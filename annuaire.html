@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Annuaire</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html" class="active">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:30px;padding-bottom:40px;">
+    <div class="search-card">
+      <h2>Recherche d'initiative</h2>
+      <div class="search-row">
+        <input id="f-q" type="text" placeholder="Nom de l'initiative, association, entreprise...">
+        <button class="btn btn-navy" id="btn-search">🔍 Rechercher</button>
+      </div>
+      <div class="filters">
+        <div>
+          <label>Nationalité 1</label>
+          <select id="f-pays"><option value="">Toutes</option></select>
+        </div>
+        <div>
+          <label>Nationalité 2</label>
+          <select id="f-nat2"><option value="">Toutes</option></select>
+        </div>
+        <div>
+          <label>Domaine de l'initiative</label>
+          <select id="f-domaine"><option value="">Tous</option></select>
+        </div>
+        <div>
+          <label>Type d'organisation</label>
+          <select id="f-type"><option value="">Tous</option></select>
+        </div>
+      </div>
+      <label class="checkbox-row"><input type="checkbox" id="f-unique"> Afficher uniquement les initiatives réservées à une nationalité unique</label>
+    </div>
+
+    <div id="ad-annuaire" data-ad-slot="1"></div>
+
+    <section class="section">
+      <p class="sub"><strong id="result-count">0</strong> initiative(s) trouvée(s)</p>
+      <div id="init-list"></div>
+    </section>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a></footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

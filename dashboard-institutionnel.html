@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Redirection</title>
+<meta http-equiv="refresh" content="0;url=dashboard-collectivite.html">
+</head>
+<body>
+<p>Redirection vers <a href="dashboard-collectivite.html">dashboard-collectivite.html</a>…</p>
+<script>window.location.replace("dashboard-collectivite.html");</script>
+</body>
+</html>
+<!-- LEGACY: ce fichier redirige vers dashboard-collectivite.html -->
+<!--
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="with-sidebar">
+    <aside class="sidebar">
+      <div class="brand" id="sidebar-brand">Compte Institutionnel</div>
+      <a class="active" href="#ciblage">🎯 Communication ciblée</a>
+      <a href="#collectifs">✉️ Messages collectifs</a>
+      <a href="#communautes">👥 Communautés</a>
+      <a href="#competences">🧠 Compétences diaspora</a>
+      <a href="#observatoire">📊 Observatoire statistique</a>
+      <a href="confidentialite.html">🔐 Confidentialité</a>
+    </aside>
+    <main class="content" id="dashboard-content">
+      <div class="notice">Chargement de votre espace institutionnel…</div>
+    </main>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(async function initDashboardInstitutionnel() {
+  const content = document.getElementById("dashboard-content");
+
+  /* Vérification session */
+  const me = await fetchCurrentUser();
+  if (!me) { window.location.href = "login.html"; return; }
+  if (me.role !== "institutionnel") {
+    content.innerHTML = `<div class="notice">⚠️ Cette page est réservée aux comptes Institutionnels. <a href="${ROLE_DASHBOARD[me.role] || 'index.html'}">Accéder à mon tableau de bord →</a></div>`;
+    return;
+  }
+
+  document.getElementById("sidebar-brand").textContent = me.nom || "Compte Institutionnel";
+
+  /* Chargement observatoire réel depuis l'API */
+  let obs = null;
+  try {
+    obs = await api("GET", "/observatoire");
+  } catch (e) { /* observatoire indisponible */ }
+
+  /* Seuil de confidentialité */
+  const SEUIL = (obs && obs.seuil_confidentialite) || 10;
+  const maskOrShow = (n) => (n === null || n < SEUIL) ? `< ${SEUIL} (masqué)` : n.toLocaleString("fr-FR");
+
+  /* Stats globales : API pour le total réel, data.js pour le reste */
+  const totalMembresReel = obs ? obs.total_membres : (OBSERVATOIRE_DIASPORA ? OBSERVATOIRE_DIASPORA.total : "—");
+  const o = OBSERVATOIRE_DIASPORA || {};
+
+  content.innerHTML = `
+    <div class="flex-between" style="margin-bottom:16px;">
+      <h1 style="margin:0;">${me.nom}</h1>
+      <span class="badge badge-instit">🏛️ Compte Institutionnel</span>
+    </div>
+    <div class="notice">Réservé aux ambassades, consulats, mairies, préfectures, régions, ministères, chambres de commerce et autres organismes publics ou parapublics souhaitant interagir avec leur diaspora.</div>
+
+    <div class="stat-row" style="margin-bottom:20px;">
+      <div class="stat-card"><div class="num">${Number(totalMembresReel).toLocaleString("fr-FR")}</div><div class="label">Membres inscrits (réel)</div></div>
+      <div class="stat-card"><div class="num">${obs && obs.par_pays ? obs.par_pays.length : "—"}</div><div class="label">Pays représentés</div></div>
+      <div class="stat-card"><div class="num">68%</div><div class="label">Taux d'engagement</div></div>
+    </div>
+
+    <!-- CIBLAGE -->
+    <div class="card" id="ciblage" style="margin-bottom:20px;">
+      <h3>Communication ciblée avec la diaspora</h3>
+      <p>Sélectionnez les destinataires concernés selon différents critères. Les publications ciblées n'apparaissent que pour les publics concernés.</p>
+      <div id="segments-ciblage" style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px;"></div>
+      <button class="btn btn-orange" style="margin-top:8px;" id="btn-definir-audience">Définir l'audience</button>
+
+      <div class="notice" style="margin-top:16px;">
+        🔐 <strong>Ciblage sans accès aux données individuelles.</strong> Les institutions sélectionnent une ou plusieurs nationalités et Diaspo'Actif transmet automatiquement le message aux utilisateurs correspondants, sans révéler leur identité. Un utilisateur binational est inclus dans chacune des communautés auxquelles il appartient.
+      </div>
+
+      <div id="apercu-ciblage-wrap" style="display:none;margin-top:16px;">
+        <p style="font-size:13px;font-weight:700;color:var(--navy);">Aperçu agrégé de l'envoi ciblé (simulation)</p>
+        <div id="apercu-ciblage" class="stat-row" style="margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <!-- COLLECTIFS -->
+    <div class="card" id="collectifs" style="margin-bottom:20px;">
+      <h3>Communication institutionnelle</h3>
+      <p>Diffusez en une seule opération vers l'ensemble des membres correspondant aux critères définis.</p>
+      <div id="types-diffusion" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;"></div>
+      <select id="inst-categorie" class="input-field" style="margin-bottom:8px;">
+        <option value="Annonce officielle">📋 Annonce officielle</option>
+        <option value="Appel à projets">🤝 Appel à projets</option>
+        <option value="Information consulaire">🏛️ Information consulaire</option>
+        <option value="Événement">📅 Événement institutionnel</option>
+      </select>
+      <textarea id="inst-contenu" placeholder="Rédiger le message à diffuser à l'audience sélectionnée…" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;"></textarea>
+      <button class="btn btn-navy btn-block" id="inst-send" style="margin-top:12px;">Envoyer à l'audience ciblée</button>
+      <div id="inst-confirm" style="display:none;color:var(--green);font-size:13px;margin-top:8px;font-weight:700;">✅ Message envoyé sur le fil d'actualité.</div>
+      <div class="notice" style="margin-top:12px;">
+        🔒 Stats envoyées après diffusion (simulation) : nb destinataires, taux d'ouverture, taux de participation — jamais les identités individuelles.
+      </div>
+    </div>
+
+    <!-- COMMUNAUTÉS -->
+    <div class="card" id="communautes" style="margin-bottom:20px;">
+      <h3>Gestion de communautés</h3>
+      <div class="grid grid-3">
+        <div class="card" style="box-shadow:none;border:1px solid var(--border);">
+          <div class="icon-badge">🗂️</div>
+          <h3 style="font-size:14px;">Groupes thématiques</h3>
+          <p>Créer des espaces par centre d'intérêt ou secteur.</p>
+          <button class="btn btn-sm btn-outline" style="margin-top:8px;">Créer un groupe</button>
+        </div>
+        <div class="card" style="box-shadow:none;border:1px solid var(--border);">
+          <div class="icon-badge">🤝</div>
+          <h3 style="font-size:14px;">Rencontres</h3>
+          <p>Organiser des rencontres physiques ou virtuelles.</p>
+          <button class="btn btn-sm btn-outline" style="margin-top:8px;">Planifier</button>
+        </div>
+        <div class="card" style="box-shadow:none;border:1px solid var(--border);">
+          <div class="icon-badge">📋</div>
+          <h3 style="font-size:14px;">Sondages</h3>
+          <p>Recueillir les attentes et besoins de la diaspora.</p>
+          <button class="btn btn-sm btn-outline" style="margin-top:8px;">Créer un sondage</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPÉTENCES -->
+    <div class="card" id="competences" style="margin-bottom:20px;">
+      <h3>Cartographie des compétences</h3>
+      <p>Identifier et mobiliser les talents de la diaspora : experts, entrepreneurs, investisseurs, étudiants, chercheurs, professionnels.</p>
+      <table class="simple-table" style="margin-top:12px;">
+        <thead><tr><th>Nom</th><th>Profil</th><th>Secteur</th><th>Pays de résidence</th><th>Origine</th></tr></thead>
+        <tbody id="competences-tbody"></tbody>
+      </table>
+      <p style="margin-top:10px;color:var(--muted);font-size:12px;">🔒 Les données affichées sont représentatives et anonymisées — aucune identité individuelle n'est communiquée aux institutions.</p>
+    </div>
+
+    <!-- OBSERVATOIRE -->
+    <div class="card" id="observatoire" style="margin-bottom:20px;">
+      <h3>📊 Observatoire statistique de la diaspora</h3>
+      <p>Statistiques agrégées et anonymisées. Toute statistique portant sur moins de <strong>${SEUIL} personnes</strong> est automatiquement masquée.</p>
+
+      <div class="stat-row" style="margin-top:16px;">
+        <div class="stat-card"><div class="num" id="obs-total">${Number(totalMembresReel).toLocaleString("fr-FR")}</div><div class="label">Membres inscrits</div></div>
+        ${o.porteurs_projets !== undefined ? `<div class="stat-card"><div class="num">${o.porteurs_projets.toLocaleString("fr-FR")}</div><div class="label">Porteurs de projets</div></div>` : ""}
+        ${o.entrepreneurs !== undefined ? `<div class="stat-card"><div class="num">${o.entrepreneurs.toLocaleString("fr-FR")}</div><div class="label">Entrepreneurs</div></div>` : ""}
+        ${o.investisseurs !== undefined ? `<div class="stat-card"><div class="num">${o.investisseurs.toLocaleString("fr-FR")}</div><div class="label">Investisseurs</div></div>` : ""}
+        ${o.etudiants !== undefined ? `<div class="stat-card"><div class="num">${o.etudiants.toLocaleString("fr-FR")}</div><div class="label">Étudiants</div></div>` : ""}
+      </div>
+
+      <div class="grid grid-2" style="margin-top:6px;">
+        <div>
+          <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Répartition par pays et ville de résidence <span style="font-weight:400;color:var(--orange);font-size:11.5px;">(données réelles)</span></p>
+          <div id="obs-pays">
+            ${obs && obs.par_pays && obs.par_pays.length
+              ? obs.par_pays.map(p => `
+                <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border);">
+                  <strong>${p.pays}</strong>
+                  <span>${p.membres !== null ? Number(p.membres).toLocaleString("fr-FR") + " membres" : `< ${SEUIL} (masqué)`}</span>
+                </div>
+                ${(p.villes || []).map(v => `
+                  <div class="flex-between" style="padding:4px 0 4px 18px;color:var(--muted);font-size:12.5px;">
+                    <span>↳ ${v.ville}</span>
+                    <span>${v.membres !== null ? v.membres : `< ${SEUIL}`}</span>
+                  </div>`).join("")}`).join("")
+              : `<div class="empty" style="padding:12px 0;">Données insuffisantes (seuil confidentialité = ${SEUIL} membres minimum par groupe).</div>`}
+          </div>
+        </div>
+        <div>
+          <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Répartition par secteur d'activité <span style="font-weight:400;color:var(--muted);font-size:11.5px;">(illustration)</span></p>
+          <div id="obs-secteur" style="margin-bottom:18px;"></div>
+          <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Répartition par tranche d'âge</p>
+          <div id="obs-age" style="margin-bottom:18px;"></div>
+          <p style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Niveau d'études</p>
+          <div id="obs-etudes"></div>
+        </div>
+      </div>
+
+      <div class="notice" style="margin-top:18px;">
+        🔒 <strong>Protection de la vie privée.</strong> Les institutions n'ont accès qu'à des statistiques globales et anonymisées. Elles ne peuvent pas obtenir les noms des membres, accéder aux nationalités déclarées individuellement, ni télécharger des listes nominatives.
+      </div>
+    </div>
+
+    <!-- PARTENAIRES -->
+    <div class="card">
+      <h3>Réseau d'institutions partenaires sur Diaspo'Actif</h3>
+      <div id="institutions-list" style="margin-top:10px;"></div>
+    </div>`;
+
+  /* --- Segments de ciblage (data.js) --- */
+  if (typeof SEGMENTS_CIBLAGE !== "undefined") {
+    const wrap = document.getElementById("segments-ciblage");
+    SEGMENTS_CIBLAGE.forEach((s, i) => {
+      const chip = document.createElement("span");
+      chip.className = "chip-select" + (i < 3 ? " selected" : "");
+      chip.textContent = (i < 3 ? "✓ " : "") + s;
+      chip.style.cursor = "pointer";
+      chip.addEventListener("click", () => {
+        chip.classList.toggle("selected");
+        chip.textContent = (chip.classList.contains("selected") ? "✓ " : "") + s;
+      });
+      wrap.appendChild(chip);
+    });
+  }
+
+  /* --- Bouton "Définir l'audience" (affiche l'aperçu agrégé) --- */
+  document.getElementById("btn-definir-audience").addEventListener("click", () => {
+    const apercuWrap = document.getElementById("apercu-ciblage-wrap");
+    apercuWrap.style.display = "block";
+    if (typeof ENVOI_CIBLE_EXEMPLE !== "undefined") {
+      const e = ENVOI_CIBLE_EXEMPLE;
+      document.getElementById("apercu-ciblage").innerHTML = `
+        <div class="stat-card"><div class="num">${e.destinataires}</div><div class="label">Destinataires correspondant aux critères</div></div>
+        <div class="stat-card"><div class="num">${e.taux_ouverture}%</div><div class="label">Taux d'ouverture estimé</div></div>
+        <div class="stat-card"><div class="num">${e.taux_participation}%</div><div class="label">Taux de participation estimé</div></div>
+        <div class="stat-card"><div class="num">${e.reponses}</div><div class="label">Réponses obtenues (sim.)</div></div>`;
+    } else {
+      /* Simulation simple si ENVOI_CIBLE_EXEMPLE n'est pas dans data.js */
+      const selected = document.querySelectorAll("#segments-ciblage .chip-select.selected").length;
+      document.getElementById("apercu-ciblage").innerHTML = `
+        <div class="stat-card"><div class="num">~${(selected * 180).toLocaleString("fr-FR")}</div><div class="label">Destinataires estimés</div></div>
+        <div class="stat-card"><div class="num">64%</div><div class="label">Taux d'ouverture estimé</div></div>
+        <div class="stat-card"><div class="num">22%</div><div class="label">Taux de participation estimé</div></div>`;
+    }
+  });
+
+  /* --- Types de diffusion (data.js) --- */
+  if (typeof TYPES_DIFFUSION_INSTITUTION !== "undefined") {
+    document.getElementById("types-diffusion").innerHTML = TYPES_DIFFUSION_INSTITUTION.map(t =>
+      `<button class="btn btn-sm btn-outline">${t}</button>`
+    ).join("");
+  }
+
+  /* --- Envoyer message institutionnel → POST /api/fil --- */
+  document.getElementById("inst-send").addEventListener("click", async () => {
+    const contenu = document.getElementById("inst-contenu").value.trim();
+    const categorie = document.getElementById("inst-categorie").value;
+    if (!contenu) return;
+    const btn = document.getElementById("inst-send");
+    btn.disabled = true;
+    try {
+      await api("POST", "/fil", { contenu, categorie });
+      document.getElementById("inst-contenu").value = "";
+      document.getElementById("inst-confirm").style.display = "block";
+      setTimeout(() => { document.getElementById("inst-confirm").style.display = "none"; }, 4000);
+    } catch (e) {
+      alert("Erreur : " + (e.message || "Impossible d'envoyer."));
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  /* --- Compétences (data.js) --- */
+  if (typeof COMPETENCES !== "undefined") {
+    document.getElementById("competences-tbody").innerHTML = COMPETENCES.map(c =>
+      `<tr><td><strong>${c.nom}</strong></td><td>${c.profil}</td><td>${c.secteur}</td><td>${c.pays_residence}</td><td>${c.origine}</td></tr>`
+    ).join("");
+  }
+
+  /* --- Observatoire : barres secteur/âge/études depuis data.js --- */
+  function renderBars(containerId, items, labelKey) {
+    const c = document.getElementById(containerId);
+    if (!c || !items || !items.length) return;
+    const max = Math.max(...items.map(i => i.membres));
+    c.innerHTML = items.map(i => `
+      <div style="margin-bottom:8px;">
+        <div class="flex-between" style="font-size:12.5px;margin-bottom:3px;"><span>${i[labelKey]}</span><span>${i.membres.toLocaleString("fr-FR")}</span></div>
+        <div style="background:var(--bg);border-radius:20px;height:8px;overflow:hidden;">
+          <div style="background:var(--orange);height:100%;width:${Math.round((i.membres / max) * 100)}%;"></div>
+        </div>
+      </div>`).join("");
+  }
+  if (o.par_secteur) renderBars("obs-secteur", o.par_secteur, "secteur");
+  if (o.par_age) renderBars("obs-age", o.par_age, "tranche");
+  if (o.par_niveau_etudes) renderBars("obs-etudes", o.par_niveau_etudes, "niveau");
+
+  /* --- Institutions partenaires (data.js) --- */
+  if (typeof INSTITUTIONS !== "undefined") {
+    document.getElementById("institutions-list").innerHTML = INSTITUTIONS.map(i =>
+      `<div class="init-card" style="margin-bottom:10px;">
+        <div class="init-logo" style="background:#E0ECFF;color:#1A4FBF;">🏛️</div>
+        <div class="meta"><h4>${i.nom}</h4><p>${i.type} · ${i.pays}</p></div>
+        <span class="tag">${i.abonnes.toLocaleString("fr-FR")} abonnés</span>
+      </div>`
+    ).join("");
+  }
+})();
+</script>
+</body>
+</html>

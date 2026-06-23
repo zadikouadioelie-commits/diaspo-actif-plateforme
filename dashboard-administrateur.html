@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Dashboard Administrateur</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav"><a href="index.html">Accueil</a><a href="annuaire.html">Annuaire</a><a href="fil-actualite.html">Fil</a></nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="with-sidebar">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">Administration</div>
+      <a href="#vue-ensemble" class="active" data-section="vue-ensemble">📊 Vue d'ensemble</a>
+      <a href="#membres" data-section="membres">👥 Membres</a>
+      <a href="#initiatives" data-section="initiatives">🌍 Initiatives</a>
+      <a href="#formations" data-section="formations">📚 Formations</a>
+      <a href="#publications" data-section="publications">📢 Publications</a>
+      <a href="#moderation" data-section="moderation">🛡 Modération</a>
+      <a href="#communication" data-section="communication">✉ Communication</a>
+    </aside>
+
+    <main class="content">
+      <div id="dashboard-error" style="display:none;" class="notice" style="color:#D33;"></div>
+
+      <!-- VUE D'ENSEMBLE -->
+      <section id="section-vue-ensemble">
+        <div class="flex-between" style="margin-bottom:20px;">
+          <div>
+            <h1 style="margin:0;">Tableau de bord Administrateur</h1>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13.5px;">Diaspo'Actif — gestion de la plateforme</p>
+          </div>
+          <span class="badge badge-asso">Administrateur</span>
+        </div>
+
+        <div class="grid grid-3" style="gap:12px;margin-bottom:20px;">
+          <div class="card stat-card">
+            <div class="stat-number" id="stat-membres">—</div>
+            <div class="stat-label">Membres inscrits</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-number" id="stat-initiatives">—</div>
+            <div class="stat-label">Initiatives</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-number" id="stat-publications">—</div>
+            <div class="stat-label">Publications</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-number" id="stat-formations">—</div>
+            <div class="stat-label">Formations</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-number" id="stat-abonnements">—</div>
+            <div class="stat-label">Abonnements actifs</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-number" id="stat-signalements">—</div>
+            <div class="stat-label">Signalements</div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="gap:16px;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;">Dernières inscriptions</h3>
+            <div id="derniers-inscrits"><div class="notice">Chargement…</div></div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 14px;">Publications récentes</h3>
+            <div id="publis-recentes"><div class="notice">Chargement…</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MEMBRES -->
+      <section id="section-membres" style="display:none;">
+        <h2>Gestion des membres</h2>
+        <div class="notice">Cette section affiche les membres inscrits sur la plateforme. Les données personnelles sont affichées en lecture seule pour l'administrateur. Seul l'utilisateur peut modifier son profil.</div>
+        <div id="membres-list" style="margin-top:16px;"><div class="notice">Chargement…</div></div>
+      </section>
+
+      <!-- INITIATIVES -->
+      <section id="section-initiatives" style="display:none;">
+        <h2>Gestion des initiatives</h2>
+        <div id="initiatives-admin-list" style="margin-top:16px;"><div class="notice">Chargement…</div></div>
+      </section>
+
+      <!-- FORMATIONS -->
+      <section id="section-formations" style="display:none;">
+        <h2>Formations publiées</h2>
+        <div id="formations-admin-list" style="margin-top:16px;"><div class="notice">Chargement…</div></div>
+      </section>
+
+      <!-- PUBLICATIONS -->
+      <section id="section-publications" style="display:none;">
+        <h2>Publication officielle</h2>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <h3 style="margin:0;">Nouvelle publication</h3>
+            <span class="badge badge-asso">Fil d'actualité global</span>
+          </div>
+          <div style="margin-bottom:10px;">
+            <select id="pub-categorie" class="input-field" style="width:200px;">
+              <option value="annonce">Annonce</option>
+              <option value="evenement">Événement</option>
+              <option value="article">Article</option>
+              <option value="alerte">Alerte</option>
+            </select>
+          </div>
+          <textarea id="pub-contenu" style="width:100%;min-height:100px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;" placeholder="Rédigez une annonce officielle visible par tous les membres de la plateforme…"></textarea>
+          <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-orange" id="btn-publier-admin">Publier sur le fil</button>
+          </div>
+        </div>
+        <div id="publications-list"><div class="notice">Chargement des publications…</div></div>
+      </section>
+
+      <!-- MODÉRATION -->
+      <section id="section-moderation" style="display:none;">
+        <h2>Modération</h2>
+        <div class="notice" style="margin-bottom:16px;">🛡 Aucune action de modération n'est irréversible depuis cette interface. Les suppressions définitives requièrent une confirmation par email. (Simulation)</div>
+        <div class="card">
+          <h3>Signalements en attente</h3>
+          <div style="margin-top:12px;">
+            <div style="display:flex;gap:12px;align-items:center;padding:10px;border-bottom:1px solid var(--border);">
+              <span class="badge badge-ent">Signalement</span>
+              <span style="flex:1;font-size:13.5px;">Publication de «A.I.T.O» signalée pour contenu inapproprié par 2 membres.</span>
+              <button class="btn btn-sm btn-outline">Examiner</button>
+              <button class="btn btn-sm btn-outline" style="color:#D33;">Supprimer</button>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;padding:10px;border-bottom:1px solid var(--border);">
+              <span class="badge badge-ent">Signalement</span>
+              <span style="flex:1;font-size:13.5px;">Compte «diaspora2025@example.com» signalé pour spam par 3 membres.</span>
+              <button class="btn btn-sm btn-outline">Examiner</button>
+              <button class="btn btn-sm btn-outline" style="color:#D33;">Suspendre</button>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;padding:10px;">
+              <span class="badge badge-asso">Résolu</span>
+              <span style="flex:1;font-size:13.5px;color:var(--muted);">Publication de «Tech For Senegal» : signalement rejeté le 20/06/2026.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMMUNICATION -->
+      <section id="section-communication" style="display:none;">
+        <h2>Communication institutionnelle</h2>
+        <div class="notice" style="margin-bottom:16px;">✉ Les communications sont envoyées à des segments de membres. Vous voyez uniquement des statistiques agrégées (nb destinataires) — jamais les identités individuelles.</div>
+        <div class="card">
+          <h3>Nouvelle campagne</h3>
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">
+            <div>
+              <label style="font-size:13px;font-weight:700;">Objet</label>
+              <input class="input-field" style="width:100%;margin-top:4px;" placeholder="Objet de la communication">
+            </div>
+            <div>
+              <label style="font-size:13px;font-weight:700;">Segment cible</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;" id="ciblage-chips">
+                <span class="chip chip-active" data-seg="tous">Tous les membres</span>
+                <span class="chip" data-seg="utilisateur">Utilisateurs</span>
+                <span class="chip" data-seg="initiative">Initiatives</span>
+                <span class="chip" data-seg="collectivite">Collectivités</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:13px;font-weight:700;">Message</label>
+              <textarea style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;margin-top:4px;" placeholder="Contenu de la communication…"></textarea>
+            </div>
+            <div class="notice" style="margin-bottom:0;">
+              <strong>Aperçu :</strong> cette communication sera envoyée à <span id="nb-destinataires">tous les membres inscrits</span>. Statistiques de retour disponibles sous 48h après envoi.
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+              <button class="btn btn-outline">Aperçu</button>
+              <button class="btn btn-orange">Envoyer (simulation)</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(async () => {
+  // Auth guard
+  const me = await fetchCurrentUser();
+  if (!me) { window.location.href = "connexion.html"; return; }
+  if (me.role !== "administrateur") { window.location.href = ROLE_DASHBOARD[me.role] || "index.html"; return; }
+
+  // Navigation sections
+  const links = document.querySelectorAll(".sidebar a[data-section]");
+  links.forEach(a => a.addEventListener("click", e => {
+    e.preventDefault();
+    links.forEach(l => l.classList.remove("active"));
+    a.classList.add("active");
+    document.querySelectorAll("section[id^='section-']").forEach(s => s.style.display = "none");
+    const target = document.getElementById("section-" + a.dataset.section);
+    if (target) target.style.display = "";
+  }));
+
+  // Charger données
+  let data = {};
+  try {
+    data = await api("GET", "/dashboard/administrateur");
+  } catch(e) {
+    document.getElementById("dashboard-error").textContent = "Erreur de chargement : " + e.message;
+    document.getElementById("dashboard-error").style.display = "block";
+    return;
+  }
+
+  // Stats
+  document.getElementById("stat-membres").textContent = data.total_utilisateurs ?? "—";
+  document.getElementById("stat-initiatives").textContent = data.total_initiatives ?? "—";
+  document.getElementById("stat-publications").textContent = data.total_publications ?? "—";
+  document.getElementById("stat-formations").textContent = data.total_formations ?? "—";
+  document.getElementById("stat-abonnements").textContent = data.total_abonnements ?? "—";
+  document.getElementById("stat-signalements").textContent = data.signalements ?? "0";
+
+  // Derniers inscrits
+  const inscList = document.getElementById("derniers-inscrits");
+  if (data.derniers_inscrits?.length) {
+    inscList.innerHTML = data.derniers_inscrits.map(u => `
+      <div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div class="avatar avatar-sm" style="width:32px;height:32px;font-size:13px;flex-shrink:0;">${u.nom?.[0]||"?"}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.nom}</div>
+          <div style="font-size:12px;color:var(--muted);">${ROLE_LABEL_FR[u.role]||u.role} ${u.pays ? "· " + u.pays : ""}</div>
+        </div>
+        <span class="badge ${u.role==='initiative'?'badge-asso':u.role==='administrateur'?'badge-ent':'badge-inst'}">${ROLE_LABEL_FR[u.role]||u.role}</span>
+      </div>
+    `).join("");
+  } else {
+    inscList.innerHTML = `<div class="empty">Aucun inscrit récent.</div>`;
+  }
+
+  // Publications récentes
+  const pubList = document.getElementById("publis-recentes");
+  if (data.publications_recentes?.length) {
+    pubList.innerHTML = data.publications_recentes.slice(0,5).map(p => `
+      <div style="padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:3px;">
+          <span class="feed-cat">${p.categorie||"post"}</span>
+          <span style="font-size:12px;color:var(--muted);">${p.auteur_nom||"Anonyme"}</span>
+        </div>
+        <p style="margin:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.contenu}</p>
+      </div>
+    `).join("");
+  } else {
+    pubList.innerHTML = `<div class="empty">Aucune publication récente.</div>`;
+  }
+
+  // Publications admin section
+  const publisSection = document.getElementById("publications-list");
+  if (data.publications_recentes?.length) {
+    publisSection.innerHTML = data.publications_recentes.map(p => `
+      <div class="card" style="margin-bottom:10px;padding:12px 16px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="feed-cat">${p.categorie||"post"}</span>
+          <span style="font-size:12.5px;color:var(--muted);">${p.auteur_nom||"Anonyme"} · ${p.created_at?.slice(0,10)||""}</span>
+          <button class="btn btn-sm btn-outline" style="margin-left:auto;color:#D33;">Supprimer</button>
+        </div>
+        <p style="margin:8px 0 0;font-size:13.5px;">${p.contenu}</p>
+      </div>
+    `).join("");
+  }
+
+  // Publier
+  document.getElementById("btn-publier-admin").addEventListener("click", async () => {
+    const contenu = document.getElementById("pub-contenu").value.trim();
+    const categorie = document.getElementById("pub-categorie").value;
+    if (!contenu) return;
+    try {
+      await api("POST", "/fil", { type: "officiel", categorie, contenu });
+      document.getElementById("pub-contenu").value = "";
+      alert("Publication envoyée sur le fil global.");
+    } catch(e) { alert("Erreur : " + e.message); }
+  });
+
+  // Ciblage chips
+  document.querySelectorAll("#ciblage-chips .chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll("#ciblage-chips .chip").forEach(c => c.classList.remove("chip-active"));
+      chip.classList.add("chip-active");
+      const seg = chip.dataset.seg;
+      const label = seg === "tous" ? "tous les membres inscrits" :
+                    seg === "utilisateur" ? `les membres de type Utilisateur (${data.total_utilisateurs} personnes)` :
+                    seg === "initiative" ? `les initiatives (${data.total_initiatives} organisations)` :
+                    `les collectivités (${data.total_collectivites} entités)`;
+      document.getElementById("nb-destinataires").textContent = label;
+    });
+  });
+
+})();
+</script>
+</body>
+</html>

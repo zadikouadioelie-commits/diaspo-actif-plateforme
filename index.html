@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Accueil</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html" class="active">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <h1>Une plateforme. Toutes les diasporas. Un impact global.</h1>
+      <p>Connecter les initiatives des diasporas du monde entier pour créer des opportunités, partager des expériences et développer des collaborations durables.</p>
+      <div class="network" id="world-network">
+        <div class="tooltip-card callout-onboard"><strong>Onboarding immédiat :</strong> inscription en 1 clic via SSO Google.</div>
+        <div class="tooltip-card callout-immersive"><strong>Interface immersive :</strong> carte mondiale interactive affichant les initiatives en temps réel.</div>
+      </div>
+    </div>
+  </section>
+
+  <main class="container">
+    <section class="section">
+      <h2>L'accessibilité comme moteur de découverte</h2>
+      <p class="sub">Quatre profils, un seul écosystème mondial.</p>
+      <div class="grid grid-4">
+        <div class="card">
+          <div class="icon-badge">🧭</div>
+          <h3>Compte Utilisateur — Gratuit</h3>
+          <p>Profil personnel, publication, réactions, recherche d'initiatives, messagerie interne. Aucun engagement financier.</p>
+          <a class="btn btn-orange btn-block" style="margin-top:14px;" href="dashboard-utilisateur.html">Créer un Compte Utilisateur</a>
+        </div>
+        <div class="card">
+          <div class="icon-badge">🚀</div>
+          <h3>Compte Initiative — 50 €/an</h3>
+          <p>Espace vitrine complet, publication d'articles, photos et vidéos (&lt; 3 min), gestion des abonnés.</p>
+          <a class="btn btn-outline btn-block" style="margin-top:14px;" href="dashboard-initiative.html">Découvrir l'espace Initiative</a>
+        </div>
+        <div class="card">
+          <div class="icon-badge">🏛️</div>
+          <h3>Compte Officiel — Diaspo'Actif</h3>
+          <p>Appels à projets, modération de la plateforme, communication institutionnelle ciblée.</p>
+          <a class="btn btn-outline btn-block" style="margin-top:14px;" href="dashboard-officiel.html">Voir le centre de commandement</a>
+        </div>
+        <div class="card">
+          <div class="icon-badge">🏢</div>
+          <h3>Compte Institutionnel</h3>
+          <p>Ambassades, consulats, mairies, ministères : ciblez et mobilisez votre diaspora à l'étranger.</p>
+          <a class="btn btn-outline btn-block" style="margin-top:14px;" href="dashboard-institutionnel.html">Découvrir le Compte Institutionnel</a>
+        </div>
+      </div>
+    </section>
+
+    <div id="ad-home" data-ad-slot="0"></div>
+
+    <section class="section">
+      <h2>Financements participatifs en cours</h2>
+      <p class="sub">Soutenez les campagnes portées par les initiatives de la diaspora.</p>
+      <div class="grid grid-2" id="campagnes-list"></div>
+    </section>
+
+    <section class="section">
+      <h2>Projets Diaspo'Actif en cours</h2>
+      <p class="sub">Projets économiques, associatifs, programmes de formation, missions institutionnelles et actions solidaires portés ou accompagnés par Diaspo'Actif.</p>
+      <div class="grid grid-2" id="projets-list"></div>
+    </section>
+
+    <section class="section">
+      <div class="card" style="text-align:center;padding:34px;">
+        <h2 style="margin-bottom:18px;">Le premier réseau mondial de l'engagement</h2>
+        <div class="grid grid-2" style="text-align:left;max-width:640px;margin:0 auto 22px;">
+          <p>✅ Favoriser les collaborations</p>
+          <p>✅ Faciliter les partenariats</p>
+          <p>✅ Valoriser les projets</p>
+          <p>✅ Renforcer les liens Sud-Nord</p>
+          <p>✅ Encourager l'investissement</p>
+          <p>✅ Construire un réseau mondial</p>
+        </div>
+        <a class="btn btn-orange" href="dashboard-utilisateur.html">Créer un Compte Utilisateur →</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a></footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>renderNetwork("world-network", INITIATIVES);</script>
+</body>
+</html>

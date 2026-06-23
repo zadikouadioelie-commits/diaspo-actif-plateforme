@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Redirection</title>
+<meta http-equiv="refresh" content="0;url=dashboard-administrateur.html">
+</head>
+<body>
+<p>Redirection vers <a href="dashboard-administrateur.html">dashboard-administrateur.html</a>…</p>
+<script>window.location.replace("dashboard-administrateur.html");</script>
+</body>
+</html>
+<!-- LEGACY: ce fichier redirige vers dashboard-administrateur.html -->
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="with-sidebar">
+    <aside class="sidebar">
+      <div class="brand">Compte Officiel</div>
+      <a class="active" href="#diffuser">📣 Diffuser</a>
+      <a href="#publications">📋 Publications récentes</a>
+      <a href="#moderation">🛡️ Modération</a>
+      <a href="#stats">📊 Statistiques</a>
+      <a href="confidentialite.html">🔐 Confidentialité</a>
+    </aside>
+    <main class="content" id="dashboard-content">
+      <div class="notice">Chargement du centre de commandement…</div>
+    </main>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(async function initDashboardOfficiel() {
+  const content = document.getElementById("dashboard-content");
+
+  /* Vérification session */
+  const me = await fetchCurrentUser();
+  if (!me) { window.location.href = "login.html"; return; }
+  if (me.role !== "officiel") {
+    content.innerHTML = `<div class="notice">⚠️ Cette page est réservée aux comptes Officiels. <a href="${ROLE_DASHBOARD[me.role] || 'index.html'}">Accéder à mon tableau de bord →</a></div>`;
+    return;
+  }
+
+  /* Chargement des statistiques réelles */
+  let stats;
+  try {
+    stats = await api("GET", "/dashboard/officiel");
+  } catch (e) {
+    content.innerHTML = `<div class="notice">Impossible de charger les données. Vérifiez que le serveur tourne.</div>`;
+    return;
+  }
+
+  const { total_utilisateurs, total_initiatives, total_publications, signalements, publications_recentes } = stats;
+
+  content.innerHTML = `
+    <div class="flex-between" style="margin-bottom:16px;">
+      <h1 style="margin:0;">Centre de commandement</h1>
+      <span class="badge badge-ong">Abonnement automatique : 100% des utilisateurs</span>
+    </div>
+    <div class="notice">Tous les utilisateurs (Compte Utilisateur et Initiatives) sont automatiquement abonnés au compte Officiel pour garantir une circulation fluide de l'information.</div>
+
+    <div class="stat-row" id="stats" style="margin-bottom:20px;">
+      <div class="stat-card"><div class="num">${total_utilisateurs.toLocaleString("fr-FR")}</div><div class="label">Membres &amp; initiatives</div></div>
+      <div class="stat-card"><div class="num">${signalements}</div><div class="label">Contenus signalés</div></div>
+      <div class="stat-card"><div class="num">${total_initiatives}</div><div class="label">Initiatives référencées</div></div>
+      <div class="stat-card"><div class="num">${total_publications}</div><div class="label">Publications sur le fil</div></div>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:20px;">
+      <div class="card" id="diffuser">
+        <h3>Nouvel appel à projets</h3>
+        <p style="font-size:13px;color:var(--muted);">Diffusion ciblée selon le segment d'audience. Publié également dans le <a href="fil-actualite.html" style="color:var(--orange);font-weight:700;">Fil d'actualité global</a>.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
+          <button class="btn btn-sm btn-outline seg-btn" data-cat="Visiteurs">Visiteurs uniquement</button>
+          <button class="btn btn-sm btn-outline seg-btn" data-cat="Initiatives">Initiatives uniquement</button>
+          <button class="btn btn-sm btn-navy seg-btn active-seg" data-cat="Appel à projets">● Tous les utilisateurs</button>
+        </div>
+        <select id="off-categorie" class="input-field" style="margin-bottom:8px;">
+          <option value="Appel à projets">📢 Appel à projets</option>
+          <option value="Annonce officielle">📋 Annonce officielle</option>
+          <option value="Information">ℹ️ Information plateforme</option>
+          <option value="Alerte">⚠️ Alerte modération</option>
+        </select>
+        <textarea id="off-contenu" placeholder="Rédiger l'appel à projets ou l'annonce officielle…" style="width:100%;min-height:90px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;"></textarea>
+        <button class="btn btn-orange btn-block" id="off-publish" style="margin-top:12px;">Publier</button>
+        <div id="off-confirm" style="display:none;color:var(--green);font-size:13px;margin-top:8px;font-weight:700;">✅ Publication envoyée sur le fil d'actualité.</div>
+      </div>
+
+      <div class="card" id="moderation">
+        <h3>Contenus signalés</h3>
+        <div class="init-card" style="margin-top:12px;">
+          <div class="init-logo" style="background:#FFE2E2;color:#D33;">⚠️</div>
+          <div class="meta"><h4>Publication — Coopérative Cacao Solidaire</h4><p>Signalée pour vérification des informations financières</p></div>
+          <button class="btn btn-sm btn-outline mod-btn" data-action="examiné">Examiner</button>
+        </div>
+        <div class="init-card" style="margin-top:10px;">
+          <div class="init-logo" style="background:#FFE2E2;color:#D33;">⚠️</div>
+          <div class="meta"><h4>Message — Utilisateur anonyme</h4><p>Signalé pour contact hors plateforme</p></div>
+          <button class="btn btn-sm btn-outline mod-btn" data-action="examiné">Examiner</button>
+        </div>
+        <div class="init-card" style="margin-top:10px;">
+          <div class="init-logo" style="background:#FFF3E0;color:#E65100;">⚠️</div>
+          <div class="meta"><h4>Profil — Compte non vérifié</h4><p>Informations de localisation incohérentes</p></div>
+          <button class="btn btn-sm btn-outline mod-btn" data-action="examiné">Examiner</button>
+        </div>
+        <p style="margin-top:14px;color:var(--muted);font-size:12.5px;">🛡️ La modération garantit un environnement professionnel sain et la conservation des preuves en cas de litige.</p>
+      </div>
+    </div>
+
+    <div class="card" id="publications" style="margin-bottom:20px;">
+      <h3>Publications récentes sur la plateforme</h3>
+      <div id="recent-posts-list" style="margin-top:12px;">
+        ${publications_recentes.length ? publications_recentes.map(p => `
+          <div class="flex-between" style="padding:10px 0;border-bottom:1px solid var(--border);">
+            <div style="flex:1;">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+                <span class="feed-cat">${p.categorie || p.type || ""}</span>
+                <strong style="font-size:13px;">${p.auteur_nom || "Anonyme"}</strong>
+              </div>
+              <p style="margin:0;font-size:13px;color:var(--muted);">${(p.contenu || "").slice(0, 120)}${p.contenu && p.contenu.length > 120 ? "…" : ""}</p>
+            </div>
+            <span style="color:var(--muted);font-size:11.5px;white-space:nowrap;margin-left:14px;">${new Date(p.created_at.replace(" ","T")+"Z").toLocaleDateString("fr-FR")}</span>
+          </div>`).join("") : `<div class="empty">Aucune publication pour le moment.</div>`}
+      </div>
+      <a href="fil-actualite.html" class="btn btn-sm btn-outline" style="margin-top:14px;">Voir le fil complet →</a>
+    </div>
+
+    <div class="card" id="stats">
+      <h3>Abonnés &amp; membres</h3>
+      <div class="grid grid-2" style="margin-top:12px;">
+        <div class="card" style="box-shadow:none;border:1px solid var(--border);text-align:center;">
+          <div class="num">${total_utilisateurs.toLocaleString("fr-FR")}</div>
+          <p style="color:var(--muted);font-size:13px;margin-top:4px;">Membres abonnés automatiquement (utilisateurs + initiatives)</p>
+        </div>
+        <div class="card" style="box-shadow:none;border:1px solid var(--border);text-align:center;">
+          <div class="num">${total_publications}</div>
+          <p style="color:var(--muted);font-size:13px;margin-top:4px;">Publications sur le fil d'actualité</p>
+        </div>
+      </div>
+      <div class="notice" style="margin-top:16px;">
+        📊 Les statistiques détaillées (taux d'ouverture, taux de participation, répartition géographique) sont disponibles dans le tableau de bord institutionnel.
+      </div>
+    </div>`;
+
+  /* Bouton publier */
+  document.getElementById("off-publish").addEventListener("click", async () => {
+    const contenu = document.getElementById("off-contenu").value.trim();
+    const categorie = document.getElementById("off-categorie").value;
+    if (!contenu) return;
+    const btn = document.getElementById("off-publish");
+    btn.disabled = true;
+    try {
+      await api("POST", "/fil", { contenu, categorie });
+      document.getElementById("off-contenu").value = "";
+      document.getElementById("off-confirm").style.display = "block";
+      setTimeout(() => { document.getElementById("off-confirm").style.display = "none"; }, 4000);
+      /* Recharger les publications récentes */
+      const r2 = await api("GET", "/dashboard/officiel");
+      document.getElementById("recent-posts-list").innerHTML = r2.publications_recentes.map(p => `
+        <div class="flex-between" style="padding:10px 0;border-bottom:1px solid var(--border);">
+          <div style="flex:1;">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+              <span class="feed-cat">${p.categorie || p.type || ""}</span>
+              <strong style="font-size:13px;">${p.auteur_nom || "Anonyme"}</strong>
+            </div>
+            <p style="margin:0;font-size:13px;color:var(--muted);">${(p.contenu || "").slice(0, 120)}${p.contenu && p.contenu.length > 120 ? "…" : ""}</p>
+          </div>
+          <span style="color:var(--muted);font-size:11.5px;white-space:nowrap;margin-left:14px;">${new Date(p.created_at.replace(" ","T")+"Z").toLocaleDateString("fr-FR")}</span>
+        </div>`).join("");
+    } catch (e) {
+      alert("Erreur lors de la publication : " + (e.message || "Serveur indisponible."));
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  /* Boutons modération (simulation) */
+  document.querySelectorAll(".mod-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      btn.textContent = "✓ Traité";
+      btn.disabled = true;
+      btn.closest(".init-card").style.opacity = "0.5";
+    });
+  });
+})();
+</script>
+</body>
+</html>

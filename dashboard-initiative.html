@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Espace Initiative</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="with-sidebar">
+    <aside class="sidebar">
+      <div class="brand" id="sidebar-brand">Mon espace initiative</div>
+      <a class="active" href="#presentation">📋 Présentation</a>
+      <a href="#publications">📰 Publications</a>
+      <a href="#evenements">📅 Événements</a>
+      <a href="#paiement">💳 Module paiement</a>
+      <a href="messagerie.html">💬 Messages <span class="pill" id="msg-count">—</span></a>
+      <a href="confidentialite.html">🔐 Confidentialité</a>
+    </aside>
+    <main class="content" id="dashboard-content">
+      <div class="notice">Chargement de votre espace initiative…</div>
+    </main>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(async function initDashboardInitiative() {
+  const content = document.getElementById("dashboard-content");
+
+  /* Vérification session */
+  const me = await fetchCurrentUser();
+  if (!me) {
+    window.location.href = "login.html";
+    return;
+  }
+  if (me.role !== "initiative") {
+    content.innerHTML = `<div class="notice">⚠️ Cette page est réservée aux comptes Initiative. <a href="${ROLE_DASHBOARD[me.role] || 'index.html'}">Accéder à mon tableau de bord →</a></div>`;
+    return;
+  }
+
+  /* Chargement des données du dashboard */
+  let data;
+  try {
+    data = await api("GET", "/dashboard/initiative");
+  } catch (e) {
+    content.innerHTML = `<div class="notice">Impossible de charger les données. Vérifiez que le serveur tourne.</div>`;
+    return;
+  }
+
+  const { initiative: init, messages_non_lus, publications_recentes } = data;
+
+  /* Compteur messages */
+  const msgPill = document.getElementById("msg-count");
+  if (msgPill) msgPill.textContent = messages_non_lus || 0;
+
+  /* Pas encore d'initiative liée → formulaire de création */
+  if (!init) {
+    document.getElementById("sidebar-brand").textContent = "Nouvelle initiative";
+    content.innerHTML = `
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h1 style="margin:0;">Créer votre fiche initiative</h1>
+        <span class="badge badge-asso">Compte Initiative</span>
+      </div>
+      <div class="notice">Votre compte est prêt. Complétez votre fiche pour apparaître dans l'annuaire et accéder à toutes les fonctionnalités.</div>
+      <div class="card" style="margin-top:20px;">
+        <h3>Informations de base</h3>
+        <div class="grid grid-2" style="margin-top:14px;gap:14px;">
+          <div><label style="font-size:13px;font-weight:700;">Nom de l'initiative *</label><input id="cr-nom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Association des…"></div>
+          <div><label style="font-size:13px;font-weight:700;">Sigle</label><input id="cr-sigle" class="input-field" style="width:100%;margin-top:4px;" placeholder="A.I.T.O"></div>
+          <div><label style="font-size:13px;font-weight:700;">Pays d'origine *</label><input id="cr-pays" class="input-field" style="width:100%;margin-top:4px;" placeholder="Côte d'Ivoire"></div>
+          <div><label style="font-size:13px;font-weight:700;">Région de résidence</label><input id="cr-region" class="input-field" style="width:100%;margin-top:4px;" placeholder="Occitanie"></div>
+          <div><label style="font-size:13px;font-weight:700;">Ville</label><input id="cr-ville" class="input-field" style="width:100%;margin-top:4px;" placeholder="Toulouse"></div>
+          <div><label style="font-size:13px;font-weight:700;">Domaine d'activité</label>
+            <select id="cr-domaine" class="input-field" style="width:100%;margin-top:4px;">
+              <option value="">— Choisir —</option>
+              ${["Action Sociale","Agriculture","Santé","Éducation","Technologie","Culture","Économie","Environnement"].map(d=>`<option>${d}</option>`).join("")}
+            </select>
+          </div>
+          <div><label style="font-size:13px;font-weight:700;">Type d'organisation</label>
+            <select id="cr-type" class="input-field" style="width:100%;margin-top:4px;">
+              <option value="">— Choisir —</option>
+              ${["Association","ONG","Entreprise","Fondation","Coopérative"].map(t=>`<option>${t}</option>`).join("")}
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:20px;">
+            <input type="checkbox" id="cr-nat-unique"> <label for="cr-nat-unique" style="font-size:13px;">Réservée à une nationalité unique</label>
+          </div>
+        </div>
+        <div style="margin-top:14px;"><label style="font-size:13px;font-weight:700;">Description</label>
+          <textarea id="cr-desc" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Présentez votre initiative, ses objectifs et ses activités…"></textarea>
+        </div>
+        <div id="cr-error" style="color:#D33;font-size:13px;margin-top:8px;display:none;"></div>
+        <button class="btn btn-orange btn-block" style="margin-top:16px;" id="cr-submit">Créer ma fiche initiative</button>
+      </div>`;
+
+    document.getElementById("cr-submit").addEventListener("click", async () => {
+      const nom = document.getElementById("cr-nom").value.trim();
+      const pays = document.getElementById("cr-pays").value.trim();
+      const errEl = document.getElementById("cr-error");
+      if (!nom || !pays) { errEl.textContent = "Le nom et le pays sont obligatoires."; errEl.style.display = "block"; return; }
+      errEl.style.display = "none";
+      try {
+        await api("POST", "/initiatives", {
+          nom, pays,
+          sigle: document.getElementById("cr-sigle").value.trim(),
+          region: document.getElementById("cr-region").value.trim(),
+          ville: document.getElementById("cr-ville").value.trim(),
+          domaine: document.getElementById("cr-domaine").value,
+          type: document.getElementById("cr-type").value,
+          description: document.getElementById("cr-desc").value.trim(),
+          nationalite_unique: document.getElementById("cr-nat-unique").checked
+        });
+        window.location.reload();
+      } catch (e) {
+        errEl.textContent = e.message || "Erreur lors de la création.";
+        errEl.style.display = "block";
+      }
+    });
+    return;
+  }
+
+  /* Mise à jour du nom dans la sidebar */
+  document.getElementById("sidebar-brand").textContent = init.sigle || init.nom;
+
+  /* Abonnement — état initial depuis l'API */
+  let abonneActif = !!init.abonnement_actif;
+  function subBadgeHTML() {
+    return abonneActif
+      ? `<span class="badge badge-asso" id="sub-badge">⭐ Abonné — ${TARIF_INITIATIVE_ANNUEL || 50} €/an</span>`
+      : `<span class="badge" style="background:#FFE2E2;color:#B00;" id="sub-badge">Non abonné</span>`;
+  }
+  function subNoticeHTML() {
+    return abonneActif
+      ? `Votre abonnement annuel de <strong>${TARIF_INITIATIVE_ANNUEL || 50}&nbsp;€/an</strong> soutient le fonctionnement et l'indépendance de la plateforme Diaspo'Actif.`
+      : `Abonnez-vous pour <strong>${TARIF_INITIATIVE_ANNUEL || 50}&nbsp;€/an</strong> afin de débloquer la publication, la gestion des abonnés et les statistiques.`;
+  }
+
+  /* Rendu principal */
+  content.innerHTML = `
+    <div id="presentation">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h1 style="margin:0;">${init.nom}</h1>
+        ${subBadgeHTML()}
+      </div>
+      <div class="notice" id="sub-notice">${subNoticeHTML()}</div>
+
+      <div class="grid grid-2" style="margin-bottom:20px;align-items:stretch;">
+        <div class="price-card">
+          <div class="label" style="color:var(--muted);font-size:12.5px;text-transform:uppercase;font-weight:700;margin-bottom:6px;">Abonnement Compte Initiative</div>
+          <div class="amount">${TARIF_INITIATIVE_ANNUEL || 50} €<span> / an / initiative</span></div>
+          <p style="color:var(--muted);font-size:12.5px;margin:10px 0 16px;">Renouvellement annuel automatique. Donne accès à la publication, à la gestion des abonnés et aux statistiques.</p>
+          <button class="btn btn-orange btn-block" id="btn-subscribe">${abonneActif ? "Suspendre l'abonnement (simulation)" : "Activer mon abonnement (simulation)"}</button>
+          <p style="color:var(--muted);font-size:11px;margin-top:8px;">Démonstration — aucun paiement réel n'est traité dans ce prototype.</p>
+        </div>
+        <div class="stat-row" style="margin-bottom:0;">
+          <div class="stat-card"><div class="num">${(init.membres || 0).toLocaleString("fr-FR")}</div><div class="label">Membres du réseau</div></div>
+          <div class="stat-card"><div class="num">${messages_non_lus}</div><div class="label">Messages reçus</div></div>
+          <div class="stat-card"><div class="num">${(init.vues || 0).toLocaleString("fr-FR")}</div><div class="label">Vues du profil</div></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <h3>Localisation de l'initiative</h3>
+        <div class="tags">
+          ${init.pays ? `<span class="tag">🌍 Pays d'origine : ${init.pays}</span>` : ""}
+          ${init.region ? `<span class="tag">📍 Région : ${init.region}</span>` : ""}
+          ${init.ville ? `<span class="tag">📍 Ville : ${init.ville}</span>` : ""}
+          ${init.zone ? `<span class="tag">🗺️ Zone : ${init.zone}</span>` : ""}
+          ${init.domaine ? `<span class="tag">${init.domaine}</span>` : ""}
+          ${init.type ? `<span class="badge ${badgeClass(init.type)}">${init.type}</span>` : ""}
+          ${init.nationalite_unique ? `<span class="badge badge-unique">Réservée à la diaspora ${init.nationalite1 || ""} (nationalité unique)</span>` : ""}
+        </div>
+        ${init.description ? `<p style="margin-top:12px;color:var(--muted);font-size:13.5px;">${init.description}</p>` : ""}
+        <a href="initiative.html?id=${init.slug || init.id}" class="btn btn-sm btn-outline" style="margin-top:12px;">Voir ma fiche publique →</a>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;" id="publications">
+      <h3>Nouvelle publication</h3>
+      <p style="font-size:13px;color:var(--muted);">Format court recommandé pour les vidéos : max 3 minutes. Vos publications apparaissent dans le <a href="fil-actualite.html" style="color:var(--orange);font-weight:700;">Fil d'actualité global</a>.</p>
+      <div id="pub-form" style="margin-top:12px;">
+        <select id="pub-categorie" class="input-field" style="margin-bottom:8px;">
+          <option value="Actualité">📰 Actualité</option>
+          <option value="Appel à projets">🤝 Appel à projets</option>
+          <option value="Événement">📅 Événement</option>
+          <option value="Témoignage">💬 Témoignage</option>
+          <option value="Vidéo">🎬 Vidéo (&lt;3 min)</option>
+        </select>
+        <textarea id="pub-contenu" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;" placeholder="Partager une actualité, une opportunité, un appel à projets…"></textarea>
+        <button class="btn btn-orange" id="pub-btn" style="margin-top:8px;" ${abonneActif ? "" : "disabled"}>Publier</button>
+        ${!abonneActif ? `<p style="color:var(--muted);font-size:12px;margin-top:6px;">Abonnez-vous pour débloquer la publication.</p>` : ""}
+      </div>
+      ${publications_recentes.length ? `
+      <h4 style="margin-top:20px;font-size:13px;text-transform:uppercase;color:var(--muted);">Mes publications récentes</h4>
+      ${publications_recentes.map(p => `
+        <div class="feed-post" style="margin-top:10px;">
+          <div class="flex-between">
+            <span class="feed-cat">${p.categorie || ""}</span>
+            <span style="color:var(--muted);font-size:12px;">${new Date(p.created_at.replace(" ","T")+"Z").toLocaleString("fr-FR")}</span>
+          </div>
+          <div class="feed-body" style="margin-top:6px;">${p.contenu}</div>
+        </div>`).join("")}` : ""}
+    </div>
+
+    <div class="card" style="margin-bottom:20px;" id="evenements">
+      <h3>Mobiliser la diaspora</h3>
+      <div class="timeline-item" style="margin-top:14px;">
+        <div class="date-chip">15<span>NOV</span></div>
+        <div style="flex:1;">
+          <div class="flex-between">
+            <div><strong>Forum des entrepreneurs</strong><p style="margin:2px 0 0;color:var(--muted);font-size:13px;">120 participants confirmés</p></div>
+            <button class="btn btn-sm btn-orange">Gérer les inscriptions</button>
+          </div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="date-chip">02<span>DÉC</span></div>
+        <div style="flex:1;">
+          <div class="flex-between">
+            <div><strong>Gala de solidarité de fin d'année</strong><p style="margin:2px 0 0;color:var(--muted);font-size:13px;">Ouvert à tous</p></div>
+            <button class="btn btn-sm btn-outline">Éditer l'événement</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-outline" style="margin-top:14px;">+ Créer un événement</button>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;" id="paiement">
+      <h3>Module de paiement — billetterie &amp; cotisations</h3>
+      <p>Activez un module de paiement pour vos événements : vente de billets, cotisations, inscriptions, collectes de fonds, dons.</p>
+      <p style="margin:14px 0 6px;font-weight:700;font-size:13px;">Type de tarification</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <label class="payment-option"><input type="radio" name="tarification" checked> Tarif unique</label>
+        <label class="payment-option"><input type="radio" name="tarification"> Plusieurs catégories</label>
+        <label class="payment-option"><input type="radio" name="tarification"> Accès gratuit</label>
+        <label class="payment-option"><input type="radio" name="tarification"> Participation libre</label>
+      </div>
+      <p style="margin:16px 0 6px;font-weight:700;font-size:13px;">Moyens de paiement acceptés</p>
+      <div class="payment-grid" id="moyens-paiement"></div>
+      <button class="btn btn-navy btn-block" style="margin-top:14px;" disabled>Activer le module de paiement (démonstration)</button>
+      <p style="color:var(--muted);font-size:11px;margin-top:8px;">⚠️ Démonstration uniquement — aucune transaction réelle n'est traitée.</p>
+    </div>
+
+    <div id="ad-dashboard-initiative" data-ad-slot="4"></div>`;
+
+  /* Moyens de paiement */
+  if (typeof MOYENS_PAIEMENT !== "undefined") {
+    document.getElementById("moyens-paiement").innerHTML = MOYENS_PAIEMENT.map((m, i) =>
+      `<label class="payment-option"><input type="checkbox" ${i < 2 ? "checked" : ""}> ${m}</label>`
+    ).join("");
+  }
+
+  /* Bouton abonnement */
+  document.getElementById("btn-subscribe").addEventListener("click", async () => {
+    const newState = !abonneActif;
+    try {
+      await api("POST", `/initiatives/${init.id}/abonnement`, { actif: newState });
+      abonneActif = newState;
+      document.getElementById("sub-badge").outerHTML = subBadgeHTML();
+      document.getElementById("sub-notice").innerHTML = subNoticeHTML();
+      document.getElementById("btn-subscribe").textContent = abonneActif ? "Suspendre l'abonnement (simulation)" : "Activer mon abonnement (simulation)";
+      const pubBtn = document.getElementById("pub-btn");
+      if (pubBtn) pubBtn.disabled = !abonneActif;
+    } catch (e) { console.error(e); }
+  });
+
+  /* Publication sur le fil */
+  const pubBtn = document.getElementById("pub-btn");
+  if (pubBtn) pubBtn.addEventListener("click", async () => {
+    const contenu = document.getElementById("pub-contenu").value.trim();
+    const categorie = document.getElementById("pub-categorie").value;
+    if (!contenu) return;
+    pubBtn.disabled = true;
+    try {
+      await api("POST", "/fil", { contenu, categorie });
+      document.getElementById("pub-contenu").value = "";
+      alert("Publication envoyée ! Elle apparaît maintenant dans le fil d'actualité.");
+    } catch (e) {
+      alert("Erreur : " + (e.message || "Impossible de publier."));
+    } finally {
+      pubBtn.disabled = false;
+    }
+  });
+
+  renderAllAds();
+})();
+</script>
+</body>
+</html>

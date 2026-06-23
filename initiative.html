@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Profil initiative</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="formations.html">Formations</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main id="initiative-profil" style="max-width:900px;margin:0 auto;padding:24px 16px;">
+    <div class="notice">Chargement du profil…</div>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const slug = params.get("id");
+  const el = document.getElementById("initiative-profil");
+
+  if (!slug) {
+    el.innerHTML = `<div class="notice">Identifiant d'initiative manquant. <a href="annuaire.html">Retour à l'annuaire</a>.</div>`;
+    return;
+  }
+
+  let data, me;
+  try {
+    [data, me] = await Promise.all([
+      api("GET", "/initiatives/" + slug),
+      fetchCurrentUser().catch(() => null)
+    ]);
+  } catch(e) {
+    el.innerHTML = `<div class="notice">Initiative introuvable. <a href="annuaire.html">Retour à l'annuaire</a>.</div>`;
+    return;
+  }
+
+  const init = data.initiative;
+  const nats = Array.isArray(init.nationalites_concernees) ? init.nationalites_concernees : [];
+
+  let estAbonne = false;
+  if (me?.role === "utilisateur") {
+    try {
+      const suivis = await api("GET", "/mes-suivis");
+      estAbonne = suivis.initiatives.some(i => i.id === init.id || i.slug === slug);
+    } catch(e) {}
+  }
+
+  const galerie = Array.isArray(init.galerie_json) ? init.galerie_json : [];
+  const reseaux = (init.reseaux_sociaux && typeof init.reseaux_sociaux === "object") ? init.reseaux_sociaux : {};
+
+  function badgeType(type) {
+    if (!type) return "";
+    const map = { "association": "badge-asso", "entreprise": "badge-ent", "institution": "badge-inst" };
+    return `<span class="badge ${map[type?.toLowerCase()] || 'badge-asso'}">${type}</span>`;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;gap:4px;align-items:center;margin-bottom:16px;font-size:13px;color:var(--muted);">
+      <a href="annuaire.html" style="color:var(--accent);">Annuaire</a>
+      <span>›</span>
+      <span>${init.nom}</span>
+    </div>
+
+    <div class="card" style="padding:24px;margin-bottom:20px;">
+      <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+        <div class="avatar" style="width:72px;height:72px;font-size:28px;flex-shrink:0;">${(init.sigle||init.nom)?.[0]||"?"}</div>
+        <div style="flex:1;min-width:200px;">
+          <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+            <h1 style="margin:0;font-size:22px;">${init.nom}</h1>
+            ${init.sigle ? `<span class="badge badge-asso">${init.sigle}</span>` : ""}
+            ${badgeType(init.type)}
+          </div>
+          <div style="margin:6px 0;color:var(--muted);font-size:13.5px;">
+            ${[init.ville, init.region, init.pays].filter(Boolean).join(" · ")}
+            ${init.domaine ? ` · ${init.domaine}` : ""}
+          </div>
+          <div class="tags" style="margin-top:8px;">
+            ${nats.map(n => `<span class="tag">${n}</span>`).join("")}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+          ${me?.role === "utilisateur" ? `
+            <button id="btn-suivre" class="btn ${estAbonne ? "btn-outline" : "btn-orange"}" style="min-width:140px;">
+              ${estAbonne ? "✓ Vous suivez" : "+ Suivre cette initiative"}
+            </button>
+          ` : me ? "" : `<a href="connexion.html" class="btn btn-orange">Connexion pour suivre</a>`}
+          <a href="messagerie.html?init=${init.id}" class="btn btn-outline">Contacter</a>
+        </div>
+      </div>
+
+      <div class="grid grid-3" style="gap:12px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+        <div style="padding:12px;border-radius:10px;background:var(--surface2);text-align:center;">
+          <div style="font-size:22px;font-weight:800;">${init.membres ?? 0}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Membres</div>
+        </div>
+        <div style="padding:12px;border-radius:10px;background:var(--surface2);text-align:center;">
+          <div style="font-size:22px;font-weight:800;" id="live-abonnes">${init.abonnes ?? 0}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Abonnés Diaspo'Actif</div>
+        </div>
+        <div style="padding:12px;border-radius:10px;background:var(--surface2);text-align:center;">
+          <div style="font-size:22px;font-weight:800;">${init.vues ?? 0}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Vues du profil</div>
+        </div>
+      </div>
+    </div>
+
+    ${(init.description || init.mission) ? `
+    <div class="card" style="margin-bottom:20px;">
+      ${init.description ? `<div><h3 style="margin:0 0 8px;">À propos</h3><p style="margin:0;line-height:1.6;">${init.description}</p></div>` : ""}
+      ${(init.description && init.mission) ? `<hr style="margin:16px 0;border:none;border-top:1px solid var(--border);">` : ""}
+      ${init.mission ? `<div><h3 style="margin:0 0 8px;">Notre mission</h3><p style="margin:0;line-height:1.6;">${init.mission}</p></div>` : ""}
+    </div>` : ""}
+
+    ${init.historique ? `
+    <div class="card" style="margin-bottom:20px;">
+      <h3 style="margin:0 0 12px;">Notre histoire</h3>
+      <p style="margin:0;line-height:1.6;">${init.historique}</p>
+    </div>` : ""}
+
+    ${galerie.length ? `
+    <div class="card" style="margin-bottom:20px;">
+      <h3 style="margin:0 0 14px;">Galerie</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
+        ${galerie.map(img => `
+          <div style="background:var(--surface2);border-radius:10px;height:120px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:32px;">
+            ${img.url ? `<img src="${img.url}" style="width:100%;height:100%;object-fit:cover;" alt="${img.caption||''}">` : "🖼"}
+          </div>
+        `).join("")}
+      </div>
+    </div>` : ""}
+
+    <div class="card" style="margin-bottom:20px;">
+      <h3 style="margin:0 0 14px;">Contact & Liens</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${init.site_web ? `<div style="display:flex;gap:10px;align-items:center;"><span>🌐</span><a href="${init.site_web}" target="_blank" rel="noopener" style="color:var(--accent);">${init.site_web.replace(/^https?:\/\//,"")}</a></div>` : ""}
+        ${reseaux.facebook ? `<div style="display:flex;gap:10px;align-items:center;"><span>📘</span><a href="${reseaux.facebook}" target="_blank" style="color:var(--accent);">Facebook</a></div>` : ""}
+        ${reseaux.instagram ? `<div style="display:flex;gap:10px;align-items:center;"><span>📸</span><a href="${reseaux.instagram}" target="_blank" style="color:var(--accent);">Instagram</a></div>` : ""}
+        ${reseaux.linkedin ? `<div style="display:flex;gap:10px;align-items:center;"><span>💼</span><a href="${reseaux.linkedin}" target="_blank" style="color:var(--accent);">LinkedIn</a></div>` : ""}
+        ${!init.site_web && !reseaux.facebook && !reseaux.instagram && !reseaux.linkedin
+          ? `<div style="color:var(--muted);font-size:13.5px;">Aucun lien renseigné.</div>` : ""}
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <h3 style="margin:0 0 14px;">Publications récentes</h3>
+      <div id="init-publications"><div class="notice">Chargement…</div></div>
+    </div>
+  `;
+
+  document.title = `Diaspo'Actif — ${init.nom}`;
+
+  const btnSuivre = document.getElementById("btn-suivre");
+  if (btnSuivre) {
+    btnSuivre.addEventListener("click", async () => {
+      try {
+        if (estAbonne) {
+          await api("DELETE", "/initiatives/" + init.id + "/suivre");
+          estAbonne = false;
+          btnSuivre.textContent = "+ Suivre cette initiative";
+          btnSuivre.classList.remove("btn-outline");
+          btnSuivre.classList.add("btn-orange");
+          const liveEl = document.getElementById("live-abonnes");
+          if (liveEl) liveEl.textContent = Math.max(0, parseInt(liveEl.textContent) - 1);
+        } else {
+          await api("POST", "/initiatives/" + init.id + "/suivre");
+          estAbonne = true;
+          btnSuivre.textContent = "✓ Vous suivez";
+          btnSuivre.classList.add("btn-outline");
+          btnSuivre.classList.remove("btn-orange");
+          const liveEl = document.getElementById("live-abonnes");
+          if (liveEl) liveEl.textContent = parseInt(liveEl.textContent) + 1;
+        }
+      } catch(e) { alert(e.message); }
+    });
+  }
+
+  try {
+    const r = await api("GET", "/fil?limit=20");
+    const posts = (r.posts || []).filter(p => p.auteur_nom === init.nom || p.auteur_nom === init.sigle);
+    const pubEl = document.getElementById("init-publications");
+    if (posts.length) {
+      pubEl.innerHTML = posts.slice(0,5).map(p => `
+        <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+            <span class="feed-cat">${p.categorie||"post"}</span>
+            <span style="font-size:12px;color:var(--muted);">${p.created_at?.slice(0,10)||""}</span>
+          </div>
+          <p style="margin:0;font-size:13.5px;">${p.contenu}</p>
+        </div>
+      `).join("");
+    } else {
+      pubEl.innerHTML = `<div style="color:var(--muted);font-size:13.5px;padding:12px 0;">Aucune publication publiée sur le fil pour le moment.</div>`;
+    }
+  } catch(e) {
+    document.getElementById("init-publications").innerHTML = `<div class="notice">Impossible de charger les publications.</div>`;
+  }
+})();
+</script>
+</body>
+</html>

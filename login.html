@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Connexion</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="card auth-form-card">
+      <h2 style="margin-top:0;">Connexion à Diaspo'Actif</h2>
+      <p class="sub" style="margin-bottom:0;">Accédez à votre espace Utilisateur, Initiative, Officiel ou Institutionnel.</p>
+
+      <form id="login-form">
+        <label for="email">Adresse e-mail</label>
+        <input type="email" id="email" required autocomplete="username">
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" required autocomplete="current-password">
+        <button type="submit" class="btn btn-orange btn-block" style="margin-top:20px;">Se connecter</button>
+        <div class="auth-error" id="login-error"></div>
+      </form>
+
+      <p style="margin-top:18px;font-size:13px;color:var(--muted);">Pas encore de compte ? <a href="inscription.html" style="color:var(--orange);font-weight:700;">Créer un compte</a></p>
+
+      <div class="notice" style="margin-top:18px;">
+        🔎 Comptes de démonstration (mot de passe <strong>Demo1234!</strong>) :<br>
+        jean@diaspoactif.demo (Utilisateur) · contact@aito.diaspoactif.demo (Initiative) ·
+        officiel@diaspoactif.demo (Officiel) · consulat.senegal@diaspoactif.demo (Institutionnel)
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a></footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  document.getElementById("login-form").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const errBox = document.getElementById("login-error");
+    errBox.style.display = "none";
+    try {
+      const r = await api("POST", "/auth/login", { email, password });
+      const dest = ROLE_DASHBOARD[r.user.role] || "index.html";
+      window.location.href = dest;
+    } catch (err) {
+      errBox.textContent = err.message || "Connexion impossible.";
+      errBox.style.display = "block";
+    }
+  });
+</script>
+</body>
+</html>

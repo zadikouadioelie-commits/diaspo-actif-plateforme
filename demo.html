@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diaspo'Actif — Démo interactive</title>
+<style>
+:root{--navy:#1F2430;--navy-light:#2C3242;--orange:#F2761F;--orange-light:#FDEBDD;--bg:#F4F5F8;--card:#FFFFFF;--text:#222633;--muted:#6B7280;--border:#E6E8EE;--green:#1FA971;--radius:14px;--shadow:0 4px 18px rgba(31,36,48,.08);}
+*{box-sizing:border-box;}html,body{margin:0;padding:0;}
+body{font-family:"Segoe UI",Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;}
+a{text-decoration:none;color:inherit;}img{max-width:100%;display:block;}button{font-family:inherit;cursor:pointer;}
+.page{min-height:100vh;display:flex;flex-direction:column;}
+.container{max-width:1180px;margin:0 auto;padding:0 24px;}
+.topbar{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;}
+.topbar-inner{display:flex;align-items:center;gap:20px;max-width:1180px;margin:0 auto;padding:10px 24px;}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16px;color:var(--navy);}
+.logo-img{width:44px;height:44px;flex:none;}
+.logo small{display:block;font-weight:400;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.nav{display:flex;gap:18px;flex:1;flex-wrap:wrap;}
+.nav a{font-size:14px;font-weight:600;color:var(--muted);padding:6px 0;border-bottom:2px solid transparent;cursor:pointer;}
+.nav a.active,.nav a:hover{color:var(--navy);border-bottom-color:var(--orange);}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.role-switch{display:flex;background:var(--bg);border-radius:30px;padding:3px;gap:2px;border:1px solid var(--border);}
+.role-switch button{border:none;background:transparent;padding:5px 10px;border-radius:24px;font-size:12px;font-weight:700;color:var(--muted);}
+.role-switch button.active{background:var(--navy);color:#fff;}
+.user-chip{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--orange),#ffb27a);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;}
+.lang-select{border:1px solid var(--border);border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--navy);background:#fff;}
+.btn{display:inline-flex;align-items:center;gap:8px;justify-content:center;padding:10px 18px;border-radius:30px;font-weight:700;font-size:14px;border:1px solid transparent;}
+.btn-orange{background:var(--orange);color:#fff;}.btn-orange:hover{background:#d9650f;}
+.btn-outline{background:#fff;border:1px solid var(--border);color:var(--navy);}.btn-outline:hover{border-color:var(--orange);color:var(--orange);}
+.btn-navy{background:var(--navy);color:#fff;}
+.btn-sm{padding:6px 14px;font-size:12px;border-radius:20px;}
+.btn-block{width:100%;}
+.hero{background:linear-gradient(180deg,var(--navy) 0%,#161A24 100%);color:#fff;overflow:hidden;}
+.hero-inner{max-width:1180px;margin:0 auto;padding:46px 24px 56px;position:relative;z-index:2;}
+.hero h1{font-size:30px;margin:0 0 8px;}
+.hero p{color:#C7CBD6;max-width:560px;margin:0 0 22px;font-size:15px;}
+.network{position:relative;height:320px;border-radius:var(--radius);background:#10141d;overflow:hidden;border:1px solid #2b3142;}
+.network svg{width:100%;height:100%;display:block;}
+.dot{fill:var(--orange);filter:drop-shadow(0 0 6px rgba(242,118,31,.9));cursor:pointer;transition:r .2s;}
+.dot:hover{filter:drop-shadow(0 0 12px rgba(242,118,31,1));}
+.dot.dim{fill:#5b6171;filter:none;}
+.link{stroke:rgba(242,118,31,.3);stroke-width:1;fill:none;}
+.tooltip-card{position:absolute;background:#fff;color:var(--text);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);font-size:12.5px;max-width:230px;}
+.callout-onboard{top:14px;right:14px;}.callout-immersive{bottom:18px;left:18px;}
+.section{padding:34px 0;}
+.section h2{font-size:21px;margin:0 0 4px;}
+.section .sub{color:var(--muted);font-size:14px;margin:0 0 20px;}
+.grid{display:grid;gap:18px;}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+@media(max-width:1040px){.grid-4{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:900px){.grid-3,.grid-2{grid-template-columns:1fr;}}
+@media(max-width:560px){.grid-4{grid-template-columns:1fr;}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.card h3{margin:0 0 6px;font-size:16px;}.card p{margin:0;color:var(--muted);font-size:13.5px;}
+.icon-badge{width:42px;height:42px;border-radius:12px;background:var(--orange-light);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px;}
+.search-card{background:#fff;border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);border:1px solid var(--border);}
+.search-card h2{margin:0 0 14px;font-size:18px;}
+.search-row{display:flex;gap:10px;margin-bottom:14px;}
+.search-row input{flex:1;padding:12px 16px;border-radius:30px;border:1px solid var(--border);font-size:14px;}
+.filters{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:end;}
+@media(max-width:900px){.filters{grid-template-columns:repeat(2,1fr);}}
+.filters label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;}
+.filters select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);font-size:13px;background:#fff;}
+.init-card{display:flex;gap:14px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);}
+.init-logo{width:48px;height:48px;border-radius:50%;background:var(--orange-light);color:var(--orange);display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;font-size:14px;}
+.init-card .meta{flex:1;}.init-card .meta h4{margin:0 0 3px;font-size:15px;}
+.init-card .meta .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.tag{font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;color:var(--muted);}
+.badge{font-size:11px;font-weight:700;border-radius:20px;padding:3px 10px;}
+.badge-ong{background:#E7F4EE;color:var(--green);}.badge-asso{background:var(--orange-light);color:var(--orange);}
+.badge-ent{background:#EAF0FF;color:#3457D5;}.badge-fond{background:#F4E9FF;color:#8138C2;}
+.badge-coop{background:#FFF6DA;color:#B68900;}.badge-instit{background:#E0ECFF;color:#1A4FBF;}
+.badge-unique{background:#FDEBDD;color:#B5470F;}
+.with-sidebar{display:flex;flex:1;}
+.sidebar{width:230px;background:var(--navy);color:#cdd1dc;padding:22px 14px;flex:none;}
+.sidebar .brand{color:#fff;font-weight:800;margin-bottom:26px;padding:0 8px;display:flex;align-items:center;gap:10px;}
+.sidebar a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:600;margin-bottom:4px;color:#aeb3c2;cursor:pointer;}
+.sidebar a.active,.sidebar a:hover{background:var(--navy-light);color:#fff;}
+.sidebar .pill{background:var(--orange);color:#fff;font-size:10px;border-radius:20px;padding:1px 7px;margin-left:auto;}
+.content{flex:1;padding:30px 34px;background:var(--bg);}
+.content h1{font-size:22px;margin:0 0 18px;}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px;}
+.stat-card{background:#fff;border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border:1px solid var(--border);}
+.stat-card .num{font-size:26px;font-weight:800;}.stat-card .label{color:var(--muted);font-size:12.5px;}
+.chat-wrap{display:flex;background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);height:520px;}
+.chat-list{width:280px;border-right:1px solid var(--border);overflow-y:auto;}
+.chat-item{padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;}
+.chat-item.active{background:var(--orange-light);}
+.chat-item h5{margin:0 0 3px;font-size:13.5px;}.chat-item p{margin:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chat-main{flex:1;display:flex;flex-direction:column;}
+.chat-head{padding:14px 18px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;}
+.chat-body{flex:1;padding:18px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+.bubble{max-width:62%;padding:10px 14px;border-radius:16px;font-size:13.5px;}
+.bubble.me{background:var(--orange);color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.bubble.them{background:var(--bg);align-self:flex-start;border-bottom-left-radius:4px;}
+.chat-input{display:flex;gap:10px;padding:14px;border-top:1px solid var(--border);}
+.chat-input input{flex:1;padding:10px 14px;border-radius:30px;border:1px solid var(--border);}
+.lock-note{font-size:11.5px;color:var(--muted);padding:8px 18px;border-top:1px solid var(--border);display:flex;gap:6px;align-items:center;}
+.footer{background:var(--navy);color:#9aa0b0;padding:26px 0;font-size:12.5px;text-align:center;margin-top:auto;}
+.flex-between{display:flex;align-items:center;justify-content:space-between;}
+.notice{background:var(--orange-light);color:#9a4a0d;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px;}
+.feed-post{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow);}
+.feed-head{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.feed-head .meta{flex:1;}.feed-head h4{margin:0;font-size:14px;}.feed-head .sub-meta{font-size:12px;color:var(--muted);}
+.feed-cat{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;background:var(--orange-light);color:var(--orange);border-radius:6px;padding:3px 8px;}
+.feed-body{font-size:13.5px;color:var(--text);margin-bottom:12px;}
+.feed-actions{display:flex;gap:18px;border-top:1px solid var(--border);padding-top:10px;font-size:12.5px;color:var(--muted);}
+.feed-actions span{display:flex;align-items:center;gap:5px;cursor:pointer;transition:color .15s;}.feed-actions span:hover{color:var(--orange);}
+.feed-filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+.feed-filter-bar button{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:#fff;font-size:12.5px;font-weight:600;color:var(--muted);}
+.feed-filter-bar button.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+.profile-cover{height:140px;border-radius:var(--radius) var(--radius) 0 0;background:linear-gradient(120deg,#2C3242,#454C5F);}
+.profile-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;margin-bottom:20px;}
+.profile-head{display:flex;gap:16px;padding:0 22px 18px;margin-top:-32px;align-items:flex-end;}
+.profile-head .init-logo{width:64px;height:64px;font-size:22px;border:4px solid #fff;}
+.timeline-item{display:flex;gap:14px;margin-bottom:16px;}
+.date-chip{width:56px;height:56px;border-radius:10px;background:var(--orange);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;flex:none;}
+.date-chip span{font-size:10px;font-weight:600;}
+.ad-banner{display:flex;align-items:center;gap:14px;background:#FAFAFB;border:1px dashed var(--border);border-radius:var(--radius);padding:14px 18px;margin:18px 0;}
+.ad-banner .ad-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex:none;}
+.ad-banner .ad-body{flex:1;}
+.ad-banner .ad-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);background:var(--bg);border-radius:6px;padding:2px 6px;display:inline-block;margin-bottom:4px;}
+.ad-banner h4{margin:0 0 2px;font-size:14px;}.ad-banner p{margin:0;font-size:12.5px;color:var(--muted);}
+.conf-card{border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border:1px solid var(--border);background:#fff;}
+.conf-card .conf-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:10px;}
+.conf-public .conf-icon{background:#E7F4EE;}.conf-reseau .conf-icon{background:#FFF6DA;}.conf-confidentiel .conf-icon{background:#FDE2E2;}
+.conf-card ul{margin:10px 0 0;padding-left:18px;font-size:13px;}
+.nat-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;}
+.statut-pill{font-size:11px;font-weight:700;border-radius:20px;padding:4px 10px;}
+.statut-verifiee{background:#E7F4EE;color:var(--green);}.statut-attente{background:#FFF6DA;color:#B68900;}
+.view{display:none;}.view.active{display:block;}
+.flex-view{display:none;}.flex-view.active{display:flex!important;}
+progress-bar{display:block;background:var(--bg);border-radius:20px;height:8px;overflow:hidden;margin:4px 0;}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="logo">
+      <svg class="logo-img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220">
+        <defs><path id="arcTop" d="M 28 90 A 82 82 0 0 1 192 90"/><radialGradient id="treeGrad" cx="40%" cy="30%" r="70%"><stop offset="0%" stop-color="#FFC273"/><stop offset="55%" stop-color="#F2761F"/><stop offset="100%" stop-color="#C9460B"/></radialGradient></defs>
+        <circle cx="110" cy="110" r="104" fill="#FFFFFF" stroke="#20242E" stroke-width="3"/>
+        <circle cx="110" cy="110" r="90" fill="none" stroke="#20242E" stroke-width="1.4"/>
+        <text font-family="Arial,Helvetica,sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.5" fill="#20242E"><textPath href="#arcTop" startOffset="2">ACTIONS LOCALES • IMPACT GLOBAL</textPath></text>
+        <g transform="translate(110,96)"><rect x="-2.5" y="2" width="5" height="26" fill="#5B3A20"/><circle cx="-16" cy="-6" r="15" fill="url(#treeGrad)"/><circle cx="14" cy="-8" r="16" fill="url(#treeGrad)"/><circle cx="0" cy="-22" r="16" fill="url(#treeGrad)"/><circle cx="-8" cy="6" r="13" fill="url(#treeGrad)"/><circle cx="10" cy="8" r="12" fill="url(#treeGrad)"/></g>
+        <g transform="translate(110,148)"><polygon points="-95,-15 95,-15 95,17 -95,17 -110,1" fill="#20242E"/><text x="0" y="8" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="22" font-weight="800" fill="#FFFFFF">DIASPO<tspan fill="#F2761F">'</tspan>ACTIF</text></g>
+        <text x="110" y="178" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="10.5" font-weight="600" letter-spacing="2" fill="#20242E">DU SUD AU NORD</text>
+        <circle cx="178" cy="178" r="17" fill="#FFFFFF" stroke="#20242E" stroke-width="2.5"/><text x="178" y="183" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="14" fill="#F2761F">🌍</text>
+      </svg>
+      <div>Diaspo'Actif <small>Du Sud au Nord</small></div>
+    </div>
+    <nav class="nav" id="main-nav">
+      <a onclick="show('accueil')" class="active" data-view="accueil">Accueil</a>
+      <a onclick="show('annuaire')" data-view="annuaire">Annuaire</a>
+      <a onclick="show('fil')" data-view="fil">Fil d'actualité</a>
+      <a onclick="show('evenements')" data-view="evenements">Événements</a>
+      <a onclick="show('messagerie')" data-view="messagerie">Messagerie</a>
+      <a onclick="show('dashboard')" data-view="dashboard">Dashboard</a>
+    </nav>
+    <div class="topbar-right">
+      <select class="lang-select" onchange="setLang(this.value)" id="lang-select">
+        <option value="fr">FR</option><option value="en">EN</option><option value="es">ES</option>
+      </select>
+      <div class="role-switch">
+        <button class="active" onclick="setRole(this,'utilisateur')">Utilisateur</button>
+        <button onclick="setRole(this,'initiative')">Initiative</button>
+        <button onclick="setRole(this,'officiel')">Officiel</button>
+      </div>
+      <div class="user-chip">
+        <div class="avatar">Y</div>
+        <span id="user-name">Ynouss</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ACCUEIL ==================== -->
+<div id="view-accueil" class="view active">
+  <div class="hero">
+    <div class="hero-inner">
+      <h1 id="hero-title">Connecter la diaspora mondiale 🌍</h1>
+      <p id="hero-sub">Diaspo'Actif réunit initiatives associatives, entrepreneurs et institutions pour un réseau diaspora vivant, solidaire et actif.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <button class="btn btn-orange" onclick="show('inscription')">Rejoindre le réseau</button>
+        <button class="btn btn-outline" style="color:#fff;border-color:rgba(255,255,255,.3)" onclick="show('annuaire')">Explorer les initiatives</button>
+      </div>
+      <div class="network" style="margin-top:28px;" id="hero-network">
+        <svg viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet" id="network-svg"></svg>
+        <div class="tooltip-card callout-onboard" id="tip-onboard"></div>
+        <div class="tooltip-card callout-immersive">
+          <strong>📡 Réseau actif</strong><br>
+          <span id="network-stats"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="section">
+      <h2>Pourquoi Diaspo'Actif ?</h2>
+      <p class="sub">Une plateforme pensée pour tous les acteurs de la diaspora</p>
+      <div class="grid grid-4">
+        <div class="card"><div class="icon-badge">🤝</div><h3>Réseau solidaire</h3><p>Connectez-vous avec des initiatives partageant vos valeurs, où que vous soyez dans le monde.</p></div>
+        <div class="card"><div class="icon-badge">📊</div><h3>Observatoire</h3><p>Accédez à des statistiques agrégées sur la diaspora : répartition géographique, secteurs, mobilisation.</p></div>
+        <div class="card"><div class="icon-badge">🏛️</div><h3>Services officiels</h3><p>Consulats et institutions retrouvent leurs communautés pour des communications ciblées et anonymisées.</p></div>
+        <div class="card"><div class="icon-badge">🔒</div><h3>Confidentialité</h3><p>Vos données ne sont jamais vendues. Contrôle total sur votre visibilité et vos informations.</p></div>
+      </div>
+    </div>
+    <div id="ad-home" class="ad-banner"></div>
+    <div class="section">
+      <h2>Initiatives en vedette</h2>
+      <p class="sub">Découvrez des associations, ONG et entreprises de la diaspora</p>
+      <div id="accueil-init" style="display:flex;flex-direction:column;gap:12px;"></div>
+      <div style="text-align:center;margin-top:20px;"><button class="btn btn-navy" onclick="show('annuaire')">Voir toutes les initiatives →</button></div>
+    </div>
+    <div class="section">
+      <h2>Financements participatifs en cours</h2>
+      <p class="sub">Contribuez aux projets de la diaspora</p>
+      <div class="grid grid-2" id="campagnes-home"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ANNUAIRE ==================== -->
+<div id="view-annuaire" class="view">
+  <div class="container">
+    <div class="section">
+      <h2>Annuaire des initiatives</h2>
+      <p class="sub" id="annuaire-count"></p>
+      <div class="search-card" style="margin-bottom:24px;">
+        <div class="search-row">
+          <input type="text" id="f-q" placeholder="🔍  Rechercher une initiative, un pays, un domaine…">
+          <button class="btn btn-orange" onclick="applyFilter()">Rechercher</button>
+        </div>
+        <div class="filters">
+          <div><label>Type</label><select id="f-type"><option value="">Tous</option></select></div>
+          <div><label>Domaine</label><select id="f-domaine"><option value="">Tous</option></select></div>
+          <div><label>Pays d'origine</label><select id="f-pays"><option value="">Tous</option></select></div>
+          <div><label>Zone</label><select id="f-zone"><option value="">Toutes</option></select></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;font-weight:600;color:var(--navy);">
+          <input type="checkbox" id="f-unique" style="width:16px;height:16px;">
+          <label for="f-unique">Initiatives à nationalité unique uniquement</label>
+        </div>
+      </div>
+      <div id="init-list" style="display:flex;flex-direction:column;gap:12px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== FIL ==================== -->
+<div id="view-fil" class="view">
+  <div class="container">
+    <div class="section">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <div><h2>Fil d'actualité</h2><p class="sub" style="margin:0;">Publications de la communauté Diaspo'Actif</p></div>
+        <button class="btn btn-orange" onclick="toggleNewPost()">+ Publier</button>
+      </div>
+      <div id="new-post-form" style="display:none;" class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 12px;">Nouvelle publication</h3>
+        <textarea id="post-text" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:14px;resize:vertical;min-height:90px;" placeholder="Partagez une actualité, une opportunité, un événement…"></textarea>
+        <div style="display:flex;gap:10px;margin-top:10px;justify-content:flex-end;">
+          <button class="btn btn-outline btn-sm" onclick="toggleNewPost()">Annuler</button>
+          <button class="btn btn-orange btn-sm" onclick="publishPost()">Publier</button>
+        </div>
+      </div>
+      <div class="feed-filter-bar" id="fil-filter-bar">
+        <button class="active" data-cat="Tous">Tous</button>
+        <button data-cat="Opportunité professionnelle">Opportunités</button>
+        <button data-cat="Appel à projets">Appels à projets</button>
+        <button data-cat="Annonce d'événement">Événements</button>
+        <button data-cat="Actualité des diasporas">Actualités</button>
+        <button data-cat="Publication">Publications</button>
+      </div>
+      <div id="feed-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ÉVÉNEMENTS ==================== -->
+<div id="view-evenements" class="view">
+  <div class="container">
+    <div class="section">
+      <h2>Événements</h2>
+      <p class="sub">Agenda des initiatives et de la plateforme</p>
+      <div id="evt-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MESSAGERIE ==================== -->
+<div id="view-messagerie" class="view">
+  <div class="container">
+    <div class="section">
+      <h2>Messagerie</h2>
+      <p class="sub">Conversations privées et sécurisées</p>
+      <div class="chat-wrap">
+        <div class="chat-list" id="chat-list"></div>
+        <div class="chat-main">
+          <div class="chat-head" id="chat-head">Sélectionnez une conversation</div>
+          <div class="chat-body" id="chat-body"></div>
+          <div class="lock-note">🔒 Chiffrement de bout en bout · vos messages sont privés</div>
+          <div class="chat-input">
+            <input type="text" id="chat-input-field" placeholder="Écrire un message…" onkeydown="if(event.key==='Enter')sendMsg()">
+            <button class="btn btn-orange btn-sm" onclick="sendMsg()">Envoyer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DASHBOARD ==================== -->
+<div id="view-dashboard" class="view flex-view" style="flex:1;">
+  <div class="sidebar">
+    <div class="brand">
+      <svg width="28" height="28" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220"><circle cx="110" cy="110" r="104" fill="#fff" stroke="#20242E" stroke-width="3"/><g transform="translate(110,96)"><rect x="-2.5" y="2" width="5" height="26" fill="#5B3A20"/><circle cx="-16" cy="-6" r="15" fill="#F2761F"/><circle cx="14" cy="-8" r="16" fill="#F2761F"/><circle cx="0" cy="-22" r="16" fill="#F2761F"/><circle cx="-8" cy="6" r="13" fill="#F2761F"/><circle cx="10" cy="8" r="12" fill="#F2761F"/></g></svg>
+      Diaspo'Actif
+    </div>
+    <a class="active" onclick="showDash('dash-home')">🏠 Tableau de bord</a>
+    <a onclick="showDash('dash-profil')">👤 Mon profil</a>
+    <a onclick="showDash('dash-collab')">🤝 Collaborations</a>
+    <a onclick="showDash('dash-financement')">💚 Mes financements</a>
+    <a onclick="showDash('dash-obs')">📊 Observatoire</a>
+    <a onclick="showDash('dash-conf')">🔒 Confidentialité</a>
+    <a style="margin-top:30px;color:#666;" onclick="show('accueil')">← Retour accueil</a>
+  </div>
+  <div class="content">
+    <div id="dash-home" class="dash-panel">
+      <h1>Bonjour, Ynouss Diallo 👋</h1>
+      <div class="notice">⚡ Votre profil est complété à 78% — <a href="#" style="color:var(--orange);font-weight:700;">compléter maintenant</a></div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="num">3</div><div class="label">Projets financés · 2 500 €</div></div>
+        <div class="stat-card"><div class="num">5</div><div class="label">Collaborations en cours</div></div>
+        <div class="stat-card"><div class="num">148</div><div class="label">Contacts dans le réseau</div></div>
+      </div>
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>🥈 Badge Contributeur Argent</h3>
+          <p style="margin-top:8px;">Vous avez financé 3 projets (2 500 €), participé à 5 collaborations et suivi 3 événements. Continuez pour atteindre le badge Or !</p>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+            <span class="tag">3 événements suivis</span>
+            <span class="tag">Y-DITECH</span>
+            <span class="tag">Chef d'entreprise</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Recherche actuellement</h3>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;" id="dash-recherche-tags"></div>
+          <div class="notice" style="margin-top:14px;">📍 Toulouse, France · Bureau d'étude en conception électronique embarquée — Abidjan, Côte d'Ivoire</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="dash-profil" class="dash-panel" style="display:none;">
+      <h1>Mon profil</h1>
+      <div class="profile-card">
+        <div class="profile-cover"></div>
+        <div class="profile-head">
+          <div class="init-logo" style="width:64px;height:64px;font-size:22px;border:4px solid #fff;">YD</div>
+          <div style="flex:1;">
+            <h3 style="margin:0 0 2px;">Ynouss Diallo <span class="tag" style="background:#E7F4EE;color:var(--green);">✅ Vérifié</span></h3>
+            <p style="margin:0;color:var(--muted);font-size:13px;">Chef d'entreprise · Toulouse, France</p>
+          </div>
+          <button class="btn btn-outline btn-sm">Modifier</button>
+        </div>
+        <div style="padding:0 22px 22px;">
+          <div class="grid grid-2" style="gap:14px;">
+            <div><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;">Situation</label><p style="margin:4px 0;">Chef(fe) d'entreprise</p></div>
+            <div><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;">Secteur</label><p style="margin:4px 0;">Technologies & Numérique</p></div>
+            <div><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;">Entreprise</label><p style="margin:4px 0;">Y-DITECH (France)</p></div>
+            <div><label style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;">Niveau d'études</label><p style="margin:4px 0;">Bac+5 / Master 2</p></div>
+          </div>
+          <div style="margin-top:16px;">
+            <div class="nat-card">
+              <div style="font-size:22px;">🇨🇮</div>
+              <div style="flex:1;"><strong>Côte d'Ivoire</strong><br><span style="font-size:12px;color:var(--muted);">CNI · Nationalité de naissance</span></div>
+              <span class="statut-pill statut-verifiee">✓ Vérifiée</span>
+            </div>
+            <div class="nat-card">
+              <div style="font-size:22px;">🇫🇷</div>
+              <div style="flex:1;"><strong>France</strong><br><span style="font-size:12px;color:var(--muted);">Passeport · Nationalité acquise</span></div>
+              <span class="statut-pill statut-attente">⏳ En attente</span>
+            </div>
+            <div class="notice" style="margin-top:10px;">🔒 Vos nationalités ne sont jamais affichées publiquement — elles contribuent uniquement aux statistiques agrégées (seuil minimum : 10 membres).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="dash-collab" class="dash-panel" style="display:none;">
+      <h1>Mes collaborations</h1>
+      <div id="collab-list"></div>
+    </div>
+
+    <div id="dash-financement" class="dash-panel" style="display:none;">
+      <h1>Mes financements</h1>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="stat-row">
+          <div class="stat-card"><div class="num">3</div><div class="label">Projets financés</div></div>
+          <div class="stat-card"><div class="num">2 500 €</div><div class="label">Total investi</div></div>
+          <div class="stat-card"><div class="num">🥈</div><div class="label">Badge Argent</div></div>
+        </div>
+      </div>
+      <div id="financement-list"></div>
+    </div>
+
+    <div id="dash-obs" class="dash-panel" style="display:none;">
+      <h1>Observatoire statistique</h1>
+      <div class="notice">📊 Toutes les statistiques sont agrégées. Seuil de confidentialité : minimum 10 membres par groupe. Aucune donnée individuelle n'est accessible.</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px;">
+        <div class="stat-card"><div class="num">6 670</div><div class="label">Membres diaspora ivoirienne</div></div>
+        <div class="stat-card"><div class="num">312</div><div class="label">Porteurs de projets</div></div>
+        <div class="stat-card"><div class="num">540</div><div class="label">Entrepreneurs</div></div>
+        <div class="stat-card"><div class="num">87</div><div class="label">Investisseurs</div></div>
+        <div class="stat-card"><div class="num">940</div><div class="label">Étudiants</div></div>
+      </div>
+      <div class="grid grid-2">
+        <div class="card"><h3>Par pays de résidence</h3><div id="obs-pays" style="margin-top:14px;"></div></div>
+        <div class="card"><h3>Par secteur d'activité</h3><div id="obs-secteur" style="margin-top:14px;"></div></div>
+        <div class="card"><h3>Par tranche d'âge</h3><div id="obs-age" style="margin-top:14px;"></div></div>
+        <div class="card"><h3>Par niveau d'études</h3><div id="obs-etudes" style="margin-top:14px;"></div></div>
+      </div>
+    </div>
+
+    <div id="dash-conf" class="dash-panel" style="display:none;">
+      <h1>Niveaux de confidentialité</h1>
+      <div id="conf-list" class="grid grid-3"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== INSCRIPTION ==================== -->
+<div id="view-inscription" class="view">
+  <div class="container">
+    <div style="max-width:440px;margin:40px auto;">
+      <div class="card">
+        <div style="text-align:center;margin-bottom:20px;">
+          <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" style="margin:0 auto 10px;"><circle cx="110" cy="110" r="104" fill="#fff" stroke="#20242E" stroke-width="3"/><g transform="translate(110,96)"><rect x="-2.5" y="2" width="5" height="26" fill="#5B3A20"/><circle cx="-16" cy="-6" r="15" fill="#F2761F"/><circle cx="14" cy="-8" r="16" fill="#F2761F"/><circle cx="0" cy="-22" r="16" fill="#F2761F"/><circle cx="-8" cy="6" r="13" fill="#F2761F"/><circle cx="10" cy="8" r="12" fill="#F2761F"/></g><g transform="translate(110,148)"><polygon points="-95,-15 95,-15 95,17 -95,17 -110,1" fill="#20242E"/><text x="0" y="8" text-anchor="middle" font-family="Arial" font-size="22" font-weight="800" fill="#fff">DIASPO<tspan fill="#F2761F">'</tspan>ACTIF</text></g></svg>
+          <p style="color:var(--muted);font-size:13px;margin:0;">Rejoignez le réseau de la diaspora mondiale</p>
+        </div>
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:14px 0 4px;">Prénom & Nom</label>
+        <input type="text" placeholder="Jean Kouassi" style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--border);font-size:14px;">
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:14px 0 4px;">Email</label>
+        <input type="email" placeholder="jean@email.com" style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--border);font-size:14px;">
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:14px 0 4px;">Mot de passe</label>
+        <input type="password" placeholder="••••••••" style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--border);font-size:14px;">
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:14px 0 4px;">Type de compte</label>
+        <select style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--border);font-size:14px;"><option>Membre individuel</option><option>Initiative / Association</option><option>Officiel / Consulat</option></select>
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:14px 0 4px;">Pays d'origine</label>
+        <select style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--border);font-size:14px;" id="reg-pays"></select>
+        <button class="btn btn-orange btn-block" style="margin-top:18px;" onclick="alert('Inscription simulée — prototype démo, aucune donnée transmise.')">Créer mon compte</button>
+        <p style="text-align:center;font-size:13px;color:var(--muted);margin-top:14px;">Déjà membre ? <a href="#" style="color:var(--orange);font-weight:700;" onclick="show('accueil')">Revenir à l'accueil</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="container">
+    <strong style="color:#fff;">Diaspo'Actif</strong> — "Du Sud au Nord" &nbsp;·&nbsp;
+    <span id="footer-text">Prototype interactif · Données fictives · Aucun paiement réel · 2026</span>
+  </div>
+</div>
+</div>
+
+<script>
+// ===== DONNÉES (depuis data.js) =====
+const INITIATIVES = [
+  {id:"aito",nom:"Association des Ivoiriens de Toulouse et de l'Occitanie",sigle:"A.I.T.O",pays:"Côte d'Ivoire",region:"Occitanie",ville:"Toulouse, France",zone:"Europe de l'Ouest",nationalite1:"Ivoirienne",nationalite2:"Française",domaine:"Action Sociale",type:"Association",membres:342,vues:1200,abonnes:215,description:"Fédère la diaspora ivoirienne d'Occitanie autour de l'entraide, la culture et l'entrepreneuriat.",nationalite_unique:true},
+  {id:"tech4senegal",nom:"Tech For Senegal",sigle:"TFS",pays:"Sénégal",region:"Dakar",ville:"Dakar, Sénégal",zone:"Afrique de l'Ouest",nationalite1:"Sénégalaise",nationalite2:"Canadienne",domaine:"Technologie",type:"ONG",membres:580,vues:3400,abonnes:410,description:"Agriculture connectée portée par des ingénieurs de la diaspora sénégalaise.",nationalite_unique:false},
+  {id:"mali-sante",nom:"Santé Sans Frontière Mali",sigle:"SSF",pays:"Mali",region:"Bamako",ville:"Bamako, Mali",zone:"Afrique de l'Ouest",nationalite1:"Malienne",nationalite2:"Belge",domaine:"Santé",type:"Fondation",membres:198,vues:980,abonnes:140,description:"Finance des équipements médicaux dans les zones rurales maliennes.",nationalite_unique:true},
+  {id:"coop-cacao",nom:"Coopérative Cacao Solidaire",sigle:"CCS",pays:"Cameroun",region:"Littoral",ville:"Douala, Cameroun",zone:"Afrique Centrale",nationalite1:"Camerounaise",nationalite2:"Allemande",domaine:"Agriculture",type:"Coopérative",membres:76,vues:540,abonnes:62,description:"Structure 120 producteurs de cacao autour de prix équitables.",nationalite_unique:false},
+  {id:"marrakech-edu",nom:"Marrakech Éducation Plus",sigle:"MEP",pays:"Maroc",region:"Marrakech-Safi",ville:"Marrakech, Maroc",zone:"Afrique du Nord",nationalite1:"Marocaine",nationalite2:"Française",domaine:"Éducation",type:"Association",membres:264,vues:1510,abonnes:190,description:"Construit des bibliothèques rurales et finance des bourses pour étudiants.",nationalite_unique:false},
+  {id:"benin-green",nom:"Bénin Green Future",sigle:"BGF",pays:"Bénin",region:"Littoral",ville:"Cotonou, Bénin",zone:"Afrique de l'Ouest",nationalite1:"Béninoise",nationalite2:"Américaine",domaine:"Environnement",type:"ONG",membres:132,vues:760,abonnes:95,description:"Reforestation et gestion des déchets plastiques avec la diaspora béninoise.",nationalite_unique:true},
+  {id:"tunis-startup",nom:"Tunis Startup Bridge",sigle:"TSB",pays:"Tunisie",region:"Tunis",ville:"Tunis, Tunisie",zone:"Afrique du Nord",nationalite1:"Tunisienne",nationalite2:"Canadienne",domaine:"Entrepreneuriat",type:"Entreprise",membres:410,vues:2300,abonnes:305,description:"Accélérateur connectant entrepreneurs tunisiens et investisseurs de la diaspora.",nationalite_unique:false},
+  {id:"guinee-culture",nom:"Racines de Guinée",sigle:"RDG",pays:"Guinée",region:"Conakry",ville:"Conakry, Guinée",zone:"Afrique de l'Ouest",nationalite1:"Guinéenne",nationalite2:"Espagnole",domaine:"Culture",type:"Association",membres:145,vues:690,abonnes:88,description:"Valorise le patrimoine culturel guinéen via des festivals en Espagne et en Guinée.",nationalite_unique:true},
+  {id:"rdc-femmes",nom:"Femmes Actives du Congo",sigle:"FAC",pays:"RD Congo",region:"Kinshasa",ville:"Kinshasa, RD Congo",zone:"Afrique Centrale",nationalite1:"Congolaise",nationalite2:"Britannique",domaine:"Entrepreneuriat",type:"Coopérative",membres:220,vues:1100,abonnes:160,description:"Micro-crédits et formation pour entrepreneuses congolaises.",nationalite_unique:false},
+  {id:"togo-num",nom:"Togo Numérique",sigle:"TN",pays:"Togo",region:"Maritime",ville:"Lomé, Togo",zone:"Afrique de l'Ouest",nationalite1:"Togolaise",nationalite2:"Suisse",domaine:"Technologie",type:"Entreprise",membres:95,vues:430,abonnes:70,description:"Forme aux métiers du numérique, en lien avec des mentors togolais de Suisse.",nationalite_unique:false}
+];
+
+const FIL_ACTUALITE = [
+  {id:1,auteur:"Tech For Senegal",type:"Association",categorie:"Opportunité professionnelle",contenu:"Nous recherchons un(e) ingénieur(e) IoT pour étendre notre réseau de capteurs agricoles à Dakar. Profils de la diaspora bienvenus.",date:"Il y a 2 h",reactions:48,commentaires:12,partages:6},
+  {id:2,auteur:"Jean K.",type:"Utilisateur",categorie:"Publication",contenu:"Très heureux d'avoir rejoint le réseau Tech For Senegal aujourd'hui. Hâte de contribuer avec mon expérience en logistique !",date:"Il y a 4 h",reactions:21,commentaires:3,partages:1},
+  {id:3,auteur:"Diaspo'Actif",type:"Institution",categorie:"Appel à projets",contenu:"Appel à projets santé pour l'Afrique de l'Ouest : financement jusqu'à 15 000 € pour les initiatives sélectionnées. Candidatures jusqu'au 30 juillet.",date:"Il y a 6 h",reactions:132,commentaires:28,partages:54},
+  {id:4,auteur:"Ambassade de Côte d'Ivoire en France",type:"Institution",categorie:"Actualité des diasporas",contenu:"Consultation citoyenne ouverte : donnez votre avis sur les nouveaux services consulaires en ligne.",date:"Il y a 8 h",reactions:76,commentaires:19,partages:9},
+  {id:5,auteur:"ConnectPro Formations",type:"Entreprise",categorie:"Offre de formation",contenu:"Nouvelle session 'Data Analyst' à distance, mentorée par des professionnels de la diaspora. Places limitées.",date:"Hier",reactions:64,commentaires:8,partages:15},
+  {id:6,auteur:"A.I.T.O",type:"Association",categorie:"Annonce d'événement",contenu:"Le Forum des entrepreneurs ivoiriens de Toulouse affiche déjà 120 participants confirmés pour le 15 novembre !",date:"Hier",reactions:95,commentaires:14,partages:22},
+  {id:7,auteur:"Marrakech Éducation Plus",type:"Association",categorie:"Actualité des diasporas",contenu:"Notre 5e bibliothèque rurale est inaugurée ! Plus de 3000 enfants ont désormais accès à un espace de lecture dédié.",date:"Il y a 2 jours",reactions:210,commentaires:31,partages:47}
+];
+
+const EVENEMENTS = [
+  {titre:"Forum des entrepreneurs ivoiriens de Toulouse",organisateur:"A.I.T.O",date:"15 NOV",lieu:"Toulouse, France",statut:"120 participants confirmés"},
+  {titre:"Gala de solidarité de fin d'année A.I.T.O",organisateur:"A.I.T.O",date:"02 DÉC",lieu:"Toulouse, France",statut:"Ouvert à tous"},
+  {titre:"Sommet Tech Diaspora Dakar",organisateur:"Tech For Senegal",date:"20 JAN",lieu:"Dakar, Sénégal",statut:"Inscriptions ouvertes"},
+  {titre:"Atelier financement pour coopératives",organisateur:"Diaspo'Actif",date:"05 FÉV",lieu:"En ligne",statut:"Webinaire gratuit"}
+];
+
+const CONVERSATIONS = [
+  {id:1,avec:"Tech For Senegal",initials:"TS",preview:"Bonjour Jean ! Nous cherchons actuellement...",msgs:[{me:false,texte:"Bonjour, votre profil sur Diaspo'Actif nous a été signalé."},{me:true,texte:"Bonjour ! Merci de me contacter, j'ai vu vos travaux en IoT agricole."},{me:false,texte:"Nous cherchons actuellement des compétences en supply chain. Vous correspondez exactement."},{me:true,texte:"J'ai justement une expérience en logistique et supply chain. Puis-je vous envoyer mon profil ?"},{me:false,texte:"Bien sûr ! Nous vous recontactons sous 48h."}]},
+  {id:2,avec:"Association des Ivoiriens de Toulouse",initials:"AI",preview:"Pour notre forum de novembre...",msgs:[{me:false,texte:"Bonjour, nous souhaiterions échanger sur un partenariat pour notre forum de novembre."},{me:true,texte:"Avec plaisir, je suis disponible cette semaine."},{me:false,texte:"Pour notre forum de novembre, nous cherchons des intervenants sur la thématique fintech."}]},
+  {id:3,avec:"Diaspo'Actif (Officiel)",initials:"DA",preview:"Bienvenue sur Diaspo'Actif !",msgs:[{me:false,texte:"Bienvenue sur Diaspo'Actif ! Vous êtes désormais abonné aux communications officielles de la plateforme."},{me:false,texte:"Votre profil a été vérifié avec succès. Vous pouvez maintenant accéder à toutes les fonctionnalités."}]}
+];
+
+const CAMPAGNES = [
+  {projet:"Puits d'eau potable pour 3 villages",porteur:"Bénin Green Future",recherche:8000,collecte:5420,contributeurs:132,jours:18},
+  {projet:"Ambulance communautaire pour Bamako",porteur:"Santé Sans Frontière Mali",recherche:15000,collecte:9100,contributeurs:204,jours:27},
+  {projet:"Incubateur numérique pour jeunes entrepreneurs",porteur:"Tunis Startup Bridge",recherche:12000,collecte:11760,contributeurs:311,jours:4},
+  {projet:"Bus scolaire pour zones rurales",porteur:"Marrakech Éducation Plus",recherche:6000,collecte:1980,contributeurs:58,jours:41}
+];
+
+const MES_FINANCEMENTS = [
+  {campagne:"Ambulance communautaire pour Bamako",montant:50,date:"10 juin 2026"},
+  {campagne:"Incubateur numérique pour jeunes entrepreneurs",montant:25,date:"2 mai 2026"},
+  {campagne:"Puits d'eau potable pour 3 villages",montant:30,date:"14 avril 2026"}
+];
+
+const MES_COLLABORATIONS = [
+  {titre:"Réseau AgriTech Diaspora",role:"Contributeur logistique",avec:"Tech For Senegal",statut:"En cours"},
+  {titre:"Forum des entrepreneurs ivoiriens de Toulouse",role:"Bénévole organisation",avec:"A.I.T.O",statut:"Mission réalisée"},
+  {titre:"Groupe de travail Mobilité diaspora",role:"Membre du groupe",avec:"Diaspo'Actif (Officiel)",statut:"En cours"}
+];
+
+const PUBLICITES = [
+  {marque:"AfriTransfer",accroche:"Envoyez de l'argent à votre famille en 3 minutes, frais réduits pour la diaspora.",cta:"Découvrir l'offre",icone:"💸",couleur:"#1FA971"},
+  {marque:"Air Sahel",accroche:"Vols directs Paris–Dakar–Abidjan dès 399 €. Réservez votre billet retour.",cta:"Voir les vols",icone:"✈️",couleur:"#3457D5"},
+  {marque:"Banque Diaspora+",accroche:"Ouvrez un compte multi-devises pensé pour les investisseurs de la diaspora.",cta:"Ouvrir un compte",icone:"🏦",couleur:"#8138C2"},
+  {marque:"ConnectPro Formations",accroche:"Formez-vous aux métiers du numérique avec des mentors de la diaspora.",cta:"Voir les formations",icone:"🎓",couleur:"#F2761F"}
+];
+
+const OBSERVATOIRE = {
+  par_pays:[{pays:"France",membres:4520},{pays:"Canada",membres:980},{pays:"Allemagne",membres:640},{pays:"États-Unis",membres:530},{pays:"Belgique",membres:320}],
+  par_secteur:[{secteur:"Technologie",membres:820},{secteur:"Commerce",membres:610},{secteur:"Santé",membres:540},{secteur:"Éducation",membres:430},{secteur:"Autre",membres:4270}],
+  par_age:[{tranche:"18-25 ans",membres:980},{tranche:"26-35 ans",membres:2210},{tranche:"36-50 ans",membres:2340},{tranche:"51 ans et +",membres:1140}],
+  par_etudes:[{niveau:"Bac ou inférieur",membres:1340},{niveau:"Licence",membres:2230},{niveau:"Master",membres:2150},{niveau:"Doctorat",membres:950}]
+};
+
+const CONFIDENTIALITE = [
+  {niveau:"Public",icone:"🌍",classe:"conf-public",description:"Visible par l'ensemble des membres, y compris les visiteurs non connectés.",champs:["Nom (ou pseudonyme)","Photo","Ville (optionnel)","Profession","Compétences","Projets","Publications"]},
+  {niveau:"Réseau uniquement",icone:"🔒",classe:"conf-reseau",description:"Visible uniquement par vos connexions acceptées, initiatives suivies et groupes communs.",champs:["Téléphone","Email","Documents partagés","Informations professionnelles détaillées"]},
+  {niveau:"Confidentiel",icone:"🔐",classe:"conf-confidentiel",description:"Accès réservé à Diaspo'Actif et aux institutions habilitées, dans un cadre strictement encadré.",champs:["Nationalités","Pièces d'identité","Documents de vérification","Informations de paiement"]}
+];
+
+const NAV_LABELS = {
+  fr:{accueil:"Accueil",annuaire:"Annuaire",fil:"Fil d'actualité",evenements:"Événements",messagerie:"Messagerie",dashboard:"Dashboard"},
+  en:{accueil:"Home",annuaire:"Directory",fil:"News Feed",evenements:"Events",messagerie:"Messages",dashboard:"Dashboard"},
+  es:{accueil:"Inicio",annuaire:"Directorio",fil:"Novedades",evenements:"Eventos",messagerie:"Mensajes",dashboard:"Panel"}
+};
+
+// ===== HELPERS =====
+function initials(nom){return(nom||"?").split(" ").filter(w=>w.length>2).slice(0,2).map(w=>w[0]).join("").toUpperCase()||(nom||"?")[0].toUpperCase();}
+function badgeClass(type){return({Association:"badge-asso",ONG:"badge-ong",Entreprise:"badge-ent",Fondation:"badge-fond","Coopérative":"badge-coop"}[type]||"badge-asso");}
+function bar(val,max,color="var(--orange)"){const p=Math.round((val/max)*100);return`<div style="background:var(--bg);border-radius:20px;height:8px;overflow:hidden;margin:3px 0;"><div style="background:${color};height:100%;width:${p}%;border-radius:20px;"></div></div>`;}
+
+// ===== NAVIGATION =====
+function show(view){
+  document.querySelectorAll('.view').forEach(v=>{v.classList.remove('active');if(v.classList.contains('flex-view'))v.style.display='none';});
+  const el=document.getElementById('view-'+view);
+  if(!el)return;
+  el.classList.add('active');
+  if(el.classList.contains('flex-view'))el.style.display='flex';
+  document.querySelectorAll('#main-nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===view));
+  const inits={annuaire:renderAnnuaire,fil:renderFil,evenements:renderEvenements,messagerie:renderChat,dashboard:initDashboard};
+  if(inits[view])inits[view]();
+  window.scrollTo(0,0);
+}
+
+function setRole(btn,role){
+  document.querySelectorAll('.role-switch button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ===== LANGUE =====
+let lang='fr';
+function setLang(l){
+  lang=l;
+  document.querySelectorAll('#main-nav a').forEach(a=>{
+    if(NAV_LABELS[l]&&NAV_LABELS[l][a.dataset.view])a.textContent=NAV_LABELS[l][a.dataset.view];
+  });
+  const ftMap={fr:"Prototype interactif · Données fictives · Aucun paiement réel · 2026",en:"Interactive prototype · Sample data · No real payment · 2026",es:"Prototipo interactivo · Datos ficticios · Sin pago real · 2026"};
+  document.getElementById('footer-text').textContent=ftMap[l]||ftMap.fr;
+  const heroMap={fr:["Connecter la diaspora mondiale 🌍","Diaspo'Actif réunit initiatives, entrepreneurs et institutions pour un réseau diaspora vivant et actif."],en:["Connecting the global diaspora 🌍","Diaspo'Actif brings together initiatives, entrepreneurs and institutions for a vibrant diaspora network."],es:["Conectar la diáspora mundial 🌍","Diaspo'Actif reúne iniciativas, emprendedores e instituciones para una red de diáspora activa."]};
+  if(heroMap[l]){document.getElementById('hero-title').textContent=heroMap[l][0];document.getElementById('hero-sub').textContent=heroMap[l][1];}
+}
+
+// ===== RÉSEAU SVG =====
+function renderNetwork(){
+  const pts=[
+    {nom:"A.I.T.O",ville:"Toulouse",lon:1.4,lat:43.6},{nom:"Tech For Senegal",ville:"Dakar",lon:-17.4,lat:14.7},
+    {nom:"SSF Mali",ville:"Bamako",lon:-8.0,lat:12.6},{nom:"Cacao Solidaire",ville:"Douala",lon:9.7,lat:4.05},
+    {nom:"Marrakech Edu",ville:"Marrakech",lon:-8.0,lat:31.6},{nom:"Bénin Green",ville:"Cotonou",lon:2.3,lat:6.4},
+    {nom:"Tunis Startup",ville:"Tunis",lon:10.2,lat:36.8},{nom:"Racines de Guinée",ville:"Conakry",lon:-13.7,lat:9.5},
+    {nom:"FAC",ville:"Kinshasa",lon:15.3,lat:-4.3},{nom:"Togo Numérique",ville:"Lomé",lon:1.2,lat:6.1}
+  ];
+  const W=1000,H=300;
+  const toX=lon=>((lon+20)/60)*W*0.88+W*0.06;
+  const toY=lat=>H-(((lat+10)/60)*H*0.8+H*0.1);
+
+  let bg='';
+  for(let i=0;i<28;i++)bg+=`<circle class="dot dim" cx="${40+(i*41)%920}" cy="${25+((i*57)%250)}" r="2"/>`;
+  let links='';
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i],b=pts[(i+3)%pts.length];
+    links+=`<line class="link" x1="${toX(a.lon)}" y1="${toY(a.lat)}" x2="${toX(b.lon)}" y2="${toY(b.lat)}"/>`;
+  }
+  let dots='',labels='';
+  pts.forEach((p,i)=>{
+    const x=toX(p.lon),y=toY(p.lat),r=i===0?9:6;
+    dots+=`<circle class="dot" cx="${x}" cy="${y}" r="${r}" title="${p.nom}"/>`;
+    if(i<5)labels+=`<text x="${x+8}" y="${y-6}" fill="#F2761F" font-size="9" font-family="Segoe UI,sans-serif">${p.ville}</text>`;
+  });
+  document.getElementById('network-svg').innerHTML=bg+links+dots+labels;
+  document.getElementById('tip-onboard').innerHTML=`<strong>🟠 ${INITIATIVES[0].sigle} — ${INITIATIVES[0].ville}</strong><br>${INITIATIVES[0].description.slice(0,60)}…<br><span style="color:var(--green);font-weight:700;">✓ Vérifié</span> · ${INITIATIVES[0].membres} membres`;
+  document.getElementById('network-stats').innerHTML=`${INITIATIVES.length} initiatives · 10 pays · ~2 000 membres`;
+}
+
+// ===== ACCUEIL =====
+function renderAccueil(){
+  // Initiatives en vedette (3 premières)
+  document.getElementById('accueil-init').innerHTML=INITIATIVES.slice(0,3).map(i=>`
+    <div class="init-card">
+      <div class="init-logo">${i.sigle}</div>
+      <div class="meta">
+        <div class="flex-between"><h4>${i.nom}</h4><span class="badge ${badgeClass(i.type)}">${i.type}</span></div>
+        <p style="margin:2px 0;font-size:13px;color:var(--muted);">${i.ville} · ${i.domaine}</p>
+        <div class="tags"><span class="tag">🌍 ${i.nationalite1}${i.nationalite2?' / '+i.nationalite2:''}</span><span class="tag">${i.membres} membres</span>${i.nationalite_unique?'<span class="badge badge-unique">Nationalité unique</span>':''}</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="show('annuaire')">Voir</button>
+    </div>`).join('');
+
+  // Campagnes (2)
+  document.getElementById('campagnes-home').innerHTML=CAMPAGNES.slice(0,2).map(c=>{
+    const pct=Math.min(100,Math.round((c.collecte/c.recherche)*100));
+    return`<div class="card">
+      <div class="flex-between"><h3 style="margin:0;font-size:15px;">${c.projet}</h3><span class="tag">${c.jours}j restants</span></div>
+      <p style="margin:4px 0 10px;color:var(--muted);font-size:13px;">Porté par ${c.porteur}</p>
+      ${bar(c.collecte,c.recherche)}
+      <div class="flex-between" style="font-size:12.5px;color:var(--muted);margin:6px 0 12px;">
+        <span><strong style="color:var(--navy);">${c.collecte.toLocaleString('fr')} €</strong> / ${c.recherche.toLocaleString('fr')} € (${pct}%)</span>
+        <span>${c.contributeurs} contributeurs</span>
+      </div>
+      <button class="btn btn-orange btn-block btn-sm">Contribuer</button>
+    </div>`;
+  }).join('');
+
+  // Pub
+  const ad=PUBLICITES[0];
+  document.getElementById('ad-home').innerHTML=`<div class="ad-icon" style="background:${ad.couleur};">${ad.icone}</div><div class="ad-body"><span class="ad-tag">Publicité · ciblée pour Toulouse</span><h4>${ad.marque}</h4><p>${ad.accroche}</p></div><button class="btn btn-sm btn-outline">${ad.cta}</button>`;
+}
+
+// ===== ANNUAIRE =====
+let currentInits=INITIATIVES;
+function renderAnnuaire(){
+  // Populate selects
+  const types=[...new Set(INITIATIVES.map(i=>i.type))].sort();
+  const domaines=[...new Set(INITIATIVES.map(i=>i.domaine))].sort();
+  const pays=[...new Set(INITIATIVES.map(i=>i.nationalite1))].sort();
+  const zones=[...new Set(INITIATIVES.map(i=>i.zone))].sort();
+  const fill=(id,vals)=>{const s=document.getElementById(id);if(s.options.length<2)vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o);});};
+  fill('f-type',types);fill('f-domaine',domaines);fill('f-pays',pays);fill('f-zone',zones);
+  applyFilter();
+  ['f-q','f-type','f-domaine','f-pays','f-zone','f-unique'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el&&!el._bound){el.addEventListener('input',applyFilter);el.addEventListener('change',applyFilter);el._bound=true;}
+  });
+}
+
+function applyFilter(){
+  const q=(document.getElementById('f-q').value||'').toLowerCase();
+  const type=document.getElementById('f-type').value;
+  const domaine=document.getElementById('f-domaine').value;
+  const pays=document.getElementById('f-pays').value;
+  const zone=document.getElementById('f-zone').value;
+  const uniq=document.getElementById('f-unique').checked;
+  currentInits=INITIATIVES.filter(i=>{
+    if(q&&!i.nom.toLowerCase().includes(q)&&!i.ville.toLowerCase().includes(q)&&!i.domaine.toLowerCase().includes(q))return false;
+    if(type&&i.type!==type)return false;
+    if(domaine&&i.domaine!==domaine)return false;
+    if(pays&&i.nationalite1!==pays)return false;
+    if(zone&&i.zone!==zone)return false;
+    if(uniq&&!i.nationalite_unique)return false;
+    return true;
+  });
+  document.getElementById('annuaire-count').textContent=`${currentInits.length} organisation${currentInits.length>1?'s':''} référencée${currentInits.length>1?'s':''}`;
+  document.getElementById('init-list').innerHTML=currentInits.length?currentInits.map(i=>`
+    <div class="init-card">
+      <div class="init-logo">${i.sigle}</div>
+      <div class="meta">
+        <div class="flex-between"><h4>${i.nom}</h4><span class="badge ${badgeClass(i.type)}">${i.type}</span></div>
+        <p style="margin:2px 0;font-size:13px;color:var(--muted);">${i.ville} · Fondée <em>${i.region}</em></p>
+        <div class="tags">
+          <span class="tag">🌍 ${i.nationalite1}${i.nationalite2?' / '+i.nationalite2:''}</span>
+          <span class="tag">${i.domaine}</span>
+          <span class="tag">${i.membres} membres</span>
+          ${i.nationalite_unique?'<span class="badge badge-unique">Nationalité unique</span>':''}
+        </div>
+      </div>
+      <div style="text-align:right;flex:none;">
+        <div style="font-size:12px;color:var(--muted);">${i.vues} vues</div>
+        <button class="btn btn-outline btn-sm" style="margin-top:6px;">Voir le profil</button>
+      </div>
+    </div>`).join(''):`<div style="text-align:center;color:var(--muted);padding:40px 0;">Aucune initiative ne correspond à ces critères.</div>`;
+}
+
+// ===== FIL =====
+let filPosts=[...FIL_ACTUALITE];
+let filCat='Tous';
+function renderFil(){
+  const bar=document.getElementById('fil-filter-bar');
+  bar.querySelectorAll('button').forEach(b=>{
+    b.classList.toggle('active',b.dataset.cat===filCat);
+    if(!b._bound){b.addEventListener('click',()=>{filCat=b.dataset.cat;renderFil();});b._bound=true;}
+  });
+  const items=filCat==='Tous'?filPosts:filPosts.filter(p=>p.categorie===filCat);
+  document.getElementById('feed-list').innerHTML=items.map(p=>`
+    <div class="feed-post">
+      <div class="feed-head">
+        <div class="avatar" style="width:38px;height:38px;flex:none;">${initials(p.auteur)}</div>
+        <div class="meta"><h4>${p.auteur}</h4><div class="sub-meta">${p.type} · ${p.date}</div></div>
+        <span class="feed-cat">${p.categorie}</span>
+      </div>
+      <div class="feed-body">${p.contenu}</div>
+      <div class="feed-actions">
+        <span onclick="reactPost(${p.id})">❤️ ${p.reactions}</span>
+        <span>💬 ${p.commentaires}</span>
+        <span onclick="reactPost(${p.id},'partages')">↗️ ${p.partages}</span>
+        <span>🔖 Enregistrer</span>
+      </div>
+    </div>`).join('');
+}
+function reactPost(id,field='reactions'){const p=filPosts.find(x=>x.id===id);if(p){p[field]++;renderFil();}}
+function toggleNewPost(){const f=document.getElementById('new-post-form');f.style.display=f.style.display==='none'?'block':'none';}
+function publishPost(){
+  const txt=document.getElementById('post-text').value.trim();
+  if(!txt)return;
+  filPosts.unshift({id:Date.now(),auteur:'Ynouss Diallo',type:'Utilisateur',categorie:'Publication',contenu:txt,date:"À l'instant",reactions:0,commentaires:0,partages:0});
+  document.getElementById('post-text').value='';
+  toggleNewPost();
+  renderFil();
+}
+
+// ===== ÉVÉNEMENTS =====
+function renderEvenements(){
+  document.getElementById('evt-list').innerHTML=EVENEMENTS.map(e=>`
+    <div class="timeline-item">
+      <div class="date-chip"><div>${e.date.split(' ')[0]}</div><span>${e.date.split(' ')[1]}</span></div>
+      <div class="card" style="flex:1;">
+        <div class="flex-between">
+          <div><h3 style="margin:0 0 4px;">${e.titre}</h3><p style="margin:0;">${e.organisateur} · ${e.lieu}</p></div>
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+            <span class="tag">${e.statut}</span>
+            <button class="btn btn-orange btn-sm">S'inscrire</button>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ===== MESSAGERIE =====
+let activeConv=1;
+function renderChat(){
+  document.getElementById('chat-list').innerHTML=CONVERSATIONS.map(c=>`
+    <div class="chat-item${c.id===activeConv?' active':''}" onclick="selectConv(${c.id})">
+      <h5>${c.avec}</h5><p>${c.preview}</p>
+    </div>`).join('');
+  renderMsgs();
+}
+function selectConv(id){activeConv=id;renderChat();}
+function renderMsgs(){
+  const c=CONVERSATIONS.find(x=>x.id===activeConv);
+  if(!c)return;
+  document.getElementById('chat-head').textContent=c.avec;
+  document.getElementById('chat-body').innerHTML=c.msgs.map(m=>`<div class="bubble ${m.me?'me':'them'}">${m.texte}</div>`).join('');
+  document.getElementById('chat-body').scrollTop=9999;
+}
+function sendMsg(){
+  const inp=document.getElementById('chat-input-field');
+  const txt=inp.value.trim();if(!txt)return;
+  CONVERSATIONS.find(x=>x.id===activeConv).msgs.push({me:true,texte:txt});
+  inp.value='';renderMsgs();
+  setTimeout(()=>{CONVERSATIONS.find(x=>x.id===activeConv).msgs.push({me:false,texte:"Message reçu, merci ! Nous vous répondrons rapidement. 👍"});renderMsgs();},800);
+}
+
+// ===== DASHBOARD =====
+function showDash(id){
+  document.querySelectorAll('.dash-panel').forEach(p=>p.style.display='none');
+  document.getElementById(id).style.display='block';
+  document.querySelectorAll('.sidebar a').forEach(a=>a.classList.remove('active'));
+}
+function initDashboard(){
+  showDash('dash-home');
+  document.getElementById('dash-recherche-tags').innerHTML=['Investisseurs','Associés','Clients','Talents','Partenaires publics'].map(t=>`<span class="tag">${t}</span>`).join('');
+  document.getElementById('collab-list').innerHTML=MES_COLLABORATIONS.map(c=>`
+    <div class="init-card" style="margin-bottom:12px;">
+      <div class="init-logo">${initials(c.titre)}</div>
+      <div class="meta"><h4>${c.titre}</h4><p style="font-size:12px;color:var(--muted);">${c.role} · avec ${c.avec}</p></div>
+      <span class="tag" style="flex:none;">${c.statut}</span>
+    </div>`).join('');
+  document.getElementById('financement-list').innerHTML=MES_FINANCEMENTS.map(f=>`
+    <div class="card" style="margin-bottom:12px;display:flex;align-items:center;gap:16px;">
+      <div style="font-size:26px;">💚</div>
+      <div style="flex:1;"><strong>${f.campagne}</strong><br><span style="font-size:12px;color:var(--muted);">${f.date}</span></div>
+      <strong style="color:var(--orange);">${f.montant} €</strong>
+    </div>`).join('');
+  // Observatoire
+  function renderBars(elId,items,key){
+    const max=Math.max(...items.map(i=>i.membres));
+    document.getElementById(elId).innerHTML=items.map(i=>`
+      <div style="margin-bottom:8px;">
+        <div class="flex-between" style="font-size:12.5px;margin-bottom:2px;"><span>${i[key]}</span><strong>${i.membres.toLocaleString('fr')}</strong></div>
+        ${bar(i.membres,max)}
+      </div>`).join('');
+  }
+  renderBars('obs-pays',OBSERVATOIRE.par_pays,'pays');
+  renderBars('obs-secteur',OBSERVATOIRE.par_secteur,'secteur');
+  renderBars('obs-age',OBSERVATOIRE.par_age,'tranche');
+  renderBars('obs-etudes',OBSERVATOIRE.par_etudes,'niveau');
+  // Confidentialité
+  document.getElementById('conf-list').innerHTML=CONFIDENTIALITE.map(n=>`
+    <div class="conf-card ${n.classe}">
+      <div class="conf-icon">${n.icone}</div>
+      <h3>${n.niveau}</h3>
+      <p>${n.description}</p>
+      <ul>${n.champs.map(c=>`<li>${c}</li>`).join('')}</ul>
+    </div>`).join('');
+  // Pays inscription
+  const pays=[...new Set(INITIATIVES.map(i=>i.pays))].sort();
+  const sel=document.getElementById('reg-pays');
+  if(sel&&sel.options.length===0)pays.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;sel.appendChild(o);});
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded',()=>{
+  renderNetwork();
+  renderAccueil();
+  // Préparer select inscription
+  const pays=[...new Set(INITIATIVES.map(i=>i.pays))].sort();
+  const sel=document.getElementById('reg-pays');
+  pays.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;sel.appendChild(o);});
+});
+</script>
+</body>
+</html>

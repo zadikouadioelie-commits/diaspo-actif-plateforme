@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Inscription</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+.insc-wrap{max-width:720px;margin:32px auto;padding:0 16px 64px}
+.insc-stepper{display:flex;align-items:center;margin-bottom:32px}
+.insc-step-dot{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.insc-step-dot .dot{width:32px;height:32px;border-radius:50%;background:var(--border);color:var(--muted);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.insc-step-dot .dot.active{background:var(--orange);color:#fff}
+.insc-step-dot .dot.done{background:#22c55e;color:#fff}
+.insc-step-dot span{font-size:11px;color:var(--muted);text-align:center}
+.insc-step-line{flex:1;height:2px;background:var(--border);max-width:60px;margin-top:-16px}
+.type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
+@media(max-width:580px){.type-grid{grid-template-columns:1fr}}
+.type-card{border:2px solid var(--border);border-radius:12px;padding:22px 18px;cursor:pointer;text-align:center;transition:border-color .15s}
+.type-card:hover{border-color:var(--orange)}
+.type-card.selected{border-color:var(--orange);background:#fff8f2;box-shadow:0 0 0 3px rgba(255,107,0,.12)}
+.type-card .tc-icon{font-size:36px;margin-bottom:10px}
+.type-card h3{margin:0 0 6px;font-size:16px}
+.type-card p{font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.4}
+.type-card .badge{font-size:11px;padding:3px 10px;border-radius:99px;background:var(--bg);border:1px solid var(--border)}
+.type-card.selected .badge{background:var(--orange);color:#fff;border-color:var(--orange)}
+.form-section{margin-top:24px}
+.form-section h4{font-size:14px;color:var(--orange);text-transform:uppercase;letter-spacing:.05em;margin:0 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:580px){.grid-2,.grid-3{grid-template-columns:1fr}}
+.nat-notice{background:#fff8e1;border:1px solid #ffd54f;border-radius:8px;padding:10px 14px;font-size:12px;color:#7a5700;margin-bottom:14px}
+.interests-grid{display:flex;flex-wrap:wrap;gap:8px}
+.interests-grid label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:5px 10px;border:1px solid var(--border);border-radius:99px}
+.interests-grid label:hover{border-color:var(--orange)}
+.interests-grid input[type=checkbox]{accent-color:var(--orange)}
+.radio-grid{display:flex;flex-wrap:wrap;gap:8px}
+.radio-grid label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:5px 12px;border:1px solid var(--border);border-radius:99px}
+.radio-grid input[type=radio]{accent-color:var(--orange)}
+.pwd-strength{height:4px;border-radius:4px;margin-top:6px;background:var(--border);overflow:hidden}
+.pwd-strength-bar{height:100%;border-radius:4px;transition:width .3s,background .3s;width:0%}
+.pwd-hint{font-size:11px;color:var(--muted);margin-top:4px}
+.validation-notice{background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px 14px;font-size:13px;color:#0c4a6e;margin-top:16px}
+.validation-notice strong{display:block;margin-bottom:4px}
+.auth-error{display:none;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:10px 14px;margin-top:12px;font-size:13px}
+.insc-pane{display:none}.insc-pane.active{display:block}
+.success-box{text-align:center;padding:40px 24px}
+.success-box .success-icon{font-size:64px;margin-bottom:16px}
+.success-box h3{font-size:22px;margin-bottom:8px}
+.success-box p{color:var(--muted);max-width:380px;margin:0 auto 20px}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <nav class="nav">
+      <a href="index.html">Accueil</a>
+      <a href="annuaire.html">Annuaire</a>
+      <a href="fil-actualite.html">Fil d'actualite</a>
+      <a href="formations.html">Formations</a>
+    </nav>
+    <div class="topbar-right">
+      <select class="lang-select" id="lang-select"></select>
+      <div id="auth-area" class="auth-area"></div>
+    </div>
+  </div>
+</header>
+<main class="insc-wrap">
+  <div style="text-align:center;margin-bottom:28px">
+    <h2 style="margin:0 0 6px">Creer un compte Diaspo'Actif</h2>
+    <p style="color:var(--muted);margin:0;font-size:14px">Choisissez le type de compte adapte a votre profil</p>
+  </div>
+  <div class="insc-stepper">
+    <div class="insc-step-dot"><div class="dot active" id="dot-1">1</div><span>Type de compte</span></div>
+    <div class="insc-step-line"></div>
+    <div class="insc-step-dot"><div class="dot" id="dot-2">2</div><span>Informations</span></div>
+    <div class="insc-step-line"></div>
+    <div class="insc-step-dot"><div class="dot" id="dot-3">3</div><span>Confirmation</span></div>
+  </div>
+  <!-- ETAPE 1 -->
+  <div class="insc-pane active" id="pane-1">
+    <div class="card" style="padding:28px">
+      <h3 style="margin:0 0 4px">Quel type de compte souhaitez-vous creer ?</h3>
+      <p style="color:var(--muted);font-size:13px;margin:0">Chaque type donne acces a des fonctionnalites differentes.</p>
+      <div class="type-grid">
+        <div class="type-card" data-role="utilisateur">
+          <div class="tc-icon">&#128100;</div><h3>Utilisateur</h3>
+          <p>Personne physique — particulier membre de la diaspora</p>
+          <span class="badge">Gratuit</span>
+        </div>
+        <div class="type-card" data-role="initiative">
+          <div class="tc-icon">&#127970;</div><h3>Initiative</h3>
+          <p>Association, ONG, entreprise, cooperative, startup, projet collectif</p>
+          <span class="badge">50 €/an (simule)</span>
+        </div>
+        <div class="type-card" data-role="collectivite">
+          <div class="tc-icon">&#127963;</div><h3>Compte Officiel</h3>
+          <p>Ambassade, consulat, ministere, region, mairie, organisme public</p>
+          <span class="badge">Validation requise</span>
+        </div>
+      </div>
+      <div style="margin-top:24px;text-align:right"><button class="btn btn-orange" id="btn-next-1" disabled>Continuer &rarr;</button></div>
+    </div>
+    <p style="text-align:center;font-size:13px;color:var(--muted);margin-top:16px">Deja inscrit ? <a href="login.html" style="color:var(--orange);font-weight:700">Se connecter</a></p>
+  </div>
+  <!-- ETAPE 2a : Utilisateur -->
+  <div class="insc-pane" id="pane-utilisateur">
+    <div class="card" style="padding:28px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+        <button class="btn" id="back-utilisateur" style="padding:6px 12px;font-size:13px">&larr; Retour</button>
+        <div><strong>Compte Utilisateur</strong><br><span style="font-size:12px;color:var(--muted)">Personne physique</span></div>
+      </div>
+      <div class="form-section"><h4>Identite</h4>
+        <div class="grid-2">
+          <div><label>Nom <span style="color:var(--orange)">*</span></label><input type="text" id="u-nom" placeholder="Kouadio"></div>
+          <div><label>Prenom <span style="color:var(--orange)">*</span></label><input type="text" id="u-prenom" placeholder="Jean"></div>
+        </div>
+        <div style="margin-top:12px"><label>Date de naissance <span style="color:var(--orange)">*</span></label><input type="date" id="u-dob"></div>
+      </div>
+      <div class="form-section"><h4>Nationalites</h4>
+        <div class="nat-notice">&#128274; <strong>Information privee</strong> — Jamais affichees publiquement. Utilisees uniquement pour le ciblage institutionnel anonymise et les recommandations.</div>
+        <div class="grid-3">
+          <div><label>Nationalite 1 <span style="color:var(--orange)">*</span></label><input type="text" id="u-nat1" placeholder="Francaise"></div>
+          <div><label>Nationalite 2</label><input type="text" id="u-nat2" placeholder="Senegalaise (opt.)"></div>
+          <div><label>Nationalite 3</label><input type="text" id="u-nat3" placeholder="Optionnel"></div>
+        </div>
+      </div>
+      <div class="form-section"><h4>Residence</h4>
+        <div class="grid-3">
+          <div><label>Pays <span style="color:var(--orange)">*</span></label><input type="text" id="u-pays" placeholder="France"></div>
+          <div><label>Ville <span style="color:var(--orange)">*</span></label><input type="text" id="u-ville" placeholder="Paris"></div>
+          <div><label>Code postal</label><input type="text" id="u-cp" placeholder="75001"></div>
+        </div>
+      </div>
+      <div class="form-section"><h4>Coordonnees</h4>
+        <div class="grid-2">
+          <div><label>Email <span style="color:var(--orange)">*</span></label><input type="email" id="u-email" placeholder="jean@example.com"></div>
+          <div><label>Telephone</label><input type="tel" id="u-tel" placeholder="+33 6 00 00 00 00"></div>
+        </div>
+      </div>
+      <div class="form-section"><h4>Centres d'interet</h4>
+        <div class="interests-grid" id="u-interests">
+          <label><input type="checkbox" value="entrepreneuriat"> Entrepreneuriat</label>
+          <label><input type="checkbox" value="investissement"> Investissement</label>
+          <label><input type="checkbox" value="emploi"> Emploi</label>
+          <label><input type="checkbox" value="formation"> Formation</label>
+          <label><input type="checkbox" value="agriculture"> Agriculture</label>
+          <label><input type="checkbox" value="sante"> Sante</label>
+          <label><input type="checkbox" value="education"> Education</label>
+          <label><input type="checkbox" value="technologie"> Technologie</label>
+          <label><input type="checkbox" value="culture"> Culture</label>
+          <label><input type="checkbox" value="sport"> Sport</label>
+          <label><input type="checkbox" value="tourisme"> Tourisme</label>
+          <label><input type="checkbox" value="autres"> Autres</label>
+        </div>
+      </div>
+      <div class="form-section"><h4>Situation professionnelle</h4>
+        <div class="radio-grid">
+          <label><input type="radio" name="sitpro" value="etudiant"> Etudiant</label>
+          <label><input type="radio" name="sitpro" value="salarie"> Salarie</label>
+          <label><input type="radio" name="sitpro" value="entrepreneur"> Entrepreneur</label>
+          <label><input type="radio" name="sitpro" value="liberal"> Profession liberale</label>
+          <label><input type="radio" name="sitpro" value="fonctionnaire"> Fonctionnaire</label>
+          <label><input type="radio" name="sitpro" value="retraite"> Retraite</label>
+          <label><input type="radio" name="sitpro" value="sans_emploi"> Sans emploi</label>
+          <label><input type="radio" name="sitpro" value="autre"> Autre</label>
+        </div>
+      </div>
+      <div class="form-section"><h4>Securite</h4>
+        <div class="grid-2">
+          <div>
+            <label>Mot de passe <span style="color:var(--orange)">*</span></label>
+            <input type="password" id="u-pwd" minlength="8" placeholder="8 caracteres min" autocomplete="new-password" oninput="updateStrength(this,'u-sbar','u-shint')">
+            <div class="pwd-strength"><div class="pwd-strength-bar" id="u-sbar"></div></div>
+            <div class="pwd-hint" id="u-shint"></div>
+          </div>
+          <div><label>Confirmer <span style="color:var(--orange)">*</span></label><input type="password" id="u-pwd2" minlength="8" placeholder="Repeter" autocomplete="new-password"></div>
+        </div>
+      </div>
+      <div class="notice" style="margin-top:16px">&#9888; Demo : verification d'identite et paiements simules.</div>
+      <div class="auth-error" id="u-error"></div>
+      <div style="margin-top:20px"><button class="btn btn-orange btn-block" id="u-submit">Creer mon compte utilisateur</button></div>
+    </div>
+  </div>
+  <!-- ETAPE 2b : Initiative -->
+  <div class="insc-pane" id="pane-initiative">
+    <div class="card" style="padding:28px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+        <button class="btn" id="back-initiative" style="padding:6px 12px;font-size:13px">&larr; Retour</button>
+        <div><strong>Compte Initiative</strong><br><span style="font-size:12px;color:var(--muted)">Association, ONG, entreprise, startup…</span></div>
+      </div>
+      <div class="form-section"><h4>Organisation</h4>
+        <div class="grid-2">
+          <div><label>Nom de l'organisation <span style="color:var(--orange)">*</span></label><input type="text" id="i-nom" placeholder="Association Solidarite Diaspora"></div>
+          <div><label>Type <span style="color:var(--orange)">*</span></label>
+            <select id="i-type">
+              <option value="">— Selectionner —</option>
+              <option>Association</option><option>Entreprise</option><option>ONG</option>
+              <option>Cooperative</option><option>Fondation</option><option>Startup</option>
+              <option>Projet collectif</option><option>Autre</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:12px"><label>Domaine d'activite</label>
+          <select id="i-domaine">
+            <option value="">— Selectionner —</option>
+            <option>Entrepreneuriat</option><option>Investissement</option><option>Emploi</option>
+            <option>Formation</option><option>Agriculture</option><option>Sante</option>
+            <option>Education</option><option>Technologie</option><option>Culture</option>
+            <option>Sport</option><option>Tourisme</option><option>Autre</option>
+          </select>
+        </div>
+        <div style="margin-top:12px"><label>Description <span style="color:var(--orange)">*</span></label>
+          <textarea id="i-desc" rows="3" placeholder="Presentez votre initiative…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
+        </div>
+        <div style="margin-top:12px"><label>Objectifs</label>
+          <textarea id="i-objectifs" rows="2" placeholder="Vos principaux objectifs…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
+        </div>
+      </div>
+      <div class="form-section"><h4>Localisation</h4>
+        <div class="grid-2">
+          <div><label>Pays <span style="color:var(--orange)">*</span></label><input type="text" id="i-pays" placeholder="France"></div>
+          <div><label>Ville <span style="color:var(--orange)">*</span></label><input type="text" id="i-ville" placeholder="Toulouse"></div>
+        </div>
+        <div class="grid-2" style="margin-top:12px">
+          <div><label>Adresse</label><input type="text" id="i-adresse" placeholder="12 rue de la Solidarite"></div>
+          <div><label>Code postal</label><input type="text" id="i-cp" placeholder="31000"></div>
+        </div>
+      </div>
+      <div class="form-section"><h4>Responsable principal</h4>
+        <div class="grid-3">
+          <div><label>Nom <span style="color:var(--orange)">*</span></label><input type="text" id="i-rnom" placeholder="Diallo"></div>
+          <div><label>Prenom <span style="color:var(--orange)">*</span></label><input type="text" id="i-rprenom" placeholder="Aminata"></div>
+          <div><label>Fonction</label><input type="text" id="i-rfct" placeholder="Presidente"></div>
+        </div>
+        <div class="grid-2" style="margin-top:12px">
+          <div><label>Email <span style="color:var(--orange)">*</span></label><input type="email" id="i-email" placeholder="contact@initiative.org"></div>
+          <div><label>Telephone</label><input type="tel" id="i-tel" placeholder="+33 5 00 00 00 00"></div>
+        </div>
+      </div>
+      <div class="form-section"><h4>Presence en ligne (facultatif)</h4>
+        <div class="grid-2">
+          <div><label>Site internet</label><input type="url" id="i-site" placeholder="https://mon-initiative.org"></div>
+          <div><label>Reseau social principal</label><input type="url" id="i-rs" placeholder="https://facebook.com/..."></div>
+        </div>
+      </div>
+      <div class="validation-notice">
+        <strong>&#128203; Validation manuelle requise</strong>
+        Votre compte sera examine avant activation. Documents : statuts, registre de commerce, recepisse de declaration ou numero d'identification officiel.
+      </div>
+      <div class="form-section"><h4>Securite</h4>
+        <div class="grid-2">
+          <div>
+            <label>Mot de passe <span style="color:var(--orange)">*</span></label>
+            <input type="password" id="i-pwd" minlength="8" placeholder="8 caracteres min" autocomplete="new-password" oninput="updateStrength(this,'i-sbar','i-shint')">
+            <div class="pwd-strength"><div class="pwd-strength-bar" id="i-sbar"></div></div>
+            <div class="pwd-hint" id="i-shint"></div>
+          </div>
+          <div><label>Confirmer <span style="color:var(--orange)">*</span></label><input type="password" id="i-pwd2" minlength="8" placeholder="Repeter" autocomplete="new-password"></div>
+        </div>
+      </div>
+      <div class="notice" style="margin-top:16px">&#9888; Abonnement 50 €/an et verification des documents simules.</div>
+      <div class="auth-error" id="i-error"></div>
+      <div style="margin-top:20px"><button class="btn btn-orange btn-block" id="i-submit">Creer mon compte initiative</button></div>
+    </div>
+  </div>
+  <!-- ETAPE 2c : Collectivite -->
+  <div class="insc-pane" id="pane-collectivite">
+    <div class="card" style="padding:28px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+        <button class="btn" id="back-collectivite" style="padding:6px 12px;font-size:13px">&larr; Retour</button>
+        <div><strong>Compte Officiel</strong><br><span style="font-size:12px;color:var(--muted)">Institution publique ou parapublique</span></div>
+      </div>
+      <div class="form-section"><h4>Institution</h4>
+        <div class="grid-2">
+          <div><label>Type <span style="color:var(--orange)">*</span></label>
+            <select id="c-type">
+              <option value="">— Selectionner —</option>
+              <option>Ambassade</option><option>Consulat</option><option>Ministere</option>
+              <option>Prefecture</option><option>Region</option><option>Mairie</option>
+              <option>Chambre de commerce</option><option>Organisme public</option>
+              <option>Agence gouvernementale</option>
+            </select>
+          </div>
+          <div><label>Nom officiel <span style="color:var(--orange)">*</span></label><input type="text" id="c-nom" placeholder="Ambassade du Senegal en France"></div>
+        </div>
+        <div class="grid-2" style="margin-top:12px">
+          <div><label>Pays concerne <span style="color:var(--orange)">*</span></label><input type="text" id="c-pays" placeholder="Senegal"></div>
+          <div><label>Ville <span style="color:var(--orange)">*</span></label><input type="text" id="c-ville" placeholder="Paris"></div>
+        </div>
+        <div style="margin-top:12px"><label>Adresse</label><input type="text" id="c-adresse" placeholder="14 avenue Robert Schuman…"></div>
+      </div>
+      <div class="form-section"><h4>Responsable du compte</h4>
+        <div class="grid-3">
+          <div><label>Nom <span style="color:var(--orange)">*</span></label><input type="text" id="c-rnom" placeholder="Sow"></div>
+          <div><label>Prenom <span style="color:var(--orange)">*</span></label><input type="text" id="c-rprenom" placeholder="Ibrahim"></div>
+          <div><label>Fonction <span style="color:var(--orange)">*</span></label><input type="text" id="c-rfct" placeholder="Consul General"></div>
+        </div>
+        <div class="grid-3" style="margin-top:12px">
+          <div><label>Email professionnel <span style="color:var(--orange)">*</span></label><input type="email" id="c-email" placeholder="contact@ambassade.fr"></div>
+          <div><label>Telephone</label><input type="tel" id="c-tel" placeholder="+33 1 00 00 00 00"></div>
+          <div><label>Site officiel</label><input type="url" id="c-site" placeholder="https://ambassade.fr"></div>
+        </div>
+      </div>
+      <div class="validation-notice">
+        <strong>&#128274; Validation obligatoire avant activation</strong>
+        Documents : lettre officielle, arrete de nomination, courrier administratif ou email d'un domaine institutionnel. Les fonctionnalites s'activent apres verification.
+      </div>
+      <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:16px">
+        <strong style="font-size:13px">&#128683; Restrictions permanentes</strong>
+        <ul style="font-size:12px;color:var(--muted);margin:8px 0 0;padding-left:18px;line-height:1.7">
+          <li>Ne peuvent pas initier un contact avec un utilisateur (personne physique)</li>
+          <li>Aucun acces aux nationalites ou identites individuelles</li>
+          <li>Statistiques uniquement agregees (seuil minimum : 10 membres)</li>
+          <li>Aucun acces aux pieces d'identite ni coordonnees privees</li>
+        </ul>
+      </div>
+      <div class="form-section"><h4>Securite</h4>
+        <div class="grid-2">
+          <div>
+            <label>Mot de passe <span style="color:var(--orange)">*</span></label>
+            <input type="password" id="c-pwd" minlength="8" placeholder="8 caracteres min" autocomplete="new-password" oninput="updateStrength(this,'c-sbar','c-shint')">
+            <div class="pwd-strength"><div class="pwd-strength-bar" id="c-sbar"></div></div>
+            <div class="pwd-hint" id="c-shint"></div>
+          </div>
+          <div><label>Confirmer <span style="color:var(--orange)">*</span></label><input type="password" id="c-pwd2" minlength="8" placeholder="Repeter" autocomplete="new-password"></div>
+        </div>
+      </div>
+      <div class="auth-error" id="c-error"></div>
+      <div style="margin-top:20px"><button class="btn btn-orange btn-block" id="c-submit">Soumettre ma demande d'acces</button></div>
+    </div>
+  </div>
+  <!-- SUCCES -->
+  <div class="insc-pane" id="pane-success">
+    <div class="card">
+      <div class="success-box">
+        <div class="success-icon" id="success-icon">&#127881;</div>
+        <h3 id="success-title">Compte cree !</h3>
+        <p id="success-msg">Bienvenue sur Diaspo'Actif.</p>
+        <button class="btn btn-orange" id="success-btn">Acceder a la plateforme</button>
+      </div>
+    </div>
+  </div>
+</main>
+<footer class="footer">
+  <span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif · 2026</span> ·
+  <a href="confidentialite.html" class="footer-link">Confidentialite des donnees</a>
+</footer>
+</div>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+let currentRole=null;
+function goToStep(step){
+  document.querySelectorAll(".insc-pane").forEach(p=>p.classList.remove("active"));
+  ["dot-1","dot-2","dot-3"].forEach((id,i)=>{
+    const d=document.getElementById(id),n=i+1;
+    d.className="dot";
+    if(n<step){d.classList.add("done");d.textContent="✓";}
+    else if(n===step){d.classList.add("active");d.textContent=n;}
+    else d.textContent=n;
+  });
+  if(step===1)document.getElementById("pane-1").classList.add("active");
+  else if(step===2&&currentRole)document.getElementById("pane-"+currentRole).classList.add("active");
+  else if(step===3)document.getElementById("pane-success").classList.add("active");
+}
+document.querySelectorAll(".type-card").forEach(card=>{
+  card.addEventListener("click",()=>{
+    document.querySelectorAll(".type-card").forEach(c=>c.classList.remove("selected"));
+    card.classList.add("selected");
+    currentRole=card.dataset.role;
+    document.getElementById("btn-next-1").disabled=false;
+  });
+});
+document.getElementById("btn-next-1").addEventListener("click",()=>{if(currentRole)goToStep(2);});
+["utilisateur","initiative","collectivite"].forEach(r=>{
+  document.getElementById("back-"+r).addEventListener("click",()=>{currentRole=r;goToStep(1);});
+});
+function updateStrength(input,barId,hintId){
+  const v=input.value;let s=0;
+  if(v.length>=8)s++;if(v.length>=12)s++;
+  if(/[A-Z]/.test(v))s++;if(/[0-9]/.test(v))s++;if(/[^A-Za-z0-9]/.test(v))s++;
+  const bar=document.getElementById(barId);
+  bar.style.width=Math.round(s/5*100)+"%";
+  const colors=["#ef4444","#f97316","#eab308","#22c55e","#16a34a"];
+  const labels=["Trop faible","Faible","Moyen","Fort","Tres fort"];
+  bar.style.background=colors[Math.min(s,4)];
+  document.getElementById(hintId).textContent=s?labels[Math.min(s-1,4)]:"";
+}
+async function submitForm(btnId,errId,body){
+  const btn=document.getElementById(btnId),errBox=document.getElementById(errId);
+  errBox.style.display="none";const orig=btn.textContent;
+  btn.disabled=true;btn.textContent="Creation en cours…";
+  try{
+    const r=await api("POST","/auth/signup",body);
+    const role=r.user.role;
+    const icons={utilisateur:"🎉",initiative:"📋",collectivite:"🏛️"};
+    const titles={utilisateur:"Compte cree avec succes !",initiative:"Demande envoyee !",collectivite:"Demande officielle soumise !"};
+    const msgs={
+      utilisateur:"Bienvenue sur Diaspo'Actif ! Votre compte est actif.",
+      initiative:"Votre compte Initiative est en attente de validation par l'equipe Diaspo'Actif.",
+      collectivite:"Votre demande est soumise a validation obligatoire. Les fonctionnalites seront activees apres verification."
+    };
+    document.getElementById("success-icon").textContent=icons[role]||"🎉";
+    document.getElementById("success-title").textContent=titles[role]||"Compte cree !";
+    document.getElementById("success-msg").textContent=msgs[role]||"";
+    document.getElementById("success-btn").onclick=()=>window.location.href=ROLE_DASHBOARD[role]||"index.html";
+    goToStep(3);
+  }catch(err){
+    errBox.textContent=err.message||"Inscription impossible.";
+    errBox.style.display="block";btn.disabled=false;btn.textContent=orig;
+  }
+}
+function req(v,label){if(!v)throw new Error("Le champ « "+label+" » est obligatoire.");}
+document.getElementById("u-submit").addEventListener("click",async()=>{
+  try{
+    const nom=document.getElementById("u-nom").value.trim();
+    const prenom=document.getElementById("u-prenom").value.trim();
+    const dob=document.getElementById("u-dob").value;
+    const nat1=document.getElementById("u-nat1").value.trim();
+    const pays=document.getElementById("u-pays").value.trim();
+    const ville=document.getElementById("u-ville").value.trim();
+    const email=document.getElementById("u-email").value.trim();
+    const pwd=document.getElementById("u-pwd").value;
+    const pwd2=document.getElementById("u-pwd2").value;
+    req(nom,"Nom");req(prenom,"Prenom");req(dob,"Date de naissance");
+    req(nat1,"Nationalite 1");req(pays,"Pays");req(ville,"Ville");
+    req(email,"Email");req(pwd,"Mot de passe");
+    if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
+    if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
+    const interests=[...document.querySelectorAll("#u-interests input:checked")].map(c=>c.value);
+    const sitpro=document.querySelector('input[name="sitpro"]:checked')?.value||null;
+    await submitForm("u-submit","u-error",{
+      role:"utilisateur",nom,prenom,email,password:pwd,
+      date_naissance:dob,nationalite1:nat1,
+      nationalite2:document.getElementById("u-nat2").value.trim()||null,
+      nationalite3:document.getElementById("u-nat3").value.trim()||null,
+      pays,ville,
+      code_postal:document.getElementById("u-cp").value.trim()||null,
+      telephone:document.getElementById("u-tel").value.trim()||null,
+      centres_interet:interests,situation_pro:sitpro
+    });
+  }catch(e){const eb=document.getElementById("u-error");eb.textContent=e.message;eb.style.display="block";}
+});
+document.getElementById("i-submit").addEventListener("click",async()=>{
+  try{
+    const nom=document.getElementById("i-nom").value.trim();
+    const typeOrg=document.getElementById("i-type").value;
+    const desc=document.getElementById("i-desc").value.trim();
+    const pays=document.getElementById("i-pays").value.trim();
+    const ville=document.getElementById("i-ville").value.trim();
+    const rnom=document.getElementById("i-rnom").value.trim();
+    const rprenom=document.getElementById("i-rprenom").value.trim();
+    const email=document.getElementById("i-email").value.trim();
+    const pwd=document.getElementById("i-pwd").value;
+    const pwd2=document.getElementById("i-pwd2").value;
+    req(nom,"Nom organisation");req(typeOrg,"Type");req(desc,"Description");
+    req(pays,"Pays");req(ville,"Ville");req(rnom,"Nom responsable");
+    req(rprenom,"Prenom responsable");req(email,"Email");req(pwd,"Mot de passe");
+    if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
+    if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
+    const rs=document.getElementById("i-rs").value.trim();
+    await submitForm("i-submit","i-error",{
+      role:"initiative",nom:rnom,prenom:rprenom,email,password:pwd,
+      nom_institution:nom,type_org:typeOrg,
+      domaine:document.getElementById("i-domaine").value,
+      description:desc,objectifs:document.getElementById("i-objectifs").value.trim()||null,
+      pays,ville,adresse:document.getElementById("i-adresse").value.trim()||null,
+      code_postal:document.getElementById("i-cp").value.trim()||null,
+      nom_responsable:rnom,prenom_responsable:rprenom,
+      fonction_responsable:document.getElementById("i-rfct").value.trim()||null,
+      email_responsable:email,tel_responsable:document.getElementById("i-tel").value.trim()||null,
+      site_web:document.getElementById("i-site").value.trim()||null,
+      reseaux_sociaux:rs?{lien:rs}:{}
+    });
+  }catch(e){const eb=document.getElementById("i-error");eb.textContent=e.message;eb.style.display="block";}
+});
+document.getElementById("c-submit").addEventListener("click",async()=>{
+  try{
+    const typeInst=document.getElementById("c-type").value;
+    const nom=document.getElementById("c-nom").value.trim();
+    const pays=document.getElementById("c-pays").value.trim();
+    const ville=document.getElementById("c-ville").value.trim();
+    const rnom=document.getElementById("c-rnom").value.trim();
+    const rprenom=document.getElementById("c-rprenom").value.trim();
+    const rfct=document.getElementById("c-rfct").value.trim();
+    const email=document.getElementById("c-email").value.trim();
+    const pwd=document.getElementById("c-pwd").value;
+    const pwd2=document.getElementById("c-pwd2").value;
+    req(typeInst,"Type institution");req(nom,"Nom officiel");req(pays,"Pays");
+    req(ville,"Ville");req(rnom,"Nom");req(rprenom,"Prenom");
+    req(rfct,"Fonction");req(email,"Email professionnel");req(pwd,"Mot de passe");
+    if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
+    if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
+    await submitForm("c-submit","c-error",{
+      role:"collectivite",nom:rnom,prenom:rprenom,email,password:pwd,
+      type_institution:typeInst,nom_institution:nom,
+      pays_concerne:pays,ville,
+      adresse:document.getElementById("c-adresse").value.trim()||null,
+      nom_responsable:rnom,prenom_responsable:rprenom,fonction_responsable:rfct,
+      telephone_pro:document.getElementById("c-tel").value.trim()||null,
+      site_officiel:document.getElementById("c-site").value.trim()||null
+    });
+  }catch(e){const eb=document.getElementById("c-error");eb.textContent=e.message;eb.style.display="block";}
+});
+</script>
+</body>
+</html>

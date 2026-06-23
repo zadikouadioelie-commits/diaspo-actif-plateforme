@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Fil d'actualité</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html" class="active">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="max-width:760px;padding-top:30px;padding-bottom:40px;">
+    <h2 style="margin:0 0 4px;">Fil d'actualité global</h2>
+    <p class="sub">Publications des utilisateurs, associations, entreprises et institutions : opportunités, appels à projets, formations et actualités des diasporas.</p>
+
+    <div class="notice">À mesure de votre utilisation (nationalités déclarées, centres d'intérêt, groupes rejoints, interactions, événements consultés, initiatives suivies), ce fil deviendra progressivement personnalisé pour prioriser les contenus les plus pertinents pour vous. Pour l'instant, vous voyez l'ensemble des publications publiques.</div>
+
+    <div class="card" id="fil-publish" style="margin-bottom:16px;"></div>
+
+    <div class="feed-filter-bar" id="feed-filter-bar">
+      <button class="active" data-type="Tous">Tous</button>
+      <button data-type="Utilisateur">Utilisateurs</button>
+      <button data-type="Association">Associations</button>
+      <button data-type="Entreprise">Entreprises</button>
+      <button data-type="Institution">Institutions</button>
+    </div>
+
+    <div id="ad-fil" data-ad-slot="2"></div>
+
+    <div id="feed-list"></div>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a></footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

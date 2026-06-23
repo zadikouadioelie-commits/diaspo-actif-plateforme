@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Formations en ligne</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="formations.html" class="active">Formations</a>
+        <a href="evenements.html">Événements</a>
+        <a href="actualites.html">Actualités</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="with-sidebar">
+    <aside class="sidebar">
+      <div class="brand">Formations</div>
+      <a class="active" href="#">📚 Catalogue</a>
+      <a href="#">🎓 Mes inscriptions</a>
+      <a href="#">⭐ Favoris</a>
+      <a href="#">📜 Certifications</a>
+    </aside>
+    <main class="content">
+
+      <div class="flex-between" style="margin-bottom:16px;">
+        <div>
+          <h1 style="margin:0;">Plateforme de formations</h1>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13.5px;">Toutes les formations de la diaspora mondiale centralisées sur Diaspo'Actif</p>
+        </div>
+        <span class="badge badge-asso" id="formations-count-badge">—</span>
+      </div>
+
+      <div class="notice" style="margin-bottom:20px;">
+        📚 Toute organisation souhaitant proposer une formation doit passer par Diaspo'Actif pour la publication et la mise à disposition de ses contenus. Les formations gratuites sont diffusées sans commission. Les formations payantes font l'objet d'un accord de partenariat.
+      </div>
+
+      <!-- Filtres -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="grid grid-2" style="gap:12px;">
+          <div>
+            <label style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;">Recherche libre</label>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <input id="f-form-q" class="input-field" style="flex:1;" placeholder="Mot-clé, organisme, thème…">
+              <button id="btn-form-search" class="btn btn-orange">Chercher</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:20px;">
+            <input type="checkbox" id="f-form-gratuit">
+            <label for="f-form-gratuit" style="font-size:13px;font-weight:700;">Formations gratuites uniquement</label>
+          </div>
+        </div>
+        <div class="grid grid-3" style="gap:10px;margin-top:12px;">
+          <div>
+            <label style="font-size:12px;color:var(--muted);font-weight:700;">Domaine</label>
+            <select id="f-form-domaine" class="input-field" style="margin-top:4px;width:100%;">
+              <option value="">Tous les domaines</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--muted);font-weight:700;">Type</label>
+            <select id="f-form-type" class="input-field" style="margin-top:4px;width:100%;">
+              <option value="">Tous les types</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--muted);font-weight:700;">Niveau</label>
+            <select id="f-form-niveau" class="input-field" style="margin-top:4px;width:100%;">
+              <option value="">Tous les niveaux</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-between" style="margin-bottom:12px;">
+        <span style="font-size:13.5px;color:var(--muted);"><strong id="formations-count">—</strong> formations disponibles</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-outline" id="btn-proposer">+ Proposer une formation</button>
+        </div>
+      </div>
+
+      <!-- Grille de formations -->
+      <div id="formations-grid">
+        <div class="notice">Chargement des formations…</div>
+      </div>
+
+      <!-- Modal proposer formation (initiative/admin) -->
+      <div id="modal-formation" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;overflow-y:auto;">
+        <div class="card" style="max-width:600px;margin:40px auto;padding:24px;">
+          <div class="flex-between" style="margin-bottom:20px;">
+            <h2 style="margin:0;">Proposer une formation</h2>
+            <button class="btn btn-sm btn-outline" id="modal-close">✕ Fermer</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div><label style="font-size:13px;font-weight:700;">Titre *</label><input id="new-form-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Titre de la formation"></div>
+            <div class="grid grid-2" style="gap:10px;">
+              <div><label style="font-size:13px;font-weight:700;">Type</label>
+                <select id="new-form-type" class="input-field" style="width:100%;margin-top:4px;">
+                  <option value="Webinaire">Webinaire</option>
+                  <option value="Atelier en ligne">Atelier en ligne</option>
+                  <option value="Module certifiant">Module certifiant</option>
+                  <option value="Coaching">Coaching et mentorat</option>
+                  <option value="Programme professionnel">Programme professionnel</option>
+                </select>
+              </div>
+              <div><label style="font-size:13px;font-weight:700;">Domaine</label>
+                <select id="new-form-domaine" class="input-field" style="width:100%;margin-top:4px;">
+                  ${["Action Sociale","Agriculture","Santé","Éducation","Technologie","Culture","Économie","Finance","Droit","Environnement"].map(d=>`<option>${d}</option>`).join("")}
+                </select>
+              </div>
+              <div><label style="font-size:13px;font-weight:700;">Niveau</label>
+                <select id="new-form-niveau" class="input-field" style="width:100%;margin-top:4px;">
+                  <option value="Débutant">Débutant</option>
+                  <option value="Intermédiaire">Intermédiaire</option>
+                  <option value="Avancé">Avancé</option>
+                  <option value="Tous niveaux">Tous niveaux</option>
+                </select>
+              </div>
+              <div><label style="font-size:13px;font-weight:700;">Langue</label>
+                <select id="new-form-langue" class="input-field" style="width:100%;margin-top:4px;">
+                  <option>Français</option><option>Anglais</option><option>Espagnol</option><option>Arabe</option><option>Portugais</option>
+                </select>
+              </div>
+              <div><label style="font-size:13px;font-weight:700;">Durée</label><input id="new-form-duree" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 3h, 2 jours, 6 semaines"></div>
+              <div><label style="font-size:13px;font-weight:700;">Places</label><input type="number" id="new-form-places" class="input-field" style="width:100%;margin-top:4px;" placeholder="Nombre de places"></div>
+            </div>
+            <div><label style="font-size:13px;font-weight:700;">Description</label>
+              <textarea id="new-form-desc" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Décrivez le contenu, les objectifs et le public cible…"></textarea>
+            </div>
+            <div style="display:flex;gap:14px;align-items:center;">
+              <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="new-form-gratuit" checked> <span style="font-size:13px;font-weight:700;">Formation gratuite</span></label>
+              <div style="flex:1;display:none;" id="prix-wrap"><label style="font-size:13px;">Prix (€)</label><input type="number" id="new-form-prix" class="input-field" style="width:80px;margin-left:8px;" value="0"></div>
+            </div>
+            <div id="new-form-error" style="color:#D33;font-size:13px;display:none;"></div>
+            <button class="btn btn-orange btn-block" id="btn-submit-formation">Soumettre la formation</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  document.getElementById("formations-count-badge").addEventListener("DOMContentLoaded", ()=>{});
+
+  // Mise à jour du badge count quand #formations-count change
+  const countEl = document.getElementById("formations-count");
+  const observer = new MutationObserver(()=>{
+    document.getElementById("formations-count-badge").textContent = countEl.textContent + " formations";
+  });
+  if(countEl) observer.observe(countEl, {childList:true, characterData:true, subtree:true});
+
+  // Modal proposer formation
+  document.getElementById("btn-proposer").addEventListener("click", async ()=>{
+    const me = await fetchCurrentUser();
+    if(!me){ alert("Connectez-vous pour proposer une formation."); return; }
+    if(!["initiative","administrateur"].includes(me.role)){ alert("Seuls les comptes Initiative et Administrateur peuvent proposer des formations."); return; }
+    document.getElementById("modal-formation").style.display = "block";
+  });
+  document.getElementById("modal-close").addEventListener("click", ()=>{ document.getElementById("modal-formation").style.display = "none"; });
+  document.getElementById("new-form-gratuit").addEventListener("change", function(){
+    document.getElementById("prix-wrap").style.display = this.checked ? "none" : "flex";
+  });
+  document.getElementById("btn-submit-formation").addEventListener("click", async ()=>{
+    const titre = document.getElementById("new-form-titre").value.trim();
+    const errEl = document.getElementById("new-form-error");
+    if(!titre){ errEl.textContent = "Le titre est obligatoire."; errEl.style.display="block"; return; }
+    errEl.style.display = "none";
+    try {
+      await api("POST", "/formations", {
+        titre,
+        type_formation: document.getElementById("new-form-type").value,
+        domaine: document.getElementById("new-form-domaine").value,
+        niveau: document.getElementById("new-form-niveau").value,
+        langue: document.getElementById("new-form-langue").value,
+        duree: document.getElementById("new-form-duree").value,
+        places: parseInt(document.getElementById("new-form-places").value)||null,
+        description: document.getElementById("new-form-desc").value.trim(),
+        gratuit: document.getElementById("new-form-gratuit").checked,
+        prix: parseFloat(document.getElementById("new-form-prix").value)||0
+      });
+      document.getElementById("modal-formation").style.display = "none";
+      window.location.reload();
+    } catch(e){ errEl.textContent = e.message||"Erreur."; errEl.style.display="block"; }
+  });
+</script>
+</body>
+</html>

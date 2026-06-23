@@ -1,0 +1,9 @@
+{
+  "name": "diaspoactif-server",
+  "version": "1.0.0",
+  "description": "Backend Diaspo'Actif - prototype fonctionnel (donnees fictives, sans dependance externe)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  }
+}

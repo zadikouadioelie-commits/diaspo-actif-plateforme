@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Dashboard Collectivité</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav"><a href="index.html">Accueil</a><a href="annuaire.html">Annuaire</a><a href="fil-actualite.html">Fil</a></nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="with-sidebar">
+    <aside class="sidebar">
+      <div class="brand">Collectivité</div>
+      <a href="#" class="active" data-section="observatoire">📊 Observatoire</a>
+      <a href="#" data-section="communication">✉ Communication</a>
+      <a href="#" data-section="partenariats">🤝 Partenariats</a>
+    </aside>
+
+    <main class="content">
+      <div id="dashboard-error" style="display:none;" class="notice"></div>
+
+      <!-- OBSERVATOIRE -->
+      <section id="section-observatoire">
+        <div class="flex-between" style="margin-bottom:20px;">
+          <div>
+            <h1 style="margin:0;">Tableau de bord Collectivité</h1>
+            <p id="collectivite-nom" style="margin:4px 0 0;color:var(--muted);font-size:13.5px;">Chargement…</p>
+          </div>
+          <span class="badge badge-inst">Collectivité</span>
+        </div>
+
+        <div class="notice" style="margin-bottom:20px;">
+          🔒 Conformément à la politique de confidentialité de Diaspo'Actif, cet observatoire affiche uniquement des données agrégées. Les groupes de moins de 10 membres ne sont pas affichés. Aucune liste nominative n'est accessible.
+        </div>
+
+        <div class="grid grid-3" style="gap:12px;margin-bottom:20px;">
+          <div class="card stat-card">
+            <div class="stat-number" id="stat-membres">—</div>
+            <div class="stat-label">Membres diaspora</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-number" id="stat-initiatives">—</div>
+            <div class="stat-label">Initiatives actives</div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-number" id="stat-pays">—</div>
+            <div class="stat-label">Pays représentés</div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="gap:16px;margin-bottom:20px;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;">Répartition par pays de résidence</h3>
+            <div id="pays-chart">
+              <div class="notice">Chargement…</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 14px;">Répartition par secteur d'activité</h3>
+            <div id="secteur-chart"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="gap:16px;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;">Tranche d'âge estimée</h3>
+            <div id="age-chart"></div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 14px;">Niveau d'études</h3>
+            <div id="etudes-chart"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMMUNICATION -->
+      <section id="section-communication" style="display:none;">
+        <h2>Communication vers la diaspora</h2>
+        <div class="notice" style="margin-bottom:16px;">
+          ✉ Vous pouvez envoyer des communications à la diaspora liée à votre territoire. Vous verrez uniquement le nombre de destinataires — jamais leurs identités. Les membres choisissent de recevoir ou non vos communications.
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 16px;">Nouvelle communication</h3>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div>
+              <label style="font-size:13px;font-weight:700;">Objet</label>
+              <input id="comm-objet" class="input-field" style="width:100%;margin-top:4px;" placeholder="Objet de votre communication">
+            </div>
+            <div>
+              <label style="font-size:13px;font-weight:700;">Publier sur le fil d'actualité</label>
+              <select id="comm-categorie" class="input-field" style="margin-top:4px;width:200px;">
+                <option value="annonce">Annonce officielle</option>
+                <option value="evenement">Événement</option>
+                <option value="appel">Appel à participation</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:13px;font-weight:700;">Contenu</label>
+              <textarea id="comm-contenu" style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;margin-top:4px;" placeholder="Rédigez votre message officiel…"></textarea>
+            </div>
+
+            <div class="card" style="background:var(--surface2);border:none;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Ciblage par nationalité</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;" id="ciblage-nationalites">
+                <span class="chip chip-active" data-nat="toutes">Toutes nationalités</span>
+                <span class="chip" data-nat="Sénégalaise">Sénégalaise</span>
+                <span class="chip" data-nat="Ivoirienne">Ivoirienne</span>
+                <span class="chip" data-nat="Malienne">Malienne</span>
+                <span class="chip" data-nat="Camerounaise">Camerounaise</span>
+                <span class="chip" data-nat="Congolaise">Congolaise</span>
+              </div>
+              <p style="margin:10px 0 0;font-size:12.5px;color:var(--muted);">Les membres à nationalités multiples sont inclus dans chaque communauté correspondante.</p>
+            </div>
+
+            <div class="notice" style="margin-bottom:0;">
+              <strong>Aperçu audience :</strong> <span id="audience-preview">Tous les membres de la plateforme</span>.
+              <br><span style="font-size:12px;color:var(--muted);">Taux d'ouverture moyen sur cette plateforme : <strong>34%</strong></span>
+            </div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+              <button class="btn btn-outline">Aperçu</button>
+              <button class="btn btn-orange" id="btn-envoyer-comm">Publier sur le fil (simulation)</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin:0 0 14px;">Historique des communications</h3>
+          <div style="color:var(--muted);font-size:13.5px;padding:20px 0;text-align:center;">Aucune communication envoyée pour le moment.</div>
+        </div>
+      </section>
+
+      <!-- PARTENARIATS -->
+      <section id="section-partenariats" style="display:none;">
+        <h2>Partenariats avec les initiatives</h2>
+        <div class="notice" style="margin-bottom:16px;">
+          🤝 Retrouvez les initiatives de la diaspora ouvertes à des partenariats institutionnels et engagez le dialogue.
+        </div>
+        <div id="initiatives-partenaires"><div class="notice">Chargement…</div></div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(async () => {
+  const me = await fetchCurrentUser();
+  if (!me) { window.location.href = "connexion.html"; return; }
+  if (me.role !== "collectivite") { window.location.href = ROLE_DASHBOARD[me.role] || "index.html"; return; }
+
+  document.getElementById("collectivite-nom").textContent = me.nom + (me.ville ? " · " + me.ville : "");
+
+  // Navigation
+  document.querySelectorAll(".sidebar a[data-section]").forEach(a => {
+    a.addEventListener("click", e => {
+      e.preventDefault();
+      document.querySelectorAll(".sidebar a").forEach(l => l.classList.remove("active"));
+      a.classList.add("active");
+      document.querySelectorAll("section[id^='section-']").forEach(s => s.style.display = "none");
+      document.getElementById("section-" + a.dataset.section).style.display = "";
+      if (a.dataset.section === "partenariats") loadPartenariats();
+    });
+  });
+
+  // Charger données
+  let data = {};
+  try {
+    data = await api("GET", "/dashboard/collectivite");
+  } catch(e) {
+    document.getElementById("dashboard-error").textContent = "Erreur : " + e.message;
+    document.getElementById("dashboard-error").style.display = "block";
+  }
+
+  document.getElementById("stat-membres").textContent = data.total_membres ?? "—";
+  document.getElementById("stat-initiatives").textContent = data.total_initiatives ?? "—";
+
+  // Pays chart
+  const pays = data.repartition_pays || [];
+  document.getElementById("stat-pays").textContent = pays.length;
+  const maxPays = Math.max(...pays.map(p => p.n), 1);
+  document.getElementById("pays-chart").innerHTML = pays.length
+    ? pays.map(p => `
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <span style="width:100px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.pays}</span>
+        <div style="flex:1;background:var(--surface2);border-radius:6px;height:16px;overflow:hidden;">
+          <div style="width:${Math.round(p.n/maxPays*100)}%;background:var(--accent);height:100%;border-radius:6px;"></div>
+        </div>
+        <span style="font-size:12px;color:var(--muted);width:24px;text-align:right;">${p.n}</span>
+      </div>
+    `).join("")
+    : `<div class="empty">Données insuffisantes (seuil de confidentialité : 10 membres minimum).</div>`;
+
+  // Secteurs statiques (données simulées)
+  const secteurs = OBSERVATOIRE_DIASPORA?.secteur_activite || [
+    {label:"Santé / Social",pct:28}, {label:"Technologie",pct:22}, {label:"Éducation",pct:18},
+    {label:"Commerce / Artisanat",pct:15}, {label:"Agriculture",pct:10}, {label:"Autres",pct:7}
+  ];
+  document.getElementById("secteur-chart").innerHTML = secteurs.map(s => `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+      <span style="width:140px;font-size:12.5px;">${s.label}</span>
+      <div style="flex:1;background:var(--surface2);border-radius:6px;height:16px;overflow:hidden;">
+        <div style="width:${s.pct}%;background:#7C3AED;height:100%;border-radius:6px;"></div>
+      </div>
+      <span style="font-size:12px;color:var(--muted);width:30px;">${s.pct}%</span>
+    </div>
+  `).join("");
+
+  const ages = OBSERVATOIRE_DIASPORA?.tranche_age || [
+    {label:"18-25 ans",pct:16},{label:"26-35 ans",pct:38},{label:"36-45 ans",pct:28},{label:"46-55 ans",pct:12},{label:"55+ ans",pct:6}
+  ];
+  document.getElementById("age-chart").innerHTML = ages.map(a => `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+      <span style="width:90px;font-size:12.5px;">${a.label}</span>
+      <div style="flex:1;background:var(--surface2);border-radius:6px;height:16px;overflow:hidden;">
+        <div style="width:${a.pct}%;background:#F97316;height:100%;border-radius:6px;"></div>
+      </div>
+      <span style="font-size:12px;color:var(--muted);width:30px;">${a.pct}%</span>
+    </div>
+  `).join("");
+
+  const etudes = OBSERVATOIRE_DIASPORA?.niveau_etudes || [
+    {label:"Bac+5 et +",pct:42},{label:"Bac+3/4",pct:31},{label:"Bac+1/2",pct:16},{label:"Bac",pct:8},{label:"Sans diplôme",pct:3}
+  ];
+  document.getElementById("etudes-chart").innerHTML = etudes.map(e => `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+      <span style="width:110px;font-size:12.5px;">${e.label}</span>
+      <div style="flex:1;background:var(--surface2);border-radius:6px;height:16px;overflow:hidden;">
+        <div style="width:${e.pct}%;background:#10B981;height:100%;border-radius:6px;"></div>
+      </div>
+      <span style="font-size:12px;color:var(--muted);width:30px;">${e.pct}%</span>
+    </div>
+  `).join("");
+
+  // Ciblage nationalités
+  document.querySelectorAll("#ciblage-nationalites .chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll("#ciblage-nationalites .chip").forEach(c => c.classList.remove("chip-active"));
+      chip.classList.add("chip-active");
+      const nat = chip.dataset.nat;
+      document.getElementById("audience-preview").textContent = nat === "toutes"
+        ? "Tous les membres de la plateforme"
+        : `Les membres de nationalité ${nat} (données agrégées uniquement)`;
+    });
+  });
+
+  // Envoyer communication
+  document.getElementById("btn-envoyer-comm").addEventListener("click", async () => {
+    const contenu = document.getElementById("comm-contenu").value.trim();
+    if (!contenu) return;
+    try {
+      await api("POST", "/fil", {
+        type: "institutionnel",
+        categorie: document.getElementById("comm-categorie").value,
+        contenu
+      });
+      document.getElementById("comm-contenu").value = "";
+      document.getElementById("comm-objet").value = "";
+      alert("Communication publiée sur le fil d'actualité. (Simulation)");
+    } catch(e) { alert("Erreur : " + e.message); }
+  });
+
+  async function loadPartenariats() {
+    const el = document.getElementById("initiatives-partenaires");
+    try {
+      const r = await api("GET", "/initiatives");
+      const inits = r.initiatives || [];
+      if (!inits.length) { el.innerHTML = `<div class="empty">Aucune initiative disponible.</div>`; return; }
+      el.innerHTML = inits.slice(0,6).map(i => `
+        <div class="card" style="margin-bottom:12px;display:flex;gap:14px;align-items:flex-start;">
+          <div class="avatar" style="flex-shrink:0;">${(i.sigle||i.nom)[0]}</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:14px;">${i.nom}</div>
+            <div style="font-size:12.5px;color:var(--muted);">${i.domaine||""} ${i.ville ? "· " + i.ville : ""} ${i.pays ? "· " + i.pays : ""}</div>
+            ${i.description ? `<p style="font-size:13px;margin:6px 0 0;">${i.description.slice(0,120)}…</p>` : ""}
+          </div>
+          <button class="btn btn-sm btn-outline" onclick="alert('Messagerie partenariat (simulation) — contactez cette initiative via la messagerie.')">Contacter</button>
+        </div>
+      `).join("");
+    } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+  }
+})();
+</script>
+</body>
+</html>

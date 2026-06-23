@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Confidentialité des données</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:30px;padding-bottom:40px;">
+    <h2 style="margin:0 0 4px;">Niveau de confidentialité des données</h2>
+    <p class="sub">Dans Diaspo'Actif, les informations que vous partagez sont classées en trois catégories de visibilité.</p>
+
+    <div class="grid grid-3" id="conf-list"></div>
+
+    <div class="notice" style="margin-top:24px;">🔐 Les données classées « Confidentiel » (nationalités, pièces d'identité, documents de vérification, coordonnées administratives, informations de paiement) ne sont accessibles qu'à Diaspo'Actif et aux institutions habilitées, dans un cadre strictement encadré.</div>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a></footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
