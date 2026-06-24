@@ -142,7 +142,7 @@ function render() {
       ?'<div class="interests-grid">'+INTERETS.map(i=>'<label><input type="checkbox" value="'+i+'"'+(ci.includes(i)?' checked':'')+'> '+i+'</label>').join('')+'</div>'
       :(ci.length
         ?'<div style="display:flex;flex-wrap:wrap;gap:6px">'+ci.map(i=>'<span style="background:#fff8f2;border:1px solid var(--orange);color:var(--orange);border-radius:99px;padding:3px 10px;font-size:12px">'+i+'</span>').join('')+'</div>'
-        :'<span class="read-empty">Aucun centre d'interet renseigne</span>'
+        :'<span class="read-empty">Aucun centre d\'interet renseigne</span>'
       )
     }
   </div>
