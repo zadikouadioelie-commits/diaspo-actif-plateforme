@@ -102,7 +102,7 @@ function renderTabs() {
     {id:'formations',label:'Formations',n:lastRes.formations?.length||0},
     {id:'evenements',label:'Evenements',n:lastRes.evenements?.length||0},
   ].filter(t=>t.id==='tous'||t.n>0);
-  document.getElementById('tabs').innerHTML = tabs.map(t=>'<button class="tab-btn'+(activeTab===t.id?' active':'')+'" onclick="setTab(''+t.id+'')">'+t.label+' <span class="result-count">'+t.n+'</span></button>').join('');
+  document.getElementById('tabs').innerHTML = tabs.map(t=>`<button class="tab-btn${activeTab===t.id?' active':''}" onclick="setTab('${t.id}')">${t.label} <span class="result-count">${t.n}</span></button>`).join('');
 }
 
 function setTab(id) { activeTab = id; renderTabs(); renderResults(); }
