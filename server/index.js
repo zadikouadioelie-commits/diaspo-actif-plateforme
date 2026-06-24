@@ -938,7 +938,7 @@ async function handleRequest(req, res) {
       return;
     }
     /* ---- GET /api/visits — compteur cumulatif de visites ---- */
-    if (method === "GET" && pathname === "/api/visits") {
+    if (req.method === "GET" && pathname === "/api/visits") {
       try {
         db.exec(`CREATE TABLE IF NOT EXISTS counters (key TEXT PRIMARY KEY, value INTEGER NOT NULL DEFAULT 0)`);
         db.prepare(`INSERT OR IGNORE INTO counters (key, value) VALUES (?, ?)`).run('page_visits', 0);
@@ -952,7 +952,7 @@ async function handleRequest(req, res) {
     }
 
     /* ---- GET /api/stats — statistiques agrégées publiques ---- */
-    if (method === "GET" && pathname === "/api/stats") {
+    if (req.method === "GET" && pathname === "/api/stats") {
       try {
         const membres = db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur'`).get().n;
         const initiatives = db.prepare(`SELECT COUNT(*) AS n FROM initiatives`).get().n;
