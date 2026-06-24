@@ -5,6 +5,119 @@
 <title>Diaspo'Actif — Annuaire</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
+<style>
+/* ===== Hero annuaire ===== */
+.ann-hero{
+  position:relative;height:320px;overflow:hidden;
+  background:linear-gradient(135deg,#0F2A50 0%,#1B3A6B 60%,#1565C0 100%);
+}
+.ann-hero-img{width:100%;height:100%;object-fit:cover;display:block;opacity:.45;}
+.ann-hero-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(to bottom,rgba(10,30,60,.3) 0%,rgba(10,30,60,.7) 100%);
+}
+.ann-hero-content{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  justify-content:flex-end;padding:0 0 0 0;
+}
+.ann-hero-text{max-width:1180px;margin:0 auto;width:100%;padding:0 24px 36px;}
+.ann-hero-text h1{font-size:42px;font-weight:900;color:#fff;margin:0 0 8px;letter-spacing:-.5px;text-transform:uppercase;}
+.ann-hero-text p{color:rgba(255,255,255,.85);font-size:15px;margin:0;max-width:460px;line-height:1.5;}
+
+/* Stat chips band */
+.ann-stat-band{background:#1B3A6B;padding:0;}
+.ann-stat-band-inner{
+  max-width:1180px;margin:0 auto;padding:0 24px;
+  display:flex;
+}
+.ann-stat-chip{
+  display:flex;align-items:center;gap:12px;
+  padding:16px 32px;font-size:14px;font-weight:600;color:rgba(255,255,255,.9);
+  border-right:1px solid rgba(255,255,255,.15);
+}
+.ann-stat-chip:last-child{border-right:none;}
+.ann-stat-icon{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);
+  display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+
+/* Filters bar */
+.ann-filters{background:#fff;border-bottom:1px solid var(--border);padding:16px 0;}
+.ann-filters-inner{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.ann-filters-inner select,.ann-filters-inner input{
+  height:42px;padding:0 14px;border:1px solid var(--border);border-radius:6px;
+  font-size:13.5px;background:#fff;color:var(--text);min-width:160px;flex:1;
+}
+.ann-search-btn{
+  height:42px;padding:0 22px;background:var(--orange);color:#fff;
+  border:none;border-radius:6px;font-weight:700;font-size:13.5px;cursor:pointer;
+  display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0;
+}
+.ann-search-btn:hover{background:#0D47A1;}
+.ann-unique-chk{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap;}
+
+/* Section heading */
+.ann-section-head{max-width:1180px;margin:0 auto;padding:32px 24px 18px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;}
+.ann-section-head h2{font-size:22px;font-weight:800;margin:0;position:relative;padding-bottom:10px;}
+.ann-section-head h2::after{content:'';position:absolute;left:0;bottom:0;width:36px;height:3px;background:var(--orange);border-radius:2px;}
+.ann-section-desc{font-size:13px;color:var(--muted);max-width:420px;line-height:1.55;}
+.ann-result-count{font-size:13px;color:var(--muted);margin-top:4px;}
+
+/* Cards grid */
+.ann-grid{
+  max-width:1180px;margin:0 auto;padding:0 24px 40px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:20px;
+}
+@media(max-width:1100px){.ann-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:780px){.ann-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:480px){.ann-grid{grid-template-columns:1fr;}}
+
+/* Card */
+.ann-card{
+  background:#fff;border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;text-decoration:none;color:inherit;
+  box-shadow:var(--shadow);transition:transform .15s,box-shadow .15s;
+  display:flex;flex-direction:column;
+}
+.ann-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(27,58,107,.13);}
+
+/* Card photo */
+.ann-card-photo{height:180px;position:relative;overflow:hidden;background:var(--bg);}
+.ann-card-photo img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s;}
+.ann-card:hover .ann-card-photo img{transform:scale(1.04);}
+.ann-cat-badge{
+  position:absolute;top:10px;left:10px;
+  padding:4px 10px;border-radius:4px;
+  font-size:10px;font-weight:800;color:#fff;letter-spacing:.06em;text-transform:uppercase;
+}
+
+/* Card body */
+.ann-card-body{padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:6px;}
+.ann-card-title{font-size:14px;font-weight:700;margin:0;line-height:1.3;color:var(--text);}
+.ann-card-desc{font-size:12.5px;color:var(--muted);margin:0;line-height:1.5;flex:1;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.ann-card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+.ann-location{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;}
+.ann-arrow{width:26px;height:26px;border-radius:50%;background:var(--orange-light);color:var(--orange);
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+
+/* CTA */
+.ann-cta{background:#1B3A6B;padding:40px 24px;text-align:center;margin-top:0;}
+.ann-cta-inner{max-width:600px;margin:0 auto;}
+.ann-cta-icon{width:52px;height:52px;background:rgba(255,255,255,.1);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 16px;}
+.ann-cta h3{color:#fff;font-size:20px;margin:0 0 8px;font-weight:800;}
+.ann-cta p{color:rgba(255,255,255,.75);font-size:14px;margin:0 0 22px;}
+.ann-cta-btn{display:inline-flex;align-items:center;gap:8px;background:var(--orange);color:#fff;
+  padding:12px 28px;border-radius:6px;font-weight:700;font-size:14px;text-decoration:none;border:none;cursor:pointer;}
+.ann-cta-btn:hover{background:#0D47A1;}
+
+/* Responsive filters */
+@media(max-width:680px){
+  .ann-filters-inner{flex-direction:column;}
+  .ann-filters-inner select,.ann-filters-inner input{min-width:100%;}
+  .ann-hero-text h1{font-size:28px;}
+  .ann-stat-chip{padding:12px 16px;font-size:12.5px;}
+}
+</style>
 </head>
 <body>
 <div class="page">
@@ -20,50 +133,82 @@
         <a href="evenements.html">Événements</a>
       </nav>
       <div class="topbar-right">
-        
         <select class="lang-select" id="lang-select"></select>
         <div id="auth-area" class="auth-area"></div>
       </div>
     </div>
   </header>
 
-  <main class="container" style="padding-top:30px;padding-bottom:40px;">
-    <div class="search-card">
-      <h2>Recherche d'initiative</h2>
-      <div class="search-row">
-        <input id="f-q" type="text" placeholder="Nom de l'initiative, association, entreprise...">
-        <button class="btn btn-navy" id="btn-search">🔍 Rechercher</button>
+  <!-- ===== HERO ===== -->
+  <div class="ann-hero">
+    <img class="ann-hero-img" src="https://picsum.photos/seed/diaspora-community/1400/400" alt="Diaspora" loading="eager" onerror="this.style.display='none'">
+    <div class="ann-hero-overlay"></div>
+    <div class="ann-hero-content">
+      <div class="ann-hero-text">
+        <h1>Annuaire</h1>
+        <p>Découvrez les initiatives locales à impact global du Sud au Nord.</p>
       </div>
-      <div class="filters">
-        <div>
-          <label>Nationalité 1</label>
-          <select id="f-pays"><option value="">Toutes</option></select>
-        </div>
-        <div>
-          <label>Nationalité 2</label>
-          <select id="f-nat2"><option value="">Toutes</option></select>
-        </div>
-        <div>
-          <label>Domaine de l'initiative</label>
-          <select id="f-domaine"><option value="">Tous</option></select>
-        </div>
-        <div>
-          <label>Type d'organisation</label>
-          <select id="f-type"><option value="">Tous</option></select>
-        </div>
-      </div>
-      <label class="checkbox-row"><input type="checkbox" id="f-unique"> Afficher uniquement les initiatives réservées à une nationalité unique</label>
     </div>
+  </div>
 
-    <div id="ad-annuaire" data-ad-slot="1"></div>
+  <!-- ===== STAT CHIPS ===== -->
+  <div class="ann-stat-band">
+    <div class="ann-stat-band-inner">
+      <div class="ann-stat-chip">
+        <div class="ann-stat-icon">👥</div>
+        <span>Des acteurs engagés</span>
+      </div>
+      <div class="ann-stat-chip">
+        <div class="ann-stat-icon">🌱</div>
+        <span>Des initiatives concrètes</span>
+      </div>
+      <div class="ann-stat-chip">
+        <div class="ann-stat-icon">🌍</div>
+        <span>Un impact durable</span>
+      </div>
+    </div>
+  </div>
 
-    <section class="section">
-      <p class="sub"><strong id="result-count">0</strong> initiative(s) trouvée(s)</p>
-      <div id="init-list"></div>
-    </section>
-  </main>
+  <!-- ===== FILTRES ===== -->
+  <div class="ann-filters">
+    <div class="ann-filters-inner">
+      <select id="f-pays"><option value="">Catégorie (Nationalité)</option></select>
+      <select id="f-domaine"><option value="">Domaine d'activité</option></select>
+      <select id="f-nat2"><option value="">Nationalité 2</option></select>
+      <select id="f-type"><option value="">Type d'organisation</option></select>
+      <input type="text" id="f-q" placeholder="Rechercher une initiative...">
+      <label class="ann-unique-chk"><input type="checkbox" id="f-unique"> Nationalité unique</label>
+      <button class="ann-search-btn" id="btn-search">🔍 Rechercher</button>
+    </div>
+  </div>
 
-  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a></footer>
+  <!-- ===== NOS INITIATIVES ===== -->
+  <div class="ann-section-head">
+    <div>
+      <h2>Nos initiatives</h2>
+      <div class="ann-result-count"><strong id="result-count">0</strong> initiative(s) trouvée(s)</div>
+    </div>
+    <p class="ann-section-desc">Explorez les actions inspirantes portées par des individus, des collectifs et des organisations qui œuvrent pour un changement positif.</p>
+  </div>
+
+  <div class="ann-grid" id="init-list">
+    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+  </div>
+
+  <!-- ===== CTA ===== -->
+  <div class="ann-cta">
+    <div class="ann-cta-inner">
+      <div class="ann-cta-icon">🌱</div>
+      <h3>Vous avez une initiative à partager ?</h3>
+      <p>Rejoignez l'annuaire et faites connaître votre action à la communauté.</p>
+      <a href="inscription.html" class="ann-cta-btn">Proposer une initiative →</a>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span> ·
+    <a href="confidentialite.html" class="footer-link">Confidentialité des données</a>
+  </footer>
 </div>
 
 <script src="assets/data.js"></script>

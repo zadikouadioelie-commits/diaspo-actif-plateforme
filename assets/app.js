@@ -165,20 +165,39 @@ function renderNetwork(containerId, items){
 }
 
 /* ---------- Annuaire : rendu + filtres (branché sur l'API) ---------- */
+/* Couleurs par domaine pour les badges cartes */
+const DOMAIN_BADGE = {
+  'Environnement':  {bg:'#2E7D52', label:'ENVIRONNEMENT'},
+  'Agriculture':    {bg:'#558B2F', label:'AGRICULTURE'},
+  'Education':      {bg:'#1565C0', label:'EDUCATION'},
+  'Sante':          {bg:'#00838F', label:'SANTÉ'},
+  'Action Sociale': {bg:'#AD1457', label:'ACTION SOCIALE'},
+  'Technologie':    {bg:'#4527A0', label:'INNOVATION'},
+  'Culture':        {bg:'#6A1B9A', label:'CULTURE'},
+  'Entrepreneuriat':{bg:'#E65100', label:'ENTREPRENEURIAT'},
+  'Finance':        {bg:'#1B5E20', label:'FINANCE'},
+  'Droit':          {bg:'#37474F', label:'DROIT'},
+};
+
 function renderInitiativeCard(it){
+  const badge = DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()};
+  const seed  = encodeURIComponent(it.slug || it.nom || 'init');
+  const photo = `https://picsum.photos/seed/${seed}/400/240`;
+  const loc   = [it.ville, it.pays].filter(Boolean).join(', ') || it.region || '—';
+  const desc  = it.description || it.mission || (it.domaine ? `Initiative ${it.domaine.toLowerCase()}` : '');
+
   return `
-  <a class="init-card" href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}" style="margin-bottom:12px;">
-    <div class="init-logo">${photoAvatar(it.nom, 48, 'initiative')}</div>
-    <div class="meta">
-      <div class="flex-between">
-        <h4>${it.nom}</h4>
-        <span class="badge ${badgeClass(it.type)}">${it.type}</span>
-      </div>
-      <p style="color:var(--muted);font-size:13px;">${it.ville} · ${it.region}</p>
-      <div class="tags">
-        <span class="tag">🌍 ${it.nationalite1}${it.nationalite2 ? " / "+it.nationalite2 : ""}</span>
-        <span class="tag">${it.domaine}</span>
-        ${it.nationalite_unique ? `<span class="badge badge-unique">Nationalité unique</span>` : ``}
+  <a class="ann-card" href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}">
+    <div class="ann-card-photo">
+      <img src="${photo}" alt="${it.nom}" loading="lazy" onerror="this.src='https://picsum.photos/seed/${it.id||0}/400/240'">
+      <span class="ann-cat-badge" style="background:${badge.bg};">${badge.label}</span>
+    </div>
+    <div class="ann-card-body">
+      <div class="ann-card-title">${it.nom}</div>
+      <div class="ann-card-desc">${desc}</div>
+      <div class="ann-card-foot">
+        <span class="ann-location">📍 ${loc}</span>
+        <span class="ann-arrow">→</span>
       </div>
     </div>
   </a>`;
