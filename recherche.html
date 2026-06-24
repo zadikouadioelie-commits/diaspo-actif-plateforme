@@ -70,9 +70,10 @@ if(params.get('q')) {
 
 document.getElementById('q').addEventListener('keydown', e => { if(e.key==='Enter') doSearch(); });
 
-async function doSearch() {
-  const q = document.getElementById('q').value.trim();
+async function doSearch(forceQ) {
+  const q = forceQ || document.getElementById('q').value.trim();
   if(q.length < 2) return;
+  document.getElementById('q').value = q;
   history.replaceState(null,'','/recherche.html?q='+encodeURIComponent(q));
   const res = document.getElementById('results');
   res.innerHTML = '<div class="empty">Recherche en cours...</div>';
@@ -147,7 +148,8 @@ function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt
 
 (async()=>{
   await applyAuthState();
-  if(params.get('q')) doSearch();
+  const q0 = params.get('q');
+  if(q0) doSearch(q0);
 })();
 </script>
 </body>
