@@ -232,25 +232,41 @@ async function initAnnuaire(){
     return;
   }
 
-  populateSelect("f-pays", [...new Set(ALL.map(i=>i.nationalite1).filter(Boolean))].sort());
-  populateSelect("f-nat2", [...new Set(ALL.map(i=>i.nationalite2).filter(Boolean))].sort());
+  /* Peupler les filtres Nationalités */
+  populateSelect("f-pays",    [...new Set(ALL.map(i=>i.nationalite1).filter(Boolean))].sort());
+  populateSelect("f-nat2",    [...new Set(ALL.map(i=>i.nationalite2).filter(Boolean))].sort());
+  /* Peupler les filtres Localisation */
+  populateSelect("f-pays-res",[...new Set(ALL.map(i=>i.pays).filter(Boolean))].sort());
+  populateSelect("f-region",  [...new Set(ALL.map(i=>i.region).filter(Boolean))].sort());
+  populateSelect("f-ville",   [...new Set(ALL.map(i=>i.ville).filter(Boolean))].sort());
+  /* Peupler Domaine et Type */
   populateSelect("f-domaine", [...new Set(ALL.map(i=>i.domaine).filter(Boolean))].sort());
-  populateSelect("f-type", [...new Set(ALL.map(i=>i.type).filter(Boolean))].sort());
+  populateSelect("f-type",    [...new Set(ALL.map(i=>i.type).filter(Boolean))].sort());
+
+  function sel(id){ return (document.getElementById(id)||{}).value || ""; }
 
   function apply(){
-    const q = (document.getElementById("f-q").value || "").toLowerCase();
-    const pays = document.getElementById("f-pays").value;
-    const nat2 = document.getElementById("f-nat2").value;
-    const dom = document.getElementById("f-domaine").value;
-    const type = document.getElementById("f-type").value;
-    const uniqueOnly = document.getElementById("f-unique") ? document.getElementById("f-unique").checked : false;
+    const q          = sel("f-q").toLowerCase();
+    const nat1       = sel("f-pays");
+    const nat2       = sel("f-nat2");
+    const paysRes    = sel("f-pays-res");
+    const region     = sel("f-region");
+    const ville      = sel("f-ville");
+    const dom        = sel("f-domaine");
+    const type       = sel("f-type");
+    const uniqueOnly = document.getElementById("f-unique")?.checked || false;
 
     const filtered = ALL.filter(it=>{
-      if(q && !it.nom.toLowerCase().includes(q)) return false;
-      if(pays && it.nationalite1 !== pays) return false;
-      if(nat2 && it.nationalite2 !== nat2) return false;
-      if(dom && it.domaine !== dom) return false;
-      if(type && it.type !== type) return false;
+      if(q && !it.nom.toLowerCase().includes(q) && !(it.description||"").toLowerCase().includes(q)) return false;
+      /* Nationalités : la valeur doit correspondre à nat1 OU nat2 de l'initiative */
+      if(nat1 && it.nationalite1 !== nat1 && it.nationalite2 !== nat1) return false;
+      if(nat2 && it.nationalite1 !== nat2 && it.nationalite2 !== nat2) return false;
+      /* Localisation combinable */
+      if(paysRes && it.pays !== paysRes) return false;
+      if(region  && it.region !== region) return false;
+      if(ville   && it.ville !== ville) return false;
+      if(dom     && it.domaine !== dom) return false;
+      if(type    && it.type !== type) return false;
       if(uniqueOnly && !it.nationalite_unique) return false;
       return true;
     });
@@ -258,17 +274,15 @@ async function initAnnuaire(){
     document.getElementById("result-count").textContent = filtered.length;
     list.innerHTML = filtered.length
       ? filtered.map(renderInitiativeCard).join("")
-      : `<div class="empty">Aucune initiative ne correspond à ces critères.</div>`;
+      : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">Aucune initiative ne correspond à ces critères.</div>`;
   }
 
-  ["f-q","f-pays","f-nat2","f-domaine","f-type"].forEach(id=>{
-    document.getElementById(id).addEventListener("input", apply);
-    document.getElementById(id).addEventListener("change", apply);
+  ["f-q","f-pays","f-nat2","f-pays-res","f-region","f-ville","f-domaine","f-type"].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.addEventListener("input", apply); el.addEventListener("change", apply); }
   });
-  if(document.getElementById("f-unique")){
-    document.getElementById("f-unique").addEventListener("change", apply);
-  }
-  document.getElementById("btn-search").addEventListener("click", apply);
+  document.getElementById("f-unique")?.addEventListener("change", apply);
+  document.getElementById("btn-search")?.addEventListener("click", apply);
   apply();
 }
 

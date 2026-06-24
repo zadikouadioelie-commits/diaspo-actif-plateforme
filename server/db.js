@@ -28,6 +28,8 @@ db.exec(`
     nationalite1 TEXT,
     nationalite2 TEXT,
     nationalite3 TEXT,
+    region TEXT,
+    departement TEXT,
     centres_interet TEXT DEFAULT '[]',
     situation_pro TEXT,
     type_institution TEXT,

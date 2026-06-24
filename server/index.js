@@ -77,7 +77,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   const {
     nom, prenom, email, password, role,
     date_naissance, nationalite1, nationalite2, nationalite3,
-    pays, ville, adresse, code_postal, telephone,
+    pays, region, departement, ville, adresse, code_postal, telephone,
     centres_interet, situation_pro,
     // initiative
     type_org, description, domaine, objectifs,
@@ -101,13 +101,14 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   const id = db.prepare(`
     INSERT INTO users (nom, prenom, email, password_hash, password_salt, role,
-      ville, pays, adresse, code_postal, telephone, date_naissance,
+      ville, pays, region, departement, adresse, code_postal, telephone, date_naissance,
       nationalite1, nationalite2, nationalite3,
       centres_interet, situation_pro, type_institution, statut_verification)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     nom, prenom || null, email, hash, salt, role,
     ville || null, (role === "collectivite" ? pays_concerne : pays) || null,
+    region || null, departement || null,
     adresse || null, code_postal || null, (telephone || telephone_pro) || null,
     date_naissance || null,
     nationalite1 || null, nationalite2 || null, nationalite3 || null,
@@ -122,15 +123,17 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     const slug = nom.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + id;
     db.prepare(`
       INSERT INTO initiatives (slug, nom, type, description, domaine, objectifs,
-        pays, ville, adresse, code_postal, site_web, reseaux_sociaux,
+        pays, region, ville, adresse, code_postal, site_web, reseaux_sociaux,
+        nationalite1, nationalite2,
         pays_intervention, nom_responsable, prenom_responsable, fonction_responsable,
         email_responsable, tel_responsable, owner_user_id, abonnement_actif)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
     `).run(
       slug, nom_institution || nom, type_org || null, description || null, domaine || null, objectifs || null,
-      pays || null, ville || null, adresse || null, code_postal || null,
+      pays || null, region || null, ville || null, adresse || null, code_postal || null,
       site_web || null,
       typeof reseaux_sociaux === "object" ? JSON.stringify(reseaux_sociaux) : (reseaux_sociaux || "{}"),
+      nationalite1 || null, nationalite2 || null,
       JSON.stringify(Array.isArray(pays_intervention) ? pays_intervention : []),
       nom_responsable || nom || null, prenom_responsable || prenom || null,
       fonction_responsable || null, email_responsable || email,

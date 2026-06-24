@@ -53,6 +53,7 @@
 }
 .ann-search-btn:hover{background:#0D47A1;}
 .ann-unique-chk{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.ann-filter-label{font-size:12px;font-weight:700;color:var(--navy);white-space:nowrap;min-width:90px;}
 
 /* Section heading */
 .ann-section-head{max-width:1180px;margin:0 auto;padding:32px 24px 18px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;}
@@ -180,14 +181,25 @@
 
   <!-- ===== FILTRES ===== -->
   <div class="ann-filters">
-    <div class="ann-filters-inner">
-      <select id="f-pays"><option value="">Catégorie (Nationalité)</option></select>
-      <select id="f-domaine"><option value="">Domaine d'activité</option></select>
-      <select id="f-nat2"><option value="">Nationalité 2</option></select>
-      <select id="f-type"><option value="">Type d'organisation</option></select>
-      <input type="text" id="f-q" placeholder="Rechercher une initiative...">
-      <label class="ann-unique-chk"><input type="checkbox" id="f-unique"> Nationalité unique</label>
-      <button class="ann-search-btn" id="btn-search">🔍 Rechercher</button>
+    <div class="ann-filters-inner" style="flex-direction:column;gap:10px;">
+      <!-- Bloc Nationalités -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%;">
+        <span class="ann-filter-label">🌍 Nationalités</span>
+        <select id="f-pays" style="flex:1;min-width:160px;"><option value="">Nationalité 1</option></select>
+        <select id="f-nat2" style="flex:1;min-width:160px;"><option value="">Nationalité 2</option></select>
+        <label class="ann-unique-chk"><input type="checkbox" id="f-unique"> Nationalité unique</label>
+      </div>
+      <!-- Bloc Localisation -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%;">
+        <span class="ann-filter-label">📍 Localisation</span>
+        <select id="f-pays-res" style="flex:1;min-width:130px;"><option value="">Pays</option></select>
+        <select id="f-region" style="flex:1;min-width:130px;"><option value="">Région</option></select>
+        <select id="f-ville" style="flex:1;min-width:130px;"><option value="">Ville</option></select>
+        <select id="f-domaine" style="flex:1;min-width:140px;"><option value="">Domaine</option></select>
+        <select id="f-type" style="flex:1;min-width:130px;"><option value="">Type</option></select>
+        <input type="text" id="f-q" placeholder="Nom de l'initiative..." style="flex:2;min-width:180px;">
+        <button class="ann-search-btn" id="btn-search">🔍 Rechercher</button>
+      </div>
     </div>
   </div>
 
