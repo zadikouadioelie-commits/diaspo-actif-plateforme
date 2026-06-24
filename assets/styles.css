@@ -164,7 +164,7 @@ button{font-family:inherit;cursor:pointer;}
 .with-sidebar{display:flex;flex:1;}
 .sidebar{
   width:230px;background:var(--navy);color:#cdd1dc;padding:22px 14px;flex:none;
-  position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:hidden;
+  position:sticky;top:58px;height:calc(100vh - 58px);overflow-y:auto;overflow-x:hidden;
   scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent;
 }
 .sidebar .brand{color:#fff;font-weight:800;margin-bottom:26px;padding:0 8px;}
