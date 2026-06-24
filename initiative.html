@@ -200,6 +200,7 @@ const DOMAIN_GRAD = {
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <h1>${init.nom}</h1>
             ${init.type ? `<span class="type-badge">${init.type}</span>` : ''}
+            ${init.certif ? badgeCertif(init.certif) : ''}
           </div>
           <div class="init-profile-meta">
             ${init.domaine ? `<span>📂 ${init.domaine}</span>` : ''}

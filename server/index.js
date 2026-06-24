@@ -181,6 +181,11 @@ route("GET", "/api/auth/me", async (req, res) => {
 });
 
 /* ---------- Initiatives ---------- */
+/* Helper : certification d'une initiative */
+function getCertif(initiativeId) {
+  return db.prepare("SELECT niveau, statut, date_attribution FROM certifications WHERE initiative_id=? AND statut='actif'").get(initiativeId) || null;
+}
+
 route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   let rows = db.prepare("SELECT * FROM initiatives ORDER BY created_at DESC").all();
   const q = (query.q || "").toLowerCase();
@@ -189,7 +194,7 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
   if (query.type) rows = rows.filter(r => r.type === query.type);
   if (query.nationalite_unique === "1") rows = rows.filter(r => r.nationalite_unique === 1);
-  rows = rows.map(r => ({ ...r, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif }));
+  rows = rows.map(r => ({ ...r, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: getCertif(r.id) }));
   sendJSON(res, 200, { initiatives: rows });
 });
 
@@ -199,6 +204,7 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
   row.nationalites_concernees = safeParse(row.nationalites_concernees);
   row.nationalite_unique = !!row.nationalite_unique;
   row.abonnement_actif = !!row.abonnement_actif;
+  row.certif = getCertif(row.id);
   sendJSON(res, 200, { initiative: row });
 });
 
@@ -355,13 +361,22 @@ route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
 route("GET", "/api/fil/:id/commentaires", async (req, res, params) => {
   const comms = db.prepare(`
     SELECT c.id, c.contenu, c.created_at, c.auteur_id, c.auteur_nom,
-           u.photo_url, u.theme_couleur
+           u.photo_url, u.theme_couleur, u.role
     FROM fil_commentaires c
     LEFT JOIN users u ON u.id = c.auteur_id
     WHERE c.post_id = ?
     ORDER BY c.created_at ASC
   `).all(params.id);
-  sendJSON(res, 200, { commentaires: comms });
+  // Ajouter la certification pour les commentaires d'initiatives
+  const enriched = comms.map(c => {
+    let certif = null;
+    if (c.role === "initiative" && c.auteur_id) {
+      const init = db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(c.auteur_id);
+      if (init) certif = getCertif(init.id);
+    }
+    return { ...c, certif };
+  });
+  sendJSON(res, 200, { commentaires: enriched });
 });
 
 route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
@@ -1087,6 +1102,121 @@ route("GET", "/api/admin/contenus", async (req, res) => {
   sendJSON(res, 200, { posts, formations, evenements });
 });
 
+/* ========== ROUTES CERTIFICATION ========== */
+
+/* Helper : enregistrer une action dans l'historique */
+function histoCertif(initiative_id, action, admin, motif, contenu) {
+  db.prepare("INSERT INTO certification_historique (initiative_id,action,admin_id,admin_nom,motif,contenu) VALUES (?,?,?,?,?,?)")
+    .run(initiative_id, action, admin.id, admin.nom, motif || null, contenu || null);
+}
+
+/* Liste toutes les initiatives avec statut certif — admin only */
+route("GET", "/api/admin/certifications", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const rows = db.prepare("SELECT i.id,i.nom,i.slug,i.domaine,i.pays,i.created_at, c.statut AS certif_statut, c.niveau AS certif_niveau, c.date_attribution FROM initiatives i LEFT JOIN certifications c ON c.initiative_id=i.id ORDER BY i.nom ASC").all();
+  sendJSON(res, 200, { initiatives: rows });
+});
+
+/* Fiche d'évaluation : lecture */
+route("GET", "/api/admin/certifications/:id/evaluation", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const eval_ = db.prepare("SELECT * FROM certification_evaluations WHERE initiative_id=?").get(params.id) || { initiative_id: Number(params.id) };
+  sendJSON(res, 200, { evaluation: eval_ });
+});
+
+/* Fiche d'évaluation : sauvegarde */
+route("PUT", "/api/admin/certifications/:id/evaluation", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const fields = [
+    "anciennete_score","publications_regularite","profil_completude","participation_communaute",
+    "taux_reponse","delai_reponse","qualite_echanges",
+    "projets_realises","actions_concretes","partenariats","emplois_crees","investissements","impacts",
+    "avis_utilisateurs","recommandations","retours_experience",
+    "documents_officiels","existence_legale","coordonnees_verifiees","infos_administratives",
+    "entretien_realise","visioconference","rencontre_physique","visite_site",
+    "verification_partenaires","verification_beneficiaires","verification_institutions",
+    "notes_internes","rapport_verification"
+  ];
+  const existing = db.prepare("SELECT id FROM certification_evaluations WHERE initiative_id=?").get(params.id);
+  const vals = fields.map(f => body[f] !== undefined ? body[f] : null);
+  if (existing) {
+    const sets = fields.map(f => `${f}=?`).join(",") + ",updated_at=datetime('now')";
+    db.prepare(`UPDATE certification_evaluations SET ${sets} WHERE initiative_id=?`).run(...vals, params.id);
+  } else {
+    const cols = ["initiative_id", ...fields].join(",");
+    const placeholders = ["?", ...fields.map(()=>"?")].join(",");
+    db.prepare(`INSERT INTO certification_evaluations (${cols}) VALUES (${placeholders})`).run(params.id, ...vals);
+  }
+  histoCertif(Number(params.id), "evaluation", user, "Mise à jour de la fiche d'évaluation", null);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Attribuer le badge */
+route("POST", "/api/admin/certifications/:id/attribuer", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const init = db.prepare("SELECT id,nom FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  const niveau = body.niveau || "verifie";
+  const existing = db.prepare("SELECT id FROM certifications WHERE initiative_id=?").get(params.id);
+  if (existing) {
+    db.prepare("UPDATE certifications SET statut='actif',niveau=?,admin_id=?,date_attribution=datetime('now'),updated_at=datetime('now') WHERE initiative_id=?").run(niveau, user.id, params.id);
+  } else {
+    db.prepare("INSERT INTO certifications (initiative_id,niveau,statut,admin_id) VALUES (?,?,'actif',?)").run(params.id, niveau, user.id);
+  }
+  histoCertif(Number(params.id), "attribution", user, body.motif || "Badge attribué", `Niveau : ${niveau}`);
+  // Notifier le propriétaire de l'initiative
+  const owner = db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (owner?.owner_user_id) {
+    creerNotif(owner.owner_user_id, "certification", "🛡️ Badge Initiative Vérifiée obtenu !", `Félicitations ! L'initiative « ${init.nom} » vient d'obtenir le badge Initiative Vérifiée Diaspo'Actif.`, { initiative_id: init.id });
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Suspendre le badge */
+route("POST", "/api/admin/certifications/:id/suspendre", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const existing = db.prepare("SELECT id FROM certifications WHERE initiative_id=?").get(params.id);
+  if (!existing) return sendJSON(res, 404, { error: "Aucune certification pour cette initiative." });
+  db.prepare("UPDATE certifications SET statut='suspendu',updated_at=datetime('now') WHERE initiative_id=?").run(params.id);
+  histoCertif(Number(params.id), "suspension", user, body.motif || null, null);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Retirer le badge */
+route("POST", "/api/admin/certifications/:id/retirer", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const existing = db.prepare("SELECT id FROM certifications WHERE initiative_id=?").get(params.id);
+  if (!existing) return sendJSON(res, 404, { error: "Aucune certification pour cette initiative." });
+  db.prepare("UPDATE certifications SET statut='retire',updated_at=datetime('now') WHERE initiative_id=?").run(params.id);
+  histoCertif(Number(params.id), "retrait", user, body.motif || null, null);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Ajouter une note interne */
+route("POST", "/api/admin/certifications/:id/note", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  if (!body.contenu) return sendJSON(res, 400, { error: "Contenu requis." });
+  histoCertif(Number(params.id), "note", user, body.titre || "Note interne", body.contenu);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Historique des décisions */
+route("GET", "/api/admin/certifications/:id/historique", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const rows = db.prepare("SELECT * FROM certification_historique WHERE initiative_id=? ORDER BY created_at DESC").all(params.id);
+  sendJSON(res, 200, { historique: rows });
+});
+
+/* ========== FIN ROUTES CERTIFICATION ========== */
+
 /* ---------- Collaborations (appels à contribution) ---------- */
 route("GET", "/api/collaborations", async (req, res, params, body, query) => {
   let rows = db.prepare(`SELECT c.*,u.nom AS auteur_nom,i.nom AS initiative_nom FROM collaborations c LEFT JOIN users u ON u.id=c.user_id LEFT JOIN initiatives i ON i.id=c.initiative_id ORDER BY c.created_at DESC`).all();
@@ -1142,10 +1272,17 @@ function enrichPost(p, cu) {
   const nb_commentaires = db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id).n;
   const user_a_aime = cu ? !!db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
 
-  let auteur = {};
+  let auteur = {}, auteur_certif = null;
   if (p.auteur_id) {
-    const u = db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur FROM users WHERE id=?").get(p.auteur_id);
-    if (u) auteur = u;
+    const u = db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur,role FROM users WHERE id=?").get(p.auteur_id);
+    if (u) {
+      auteur = u;
+      // Si l'auteur est une initiative, chercher sa certification
+      if (u.role === "initiative") {
+        const init = db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(p.auteur_id);
+        if (init) auteur_certif = getCertif(init.id);
+      }
+    }
   }
 
   // Score de popularité : likes×3 + commentaires×2 + reposts×1
@@ -1166,7 +1303,7 @@ function enrichPost(p, cu) {
       original_post = { ...orig, reactions: orig_counts, auteur_profil: orig_auteur };
     }
   }
-  return { ...p, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, score, original_post };
+  return { ...p, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, score, original_post };
 }
 
 /* ---------- Fil intelligent ---------- */

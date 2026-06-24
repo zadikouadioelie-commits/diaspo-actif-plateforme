@@ -37,6 +37,70 @@ const ROLE_LABEL_FR = { utilisateur: "Utilisateur", initiative: "Initiative", ad
 /* ---------- Utilitaires globaux ---------- */
 function escH(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
+/* ========== BADGE INITIATIVE VÉRIFIÉE ========== */
+const CERTIF_NIVEAUX = {
+  verifie:    { icon: "🛡️", label: "Initiative Vérifiée", cls: "certif-verifie" },
+  reference:  { icon: "⭐", label: "Initiative de Référence", cls: "certif-reference" },
+  partenaire: { icon: "🤝", label: "Partenaire Certifié", cls: "certif-partenaire" },
+};
+
+/* Retourne le HTML du badge (cliquable → modale d'info) */
+function badgeCertif(certif, opts = {}) {
+  if (!certif || certif.statut !== "actif") return "";
+  const n = CERTIF_NIVEAUX[certif.niveau] || CERTIF_NIVEAUX.verifie;
+  const size = opts.small ? "certif-badge-sm" : "";
+  return `<button class="certif-badge ${n.cls} ${size}" onclick="showCertifModal('${certif.niveau}')" title="${n.label} Diaspo'Actif">${n.icon} ${opts.labelOnly ? n.label : n.label} <span class="certif-da">Diaspo'Actif</span></button>`;
+}
+
+/* Modale d'information du badge */
+window.showCertifModal = function(niveau) {
+  const n = CERTIF_NIVEAUX[niveau] || CERTIF_NIVEAUX.verifie;
+  const existing = document.getElementById("certif-modal-overlay");
+  if (existing) existing.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "certif-modal-overlay";
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:440px;">
+      <button class="modal-close" onclick="document.getElementById('certif-modal-overlay').remove()">✕</button>
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:48px;margin-bottom:8px;">${n.icon}</div>
+        <div class="certif-badge ${n.cls}" style="font-size:15px;padding:6px 16px;cursor:default;display:inline-flex;">${n.icon} ${n.label} <span class="certif-da">Diaspo'Actif</span></div>
+      </div>
+      <p style="font-size:14px;line-height:1.7;color:var(--text);margin:0;">
+        Cette initiative a fait l'objet d'un processus de vérification réalisé par <strong>Diaspo'Actif</strong> portant notamment sur son <strong>activité</strong>, sa <strong>réactivité</strong>, ses <strong>réalisations</strong>, ses <strong>témoignages</strong> et différents éléments de contrôle jugés nécessaires.
+      </p>
+      <p style="font-size:12px;color:var(--muted);margin:12px 0 0;line-height:1.6;">
+        Ce badge est attribué exclusivement par l'équipe Diaspo'Actif, sans aucune contrepartie financière. Il peut être suspendu ou retiré à tout moment.
+      </p>
+    </div>`;
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+};
+
+/* Injection CSS du badge */
+(function injectCertifCSS() {
+  const s = document.createElement("style");
+  s.textContent = `
+    .certif-badge {
+      display:inline-flex;align-items:center;gap:5px;border:none;
+      border-radius:20px;font-size:12px;font-weight:700;
+      padding:3px 10px;cursor:pointer;transition:opacity .15s;
+      white-space:nowrap;line-height:1.4;
+    }
+    .certif-badge:hover { opacity:.82; }
+    .certif-verifie   { background:#E0F2FE;color:#0369A1; }
+    .certif-reference { background:#FEF9C3;color:#A16207; }
+    .certif-partenaire{ background:#F0FDF4;color:#166534; }
+    .certif-badge-sm  { font-size:10.5px;padding:2px 7px; }
+    .certif-da { font-weight:400;opacity:.75;font-size:.9em; }
+    /* Annuaire : badge overlay sur la carte */
+    .ann-certif-wrap { position:absolute;bottom:8px;left:8px;z-index:2; }
+  `;
+  document.head.appendChild(s);
+})();
+/* ========== FIN BADGE ========== */
+
 /* ---------- Avatars photo (DiceBear) ---------- */
 function photoAvatar(name, size=48, type='user') {
   const seed = encodeURIComponent((name||'?').trim());
@@ -367,12 +431,15 @@ function renderInitiativeCard(it){
   const desc    = it.description || it.mission || '';
   const membres = it.membres ? `<span class="ann-membres">👥 ${it.membres}</span>` : '';
 
+  const certifBadgeHtml = it.certif ? `<div class="ann-certif-wrap">${badgeCertif(it.certif, { small: true })}</div>` : "";
+
   return `
   <a class="ann-card" href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}">
-    <div class="ann-card-photo">
+    <div class="ann-card-photo" style="position:relative;">
       <img src="${photo}" alt="${it.nom}" loading="lazy" onerror="this.src='https://picsum.photos/seed/${it.id||0}/400/240'">
       <span class="ann-cat-badge" style="background:${badge.bg};">${badge.label}</span>
       ${it.type ? `<span class="ann-type-badge">${it.type}</span>` : ''}
+      ${certifBadgeHtml}
     </div>
     <div class="ann-card-body">
       <div class="ann-card-title">${it.nom}</div>
@@ -1015,7 +1082,7 @@ function renderCommentsSection(postId, commentaires){
     return `<div class="cmt-item">
       <div class="cmt-av">${av}</div>
       <div class="cmt-bubble">
-        <strong class="cmt-nom">${escH(c.auteur_nom||"Anonyme")}</strong>
+        <strong class="cmt-nom">${escH(c.auteur_nom||"Anonyme")}</strong>${c.certif ? " " + badgeCertif(c.certif, { small: true }) : ""}
         <span class="cmt-date">${fmtDateGlobal(c.created_at)}</span>
         <div class="cmt-text">${escH(c.contenu)}</div>
       </div>
@@ -1728,6 +1795,7 @@ async function initFilActualite(){
     const nbCmts = p.nb_commentaires || 0;
     const { banner, avHtml, locHtml, origHtml, titreHtml, bioHtml, nom, typeIcon, typeLabel } = buildAuthorHeader(p);
     const { mediaHtml, bodyHtml } = buildPostBody(p);
+    const postCertifBadge = p.auteur_certif ? badgeCertif(p.auteur_certif, { small: true }) : "";
 
     return `<div class="feed-post" id="fp-${p.id}">
       <div class="fp-author-banner" style="background:${banner};">
@@ -1737,7 +1805,7 @@ async function initFilActualite(){
       <div class="fp-head">
         <a href="profil.html?id=${p.auteur_id||''}" class="fp-av-link">${avHtml}</a>
         <div class="fp-meta">
-          <div class="fp-nom"><a href="profil.html?id=${p.auteur_id||''}" class="fp-nom-link">${escH(nom)}</a></div>
+          <div class="fp-nom"><a href="profil.html?id=${p.auteur_id||''}" class="fp-nom-link">${escH(nom)}</a>${postCertifBadge ? " " + postCertifBadge : ""}</div>
           ${titreHtml}
           <div class="fp-sub-row">${locHtml}${origHtml}<span class="fp-date">🕐 ${fmtDate(p.created_at)}</span></div>
         </div>

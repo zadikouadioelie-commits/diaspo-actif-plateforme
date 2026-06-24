@@ -259,6 +259,79 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value INTEGER NOT NULL DEFAULT 0
   );
+
+  /* ===== SYSTÈME DE CERTIFICATION ===== */
+
+  /* Certification active d'une initiative */
+  CREATE TABLE IF NOT EXISTS certifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL UNIQUE,
+    niveau TEXT NOT NULL DEFAULT 'verifie',
+    statut TEXT NOT NULL DEFAULT 'actif' CHECK(statut IN ('actif','suspendu','retire')),
+    date_attribution TEXT DEFAULT (datetime('now')),
+    admin_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+
+  /* Historique de toutes les décisions (attribution, suspension, retrait, note, rapport) */
+  CREATE TABLE IF NOT EXISTS certification_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    admin_id INTEGER NOT NULL,
+    admin_nom TEXT,
+    motif TEXT,
+    contenu TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
+  /* Fiche d'évaluation interne par initiative */
+  CREATE TABLE IF NOT EXISTS certification_evaluations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL UNIQUE,
+    -- Activité sur la plateforme
+    anciennete_score INTEGER DEFAULT 0,
+    publications_regularite INTEGER DEFAULT 0,
+    profil_completude INTEGER DEFAULT 0,
+    participation_communaute INTEGER DEFAULT 0,
+    -- Réactivité
+    taux_reponse INTEGER DEFAULT 0,
+    delai_reponse TEXT DEFAULT '',
+    qualite_echanges INTEGER DEFAULT 0,
+    -- Réalisations
+    projets_realises TEXT DEFAULT '',
+    actions_concretes TEXT DEFAULT '',
+    partenariats TEXT DEFAULT '',
+    emplois_crees INTEGER DEFAULT 0,
+    investissements TEXT DEFAULT '',
+    impacts TEXT DEFAULT '',
+    -- Témoignages
+    avis_utilisateurs TEXT DEFAULT '',
+    recommandations TEXT DEFAULT '',
+    retours_experience TEXT DEFAULT '',
+    -- Vérifications administratives
+    documents_officiels INTEGER DEFAULT 0,
+    existence_legale INTEGER DEFAULT 0,
+    coordonnees_verifiees INTEGER DEFAULT 0,
+    infos_administratives TEXT DEFAULT '',
+    -- Vérifications complémentaires
+    entretien_realise INTEGER DEFAULT 0,
+    visioconference INTEGER DEFAULT 0,
+    rencontre_physique INTEGER DEFAULT 0,
+    visite_site INTEGER DEFAULT 0,
+    verification_partenaires INTEGER DEFAULT 0,
+    verification_beneficiaires INTEGER DEFAULT 0,
+    verification_institutions INTEGER DEFAULT 0,
+    -- Notes et rapport
+    notes_internes TEXT DEFAULT '',
+    rapport_verification TEXT DEFAULT '',
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
 `);
 
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */

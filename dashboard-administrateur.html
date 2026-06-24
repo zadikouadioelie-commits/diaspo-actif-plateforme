@@ -27,6 +27,7 @@
       <a href="#initiatives" data-section="initiatives">🌍 Initiatives</a>
       <a href="#formations" data-section="formations">📚 Formations</a>
       <a href="#publications" data-section="publications">📢 Publications</a>
+      <a href="#certifications" data-section="certifications">🛡️ Certifications</a>
       <a href="#moderation" data-section="moderation">🛡 Modération</a>
       <a href="#communication" data-section="communication">✉ Communication</a>
     </aside>
@@ -126,6 +127,134 @@
         <div id="publications-list"><div class="notice">Chargement des publications…</div></div>
       </section>
 
+      <!-- CERTIFICATIONS -->
+      <section id="section-certifications" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div>
+            <h2 style="margin:0;">🛡️ Certifications</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Attribution et gestion du badge « Initiative Vérifiée Diaspo'Actif »</p>
+          </div>
+        </div>
+
+        <div class="notice" style="margin-bottom:20px;">
+          Le badge <strong>Initiative Vérifiée Diaspo'Actif</strong> est attribué exclusivement par l'équipe d'administration, après évaluation. Aucune attribution automatique. Aucun achat possible.
+        </div>
+
+        <!-- Liste des initiatives -->
+        <div class="card" style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <h3 style="margin:0;flex:1;">Initiatives</h3>
+            <input type="text" id="certif-search" placeholder="Rechercher…" class="input-field" style="max-width:220px;padding:6px 10px;font-size:13px;">
+          </div>
+          <div id="certif-list"><div class="notice">Chargement…</div></div>
+        </div>
+
+        <!-- Fiche d'évaluation (cachée par défaut) -->
+        <div id="certif-fiche-wrap" style="display:none;">
+          <div class="card" style="margin-bottom:16px;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+              <h3 style="margin:0;flex:1;">📋 Fiche d'évaluation — <span id="certif-fiche-nom"></span></h3>
+              <button class="btn btn-sm btn-outline" onclick="closeCertifFiche()">✕ Fermer</button>
+              <button class="btn btn-sm btn-orange" onclick="saveCertifFiche()">💾 Sauvegarder</button>
+            </div>
+            <div id="certif-fiche-statut" style="margin-bottom:16px;"></div>
+
+            <!-- Actions rapides -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;padding:12px;background:var(--bg);border-radius:8px;">
+              <button class="btn btn-sm btn-orange" onclick="actionCertif('attribuer')">🛡️ Attribuer le badge</button>
+              <button class="btn btn-sm btn-outline" onclick="actionCertif('suspendre')">⏸ Suspendre</button>
+              <button class="btn btn-sm btn-outline" style="color:#D33;border-color:#D33;" onclick="actionCertif('retirer')">✕ Retirer</button>
+              <button class="btn btn-sm btn-outline" onclick="openNoteModal()" style="margin-left:auto;">📝 Ajouter une note</button>
+            </div>
+
+            <!-- Formulaire d'évaluation en onglets -->
+            <div class="certif-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:8px;">
+              <button class="certif-tab active" data-tab="activite">📊 Activité</button>
+              <button class="certif-tab" data-tab="reactivite">⚡ Réactivité</button>
+              <button class="certif-tab" data-tab="realisations">🏆 Réalisations</button>
+              <button class="certif-tab" data-tab="temoignages">💬 Témoignages</button>
+              <button class="certif-tab" data-tab="verifications">✅ Vérifications</button>
+              <button class="certif-tab" data-tab="notes">📝 Notes</button>
+              <button class="certif-tab" data-tab="historique">📜 Historique</button>
+            </div>
+
+            <!-- TAB : Activité -->
+            <div class="certif-tab-content" id="tab-activite">
+              <div class="certif-grid">
+                <div class="certif-field"><label>Ancienneté du compte (0-5)</label><input type="number" min="0" max="5" name="anciennete_score" class="input-field"></div>
+                <div class="certif-field"><label>Régularité des publications (0-5)</label><input type="number" min="0" max="5" name="publications_regularite" class="input-field"></div>
+                <div class="certif-field"><label>Complétude du profil (0-5)</label><input type="number" min="0" max="5" name="profil_completude" class="input-field"></div>
+                <div class="certif-field"><label>Participation communauté (0-5)</label><input type="number" min="0" max="5" name="participation_communaute" class="input-field"></div>
+              </div>
+            </div>
+
+            <!-- TAB : Réactivité -->
+            <div class="certif-tab-content" id="tab-reactivite" style="display:none;">
+              <div class="certif-grid">
+                <div class="certif-field"><label>Taux de réponse aux messages (0-5)</label><input type="number" min="0" max="5" name="taux_reponse" class="input-field"></div>
+                <div class="certif-field"><label>Délai moyen de réponse</label><input type="text" name="delai_reponse" placeholder="ex: 24h" class="input-field"></div>
+                <div class="certif-field"><label>Qualité des échanges (0-5)</label><input type="number" min="0" max="5" name="qualite_echanges" class="input-field"></div>
+              </div>
+            </div>
+
+            <!-- TAB : Réalisations -->
+            <div class="certif-tab-content" id="tab-realisations" style="display:none;">
+              <div class="certif-field" style="margin-bottom:10px;"><label>Projets réalisés</label><textarea name="projets_realises" class="input-field" rows="3"></textarea></div>
+              <div class="certif-field" style="margin-bottom:10px;"><label>Actions concrètes</label><textarea name="actions_concretes" class="input-field" rows="3"></textarea></div>
+              <div class="certif-field" style="margin-bottom:10px;"><label>Partenariats conclus</label><textarea name="partenariats" class="input-field" rows="2"></textarea></div>
+              <div class="certif-grid">
+                <div class="certif-field"><label>Emplois créés</label><input type="number" min="0" name="emplois_crees" class="input-field"></div>
+              </div>
+              <div class="certif-field" style="margin-bottom:10px;"><label>Investissements mobilisés</label><textarea name="investissements" class="input-field" rows="2"></textarea></div>
+              <div class="certif-field"><label>Impacts mesurables</label><textarea name="impacts" class="input-field" rows="3"></textarea></div>
+            </div>
+
+            <!-- TAB : Témoignages -->
+            <div class="certif-tab-content" id="tab-temoignages" style="display:none;">
+              <div class="certif-field" style="margin-bottom:10px;"><label>Avis des utilisateurs</label><textarea name="avis_utilisateurs" class="input-field" rows="3"></textarea></div>
+              <div class="certif-field" style="margin-bottom:10px;"><label>Recommandations</label><textarea name="recommandations" class="input-field" rows="3"></textarea></div>
+              <div class="certif-field"><label>Retours d'expérience</label><textarea name="retours_experience" class="input-field" rows="3"></textarea></div>
+            </div>
+
+            <!-- TAB : Vérifications -->
+            <div class="certif-tab-content" id="tab-verifications" style="display:none;">
+              <h4 style="margin:0 0 12px;font-size:13px;text-transform:uppercase;color:var(--muted);">Vérifications administratives</h4>
+              <div class="certif-checks">
+                <label class="certif-check"><input type="checkbox" name="documents_officiels"> Documents officiels transmis</label>
+                <label class="certif-check"><input type="checkbox" name="existence_legale"> Existence légale vérifiée</label>
+                <label class="certif-check"><input type="checkbox" name="coordonnees_verifiees"> Coordonnées vérifiées</label>
+              </div>
+              <div class="certif-field" style="margin:12px 0;"><label>Informations administratives</label><textarea name="infos_administratives" class="input-field" rows="2"></textarea></div>
+              <h4 style="margin:16px 0 12px;font-size:13px;text-transform:uppercase;color:var(--muted);">Vérifications complémentaires</h4>
+              <div class="certif-checks">
+                <label class="certif-check"><input type="checkbox" name="entretien_realise"> Entretien réalisé</label>
+                <label class="certif-check"><input type="checkbox" name="visioconference"> Visioconférence réalisée</label>
+                <label class="certif-check"><input type="checkbox" name="rencontre_physique"> Rencontre physique réalisée</label>
+                <label class="certif-check"><input type="checkbox" name="visite_site"> Visite sur site effectuée</label>
+                <label class="certif-check"><input type="checkbox" name="verification_partenaires"> Vérification auprès de partenaires</label>
+                <label class="certif-check"><input type="checkbox" name="verification_beneficiaires"> Vérification auprès de bénéficiaires</label>
+                <label class="certif-check"><input type="checkbox" name="verification_institutions"> Vérification auprès d'institutions</label>
+              </div>
+            </div>
+
+            <!-- TAB : Notes & Rapport -->
+            <div class="certif-tab-content" id="tab-notes" style="display:none;">
+              <div class="certif-field" style="margin-bottom:12px;"><label>Notes internes</label><textarea name="notes_internes" class="input-field" rows="5" placeholder="Observations, points d'attention, résumé des échanges…"></textarea></div>
+              <div class="certif-field"><label>Rapport de vérification</label><textarea name="rapport_verification" class="input-field" rows="8" placeholder="Rapport détaillé de la procédure de certification…"></textarea></div>
+            </div>
+
+            <!-- TAB : Historique -->
+            <div class="certif-tab-content" id="tab-historique" style="display:none;">
+              <div id="certif-historique-list"><div class="notice">Chargement…</div></div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+              <button class="btn btn-orange" onclick="saveCertifFiche()">💾 Sauvegarder la fiche</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- MODÉRATION -->
       <section id="section-moderation" style="display:none;">
         <h2>Modération</h2>
@@ -192,9 +321,187 @@
   </div>
 </div>
 
+<style>
+/* Certifications admin */
+.certif-row { display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap; }
+.certif-row:last-child { border-bottom:none; }
+.certif-nom { flex:1;min-width:140px;font-weight:700;font-size:13.5px; }
+.certif-meta { font-size:12px;color:var(--muted); }
+.certif-statut-badge { font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px; }
+.cs-actif   { background:#D1FAE5;color:#065F46; }
+.cs-suspendu{ background:#FEF3C7;color:#92400E; }
+.cs-retire  { background:#FEE2E2;color:#991B1B; }
+.cs-aucun   { background:#F3F4F6;color:#6B7280; }
+.certif-grid { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px; }
+.certif-field label { display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em; }
+.certif-field .input-field { width:100%;margin:0; }
+.certif-checks { display:flex;flex-direction:column;gap:8px; }
+.certif-check { display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer; }
+.certif-check input { width:16px;height:16px; }
+.certif-tabs { gap:6px; }
+.certif-tab { background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;color:var(--muted);transition:all .15s; }
+.certif-tab.active { background:var(--navy);color:#fff;border-color:var(--navy); }
+.certif-histo-item { padding:10px 0;border-bottom:1px solid var(--border);font-size:13px; }
+.certif-histo-action { font-weight:700;text-transform:capitalize; }
+</style>
+
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
+
+/* ===== Logique certifications ===== */
+let certifInitiativeId = null;
+
+async function loadCertifList(q = "") {
+  const el = document.getElementById("certif-list");
+  try {
+    const data = await api("GET", "/admin/certifications");
+    let rows = data.initiatives || [];
+    if (q) rows = rows.filter(r => r.nom.toLowerCase().includes(q.toLowerCase()));
+    if (!rows.length) { el.innerHTML = `<div class="notice">Aucune initiative trouvée.</div>`; return; }
+    el.innerHTML = rows.map(r => {
+      const statut = r.certif_statut || "aucun";
+      const statutHtml = `<span class="certif-statut-badge cs-${statut}">${statut === "actif" ? "🛡️ Vérifiée" : statut === "suspendu" ? "⏸ Suspendu" : statut === "retire" ? "✕ Retiré" : "— Sans badge"}</span>`;
+      return `<div class="certif-row">
+        <div>
+          <div class="certif-nom">${escH(r.nom)}</div>
+          <div class="certif-meta">${r.domaine||""} · ${r.pays||""}</div>
+        </div>
+        ${statutHtml}
+        ${r.certif_statut === "actif" && r.date_attribution ? `<span class="certif-meta">Depuis le ${r.date_attribution.slice(0,10)}</span>` : ""}
+        <button class="btn btn-sm btn-outline" onclick="openCertifFiche(${r.id},'${escH(r.nom)}')">📋 Évaluer</button>
+      </div>`;
+    }).join("");
+  } catch(e) { el.innerHTML = `<div class="notice" style="color:#D33;">Erreur : ${escH(e.message)}</div>`; }
+}
+
+async function openCertifFiche(id, nom) {
+  certifInitiativeId = id;
+  document.getElementById("certif-fiche-nom").textContent = nom;
+  document.getElementById("certif-fiche-wrap").style.display = "";
+  document.getElementById("certif-fiche-wrap").scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // Charger le statut actuel
+  try {
+    const data = await api("GET", "/admin/certifications");
+    const row = (data.initiatives||[]).find(r => r.id === id);
+    const statut = row?.certif_statut || "aucun";
+    const statutEl = document.getElementById("certif-fiche-statut");
+    const labelMap = { actif: "🛡️ Badge actif", suspendu: "⏸ Badge suspendu", retire: "✕ Badge retiré", aucun: "— Aucun badge attribué" };
+    const clsMap   = { actif: "cs-actif", suspendu: "cs-suspendu", retire: "cs-retire", aucun: "cs-aucun" };
+    statutEl.innerHTML = `<span class="certif-statut-badge ${clsMap[statut]||"cs-aucun"}">${labelMap[statut]||statut}</span>`;
+  } catch(e) {}
+
+  // Charger la fiche d'évaluation
+  try {
+    const { evaluation } = await api("GET", `/admin/certifications/${id}/evaluation`);
+    const fiche = document.getElementById("certif-fiche-wrap");
+    const textFields = ["delai_reponse","projets_realises","actions_concretes","partenariats","investissements","impacts","avis_utilisateurs","recommandations","retours_experience","infos_administratives","notes_internes","rapport_verification"];
+    const numFields  = ["anciennete_score","publications_regularite","profil_completude","participation_communaute","taux_reponse","qualite_echanges","emplois_crees"];
+    const boolFields = ["documents_officiels","existence_legale","coordonnees_verifiees","entretien_realise","visioconference","rencontre_physique","visite_site","verification_partenaires","verification_beneficiaires","verification_institutions"];
+    for (const f of [...textFields, ...numFields]) {
+      const el = fiche.querySelector(`[name="${f}"]`);
+      if (el && evaluation[f] != null) el.value = evaluation[f];
+    }
+    for (const f of boolFields) {
+      const el = fiche.querySelector(`[name="${f}"]`);
+      if (el) el.checked = !!evaluation[f];
+    }
+  } catch(e) {}
+
+  // Sélectionner le premier onglet
+  switchCertifTab("activite");
+}
+
+function closeCertifFiche() {
+  certifInitiativeId = null;
+  document.getElementById("certif-fiche-wrap").style.display = "none";
+}
+
+function switchCertifTab(tabId) {
+  document.querySelectorAll(".certif-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabId));
+  document.querySelectorAll(".certif-tab-content").forEach(c => c.style.display = c.id === "tab-" + tabId ? "" : "none");
+  if (tabId === "historique") loadCertifHistorique();
+}
+
+async function loadCertifHistorique() {
+  if (!certifInitiativeId) return;
+  const el = document.getElementById("certif-historique-list");
+  try {
+    const { historique } = await api("GET", `/admin/certifications/${certifInitiativeId}/historique`);
+    if (!historique.length) { el.innerHTML = `<div class="notice">Aucune décision enregistrée.</div>`; return; }
+    const actionIcons = { attribution:"🛡️", suspension:"⏸", retrait:"✕", note:"📝", evaluation:"📋", rapport:"📄" };
+    el.innerHTML = historique.map(h => `
+      <div class="certif-histo-item">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+          <span>${actionIcons[h.action]||"•"}</span>
+          <span class="certif-histo-action">${h.action}</span>
+          <span style="color:var(--muted);font-size:12px;">${h.created_at?.slice(0,16)||""}</span>
+          <span style="color:var(--muted);font-size:12px;margin-left:auto;">par ${escH(h.admin_nom||"Admin")}</span>
+        </div>
+        ${h.motif ? `<div style="color:var(--muted);font-size:12.5px;">${escH(h.motif)}</div>` : ""}
+        ${h.contenu ? `<div style="font-size:12.5px;margin-top:3px;background:var(--bg);padding:6px 10px;border-radius:6px;">${escH(h.contenu)}</div>` : ""}
+      </div>
+    `).join("");
+  } catch(e) { el.innerHTML = `<div class="notice" style="color:#D33;">Erreur : ${escH(e.message)}</div>`; }
+}
+
+async function saveCertifFiche() {
+  if (!certifInitiativeId) return;
+  const fiche = document.getElementById("certif-fiche-wrap");
+  const body = {};
+  fiche.querySelectorAll("[name]").forEach(el => {
+    body[el.name] = el.type === "checkbox" ? (el.checked ? 1 : 0) : el.value;
+  });
+  try {
+    await api("PUT", `/admin/certifications/${certifInitiativeId}/evaluation`, body);
+    alert("Fiche d'évaluation sauvegardée.");
+  } catch(e) { alert("Erreur : " + e.message); }
+}
+
+async function actionCertif(action) {
+  if (!certifInitiativeId) return;
+  const labels = { attribuer: "Attribuer le badge Initiative Vérifiée", suspendre: "Suspendre le badge", retirer: "Retirer le badge définitivement" };
+  const motif = prompt(labels[action] + "\n\nMotif (optionnel) :");
+  if (motif === null) return; // annulé
+  try {
+    await api("POST", `/admin/certifications/${certifInitiativeId}/${action}`, { motif });
+    alert(action === "attribuer" ? "✅ Badge attribué avec succès." : action === "suspendre" ? "⏸ Badge suspendu." : "✕ Badge retiré.");
+    await openCertifFiche(certifInitiativeId, document.getElementById("certif-fiche-nom").textContent);
+    await loadCertifList(document.getElementById("certif-search").value);
+  } catch(e) { alert("Erreur : " + e.message); }
+}
+
+async function openNoteModal() {
+  if (!certifInitiativeId) return;
+  const titre = prompt("Titre de la note :");
+  if (!titre) return;
+  const contenu = prompt("Contenu de la note :");
+  if (!contenu) return;
+  try {
+    await api("POST", `/admin/certifications/${certifInitiativeId}/note`, { titre, contenu });
+    alert("Note ajoutée.");
+    loadCertifHistorique();
+  } catch(e) { alert("Erreur : " + e.message); }
+}
+
+/* Onglets certif */
+document.addEventListener("click", e => {
+  const tab = e.target.closest(".certif-tab");
+  if (tab) switchCertifTab(tab.dataset.tab);
+});
+
+/* Recherche dans la liste */
+document.getElementById("certif-search")?.addEventListener("input", e => {
+  loadCertifList(e.target.value);
+});
+
+/* Charger la liste quand la section s'ouvre */
+document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a => {
+  a.addEventListener("click", () => setTimeout(() => loadCertifList(), 50));
+});
+/* ===== Fin certifications ===== */
+
 (async () => {
   // Auth guard
   const me = await fetchCurrentUser();
