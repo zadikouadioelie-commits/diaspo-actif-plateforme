@@ -607,6 +607,192 @@ function initEvenements(){
 
 /* ---------- Fil d'actualité global (branché sur l'API) ---------- */
 /* ================================================================
+   SYSTÈME @MENTIONS — Autocomplete universel + rendu cliquable
+   ================================================================ */
+
+/* Styles injectés une seule fois */
+(function injectMentionStyles(){
+  if(document.getElementById("mention-style")) return;
+  const s = document.createElement("style");
+  s.id = "mention-style";
+  s.textContent = `
+.mention-dropdown {
+  position:fixed; z-index:99999;
+  background:#fff; border:1px solid #E5E7EB; border-radius:12px;
+  box-shadow:0 8px 30px rgba(0,0,0,.14);
+  min-width:300px; max-height:260px; overflow-y:auto;
+  animation:mentionIn .12s ease;
+}
+@keyframes mentionIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
+.mention-item {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 14px; cursor:pointer; transition:background .12s;
+}
+.mention-item:hover, .mention-item.active { background:#EEF2FF; }
+.mention-item:not(:last-child) { border-bottom:1px solid #F3F4F6; }
+.mi-av { width:38px; height:38px; border-radius:50%; flex-shrink:0; overflow:hidden; }
+.mi-av.initiative { border-radius:8px; }
+.mi-nom { font-size:13px; font-weight:700; color:#0D1B2A; }
+.mi-sub { font-size:11px; color:#9CA3AF; margin-top:2px; }
+.mi-badge {
+  margin-left:auto; font-size:10px; font-weight:800; padding:2px 8px;
+  border-radius:99px; white-space:nowrap;
+}
+.mi-badge.user { background:#EEF2FF; color:#4338CA; }
+.mi-badge.initiative { background:#ECFDF5; color:#059669; }
+a.mention-link {
+  color:#4338CA; font-weight:700; text-decoration:none;
+  border-radius:3px; padding:0 1px;
+}
+a.mention-link:hover { text-decoration:underline; }
+  `;
+  document.head.appendChild(s);
+})();
+
+class MentionPicker {
+  constructor(textarea) {
+    this.ta        = textarea;
+    this.dropdown  = null;
+    this.results   = [];
+    this.activeIdx = 0;
+    this.triggerPos = -1;
+    this._debounce  = null;
+    this._bind();
+  }
+
+  _bind() {
+    this.ta.addEventListener("input",   () => this._onInput());
+    this.ta.addEventListener("keydown", e  => this._onKey(e));
+    this.ta.addEventListener("blur",    () => setTimeout(() => this._close(), 150));
+  }
+
+  _onInput() {
+    const val  = this.ta.value;
+    const pos  = this.ta.selectionStart;
+    const before = val.slice(0, pos);
+    // Capture @ + word chars (lettres, chiffres, accents, tirets)
+    const m = before.match(/@([\wÀ-ž-]{1,40})$/);
+    if (m) {
+      this.triggerPos = before.lastIndexOf("@");
+      clearTimeout(this._debounce);
+      this._debounce = setTimeout(() => this._search(m[1]), 200);
+    } else {
+      this._close();
+    }
+  }
+
+  async _search(q) {
+    try {
+      const r = await api("GET", `/mentions?q=${encodeURIComponent(q)}`);
+      this.results   = r.results || [];
+      this.activeIdx = 0;
+      if (this.results.length) this._show();
+      else this._close();
+    } catch { this._close(); }
+  }
+
+  _show() {
+    this._close();
+    const rect = this.ta.getBoundingClientRect();
+    const div  = document.createElement("div");
+    div.className = "mention-dropdown";
+    // Position sous le textarea, aligné à gauche
+    const top = rect.bottom + window.scrollY + 4;
+    const left = rect.left  + window.scrollX;
+    div.style.top  = top  + "px";
+    div.style.left = left + "px";
+    // Corrige si dépasse à droite
+    div.style.maxWidth = Math.min(360, window.innerWidth - left - 12) + "px";
+
+    this.results.forEach((r, i) => {
+      const item = document.createElement("div");
+      item.className = "mention-item" + (i === 0 ? " active" : "");
+      const avHtml = r.photo_url
+        ? `<img src="${r.photo_url}" alt="${r.nom}" style="width:38px;height:38px;object-fit:cover;border-radius:${r.type==="initiative"?"8px":"50%"};">`
+        : photoAvatar(r.nom, 38, r.type === "initiative" ? "initiative" : "user");
+      item.innerHTML = `
+        <div class="mi-av ${r.type === "initiative" ? "initiative" : ""}">${avHtml}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="mi-nom">${_escM(r.nom)}</div>
+          <div class="mi-sub">📍 ${_escM(r.pays || "—")}</div>
+        </div>
+        <span class="mi-badge ${r.type}">${r.type === "initiative" ? "Initiative" : _escM(r.type_label)}</span>`;
+      item.addEventListener("mouseenter", () => { this.activeIdx = i; this._highlight(); });
+      item.addEventListener("mousedown",  e => { e.preventDefault(); this._select(i); });
+      div.appendChild(item);
+    });
+
+    document.body.appendChild(div);
+    this.dropdown = div;
+  }
+
+  _highlight() {
+    if (!this.dropdown) return;
+    [...this.dropdown.children].forEach((el, i) => {
+      el.classList.toggle("active", i === this.activeIdx);
+    });
+  }
+
+  _onKey(e) {
+    if (!this.dropdown) return;
+    if (e.key === "ArrowDown")  { e.preventDefault(); this.activeIdx = Math.min(this.activeIdx + 1, this.results.length - 1); this._highlight(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); this.activeIdx = Math.max(this.activeIdx - 1, 0); this._highlight(); }
+    else if (e.key === "Enter" || e.key === "Tab") { if (this.results.length) { e.preventDefault(); this._select(this.activeIdx); } }
+    else if (e.key === "Escape") { this._close(); }
+  }
+
+  _select(idx) {
+    const r = this.results[idx];
+    if (!r) return;
+    const val    = this.ta.value;
+    const pos    = this.ta.selectionStart;
+    const before = val.slice(0, this.triggerPos);
+    const after  = val.slice(pos);
+    const token  = `@[${r.nom}](${r.type === "initiative" ? "i" : "u"}:${r.id}) `;
+    this.ta.value = before + token + after;
+    const newPos  = before.length + token.length;
+    this.ta.setSelectionRange(newPos, newPos);
+    this.ta.dispatchEvent(new Event("input", { bubbles: true }));
+    this._close();
+  }
+
+  _close() {
+    if (this.dropdown) { this.dropdown.remove(); this.dropdown = null; }
+    this.results = [];
+  }
+
+  destroy() { this._close(); }
+}
+
+/* Mini-escape pour le HTML des items du dropdown (pas XSS-critique mais propre) */
+function _escM(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* Transforme @[Nom](u:1) ou @[Nom](i:5) en <a> cliquable */
+function renderMentions(rawText) {
+  const parts = [];
+  let last = 0;
+  const re  = /@\[([^\]]+)\]\(([ui]):(\d+)\)/g;
+  let m;
+  while ((m = re.exec(rawText)) !== null) {
+    // Échappe le texte avant la mention
+    if (m.index > last) parts.push(_escTxt(rawText.slice(last, m.index)));
+    const nom  = m[1], type = m[2], id = m[3];
+    const href = type === "i" ? `initiative.html?id=${id}` : `profil.html?id=${id}`;
+    parts.push(`<a href="${href}" class="mention-link">@${_escM(nom)}</a>`);
+    last = m.index + m[0].length;
+  }
+  if (last < rawText.length) parts.push(_escTxt(rawText.slice(last)));
+  return parts.join("");
+}
+
+/* Échappe le texte ordinaire (préserve les sauts de ligne → <br>) */
+function _escTxt(s) {
+  return String(s||"")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")
+    .replace(/\n/g,"<br>");
+}
+
+/* ================================================================
    FIL D'ACTUALITÉ — Compositeur riche + rendu enrichi
    ================================================================ */
 async function initFilActualite(){
@@ -776,6 +962,7 @@ async function initFilActualite(){
       let videoDuree   = null;
       let videoErreur  = false;
       const MAX_CHARS  = 3000;
+      let _mentionPicker = null;
 
       pubBox.innerHTML = `
 <div class="composer card">
@@ -817,6 +1004,12 @@ async function initFilActualite(){
   </div>
 </div>`;
 
+      function attachMentionPicker() {
+        if (_mentionPicker) _mentionPicker.destroy();
+        const ta = document.getElementById("comp-ta");
+        if (ta) _mentionPicker = new MentionPicker(ta);
+      }
+
       function switchType(t) {
         currentType  = t;
         mediaDataUrl = null; mediaFile = null; videoDuree = null; videoErreur = false;
@@ -825,12 +1018,13 @@ async function initFilActualite(){
         const articleWrap = document.getElementById("comp-article-titre-wrap");
         articleWrap.style.display = t==="article" ? "block" : "none";
         document.getElementById("comp-ta").placeholder =
-          t==="texte"   ? "Partagez une idée, une actualité, une opportunité… (max 3 000 caractères)" :
-          t==="article" ? "Rédigez le corps de votre article ici…" :
-          t==="photo"   ? "Décrivez votre photo (facultatif)…" :
-                          "Décrivez votre vidéo (facultatif)…";
+          t==="texte"   ? "Partagez une idée… Tapez @ pour mentionner quelqu'un (max 3 000 car.)" :
+          t==="article" ? "Rédigez le corps de votre article ici… Tapez @ pour mentionner" :
+          t==="photo"   ? "Décrivez votre photo… Tapez @ pour mentionner (facultatif)" :
+                          "Décrivez votre vidéo… Tapez @ pour mentionner (facultatif)";
         renderMediaZone();
         checkSubmit();
+        attachMentionPicker();
       }
 
       function renderMediaZone() {
@@ -905,7 +1099,9 @@ async function initFilActualite(){
 
       document.getElementById("comp-open-btn")?.addEventListener("click", ()=>{
         document.getElementById("comp-form").classList.add("open");
-        document.getElementById("comp-ta").focus();
+        const ta = document.getElementById("comp-ta");
+        ta.focus();
+        attachMentionPicker();
       });
 
       pubBox.querySelectorAll(".ctype-btn").forEach(b=>{
@@ -981,16 +1177,16 @@ async function initFilActualite(){
 
     let bodyHtml = "";
     if(p.pub_type==="article" && p.article_titre){
-      const body = p.article_contenu || p.contenu || "";
+      const body    = p.article_contenu || p.contenu || "";
       const preview = body.length > 300 ? body.slice(0,300)+"…" : body;
       bodyHtml = `
         <h3 class="fp-article-titre">${escH(p.article_titre)}</h3>
-        <div class="fp-article-body" id="art-body-${p.id}">${escH(preview)}</div>
-        ${body.length>300?`<span class="fp-article-more" onclick="expandArticle(${p.id},this,${JSON.stringify(escH(body))})">Lire la suite →</span>`:""}`;
+        <div class="fp-article-body" id="art-body-${p.id}">${renderMentions(preview)}</div>
+        ${body.length>300?`<span class="fp-article-more" onclick="expandArticleMention(${p.id},this,${JSON.stringify(body)})">Lire la suite →</span>`:""}`;
     } else {
-      const text = p.contenu || "";
+      const text    = p.contenu || "";
       const preview = text.length > 400 ? text.slice(0,400)+"…" : text;
-      bodyHtml = `<div class="fp-text">${escH(preview)}${text.length>400?`<span class="fp-article-more" onclick="expandText(${p.id},this,${JSON.stringify(escH(text))})"> Lire la suite →</span>`:""}</div>`;
+      bodyHtml = `<div class="fp-text">${renderMentions(preview)}${text.length>400?`<span class="fp-article-more" onclick="expandTextMention(${p.id},this,${JSON.stringify(text)})"> Lire la suite →</span>`:""}</div>`;
     }
 
     return `<div class="feed-post" id="fp-${p.id}">
@@ -1017,13 +1213,13 @@ async function initFilActualite(){
     </div>`;
   }
 
-  window.expandArticle = function(id,btn,full){
+  window.expandArticleMention = function(id,btn,raw){
     const el2=document.getElementById("art-body-"+id);
-    if(el2){ el2.innerHTML=full; btn.remove(); }
+    if(el2){ el2.innerHTML=renderMentions(raw); btn.remove(); }
   };
-  window.expandText = function(id,btn,full){
+  window.expandTextMention = function(id,btn,raw){
     const p=btn.closest(".fp-text");
-    if(p){ p.innerHTML=full; }
+    if(p){ p.innerHTML=renderMentions(raw); }
   };
 
   function render(filterType){

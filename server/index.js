@@ -766,6 +766,40 @@ route("POST", "/api/upload", async (req, res, params, body) => {
 });
 
 /* ---------- Recherche globale ---------- */
+/* ---------- Autocomplete @mentions ---------- */
+route("GET", "/api/mentions", async (req, res, params, body, query) => {
+  const q = (query.q || "").trim();
+  if (q.length < 1) return sendJSON(res, 200, { results: [] });
+  const like = `%${q}%`;
+  const users = db.prepare(`
+    SELECT id, nom, prenom, role, ville, pays, photo_url
+    FROM users WHERE (nom LIKE ? OR prenom LIKE ?) AND role != 'administrateur' LIMIT 5
+  `).all(like, like);
+  const inits = db.prepare(`
+    SELECT id, nom, 'initiative' AS role, pays, logo_url AS photo_url
+    FROM initiatives WHERE nom LIKE ? LIMIT 4
+  `).all(like);
+  const results = [
+    ...users.map(u => ({
+      id: u.id,
+      nom: [u.prenom, u.nom].filter(Boolean).join(" "),
+      type: "user",
+      type_label: u.role === "initiative" ? "Initiative" : "Utilisateur",
+      pays: u.pays || u.ville || "",
+      photo_url: u.photo_url || null,
+    })),
+    ...inits.map(i => ({
+      id: i.id,
+      nom: i.nom,
+      type: "initiative",
+      type_label: "Initiative",
+      pays: i.pays || "",
+      photo_url: i.photo_url || null,
+    })),
+  ].slice(0, 8);
+  sendJSON(res, 200, { results });
+});
+
 route("GET", "/api/recherche", async (req, res, params, body, query) => {
   const q = (query.q || "").trim();
   if (q.length < 2) return sendJSON(res, 200, { utilisateurs: [], initiatives: [], publications: [], formations: [], evenements: [] });
