@@ -6,40 +6,261 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
 <style>
-.profil-header{display:flex;gap:20px;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap}
-.profil-avatar{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--orange),#ff9f43);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;flex-shrink:0;cursor:pointer;position:relative;overflow:hidden}
-.profil-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
-.profil-avatar:hover::after{content:'📷';position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:24px}
-.section{margin-bottom:28px}
-.section-title{font-size:14px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.05em;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-@media(max-width:580px){.grid-2,.grid-3{grid-template-columns:1fr}}
-.interests-grid{display:flex;flex-wrap:wrap;gap:8px}
-.interests-grid label{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:99px}
-.interests-grid label:has(input:checked){background:#fff8f2;border-color:var(--orange)}
-.interests-grid input{accent-color:var(--orange)}
-.read-val{font-size:14px;color:var(--text);min-height:20px}
-.read-empty{color:var(--muted);font-style:italic;font-size:13px}
-.edit-toggle{display:none}
-.edit-mode .edit-toggle{display:block}
-.edit-mode .read-toggle{display:none}
-.stat-chip{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center}
-.stat-chip .n{font-size:22px;font-weight:700;color:var(--orange)}
-.stat-chip .l{font-size:12px;color:var(--muted);margin-top:2px}
-.radio-grid{display:flex;flex-wrap:wrap;gap:8px}
-.radio-grid label{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 12px;border:1px solid var(--border);border-radius:99px}
-.radio-grid label:has(input:checked){background:#fff8f2;border-color:var(--orange)}
+/* ===== VARIABLES THÈME (modifiées dynamiquement) ===== */
+:root {
+  --tp:        #1565C0;
+  --tp-light:  #E3F2FD;
+  --tp-dark:   #0D47A1;
+  --tp-banner: linear-gradient(135deg,#0D47A1 0%,#1976D2 100%);
+}
+
+/* ===== BANNIÈRE ===== */
+.p-banner {
+  width:100%; height:200px;
+  background: var(--tp-banner);
+  position:relative; overflow:hidden;
+  cursor:pointer;
+}
+.p-banner img { width:100%; height:100%; object-fit:cover; display:block; }
+.p-banner-edit {
+  position:absolute; bottom:10px; right:12px;
+  background:rgba(0,0,0,.45); color:#fff; border:none; border-radius:6px;
+  padding:5px 12px; font-size:12px; cursor:pointer; display:none;
+}
+.is-own .p-banner-edit { display:block; }
+
+/* ===== CARTE PROFIL ===== */
+.p-card {
+  background:#fff; border:1px solid var(--border);
+  border-radius:12px; margin-bottom:14px;
+  padding:0 24px 20px;
+}
+.p-card-top {
+  display:flex; align-items:flex-end;
+  justify-content:space-between; flex-wrap:wrap; gap:10px;
+}
+.p-avatar-wrap { position:relative; margin-top:-52px; }
+.p-avatar {
+  width:104px; height:104px; border-radius:50%;
+  border:4px solid #fff; background:var(--tp);
+  display:flex; align-items:center; justify-content:center;
+  font-size:34px; font-weight:800; color:#fff;
+  overflow:hidden; box-shadow:0 2px 14px rgba(0,0,0,.18);
+  position:relative; cursor:default;
+}
+.p-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.p-avatar-overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,.4); border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:22px;
+  opacity:0; transition:opacity .2s; cursor:pointer;
+}
+.is-own .p-avatar:hover .p-avatar-overlay { opacity:1; }
+.is-own .p-avatar { cursor:pointer; }
+.p-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding-bottom:6px; }
+.btn-follow {
+  height:36px; padding:0 20px; border-radius:8px; font-size:13px; font-weight:700;
+  cursor:pointer; border:none; background:var(--tp); color:#fff; transition:background .2s;
+}
+.btn-follow:hover { background:var(--tp-dark); }
+.btn-follow.following { background:#fff; color:var(--tp); border:1.5px solid var(--tp); }
+.btn-follow.following:hover { background:#fee2e2; border-color:#dc2626; color:#dc2626; }
+.btn-msg {
+  height:36px; padding:0 16px; border-radius:8px; font-size:13px; font-weight:600;
+  cursor:pointer; background:#fff; border:1.5px solid var(--border); color:var(--text);
+  text-decoration:none; display:flex; align-items:center;
+}
+.btn-msg:hover { border-color:var(--tp); color:var(--tp); }
+
+/* Identité */
+.p-name { font-size:22px; font-weight:800; color:#0D1B2A; margin:14px 0 3px; }
+.p-titre { font-size:14px; color:var(--muted); margin:0 0 5px; }
+.p-loc { font-size:13px; color:var(--muted); margin:0 0 10px; }
+.p-bio { font-size:14px; color:var(--text); line-height:1.65; margin:0 0 14px; white-space:pre-wrap; }
+.p-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+.p-tag {
+  background:var(--tp-light); color:var(--tp); border:1px solid var(--tp);
+  border-radius:99px; padding:3px 12px; font-size:12px; font-weight:600;
+}
+
+/* Stats */
+.p-stats {
+  display:flex; gap:0; flex-wrap:wrap;
+  border-top:1px solid var(--border); padding-top:14px; margin-top:2px;
+}
+.p-stat {
+  padding:0 20px 0 0; margin-right:20px;
+  border-right:1px solid var(--border); cursor:pointer;
+}
+.p-stat:last-child { border-right:none; }
+.p-stat .n { font-size:17px; font-weight:800; color:var(--tp); }
+.p-stat .l { font-size:11px; color:var(--muted); margin-top:1px; }
+
+/* ===== SÉLECTEUR DE THÈME ===== */
+.theme-row {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:12px 0; border-bottom:1px solid var(--border); margin-bottom:2px;
+}
+.theme-row span { font-size:12px; font-weight:700; color:var(--muted); }
+.theme-swatch {
+  width:26px; height:26px; border-radius:50%; cursor:pointer;
+  border:3px solid transparent; transition:all .18s;
+  box-shadow:0 1px 5px rgba(0,0,0,.22);
+}
+.theme-swatch.active { border-color:#0D1B2A; transform:scale(1.2); }
+
+/* ===== SECTIONS ===== */
+.p-section {
+  background:#fff; border:1px solid var(--border);
+  border-radius:12px; padding:20px 24px; margin-bottom:14px;
+}
+.p-sec-hd {
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;
+}
+.p-sec-hd h3 { margin:0; font-size:16px; font-weight:800; color:#0D1B2A; }
+.p-sec-actions { display:flex; gap:6px; }
+.btn-ico {
+  background:none; border:1px solid var(--border); border-radius:6px;
+  padding:5px 11px; cursor:pointer; font-size:12px; color:var(--muted);
+  transition:all .18s; white-space:nowrap;
+}
+.btn-ico:hover { background:var(--tp-light); color:var(--tp); border-color:var(--tp); }
+
+/* Expériences */
+.exp-list { display:flex; flex-direction:column; gap:0; }
+.exp-item {
+  display:flex; gap:14px; padding:14px 0;
+  border-bottom:1px solid var(--border);
+}
+.exp-item:last-child { border-bottom:none; padding-bottom:0; }
+.exp-logo {
+  width:46px; height:46px; flex-shrink:0; border-radius:8px;
+  background:var(--tp-light); display:flex; align-items:center;
+  justify-content:center; font-size:15px; font-weight:800; color:var(--tp);
+}
+.exp-body { flex:1; min-width:0; }
+.exp-body h4 { margin:0 0 2px; font-size:14px; font-weight:700; color:#0D1B2A; }
+.exp-company { font-size:13px; color:var(--text); margin:0 0 2px; }
+.exp-dates { font-size:12px; color:var(--muted); margin:0 0 5px; }
+.exp-desc { font-size:13px; color:var(--muted); margin:0; line-height:1.55; }
+.exp-btns { display:flex; gap:5px; margin-top:6px; }
+.btn-sm-ghost {
+  background:none; border:1px solid var(--border); border-radius:5px;
+  padding:3px 9px; font-size:11px; cursor:pointer; color:var(--muted);
+}
+.btn-sm-ghost:hover { border-color:var(--tp); color:var(--tp); }
+.btn-sm-ghost.danger:hover { border-color:#dc2626; color:#dc2626; }
+
+/* Compétences */
+.skills-wrap { display:flex; flex-wrap:wrap; gap:8px; }
+.skill-pill {
+  display:flex; align-items:center; gap:6px;
+  background:var(--tp-light); color:var(--tp);
+  border:1px solid var(--tp); border-radius:99px;
+  padding:5px 14px; font-size:13px; font-weight:600;
+}
+.skill-del { cursor:pointer; font-size:11px; opacity:.65; }
+.skill-del:hover { opacity:1; }
+.skill-add-row { display:flex; gap:8px; margin-top:12px; align-items:center; }
+.skill-add-row input {
+  flex:1; height:36px; border:1px solid var(--border); border-radius:6px;
+  padding:0 12px; font-size:13px; font-family:inherit;
+}
+
+/* Publications */
+.pub-item { padding:12px 0; border-bottom:1px solid var(--border); }
+.pub-item:last-child { border-bottom:none; padding-bottom:0; }
+.pub-cat { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--tp); margin-bottom:4px; }
+.pub-text { font-size:14px; color:var(--text); line-height:1.55; margin:0 0 4px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.pub-date { font-size:11px; color:var(--muted); }
+
+/* Grilles abonnements */
+.follow-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  gap:10px;
+}
+.fc {
+  border:1px solid var(--border); border-radius:10px;
+  padding:14px 10px; text-align:center;
+  text-decoration:none; color:inherit; transition:box-shadow .2s;
+  display:block;
+}
+.fc:hover { box-shadow:0 4px 14px rgba(0,0,0,.1); }
+.fc-av {
+  width:50px; height:50px; border-radius:50%; margin:0 auto 8px;
+  background:var(--tp-light); display:flex; align-items:center;
+  justify-content:center; font-size:17px; font-weight:800; color:var(--tp); overflow:hidden;
+}
+.fc-av img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.fc-nom { font-size:12px; font-weight:700; color:#0D1B2A; margin-bottom:2px; line-height:1.3; }
+.fc-sub { font-size:11px; color:var(--muted); }
+.init-fc {
+  border:1px solid var(--border); border-radius:10px; padding:12px 14px;
+  text-decoration:none; color:inherit; display:flex; align-items:center;
+  gap:10px; transition:box-shadow .2s;
+}
+.init-fc:hover { box-shadow:0 4px 14px rgba(0,0,0,.1); }
+.init-fc-av {
+  width:40px; height:40px; border-radius:8px; flex-shrink:0;
+  background:var(--tp-light); display:flex; align-items:center;
+  justify-content:center; font-size:13px; font-weight:800; color:var(--tp);
+}
+.init-fc-body .init-fc-nom { font-size:13px; font-weight:700; color:#0D1B2A; }
+.init-fc-body .init-fc-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+.init-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+
+/* ===== FORMULAIRES ÉDITION ===== */
+.p-edit-form { background:#F8FAFF; border:1px solid var(--border); border-radius:8px; padding:16px; margin-top:12px; }
+.fg { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+.fg.full { grid-template-columns:1fr; }
+.fg label { font-size:11px; font-weight:700; color:var(--muted); display:block; margin-bottom:3px; text-transform:uppercase; letter-spacing:.04em; }
+.fg input, .fg textarea, .fg select {
+  width:100%; box-sizing:border-box; height:38px;
+  border:1px solid var(--border); border-radius:6px;
+  padding:0 12px; font-size:13px; font-family:inherit;
+}
+.fg textarea { height:80px; padding:10px 12px; resize:vertical; }
+.edit-btns { display:flex; gap:8px; margin-top:12px; }
+.btn-save {
+  background:var(--tp); color:#fff; border:none; border-radius:7px;
+  padding:8px 20px; font-size:13px; font-weight:700; cursor:pointer;
+}
+.btn-save:hover { background:var(--tp-dark); }
+.btn-cancel {
+  background:#fff; border:1px solid var(--border); border-radius:7px;
+  padding:8px 16px; font-size:13px; cursor:pointer;
+}
+.e-msg { font-size:12px; margin-top:6px; display:none; }
+.e-msg.err { color:#dc2626; } .e-msg.ok { color:#16a34a; }
+
+/* ===== EMPTY STATE ===== */
+.empty-p { text-align:center; padding:20px 0; color:var(--muted); font-size:13px; }
+.empty-p .ei { font-size:28px; margin-bottom:6px; }
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:600px){
+  .p-banner { height:140px; }
+  .p-avatar { width:80px; height:80px; font-size:26px; }
+  .p-avatar-wrap { margin-top:-40px; }
+  .p-name { font-size:18px; }
+  .p-section, .p-card { padding:14px 16px; }
+  .fg { grid-template-columns:1fr; }
+  .follow-grid { grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); }
+  .init-grid { grid-template-columns:1fr; }
+}
 </style>
 </head>
 <body>
-<div class="page">
+<div class="page" id="root-page">
+
 <header class="topbar">
   <div class="topbar-inner">
     <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
     <nav class="nav">
-      <a href="index.html">Accueil</a><a href="annuaire.html">Annuaire</a>
-      <a href="fil-actualite.html">Fil d'actualite</a><a href="formations.html">Formations</a>
+      <a href="index.html">Accueil</a>
+      <a href="annuaire.html">Annuaire</a>
+      <a href="fil-actualite.html">Fil d'actualité</a>
+      <a href="formations.html">Formations</a>
     </nav>
     <div class="topbar-right">
       <select class="lang-select" id="lang-select"></select>
@@ -47,156 +268,585 @@
     </div>
   </div>
 </header>
-<main class="container" style="max-width:760px;padding-top:28px;padding-bottom:48px">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
-    <a href="#" id="back-link" style="color:var(--muted);font-size:13px">← Retour</a>
-    <div style="display:flex;gap:8px" id="edit-controls"></div>
-  </div>
-  <div id="profil-content"></div>
-</main>
-<footer class="footer"><span id="footer-text">Diaspo'Actif · Prototype · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialite</a></footer>
+
+<!-- BANNIÈRE -->
+<div class="p-banner" id="p-banner">
+  <img id="banner-img" alt="Bannière" style="display:none">
+  <button class="p-banner-edit" onclick="pickBannerColor()">📷 Modifier la bannière</button>
 </div>
+
+<main class="container" style="max-width:820px;padding-top:0;padding-bottom:48px">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;flex-wrap:wrap;gap:8px">
+    <a href="#" id="back-link" style="color:var(--muted);font-size:13px;">← Retour</a>
+    <div id="top-bar-controls"></div>
+  </div>
+
+  <!-- CARTE PROFIL -->
+  <div class="p-card" id="p-card">
+    <div class="p-card-top">
+      <div class="p-avatar-wrap">
+        <div class="p-avatar" id="p-avatar" onclick="isOwn&&editAvatar()">
+          <span id="av-initials"></span>
+          <img id="av-img" alt="Photo" style="display:none">
+          <div class="p-avatar-overlay" id="av-overlay">📷</div>
+        </div>
+      </div>
+      <div class="p-actions" id="p-actions"></div>
+    </div>
+    <div id="p-identity"></div>
+    <div id="theme-row-wrap" style="display:none">
+      <div class="theme-row">
+        <span>🎨 Thème :</span>
+        <div id="theme-swatches"></div>
+      </div>
+    </div>
+    <div class="p-stats" id="p-stats"></div>
+  </div>
+
+  <!-- SECTIONS -->
+  <div id="p-sections"></div>
+
+</main>
+
+<footer class="footer">
+  <span>Diaspo'Actif · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialité</a>
+</footer>
+
+</div><!-- /page -->
+
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
-const INTERETS = ['entrepreneuriat','investissement','emploi','formation','agriculture','sante','education','technologie','culture','sport','tourisme','autres'];
-const SITPRO = ['etudiant','salarie','entrepreneur','liberal','fonctionnaire','retraite','sans_emploi','autre'];
+/* ===================================================
+   PROFIL UTILISATEUR — logique complète
+   =================================================== */
+
+const THEMES = {
+  ocean:  { primary:'#1565C0', dark:'#0D47A1', light:'#E3F2FD', banner:'linear-gradient(135deg,#0D47A1 0%,#1976D2 100%)', label:'Océan' },
+  foret:  { primary:'#2E7D32', dark:'#1B5E20', light:'#E8F5E9', banner:'linear-gradient(135deg,#1B5E20 0%,#388E3C 100%)', label:'Forêt' },
+  soleil: { primary:'#D84315', dark:'#BF360C', light:'#FBE9E7', banner:'linear-gradient(135deg,#BF360C 0%,#F4511E 100%)', label:'Soleil' },
+  violet: { primary:'#6A1B9A', dark:'#4A148C', light:'#F3E5F5', banner:'linear-gradient(135deg,#4A148C 0%,#7B1FA2 100%)', label:'Violet' },
+  terre:  { primary:'#5D4037', dark:'#3E2723', light:'#EFEBE9', banner:'linear-gradient(135deg,#3E2723 0%,#6D4C41 100%)', label:'Terre' },
+  nuit:   { primary:'#1A237E', dark:'#0D1B2A', light:'#E8EAF6', banner:'linear-gradient(135deg,#0D1B2A 0%,#1A237E 100%)', label:'Nuit' },
+};
+
+const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
 let profil = null;
-let isOwn = false;
-let editMode = false;
+let isOwn  = false;
+let CU     = null; /* utilisateur connecté */
 
-const params = new URLSearchParams(location.search);
-const uid = params.get('id');
-
+/* ---- init ---- */
 async function init() {
   await applyAuthState();
+  CU = window.CURRENT_USER || null;
   const backLink = document.getElementById('back-link');
-  if(CURRENT_USER) backLink.href = ROLE_DASHBOARD[CURRENT_USER.role]||'index.html';
-  else backLink.href = 'index.html';
+  if (CU) backLink.href = ROLE_DASHBOARD[CU.role] || 'index.html';
+  else     backLink.href = 'index.html';
 
-  const targetId = uid || (CURRENT_USER?.id);
-  if (!targetId) { window.location.href = 'login.html'; return; }
+  const uid = new URLSearchParams(location.search).get('id') || CU?.id;
+  if (!uid) { window.location.href = 'login.html'; return; }
 
   try {
-    const r = await api('GET', '/profil/'+targetId);
+    const r = await api('GET', '/profil/' + uid);
     profil = r.profil;
-    isOwn = CURRENT_USER && CURRENT_USER.id == profil.id;
-    if(isOwn) {
-      document.getElementById('edit-controls').innerHTML = `<button class="btn" id="btn-edit">Modifier mon profil</button>`;
-      document.getElementById('btn-edit').addEventListener('click', () => toggleEdit(true));
-    }
+    isOwn  = CU && Number(CU.id) === Number(profil.id);
+    if (isOwn) document.getElementById('root-page').classList.add('is-own');
+    applyTheme(profil.theme_couleur || 'ocean');
     render();
   } catch(e) {
-    document.getElementById('profil-content').innerHTML = '<p style="color:red">Profil introuvable.</p>';
+    document.getElementById('p-sections').innerHTML =
+      '<div class="p-section"><p style="color:red">Profil introuvable ou erreur serveur.</p></div>';
   }
 }
 
-function initials(nom){return (nom||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+/* ---- thème ---- */
+function applyTheme(name) {
+  const t = THEMES[name] || THEMES.ocean;
+  const r = document.documentElement.style;
+  r.setProperty('--tp',        t.primary);
+  r.setProperty('--tp-dark',   t.dark);
+  r.setProperty('--tp-light',  t.light);
+  r.setProperty('--tp-banner', t.banner);
+  document.getElementById('p-banner').style.background = t.banner;
+  if (profil) profil.theme_couleur = name;
+}
 
+async function setTheme(name) {
+  applyTheme(name);
+  renderThemeSwatches(name);
+  try { await api('PUT', '/profil', { theme_couleur: name }); } catch(e){}
+}
+
+function renderThemeSwatches(active) {
+  const el = document.getElementById('theme-swatches');
+  el.innerHTML = Object.entries(THEMES).map(([k,t]) =>
+    `<button class="theme-swatch${k===active?' active':''}" style="background:${t.primary}" title="${t.label}" onclick="setTheme('${k}')"></button>`
+  ).join('');
+}
+
+/* ---- bannière ---- */
+function pickBannerColor() {
+  const keys = Object.keys(THEMES);
+  const cur  = profil?.theme_couleur || 'ocean';
+  const idx  = keys.indexOf(cur);
+  const next = keys[(idx + 1) % keys.length];
+  setTheme(next);
+}
+
+/* ---- avatar ---- */
+async function editAvatar() {
+  if (!isOwn) return;
+  const url = `https://api.dicebear.com/7.x/lorelei/svg?seed=${encodeURIComponent(profil.nom+profil.id)}&backgroundColor=${(THEMES[profil.theme_couleur]?.primary||'#1565C0').replace('#','')}`;
+  try {
+    await api('PUT', '/profil', { photo_url: url });
+    profil.photo_url = url;
+    renderAvatar();
+  } catch(e) { alert('Erreur lors de la mise à jour de l\'avatar.'); }
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function initials(n) { return (n||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); }
+
+function fmtDate(str) {
+  if (!str) return '';
+  const [y, m] = str.split('-');
+  return (MOIS[parseInt(m,10)-1]||'') + ' ' + y;
+}
+
+/* ======================================================
+   RENDER PRINCIPAL
+   ====================================================== */
 function render() {
-  const ci = Array.isArray(profil.centres_interet) ? profil.centres_interet : [];
-  const isEdit = editMode && isOwn;
-  const container = document.getElementById('profil-content');
-  container.innerHTML = `
-  <div class="profil-header">
-    <div class="profil-avatar" ${isEdit?"onclick='simulerUpload()' title='Changer la photo'":''}>
-      ${profil.photo_url?'<img src="'+profil.photo_url+'" alt="">':initials(profil.nom)}
-    </div>
-    <div style="flex:1;min-width:0">
-      ${isEdit
-        ?'<div class="grid-2"><div><label>Nom *</label><input type="text" id="e-nom" value="'+escHtml(profil.nom)+'"></div><div><label>Prenom</label><input type="text" id="e-prenom" value="'+escHtml(profil.prenom||'')+'"></div></div>'
-        :'<h2 style="margin:0 0 4px">'+escHtml(profil.nom+(profil.prenom?' '+profil.prenom:''))+'</h2>'
-      }
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
-        <span class="role-tag">${ROLE_LABEL_FR[profil.role]||profil.role}</span>
-        ${profil.ville?'<span style="font-size:13px;color:var(--muted)">📍 '+escHtml(profil.ville)+(profil.pays?', '+escHtml(profil.pays):'')+'</span>':''}
-      </div>
-      ${isEdit
-        ?'<div style="margin-top:10px"><label>Bio</label><textarea id="e-bio" rows="2" style="width:100%;resize:vertical;box-sizing:border-box">'+escHtml(profil.bio||'')+'</textarea></div>'
-        :(profil.bio?'<p style="font-size:14px;color:var(--muted);margin:8px 0 0">'+escHtml(profil.bio)+'</p>':'')
-      }
-    </div>
-  </div>
-
-  ${isOwn?'<div style="display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap"><div class="stat-chip"><div class="n" id="nb-suivis">—</div><div class="l">Initiatives suivies</div></div></div>':''}
-
-  <div class="section">
-    <div class="section-title">Localisation</div>
-    ${isEdit
-      ?'<div class="grid-3"><div><label>Pays</label><input type="text" id="e-pays" value="'+escHtml(profil.pays||'')+'"></div><div><label>Ville</label><input type="text" id="e-ville" value="'+escHtml(profil.ville||'')+'"></div><div><label>Telephone</label><input type="tel" id="e-tel" value="'+escHtml(profil.telephone||'')+'"></div></div>'
-      :'<div class="grid-3"><div><div class="section-title" style="font-size:11px;border:none;padding:0;margin:0 0 4px">Pays</div><div class="read-val">'+(profil.pays||'<span class="read-empty">Non renseigne</span>')+'</div></div><div><div class="section-title" style="font-size:11px;border:none;padding:0;margin:0 0 4px">Ville</div><div class="read-val">'+(profil.ville||'<span class="read-empty">Non renseigne</span>')+'</div></div><div><div class="section-title" style="font-size:11px;border:none;padding:0;margin:0 0 4px">Telephone</div><div class="read-val">'+(profil.telephone||'<span class="read-empty">Non renseigne</span>')+'</div></div></div>'
-    }
-  </div>
-
-  <div class="section">
-    <div class="section-title">Situation professionnelle</div>
-    ${isEdit
-      ?'<div class="radio-grid">'+SITPRO.map(s=>'<label><input type="radio" name="e-sitpro" value="'+s+'"'+(profil.situation_pro===s?' checked':'')+'> '+s.replace('_',' ')+'</label>').join('')+'</div>'
-      :'<div class="read-val">'+(profil.situation_pro?profil.situation_pro.replace('_',' '):'<span class="read-empty">Non renseigne</span>')+'</div>'
-    }
-  </div>
-
-  <div class="section">
-    <div class="section-title">Centres d'interet</div>
-    ${isEdit
-      ?'<div class="interests-grid">'+INTERETS.map(i=>'<label><input type="checkbox" value="'+i+'"'+(ci.includes(i)?' checked':'')+'> '+i+'</label>').join('')+'</div>'
-      :(ci.length
-        ?'<div style="display:flex;flex-wrap:wrap;gap:6px">'+ci.map(i=>'<span style="background:#fff8f2;border:1px solid var(--orange);color:var(--orange);border-radius:99px;padding:3px 10px;font-size:12px">'+i+'</span>').join('')+'</div>'
-        :'<span class="read-empty">Aucun centre d\'interet renseigne</span>'
-      )
-    }
-  </div>
-
-  ${isEdit?'<div class="auth-error" id="save-error" style="display:none"></div><div style="display:flex;gap:10px;margin-top:8px"><button class="btn btn-orange" onclick="saveProfile()">Enregistrer les modifications</button><button class="btn" onclick="toggleEdit(false)">Annuler</button></div>':''}
-  `;
-
-  if(isOwn) loadStats();
-}
-
-function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-function toggleEdit(on) {
-  editMode = on;
-  render();
-}
-
-async function loadStats() {
-  try { const r = await api('GET','/mes-suivis'); document.getElementById('nb-suivis').textContent = r.initiatives?.length||0; } catch(e){}
-}
-
-async function saveProfile() {
-  const errBox = document.getElementById('save-error');
-  errBox.style.display='none';
-  const body = {
-    nom: document.getElementById('e-nom')?.value.trim() || profil.nom,
-    prenom: document.getElementById('e-prenom')?.value.trim() || '',
-    pays: document.getElementById('e-pays')?.value.trim() || '',
-    ville: document.getElementById('e-ville')?.value.trim() || '',
-    telephone: document.getElementById('e-tel')?.value.trim() || '',
-    bio: document.getElementById('e-bio')?.value.trim() || '',
-    situation_pro: document.querySelector('input[name="e-sitpro"]:checked')?.value || '',
-    centres_interet: [...(document.querySelectorAll('.interests-grid input:checked')||[])].map(c=>c.value)
-  };
-  try {
-    const r = await api('PUT', '/profil', body);
-    profil = {...profil, ...r.profil};
-    editMode = false;
-    render();
-  } catch(e) {
-    errBox.textContent = e.message || 'Erreur lors de la sauvegarde.';
-    errBox.style.display = 'block';
+  renderBanner();
+  renderAvatar();
+  renderIdentity();
+  renderActions();
+  if (isOwn) {
+    document.getElementById('theme-row-wrap').style.display = 'block';
+    renderThemeSwatches(profil.theme_couleur || 'ocean');
   }
+  renderStats();
+  renderSections();
 }
 
-async function simulerUpload() {
-  const url = 'https://api.dicebear.com/7.x/initials/svg?seed='+(profil.nom||'U')+'&backgroundColor=ff6b00';
+function renderBanner() {
+  const img = document.getElementById('banner-img');
+  if (profil.banner_url) { img.src = profil.banner_url; img.style.display = 'block'; }
+  else img.style.display = 'none';
+}
+
+function renderAvatar() {
+  const av   = document.getElementById('p-avatar');
+  const img  = document.getElementById('av-img');
+  const ini  = document.getElementById('av-initials');
+  const over = document.getElementById('av-overlay');
+  if (profil.photo_url) {
+    img.src = profil.photo_url; img.style.display = 'block';
+    ini.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    ini.style.display = '';
+    ini.textContent = initials((profil.prenom||'')+' '+(profil.nom||''));
+  }
+  over.style.display = isOwn ? '' : 'none';
+}
+
+function renderIdentity() {
+  const el = document.getElementById('p-identity');
+  const nomComplet = [profil.prenom, profil.nom].filter(Boolean).join(' ') || profil.nom || 'Membre';
+  const loc = [profil.ville, profil.pays].filter(Boolean).join(', ');
+  const ci  = Array.isArray(profil.centres_interet) ? profil.centres_interet : [];
+
+  let html = `<div class="p-name">${esc(nomComplet)}</div>`;
+  if (profil.titre_pro) html += `<div class="p-titre">${esc(profil.titre_pro)}</div>`;
+  else if (profil.situation_pro) html += `<div class="p-titre">${esc(profil.situation_pro.replace('_',' '))}</div>`;
+  if (loc) html += `<div class="p-loc">📍 ${esc(loc)}</div>`;
+  if (profil.bio) html += `<div class="p-bio">${esc(profil.bio)}</div>`;
+  if (ci.length) html += `<div class="p-tags">${ci.map(c=>`<span class="p-tag">${esc(c)}</span>`).join('')}</div>`;
+
+  if (isOwn) html += `<button class="btn-ico" style="margin-bottom:4px;" onclick="openEditIdentity()">✏️ Modifier</button>`;
+
+  el.innerHTML = html;
+}
+
+function renderActions() {
+  const el = document.getElementById('p-actions');
+  if (isOwn) { el.innerHTML = ''; return; }
+  if (!CU)   { el.innerHTML = `<a href="login.html" class="btn-follow">Suivre</a>`; return; }
+
+  const following = profil.isFollowing;
+  el.innerHTML = `
+    <button class="btn-follow${following?' following':''}" id="btn-follow" onclick="toggleFollow()">
+      ${following ? '✓ Abonné' : '+ Suivre'}
+    </button>
+    <a href="messagerie.html?user=${profil.id}" class="btn-msg">💬 Message</a>`;
+}
+
+function renderStats() {
+  const el = document.getElementById('p-stats');
+  const nbPubs = (profil.publications||[]).length;
+  el.innerHTML = `
+    <div class="p-stat"><div class="n">${profil.nbAbonnes||0}</div><div class="l">abonnés</div></div>
+    <div class="p-stat"><div class="n">${profil.nbSuivis||0}</div><div class="l">abonnements</div></div>
+    <div class="p-stat"><div class="n">${(profil.initiativesSuivies||[]).length}</div><div class="l">initiatives</div></div>
+    <div class="p-stat"><div class="n">${nbPubs}</div><div class="l">publications</div></div>`;
+}
+
+function renderSections() {
+  const wrap = document.getElementById('p-sections');
+  wrap.innerHTML = '';
+  wrap.appendChild(buildSectionExp());
+  wrap.appendChild(buildSectionSkills());
+  wrap.appendChild(buildSectionPubs());
+  wrap.appendChild(buildSectionInitiatives());
+  wrap.appendChild(buildSectionUsers());
+}
+
+/* ======================================================
+   SECTION — Expériences professionnelles
+   ====================================================== */
+function buildSectionExp() {
+  const sec = document.createElement('div');
+  sec.className = 'p-section';
+  sec.id = 'sec-exp';
+
+  const exps = Array.isArray(profil.experiences) ? profil.experiences : [];
+
+  let hd = `<div class="p-sec-hd"><h3>💼 Expériences professionnelles</h3>`;
+  if (isOwn) hd += `<div class="p-sec-actions"><button class="btn-ico" onclick="openAddExp()">+ Ajouter</button></div>`;
+  hd += `</div>`;
+
+  if (!exps.length) {
+    sec.innerHTML = hd + `<div class="empty-p"><div class="ei">💼</div>Aucune expérience renseignée${isOwn?' — cliquez sur "+ Ajouter"':''}</div>`;
+  } else {
+    const items = exps.map((e, i) => {
+      const dates = [fmtDate(e.debut), e.actuel ? 'Aujourd\'hui' : fmtDate(e.fin)].filter(Boolean).join(' – ');
+      return `<div class="exp-item" id="exp-${i}">
+        <div class="exp-logo">${initials(e.entreprise)}</div>
+        <div class="exp-body">
+          <h4>${esc(e.titre)}</h4>
+          <div class="exp-company">${esc(e.entreprise)}${e.lieu?` · ${esc(e.lieu)}`:''}</div>
+          ${dates?`<div class="exp-dates">📅 ${esc(dates)}</div>`:''}
+          ${e.description?`<div class="exp-desc">${esc(e.description)}</div>`:''}
+          ${isOwn?`<div class="exp-btns">
+            <button class="btn-sm-ghost" onclick="openEditExp(${i})">✏️ Modifier</button>
+            <button class="btn-sm-ghost danger" onclick="deleteExp(${i})">🗑 Supprimer</button>
+          </div>`:''}
+        </div>
+      </div>`;
+    }).join('');
+    sec.innerHTML = hd + `<div class="exp-list">${items}</div>`;
+  }
+
+  sec.innerHTML += `<div id="exp-form-wrap"></div>`;
+  return sec;
+}
+
+function openAddExp() { renderExpForm(null, null); }
+function openEditExp(i) { renderExpForm(profil.experiences[i], i); }
+
+function renderExpForm(exp, idx) {
+  const wrap = document.getElementById('exp-form-wrap');
+  const isEdit = idx !== null;
+  wrap.innerHTML = `<div class="p-edit-form">
+    <h4 style="margin:0 0 12px;font-size:14px;">${isEdit?'Modifier':'Ajouter'} une expérience</h4>
+    <div class="fg">
+      <div><label>Titre du poste *</label><input id="ef-titre" value="${esc(exp?.titre||'')}"></div>
+      <div><label>Entreprise / Organisation *</label><input id="ef-ent" value="${esc(exp?.entreprise||'')}"></div>
+      <div><label>Lieu</label><input id="ef-lieu" value="${esc(exp?.lieu||'')}"></div>
+      <div><label>Date de début (AAAA-MM)</label><input id="ef-deb" placeholder="2022-01" value="${esc(exp?.debut||'')}"></div>
+      <div><label>Date de fin (AAAA-MM)</label><input id="ef-fin" placeholder="2024-06" value="${esc(exp?.fin||'')}" ${exp?.actuel?'disabled':''}></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:24px">
+        <input type="checkbox" id="ef-act" ${exp?.actuel?'checked':''} onchange="document.getElementById('ef-fin').disabled=this.checked">
+        <label for="ef-act" style="font-size:13px;margin:0;text-transform:none;letter-spacing:0;color:var(--text);">Poste actuel</label>
+      </div>
+    </div>
+    <div class="fg full"><div><label>Description</label><textarea id="ef-desc" rows="3">${esc(exp?.description||'')}</textarea></div></div>
+    <div class="edit-btns">
+      <button class="btn-save" onclick="saveExp(${idx})">Enregistrer</button>
+      <button class="btn-cancel" onclick="document.getElementById('exp-form-wrap').innerHTML=''">Annuler</button>
+    </div>
+    <p class="e-msg err" id="exp-err"></p>
+  </div>`;
+  wrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+async function saveExp(idx) {
+  const titre  = document.getElementById('ef-titre').value.trim();
+  const ent    = document.getElementById('ef-ent').value.trim();
+  const err    = document.getElementById('exp-err');
+  if (!titre || !ent) { err.style.display='block'; err.textContent='Titre et entreprise requis.'; return; }
+
+  const newExp = {
+    titre, entreprise: ent,
+    lieu:        document.getElementById('ef-lieu').value.trim(),
+    debut:       document.getElementById('ef-deb').value.trim(),
+    fin:         document.getElementById('ef-fin').value.trim(),
+    actuel:      document.getElementById('ef-act').checked,
+    description: document.getElementById('ef-desc').value.trim(),
+  };
+
+  const list = [...(profil.experiences||[])];
+  if (idx !== null) list[idx] = newExp;
+  else list.unshift(newExp);
+
   try {
-    const r = await api('PUT', '/profil', { photo_url: url });
-    profil = {...profil, ...r.profil, photo_url: url};
-    render();
+    await api('PUT', '/profil', { experiences: list });
+    profil.experiences = list;
+    rebuildSection('sec-exp', buildSectionExp());
+  } catch(e) { err.style.display='block'; err.textContent='Erreur lors de la sauvegarde.'; }
+}
+
+async function deleteExp(idx) {
+  if (!confirm('Supprimer cette expérience ?')) return;
+  const list = [...(profil.experiences||[])];
+  list.splice(idx, 1);
+  try {
+    await api('PUT', '/profil', { experiences: list });
+    profil.experiences = list;
+    rebuildSection('sec-exp', buildSectionExp());
+  } catch(e) { alert('Erreur.'); }
+}
+
+/* ======================================================
+   SECTION — Compétences
+   ====================================================== */
+function buildSectionSkills() {
+  const sec = document.createElement('div');
+  sec.className = 'p-section';
+  sec.id = 'sec-skills';
+
+  const skills = Array.isArray(profil.competences) ? profil.competences : [];
+
+  let hd = `<div class="p-sec-hd"><h3>🛠 Compétences</h3>`;
+  if (isOwn) hd += `<div class="p-sec-actions"><button class="btn-ico" onclick="focusSkillInput()">+ Ajouter</button></div>`;
+  hd += `</div>`;
+
+  const pillsHtml = skills.length
+    ? `<div class="skills-wrap">${skills.map((s,i)=>`<span class="skill-pill">${esc(s)}${isOwn?`<span class="skill-del" onclick="deleteSkill(${i})" title="Retirer">✕</span>`:''}</span>`).join('')}</div>`
+    : `<div class="empty-p"><div class="ei">🛠</div>Aucune compétence renseignée${isOwn?' — ajoutez-en ci-dessous':''}</div>`;
+
+  const addForm = isOwn ? `<div class="skill-add-row" id="skill-add-row">
+    <input id="skill-input" placeholder="Ex : React, Finance, Agriculture…" onkeydown="if(event.key==='Enter')addSkill()">
+    <button class="btn-ico" onclick="addSkill()">Ajouter</button>
+  </div>` : '';
+
+  sec.innerHTML = hd + pillsHtml + addForm;
+  return sec;
+}
+
+function focusSkillInput() { document.getElementById('skill-input')?.focus(); }
+
+async function addSkill() {
+  const inp   = document.getElementById('skill-input');
+  const val   = inp?.value.trim();
+  if (!val) return;
+  const list  = [...(profil.competences||[])];
+  if (list.includes(val)) { inp.value=''; return; }
+  list.push(val);
+  try {
+    await api('PUT', '/profil', { competences: list });
+    profil.competences = list;
+    rebuildSection('sec-skills', buildSectionSkills());
+    setTimeout(focusSkillInput, 80);
   } catch(e) {}
 }
 
+async function deleteSkill(idx) {
+  const list = [...(profil.competences||[])];
+  list.splice(idx, 1);
+  try {
+    await api('PUT', '/profil', { competences: list });
+    profil.competences = list;
+    rebuildSection('sec-skills', buildSectionSkills());
+  } catch(e) {}
+}
+
+/* ======================================================
+   SECTION — Publications récentes
+   ====================================================== */
+function buildSectionPubs() {
+  const sec  = document.createElement('div');
+  sec.className = 'p-section';
+  sec.id = 'sec-pubs';
+
+  const pubs = profil.publications || [];
+  let hd = `<div class="p-sec-hd"><h3>📝 Publications récentes</h3>`;
+  if (pubs.length) hd += `<a href="fil-actualite.html" class="btn-ico" style="text-decoration:none;">Voir tout</a>`;
+  hd += `</div>`;
+
+  const body = pubs.length
+    ? pubs.map(p => {
+        const d = new Date(p.created_at);
+        const dateStr = isNaN(d) ? p.created_at : `${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
+        const preview = (p.contenu||'').slice(0, 200) + (p.contenu?.length > 200 ? '…' : '');
+        return `<div class="pub-item">
+          <div class="pub-cat">${esc(p.categorie||p.type||'Publication')}</div>
+          <div class="pub-text">${esc(preview)}</div>
+          <div class="pub-date">${esc(dateStr)}</div>
+        </div>`;
+      }).join('')
+    : `<div class="empty-p"><div class="ei">📝</div>Aucune publication pour l'instant</div>`;
+
+  sec.innerHTML = hd + body;
+  return sec;
+}
+
+/* ======================================================
+   SECTION — Initiatives suivies
+   ====================================================== */
+function buildSectionInitiatives() {
+  const sec = document.createElement('div');
+  sec.className = 'p-section';
+  sec.id = 'sec-init';
+
+  const list = profil.initiativesSuivies || [];
+  let hd = `<div class="p-sec-hd"><h3>🌱 Initiatives suivies</h3>`;
+  if (list.length) hd += `<a href="annuaire.html" class="btn-ico" style="text-decoration:none;">Explorer</a>`;
+  hd += `</div>`;
+
+  const body = list.length
+    ? `<div class="init-grid">${list.map(i => {
+        const slug = i.slug || i.id;
+        return `<a class="init-fc" href="initiative.html?id=${encodeURIComponent(slug)}">
+          <div class="init-fc-av">${initials(i.nom)}</div>
+          <div class="init-fc-body">
+            <div class="init-fc-nom">${esc(i.nom)}</div>
+            <div class="init-fc-sub">${[i.domaine, i.pays].filter(Boolean).join(' · ')}</div>
+          </div>
+        </a>`;
+      }).join('')}</div>`
+    : `<div class="empty-p"><div class="ei">🌱</div>Aucune initiative suivie</div>`;
+
+  sec.innerHTML = hd + body;
+  return sec;
+}
+
+/* ======================================================
+   SECTION — Utilisateurs suivis
+   ====================================================== */
+function buildSectionUsers() {
+  const sec = document.createElement('div');
+  sec.className = 'p-section';
+  sec.id = 'sec-users';
+
+  const list = profil.usersSuivis || [];
+  const hd   = `<div class="p-sec-hd"><h3>👥 Abonnements</h3></div>`;
+
+  const body = list.length
+    ? `<div class="follow-grid">${list.map(u => {
+        const nom  = [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom || '?';
+        const avEl = u.photo_url
+          ? `<img src="${esc(u.photo_url)}" alt="${esc(nom)}">`
+          : initials(nom);
+        return `<a class="fc" href="profil.html?id=${u.id}">
+          <div class="fc-av">${avEl}</div>
+          <div class="fc-nom">${esc(nom)}</div>
+          <div class="fc-sub">${esc(u.titre_pro||u.ville||'Membre')}</div>
+        </a>`;
+      }).join('')}</div>`
+    : `<div class="empty-p"><div class="ei">👥</div>Aucun abonnement pour l'instant</div>`;
+
+  sec.innerHTML = hd + body;
+  return sec;
+}
+
+/* ======================================================
+   ÉDITION IDENTITÉ (modale inline)
+   ====================================================== */
+function openEditIdentity() {
+  const ci = Array.isArray(profil.centres_interet) ? profil.centres_interet : [];
+  const INTERETS = ['entrepreneuriat','investissement','emploi','formation','agriculture','santé','éducation','technologie','culture','sport','tourisme','autres'];
+
+  const existingForm = document.getElementById('identity-edit-form');
+  if (existingForm) { existingForm.remove(); return; }
+
+  const form = document.createElement('div');
+  form.id = 'identity-edit-form';
+  form.className = 'p-edit-form';
+  form.style.marginTop = '12px';
+  form.innerHTML = `
+    <h4 style="margin:0 0 12px;font-size:14px;">Modifier le profil</h4>
+    <div class="fg">
+      <div><label>Prénom</label><input id="id-prenom" value="${esc(profil.prenom||'')}"></div>
+      <div><label>Nom</label><input id="id-nom" value="${esc(profil.nom||'')}"></div>
+      <div><label>Titre professionnel</label><input id="id-titre" placeholder="Ex : CEO · Ingénieure · Étudiant" value="${esc(profil.titre_pro||'')}"></div>
+      <div><label>Téléphone</label><input id="id-tel" type="tel" value="${esc(profil.telephone||'')}"></div>
+      <div><label>Ville</label><input id="id-ville" value="${esc(profil.ville||'')}"></div>
+      <div><label>Pays</label><input id="id-pays" value="${esc(profil.pays||'')}"></div>
+    </div>
+    <div class="fg full"><div><label>Biographie</label><textarea id="id-bio" rows="4">${esc(profil.bio||'')}</textarea></div></div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Centres d'intérêt</label>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;">${INTERETS.map(i=>`
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;padding:4px 10px;border:1px solid var(--border);border-radius:99px;${ci.includes(i)?'background:var(--tp-light);border-color:var(--tp);color:var(--tp);font-weight:600;':''}">
+          <input type="checkbox" value="${i}" ${ci.includes(i)?'checked':''} style="accent-color:var(--tp);"> ${i}
+        </label>`).join('')}
+      </div>
+    </div>
+    <div class="edit-btns">
+      <button class="btn-save" onclick="saveIdentity()">Enregistrer</button>
+      <button class="btn-cancel" onclick="document.getElementById('identity-edit-form').remove()">Annuler</button>
+    </div>
+    <p class="e-msg err" id="id-err"></p><p class="e-msg ok" id="id-ok"></p>`;
+
+  document.getElementById('p-identity').appendChild(form);
+  form.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+async function saveIdentity() {
+  const err = document.getElementById('id-err');
+  const ok  = document.getElementById('id-ok');
+  err.style.display = 'none'; ok.style.display = 'none';
+
+  const body = {
+    prenom:        document.getElementById('id-prenom').value.trim(),
+    nom:           document.getElementById('id-nom').value.trim() || profil.nom,
+    titre_pro:     document.getElementById('id-titre').value.trim(),
+    telephone:     document.getElementById('id-tel').value.trim(),
+    ville:         document.getElementById('id-ville').value.trim(),
+    pays:          document.getElementById('id-pays').value.trim(),
+    bio:           document.getElementById('id-bio').value.trim(),
+    centres_interet: [...document.querySelectorAll('#identity-edit-form input[type=checkbox]:checked')].map(c=>c.value),
+  };
+  try {
+    const r = await api('PUT', '/profil', body);
+    Object.assign(profil, body);
+    ok.style.display='block'; ok.textContent='Profil mis à jour ✓';
+    setTimeout(()=>{ document.getElementById('identity-edit-form')?.remove(); renderIdentity(); renderStats(); }, 800);
+  } catch(e) { err.style.display='block'; err.textContent=e.message||'Erreur.'; }
+}
+
+/* ======================================================
+   FOLLOW / UNFOLLOW
+   ====================================================== */
+async function toggleFollow() {
+  if (!CU) { window.location.href='login.html'; return; }
+  const btn = document.getElementById('btn-follow');
+  btn.disabled = true;
+  try {
+    const method = profil.isFollowing ? 'DELETE' : 'POST';
+    const r = await api(method, `/users/${profil.id}/suivre`);
+    profil.isFollowing = !profil.isFollowing;
+    profil.nbAbonnes   = r.nbAbonnes;
+    renderActions();
+    renderStats();
+  } catch(e) { alert(e.message||'Erreur.'); }
+  finally { const b2 = document.getElementById('btn-follow'); if(b2) b2.disabled=false; }
+}
+
+/* ======================================================
+   UTILITAIRES
+   ====================================================== */
+function rebuildSection(id, newEl) {
+  const old = document.getElementById(id);
+  if (old) old.replaceWith(newEl);
+  else document.getElementById('p-sections').appendChild(newEl);
+}
+
+/* ---- démarrage ---- */
 init();
 </script>
 </body>

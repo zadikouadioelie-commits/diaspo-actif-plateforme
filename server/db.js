@@ -83,6 +83,16 @@ db.exec(`
     FOREIGN KEY(owner_user_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS user_follows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    follower_id INTEGER NOT NULL,
+    followed_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(follower_id, followed_id),
+    FOREIGN KEY(follower_id) REFERENCES users(id),
+    FOREIGN KEY(followed_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS abonnements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -282,9 +292,14 @@ const MIGRATIONS = [
   ["initiatives", "fonction_responsable TEXT"],
   ["initiatives", "email_responsable TEXT"],
   ["initiatives", "tel_responsable TEXT"],
-  // Profil utilisateur enrichi
+  // Profil utilisateur enrichi (LinkedIn-style)
   ["users", "photo_url TEXT"],
   ["users", "bio TEXT"],
+  ["users", "banner_url TEXT"],
+  ["users", "titre_pro TEXT"],
+  ["users", "competences TEXT DEFAULT '[]'"],
+  ["users", "experiences TEXT DEFAULT '[]'"],
+  ["users", "theme_couleur TEXT DEFAULT 'ocean'"],
   // Événements enrichis
   ["evenements", "description TEXT"],
   ["evenements", "places_max INTEGER"],

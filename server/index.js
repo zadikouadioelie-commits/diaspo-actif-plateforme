@@ -643,36 +643,83 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
   sendJSON(res, 200, { nationalite, seuil_confidentialite: SEUIL_CONFIDENTIALITE, total_membres: totalMembres, par_pays: Object.values(parPays) });
 });
 
+/* ---------- Profil (lecture enrichie) ---------- */
+route("GET", "/api/profil/:id", async (req, res, params) => {
+  const u = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,created_at FROM users WHERE id=?").get(params.id);
+  if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
+  const me = getCurrentUser(req);
+  const nbAbonnes    = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(u.id).n;
+  const nbSuivis     = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE follower_id=?").get(u.id).n;
+  const isFollowing  = me ? !!db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, u.id) : false;
+  const initiativesSuivies = db.prepare("SELECT i.id,i.slug,i.nom,i.domaine,i.pays FROM abonnements a JOIN initiatives i ON i.id=a.initiative_id WHERE a.user_id=? LIMIT 12").all(u.id);
+  const usersSuivis  = db.prepare("SELECT u2.id,u2.nom,u2.prenom,u2.titre_pro,u2.ville,u2.photo_url FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? LIMIT 12").all(u.id);
+  const publications = db.prepare("SELECT id,type,categorie,contenu,created_at FROM fil_posts WHERE auteur_id=? ORDER BY id DESC LIMIT 5").all(u.id);
+  sendJSON(res, 200, { profil: {
+    ...publicUser(u),
+    bio: u.bio, photo_url: u.photo_url, banner_url: u.banner_url,
+    prenom: u.prenom, titre_pro: u.titre_pro,
+    centres_interet: safeParse(u.centres_interet || "[]"),
+    competences: safeParse(u.competences || "[]"),
+    experiences: safeParse(u.experiences || "[]"),
+    theme_couleur: u.theme_couleur || "ocean",
+    situation_pro: u.situation_pro, created_at: u.created_at,
+    nbAbonnes, nbSuivis, isFollowing,
+    initiativesSuivies, usersSuivis, publications
+  }});
+});
+
 /* ---------- Profil (mise à jour étendue) ---------- */
 route("PUT", "/api/profil", async (req, res, params, body) => {
   const user = getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const { nom, prenom, ville, pays, bio, photo_url, centres_interet, situation_pro, telephone } = body;
-  const fields = [];
-  const vals = [];
-  if (nom) { fields.push("nom=?"); vals.push(nom); }
-  if (prenom !== undefined) { fields.push("prenom=?"); vals.push(prenom); }
-  if (ville !== undefined) { fields.push("ville=?"); vals.push(ville); }
-  if (pays !== undefined) { fields.push("pays=?"); vals.push(pays); }
-  if (bio !== undefined) { fields.push("bio=?"); vals.push(bio); }
-  if (photo_url !== undefined) { fields.push("photo_url=?"); vals.push(photo_url); }
-  if (centres_interet !== undefined) { fields.push("centres_interet=?"); vals.push(JSON.stringify(Array.isArray(centres_interet) ? centres_interet : [])); }
-  if (situation_pro !== undefined) { fields.push("situation_pro=?"); vals.push(situation_pro); }
-  if (telephone !== undefined) { fields.push("telephone=?"); vals.push(telephone); }
+  const { nom, prenom, ville, pays, bio, photo_url, banner_url, titre_pro,
+          centres_interet, situation_pro, telephone, competences, experiences, theme_couleur } = body;
+  const fields = [], vals = [];
+  if (nom)                   { fields.push("nom=?");           vals.push(nom); }
+  if (prenom !== undefined)  { fields.push("prenom=?");        vals.push(prenom); }
+  if (ville !== undefined)   { fields.push("ville=?");         vals.push(ville); }
+  if (pays !== undefined)    { fields.push("pays=?");          vals.push(pays); }
+  if (bio !== undefined)     { fields.push("bio=?");           vals.push(bio); }
+  if (photo_url !== undefined)  { fields.push("photo_url=?");  vals.push(photo_url); }
+  if (banner_url !== undefined) { fields.push("banner_url=?"); vals.push(banner_url); }
+  if (titre_pro !== undefined)  { fields.push("titre_pro=?");  vals.push(titre_pro); }
+  if (theme_couleur !== undefined) { fields.push("theme_couleur=?"); vals.push(theme_couleur); }
+  if (centres_interet !== undefined) { fields.push("centres_interet=?"); vals.push(JSON.stringify(Array.isArray(centres_interet)?centres_interet:[])); }
+  if (situation_pro !== undefined)   { fields.push("situation_pro=?");   vals.push(situation_pro); }
+  if (telephone !== undefined)       { fields.push("telephone=?");        vals.push(telephone); }
+  if (competences !== undefined)     { fields.push("competences=?");      vals.push(JSON.stringify(Array.isArray(competences)?competences:[])); }
+  if (experiences !== undefined)     { fields.push("experiences=?");      vals.push(JSON.stringify(Array.isArray(experiences)?experiences:[])); }
   if (body.profil !== undefined) {
-    const current = db.prepare("SELECT profil_json FROM users WHERE id=?").get(user.id);
-    const merged = { ...safeParse(current.profil_json), ...body.profil };
+    const cur = db.prepare("SELECT profil_json FROM users WHERE id=?").get(user.id);
+    const merged = { ...safeParse(cur.profil_json), ...body.profil };
     fields.push("profil_json=?"); vals.push(JSON.stringify(merged));
   }
   if (fields.length) { vals.push(user.id); db.prepare(`UPDATE users SET ${fields.join(",")} WHERE id=?`).run(...vals); }
-  const updated = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,centres_interet,situation_pro,telephone,profil_json FROM users WHERE id=?").get(user.id);
-  sendJSON(res, 200, { profil: { ...publicUser(updated), bio: updated.bio, photo_url: updated.photo_url, prenom: updated.prenom, centres_interet: safeParse(updated.centres_interet), situation_pro: updated.situation_pro, telephone: updated.telephone } });
+  const up = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,telephone,profil_json FROM users WHERE id=?").get(user.id);
+  sendJSON(res, 200, { profil: { ...publicUser(up), bio: up.bio, photo_url: up.photo_url, banner_url: up.banner_url,
+    prenom: up.prenom, titre_pro: up.titre_pro, theme_couleur: up.theme_couleur,
+    competences: safeParse(up.competences||"[]"), experiences: safeParse(up.experiences||"[]"),
+    centres_interet: safeParse(up.centres_interet||"[]"), situation_pro: up.situation_pro, telephone: up.telephone } });
 });
 
-route("GET", "/api/profil/:id", async (req, res, params) => {
-  const u = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,centres_interet,situation_pro,profil_json,created_at FROM users WHERE id=?").get(params.id);
-  if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
-  sendJSON(res, 200, { profil: { ...publicUser(u), bio: u.bio, photo_url: u.photo_url, prenom: u.prenom, centres_interet: safeParse(u.centres_interet || "[]"), situation_pro: u.situation_pro, created_at: u.created_at } });
+/* ---------- Suivre / ne plus suivre un utilisateur ---------- */
+route("POST", "/api/users/:id/suivre", async (req, res, params) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (me.id == params.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
+  try {
+    db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, parseInt(params.id));
+    const n = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(parseInt(params.id)).n;
+    sendJSON(res, 200, { ok: true, nbAbonnes: n });
+  } catch(e) { sendJSON(res, 400, { error: e.message }); }
+});
+
+route("DELETE", "/api/users/:id/suivre", async (req, res, params) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  db.prepare("DELETE FROM user_follows WHERE follower_id=? AND followed_id=?").run(me.id, parseInt(params.id));
+  const n = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(parseInt(params.id)).n;
+  sendJSON(res, 200, { ok: true, nbAbonnes: n });
 });
 
 /* ---------- Upload simulé ---------- */
