@@ -339,8 +339,8 @@ let CU     = null; /* utilisateur connecté */
 
 /* ---- init ---- */
 async function init() {
+  CU = await fetchCurrentUser();
   await applyAuthState();
-  CU = window.CURRENT_USER || null;
   const backLink = document.getElementById('back-link');
   if (CU) backLink.href = ROLE_DASHBOARD[CU.role] || 'index.html';
   else     backLink.href = 'index.html';
