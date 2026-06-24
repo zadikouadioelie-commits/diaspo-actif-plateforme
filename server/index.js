@@ -2046,28 +2046,95 @@ route("GET", "/api/admin/publicites", async (req, res) => {
   sendJSON(res, 200, { publicites: rows });
 });
 
+function _pubBody(body) {
+  const j = (v, def="[]") => { try { return JSON.stringify(Array.isArray(v) ? v : JSON.parse(v||def)); } catch { return def; } };
+  const jo = (v) => { try { return JSON.stringify(typeof v==="object"&&!Array.isArray(v) ? v : JSON.parse(v||"{}")); } catch { return "{}"; } };
+  return {
+    nom_campagne: body.nom_campagne||null,
+    reference_interne: body.reference_interne||null,
+    annonceur: body.annonceur,
+    categorie: body.categorie||"general",
+    type_sponsor: body.type_sponsor||"partenaire",
+    sponsor_id: body.sponsor_id||null,
+    format: body.format||"banniere",
+    statut: body.statut||"brouillon",
+    priorite: parseInt(body.priorite)||2,
+    titre: body.titre,
+    sous_titre: body.sous_titre||null,
+    description_courte: body.description_courte||null,
+    description_detaillee: body.description_detaillee||null,
+    description: body.description||body.description_courte||null,
+    logo_annonceur: body.logo_annonceur||null,
+    image_url: body.image_url||null,
+    galerie_images: j(body.galerie_images),
+    video_url: body.video_url||null,
+    bouton_action: body.bouton_action||body.lien_texte||"En savoir plus",
+    lien_url: body.lien_url||body.lien_site||null,
+    lien_texte: body.lien_texte||body.bouton_action||"En savoir plus",
+    lien_type: body.lien_type||"externe",
+    lien_interne_id: body.lien_interne_id||null,
+    lien_site: body.lien_site||null,
+    contact_telephone: body.contact_telephone||null,
+    contact_whatsapp: body.contact_whatsapp||null,
+    contact_email: body.contact_email||null,
+    contact_adresse: body.contact_adresse||null,
+    reseaux_sociaux: jo(body.reseaux_sociaux),
+    moyens_paiement: j(body.moyens_paiement),
+    zone_geo: body.zone_geo||"monde",
+    cible_continents: j(body.cible_continents),
+    cible_pays: j(body.cible_pays),
+    cible_regions: j(body.cible_regions),
+    cible_villes: j(body.cible_villes),
+    cible_pays_residence: j(body.cible_pays_residence),
+    cible_roles: j(body.cible_roles),
+    cible_nationalites: j(body.cible_nationalites),
+    cible_origines: j(body.cible_origines),
+    cible_interets: j(body.cible_interets),
+    emplacements: j(body.emplacements, '["fil"]'),
+    max_affichages_user: parseInt(body.max_affichages_user)||0,
+    max_affichages_jour: parseInt(body.max_affichages_jour)||0,
+    max_clics: parseInt(body.max_clics)||0,
+    date_debut: body.date_debut||null,
+    date_fin: body.date_fin||null,
+    heure_debut: body.heure_debut||null,
+    heure_fin: body.heure_fin||null,
+    notes_admin: body.notes_admin||null,
+  };
+}
+
 route("POST", "/api/admin/publicites", async (req, res, params, body) => {
   const user = getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  const {
-    titre, description, image_url, lien_url, lien_texte, annonceur, format,
-    statut, date_debut, date_fin, priorite,
-    cible_pays, cible_regions, cible_villes, cible_roles, cible_nationalites, cible_origines,
-    notes_admin
-  } = body;
-  if (!titre || !annonceur) return sendJSON(res, 400, { error: "titre et annonceur requis." });
+  const b = _pubBody(body);
+  if (!b.titre || !b.annonceur) return sendJSON(res, 400, { error: "titre et annonceur requis." });
   const id = db.prepare(`
-    INSERT INTO publicites (titre,description,image_url,lien_url,lien_texte,annonceur,format,statut,
-      date_debut,date_fin,priorite,cible_pays,cible_regions,cible_villes,cible_roles,
-      cible_nationalites,cible_origines,notes_admin,created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO publicites (
+      nom_campagne,reference_interne,annonceur,categorie,type_sponsor,sponsor_id,
+      format,statut,priorite,
+      titre,sous_titre,description_courte,description_detaillee,description,
+      logo_annonceur,image_url,galerie_images,video_url,
+      bouton_action,lien_url,lien_texte,lien_type,lien_interne_id,lien_site,
+      contact_telephone,contact_whatsapp,contact_email,contact_adresse,
+      reseaux_sociaux,moyens_paiement,
+      zone_geo,cible_continents,cible_pays,cible_regions,cible_villes,cible_pays_residence,
+      cible_roles,cible_nationalites,cible_origines,cible_interets,
+      emplacements,max_affichages_user,max_affichages_jour,max_clics,
+      date_debut,date_fin,heure_debut,heure_fin,
+      notes_admin,created_by
+    ) VALUES (${",?".repeat(50).slice(1)})
   `).run(
-    titre, description||null, image_url||null, lien_url||null, lien_texte||"En savoir plus",
-    annonceur, format||"banniere", statut||"active",
-    date_debut||null, date_fin||null, priorite||2,
-    JSON.stringify(cible_pays||[]), JSON.stringify(cible_regions||[]), JSON.stringify(cible_villes||[]),
-    JSON.stringify(cible_roles||[]), JSON.stringify(cible_nationalites||[]), JSON.stringify(cible_origines||[]),
-    notes_admin||null, user.id
+    b.nom_campagne,b.reference_interne,b.annonceur,b.categorie,b.type_sponsor,b.sponsor_id,
+    b.format,b.statut,b.priorite,
+    b.titre,b.sous_titre,b.description_courte,b.description_detaillee,b.description,
+    b.logo_annonceur,b.image_url,b.galerie_images,b.video_url,
+    b.bouton_action,b.lien_url,b.lien_texte,b.lien_type,b.lien_interne_id,b.lien_site,
+    b.contact_telephone,b.contact_whatsapp,b.contact_email,b.contact_adresse,
+    b.reseaux_sociaux,b.moyens_paiement,
+    b.zone_geo,b.cible_continents,b.cible_pays,b.cible_regions,b.cible_villes,b.cible_pays_residence,
+    b.cible_roles,b.cible_nationalites,b.cible_origines,b.cible_interets,
+    b.emplacements,b.max_affichages_user,b.max_affichages_jour,b.max_clics,
+    b.date_debut,b.date_fin,b.heure_debut,b.heure_fin,
+    b.notes_admin,user.id
   ).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
@@ -2075,24 +2142,35 @@ route("POST", "/api/admin/publicites", async (req, res, params, body) => {
 route("PUT", "/api/admin/publicites/:id", async (req, res, params, body) => {
   const user = getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  const {
-    titre, description, image_url, lien_url, lien_texte, annonceur, format,
-    statut, date_debut, date_fin, priorite,
-    cible_pays, cible_regions, cible_villes, cible_roles, cible_nationalites, cible_origines,
-    notes_admin
-  } = body;
+  const b = _pubBody(body);
   db.prepare(`
-    UPDATE publicites SET titre=?,description=?,image_url=?,lien_url=?,lien_texte=?,annonceur=?,
-      format=?,statut=?,date_debut=?,date_fin=?,priorite=?,
-      cible_pays=?,cible_regions=?,cible_villes=?,cible_roles=?,cible_nationalites=?,cible_origines=?,
-      notes_admin=?,updated_at=datetime('now') WHERE id=?
+    UPDATE publicites SET
+      nom_campagne=?,reference_interne=?,annonceur=?,categorie=?,type_sponsor=?,sponsor_id=?,
+      format=?,statut=?,priorite=?,
+      titre=?,sous_titre=?,description_courte=?,description_detaillee=?,description=?,
+      logo_annonceur=?,image_url=?,galerie_images=?,video_url=?,
+      bouton_action=?,lien_url=?,lien_texte=?,lien_type=?,lien_interne_id=?,lien_site=?,
+      contact_telephone=?,contact_whatsapp=?,contact_email=?,contact_adresse=?,
+      reseaux_sociaux=?,moyens_paiement=?,
+      zone_geo=?,cible_continents=?,cible_pays=?,cible_regions=?,cible_villes=?,cible_pays_residence=?,
+      cible_roles=?,cible_nationalites=?,cible_origines=?,cible_interets=?,
+      emplacements=?,max_affichages_user=?,max_affichages_jour=?,max_clics=?,
+      date_debut=?,date_fin=?,heure_debut=?,heure_fin=?,
+      notes_admin=?,updated_at=datetime('now')
+    WHERE id=?
   `).run(
-    titre, description||null, image_url||null, lien_url||null, lien_texte||"En savoir plus",
-    annonceur, format||"banniere", statut||"active",
-    date_debut||null, date_fin||null, priorite||2,
-    JSON.stringify(cible_pays||[]), JSON.stringify(cible_regions||[]), JSON.stringify(cible_villes||[]),
-    JSON.stringify(cible_roles||[]), JSON.stringify(cible_nationalites||[]), JSON.stringify(cible_origines||[]),
-    notes_admin||null, params.id
+    b.nom_campagne,b.reference_interne,b.annonceur,b.categorie,b.type_sponsor,b.sponsor_id,
+    b.format,b.statut,b.priorite,
+    b.titre,b.sous_titre,b.description_courte,b.description_detaillee,b.description,
+    b.logo_annonceur,b.image_url,b.galerie_images,b.video_url,
+    b.bouton_action,b.lien_url,b.lien_texte,b.lien_type,b.lien_interne_id,b.lien_site,
+    b.contact_telephone,b.contact_whatsapp,b.contact_email,b.contact_adresse,
+    b.reseaux_sociaux,b.moyens_paiement,
+    b.zone_geo,b.cible_continents,b.cible_pays,b.cible_regions,b.cible_villes,b.cible_pays_residence,
+    b.cible_roles,b.cible_nationalites,b.cible_origines,b.cible_interets,
+    b.emplacements,b.max_affichages_user,b.max_affichages_jour,b.max_clics,
+    b.date_debut,b.date_fin,b.heure_debut,b.heure_fin,
+    b.notes_admin, params.id
   );
   sendJSON(res, 200, { ok: true });
 });
@@ -2100,9 +2178,17 @@ route("PUT", "/api/admin/publicites/:id", async (req, res, params, body) => {
 route("POST", "/api/admin/publicites/:id/statut", async (req, res, params, body) => {
   const user = getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  const { statut } = body;
-  if (!["brouillon","active","pausee","expiree","refusee"].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
-  db.prepare("UPDATE publicites SET statut=?,updated_at=datetime('now') WHERE id=?").run(statut, params.id);
+  const { statut, refus_motif } = body;
+  const valides = ["brouillon","en_attente","active","suspendue","terminee","refusee","pausee","expiree"];
+  if (!valides.includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  const extra = statut === "active"
+    ? ", validated_by=?, validated_at=datetime('now')"
+    : statut === "refusee" ? ", refus_motif=?" : "";
+  const args = [statut];
+  if (statut === "active") args.push(user.id);
+  else if (statut === "refusee") args.push(refus_motif||null);
+  args.push(params.id);
+  db.prepare(`UPDATE publicites SET statut=?,updated_at=datetime('now')${extra} WHERE id=?`).run(...args);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -2117,12 +2203,35 @@ route("DELETE", "/api/admin/publicites/:id", async (req, res, params) => {
 route("GET", "/api/admin/publicites/:id/stats", async (req, res, params) => {
   const user = getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  const pub = db.prepare("SELECT id,titre,nb_impressions,nb_clics FROM publicites WHERE id=?").get(params.id);
+  const pub = db.prepare(`
+    SELECT id,titre,annonceur,statut,nb_impressions,nb_clics,nb_portee,nb_partages,nb_enregistrements,nb_contacts,nb_messages
+    FROM publicites WHERE id=?
+  `).get(params.id);
   if (!pub) return sendJSON(res, 404, { error: "Publicité introuvable." });
-  const parPays = db.prepare("SELECT user_pays AS pays, COUNT(*) AS n FROM publicite_events WHERE publicite_id=? AND type='impression' AND user_pays IS NOT NULL GROUP BY user_pays ORDER BY n DESC LIMIT 10").all(params.id);
-  const parJour = db.prepare("SELECT date(created_at) AS jour, COUNT(*) AS impressions FROM publicite_events WHERE publicite_id=? AND type='impression' GROUP BY jour ORDER BY jour DESC LIMIT 14").all(params.id);
+  const parPays = db.prepare(`
+    SELECT user_pays AS pays, COUNT(*) AS n FROM publicite_events
+    WHERE publicite_id=? AND type='impression' AND user_pays IS NOT NULL
+    GROUP BY user_pays ORDER BY n DESC LIMIT 10
+  `).all(params.id);
+  const parJour = db.prepare(`
+    SELECT date(created_at) AS jour,
+      SUM(CASE WHEN type='impression' THEN 1 ELSE 0 END) AS impressions,
+      SUM(CASE WHEN type='clic' THEN 1 ELSE 0 END) AS clics
+    FROM publicite_events WHERE publicite_id=?
+    GROUP BY jour ORDER BY jour DESC LIMIT 30
+  `).all(params.id);
+  const parNationalite = db.prepare(`
+    SELECT user_nationalite AS nationalite, COUNT(*) AS n FROM publicite_events
+    WHERE publicite_id=? AND type='impression' AND user_nationalite IS NOT NULL
+    GROUP BY user_nationalite ORDER BY n DESC LIMIT 10
+  `).all(params.id);
+  const parRole = db.prepare(`
+    SELECT user_role AS role, COUNT(*) AS n FROM publicite_events
+    WHERE publicite_id=? AND type='impression' AND user_role IS NOT NULL
+    GROUP BY user_role ORDER BY n DESC
+  `).all(params.id);
   const ctr = pub.nb_impressions > 0 ? ((pub.nb_clics / pub.nb_impressions) * 100).toFixed(2) : "0.00";
-  sendJSON(res, 200, { pub, ctr, par_pays: parPays, par_jour: parJour });
+  sendJSON(res, 200, { pub, ctr, par_pays: parPays, par_jour: parJour, par_nationalite: parNationalite, par_role: parRole });
 });
 
 /* ===== MODULE INSTITUTIONS & OBSERVATOIRE ===== */
