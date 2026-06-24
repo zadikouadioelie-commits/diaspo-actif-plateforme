@@ -600,7 +600,7 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
 (async () => {
   // Auth guard
   const me = await fetchCurrentUser();
-  if (!me) { window.location.href = "connexion.html"; return; }
+  if (!me) { window.location.href = "login.html"; return; }
   if (me.role !== "administrateur") { window.location.href = ROLE_DASHBOARD[me.role] || "index.html"; return; }
 
   // Navigation sections

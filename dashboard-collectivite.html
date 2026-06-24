@@ -644,7 +644,7 @@ async function loadPartenariats() {
 /* ===== Init ===== */
 (async () => {
   ME = await fetchCurrentUser();
-  if (!ME) { window.location.href = "connexion.html"; return; }
+  if (!ME) { window.location.href = "login.html"; return; }
   if (ME.role !== "collectivite") { window.location.href = ROLE_DASHBOARD[ME.role] || "index.html"; return; }
 
   document.getElementById("inst-nom").textContent = ME.nom;
