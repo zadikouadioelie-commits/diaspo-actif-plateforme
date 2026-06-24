@@ -58,16 +58,180 @@ function updateTopbarBadge(count) {
   }
 }
 
+/* Styles du dropdown notifications (injectés une seule fois) */
+function injectNotifStyles() {
+  if (document.getElementById("notif-dropdown-style")) return;
+  const st = document.createElement("style");
+  st.id = "notif-dropdown-style";
+  st.textContent = `
+.notif-bell-wrap { position:relative; display:inline-flex; }
+.notif-bell-btn {
+  background:none; border:none; cursor:pointer; padding:6px 8px;
+  border-radius:8px; color:var(--navy); line-height:1;
+  display:flex; align-items:center; position:relative;
+  transition:background .15s;
+}
+.notif-bell-btn:hover { background:#F3F4F6; }
+.notif-badge {
+  position:absolute; top:-4px; right:-4px;
+  background:#EF4444; color:#fff; border-radius:50%;
+  min-width:17px; height:17px; font-size:10px; font-weight:800;
+  display:none; align-items:center; justify-content:center; padding:0 3px;
+  border:2px solid #fff;
+}
+.notif-badge.show { display:flex; }
+.notif-dropdown {
+  position:absolute; top:calc(100% + 8px); right:0;
+  width:340px; background:#fff; border:1px solid #E5E7EB;
+  border-radius:14px; box-shadow:0 8px 32px rgba(0,0,0,.14);
+  z-index:9999; overflow:hidden; display:none;
+}
+.notif-dropdown.open { display:block; }
+.notif-dd-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; border-bottom:1px solid #F3F4F6;
+}
+.notif-dd-title { font-size:14px; font-weight:800; color:#0D1B2A; }
+.notif-dd-markall {
+  font-size:11.5px; color:#4338CA; cursor:pointer; font-weight:600;
+  background:none; border:none; padding:0;
+}
+.notif-dd-markall:hover { text-decoration:underline; }
+.notif-list { max-height:360px; overflow-y:auto; }
+.notif-item {
+  display:flex; gap:11px; padding:12px 16px; cursor:pointer;
+  border-bottom:1px solid #F9FAFB; transition:background .13s;
+  text-decoration:none; color:inherit;
+}
+.notif-item:hover { background:#F9FAFB; }
+.notif-item.unread { background:#EEF2FF; }
+.notif-item.unread:hover { background:#E0E7FF; }
+.notif-icon {
+  width:36px; height:36px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px; background:#F3F4F6;
+}
+.notif-icon.mention { background:#EEF2FF; }
+.notif-icon.reaction { background:#FEF2F2; }
+.notif-icon.message  { background:#F0FDF4; }
+.notif-icon.evenement { background:#FFF7ED; }
+.notif-icon.validation { background:#F0FDF4; }
+.notif-content { flex:1; min-width:0; }
+.notif-titre { font-size:13px; font-weight:700; color:#0D1B2A; line-height:1.3; margin-bottom:2px; }
+.notif-contenu { font-size:12px; color:#6B7280; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.notif-date { font-size:11px; color:#9CA3AF; margin-top:3px; }
+.notif-unread-dot { width:8px; height:8px; border-radius:50%; background:#4338CA; flex-shrink:0; margin-top:4px; }
+.notif-empty { text-align:center; padding:28px 16px; color:#9CA3AF; font-size:13px; }
+.notif-dd-footer { border-top:1px solid #F3F4F6; text-align:center; padding:10px; }
+.notif-dd-footer a { font-size:12.5px; color:#4338CA; font-weight:700; text-decoration:none; }
+.notif-dd-footer a:hover { text-decoration:underline; }
+  `;
+  document.head.appendChild(st);
+}
+
+const NOTIF_ICONS = {
+  mention:    "🔔",
+  reaction:   "❤️",
+  message:    "💬",
+  evenement:  "📅",
+  validation: "✅",
+  abonnement: "⭐",
+};
+
+function notifUrl(n) {
+  const d = (typeof n.data === "object" ? n.data : null) || {};
+  if (d.post_id)          return `fil-actualite.html#fp-${d.post_id}`;
+  if (d.conversation_id)  return `messagerie.html?conv=${d.conversation_id}`;
+  if (d.evenement_id)     return `evenements.html#evt-${d.evenement_id}`;
+  return "#";
+}
+
+function renderNotifItem(n) {
+  const icon  = NOTIF_ICONS[n.type] || "🔔";
+  const url   = notifUrl(n);
+  const unread = !n.lue;
+  return `<a href="${url}" class="notif-item${unread ? " unread" : ""}" data-notif-id="${n.id}" onclick="markNotifRead(${n.id})">
+    <div class="notif-icon ${n.type}">${icon}</div>
+    <div class="notif-content">
+      <div class="notif-titre">${escapeHtml(n.titre || "")}</div>
+      <div class="notif-contenu">${escapeHtml(n.contenu || "")}</div>
+      <div class="notif-date">${fmtDate(n.created_at)}</div>
+    </div>
+    ${unread ? `<div class="notif-unread-dot"></div>` : ""}
+  </a>`;
+}
+
+function escapeHtml(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+window.markNotifRead = async function(id) {
+  try { await api("PATCH", `/notifications/${id}/lire`); } catch{}
+  const item = document.querySelector(`.notif-item[data-notif-id="${id}"]`);
+  if (item) { item.classList.remove("unread"); item.querySelector(".notif-unread-dot")?.remove(); }
+};
+
+window.markAllNotifsRead = async function() {
+  try { await api("POST", "/notifications/lire-tout"); } catch{}
+  document.querySelectorAll(".notif-item.unread").forEach(el => {
+    el.classList.remove("unread");
+    el.querySelector(".notif-unread-dot")?.remove();
+  });
+  const badge = document.getElementById("notif-badge");
+  if (badge) badge.classList.remove("show");
+};
+
+async function openNotifDropdown(btn) {
+  const dd = document.getElementById("notif-dropdown");
+  if (!dd) return;
+  const isOpen = dd.classList.contains("open");
+  // Ferme tous les dropdowns ouverts
+  document.querySelectorAll(".notif-dropdown.open").forEach(el => el.classList.remove("open"));
+  if (isOpen) return;
+  dd.classList.add("open");
+  dd.innerHTML = `<div class="notif-dd-head"><span class="notif-dd-title">Notifications</span></div>
+    <div class="notif-list"><div class="notif-empty">Chargement…</div></div>`;
+  try {
+    const data = await api("GET", "/notifications?limit=20");
+    const items = data.notifications || [];
+    dd.innerHTML = `
+      <div class="notif-dd-head">
+        <span class="notif-dd-title">Notifications</span>
+        <button class="notif-dd-markall" onclick="markAllNotifsRead()">Tout marquer comme lu</button>
+      </div>
+      <div class="notif-list">
+        ${items.length ? items.map(renderNotifItem).join("") : `<div class="notif-empty">Aucune notification</div>`}
+      </div>
+      <div class="notif-dd-footer"><a href="#">Voir tout →</a></div>`;
+    // MAJ badge
+    const nb = document.getElementById("notif-badge");
+    if (nb) { nb.classList.remove("show"); }
+  } catch { dd.innerHTML = `<div class="notif-empty">Erreur de chargement.</div>`; }
+}
+
+// Ferme le dropdown au clic extérieur
+document.addEventListener("click", e => {
+  if (!e.target.closest(".notif-bell-wrap")) {
+    document.querySelectorAll(".notif-dropdown.open").forEach(el => el.classList.remove("open"));
+  }
+});
+
 async function applyAuthState() {
   const el = document.getElementById("auth-area");
   if (!el) return;
   const user = await fetchCurrentUser();
   if (user) {
+    injectNotifStyles();
     el.innerHTML = `
       <a href="messagerie.html" class="user-chip" style="text-decoration:none;position:relative;" title="Messagerie">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span id="msg-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
       </a>
+      <div class="notif-bell-wrap">
+        <button class="notif-bell-btn" id="notif-bell-btn" title="Notifications" onclick="openNotifDropdown(this)">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notif-badge" id="notif-badge"></span>
+        </button>
+        <div class="notif-dropdown" id="notif-dropdown"></div>
+      </div>
       <a href="${ROLE_DASHBOARD[user.role] || '#'}" class="user-chip" style="text-decoration:none;">
         <div class="avatar">${photoAvatar(user.nom, 30)}</div> ${user.nom}
       </a>
@@ -79,13 +243,18 @@ async function applyAuthState() {
       try { await api("POST", "/auth/logout"); } catch (err) { /* ignore */ }
       window.location.href = "index.html";
     });
-    // Charger le nombre de messages non lus + notifications
+    // Charger le nombre de messages non lus + notifications non lues
     try {
       const [msgs, notifs] = await Promise.all([
         api("GET", "/messages/non-lus").catch(()=>({total:0})),
-        api("GET", "/notifications?limit=5").catch(()=>({non_lues:0}))
+        api("GET", "/notifications?limit=1").catch(()=>({non_lues:0}))
       ]);
-      updateTopbarBadge(msgs.total + (notifs.non_lues||0));
+      updateTopbarBadge(msgs.total);
+      const nb = document.getElementById("notif-badge");
+      if (nb && notifs.non_lues > 0) {
+        nb.textContent = notifs.non_lues > 9 ? "9+" : notifs.non_lues;
+        nb.classList.add("show");
+      }
     } catch (e) { /* silencieux */ }
   } else {
     el.innerHTML = `

@@ -285,6 +285,49 @@ route("POST", "/api/fil", async (req, res, params, body) => {
 
   // Récupère le post complet pour le renvoyer
   const post = db.prepare("SELECT * FROM fil_posts WHERE id=?").get(id);
+
+  // --- Notifications de mention ---
+  // Cherche tous les tokens @[Nom](u:123) et @[Nom](i:456)
+  const allText = [contenu, article_titre, article_contenu].join(" ");
+  const MENTION_RE = /@\[([^\]]+)\]\(([ui]):(\d+)\)/g;
+  const notified = new Set(); // évite les doublons si même personne mentionnée 2x
+  let m;
+  // Extrait 80 premiers chars du texte visible pour la notification
+  const visibleText = allText.replace(MENTION_RE, "@$1").replace(/<[^>]+>/g,"").trim();
+  const extrait = visibleText.slice(0, 80) + (visibleText.length > 80 ? "…" : "");
+
+  while ((m = MENTION_RE.exec(allText)) !== null) {
+    const [, nomMentionne, kind, rawId] = m;
+    const cibleId = Number(rawId);
+    if (!cibleId || notified.has(`${kind}:${cibleId}`)) continue;
+    notified.add(`${kind}:${cibleId}`);
+
+    if (kind === "u") {
+      // Utilisateur direct — ne pas notifier soi-même
+      if (cibleId !== user.id) {
+        creerNotif(
+          cibleId,
+          "mention",
+          `${user.nom} vous a mentionné dans une publication`,
+          `« ${extrait} »`,
+          { post_id: Number(id) }
+        );
+      }
+    } else if (kind === "i") {
+      // Initiative — notifier le propriétaire de l'initiative
+      const owner = db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(cibleId);
+      if (owner && owner.owner_user_id && owner.owner_user_id !== user.id) {
+        creerNotif(
+          owner.owner_user_id,
+          "mention",
+          `${user.nom} a mentionné votre initiative dans une publication`,
+          `« ${extrait} »`,
+          { post_id: Number(id) }
+        );
+      }
+    }
+  }
+
   sendJSON(res, 201, { id, post });
 });
 
