@@ -277,6 +277,64 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
+  /* ===== PLANS D'ABONNEMENT, TRANSACTIONS, PROMOS, PARAMÈTRES ===== */
+
+  CREATE TABLE IF NOT EXISTS plans_abonnement (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    description TEXT,
+    prix_mensuel REAL DEFAULT 0,
+    prix_annuel REAL DEFAULT 0,
+    cible TEXT DEFAULT 'tous',
+    avantages TEXT DEFAULT '{}',
+    actif INTEGER DEFAULT 1,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    plan_id INTEGER,
+    montant REAL NOT NULL,
+    type TEXT DEFAULT 'abonnement',
+    statut TEXT DEFAULT 'reussi',
+    reference TEXT,
+    code_promo_id INTEGER,
+    date_transaction TEXT DEFAULT (datetime('now')),
+    periode_debut TEXT,
+    periode_fin TEXT,
+    notes TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS codes_promo (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL DEFAULT 'pourcentage',
+    valeur REAL NOT NULL DEFAULT 0,
+    date_debut TEXT,
+    date_fin TEXT,
+    nb_max_utilisations INTEGER,
+    nb_utilisations INTEGER DEFAULT 0,
+    cible TEXT DEFAULT 'tous',
+    cible_pays TEXT DEFAULT '[]',
+    actif INTEGER DEFAULT 1,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS parametres_plateforme (
+    cle TEXT PRIMARY KEY,
+    valeur TEXT NOT NULL DEFAULT '',
+    type TEXT DEFAULT 'booleen',
+    description TEXT,
+    updated_at TEXT DEFAULT (datetime('now')),
+    updated_by INTEGER
+  );
+
   /* ===== MODULE PUBLICITÉS ===== */
 
   CREATE TABLE IF NOT EXISTS publicites (
@@ -561,6 +619,10 @@ const MIGRATIONS = [
   ["fil_posts", "pub_type TEXT"],
   ["fil_posts", "original_post_id INTEGER"],
   ["fil_posts", "repost_commentaire TEXT"],
+  // Tracking date sur les réactions (pour tendances engagement)
+  ["fil_reactions", "created_at TEXT DEFAULT (datetime('now'))"],
+  // Vues initiatives
+  ["initiatives", "nb_vues INTEGER DEFAULT 0"],
 ];
 for (const [table, col] of MIGRATIONS) {
   const colName = col.split(" ")[0];

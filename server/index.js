@@ -1576,6 +1576,389 @@ function serveStatic(req, res, pathname) {
 /* ================================================================
    HANDLER PRINCIPAL (utilisé en local ET en Vercel serverless)
    ================================================================ */
+/* ===== MODULE RÉSEAU & DIASPORA ===== */
+
+route("GET", "/api/admin/reseau", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  const parPays     = db.prepare("SELECT pays, COUNT(*) n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 12").all();
+  const parNat1     = db.prepare("SELECT nationalite1 AS nat, COUNT(*) n FROM users WHERE nationalite1 IS NOT NULL GROUP BY nat ORDER BY n DESC LIMIT 10").all();
+  const parNat2     = db.prepare("SELECT nationalite2 AS nat, COUNT(*) n FROM users WHERE nationalite2 IS NOT NULL GROUP BY nat ORDER BY n DESC LIMIT 8").all();
+  const parOrig1    = db.prepare("SELECT origine1 AS orig, COUNT(*) n FROM users WHERE origine1 IS NOT NULL GROUP BY orig ORDER BY n DESC LIMIT 10").all();
+  const parVille    = db.prepare("SELECT ville, pays, COUNT(*) n FROM users WHERE ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 10").all();
+
+  // Top pays actifs = pays avec le plus d'activité (user_activity JOIN users)
+  const paysActifs  = db.prepare(`
+    SELECT u.pays, COUNT(DISTINCT a.user_id) n
+    FROM user_activity a JOIN users u ON u.id=a.user_id
+    WHERE a.date >= date('now','-30 days') AND u.pays IS NOT NULL
+    GROUP BY u.pays ORDER BY n DESC LIMIT 8
+  `).all();
+
+  // Croissance internationale : nombre de pays distincts avec inscrits ce mois
+  const paysNouveaux = db.prepare(`
+    SELECT COUNT(DISTINCT pays) n FROM users
+    WHERE pays IS NOT NULL AND created_at >= datetime('now','-30 days')
+  `).get().n;
+
+  sendJSON(res, 200, { par_pays: parPays, par_nationalite: parNat1, par_nationalite2: parNat2,
+    par_origine: parOrig1, par_ville: parVille, pays_actifs: paysActifs,
+    pays_nouveaux_mois: paysNouveaux });
+});
+
+/* ===== MODULE CONTENU ===== */
+
+route("GET", "/api/admin/contenu", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  // Publications les plus engageantes (vue simulée = score engagement)
+  const topPublications = db.prepare(`
+    SELECT p.id, p.contenu, p.auteur_nom, p.categorie, substr(p.created_at,1,10) AS date_pub,
+      COUNT(DISTINCT r.id) AS nb_reactions, COUNT(DISTINCT c.id) AS nb_commentaires,
+      (COUNT(DISTINCT r.id) * 2 + COUNT(DISTINCT c.id) * 3) AS score
+    FROM fil_posts p
+    LEFT JOIN fil_reactions r ON r.post_id = p.id
+    LEFT JOIN fil_commentaires c ON c.post_id = p.id
+    GROUP BY p.id ORDER BY score DESC LIMIT 10
+  `).all();
+
+  // Articles les plus partagés
+  const topArticles = db.prepare(`
+    SELECT p.id, p.contenu, p.auteur_nom, substr(p.created_at,1,10) AS date_pub,
+      COUNT(DISTINCT r.id) AS nb_reposts
+    FROM fil_posts p
+    LEFT JOIN fil_reactions r ON r.post_id = p.id AND r.type IN ('repost','partage')
+    WHERE p.categorie = 'article' OR p.type = 'article'
+    GROUP BY p.id ORDER BY nb_reposts DESC LIMIT 8
+  `).all();
+
+  // Initiatives les plus consultées (par nb_vues ou score engagement)
+  const topInitiatives = db.prepare(`
+    SELECT i.id, i.nom, i.ville, i.pays, i.domaine, COALESCE(i.nb_vues,0) AS nb_vues,
+      (SELECT COUNT(*) FROM user_follows f WHERE f.followed_id = u.id) AS nb_abonnes
+    FROM initiatives i
+    LEFT JOIN users u ON u.role='initiative' AND u.nom=i.nom
+    ORDER BY nb_vues DESC, nb_abonnes DESC LIMIT 8
+  `).all();
+
+  // Utilisateurs les plus influents
+  const topInfluents = db.prepare(`
+    SELECT u.id, u.nom, u.role, u.pays,
+      COUNT(DISTINCT p.id) AS nb_posts,
+      SUM(COALESCE(sub.nb_react,0)) AS nb_reactions_recues,
+      (SELECT COUNT(*) FROM user_follows f WHERE f.followed_id = u.id) AS nb_abonnes,
+      (COUNT(DISTINCT p.id)*2 + SUM(COALESCE(sub.nb_react,0))*3 + (SELECT COUNT(*) FROM user_follows f WHERE f.followed_id=u.id)*5) AS score
+    FROM users u
+    LEFT JOIN fil_posts p ON p.auteur_id = u.id
+    LEFT JOIN (SELECT post_id, COUNT(*) nb_react FROM fil_reactions GROUP BY post_id) sub ON sub.post_id = p.id
+    WHERE u.role IN ('utilisateur','initiative')
+    GROUP BY u.id ORDER BY score DESC LIMIT 8
+  `).all();
+
+  // Types de contenu les plus performants
+  const parCategorie = db.prepare(`
+    SELECT p.categorie, COUNT(DISTINCT p.id) AS nb_posts,
+      AVG(sub.score) AS score_moy
+    FROM fil_posts p
+    LEFT JOIN (
+      SELECT post_id,
+        COUNT(DISTINCT r.id)*2 + COUNT(DISTINCT c.id)*3 AS score
+      FROM fil_posts pp
+      LEFT JOIN fil_reactions r ON r.post_id = pp.id
+      LEFT JOIN fil_commentaires c ON c.post_id = pp.id
+      GROUP BY pp.id
+    ) sub ON sub.post_id = p.id
+    WHERE p.categorie IS NOT NULL
+    GROUP BY p.categorie ORDER BY score_moy DESC
+  `).all();
+
+  sendJSON(res, 200, { top_publications: topPublications, top_articles: topArticles,
+    top_initiatives: topInitiatives, top_influents: topInfluents, par_categorie: parCategorie });
+});
+
+/* ===== MODULE FINANCES ===== */
+
+route("GET", "/api/admin/finances", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  // Abonnés actifs (abonnements table)
+  const abonnesActifs = db.prepare("SELECT COUNT(*) n FROM abonnements WHERE statut='actif'").get().n;
+
+  // Transactions du mois courant
+  const txMois = db.prepare(`
+    SELECT type, statut, SUM(montant) total, COUNT(*) nb
+    FROM transactions
+    WHERE date_transaction >= datetime('now','-30 days')
+    GROUP BY type, statut
+  `).all();
+
+  // MRR = revenus abonnements réussis du mois en cours
+  const mrrRow = db.prepare(`
+    SELECT COALESCE(SUM(montant),0) mrr FROM transactions
+    WHERE type='abonnement' AND statut='reussi'
+      AND date_transaction >= datetime('now','-30 days')
+  `).get();
+  const mrr = mrrRow.mrr;
+  const arr = Math.round(mrr * 12 * 100) / 100;
+
+  // Revenus par source
+  const parSource = db.prepare(`
+    SELECT type, COALESCE(SUM(CASE WHEN statut='reussi' THEN montant ELSE 0 END),0) AS total,
+      COUNT(CASE WHEN statut='reussi' THEN 1 END) AS nb_reussis,
+      COUNT(CASE WHEN statut='echoue' THEN 1 END) AS nb_echoues
+    FROM transactions
+    WHERE date_transaction >= datetime('now','-30 days')
+    GROUP BY type
+  `).all();
+
+  // Tendance revenus 30 jours
+  const tendance30j = db.prepare(`
+    SELECT date(date_transaction) jour, SUM(CASE WHEN statut='reussi' THEN montant ELSE 0 END) revenu,
+      COUNT(CASE WHEN statut='reussi' THEN 1 END) nb_ventes
+    FROM transactions
+    WHERE date_transaction >= datetime('now','-29 days')
+    GROUP BY date(date_transaction) ORDER BY jour ASC
+  `).all();
+
+  // Paiements réussis / échoués / remboursements
+  const paiementsStatuts = db.prepare(`
+    SELECT statut, COUNT(*) nb, COALESCE(SUM(montant),0) total
+    FROM transactions GROUP BY statut
+  `).all();
+
+  // Top clients (utilisateurs avec le plus de dépenses)
+  const topClients = db.prepare(`
+    SELECT u.nom, u.role, u.pays, COUNT(t.id) nb_achats,
+      SUM(t.montant) total_depense
+    FROM transactions t JOIN users u ON u.id = t.user_id
+    WHERE t.statut='reussi'
+    GROUP BY t.user_id ORDER BY total_depense DESC LIMIT 5
+  `).all();
+
+  // Taux de conversion (abonnés / total utilisateurs)
+  const totalUtilisateurs = db.prepare("SELECT COUNT(*) n FROM users WHERE role IN ('utilisateur','initiative')").get().n;
+  const tauxConversion = totalUtilisateurs > 0 ? ((abonnesActifs / totalUtilisateurs) * 100).toFixed(1) : "0.0";
+
+  // Ventes du jour
+  const venteJour = db.prepare(`
+    SELECT COUNT(*) nb, COALESCE(SUM(montant),0) total
+    FROM transactions WHERE statut='reussi' AND date(date_transaction)=date('now')
+  `).get();
+
+  // Plans — performance
+  const parPlan = db.prepare(`
+    SELECT p.nom, p.prix_mensuel, p.prix_annuel,
+      COUNT(t.id) AS nb_ventes,
+      COALESCE(SUM(CASE WHEN t.statut='reussi' THEN t.montant ELSE 0 END),0) AS revenu
+    FROM plans_abonnement p
+    LEFT JOIN transactions t ON t.plan_id = p.id AND t.date_transaction >= datetime('now','-30 days')
+    GROUP BY p.id ORDER BY revenu DESC
+  `).all();
+
+  sendJSON(res, 200, {
+    simulation: true,
+    abonnes_actifs: abonnesActifs,
+    mrr, arr,
+    taux_conversion: tauxConversion,
+    par_source: parSource,
+    tendance_30j: tendance30j,
+    paiements_statuts: paiementsStatuts,
+    top_clients: topClients,
+    vente_jour: venteJour,
+    par_plan: parPlan
+  });
+});
+
+/* ===== PLANS D'ABONNEMENT — CRUD ===== */
+
+route("GET", "/api/admin/plans", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  sendJSON(res, 200, { plans: db.prepare("SELECT * FROM plans_abonnement ORDER BY ordre").all() });
+});
+
+route("POST", "/api/admin/plans", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { nom, description, prix_mensuel, prix_annuel, cible, avantages } = body;
+  if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
+  const id = db.prepare(`
+    INSERT INTO plans_abonnement (nom, description, prix_mensuel, prix_annuel, cible, avantages)
+    VALUES (?,?,?,?,?,?)
+  `).run(nom, description||null, prix_mensuel||0, prix_annuel||0, cible||"tous",
+    JSON.stringify(avantages||{})).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/admin/plans/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { nom, description, prix_mensuel, prix_annuel, cible, avantages, actif } = body;
+  db.prepare(`
+    UPDATE plans_abonnement SET nom=?,description=?,prix_mensuel=?,prix_annuel=?,cible=?,avantages=?,
+    actif=?,updated_at=datetime('now') WHERE id=?
+  `).run(nom, description||null, prix_mensuel||0, prix_annuel||0, cible||"tous",
+    JSON.stringify(avantages||{}), actif!=null?actif:1, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/admin/plans/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE plans_abonnement SET actif=0 WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ===== CODES PROMO — CRUD ===== */
+
+route("GET", "/api/admin/promos", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  sendJSON(res, 200, { promos: db.prepare("SELECT * FROM codes_promo ORDER BY created_at DESC").all() });
+});
+
+route("POST", "/api/admin/promos", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { nom, code, type, valeur, date_debut, date_fin, nb_max_utilisations, cible } = body;
+  if (!nom || !code || !type) return sendJSON(res, 400, { error: "Nom, code et type requis." });
+  const id = db.prepare(`
+    INSERT INTO codes_promo (nom, code, type, valeur, date_debut, date_fin, nb_max_utilisations, cible, created_by)
+    VALUES (?,?,?,?,?,?,?,?,?)
+  `).run(nom, code.toUpperCase(), type, valeur||0, date_debut||null, date_fin||null,
+    nb_max_utilisations||null, cible||"tous", user.id).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/admin/promos/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { nom, type, valeur, date_debut, date_fin, nb_max_utilisations, cible, actif } = body;
+  db.prepare(`
+    UPDATE codes_promo SET nom=?,type=?,valeur=?,date_debut=?,date_fin=?,
+    nb_max_utilisations=?,cible=?,actif=? WHERE id=?
+  `).run(nom, type, valeur||0, date_debut||null, date_fin||null, nb_max_utilisations||null,
+    cible||"tous", actif!=null?actif:1, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/admin/promos/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE codes_promo SET actif=0 WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ===== PARAMÈTRES PLATEFORME ===== */
+
+route("GET", "/api/admin/parametres", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const params2 = db.prepare("SELECT * FROM parametres_plateforme ORDER BY cle").all();
+  const obj = {};
+  params2.forEach(p => { obj[p.cle] = { valeur: p.valeur, type: p.type, description: p.description }; });
+  sendJSON(res, 200, { parametres: obj });
+});
+
+route("PUT", "/api/admin/parametres", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const updates = body.updates || {};
+  const stmt = db.prepare(`
+    INSERT INTO parametres_plateforme (cle, valeur, updated_at, updated_by)
+    VALUES (?,?,datetime('now'),?)
+    ON CONFLICT(cle) DO UPDATE SET valeur=excluded.valeur, updated_at=excluded.updated_at, updated_by=excluded.updated_by
+  `);
+  Object.entries(updates).forEach(([k, v]) => stmt.run(k, String(v), user.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ===== ABONNÉS — LISTE DÉTAILLÉE ===== */
+
+route("GET", "/api/admin/abonnes", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const abonnes = db.prepare(`
+    SELECT a.id, a.user_id, u.nom, u.email, u.role, u.pays,
+      a.plan, a.statut, a.date_debut, a.date_fin, a.created_at
+    FROM abonnements a LEFT JOIN users u ON u.id = a.user_id
+    ORDER BY a.created_at DESC LIMIT 50
+  `).all();
+  // Taux de renouvellement simulé
+  const totalExpires = db.prepare("SELECT COUNT(*) n FROM abonnements WHERE statut='expire'").get().n;
+  const totalRenouveles = db.prepare("SELECT COUNT(*) n FROM abonnements WHERE statut='actif' AND date_debut > date('now','-60 days')").get().n;
+  const tauxRenouvellement = (totalExpires + totalRenouveles) > 0
+    ? ((totalRenouveles / (totalExpires + totalRenouveles)) * 100).toFixed(1)
+    : "0.0";
+  sendJSON(res, 200, { abonnes, taux_renouvellement: tauxRenouvellement, total_expires: totalExpires });
+});
+
+/* ===== TRANSACTIONS — LISTE ===== */
+
+route("GET", "/api/admin/transactions", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const txs = db.prepare(`
+    SELECT t.*, u.nom AS user_nom, p.nom AS plan_nom
+    FROM transactions t
+    LEFT JOIN users u ON u.id = t.user_id
+    LEFT JOIN plans_abonnement p ON p.id = t.plan_id
+    ORDER BY t.date_transaction DESC LIMIT 100
+  `).all();
+  sendJSON(res, 200, { transactions: txs });
+});
+
+/* ===== RÉTENTION ===== */
+
+route("GET", "/api/admin/retention", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  // Rétention J+7 : inscrits il y a 7–14 jours ET actifs dans les 7 derniers jours
+  const cohortJ7 = db.prepare(`
+    SELECT COUNT(*) n FROM users WHERE created_at BETWEEN datetime('now','-14 days') AND datetime('now','-7 days')
+  `).get().n;
+  const retentionJ7 = db.prepare(`
+    SELECT COUNT(DISTINCT u.id) n FROM users u
+    JOIN user_activity a ON a.user_id=u.id
+    WHERE u.created_at BETWEEN datetime('now','-14 days') AND datetime('now','-7 days')
+      AND a.date >= date('now','-7 days')
+  `).get().n;
+
+  // Rétention J+30 : inscrits il y a 30–60 jours ET actifs dans les 30 derniers jours
+  const cohortJ30 = db.prepare(`
+    SELECT COUNT(*) n FROM users WHERE created_at BETWEEN datetime('now','-60 days') AND datetime('now','-30 days')
+  `).get().n;
+  const retentionJ30 = db.prepare(`
+    SELECT COUNT(DISTINCT u.id) n FROM users u
+    JOIN user_activity a ON a.user_id=u.id
+    WHERE u.created_at BETWEEN datetime('now','-60 days') AND datetime('now','-30 days')
+      AND a.date >= date('now','-30 days')
+  `).get().n;
+
+  // Rétention J+90 : inscrits il y a 90–180 jours ET actifs dans les 90 derniers jours
+  const cohortJ90 = db.prepare(`
+    SELECT COUNT(*) n FROM users WHERE created_at BETWEEN datetime('now','-180 days') AND datetime('now','-90 days')
+  `).get().n;
+  const retentionJ90 = db.prepare(`
+    SELECT COUNT(DISTINCT u.id) n FROM users u
+    JOIN user_activity a ON a.user_id=u.id
+    WHERE u.created_at BETWEEN datetime('now','-180 days') AND datetime('now','-90 days')
+      AND a.date >= date('now','-90 days')
+  `).get().n;
+
+  const pct = (n, total) => total > 0 ? ((n/total)*100).toFixed(1) : "—";
+
+  sendJSON(res, 200, {
+    j7:  { cohorte: cohortJ7,  actifs: retentionJ7,  taux: pct(retentionJ7, cohortJ7) },
+    j30: { cohorte: cohortJ30, actifs: retentionJ30, taux: pct(retentionJ30, cohortJ30) },
+    j90: { cohorte: cohortJ90, actifs: retentionJ90, taux: pct(retentionJ90, cohortJ90) },
+  });
+});
+
 /* ===== HEARTBEAT SESSION (temps passé sur la plateforme) ===== */
 
 route("POST", "/api/session/heartbeat", async (req, res, params, body) => {
