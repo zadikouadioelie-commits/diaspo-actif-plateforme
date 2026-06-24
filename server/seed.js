@@ -29,12 +29,25 @@ function seed() {
   /* ---- Initiatives ---- */
   const insertInitiative = db.prepare(`
     INSERT INTO initiatives (slug, nom, sigle, pays, region, ville, zone, nationalite1, nationalite2,
-      nationalites_concernees, nationalite_unique, domaine, type, membres, vues, abonnes, description,
-      mission, historique, site_web, lat, lon)
+      nationalites_concernees, nationalite_unique, origine1, origine2, rayonnement, pays_intervention,
+      domaine, type, membres, vues, abonnes, description, mission, historique, site_web, lat, lon)
     VALUES (@slug, @nom, @sigle, @pays, @region, @ville, @zone, @nationalite1, @nationalite2,
-      @nationalites_concernees, @nationalite_unique, @domaine, @type, @membres, @vues, @abonnes, @description,
-      @mission, @historique, @site_web, @lat, @lon)
+      @nationalites_concernees, @nationalite_unique, @origine1, @origine2, @rayonnement, @pays_intervention,
+      @domaine, @type, @membres, @vues, @abonnes, @description, @mission, @historique, @site_web, @lat, @lon)
   `);
+
+  const origineMap = {
+    "aito":           { origine1: "Côte d'Ivoire", origine2: null,         rayonnement: "régionale",      pays_intervention: [] },
+    "tech4senegal":   { origine1: "Sénégal",        origine2: "Canada",     rayonnement: "internationale", pays_intervention: [{"pays":"Sénégal","region":"Thiès"},{"pays":"Sénégal","region":"Kaolack"}] },
+    "mali-sante":     { origine1: "Mali",            origine2: "Belgique",   rayonnement: "nationale",      pays_intervention: [{"pays":"Mali","region":"Koulikoro"},{"pays":"Mali","region":"Ségou"}] },
+    "cacao-solidaire":{ origine1: "Cameroun",        origine2: "Allemagne",  rayonnement: "internationale", pays_intervention: [{"pays":"Cameroun"},{"pays":"Allemagne","ville":"Berlin"}] },
+    "marrakech-edu":  { origine1: "Maroc",           origine2: "France",     rayonnement: "régionale",      pays_intervention: [] },
+    "benin-green":    { origine1: "Bénin",           origine2: "États-Unis", rayonnement: "nationale",      pays_intervention: [{"pays":"Bénin","region":"Littoral"},{"pays":"Bénin","region":"Ouémé"}] },
+    "tunis-startup":  { origine1: "Tunisie",         origine2: "Canada",     rayonnement: "internationale", pays_intervention: [{"pays":"Tunisie"},{"pays":"Canada","ville":"Montréal"}] },
+    "racines-guinee": { origine1: "Guinée",          origine2: "Espagne",    rayonnement: "internationale", pays_intervention: [{"pays":"Guinée"},{"pays":"Espagne","ville":"Madrid"}] },
+    "femmes-congo":   { origine1: "RD Congo",        origine2: null,         rayonnement: "nationale",      pays_intervention: [] },
+    "togo-num":       { origine1: "Togo",            origine2: "Suisse",     rayonnement: "internationale", pays_intervention: [{"pays":"Togo"},{"pays":"Suisse","ville":"Genève"}] },
+  };
 
   const missionMap = {
     "aito": "Fédérer, représenter et valoriser la diaspora ivoirienne d'Occitanie. Créer des liens entre la France et la Côte d'Ivoire à travers l'entraide, la culture et l'entrepreneuriat.",
@@ -64,6 +77,10 @@ function seed() {
       nationalite2: it.nationalite2 || null,
       nationalites_concernees: JSON.stringify(it.nationalites_concernees || []),
       nationalite_unique: it.nationalite_unique ? 1 : 0,
+      origine1: (origineMap[it.id] || {}).origine1 || null,
+      origine2: (origineMap[it.id] || {}).origine2 || null,
+      rayonnement: (origineMap[it.id] || {}).rayonnement || 'locale',
+      pays_intervention: JSON.stringify((origineMap[it.id] || {}).pays_intervention || []),
       domaine: it.domaine || null,
       type: it.type || null,
       membres: it.membres || 0,

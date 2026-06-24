@@ -224,10 +224,30 @@
         </div>
       </div>
       <div class="form-section"><h4>Nationalites concernees</h4>
-        <div class="nat-notice">&#127760; Ces nationalites definissent quelle diaspora votre initiative sert — elles sont affichees publiquement dans l'annuaire.</div>
+        <div class="nat-notice">&#127760; Appartenance juridique ou administrative de l'organisation — affichee dans l'annuaire.</div>
         <div class="grid-2">
           <div><label>Nationalite 1 <span style="color:var(--orange)">*</span></label><input type="text" id="i-nat1" placeholder="Ivoirienne"></div>
           <div><label>Nationalite 2 (facultatif)</label><input type="text" id="i-nat2" placeholder="Française"></div>
+        </div>
+      </div>
+      <div class="form-section"><h4>Origines culturelles</h4>
+        <div class="nat-notice">&#127758; Racines culturelles, communautaires ou historiques de l'initiative — affichees dans l'annuaire.</div>
+        <div class="grid-2">
+          <div><label>Origine 1 <span style="color:var(--orange)">*</span></label><input type="text" id="i-orig1" placeholder="Cote d'Ivoire"></div>
+          <div><label>Origine 2 (facultatif)</label><input type="text" id="i-orig2" placeholder="Burkina Faso"></div>
+        </div>
+      </div>
+      <div class="form-section"><h4>Rayonnement territorial</h4>
+        <div class="radio-grid" id="i-rayonnement-group">
+          <label><input type="radio" name="i-ray" value="locale" checked> Locale</label>
+          <label><input type="radio" name="i-ray" value="régionale"> Regionale</label>
+          <label><input type="radio" name="i-ray" value="nationale"> Nationale</label>
+          <label><input type="radio" name="i-ray" value="internationale"> Internationale</label>
+        </div>
+        <div id="i-territoires-box" style="display:none;margin-top:14px;">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Territoires d'intervention (illimite)</div>
+          <div id="i-territoires-list"></div>
+          <button type="button" class="btn" id="i-add-territoire" style="margin-top:8px;font-size:13px;">+ Ajouter un territoire</button>
         </div>
       </div>
       <div class="form-section"><h4>Localisation</h4>
@@ -472,17 +492,23 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     const pwd=document.getElementById("i-pwd").value;
     const pwd2=document.getElementById("i-pwd2").value;
     const nat1i=document.getElementById("i-nat1").value.trim();
-    req(nom,"Nom organisation");req(typeOrg,"Type");req(nat1i,"Nationalite 1");req(desc,"Description");
+    const orig1=document.getElementById("i-orig1").value.trim();
+    req(nom,"Nom organisation");req(typeOrg,"Type");req(nat1i,"Nationalite 1");req(orig1,"Origine 1");req(desc,"Description");
     req(pays,"Pays");req(ville,"Ville");req(rnom,"Nom responsable");
     req(rprenom,"Prenom responsable");req(email,"Email");req(pwd,"Mot de passe");
     if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
     if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
     const rs=document.getElementById("i-rs").value.trim();
+    const rayonnement=document.querySelector('input[name="i-ray"]:checked')?.value||'locale';
+    const pays_intervention=rayonnement==='internationale'?collecterTerritoires():[];
     await submitForm("i-submit","i-error",{
       role:"initiative",nom:rnom,prenom:rprenom,email,password:pwd,
       nom_institution:nom,type_org:typeOrg,
       nationalite1:nat1i,
       nationalite2:document.getElementById("i-nat2").value.trim()||null,
+      origine1:orig1,
+      origine2:document.getElementById("i-orig2").value.trim()||null,
+      rayonnement,pays_intervention,
       domaine:document.getElementById("i-domaine").value,
       description:desc,objectifs:document.getElementById("i-objectifs").value.trim()||null,
       pays,region:document.getElementById("i-region").value.trim()||null,
@@ -496,6 +522,45 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     });
   }catch(e){const eb=document.getElementById("i-error");eb.textContent=e.message;eb.style.display="block";}
 });
+/* ===== Rayonnement + territoires dynamiques ===== */
+document.querySelectorAll('input[name="i-ray"]').forEach(r=>{
+  r.addEventListener('change',()=>{
+    const box=document.getElementById('i-territoires-box');
+    if(r.value==='internationale'&&r.checked){
+      box.style.display='block';
+      if(!document.querySelectorAll('.territoire-row').length) ajouterTerritoire();
+    } else if(r.checked) box.style.display='none';
+  });
+});
+document.getElementById('i-add-territoire').addEventListener('click', ajouterTerritoire);
+
+let terIdx=0;
+function ajouterTerritoire(){
+  const i=terIdx++;
+  const row=document.createElement('div');
+  row.className='territoire-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;';
+  row.innerHTML=`
+    <input type="text" placeholder="Pays *" id="ter-pays-${i}" style="height:38px;padding:0 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+    <input type="text" placeholder="Region" id="ter-reg-${i}" style="height:38px;padding:0 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+    <input type="text" placeholder="Ville" id="ter-ville-${i}" style="height:38px;padding:0 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+    <button type="button" style="height:38px;width:38px;border:none;background:#fee2e2;color:#dc2626;border-radius:6px;cursor:pointer;font-size:16px;" onclick="this.closest('.territoire-row').remove()">×</button>
+  `;
+  document.getElementById('i-territoires-list').appendChild(row);
+}
+function collecterTerritoires(){
+  return [...document.querySelectorAll('.territoire-row')].map(row=>{
+    const pays=row.querySelector('[id^="ter-pays"]').value.trim();
+    const region=row.querySelector('[id^="ter-reg"]').value.trim();
+    const ville=row.querySelector('[id^="ter-ville"]').value.trim();
+    if(!pays) return null;
+    const t={pays};
+    if(region) t.region=region;
+    if(ville) t.ville=ville;
+    return t;
+  }).filter(Boolean);
+}
+
 document.getElementById("c-submit").addEventListener("click",async()=>{
   try{
     const typeInst=document.getElementById("c-type").value;

@@ -179,14 +179,18 @@ const DOMAIN_BADGE = {
   'Droit':          {bg:'#37474F', label:'DROIT'},
 };
 
+const RAY_ICON = {locale:'📍', régionale:'🗺️', nationale:'🏳️', internationale:'🌐'};
+const RAY_LABEL = {locale:'Locale', régionale:'Régionale', nationale:'Nationale', internationale:'Internationale'};
+
 function renderInitiativeCard(it){
   const badge   = DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()};
   const seed    = encodeURIComponent(it.slug || it.nom || 'init');
   const photo   = `https://picsum.photos/seed/${seed}/400/240`;
-  /* Localisation opérationnelle : ville + région (sans nationalité) */
-  const loc     = [it.ville, it.region || it.pays].filter(Boolean).join(', ') || '—';
-  /* Nationalité(s) de la diaspora concernée — info clé de la plateforme */
-  const nats    = [it.nationalite1, it.nationalite2].filter(Boolean).join(' / ') || '—';
+  const loc     = [it.ville, it.pays].filter(Boolean).join(', ') || '—';
+  const nats    = [it.nationalite1, it.nationalite2].filter(Boolean).join(' • ') || '—';
+  const origs   = [it.origine1, it.origine2].filter(Boolean).join(' • ');
+  const ray     = it.rayonnement || '';
+  const rayHtml = ray ? `<span class="ann-ray-badge ann-ray-${ray}">${RAY_ICON[ray]||'🌐'} ${RAY_LABEL[ray]||ray}</span>` : '';
   const desc    = it.description || it.mission || '';
   const membres = it.membres ? `<span class="ann-membres">👥 ${it.membres}</span>` : '';
 
@@ -199,11 +203,16 @@ function renderInitiativeCard(it){
     </div>
     <div class="ann-card-body">
       <div class="ann-card-title">${it.nom}</div>
-      <div class="ann-card-nat">🌍 ${nats}</div>
+      <div class="ann-card-meta-row">
+        <span class="ann-card-loc">📍 ${loc}</span>
+        ${rayHtml}
+      </div>
+      ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
+      <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
       ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
       <div class="ann-card-foot">
-        <span class="ann-location">📍 ${loc}</span>
-        <div style="display:flex;align-items:center;gap:8px">${membres}<span class="ann-arrow">→</span></div>
+        ${membres}
+        <span class="ann-arrow">→</span>
       </div>
     </div>
   </a>`;
@@ -232,14 +241,20 @@ async function initAnnuaire(){
     return;
   }
 
-  /* Peupler les filtres Nationalités */
+  /* Nationalités */
   populateSelect("f-pays",    [...new Set(ALL.map(i=>i.nationalite1).filter(Boolean))].sort());
   populateSelect("f-nat2",    [...new Set(ALL.map(i=>i.nationalite2).filter(Boolean))].sort());
-  /* Peupler les filtres Localisation */
+  /* Origines */
+  const toutesOrigines = [...new Set([
+    ...ALL.map(i=>i.origine1), ...ALL.map(i=>i.origine2)
+  ].filter(Boolean))].sort();
+  populateSelect("f-orig1", toutesOrigines);
+  populateSelect("f-orig2", toutesOrigines);
+  /* Localisation */
   populateSelect("f-pays-res",[...new Set(ALL.map(i=>i.pays).filter(Boolean))].sort());
   populateSelect("f-region",  [...new Set(ALL.map(i=>i.region).filter(Boolean))].sort());
   populateSelect("f-ville",   [...new Set(ALL.map(i=>i.ville).filter(Boolean))].sort());
-  /* Peupler Domaine et Type */
+  /* Domaine + Type */
   populateSelect("f-domaine", [...new Set(ALL.map(i=>i.domaine).filter(Boolean))].sort());
   populateSelect("f-type",    [...new Set(ALL.map(i=>i.type).filter(Boolean))].sort());
 
@@ -249,24 +264,32 @@ async function initAnnuaire(){
     const q          = sel("f-q").toLowerCase();
     const nat1       = sel("f-pays");
     const nat2       = sel("f-nat2");
+    const orig1      = sel("f-orig1");
+    const orig2      = sel("f-orig2");
     const paysRes    = sel("f-pays-res");
     const region     = sel("f-region");
     const ville      = sel("f-ville");
+    const ray        = sel("f-ray");
     const dom        = sel("f-domaine");
     const type       = sel("f-type");
     const uniqueOnly = document.getElementById("f-unique")?.checked || false;
 
     const filtered = ALL.filter(it=>{
       if(q && !it.nom.toLowerCase().includes(q) && !(it.description||"").toLowerCase().includes(q)) return false;
-      /* Nationalités : la valeur doit correspondre à nat1 OU nat2 de l'initiative */
+      /* Nationalités — cherche dans nat1 OU nat2 */
       if(nat1 && it.nationalite1 !== nat1 && it.nationalite2 !== nat1) return false;
       if(nat2 && it.nationalite1 !== nat2 && it.nationalite2 !== nat2) return false;
+      /* Origines — cherche dans origine1 OU origine2 */
+      if(orig1 && it.origine1 !== orig1 && it.origine2 !== orig1) return false;
+      if(orig2 && it.origine1 !== orig2 && it.origine2 !== orig2) return false;
       /* Localisation combinable */
       if(paysRes && it.pays !== paysRes) return false;
       if(region  && it.region !== region) return false;
       if(ville   && it.ville !== ville) return false;
-      if(dom     && it.domaine !== dom) return false;
-      if(type    && it.type !== type) return false;
+      /* Rayonnement */
+      if(ray && it.rayonnement !== ray) return false;
+      if(dom  && it.domaine !== dom) return false;
+      if(type && it.type !== type) return false;
       if(uniqueOnly && !it.nationalite_unique) return false;
       return true;
     });
@@ -277,7 +300,7 @@ async function initAnnuaire(){
       : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">Aucune initiative ne correspond à ces critères.</div>`;
   }
 
-  ["f-q","f-pays","f-nat2","f-pays-res","f-region","f-ville","f-domaine","f-type"].forEach(id=>{
+  ["f-q","f-pays","f-nat2","f-orig1","f-orig2","f-pays-res","f-region","f-ville","f-ray","f-domaine","f-type"].forEach(id=>{
     const el = document.getElementById(id);
     if(el){ el.addEventListener("input", apply); el.addEventListener("change", apply); }
   });

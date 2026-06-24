@@ -99,14 +99,23 @@
 .ann-location{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;}
 .ann-arrow{width:26px;height:26px;border-radius:50%;background:var(--orange-light);color:var(--orange);
   display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
-/* Nationalités + type + membres */
-.ann-card-nat{font-size:12px;color:var(--navy);font-weight:600;margin:-2px 0 2px;}
+/* Infos carte */
+.ann-card-meta-row{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;}
+.ann-card-loc{font-size:12px;color:var(--muted);}
+.ann-card-origs{font-size:12px;color:#1B3A6B;margin:2px 0;}
+.ann-card-nats{font-size:12px;color:#374151;margin:2px 0;}
 .ann-type-badge{
   position:absolute;bottom:10px;right:10px;
   background:rgba(255,255,255,.88);color:#1B3A6B;
   padding:3px 9px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.04em;
   backdrop-filter:blur(4px);
 }
+/* Badge rayonnement */
+.ann-ray-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;}
+.ann-ray-locale{background:#F0FDF4;color:#15803D;}
+.ann-ray-régionale{background:#EFF6FF;color:#1D4ED8;}
+.ann-ray-nationale{background:#FFF7ED;color:#C2410C;}
+.ann-ray-internationale{background:#F0F9FF;color:#0369A1;}
 .ann-membres{font-size:11.5px;color:var(--muted);white-space:nowrap;}
 
 /* CTA */
@@ -182,24 +191,38 @@
   <!-- ===== FILTRES ===== -->
   <div class="ann-filters">
     <div class="ann-filters-inner" style="flex-direction:column;gap:10px;">
-      <!-- Bloc Nationalités -->
+
+      <!-- Ligne 1 : Nationalités + Origines -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%;">
-        <span class="ann-filter-label">🌍 Nationalités</span>
-        <select id="f-pays" style="flex:1;min-width:160px;"><option value="">Nationalité 1</option></select>
-        <select id="f-nat2" style="flex:1;min-width:160px;"><option value="">Nationalité 2</option></select>
+        <span class="ann-filter-label">🏛 Nationalités</span>
+        <select id="f-pays"    style="flex:1;min-width:140px;"><option value="">Nationalité 1</option></select>
+        <select id="f-nat2"    style="flex:1;min-width:140px;"><option value="">Nationalité 2</option></select>
+        <span class="ann-filter-label" style="margin-left:8px;">🌍 Origines</span>
+        <select id="f-orig1"   style="flex:1;min-width:140px;"><option value="">Origine 1</option></select>
+        <select id="f-orig2"   style="flex:1;min-width:140px;"><option value="">Origine 2</option></select>
         <label class="ann-unique-chk"><input type="checkbox" id="f-unique"> Nationalité unique</label>
       </div>
-      <!-- Bloc Localisation -->
+
+      <!-- Ligne 2 : Localisation + Rayonnement + Domaine + Recherche -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%;">
         <span class="ann-filter-label">📍 Localisation</span>
-        <select id="f-pays-res" style="flex:1;min-width:130px;"><option value="">Pays</option></select>
-        <select id="f-region" style="flex:1;min-width:130px;"><option value="">Région</option></select>
-        <select id="f-ville" style="flex:1;min-width:130px;"><option value="">Ville</option></select>
-        <select id="f-domaine" style="flex:1;min-width:140px;"><option value="">Domaine</option></select>
-        <select id="f-type" style="flex:1;min-width:130px;"><option value="">Type</option></select>
-        <input type="text" id="f-q" placeholder="Nom de l'initiative..." style="flex:2;min-width:180px;">
+        <select id="f-pays-res" style="flex:1;min-width:110px;"><option value="">Pays</option></select>
+        <select id="f-region"   style="flex:1;min-width:110px;"><option value="">Région</option></select>
+        <select id="f-ville"    style="flex:1;min-width:110px;"><option value="">Ville</option></select>
+        <span class="ann-filter-label" style="margin-left:8px;">🌐 Portée</span>
+        <select id="f-ray" style="flex:1;min-width:120px;">
+          <option value="">Tout rayonnement</option>
+          <option value="locale">Locale</option>
+          <option value="régionale">Régionale</option>
+          <option value="nationale">Nationale</option>
+          <option value="internationale">Internationale</option>
+        </select>
+        <select id="f-domaine"  style="flex:1;min-width:120px;"><option value="">Domaine</option></select>
+        <select id="f-type"     style="flex:1;min-width:110px;"><option value="">Type</option></select>
+        <input type="text" id="f-q" placeholder="Nom ou mot-clé..." style="flex:2;min-width:160px;">
         <button class="ann-search-btn" id="btn-search">🔍 Rechercher</button>
       </div>
+
     </div>
   </div>
 

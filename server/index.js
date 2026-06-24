@@ -193,14 +193,23 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
 route("POST", "/api/initiatives", async (req, res, params, body) => {
   const user = getCurrentUser(req);
   if (!user || !["initiative", "collectivite", "administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Seul un compte Initiative, Collectivité ou Administrateur peut créer une initiative." });
-  const { nom, sigle, pays, region, ville, zone, domaine, type, description, nationalite1, nationalite2, nationalites_concernees, nationalite_unique } = body;
+  const { nom, sigle, pays, region, ville, zone, domaine, type, description,
+    nationalite1, nationalite2, nationalites_concernees, nationalite_unique,
+    origine1, origine2, rayonnement, pays_intervention } = body;
   if (!nom || !pays) return sendJSON(res, 400, { error: "Nom et pays requis." });
   const slug = nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now();
   const id = db.prepare(`
-    INSERT INTO initiatives (slug, nom, sigle, pays, region, ville, zone, nationalite1, nationalite2, nationalites_concernees, nationalite_unique, domaine, type, description, owner_user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(slug, nom, sigle || null, pays, region || null, ville || null, zone || null, nationalite1 || null, nationalite2 || null,
-    JSON.stringify(nationalites_concernees || []), nationalite_unique ? 1 : 0, domaine || null, type || null, description || null, user.id).lastInsertRowid;
+    INSERT INTO initiatives (slug, nom, sigle, pays, region, ville, zone,
+      nationalite1, nationalite2, nationalites_concernees, nationalite_unique,
+      origine1, origine2, rayonnement, pays_intervention,
+      domaine, type, description, owner_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(slug, nom, sigle || null, pays, region || null, ville || null, zone || null,
+    nationalite1 || null, nationalite2 || null,
+    JSON.stringify(nationalites_concernees || []), nationalite_unique ? 1 : 0,
+    origine1 || null, origine2 || null, rayonnement || 'locale',
+    JSON.stringify(Array.isArray(pays_intervention) ? pays_intervention : []),
+    domaine || null, type || null, description || null, user.id).lastInsertRowid;
   sendJSON(res, 201, { id, slug });
 });
 
