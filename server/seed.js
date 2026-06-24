@@ -178,6 +178,23 @@ function seed() {
   ];
   for (const f of formations) insertForm.run(...f);
 
+  /* ---- Certifications démo ---- */
+  // Tech For Senegal et A.I.T.O obtiennent le badge Initiative Vérifiée
+  const insertCertif = db.prepare(`
+    INSERT OR IGNORE INTO certifications (initiative_id, niveau, statut, admin_id, date_attribution)
+    VALUES (?, 'verifie', 'actif', ?, datetime('now', ?))
+  `);
+  const insertHisto = db.prepare(`
+    INSERT INTO certification_historique (initiative_id, action, admin_id, admin_nom, motif)
+    VALUES (?, 'attribution', ?, 'Diaspo''Actif Admin', ?)
+  `);
+  if (tfsId) {
+    insertCertif.run(tfsId, adminId, '-45 days');
+    insertHisto.run(tfsId, adminId, "Structure active, profil complet, projets IoT vérifiés sur le terrain.");
+  }
+  insertCertif.run(aitoId, adminId, '-12 days');
+  insertHisto.run(aitoId, adminId, "Association ivoirienne de référence à Toulouse, entretien réalisé le 12/06/2026.");
+
   /* ---- Conversation démo Jean ↔ A.I.T.O ---- */
   const convId = db.prepare(`INSERT INTO conversations (user1_id, user2_id) VALUES (?, ?)`).run(jeanId, initUserId).lastInsertRowid;
   const insertMsg = db.prepare(`INSERT INTO messages (conversation_id, sender_id, contenu, created_at) VALUES (?, ?, ?, datetime('now', ?))`);

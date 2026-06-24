@@ -49,7 +49,7 @@ function badgeCertif(certif, opts = {}) {
   if (!certif || certif.statut !== "actif") return "";
   const n = CERTIF_NIVEAUX[certif.niveau] || CERTIF_NIVEAUX.verifie;
   const size = opts.small ? "certif-badge-sm" : "";
-  return `<button class="certif-badge ${n.cls} ${size}" onclick="showCertifModal('${certif.niveau}')" title="${n.label} Diaspo'Actif">${n.icon} ${opts.labelOnly ? n.label : n.label} <span class="certif-da">Diaspo'Actif</span></button>`;
+  return `<button class="certif-badge ${n.cls} ${size}" onclick="event.stopPropagation();showCertifModal('${certif.niveau}')" title="${n.label} Diaspo'Actif">${n.icon} ${n.label} <span class="certif-da">Diaspo'Actif</span></button>`;
 }
 
 /* Modale d'information du badge */
