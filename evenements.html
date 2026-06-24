@@ -97,7 +97,7 @@
 <script src="assets/app.js"></script>
 <script>
 const DOMAINE_ICON = {Entrepreneuriat:'💼',Formation:'📚',Culture:'🎭',Sante:'🏥',Agriculture:'🌱',Technologie:'💻',Sport:'⚽',Autre:'📅'};
-function fmtDate(d){if(!d)return '';try{const dt=new Date(d);return dt.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});}catch(e){return d;}}
+function fmtDate(d){if(!d)return '';try{const dt=new Date(d);if(isNaN(dt.getTime()))return d;return dt.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});}catch(e){return d;}}
 
 let allEvts=[];
 async function loadEvts(){

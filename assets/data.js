@@ -213,10 +213,10 @@ const ACTUALITES = [
 ];
 
 const EVENEMENTS = [
-  { titre: "Forum des entrepreneurs ivoiriens de Toulouse", organisateur: "A.I.T.O", date: "15 NOV", lieu: "Toulouse, France", statut: "120 participants confirmés" },
-  { titre: "Gala de solidarité de fin d'année A.I.T.O", organisateur: "A.I.T.O", date: "02 DÉC", lieu: "Toulouse, France", statut: "Ouvert à tous les visiteurs" },
-  { titre: "Sommet Tech Diaspora Dakar", organisateur: "Tech For Senegal", date: "20 JAN", lieu: "Dakar, Sénégal", statut: "Inscriptions ouvertes" },
-  { titre: "Atelier financement pour coopératives", organisateur: "Diaspo'Actif (Officiel)", date: "05 FÉV", lieu: "En ligne", statut: "Webinaire gratuit" }
+  { titre: "Forum des entrepreneurs ivoiriens de Toulouse", organisateur: "A.I.T.O", date: "2026-11-15", lieu: "Toulouse, France", statut: "ouvert", domaine: "Entrepreneuriat", type: "forum", pays: "France" },
+  { titre: "Gala de solidarité de fin d'année A.I.T.O", organisateur: "A.I.T.O", date: "2026-12-02", lieu: "Toulouse, France", statut: "ouvert", domaine: "Culture", type: "evenement", pays: "France" },
+  { titre: "Sommet Tech Diaspora Dakar", organisateur: "Tech For Senegal", date: "2027-01-20", lieu: "Dakar, Sénégal", statut: "ouvert", domaine: "Technologie", type: "forum", pays: "Senegal" },
+  { titre: "Atelier financement pour coopératives", organisateur: "Diaspo'Actif (Officiel)", date: "2027-02-05", lieu: "En ligne", statut: "ouvert", domaine: "Entrepreneuriat", type: "webinaire", pays: "France" }
 ];
 
 const CONVERSATIONS = [

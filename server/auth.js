@@ -1,7 +1,23 @@
 /* ===========================================================
-   DIASPO'ACTIF — Authentification (hash de mots de passe + sessions en mémoire)
+   DIASPO'ACTIF — Authentification (hash de mots de passe + sessions SQLite)
+   Sessions persistées en DB pour survivre aux cold starts Vercel
    =========================================================== */
 const crypto = require("node:crypto");
+const db = require("./db");
+
+/* Créer la table sessions si elle n'existe pas */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`);
+
+/* Nettoyer les sessions > 30 jours au démarrage */
+const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+try { db.prepare("DELETE FROM sessions WHERE created_at < ?").run(Date.now() - THIRTY_DAYS); } catch(e) {}
 
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -14,21 +30,22 @@ function verifyPassword(password, salt, expectedHash) {
   return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(expectedHash, "hex"));
 }
 
-/* Sessions en mémoire : token -> { userId, createdAt } */
-const sessions = new Map();
-
 function createSession(userId) {
   const token = crypto.randomBytes(32).toString("hex");
-  sessions.set(token, { userId, createdAt: Date.now() });
+  db.prepare("INSERT OR REPLACE INTO sessions (token, user_id, created_at) VALUES (?,?,?)").run(token, userId, Date.now());
   return token;
 }
 
 function getSession(token) {
-  return sessions.get(token) || null;
+  if (!token) return null;
+  const row = db.prepare("SELECT user_id, created_at FROM sessions WHERE token=?").get(token);
+  if (!row) return null;
+  if (Date.now() - row.created_at > THIRTY_DAYS) { db.prepare("DELETE FROM sessions WHERE token=?").run(token); return null; }
+  return { userId: row.user_id, createdAt: row.created_at };
 }
 
 function destroySession(token) {
-  sessions.delete(token);
+  if (token) db.prepare("DELETE FROM sessions WHERE token=?").run(token);
 }
 
 function parseCookies(req) {

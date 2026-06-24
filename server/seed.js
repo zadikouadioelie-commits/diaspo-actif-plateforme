@@ -82,8 +82,8 @@ function seed() {
   const insertActu = db.prepare(`INSERT INTO actualites (titre, source, date_pub, resume) VALUES (?, ?, ?, ?)`);
   for (const a of legacy.ACTUALITES) insertActu.run(a.titre, a.source, a.date, a.resume);
 
-  const insertEvt = db.prepare(`INSERT INTO evenements (titre, organisateur, date_evt, lieu, statut) VALUES (?, ?, ?, ?, ?)`);
-  for (const e of legacy.EVENEMENTS) insertEvt.run(e.titre, e.organisateur, e.date, e.lieu, e.statut);
+  const insertEvt = db.prepare(`INSERT INTO evenements (titre, organisateur, date_evt, lieu, statut, domaine, type_evt, pays, inscription_ouverte) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`);
+  for (const e of legacy.EVENEMENTS) insertEvt.run(e.titre, e.organisateur, e.date, e.lieu, e.statut||'ouvert', e.domaine||null, e.type||'evenement', e.pays||null);
 
   /* ---- Fil d'actualité ---- */
   const insertFil = db.prepare(`INSERT INTO fil_posts (auteur_id, auteur_nom, type, categorie, contenu, created_at) VALUES (NULL, ?, ?, ?, ?, datetime('now', ?))`);
