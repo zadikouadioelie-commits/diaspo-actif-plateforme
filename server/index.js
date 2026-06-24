@@ -267,12 +267,13 @@ route("POST", "/api/fil", async (req, res, params, body) => {
 
   const id = db.prepare(`
     INSERT INTO fil_posts
-      (auteur_id, auteur_nom, type, categorie, contenu,
+      (auteur_id, auteur_nom, type, pub_type, categorie, contenu,
        media_url, media_type, article_titre, article_contenu, video_duree)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     user.id,
     user.nom,
+    pub_type,
     pub_type,
     body.categorie || "Publication",
     contenu || article_titre,
@@ -347,6 +348,83 @@ route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
     creerNotif(post.auteur_id, "reaction", "Réaction sur votre post", `${user.nom} a réagi à votre publication`, { post_id: Number(params.id) });
   }
   sendJSON(res, 200, { reactions: counts });
+});
+
+/* ---------- Commentaires ---------- */
+
+route("GET", "/api/fil/:id/commentaires", async (req, res, params) => {
+  const comms = db.prepare(`
+    SELECT c.id, c.contenu, c.created_at, c.auteur_id, c.auteur_nom,
+           u.photo_url, u.theme_couleur
+    FROM fil_commentaires c
+    LEFT JOIN users u ON u.id = c.auteur_id
+    WHERE c.post_id = ?
+    ORDER BY c.created_at ASC
+  `).all(params.id);
+  sendJSON(res, 200, { commentaires: comms });
+});
+
+route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const contenu = (body.contenu || "").trim();
+  if (!contenu) return sendJSON(res, 400, { error: "Le commentaire ne peut pas être vide." });
+
+  const id = db.prepare(
+    "INSERT INTO fil_commentaires (post_id, auteur_id, auteur_nom, contenu) VALUES (?,?,?,?)"
+  ).run(params.id, user.id, user.nom, contenu).lastInsertRowid;
+
+  const comm = db.prepare(`
+    SELECT c.id, c.contenu, c.created_at, c.auteur_id, c.auteur_nom,
+           u.photo_url, u.theme_couleur
+    FROM fil_commentaires c LEFT JOIN users u ON u.id = c.auteur_id
+    WHERE c.id = ?
+  `).get(id);
+
+  // Notifier l'auteur du post
+  const post = db.prepare("SELECT auteur_id, contenu FROM fil_posts WHERE id=?").get(params.id);
+  if (post && post.auteur_id && post.auteur_id !== user.id) {
+    creerNotif(post.auteur_id, "message", `${user.nom} a commenté votre publication`,
+      contenu.slice(0, 80) + (contenu.length > 80 ? "…" : ""),
+      { post_id: Number(params.id) });
+  }
+
+  sendJSON(res, 201, { commentaire: comm });
+});
+
+/* ---------- Republier ---------- */
+
+route("POST", "/api/fil/:id/republier", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  const original = db.prepare("SELECT * FROM fil_posts WHERE id=?").get(params.id);
+  if (!original) return sendJSON(res, 404, { error: "Publication introuvable." });
+
+  const commentaire = (body.commentaire || "").trim();
+
+  const newId = db.prepare(`
+    INSERT INTO fil_posts
+      (auteur_id, auteur_nom, type, pub_type, categorie, contenu, original_post_id, repost_commentaire)
+    VALUES (?,?,?,?,?,?,?,?)
+  `).run(
+    user.id, user.nom, "repost", "repost",
+    original.categorie || "Republication",
+    commentaire || "",
+    original.id,
+    commentaire || null
+  ).lastInsertRowid;
+
+  // Notifier l'auteur de l'original
+  if (original.auteur_id && original.auteur_id !== user.id) {
+    creerNotif(original.auteur_id, "mention",
+      `${user.nom} a republié votre publication`,
+      commentaire ? `« ${commentaire.slice(0,80)} »` : "Sans commentaire ajouté",
+      { post_id: Number(newId) });
+  }
+
+  const post = db.prepare("SELECT * FROM fil_posts WHERE id=?").get(newId);
+  sendJSON(res, 201, { id: newId, post });
 });
 
 /* ================================================================
@@ -1064,16 +1142,36 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   const offset = (page - 1) * limit;
   const total = db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get().n;
   const posts = db.prepare("SELECT * FROM fil_posts ORDER BY created_at DESC LIMIT ? OFFSET ?").all(limit, offset);
+  const cu = getCurrentUser(req);
   const withReactions = posts.map(p => {
     const reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
     const counts = {}; reactions.forEach(r => counts[r.type]=r.n);
-    // Enrichir avec les données profil de l'auteur
+    const nb_commentaires = db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id).n;
+    const user_a_aime = cu ? !!db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
+
     let auteur = {};
     if (p.auteur_id) {
       const u = db.prepare("SELECT photo_url, banner_url, ville, pays, nationalite1, titre_pro, bio, situation_pro, theme_couleur FROM users WHERE id=?").get(p.auteur_id);
       if (u) auteur = u;
     }
-    return { ...p, reactions: counts, auteur_profil: auteur };
+
+    // Pour les reposts : inclure le post original enrichi
+    let original_post = null;
+    if ((p.type === "repost" || p.pub_type === "repost") && p.original_post_id) {
+      const orig = db.prepare("SELECT * FROM fil_posts WHERE id=?").get(p.original_post_id);
+      if (orig) {
+        let orig_auteur = {};
+        if (orig.auteur_id) {
+          const ou = db.prepare("SELECT photo_url, banner_url, ville, pays, nationalite1, titre_pro, bio, situation_pro, theme_couleur FROM users WHERE id=?").get(orig.auteur_id);
+          if (ou) orig_auteur = ou;
+        }
+        const orig_reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(orig.id);
+        const orig_counts = {}; orig_reactions.forEach(r => orig_counts[r.type]=r.n);
+        original_post = { ...orig, reactions: orig_counts, auteur_profil: orig_auteur };
+      }
+    }
+
+    return { ...p, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, original_post };
   });
   sendJSON(res, 200, { posts: withReactions, total, page, pages: Math.ceil(total/limit) });
 });

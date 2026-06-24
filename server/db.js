@@ -189,6 +189,16 @@ db.exec(`
     FOREIGN KEY(post_id) REFERENCES fil_posts(id)
   );
 
+  CREATE TABLE IF NOT EXISTS fil_commentaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    auteur_id INTEGER,
+    auteur_nom TEXT NOT NULL,
+    contenu TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(post_id) REFERENCES fil_posts(id)
+  );
+
   CREATE TABLE IF NOT EXISTS financements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -324,6 +334,10 @@ const MIGRATIONS = [
   ["fil_posts", "article_contenu TEXT"],
   ["fil_posts", "video_duree INTEGER"],
   ["fil_posts", "mentions_json TEXT DEFAULT '[]'"],
+  // Reposts (style LinkedIn)
+  ["fil_posts", "pub_type TEXT"],
+  ["fil_posts", "original_post_id INTEGER"],
+  ["fil_posts", "repost_commentaire TEXT"],
 ];
 for (const [table, col] of MIGRATIONS) {
   const colName = col.split(" ")[0];

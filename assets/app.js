@@ -965,6 +965,163 @@ function _escTxt(s) {
 /* ================================================================
    FIL D'ACTUALITÉ — Compositeur riche + rendu enrichi
    ================================================================ */
+/* ==============================================================
+   INTERACTIONS SOCIALES — J'aime / Commenter / Partager / Republier
+   ============================================================== */
+
+window.toggleLike = async function(btn){
+  const postId = btn.dataset.id;
+  if(!postId){ alert("Connectez-vous pour réagir."); return; }
+  const wasLiked = btn.classList.contains("liked");
+  btn.classList.toggle("liked");
+  const countEl = btn.querySelector(".like-count");
+  const statEl  = document.getElementById("fp-likes-"+postId);
+  const cur = parseInt(countEl?.textContent)||0;
+  const next = wasLiked ? Math.max(0, cur-1) : cur+1;
+  if(countEl) countEl.textContent = next;
+  if(statEl)  statEl.textContent  = `❤️ ${next} J'aime`;
+  btn.firstChild.textContent = wasLiked ? "🤍" : "❤️";
+  btn.dataset.likes = next;
+  try { await api("POST", `/fil/${postId}/react`, { type:"like" }); } catch{}
+};
+
+window.toggleComments = async function(postId, triggerBtn){
+  const section = document.getElementById("cmt-section-"+postId);
+  if(!section) return;
+  if(section.style.display !== "none"){
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "block";
+  section.innerHTML = `<div style="padding:12px;color:#9CA3AF;font-size:13px;">Chargement…</div>`;
+  try {
+    const data = await api("GET", `/fil/${postId}/commentaires`);
+    renderCommentsSection(postId, data.commentaires || []);
+  } catch(e){
+    section.innerHTML = `<div style="padding:12px;color:#EF4444;">Erreur de chargement.</div>`;
+  }
+};
+
+function renderCommentsSection(postId, commentaires){
+  const section = document.getElementById("cmt-section-"+postId);
+  if(!section) return;
+  const cmtsHtml = commentaires.map(c => {
+    const av = c.photo_url
+      ? `<img src="${escH(c.photo_url)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">`
+      : photoAvatar(c.auteur_nom||"?", 32);
+    return `<div class="cmt-item">
+      <div class="cmt-av">${av}</div>
+      <div class="cmt-bubble">
+        <strong class="cmt-nom">${escH(c.auteur_nom||"Anonyme")}</strong>
+        <span class="cmt-date">${fmtDateGlobal(c.created_at)}</span>
+        <div class="cmt-text">${escH(c.contenu)}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  section.innerHTML = `
+    <div class="cmt-list">${cmtsHtml || '<div class="cmt-empty">Soyez le premier à commenter…</div>'}</div>
+    <div class="cmt-form">
+      <textarea class="cmt-input" id="cmt-inp-${postId}" placeholder="Écrire un commentaire…" rows="2"></textarea>
+      <button class="cmt-send" onclick="submitComment(${postId})">Publier</button>
+    </div>`;
+
+  // Autofocus
+  const inp = document.getElementById("cmt-inp-"+postId);
+  if(inp) setTimeout(()=>inp.focus(), 50);
+}
+
+window.submitComment = async function(postId){
+  const inp = document.getElementById("cmt-inp-"+postId);
+  if(!inp) return;
+  const text = inp.value.trim();
+  if(!text) return;
+  inp.disabled = true;
+  try {
+    const data = await api("POST", `/fil/${postId}/commentaires`, { contenu: text });
+    inp.value = "";
+    // Met à jour le compteur
+    const countEl = document.getElementById("cmt-count-"+postId);
+    if(countEl) countEl.textContent = parseInt(countEl.textContent||"0")+1;
+    // Recharge la section
+    const fresh = await api("GET", `/fil/${postId}/commentaires`);
+    renderCommentsSection(postId, fresh.commentaires||[]);
+  } catch(e){
+    alert("Erreur lors de la publication du commentaire.");
+  } finally {
+    if(inp) inp.disabled = false;
+  }
+};
+
+window.openShareModal = function(postId){
+  const existing = document.getElementById("share-modal");
+  if(existing) existing.remove();
+  const url = `${location.origin}/fil-actualite.html#fp-${postId}`;
+  const modal = document.createElement("div");
+  modal.id = "share-modal";
+  modal.className = "social-modal-overlay";
+  modal.innerHTML = `
+    <div class="social-modal">
+      <button class="social-modal-close" onclick="document.getElementById('share-modal').remove()">✕</button>
+      <h3>Partager cette publication</h3>
+      <div class="share-url-box">
+        <input type="text" id="share-url-inp" value="${escH(url)}" readonly>
+        <button onclick="navigator.clipboard.writeText('${escH(url)}').then(()=>{document.getElementById('share-copied').style.display='inline'})">Copier</button>
+      </div>
+      <span id="share-copied" style="display:none;color:#10B981;font-size:13px;">✓ Lien copié !</span>
+      <div class="share-btns">
+        <a class="share-btn share-wa" href="https://wa.me/?text=${encodeURIComponent('Découvrez cette publication Diaspo\'Actif : '+url)}" target="_blank" rel="noopener">
+          WhatsApp
+        </a>
+        <a class="share-btn share-li" href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}" target="_blank" rel="noopener">
+          LinkedIn
+        </a>
+        <a class="share-btn share-tw" href="https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent('Publication sur Diaspo\'Actif')}" target="_blank" rel="noopener">
+          Twitter / X
+        </a>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", e => { if(e.target===modal) modal.remove(); });
+};
+
+window.openRepostModal = function(postId){
+  const existing = document.getElementById("repost-modal");
+  if(existing) existing.remove();
+  const modal = document.createElement("div");
+  modal.id = "repost-modal";
+  modal.className = "social-modal-overlay";
+  modal.innerHTML = `
+    <div class="social-modal">
+      <button class="social-modal-close" onclick="document.getElementById('repost-modal').remove()">✕</button>
+      <h3>🔁 Republier</h3>
+      <p style="font-size:13px;color:#6B7280;margin:0 0 12px;">La publication réapparaîtra dans votre fil avec votre commentaire.</p>
+      <textarea id="repost-comment-inp" class="cmt-input" placeholder="Ajouter un commentaire (optionnel)…" rows="3" style="width:100%;"></textarea>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <button class="cmt-send" style="flex:1;" onclick="submitRepost(${postId})">Republier</button>
+        <button class="fp-btn" style="flex:0 0 auto;padding:8px 16px;" onclick="document.getElementById('repost-modal').remove()">Annuler</button>
+      </div>
+      <div id="repost-feedback" style="margin-top:8px;font-size:13px;"></div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", e => { if(e.target===modal) modal.remove(); });
+  setTimeout(()=>{ const t=document.getElementById("repost-comment-inp"); if(t) t.focus(); }, 50);
+};
+
+window.submitRepost = async function(postId){
+  const inp = document.getElementById("repost-comment-inp");
+  const fb  = document.getElementById("repost-feedback");
+  const commentaire = inp ? inp.value.trim() : "";
+  if(fb) fb.innerHTML = `<span style="color:#6B7280;">Publication en cours…</span>`;
+  try {
+    await api("POST", `/fil/${postId}/republier`, { commentaire });
+    if(fb) fb.innerHTML = `<span style="color:#10B981;">✓ Republié ! La publication apparaît maintenant dans votre fil.</span>`;
+    setTimeout(()=>{ document.getElementById("repost-modal")?.remove(); }, 1500);
+  } catch(e){
+    if(fb) fb.innerHTML = `<span style="color:#EF4444;">Erreur lors de la republication.</span>`;
+  }
+};
+
 async function initFilActualite(){
   const el = document.getElementById("feed-list");
   if(!el) return;
@@ -1122,6 +1279,42 @@ async function initFilActualite(){
 .fp-btn:hover { background:#F9FAFB; color:#4338CA; }
 .fp-btn.liked { color:#EF4444; }
 .fp-btn.saved  { color:#F59E0B; }
+/* Commentaires */
+.fp-comments-section { border-top:1px solid #F3F4F6; }
+.cmt-list { padding:12px 16px 4px; display:flex; flex-direction:column; gap:10px; }
+.cmt-empty { font-size:13px; color:#9CA3AF; font-style:italic; }
+.cmt-item { display:flex; gap:10px; align-items:flex-start; }
+.cmt-av { flex-shrink:0; }
+.cmt-bubble { background:#F9FAFB; border-radius:12px; padding:8px 12px; flex:1; }
+.cmt-nom { font-size:13px; color:#111827; }
+.cmt-date { font-size:11px; color:#9CA3AF; margin-left:8px; }
+.cmt-text { font-size:13px; color:#374151; margin-top:3px; white-space:pre-wrap; }
+.cmt-form { display:flex; gap:8px; align-items:flex-end; padding:8px 16px 12px; }
+.cmt-input { flex:1; border:1px solid #E5E7EB; border-radius:10px; padding:8px 12px; font-size:13px; resize:none; font-family:inherit; }
+.cmt-input:focus { outline:none; border-color:#4338CA; }
+.cmt-send { background:#4338CA; color:#fff; border:none; border-radius:10px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.cmt-send:hover { background:#3730A3; }
+/* Modals Partager / Republier */
+.social-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9000; display:flex; align-items:center; justify-content:center; padding:16px; }
+.social-modal { background:#fff; border-radius:16px; padding:24px; width:100%; max-width:420px; position:relative; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+.social-modal h3 { margin:0 0 12px; font-size:17px; color:#111827; }
+.social-modal-close { position:absolute; top:14px; right:14px; background:none; border:none; font-size:18px; cursor:pointer; color:#6B7280; line-height:1; }
+.share-url-box { display:flex; gap:8px; margin-bottom:6px; }
+.share-url-box input { flex:1; border:1px solid #E5E7EB; border-radius:8px; padding:7px 10px; font-size:12px; color:#374151; }
+.share-url-box button { background:#4338CA; color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+.share-btns { display:flex; gap:10px; margin-top:14px; }
+.share-btn { flex:1; text-align:center; padding:10px 6px; border-radius:10px; font-size:13px; font-weight:600; text-decoration:none; }
+.share-wa { background:#25D366; color:#fff; }
+.share-li { background:#0077B5; color:#fff; }
+.share-tw { background:#1DA1F2; color:#fff; }
+/* Repost */
+.fp-repost { border-left:3px solid #4338CA; }
+.fp-repost-header { padding:10px 16px 4px; font-size:13px; color:#6B7280; display:flex; align-items:center; gap:8px; }
+.fp-repost-comment { padding:6px 16px 10px; font-size:14px; color:#111827; white-space:pre-wrap; }
+.fp-repost-card { margin:0 12px 12px; border:1px solid #E5E7EB; border-radius:12px; overflow:hidden; }
+.fp-stats-orig { border-top:none; padding:4px 12px 8px; font-size:12px; }
+.fp-stat-cmts { cursor:pointer; }
+.fp-stat-cmts:hover { color:#4338CA; }
 /* Bannière auteur + localisation */
 .fp-author-banner {
   height:72px; width:100%; position:relative; flex-shrink:0;
@@ -1392,64 +1585,120 @@ async function initFilActualite(){
     return Object.values(THEME_BANNERS)[idx];
   }
 
-  function renderPost(p){
-    const likes   = (p.reactions&&p.reactions.like)||0;
-    const typeIcon = TYPE_ICONS[p.pub_type||p.type] || "📝";
-    const prof    = p.auteur_profil || {};
-    const nom     = p.auteur_nom || "Anonyme";
-    const banner  = prof.banner_url
-      ? `url('${prof.banner_url}') center/cover no-repeat`
+  function buildAuthorHeader(p, opts = {}){
+    const { compact = false } = opts;
+    const prof   = p.auteur_profil || {};
+    const nom    = p.auteur_nom || "Anonyme";
+    const banner = prof.banner_url
+      ? `url('${escH(prof.banner_url)}') center/cover no-repeat`
       : themeGradient(prof.theme_couleur, nom);
-    const avHtml  = prof.photo_url
-      ? `<img src="${escH(prof.photo_url)}" alt="${escH(nom)}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:3px solid #fff;">`
-      : photoAvatar(nom, 52);
-    const locParts = [prof.ville, prof.pays].filter(Boolean);
-    const locHtml  = locParts.length
-      ? `<span class="fp-loc">📍 ${escH(locParts.join(", "))}</span>`
-      : "";
-    const origHtml = prof.nationalite1
-      ? `<span class="fp-orig">🌍 Origine : ${escH(prof.nationalite1)}</span>`
-      : "";
-    const titreHtml = (prof.titre_pro || prof.situation_pro)
-      ? `<div class="fp-titre-pro">${escH(prof.titre_pro || prof.situation_pro)}</div>`
-      : "";
-    const bioHtml = prof.bio
-      ? `<div class="fp-bio-snippet">${escH(prof.bio.slice(0,100))}${prof.bio.length>100?"…":""}</div>`
-      : "";
+    const sz     = compact ? 38 : 52;
+    const avHtml = prof.photo_url
+      ? `<img src="${escH(prof.photo_url)}" alt="${escH(nom)}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;border:3px solid #fff;">`
+      : photoAvatar(nom, sz);
+    const locParts  = [prof.ville, prof.pays].filter(Boolean);
+    const locHtml   = locParts.length ? `<span class="fp-loc">📍 ${escH(locParts.join(", "))}</span>` : "";
+    const origHtml  = prof.nationalite1 ? `<span class="fp-orig">🌍 ${escH(prof.nationalite1)}</span>` : "";
+    const titreHtml = !compact && (prof.titre_pro || prof.situation_pro)
+      ? `<div class="fp-titre-pro">${escH(prof.titre_pro || prof.situation_pro)}</div>` : "";
+    const bioHtml   = !compact && prof.bio
+      ? `<div class="fp-bio-snippet">${escH(prof.bio.slice(0,100))}${prof.bio.length>100?"…":""}</div>` : "";
+    const typeIcon  = TYPE_ICONS[p.pub_type||p.type] || "📝";
+    const typeLabel = escH(p.pub_type||p.type||"Publication");
 
+    return { banner, avHtml, locHtml, origHtml, titreHtml, bioHtml, nom, typeIcon, typeLabel };
+  }
+
+  function buildPostBody(p){
     let mediaHtml = "";
     if(p.media_type==="image" && p.media_url)
       mediaHtml = `<img class="fp-img" src="${escH(p.media_url)}" alt="Photo" loading="lazy">`;
     else if(p.media_type==="video" && p.media_url)
-      mediaHtml = `<video class="fp-video" src="${escH(p.media_url)}" controls preload="metadata" style="margin-bottom:2px;"></video>`;
+      mediaHtml = `<video class="fp-video" src="${escH(p.media_url)}" controls preload="metadata"></video>`;
 
     let bodyHtml = "";
-    if(p.pub_type==="article" && p.article_titre){
-      const body    = p.article_contenu || p.contenu || "";
-      const preview = body.length > 300 ? body.slice(0,300)+"…" : body;
-      bodyHtml = `
-        <h3 class="fp-article-titre">${escH(p.article_titre)}</h3>
+    if((p.pub_type==="article"||p.type==="article") && p.article_titre){
+      const txt     = p.article_contenu || p.contenu || "";
+      const preview = txt.length > 300 ? txt.slice(0,300)+"…" : txt;
+      bodyHtml = `<h3 class="fp-article-titre">${escH(p.article_titre)}</h3>
         <div class="fp-article-body" id="art-body-${p.id}">${renderMentions(preview)}</div>
-        ${body.length>300?`<span class="fp-article-more" onclick="expandArticleMention(${p.id},this,${JSON.stringify(body)})">Lire la suite →</span>`:""}`;
+        ${txt.length>300?`<span class="fp-article-more" onclick="expandArticleMention(${p.id},this,${JSON.stringify(txt)})">Lire la suite →</span>`:""}`;
     } else {
       const text    = p.contenu || "";
       const preview = text.length > 400 ? text.slice(0,400)+"…" : text;
       bodyHtml = `<div class="fp-text">${renderMentions(preview)}${text.length>400?`<span class="fp-article-more" onclick="expandTextMention(${p.id},this,${JSON.stringify(text)})"> Lire la suite →</span>`:""}</div>`;
     }
+    return { mediaHtml, bodyHtml };
+  }
+
+  function renderPost(p){
+    const isRepost = (p.pub_type === "repost" || p.type === "repost");
+
+    // --- Repost : affichage dédié ---
+    if(isRepost && p.original_post){
+      const nom    = p.auteur_nom || "Anonyme";
+      const av     = (p.auteur_profil||{}).photo_url
+        ? `<img src="${escH(p.auteur_profil.photo_url)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;">`
+        : photoAvatar(nom, 28);
+      const { banner, avHtml, locHtml, origHtml, titreHtml, typeIcon, typeLabel, bioHtml } = buildAuthorHeader(p.original_post);
+      const orig = p.original_post;
+      const { mediaHtml, bodyHtml } = buildPostBody(orig);
+      const origNom    = orig.auteur_nom || "Anonyme";
+      const origLikes  = (orig.reactions&&orig.reactions.like)||0;
+
+      return `<div class="feed-post fp-repost" id="fp-${p.id}">
+        <div class="fp-repost-header">
+          ${av} <strong>${escH(nom)}</strong> a republié · <span class="fp-date">${fmtDate(p.created_at)}</span>
+        </div>
+        ${p.repost_commentaire ? `<div class="fp-repost-comment">${escH(p.repost_commentaire)}</div>` : ""}
+        <div class="fp-repost-card">
+          <div class="fp-author-banner" style="background:${banner};">
+            <span class="fp-type-badge">${typeIcon} ${typeLabel}</span>
+          </div>
+          <div class="fp-head">
+            <a href="profil.html?id=${orig.auteur_id||''}" class="fp-av-link">${avHtml}</a>
+            <div class="fp-meta">
+              <div class="fp-nom"><a href="profil.html?id=${orig.auteur_id||''}" class="fp-nom-link">${escH(origNom)}</a></div>
+              ${titreHtml}
+              <div class="fp-sub-row">${locHtml}${origHtml}<span class="fp-date">🕐 ${fmtDate(orig.created_at)}</span></div>
+            </div>
+            <span class="fp-cat">${escH(orig.categorie||"")}</span>
+          </div>
+          ${bioHtml ? `<div class="fp-author-bio">${bioHtml}</div>` : ""}
+          ${mediaHtml ? `<div>${mediaHtml}</div>` : ""}
+          <div class="fp-body">${bodyHtml}</div>
+          <div class="fp-stats fp-stats-orig">
+            <span>❤️ ${origLikes} J'aime</span>
+          </div>
+        </div>
+        <div class="fp-actions">
+          <button class="fp-btn feed-react${p.user_a_aime?" liked":""}" data-id="${p.id}" data-likes="${(p.reactions&&p.reactions.like)||0}" onclick="toggleLike(this)">
+            ${p.user_a_aime?"❤️":"🤍"} <span class="like-count">${(p.reactions&&p.reactions.like)||0}</span>
+          </button>
+          <button class="fp-btn" onclick="toggleComments(${p.id},this)">💬 <span id="cmt-count-${p.id}">${p.nb_commentaires||0}</span></button>
+          <button class="fp-btn" onclick="openShareModal(${p.id})">↗️ Partager</button>
+          <button class="fp-btn" onclick="openRepostModal(${p.id})">🔁 Republier</button>
+        </div>
+        <div class="fp-comments-section" id="cmt-section-${p.id}" style="display:none;"></div>
+      </div>`;
+    }
+
+    // --- Post normal ---
+    const likes  = (p.reactions&&p.reactions.like)||0;
+    const nbCmts = p.nb_commentaires || 0;
+    const { banner, avHtml, locHtml, origHtml, titreHtml, bioHtml, nom, typeIcon, typeLabel } = buildAuthorHeader(p);
+    const { mediaHtml, bodyHtml } = buildPostBody(p);
 
     return `<div class="feed-post" id="fp-${p.id}">
       <div class="fp-author-banner" style="background:${banner};">
-        <span class="fp-type-badge">${typeIcon} ${escH(p.pub_type||p.type||"Publication")}</span>
+        <span class="fp-type-badge">${typeIcon} ${typeLabel}</span>
       </div>
       <div class="fp-head">
         <a href="profil.html?id=${p.auteur_id||''}" class="fp-av-link">${avHtml}</a>
         <div class="fp-meta">
           <div class="fp-nom"><a href="profil.html?id=${p.auteur_id||''}" class="fp-nom-link">${escH(nom)}</a></div>
           ${titreHtml}
-          <div class="fp-sub-row">
-            ${locHtml}${origHtml}
-            <span class="fp-date">🕐 ${fmtDate(p.created_at)}</span>
-          </div>
+          <div class="fp-sub-row">${locHtml}${origHtml}<span class="fp-date">🕐 ${fmtDate(p.created_at)}</span></div>
         </div>
         <span class="fp-cat">${escH(p.categorie||"")}</span>
       </div>
@@ -1457,15 +1706,18 @@ async function initFilActualite(){
       ${mediaHtml ? `<div>${mediaHtml}</div>` : ""}
       <div class="fp-body">${bodyHtml}</div>
       <div class="fp-stats">
-        <span id="fp-likes-${p.id}">❤️ ${likes}</span>
-        <span>💬 ${Math.floor(Math.random()*8)} commentaires</span>
+        <span id="fp-likes-${p.id}">❤️ ${likes} J'aime</span>
+        <span class="fp-stat-cmts" onclick="toggleComments(${p.id},null)" style="cursor:pointer;">💬 <span id="cmt-count-${p.id}">${nbCmts}</span> commentaire${nbCmts!==1?"s":""}</span>
       </div>
       <div class="fp-actions">
-        <button class="fp-btn feed-react" data-id="${p.id}" data-likes="${likes}">❤️ J'aime</button>
-        <button class="fp-btn">💬 Commenter</button>
-        <button class="fp-btn" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.href)">↗️ Partager</button>
-        <button class="fp-btn" onclick="this.classList.toggle('saved');this.textContent=this.classList.contains('saved')?'🔖 Enregistré':'🔖 Enregistrer'">🔖 Enregistrer</button>
+        <button class="fp-btn feed-react${p.user_a_aime?" liked":""}" data-id="${p.id}" data-likes="${likes}" onclick="toggleLike(this)">
+          ${p.user_a_aime?"❤️":"🤍"} <span class="like-count">${likes}</span>
+        </button>
+        <button class="fp-btn" onclick="toggleComments(${p.id},this)">💬 Commenter</button>
+        <button class="fp-btn" onclick="openShareModal(${p.id})">↗️ Partager</button>
+        <button class="fp-btn" onclick="openRepostModal(${p.id})">🔁 Republier</button>
       </div>
+      <div class="fp-comments-section" id="cmt-section-${p.id}" style="display:none;"></div>
     </div>`;
   }
 
@@ -1564,17 +1816,7 @@ async function initFilActualite(){
       el.innerHTML = html;
     }
 
-    el.querySelectorAll(".feed-react").forEach(btn=>{
-      btn.addEventListener("click", async ()=>{
-        if(!me){ alert("Connectez-vous pour réagir."); return; }
-        btn.classList.toggle("liked");
-        const base = parseInt(btn.dataset.likes)||0;
-        const inc  = btn.classList.contains("liked") ? 1 : 0;
-        const stat = document.getElementById("fp-likes-"+btn.dataset.id);
-        if(stat) stat.textContent = `❤️ ${base + inc}`;
-        try { await api("POST",`/fil/${btn.dataset.id}/react`,{type:"like"}); } catch{}
-      });
-    });
+    // Les boutons J'aime utilisent toggleLike() global (onclick inline)
 
     // Remplir le slot widget profils (async)
     const slot = document.getElementById("profiles-widget-slot");
