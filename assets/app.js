@@ -180,24 +180,30 @@ const DOMAIN_BADGE = {
 };
 
 function renderInitiativeCard(it){
-  const badge = DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()};
-  const seed  = encodeURIComponent(it.slug || it.nom || 'init');
-  const photo = `https://picsum.photos/seed/${seed}/400/240`;
-  const loc   = [it.ville, it.pays].filter(Boolean).join(', ') || it.region || '—';
-  const desc  = it.description || it.mission || (it.domaine ? `Initiative ${it.domaine.toLowerCase()}` : '');
+  const badge   = DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()};
+  const seed    = encodeURIComponent(it.slug || it.nom || 'init');
+  const photo   = `https://picsum.photos/seed/${seed}/400/240`;
+  /* Localisation opérationnelle : ville + région (sans nationalité) */
+  const loc     = [it.ville, it.region || it.pays].filter(Boolean).join(', ') || '—';
+  /* Nationalité(s) de la diaspora concernée — info clé de la plateforme */
+  const nats    = [it.nationalite1, it.nationalite2].filter(Boolean).join(' / ') || '—';
+  const desc    = it.description || it.mission || '';
+  const membres = it.membres ? `<span class="ann-membres">👥 ${it.membres}</span>` : '';
 
   return `
   <a class="ann-card" href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}">
     <div class="ann-card-photo">
       <img src="${photo}" alt="${it.nom}" loading="lazy" onerror="this.src='https://picsum.photos/seed/${it.id||0}/400/240'">
       <span class="ann-cat-badge" style="background:${badge.bg};">${badge.label}</span>
+      ${it.type ? `<span class="ann-type-badge">${it.type}</span>` : ''}
     </div>
     <div class="ann-card-body">
       <div class="ann-card-title">${it.nom}</div>
-      <div class="ann-card-desc">${desc}</div>
+      <div class="ann-card-nat">🌍 ${nats}</div>
+      ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
       <div class="ann-card-foot">
         <span class="ann-location">📍 ${loc}</span>
-        <span class="ann-arrow">→</span>
+        <div style="display:flex;align-items:center;gap:8px">${membres}<span class="ann-arrow">→</span></div>
       </div>
     </div>
   </a>`;
