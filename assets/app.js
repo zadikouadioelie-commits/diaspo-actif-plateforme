@@ -696,9 +696,9 @@ class MentionPicker {
     const rect = this.ta.getBoundingClientRect();
     const div  = document.createElement("div");
     div.className = "mention-dropdown";
-    // Position sous le textarea, aligné à gauche
-    const top = rect.bottom + window.scrollY + 4;
-    const left = rect.left  + window.scrollX;
+    // Position sous le textarea (fixed = relatif au viewport, pas au document)
+    const top  = rect.bottom + 4;
+    const left = rect.left;
     div.style.top  = top  + "px";
     div.style.left = left + "px";
     // Corrige si dépasse à droite
@@ -758,7 +758,7 @@ class MentionPicker {
 
   _close() {
     if (this.dropdown) { this.dropdown.remove(); this.dropdown = null; }
-    this.results = [];
+    // Ne pas vider this.results ici — _show() lit results juste après _close()
   }
 
   destroy() { this._close(); }
