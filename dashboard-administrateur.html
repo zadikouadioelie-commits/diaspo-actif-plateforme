@@ -855,12 +855,13 @@
             <button onclick="closePubModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:20px;cursor:pointer;border-radius:8px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">×</button>
           </div>
           <!-- Onglets -->
-          <div id="pub-tabs" style="display:flex;background:var(--surface);border-bottom:2px solid var(--border);">
-            <button class="pub-tab active" data-tab="1" onclick="pubSwitchTab(1)" style="flex:1;padding:12px 6px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);transition:.15s;margin-bottom:-2px;">1 · Général</button>
-            <button class="pub-tab" data-tab="2" onclick="pubSwitchTab(2)" style="flex:1;padding:12px 6px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);transition:.15s;margin-bottom:-2px;">2 · Contenu</button>
-            <button class="pub-tab" data-tab="3" onclick="pubSwitchTab(3)" style="flex:1;padding:12px 6px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);transition:.15s;margin-bottom:-2px;">3 · Liens & Contacts</button>
-            <button class="pub-tab" data-tab="4" onclick="pubSwitchTab(4)" style="flex:1;padding:12px 6px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);transition:.15s;margin-bottom:-2px;">4 · Ciblage</button>
-            <button class="pub-tab" data-tab="5" onclick="pubSwitchTab(5)" style="flex:1;padding:12px 6px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);transition:.15s;margin-bottom:-2px;">5 · Affichage</button>
+          <div id="pub-tabs" style="display:flex;background:var(--surface);border-bottom:2px solid var(--border);overflow-x:auto;">
+            <button class="pub-tab active" data-tab="1" onclick="pubSwitchTab(1)" style="flex:1;min-width:80px;padding:12px 6px;font-size:11px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);white-space:nowrap;margin-bottom:-2px;">1 · Général</button>
+            <button class="pub-tab" data-tab="2" onclick="pubSwitchTab(2)" style="flex:1;min-width:80px;padding:12px 6px;font-size:11px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);white-space:nowrap;margin-bottom:-2px;">2 · Contenu</button>
+            <button class="pub-tab" data-tab="3" onclick="pubSwitchTab(3)" style="flex:1;min-width:80px;padding:12px 6px;font-size:11px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);white-space:nowrap;margin-bottom:-2px;">3 · Liens & Contacts</button>
+            <button class="pub-tab" data-tab="4" onclick="pubSwitchTab(4)" style="flex:1;min-width:80px;padding:12px 6px;font-size:11px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);white-space:nowrap;margin-bottom:-2px;">4 · Ciblage</button>
+            <button class="pub-tab" data-tab="5" onclick="pubSwitchTab(5)" style="flex:1;min-width:80px;padding:12px 6px;font-size:11px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);white-space:nowrap;margin-bottom:-2px;">5 · Affichage</button>
+            <button class="pub-tab" data-tab="6" onclick="pubSwitchTab(6)" style="flex:1;min-width:80px;padding:12px 6px;font-size:11px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);white-space:nowrap;margin-bottom:-2px;">👁️ Aperçu</button>
           </div>
           <input type="hidden" id="pub-id" value="">
           <!-- Corps -->
@@ -943,56 +944,108 @@
 
             <!-- ── ONGLET 2 : Contenu ── -->
             <div id="pub-tab-2" class="pub-tab-content" style="display:none;">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-                <div style="grid-column:1/-1;">
-                  <label class="form-label">Titre de la publicité *</label>
-                  <input id="pub-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Titre accrocheur">
+              <div style="display:grid;gap:14px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                  <div style="grid-column:1/-1;">
+                    <label class="form-label">Titre de la publicité *</label>
+                    <input id="pub-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Titre accrocheur" oninput="pubDebouncedPreview()">
+                  </div>
+                  <div style="grid-column:1/-1;">
+                    <label class="form-label">Sous-titre</label>
+                    <input id="pub-sous-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Sous-titre optionnel" oninput="pubDebouncedPreview()">
+                  </div>
+                  <div style="grid-column:1/-1;">
+                    <label class="form-label">Description courte <span style="font-weight:400;color:var(--muted);">(visible sur la pub)</span></label>
+                    <textarea id="pub-desc-courte" class="input-field" style="width:100%;min-height:56px;margin-top:4px;resize:vertical;" placeholder="1-2 phrases d'accroche" oninput="pubDebouncedPreview()"></textarea>
+                  </div>
+                  <div style="grid-column:1/-1;">
+                    <label class="form-label">Description détaillée <span style="font-weight:400;color:var(--muted);">(page de détail)</span></label>
+                    <textarea id="pub-desc-detaillee" class="input-field" style="width:100%;min-height:72px;margin-top:4px;resize:vertical;" placeholder="Description complète de l'offre…"></textarea>
+                  </div>
+                  <div>
+                    <label class="form-label">Bouton d'action</label>
+                    <select id="pub-bouton" class="input-field" style="width:100%;margin-top:4px;" onchange="pubDebouncedPreview()">
+                      <option value="En savoir plus">En savoir plus</option>
+                      <option value="S'inscrire">S'inscrire</option>
+                      <option value="Réserver">Réserver</option>
+                      <option value="Investir">Investir</option>
+                      <option value="Acheter">Acheter</option>
+                      <option value="Nous contacter">Nous contacter</option>
+                      <option value="Participer">Participer</option>
+                      <option value="Télécharger">Télécharger</option>
+                      <option value="Voir l'offre">Voir l'offre</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label">Texte bouton personnalisé</label>
+                    <input id="pub-bouton-custom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Remplace la liste si renseigné" oninput="pubDebouncedPreview()">
+                  </div>
                 </div>
-                <div style="grid-column:1/-1;">
-                  <label class="form-label">Sous-titre</label>
-                  <input id="pub-sous-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Sous-titre optionnel">
-                </div>
-                <div style="grid-column:1/-1;">
-                  <label class="form-label">Description courte</label>
-                  <textarea id="pub-desc-courte" class="input-field" style="width:100%;min-height:60px;margin-top:4px;resize:vertical;" placeholder="Texte d'accroche visible sur la publicité (1-2 phrases)"></textarea>
-                </div>
-                <div style="grid-column:1/-1;">
-                  <label class="form-label">Description détaillée</label>
-                  <textarea id="pub-desc-detaillee" class="input-field" style="width:100%;min-height:80px;margin-top:4px;resize:vertical;" placeholder="Description complète (page de détail)"></textarea>
-                </div>
-                <div style="grid-column:1/-1;">
-                  <label class="form-label">Logo de l'annonceur (URL)</label>
-                  <input id="pub-logo" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://…/logo.png">
-                </div>
-                <div style="grid-column:1/-1;">
-                  <label class="form-label">Image principale (URL)</label>
-                  <input id="pub-image" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://…/image.jpg">
-                </div>
-                <div style="grid-column:1/-1;">
-                  <label class="form-label">Galerie d'images (URLs séparées par virgule)</label>
-                  <input id="pub-galerie" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://img1.jpg, https://img2.jpg">
-                </div>
-                <div style="grid-column:1/-1;">
-                  <label class="form-label">Vidéo (URL)</label>
-                  <input id="pub-video" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://youtube.com/… ou lien direct .mp4">
-                </div>
-                <div>
-                  <label class="form-label">Bouton d'action</label>
-                  <select id="pub-bouton" class="input-field" style="width:100%;margin-top:4px;">
-                    <option value="En savoir plus">En savoir plus</option>
-                    <option value="S'inscrire">S'inscrire</option>
-                    <option value="Réserver">Réserver</option>
-                    <option value="Investir">Investir</option>
-                    <option value="Acheter">Acheter</option>
-                    <option value="Nous contacter">Nous contacter</option>
-                    <option value="Participer">Participer</option>
-                    <option value="Télécharger">Télécharger</option>
-                    <option value="Voir l'offre">Voir l'offre</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label">Texte bouton personnalisé</label>
-                  <input id="pub-bouton-custom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Laisser vide pour utiliser le choix">
+
+                <!-- Médias -->
+                <div style="padding:14px;background:var(--surface);border-radius:10px;">
+                  <h4 style="margin:0 0 14px;font-size:13px;font-weight:700;">🖼️ Identité visuelle</h4>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+                    <!-- Logo annonceur -->
+                    <div>
+                      <label class="form-label">Logo de l'annonceur</label>
+                      <div style="display:flex;gap:6px;margin-top:4px;align-items:center;">
+                        <input id="pub-logo" class="input-field" style="flex:1;min-width:0;" placeholder="https://… ou charger" oninput="pubPreviewImg('pub-logo','pub-logo-thumb');pubDebouncedPreview()">
+                        <label style="cursor:pointer;flex-shrink:0;">
+                          <input type="file" accept="image/*" style="display:none;" onchange="pubLoadFile(event,'pub-logo','pub-logo-thumb')">
+                          <span class="btn" style="padding:5px 10px;font-size:12px;display:block;">📁</span>
+                        </label>
+                      </div>
+                      <div id="pub-logo-thumb" style="margin-top:6px;display:none;">
+                        <img style="height:52px;width:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#f5f5f5;">
+                      </div>
+                    </div>
+
+                    <!-- Image principale -->
+                    <div>
+                      <label class="form-label">Image principale</label>
+                      <div style="display:flex;gap:6px;margin-top:4px;align-items:center;">
+                        <input id="pub-image" class="input-field" style="flex:1;min-width:0;" placeholder="https://… ou charger" oninput="pubPreviewImg('pub-image','pub-image-thumb');pubDebouncedPreview()">
+                        <label style="cursor:pointer;flex-shrink:0;">
+                          <input type="file" accept="image/*" style="display:none;" onchange="pubLoadFile(event,'pub-image','pub-image-thumb')">
+                          <span class="btn" style="padding:5px 10px;font-size:12px;display:block;">📁</span>
+                        </label>
+                      </div>
+                      <div id="pub-image-thumb" style="margin-top:6px;display:none;">
+                        <img style="height:60px;width:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border);">
+                      </div>
+                    </div>
+
+                    <!-- Galerie -->
+                    <div style="grid-column:1/-1;">
+                      <label class="form-label">Galerie d'images <span style="font-weight:400;color:var(--muted);">(optionnel — plusieurs fichiers acceptés)</span></label>
+                      <div style="display:flex;gap:6px;margin-top:4px;align-items:center;">
+                        <input id="pub-galerie" class="input-field" style="flex:1;" placeholder="URLs séparées par virgule, ou charger des fichiers">
+                        <label style="cursor:pointer;flex-shrink:0;">
+                          <input type="file" accept="image/*" multiple style="display:none;" onchange="pubLoadGalerie(event)">
+                          <span class="btn" style="padding:5px 10px;font-size:12px;display:block;">📁 Multiple</span>
+                        </label>
+                      </div>
+                      <div id="pub-galerie-thumb" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+                    </div>
+
+                    <!-- Vidéo -->
+                    <div style="grid-column:1/-1;">
+                      <label class="form-label">Vidéo publicitaire <span style="font-weight:400;color:var(--muted);">(URL YouTube, Vimeo ou .mp4)</span></label>
+                      <div style="display:flex;gap:6px;margin-top:4px;align-items:center;">
+                        <input id="pub-video" class="input-field" style="flex:1;" placeholder="https://youtube.com/… ou https://…/video.mp4">
+                        <label style="cursor:pointer;flex-shrink:0;">
+                          <input type="file" accept="video/*" style="display:none;" onchange="pubLoadFile(event,'pub-video',null,true)">
+                          <span class="btn" style="padding:5px 10px;font-size:12px;display:block;">📁</span>
+                        </label>
+                      </div>
+                      <div id="pub-video-thumb" style="margin-top:6px;display:none;">
+                        <video controls style="width:100%;max-height:120px;border-radius:8px;border:1px solid var(--border);"></video>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
               </div>
             </div>
@@ -1216,14 +1269,40 @@
               </div>
             </div>
 
+            <!-- ── ONGLET 6 : Aperçu ── -->
+            <div id="pub-tab-6" class="pub-tab-content" style="display:none;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                <div style="font-size:13px;color:var(--muted);">Aperçu en temps réel selon les informations saisies</div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn" style="font-size:12px;padding:4px 12px;" onclick="pubUpdatePreview('banniere')">🖼 Bannière</button>
+                  <button class="btn" style="font-size:12px;padding:4px 12px;" onclick="pubUpdatePreview('native')">📰 Natif</button>
+                  <button class="btn" style="font-size:12px;padding:4px 12px;" onclick="pubUpdatePreview('annuaire')">📋 Annuaire</button>
+                  <button class="btn" style="font-size:12px;padding:4px 12px;" onclick="pubUpdatePreview('profil')">👤 Profil</button>
+                </div>
+              </div>
+              <!-- Aperçu format sélectionné -->
+              <div style="margin-bottom:20px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;" id="pub-preview-format-label">Bannière</div>
+                <div id="pub-preview-main"></div>
+              </div>
+              <!-- Aperçu tous les formats -->
+              <div style="padding:14px;background:var(--surface);border-radius:10px;">
+                <h4 style="margin:0 0 14px;font-size:13px;font-weight:700;">Tous les formats</h4>
+                <div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Bannière</div><div id="pub-prev-banniere"></div></div>
+                <div style="margin-bottom:10px;margin-top:16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Natif (fil)</div><div id="pub-prev-native" style="max-width:380px;"></div></div>
+                <div><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Annuaire</div><div id="pub-prev-annuaire" style="max-width:260px;"></div></div>
+              </div>
+            </div>
+
           </div>
           <!-- Footer -->
-          <div style="padding:16px 28px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface);">
+          <div style="padding:14px 28px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface);">
             <div style="display:flex;gap:8px;">
               <button id="pub-btn-prev" class="btn" onclick="pubSwitchTab(window._pubCurrentTab-1)" style="display:none;background:var(--surface);">← Précédent</button>
               <button id="pub-btn-next" class="btn btn-orange" onclick="pubSwitchTab(window._pubCurrentTab+1)">Suivant →</button>
             </div>
             <div style="display:flex;gap:8px;">
+              <button class="btn" onclick="pubSwitchTab(6)" style="background:var(--surface);">👁️ Aperçu</button>
               <button class="btn" onclick="closePubModal()" style="background:var(--surface);">Annuler</button>
               <button id="pub-btn-save" class="btn btn-orange" onclick="savePub()" style="display:none;">💾 Enregistrer</button>
             </div>
@@ -2490,8 +2569,10 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
 
   // ── Onglets modal pub ──
   window._pubCurrentTab = 1;
+  const PUB_TAB_MAX = 6;
+
   function pubSwitchTab(n) {
-    if (n < 1 || n > 5) return;
+    if (n < 1 || n > PUB_TAB_MAX) return;
     window._pubCurrentTab = n;
     document.querySelectorAll(".pub-tab-content").forEach((el, i) => {
       el.style.display = (i + 1 === n) ? "" : "none";
@@ -2506,8 +2587,203 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
     const next = document.getElementById("pub-btn-next");
     const save = document.getElementById("pub-btn-save");
     prev.style.display = n > 1 ? "" : "none";
-    next.style.display = n < 5 ? "" : "none";
-    save.style.display = n === 5 ? "" : "none";
+    next.style.display = n < PUB_TAB_MAX ? "" : "none";
+    save.style.display = n >= 5 ? "" : "none";
+    if (n === 6) pubUpdatePreview();
+  }
+
+  // ── Upload fichier → base64 dans l'input URL + thumbnail ──
+  function pubLoadFile(event, targetId, thumbId, isVideo = false) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const data = e.target.result;
+      const input = document.getElementById(targetId);
+      if (input) input.value = data;
+      if (thumbId) {
+        const wrap = document.getElementById(thumbId);
+        if (wrap) {
+          const media = wrap.querySelector(isVideo ? "video" : "img");
+          if (media) { media.src = data; wrap.style.display = ""; }
+        }
+      }
+      if (isVideo) {
+        const vw = document.getElementById("pub-video-thumb");
+        if (vw) { vw.querySelector("video").src = data; vw.style.display = ""; }
+      }
+      pubDebouncedPreview();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function pubLoadGalerie(event) {
+    const files = [...event.target.files];
+    if (!files.length) return;
+    const promises = files.map(f => new Promise(res => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.readAsDataURL(f);
+    }));
+    Promise.all(promises).then(results => {
+      const input = document.getElementById("pub-galerie");
+      const existing = (input.value || "").split(",").map(s => s.trim()).filter(Boolean);
+      const combined = [...existing, ...results];
+      input.value = combined.join(", ");
+      const thumb = document.getElementById("pub-galerie-thumb");
+      thumb.innerHTML = combined.slice(0, 8).map(src =>
+        `<img src="${src}" style="height:48px;width:48px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">`
+      ).join("");
+      thumb.style.display = combined.length ? "flex" : "none";
+    });
+  }
+
+  function pubPreviewImg(srcId, thumbId) {
+    const src = document.getElementById(srcId)?.value?.trim();
+    const wrap = document.getElementById(thumbId);
+    if (!wrap) return;
+    if (src && (src.startsWith("http") || src.startsWith("data:"))) {
+      wrap.querySelector("img").src = src;
+      wrap.style.display = "";
+    } else {
+      wrap.style.display = "none";
+    }
+  }
+
+  // ── Aperçu live ──
+  let _pubPreviewTimer = null;
+  function pubDebouncedPreview() {
+    clearTimeout(_pubPreviewTimer);
+    _pubPreviewTimer = setTimeout(pubUpdatePreview, 300);
+  }
+
+  function _pubPreviewData() {
+    const custom = (document.getElementById("pub-bouton-custom")?.value || "").trim();
+    const jp = (id, def = []) => {
+      try { const v = document.getElementById(id)?.value || ""; if (!v) return def;
+        const arr = v.split(",").map(s => s.trim()).filter(Boolean); return arr; } catch { return def; }
+    };
+    return {
+      id: 0,
+      nom_campagne: document.getElementById("pub-nom-campagne")?.value || "",
+      annonceur: document.getElementById("pub-annonceur")?.value || "Annonceur",
+      titre: document.getElementById("pub-titre")?.value || "Titre de la publicité",
+      sous_titre: document.getElementById("pub-sous-titre")?.value || "",
+      description: document.getElementById("pub-desc-courte")?.value || "",
+      description_courte: document.getElementById("pub-desc-courte")?.value || "",
+      logo_annonceur: document.getElementById("pub-logo")?.value || "",
+      image_url: document.getElementById("pub-image")?.value || "",
+      video_url: document.getElementById("pub-video")?.value || "",
+      galerie_images: JSON.stringify(jp("pub-galerie")),
+      bouton_action: custom || document.getElementById("pub-bouton")?.value || "En savoir plus",
+      lien_texte: custom || document.getElementById("pub-bouton")?.value || "En savoir plus",
+      lien_url: document.getElementById("pub-lien")?.value || "#",
+      lien_site: document.getElementById("pub-site")?.value || "",
+      contact_telephone: document.getElementById("pub-tel")?.value || "",
+      contact_whatsapp: document.getElementById("pub-whatsapp")?.value || "",
+      contact_email: document.getElementById("pub-email-contact")?.value || "",
+      contact_adresse: document.getElementById("pub-adresse")?.value || "",
+      moyens_paiement: JSON.stringify([...(document.querySelectorAll(".pub-paiement:checked")||[])].map(el=>el.value)),
+      statut: "active",
+    };
+  }
+
+  function pubUpdatePreview(forceFormat) {
+    if (!document.getElementById("pub-modal") || document.getElementById("pub-modal").style.display === "none") return;
+    const p = _pubPreviewData();
+    const fmt = forceFormat || document.getElementById("pub-format")?.value || "banniere";
+    const fmtLabels = { banniere:"Bannière", native:"Natif (fil)", annuaire:"Annuaire", profil:"Profil", video:"Vidéo", native_article:"Article sponsorisé" };
+    const lbl = document.getElementById("pub-preview-format-label");
+    if (lbl) lbl.textContent = fmtLabels[fmt] || fmt;
+    const main = document.getElementById("pub-preview-main");
+    if (main) main.innerHTML = _pubHtmlFull(p, fmt);
+    const b = document.getElementById("pub-prev-banniere"); if (b) b.innerHTML = _pubHtmlFull(p, "banniere");
+    const n = document.getElementById("pub-prev-native");   if (n) n.innerHTML = _pubHtmlFull(p, "native");
+    const a = document.getElementById("pub-prev-annuaire"); if (a) a.innerHTML = _pubHtmlFull(p, "annuaire");
+  }
+
+  // ── Rendu HTML des formats pub (utilisé pour l'aperçu dans le modal) ──
+  function _pubHtmlFull(p, format) {
+    const img   = p.image_url || "";
+    const logo  = p.logo_annonceur || "";
+    const desc  = p.description_courte || p.description || "";
+    const btn   = p.bouton_action || p.lien_texte || "En savoir plus";
+    const url   = p.lien_url || p.lien_site || "#";
+    const tel   = p.contact_telephone || "";
+    const wa    = p.contact_whatsapp  || "";
+    const mail  = p.contact_email     || "";
+    const adr   = p.contact_adresse   || "";
+    const hasContact = tel || wa || mail || adr;
+    let mp = [];
+    try { mp = JSON.parse(p.moyens_paiement || "[]"); } catch {}
+    const mpLabels = { carte_bancaire:"💳 Carte", paypal:"🅿️ PayPal", virement:"🏦 Virement",
+      mobile_money:"📱 Mobile Money", orange_money:"🟠 Orange Money",
+      mtn_money:"🟡 MTN Money", moov_money:"🔵 Moov Money", wave:"🌊 Wave", crypto:"₿ Crypto" };
+    const logoEl  = logo ? `<img src="${logo}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:5px;background:#f5f5f5;flex-shrink:0;">` : `<div style="width:32px;height:32px;border-radius:5px;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;">📣</div>`;
+    const sponsoTag = `<div style="font-size:10px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;">Sponsorisé · ${esc(p.annonceur)}</div>`;
+
+    if (format === "banniere") {
+      return `<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+        ${img ? `<img src="${img}" alt="" style="width:72px;height:58px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : logo ? `<img src="${logo}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:8px;background:#f5f5f5;flex-shrink:0;">` : ""}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+            ${logo && img ? `<img src="${logo}" alt="" style="width:16px;height:16px;object-fit:contain;border-radius:3px;">` : ""}
+            ${sponsoTag}
+          </div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:2px;">${esc(p.titre)}</div>
+          ${desc ? `<div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(desc)}</div>` : ""}
+        </div>
+        <a href="${esc(url)}" target="_blank" rel="noopener" class="btn btn-orange" style="flex-shrink:0;font-size:13px;">${esc(btn)}</a>
+      </div>`;
+    }
+
+    if (format === "native") {
+      const galerie = (() => { try { return JSON.parse(p.galerie_images || "[]"); } catch { return []; } })();
+      return `<div class="card" style="border:1.5px solid var(--border);max-width:480px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          ${logoEl}
+          <div>
+            <div style="font-weight:700;font-size:14px;">${esc(p.annonceur)}</div>
+            <div style="font-size:11px;color:var(--muted);background:var(--surface);padding:1px 8px;border-radius:20px;display:inline-block;">Sponsorisé</div>
+          </div>
+        </div>
+        ${p.titre ? `<div style="font-weight:700;font-size:15px;margin-bottom:6px;">${esc(p.titre)}</div>` : ""}
+        ${desc ? `<p style="margin:0 0 10px;font-size:13px;color:var(--muted);">${esc(desc)}</p>` : ""}
+        ${img ? `<img src="${img}" alt="" style="width:100%;border-radius:10px;max-height:200px;object-fit:cover;margin-bottom:10px;">` : ""}
+        ${galerie.length > 1 ? `<div style="display:flex;gap:6px;margin-bottom:10px;overflow:hidden;border-radius:8px;">${galerie.slice(1,4).map(u=>`<img src="${u}" style="flex:1;height:72px;object-fit:cover;border-radius:6px;">`).join("")}</div>` : ""}
+        ${hasContact ? `<div style="background:var(--surface);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;">
+          ${tel ? `<span>📞 ${esc(tel)}</span>` : ""}${wa ? `<span>💬 ${esc(wa)}</span>` : ""}${mail ? `<span>✉️ ${esc(mail)}</span>` : ""}${adr ? `<span>📍 ${esc(adr)}</span>` : ""}
+        </div>` : ""}
+        ${mp.length ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${mp.map(k=>`<span style="font-size:11px;background:var(--surface);border-radius:20px;padding:2px 8px;">${mpLabels[k]||k}</span>`).join("")}</div>` : ""}
+        <a href="${esc(url)}" target="_blank" rel="noopener" class="btn btn-orange" style="font-size:13px;display:block;text-align:center;">${esc(btn)}</a>
+      </div>`;
+    }
+
+    if (format === "annuaire") {
+      return `<div class="card" style="border:1.5px dashed var(--border);max-width:260px;">
+        ${sponsoTag}
+        ${img ? `<img src="${img}" alt="" style="width:100%;height:110px;object-fit:cover;border-radius:8px;margin:8px 0;">` : logo ? `<img src="${logo}" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:8px;margin:8px 0;background:#f5f5f5;">` : ""}
+        <div style="font-weight:700;margin-bottom:4px;font-size:14px;">${esc(p.titre)}</div>
+        ${desc ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${esc(desc)}</div>` : ""}
+        ${hasContact ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${[tel,wa,mail].filter(Boolean).join(" · ")}</div>` : ""}
+        <a href="${esc(url)}" target="_blank" rel="noopener" class="btn" style="font-size:12px;width:100%;text-align:center;display:block;">${esc(btn)}</a>
+      </div>`;
+    }
+
+    if (format === "profil") {
+      return `<div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+        ${logoEl}
+        <div style="flex:1;min-width:0;">
+          ${sponsoTag}
+          <div style="font-weight:700;font-size:13px;">${esc(p.titre)}</div>
+          ${desc ? `<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(desc)}</div>` : ""}
+        </div>
+        <a href="${esc(url)}" target="_blank" rel="noopener" class="btn" style="font-size:12px;flex-shrink:0;">${esc(btn)}</a>
+      </div>`;
+    }
+
+    // video / native_article → fallback banniere
+    return _pubHtmlFull(p, "banniere");
   }
 
   function _pubCsv(val) {

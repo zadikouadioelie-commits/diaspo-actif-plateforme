@@ -2056,40 +2056,111 @@ function initProjetsDiaspoActif(){
 
 /* ---------- Publicité (démo, données fictives, géolocalisée) ---------- */
 /* ---------- Publicités dynamiques (API) ---------- */
+function _pubRenderContact(pub) {
+  const parts = [];
+  if (pub.contact_telephone) parts.push(`📞 <a href="tel:${pub.contact_telephone}" style="color:inherit;text-decoration:none;">${pub.contact_telephone}</a>`);
+  if (pub.contact_whatsapp)  parts.push(`💬 <a href="https://wa.me/${pub.contact_whatsapp.replace(/\D/g,'')}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">WhatsApp</a>`);
+  if (pub.contact_email)     parts.push(`✉️ <a href="mailto:${pub.contact_email}" style="color:inherit;text-decoration:none;">${pub.contact_email}</a>`);
+  if (pub.contact_adresse)   parts.push(`📍 ${pub.contact_adresse}`);
+  if (!parts.length) return "";
+  return `<div style="background:var(--surface);border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;color:var(--muted);">${parts.join("")}</div>`;
+}
+
+function _pubRenderPaiement(pub) {
+  let mp = [];
+  try { mp = JSON.parse(pub.moyens_paiement || "[]"); } catch {}
+  if (!mp.length) return "";
+  const labels = { carte_bancaire:"💳 Carte", paypal:"🅿️ PayPal", virement:"🏦 Virement",
+    mobile_money:"📱 Mobile Money", orange_money:"🟠 Orange Money",
+    mtn_money:"🟡 MTN Money", moov_money:"🔵 Moov Money", wave:"🌊 Wave", crypto:"₿ Crypto" };
+  return `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;">${mp.map(k=>`<span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2px 8px;">${labels[k]||k}</span>`).join("")}</div>`;
+}
+
 function _pubHtmlBanniere(pub) {
-  return `<div class="pub-banniere" style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;position:relative;">
-    ${pub.image_url ? `<img src="${pub.image_url}" alt="" style="width:72px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : ""}
+  const img  = pub.image_url || "";
+  const logo = pub.logo_annonceur || "";
+  const desc = pub.description_courte || pub.description || "";
+  const btn  = pub.bouton_action || pub.lien_texte || "En savoir plus";
+  const url  = pub.lien_url || pub.lien_site || "";
+  const clic = pub.id ? `onclick="trackPubClic(${pub.id})"` : "";
+  return `<div class="pub-banniere" style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;position:relative;">
+    ${img ? `<img src="${img}" alt="" style="width:72px;height:58px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : logo ? `<img src="${logo}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:8px;background:#f5f5f5;flex-shrink:0;">` : ""}
     <div style="flex:1;min-width:0;">
-      <div style="font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px;">Sponsorisé · ${pub.annonceur}</div>
-      <div style="font-weight:700;font-size:15px;margin-bottom:2px;">${pub.titre}</div>
-      ${pub.description ? `<div style="font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${pub.description}</div>` : ""}
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+        ${logo && img ? `<img src="${logo}" alt="" style="width:16px;height:16px;object-fit:contain;border-radius:3px;">` : ""}
+        <div style="font-size:10px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;">Sponsorisé · ${pub.annonceur}</div>
+      </div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px;">${pub.titre}</div>
+      ${desc ? `<div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${desc}</div>` : ""}
     </div>
-    ${pub.lien_url ? `<a href="${pub.lien_url}" target="_blank" rel="noopener" class="btn btn-orange" style="flex-shrink:0;font-size:13px;" onclick="trackPubClic(${pub.id})">${pub.lien_texte||"En savoir plus"}</a>` : ""}
+    ${url ? `<a href="${url}" target="_blank" rel="noopener" class="btn btn-orange" style="flex-shrink:0;font-size:13px;" ${clic}>${btn}</a>` : ""}
   </div>`;
 }
 
 function _pubHtmlNative(pub) {
+  const logo = pub.logo_annonceur || "";
+  const img  = pub.image_url || "";
+  const desc = pub.description_courte || pub.description || "";
+  const btn  = pub.bouton_action || pub.lien_texte || "En savoir plus";
+  const url  = pub.lien_url || pub.lien_site || "";
+  const clic = pub.id ? `onclick="trackPubClic(${pub.id})"` : "";
+  const logoEl = logo
+    ? `<img src="${logo}" alt="" style="width:42px;height:42px;object-fit:contain;border-radius:50%;background:#f5f5f5;">`
+    : `<div style="width:42px;height:42px;border-radius:50%;background:#E87C3E;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;">📣</div>`;
+  let galerie = [];
+  try { galerie = JSON.parse(pub.galerie_images || "[]"); } catch {}
   return `<div class="card pub-native" style="border:1.5px solid var(--border);position:relative;">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      ${pub.image_url ? `<img src="${pub.image_url}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:50%;">` : `<div style="width:44px;height:44px;border-radius:50%;background:#E87C3E;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;">📣</div>`}
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      ${logoEl}
       <div>
-        <div style="font-weight:700;">${pub.annonceur}</div>
+        <div style="font-weight:700;font-size:14px;">${pub.annonceur}</div>
         <div style="font-size:11px;color:var(--muted);background:var(--surface);padding:1px 8px;border-radius:20px;display:inline-block;">Sponsorisé</div>
       </div>
     </div>
-    <p style="margin:0 0 12px;font-size:14px;">${pub.description||pub.titre}</p>
-    ${pub.image_url ? `<img src="${pub.image_url}" alt="${pub.titre}" style="width:100%;border-radius:10px;max-height:220px;object-fit:cover;margin-bottom:12px;">` : ""}
-    ${pub.lien_url ? `<a href="${pub.lien_url}" target="_blank" rel="noopener" class="btn btn-orange" style="font-size:13px;" onclick="trackPubClic(${pub.id})">${pub.lien_texte||"En savoir plus"}</a>` : ""}
+    ${pub.titre ? `<div style="font-weight:700;font-size:15px;margin-bottom:6px;">${pub.titre}</div>` : ""}
+    ${desc ? `<p style="margin:0 0 10px;font-size:13px;color:var(--muted);">${desc}</p>` : ""}
+    ${img ? `<img src="${img}" alt="${pub.titre}" style="width:100%;border-radius:10px;max-height:220px;object-fit:cover;margin-bottom:10px;">` : ""}
+    ${galerie.length > 1 ? `<div style="display:flex;gap:5px;margin-bottom:10px;">${galerie.slice(1,4).map(u=>`<img src="${u}" style="flex:1;height:70px;object-fit:cover;border-radius:6px;">`).join("")}</div>` : ""}
+    ${_pubRenderContact(pub)}
+    ${_pubRenderPaiement(pub)}
+    ${url ? `<a href="${url}" target="_blank" rel="noopener" class="btn btn-orange" style="font-size:13px;display:block;text-align:center;margin-top:10px;" ${clic}>${btn}</a>` : ""}
   </div>`;
 }
 
 function _pubHtmlAnnuaire(pub) {
+  const img  = pub.image_url || "";
+  const logo = pub.logo_annonceur || "";
+  const desc = pub.description_courte || pub.description || "";
+  const btn  = pub.bouton_action || pub.lien_texte || "Découvrir";
+  const url  = pub.lien_url || pub.lien_site || "";
+  const clic = pub.id ? `onclick="trackPubClic(${pub.id})"` : "";
   return `<div class="card pub-annuaire" style="border:1.5px dashed var(--border);position:relative;">
-    <div style="font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;">Sponsorisé</div>
-    ${pub.image_url ? `<img src="${pub.image_url}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:10px;">` : ""}
-    <div style="font-weight:700;margin-bottom:4px;">${pub.titre}</div>
-    ${pub.description ? `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">${pub.description}</div>` : ""}
-    ${pub.lien_url ? `<a href="${pub.lien_url}" target="_blank" rel="noopener" class="btn" style="font-size:12px;width:100%;text-align:center;" onclick="trackPubClic(${pub.id})">${pub.lien_texte||"Découvrir"}</a>` : ""}
+    <div style="font-size:10px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px;">Sponsorisé</div>
+    ${img ? `<img src="${img}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:10px;">` : logo ? `<img src="${logo}" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:8px;background:#f5f5f5;margin-bottom:8px;">` : ""}
+    <div style="font-weight:700;margin-bottom:4px;font-size:14px;">${pub.titre}</div>
+    ${desc ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${desc}</div>` : ""}
+    ${_pubRenderContact(pub)}
+    ${url ? `<a href="${url}" target="_blank" rel="noopener" class="btn" style="font-size:12px;width:100%;text-align:center;display:block;margin-top:10px;" ${clic}>${btn}</a>` : ""}
+  </div>`;
+}
+
+function _pubHtmlProfil(pub) {
+  const logo = pub.logo_annonceur || "";
+  const desc = pub.description_courte || pub.description || "";
+  const btn  = pub.bouton_action || pub.lien_texte || "Voir";
+  const url  = pub.lien_url || pub.lien_site || "";
+  const clic = pub.id ? `onclick="trackPubClic(${pub.id})"` : "";
+  const logoEl = logo
+    ? `<img src="${logo}" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:6px;background:#f5f5f5;flex-shrink:0;">`
+    : `<div style="width:36px;height:36px;border-radius:6px;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;">📣</div>`;
+  return `<div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+    ${logoEl}
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Sponsorisé · ${pub.annonceur}</div>
+      <div style="font-weight:700;font-size:13px;">${pub.titre}</div>
+      ${desc ? `<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${desc}</div>` : ""}
+    </div>
+    ${url ? `<a href="${url}" target="_blank" rel="noopener" class="btn" style="font-size:12px;flex-shrink:0;" ${clic}>${btn}</a>` : ""}
   </div>`;
 }
 
@@ -2107,6 +2178,7 @@ async function servePub(format, containerId) {
     if (format === "banniere") el.innerHTML = _pubHtmlBanniere(pub);
     else if (format === "native") el.innerHTML = _pubHtmlNative(pub);
     else if (format === "annuaire") el.innerHTML = _pubHtmlAnnuaire(pub);
+    else if (format === "profil") el.innerHTML = _pubHtmlProfil(pub);
     else el.innerHTML = _pubHtmlBanniere(pub);
     el.style.display = "";
   } catch(e) { el.style.display = "none"; }
