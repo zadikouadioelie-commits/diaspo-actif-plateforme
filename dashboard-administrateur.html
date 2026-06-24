@@ -155,6 +155,54 @@
           </div>
         </div>
 
+        <!-- ── Bloc Engagement ── -->
+        <div style="margin:24px 0 8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Engagement</div>
+
+        <!-- Stat cards engagement -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
+          <div class="card stat-card" style="border-left:4px solid #E87C3E;">
+            <div class="stat-number" id="eng-publications" style="color:#E87C3E;">—</div>
+            <div class="stat-label">Publications</div>
+          </div>
+          <div class="card stat-card" style="border-left:4px solid #0891B2;">
+            <div class="stat-number" id="eng-commentaires" style="color:#0891B2;">—</div>
+            <div class="stat-label">Commentaires</div>
+          </div>
+          <div class="card stat-card" style="border-left:4px solid #EF4444;">
+            <div class="stat-number" id="eng-likes" style="color:#EF4444;">—</div>
+            <div class="stat-label">Likes</div>
+          </div>
+          <div class="card stat-card" style="border-left:4px solid #8B5CF6;">
+            <div class="stat-number" id="eng-reposts" style="color:#8B5CF6;">—</div>
+            <div class="stat-label">Partages</div>
+          </div>
+          <div class="card stat-card" style="border-left:4px solid #059669;">
+            <div style="font-size:22px;font-weight:800;color:#059669;" id="eng-taux">—</div>
+            <div class="stat-label">Interactions / pub</div>
+          </div>
+          <div class="card stat-card" style="border-left:4px solid #F59E0B;">
+            <div style="font-size:22px;font-weight:800;color:#F59E0B;" id="eng-session-moy">—</div>
+            <div class="stat-label">min. moy. / session</div>
+            <div id="eng-session-total" style="font-size:11px;color:var(--muted);margin-top:2px;"></div>
+          </div>
+        </div>
+
+        <!-- Tendance engagement 14j + Top posts -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+          <div class="card">
+            <h3 style="margin:0 0 16px;font-size:14px;">📊 Interactions quotidiennes — 14 jours</h3>
+            <canvas id="chart-engagement" height="110"></canvas>
+            <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;">
+              <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:3px;background:#E87C3E;display:inline-block;border-radius:2px;"></span> Interactions</span>
+              <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:3px;background:#1B3A6B;display:inline-block;border-radius:2px;"></span> Publications</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:14px;">🏆 Top publications les plus engageantes</h3>
+            <div id="top-posts"></div>
+          </div>
+        </div>
+
         <!-- ── Bloc 6 : Dernières inscriptions + Publications ── -->
         <div class="grid grid-2" style="gap:16px;">
           <div class="card">
@@ -1015,6 +1063,107 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
     `).join("");
   } else {
     pubList.innerHTML = `<div class="empty">Aucune publication récente.</div>`;
+  }
+
+  // ── Engagement : remplissage des cartes
+  document.getElementById("eng-publications").textContent = (data.total_publications ?? "—").toLocaleString?.() ?? data.total_publications;
+  document.getElementById("eng-commentaires").textContent = (data.total_commentaires ?? "—").toLocaleString?.() ?? data.total_commentaires;
+  document.getElementById("eng-likes").textContent        = (data.total_likes ?? "—").toLocaleString?.() ?? data.total_likes;
+  document.getElementById("eng-reposts").textContent      = (data.total_reposts ?? "—").toLocaleString?.() ?? data.total_reposts;
+  document.getElementById("eng-taux").textContent         = data.taux_interaction != null ? data.taux_interaction + " ×" : "—";
+  document.getElementById("eng-session-moy").textContent  = data.temps_session_moy_min != null ? data.temps_session_moy_min + " min" : "—";
+  document.getElementById("eng-session-total").textContent = data.temps_session_total_h != null ? data.temps_session_total_h + " h cumulées" : "";
+
+  // ── Sparkline engagement double-courbe (interactions + publications)
+  function drawDualSparkline(canvasId, points, key1, color1, key2, color2) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth || 420;
+    const H = 110;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+    const vals1 = points.map(p => p[key1] || 0);
+    const vals2 = points.map(p => p[key2] || 0);
+    const max = Math.max(...vals1, ...vals2, 1);
+    const step = W / Math.max(points.length - 1, 1);
+    function toCoords(vals) {
+      return vals.map((v, i) => ({ x: i * step, y: H - 14 - (v / max) * (H - 28) }));
+    }
+    function drawLine(coords, color, fillAlpha) {
+      // Fill
+      ctx.beginPath();
+      ctx.moveTo(coords[0].x, H - 14);
+      coords.forEach(c => ctx.lineTo(c.x, c.y));
+      ctx.lineTo(coords[coords.length - 1].x, H - 14);
+      ctx.closePath();
+      ctx.fillStyle = color.replace(")", `, ${fillAlpha})`).replace("rgb", "rgba");
+      ctx.fill();
+      // Line
+      ctx.beginPath();
+      coords.forEach((c, i) => i === 0 ? ctx.moveTo(c.x, c.y) : ctx.lineTo(c.x, c.y));
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+    }
+    drawLine(toCoords(vals1), color1, 0.08);
+    drawLine(toCoords(vals2), color2, 0.08);
+
+    // Labels jour (MM-DD) sur l'axe X — tous les 2 jours
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "9px system-ui";
+    ctx.textAlign = "center";
+    points.forEach((p, i) => {
+      if (i % 2 === 0 || i === points.length - 1) {
+        const x = i * step;
+        ctx.fillText(p.jour?.slice(5) || "", x, H - 2);
+      }
+    });
+
+    // Valeurs sur la courbe interactions (key1) au-dessus des points
+    ctx.font = "bold 10px system-ui";
+    const coords1 = toCoords(vals1);
+    coords1.forEach((c, i) => {
+      if (vals1[i] > 0) {
+        ctx.fillStyle = color1;
+        ctx.fillText(vals1[i], c.x, c.y - 5);
+      }
+    });
+  }
+
+  if (data.tendance_engagement?.length) {
+    drawDualSparkline("chart-engagement",
+      fillDays(data.tendance_engagement.map(r => ({ jour: r.jour, n: r.interactions })), 14)
+        .map((r, i) => ({ jour: r.jour, interactions: r.n, publications: (data.tendance_engagement[i]?.publications || 0) })),
+      "interactions", "rgb(232,124,62)",
+      "publications",  "rgb(27,58,107)"
+    );
+  }
+
+  // ── Top posts
+  const topPostsEl = document.getElementById("top-posts");
+  if (data.top_posts?.length) {
+    topPostsEl.innerHTML = data.top_posts.map((p, i) => {
+      const score = (p.nb_reactions || 0) + (p.nb_commentaires || 0);
+      const extrait = (p.contenu || "").slice(0, 80) + ((p.contenu || "").length > 80 ? "…" : "");
+      const medals = ["🥇","🥈","🥉","4️⃣","5️⃣"];
+      return `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);${i===data.top_posts.length-1?'border-bottom:none;':''}">
+        <span style="font-size:16px;flex-shrink:0;margin-top:2px;">${medals[i]||i+1}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:2px;">${p.auteur_nom||"Anonyme"} · ${p.date_pub||""}</div>
+          <div style="font-size:13px;line-height:1.4;">${extrait}</div>
+        </div>
+        <div style="flex-shrink:0;text-align:right;">
+          <div style="font-size:13px;font-weight:700;color:#E87C3E;">${score} <span style="font-size:10px;font-weight:400;color:var(--muted);">inter.</span></div>
+          <div style="font-size:11px;color:var(--muted);">❤️ ${p.nb_reactions||0} 💬 ${p.nb_commentaires||0}</div>
+        </div>
+      </div>`;
+    }).join("");
+  } else {
+    topPostsEl.innerHTML = `<div class="notice">Aucune publication avec engagement pour le moment.</div>`;
   }
 
   // Publications admin section

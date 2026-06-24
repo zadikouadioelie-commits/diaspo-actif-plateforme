@@ -108,6 +108,25 @@ function seed() {
     insertFil.run(p.auteur, p.type, p.categorie, p.contenu, `-${(idx + 1) * 3} hours`);
   });
 
+  // Ajouter des posts supplémentaires sur les 14 derniers jours pour les tendances
+  const postsDemo = [
+    { auteur:"Jean K.", type:"post", cat:"annonce",     contenu:"Rejoignez notre réseau d'entrepreneurs diaspora — plus de 500 membres actifs !",    jours:1 },
+    { auteur:"A.I.T.O", type:"post", cat:"evenement",   contenu:"Webinaire gratuit : Créer son entreprise en Afrique depuis l'Europe — 15 juillet",    jours:2 },
+    { auteur:"Ynouss D.", type:"post", cat:"article",   contenu:"Retour d'expérience : comment j'ai monté ma startup entre Paris et Dakar",             jours:3 },
+    { auteur:"DiaspoActif", type:"officiel", cat:"annonce", contenu:"📣 Nouveau : l'Observatoire Diaspora est en ligne. Collectivités, découvrez les données.",jours:4 },
+    { auteur:"Jean K.", type:"post", cat:"question",    contenu:"Question : quels sont les meilleurs outils pour gérer une équipe transnationale ?",    jours:5 },
+    { auteur:"A.I.T.O", type:"post", cat:"partage",    contenu:"Partenariat signé avec l'APIX pour faciliter l'investissement des diasporas au Sénégal", jours:6 },
+    { auteur:"Ynouss D.", type:"post", cat:"article",   contenu:"Guide pratique : obtenir un visa entrepreneur au Sénégal en 2025",                     jours:7 },
+    { auteur:"DiaspoActif", type:"officiel", cat:"alerte", contenu:"Mise à jour des conditions générales d'utilisation — à lire avant le 30 juin",       jours:9 },
+    { auteur:"Jean K.", type:"post", cat:"evenement",   contenu:"Je serai au Salon de la Diaspora à Paris — qui vient ? Retrouvons-nous au stand DiaspoActif !", jours:11 },
+    { auteur:"A.I.T.O", type:"post", cat:"annonce",    contenu:"Appel à projets ouvert : financement jusqu'à 5000€ pour les initiatives diaspora 2025",   jours:13 },
+  ];
+  const insertFilExtra = db.prepare(`
+    INSERT INTO fil_posts (auteur_id, auteur_nom, type, categorie, contenu, created_at)
+    VALUES (NULL, ?, ?, ?, ?, datetime('now', '-' || ? || ' days', '-' || ? || ' hours'))
+  `);
+  postsDemo.forEach((p, i) => insertFilExtra.run(p.auteur, p.type, p.cat, p.contenu, p.jours, (i % 12) + 1));
+
   /* ---- Comptes de démonstration (mot de passe : Demo1234!) ---- */
   const insertUser = db.prepare(`
     INSERT INTO users (nom, email, password_hash, password_salt, role, ville, pays, profil_json)
@@ -252,6 +271,57 @@ function seed() {
     const taux = 0.3 + (29 - d) / 29 * 0.5; // 30% → 80%
     allUsers.forEach(uid => {
       if (Math.random() < taux) insAct.run(uid, dateStr);
+    });
+  }
+
+  /* ===== ENGAGEMENT : RÉACTIONS, COMMENTAIRES, SESSIONS ===== */
+  const allPosts = db.prepare("SELECT id FROM fil_posts").all().map(r => r.id);
+  const insReact = db.prepare("INSERT OR IGNORE INTO fil_reactions (post_id, user_id, type) VALUES (?,?,?)");
+  const insComm  = db.prepare("INSERT INTO fil_commentaires (post_id, auteur_id, auteur_nom, contenu, created_at) VALUES (?,?,?,?,datetime('now',?))");
+  const insSession = db.prepare(`
+    INSERT OR IGNORE INTO user_sessions (user_id, date, duree_sec) VALUES (?,?,?)
+  `);
+
+  const commentairesSeed = [
+    "Excellent partage, merci pour ces infos précieuses !",
+    "Très inspirant, je vais me renseigner davantage.",
+    "Je suis entièrement d'accord avec ce point de vue.",
+    "Avez-vous des ressources supplémentaires à recommander ?",
+    "Bravo pour cette initiative, c'est exactement ce dont on avait besoin.",
+    "Pouvez-vous partager le lien vers le programme complet ?",
+    "Je partage à mon réseau, merci !",
+    "Cette question est fondamentale pour notre communauté.",
+    "Hâte de participer à cet événement !",
+    "Merci pour ce retour d'expérience très utile.",
+  ];
+
+  allPosts.forEach(postId => {
+    // Likes : 20%→90% des utilisateurs selon popularité
+    const likeRate = 0.2 + Math.random() * 0.7;
+    allUsers.forEach(uid => {
+      if (Math.random() < likeRate) insReact.run(postId, uid, "like");
+      if (Math.random() < 0.08) insReact.run(postId, uid, "repost");
+    });
+    // Commentaires : 0 à 4 par post
+    const nbComm = Math.floor(Math.random() * 5);
+    for (let i = 0; i < nbComm; i++) {
+      const uid = allUsers[Math.floor(Math.random() * allUsers.length)];
+      const nom = db.prepare("SELECT nom FROM users WHERE id=?").get(uid)?.nom || "Membre";
+      const texte = commentairesSeed[Math.floor(Math.random() * commentairesSeed.length)];
+      const heuresPassees = Math.floor(Math.random() * 72);
+      insComm.run(postId, uid, nom, texte, `-${heuresPassees} hours`);
+    }
+  });
+
+  // Sessions : durée réaliste sur 30 jours (entre 2 et 25 minutes par session)
+  for (let d = 29; d >= 0; d--) {
+    const dateStr = new Date(Date.now() - d * 86400000).toISOString().slice(0, 10);
+    const taux = 0.3 + (29 - d) / 29 * 0.5;
+    allUsers.forEach(uid => {
+      if (Math.random() < taux) {
+        const dureeMin = 2 + Math.floor(Math.random() * 23); // 2–25 min
+        insSession.run(uid, dateStr, dureeMin * 60);
+      }
     });
   }
 

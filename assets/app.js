@@ -2536,4 +2536,16 @@ document.addEventListener("DOMContentLoaded", ()=>{
   if("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(()=>{});
   }
+
+  // ── Heartbeat session : envoie 30s toutes les 30s si connecté
+  (function startHeartbeat() {
+    const beat = () => fetch("/api/session/heartbeat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secs: 30 })
+    }).catch(() => {});
+    // Premier battement après 10s pour laisser la page se charger
+    setTimeout(beat, 10000);
+    setInterval(beat, 30000);
+  })();
 });

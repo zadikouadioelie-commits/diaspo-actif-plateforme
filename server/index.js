@@ -795,6 +795,52 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   // Top pays
   const topPays = db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 8").all();
 
+  // ── Engagement
+  const totalCommentaires = db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires").get().n;
+  const totalLikes    = db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE type='like'").get().n;
+  const totalReposts  = db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE type IN ('repost','partage','share')").get().n;
+
+  // Taux d'interaction moyen par publication (likes + commentaires + reposts) / nb_posts
+  const tauxInteraction = totalPublications > 0
+    ? ((totalLikes + totalCommentaires + totalReposts) / totalPublications).toFixed(2)
+    : "0.00";
+
+  // Temps moyen de session (secondes → minutes)
+  const sessionRow = db.prepare("SELECT AVG(duree_sec) AS avg_sec, SUM(duree_sec) AS total_sec FROM user_sessions WHERE duree_sec > 30").get();
+  const tempsSessionMoyenMin = sessionRow.avg_sec ? (sessionRow.avg_sec / 60).toFixed(1) : "0.0";
+  const tempsSessionTotalH   = sessionRow.total_sec ? (sessionRow.total_sec / 3600).toFixed(1) : "0.0";
+
+  // Tendance engagement 14j (publications + réactions + commentaires par jour)
+  const tendanceEngagement14j = db.prepare(`
+    WITH jours AS (
+      SELECT date('now', '-' || d || ' days') AS jour
+      FROM (SELECT 0 d UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION
+            SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 UNION
+            SELECT 10 UNION SELECT 11 UNION SELECT 12 UNION SELECT 13)
+    )
+    SELECT j.jour,
+      COALESCE((SELECT COUNT(*) FROM fil_reactions r WHERE date(r.rowid, 'unixepoch') = j.jour), 0) +
+      COALESCE((SELECT COUNT(*) FROM fil_commentaires c WHERE date(c.created_at) = j.jour), 0) AS interactions,
+      COALESCE((SELECT COUNT(*) FROM fil_posts p WHERE date(p.created_at) = j.jour), 0) AS publications
+    FROM jours j
+    ORDER BY j.jour ASC
+  `).all();
+
+  // Top 5 publications les plus engageantes
+  const topPosts = db.prepare(`
+    SELECT p.id, p.contenu, p.auteur_nom, p.categorie,
+      substr(p.created_at, 1, 10) AS date_pub,
+      COUNT(DISTINCT r.id) AS nb_reactions,
+      COUNT(DISTINCT c.id) AS nb_commentaires,
+      (COUNT(DISTINCT r.id) * 2 + COUNT(DISTINCT c.id) * 3) AS score
+    FROM fil_posts p
+    LEFT JOIN fil_reactions r ON r.post_id = p.id
+    LEFT JOIN fil_commentaires c ON c.post_id = p.id
+    GROUP BY p.id
+    ORDER BY score DESC
+    LIMIT 5
+  `).all();
+
   const publicationsRecentes = db.prepare("SELECT * FROM fil_posts ORDER BY created_at DESC LIMIT 10").all();
   const derniersInscrits = db.prepare("SELECT id, nom, email, role, ville, pays, created_at FROM users ORDER BY created_at DESC LIMIT 8").all();
 
@@ -820,6 +866,15 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
     // Répartition
     par_role: parRole,
     top_pays: topPays,
+    // Engagement
+    total_commentaires:   totalCommentaires,
+    total_likes:          totalLikes,
+    total_reposts:        totalReposts,
+    taux_interaction:     tauxInteraction,
+    temps_session_moy_min: tempsSessionMoyenMin,
+    temps_session_total_h: tempsSessionTotalH,
+    tendance_engagement:   tendanceEngagement14j,
+    top_posts:             topPosts,
     // Listes
     publications_recentes: publicationsRecentes,
     derniers_inscrits:     derniersInscrits
@@ -1521,6 +1576,21 @@ function serveStatic(req, res, pathname) {
 /* ================================================================
    HANDLER PRINCIPAL (utilisé en local ET en Vercel serverless)
    ================================================================ */
+/* ===== HEARTBEAT SESSION (temps passé sur la plateforme) ===== */
+
+route("POST", "/api/session/heartbeat", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 200, { ok: false });
+  const secs = Math.min(Math.max(parseInt(body.secs) || 30, 1), 120);
+  db.prepare(`
+    INSERT INTO user_sessions (user_id, date, duree_sec) VALUES (?, date('now'), ?)
+    ON CONFLICT(user_id, date) DO UPDATE SET duree_sec = duree_sec + excluded.duree_sec
+  `).run(user.id, secs);
+  // Aussi tracer l'activité du jour
+  db.prepare("INSERT OR IGNORE INTO user_activity (user_id, date) VALUES (?, date('now'))").run(user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 /* ===== MODULE PUBLICITÉS ===== */
 
 /* Helper : vérifie si un tableau de ciblage accepte une valeur (vide = tous) */

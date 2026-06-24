@@ -260,11 +260,19 @@ db.exec(`
     value INTEGER NOT NULL DEFAULT 0
   );
 
-  /* ===== TRACKING ACTIVITÉ PLATEFORME ===== */
+  /* ===== TRACKING ACTIVITÉ & ENGAGEMENT PLATEFORME ===== */
 
   CREATE TABLE IF NOT EXISTS user_activity (
     user_id INTEGER NOT NULL,
     date    TEXT    NOT NULL,
+    PRIMARY KEY(user_id, date),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS user_sessions (
+    user_id   INTEGER NOT NULL,
+    date      TEXT    NOT NULL,
+    duree_sec INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY(user_id, date),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
