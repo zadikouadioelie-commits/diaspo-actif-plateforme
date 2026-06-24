@@ -317,6 +317,13 @@ const MIGRATIONS = [
   ["collaborations", "competences TEXT DEFAULT '[]'"],
   ["collaborations", "deadline TEXT"],
   ["collaborations", "initiative_id INTEGER"],
+  // Publications enrichies (système de publication)
+  ["fil_posts", "media_url TEXT"],
+  ["fil_posts", "media_type TEXT"],
+  ["fil_posts", "article_titre TEXT"],
+  ["fil_posts", "article_contenu TEXT"],
+  ["fil_posts", "video_duree INTEGER"],
+  ["fil_posts", "mentions_json TEXT DEFAULT '[]'"],
 ];
 for (const [table, col] of MIGRATIONS) {
   const colName = col.split(" ")[0];

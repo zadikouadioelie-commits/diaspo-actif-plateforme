@@ -247,11 +247,45 @@ const TYPE_PAR_ROLE = { utilisateur: "Utilisateur", initiative: "Association", a
 route("POST", "/api/fil", async (req, res, params, body) => {
   const user = getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise pour publier." });
-  if (!body.contenu) return sendJSON(res, 400, { error: "Contenu requis." });
-  const type = TYPE_PAR_ROLE[user.role] || "Utilisateur";
-  const id = db.prepare("INSERT INTO fil_posts (auteur_id, auteur_nom, type, categorie, contenu) VALUES (?, ?, ?, ?, ?)")
-    .run(user.id, user.nom, type, body.categorie || "Publication", body.contenu).lastInsertRowid;
-  sendJSON(res, 201, { id });
+
+  const pub_type = body.pub_type || "texte"; // texte | article | photo | video
+  const contenu  = (body.contenu || "").trim();
+  const article_titre   = (body.article_titre || "").trim();
+  const article_contenu = (body.article_contenu || "").trim();
+
+  // Validation selon le type
+  if (pub_type === "texte"   && !contenu)         return sendJSON(res, 400, { error: "Le texte ne peut pas être vide." });
+  if (pub_type === "article" && !article_titre)   return sendJSON(res, 400, { error: "Le titre de l'article est requis." });
+  if (pub_type === "photo"   && !body.media_url)  return sendJSON(res, 400, { error: "Aucune photo sélectionnée." });
+  if (pub_type === "video"   && !body.media_url)  return sendJSON(res, 400, { error: "Aucune vidéo sélectionnée." });
+
+  // Limite 2 min pour les vidéos
+  if (pub_type === "video" && body.video_duree && body.video_duree > 120)
+    return sendJSON(res, 400, { error: "La vidéo dépasse 2 minutes (limite autorisée)." });
+
+  const role_type = TYPE_PAR_ROLE[user.role] || "Utilisateur";
+
+  const id = db.prepare(`
+    INSERT INTO fil_posts
+      (auteur_id, auteur_nom, type, categorie, contenu,
+       media_url, media_type, article_titre, article_contenu, video_duree)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    user.id,
+    user.nom,
+    pub_type,
+    body.categorie || "Publication",
+    contenu || article_titre,
+    body.media_url    || null,
+    pub_type === "photo" ? "image" : pub_type === "video" ? "video" : null,
+    article_titre     || null,
+    article_contenu   || null,
+    body.video_duree  || null,
+  ).lastInsertRowid;
+
+  // Récupère le post complet pour le renvoyer
+  const post = db.prepare("SELECT * FROM fil_posts WHERE id=?").get(id);
+  sendJSON(res, 201, { id, post });
 });
 
 route("POST", "/api/fil/:id/react", async (req, res, params, body) => {

@@ -606,58 +606,446 @@ function initEvenements(){
 }
 
 /* ---------- Fil d'actualité global (branché sur l'API) ---------- */
+/* ================================================================
+   FIL D'ACTUALITÉ — Compositeur riche + rendu enrichi
+   ================================================================ */
 async function initFilActualite(){
   const el = document.getElementById("feed-list");
   if(!el) return;
 
+  const CATS = ["Diaspora","Entrepreneuriat","Investissement","Culture","Initiatives citoyennes","Formation","Santé","Technologie","Agriculture","Autre"];
+  const TYPE_ICONS = { texte:"📝", article:"📰", photo:"📷", video:"🎥" };
   let posts = [];
+  let currentFilter = "Tous";
+  let me = null;
+
+  // --- CHARGEMENT INITIAL ---
   try {
-    const r = await api("GET", "/fil");
-    posts = r.posts;
-  } catch (e) {
-    el.innerHTML = `<div class="empty">Impossible de contacter le serveur Diaspo'Actif.</div>`;
+    [{ posts }, me] = await Promise.all([
+      api("GET","/fil"),
+      fetchCurrentUser().catch(()=>null)
+    ]);
+  } catch(e) {
+    el.innerHTML = `<div class="empty">Impossible de contacter le serveur.</div>`;
     return;
   }
 
-  function countReactions(p){
-    return Object.values(p.reactions || {}).reduce((a,b)=>a+b, 0);
+  // ============================================================
+  // COMPOSITEUR RICHE
+  // ============================================================
+  const pubBox = document.getElementById("fil-publish");
+  if(pubBox){
+    if(!me){
+      pubBox.innerHTML = `<div class="notice" style="margin:0;">
+        <a href="login.html">Connectez-vous</a> pour publier sur le fil.
+      </div>`;
+    } else {
+      // Inject composer styles once
+      if(!document.getElementById("composer-style")){
+        const st = document.createElement("style");
+        st.id = "composer-style";
+        st.textContent = `
+.composer { background:#fff; border-radius:14px; overflow:hidden; }
+.composer-trigger {
+  display:flex; align-items:center; gap:12px;
+  padding:14px 16px; cursor:pointer;
+}
+.composer-trigger .ct-av {
+  width:42px; height:42px; border-radius:50%; flex-shrink:0; overflow:hidden;
+}
+.composer-trigger .ct-ph {
+  flex:1; background:#F3F4F6; border-radius:99px; padding:10px 16px;
+  font-size:14px; color:#9CA3AF; border:1px solid #E5E7EB;
+  cursor:pointer; text-align:left; transition:border-color .2s;
+}
+.composer-trigger .ct-ph:hover { border-color:#6B7280; }
+.composer-type-bar {
+  display:flex; border-top:1px solid #F3F4F6; padding:4px 8px;
+}
+.ctype-btn {
+  flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+  padding:9px 4px; border:none; background:none; cursor:pointer;
+  font-size:12px; font-weight:700; color:#6B7280; border-radius:8px;
+  transition:all .18s;
+}
+.ctype-btn:hover, .ctype-btn.active { background:#EEF2FF; color:#4338CA; }
+
+/* Formulaire plein */
+.composer-form {
+  padding:16px; border-top:1px solid #F3F4F6; display:none;
+}
+.composer-form.open { display:block; }
+.composer-head {
+  display:flex; align-items:center; gap:10px; margin-bottom:12px;
+}
+.composer-head .ch-av { width:40px; height:40px; border-radius:50%; flex-shrink:0; overflow:hidden; }
+.composer-head .ch-name { font-weight:700; font-size:14px; }
+.composer-head .ch-cat select {
+  margin-left:8px; font-size:12px; border:1px solid #E5E7EB;
+  border-radius:6px; padding:4px 8px; background:#F9FAFB;
+}
+.comp-ta {
+  width:100%; box-sizing:border-box; border:none; font-size:15px;
+  font-family:inherit; line-height:1.6; resize:none; outline:none;
+  min-height:80px; color:#111827; background:transparent;
+}
+.article-titre-inp {
+  width:100%; box-sizing:border-box; font-size:18px; font-weight:700;
+  border:none; border-bottom:2px solid #E5E7EB; outline:none; padding:4px 0;
+  margin-bottom:12px; font-family:inherit; color:#111827; background:transparent;
+}
+.article-titre-inp::placeholder { color:#D1D5DB; }
+.comp-media-zone {
+  border:2px dashed #E5E7EB; border-radius:10px; padding:28px;
+  text-align:center; cursor:pointer; transition:all .2s; margin-bottom:12px;
+  position:relative;
+}
+.comp-media-zone:hover { border-color:#4338CA; background:#EEF2FF; }
+.comp-media-zone input[type=file] {
+  position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;
+}
+.comp-media-zone .mz-icon { font-size:32px; margin-bottom:8px; display:block; }
+.comp-media-zone .mz-label { font-size:13px; color:#6B7280; }
+.comp-preview { margin-bottom:12px; position:relative; }
+.comp-preview img, .comp-preview video {
+  width:100%; max-height:360px; object-fit:cover; border-radius:10px; display:block;
+}
+.comp-preview .prev-del {
+  position:absolute; top:8px; right:8px; background:rgba(0,0,0,.5); color:#fff;
+  border:none; border-radius:50%; width:28px; height:28px; cursor:pointer;
+  font-size:14px; display:flex; align-items:center; justify-content:center;
+}
+.comp-video-info {
+  background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px;
+  padding:10px 14px; margin-bottom:12px; font-size:13px; color:#15803D;
+}
+.comp-video-err {
+  background:#FEF2F2; border:1px solid #FECACA; border-radius:8px;
+  padding:10px 14px; margin-bottom:12px; font-size:13px; color:#DC2626;
+}
+.composer-actions {
+  display:flex; align-items:center; justify-content:space-between;
+  padding-top:12px; border-top:1px solid #F3F4F6; margin-top:12px;
+}
+.comp-charcount { font-size:12px; color:#9CA3AF; }
+.comp-charcount.warn { color:#F59E0B; }
+.comp-charcount.over { color:#EF4444; }
+.btn-publish {
+  background:#4338CA; color:#fff; border:none; border-radius:8px;
+  padding:9px 24px; font-size:14px; font-weight:700; cursor:pointer;
+  transition:background .18s;
+}
+.btn-publish:hover { background:#3730A3; }
+.btn-publish:disabled { background:#C7D2FE; cursor:not-allowed; }
+.comp-cancel {
+  background:none; border:1px solid #E5E7EB; border-radius:8px;
+  padding:9px 14px; font-size:13px; cursor:pointer; color:#6B7280;
+}
+/* POST CARDS RICHES */
+.feed-post { background:#fff; border-radius:14px; margin-bottom:14px; overflow:hidden; border:1px solid #E5E7EB; }
+.fp-head { display:flex; align-items:flex-start; gap:12px; padding:14px 16px 10px; }
+.fp-av { width:44px; height:44px; border-radius:50%; flex-shrink:0; overflow:hidden; }
+.fp-meta { flex:1; min-width:0; }
+.fp-nom { font-weight:700; font-size:14px; color:#0D1B2A; }
+.fp-sub { font-size:12px; color:#9CA3AF; margin-top:2px; }
+.fp-cat { background:#EEF2FF; color:#4338CA; border-radius:99px; padding:3px 10px; font-size:11px; font-weight:700; white-space:nowrap; }
+.fp-body { padding:0 16px 12px; }
+.fp-text { font-size:14px; color:#374151; line-height:1.65; white-space:pre-wrap; margin:0 0 10px; }
+.fp-img { width:100%; max-height:420px; object-fit:cover; display:block; margin-bottom:2px; }
+.fp-video { width:100%; max-height:420px; border-radius:0; display:block; background:#000; }
+.fp-article-titre { font-size:18px; font-weight:800; color:#0D1B2A; margin:0 0 8px; line-height:1.3; }
+.fp-article-body { font-size:14px; color:#374151; line-height:1.7; white-space:pre-wrap; }
+.fp-article-more { color:#4338CA; font-size:13px; font-weight:700; cursor:pointer; margin-top:6px; display:inline-block; }
+.fp-stats { padding:6px 16px; font-size:12px; color:#9CA3AF; display:flex; gap:14px; border-top:1px solid #F3F4F6; }
+.fp-actions { display:flex; border-top:1px solid #F3F4F6; }
+.fp-btn {
+  flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+  padding:10px 4px; font-size:13px; font-weight:600; color:#6B7280;
+  background:none; border:none; cursor:pointer; border-radius:0; transition:all .18s;
+}
+.fp-btn:hover { background:#F9FAFB; color:#4338CA; }
+.fp-btn.liked { color:#EF4444; }
+.fp-btn.saved  { color:#F59E0B; }
+        `;
+        document.head.appendChild(st);
+      }
+
+      let currentType = "texte";
+      let mediaDataUrl = null;
+      let mediaFile    = null;
+      let videoDuree   = null;
+      let videoErreur  = false;
+      const MAX_CHARS  = 3000;
+
+      pubBox.innerHTML = `
+<div class="composer card">
+  <div class="composer-trigger">
+    <div class="ct-av">${photoAvatar(me.nom, 42)}</div>
+    <button class="ct-ph" id="comp-open-btn">Que souhaitez-vous partager ?</button>
+  </div>
+  <div class="composer-type-bar">
+    <button class="ctype-btn active" data-t="texte">📝 Texte</button>
+    <button class="ctype-btn" data-t="article">📰 Article</button>
+    <button class="ctype-btn" data-t="photo">📷 Photo</button>
+    <button class="ctype-btn" data-t="video">🎥 Vidéo</button>
+  </div>
+  <div class="composer-form" id="comp-form">
+    <div class="composer-head">
+      <div class="ch-av">${photoAvatar(me.nom, 40)}</div>
+      <div>
+        <div class="ch-name">${me.nom}</div>
+        <div class="ch-cat">
+          Catégorie :
+          <select id="comp-cat">
+            ${CATS.map(c=>`<option value="${c}">${c}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="comp-article-titre-wrap" style="display:none">
+      <input class="article-titre-inp" id="comp-article-titre" placeholder="Titre de votre article…" maxlength="200">
+    </div>
+    <textarea class="comp-ta" id="comp-ta" placeholder="Exprimez-vous…" maxlength="${MAX_CHARS}"></textarea>
+    <div id="comp-media-wrap"></div>
+    <div class="composer-actions">
+      <div class="comp-charcount" id="comp-cc">0 / ${MAX_CHARS}</div>
+      <div style="display:flex;gap:8px;">
+        <button class="comp-cancel" id="comp-cancel">Annuler</button>
+        <button class="btn-publish" id="comp-submit" disabled>Publier</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+
+      function switchType(t) {
+        currentType  = t;
+        mediaDataUrl = null; mediaFile = null; videoDuree = null; videoErreur = false;
+        pubBox.querySelectorAll(".ctype-btn").forEach(b=>b.classList.toggle("active", b.dataset.t===t));
+        document.getElementById("comp-form").classList.add("open");
+        const articleWrap = document.getElementById("comp-article-titre-wrap");
+        articleWrap.style.display = t==="article" ? "block" : "none";
+        document.getElementById("comp-ta").placeholder =
+          t==="texte"   ? "Partagez une idée, une actualité, une opportunité… (max 3 000 caractères)" :
+          t==="article" ? "Rédigez le corps de votre article ici…" :
+          t==="photo"   ? "Décrivez votre photo (facultatif)…" :
+                          "Décrivez votre vidéo (facultatif)…";
+        renderMediaZone();
+        checkSubmit();
+      }
+
+      function renderMediaZone() {
+        const wrap = document.getElementById("comp-media-wrap");
+        if(currentType === "texte" || currentType === "article") { wrap.innerHTML=""; return; }
+        if(mediaDataUrl) {
+          wrap.innerHTML = `<div class="comp-preview">
+            ${currentType==="photo"
+              ? `<img src="${mediaDataUrl}" alt="Aperçu">`
+              : `<video src="${mediaDataUrl}" controls class="fp-video" style="border-radius:10px;"></video>`}
+            <button class="prev-del" onclick="clearMedia()">✕</button>
+          </div>
+          ${videoDuree ? `<div class="comp-video-info">✅ Durée : ${Math.floor(videoDuree/60)}min ${Math.round(videoDuree%60)}s — dans la limite autorisée (2 min)</div>` : ""}
+          ${videoErreur ? `<div class="comp-video-err">⛔ Vidéo trop longue — maximum 2 minutes autorisé</div>` : ""}`;
+        } else {
+          const accept = currentType==="photo" ? "image/*" : "video/*";
+          const icon   = currentType==="photo" ? "📷" : "🎥";
+          const label  = currentType==="photo" ? "Cliquez ou glissez une photo (JPG, PNG, GIF, WebP)" : "Cliquez ou glissez une vidéo (MP4, WebM — max 2 min)";
+          wrap.innerHTML = `<div class="comp-media-zone" id="comp-dropzone">
+            <input type="file" accept="${accept}" id="comp-file-inp">
+            <span class="mz-icon">${icon}</span>
+            <div class="mz-label">${label}</div>
+          </div>`;
+          document.getElementById("comp-file-inp").addEventListener("change", handleFileSelect);
+        }
+      }
+
+      window.clearMedia = function() {
+        mediaDataUrl=null; mediaFile=null; videoDuree=null; videoErreur=false;
+        renderMediaZone(); checkSubmit();
+      };
+
+      function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if(!file) return;
+        mediaFile = file;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          mediaDataUrl = ev.target.result;
+          if(currentType==="video") {
+            const vid = document.createElement("video");
+            vid.src = mediaDataUrl;
+            vid.addEventListener("loadedmetadata", () => {
+              videoDuree = vid.duration;
+              videoErreur = vid.duration > 120;
+              renderMediaZone(); checkSubmit();
+            });
+          } else {
+            renderMediaZone(); checkSubmit();
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function checkSubmit() {
+        const ta    = document.getElementById("comp-ta");
+        const titre = document.getElementById("comp-article-titre");
+        const btn   = document.getElementById("comp-submit");
+        const cc    = document.getElementById("comp-cc");
+        const len   = (ta?.value||"").length;
+        if(cc){ cc.textContent=`${len} / ${MAX_CHARS}`; cc.className="comp-charcount"+(len>MAX_CHARS*0.9?" warn":"")+(len>MAX_CHARS?" over":""); }
+        let ok = false;
+        if(currentType==="texte")   ok = len > 0 && len <= MAX_CHARS;
+        if(currentType==="article") ok = (titre?.value||"").trim().length > 0;
+        if(currentType==="photo")   ok = !!mediaDataUrl;
+        if(currentType==="video")   ok = !!mediaDataUrl && !videoErreur;
+        if(btn) btn.disabled = !ok;
+      }
+
+      document.getElementById("comp-ta")?.addEventListener("input", checkSubmit);
+      document.getElementById("comp-article-titre")?.addEventListener("input", checkSubmit);
+
+      document.getElementById("comp-open-btn")?.addEventListener("click", ()=>{
+        document.getElementById("comp-form").classList.add("open");
+        document.getElementById("comp-ta").focus();
+      });
+
+      pubBox.querySelectorAll(".ctype-btn").forEach(b=>{
+        b.addEventListener("click", ()=>switchType(b.dataset.t));
+      });
+
+      document.getElementById("comp-cancel")?.addEventListener("click", ()=>{
+        document.getElementById("comp-form").classList.remove("open");
+        document.getElementById("comp-ta").value="";
+        if(document.getElementById("comp-article-titre")) document.getElementById("comp-article-titre").value="";
+        mediaDataUrl=null; mediaFile=null; videoDuree=null; videoErreur=false;
+        renderMediaZone(); checkSubmit();
+      });
+
+      document.getElementById("comp-submit")?.addEventListener("click", async ()=>{
+        const btn  = document.getElementById("comp-submit");
+        const ta   = document.getElementById("comp-ta");
+        const cat  = document.getElementById("comp-cat").value;
+        const titre = (document.getElementById("comp-article-titre")?.value||"").trim();
+        btn.disabled=true; btn.textContent="Publication…";
+
+        const payload = {
+          pub_type: currentType,
+          categorie: cat,
+          contenu: ta.value.trim(),
+        };
+        if(currentType==="article"){ payload.article_titre=titre; payload.article_contenu=ta.value.trim(); }
+        if(currentType==="photo" && mediaDataUrl)  payload.media_url = mediaDataUrl;
+        if(currentType==="video" && mediaDataUrl){ payload.media_url=mediaDataUrl; payload.video_duree=Math.round(videoDuree); }
+
+        try {
+          const res = await api("POST","/fil", payload);
+          // Prépend le nouveau post
+          if(res.post){
+            const np = { ...res.post, reactions:{} };
+            posts.unshift(np);
+          }
+          // Reset
+          ta.value="";
+          if(document.getElementById("comp-article-titre")) document.getElementById("comp-article-titre").value="";
+          mediaDataUrl=null; mediaFile=null; videoDuree=null; videoErreur=false;
+          document.getElementById("comp-form").classList.remove("open");
+          renderMediaZone();
+          render(currentFilter);
+        } catch(err){
+          alert(err.message||"Erreur lors de la publication.");
+        } finally {
+          btn.disabled=false; btn.textContent="Publier";
+        }
+      });
+    }
   }
 
-  let currentFilter = "Tous";
+  // ============================================================
+  // RENDU DES POSTS
+  // ============================================================
+  function fmtDate(str){
+    try{ return new Date(str.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"}); }
+    catch{ return str||""; }
+  }
+
+  function escH(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  function renderPost(p){
+    const likes   = (p.reactions&&p.reactions.like)||0;
+    const typeIcon = TYPE_ICONS[p.pub_type||p.type] || "📝";
+
+    let mediaHtml = "";
+    if(p.media_type==="image" && p.media_url)
+      mediaHtml = `<img class="fp-img" src="${escH(p.media_url)}" alt="Photo" loading="lazy">`;
+    else if(p.media_type==="video" && p.media_url)
+      mediaHtml = `<video class="fp-video" src="${escH(p.media_url)}" controls preload="metadata" style="margin-bottom:2px;"></video>`;
+
+    let bodyHtml = "";
+    if(p.pub_type==="article" && p.article_titre){
+      const body = p.article_contenu || p.contenu || "";
+      const preview = body.length > 300 ? body.slice(0,300)+"…" : body;
+      bodyHtml = `
+        <h3 class="fp-article-titre">${escH(p.article_titre)}</h3>
+        <div class="fp-article-body" id="art-body-${p.id}">${escH(preview)}</div>
+        ${body.length>300?`<span class="fp-article-more" onclick="expandArticle(${p.id},this,${JSON.stringify(escH(body))})">Lire la suite →</span>`:""}`;
+    } else {
+      const text = p.contenu || "";
+      const preview = text.length > 400 ? text.slice(0,400)+"…" : text;
+      bodyHtml = `<div class="fp-text">${escH(preview)}${text.length>400?`<span class="fp-article-more" onclick="expandText(${p.id},this,${JSON.stringify(escH(text))})"> Lire la suite →</span>`:""}</div>`;
+    }
+
+    return `<div class="feed-post" id="fp-${p.id}">
+      <div class="fp-head">
+        <div class="fp-av">${photoAvatar(p.auteur_nom||"?",44)}</div>
+        <div class="fp-meta">
+          <div class="fp-nom">${escH(p.auteur_nom||"Anonyme")}</div>
+          <div class="fp-sub">${typeIcon} ${p.pub_type||p.type||"Publication"} · ${fmtDate(p.created_at)}</div>
+        </div>
+        <span class="fp-cat">${escH(p.categorie||"")}</span>
+      </div>
+      ${mediaHtml ? `<div>${mediaHtml}</div>` : ""}
+      <div class="fp-body">${bodyHtml}</div>
+      <div class="fp-stats">
+        <span id="fp-likes-${p.id}">❤️ ${likes}</span>
+        <span>💬 ${Math.floor(Math.random()*8)} commentaires</span>
+      </div>
+      <div class="fp-actions">
+        <button class="fp-btn feed-react" data-id="${p.id}" data-likes="${likes}">❤️ J'aime</button>
+        <button class="fp-btn">💬 Commenter</button>
+        <button class="fp-btn" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.href)">↗️ Partager</button>
+        <button class="fp-btn" onclick="this.classList.toggle('saved');this.textContent=this.classList.contains('saved')?'🔖 Enregistré':'🔖 Enregistrer'">🔖 Enregistrer</button>
+      </div>
+    </div>`;
+  }
+
+  window.expandArticle = function(id,btn,full){
+    const el2=document.getElementById("art-body-"+id);
+    if(el2){ el2.innerHTML=full; btn.remove(); }
+  };
+  window.expandText = function(id,btn,full){
+    const p=btn.closest(".fp-text");
+    if(p){ p.innerHTML=full; }
+  };
 
   function render(filterType){
-    currentFilter = filterType || "Tous";
-    const items = currentFilter !== "Tous" ? posts.filter(p=>p.type === currentFilter) : posts;
-    el.innerHTML = items.length ? items.map(p=>`
-      <div class="feed-post">
-        <div class="feed-head">
-          <div class="init-logo">${photoAvatar(p.auteur_nom || '?', 48)}</div>
-          <div class="meta">
-            <h4>${p.auteur_nom || "Anonyme"}</h4>
-            <div class="sub-meta">${p.type || ""} · ${new Date(p.created_at.replace(" ","T")+"Z").toLocaleString('fr-FR')}</div>
-          </div>
-          <span class="feed-cat">${p.categorie || ""}</span>
-        </div>
-        <div class="feed-body">${p.contenu}</div>
-        <div class="feed-actions">
-          <span class="feed-react" data-id="${p.id}" style="cursor:pointer;">👍 Réagir (${countReactions(p)})</span>
-          <span>💬 Commenter</span>
-          <span>🔁 Partager</span>
-          <span>🔖 Enregistrer</span>
-          <span>🚩 Signaler</span>
-        </div>
-      </div>`).join("") : `<div class="empty">Aucune publication pour ce filtre.</div>`;
+    currentFilter = filterType||"Tous";
+    const items = currentFilter!=="Tous" ? posts.filter(p=>{
+      const t = (p.pub_type||p.type||"").toLowerCase();
+      const filterMap = { "utilisateur":"texte","association":"article","entreprise":"photo","institution":"video" };
+      return t === (filterMap[currentFilter.toLowerCase()]||currentFilter.toLowerCase());
+    }) : posts;
+    el.innerHTML = items.length
+      ? items.map(renderPost).join("")
+      : `<div class="empty">Aucune publication pour ce filtre.</div>`;
 
-    el.querySelectorAll(".feed-react").forEach(s=>{
-      s.addEventListener("click", async ()=>{
-        try {
-          const r = await api("POST", `/fil/${s.dataset.id}/react`, { type: "like" });
-          const post = posts.find(p=>String(p.id)===s.dataset.id);
-          if(post) post.reactions = r.reactions;
-          render(currentFilter);
-        } catch (e) {
-          alert("Connectez-vous pour réagir aux publications.");
-        }
+    el.querySelectorAll(".feed-react").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        if(!me){ alert("Connectez-vous pour réagir."); return; }
+        btn.classList.toggle("liked");
+        const base = parseInt(btn.dataset.likes)||0;
+        const inc  = btn.classList.contains("liked") ? 1 : 0;
+        const stat = document.getElementById("fp-likes-"+btn.dataset.id);
+        if(stat) stat.textContent = `❤️ ${base + inc}`;
+        try { await api("POST",`/fil/${btn.dataset.id}/react`,{type:"like"}); } catch{}
       });
     });
   }
@@ -665,33 +1053,12 @@ async function initFilActualite(){
   const bar = document.getElementById("feed-filter-bar");
   if(bar){
     bar.querySelectorAll("button").forEach(b=>{
-      b.addEventListener("click", ()=>{
+      b.addEventListener("click",()=>{
         bar.querySelectorAll("button").forEach(x=>x.classList.remove("active"));
         b.classList.add("active");
         render(b.dataset.type);
       });
     });
-  }
-
-  const pubBox = document.getElementById("fil-publish");
-  if(pubBox){
-    const me = await fetchCurrentUser();
-    if(me){
-      pubBox.innerHTML = `
-        <textarea id="fil-new-content" placeholder="Partager une actualité, une opportunité, un appel à projets..." style="width:100%;min-height:70px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;"></textarea>
-        <button class="btn btn-orange" id="fil-publish-btn" style="margin-top:8px;">Publier</button>`;
-      document.getElementById("fil-publish-btn").addEventListener("click", async ()=>{
-        const ta = document.getElementById("fil-new-content");
-        if(!ta.value.trim()) return;
-        await api("POST", "/fil", { contenu: ta.value.trim(), categorie: "Publication" });
-        ta.value = "";
-        const r = await api("GET", "/fil");
-        posts = r.posts;
-        render(currentFilter);
-      });
-    } else {
-      pubBox.innerHTML = `<div class="notice" style="margin:0;">Vous devez être <a href="login.html">connecté</a> pour publier sur le fil d'actualité.</div>`;
-    }
   }
 
   render("Tous");
