@@ -1141,7 +1141,7 @@
 </div>
 
 <script src="assets/data.js?v=5"></script>
-<script src="assets/app.js?v=5"></script>
+<script src="assets/app.js?v=6"></script>
 <script>
 /* ============================================================
    HOMEPAGE — scripts inline
@@ -1201,6 +1201,7 @@
   const arcProg = CONNS.map((_,i) => ({
     p: i / CONNS.length,
     spd: 0.0015 + (i % 5) * 0.0003,
+    trail: [],
   }));
 
   /* Grille de fond (points terre simplifiés) */
@@ -1287,18 +1288,41 @@
       ctx.stroke();
       ctx.setLineDash([]);
 
-      /* Dot qui se déplace */
+      /* Dot animé avec traînée comète (direction origine→accueil) */
       const bx = (1-t)*(1-t)*from[0] + 2*(1-t)*t*mx + t*t*to[0];
       const by = (1-t)*(1-t)*from[1] + 2*(1-t)*t*my + t*t*to[1];
+
+      /* Traînée : positions précédentes avec opacité décroissante */
+      const trail = arcProg[i].trail;
+      trail.forEach((pos, ti) => {
+        const ratio = (ti + 1) / trail.length;
+        const alpha = Math.floor(ratio * 140).toString(16).padStart(2,'0');
+        const r = 1.2 + ratio * 1.4;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = conn.c + alpha;
+        ctx.fill();
+      });
+
+      /* Tête lumineuse */
       ctx.shadowColor = conn.c;
-      ctx.shadowBlur = 14;
+      ctx.shadowBlur = 16;
       ctx.beginPath();
-      ctx.arc(bx, by, 2.8, 0, Math.PI * 2);
+      ctx.arc(bx, by, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(bx, by, 2, 0, Math.PI * 2);
       ctx.fillStyle = conn.c;
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      arcProg[i].p = (arcProg[i].p + arcProg[i].spd) % 1;
+      /* Mise à jour traînée */
+      const nextP = (arcProg[i].p + arcProg[i].spd) % 1;
+      if (nextP < arcProg[i].p) trail.length = 0; /* reset au cycle */
+      trail.push({x: bx, y: by});
+      if (trail.length > 8) trail.shift();
+      arcProg[i].p = nextP;
     });
 
     /* Villes */
@@ -1435,7 +1459,7 @@
           </div>
           <div class="hp-init-meta">
             <span>📍 ${loc}</span>
-            <a href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}" class="hp-discover-btn">Découvrir →</a>
+            <span class="hp-discover-btn">Découvrir →</span>
           </div>
         </div>
       </a>`;
