@@ -34,6 +34,18 @@ async function fetchCurrentUser() {
 const ROLE_DASHBOARD = { utilisateur: "dashboard-utilisateur.html", initiative: "dashboard-initiative.html", administrateur: "dashboard-administrateur.html", collectivite: "dashboard-collectivite.html" };
 const ROLE_LABEL_FR = { utilisateur: "Utilisateur", initiative: "Initiative", administrateur: "Administrateur", collectivite: "Collectivité" };
 
+/* ---------- Avatars photo (DiceBear) ---------- */
+function photoAvatar(name, size=48, type='user') {
+  const seed = encodeURIComponent((name||'?').trim());
+  const url = type === 'initiative'
+    ? `https://api.dicebear.com/7.x/initials/svg?seed=${seed}&backgroundColor=1B3A6B,1565C0,24487E&fontColor=ffffff&fontSize=38`
+    : `https://api.dicebear.com/7.x/lorelei/svg?seed=${seed}&backgroundColor=E8F1FC,dde3ec`;
+  return `<img src="${url}" alt="${name||'?'}" style="width:${size}px;height:${size}px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">`;
+}
+function avatarDiv(name, size=48, type='user', extraStyle='') {
+  return `<div class="init-logo" style="width:${size}px;height:${size}px;${extraStyle}">${photoAvatar(name, size, type)}</div>`;
+}
+
 /* Badge de messages non lus dans la topbar */
 function updateTopbarBadge(count) {
   const badge = document.getElementById("msg-topbar-badge");
@@ -57,7 +69,7 @@ async function applyAuthState() {
         <span id="msg-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
       </a>
       <a href="${ROLE_DASHBOARD[user.role] || '#'}" class="user-chip" style="text-decoration:none;">
-        <div class="avatar">${initials(user.nom)}</div> ${user.nom}
+        <div class="avatar">${photoAvatar(user.nom, 30)}</div> ${user.nom}
       </a>
       <span class="role-tag">${ROLE_LABEL_FR[user.role] || user.role}</span>
       <a href="#" id="logout-link" class="btn btn-sm btn-outline">Déconnexion</a>`;
@@ -156,7 +168,7 @@ function renderNetwork(containerId, items){
 function renderInitiativeCard(it){
   return `
   <a class="init-card" href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}" style="margin-bottom:12px;">
-    <div class="init-logo">${initials(it.nom)}</div>
+    <div class="init-logo">${photoAvatar(it.nom, 48, 'initiative')}</div>
     <div class="meta">
       <div class="flex-between">
         <h4>${it.nom}</h4>
@@ -254,7 +266,7 @@ async function initFicheInitiative(){
     <div class="profile-card">
       <div class="profile-cover"></div>
       <div class="profile-head">
-        <div class="init-logo">${initials(it.nom)}</div>
+        <div class="init-logo" style="width:64px;height:64px;">${photoAvatar(it.nom, 64, 'initiative')}</div>
         <div style="flex:1;">
           <div class="flex-between">
             <div>
@@ -312,7 +324,7 @@ async function initMessagerie(){
       }
       cv.innerHTML = convs.slice(0,4).map(c=>`
         <a href="messagerie.html" style="text-decoration:none;display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center;">
-          <div class="avatar" style="flex-shrink:0;">${(c.avec_nom||"?")[0].toUpperCase()}</div>
+          <div class="avatar" style="flex-shrink:0;width:36px;height:36px;">${photoAvatar(c.avec_nom||'?', 36)}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-weight:700;font-size:13px;${c.non_lus>0?'color:var(--orange);':''}">${c.avec_nom||"Utilisateur"} ${c.non_lus>0?`<span style="background:var(--orange);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;">${c.non_lus}</span>`:''}</div>
             <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.derniere||"Nouvelle conversation"}</div>
@@ -402,7 +414,7 @@ async function initDashboardUtilisateur(){
         const r = await api("GET", "/conversations");
         cv.innerHTML = r.conversations.length ? r.conversations.map(c=>`
           <a class="init-card" href="messagerie.html?conv=${c.id}" style="margin-bottom:10px;">
-            <div class="init-logo">${initials(c.avec_nom||'?')}</div>
+            <div class="init-logo">${photoAvatar(c.avec_nom||'?', 48)}</div>
             <div class="meta"><h4>${c.avec_nom || "Utilisateur"}</h4><p>${c.derniere || "Nouvelle conversation"}</p></div>
           </a>`).join("") : `<div class="empty">Aucune conversation pour le moment.</div>`;
       }
@@ -468,7 +480,7 @@ async function initFilActualite(){
     el.innerHTML = items.length ? items.map(p=>`
       <div class="feed-post">
         <div class="feed-head">
-          <div class="init-logo">${initials(p.auteur_nom || "?")}</div>
+          <div class="init-logo">${photoAvatar(p.auteur_nom || '?', 48)}</div>
           <div class="meta">
             <h4>${p.auteur_nom || "Anonyme"}</h4>
             <div class="sub-meta">${p.type || ""} · ${new Date(p.created_at.replace(" ","T")+"Z").toLocaleString('fr-FR')}</div>
@@ -684,7 +696,7 @@ function renderProfilUtilisateur(vm){
     <div class="card" style="margin-bottom:20px;">
       <div class="flex-between" style="align-items:flex-start;flex-wrap:wrap;gap:14px;">
         <div style="display:flex;gap:14px;align-items:center;">
-          <div class="avatar" style="width:64px;height:64px;font-size:22px;">${initials(vm.nom)}</div>
+          <div class="avatar" style="width:64px;height:64px;font-size:22px;">${photoAvatar(vm.nom, 64)}</div>
           <div>
             <h2 style="margin:0 0 4px;">${vm.nom} ${vm.verifie ? '<span class="tag" style="background:#E7F4EE;color:var(--green);border-color:#cdeede;">✅ Profil vérifié</span>' : ''}</h2>
             <p style="margin:0;color:var(--muted);">${vm.statut_professionnel || ""}${vm.ville ? " · "+vm.ville : ""}</p>
