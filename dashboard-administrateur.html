@@ -1602,6 +1602,20 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
     if (SECTION_LOADERS[a.dataset.section]) SECTION_LOADERS[a.dataset.section]();
   }));
 
+  // ── Exposer fonctions pub AVANT le premier await ──
+  // (garantit qu'elles sont accessibles même si l'API dashboard échoue)
+  window.openPubModal        = openPubModal;
+  window.closePubModal       = closePubModal;
+  window.savePub             = savePub;
+  window.deletePub           = deletePub;
+  window.viewPubStats        = viewPubStats;
+  window.pubSwitchTab        = pubSwitchTab;
+  window.pubLoadFile         = pubLoadFile;
+  window.pubLoadGalerie      = pubLoadGalerie;
+  window.pubPreviewImg       = pubPreviewImg;
+  window.pubDebouncedPreview = pubDebouncedPreview;
+  window.pubUpdatePreview    = pubUpdatePreview;
+
   // Charger données
   let data = {};
   try {
