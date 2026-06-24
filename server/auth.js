@@ -62,4 +62,32 @@ function parseCookies(req) {
   return out;
 }
 
-module.exports = { hashPassword, verifyPassword, createSession, getSession, destroySession, parseCookies };
+/* ---------- Token signé stateless (survit aux cold starts Vercel) ---------- */
+const AUTH_SECRET = process.env.AUTH_SECRET || "diaspo-actif-2026-secret";
+const TOKEN_TTL = 7 * 24 * 3600; // secondes
+
+function signAuthToken(payload) {
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig  = crypto.createHmac("sha256", AUTH_SECRET).update(data).digest("base64url");
+  return data + "." + sig;
+}
+
+function verifyAuthToken(token) {
+  if (!token) return null;
+  const dot = token.lastIndexOf(".");
+  if (dot < 0) return null;
+  const data = token.slice(0, dot);
+  const sig  = token.slice(dot + 1);
+  let expected;
+  try { expected = crypto.createHmac("sha256", AUTH_SECRET).update(data).digest("base64url"); } catch { return null; }
+  try {
+    if (sig.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  } catch { return null; }
+  try {
+    const payload = JSON.parse(Buffer.from(data, "base64url").toString());
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch { return null; }
+}
+
+module.exports = { hashPassword, verifyPassword, createSession, getSession, destroySession, parseCookies, signAuthToken, verifyAuthToken, TOKEN_TTL };

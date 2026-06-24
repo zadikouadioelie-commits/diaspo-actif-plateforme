@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const url = require("node:url");
 const db = require("./db");
-const { hashPassword, verifyPassword, createSession, getSession, destroySession, parseCookies } = require("./auth");
+const { hashPassword, verifyPassword, createSession, getSession, destroySession, parseCookies, signAuthToken, verifyAuthToken, TOKEN_TTL } = require("./auth");
 
 const PORT = process.env.PORT || 3000;
 const ROOT = path.join(__dirname, ".."); // dossier diaspoactif-site (fichiers statiques)
@@ -48,6 +48,16 @@ function readBody(req) {
 
 function getCurrentUser(req) {
   const cookies = parseCookies(req);
+  /* 1. Token stateless signé (résiste aux cold starts Vercel) */
+  const authCookie = cookies.auth;
+  if (authCookie) {
+    const payload = verifyAuthToken(authCookie);
+    if (payload?.uid) {
+      const user = db.prepare("SELECT id, nom, email, role, ville, pays, profil_json FROM users WHERE id = ?").get(payload.uid);
+      if (user) return user;
+    }
+  }
+  /* 2. Session DB classique (fallback) */
   const sid = cookies.sid;
   if (!sid) return null;
   const session = getSession(sid);
@@ -144,7 +154,8 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   const token = createSession(id);
   const user = db.prepare("SELECT id, nom, prenom, email, role, ville, pays, statut_verification FROM users WHERE id = ?").get(id);
-  sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": `sid=${token}; HttpOnly; Path=/; SameSite=Lax` });
+  const authTok = signAuthToken({ uid: id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
 });
 
 route("POST", "/api/auth/login", async (req, res, params, body) => {
@@ -154,13 +165,14 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
     return sendJSON(res, 401, { error: "E-mail ou mot de passe incorrect." });
   }
   const token = createSession(user.id);
-  sendJSON(res, 200, { user: publicUser(user) }, { "Set-Cookie": `sid=${token}; HttpOnly; Path=/; SameSite=Lax` });
+  const authTok = signAuthToken({ uid: user.id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  sendJSON(res, 200, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
 });
 
 route("POST", "/api/auth/logout", async (req, res) => {
   const cookies = parseCookies(req);
   if (cookies.sid) destroySession(cookies.sid);
-  sendJSON(res, 200, { ok: true }, { "Set-Cookie": "sid=; HttpOnly; Path=/; Max-Age=0" });
+  sendJSON(res, 200, { ok: true }, { "Set-Cookie": ["sid=; HttpOnly; Path=/; Max-Age=0", "auth=; HttpOnly; Path=/; Max-Age=0"] });
 });
 
 route("GET", "/api/auth/me", async (req, res) => {
