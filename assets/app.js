@@ -952,6 +952,47 @@ async function initFilActualite(){
 .fp-btn:hover { background:#F9FAFB; color:#4338CA; }
 .fp-btn.liked { color:#EF4444; }
 .fp-btn.saved  { color:#F59E0B; }
+/* Bannière auteur + localisation */
+.fp-author-banner {
+  height:72px; width:100%; position:relative; flex-shrink:0;
+}
+.fp-type-badge {
+  position:absolute; bottom:8px; left:14px;
+  background:rgba(0,0,0,.38); color:#fff; border-radius:20px;
+  padding:2px 10px; font-size:11px; font-weight:700; backdrop-filter:blur(4px);
+}
+.fp-av-link { display:block; flex-shrink:0; }
+.fp-nom-link { color:#0D1B2A; text-decoration:none; }
+.fp-nom-link:hover { text-decoration:underline; }
+.fp-titre-pro { font-size:12px; color:#6B7280; margin-top:1px; }
+.fp-sub-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:4px; }
+.fp-loc, .fp-orig, .fp-date { font-size:11.5px; color:#9CA3AF; }
+.fp-loc { color:#374151; font-weight:500; }
+.fp-orig { color:#059669; font-weight:500; }
+.fp-author-bio { font-size:12.5px; color:#6B7280; padding:0 16px 8px; font-style:italic; line-height:1.5; }
+.fp-bio-snippet { /* inline within fp-author-bio */ }
+/* Widget Profils à découvrir */
+.pdc-wrapper { background:#fff; border-radius:14px; border:1px solid #E5E7EB; margin-bottom:16px; overflow:hidden; }
+.pdc-header { display:flex; align-items:baseline; justify-content:space-between; padding:14px 16px 10px; border-bottom:1px solid #F3F4F6; }
+.pdc-title { font-size:14px; font-weight:800; color:#0D1B2A; }
+.pdc-sub { font-size:11.5px; color:#9CA3AF; }
+.pdc-scroll { display:flex; gap:12px; overflow-x:auto; padding:14px 14px 16px; scroll-snap-type:x mandatory; scrollbar-width:thin; }
+.pdc-scroll::-webkit-scrollbar { height:4px; }
+.pdc-scroll::-webkit-scrollbar-thumb { background:#E5E7EB; border-radius:4px; }
+.pdc-card { flex:0 0 200px; scroll-snap-align:start; border:1px solid #F3F4F6; border-radius:12px; overflow:hidden; background:#FAFAFA; transition:box-shadow .18s; }
+.pdc-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.1); }
+.pdc-banner { height:80px; width:100%; }
+.pdc-av { margin:-28px auto 0; width:56px; height:56px; border-radius:50%; overflow:hidden; border:3px solid #fff; display:flex; align-items:center; justify-content:center; background:#E5E7EB; position:relative; z-index:1; }
+.pdc-av img { width:100%; height:100%; object-fit:cover; }
+.pdc-body { padding:10px 12px 14px; text-align:center; }
+.pdc-nom { display:block; font-weight:700; font-size:13.5px; color:#0D1B2A; text-decoration:none; margin-bottom:2px; }
+.pdc-nom:hover { text-decoration:underline; }
+.pdc-titre { font-size:11.5px; color:#6B7280; margin-bottom:4px; }
+.pdc-loc { font-size:11px; color:#374151; font-weight:500; margin-bottom:2px; }
+.pdc-orig { font-size:11px; color:#059669; font-weight:600; margin-bottom:6px; }
+.pdc-bio { font-size:11.5px; color:#6B7280; line-height:1.45; margin-bottom:8px; text-align:left; }
+.pdc-btn { display:block; background:#4338CA; color:#fff; border-radius:8px; padding:6px 0; font-size:12px; font-weight:700; text-align:center; text-decoration:none; transition:background .18s; }
+.pdc-btn:hover { background:#3730A3; }
         `;
         document.head.appendChild(st);
       }
@@ -1165,9 +1206,46 @@ async function initFilActualite(){
 
   function escH(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
+  // Palettes banner par thème (ou fallback selon nom)
+  const THEME_BANNERS = {
+    ocean:  "linear-gradient(135deg,#1a6985 0%,#2ab7ca 100%)",
+    foret:  "linear-gradient(135deg,#2d6a4f 0%,#74c69d 100%)",
+    soleil: "linear-gradient(135deg,#e07b00 0%,#ffd166 100%)",
+    violet: "linear-gradient(135deg,#5a2d82 0%,#c77dff 100%)",
+    terre:  "linear-gradient(135deg,#7b3f00 0%,#c8903f 100%)",
+    nuit:   "linear-gradient(135deg,#1a1a2e 0%,#4a4e8c 100%)",
+  };
+  function themeGradient(theme, nom){
+    if(THEME_BANNERS[theme]) return THEME_BANNERS[theme];
+    // Fallback déterministe basé sur initiale
+    const idx = (nom||"?").charCodeAt(0) % Object.keys(THEME_BANNERS).length;
+    return Object.values(THEME_BANNERS)[idx];
+  }
+
   function renderPost(p){
     const likes   = (p.reactions&&p.reactions.like)||0;
     const typeIcon = TYPE_ICONS[p.pub_type||p.type] || "📝";
+    const prof    = p.auteur_profil || {};
+    const nom     = p.auteur_nom || "Anonyme";
+    const banner  = prof.banner_url
+      ? `url('${prof.banner_url}') center/cover no-repeat`
+      : themeGradient(prof.theme_couleur, nom);
+    const avHtml  = prof.photo_url
+      ? `<img src="${escH(prof.photo_url)}" alt="${escH(nom)}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:3px solid #fff;">`
+      : photoAvatar(nom, 52);
+    const locParts = [prof.ville, prof.pays].filter(Boolean);
+    const locHtml  = locParts.length
+      ? `<span class="fp-loc">📍 ${escH(locParts.join(", "))}</span>`
+      : "";
+    const origHtml = prof.nationalite1
+      ? `<span class="fp-orig">🌍 Origine : ${escH(prof.nationalite1)}</span>`
+      : "";
+    const titreHtml = (prof.titre_pro || prof.situation_pro)
+      ? `<div class="fp-titre-pro">${escH(prof.titre_pro || prof.situation_pro)}</div>`
+      : "";
+    const bioHtml = prof.bio
+      ? `<div class="fp-bio-snippet">${escH(prof.bio.slice(0,100))}${prof.bio.length>100?"…":""}</div>`
+      : "";
 
     let mediaHtml = "";
     if(p.media_type==="image" && p.media_url)
@@ -1190,14 +1268,22 @@ async function initFilActualite(){
     }
 
     return `<div class="feed-post" id="fp-${p.id}">
+      <div class="fp-author-banner" style="background:${banner};">
+        <span class="fp-type-badge">${typeIcon} ${escH(p.pub_type||p.type||"Publication")}</span>
+      </div>
       <div class="fp-head">
-        <div class="fp-av">${photoAvatar(p.auteur_nom||"?",44)}</div>
+        <a href="profil.html?id=${p.auteur_id||''}" class="fp-av-link">${avHtml}</a>
         <div class="fp-meta">
-          <div class="fp-nom">${escH(p.auteur_nom||"Anonyme")}</div>
-          <div class="fp-sub">${typeIcon} ${p.pub_type||p.type||"Publication"} · ${fmtDate(p.created_at)}</div>
+          <div class="fp-nom"><a href="profil.html?id=${p.auteur_id||''}" class="fp-nom-link">${escH(nom)}</a></div>
+          ${titreHtml}
+          <div class="fp-sub-row">
+            ${locHtml}${origHtml}
+            <span class="fp-date">🕐 ${fmtDate(p.created_at)}</span>
+          </div>
         </div>
         <span class="fp-cat">${escH(p.categorie||"")}</span>
       </div>
+      ${bioHtml ? `<div class="fp-author-bio">${bioHtml}</div>` : ""}
       ${mediaHtml ? `<div>${mediaHtml}</div>` : ""}
       <div class="fp-body">${bodyHtml}</div>
       <div class="fp-stats">
@@ -1222,6 +1308,70 @@ async function initFilActualite(){
     if(p){ p.innerHTML=renderMentions(raw); }
   };
 
+  // Profils fictifs riches pour remplir le widget même sur DB vide
+  const DEMO_PROFILES = [
+    { id:null, nom:"Amara Diallo", titre_pro:"Entrepreneur · Fintech", ville:"Paris", pays:"France",
+      nationalite1:"Guinéenne", bio:"Fondateur de PayDiaspo, solution de transfert d'argent dédiée aux diasporas africaines.",
+      theme_couleur:"ocean", banner_url:"https://picsum.photos/seed/amara2026/400/120", photo_url:null },
+    { id:null, nom:"Fatou Sène", titre_pro:"Médecin · Santé publique", ville:"Lyon", pays:"France",
+      nationalite1:"Sénégalaise", bio:"Coordinatrice du programme Santé Diaspora — accès aux soins pour les migrants.",
+      theme_couleur:"foret", banner_url:"https://picsum.photos/seed/fatou2026/400/120", photo_url:null },
+    { id:null, nom:"Kofi Mensah", titre_pro:"Ingénieur logiciel · Tech4Africa", ville:"Londres", pays:"Royaume-Uni",
+      nationalite1:"Ghanéenne", bio:"Développe des outils numériques pour connecter la diaspora ghanéenne aux opportunités locales.",
+      theme_couleur:"violet", banner_url:"https://picsum.photos/seed/kofi2026/400/120", photo_url:null },
+    { id:null, nom:"Marie-Claire Nkosi", titre_pro:"Enseignante · Éducation", ville:"Bruxelles", pays:"Belgique",
+      nationalite1:"Congolaise (RDC)", bio:"Militante pour l'accès à l'éducation bilingue et la valorisation des cultures africaines en Europe.",
+      theme_couleur:"soleil", banner_url:"https://picsum.photos/seed/marie2026/400/120", photo_url:null },
+    { id:null, nom:"Ibrahim Touré", titre_pro:"Agriculteur · Agri-Tech", ville:"Marseille", pays:"France",
+      nationalite1:"Malienne", bio:"Développe des coopératives agricoles reliant les producteurs maliens à la diaspora européenne.",
+      theme_couleur:"terre", banner_url:"https://picsum.photos/seed/ibrahim2026/400/120", photo_url:null },
+    { id:null, nom:"Awa Camara", titre_pro:"Juriste · Droits des migrants", ville:"Berlin", pays:"Allemagne",
+      nationalite1:"Burkinabè", bio:"Avocate spécialisée en droit de l'immigration et accès aux droits pour les diasporas africaines.",
+      theme_couleur:"nuit", banner_url:"https://picsum.photos/seed/awa2026/400/120", photo_url:null },
+  ];
+
+  function renderProfileCard(u){
+    const nom    = u.nom || "Profil";
+    const banner = u.banner_url
+      ? `url('${u.banner_url}') center/cover no-repeat`
+      : themeGradient(u.theme_couleur, nom);
+    const avHtml = u.photo_url
+      ? `<img src="${escH(u.photo_url)}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #fff;" alt="${escH(nom)}">`
+      : photoAvatar(nom, 64);
+    const profUrl = u.id ? `profil.html?id=${u.id}` : "#";
+    return `<div class="pdc-card">
+      <div class="pdc-banner" style="background:${banner};"></div>
+      <div class="pdc-av">${avHtml}</div>
+      <div class="pdc-body">
+        <a href="${profUrl}" class="pdc-nom">${escH(nom)}</a>
+        ${u.titre_pro ? `<div class="pdc-titre">${escH(u.titre_pro)}</div>` : ""}
+        ${u.ville||u.pays ? `<div class="pdc-loc">📍 ${escH([u.ville,u.pays].filter(Boolean).join(", "))}</div>` : ""}
+        ${u.nationalite1 ? `<div class="pdc-orig">🌍 ${escH(u.nationalite1)}</div>` : ""}
+        ${u.bio ? `<div class="pdc-bio">${escH(u.bio.slice(0,90))}${u.bio.length>90?"…":""}</div>` : ""}
+        <a href="${profUrl}" class="pdc-btn">Voir le profil</a>
+      </div>
+    </div>`;
+  }
+
+  async function buildProfilesWidget(){
+    let profiles = DEMO_PROFILES;
+    try {
+      const data = await api("GET", "/fil/profiles");
+      if(data.profiles && data.profiles.length) {
+        // Fusionner: vrais profils d'abord, puis compléter avec DEMO_PROFILES
+        const real = data.profiles.filter(u => u.ville || u.pays || u.nationalite1 || u.bio);
+        profiles = [...real, ...DEMO_PROFILES].slice(0, 6);
+      }
+    } catch{}
+    return `<div class="pdc-wrapper">
+      <div class="pdc-header">
+        <span class="pdc-title">👥 Profils à découvrir</span>
+        <span class="pdc-sub">Membres actifs de la diaspora</span>
+      </div>
+      <div class="pdc-scroll">${profiles.map(renderProfileCard).join("")}</div>
+    </div>`;
+  }
+
   function render(filterType){
     currentFilter = filterType||"Tous";
     const items = currentFilter!=="Tous" ? posts.filter(p=>{
@@ -1229,9 +1379,20 @@ async function initFilActualite(){
       const filterMap = { "utilisateur":"texte","association":"article","entreprise":"photo","institution":"video" };
       return t === (filterMap[currentFilter.toLowerCase()]||currentFilter.toLowerCase());
     }) : posts;
-    el.innerHTML = items.length
-      ? items.map(renderPost).join("")
-      : `<div class="empty">Aucune publication pour ce filtre.</div>`;
+
+    if(!items.length){
+      el.innerHTML = `<div class="empty">Aucune publication pour ce filtre.</div>`;
+    } else {
+      // Injecter le widget profils après le 3e post (ou à la fin si moins de 3)
+      const INSERT_AT = 3;
+      let html = "";
+      items.forEach((p, i) => {
+        html += renderPost(p);
+        if(i === INSERT_AT - 1) html += `<div id="profiles-widget-slot"></div>`;
+      });
+      if(items.length < INSERT_AT) html += `<div id="profiles-widget-slot"></div>`;
+      el.innerHTML = html;
+    }
 
     el.querySelectorAll(".feed-react").forEach(btn=>{
       btn.addEventListener("click", async ()=>{
@@ -1244,6 +1405,10 @@ async function initFilActualite(){
         try { await api("POST",`/fil/${btn.dataset.id}/react`,{type:"like"}); } catch{}
       });
     });
+
+    // Remplir le slot widget profils (async)
+    const slot = document.getElementById("profiles-widget-slot");
+    if(slot) buildProfilesWidget().then(html => { slot.outerHTML = html; });
   }
 
   const bar = document.getElementById("feed-filter-bar");

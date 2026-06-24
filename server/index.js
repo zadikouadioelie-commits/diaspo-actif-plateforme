@@ -1024,9 +1024,31 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   const withReactions = posts.map(p => {
     const reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
     const counts = {}; reactions.forEach(r => counts[r.type]=r.n);
-    return { ...p, reactions: counts };
+    // Enrichir avec les données profil de l'auteur
+    let auteur = {};
+    if (p.auteur_id) {
+      const u = db.prepare("SELECT photo_url, banner_url, ville, pays, nationalite1, titre_pro, bio, situation_pro, theme_couleur FROM users WHERE id=?").get(p.auteur_id);
+      if (u) auteur = u;
+    }
+    return { ...p, reactions: counts, auteur_profil: auteur };
   });
   sendJSON(res, 200, { posts: withReactions, total, page, pages: Math.ceil(total/limit) });
+});
+
+/* ---------- Profils à découvrir dans le fil ---------- */
+route("GET", "/api/fil/profiles", async (req, res, params, body, query) => {
+  const cu = getCurrentUser(req);
+  // Exclure l'utilisateur connecté, retourner 8 profils enrichis
+  const users = db.prepare(`
+    SELECT id, nom, prenom, photo_url, banner_url, ville, pays,
+           nationalite1, nationalite2, titre_pro, bio, situation_pro, theme_couleur, role
+    FROM users
+    WHERE role IN ('utilisateur','initiative')
+    ${cu ? "AND id != " + cu.id : ""}
+    ORDER BY created_at DESC
+    LIMIT 8
+  `).all();
+  sendJSON(res, 200, { profiles: users });
 });
 
 /* ---------- Static file server (frontend existant) ---------- */
