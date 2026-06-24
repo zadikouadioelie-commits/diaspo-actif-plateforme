@@ -1181,11 +1181,10 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   if (mode === "suivis" && cu) {
     // IDs des utilisateurs suivis
     const followedUsers = db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(cu.id).map(r => r.followed_id);
-    // IDs des initiatives suivies → auteur_id de leurs posts
+    // IDs des initiatives suivies → propriétaires (owner_user_id)
     const followedInits = db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id).map(r => r.initiative_id);
-    // Trouver les auteurs_id dont le compte représente une initiative suivie
     const initAuthorIds = followedInits.length
-      ? db.prepare(`SELECT id FROM users WHERE initiative_id IN (${followedInits.map(()=>"?").join(",")}) OR id IN (SELECT owner_user_id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")})) `).all(...followedInits, ...followedInits).map(r => r.id)
+      ? db.prepare(`SELECT owner_user_id AS id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")}) AND owner_user_id IS NOT NULL`).all(...followedInits).map(r => r.id)
       : [];
     const allIds = [...new Set([...followedUsers, ...initAuthorIds])];
 
@@ -1237,7 +1236,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     const followedUsers = db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(cu.id).map(r => r.followed_id);
     const followedInits = db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id).map(r => r.initiative_id);
     const initOwners = followedInits.length
-      ? db.prepare(`SELECT owner_user_id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")}) AND owner_user_id IS NOT NULL`).all(...followedInits).map(r => r.owner_user_id)
+      ? db.prepare(`SELECT owner_user_id AS id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")}) AND owner_user_id IS NOT NULL`).all(...followedInits).map(r => r.id)
       : [];
     const followedAll = [...new Set([...followedUsers, ...initOwners])];
     if (followedAll.length) {
