@@ -132,7 +132,7 @@ function renderResults() {
   }
   if(show('formations') && (lastRes.formations||[]).length) {
     html+='<div class="result-section"><h3>📚 Formations <span class="result-count">'+lastRes.formations.length+'</span></h3>';
-    html+=lastRes.formations.map(f=>'<a href="formations.html" class="result-item"><div class="result-icon">📚</div><div class="result-body"><div class="result-title">'+escHtml(f.titre)+'</div><div class="result-sub">'+(f.gratuit?'Gratuite':''+f.prix+'€')+(f.organisme?', '+escHtml(f.organisme):'')+'</div></div></a>').join('');
+    html+=lastRes.formations.map(f=>'<a href="formations.html" class="result-item"><div class="result-icon">📚</div><div class="result-body"><div class="result-title">'+escHtml(f.titre)+'</div><div class="result-sub">'+(f.gratuit?'Gratuite':(f.prix!=null?f.prix+'€':''))+(f.organisme?', '+escHtml(f.organisme):'')+'</div></div></a>').join('');
     html+='</div>';
   }
   if(show('evenements') && (lastRes.evenements||[]).length) {
