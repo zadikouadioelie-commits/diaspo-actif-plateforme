@@ -939,10 +939,28 @@ async function handleRequest(req, res) {
     }
     /* ---- GET /api/visits — compteur cumulatif de visites ---- */
     if (method === "GET" && pathname === "/api/visits") {
-      db.exec(`INSERT OR IGNORE INTO counters (key, value) VALUES ('page_visits', 0)`);
-      db.prepare(`UPDATE counters SET value = value + 1 WHERE key = 'page_visits'`).run();
-      const row = db.prepare(`SELECT value FROM counters WHERE key = 'page_visits'`).get();
-      return sendJSON(res, 200, { count: row.value });
+      try {
+        db.exec(`CREATE TABLE IF NOT EXISTS counters (key TEXT PRIMARY KEY, value INTEGER NOT NULL DEFAULT 0)`);
+        db.prepare(`INSERT OR IGNORE INTO counters (key, value) VALUES (?, ?)`).run('page_visits', 0);
+        db.prepare(`UPDATE counters SET value = value + 1 WHERE key = ?`).run('page_visits');
+        const row = db.prepare(`SELECT value FROM counters WHERE key = ?`).get('page_visits');
+        return sendJSON(res, 200, { count: row ? row.value : 1 });
+      } catch (e) {
+        console.error('visits error:', e);
+        return sendJSON(res, 200, { count: 0 });
+      }
+    }
+
+    /* ---- GET /api/stats — statistiques agrégées publiques ---- */
+    if (method === "GET" && pathname === "/api/stats") {
+      try {
+        const membres = db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur'`).get().n;
+        const initiatives = db.prepare(`SELECT COUNT(*) AS n FROM initiatives`).get().n;
+        const pays = db.prepare(`SELECT COUNT(DISTINCT pays) AS n FROM initiatives WHERE pays IS NOT NULL`).get().n;
+        return sendJSON(res, 200, { membres, initiatives, pays });
+      } catch (e) {
+        return sendJSON(res, 200, { membres: 0, initiatives: 0, pays: 0 });
+      }
     }
 
     return sendJSON(res, 404, { error: "Route API inconnue." });
