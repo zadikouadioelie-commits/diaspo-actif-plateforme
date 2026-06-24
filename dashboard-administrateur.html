@@ -3057,6 +3057,19 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
     el.addEventListener("click", loadPublicites);
   });
 
+  // ── Exposer les fonctions pub en global (appelées par onclick HTML) ──
+  window.openPubModal        = openPubModal;
+  window.closePubModal       = closePubModal;
+  window.savePub             = savePub;
+  window.deletePub           = deletePub;
+  window.viewPubStats        = viewPubStats;
+  window.pubSwitchTab        = pubSwitchTab;
+  window.pubLoadFile         = pubLoadFile;
+  window.pubLoadGalerie      = pubLoadGalerie;
+  window.pubPreviewImg       = pubPreviewImg;
+  window.pubDebouncedPreview = pubDebouncedPreview;
+  window.pubUpdatePreview    = pubUpdatePreview;
+
 })();
 </script>
 </body>
