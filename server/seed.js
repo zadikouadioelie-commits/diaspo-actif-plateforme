@@ -242,6 +242,19 @@ function seed() {
     insQ.run(consultId, "Avez-vous des commentaires ou suggestions supplémentaires ?", "texte_libre", "[]", 2);
   }
 
+  /* ===== ACTIVITÉ PLATEFORME (DAU/WAU/MAU) ===== */
+  const allUsers = db.prepare("SELECT id FROM users").all().map(r => r.id);
+  const insAct = db.prepare("INSERT OR IGNORE INTO user_activity (user_id, date) VALUES (?,?)");
+  // Simuler 30 jours d'activité : chaque utilisateur actif en moyenne 60% des jours
+  for (let d = 29; d >= 0; d--) {
+    const dateStr = new Date(Date.now() - d * 86400000).toISOString().slice(0, 10);
+    // Taux de présence décroissant avec le recul (plus actifs récemment)
+    const taux = 0.3 + (29 - d) / 29 * 0.5; // 30% → 80%
+    allUsers.forEach(uid => {
+      if (Math.random() < taux) insAct.run(uid, dateStr);
+    });
+  }
+
   /* ===== PUBLICITÉS DÉMO ===== */
   const insPub = db.prepare(`
     INSERT OR IGNORE INTO publicites

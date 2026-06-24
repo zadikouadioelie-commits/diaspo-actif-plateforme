@@ -39,41 +39,123 @@
 
       <!-- VUE D'ENSEMBLE -->
       <section id="section-vue-ensemble">
-        <div class="flex-between" style="margin-bottom:20px;">
+        <div class="flex-between" style="margin-bottom:24px;">
           <div>
             <h1 style="margin:0;">Tableau de bord Administrateur</h1>
-            <p style="margin:4px 0 0;color:var(--muted);font-size:13.5px;">Diaspo'Actif — gestion de la plateforme</p>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13.5px;">Diaspo'Actif — activité et gestion de la plateforme</p>
           </div>
-          <span class="badge badge-asso">Administrateur</span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span id="last-refresh" style="font-size:12px;color:var(--muted);"></span>
+            <button class="btn" style="font-size:13px;padding:6px 14px;" onclick="reloadDashboard()">↺ Actualiser</button>
+            <span class="badge badge-asso">Administrateur</span>
+          </div>
         </div>
 
-        <div class="grid grid-3" style="gap:12px;margin-bottom:20px;">
-          <div class="card stat-card">
-            <div class="stat-number" id="stat-membres">—</div>
-            <div class="stat-label">Membres inscrits</div>
+        <!-- ── Bloc 1 : Totaux globaux ── -->
+        <div style="margin-bottom:8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Plateforme — totaux</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;">
+          <div class="card stat-card" style="border-left:4px solid #1B3A6B;">
+            <div class="stat-number" id="stat-membres" style="color:#1B3A6B;">—</div>
+            <div class="stat-label">Utilisateurs</div>
           </div>
-          <div class="card stat-card">
-            <div class="stat-number" id="stat-initiatives">—</div>
+          <div class="card stat-card" style="border-left:4px solid #E87C3E;">
+            <div class="stat-number" id="stat-initiatives" style="color:#E87C3E;">—</div>
             <div class="stat-label">Initiatives</div>
           </div>
-          <div class="card stat-card">
+          <div class="card stat-card" style="border-left:4px solid #7C3AED;">
+            <div class="stat-number" id="stat-institutions" style="color:#7C3AED;">—</div>
+            <div class="stat-label">Institutions</div>
+          </div>
+          <div class="card stat-card" style="border-left:4px solid #059669;">
             <div class="stat-number" id="stat-publications">—</div>
             <div class="stat-label">Publications</div>
           </div>
-          <div class="card stat-card">
+          <div class="card stat-card" style="border-left:4px solid #0891B2;">
             <div class="stat-number" id="stat-formations">—</div>
             <div class="stat-label">Formations</div>
           </div>
-          <div class="card stat-card">
+          <div class="card stat-card" style="border-left:4px solid #F59E0B;">
             <div class="stat-number" id="stat-abonnements">—</div>
-            <div class="stat-label">Abonnements actifs</div>
-          </div>
-          <div class="card stat-card">
-            <div class="stat-number" id="stat-signalements">—</div>
-            <div class="stat-label">Signalements</div>
+            <div class="stat-label">Abonnements</div>
           </div>
         </div>
 
+        <!-- ── Bloc 2 : Nouveaux inscrits ── -->
+        <div style="margin-bottom:8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Nouveaux inscrits</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
+          <div class="card" style="text-align:center;padding:20px 12px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px;">Aujourd'hui</div>
+            <div id="insc-jour" style="font-size:32px;font-weight:800;color:#1B3A6B;line-height:1;">—</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">inscriptions</div>
+          </div>
+          <div class="card" style="text-align:center;padding:20px 12px;position:relative;">
+            <div style="position:absolute;top:10px;right:12px;font-size:10px;background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:20px;font-weight:700;">7 jours</div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px;">Cette semaine</div>
+            <div id="insc-semaine" style="font-size:32px;font-weight:800;color:#1B3A6B;line-height:1;">—</div>
+            <div id="insc-semaine-avg" style="font-size:11px;color:var(--muted);margin-top:4px;">— /jour en moy.</div>
+          </div>
+          <div class="card" style="text-align:center;padding:20px 12px;position:relative;">
+            <div style="position:absolute;top:10px;right:12px;font-size:10px;background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:20px;font-weight:700;">30 jours</div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px;">Ce mois</div>
+            <div id="insc-mois" style="font-size:32px;font-weight:800;color:#1B3A6B;line-height:1;">—</div>
+            <div id="insc-mois-avg" style="font-size:11px;color:var(--muted);margin-top:4px;">— /jour en moy.</div>
+          </div>
+        </div>
+
+        <!-- ── Bloc 3 : Utilisateurs actifs (DAU/WAU/MAU) ── -->
+        <div style="margin-bottom:8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Utilisateurs actifs</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
+          <div class="card" style="padding:20px;text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;">DAU</div>
+            <div id="stat-dau" style="font-size:36px;font-weight:800;color:#E87C3E;line-height:1;">—</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Actifs aujourd'hui</div>
+            <div id="dau-rate" style="font-size:11px;color:var(--muted);margin-top:2px;"></div>
+          </div>
+          <div class="card" style="padding:20px;text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;">WAU</div>
+            <div id="stat-wau" style="font-size:36px;font-weight:800;color:#7C3AED;line-height:1;">—</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Actifs cette semaine</div>
+            <div id="wau-rate" style="font-size:11px;color:var(--muted);margin-top:2px;"></div>
+          </div>
+          <div class="card" style="padding:20px;text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;">MAU</div>
+            <div id="stat-mau" style="font-size:36px;font-weight:800;color:#059669;line-height:1;">—</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Actifs ce mois</div>
+            <div id="mau-rate" style="font-size:11px;color:var(--muted);margin-top:2px;"></div>
+          </div>
+        </div>
+
+        <!-- ── Bloc 4 : Graphiques + répartition ── -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+          <!-- Sparkline inscriptions -->
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+              <h3 style="margin:0;font-size:14px;">📈 Inscriptions — 14 derniers jours</h3>
+            </div>
+            <canvas id="chart-inscriptions" height="100"></canvas>
+          </div>
+          <!-- Sparkline activité -->
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+              <h3 style="margin:0;font-size:14px;">⚡ Utilisateurs actifs — 14 jours</h3>
+            </div>
+            <canvas id="chart-actifs" height="100"></canvas>
+          </div>
+        </div>
+
+        <!-- ── Bloc 5 : Répartition + Top pays ── -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:14px;">👥 Répartition par type de compte</h3>
+            <div id="stat-par-role"></div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:14px;">🌍 Top pays de résidence</h3>
+            <div id="stat-top-pays"></div>
+          </div>
+        </div>
+
+        <!-- ── Bloc 6 : Dernières inscriptions + Publications ── -->
         <div class="grid grid-2" style="gap:16px;">
           <div class="card">
             <h3 style="margin:0 0 14px;">Dernières inscriptions</h3>
@@ -591,6 +673,11 @@
 <script src="assets/app.js"></script>
 <script>
 
+/* ===== Utilitaires globaux ===== */
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
 /* ===== Logique certifications ===== */
 let certifInitiativeId = null;
 
@@ -771,13 +858,131 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
     return;
   }
 
-  // Stats
-  document.getElementById("stat-membres").textContent = data.total_utilisateurs ?? "—";
-  document.getElementById("stat-initiatives").textContent = data.total_initiatives ?? "—";
+  // ── Totaux globaux
+  document.getElementById("stat-membres").textContent      = (data.total_utilisateurs ?? "—").toLocaleString?.() ?? data.total_utilisateurs;
+  document.getElementById("stat-initiatives").textContent  = data.total_initiatives ?? "—";
+  document.getElementById("stat-institutions").textContent = data.total_institutions ?? "—";
   document.getElementById("stat-publications").textContent = data.total_publications ?? "—";
-  document.getElementById("stat-formations").textContent = data.total_formations ?? "—";
-  document.getElementById("stat-abonnements").textContent = data.total_abonnements ?? "—";
-  document.getElementById("stat-signalements").textContent = data.signalements ?? "0";
+  document.getElementById("stat-formations").textContent   = data.total_formations ?? "—";
+  document.getElementById("stat-abonnements").textContent  = data.total_abonnements ?? "—";
+
+  // ── Nouveaux inscrits
+  document.getElementById("insc-jour").textContent    = data.inscrits_jour ?? "0";
+  document.getElementById("insc-semaine").textContent = data.inscrits_semaine ?? "0";
+  document.getElementById("insc-mois").textContent    = data.inscrits_mois ?? "0";
+  const avgSem = data.inscrits_semaine != null ? (data.inscrits_semaine / 7).toFixed(1) : "—";
+  const avgMois = data.inscrits_mois != null ? (data.inscrits_mois / 30).toFixed(1) : "—";
+  document.getElementById("insc-semaine-avg").textContent = avgSem + " /jour en moy.";
+  document.getElementById("insc-mois-avg").textContent    = avgMois + " /jour en moy.";
+
+  // ── DAU / WAU / MAU
+  const total = data.total_utilisateurs || 1;
+  document.getElementById("stat-dau").textContent = data.dau ?? "—";
+  document.getElementById("stat-wau").textContent = data.wau ?? "—";
+  document.getElementById("stat-mau").textContent = data.mau ?? "—";
+  document.getElementById("dau-rate").textContent = data.dau != null ? ((data.dau/total*100).toFixed(1) + "% des membres") : "";
+  document.getElementById("wau-rate").textContent = data.wau != null ? ((data.wau/total*100).toFixed(1) + "% des membres") : "";
+  document.getElementById("mau-rate").textContent = data.mau != null ? ((data.mau/total*100).toFixed(1) + "% des membres") : "";
+
+  // ── Sparklines (Canvas natif, sans librairie)
+  function drawSparkline(canvasId, points, color, fillColor) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth || 400;
+    const H = 100;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+    const vals = points.map(p => p.n);
+    const max = Math.max(...vals, 1);
+    const step = W / Math.max(points.length - 1, 1);
+    const coords = points.map((p, i) => ({ x: i * step, y: H - 8 - ((p.n / max) * (H - 20)) }));
+    // Fill
+    ctx.beginPath();
+    ctx.moveTo(coords[0].x, H - 8);
+    coords.forEach(c => ctx.lineTo(c.x, c.y));
+    ctx.lineTo(coords[coords.length-1].x, H - 8);
+    ctx.closePath();
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    // Line
+    ctx.beginPath();
+    coords.forEach((c,i) => i === 0 ? ctx.moveTo(c.x, c.y) : ctx.lineTo(c.x, c.y));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    // Points + labels date
+    const labelStep = Math.max(1, Math.floor(points.length / 7));
+    points.forEach((p, i) => {
+      const c = coords[i];
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      if (i % labelStep === 0 || i === points.length - 1) {
+        const label = p.jour?.slice(5) || ""; // MM-DD
+        ctx.fillStyle = "#6b7280";
+        ctx.font = "10px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText(label, c.x, H - 2);
+        ctx.fillStyle = "#1f2937";
+        ctx.font = "bold 11px system-ui";
+        ctx.fillText(p.n, c.x, c.y - 7);
+      }
+    });
+  }
+
+  // Remplir les 14 jours manquants avec 0
+  function fillDays(rows, days = 14) {
+    const map = {};
+    rows.forEach(r => { map[r.jour] = r.n; });
+    const result = [];
+    for (let d = days - 1; d >= 0; d--) {
+      const dt = new Date(Date.now() - d * 86400000);
+      const key = dt.toISOString().slice(0, 10);
+      result.push({ jour: key.slice(5), n: map[key] || 0 });
+    }
+    return result;
+  }
+
+  if (data.tendance_inscriptions?.length) {
+    drawSparkline("chart-inscriptions", fillDays(data.tendance_inscriptions), "#1B3A6B", "rgba(27,58,107,.12)");
+  }
+  if (data.tendance_actifs?.length) {
+    drawSparkline("chart-actifs", fillDays(data.tendance_actifs), "#E87C3E", "rgba(232,124,62,.12)");
+  }
+
+  // ── Répartition par rôle
+  const ROLE_COLOR = { utilisateur:"#1B3A6B", initiative:"#E87C3E", collectivite:"#7C3AED", administrateur:"#6b7280" };
+  const totalComptes = (data.par_role||[]).reduce((s,r) => s + r.n, 0) || 1;
+  document.getElementById("stat-par-role").innerHTML = (data.par_role||[]).map(r => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <div style="width:10px;height:10px;border-radius:50%;background:${ROLE_COLOR[r.role]||'#ccc'};flex-shrink:0;"></div>
+      <div style="flex:1;font-size:13px;">${ROLE_LABEL_FR[r.role]||r.role}</div>
+      <div style="width:120px;height:8px;background:var(--surface);border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:${(r.n/totalComptes*100).toFixed(1)}%;background:${ROLE_COLOR[r.role]||'#ccc'};border-radius:4px;transition:width .6s;"></div>
+      </div>
+      <div style="font-weight:700;font-size:13px;width:30px;text-align:right;">${r.n}</div>
+    </div>
+  `).join("") || "<div class='notice'>Aucune donnée.</div>";
+
+  // ── Top pays
+  const maxPays = (data.top_pays?.[0]?.n) || 1;
+  document.getElementById("stat-top-pays").innerHTML = (data.top_pays||[]).map(r => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-size:13px;width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);">${r.pays}</div>
+      <div style="flex:1;height:8px;background:var(--surface);border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:${(r.n/maxPays*100).toFixed(1)}%;background:#1B3A6B;border-radius:4px;transition:width .6s;"></div>
+      </div>
+      <div style="font-weight:700;font-size:13px;width:28px;text-align:right;">${r.n}</div>
+    </div>
+  `).join("") || "<div class='notice'>Aucune donnée.</div>";
+
+  // Horodatage du dernier refresh
+  document.getElementById("last-refresh").textContent = "Actualisé à " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit",minute:"2-digit"});
 
   // Derniers inscrits
   const inscList = document.getElementById("derniers-inscrits");
@@ -826,6 +1031,37 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
       </div>
     `).join("");
   }
+
+  // Fonction reload exposée globalement
+  window.reloadDashboard = async function() {
+    const btn = document.querySelector("[onclick='reloadDashboard()']");
+    if (btn) { btn.disabled = true; btn.textContent = "…"; }
+    try {
+      const fresh = await api("GET", "/dashboard/administrateur");
+      // Re-injecter les stats sans recharger la page
+      Object.assign(data, fresh);
+      document.getElementById("stat-membres").textContent      = fresh.total_utilisateurs ?? "—";
+      document.getElementById("stat-initiatives").textContent  = fresh.total_initiatives ?? "—";
+      document.getElementById("stat-institutions").textContent = fresh.total_institutions ?? "—";
+      document.getElementById("stat-publications").textContent = fresh.total_publications ?? "—";
+      document.getElementById("stat-formations").textContent   = fresh.total_formations ?? "—";
+      document.getElementById("stat-abonnements").textContent  = fresh.total_abonnements ?? "—";
+      document.getElementById("insc-jour").textContent         = fresh.inscrits_jour ?? "0";
+      document.getElementById("insc-semaine").textContent      = fresh.inscrits_semaine ?? "0";
+      document.getElementById("insc-mois").textContent         = fresh.inscrits_mois ?? "0";
+      document.getElementById("stat-dau").textContent = fresh.dau ?? "—";
+      document.getElementById("stat-wau").textContent = fresh.wau ?? "—";
+      document.getElementById("stat-mau").textContent = fresh.mau ?? "—";
+      const tot = fresh.total_utilisateurs || 1;
+      document.getElementById("dau-rate").textContent = fresh.dau != null ? ((fresh.dau/tot*100).toFixed(1) + "% des membres") : "";
+      document.getElementById("wau-rate").textContent = fresh.wau != null ? ((fresh.wau/tot*100).toFixed(1) + "% des membres") : "";
+      document.getElementById("mau-rate").textContent = fresh.mau != null ? ((fresh.mau/tot*100).toFixed(1) + "% des membres") : "";
+      if (fresh.tendance_inscriptions?.length) drawSparkline("chart-inscriptions", fillDays(fresh.tendance_inscriptions), "#1B3A6B", "rgba(27,58,107,.12)");
+      if (fresh.tendance_actifs?.length) drawSparkline("chart-actifs", fillDays(fresh.tendance_actifs), "#E87C3E", "rgba(232,124,62,.12)");
+      document.getElementById("last-refresh").textContent = "Actualisé à " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit",minute:"2-digit"});
+    } catch(e) { alert("Erreur de rafraîchissement : " + e.message); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = "↺ Actualiser"; } }
+  };
 
   // Publier
   document.getElementById("btn-publier-admin").addEventListener("click", async () => {

@@ -757,25 +757,72 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
 
-  const totalUtilisateurs = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur'").get().n;
-  const totalInitiatives = db.prepare("SELECT COUNT(*) AS n FROM initiatives").get().n;
-  const totalPublications = db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get().n;
-  const totalFormations = db.prepare("SELECT COUNT(*) AS n FROM formations").get().n;
-  const totalAbonnements = db.prepare("SELECT COUNT(*) AS n FROM abonnements").get().n;
-  const totalCollectivites = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'collectivite'").get().n;
+  // Totaux globaux
+  const totalUtilisateurs  = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur'").get().n;
+  const totalInitiatives   = db.prepare("SELECT COUNT(*) AS n FROM initiatives").get().n;
+  const totalInstitutions  = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite'").get().n;
+  const totalPublications  = db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get().n;
+  const totalFormations    = db.prepare("SELECT COUNT(*) AS n FROM formations").get().n;
+  const totalAbonnements   = db.prepare("SELECT COUNT(*) AS n FROM abonnements").get().n;
+
+  // Nouveaux inscrits
+  const inscJour    = db.prepare("SELECT COUNT(*) AS n FROM users WHERE date(created_at)=date('now')").get().n;
+  const inscSemaine = db.prepare("SELECT COUNT(*) AS n FROM users WHERE created_at>=datetime('now','-7 days')").get().n;
+  const inscMois    = db.prepare("SELECT COUNT(*) AS n FROM users WHERE created_at>=datetime('now','-30 days')").get().n;
+
+  // Utilisateurs actifs (DAU/WAU/MAU)
+  const dau = db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date=date('now')").get().n;
+  const wau = db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=date('now','-6 days')").get().n;
+  const mau = db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=date('now','-29 days')").get().n;
+
+  // Tendance inscriptions : 14 derniers jours
+  const tendance14j = db.prepare(`
+    SELECT date(created_at) AS jour, COUNT(*) AS n FROM users
+    WHERE created_at >= datetime('now','-13 days')
+    GROUP BY jour ORDER BY jour ASC
+  `).all();
+
+  // Tendance activité : 14 derniers jours
+  const tendanceActif14j = db.prepare(`
+    SELECT date AS jour, COUNT(DISTINCT user_id) AS n FROM user_activity
+    WHERE date >= date('now','-13 days')
+    GROUP BY date ORDER BY date ASC
+  `).all();
+
+  // Répartition par rôle
+  const parRole = db.prepare("SELECT role, COUNT(*) AS n FROM users GROUP BY role ORDER BY n DESC").all();
+
+  // Top pays
+  const topPays = db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 8").all();
+
   const publicationsRecentes = db.prepare("SELECT * FROM fil_posts ORDER BY created_at DESC LIMIT 10").all();
   const derniersInscrits = db.prepare("SELECT id, nom, email, role, ville, pays, created_at FROM users ORDER BY created_at DESC LIMIT 8").all();
 
   sendJSON(res, 200, {
+    // Totaux
     total_utilisateurs: totalUtilisateurs,
-    total_initiatives: totalInitiatives,
+    total_initiatives:  totalInitiatives,
+    total_institutions: totalInstitutions,
     total_publications: totalPublications,
-    total_formations: totalFormations,
-    total_abonnements: totalAbonnements,
-    total_collectivites: totalCollectivites,
+    total_formations:   totalFormations,
+    total_abonnements:  totalAbonnements,
+    total_collectivites: totalInstitutions,
     signalements: 3,
+    // Inscriptions
+    inscrits_jour:    inscJour,
+    inscrits_semaine: inscSemaine,
+    inscrits_mois:    inscMois,
+    // Utilisateurs actifs
+    dau, wau, mau,
+    // Tendances
+    tendance_inscriptions: tendance14j,
+    tendance_actifs:       tendanceActif14j,
+    // Répartition
+    par_role: parRole,
+    top_pays: topPays,
+    // Listes
     publications_recentes: publicationsRecentes,
-    derniers_inscrits: derniersInscrits
+    derniers_inscrits:     derniersInscrits
   });
 });
 
@@ -1974,11 +2021,21 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     sendJSON(res, 200, { ok: true });
   });
 
+const _trackStmt = db.prepare(
+  "INSERT OR IGNORE INTO user_activity (user_id, date) VALUES (?, date('now'))"
+);
+function trackActivity(req) {
+  try { const u = getCurrentUser(req); if (u) _trackStmt.run(u.id); } catch {}
+}
+
 async function handleRequest(req, res) {
   const parsed = url.parse(req.url, true);
   const pathname = decodeURIComponent(parsed.pathname);
 
   if (pathname.startsWith("/api/")) {
+    // Enregistrer l'activité de l'utilisateur connecté (pour DAU/WAU/MAU)
+    if (req.method === "GET") trackActivity(req);
+
     for (const r of routes) {
       if (r.method !== req.method) continue;
       const m = pathname.match(r.regex);
