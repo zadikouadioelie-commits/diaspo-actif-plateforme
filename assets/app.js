@@ -2055,25 +2055,77 @@ function initProjetsDiaspoActif(){
 }
 
 /* ---------- Publicité (démo, données fictives, géolocalisée) ---------- */
-function renderAd(containerId, idx){
-  const el = document.getElementById(containerId);
-  if(!el || typeof PUBLICITES === "undefined") return;
-  const ad = PUBLICITES[idx % PUBLICITES.length];
-  const ville = (typeof UTILISATEUR_PROFIL !== "undefined" && UTILISATEUR_PROFIL.localisation) ? UTILISATEUR_PROFIL.localisation.ville : null;
-  el.innerHTML = `
-    <div class="ad-icon" style="background:${ad.couleur};">${ad.icone}</div>
-    <div class="ad-body">
-      <span class="ad-tag">Publicité${ville ? " · ciblée pour "+ville : ""}</span>
-      <h4>${ad.marque}</h4>
-      <p>${ad.accroche}</p>
+/* ---------- Publicités dynamiques (API) ---------- */
+function _pubHtmlBanniere(pub) {
+  return `<div class="pub-banniere" style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;position:relative;">
+    ${pub.image_url ? `<img src="${pub.image_url}" alt="" style="width:72px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : ""}
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px;">Sponsorisé · ${pub.annonceur}</div>
+      <div style="font-weight:700;font-size:15px;margin-bottom:2px;">${pub.titre}</div>
+      ${pub.description ? `<div style="font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${pub.description}</div>` : ""}
     </div>
-    <button class="btn btn-sm btn-outline">${ad.cta}</button>
-  `;
-  el.className = "ad-banner";
+    ${pub.lien_url ? `<a href="${pub.lien_url}" target="_blank" rel="noopener" class="btn btn-orange" style="flex-shrink:0;font-size:13px;" onclick="trackPubClic(${pub.id})">${pub.lien_texte||"En savoir plus"}</a>` : ""}
+  </div>`;
 }
+
+function _pubHtmlNative(pub) {
+  return `<div class="card pub-native" style="border:1.5px solid var(--border);position:relative;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      ${pub.image_url ? `<img src="${pub.image_url}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:50%;">` : `<div style="width:44px;height:44px;border-radius:50%;background:#E87C3E;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;">📣</div>`}
+      <div>
+        <div style="font-weight:700;">${pub.annonceur}</div>
+        <div style="font-size:11px;color:var(--muted);background:var(--surface);padding:1px 8px;border-radius:20px;display:inline-block;">Sponsorisé</div>
+      </div>
+    </div>
+    <p style="margin:0 0 12px;font-size:14px;">${pub.description||pub.titre}</p>
+    ${pub.image_url ? `<img src="${pub.image_url}" alt="${pub.titre}" style="width:100%;border-radius:10px;max-height:220px;object-fit:cover;margin-bottom:12px;">` : ""}
+    ${pub.lien_url ? `<a href="${pub.lien_url}" target="_blank" rel="noopener" class="btn btn-orange" style="font-size:13px;" onclick="trackPubClic(${pub.id})">${pub.lien_texte||"En savoir plus"}</a>` : ""}
+  </div>`;
+}
+
+function _pubHtmlAnnuaire(pub) {
+  return `<div class="card pub-annuaire" style="border:1.5px dashed var(--border);position:relative;">
+    <div style="font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;">Sponsorisé</div>
+    ${pub.image_url ? `<img src="${pub.image_url}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:10px;">` : ""}
+    <div style="font-weight:700;margin-bottom:4px;">${pub.titre}</div>
+    ${pub.description ? `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">${pub.description}</div>` : ""}
+    ${pub.lien_url ? `<a href="${pub.lien_url}" target="_blank" rel="noopener" class="btn" style="font-size:12px;width:100%;text-align:center;" onclick="trackPubClic(${pub.id})">${pub.lien_texte||"Découvrir"}</a>` : ""}
+  </div>`;
+}
+
+function trackPubClic(id) {
+  fetch(`/api/publicites/${id}/clic`, { method:"POST" }).catch(()=>{});
+}
+
+async function servePub(format, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  try {
+    const r = await fetch(`/api/publicites/servir?format=${format}`).then(x => x.json());
+    if (!r.pub) { el.style.display = "none"; return; }
+    const pub = r.pub;
+    if (format === "banniere") el.innerHTML = _pubHtmlBanniere(pub);
+    else if (format === "native") el.innerHTML = _pubHtmlNative(pub);
+    else if (format === "annuaire") el.innerHTML = _pubHtmlAnnuaire(pub);
+    else el.innerHTML = _pubHtmlBanniere(pub);
+    el.style.display = "";
+  } catch(e) { el.style.display = "none"; }
+}
+
+function renderAd(containerId, idx){
+  // Redirige vers servePub dynamique si le slot contient un format
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const format = el.dataset.pubFormat || "banniere";
+  servePub(format, containerId);
+}
+
 function renderAllAds(){
-  document.querySelectorAll("[data-ad-slot]").forEach(el=>{
-    renderAd(el.id, parseInt(el.dataset.adSlot, 10) || 0);
+  document.querySelectorAll("[data-ad-slot],[data-pub-format]").forEach(el=>{
+    if (el.id) {
+      const format = el.dataset.pubFormat || "banniere";
+      servePub(format, el.id);
+    }
   });
 }
 

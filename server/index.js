@@ -1474,6 +1474,157 @@ function serveStatic(req, res, pathname) {
 /* ================================================================
    HANDLER PRINCIPAL (utilisé en local ET en Vercel serverless)
    ================================================================ */
+/* ===== MODULE PUBLICITÉS ===== */
+
+/* Helper : vérifie si un tableau de ciblage accepte une valeur (vide = tous) */
+function pubCibleMatch(cibleJson, valeurs) {
+  const cible = safeParse(cibleJson);
+  if (!Array.isArray(cible) || cible.length === 0) return true;
+  if (!valeurs) return false;
+  const vals = Array.isArray(valeurs) ? valeurs : [valeurs];
+  return cible.some(c => vals.some(v => v && v.toLowerCase() === c.toLowerCase()));
+}
+
+/* Servir une publicité adaptée à l'utilisateur courant */
+route("GET", "/api/publicites/servir", async (req, res, params, body, query) => {
+  const format = query.format || "banniere";
+  const user = getCurrentUser(req);
+  const now = new Date().toISOString().slice(0, 10);
+
+  const candidates = db.prepare(`
+    SELECT * FROM publicites
+    WHERE statut = 'active'
+      AND format = ?
+      AND (date_debut IS NULL OR date_debut <= ?)
+      AND (date_fin IS NULL OR date_fin >= ?)
+    ORDER BY priorite DESC, RANDOM()
+  `).all(format, now, now);
+
+  let pub = null;
+  for (const p of candidates) {
+    if (user) {
+      if (!pubCibleMatch(p.cible_pays, user.pays)) continue;
+      if (!pubCibleMatch(p.cible_roles, user.role)) continue;
+      const profil = safeParse(user.profil_json || "{}");
+      const nats = [user.nationalite1, user.nationalite2].filter(Boolean);
+      if (!pubCibleMatch(p.cible_nationalites, nats.length ? nats : null)) continue;
+    } else {
+      if (!pubCibleMatch(p.cible_roles, null)) continue;
+    }
+    pub = p;
+    break;
+  }
+
+  if (!pub) return sendJSON(res, 200, { pub: null });
+
+  // Enregistrer l'impression
+  db.prepare("INSERT INTO publicite_events (publicite_id,type,user_id,user_pays,user_ville) VALUES (?,?,?,?,?)")
+    .run(pub.id, "impression", user?.id || null, user?.pays || null, user?.ville || null);
+  db.prepare("UPDATE publicites SET nb_impressions=nb_impressions+1,updated_at=datetime('now') WHERE id=?").run(pub.id);
+
+  sendJSON(res, 200, { pub: {
+    id: pub.id, titre: pub.titre, description: pub.description,
+    image_url: pub.image_url, lien_url: pub.lien_url, lien_texte: pub.lien_texte,
+    annonceur: pub.annonceur, format: pub.format, priorite: pub.priorite
+  }});
+});
+
+/* Enregistrer un clic */
+route("POST", "/api/publicites/:id/clic", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  db.prepare("INSERT INTO publicite_events (publicite_id,type,user_id,user_pays,user_ville) VALUES (?,?,?,?,?)")
+    .run(params.id, "clic", user?.id || null, user?.pays || null, user?.ville || null);
+  db.prepare("UPDATE publicites SET nb_clics=nb_clics+1,updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ---- Admin : CRUD publicités ---- */
+route("GET", "/api/admin/publicites", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const rows = db.prepare("SELECT * FROM publicites ORDER BY created_at DESC").all();
+  sendJSON(res, 200, { publicites: rows });
+});
+
+route("POST", "/api/admin/publicites", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const {
+    titre, description, image_url, lien_url, lien_texte, annonceur, format,
+    statut, date_debut, date_fin, priorite,
+    cible_pays, cible_regions, cible_villes, cible_roles, cible_nationalites, cible_origines,
+    notes_admin
+  } = body;
+  if (!titre || !annonceur) return sendJSON(res, 400, { error: "titre et annonceur requis." });
+  const id = db.prepare(`
+    INSERT INTO publicites (titre,description,image_url,lien_url,lien_texte,annonceur,format,statut,
+      date_debut,date_fin,priorite,cible_pays,cible_regions,cible_villes,cible_roles,
+      cible_nationalites,cible_origines,notes_admin,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    titre, description||null, image_url||null, lien_url||null, lien_texte||"En savoir plus",
+    annonceur, format||"banniere", statut||"active",
+    date_debut||null, date_fin||null, priorite||2,
+    JSON.stringify(cible_pays||[]), JSON.stringify(cible_regions||[]), JSON.stringify(cible_villes||[]),
+    JSON.stringify(cible_roles||[]), JSON.stringify(cible_nationalites||[]), JSON.stringify(cible_origines||[]),
+    notes_admin||null, user.id
+  ).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/admin/publicites/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const {
+    titre, description, image_url, lien_url, lien_texte, annonceur, format,
+    statut, date_debut, date_fin, priorite,
+    cible_pays, cible_regions, cible_villes, cible_roles, cible_nationalites, cible_origines,
+    notes_admin
+  } = body;
+  db.prepare(`
+    UPDATE publicites SET titre=?,description=?,image_url=?,lien_url=?,lien_texte=?,annonceur=?,
+      format=?,statut=?,date_debut=?,date_fin=?,priorite=?,
+      cible_pays=?,cible_regions=?,cible_villes=?,cible_roles=?,cible_nationalites=?,cible_origines=?,
+      notes_admin=?,updated_at=datetime('now') WHERE id=?
+  `).run(
+    titre, description||null, image_url||null, lien_url||null, lien_texte||"En savoir plus",
+    annonceur, format||"banniere", statut||"active",
+    date_debut||null, date_fin||null, priorite||2,
+    JSON.stringify(cible_pays||[]), JSON.stringify(cible_regions||[]), JSON.stringify(cible_villes||[]),
+    JSON.stringify(cible_roles||[]), JSON.stringify(cible_nationalites||[]), JSON.stringify(cible_origines||[]),
+    notes_admin||null, params.id
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/publicites/:id/statut", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const { statut } = body;
+  if (!["brouillon","active","pausee","expiree","refusee"].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  db.prepare("UPDATE publicites SET statut=?,updated_at=datetime('now') WHERE id=?").run(statut, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/admin/publicites/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  db.prepare("DELETE FROM publicite_events WHERE publicite_id=?").run(params.id);
+  db.prepare("DELETE FROM publicites WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/admin/publicites/:id/stats", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const pub = db.prepare("SELECT id,titre,nb_impressions,nb_clics FROM publicites WHERE id=?").get(params.id);
+  if (!pub) return sendJSON(res, 404, { error: "Publicité introuvable." });
+  const parPays = db.prepare("SELECT user_pays AS pays, COUNT(*) AS n FROM publicite_events WHERE publicite_id=? AND type='impression' AND user_pays IS NOT NULL GROUP BY user_pays ORDER BY n DESC LIMIT 10").all(params.id);
+  const parJour = db.prepare("SELECT date(created_at) AS jour, COUNT(*) AS impressions FROM publicite_events WHERE publicite_id=? AND type='impression' GROUP BY jour ORDER BY jour DESC LIMIT 14").all(params.id);
+  const ctr = pub.nb_impressions > 0 ? ((pub.nb_clics / pub.nb_impressions) * 100).toFixed(2) : "0.00";
+  sendJSON(res, 200, { pub, ctr, par_pays: parPays, par_jour: parJour });
+});
+
 /* ===== MODULE INSTITUTIONS & OBSERVATOIRE ===== */
 
 /* Helper : accréditation active d'une institution */

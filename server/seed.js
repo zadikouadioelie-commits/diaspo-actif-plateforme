@@ -242,6 +242,35 @@ function seed() {
     insQ.run(consultId, "Avez-vous des commentaires ou suggestions supplémentaires ?", "texte_libre", "[]", 2);
   }
 
+  /* ===== PUBLICITÉS DÉMO ===== */
+  const insPub = db.prepare(`
+    INSERT OR IGNORE INTO publicites
+      (titre,description,image_url,lien_url,lien_texte,annonceur,format,statut,date_debut,date_fin,priorite,
+       cible_pays,cible_roles,cible_nationalites,created_by)
+    VALUES (?,?,?,?,?,?,?,?,date('now','-5 days'),date('now','+60 days'),?,?,?,?,?)
+  `);
+  // Bannière universelle
+  insPub.run(
+    "Salon de la Diaspora 2025 — Paris","Retrouvez les acteurs de la diaspora africaine pour 3 jours d'échanges, networking et opportunités.",
+    "https://picsum.photos/seed/salon2025/800/200","https://diaspoactif.fr","Découvrir le programme",
+    "Diaspo'Actif","banniere","active",3,
+    "[]","[]","[]",adminId
+  );
+  // Post natif — ciblé Sénégalais en France
+  insPub.run(
+    "Ouvrir une entreprise au Sénégal : guide pratique","APIX vous accompagne dans vos démarches d'investissement. Découvrez les opportunités et avantages fiscaux.",
+    "https://picsum.photos/seed/apix/600/400","https://apix.sn","En savoir plus",
+    "APIX Sénégal","native","active",2,
+    '["France"]','["utilisateur","initiative"]','["Sénégalaise"]',adminId
+  );
+  // Annuaire — toutes nationalités
+  insPub.run(
+    "AssurDiaspora — Assurance rapatriement & famille","Protégez votre famille où qu'elle soit. Offres dédiées aux membres de la diaspora.",
+    "https://picsum.photos/seed/assur/400/300","https://assurdiaspora.com","Obtenir un devis",
+    "AssurDiaspora","annuaire","active",1,
+    "[]","[]","[]",adminId
+  );
+
   console.log(`Seed terminé : ${legacy.INITIATIVES.length} initiatives, 5 comptes, 6 formations, ${3} abonnements démo.`);
   console.log("Comptes démo (mot de passe : Demo1234!) :");
   console.log("  jean@diaspoactif.demo            → utilisateur");

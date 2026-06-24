@@ -29,6 +29,7 @@
       <a href="#publications" data-section="publications">📢 Publications</a>
       <a href="#certifications" data-section="certifications">🛡️ Certifications</a>
       <a href="#accreditations" data-section="accreditations">🏛️ Accréditations Obs.</a>
+      <a href="#publicites" data-section="publicites">📣 Publicités</a>
       <a href="#moderation" data-section="moderation">🛡 Modération</a>
       <a href="#communication" data-section="communication">✉ Communication</a>
     </aside>
@@ -347,6 +348,152 @@
             <button class="btn btn-outline" onclick="document.getElementById('accred-modal').style.display='none'">Annuler</button>
             <button class="btn btn-orange" onclick="createAccreditation()">Créer l'accréditation</button>
           </div>
+        </div>
+      </div>
+
+      <!-- PUBLICITÉS -->
+      <section id="section-publicites" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <h2 style="margin:0;">📣 Gestion des Publicités</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Créez, ciblez et diffusez des publicités sur la plateforme</p>
+          </div>
+          <button class="btn btn-orange" onclick="openPubModal()">+ Nouvelle publicité</button>
+        </div>
+
+        <!-- Tableau -->
+        <div class="card" style="padding:0;overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                <th style="padding:12px 16px;text-align:left;">Titre / Annonceur</th>
+                <th style="padding:12px 8px;text-align:center;">Format</th>
+                <th style="padding:12px 8px;text-align:center;">Statut</th>
+                <th style="padding:12px 8px;text-align:center;">Période</th>
+                <th style="padding:12px 8px;text-align:center;">Impressions</th>
+                <th style="padding:12px 8px;text-align:center;">Clics / CTR</th>
+                <th style="padding:12px 8px;text-align:center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pub-table-body">
+              <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Chargement…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Modal Publicité -->
+      <div id="pub-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
+        <div style="background:var(--card);border-radius:16px;max-width:700px;margin:40px auto;padding:32px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+            <h3 id="pub-modal-title" style="margin:0;">Nouvelle publicité</h3>
+            <button onclick="closePubModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);">×</button>
+          </div>
+          <input type="hidden" id="pub-id" value="">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div style="grid-column:1/-1;">
+              <label style="font-weight:600;font-size:13px;">Titre *</label>
+              <input id="pub-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Titre de la publicité">
+            </div>
+            <div style="grid-column:1/-1;">
+              <label style="font-weight:600;font-size:13px;">Description</label>
+              <textarea id="pub-description" class="input-field" style="width:100%;min-height:72px;margin-top:4px;resize:vertical;" placeholder="Texte d'accroche…"></textarea>
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:13px;">Annonceur *</label>
+              <input id="pub-annonceur" class="input-field" style="width:100%;margin-top:4px;" placeholder="Nom de l'annonceur">
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:13px;">Format</label>
+              <select id="pub-format" class="input-field" style="width:100%;margin-top:4px;">
+                <option value="banniere">🖼️ Bannière</option>
+                <option value="native">📰 Post natif (fil)</option>
+                <option value="annuaire">📋 Annuaire</option>
+                <option value="profil">👤 Profil</option>
+              </select>
+            </div>
+            <div style="grid-column:1/-1;">
+              <label style="font-weight:600;font-size:13px;">Image URL</label>
+              <input id="pub-image" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://…">
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:13px;">Lien URL</label>
+              <input id="pub-lien" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://…">
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:13px;">Texte du bouton</label>
+              <input id="pub-lien-texte" class="input-field" style="width:100%;margin-top:4px;" placeholder="En savoir plus">
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:13px;">Date début</label>
+              <input id="pub-debut" type="date" class="input-field" style="width:100%;margin-top:4px;">
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:13px;">Date fin</label>
+              <input id="pub-fin" type="date" class="input-field" style="width:100%;margin-top:4px;">
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:13px;">Priorité</label>
+              <select id="pub-priorite" class="input-field" style="width:100%;margin-top:4px;">
+                <option value="1">1 — Faible</option>
+                <option value="2" selected>2 — Normal</option>
+                <option value="3">3 — Prioritaire</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-weight:600;font-size:13px;">Statut</label>
+              <select id="pub-statut" class="input-field" style="width:100%;margin-top:4px;">
+                <option value="active">✅ Active</option>
+                <option value="brouillon">✏️ Brouillon</option>
+                <option value="pausee">⏸️ Pausée</option>
+                <option value="refusee">❌ Refusée</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Ciblage -->
+          <div style="margin-top:20px;padding:16px;background:var(--surface);border-radius:12px;">
+            <h4 style="margin:0 0 12px;font-size:14px;">🎯 Ciblage (vide = tout le monde)</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+              <div>
+                <label style="font-weight:600;">Pays (JSON array)</label>
+                <input id="pub-cible-pays" class="input-field" style="width:100%;margin-top:4px;" placeholder='["France","Belgique"]'>
+              </div>
+              <div>
+                <label style="font-weight:600;">Régions (JSON array)</label>
+                <input id="pub-cible-regions" class="input-field" style="width:100%;margin-top:4px;" placeholder='["Île-de-France"]'>
+              </div>
+              <div>
+                <label style="font-weight:600;">Types de compte</label>
+                <input id="pub-cible-roles" class="input-field" style="width:100%;margin-top:4px;" placeholder='["utilisateur","initiative"]'>
+              </div>
+              <div>
+                <label style="font-weight:600;">Nationalités</label>
+                <input id="pub-cible-nationalites" class="input-field" style="width:100%;margin-top:4px;" placeholder='["Sénégalaise","Ivoirienne"]'>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:16px;">
+            <label style="font-weight:600;font-size:13px;">Notes admin</label>
+            <textarea id="pub-notes" class="input-field" style="width:100%;min-height:56px;margin-top:4px;resize:vertical;" placeholder="Notes internes…"></textarea>
+          </div>
+
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px;">
+            <button class="btn" onclick="closePubModal()" style="background:var(--surface);">Annuler</button>
+            <button class="btn btn-orange" onclick="savePub()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Stats Publicité -->
+      <div id="pub-stats-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
+        <div style="background:var(--card);border-radius:16px;max-width:600px;margin:60px auto;padding:32px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h3 id="pub-stats-titre" style="margin:0;"></h3>
+            <button onclick="document.getElementById('pub-stats-modal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);">×</button>
+          </div>
+          <div id="pub-stats-content"></div>
         </div>
       </div>
 
@@ -835,6 +982,173 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
                     `les collectivités (${data.total_collectivites} entités)`;
       document.getElementById("nb-destinataires").textContent = label;
     });
+  });
+
+  /* ===== Publicités ===== */
+  const PUB_FORMAT_LABEL = { banniere:"Bannière", native:"Post natif", annuaire:"Annuaire", profil:"Profil" };
+  const PUB_STATUT_STYLE = {
+    active:   { bg:"#d1fae5", color:"#065f46", label:"Active" },
+    brouillon:{ bg:"#f3f4f6", color:"#374151", label:"Brouillon" },
+    pausee:   { bg:"#fef3c7", color:"#92400e", label:"Pausée" },
+    expiree:  { bg:"#e5e7eb", color:"#6b7280", label:"Expirée" },
+    refusee:  { bg:"#fee2e2", color:"#991b1b", label:"Refusée" }
+  };
+
+  async function loadPublicites() {
+    const r = await api("GET", "/admin/publicites");
+    const tbody = document.getElementById("pub-table-body");
+    if (!r.publicites || !r.publicites.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Aucune publicité pour le moment.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = r.publicites.map(p => {
+      const s = PUB_STATUT_STYLE[p.statut] || PUB_STATUT_STYLE.brouillon;
+      const ctr = p.nb_impressions > 0 ? ((p.nb_clics / p.nb_impressions) * 100).toFixed(1) + "%" : "—";
+      const periode = [p.date_debut, p.date_fin].filter(Boolean).join(" → ") || "Toujours";
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:12px 16px;">
+          <div style="font-weight:600;">${esc(p.titre)}</div>
+          <div style="font-size:12px;color:var(--muted);">${esc(p.annonceur)}</div>
+        </td>
+        <td style="padding:8px;text-align:center;font-size:12px;">${PUB_FORMAT_LABEL[p.format]||p.format}</td>
+        <td style="padding:8px;text-align:center;">
+          <span style="background:${s.bg};color:${s.color};padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600;">${s.label}</span>
+        </td>
+        <td style="padding:8px;text-align:center;font-size:12px;color:var(--muted);">${periode}</td>
+        <td style="padding:8px;text-align:center;font-weight:600;">${p.nb_impressions.toLocaleString()}</td>
+        <td style="padding:8px;text-align:center;">${p.nb_clics} <span style="color:var(--muted);font-size:12px;">${ctr}</span></td>
+        <td style="padding:8px;text-align:center;">
+          <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
+            <button class="btn" style="padding:4px 10px;font-size:12px;" onclick="openPubModal(${p.id})">✏️</button>
+            <button class="btn" style="padding:4px 10px;font-size:12px;" onclick="viewPubStats(${p.id},'${esc(p.titre)}')">📊</button>
+            <button class="btn" style="padding:4px 10px;font-size:12px;background:#fee2e2;color:#991b1b;" onclick="deletePub(${p.id})">🗑️</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+
+  function openPubModal(id) {
+    document.getElementById("pub-modal-title").textContent = id ? "Modifier la publicité" : "Nouvelle publicité";
+    document.getElementById("pub-id").value = id || "";
+    if (!id) {
+      ["pub-titre","pub-description","pub-annonceur","pub-image","pub-lien","pub-notes",
+       "pub-cible-pays","pub-cible-regions","pub-cible-roles","pub-cible-nationalites"].forEach(x => document.getElementById(x).value = "");
+      document.getElementById("pub-lien-texte").value = "En savoir plus";
+      document.getElementById("pub-format").value = "banniere";
+      document.getElementById("pub-priorite").value = "2";
+      document.getElementById("pub-statut").value = "active";
+      document.getElementById("pub-debut").value = "";
+      document.getElementById("pub-fin").value = "";
+    } else {
+      api("GET", "/admin/publicites").then(r => {
+        const p = r.publicites.find(x => x.id === id);
+        if (!p) return;
+        document.getElementById("pub-titre").value = p.titre || "";
+        document.getElementById("pub-description").value = p.description || "";
+        document.getElementById("pub-annonceur").value = p.annonceur || "";
+        document.getElementById("pub-image").value = p.image_url || "";
+        document.getElementById("pub-lien").value = p.lien_url || "";
+        document.getElementById("pub-lien-texte").value = p.lien_texte || "En savoir plus";
+        document.getElementById("pub-format").value = p.format || "banniere";
+        document.getElementById("pub-priorite").value = String(p.priorite || 2);
+        document.getElementById("pub-statut").value = p.statut || "active";
+        document.getElementById("pub-debut").value = p.date_debut || "";
+        document.getElementById("pub-fin").value = p.date_fin || "";
+        document.getElementById("pub-cible-pays").value = p.cible_pays && p.cible_pays !== "[]" ? p.cible_pays : "";
+        document.getElementById("pub-cible-regions").value = p.cible_regions && p.cible_regions !== "[]" ? p.cible_regions : "";
+        document.getElementById("pub-cible-roles").value = p.cible_roles && p.cible_roles !== "[]" ? p.cible_roles : "";
+        document.getElementById("pub-cible-nationalites").value = p.cible_nationalites && p.cible_nationalites !== "[]" ? p.cible_nationalites : "";
+        document.getElementById("pub-notes").value = p.notes_admin || "";
+      });
+    }
+    document.getElementById("pub-modal").style.display = "block";
+  }
+
+  function closePubModal() { document.getElementById("pub-modal").style.display = "none"; }
+
+  function parsePubArray(val) {
+    const v = (val || "").trim();
+    if (!v) return [];
+    try { return JSON.parse(v); } catch { return v.split(",").map(x => x.trim()).filter(Boolean); }
+  }
+
+  async function savePub() {
+    const id = document.getElementById("pub-id").value;
+    const body = {
+      titre: document.getElementById("pub-titre").value.trim(),
+      description: document.getElementById("pub-description").value.trim(),
+      annonceur: document.getElementById("pub-annonceur").value.trim(),
+      image_url: document.getElementById("pub-image").value.trim(),
+      lien_url: document.getElementById("pub-lien").value.trim(),
+      lien_texte: document.getElementById("pub-lien-texte").value.trim() || "En savoir plus",
+      format: document.getElementById("pub-format").value,
+      priorite: parseInt(document.getElementById("pub-priorite").value),
+      statut: document.getElementById("pub-statut").value,
+      date_debut: document.getElementById("pub-debut").value || null,
+      date_fin: document.getElementById("pub-fin").value || null,
+      cible_pays: parsePubArray(document.getElementById("pub-cible-pays").value),
+      cible_regions: parsePubArray(document.getElementById("pub-cible-regions").value),
+      cible_villes: [],
+      cible_roles: parsePubArray(document.getElementById("pub-cible-roles").value),
+      cible_nationalites: parsePubArray(document.getElementById("pub-cible-nationalites").value),
+      cible_origines: [],
+      notes_admin: document.getElementById("pub-notes").value.trim() || null
+    };
+    if (!body.titre || !body.annonceur) { alert("Titre et annonceur sont obligatoires."); return; }
+    const method = id ? "PUT" : "POST";
+    const path = id ? `/admin/publicites/${id}` : "/admin/publicites";
+    await api(method, path, body);
+    closePubModal();
+    loadPublicites();
+  }
+
+  async function deletePub(id) {
+    if (!confirm("Supprimer définitivement cette publicité et toutes ses statistiques ?")) return;
+    await api("DELETE", `/admin/publicites/${id}`);
+    loadPublicites();
+  }
+
+  async function viewPubStats(id, titre) {
+    const modal = document.getElementById("pub-stats-modal");
+    const content = document.getElementById("pub-stats-content");
+    document.getElementById("pub-stats-titre").textContent = "📊 " + titre;
+    content.innerHTML = "<div style='text-align:center;padding:20px;color:var(--muted);'>Chargement…</div>";
+    modal.style.display = "block";
+    const r = await api("GET", `/admin/publicites/${id}/stats`);
+    const ctrStyle = parseFloat(r.ctr) >= 2 ? "color:#065f46;font-weight:700;" : "color:var(--muted);";
+    const geoBars = (r.par_pays || []).map(g => `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <div style="width:80px;font-size:12px;color:var(--muted);text-align:right;">${g.pays}</div>
+        <div style="flex:1;height:16px;background:var(--surface);border-radius:8px;overflow:hidden;">
+          <div style="height:100%;background:#E87C3E;border-radius:8px;width:${Math.min(100,g.n/((r.par_pays[0]||{n:1}).n)*100)}%;"></div>
+        </div>
+        <div style="width:30px;font-size:12px;font-weight:600;">${g.n}</div>
+      </div>`).join("") || "<div style='font-size:13px;color:var(--muted);'>Aucune donnée géographique.</div>";
+    content.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+        <div class="card" style="text-align:center;padding:16px;">
+          <div style="font-size:24px;font-weight:700;">${(r.pub.nb_impressions||0).toLocaleString()}</div>
+          <div style="font-size:12px;color:var(--muted);">Impressions</div>
+        </div>
+        <div class="card" style="text-align:center;padding:16px;">
+          <div style="font-size:24px;font-weight:700;">${(r.pub.nb_clics||0).toLocaleString()}</div>
+          <div style="font-size:12px;color:var(--muted);">Clics</div>
+        </div>
+        <div class="card" style="text-align:center;padding:16px;">
+          <div style="font-size:24px;font-weight:700;${ctrStyle}">${r.ctr}%</div>
+          <div style="font-size:12px;color:var(--muted);">CTR</div>
+        </div>
+      </div>
+      <div style="margin-bottom:20px;">
+        <h4 style="margin:0 0 12px;font-size:14px;">🌍 Performance géographique</h4>
+        ${geoBars}
+      </div>`;
+  }
+
+  // Charger les publicités quand on navigue vers la section
+  document.querySelectorAll("[data-section='publicites']").forEach(el => {
+    el.addEventListener("click", loadPublicites);
   });
 
 })();

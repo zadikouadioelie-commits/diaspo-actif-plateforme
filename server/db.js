@@ -260,6 +260,54 @@ db.exec(`
     value INTEGER NOT NULL DEFAULT 0
   );
 
+  /* ===== MODULE PUBLICITÉS ===== */
+
+  CREATE TABLE IF NOT EXISTS publicites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- Contenu
+    titre TEXT NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    lien_url TEXT,
+    lien_texte TEXT DEFAULT 'En savoir plus',
+    annonceur TEXT NOT NULL,
+    -- Format : banniere | native | profil | annuaire
+    format TEXT NOT NULL DEFAULT 'banniere' CHECK(format IN ('banniere','native','profil','annuaire')),
+    -- Statut
+    statut TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('brouillon','active','pausee','expiree','refusee')),
+    -- Période
+    date_debut TEXT,
+    date_fin TEXT,
+    -- Priorité 1=faible 2=normal 3=prioritaire
+    priorite INTEGER DEFAULT 2,
+    -- Ciblage (JSON arrays, vide = tous)
+    cible_pays TEXT DEFAULT '[]',
+    cible_regions TEXT DEFAULT '[]',
+    cible_villes TEXT DEFAULT '[]',
+    cible_roles TEXT DEFAULT '[]',
+    cible_nationalites TEXT DEFAULT '[]',
+    cible_origines TEXT DEFAULT '[]',
+    -- Compteurs cumulés
+    nb_impressions INTEGER DEFAULT 0,
+    nb_clics INTEGER DEFAULT 0,
+    -- Admin
+    created_by INTEGER,
+    notes_admin TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS publicite_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    publicite_id INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('impression','clic')),
+    user_id INTEGER,
+    user_pays TEXT,
+    user_ville TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(publicite_id) REFERENCES publicites(id)
+  );
+
   /* ===== MODULE INSTITUTIONS & OBSERVATOIRE DIASPORA ===== */
 
   /* Accréditations Observatoire délivrées par Diaspo'Actif */
