@@ -2,40 +2,202 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Diaspo'Actif — Profil Utilisateur</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diaspo'Actif — Profil</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
+<style>
+.profil-header{display:flex;gap:20px;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap}
+.profil-avatar{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--orange),#ff9f43);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;flex-shrink:0;cursor:pointer;position:relative;overflow:hidden}
+.profil-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.profil-avatar:hover::after{content:'📷';position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:24px}
+.section{margin-bottom:28px}
+.section-title{font-size:14px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.05em;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:580px){.grid-2,.grid-3{grid-template-columns:1fr}}
+.interests-grid{display:flex;flex-wrap:wrap;gap:8px}
+.interests-grid label{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:99px}
+.interests-grid label:has(input:checked){background:#fff8f2;border-color:var(--orange)}
+.interests-grid input{accent-color:var(--orange)}
+.read-val{font-size:14px;color:var(--text);min-height:20px}
+.read-empty{color:var(--muted);font-style:italic;font-size:13px}
+.edit-toggle{display:none}
+.edit-mode .edit-toggle{display:block}
+.edit-mode .read-toggle{display:none}
+.stat-chip{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center}
+.stat-chip .n{font-size:22px;font-weight:700;color:var(--orange)}
+.stat-chip .l{font-size:12px;color:var(--muted);margin-top:2px}
+.radio-grid{display:flex;flex-wrap:wrap;gap:8px}
+.radio-grid label{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 12px;border:1px solid var(--border);border-radius:99px}
+.radio-grid label:has(input:checked){background:#fff8f2;border-color:var(--orange)}
+</style>
 </head>
 <body>
 <div class="page">
-
-  <header class="topbar">
-    <div class="topbar-inner">
-      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
-      <nav class="nav">
-        <a href="index.html">Accueil</a>
-        <a href="annuaire.html">Annuaire</a>
-        <a href="fil-actualite.html">Fil d'actualité</a>
-        <a href="actualites.html">Actualités</a>
-        <a href="evenements.html">Événements</a>
-      </nav>
-      <div class="topbar-right">
-        
-        <select class="lang-select" id="lang-select"></select>
-        <div id="auth-area" class="auth-area"></div>
-      </div>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <nav class="nav">
+      <a href="index.html">Accueil</a><a href="annuaire.html">Annuaire</a>
+      <a href="fil-actualite.html">Fil d'actualite</a><a href="formations.html">Formations</a>
+    </nav>
+    <div class="topbar-right">
+      <select class="lang-select" id="lang-select"></select>
+      <div id="auth-area" class="auth-area"></div>
     </div>
-  </header>
-
-  <main class="container" style="max-width:900px;padding-top:30px;padding-bottom:40px;">
-    <a href="dashboard-utilisateur.html" style="color:var(--muted);font-size:13px;">← Retour à mon espace</a>
-    <div id="profil-page" style="margin-top:14px;"></div>
-  </main>
-
-  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a></footer>
+  </div>
+</header>
+<main class="container" style="max-width:760px;padding-top:28px;padding-bottom:48px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+    <a href="#" id="back-link" style="color:var(--muted);font-size:13px">← Retour</a>
+    <div style="display:flex;gap:8px" id="edit-controls"></div>
+  </div>
+  <div id="profil-content"></div>
+</main>
+<footer class="footer"><span id="footer-text">Diaspo'Actif · Prototype · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialite</a></footer>
 </div>
-
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
+<script>
+const INTERETS = ['entrepreneuriat','investissement','emploi','formation','agriculture','sante','education','technologie','culture','sport','tourisme','autres'];
+const SITPRO = ['etudiant','salarie','entrepreneur','liberal','fonctionnaire','retraite','sans_emploi','autre'];
+let profil = null;
+let isOwn = false;
+let editMode = false;
+
+const params = new URLSearchParams(location.search);
+const uid = params.get('id');
+
+async function init() {
+  await applyAuthState();
+  const backLink = document.getElementById('back-link');
+  if(CURRENT_USER) backLink.href = ROLE_DASHBOARD[CURRENT_USER.role]||'index.html';
+  else backLink.href = 'index.html';
+
+  const targetId = uid || (CURRENT_USER?.id);
+  if (!targetId) { window.location.href = 'login.html'; return; }
+
+  try {
+    const r = await api('GET', '/profil/'+targetId);
+    profil = r.profil;
+    isOwn = CURRENT_USER && CURRENT_USER.id == profil.id;
+    if(isOwn) {
+      document.getElementById('edit-controls').innerHTML = `<button class="btn" id="btn-edit">Modifier mon profil</button>`;
+      document.getElementById('btn-edit').addEventListener('click', () => toggleEdit(true));
+    }
+    render();
+  } catch(e) {
+    document.getElementById('profil-content').innerHTML = '<p style="color:red">Profil introuvable.</p>';
+  }
+}
+
+function initials(nom){return (nom||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+
+function render() {
+  const ci = Array.isArray(profil.centres_interet) ? profil.centres_interet : [];
+  const isEdit = editMode && isOwn;
+  const container = document.getElementById('profil-content');
+  container.innerHTML = `
+  <div class="profil-header">
+    <div class="profil-avatar" ${isEdit?"onclick='simulerUpload()' title='Changer la photo'":''}>
+      ${profil.photo_url?'<img src="'+profil.photo_url+'" alt="">':initials(profil.nom)}
+    </div>
+    <div style="flex:1;min-width:0">
+      ${isEdit
+        ?'<div class="grid-2"><div><label>Nom *</label><input type="text" id="e-nom" value="'+escHtml(profil.nom)+'"></div><div><label>Prenom</label><input type="text" id="e-prenom" value="'+escHtml(profil.prenom||'')+'"></div></div>'
+        :'<h2 style="margin:0 0 4px">'+escHtml(profil.nom+(profil.prenom?' '+profil.prenom:''))+'</h2>'
+      }
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <span class="role-tag">${ROLE_LABEL_FR[profil.role]||profil.role}</span>
+        ${profil.ville?'<span style="font-size:13px;color:var(--muted)">📍 '+escHtml(profil.ville)+(profil.pays?', '+escHtml(profil.pays):'')+'</span>':''}
+      </div>
+      ${isEdit
+        ?'<div style="margin-top:10px"><label>Bio</label><textarea id="e-bio" rows="2" style="width:100%;resize:vertical;box-sizing:border-box">'+escHtml(profil.bio||'')+'</textarea></div>'
+        :(profil.bio?'<p style="font-size:14px;color:var(--muted);margin:8px 0 0">'+escHtml(profil.bio)+'</p>':'')
+      }
+    </div>
+  </div>
+
+  ${isOwn?'<div style="display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap"><div class="stat-chip"><div class="n" id="nb-suivis">—</div><div class="l">Initiatives suivies</div></div></div>':''}
+
+  <div class="section">
+    <div class="section-title">Localisation</div>
+    ${isEdit
+      ?'<div class="grid-3"><div><label>Pays</label><input type="text" id="e-pays" value="'+escHtml(profil.pays||'')+'"></div><div><label>Ville</label><input type="text" id="e-ville" value="'+escHtml(profil.ville||'')+'"></div><div><label>Telephone</label><input type="tel" id="e-tel" value="'+escHtml(profil.telephone||'')+'"></div></div>'
+      :'<div class="grid-3"><div><div class="section-title" style="font-size:11px;border:none;padding:0;margin:0 0 4px">Pays</div><div class="read-val">'+(profil.pays||'<span class="read-empty">Non renseigne</span>')+'</div></div><div><div class="section-title" style="font-size:11px;border:none;padding:0;margin:0 0 4px">Ville</div><div class="read-val">'+(profil.ville||'<span class="read-empty">Non renseigne</span>')+'</div></div><div><div class="section-title" style="font-size:11px;border:none;padding:0;margin:0 0 4px">Telephone</div><div class="read-val">'+(profil.telephone||'<span class="read-empty">Non renseigne</span>')+'</div></div></div>'
+    }
+  </div>
+
+  <div class="section">
+    <div class="section-title">Situation professionnelle</div>
+    ${isEdit
+      ?'<div class="radio-grid">'+SITPRO.map(s=>'<label><input type="radio" name="e-sitpro" value="'+s+'"'+(profil.situation_pro===s?' checked':'')+'> '+s.replace('_',' ')+'</label>').join('')+'</div>'
+      :'<div class="read-val">'+(profil.situation_pro?profil.situation_pro.replace('_',' '):'<span class="read-empty">Non renseigne</span>')+'</div>'
+    }
+  </div>
+
+  <div class="section">
+    <div class="section-title">Centres d'interet</div>
+    ${isEdit
+      ?'<div class="interests-grid">'+INTERETS.map(i=>'<label><input type="checkbox" value="'+i+'"'+(ci.includes(i)?' checked':'')+'> '+i+'</label>').join('')+'</div>'
+      :(ci.length
+        ?'<div style="display:flex;flex-wrap:wrap;gap:6px">'+ci.map(i=>'<span style="background:#fff8f2;border:1px solid var(--orange);color:var(--orange);border-radius:99px;padding:3px 10px;font-size:12px">'+i+'</span>').join('')+'</div>'
+        :'<span class="read-empty">Aucun centre d'interet renseigne</span>'
+      )
+    }
+  </div>
+
+  ${isEdit?'<div class="auth-error" id="save-error" style="display:none"></div><div style="display:flex;gap:10px;margin-top:8px"><button class="btn btn-orange" onclick="saveProfile()">Enregistrer les modifications</button><button class="btn" onclick="toggleEdit(false)">Annuler</button></div>':''}
+  `;
+
+  if(isOwn) loadStats();
+}
+
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function toggleEdit(on) {
+  editMode = on;
+  render();
+}
+
+async function loadStats() {
+  try { const r = await api('GET','/mes-suivis'); document.getElementById('nb-suivis').textContent = r.initiatives?.length||0; } catch(e){}
+}
+
+async function saveProfile() {
+  const errBox = document.getElementById('save-error');
+  errBox.style.display='none';
+  const body = {
+    nom: document.getElementById('e-nom')?.value.trim() || profil.nom,
+    prenom: document.getElementById('e-prenom')?.value.trim() || '',
+    pays: document.getElementById('e-pays')?.value.trim() || '',
+    ville: document.getElementById('e-ville')?.value.trim() || '',
+    telephone: document.getElementById('e-tel')?.value.trim() || '',
+    bio: document.getElementById('e-bio')?.value.trim() || '',
+    situation_pro: document.querySelector('input[name="e-sitpro"]:checked')?.value || '',
+    centres_interet: [...(document.querySelectorAll('.interests-grid input:checked')||[])].map(c=>c.value)
+  };
+  try {
+    const r = await api('PUT', '/profil', body);
+    profil = {...profil, ...r.profil};
+    editMode = false;
+    render();
+  } catch(e) {
+    errBox.textContent = e.message || 'Erreur lors de la sauvegarde.';
+    errBox.style.display = 'block';
+  }
+}
+
+async function simulerUpload() {
+  const url = 'https://api.dicebear.com/7.x/initials/svg?seed='+(profil.nom||'U')+'&backgroundColor=ff6b00';
+  try {
+    const r = await api('PUT', '/profil', { photo_url: url });
+    profil = {...profil, ...r.profil, photo_url: url};
+    render();
+  } catch(e) {}
+}
+
+init();
+</script>
 </body>
 </html>

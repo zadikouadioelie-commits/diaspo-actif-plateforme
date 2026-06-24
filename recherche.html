@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Recherche</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+.search-hero{background:linear-gradient(135deg,#ff6b00,#ff9f43);padding:40px 20px;text-align:center;color:#fff}
+.search-hero h1{margin:0 0 16px;font-size:28px}
+.search-bar{display:flex;gap:0;max-width:560px;margin:0 auto;border-radius:10px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.2)}
+.search-bar input{flex:1;border:none;padding:14px 18px;font-size:16px;outline:none}
+.search-bar button{background:#fff;border:none;padding:14px 18px;font-size:18px;cursor:pointer;color:var(--orange)}
+.result-section{margin-bottom:28px}
+.result-section h3{font-size:16px;color:var(--orange);margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.result-count{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:2px 8px;font-size:12px;color:var(--muted)}
+.result-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;text-decoration:none;color:inherit;transition:box-shadow .12s}
+.result-item:hover{box-shadow:0 2px 10px rgba(0,0,0,.08);border-color:var(--orange)}
+.result-icon{width:36px;height:36px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.result-body{min-width:0}
+.result-title{font-weight:600;font-size:14px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.result-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.tab-row{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto}
+.tab-btn{padding:8px 16px;border:none;background:none;cursor:pointer;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.tab-btn.active{color:var(--orange);border-bottom-color:var(--orange);font-weight:700}
+.empty{text-align:center;padding:40px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <nav class="nav">
+      <a href="index.html">Accueil</a><a href="annuaire.html">Annuaire</a>
+      <a href="fil-actualite.html">Fil d'actualite</a><a href="formations.html">Formations</a>
+    </nav>
+    <div class="topbar-right">
+      <select class="lang-select" id="lang-select"></select>
+      <div id="auth-area" class="auth-area"></div>
+    </div>
+  </div>
+</header>
+
+<div class="search-hero">
+  <h1>Rechercher sur Diaspo'Actif</h1>
+  <div class="search-bar">
+    <input type="text" id="q" placeholder="Membres, initiatives, publications, formations..." autocomplete="off">
+    <button onclick="doSearch()">🔍</button>
+  </div>
+</div>
+
+<main class="container" style="max-width:800px;padding-top:28px;padding-bottom:48px">
+  <div class="tab-row" id="tabs"></div>
+  <div id="results"></div>
+</main>
+
+<footer class="footer"><span id="footer-text">Diaspo'Actif · Prototype · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialite</a></footer>
+</div>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+let lastRes = null;
+let activeTab = 'tous';
+
+const params = new URLSearchParams(location.search);
+if(params.get('q')) {
+  document.getElementById('q').value = params.get('q');
+}
+
+document.getElementById('q').addEventListener('keydown', e => { if(e.key==='Enter') doSearch(); });
+
+async function doSearch() {
+  const q = document.getElementById('q').value.trim();
+  if(q.length < 2) return;
+  history.replaceState(null,'','/recherche.html?q='+encodeURIComponent(q));
+  const res = document.getElementById('results');
+  res.innerHTML = '<div class="empty">Recherche en cours...</div>';
+  document.getElementById('tabs').innerHTML = '';
+  try {
+    const r = await api('GET','/recherche?q='+encodeURIComponent(q));
+    lastRes = r;
+    renderTabs();
+    renderResults();
+  } catch(e) {
+    res.innerHTML = '<div class="empty">Erreur de recherche.</div>';
+  }
+}
+
+function total() {
+  if(!lastRes) return 0;
+  return (lastRes.utilisateurs?.length||0)+(lastRes.initiatives?.length||0)+(lastRes.publications?.length||0)+(lastRes.formations?.length||0)+(lastRes.evenements?.length||0);
+}
+
+function renderTabs() {
+  const tabs = [
+    {id:'tous',label:'Tous',n:total()},
+    {id:'utilisateurs',label:'Membres',n:lastRes.utilisateurs?.length||0},
+    {id:'initiatives',label:'Initiatives',n:lastRes.initiatives?.length||0},
+    {id:'publications',label:'Publications',n:lastRes.publications?.length||0},
+    {id:'formations',label:'Formations',n:lastRes.formations?.length||0},
+    {id:'evenements',label:'Evenements',n:lastRes.evenements?.length||0},
+  ].filter(t=>t.id==='tous'||t.n>0);
+  document.getElementById('tabs').innerHTML = tabs.map(t=>'<button class="tab-btn'+(activeTab===t.id?' active':'')+'" onclick="setTab(''+t.id+'')">'+t.label+' <span class="result-count">'+t.n+'</span></button>').join('');
+}
+
+function setTab(id) { activeTab = id; renderTabs(); renderResults(); }
+
+function renderResults() {
+  if(!lastRes) return;
+  const q = lastRes.q;
+  const res = document.getElementById('results');
+  if(total()===0){res.innerHTML='<div class="empty">Aucun resultat pour « '+escHtml(q)+' ».</div>';return;}
+  let html='';
+  const show = id => activeTab==='tous'||activeTab===id;
+
+  if(show('utilisateurs') && (lastRes.utilisateurs||[]).length) {
+    html+='<div class="result-section"><h3>👥 Membres <span class="result-count">'+lastRes.utilisateurs.length+'</span></h3>';
+    html+=lastRes.utilisateurs.map(u=>'<a href="profil.html?id='+u.id+'" class="result-item"><div class="result-icon">'+initials(u.nom)+'</div><div class="result-body"><div class="result-title">'+escHtml(u.nom)+'</div><div class="result-sub">'+escHtml(ROLE_LABEL_FR[u.role]||u.role)+(u.ville?', '+escHtml(u.ville):'')+'</div></div></a>').join('');
+    html+='</div>';
+  }
+  if(show('initiatives') && (lastRes.initiatives||[]).length) {
+    html+='<div class="result-section"><h3>🏢 Initiatives <span class="result-count">'+lastRes.initiatives.length+'</span></h3>';
+    html+=lastRes.initiatives.map(i=>'<a href="initiative.html?id='+i.id+'" class="result-item"><div class="result-icon">🏢</div><div class="result-body"><div class="result-title">'+escHtml(i.nom)+'</div><div class="result-sub">'+(i.domaine?escHtml(i.domaine)+', ':'')+escHtml(i.pays||'')+'</div></div></a>').join('');
+    html+='</div>';
+  }
+  if(show('publications') && (lastRes.publications||[]).length) {
+    html+='<div class="result-section"><h3>📰 Publications <span class="result-count">'+lastRes.publications.length+'</span></h3>';
+    html+=lastRes.publications.map(p=>'<a href="fil-actualite.html" class="result-item"><div class="result-icon">📰</div><div class="result-body"><div class="result-title">'+escHtml((p.contenu||'').slice(0,80))+'</div><div class="result-sub">Par '+escHtml(p.auteur_nom||'?')+'</div></div></a>').join('');
+    html+='</div>';
+  }
+  if(show('formations') && (lastRes.formations||[]).length) {
+    html+='<div class="result-section"><h3>📚 Formations <span class="result-count">'+lastRes.formations.length+'</span></h3>';
+    html+=lastRes.formations.map(f=>'<a href="formations.html" class="result-item"><div class="result-icon">📚</div><div class="result-body"><div class="result-title">'+escHtml(f.titre)+'</div><div class="result-sub">'+(f.gratuit?'Gratuite':''+f.prix+'€')+(f.organisme?', '+escHtml(f.organisme):'')+'</div></div></a>').join('');
+    html+='</div>';
+  }
+  if(show('evenements') && (lastRes.evenements||[]).length) {
+    html+='<div class="result-section"><h3>📅 Evenements <span class="result-count">'+lastRes.evenements.length+'</span></h3>';
+    html+=lastRes.evenements.map(e=>'<a href="evenements.html" class="result-item"><div class="result-icon">📅</div><div class="result-body"><div class="result-title">'+escHtml(e.titre)+'</div><div class="result-sub">'+(e.date_evt?e.date_evt+', ':'')+escHtml(e.lieu||e.pays||'')+'</div></div></a>').join('');
+    html+='</div>';
+  }
+  res.innerHTML = html;
+}
+
+function initials(nom){return (nom||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+(async()=>{
+  await applyAuthState();
+  if(params.get('q')) doSearch();
+})();
+</script>
+</body>
+</html>

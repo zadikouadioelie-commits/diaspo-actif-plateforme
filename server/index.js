@@ -213,24 +213,9 @@ route("POST", "/api/initiatives/:id/abonnement", async (req, res, params, body) 
   sendJSON(res, 200, { ok: true, abonnement_actif: !!actif, note: "Démonstration — aucun paiement réel n'est traité dans ce prototype." });
 });
 
-/* ---------- Actualités & Événements ---------- */
+/* ---------- Actualités ---------- */
 route("GET", "/api/actualites", async (req, res) => {
   sendJSON(res, 200, { actualites: db.prepare("SELECT * FROM actualites ORDER BY created_at DESC").all() });
-});
-route("GET", "/api/evenements", async (req, res) => {
-  sendJSON(res, 200, { evenements: db.prepare("SELECT * FROM evenements ORDER BY created_at DESC").all() });
-});
-
-/* ---------- Fil d'actualité ---------- */
-route("GET", "/api/fil", async (req, res) => {
-  const posts = db.prepare("SELECT * FROM fil_posts ORDER BY created_at DESC").all();
-  const withReactions = posts.map(p => {
-    const reactions = db.prepare("SELECT type, COUNT(*) AS n FROM fil_reactions WHERE post_id = ? GROUP BY type").all(p.id);
-    const counts = {};
-    reactions.forEach(r => counts[r.type] = r.n);
-    return { ...p, reactions: counts };
-  });
-  sendJSON(res, 200, { posts: withReactions });
 });
 
 const TYPE_PAR_ROLE = { utilisateur: "Utilisateur", initiative: "Association", administrateur: "Institution", collectivite: "Institution" };
@@ -255,6 +240,11 @@ route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
   const reactions = db.prepare("SELECT type, COUNT(*) AS n FROM fil_reactions WHERE post_id = ? GROUP BY type").all(params.id);
   const counts = {};
   reactions.forEach(r => counts[r.type] = r.n);
+  // Notifier l'auteur du post
+  const post = db.prepare("SELECT auteur_id,contenu FROM fil_posts WHERE id=?").get(params.id);
+  if (post && post.auteur_id && post.auteur_id !== user.id) {
+    creerNotif(post.auteur_id, "reaction", "Réaction sur votre post", `${user.nom} a réagi à votre publication`, { post_id: Number(params.id) });
+  }
   sendJSON(res, 200, { reactions: counts });
 });
 
@@ -396,6 +386,9 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
   if (conv.user2_id === user.id && conv.deleted_u1) db.prepare("UPDATE conversations SET deleted_u1=0 WHERE id=?").run(conv.id);
 
   const msg = db.prepare("SELECT m.*, u.nom AS sender_nom FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.id=?").get(id);
+  // Notifier le destinataire
+  const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
+  creerNotif(otherId, "message", "Nouveau message", `${user.nom} vous a envoyé un message`, { conversation_id: conv.id });
   sendJSON(res, 201, { message: msg });
 });
 
@@ -461,21 +454,6 @@ route("GET", "/api/users/search", async (req, res, params, body, query) => {
   sendJSON(res, 200, { users: results });
 });
 
-/* ---------- Profil ---------- */
-route("GET", "/api/profil/:id", async (req, res, params) => {
-  const u = db.prepare("SELECT id, nom, email, role, ville, pays, profil_json FROM users WHERE id = ?").get(params.id);
-  if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
-  sendJSON(res, 200, { profil: publicUser(u) });
-});
-
-route("PUT", "/api/profil", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const current = db.prepare("SELECT profil_json FROM users WHERE id = ?").get(user.id);
-  const merged = { ...safeParse(current.profil_json), ...(body.profil || {}) };
-  db.prepare("UPDATE users SET profil_json = ? WHERE id = ?").run(JSON.stringify(merged), user.id);
-  sendJSON(res, 200, { profil: merged });
-});
 
 /* ---------- Abonnements : suivre / ne plus suivre une initiative ---------- */
 route("POST", "/api/initiatives/:id/suivre", async (req, res, params) => {
@@ -639,6 +617,277 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
   Object.values(parPays).forEach(p => p.membres = mask(p.membres));
   const totalMembres = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur'").get().n;
   sendJSON(res, 200, { nationalite, seuil_confidentialite: SEUIL_CONFIDENTIALITE, total_membres: totalMembres, par_pays: Object.values(parPays) });
+});
+
+/* ---------- Profil (mise à jour étendue) ---------- */
+route("PUT", "/api/profil", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { nom, prenom, ville, pays, bio, photo_url, centres_interet, situation_pro, telephone } = body;
+  const fields = [];
+  const vals = [];
+  if (nom) { fields.push("nom=?"); vals.push(nom); }
+  if (prenom !== undefined) { fields.push("prenom=?"); vals.push(prenom); }
+  if (ville !== undefined) { fields.push("ville=?"); vals.push(ville); }
+  if (pays !== undefined) { fields.push("pays=?"); vals.push(pays); }
+  if (bio !== undefined) { fields.push("bio=?"); vals.push(bio); }
+  if (photo_url !== undefined) { fields.push("photo_url=?"); vals.push(photo_url); }
+  if (centres_interet !== undefined) { fields.push("centres_interet=?"); vals.push(JSON.stringify(Array.isArray(centres_interet) ? centres_interet : [])); }
+  if (situation_pro !== undefined) { fields.push("situation_pro=?"); vals.push(situation_pro); }
+  if (telephone !== undefined) { fields.push("telephone=?"); vals.push(telephone); }
+  if (body.profil !== undefined) {
+    const current = db.prepare("SELECT profil_json FROM users WHERE id=?").get(user.id);
+    const merged = { ...safeParse(current.profil_json), ...body.profil };
+    fields.push("profil_json=?"); vals.push(JSON.stringify(merged));
+  }
+  if (fields.length) { vals.push(user.id); db.prepare(`UPDATE users SET ${fields.join(",")} WHERE id=?`).run(...vals); }
+  const updated = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,centres_interet,situation_pro,telephone,profil_json FROM users WHERE id=?").get(user.id);
+  sendJSON(res, 200, { profil: { ...publicUser(updated), bio: updated.bio, photo_url: updated.photo_url, prenom: updated.prenom, centres_interet: safeParse(updated.centres_interet), situation_pro: updated.situation_pro, telephone: updated.telephone } });
+});
+
+route("GET", "/api/profil/:id", async (req, res, params) => {
+  const u = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,centres_interet,situation_pro,profil_json,created_at FROM users WHERE id=?").get(params.id);
+  if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
+  sendJSON(res, 200, { profil: { ...publicUser(u), bio: u.bio, photo_url: u.photo_url, prenom: u.prenom, centres_interet: safeParse(u.centres_interet || "[]"), situation_pro: u.situation_pro, created_at: u.created_at } });
+});
+
+/* ---------- Upload simulé ---------- */
+route("POST", "/api/upload", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ext = (body.nom || "file.jpg").split(".").pop().toLowerCase();
+  const fakeUrl = `/assets/uploads/demo-${Date.now()}.${ext}`;
+  sendJSON(res, 200, { url: fakeUrl, nom: body.nom, note: "Prototype — upload simulé, aucun fichier réel stocké." });
+});
+
+/* ---------- Recherche globale ---------- */
+route("GET", "/api/recherche", async (req, res, params, body, query) => {
+  const q = (query.q || "").trim();
+  if (q.length < 2) return sendJSON(res, 200, { utilisateurs: [], initiatives: [], publications: [], formations: [], evenements: [] });
+  const like = `%${q}%`;
+  const type = query.type || "tous";
+
+  const utilisateurs = (type === "tous" || type === "utilisateurs")
+    ? db.prepare("SELECT id,nom,role,ville,pays FROM users WHERE (nom LIKE ? OR ville LIKE ?) AND role != 'administrateur' LIMIT 8").all(like, like)
+    : [];
+  const initiatives = (type === "tous" || type === "initiatives")
+    ? db.prepare("SELECT id,slug,nom,domaine,pays,ville,description FROM initiatives WHERE nom LIKE ? OR description LIKE ? OR domaine LIKE ? LIMIT 8").all(like, like, like)
+    : [];
+  const publications = (type === "tous" || type === "publications")
+    ? db.prepare("SELECT id,auteur_nom,contenu,categorie,created_at FROM fil_posts WHERE contenu LIKE ? OR auteur_nom LIKE ? LIMIT 8").all(like, like)
+    : [];
+  const formations = (type === "tous" || type === "formations")
+    ? db.prepare("SELECT id,titre,domaine,organisme,gratuit,duree FROM formations WHERE titre LIKE ? OR description LIKE ? OR organisme LIKE ? LIMIT 8").all(like, like, like)
+    : [];
+  const evenements = (type === "tous" || type === "evenements")
+    ? db.prepare("SELECT id,titre,lieu,date_evt,type_evt,pays FROM evenements WHERE titre LIKE ? OR lieu LIKE ? OR description LIKE ? LIMIT 8").all(like, like, like)
+    : [];
+
+  sendJSON(res, 200, { q, utilisateurs, initiatives, publications, formations, evenements });
+});
+
+/* ---------- Notifications ---------- */
+function creerNotif(userId, type, titre, contenu, data = {}) {
+  try {
+    db.prepare("INSERT INTO notifications (user_id,type,titre,contenu,data_json) VALUES (?,?,?,?,?)").run(userId, type, titre, contenu, JSON.stringify(data));
+  } catch (e) { /* silencieux */ }
+}
+
+route("GET", "/api/notifications", async (req, res, params, body, query) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const limit = Math.min(Number(query.limit) || 20, 50);
+  const rows = db.prepare("SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT ?").all(user.id, limit);
+  const non_lues = db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id=? AND lue=0").get(user.id).n;
+  sendJSON(res, 200, { notifications: rows.map(r => ({ ...r, data: safeParse(r.data_json) })), non_lues });
+});
+
+route("PATCH", "/api/notifications/:id/lire", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  db.prepare("UPDATE notifications SET lue=1 WHERE id=? AND user_id=?").run(params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/notifications/lire-tout", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  db.prepare("UPDATE notifications SET lue=1 WHERE user_id=?").run(user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ---------- Événements (complet) ---------- */
+route("GET", "/api/evenements", async (req, res, params, body, query) => {
+  let rows = db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.date_evt ASC").all();
+  if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
+  if (query.pays) rows = rows.filter(r => r.pays === query.pays);
+  if (query.type) rows = rows.filter(r => r.type_evt === query.type);
+  if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.lieu+r.description||"").toLowerCase().includes(q)); }
+  const withCounts = rows.map(r => ({ ...r, nb_participants: db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id)?.n || 0 }));
+  sendJSON(res, 200, { evenements: withCounts });
+});
+
+route("POST", "/api/evenements", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || !["initiative","administrateur","collectivite"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative, Collectivité et Administrateur." });
+  const { titre, organisateur, date_evt, lieu, pays, ville, description, type_evt, domaine, places_max, inscription_ouverte, lien_inscription, image_url } = body;
+  if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
+  const id = db.prepare(`INSERT INTO evenements (titre,organisateur,date_evt,lieu,pays,ville,description,type_evt,domaine,places_max,inscription_ouverte,lien_inscription,image_url,statut,owner_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?)`)
+    .run(titre, organisateur || user.nom, date_evt, lieu||null, pays||null, ville||null, description||null, type_evt||"evenement", domaine||null, places_max||null, inscription_ouverte!==false?1:0, lien_inscription||null, image_url||null, user.id).lastInsertRowid;
+  // Notifier abonnés de l'initiative
+  const init = db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+  if (init) {
+    const abonnes = db.prepare("SELECT user_id FROM abonnements WHERE initiative_id=?").all(init.id);
+    abonnes.forEach(a => creerNotif(a.user_id, "evenement", "Nouvel événement", `${user.nom} organise : ${titre}`, { evenement_id: id }));
+  }
+  sendJSON(res, 201, { id });
+});
+
+route("GET", "/api/evenements/:id", async (req, res, params) => {
+  const row = db.prepare("SELECT e.*,u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id WHERE e.id=?").get(params.id);
+  if (!row) return sendJSON(res, 404, { error: "Événement introuvable." });
+  const participants = db.prepare("SELECT u.id,u.nom,u.ville FROM evenements_participants ep JOIN users u ON u.id=ep.user_id WHERE ep.evenement_id=?").all(params.id);
+  sendJSON(res, 200, { evenement: row, participants, nb_participants: participants.length });
+});
+
+route("POST", "/api/evenements/:id/rejoindre", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (!evt.inscription_ouverte) return sendJSON(res, 400, { error: "Les inscriptions sont fermées." });
+  if (evt.places_max) {
+    const nb = db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(params.id).n;
+    if (nb >= evt.places_max) return sendJSON(res, 400, { error: "Plus de places disponibles." });
+  }
+  try {
+    db.prepare("INSERT INTO evenements_participants (evenement_id,user_id) VALUES (?,?)").run(params.id, user.id);
+    if (evt.owner_user_id && evt.owner_user_id !== user.id) creerNotif(evt.owner_user_id, "evenement", "Nouvelle inscription", `${user.nom} s'est inscrit à « ${evt.titre} »`, { evenement_id: evt.id });
+    sendJSON(res, 201, { ok: true, inscrit: true });
+  } catch(e) { sendJSON(res, 409, { ok: false, inscrit: true, message: "Déjà inscrit." }); }
+});
+
+route("DELETE", "/api/evenements/:id/quitter", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  db.prepare("DELETE FROM evenements_participants WHERE evenement_id=? AND user_id=?").run(params.id, user.id);
+  sendJSON(res, 200, { ok: true, inscrit: false });
+});
+
+route("GET", "/api/mes-evenements", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = db.prepare("SELECT e.* FROM evenements_participants ep JOIN evenements e ON e.id=ep.evenement_id WHERE ep.user_id=? ORDER BY e.date_evt ASC").all(user.id);
+  sendJSON(res, 200, { evenements: rows });
+});
+
+/* ---------- Modération administrateur ---------- */
+route("GET", "/api/admin/comptes", async (req, res, params, body, query) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const statut = query.statut || "en_attente";
+  const rows = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,statut_verification,created_at FROM users WHERE statut_verification=? ORDER BY created_at DESC").all(statut);
+  sendJSON(res, 200, { comptes: rows });
+});
+
+route("PATCH", "/api/admin/comptes/:id/valider", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  db.prepare("UPDATE users SET statut_verification='valide' WHERE id=?").run(params.id);
+  const cible = db.prepare("SELECT nom FROM users WHERE id=?").get(params.id);
+  if (cible) creerNotif(Number(params.id), "validation", "Compte validé !", "Votre compte a été validé par l'équipe Diaspo'Actif. Vous avez maintenant accès à toutes les fonctionnalités.", {});
+  sendJSON(res, 200, { ok: true, statut: "valide" });
+});
+
+route("PATCH", "/api/admin/comptes/:id/rejeter", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  db.prepare("UPDATE users SET statut_verification='rejete' WHERE id=?").run(params.id);
+  const motif = body.motif || "Documents insuffisants";
+  creerNotif(Number(params.id), "validation", "Demande non retenue", `Votre demande n'a pas pu être validée : ${motif}. Contactez-nous pour plus d'informations.`, { motif });
+  sendJSON(res, 200, { ok: true, statut: "rejete" });
+});
+
+route("DELETE", "/api/admin/contenu/:type/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const tables = { post: "fil_posts", formation: "formations", evenement: "evenements" };
+  const table = tables[params.type];
+  if (!table) return sendJSON(res, 400, { error: "Type de contenu invalide." });
+  db.prepare(`DELETE FROM ${table} WHERE id=?`).run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/admin/contenus", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const posts = db.prepare("SELECT p.*,u.nom AS auteur FROM fil_posts p LEFT JOIN users u ON u.id=p.auteur_id ORDER BY p.created_at DESC LIMIT 20").all();
+  const formations = db.prepare("SELECT f.*,u.nom AS auteur FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id ORDER BY f.created_at DESC LIMIT 20").all();
+  const evenements = db.prepare("SELECT e.*,u.nom AS auteur FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.created_at DESC LIMIT 20").all();
+  sendJSON(res, 200, { posts, formations, evenements });
+});
+
+/* ---------- Collaborations (appels à contribution) ---------- */
+route("GET", "/api/collaborations", async (req, res, params, body, query) => {
+  let rows = db.prepare(`SELECT c.*,u.nom AS auteur_nom,i.nom AS initiative_nom FROM collaborations c LEFT JOIN users u ON u.id=c.user_id LEFT JOIN initiatives i ON i.id=c.initiative_id ORDER BY c.created_at DESC`).all();
+  if (query.type) rows = rows.filter(r => r.type_collab === query.type);
+  if (query.statut) rows = rows.filter(r => r.statut === query.statut); else rows = rows.filter(r => (r.statut||"ouvert") === "ouvert");
+  if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => ((r.titre||"")+(r.description||"")).toLowerCase().includes(q)); }
+  const withCounts = rows.map(r => ({ ...r, nb_candidatures: db.prepare("SELECT COUNT(*) AS n FROM candidatures WHERE collaboration_id=?").get(r.id)?.n || 0, competences: safeParse(r.competences || "[]") }));
+  sendJSON(res, 200, { collaborations: withCounts });
+});
+
+route("POST", "/api/collaborations", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || !["initiative","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Administrateur." });
+  const { titre, partenaire, description, type_collab, competences, deadline } = body;
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  const init = db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+  const id = db.prepare("INSERT INTO collaborations (user_id,partenaire,titre,description,type_collab,competences,deadline,statut,initiative_id) VALUES (?,?,?,?,?,?,?,'ouvert',?)")
+    .run(user.id, partenaire||user.nom, titre, description||null, type_collab||"benevolat", JSON.stringify(Array.isArray(competences)?competences:[]), deadline||null, init?.id||null).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("GET", "/api/collaborations/:id", async (req, res, params) => {
+  const row = db.prepare("SELECT c.*,u.nom AS auteur_nom,i.nom AS initiative_nom FROM collaborations c LEFT JOIN users u ON u.id=c.user_id LEFT JOIN initiatives i ON i.id=c.initiative_id WHERE c.id=?").get(params.id);
+  if (!row) return sendJSON(res, 404, { error: "Collaboration introuvable." });
+  const candidatures = db.prepare("SELECT ca.*,u.nom AS candidat_nom FROM candidatures ca JOIN users u ON u.id=ca.user_id WHERE ca.collaboration_id=? ORDER BY ca.created_at DESC").all(params.id);
+  sendJSON(res, 200, { collaboration: { ...row, competences: safeParse(row.competences||"[]") }, candidatures });
+});
+
+route("POST", "/api/collaborations/:id/candidater", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const collab = db.prepare("SELECT * FROM collaborations WHERE id=?").get(params.id);
+  if (!collab) return sendJSON(res, 404, { error: "Collaboration introuvable." });
+  if (collab.user_id === user.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas candidater à votre propre appel." });
+  try {
+    db.prepare("INSERT INTO candidatures (collaboration_id,user_id,message) VALUES (?,?,?)").run(params.id, user.id, body.message||null);
+    creerNotif(collab.user_id, "candidature", "Nouvelle candidature", `${user.nom} a postulé à votre appel « ${collab.titre||collab.partenaire} »`, { collaboration_id: collab.id, candidat_id: user.id });
+    sendJSON(res, 201, { ok: true });
+  } catch(e) { sendJSON(res, 409, { ok: false, message: "Vous avez déjà candidaté." }); }
+});
+
+route("GET", "/api/mes-candidatures", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = db.prepare("SELECT ca.*,c.titre,c.partenaire,c.type_collab,u2.nom AS auteur_nom FROM candidatures ca JOIN collaborations c ON c.id=ca.collaboration_id LEFT JOIN users u2 ON u2.id=c.user_id WHERE ca.user_id=? ORDER BY ca.created_at DESC").all(user.id);
+  sendJSON(res, 200, { candidatures: rows });
+});
+
+/* ---------- Fil paginé ---------- */
+route("GET", "/api/fil", async (req, res, params, body, query) => {
+  const page = Math.max(1, Number(query.page) || 1);
+  const limit = Math.min(Number(query.limit) || 20, 50);
+  const offset = (page - 1) * limit;
+  const total = db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get().n;
+  const posts = db.prepare("SELECT * FROM fil_posts ORDER BY created_at DESC LIMIT ? OFFSET ?").all(limit, offset);
+  const withReactions = posts.map(p => {
+    const reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
+    const counts = {}; reactions.forEach(r => counts[r.type]=r.n);
+    return { ...p, reactions: counts };
+  });
+  sendJSON(res, 200, { posts: withReactions, total, page, pages: Math.ceil(total/limit) });
 });
 
 /* ---------- Static file server (frontend existant) ---------- */

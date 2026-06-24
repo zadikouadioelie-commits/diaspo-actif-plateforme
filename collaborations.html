@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Appels a contribution</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+.collab-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:20px}
+.collab-card{border:1px solid var(--border);border-radius:12px;padding:20px;transition:box-shadow .12s}
+.collab-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.09)}
+.collab-type{font-size:11px;padding:3px 10px;border-radius:99px;border:1px solid var(--border);background:var(--bg);display:inline-block;margin-bottom:10px}
+.collab-type.benevolat{border-color:#22c55e;color:#15803d}
+.collab-type.partenariat{border-color:#3b82f6;color:#1d4ed8}
+.collab-type.financement{border-color:#f59e0b;color:#92400e}
+.tag{background:#f0f0f0;border-radius:99px;padding:2px 8px;font-size:11px;display:inline-block;margin:2px}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <nav class="nav">
+      <a href="index.html">Accueil</a><a href="annuaire.html">Annuaire</a>
+      <a href="fil-actualite.html">Fil d'actualite</a><a href="formations.html">Formations</a>
+    </nav>
+    <div class="topbar-right">
+      <select class="lang-select" id="lang-select"></select>
+      <div id="auth-area" class="auth-area"></div>
+    </div>
+  </div>
+</header>
+<main class="container" style="max-width:1100px;padding-top:28px;padding-bottom:48px">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+    <div>
+      <h2 style="margin:0 0 4px">Appels a contribution</h2>
+      <p class="sub" style="margin:0">Benevoles, partenaires, cofinanceurs — rejoignez des projets diaspora</p>
+    </div>
+    <button class="btn btn-orange" id="btn-creer" style="display:none">+ Publier un appel</button>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+    <select id="f-type" class="btn" style="font-size:13px;padding:6px 10px"><option value="">Tous types</option><option value="benevolat">Benevolat</option><option value="partenariat">Partenariat</option><option value="financement">Financement</option><option value="expertise">Expertise</option></select>
+    <input type="text" id="q" placeholder="Rechercher..." style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+  </div>
+  <div class="collab-grid" id="collab-list"></div>
+</main>
+
+<!-- Modal creation -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <h3>Publier un appel a contribution</h3>
+    <div><label>Titre <span style="color:var(--orange)">*</span></label><input type="text" id="c-titre" placeholder="Ex: Cherche benevoles pour forum..."></div>
+    <div style="margin-top:10px"><label>Type</label><select id="c-type"><option value="benevolat">Benevolat</option><option value="partenariat">Partenariat</option><option value="financement">Financement</option><option value="expertise">Expertise</option></select></div>
+    <div style="margin-top:10px"><label>Description</label><textarea id="c-desc" rows="3" style="width:100%;resize:vertical;box-sizing:border-box" placeholder="Decrivez votre besoin..."></textarea></div>
+    <div style="margin-top:10px"><label>Competences / profils recherches (separes par virgule)</label><input type="text" id="c-comp" placeholder="developpeur, designer, comptable..."></div>
+    <div style="margin-top:10px"><label>Date limite (optionnel)</label><input type="date" id="c-deadline"></div>
+    <div class="auth-error" id="c-error" style="display:none;margin-top:10px"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+      <button class="btn" id="btn-cancel">Annuler</button>
+      <button class="btn btn-orange" id="btn-save">Publier</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal candidature -->
+<div class="modal-bg" id="cand-bg">
+  <div class="modal">
+    <h3>Postuler</h3>
+    <p id="cand-title" style="color:var(--muted);font-size:13px"></p>
+    <label>Message de candidature (optionnel)</label>
+    <textarea id="cand-msg" rows="4" style="width:100%;resize:vertical;box-sizing:border-box" placeholder="Presentez-vous et expliquez votre interet..."></textarea>
+    <div class="auth-error" id="cand-error" style="display:none;margin-top:10px"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+      <button class="btn" id="cand-cancel">Annuler</button>
+      <button class="btn btn-orange" id="cand-send">Envoyer ma candidature</button>
+    </div>
+  </div>
+</div>
+
+<footer class="footer"><span id="footer-text">Diaspo'Actif · Prototype · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialite</a></footer>
+</div>
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+let currentCollabId = null;
+const TYPE_COLORS = {benevolat:'benevolat',partenariat:'partenariat',financement:'financement',expertise:'partenariat'};
+const TYPE_ICONS = {benevolat:'🤝',partenariat:'🔗',financement:'💰',expertise:'💡'};
+
+async function loadCollabs(){
+  const q=document.getElementById('q').value;
+  const type=document.getElementById('f-type').value;
+  let url='/collaborations?';
+  if(type)url+='type='+type+'&';if(q)url+='q='+encodeURIComponent(q);
+  try{
+    const r=await api('GET',url);
+    const list=r.collaborations||[];
+    const el=document.getElementById('collab-list');
+    if(!list.length){el.innerHTML='<p style="color:var(--muted);grid-column:1/-1;text-align:center;padding:40px">Aucun appel en cours.</p>';return;}
+    el.innerHTML=list.map(c=>{
+      const icon=TYPE_ICONS[c.type_collab]||'📣';
+      const comp=Array.isArray(c.competences)?c.competences:[];
+      return `<div class="collab-card">
+        <span class="collab-type ${TYPE_COLORS[c.type_collab]||''}">${icon} ${c.type_collab||'Autre'}</span>
+        <div style="font-weight:700;font-size:15px;margin-bottom:6px">${escHtml(c.titre||c.partenaire)}</div>
+        ${c.initiative_nom?'<div style="font-size:12px;color:var(--orange);margin-bottom:6px">'+escHtml(c.initiative_nom)+'</div>':''}
+        ${c.description?'<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.5">'+escHtml(c.description.slice(0,120))+(c.description.length>120?'...':'')+'</p>':''}
+        ${comp.length?'<div style="margin-bottom:10px">'+comp.map(k=>'<span class="tag">'+escHtml(k)+'</span>').join('')+'</div>':''}
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)">
+          <span>Par ${escHtml(c.auteur_nom||'?')}${c.deadline?' · jusqu\'au '+c.deadline:''}</span>
+          <span>${c.nb_candidatures||0} candidature${c.nb_candidatures!==1?'s':''}</span>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn btn-orange" style="font-size:12px" onclick="ouvrirCandidature(${c.id},''+${JSON.stringify(escHtml(c.titre||c.partenaire))}+'')">Candidater</button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){document.getElementById('collab-list').innerHTML='<p style="color:red">Erreur chargement.</p>';}
+}
+
+function ouvrirCandidature(id,titre){
+  if(!CURRENT_USER){window.location.href='login.html';return;}
+  currentCollabId=id;
+  document.getElementById('cand-title').textContent='Pour : '+titre;
+  document.getElementById('cand-msg').value='';
+  document.getElementById('cand-error').style.display='none';
+  document.getElementById('cand-bg').classList.add('open');
+}
+
+document.getElementById('cand-cancel').addEventListener('click',()=>document.getElementById('cand-bg').classList.remove('open'));
+document.getElementById('cand-send').addEventListener('click',async()=>{
+  const errBox=document.getElementById('cand-error');errBox.style.display='none';
+  try{
+    await api('POST','/collaborations/'+currentCollabId+'/candidater',{message:document.getElementById('cand-msg').value.trim()});
+    document.getElementById('cand-bg').classList.remove('open');
+    alert('Votre candidature a ete envoyee !');
+    loadCollabs();
+  }catch(e){errBox.textContent=e.message||'Erreur.';errBox.style.display='block';}
+});
+
+document.getElementById('btn-creer').addEventListener('click',()=>document.getElementById('modal-bg').classList.add('open'));
+document.getElementById('btn-cancel').addEventListener('click',()=>document.getElementById('modal-bg').classList.remove('open'));
+document.getElementById('btn-save').addEventListener('click',async()=>{
+  const errBox=document.getElementById('c-error');errBox.style.display='none';
+  const titre=document.getElementById('c-titre').value.trim();
+  if(!titre){errBox.textContent='Titre requis.';errBox.style.display='block';return;}
+  const comp=document.getElementById('c-comp').value.split(',').map(s=>s.trim()).filter(Boolean);
+  try{
+    await api('POST','/collaborations',{titre,type_collab:document.getElementById('c-type').value,description:document.getElementById('c-desc').value.trim(),competences:comp,deadline:document.getElementById('c-deadline').value||null});
+    document.getElementById('modal-bg').classList.remove('open');
+    loadCollabs();
+  }catch(e){errBox.textContent=e.message||'Erreur.';errBox.style.display='block';}
+});
+
+['f-type'].forEach(id=>document.getElementById(id).addEventListener('change',loadCollabs));
+document.getElementById('q').addEventListener('input',()=>setTimeout(loadCollabs,300));
+
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+(async()=>{
+  await applyAuthState();
+  if(CURRENT_USER&&['initiative','administrateur'].includes(CURRENT_USER.role))document.getElementById('btn-creer').style.display='inline-flex';
+  loadCollabs();
+})();
+</script>
+</body>
+</html>

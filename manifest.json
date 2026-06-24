@@ -1,0 +1,35 @@
+{
+  "name": "Diaspo'Actif",
+  "short_name": "DiaspoActif",
+  "description": "La plateforme des initiatives diaspora — Du Sud au Nord",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ff6b00",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/assets/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Fil d'actualite",
+      "url": "/fil-actualite.html",
+      "description": "Voir le fil"
+    },
+    {
+      "name": "Messagerie",
+      "url": "/messagerie.html",
+      "description": "Mes messages"
+    },
+    {
+      "name": "Evenements",
+      "url": "/evenements.html",
+      "description": "Agenda"
+    }
+  ]
+}

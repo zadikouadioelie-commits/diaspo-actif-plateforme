@@ -67,10 +67,13 @@ async function applyAuthState() {
       try { await api("POST", "/auth/logout"); } catch (err) { /* ignore */ }
       window.location.href = "index.html";
     });
-    // Charger le nombre de messages non lus
+    // Charger le nombre de messages non lus + notifications
     try {
-      const r = await api("GET", "/messages/non-lus");
-      updateTopbarBadge(r.total);
+      const [msgs, notifs] = await Promise.all([
+        api("GET", "/messages/non-lus").catch(()=>({total:0})),
+        api("GET", "/notifications?limit=5").catch(()=>({non_lues:0}))
+      ]);
+      updateTopbarBadge(msgs.total + (notifs.non_lues||0));
     } catch (e) { /* silencieux */ }
   } else {
     el.innerHTML = `
@@ -990,4 +993,19 @@ document.addEventListener("DOMContentLoaded", ()=>{
   initFormations();
   renderAllAds();
   applyTranslations();
+
+  // Barre de recherche globale dans la topbar (si présente)
+  const searchInput = document.getElementById("global-search");
+  if(searchInput) {
+    searchInput.addEventListener("keydown", e => {
+      if(e.key === "Enter" && searchInput.value.trim().length >= 2) {
+        window.location.href = "recherche.html?q=" + encodeURIComponent(searchInput.value.trim());
+      }
+    });
+  }
+
+  // PWA Service Worker
+  if("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(()=>{});
+  }
 });

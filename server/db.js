@@ -187,7 +187,47 @@ db.exec(`
     user_id INTEGER NOT NULL,
     partenaire TEXT NOT NULL,
     statut TEXT,
+    titre TEXT,
+    description TEXT,
+    type_collab TEXT DEFAULT 'benevolat',
+    competences TEXT DEFAULT '[]',
+    deadline TEXT,
+    initiative_id INTEGER,
     created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS candidatures (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    collaboration_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    message TEXT,
+    statut TEXT DEFAULT 'en_attente',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(collaboration_id, user_id),
+    FOREIGN KEY(collaboration_id) REFERENCES collaborations(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    titre TEXT,
+    contenu TEXT,
+    lue INTEGER DEFAULT 0,
+    data_json TEXT DEFAULT '{}',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS evenements_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evenement_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(evenement_id, user_id),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
   );
 `);
 
@@ -232,6 +272,26 @@ const MIGRATIONS = [
   ["initiatives", "fonction_responsable TEXT"],
   ["initiatives", "email_responsable TEXT"],
   ["initiatives", "tel_responsable TEXT"],
+  // Profil utilisateur enrichi
+  ["users", "photo_url TEXT"],
+  ["users", "bio TEXT"],
+  // Événements enrichis
+  ["evenements", "description TEXT"],
+  ["evenements", "places_max INTEGER"],
+  ["evenements", "image_url TEXT"],
+  ["evenements", "domaine TEXT"],
+  ["evenements", "type_evt TEXT DEFAULT 'evenement'"],
+  ["evenements", "pays TEXT"],
+  ["evenements", "ville TEXT"],
+  ["evenements", "inscription_ouverte INTEGER DEFAULT 1"],
+  ["evenements", "lien_inscription TEXT"],
+  // Collaborations enrichies
+  ["collaborations", "titre TEXT"],
+  ["collaborations", "description TEXT"],
+  ["collaborations", "type_collab TEXT DEFAULT 'benevolat'"],
+  ["collaborations", "competences TEXT DEFAULT '[]'"],
+  ["collaborations", "deadline TEXT"],
+  ["collaborations", "initiative_id INTEGER"],
 ];
 for (const [table, col] of MIGRATIONS) {
   const colName = col.split(" ")[0];
