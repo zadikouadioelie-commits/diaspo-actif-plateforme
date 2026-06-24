@@ -142,12 +142,12 @@ button{font-family:inherit;cursor:pointer;}
 .tag{font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;color:var(--muted);}
 .badge{font-size:11px;font-weight:700;border-radius:20px;padding:3px 10px;}
 .badge-ong{background:#E7F4EE;color:var(--green);}
-.badge-asso{background:var(--orange-light);color:var(--orange);}
+.badge-asso{background:#E8F1FC;color:var(--navy);}
 .badge-ent{background:#EAF0FF;color:#3457D5;}
 .badge-fond{background:#F4E9FF;color:#8138C2;}
 .badge-coop{background:#FFF6DA;color:#B68900;}
 .badge-instit{background:#E0ECFF;color:#1A4FBF;}
-.badge-unique{background:#FDEBDD;color:#B5470F;}
+.badge-unique{background:#E8F1FC;color:#1B3A6B;}
 
 /* ---------- Pricing / abonnement ---------- */
 .price-card{background:#fff;border:2px solid var(--navy);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);text-align:center;}
