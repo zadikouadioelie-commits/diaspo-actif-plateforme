@@ -237,7 +237,114 @@
 .empty-p { text-align:center; padding:20px 0; color:var(--muted); font-size:13px; }
 .empty-p .ei { font-size:28px; margin-bottom:6px; }
 
+/* ===== LAYOUT 2 COLONNES ===== */
+.p-layout { display:flex; gap:14px; align-items:flex-start; }
+.p-main   { flex:1; min-width:0; }
+.p-side   { width:240px; flex-shrink:0; }
+.p-side-sticky { position:sticky; top:14px; }
+
+/* ===== PUBLICATIONS RICHES ===== */
+.post-card {
+  background:#fff; border:1px solid var(--border); border-radius:12px;
+  margin-bottom:12px; overflow:hidden;
+}
+.post-header { display:flex; align-items:center; gap:10px; padding:14px 16px 8px; }
+.post-av {
+  width:40px; height:40px; border-radius:50%; flex-shrink:0;
+  background:var(--tp-light); display:flex; align-items:center;
+  justify-content:center; font-size:14px; font-weight:800; color:var(--tp); overflow:hidden;
+}
+.post-av img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.post-meta { flex:1; min-width:0; }
+.post-meta .pm-nom { font-size:13px; font-weight:700; color:#0D1B2A; }
+.post-meta .pm-titre { font-size:11px; color:var(--muted); }
+.post-meta .pm-date { font-size:11px; color:var(--muted); }
+.post-cat-pill {
+  background:var(--tp-light); color:var(--tp); border-radius:99px;
+  padding:2px 10px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
+}
+.post-body { padding:0 16px 10px; }
+.post-text { font-size:14px; color:var(--text); line-height:1.65; margin:0 0 10px; white-space:pre-wrap; }
+.post-img {
+  width:100%; max-height:320px; object-fit:cover;
+  border-radius:8px; display:block; margin-bottom:10px;
+}
+.post-link-card {
+  border:1px solid var(--border); border-radius:8px; overflow:hidden;
+  margin-bottom:10px; text-decoration:none; display:flex; color:inherit;
+}
+.post-link-card img { width:100px; height:80px; object-fit:cover; flex-shrink:0; }
+.post-link-body { padding:10px 12px; flex:1; min-width:0; }
+.post-link-body .plb-src { font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:700; }
+.post-link-body .plb-title { font-size:13px; font-weight:700; color:#0D1B2A; line-height:1.4; }
+.post-shared {
+  border:1px solid var(--border); border-radius:8px; padding:12px 14px;
+  margin-bottom:10px; background:#F8FAFF;
+}
+.post-shared .ps-nom { font-size:12px; font-weight:700; color:var(--tp); margin-bottom:4px; }
+.post-shared .ps-text { font-size:13px; color:var(--text); }
+.post-actions {
+  display:flex; gap:0; border-top:1px solid var(--border); padding:4px 8px;
+}
+.post-btn {
+  flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+  padding:8px 4px; font-size:12px; font-weight:600; color:var(--muted);
+  background:none; border:none; border-radius:6px; cursor:pointer; transition:all .18s;
+}
+.post-btn:hover { background:var(--tp-light); color:var(--tp); }
+.post-btn.liked { color:#dc2626; }
+.post-stats { padding:0 16px 6px; font-size:11px; color:var(--muted); display:flex; gap:12px; }
+
+/* ===== PUBLICITÉS ===== */
+.ad-card {
+  background:#fff; border:1px solid var(--border); border-radius:10px;
+  overflow:hidden; margin-bottom:12px;
+}
+.ad-label {
+  font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+  padding:6px 12px 0; display:flex; align-items:center; gap:4px;
+}
+.ad-img { width:100%; height:110px; object-fit:cover; display:block; }
+.ad-body { padding:10px 12px 14px; }
+.ad-body h4 { margin:0 0 4px; font-size:13px; font-weight:800; color:#0D1B2A; line-height:1.35; }
+.ad-body p  { margin:0 0 10px; font-size:11.5px; color:var(--muted); line-height:1.5; }
+.ad-btn {
+  display:inline-block; background:var(--tp); color:#fff; border-radius:6px;
+  padding:6px 14px; font-size:11px; font-weight:700; text-decoration:none; cursor:pointer;
+  border:none;
+}
+.ad-btn:hover { background:var(--tp-dark); }
+.ad-inline {
+  background:linear-gradient(135deg,#F8FAFF,#EEF3FB);
+  border:1px solid var(--border); border-radius:10px;
+  padding:14px 16px; margin-bottom:12px; display:flex; gap:14px; align-items:center;
+}
+.ad-inline-img { width:80px; height:80px; border-radius:8px; object-fit:cover; flex-shrink:0; }
+.ad-inline-body h4 { margin:0 0 4px; font-size:13px; font-weight:800; color:#0D1B2A; }
+.ad-inline-body p  { margin:0 0 8px; font-size:12px; color:var(--muted); }
+
+/* SIDEBAR extras */
+.side-card {
+  background:#fff; border:1px solid var(--border); border-radius:10px;
+  padding:14px; margin-bottom:12px;
+}
+.side-card h4 { margin:0 0 12px; font-size:13px; font-weight:800; color:#0D1B2A; }
+.suggest-item { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.suggest-item:last-child { margin-bottom:0; }
+.sug-av {
+  width:38px; height:38px; border-radius:50%; flex-shrink:0;
+  background:var(--tp-light); display:flex; align-items:center;
+  justify-content:center; font-size:12px; font-weight:800; color:var(--tp); overflow:hidden;
+}
+.sug-av img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.sug-body { flex:1; min-width:0; }
+.sug-body .sb-nom { font-size:12px; font-weight:700; color:#0D1B2A; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sug-body .sb-sub { font-size:11px; color:var(--muted); }
+.btn-sug { background:none; border:1.5px solid var(--tp); color:var(--tp); border-radius:99px; padding:3px 12px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.btn-sug:hover { background:var(--tp-light); }
+
 /* ===== RESPONSIVE ===== */
+@media(max-width:860px){ .p-side { display:none; } }
 @media(max-width:600px){
   .p-banner { height:140px; }
   .p-avatar { width:80px; height:80px; font-size:26px; }
@@ -304,8 +411,13 @@
     <div class="p-stats" id="p-stats"></div>
   </div>
 
-  <!-- SECTIONS -->
-  <div id="p-sections"></div>
+  <!-- LAYOUT 2 COLONNES -->
+  <div class="p-layout">
+    <div class="p-main" id="p-sections"></div>
+    <aside class="p-side">
+      <div class="p-side-sticky" id="p-sidebar"></div>
+    </aside>
+  </div>
 
 </main>
 
@@ -498,10 +610,139 @@ function renderSections() {
   const wrap = document.getElementById('p-sections');
   wrap.innerHTML = '';
   wrap.appendChild(buildSectionExp());
+
+  // Pub inline entre expériences et compétences
+  wrap.appendChild(buildInlineAd());
+
   wrap.appendChild(buildSectionSkills());
   wrap.appendChild(buildSectionPubs());
   wrap.appendChild(buildSectionInitiatives());
   wrap.appendChild(buildSectionUsers());
+
+  renderSidebar();
+}
+
+/* ======================================================
+   SIDEBAR — Pubs + Suggestions
+   ====================================================== */
+function renderSidebar() {
+  const sb = document.getElementById('p-sidebar');
+  if (!sb) return;
+  sb.innerHTML = '';
+
+  // Suggestion de personnes
+  sb.appendChild(buildSidebarSuggestions());
+
+  // Pub 1
+  sb.appendChild(buildAdCard({
+    img: 'https://picsum.photos/seed/ad-formation/400/200',
+    titre: 'Formation Finance & Impact',
+    texte: 'Apprenez à financer des projets en Afrique subsaharienne. Certifiante, 100% en ligne.',
+    cta: 'Découvrir →',
+    tag: 'Formation sponsorisée'
+  }));
+
+  // Pub 2
+  sb.appendChild(buildAdCard({
+    img: 'https://picsum.photos/seed/ad-transfert/400/200',
+    titre: 'Transferts sans frais — DiaspoBank',
+    texte: 'Envoyez de l\'argent au Sénégal, Mali, Côte d\'Ivoire. 0€ de frais jusqu\'au 31/07.',
+    cta: 'En savoir plus',
+    tag: 'Offre partenaire'
+  }));
+
+  // Initiatives populaires
+  sb.appendChild(buildSidebarInitiatives());
+
+  // Pub 3
+  sb.appendChild(buildAdCard({
+    img: 'https://picsum.photos/seed/ad-immobilier/400/200',
+    titre: 'Investissez en Afrique de l\'Ouest',
+    texte: 'Projets immobiliers sécurisés à Abidjan, Dakar, Lomé. Rendement 8-12% / an.',
+    cta: 'Voir les projets',
+    tag: 'Investissement sponsorisé'
+  }));
+}
+
+function buildAdCard({ img, titre, texte, cta, tag }) {
+  const el = document.createElement('div');
+  el.className = 'ad-card';
+  el.innerHTML = `
+    <div class="ad-label">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      ${esc(tag)}
+    </div>
+    <img class="ad-img" src="${esc(img)}" alt="${esc(titre)}" loading="lazy">
+    <div class="ad-body">
+      <h4>${esc(titre)}</h4>
+      <p>${esc(texte)}</p>
+      <button class="ad-btn" onclick="void 0">${esc(cta)}</button>
+    </div>`;
+  return el;
+}
+
+function buildInlineAd() {
+  const el = document.createElement('div');
+  el.className = 'ad-inline';
+  el.innerHTML = `
+    <img class="ad-inline-img" src="https://picsum.photos/seed/ad-event2026/200/200" alt="Événement" loading="lazy">
+    <div class="ad-inline-body">
+      <div style="font-size:9px;text-transform:uppercase;font-weight:700;color:var(--muted);margin-bottom:4px;">Événement sponsorisé</div>
+      <h4 style="margin:0 0 4px;font-size:13px;font-weight:800;color:#0D1B2A;">Forum Diaspora Paris 2026</h4>
+      <p style="margin:0 0 8px;font-size:12px;color:var(--muted);">500+ membres attendus · 12 sept. 2026 · Paris 15e</p>
+      <button class="ad-btn" onclick="void 0" style="font-size:11px;padding:5px 12px;">Je participe</button>
+    </div>`;
+  return el;
+}
+
+function buildSidebarSuggestions() {
+  const SUGGESTIONS = [
+    { nom:'Aminata Diallo', sub:'Ingénieure · Montréal', av:'https://api.dicebear.com/7.x/lorelei/svg?seed=aminata&backgroundColor=E8F5E9' },
+    { nom:'Kofi Mensah', sub:'Entrepreneur · Lyon', av:'https://api.dicebear.com/7.x/lorelei/svg?seed=kofi&backgroundColor=E3F2FD' },
+    { nom:'Fatou Cissé', sub:'Médecin · Bruxelles', av:'https://api.dicebear.com/7.x/lorelei/svg?seed=fatou&backgroundColor=F3E5F5' },
+    { nom:'Ibrahim Touré', sub:'Enseignant · Bordeaux', av:'https://api.dicebear.com/7.x/lorelei/svg?seed=ibrahim&backgroundColor=FBE9E7' },
+  ];
+  const el = document.createElement('div');
+  el.className = 'side-card';
+  el.innerHTML = `<h4>👥 Vous connaissez peut-être</h4>` +
+    SUGGESTIONS.map(s => `<div class="suggest-item">
+      <div class="sug-av"><img src="${esc(s.av)}" alt="${esc(s.nom)}"></div>
+      <div class="sug-body">
+        <div class="sb-nom">${esc(s.nom)}</div>
+        <div class="sb-sub">${esc(s.sub)}</div>
+      </div>
+      <button class="btn-sug" onclick="void 0">+ Suivre</button>
+    </div>`).join('');
+  return el;
+}
+
+function buildSidebarInitiatives() {
+  const INITS = [
+    { nom:'AgriConnect Sahel', sub:'Agriculture · Mali', img:'https://picsum.photos/seed/init-agri/80/80' },
+    { nom:'SantéDiaspo', sub:'Santé · Sénégal', img:'https://picsum.photos/seed/init-sante/80/80' },
+    { nom:'TechAfrique', sub:'Technologie · Côte d\'Ivoire', img:'https://picsum.photos/seed/init-tech/80/80' },
+  ];
+  const el = document.createElement('div');
+  el.className = 'side-card';
+  el.innerHTML = `<h4>🌱 Initiatives à découvrir</h4>` +
+    INITS.map(i => `<div class="suggest-item">
+      <div class="sug-av" style="border-radius:8px;"><img src="${esc(i.img)}" alt="${esc(i.nom)}" style="border-radius:8px;"></div>
+      <div class="sug-body">
+        <div class="sb-nom">${esc(i.nom)}</div>
+        <div class="sb-sub">${esc(i.sub)}</div>
+      </div>
+      <button class="btn-sug" onclick="void 0">+ Suivre</button>
+    </div>`).join('');
+  return el;
+}
+
+/* ======================================================
+   LIKE toggle
+   ====================================================== */
+function toggleLike(btn, postId, baseLikes) {
+  const isLiked = btn.classList.toggle('liked');
+  const statsEl = btn.closest('.post-card').querySelector('.post-stats span');
+  if (statsEl) statsEl.textContent = `❤️ ${baseLikes + (isLiked ? 1 : 0)} j'aime`;
 }
 
 /* ======================================================
@@ -665,33 +906,126 @@ async function deleteSkill(idx) {
 }
 
 /* ======================================================
-   SECTION — Publications récentes
+   DONNÉES DÉMO — Publications & activité
+   ====================================================== */
+const DEMO_POSTS = [
+  {
+    id:'d1', type:'photo', cat:'Voyage', likes:47, comments:12, shares:6,
+    date:'Il y a 2 jours',
+    text:'🌍 Retour de mission à Dakar ! Trois semaines intenses avec les équipes de l\'initiative AgriConnect pour structurer leur programme de formation agricole. Des rencontres humaines extraordinaires, une énergie collective rare.\n\nMerci à toute l\'équipe locale pour leur accueil et leur engagement. On continue ! 🙏',
+    img:'https://picsum.photos/seed/dakar2026/700/380',
+  },
+  {
+    id:'d2', type:'lien', cat:'Entrepreneuriat', likes:31, comments:8, shares:14,
+    date:'Il y a 5 jours',
+    text:'📊 Un rapport essentiel sur l\'entrepreneuriat diasporique en 2025. Les chiffres confirment ce qu\'on observe sur le terrain : +34% de projets d\'investissement vers l\'Afrique subsaharienne en 5 ans.',
+    link: {
+      img:'https://picsum.photos/seed/rapport2025/200/120',
+      src:'Le Monde Afrique',
+      titre:'Diaspora et investissement : les nouvelles routes du capital'
+    }
+  },
+  {
+    id:'d3', type:'texte', cat:'Formation', likes:89, comments:23, shares:19,
+    date:'Il y a 1 semaine',
+    text:'💡 Après 3 ans sur la plateforme, voici ce que j\'ai appris :\n\n1️⃣ Le réseau est tout. Les connexions que j\'ai faites ici ont changé la trajectoire de mes projets.\n2️⃣ La diaspora n\'est pas un bloc homogène — chaque expérience est unique.\n3️⃣ L\'impact réel demande de la durée, pas de la vitesse.\n\nQu\'est-ce que vous en pensez ? 👇',
+  },
+  {
+    id:'d4', type:'partage', cat:'Initiative', likes:24, comments:5, shares:31,
+    date:'Il y a 2 semaines',
+    text:'👇 Cette initiative mérite vraiment d\'être connue. Je la suis depuis le début et les résultats sont là.',
+    shared: {
+      nom:'AgriConnect Sahel',
+      text:'🌱 Nous venons de former notre 500ème agriculteur au Burkina Faso ! Un jalon historique pour notre programme. En 2 ans, nos membres ont augmenté leurs rendements de 40% en moyenne. Merci à tous nos soutiens de la diaspora 🙏'
+    }
+  },
+  {
+    id:'d5', type:'photo', cat:'Événement', likes:112, comments:34, shares:8,
+    date:'Il y a 3 semaines',
+    text:'📸 Forum Diaspora & Développement à Paris — une journée mémorable. Plus de 400 membres présents, des panels de haute qualité et surtout… des projets concrets lancés en direct !',
+    img:'https://picsum.photos/seed/forum2026/700/380',
+  },
+  {
+    id:'d6', type:'texte', cat:'Santé', likes:56, comments:18, shares:22,
+    date:'Il y a 1 mois',
+    text:'🏥 J\'ai participé au programme de télémédecine SantéDiaspo cette semaine. Incroyable de voir comment la technologie peut connecter des médecins en Europe avec des patients en Afrique de l\'Ouest. Le futur de la médecine diasporique est là.',
+  },
+];
+
+/* ======================================================
+   SECTION — Publications & activité (cartes riches)
    ====================================================== */
 function buildSectionPubs() {
-  const sec  = document.createElement('div');
-  sec.className = 'p-section';
-  sec.id = 'sec-pubs';
+  const wrap = document.createElement('div');
+  wrap.id = 'sec-pubs-wrap';
 
-  const pubs = profil.publications || [];
-  let hd = `<div class="p-sec-hd"><h3>📝 Publications récentes</h3>`;
-  if (pubs.length) hd += `<a href="fil-actualite.html" class="btn-ico" style="text-decoration:none;">Voir tout</a>`;
-  hd += `</div>`;
+  const apiPubs = (profil.publications || []).map(p => {
+    const d = new Date(p.created_at);
+    const dateStr = isNaN(d) ? 'Récemment' : `${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
+    return {
+      id:'api_'+p.id, type:'texte', cat: p.categorie||p.type||'Publication',
+      likes: Math.floor(Math.random()*40)+5,
+      comments: Math.floor(Math.random()*12),
+      shares: Math.floor(Math.random()*8),
+      date: dateStr, text: p.contenu||''
+    };
+  });
 
-  const body = pubs.length
-    ? pubs.map(p => {
-        const d = new Date(p.created_at);
-        const dateStr = isNaN(d) ? p.created_at : `${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
-        const preview = (p.contenu||'').slice(0, 200) + (p.contenu?.length > 200 ? '…' : '');
-        return `<div class="pub-item">
-          <div class="pub-cat">${esc(p.categorie||p.type||'Publication')}</div>
-          <div class="pub-text">${esc(preview)}</div>
-          <div class="pub-date">${esc(dateStr)}</div>
-        </div>`;
-      }).join('')
-    : `<div class="empty-p"><div class="ei">📝</div>Aucune publication pour l'instant</div>`;
+  const allPosts = [...apiPubs, ...DEMO_POSTS];
+  const nom   = [profil.prenom, profil.nom].filter(Boolean).join(' ') || 'Jean K.';
+  const avHtml = profil.photo_url
+    ? `<img src="${esc(profil.photo_url)}" alt="${esc(nom)}">`
+    : `<span style="font-size:13px;font-weight:800;">${initials(nom)}</span>`;
 
-  sec.innerHTML = hd + body;
-  return sec;
+  wrap.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
+    <span style="font-size:15px;font-weight:800;color:#0D1B2A;">📝 Publications & activité</span>
+    <a href="fil-actualite.html" class="btn-ico" style="text-decoration:none;font-size:12px;">Voir tout</a>
+  </div>`;
+
+  allPosts.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'post-card';
+
+    let mediaHtml = '';
+    if (p.img) mediaHtml = `<img class="post-img" src="${esc(p.img)}" alt="Image" loading="lazy">`;
+    else if (p.link) mediaHtml = `<a class="post-link-card" href="#" onclick="return false">
+      <img src="${esc(p.link.img)}" alt="" style="width:100px;height:80px;object-fit:cover;flex-shrink:0;">
+      <div class="post-link-body"><div class="plb-src">${esc(p.link.src)}</div><div class="plb-title">${esc(p.link.titre)}</div></div>
+    </a>`;
+    else if (p.shared) mediaHtml = `<div class="post-shared">
+      <div class="ps-nom">🔗 ${esc(p.shared.nom)}</div>
+      <div class="ps-text">${esc(p.shared.text)}</div>
+    </div>`;
+
+    const likedClass = p._liked ? ' liked' : '';
+    card.innerHTML = `
+      <div class="post-header">
+        <div class="post-av">${avHtml}</div>
+        <div class="post-meta">
+          <div class="pm-nom">${esc(nom)}</div>
+          <div class="pm-titre">${esc(profil.titre_pro||profil.situation_pro||'Membre Diaspo\'Actif')}</div>
+          <div class="pm-date">${esc(p.date)}</div>
+        </div>
+        <span class="post-cat-pill">${esc(p.cat)}</span>
+      </div>
+      <div class="post-body">
+        <div class="post-text">${esc(p.text)}</div>
+        ${mediaHtml}
+      </div>
+      <div class="post-stats">
+        <span>❤️ ${p.likes} j'aime</span>
+        <span>💬 ${p.comments} commentaires</span>
+        <span>↗️ ${p.shares} partages</span>
+      </div>
+      <div class="post-actions">
+        <button class="post-btn${likedClass}" onclick="toggleLike(this,'${p.id}',${p.likes})">❤️ J'aime</button>
+        <button class="post-btn" onclick="this.closest('.post-card').querySelector('.post-text').scrollIntoView({behavior:'smooth'})">💬 Commenter</button>
+        <button class="post-btn" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.href)">↗️ Partager</button>
+      </div>`;
+    wrap.appendChild(card);
+  });
+
+  return wrap;
 }
 
 /* ======================================================
