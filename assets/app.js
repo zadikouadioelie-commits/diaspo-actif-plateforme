@@ -34,6 +34,9 @@ async function fetchCurrentUser() {
 const ROLE_DASHBOARD = { utilisateur: "dashboard-utilisateur.html", initiative: "dashboard-initiative.html", administrateur: "dashboard-administrateur.html", collectivite: "dashboard-collectivite.html" };
 const ROLE_LABEL_FR = { utilisateur: "Utilisateur", initiative: "Initiative", administrateur: "Administrateur", collectivite: "Collectivité" };
 
+/* ---------- Utilitaires globaux ---------- */
+function escH(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
 /* ---------- Avatars photo (DiceBear) ---------- */
 function photoAvatar(name, size=48, type='user') {
   const seed = encodeURIComponent((name||'?').trim());
@@ -1566,8 +1569,6 @@ async function initFilActualite(){
     try{ return new Date(str.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"}); }
     catch{ return str||""; }
   }
-
-  function escH(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
   // Palettes banner par thème (ou fallback selon nom)
   const THEME_BANNERS = {
