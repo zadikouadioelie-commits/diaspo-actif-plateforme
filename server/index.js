@@ -937,6 +937,14 @@ async function handleRequest(req, res) {
       }
       return;
     }
+    /* ---- GET /api/visits — compteur cumulatif de visites ---- */
+    if (method === "GET" && pathname === "/api/visits") {
+      db.exec(`INSERT OR IGNORE INTO counters (key, value) VALUES ('page_visits', 0)`);
+      db.prepare(`UPDATE counters SET value = value + 1 WHERE key = 'page_visits'`).run();
+      const row = db.prepare(`SELECT value FROM counters WHERE key = 'page_visits'`).get();
+      return sendJSON(res, 200, { count: row.value });
+    }
+
     return sendJSON(res, 404, { error: "Route API inconnue." });
   }
 

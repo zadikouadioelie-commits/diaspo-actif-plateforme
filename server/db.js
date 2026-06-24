@@ -234,6 +234,11 @@ db.exec(`
     FOREIGN KEY(evenement_id) REFERENCES evenements(id),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS counters (
+    key TEXT PRIMARY KEY,
+    value INTEGER NOT NULL DEFAULT 0
+  );
 `);
 
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */

@@ -2,11 +2,816 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Diaspo'Actif — Accueil</title>
+<title>Diaspo'Actif — Portail mondial de la diaspora engagée</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="La plateforme qui connecte les initiatives des diasporas du monde entier. Découvrez, rejoignez et soutenez les actions qui changent le monde.">
 <link rel="stylesheet" href="assets/styles.css">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ff6b00">
+<meta name="theme-color" content="#1565C0">
+<style>
+/* ===== HOMEPAGE — styles dédiés ===== */
+
+/* --- Hero --- */
+.hp-hero {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #060e1a 0%, #0c1e38 40%, #0F2A50 100%);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.hp-hero-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+  flex: 1;
+  min-height: calc(100vh - 64px);
+}
+.hp-hero-text { z-index: 2; }
+.hp-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(21,101,192,.18);
+  border: 1px solid rgba(21,101,192,.4);
+  color: #7EB8F7;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 99px;
+  margin-bottom: 24px;
+}
+.hp-hero-title {
+  font-size: clamp(28px, 4vw, 52px);
+  font-weight: 900;
+  line-height: 1.1;
+  color: #fff;
+  margin: 0 0 20px;
+  letter-spacing: -.02em;
+}
+.hp-hero-title span { color: #4A90D9; }
+.hp-hero-sub {
+  font-size: 16px;
+  line-height: 1.65;
+  color: rgba(255,255,255,.72);
+  margin: 0 0 36px;
+  max-width: 480px;
+}
+.hp-hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; }
+.hp-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #1565C0;
+  color: #fff;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  text-decoration: none;
+  transition: background .2s, transform .15s;
+}
+.hp-cta-primary:hover { background: #1976D2; transform: translateY(-1px); }
+.hp-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.22);
+  color: #fff;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  transition: background .2s;
+}
+.hp-cta-secondary:hover { background: rgba(255,255,255,.14); }
+.hp-hero-map {
+  position: relative;
+  height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#world-canvas {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  display: block;
+}
+.hp-hero-map-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  gap: 16px;
+  z-index: 3;
+}
+.hp-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(255,255,255,.6);
+  font-weight: 600;
+}
+.hp-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.hp-hero-scroll {
+  text-align: center;
+  padding: 20px 0 32px;
+  color: rgba(255,255,255,.4);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.hp-hero-scroll-arrow {
+  animation: bounce 1.6s ease-in-out infinite;
+  display: block;
+  margin: 6px auto 0;
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+/* --- Compteur visites --- */
+.hp-counter {
+  background: linear-gradient(90deg, #0D1B2A 0%, #1B3A6B 50%, #0D1B2A 100%);
+  padding: 36px 24px;
+  text-align: center;
+  border-bottom: 1px solid rgba(74,144,217,.15);
+}
+.hp-counter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255,255,255,.45);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.hp-counter-number {
+  font-size: clamp(42px, 6vw, 72px);
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.hp-counter-number span { color: #4A90D9; }
+.hp-counter-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,.5);
+  margin-top: 8px;
+}
+
+/* --- Stats bande --- */
+.hp-stats {
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+.hp-stats-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+.hp-stat-item {
+  padding: 28px 24px;
+  text-align: center;
+  border-right: 1px solid var(--border);
+}
+.hp-stat-item:last-child { border-right: none; }
+.hp-stat-n {
+  font-size: 36px;
+  font-weight: 900;
+  color: #1565C0;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.hp-stat-lbl { font-size: 13px; color: var(--muted); font-weight: 600; }
+
+/* --- Section commune --- */
+.hp-section {
+  padding: 72px 0;
+}
+.hp-section-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.hp-section-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1565C0;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.hp-section-title {
+  font-size: clamp(24px, 3vw, 38px);
+  font-weight: 900;
+  color: #0D1B2A;
+  margin: 0 0 16px;
+  letter-spacing: -.02em;
+}
+.hp-section-sub {
+  font-size: 16px;
+  color: var(--muted);
+  max-width: 600px;
+  line-height: 1.65;
+  margin: 0 0 48px;
+}
+
+/* --- Pourquoi Diaspo'Actif --- */
+.hp-why { background: #F8FAFF; }
+.hp-why-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.hp-why-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 28px;
+  position: relative;
+  overflow: hidden;
+}
+.hp-why-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #1565C0, #4A90D9);
+}
+.hp-why-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: #EFF6FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  margin-bottom: 20px;
+}
+.hp-why-card h3 { font-size: 18px; font-weight: 800; margin: 0 0 12px; color: #0D1B2A; }
+.hp-why-card p { font-size: 14px; color: var(--muted); line-height: 1.65; margin: 0; }
+.hp-why-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+.hp-why-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: #EFF6FF;
+  color: #1565C0;
+  letter-spacing: .04em;
+}
+
+/* --- Initiatives vedettes --- */
+.hp-initiatives-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.hp-init-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  transition: transform .2s, box-shadow .2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.hp-init-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(27,58,107,.14); }
+.hp-init-photo {
+  height: 200px;
+  position: relative;
+  overflow: hidden;
+}
+.hp-init-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform .3s;
+}
+.hp-init-card:hover .hp-init-photo img { transform: scale(1.05); }
+.hp-init-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.hp-init-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
+.hp-init-title { font-size: 16px; font-weight: 800; margin: 0 0 8px; color: #0D1B2A; }
+.hp-init-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.55;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0 0 16px;
+}
+.hp-init-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.hp-init-progress {
+  margin-top: 14px;
+}
+.hp-init-progress-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.hp-init-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1565C0, #4A90D9);
+  border-radius: 2px;
+  transition: width 1s ease;
+}
+.hp-init-progress-label {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+}
+.hp-discover-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #1565C0;
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 12px;
+  text-decoration: none;
+  transition: background .2s;
+  flex-shrink: 0;
+}
+.hp-discover-btn:hover { background: #1976D2; }
+.hp-view-all {
+  text-align: center;
+  margin-top: 40px;
+}
+.hp-view-all a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #1565C0;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  padding: 10px 24px;
+  border: 2px solid #1565C0;
+  border-radius: 8px;
+  transition: background .2s, color .2s;
+}
+.hp-view-all a:hover { background: #1565C0; color: #fff; }
+
+/* --- Talent showcase --- */
+.hp-talents { background: #F8FAFF; }
+.hp-talents-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+.hp-talent-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 20px;
+  text-align: center;
+  transition: transform .2s, box-shadow .2s;
+}
+.hp-talent-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(27,58,107,.1); }
+.hp-talent-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 3px solid #EFF6FF;
+  margin: 0 auto 12px;
+  display: block;
+}
+.hp-talent-name { font-size: 15px; font-weight: 800; color: #0D1B2A; margin: 0 0 4px; }
+.hp-talent-role { font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+.hp-talent-loc { font-size: 11px; color: #1565C0; font-weight: 600; }
+.hp-talent-tags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+.hp-talent-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: #EFF6FF;
+  color: #1565C0;
+}
+
+/* --- Fil public (aperçu) --- */
+.hp-feed-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.hp-feed-post {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+.hp-feed-post-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.hp-feed-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.hp-feed-author { font-size: 14px; font-weight: 700; color: #0D1B2A; }
+.hp-feed-time { font-size: 11px; color: var(--muted); }
+.hp-feed-content {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.6;
+  margin: 0 0 16px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hp-feed-actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.hp-feed-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: background .15s, color .15s;
+  font-family: inherit;
+  font-weight: 600;
+}
+.hp-feed-action-btn.locked { cursor: pointer; }
+.hp-feed-action-btn:hover, .hp-feed-action-btn.locked:hover {
+  background: #EFF6FF;
+  color: #1565C0;
+}
+.hp-feed-lock-icon { font-size: 10px; opacity: .7; }
+.hp-feed-cta {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, #0F2A50, #1565C0);
+  border-radius: 12px;
+  padding: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.hp-feed-cta-text h3 { color: #fff; font-size: 18px; font-weight: 800; margin: 0 0 6px; }
+.hp-feed-cta-text p { color: rgba(255,255,255,.7); font-size: 14px; margin: 0; }
+.hp-feed-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  color: #1565C0;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .2s;
+  flex-shrink: 0;
+}
+.hp-feed-cta-btn:hover { background: #EFF6FF; }
+
+/* --- Annuaire widget --- */
+.hp-annuaire { background: #fff; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.hp-annuaire-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 48px;
+  align-items: center;
+}
+.hp-annuaire-text h2 { font-size: 28px; font-weight: 900; color: #0D1B2A; margin: 0 0 12px; }
+.hp-annuaire-text p { font-size: 14px; color: var(--muted); line-height: 1.65; margin: 0 0 20px; }
+.hp-annuaire-quick {
+  background: #F8FAFF;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px;
+}
+.hp-annuaire-quick h4 {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0D1B2A;
+  margin: 0 0 16px;
+}
+.hp-search-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.hp-search-row input {
+  flex: 1;
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.hp-search-row select {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+  font-family: inherit;
+  min-width: 150px;
+}
+.hp-search-go {
+  height: 44px;
+  padding: 0 20px;
+  background: #1565C0;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.hp-search-go:hover { background: #1976D2; }
+.hp-annuaire-preview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+.hp-ann-mini {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .15s;
+}
+.hp-ann-mini:hover { border-color: #1565C0; }
+.hp-ann-mini img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.hp-ann-mini-name { font-size: 12px; font-weight: 700; color: #0D1B2A; line-height: 1.3; }
+.hp-ann-mini-loc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* --- Témoignages --- */
+.hp-testi { background: linear-gradient(135deg, #0D1B2A 0%, #1B3A6B 100%); }
+.hp-testi .hp-section-title { color: #fff; }
+.hp-testi .hp-section-sub { color: rgba(255,255,255,.6); }
+.hp-testi .hp-section-eyebrow { color: #7EB8F7; }
+.hp-testi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.hp-testi-card {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  padding: 28px 24px;
+  position: relative;
+}
+.hp-testi-quote {
+  font-size: 42px;
+  color: #4A90D9;
+  line-height: 1;
+  margin-bottom: 16px;
+  font-family: Georgia, serif;
+}
+.hp-testi-text {
+  font-size: 14px;
+  color: rgba(255,255,255,.8);
+  line-height: 1.7;
+  margin: 0 0 20px;
+  font-style: italic;
+}
+.hp-testi-author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+.hp-testi-author img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.2);
+}
+.hp-testi-name { font-size: 14px; font-weight: 700; color: #fff; }
+.hp-testi-role { font-size: 12px; color: rgba(255,255,255,.5); }
+.hp-testi-stars { color: #F59E0B; font-size: 12px; margin-bottom: 2px; }
+
+/* --- CTA final --- */
+.hp-final-cta {
+  background: #fff;
+  padding: 80px 24px;
+  text-align: center;
+}
+.hp-final-cta-inner { max-width: 720px; margin: 0 auto; }
+.hp-final-cta h2 {
+  font-size: clamp(26px, 4vw, 44px);
+  font-weight: 900;
+  color: #0D1B2A;
+  margin: 0 0 16px;
+  letter-spacing: -.02em;
+}
+.hp-final-cta p { font-size: 16px; color: var(--muted); line-height: 1.65; margin: 0 0 40px; }
+.hp-final-ctas {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.hp-cta-card {
+  background: #F8FAFF;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 32px;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  width: 200px;
+  transition: border-color .2s, transform .15s, box-shadow .2s;
+}
+.hp-cta-card:hover {
+  border-color: #1565C0;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(21,101,192,.15);
+}
+.hp-cta-card-icon { font-size: 36px; margin-bottom: 12px; }
+.hp-cta-card h3 { font-size: 15px; font-weight: 800; color: #0D1B2A; margin: 0 0 6px; }
+.hp-cta-card p { font-size: 12px; color: var(--muted); margin: 0; }
+.hp-cta-card.primary-card {
+  background: #1565C0;
+  border-color: #1565C0;
+}
+.hp-cta-card.primary-card h3, .hp-cta-card.primary-card p { color: #fff; }
+.hp-cta-card.primary-card p { color: rgba(255,255,255,.7); }
+.hp-cta-card.primary-card:hover { background: #1976D2; border-color: #1976D2; }
+
+/* --- Modal visiteur (actions verrouillées) --- */
+.lock-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.lock-modal-overlay.active { display: flex; }
+.lock-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px 36px;
+  max-width: 440px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0,0,0,.3);
+  animation: modalIn .25s ease;
+}
+@keyframes modalIn {
+  from { transform: scale(.95) translateY(12px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+.lock-modal-icon { font-size: 52px; margin-bottom: 16px; }
+.lock-modal h2 { font-size: 22px; font-weight: 900; color: #0D1B2A; margin: 0 0 10px; }
+.lock-modal p { font-size: 14px; color: var(--muted); line-height: 1.6; margin: 0 0 28px; }
+.lock-modal-actions { display: flex; flex-direction: column; gap: 10px; }
+.lock-modal-btn-join {
+  display: block;
+  background: #1565C0;
+  color: #fff;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  text-decoration: none;
+  transition: background .2s;
+}
+.lock-modal-btn-join:hover { background: #1976D2; }
+.lock-modal-btn-login {
+  display: block;
+  background: none;
+  border: 2px solid var(--border);
+  color: #0D1B2A;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  transition: border-color .2s, background .2s;
+}
+.lock-modal-btn-login:hover { border-color: #1565C0; background: #EFF6FF; }
+.lock-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+}
+.lock-modal { position: relative; }
+.lock-modal-dismiss {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: inherit;
+}
+
+/* --- Responsive --- */
+@media (max-width: 1100px) {
+  .hp-hero-inner { grid-template-columns: 1fr; min-height: auto; padding-top: 48px; padding-bottom: 40px; }
+  .hp-hero-map { height: 300px; }
+  .hp-stats-inner { grid-template-columns: repeat(2, 1fr); }
+  .hp-stat-item:nth-child(2) { border-right: none; }
+  .hp-why-grid { grid-template-columns: 1fr 1fr; }
+  .hp-initiatives-grid { grid-template-columns: 1fr 1fr; }
+  .hp-talents-grid { grid-template-columns: repeat(2, 1fr); }
+  .hp-testi-grid { grid-template-columns: 1fr 1fr; }
+  .hp-annuaire-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+  .hp-stats-inner { grid-template-columns: repeat(2, 1fr); }
+  .hp-why-grid { grid-template-columns: 1fr; }
+  .hp-initiatives-grid { grid-template-columns: 1fr; }
+  .hp-talents-grid { grid-template-columns: 1fr 1fr; }
+  .hp-feed-grid { grid-template-columns: 1fr; }
+  .hp-testi-grid { grid-template-columns: 1fr; }
+  .hp-final-ctas { flex-direction: column; align-items: center; }
+  .hp-cta-card { width: 100%; max-width: 280px; }
+  .hp-annuaire-preview { grid-template-columns: 1fr 1fr; }
+  .hp-search-row { flex-wrap: wrap; }
+}
+</style>
 </head>
 <body>
 <div class="page">
@@ -23,90 +828,741 @@
       </nav>
       <div class="topbar-right">
         <select class="lang-select" id="lang-select"></select>
-        
         <div id="auth-area" class="auth-area"></div>
       </div>
     </div>
   </header>
 
-  <section class="hero">
-    <div class="hero-inner">
-      <h1>Une plateforme. Toutes les diasporas. Un impact global.</h1>
-      <p>Connecter les initiatives des diasporas du monde entier pour créer des opportunités, partager des expériences et développer des collaborations durables.</p>
-      <div class="network" id="world-network">
-        <div class="tooltip-card callout-onboard"><strong>Onboarding immédiat :</strong> inscription en 1 clic via SSO Google.</div>
-        <div class="tooltip-card callout-immersive"><strong>Interface immersive :</strong> carte mondiale interactive affichant les initiatives en temps réel.</div>
+  <!-- ===== SECTION 1 : HERO ===== -->
+  <section class="hp-hero">
+    <div class="hp-hero-inner">
+      <div class="hp-hero-text">
+        <div class="hp-hero-eyebrow">🌍 Réseau diaspora mondial</div>
+        <h1 class="hp-hero-title">
+          Une plateforme.<br>
+          Toutes les diasporas.<br>
+          <span>Un impact global.</span>
+        </h1>
+        <p class="hp-hero-sub">
+          Connectez-vous à un réseau d'initiatives portées par les diasporas africaines et mondiales. Partagez, collaborez et construisez des projets qui transforment vos communautés.
+        </p>
+        <div class="hp-hero-ctas">
+          <a href="inscription.html" class="hp-cta-primary">🚀 Rejoindre la plateforme</a>
+          <a href="annuaire.html" class="hp-cta-secondary">🔍 Explorer les initiatives</a>
+        </div>
+      </div>
+      <div class="hp-hero-map">
+        <canvas id="world-canvas" width="640" height="400"></canvas>
+        <div class="hp-hero-map-legend">
+          <div class="hp-legend-item">
+            <div class="hp-legend-dot" style="background:#F59E0B; box-shadow:0 0 6px #F59E0B;"></div>
+            Pays d'origine
+          </div>
+          <div class="hp-legend-item">
+            <div class="hp-legend-dot" style="background:#4A90D9; box-shadow:0 0 6px #4A90D9;"></div>
+            Pays de résidence
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="hp-hero-scroll">
+      <span>Défiler pour découvrir</span>
+      <svg class="hp-hero-scroll-arrow" width="16" height="16" fill="none" viewBox="0 0 16 16">
+        <path d="M8 3v10M3 9l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 2 : COMPTEUR DE VISITES ===== -->
+  <div class="hp-counter">
+    <div class="hp-counter-label">Visites cumulées depuis la création</div>
+    <div class="hp-counter-number" id="visit-count"><span>—</span></div>
+    <div class="hp-counter-sub">Un compteur qui ne s'arrête jamais. Chaque visite compte.</div>
+  </div>
+
+  <!-- ===== SECTION 3 : STATS ===== -->
+  <div class="hp-stats">
+    <div class="hp-stats-inner">
+      <div class="hp-stat-item">
+        <div class="hp-stat-n" id="stat-membres">—</div>
+        <div class="hp-stat-lbl">Membres inscrits</div>
+      </div>
+      <div class="hp-stat-item">
+        <div class="hp-stat-n" id="stat-initiatives">—</div>
+        <div class="hp-stat-lbl">Initiatives référencées</div>
+      </div>
+      <div class="hp-stat-item">
+        <div class="hp-stat-n">28</div>
+        <div class="hp-stat-lbl">Pays représentés</div>
+      </div>
+      <div class="hp-stat-item">
+        <div class="hp-stat-n">6</div>
+        <div class="hp-stat-lbl">Domaines d'action</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION 4 : POURQUOI DIASPO'ACTIF ===== -->
+  <section class="hp-section hp-why">
+    <div class="hp-section-inner">
+      <div class="hp-section-eyebrow">Notre mission</div>
+      <h2 class="hp-section-title">Pourquoi Diaspo'Actif ?</h2>
+      <p class="hp-section-sub">La diaspora africaine représente un levier de développement majeur. Pourtant, les initiatives restent dispersées, invisibles, sans réseau. Diaspo'Actif change ça.</p>
+      <div class="hp-why-grid">
+        <div class="hp-why-card">
+          <div class="hp-why-icon">🔗</div>
+          <h3>Le problème : la dispersion</h3>
+          <p>Des milliers d'initiatives de diaspora existent dans le monde — associations, startups, projets solidaires — mais elles agissent en silo, sans réseau, sans visibilité commune.</p>
+          <div class="hp-why-tags">
+            <span class="hp-why-tag">Isolement</span>
+            <span class="hp-why-tag">Manque de visibilité</span>
+            <span class="hp-why-tag">Ressources limitées</span>
+          </div>
+        </div>
+        <div class="hp-why-card">
+          <div class="hp-why-icon">🎯</div>
+          <h3>Notre réponse : la mise en réseau</h3>
+          <p>Diaspo'Actif crée un espace commun où individus, collectifs, associations et institutions peuvent se trouver, se soutenir et co-construire des projets à impact durable.</p>
+          <div class="hp-why-tags">
+            <span class="hp-why-tag">Annuaire mondial</span>
+            <span class="hp-why-tag">Messagerie</span>
+            <span class="hp-why-tag">Collaborations</span>
+          </div>
+        </div>
+        <div class="hp-why-card">
+          <div class="hp-why-icon">🌱</div>
+          <h3>L'impact visé : Sud ↔ Nord</h3>
+          <p>Nos membres agissent dans plus de 28 pays. Ensemble, ils transfèrent des compétences, des ressources et de l'espoir — du Nord vers le Sud, et du Sud vers le monde.</p>
+          <div class="hp-why-tags">
+            <span class="hp-why-tag">28 pays</span>
+            <span class="hp-why-tag">Transfert de savoirs</span>
+            <span class="hp-why-tag">Développement durable</span>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
-  <main class="container">
-    <section class="section">
-      <h2>L'accessibilité comme moteur de découverte</h2>
-      <p class="sub">Quatre profils, un seul écosystème mondial.</p>
-      <div class="grid grid-4">
-        <div class="card">
-          <div class="icon-badge">🧭</div>
-          <h3>Compte Utilisateur — Gratuit</h3>
-          <p>Profil personnel, publication, réactions, recherche d'initiatives, messagerie interne. Aucun engagement financier.</p>
-          <a class="btn btn-orange btn-block" style="margin-top:14px;" href="dashboard-utilisateur.html">Créer un Compte Utilisateur</a>
+  <!-- ===== SECTION 5 : INITIATIVES VEDETTES ===== -->
+  <section class="hp-section">
+    <div class="hp-section-inner">
+      <div class="hp-section-eyebrow">Initiatives à la une</div>
+      <h2 class="hp-section-title">Des actions qui changent le monde</h2>
+      <p class="hp-section-sub">Découvrez des initiatives portées par des membres de la diaspora sur des enjeux de santé, d'éducation, d'entrepreneuriat et bien plus.</p>
+      <div class="hp-initiatives-grid" id="hp-init-grid">
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+      </div>
+      <div class="hp-view-all">
+        <a href="annuaire.html">Voir toutes les initiatives →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 6 : WIDGET ANNUAIRE ===== -->
+  <section class="hp-section hp-annuaire" style="padding: 64px 0;">
+    <div class="hp-section-inner">
+      <div class="hp-annuaire-grid">
+        <div class="hp-annuaire-text">
+          <div class="hp-section-eyebrow">Annuaire public</div>
+          <h2>Trouvez une initiative près de chez vous</h2>
+          <p>Recherchez par pays, domaine ou mot-clé. L'annuaire est accessible à tous, sans inscription.</p>
+          <a href="annuaire.html" class="hp-cta-primary" style="display:inline-flex;margin-top:8px;">Voir l'annuaire complet →</a>
         </div>
-        <div class="card">
-          <div class="icon-badge">🚀</div>
-          <h3>Compte Initiative — 50 €/an</h3>
-          <p>Espace vitrine complet, publication d'articles, photos et vidéos (&lt; 3 min), gestion des abonnés.</p>
-          <a class="btn btn-outline btn-block" style="margin-top:14px;" href="dashboard-initiative.html">Découvrir l'espace Initiative</a>
+        <div class="hp-annuaire-quick">
+          <h4>Recherche rapide</h4>
+          <div class="hp-search-row">
+            <input type="text" id="hp-q" placeholder="Nom ou mot-clé…">
+            <select id="hp-domaine">
+              <option value="">Tous les domaines</option>
+              <option>Education</option>
+              <option>Sante</option>
+              <option>Technologie</option>
+              <option>Environnement</option>
+              <option>Entrepreneuriat</option>
+              <option>Culture</option>
+              <option>Action Sociale</option>
+            </select>
+            <button class="hp-search-go" id="hp-search-btn">Rechercher</button>
+          </div>
+          <div class="hp-annuaire-preview" id="hp-ann-preview">
+            <!-- rempli par JS -->
+          </div>
         </div>
-        <div class="card">
-          <div class="icon-badge">🏛️</div>
-          <h3>Compte Officiel — Diaspo'Actif</h3>
-          <p>Appels à projets, modération de la plateforme, communication institutionnelle ciblée.</p>
-          <a class="btn btn-outline btn-block" style="margin-top:14px;" href="dashboard-officiel.html">Voir le centre de commandement</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 7 : TALENTS ===== -->
+  <section class="hp-section hp-talents">
+    <div class="hp-section-inner">
+      <div class="hp-section-eyebrow">Talents de la diaspora</div>
+      <h2 class="hp-section-title">Des profils qui inspirent</h2>
+      <p class="hp-section-sub">Entrepreneurs, experts, militants et créateurs. La diaspora regorge de talents. Découvrez-en quelques-uns.</p>
+      <div class="hp-talents-grid">
+        <div class="hp-talent-card">
+          <img class="hp-talent-avatar" src="https://api.dicebear.com/7.x/lorelei/svg?seed=FatouD&backgroundColor=b6e3f4" alt="Fatou D.">
+          <div class="hp-talent-name">Fatou D.</div>
+          <div class="hp-talent-role">Ingénieure agronome</div>
+          <div class="hp-talent-loc">📍 Toulouse, France — 🌍 Dakar, Sénégal</div>
+          <div class="hp-talent-tags">
+            <span class="hp-talent-tag">Agriculture</span>
+            <span class="hp-talent-tag">IoT</span>
+            <span class="hp-talent-tag">Développement</span>
+          </div>
         </div>
-        <div class="card">
-          <div class="icon-badge">🏢</div>
+        <div class="hp-talent-card">
+          <img class="hp-talent-avatar" src="https://api.dicebear.com/7.x/lorelei/svg?seed=KofiM&backgroundColor=ffd5dc" alt="Kofi M.">
+          <div class="hp-talent-name">Kofi M.</div>
+          <div class="hp-talent-role">Entrepreneur Tech</div>
+          <div class="hp-talent-loc">📍 Berlin, Allemagne — 🌍 Accra, Ghana</div>
+          <div class="hp-talent-tags">
+            <span class="hp-talent-tag">Fintech</span>
+            <span class="hp-talent-tag">Startup</span>
+            <span class="hp-talent-tag">Impact</span>
+          </div>
+        </div>
+        <div class="hp-talent-card">
+          <img class="hp-talent-avatar" src="https://api.dicebear.com/7.x/lorelei/svg?seed=AminaS&backgroundColor=c0aede" alt="Amina S.">
+          <div class="hp-talent-name">Amina S.</div>
+          <div class="hp-talent-role">Médecin — Santé publique</div>
+          <div class="hp-talent-loc">📍 Bruxelles, Belgique — 🌍 Bamako, Mali</div>
+          <div class="hp-talent-tags">
+            <span class="hp-talent-tag">Santé</span>
+            <span class="hp-talent-tag">Solidarité</span>
+            <span class="hp-talent-tag">ONG</span>
+          </div>
+        </div>
+        <div class="hp-talent-card">
+          <img class="hp-talent-avatar" src="https://api.dicebear.com/7.x/lorelei/svg?seed=JeanLK&backgroundColor=d1f4e0" alt="Jean-Luc K.">
+          <div class="hp-talent-name">Jean-Luc K.</div>
+          <div class="hp-talent-role">Avocat — Droit des étrangers</div>
+          <div class="hp-talent-loc">📍 Paris, France — 🌍 Douala, Cameroun</div>
+          <div class="hp-talent-tags">
+            <span class="hp-talent-tag">Droit</span>
+            <span class="hp-talent-tag">Migration</span>
+            <span class="hp-talent-tag">Conseil</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 8 : FIL PUBLIC (APERÇU) ===== -->
+  <section class="hp-section">
+    <div class="hp-section-inner">
+      <div class="hp-section-eyebrow">Fil d'actualité</div>
+      <h2 class="hp-section-title">Ce qui se passe en ce moment</h2>
+      <p class="hp-section-sub">Suivez les publications de la communauté. Pour commenter, réagir ou publier, rejoignez la plateforme.</p>
+      <div class="hp-feed-grid" id="hp-feed-grid">
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 9 : TÉMOIGNAGES ===== -->
+  <section class="hp-section hp-testi">
+    <div class="hp-section-inner">
+      <div class="hp-section-eyebrow">Témoignages</div>
+      <h2 class="hp-section-title">Ils ont rejoint Diaspo'Actif</h2>
+      <p class="hp-section-sub">Des membres de toute la diaspora témoignent de leur expérience sur la plateforme.</p>
+      <div class="hp-testi-grid">
+        <div class="hp-testi-card">
+          <div class="hp-testi-quote">"</div>
+          <p class="hp-testi-text">Grâce à Diaspo'Actif, notre association ivoirienne de Toulouse a pu trouver des partenaires à Lyon et à Bordeaux. En 3 mois, nous avons triplé notre nombre d'adhérents.</p>
+          <div class="hp-testi-author">
+            <img src="https://api.dicebear.com/7.x/lorelei/svg?seed=MariamK&backgroundColor=b6e3f4" alt="Mariam K.">
+            <div>
+              <div class="hp-testi-stars">★★★★★</div>
+              <div class="hp-testi-name">Mariam K.</div>
+              <div class="hp-testi-role">Présidente d'association, Toulouse</div>
+            </div>
+          </div>
+        </div>
+        <div class="hp-testi-card">
+          <div class="hp-testi-quote">"</div>
+          <p class="hp-testi-text">En tant que consultant tech dans la diaspora sénégalaise, j'ai enfin un espace pour valoriser mes compétences et trouver des projets en Afrique. La plateforme est intuitive et professionnelle.</p>
+          <div class="hp-testi-author">
+            <img src="https://api.dicebear.com/7.x/lorelei/svg?seed=OusmanD&backgroundColor=d1f4e0" alt="Ousman D.">
+            <div>
+              <div class="hp-testi-stars">★★★★★</div>
+              <div class="hp-testi-name">Ousman D.</div>
+              <div class="hp-testi-role">Consultant IT, Montréal</div>
+            </div>
+          </div>
+        </div>
+        <div class="hp-testi-card">
+          <div class="hp-testi-quote">"</div>
+          <p class="hp-testi-text">Notre consulat utilise Diaspo'Actif pour identifier et mobiliser la communauté sénégalaise en France. Les statistiques agrégées nous aident à mieux cibler nos actions consulaires.</p>
+          <div class="hp-testi-author">
+            <img src="https://api.dicebear.com/7.x/lorelei/svg?seed=AissatouB&backgroundColor=ffd5dc" alt="Aïssatou B.">
+            <div>
+              <div class="hp-testi-stars">★★★★☆</div>
+              <div class="hp-testi-name">Aïssatou B.</div>
+              <div class="hp-testi-role">Attachée consulaire, Paris</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 10 : CTA FINAL ===== -->
+  <section class="hp-final-cta">
+    <div class="hp-final-cta-inner">
+      <div style="font-size:48px;margin-bottom:20px;">🌍</div>
+      <h2>Prêt à rejoindre le réseau mondial de la diaspora engagée ?</h2>
+      <p>Que vous soyez un individu, une initiative ou une institution, Diaspo'Actif a un espace conçu pour vous. Gratuit pour les particuliers.</p>
+      <div class="hp-final-ctas">
+        <a href="inscription.html?role=utilisateur" class="hp-cta-card primary-card">
+          <div class="hp-cta-card-icon">🧭</div>
+          <h3>Compte Utilisateur</h3>
+          <p>Gratuit · Profil, réseau, messagerie</p>
+        </a>
+        <a href="inscription.html?role=initiative" class="hp-cta-card">
+          <div class="hp-cta-card-icon">🚀</div>
+          <h3>Compte Initiative</h3>
+          <p>50 €/an · Vitrine, publications, abonnés</p>
+        </a>
+        <a href="inscription.html?role=collectivite" class="hp-cta-card">
+          <div class="hp-cta-card-icon">🏛️</div>
           <h3>Compte Institutionnel</h3>
-          <p>Ambassades, consulats, mairies, ministères : ciblez et mobilisez votre diaspora à l'étranger.</p>
-          <a class="btn btn-outline btn-block" style="margin-top:14px;" href="dashboard-institutionnel.html">Découvrir le Compte Institutionnel</a>
-        </div>
+          <p>Ambassades, consulats, mairies</p>
+        </a>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <div id="ad-home" data-ad-slot="0"></div>
-
-    <section class="section">
-      <h2>Financements participatifs en cours</h2>
-      <p class="sub">Soutenez les campagnes portées par les initiatives de la diaspora.</p>
-      <div class="grid grid-2" id="campagnes-list"></div>
-    </section>
-
-    <section class="section">
-      <h2>Projets Diaspo'Actif en cours</h2>
-      <p class="sub">Projets économiques, associatifs, programmes de formation, missions institutionnelles et actions solidaires portés ou accompagnés par Diaspo'Actif.</p>
-      <div class="grid grid-2" id="projets-list"></div>
-    </section>
-
-    <section class="section">
-      <div class="card" style="text-align:center;padding:34px;">
-        <h2 style="margin-bottom:18px;">Le premier réseau mondial de l'engagement</h2>
-        <div class="grid grid-2" style="text-align:left;max-width:640px;margin:0 auto 22px;">
-          <p>✅ Favoriser les collaborations</p>
-          <p>✅ Faciliter les partenariats</p>
-          <p>✅ Valoriser les projets</p>
-          <p>✅ Renforcer les liens Sud-Nord</p>
-          <p>✅ Encourager l'investissement</p>
-          <p>✅ Construire un réseau mondial</p>
-        </div>
-        <a class="btn btn-orange" href="dashboard-utilisateur.html">Créer un Compte Utilisateur →</a>
-      </div>
-    </section>
-  </main>
-
-  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a></footer>
+  <footer class="footer">
+    <span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span>
+    · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a>
+  </footer>
 </div>
 
-<script src="assets/data.js"></script>
-<script src="assets/app.js"></script>
-<script>renderNetwork("world-network", INITIATIVES);</script>
+<!-- ===== MODAL VISITEUR ===== -->
+<div class="lock-modal-overlay" id="lock-modal-overlay">
+  <div class="lock-modal" role="dialog" aria-modal="true" aria-labelledby="lock-modal-title">
+    <button class="lock-modal-close" id="lock-modal-close" aria-label="Fermer">✕</button>
+    <div class="lock-modal-icon">🔒</div>
+    <h2 id="lock-modal-title">Action réservée aux membres</h2>
+    <p id="lock-modal-msg">Pour commenter, réagir ou contacter un membre, créez votre compte gratuit en moins de 2 minutes.</p>
+    <div class="lock-modal-actions">
+      <a href="inscription.html" class="lock-modal-btn-join">🚀 Créer mon compte gratuit</a>
+      <a href="connexion.html" class="lock-modal-btn-login">J'ai déjà un compte — Me connecter</a>
+      <button class="lock-modal-dismiss" id="lock-modal-dismiss">Continuer en visiteur</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/data.js?v=5"></script>
+<script src="assets/app.js?v=5"></script>
+<script>
+/* ============================================================
+   HOMEPAGE — scripts inline
+   ============================================================ */
+
+/* --- 1. Carte monde animée (canvas) --- */
+(function() {
+  const canvas = document.getElementById('world-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  /* Projection Mercator sur viewport [-95°..60°lon, 72°..-42°lat] */
+  const VP = { lonMin: -95, lonMax: 60, latMax: 72, latMin: -42 };
+  function proj(lat, lon) {
+    const x = ((lon - VP.lonMin) / (VP.lonMax - VP.lonMin)) * canvas.width;
+    const y = ((VP.latMax - lat) / (VP.latMax - VP.latMin)) * canvas.height;
+    return [x, y];
+  }
+
+  const CITIES = [
+    /* Destinations Europe */
+    { lat:48.8, lon:2.3,   name:'Paris',       type:'dest', r:10 },
+    { lat:51.5, lon:-0.1,  name:'Londres',     type:'dest', r:9  },
+    { lat:50.8, lon:4.4,   name:'Bruxelles',   type:'dest', r:7  },
+    { lat:52.5, lon:13.4,  name:'Berlin',      type:'dest', r:6  },
+    { lat:46.2, lon:6.1,   name:'Genève',      type:'dest', r:6  },
+    { lat:41.9, lon:12.5,  name:'Rome',        type:'dest', r:6  },
+    { lat:40.4, lon:-3.7,  name:'Madrid',      type:'dest', r:7  },
+    /* Destinations Amériques */
+    { lat:40.7, lon:-74.0, name:'New York',    type:'dest', r:9  },
+    { lat:45.5, lon:-73.6, name:'Montréal',    type:'dest', r:7  },
+    { lat:43.7, lon:-79.4, name:'Toronto',     type:'dest', r:6  },
+    /* Origines Afrique */
+    { lat:5.3,  lon:-4.0,  name:'Abidjan',     type:'orig', r:7  },
+    { lat:14.7, lon:-17.4, name:'Dakar',       type:'orig', r:8  },
+    { lat:3.8,  lon:11.5,  name:'Douala',      type:'orig', r:6  },
+    { lat:12.6, lon:-8.0,  name:'Bamako',      type:'orig', r:6  },
+    { lat:-4.3, lon:15.3,  name:'Kinshasa',    type:'orig', r:7  },
+    { lat:33.6, lon:-7.6,  name:'Casablanca',  type:'orig', r:7  },
+    { lat:36.8, lon:10.2,  name:'Tunis',       type:'orig', r:6  },
+    { lat:6.4,  lon:2.4,   name:'Cotonou',     type:'orig', r:5  },
+    { lat:9.5,  lon:-13.7, name:'Conakry',     type:'orig', r:5  },
+    { lat:6.1,  lon:1.2,   name:'Lomé',        type:'orig', r:5  },
+    { lat:12.4, lon:-1.5,  name:'Ouagadougou', type:'orig', r:5  },
+    { lat:-1.3, lon:36.8,  name:'Nairobi',     type:'orig', r:6  },
+  ];
+  CITIES.forEach(c => { c.pos = proj(c.lat, c.lon); });
+
+  const CONNS = [
+    {f:10,t:0,c:'#4A90D9'},{f:11,t:0,c:'#4A90D9'},{f:11,t:6,c:'#7B61FF'},
+    {f:12,t:1,c:'#4A90D9'},{f:12,t:2,c:'#4ACFD9'},{f:13,t:0,c:'#4A90D9'},
+    {f:14,t:2,c:'#4ACFD9'},{f:15,t:0,c:'#4A90D9'},{f:15,t:6,c:'#7B61FF'},
+    {f:16,t:0,c:'#4A90D9'},{f:16,t:5,c:'#4ACFD9'},{f:17,t:0,c:'#4A90D9'},
+    {f:10,t:7,c:'#F59E0B'},{f:11,t:8,c:'#F59E0B'},{f:18,t:6,c:'#7B61FF'},
+    {f:20,t:0,c:'#4A90D9'},{f:14,t:7,c:'#F59E0B'},{f:21,t:1,c:'#4A90D9'},
+  ];
+  const arcProg = CONNS.map((_,i) => ({
+    p: i / CONNS.length,
+    spd: 0.0015 + (i % 5) * 0.0003,
+  }));
+
+  /* Grille de fond (points terre simplifiés) */
+  const BG_PTS = [
+    /* Amérique du Nord */
+    [16,26],[17,24],[18,26],[19,24],[20,25],[21,24],[22,25],[23,24],[22,27],[21,29],
+    [18,28],[17,30],[19,29],[20,31],[16,32],[17,34],[21,32],[23,30],
+    /* Amérique Centrale */
+    [25,35],[26,36],[27,35],[27,38],
+    /* Amérique du Sud */
+    [29,40],[30,39],[31,41],[30,43],[29,45],[31,47],[30,49],[31,51],[30,53],
+    [29,55],[30,57],[31,59],[30,61],[29,63],
+    /* Europe */
+    [47,19],[48,18],[49,19],[50,18],[51,20],[52,19],[53,18],[54,19],[55,18],
+    [48,21],[50,21],[52,22],[47,23],[49,23],[51,23],[53,23],[48,25],[50,25],
+    [52,25],[49,27],[51,27],[50,29],[52,28],[47,29],[48,27],
+    /* Scandinavie */
+    [50,15],[51,16],[52,15],[53,16],[54,15],[55,14],[54,17],[56,16],
+    /* Méditerranée */
+    [47,29],[49,28],[51,28],[53,27],[55,25],[56,27],
+    /* Afrique nord */
+    [46,31],[48,31],[50,31],[52,31],[54,31],[56,31],[58,31],
+    [46,33],[48,33],[50,33],[52,33],[54,33],[56,33],[58,33],
+    /* Afrique ouest */
+    [44,35],[45,37],[44,39],[45,41],[44,43],[45,45],[46,47],[45,49],[44,51],
+    [47,35],[48,37],[47,39],[48,41],[47,43],[48,45],[47,47],[48,49],[47,51],
+    [50,37],[51,39],[50,41],[51,43],[50,45],[51,47],[50,49],
+    /* Afrique est */
+    [53,37],[54,39],[53,41],[54,43],[53,45],[55,43],[56,45],[57,47],[56,49],[55,51],[54,53],
+    /* Afrique australe */
+    [51,53],[52,55],[51,57],[52,59],[51,61],[52,63],[51,65],
+    [53,55],[54,57],[53,59],[54,61],[53,63],[52,65],[51,67],
+    /* Moyen-Orient */
+    [57,25],[58,27],[59,29],[60,27],[61,25],[62,27],[63,29],[64,27],
+    [60,31],[61,29],[62,31],[63,33],[64,31],
+  ].map(([xPct,yPct]) => [xPct / 100 * canvas.width, yPct / 100 * canvas.height]);
+
+  function draw(ts) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    /* Fond dégradé */
+    const bg = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    bg.addColorStop(0, '#060e1a');
+    bg.addColorStop(1, '#0c2444');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    /* Grille lat/lon */
+    ctx.strokeStyle = 'rgba(74,144,217,0.05)';
+    ctx.lineWidth = 0.5;
+    for (let lat = VP.latMin; lat <= VP.latMax; lat += 15) {
+      const [, y] = proj(lat, VP.lonMin);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+    for (let lon = VP.lonMin; lon <= VP.lonMax; lon += 15) {
+      const [x] = proj(0, lon);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+
+    /* Points terrain (fond) */
+    ctx.fillStyle = 'rgba(74,144,217,0.2)';
+    BG_PTS.forEach(([x, y]) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    /* Connexions + dot animé */
+    CONNS.forEach((conn, i) => {
+      const from = CITIES[conn.f].pos;
+      const to   = CITIES[conn.t].pos;
+      const t    = arcProg[i].p;
+
+      const mx = (from[0] + to[0]) / 2;
+      const dy = Math.abs(to[0] - from[0]) * 0.35;
+      const my = Math.min(from[1], to[1]) - dy;
+
+      ctx.beginPath();
+      ctx.moveTo(from[0], from[1]);
+      ctx.quadraticCurveTo(mx, my, to[0], to[1]);
+      ctx.strokeStyle = conn.c + '28';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      /* Dot qui se déplace */
+      const bx = (1-t)*(1-t)*from[0] + 2*(1-t)*t*mx + t*t*to[0];
+      const by = (1-t)*(1-t)*from[1] + 2*(1-t)*t*my + t*t*to[1];
+      ctx.shadowColor = conn.c;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(bx, by, 2.8, 0, Math.PI * 2);
+      ctx.fillStyle = conn.c;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      arcProg[i].p = (arcProg[i].p + arcProg[i].spd) % 1;
+    });
+
+    /* Villes */
+    const now = Date.now();
+    CITIES.forEach((city, i) => {
+      const [x, y] = city.pos;
+      const pulse = 0.65 + 0.35 * Math.sin(now * 0.0018 + i * 0.8);
+
+      const isDest = city.type === 'dest';
+      const col = isDest ? '#4A90D9' : '#F59E0B';
+
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.arc(x, y, city.r * 0.5 * pulse, 0, Math.PI * 2);
+      ctx.fillStyle = col + (isDest ? 'cc' : 'dd');
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.beginPath();
+      ctx.arc(x, y, city.r * pulse, 0, Math.PI * 2);
+      ctx.strokeStyle = col + '55';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      if (city.r >= 7) {
+        ctx.font = '10px Inter, system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fillText(city.name, x + city.r + 4, y + 4);
+      }
+    });
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+/* --- 2. Compteur de visites (animation) --- */
+(async function() {
+  const el = document.getElementById('visit-count');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/visits');
+    if (!r.ok) throw new Error();
+    const { count } = await r.json();
+    animateCounter(el, count);
+  } catch {
+    el.innerHTML = '<span>—</span>';
+  }
+
+  function animateCounter(el, target) {
+    const start = Math.max(0, target - Math.min(500, Math.floor(target * 0.08)));
+    const dur = 1800;
+    const t0 = performance.now();
+    const fmt = n => new Intl.NumberFormat('fr-FR').format(Math.floor(n));
+    function step(now) {
+      const progress = Math.min((now - t0) / dur, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const val = start + (target - start) * ease;
+      el.innerHTML = fmt(val);
+      if (progress < 1) requestAnimationFrame(step);
+      else el.innerHTML = fmt(target);
+    }
+    requestAnimationFrame(step);
+  }
+})();
+
+/* --- 3. Stats depuis API --- */
+(async function() {
+  try {
+    const r = await fetch('/api/initiatives?limit=100');
+    if (r.ok) {
+      const data = await r.json();
+      const list = data.initiatives || data;
+      document.getElementById('stat-initiatives').textContent = list.length + '+';
+    }
+  } catch {}
+  try {
+    const r = await fetch('/api/stats');
+    if (r.ok) {
+      const d = await r.json();
+      if (d.membres) document.getElementById('stat-membres').textContent = d.membres + '+';
+    }
+  } catch {}
+})();
+
+/* --- 4. Initiatives vedettes (3 premières) --- */
+(async function() {
+  const grid = document.getElementById('hp-init-grid');
+  const BADGE = {
+    'Environnement':  {bg:'#2E7D52', lbl:'ENVIRONNEMENT'},
+    'Agriculture':    {bg:'#558B2F', lbl:'AGRICULTURE'},
+    'Education':      {bg:'#1565C0', lbl:'ÉDUCATION'},
+    'Sante':          {bg:'#00838F', lbl:'SANTÉ'},
+    'Action Sociale': {bg:'#AD1457', lbl:'SOCIAL'},
+    'Technologie':    {bg:'#4527A0', lbl:'INNOVATION'},
+    'Culture':        {bg:'#6A1B9A', lbl:'CULTURE'},
+    'Entrepreneuriat':{bg:'#E65100', lbl:'ENTREPRENEURIAT'},
+    'Finance':        {bg:'#1B5E20', lbl:'FINANCE'},
+    'Droit':          {bg:'#37474F', lbl:'DROIT'},
+  };
+  const PROG_LABEL = {locale:'Impact local',régionale:'Impact régional',nationale:'Impact national',internationale:'Impact mondial'};
+  const PROG_VAL   = {locale:20,régionale:45,nationale:65,internationale:92};
+  try {
+    const r = await fetch('/api/initiatives?limit=3');
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    const list = (data.initiatives || data).slice(0, 3);
+    if (!list.length) throw new Error();
+    grid.innerHTML = list.map(it => {
+      const badge = BADGE[it.domaine] || {bg:'#1B3A6B', lbl:'INITIATIVE'};
+      const seed  = encodeURIComponent(it.slug || it.nom || 'init');
+      const photo = `https://picsum.photos/seed/${seed}/400/240`;
+      const loc   = [it.ville, it.pays].filter(Boolean).join(', ') || '—';
+      const ray   = it.rayonnement || 'locale';
+      const pct   = PROG_VAL[ray] || 30;
+      const plbl  = PROG_LABEL[ray] || 'Impact';
+      return `
+      <a class="hp-init-card" href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}">
+        <div class="hp-init-photo">
+          <img src="${photo}" alt="${it.nom}" loading="lazy" onerror="this.src='https://picsum.photos/seed/${it.id||Math.random()}/400/240'">
+          <span class="hp-init-badge" style="background:${badge.bg};">${badge.lbl}</span>
+        </div>
+        <div class="hp-init-body">
+          <div class="hp-init-title">${it.nom}</div>
+          <p class="hp-init-desc">${it.description || it.mission || 'Initiative de la diaspora engagée pour le développement.'}</p>
+          <div class="hp-init-progress">
+            <div class="hp-init-progress-label">
+              <span>${plbl}</span><span>${pct}%</span>
+            </div>
+            <div class="hp-init-progress-bar">
+              <div class="hp-init-progress-fill" style="width:${pct}%"></div>
+            </div>
+          </div>
+          <div class="hp-init-meta">
+            <span>📍 ${loc}</span>
+            <a href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}" class="hp-discover-btn">Découvrir →</a>
+          </div>
+        </div>
+      </a>`;
+    }).join('');
+  } catch {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Impossible de charger les initiatives.</div>';
+  }
+})();
+
+/* --- 5. Aperçu annuaire (6 mini-cartes) --- */
+(async function() {
+  const preview = document.getElementById('hp-ann-preview');
+  try {
+    const r = await fetch('/api/initiatives?limit=6');
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    const list = (data.initiatives || data).slice(0, 6);
+    preview.innerHTML = list.map(it => {
+      const seed = encodeURIComponent(it.slug || it.nom || 'init');
+      return `
+      <a class="hp-ann-mini" href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}">
+        <img src="https://picsum.photos/seed/${seed}/80/80" alt="${it.nom}" loading="lazy" onerror="this.style.display='none'">
+        <div>
+          <div class="hp-ann-mini-name">${it.nom}</div>
+          <div class="hp-ann-mini-loc">📍 ${it.pays || '—'}</div>
+        </div>
+      </a>`;
+    }).join('');
+  } catch {}
+})();
+
+/* Bouton recherche rapide annuaire */
+document.getElementById('hp-search-btn')?.addEventListener('click', () => {
+  const q = encodeURIComponent(document.getElementById('hp-q')?.value || '');
+  const d = encodeURIComponent(document.getElementById('hp-domaine')?.value || '');
+  window.location.href = `annuaire.html?q=${q}&domaine=${d}`;
+});
+document.getElementById('hp-q')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('hp-search-btn')?.click();
+});
+
+/* --- 6. Fil d'actualité (aperçu lecture seule) --- */
+(async function() {
+  const grid = document.getElementById('hp-feed-grid');
+  const TYPE_ICON = { publication:'📝', evenement:'📅', actualite:'📰', opportunite:'💼' };
+  try {
+    const r = await fetch('/api/fil?limit=4');
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    const posts = (data.posts || data).slice(0, 4);
+    if (!posts.length) throw new Error();
+    const html = posts.map(p => {
+      const icon = TYPE_ICON[p.type] || '📝';
+      const seed = encodeURIComponent(p.auteur_nom || 'anon');
+      const ts   = p.created_at ? new Date(p.created_at).toLocaleDateString('fr-FR', {day:'numeric',month:'short'}) : '';
+      return `
+      <div class="hp-feed-post">
+        <div class="hp-feed-post-header">
+          <img class="hp-feed-avatar" src="https://api.dicebear.com/7.x/lorelei/svg?seed=${seed}&backgroundColor=b6e3f4,ffd5dc,d1f4e0" alt="${p.auteur_nom||'Membre'}">
+          <div>
+            <div class="hp-feed-author">${p.auteur_nom || 'Membre Diaspo'Actif'}</div>
+            <div class="hp-feed-time">${icon} ${ts}</div>
+          </div>
+        </div>
+        <p class="hp-feed-content">${p.contenu || ''}</p>
+        <div class="hp-feed-actions">
+          <button class="hp-feed-action-btn locked" data-lock-msg="Pour réagir aux publications, créez votre compte gratuit.">
+            👍 J'aime <span class="hp-feed-lock-icon">🔒</span>
+          </button>
+          <button class="hp-feed-action-btn locked" data-lock-msg="Pour commenter, créez votre compte gratuit.">
+            💬 Commenter <span class="hp-feed-lock-icon">🔒</span>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+    grid.innerHTML = html + `
+    <div class="hp-feed-cta">
+      <div class="hp-feed-cta-text">
+        <h3>Rejoignez la conversation</h3>
+        <p>Publiez, réagissez, commentez et contactez les membres de la communauté.</p>
+      </div>
+      <a href="inscription.html" class="hp-feed-cta-btn">🚀 Créer mon compte</a>
+    </div>`;
+  } catch {
+    grid.innerHTML = `<div class="hp-feed-cta" style="grid-column:1/-1;">
+      <div class="hp-feed-cta-text">
+        <h3>Rejoignez le fil d'actualité</h3>
+        <p>Publiez, réagissez et échangez avec toute la communauté diaspora.</p>
+      </div>
+      <a href="inscription.html" class="hp-feed-cta-btn">🚀 S'inscrire gratuitement</a>
+    </div>`;
+  }
+})();
+
+/* --- 7. Modal actions verrouillées --- */
+(function() {
+  const overlay = document.getElementById('lock-modal-overlay');
+  const msgEl   = document.getElementById('lock-modal-msg');
+  const closeModal = () => overlay.classList.remove('active');
+
+  document.getElementById('lock-modal-close')?.addEventListener('click', closeModal);
+  document.getElementById('lock-modal-dismiss')?.addEventListener('click', closeModal);
+  overlay?.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-lock-msg]');
+    if (btn) {
+      e.preventDefault();
+      const msg = btn.dataset.lockMsg;
+      if (msgEl) msgEl.textContent = msg;
+      overlay?.classList.add('active');
+    }
+  });
+})();
+</script>
 </body>
 </html>
