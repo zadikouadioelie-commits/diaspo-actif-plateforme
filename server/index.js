@@ -1474,52 +1474,48 @@ function serveStatic(req, res, pathname) {
 /* ================================================================
    HANDLER PRINCIPAL (utilisé en local ET en Vercel serverless)
    ================================================================ */
-async function handleRequest(req, res) {
-  const parsed = url.parse(req.url, true);
-  const pathname = decodeURIComponent(parsed.pathname);
+/* ===== MODULE INSTITUTIONS & OBSERVATOIRE ===== */
 
-  /* ===== MODULE INSTITUTIONS & OBSERVATOIRE ===== */
+/* Helper : accréditation active d'une institution */
+function getAccred(institutionId) {
+  return db.prepare("SELECT * FROM accreditations_observatoire WHERE institution_id=? AND statut='actif'").get(institutionId) || null;
+}
 
-  /* Helper : accréditation active d'une institution */
-  function getAccred(institutionId) {
-    return db.prepare("SELECT * FROM accreditations_observatoire WHERE institution_id=? AND statut='actif'").get(institutionId) || null;
+/* Helper : construit la clause WHERE pour filtrer users selon le périmètre de l'accréditation */
+function buildObsWhere(accred, tableAlias = "u") {
+  const nats = safeParse(accred.nationalites_autorisees);
+  const terrs = safeParse(accred.territoires_autorises);
+  const conds = [];
+  const params = [];
+
+  if (nats.length > 0) {
+    const ph = nats.map(() => "?").join(",");
+    conds.push(`(${tableAlias}.nationalite1 IN (${ph}) OR ${tableAlias}.nationalite2 IN (${ph}) OR ${tableAlias}.nationalite3 IN (${ph}))`);
+    params.push(...nats, ...nats, ...nats);
   }
-
-  /* Helper : construit la clause WHERE pour filtrer users selon le périmètre de l'accréditation */
-  function buildObsWhere(accred, tableAlias = "u") {
-    const nats = safeParse(accred.nationalites_autorisees);
-    const terrs = safeParse(accred.territoires_autorises);
-    const conds = [];
-    const params = [];
-
-    if (nats.length > 0) {
-      const ph = nats.map(() => "?").join(",");
-      conds.push(`(${tableAlias}.nationalite1 IN (${ph}) OR ${tableAlias}.nationalite2 IN (${ph}) OR ${tableAlias}.nationalite3 IN (${ph}))`);
-      params.push(...nats, ...nats, ...nats);
-    }
-    if (terrs.length > 0) {
-      const terrConds = terrs.map(t => {
-        if (t.ville) { params.push(t.pays, t.region, t.ville); return `(${tableAlias}.pays=? AND ${tableAlias}.region=? AND ${tableAlias}.ville=?)`; }
-        if (t.region) { params.push(t.pays, t.region); return `(${tableAlias}.pays=? AND ${tableAlias}.region=?)`; }
-        params.push(t.pays); return `(${tableAlias}.pays=?)`;
-      });
-      conds.push(`(${terrConds.join(" OR ")})`);
-    }
-    const where = conds.length ? "AND " + conds.join(" AND ") : "";
-    return { where, params };
+  if (terrs.length > 0) {
+    const terrConds = terrs.map(t => {
+      if (t.ville) { params.push(t.pays, t.region, t.ville); return `(${tableAlias}.pays=? AND ${tableAlias}.region=? AND ${tableAlias}.ville=?)`; }
+      if (t.region) { params.push(t.pays, t.region); return `(${tableAlias}.pays=? AND ${tableAlias}.region=?)`; }
+      params.push(t.pays); return `(${tableAlias}.pays=?)`;
+    });
+    conds.push(`(${terrConds.join(" OR ")})`);
   }
+  const where = conds.length ? "AND " + conds.join(" AND ") : "";
+  return { where, params };
+}
 
-  /* Helper : historique accréditation */
-  function histoAccred(accredId, action, admin, details) {
-    db.prepare("INSERT INTO accreditations_historique (accreditation_id,action,admin_id,admin_nom,details) VALUES (?,?,?,?,?)")
-      .run(accredId, action, admin.id, admin.nom, details || null);
-    db.prepare("UPDATE accreditations_observatoire SET updated_at=datetime('now') WHERE id=?").run(accredId);
-  }
+/* Helper : historique accréditation */
+function histoAccred(accredId, action, admin, details) {
+  db.prepare("INSERT INTO accreditations_historique (accreditation_id,action,admin_id,admin_nom,details) VALUES (?,?,?,?,?)")
+    .run(accredId, action, admin.id, admin.nom, details || null);
+  db.prepare("UPDATE accreditations_observatoire SET updated_at=datetime('now') WHERE id=?").run(accredId);
+}
 
-  /* ===========================
-     ADMIN — Accréditations Observatoire
-  =========================== */
-  route("GET", "/api/admin/accreditations", async (req, res) => {
+/* ===========================
+   ADMIN — Accréditations Observatoire
+=========================== */
+route("GET", "/api/admin/accreditations", async (req, res) => {
     const user = getCurrentUser(req);
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
     const rows = db.prepare(`
@@ -1826,6 +1822,10 @@ async function handleRequest(req, res) {
     db.prepare("UPDATE consultations SET statut='cloturee' WHERE id=?").run(params.id);
     sendJSON(res, 200, { ok: true });
   });
+
+async function handleRequest(req, res) {
+  const parsed = url.parse(req.url, true);
+  const pathname = decodeURIComponent(parsed.pathname);
 
   if (pathname.startsWith("/api/")) {
     for (const r of routes) {
