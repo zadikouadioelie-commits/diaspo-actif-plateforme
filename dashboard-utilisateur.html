@@ -41,20 +41,20 @@
       <a href="confidentialite.html">🔐 Confidentialité</a>
     </aside>
     <main class="content">
-      <h1>Tableau de bord de Jean</h1>
+      <h1 id="dash-title">Tableau de bord</h1>
       <div class="notice">Compte Utilisateur — créez votre profil, publiez, réagissez, rejoignez des initiatives et développez votre réseau, gratuitement.</div>
 
       <div class="card" id="localisation" style="margin-bottom:20px;">
         <div class="flex-between"><h3 style="margin:0;">Ma localisation</h3><span class="conf-tag conf-public">🌍 Ville publique (optionnel) · <a href="confidentialite.html" style="color:inherit;">détails</a></span></div>
         <div id="dv-localisation"></div>
-        <button class="btn btn-outline btn-sm" style="margin-top:8px;">Modifier ma localisation</button>
+        <button id="btn-edit-loc" class="btn btn-outline btn-sm" style="margin-top:8px;">Modifier ma localisation</button>
       </div>
 
       <div class="card" id="nationalites" style="margin-bottom:20px;">
         <div class="flex-between"><h3 style="margin:0;">Mes nationalités déclarées</h3><span class="conf-tag conf-confidentiel">🔐 Confidentiel · <a href="confidentialite.html" style="color:inherit;">détails</a></span></div>
         <p style="margin-bottom:12px;">Jusqu'à deux nationalités peuvent être déclarées. Chaque nationalité est soumise à vérification via un justificatif (CNI, passeport ou certificat de nationalité).</p>
         <div id="dv-nationalites"></div>
-        <button class="btn btn-outline btn-sm" style="margin-top:8px;">+ Ajouter un justificatif</button>
+        <button id="btn-add-nat" class="btn btn-outline btn-sm" style="margin-top:8px;">+ Ajouter un justificatif</button>
       </div>
 
       <div class="card" id="financements" style="margin-bottom:20px;">

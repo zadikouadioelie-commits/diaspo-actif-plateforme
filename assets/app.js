@@ -414,41 +414,117 @@ function ouvrirMessagerie(userId) {
 }
 
 /* ---------- Tableau de bord utilisateur ---------- */
+function _renderLoc(el, l){
+  if(!el) return;
+  el.innerHTML = `
+    <div class="tags" style="margin-bottom:10px;">
+      <span class="tag">📍 Pays : ${l.pays||'—'}</span>
+      <span class="tag">📍 Région : ${l.region||'—'}</span>
+      <span class="tag">📍 Ville : ${l.ville||'—'}</span>
+      <span class="tag">📍 Code postal : ${l.code_postal||'—'}</span>
+    </div>
+    <p style="color:var(--muted);font-size:12.5px;">🔒 Confidentialité : ${l.visibilite||'Non définie'}. Vous contrôlez la visibilité dans vos paramètres.</p>`;
+}
+function _renderNats(el, nats){
+  if(!el) return;
+  if(!nats||!nats.length){ el.innerHTML='<p style="color:var(--muted);font-size:13px;">Aucune nationalité déclarée.</p>'; return; }
+  el.innerHTML = nats.map(n=>`
+    <div class="nat-card">
+      <div class="nat-flag">🌍</div>
+      <div class="meta"><h4>${n.pays}</h4><p>Justificatif : ${n.document}</p></div>
+      <span class="statut-pill ${n.statut&&n.statut.includes('Vérifiée')?'statut-verifiee':'statut-attente'}">${n.statut}</span>
+    </div>`).join("");
+}
 async function initDashboardUtilisateur(){
-  const rl = document.getElementById("dv-recherches");
-  if(rl && typeof RECHERCHES !== "undefined"){
-    rl.innerHTML = RECHERCHES.map(r=>`
-      <div class="flex-between" style="padding:12px 0;border-bottom:1px solid var(--border);">
-        <span>🔍 Recherche : ${r.requete}</span>
-        <span style="color:var(--muted);font-size:12.5px;">${r.date}</span>
-      </div>`).join("");
-  }
-  const nat = document.getElementById("dv-nationalites");
-  if(nat && typeof UTILISATEUR_PROFIL !== "undefined"){
-    nat.innerHTML = UTILISATEUR_PROFIL.nationalites.map(n=>`
-      <div class="nat-card">
-        <div class="nat-flag">🌍</div>
-        <div class="meta">
-          <h4>${n.pays}</h4>
-          <p>Justificatif fourni : ${n.document}</p>
-        </div>
-        <span class="statut-pill ${n.statut.includes('Vérifiée') ? 'statut-verifiee' : 'statut-attente'}">${n.statut}</span>
-      </div>`).join("");
-  }
-  const loc = document.getElementById("dv-localisation");
-  if(loc && typeof UTILISATEUR_PROFIL !== "undefined"){
-    const l = UTILISATEUR_PROFIL.localisation;
-    loc.innerHTML = `
-      <div class="tags" style="margin-bottom:10px;">
-        <span class="tag">📍 Pays : ${l.pays}</span>
-        <span class="tag">📍 Région : ${l.region}</span>
-        <span class="tag">📍 Ville : ${l.ville}</span>
-        <span class="tag">📍 Code postal : ${l.code_postal}</span>
+  /* — Chargement des données réelles via l'API — */
+  let locData = (typeof UTILISATEUR_PROFIL!=="undefined") ? UTILISATEUR_PROFIL.localisation : {};
+  let natsData = (typeof UTILISATEUR_PROFIL!=="undefined") ? UTILISATEUR_PROFIL.nationalites : [];
+  try {
+    const me = await fetchCurrentUser();
+    if(me){
+      const titleEl = document.getElementById("dash-title");
+      if(titleEl) titleEl.textContent = `Tableau de bord de ${me.nom}`;
+      const profilR = await api("GET", `/profil/${me.id}`);
+      if(profilR.profil?.profil?.localisation) locData = profilR.profil.profil.localisation;
+      if(profilR.profil?.profil?.nationalites) natsData = profilR.profil.profil.nationalites;
+    }
+  } catch(e){}
+
+  /* — Localisation — */
+  const locEl = document.getElementById("dv-localisation");
+  _renderLoc(locEl, locData);
+  const btnLoc = document.getElementById("btn-edit-loc");
+  if(btnLoc){
+    btnLoc.onclick = ()=>{
+      if(btnLoc.dataset.open==="1"){ _renderLoc(locEl, locData); btnLoc.textContent="Modifier ma localisation"; btnLoc.dataset.open=""; return; }
+      btnLoc.dataset.open="1"; btnLoc.textContent="✕ Fermer";
+      const inp = (id,label,val,ph)=>`<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">${label}</label><input id="${id}" type="text" value="${val||''}" placeholder="${ph}" style="width:100%;height:36px;border:1px solid var(--border);border-radius:6px;padding:0 10px;font-family:inherit;font-size:13px;box-sizing:border-box;"></div>`;
+      locEl.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+        ${inp("loc-ville","Ville",locData.ville,"Toulouse")}
+        ${inp("loc-region","Région",locData.region,"Occitanie")}
+        ${inp("loc-pays","Pays",locData.pays,"France")}
+        ${inp("loc-cp","Code postal",locData.code_postal,"31000")}
       </div>
-      <p style="color:var(--muted);font-size:12.5px;">🔒 Confidentialité : ${l.visibilite}. Vous contrôlez la visibilité de votre localisation dans vos paramètres.</p>`;
+      <div style="margin-top:10px;"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Visibilité</label>
+        <select id="loc-vis" style="width:100%;height:36px;border:1px solid var(--border);border-radius:6px;padding:0 10px;font-family:inherit;font-size:13px;">
+          <option ${(locData.visibilite||"").includes("institutions")?"selected":""}>Visible par les institutions et les initiatives suivies</option>
+          <option ${(locData.visibilite||"").includes("Publi")?"selected":""}>Publique</option>
+          <option ${(locData.visibilite||"").includes("Privée")?"selected":""}>Privée (uniquement moi)</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button id="loc-save" class="btn btn-sm" style="background:var(--orange);color:#fff;">Enregistrer</button>
+        <button id="loc-cancel" class="btn btn-outline btn-sm">Annuler</button>
+      </div>
+      <p id="loc-msg" style="display:none;margin-top:8px;font-size:13px;"></p>`;
+      document.getElementById("loc-save").onclick=async()=>{
+        const msg=document.getElementById("loc-msg");
+        const nl={ville:document.getElementById("loc-ville").value.trim(),region:document.getElementById("loc-region").value.trim(),pays:document.getElementById("loc-pays").value.trim(),code_postal:document.getElementById("loc-cp").value.trim(),visibilite:document.getElementById("loc-vis").value};
+        try{ await api("PUT","/profil",{ville:nl.ville,pays:nl.pays,profil:{localisation:nl}}); Object.assign(locData,nl); _renderLoc(locEl,locData); btnLoc.textContent="Modifier ma localisation"; btnLoc.dataset.open=""; }
+        catch(e){ msg.style.cssText="display:block;color:red;"; msg.textContent="Erreur lors de la sauvegarde."; }
+      };
+      document.getElementById("loc-cancel").onclick=()=>{ _renderLoc(locEl,locData); btnLoc.textContent="Modifier ma localisation"; btnLoc.dataset.open=""; };
+    };
   }
+
+  /* — Nationalités — */
+  const natEl = document.getElementById("dv-nationalites");
+  _renderNats(natEl, natsData);
+  const btnNat = document.getElementById("btn-add-nat");
+  if(btnNat){
+    btnNat.onclick=()=>{
+      const existing=document.getElementById("nat-form-inline");
+      if(existing){ existing.remove(); btnNat.textContent="+ Ajouter un justificatif"; return; }
+      btnNat.textContent="✕ Fermer";
+      const form=document.createElement("div"); form.id="nat-form-inline";
+      form.style.cssText="margin-top:12px;padding:14px;background:#f8faff;border:1px solid var(--border);border-radius:8px;";
+      form.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Pays de nationalité</label><input id="nat-pays" type="text" placeholder="ex : Sénégal" style="width:100%;height:36px;border:1px solid var(--border);border-radius:6px;padding:0 10px;font-family:inherit;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Type de justificatif</label>
+          <select id="nat-doc" style="width:100%;height:36px;border:1px solid var(--border);border-radius:6px;padding:0 10px;font-family:inherit;font-size:13px;">
+            <option>Carte Nationale d'Identité</option><option>Passeport</option><option>Certificat de nationalité</option>
+          </select></div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">📎 Déclaration simulée — en production un justificatif numérique serait requis.</p>
+      <div style="display:flex;gap:8px;"><button id="nat-save" class="btn btn-sm" style="background:var(--orange);color:#fff;">Déclarer</button><button id="nat-cancel" class="btn btn-outline btn-sm">Annuler</button></div>
+      <p id="nat-msg" style="display:none;margin-top:8px;font-size:13px;"></p>`;
+      btnNat.after(form);
+      document.getElementById("nat-save").onclick=async()=>{
+        const pays=document.getElementById("nat-pays").value.trim();
+        const msg=document.getElementById("nat-msg");
+        if(!pays){ msg.style.cssText="display:block;color:red;"; msg.textContent="Veuillez saisir un pays."; return; }
+        const newNat={pays,document:document.getElementById("nat-doc").value,statut:"En attente de vérification"};
+        const updated=[...natsData,newNat];
+        try{ await api("PUT","/profil",{profil:{nationalites:updated}}); natsData.push(newNat); _renderNats(natEl,natsData); form.remove(); btnNat.textContent="+ Ajouter un justificatif"; }
+        catch(e){ msg.style.cssText="display:block;color:red;"; msg.textContent="Erreur lors de la sauvegarde."; }
+      };
+      document.getElementById("nat-cancel").onclick=()=>{ form.remove(); btnNat.textContent="+ Ajouter un justificatif"; };
+    };
+  }
+
+  /* — Financements (données démo) — */
   const fin = document.getElementById("dv-financements");
-  if(fin && typeof MES_FINANCEMENTS !== "undefined"){
+  if(fin && typeof MES_FINANCEMENTS!=="undefined"){
     fin.innerHTML = MES_FINANCEMENTS.map(f=>`
       <div class="flex-between" style="padding:10px 0;border-bottom:1px solid var(--border);">
         <span>💚 ${f.campagne}</span>
@@ -456,8 +532,10 @@ async function initDashboardUtilisateur(){
         <span style="color:var(--muted);font-size:12px;">${f.date}</span>
       </div>`).join("");
   }
+
+  /* — Collaborations (données démo) — */
   const collab = document.getElementById("dv-collaborations");
-  if(collab && typeof MES_COLLABORATIONS !== "undefined"){
+  if(collab && typeof MES_COLLABORATIONS!=="undefined"){
     collab.innerHTML = MES_COLLABORATIONS.map(c=>`
       <div class="init-card" style="margin-bottom:10px;">
         <div class="init-logo">${initials(c.titre)}</div>
@@ -466,6 +544,17 @@ async function initDashboardUtilisateur(){
       </div>`).join("");
   }
 
+  /* — Recherches (données démo) — */
+  const rl = document.getElementById("dv-recherches");
+  if(rl && typeof RECHERCHES!=="undefined"){
+    rl.innerHTML = RECHERCHES.map(r=>`
+      <div class="flex-between" style="padding:12px 0;border-bottom:1px solid var(--border);">
+        <span>🔍 Recherche : ${r.requete}</span>
+        <span style="color:var(--muted);font-size:12.5px;">${r.date}</span>
+      </div>`).join("");
+  }
+
+  /* — Conversations (API) — */
   const cv = document.getElementById("dv-conversations");
   if(cv){
     try {
@@ -480,7 +569,7 @@ async function initDashboardUtilisateur(){
             <div class="meta"><h4>${c.avec_nom || "Utilisateur"}</h4><p>${c.derniere || "Nouvelle conversation"}</p></div>
           </a>`).join("") : `<div class="empty">Aucune conversation pour le moment.</div>`;
       }
-    } catch (e) { /* serveur indisponible : section laissée vide */ }
+    } catch(e){ /* serveur indisponible */ }
   }
 }
 
