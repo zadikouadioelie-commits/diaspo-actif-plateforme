@@ -1136,15 +1136,19 @@ async function initFilActualite(){
   let me = null;
 
   // --- CHARGEMENT INITIAL ---
+  let filMeta = { suivis_users: [], suivis_initiatives: [] };
   try {
-    [{ posts }, me] = await Promise.all([
-      api("GET","/fil"),
-      fetchCurrentUser().catch(()=>null)
+    [{ posts }, me, filMeta] = await Promise.all([
+      api("GET","/fil?mode=tous"),
+      fetchCurrentUser().catch(()=>null),
+      api("GET","/fil/meta").catch(()=>({ suivis_users:[], suivis_initiatives:[] }))
     ]);
   } catch(e) {
     el.innerHTML = `<div class="empty">Impossible de contacter le serveur.</div>`;
     return;
   }
+  let suivis_users = new Set(filMeta.suivis_users||[]);
+  let suivis_initiatives = new Set(filMeta.suivis_initiatives||[]);
 
   // ============================================================
   // COMPOSITEUR RICHE
@@ -1310,6 +1314,26 @@ async function initFilActualite(){
 .share-wa { background:#25D366; color:#fff; }
 .share-li { background:#0077B5; color:#fff; }
 .share-tw { background:#1DA1F2; color:#fff; }
+/* Badges source */
+.fp-source-badge { font-size:10.5px; font-weight:700; border-radius:20px; padding:2px 8px; display:inline-flex; align-items:center; gap:3px; }
+.fp-src-suivi   { background:#EEF2FF; color:#4338CA; }
+.fp-src-pop     { background:#FEF3C7; color:#D97706; }
+.fp-src-art     { background:#F0FDF4; color:#059669; }
+.fp-author-banner { position:relative; }
+.fp-author-banner .fp-source-badge { position:absolute; top:8px; right:12px; }
+/* Bouton Suivre */
+.fp-follow-btn {
+  font-size:12px; font-weight:700; padding:4px 12px; border-radius:99px; cursor:pointer;
+  border:1.5px solid #4338CA; background:transparent; color:#4338CA; transition:all .18s;
+  white-space:nowrap;
+}
+.fp-follow-btn:hover { background:#4338CA; color:#fff; }
+.fp-follow-btn.following { background:#F3F4F6; border-color:#D1D5DB; color:#6B7280; }
+.fp-follow-btn.following:hover { background:#FEE2E2; border-color:#EF4444; color:#EF4444; }
+.fp-head-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
+.fp-repost-header { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+/* Conseil fil vide */
+.fil-conseil { background:#EEF2FF; border-radius:12px; padding:20px 24px; font-size:14px; color:#4338CA; text-align:center; margin:16px 0; }
 /* Repost */
 .fp-repost { border-left:3px solid #4338CA; }
 .fp-repost-header { padding:10px 16px 4px; font-size:13px; color:#6B7280; display:flex; align-items:center; gap:8px; }
@@ -1632,7 +1656,20 @@ async function initFilActualite(){
     return { mediaHtml, bodyHtml };
   }
 
-  function renderPost(p){
+  function sourceBadge(source){
+    if(source==="suivi")     return `<span class="fp-source-badge fp-src-suivi">👥 Suivi</span>`;
+    if(source==="populaire") return `<span class="fp-source-badge fp-src-pop">🔥 Populaire</span>`;
+    if(source==="article")   return `<span class="fp-source-badge fp-src-art">📰 À la une</span>`;
+    return "";
+  }
+
+  function followBtn(auteurId, opts){
+    if(!opts?.me || auteurId === opts?.me?.id || !auteurId) return "";
+    const isSuivi = opts?.suivis_users?.has(auteurId);
+    return `<button class="fp-follow-btn${isSuivi?" following":""}" data-user-id="${auteurId}">${isSuivi?"✓ Suivi":"+ Suivre"}</button>`;
+  }
+
+  function renderPost(p, opts){
     const isRepost = (p.pub_type === "repost" || p.type === "repost");
 
     // --- Repost : affichage dédié ---
@@ -1649,7 +1686,9 @@ async function initFilActualite(){
 
       return `<div class="feed-post fp-repost" id="fp-${p.id}">
         <div class="fp-repost-header">
+          ${sourceBadge(p.source)}
           ${av} <strong>${escH(nom)}</strong> a republié · <span class="fp-date">${fmtDate(p.created_at)}</span>
+          ${followBtn(p.auteur_id, opts)}
         </div>
         ${p.repost_commentaire ? `<div class="fp-repost-comment">${escH(p.repost_commentaire)}</div>` : ""}
         <div class="fp-repost-card">
@@ -1693,6 +1732,7 @@ async function initFilActualite(){
     return `<div class="feed-post" id="fp-${p.id}">
       <div class="fp-author-banner" style="background:${banner};">
         <span class="fp-type-badge">${typeIcon} ${typeLabel}</span>
+        ${sourceBadge(p.source)}
       </div>
       <div class="fp-head">
         <a href="profil.html?id=${p.auteur_id||''}" class="fp-av-link">${avHtml}</a>
@@ -1701,7 +1741,10 @@ async function initFilActualite(){
           ${titreHtml}
           <div class="fp-sub-row">${locHtml}${origHtml}<span class="fp-date">🕐 ${fmtDate(p.created_at)}</span></div>
         </div>
-        <span class="fp-cat">${escH(p.categorie||"")}</span>
+        <div class="fp-head-right">
+          <span class="fp-cat">${escH(p.categorie||"")}</span>
+          ${followBtn(p.auteur_id, opts)}
+        </div>
       </div>
       ${bioHtml ? `<div class="fp-author-bio">${bioHtml}</div>` : ""}
       ${mediaHtml ? `<div>${mediaHtml}</div>` : ""}
@@ -1795,31 +1838,54 @@ async function initFilActualite(){
     </div>`;
   }
 
-  function render(filterType){
-    currentFilter = filterType||"Tous";
-    const items = currentFilter!=="Tous" ? posts.filter(p=>{
-      const t = (p.pub_type||p.type||"").toLowerCase();
-      const filterMap = { "utilisateur":"texte","association":"article","entreprise":"photo","institution":"video" };
-      return t === (filterMap[currentFilter.toLowerCase()]||currentFilter.toLowerCase());
-    }) : posts;
+  // Modes du fil → boutons filtres
+  const MODE_MAP = {
+    "Tous":       "tous",
+    "Suivis":     "suivis",
+    "Populaires": "populaires",
+    "Articles":   "articles",
+    "Texte":      "texte",
+    "Photos":     "photos",
+    "Vidéos":     "videos",
+  };
 
-    if(!items.length){
-      el.innerHTML = `<div class="empty">Aucune publication pour ce filtre.</div>`;
-    } else {
-      // Injecter le widget profils après le 3e post (ou à la fin si moins de 3)
-      const INSERT_AT = 3;
-      let html = "";
-      items.forEach((p, i) => {
-        html += renderPost(p);
-        if(i === INSERT_AT - 1) html += `<div id="profiles-widget-slot"></div>`;
-      });
-      if(items.length < INSERT_AT) html += `<div id="profiles-widget-slot"></div>`;
-      el.innerHTML = html;
+  async function loadMode(mode){
+    el.innerHTML = `<div class="empty" style="padding:32px;text-align:center;">Chargement…</div>`;
+    try {
+      // Modes filtrés côté serveur
+      if(["suivis","populaires","articles"].includes(mode)){
+        const data = await api("GET", `/fil?mode=${mode}`);
+        posts = data.posts || [];
+        if(data.conseil){
+          el.innerHTML = `<div class="fil-conseil">${escH(data.conseil)}</div>`;
+          return;
+        }
+      } else if(mode !== "tous"){
+        // Filtres locaux sur les posts déjà chargés (texte/photos/videos)
+        const typeMap = { texte:"texte", photos:"photo", videos:"video" };
+        const t = typeMap[mode]||mode;
+        posts = posts.filter(p => (p.pub_type||p.type||"").toLowerCase() === t);
+      }
+      render();
+    } catch(e){
+      el.innerHTML = `<div class="empty">Erreur de chargement.</div>`;
     }
+  }
 
-    // Les boutons J'aime utilisent toggleLike() global (onclick inline)
+  function render(){
+    if(!posts.length){
+      el.innerHTML = `<div class="empty">Aucune publication pour ce fil.</div>`;
+      return;
+    }
+    const INSERT_AT = 3;
+    let html = "";
+    posts.forEach((p, i) => {
+      html += renderPost(p, { suivis_users, me });
+      if(i === INSERT_AT - 1) html += `<div id="profiles-widget-slot"></div>`;
+    });
+    if(posts.length < INSERT_AT) html += `<div id="profiles-widget-slot"></div>`;
+    el.innerHTML = html;
 
-    // Remplir le slot widget profils (async)
     const slot = document.getElementById("profiles-widget-slot");
     if(slot) buildProfilesWidget().then(html => { slot.outerHTML = html; });
   }
@@ -1827,15 +1893,53 @@ async function initFilActualite(){
   const bar = document.getElementById("feed-filter-bar");
   if(bar){
     bar.querySelectorAll("button").forEach(b=>{
-      b.addEventListener("click",()=>{
+      b.addEventListener("click", async ()=>{
         bar.querySelectorAll("button").forEach(x=>x.classList.remove("active"));
         b.classList.add("active");
-        render(b.dataset.type);
+        const mode = MODE_MAP[b.dataset.type] || b.dataset.type || "tous";
+        currentFilter = mode;
+        // Recharger depuis serveur si nécessaire
+        if(["suivis","populaires","articles"].includes(mode)){
+          await loadMode(mode);
+        } else if(mode === "tous"){
+          const data = await api("GET", "/fil?mode=tous").catch(()=>({ posts:[] }));
+          posts = data.posts || [];
+          render();
+        } else {
+          // filtre local sur pub_type
+          const typeMap = { texte:"texte", photos:"photo", videos:"video" };
+          const t = typeMap[mode]||mode;
+          const data = await api("GET", "/fil?mode=tous").catch(()=>({ posts:[] }));
+          posts = (data.posts||[]).filter(p => (p.pub_type||p.type||"").toLowerCase() === t);
+          render();
+        }
       });
     });
   }
 
-  render("Tous");
+  // Bouton Suivre/Ne plus suivre sur les posts (délégation d'événement)
+  el.addEventListener("click", async e => {
+    const btn = e.target.closest(".fp-follow-btn");
+    if(!btn) return;
+    if(!me){ alert("Connectez-vous pour suivre."); return; }
+    const userId = Number(btn.dataset.userId);
+    const isFollowing = suivis_users.has(userId);
+    try {
+      if(isFollowing){
+        await api("DELETE", `/follow/${userId}`);
+        suivis_users.delete(userId);
+        btn.textContent = "+ Suivre";
+        btn.classList.remove("following");
+      } else {
+        await api("POST", `/follow/${userId}`);
+        suivis_users.add(userId);
+        btn.textContent = "✓ Suivi";
+        btn.classList.add("following");
+      }
+    } catch(e){ console.error(e); }
+  });
+
+  render();
 }
 
 /* ---------- Financements participatifs en cours ---------- */

@@ -1135,45 +1135,172 @@ route("GET", "/api/mes-candidatures", async (req, res) => {
   sendJSON(res, 200, { candidatures: rows });
 });
 
-/* ---------- Fil paginé ---------- */
+/* ---------- Helper : enrichir un post ---------- */
+function enrichPost(p, cu) {
+  const reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
+  const counts = {}; reactions.forEach(r => counts[r.type] = r.n);
+  const nb_commentaires = db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id).n;
+  const user_a_aime = cu ? !!db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
+
+  let auteur = {};
+  if (p.auteur_id) {
+    const u = db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur FROM users WHERE id=?").get(p.auteur_id);
+    if (u) auteur = u;
+  }
+
+  // Score de popularité : likes×3 + commentaires×2 + reposts×1
+  const nb_reposts = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE original_post_id=?").get(p.id).n;
+  const score = (counts.like||0)*3 + nb_commentaires*2 + nb_reposts;
+
+  let original_post = null;
+  if ((p.type === "repost" || p.pub_type === "repost") && p.original_post_id) {
+    const orig = db.prepare("SELECT * FROM fil_posts WHERE id=?").get(p.original_post_id);
+    if (orig) {
+      let orig_auteur = {};
+      if (orig.auteur_id) {
+        const ou = db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur FROM users WHERE id=?").get(orig.auteur_id);
+        if (ou) orig_auteur = ou;
+      }
+      const orig_reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(orig.id);
+      const orig_counts = {}; orig_reactions.forEach(r => orig_counts[r.type] = r.n);
+      original_post = { ...orig, reactions: orig_counts, auteur_profil: orig_auteur };
+    }
+  }
+  return { ...p, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, score, original_post };
+}
+
+/* ---------- Fil intelligent ---------- */
 route("GET", "/api/fil", async (req, res, params, body, query) => {
-  const page = Math.max(1, Number(query.page) || 1);
+  const cu = getCurrentUser(req);
+  const mode  = query.mode  || "tous";   // suivis | populaires | articles | tous
+  const page  = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(Number(query.limit) || 20, 50);
   const offset = (page - 1) * limit;
-  const total = db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get().n;
-  const posts = db.prepare("SELECT * FROM fil_posts ORDER BY created_at DESC LIMIT ? OFFSET ?").all(limit, offset);
+
+  // ─── MODE SUIVIS ───────────────────────────────────────────────────────────
+  if (mode === "suivis" && cu) {
+    // IDs des utilisateurs suivis
+    const followedUsers = db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(cu.id).map(r => r.followed_id);
+    // IDs des initiatives suivies → auteur_id de leurs posts
+    const followedInits = db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id).map(r => r.initiative_id);
+    // Trouver les auteurs_id dont le compte représente une initiative suivie
+    const initAuthorIds = followedInits.length
+      ? db.prepare(`SELECT id FROM users WHERE initiative_id IN (${followedInits.map(()=>"?").join(",")}) OR id IN (SELECT owner_user_id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")})) `).all(...followedInits, ...followedInits).map(r => r.id)
+      : [];
+    const allIds = [...new Set([...followedUsers, ...initAuthorIds])];
+
+    if (!allIds.length) {
+      return sendJSON(res, 200, { posts: [], total: 0, page, pages: 0, mode, conseil: "Suivez des personnes et des initiatives pour voir leurs publications ici." });
+    }
+    const placeholders = allIds.map(()=>"?").join(",");
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id IN (${placeholders})`).get(...allIds).n;
+    const posts = db.prepare(`SELECT * FROM fil_posts WHERE auteur_id IN (${placeholders}) ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...allIds, limit, offset);
+    return sendJSON(res, 200, { posts: posts.map(p => ({ ...enrichPost(p, cu), source: "suivi" })), total, page, pages: Math.ceil(total/limit), mode });
+  }
+
+  // ─── MODE POPULAIRES ───────────────────────────────────────────────────────
+  if (mode === "populaires") {
+    // Fenêtre 30 jours, score = likes×3 + commentaires×2 + reposts
+    const since = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,19).replace("T"," ");
+    const posts = db.prepare(`
+      SELECT p.*,
+        (SELECT COUNT(*) FROM fil_reactions r WHERE r.post_id=p.id AND r.type='like')*3 +
+        (SELECT COUNT(*) FROM fil_commentaires c WHERE c.post_id=p.id)*2 +
+        (SELECT COUNT(*) FROM fil_posts rp WHERE rp.original_post_id=p.id) AS score_calc
+      FROM fil_posts p
+      WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (p.type IS NULL OR p.type != 'repost')
+      ORDER BY score_calc DESC, p.created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(since, limit, offset);
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts WHERE created_at >= ? AND (pub_type IS NULL OR pub_type != 'repost')`).get(since).n;
+    return sendJSON(res, 200, { posts: posts.map(p => ({ ...enrichPost(p, cu), source: "populaire" })), total, page, pages: Math.ceil(total/limit), mode });
+  }
+
+  // ─── MODE ARTICLES MIS EN AVANT ────────────────────────────────────────────
+  if (mode === "articles") {
+    const posts = db.prepare(`
+      SELECT * FROM fil_posts
+      WHERE (pub_type='article' OR type='article')
+      ORDER BY created_at DESC LIMIT ? OFFSET ?
+    `).all(limit, offset);
+    const total = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE pub_type='article' OR type='article'").get().n;
+    return sendJSON(res, 200, { posts: posts.map(p => ({ ...enrichPost(p, cu), source: "article" })), total, page, pages: Math.ceil(total/limit), mode });
+  }
+
+  // ─── MODE TOUS (fil global enrichi) ────────────────────────────────────────
+  // Algorithme : suivis en premier, puis populaires, puis reste chronologique
+  let orderedIds = new Set();
+  const allPosts = [];
+
+  if (cu) {
+    // 1) Posts des profils/initiatives suivis (récents d'abord)
+    const followedUsers = db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(cu.id).map(r => r.followed_id);
+    const followedInits = db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id).map(r => r.initiative_id);
+    const initOwners = followedInits.length
+      ? db.prepare(`SELECT owner_user_id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")}) AND owner_user_id IS NOT NULL`).all(...followedInits).map(r => r.owner_user_id)
+      : [];
+    const followedAll = [...new Set([...followedUsers, ...initOwners])];
+    if (followedAll.length) {
+      const ph = followedAll.map(()=>"?").join(",");
+      db.prepare(`SELECT * FROM fil_posts WHERE auteur_id IN (${ph}) ORDER BY created_at DESC LIMIT 10`).all(...followedAll)
+        .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"suivi" }); } });
+    }
+  }
+
+  // 2) Posts populaires récents (30j)
+  const since = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,19).replace("T"," ");
+  db.prepare(`
+    SELECT p.* FROM fil_posts p
+    WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost')
+    ORDER BY (SELECT COUNT(*) FROM fil_reactions r WHERE r.post_id=p.id)*3 +
+             (SELECT COUNT(*) FROM fil_commentaires c WHERE c.post_id=p.id)*2 DESC,
+             p.created_at DESC
+    LIMIT 10
+  `).all(since).forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"populaire" }); } });
+
+  // 3) Articles récents mis en avant
+  db.prepare(`SELECT * FROM fil_posts WHERE (pub_type='article' OR type='article') ORDER BY created_at DESC LIMIT 5`).all()
+    .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"article" }); } });
+
+  // 4) Reste chronologique
+  const excludeClause = orderedIds.size ? `AND id NOT IN (${[...orderedIds].map(()=>"?").join(",")})` : "";
+  const excludeArgs = orderedIds.size ? [...orderedIds] : [];
+  db.prepare(`SELECT * FROM fil_posts WHERE 1=1 ${excludeClause} ORDER BY created_at DESC LIMIT 30`).all(...excludeArgs)
+    .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"global" }); } });
+
+  // Pagination sur le résultat fusionné
+  const total = allPosts.length;
+  const paginated = allPosts.slice(offset, offset + limit);
+  sendJSON(res, 200, { posts: paginated.map(p => enrichPost(p, cu)), total, page, pages: Math.ceil(total/limit), mode });
+});
+
+/* ---------- Follow / Unfollow utilisateur ---------- */
+route("POST", "/api/follow/:id", async (req, res, params) => {
   const cu = getCurrentUser(req);
-  const withReactions = posts.map(p => {
-    const reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
-    const counts = {}; reactions.forEach(r => counts[r.type]=r.n);
-    const nb_commentaires = db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id).n;
-    const user_a_aime = cu ? !!db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
+  if (!cu) return sendJSON(res, 401, { error: "Connexion requise." });
+  const targetId = Number(params.id);
+  if (targetId === cu.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
+  try {
+    db.prepare("INSERT INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(cu.id, targetId);
+    creerNotif(targetId, "abonnement", `${cu.nom} vous suit maintenant`, "", { user_id: cu.id });
+  } catch(e) { /* déjà suivi */ }
+  sendJSON(res, 200, { ok: true, suivi: true });
+});
 
-    let auteur = {};
-    if (p.auteur_id) {
-      const u = db.prepare("SELECT photo_url, banner_url, ville, pays, nationalite1, titre_pro, bio, situation_pro, theme_couleur FROM users WHERE id=?").get(p.auteur_id);
-      if (u) auteur = u;
-    }
+route("DELETE", "/api/follow/:id", async (req, res, params) => {
+  const cu = getCurrentUser(req);
+  if (!cu) return sendJSON(res, 401, { error: "Connexion requise." });
+  db.prepare("DELETE FROM user_follows WHERE follower_id=? AND followed_id=?").run(cu.id, Number(params.id));
+  sendJSON(res, 200, { ok: true, suivi: false });
+});
 
-    // Pour les reposts : inclure le post original enrichi
-    let original_post = null;
-    if ((p.type === "repost" || p.pub_type === "repost") && p.original_post_id) {
-      const orig = db.prepare("SELECT * FROM fil_posts WHERE id=?").get(p.original_post_id);
-      if (orig) {
-        let orig_auteur = {};
-        if (orig.auteur_id) {
-          const ou = db.prepare("SELECT photo_url, banner_url, ville, pays, nationalite1, titre_pro, bio, situation_pro, theme_couleur FROM users WHERE id=?").get(orig.auteur_id);
-          if (ou) orig_auteur = ou;
-        }
-        const orig_reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(orig.id);
-        const orig_counts = {}; orig_reactions.forEach(r => orig_counts[r.type]=r.n);
-        original_post = { ...orig, reactions: orig_counts, auteur_profil: orig_auteur };
-      }
-    }
-
-    return { ...p, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, original_post };
-  });
-  sendJSON(res, 200, { posts: withReactions, total, page, pages: Math.ceil(total/limit) });
+/* ---------- Meta du fil (mes follows pour l'UI) ---------- */
+route("GET", "/api/fil/meta", async (req, res) => {
+  const cu = getCurrentUser(req);
+  if (!cu) return sendJSON(res, 200, { suivis_users: [], suivis_initiatives: [] });
+  const suivis_users = db.prepare("SELECT followed_id AS id FROM user_follows WHERE follower_id=?").all(cu.id).map(r => r.id);
+  const suivis_initiatives = db.prepare("SELECT initiative_id AS id FROM abonnements WHERE user_id=?").all(cu.id).map(r => r.id);
+  sendJSON(res, 200, { suivis_users, suivis_initiatives });
 });
 
 /* ---------- Profils à découvrir dans le fil ---------- */
