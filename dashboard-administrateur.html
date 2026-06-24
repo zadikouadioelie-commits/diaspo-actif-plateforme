@@ -28,6 +28,7 @@
       <a href="#formations" data-section="formations">📚 Formations</a>
       <a href="#publications" data-section="publications">📢 Publications</a>
       <a href="#certifications" data-section="certifications">🛡️ Certifications</a>
+      <a href="#accreditations" data-section="accreditations">🏛️ Accréditations Obs.</a>
       <a href="#moderation" data-section="moderation">🛡 Modération</a>
       <a href="#communication" data-section="communication">✉ Communication</a>
     </aside>
@@ -254,6 +255,100 @@
           </div>
         </div>
       </section>
+
+      <!-- ACCRÉDITATIONS OBSERVATOIRE DIASPORA -->
+      <section id="section-accreditations" style="display:none;">
+        <div class="flex-between" style="margin-bottom:16px;">
+          <h2 style="margin:0;">🏛️ Accréditations Observatoire Diaspora</h2>
+          <button class="btn btn-orange" onclick="openAccredModal()">+ Nouvelle accréditation</button>
+        </div>
+        <div class="notice" style="margin-bottom:16px;">
+          L'accréditation Observatoire est délivrée exclusivement par Diaspo'Actif. Elle permet aux institutions d'accéder aux statistiques agrégées et anonymisées de la diaspora, dans les limites strictes définies ci-dessous.
+        </div>
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 14px;">Institutions accréditées</h3>
+          <div id="accred-list"><div class="notice">Chargement…</div></div>
+        </div>
+
+        <!-- Détail / Édition d'une accréditation -->
+        <div id="accred-fiche" style="display:none;" class="card">
+          <div class="flex-between" style="margin-bottom:16px;">
+            <h3 style="margin:0;" id="af-nom"></h3>
+            <button class="btn btn-sm btn-outline" onclick="closeAccredFiche()">✕ Fermer</button>
+          </div>
+          <div class="grid grid-2" style="gap:16px;margin-bottom:16px;">
+            <div>
+              <label class="form-label">Date de fin (vide = illimitée)</label>
+              <input id="af-date-fin" class="input-field" style="width:100%" type="date">
+            </div>
+            <div>
+              <label class="form-label">Notes admin</label>
+              <input id="af-notes" class="input-field" style="width:100%" placeholder="Notes internes…">
+            </div>
+          </div>
+          <div class="grid grid-2" style="gap:16px;margin-bottom:16px;">
+            <div>
+              <label class="form-label">Nationalités autorisées (JSON, vide = toutes)</label>
+              <textarea id="af-nats" class="input-field" style="width:100%;min-height:80px;font-size:13px;" placeholder='["Sénégalaise","Ivoirienne"]'></textarea>
+            </div>
+            <div>
+              <label class="form-label">Territoires autorisés (JSON, vide = tous)</label>
+              <textarea id="af-terr" class="input-field" style="width:100%;min-height:80px;font-size:13px;" placeholder='[{"pays":"France"},{"pays":"Belgique","region":"Bruxelles"}]'></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-orange" onclick="saveAccredFiche()">Enregistrer</button>
+            <button class="btn btn-outline" style="color:#B91C1C;" onclick="actionAccred('suspendre')">Suspendre</button>
+            <button class="btn btn-outline" style="color:#B91C1C;" onclick="actionAccred('retirer')">Retirer</button>
+            <button class="btn btn-outline" style="color:#059669;" onclick="actionAccred('reactiver')">Réactiver</button>
+            <button class="btn btn-outline" onclick="loadAccredHistorique()" style="margin-left:auto;">Voir l'historique</button>
+          </div>
+          <div id="af-histo" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Historique de l'accréditation</div>
+            <div id="af-histo-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Modal nouvelle accréditation -->
+      <div id="accred-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:var(--surface);border-radius:18px;max-width:560px;width:100%;padding:28px;max-height:90vh;overflow-y:auto;">
+          <div class="flex-between" style="margin-bottom:16px;">
+            <h3 style="margin:0;">Nouvelle accréditation Observatoire</h3>
+            <button style="background:none;border:none;font-size:22px;cursor:pointer;" onclick="document.getElementById('accred-modal').style.display='none'">✕</button>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="form-label">Institution *</label>
+            <select id="am-institution" class="input-field" style="width:100%">
+              <option value="">Sélectionner une institution…</option>
+            </select>
+          </div>
+          <div class="grid grid-2" style="gap:12px;margin-bottom:12px;">
+            <div>
+              <label class="form-label">Date de fin (vide = illimitée)</label>
+              <input id="am-date-fin" class="input-field" style="width:100%" type="date">
+            </div>
+            <div>
+              <label class="form-label">Notes admin</label>
+              <input id="am-notes" class="input-field" style="width:100%" placeholder="Contexte de la demande…">
+            </div>
+          </div>
+          <div class="grid grid-2" style="gap:12px;margin-bottom:16px;">
+            <div>
+              <label class="form-label">Nationalités (JSON, vide = toutes)</label>
+              <textarea id="am-nats" class="input-field" style="width:100%;min-height:80px;font-size:13px;" placeholder='["Sénégalaise"]'></textarea>
+            </div>
+            <div>
+              <label class="form-label">Territoires (JSON, vide = tous)</label>
+              <textarea id="am-terr" class="input-field" style="width:100%;min-height:80px;font-size:13px;" placeholder='[{"pays":"France"}]'></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="document.getElementById('accred-modal').style.display='none'">Annuler</button>
+            <button class="btn btn-orange" onclick="createAccreditation()">Créer l'accréditation</button>
+          </div>
+        </div>
+      </div>
 
       <!-- MODÉRATION -->
       <section id="section-moderation" style="display:none;">
@@ -596,6 +691,137 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
       alert("Publication envoyée sur le fil global.");
     } catch(e) { alert("Erreur : " + e.message); }
   });
+
+  /* ===== Accréditations Observatoire ===== */
+  let ACCRED_DATA = { accreditations: [], institutions: [] };
+  let CURRENT_ACCRED_ID = null;
+
+  async function loadAccredList() {
+    const el = document.getElementById("accred-list");
+    try {
+      ACCRED_DATA = await api("GET", "/admin/accreditations");
+      const rows = ACCRED_DATA.accreditations;
+      if (!rows.length) { el.innerHTML = `<div class="empty">Aucune accréditation créée.</div>`; return; }
+      const BADGE = { actif: "cs-actif", suspendu: "cs-suspendu", retire: "cs-retire" };
+      el.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="font-size:12px;color:var(--muted);border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:8px;">Institution</th>
+          <th style="text-align:left;padding:8px;">Nationalités</th>
+          <th style="text-align:left;padding:8px;">Territoires</th>
+          <th style="text-align:left;padding:8px;">Validité</th>
+          <th style="text-align:left;padding:8px;">Statut</th>
+          <th style="padding:8px;"></th>
+        </tr></thead>
+        <tbody>${rows.map(r => {
+          const nats = safeParse(r.nationalites_autorisees);
+          const terrs = safeParse(r.territoires_autorises);
+          return `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 8px;"><div style="font-weight:700;font-size:13.5px;">${escH(r.institution_nom)}</div><div style="font-size:12px;color:var(--muted);">${escH(r.institution_email)}</div></td>
+            <td style="padding:10px 8px;font-size:12.5px;">${nats.length ? escH(nats.join(", ")) : "<span style='color:var(--muted)'>Toutes</span>"}</td>
+            <td style="padding:10px 8px;font-size:12.5px;">${terrs.length ? escH(terrs.map(t=>t.pays+(t.region?","+t.region:"")).join("; ")) : "<span style='color:var(--muted)'>Tous</span>"}</td>
+            <td style="padding:10px 8px;font-size:12.5px;">${r.date_debut?.slice(0,10)||"—"} → ${r.date_fin?.slice(0,10)||"∞"}</td>
+            <td style="padding:10px 8px;"><span class="certif-statut-badge ${BADGE[r.statut]||''}">${r.statut}</span></td>
+            <td style="padding:10px 8px;"><button class="btn btn-sm btn-outline" onclick="openAccredFiche(${r.id},'${escH(r.institution_nom)}')">Gérer</button></td>
+          </tr>`;
+        }).join("")}</tbody></table>`;
+      // Alimenter le select du modal
+      const sel = document.getElementById("am-institution");
+      const existIds = new Set(rows.filter(r=>r.statut==="actif").map(r=>r.institution_id));
+      sel.innerHTML = `<option value="">Sélectionner une institution…</option>` +
+        ACCRED_DATA.institutions.filter(i=>!existIds.has(i.id)).map(i=>`<option value="${i.id}">${escH(i.nom)} — ${escH(i.email)}</option>`).join("");
+    } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+  }
+
+  function safeParse(v) { try { return JSON.parse(v||"[]"); } catch(e) { return []; } }
+
+  function openAccredFiche(id, nom) {
+    CURRENT_ACCRED_ID = id;
+    const row = ACCRED_DATA.accreditations.find(r=>r.id===id);
+    document.getElementById("af-nom").textContent = "🏛️ " + nom;
+    document.getElementById("af-date-fin").value = row?.date_fin?.slice(0,10)||"";
+    document.getElementById("af-notes").value = row?.notes_admin||"";
+    document.getElementById("af-nats").value = row?.nationalites_autorisees||"[]";
+    document.getElementById("af-terr").value = row?.territoires_autorises||"[]";
+    document.getElementById("af-histo").style.display = "none";
+    document.getElementById("accred-fiche").style.display = "";
+    document.getElementById("accred-fiche").scrollIntoView({behavior:"smooth"});
+  }
+  function closeAccredFiche() { document.getElementById("accred-fiche").style.display = "none"; CURRENT_ACCRED_ID = null; }
+
+  async function saveAccredFiche() {
+    if (!CURRENT_ACCRED_ID) return;
+    let nats, terr;
+    try { nats = JSON.parse(document.getElementById("af-nats").value||"[]"); } catch(e) { alert("JSON nationalités invalide."); return; }
+    try { terr = JSON.parse(document.getElementById("af-terr").value||"[]"); } catch(e) { alert("JSON territoires invalide."); return; }
+    try {
+      await api("PUT", "/admin/accreditations/" + CURRENT_ACCRED_ID, {
+        date_fin: document.getElementById("af-date-fin").value||null,
+        notes_admin: document.getElementById("af-notes").value,
+        nationalites_autorisees: nats, territoires_autorises: terr,
+      });
+      alert("Accréditation mise à jour.");
+      closeAccredFiche(); loadAccredList();
+    } catch(e) { alert("Erreur : " + e.message); }
+  }
+
+  async function actionAccred(action) {
+    if (!CURRENT_ACCRED_ID) return;
+    const motif = prompt("Motif (optionnel) :");
+    if (motif === null) return;
+    try {
+      await api("POST", "/admin/accreditations/" + CURRENT_ACCRED_ID + "/" + action, { motif });
+      alert("Action effectuée : " + action);
+      closeAccredFiche(); loadAccredList();
+    } catch(e) { alert("Erreur : " + e.message); }
+  }
+
+  async function loadAccredHistorique() {
+    if (!CURRENT_ACCRED_ID) return;
+    const el = document.getElementById("af-histo");
+    el.style.display = "";
+    document.getElementById("af-histo-list").innerHTML = "<div class='notice'>Chargement…</div>";
+    try {
+      const r = await api("GET", "/admin/accreditations/" + CURRENT_ACCRED_ID + "/historique");
+      const h = r.historique;
+      document.getElementById("af-histo-list").innerHTML = h.length
+        ? h.map(e=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
+            <span style="font-weight:700;">${escH(e.action)}</span> — ${escH(e.admin_nom||"Admin")} — ${escH(e.created_at?.slice(0,10)||"")}
+            ${e.details?`<div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${escH(e.details)}</div>`:""}
+          </div>`).join("")
+        : `<div class="empty">Aucun historique.</div>`;
+    } catch(e) { document.getElementById("af-histo-list").innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+  }
+
+  function openAccredModal() {
+    document.getElementById("am-institution").value = "";
+    document.getElementById("am-date-fin").value = "";
+    document.getElementById("am-notes").value = "";
+    document.getElementById("am-nats").value = "[]";
+    document.getElementById("am-terr").value = "[]";
+    document.getElementById("accred-modal").style.display = "flex";
+    loadAccredList();
+  }
+
+  async function createAccreditation() {
+    const institution_id = parseInt(document.getElementById("am-institution").value);
+    if (!institution_id) { alert("Sélectionnez une institution."); return; }
+    let nats, terr;
+    try { nats = JSON.parse(document.getElementById("am-nats").value||"[]"); } catch(e) { alert("JSON nationalités invalide."); return; }
+    try { terr = JSON.parse(document.getElementById("am-terr").value||"[]"); } catch(e) { alert("JSON territoires invalide."); return; }
+    try {
+      await api("POST", "/admin/accreditations", {
+        institution_id, date_fin: document.getElementById("am-date-fin").value||null,
+        notes_admin: document.getElementById("am-notes").value,
+        nationalites_autorisees: nats, territoires_autorises: terr,
+      });
+      document.getElementById("accred-modal").style.display = "none";
+      alert("Accréditation créée et notification envoyée à l'institution.");
+      loadAccredList();
+    } catch(e) { alert("Erreur : " + e.message); }
+  }
+
+  // Charger au click sur la section
+  document.querySelector('[data-section="accreditations"]')?.addEventListener("click", () => { setTimeout(loadAccredList, 100); });
 
   // Ciblage chips
   document.querySelectorAll("#ciblage-chips .chip").forEach(chip => {

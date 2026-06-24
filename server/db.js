@@ -260,6 +260,91 @@ db.exec(`
     value INTEGER NOT NULL DEFAULT 0
   );
 
+  /* ===== MODULE INSTITUTIONS & OBSERVATOIRE DIASPORA ===== */
+
+  /* Accréditations Observatoire délivrées par Diaspo'Actif */
+  CREATE TABLE IF NOT EXISTS accreditations_observatoire (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    institution_id INTEGER NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'actif' CHECK(statut IN ('actif','suspendu','retire')),
+    date_debut TEXT DEFAULT (date('now')),
+    date_fin TEXT,
+    nationalites_autorisees TEXT DEFAULT '[]',
+    territoires_autorises TEXT DEFAULT '[]',
+    droits TEXT DEFAULT '{}',
+    notes_admin TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(institution_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS accreditations_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    accreditation_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    admin_id INTEGER,
+    admin_nom TEXT,
+    details TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  /* Communications institutionnelles ciblées */
+  CREATE TABLE IF NOT EXISTS communications_institutionnelles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    emetteur_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    contenu TEXT NOT NULL,
+    type TEXT DEFAULT 'info' CHECK(type IN ('info','invitation','consultation','appel_projets','alerte','financement','forum')),
+    cible_json TEXT DEFAULT '{}',
+    nb_destinataires INTEGER DEFAULT 0,
+    statut TEXT DEFAULT 'envoyee',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(emetteur_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS comm_desabonnements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    institution_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, institution_id)
+  );
+
+  /* Consultations et sondages officiels */
+  CREATE TABLE IF NOT EXISTS consultations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    emetteur_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    type TEXT DEFAULT 'sondage' CHECK(type IN ('sondage','enquete','consultation_citoyenne','consultation_diaspora')),
+    statut TEXT DEFAULT 'ouverte' CHECK(statut IN ('brouillon','ouverte','cloturee')),
+    date_cloture TEXT,
+    cible_json TEXT DEFAULT '{}',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(emetteur_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS consultation_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    consultation_id INTEGER NOT NULL,
+    texte TEXT NOT NULL,
+    type TEXT DEFAULT 'texte_libre' CHECK(type IN ('texte_libre','choix_unique','choix_multiple','echelle')),
+    options_json TEXT DEFAULT '[]',
+    ordre INTEGER DEFAULT 0,
+    FOREIGN KEY(consultation_id) REFERENCES consultations(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS consultation_reponses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    consultation_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    user_id INTEGER,
+    reponse TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(consultation_id) REFERENCES consultations(id),
+    FOREIGN KEY(question_id) REFERENCES consultation_questions(id)
+  );
+
   /* ===== SYSTÈME DE CERTIFICATION ===== */
 
   /* Certification active d'une initiative */

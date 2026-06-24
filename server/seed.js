@@ -201,6 +201,47 @@ function seed() {
   insertMsg.run(convId, initUserId, "Bonjour, nous avons vu votre profil et souhaiterions échanger sur un partenariat pour notre forum de novembre.", "-1 day");
   insertMsg.run(convId, jeanId, "Avec plaisir, je suis disponible cette semaine.", "-20 hours");
 
+  /* ---- Accréditation Observatoire Diaspora (Consulat du Sénégal) ---- */
+  const consulatId = db.prepare("SELECT id FROM users WHERE email='consulat.senegal@diaspoactif.demo'").get()?.id;
+  if (consulatId) {
+    const accredId = db.prepare(`
+      INSERT OR IGNORE INTO accreditations_observatoire
+        (institution_id, date_debut, date_fin, nationalites_autorisees, territoires_autorises, droits, notes_admin)
+      VALUES (?, date('now','-30 days'), date('now','+335 days'),
+        '["Sénégalaise"]',
+        '[{"pays":"France"},{"pays":"Belgique"},{"pays":"Suisse"}]',
+        '{"voir_competences":1,"voir_secteurs":1,"voir_initiatives":1,"voir_geographie":1}',
+        'Accréditation initiale — Consulat Général du Sénégal à Paris. Périmètre Europe francophone.')
+    `).run().lastInsertRowid;
+    if (accredId) {
+      db.prepare("INSERT INTO accreditations_historique (accreditation_id,action,admin_id,admin_nom,details) VALUES (?,?,?,?,?)")
+        .run(accredId, "creation", adminId, "Diaspo'Actif Admin", "Accréditation délivrée — Consulat Général du Sénégal à Paris.");
+    }
+    /* Communication institutionnelle démo */
+    db.prepare(`INSERT OR IGNORE INTO communications_institutionnelles (emetteur_id,titre,contenu,type,cible_json,nb_destinataires)
+      VALUES (?,?,?,?,?,?)`)
+      .run(consulatId,
+        "Programme d'appui aux entrepreneurs sénégalais en Europe",
+        "Le Consulat Général du Sénégal à Paris lance un programme d'appui aux entrepreneurs de la diaspora sénégalaise établis en Europe. Ce dispositif comprend un accompagnement juridique, fiscal et financier pour les porteurs de projets souhaitant investir au Sénégal.\n\nInscriptions ouvertes jusqu'au 31 juillet 2026.",
+        "appel_projets",
+        '{"nationalites":["Sénégalaise"],"pays":["France","Belgique","Suisse"]}',
+        42);
+    /* Consultation démo */
+    const consultId = db.prepare(`INSERT INTO consultations (emetteur_id,titre,description,type,statut,date_cloture,cible_json)
+      VALUES (?,?,?,?,?,?,?)`)
+      .run(consulatId,
+        "Obstacles rencontrés par les entrepreneurs sénégalais en Europe",
+        "Cette consultation vise à identifier les principaux freins auxquels font face les entrepreneurs de la diaspora sénégalaise en Europe afin d'adapter notre programme d'appui.",
+        "consultation_diaspora", "ouverte", "2026-08-31",
+        '{"nationalites":["Sénégalaise"]}').lastInsertRowid;
+    const insQ = db.prepare("INSERT INTO consultation_questions (consultation_id,texte,type,options_json,ordre) VALUES (?,?,?,?,?)");
+    insQ.run(consultId, "Quels sont les principaux obstacles que vous rencontrez dans votre activité entrepreneuriale ?", "choix_multiple",
+      '["Accès au financement","Complexité administrative","Réseau professionnel limité","Fiscalité","Méconnaissance du marché sénégalais","Autre"]', 0);
+    insQ.run(consultId, "Quel type d'accompagnement souhaiteriez-vous en priorité ?", "choix_unique",
+      '["Accompagnement juridique","Accompagnement fiscal","Mise en réseau","Accès aux financements","Formation entrepreneuriale"]', 1);
+    insQ.run(consultId, "Avez-vous des commentaires ou suggestions supplémentaires ?", "texte_libre", "[]", 2);
+  }
+
   console.log(`Seed terminé : ${legacy.INITIATIVES.length} initiatives, 5 comptes, 6 formations, ${3} abonnements démo.`);
   console.log("Comptes démo (mot de passe : Demo1234!) :");
   console.log("  jean@diaspoactif.demo            → utilisateur");

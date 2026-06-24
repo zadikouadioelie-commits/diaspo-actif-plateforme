@@ -5,13 +5,70 @@
 <title>Diaspo'Actif — Dashboard Collectivité</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
+<style>
+/* ===== OBSERVATOIRE ===== */
+.obs-badge{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#1E3A5F,#2563EB);color:#fff;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;margin-bottom:16px;}
+.obs-badge .obs-icon{font-size:18px;}
+.obs-scope{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+.obs-scope-item{background:var(--surface2);border-radius:20px;padding:4px 12px;font-size:12.5px;display:flex;align-items:center;gap:5px;}
+.obs-locked{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;background:var(--surface2);border-radius:16px;}
+.obs-locked h3{margin:16px 0 8px;font-size:20px;}
+.obs-locked p{color:var(--muted);font-size:14px;max-width:420px;}
+.stat-card-obs{background:linear-gradient(135deg,var(--surface2),var(--surface));border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center;}
+.stat-card-obs .stat-num{font-size:30px;font-weight:800;color:var(--accent);}
+.stat-card-obs .stat-lbl{font-size:12px;color:var(--muted);margin-top:4px;}
+.bar-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.bar-row .bar-label{width:130px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;}
+.bar-row .bar-track{flex:1;background:var(--surface2);border-radius:6px;height:16px;overflow:hidden;}
+.bar-row .bar-fill{height:100%;border-radius:6px;transition:width 0.6s;}
+.bar-row .bar-val{font-size:12px;color:var(--muted);width:30px;text-align:right;flex-shrink:0;}
+.obs-tab-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;border-bottom:2px solid var(--border);padding-bottom:0;}
+.obs-tab{background:none;border:none;padding:10px 16px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;}
+.obs-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.obs-panel{display:none;}.obs-panel.active{display:block;}
+
+/* ===== COMMUNICATIONS ===== */
+.comm-type-select{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.comm-type-btn{background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:5px 13px;font-size:12.5px;cursor:pointer;transition:all .2s;}
+.comm-type-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.comm-hist-row{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border);}
+.comm-hist-row:last-child{border-bottom:none;}
+.comm-type-badge{font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px;background:var(--surface2);}
+.comm-type-badge.info{background:#DBEAFE;color:#1D4ED8;}
+.comm-type-badge.appel_projets{background:#D1FAE5;color:#065F46;}
+.comm-type-badge.alerte{background:#FEE2E2;color:#B91C1C;}
+.comm-type-badge.invitation{background:#EDE9FE;color:#6D28D9;}
+.comm-type-badge.financement{background:#FEF3C7;color:#92400E;}
+.comm-type-badge.consultation{background:#F0FDF4;color:#166534;}
+.comm-type-badge.forum{background:#F5F3FF;color:#5B21B6;}
+.cible-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.cible-chip{background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer;transition:all .2s;}
+.cible-chip.active{background:#E0F2FE;border-color:#0369A1;color:#0369A1;font-weight:600;}
+
+/* ===== CONSULTATIONS ===== */
+.consult-card{border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;}
+.consult-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.consult-status{font-size:11.5px;font-weight:700;padding:2px 10px;border-radius:20px;}
+.consult-status.ouverte{background:#D1FAE5;color:#065F46;}
+.consult-status.cloturee{background:#FEE2E2;color:#B91C1C;}
+.consult-status.brouillon{background:#FEF3C7;color:#92400E;}
+.question-builder{border:1px dashed var(--border);border-radius:12px;padding:14px;margin-bottom:10px;}
+.qb-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.modal-box{background:var(--surface);border-radius:18px;max-width:640px;width:100%;max-height:90vh;overflow-y:auto;padding:28px;}
+.modal-box h2{margin:0 0 16px;}
+.modal-close{float:right;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);margin-top:-4px;}
+
+/* ===== PARTENARIATS / PUBLICATIONS ===== */
+.partner-card{display:flex;gap:14px;align-items:flex-start;padding:14px;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;}
+</style>
 </head>
 <body>
 <div class="page">
   <header class="topbar">
     <div class="topbar-inner">
       <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
-      <nav class="nav"><a href="index.html">Accueil</a><a href="annuaire.html">Annuaire</a><a href="fil-actualite.html">Fil</a></nav>
+      <nav class="nav"><a href="index.html">Accueil</a><a href="annuaire.html">Annuaire</a><a href="fil-actualite.html">Fil d'actualité</a></nav>
       <div class="topbar-right">
         <select class="lang-select" id="lang-select"></select>
         <div id="auth-area" class="auth-area"></div>
@@ -20,134 +77,240 @@
   </header>
 
   <div class="with-sidebar">
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="brand">Collectivité</div>
-      <a href="#" class="active" data-section="observatoire">📊 Observatoire</a>
-      <a href="#" data-section="communication">✉ Communication</a>
+      <a href="#" class="active" data-section="accueil">🏛️ Accueil</a>
+      <a href="#" data-section="observatoire">📊 Observatoire Diaspora</a>
+      <a href="#" data-section="communications">✉️ Communications</a>
+      <a href="#" data-section="consultations">📋 Consultations</a>
+      <a href="#" data-section="publications">📢 Publications</a>
       <a href="#" data-section="partenariats">🤝 Partenariats</a>
     </aside>
 
     <main class="content">
       <div id="dashboard-error" style="display:none;" class="notice"></div>
 
-      <!-- OBSERVATOIRE -->
-      <section id="section-observatoire">
+      <!-- ===================== ACCUEIL ===================== -->
+      <section id="section-accueil">
         <div class="flex-between" style="margin-bottom:20px;">
           <div>
-            <h1 style="margin:0;">Tableau de bord Collectivité</h1>
-            <p id="collectivite-nom" style="margin:4px 0 0;color:var(--muted);font-size:13.5px;">Chargement…</p>
+            <h1 style="margin:0;" id="inst-nom">Chargement…</h1>
+            <p id="inst-infos" style="margin:4px 0 0;color:var(--muted);font-size:13.5px;"></p>
           </div>
           <span class="badge badge-inst">Collectivité</span>
         </div>
-
-        <div class="notice" style="margin-bottom:20px;">
-          🔒 Conformément à la politique de confidentialité de Diaspo'Actif, cet observatoire affiche uniquement des données agrégées. Les groupes de moins de 10 membres ne sont pas affichés. Aucune liste nominative n'est accessible.
+        <div id="accred-banner" style="display:none;" class="obs-badge">
+          <span class="obs-icon">🏛️</span>
+          <span>Observateur Diaspora Accrédité — <span id="accred-expire"></span></span>
+        </div>
+        <div id="no-accred-banner" style="display:none;" class="notice">
+          🔒 Votre institution n'est pas encore accréditée pour l'Observatoire Diaspora.
+          Contactez l'équipe Diaspo'Actif pour déposer une demande d'accréditation.
         </div>
 
-        <div class="grid grid-3" style="gap:12px;margin-bottom:20px;">
+        <div class="grid grid-3" style="gap:12px;margin-bottom:24px;">
           <div class="card stat-card">
-            <div class="stat-number" id="stat-membres">—</div>
-            <div class="stat-label">Membres diaspora</div>
-          </div>
-          <div class="card stat-card">
-            <div class="stat-number" id="stat-initiatives">—</div>
-            <div class="stat-label">Initiatives actives</div>
+            <div class="stat-number" id="acc-membres">—</div>
+            <div class="stat-label">Membres observables</div>
           </div>
           <div class="card stat-card">
-            <div class="stat-number" id="stat-pays">—</div>
-            <div class="stat-label">Pays représentés</div>
+            <div class="stat-number" id="acc-initiatives">—</div>
+            <div class="stat-label">Initiatives</div>
           </div>
-        </div>
-
-        <div class="grid grid-2" style="gap:16px;margin-bottom:20px;">
-          <div class="card">
-            <h3 style="margin:0 0 14px;">Répartition par pays de résidence</h3>
-            <div id="pays-chart">
-              <div class="notice">Chargement…</div>
-            </div>
-          </div>
-          <div class="card">
-            <h3 style="margin:0 0 14px;">Répartition par secteur d'activité</h3>
-            <div id="secteur-chart"></div>
+          <div class="card stat-card">
+            <div class="stat-number" id="acc-pays">—</div>
+            <div class="stat-label">Pays couverts</div>
           </div>
         </div>
 
         <div class="grid grid-2" style="gap:16px;">
           <div class="card">
-            <h3 style="margin:0 0 14px;">Tranche d'âge estimée</h3>
-            <div id="age-chart"></div>
+            <h3 style="margin:0 0 14px;">Périmètre d'accréditation</h3>
+            <div id="perimetre-content"></div>
           </div>
           <div class="card">
-            <h3 style="margin:0 0 14px;">Niveau d'études</h3>
-            <div id="etudes-chart"></div>
+            <h3 style="margin:0 0 14px;">Activité récente</h3>
+            <div id="activite-recente"></div>
           </div>
         </div>
       </section>
 
-      <!-- COMMUNICATION -->
-      <section id="section-communication" style="display:none;">
-        <h2>Communication vers la diaspora</h2>
-        <div class="notice" style="margin-bottom:16px;">
-          ✉ Vous pouvez envoyer des communications à la diaspora liée à votre territoire. Vous verrez uniquement le nombre de destinataires — jamais leurs identités. Les membres choisissent de recevoir ou non vos communications.
+      <!-- ===================== OBSERVATOIRE ===================== -->
+      <section id="section-observatoire" style="display:none;">
+        <div class="flex-between" style="margin-bottom:16px;">
+          <h2 style="margin:0;">📊 Observatoire Diaspora</h2>
+          <span class="obs-badge" style="margin:0;font-size:12px;">🏛️ Accrédité</span>
         </div>
+        <div class="notice" style="margin-bottom:16px;">
+          🔒 Données agrégées uniquement. Seuil de confidentialité : 10 membres minimum. Aucune donnée nominative n'est accessible.
+        </div>
+        <div id="obs-locked" style="display:none;" class="obs-locked">
+          <div style="font-size:48px;">🔒</div>
+          <h3>Accréditation requise</h3>
+          <p>L'accès à l'Observatoire Diaspora est réservé aux institutions accréditées par Diaspo'Actif. Contactez l'équipe Diaspo'Actif pour déposer votre demande.</p>
+          <a href="mailto:contact@diaspoactif.fr" class="btn btn-orange" style="margin-top:12px;">Demander l'accréditation</a>
+        </div>
+        <div id="obs-content" style="display:none;">
+          <div class="obs-tab-bar">
+            <button class="obs-tab active" onclick="switchObsTab('geo')">🌍 Géographie</button>
+            <button class="obs-tab" onclick="switchObsTab('competences')">👔 Compétences</button>
+            <button class="obs-tab" onclick="switchObsTab('secteurs')">🏭 Secteurs</button>
+            <button class="obs-tab" onclick="switchObsTab('initiatives')">🌱 Initiatives</button>
+          </div>
+
+          <!-- Géographie -->
+          <div class="obs-panel active" id="obs-geo">
+            <div class="grid grid-3" style="gap:12px;margin-bottom:16px;">
+              <div class="stat-card-obs"><div class="stat-num" id="og-membres">—</div><div class="stat-lbl">Membres</div></div>
+              <div class="stat-card-obs"><div class="stat-num" id="og-initiatives">—</div><div class="stat-lbl">Initiatives</div></div>
+              <div class="stat-card-obs"><div class="stat-num" id="og-pays">—</div><div class="stat-lbl">Pays</div></div>
+            </div>
+            <div class="grid grid-2" style="gap:16px;">
+              <div class="card">
+                <h3 style="margin:0 0 14px;">Répartition par pays</h3>
+                <div id="obs-pays-chart"></div>
+              </div>
+              <div class="card">
+                <h3 style="margin:0 0 14px;">Répartition par ville</h3>
+                <div id="obs-ville-chart"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Compétences -->
+          <div class="obs-panel" id="obs-competences">
+            <div class="card">
+              <h3 style="margin:0 0 14px;">Profils professionnels</h3>
+              <div id="obs-comp-chart"></div>
+            </div>
+          </div>
+
+          <!-- Secteurs -->
+          <div class="obs-panel" id="obs-secteurs">
+            <div class="card">
+              <h3 style="margin:0 0 14px;">Secteurs d'activité (initiatives)</h3>
+              <div id="obs-sect-chart"></div>
+            </div>
+          </div>
+
+          <!-- Initiatives -->
+          <div class="obs-panel" id="obs-initiatives">
+            <div class="grid grid-3" style="gap:12px;margin-bottom:16px;">
+              <div class="stat-card-obs"><div class="stat-num" id="oi-total">—</div><div class="stat-lbl">Initiatives</div></div>
+              <div class="stat-card-obs"><div class="stat-num" id="oi-membres">—</div><div class="stat-lbl">Membres cumulés</div></div>
+              <div class="stat-card-obs"><div class="stat-num" id="oi-abonnes">—</div><div class="stat-lbl">Abonnés cumulés</div></div>
+            </div>
+            <div class="grid grid-2" style="gap:16px;">
+              <div class="card"><h3 style="margin:0 0 14px;">Par domaine</h3><div id="obs-init-domaine"></div></div>
+              <div class="card"><h3 style="margin:0 0 14px;">Par pays</h3><div id="obs-init-pays"></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== COMMUNICATIONS ===================== -->
+      <section id="section-communications" style="display:none;">
+        <h2 style="margin:0 0 8px;">✉️ Communications institutionnelles</h2>
+        <p style="color:var(--muted);font-size:13.5px;margin:0 0 20px;">Diffusez des informations officielles à la diaspora liée à votre territoire. Les membres peuvent se désabonner à tout moment.</p>
 
         <div class="card" style="margin-bottom:20px;">
           <h3 style="margin:0 0 16px;">Nouvelle communication</h3>
-          <div style="display:flex;flex-direction:column;gap:12px;">
-            <div>
-              <label style="font-size:13px;font-weight:700;">Objet</label>
-              <input id="comm-objet" class="input-field" style="width:100%;margin-top:4px;" placeholder="Objet de votre communication">
-            </div>
-            <div>
-              <label style="font-size:13px;font-weight:700;">Publier sur le fil d'actualité</label>
-              <select id="comm-categorie" class="input-field" style="margin-top:4px;width:200px;">
-                <option value="annonce">Annonce officielle</option>
-                <option value="evenement">Événement</option>
-                <option value="appel">Appel à participation</option>
-              </select>
-            </div>
-            <div>
-              <label style="font-size:13px;font-weight:700;">Contenu</label>
-              <textarea id="comm-contenu" style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;margin-top:4px;" placeholder="Rédigez votre message officiel…"></textarea>
-            </div>
 
-            <div class="card" style="background:var(--surface2);border:none;">
-              <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Ciblage par nationalité</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;" id="ciblage-nationalites">
-                <span class="chip chip-active" data-nat="toutes">Toutes nationalités</span>
-                <span class="chip" data-nat="Sénégalaise">Sénégalaise</span>
-                <span class="chip" data-nat="Ivoirienne">Ivoirienne</span>
-                <span class="chip" data-nat="Malienne">Malienne</span>
-                <span class="chip" data-nat="Camerounaise">Camerounaise</span>
-                <span class="chip" data-nat="Congolaise">Congolaise</span>
-              </div>
-              <p style="margin:10px 0 0;font-size:12.5px;color:var(--muted);">Les membres à nationalités multiples sont inclus dans chaque communauté correspondante.</p>
+          <div style="margin-bottom:12px;">
+            <label class="form-label">Type de communication</label>
+            <div class="comm-type-select" id="comm-type-select">
+              <button class="comm-type-btn active" data-type="info">ℹ️ Information</button>
+              <button class="comm-type-btn" data-type="invitation">📩 Invitation</button>
+              <button class="comm-type-btn" data-type="appel_projets">📢 Appel à projets</button>
+              <button class="comm-type-btn" data-type="financement">💰 Financement</button>
+              <button class="comm-type-btn" data-type="alerte">🚨 Alerte</button>
+              <button class="comm-type-btn" data-type="forum">🗣️ Forum</button>
             </div>
+          </div>
 
-            <div class="notice" style="margin-bottom:0;">
-              <strong>Aperçu audience :</strong> <span id="audience-preview">Tous les membres de la plateforme</span>.
-              <br><span style="font-size:12px;color:var(--muted);">Taux d'ouverture moyen sur cette plateforme : <strong>34%</strong></span>
-            </div>
+          <div style="margin-bottom:12px;">
+            <label class="form-label">Objet *</label>
+            <input id="comm-titre" class="input-field" style="width:100%" placeholder="Objet de la communication…">
+          </div>
 
-            <div style="display:flex;gap:8px;justify-content:flex-end;">
-              <button class="btn btn-outline">Aperçu</button>
-              <button class="btn btn-orange" id="btn-envoyer-comm">Publier sur le fil (simulation)</button>
+          <div style="margin-bottom:12px;">
+            <label class="form-label">Contenu *</label>
+            <textarea id="comm-contenu" style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;resize:vertical;" placeholder="Rédigez votre message officiel…"></textarea>
+          </div>
+
+          <div class="card" style="background:var(--surface2);border:none;margin-bottom:12px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Ciblage géographique</div>
+            <div style="font-size:12.5px;margin-bottom:6px;color:var(--muted);">Pays de résidence :</div>
+            <div class="cible-chips" id="cible-pays">
+              <span class="cible-chip active" data-val="tous">🌍 Tous pays</span>
+              <span class="cible-chip" data-val="France">🇫🇷 France</span>
+              <span class="cible-chip" data-val="Belgique">🇧🇪 Belgique</span>
+              <span class="cible-chip" data-val="Suisse">🇨🇭 Suisse</span>
+              <span class="cible-chip" data-val="Canada">🇨🇦 Canada</span>
+              <span class="cible-chip" data-val="États-Unis">🇺🇸 États-Unis</span>
+              <span class="cible-chip" data-val="Allemagne">🇩🇪 Allemagne</span>
+              <span class="cible-chip" data-val="Espagne">🇪🇸 Espagne</span>
             </div>
+            <div style="font-size:12.5px;margin:10px 0 6px;color:var(--muted);">Nationalités :</div>
+            <div class="cible-chips" id="cible-nats">
+              <span class="cible-chip active" data-val="toutes">Toutes nationalités</span>
+              <span class="cible-chip" data-val="Sénégalaise">Sénégalaise</span>
+              <span class="cible-chip" data-val="Ivoirienne">Ivoirienne</span>
+              <span class="cible-chip" data-val="Malienne">Malienne</span>
+              <span class="cible-chip" data-val="Camerounaise">Camerounaise</span>
+              <span class="cible-chip" data-val="Congolaise">Congolaise</span>
+              <span class="cible-chip" data-val="Marocaine">Marocaine</span>
+              <span class="cible-chip" data-val="Guinéenne">Guinéenne</span>
+            </div>
+          </div>
+
+          <div class="notice" style="margin-bottom:12px;">
+            <strong>Audience estimée :</strong> <span id="comm-audience">Tous les membres de la plateforme</span>.
+            <br><span style="font-size:12px;color:var(--muted);">Les membres peuvent se désabonner des communications de votre institution.</span>
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="resetCommForm()">Réinitialiser</button>
+            <button class="btn btn-orange" id="btn-envoyer-comm">Envoyer la communication</button>
           </div>
         </div>
 
         <div class="card">
           <h3 style="margin:0 0 14px;">Historique des communications</h3>
-          <div style="color:var(--muted);font-size:13.5px;padding:20px 0;text-align:center;">Aucune communication envoyée pour le moment.</div>
+          <div id="comm-historique"><div class="notice">Chargement…</div></div>
         </div>
       </section>
 
-      <!-- PARTENARIATS -->
-      <section id="section-partenariats" style="display:none;">
-        <h2>Partenariats avec les initiatives</h2>
-        <div class="notice" style="margin-bottom:16px;">
-          🤝 Retrouvez les initiatives de la diaspora ouvertes à des partenariats institutionnels et engagez le dialogue.
+      <!-- ===================== CONSULTATIONS ===================== -->
+      <section id="section-consultations" style="display:none;">
+        <div class="flex-between" style="margin-bottom:16px;">
+          <h2 style="margin:0;">📋 Consultations et sondages</h2>
+          <button class="btn btn-orange" onclick="openConsultModal()">+ Nouvelle consultation</button>
         </div>
+        <p style="color:var(--muted);font-size:13.5px;margin:0 0 20px;">Lancez des sondages et consultations citoyennes auprès de la diaspora. Les résultats sont agrégés anonymement.</p>
+        <div id="consultations-list"><div class="notice">Chargement…</div></div>
+      </section>
+
+      <!-- ===================== PUBLICATIONS ===================== -->
+      <section id="section-publications" style="display:none;">
+        <h2 style="margin:0 0 16px;">📢 Publications</h2>
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 12px;">Publier sur le fil d'actualité</h3>
+          <textarea id="pub-contenu" style="width:100%;min-height:100px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;resize:vertical;" placeholder="Rédigez votre publication officielle…"></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+            <button class="btn btn-orange" id="btn-publier">Publier</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 14px;">Mes publications récentes</h3>
+          <div id="mes-publications"><div class="notice">Chargement…</div></div>
+        </div>
+      </section>
+
+      <!-- ===================== PARTENARIATS ===================== -->
+      <section id="section-partenariats" style="display:none;">
+        <h2 style="margin:0 0 8px;">🤝 Partenariats avec les initiatives</h2>
+        <p style="color:var(--muted);font-size:13.5px;margin:0 0 20px;">Retrouvez les initiatives de la diaspora et engagez des partenariats institutionnels.</p>
         <div id="initiatives-partenaires"><div class="notice">Chargement…</div></div>
       </section>
 
@@ -155,144 +318,451 @@
   </div>
 </div>
 
+<!-- Modal consultation -->
+<div id="consult-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeConsultModal()">✕</button>
+    <h2>Nouvelle consultation</h2>
+
+    <div style="margin-bottom:12px;">
+      <label class="form-label">Titre *</label>
+      <input id="cm-titre" class="input-field" style="width:100%" placeholder="Titre de la consultation…">
+    </div>
+    <div style="margin-bottom:12px;">
+      <label class="form-label">Description</label>
+      <textarea id="cm-desc" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;resize:vertical;" placeholder="Décrivez l'objectif de cette consultation…"></textarea>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:12px;">
+      <div style="flex:1;">
+        <label class="form-label">Type</label>
+        <select id="cm-type" class="input-field" style="width:100%">
+          <option value="sondage">Sondage</option>
+          <option value="enquete">Enquête</option>
+          <option value="consultation_citoyenne">Consultation citoyenne</option>
+          <option value="consultation_diaspora">Consultation diaspora</option>
+        </select>
+      </div>
+      <div style="flex:1;">
+        <label class="form-label">Date de clôture</label>
+        <input id="cm-cloture" class="input-field" style="width:100%" type="date">
+      </div>
+    </div>
+
+    <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Questions</div>
+    <div id="cm-questions"></div>
+    <button class="btn btn-outline" style="width:100%;margin-bottom:16px;" onclick="addQuestion()">+ Ajouter une question</button>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeConsultModal()">Annuler</button>
+      <button class="btn btn-orange" onclick="saveConsultation()">Créer la consultation</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal résultats consultation -->
+<div id="results-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <button class="modal-close" onclick="document.getElementById('results-modal').style.display='none'">✕</button>
+    <h2 id="rm-titre">Résultats</h2>
+    <p style="color:var(--muted);font-size:13px;" id="rm-repondants"></p>
+    <div id="rm-content"></div>
+  </div>
+</div>
+
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
+/* ===== Helpers ===== */
+let ME = null;
+let ACCRED = null;
+let COMM_TYPE = "info";
+const CIBLE_PAYS = [];
+const CIBLE_NATS = [];
+
+function barChart(containerId, data, color = "var(--accent)") {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!data?.length) { el.innerHTML = `<div class="empty">Données insuffisantes (seuil de confidentialité : 10 membres min.).</div>`; return; }
+  const max = Math.max(...data.map(d => d.n), 1);
+  el.innerHTML = data.map(d => `
+    <div class="bar-row">
+      <span class="bar-label" title="${escH(d.label||d.pays||d.ville||d.region||d.domaine||"")}">${escH(d.label||d.pays||d.ville||d.region||d.domaine||"")}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(d.n/max*100)}%;background:${color};"></div></div>
+      <span class="bar-val">${d.n}</span>
+    </div>
+  `).join("");
+}
+
+function switchObsTab(tab) {
+  document.querySelectorAll(".obs-tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".obs-panel").forEach(p => p.classList.remove("active"));
+  document.querySelector(`.obs-tab[onclick*="${tab}"]`)?.classList.add("active");
+  document.getElementById("obs-" + tab)?.classList.add("active");
+}
+
+/* ===== Navigation ===== */
+function showSection(name) {
+  document.querySelectorAll(".sidebar a[data-section]").forEach(a => a.classList.remove("active"));
+  document.querySelector(`.sidebar a[data-section="${name}"]`)?.classList.add("active");
+  document.querySelectorAll("section[id^='section-']").forEach(s => s.style.display = "none");
+  document.getElementById("section-" + name).style.display = "";
+  if (name === "observatoire") loadObservatoire();
+  if (name === "communications") loadCommHistorique();
+  if (name === "consultations") loadConsultations();
+  if (name === "publications") loadPublications();
+  if (name === "partenariats") loadPartenariats();
+}
+
+/* ===== Observatoire ===== */
+async function loadObservatoire() {
+  if (!ACCRED) {
+    document.getElementById("obs-locked").style.display = "";
+    document.getElementById("obs-content").style.display = "none";
+    return;
+  }
+  document.getElementById("obs-locked").style.display = "none";
+  document.getElementById("obs-content").style.display = "";
+
+  try {
+    const [vg, geo, comp, sect, init] = await Promise.all([
+      api("GET", "/observatoire/vue-generale"),
+      api("GET", "/observatoire/geographie"),
+      api("GET", "/observatoire/competences"),
+      api("GET", "/observatoire/secteurs"),
+      api("GET", "/observatoire/initiatives-stats"),
+    ]);
+    // Stats globales
+    document.getElementById("og-membres").textContent = vg.total_membres ?? "< 10";
+    document.getElementById("og-initiatives").textContent = vg.total_initiatives ?? "—";
+    document.getElementById("og-pays").textContent = vg.total_pays ?? "—";
+    // Accueil stats
+    document.getElementById("acc-membres").textContent = vg.total_membres ?? "< 10";
+    document.getElementById("acc-initiatives").textContent = vg.total_initiatives ?? "—";
+    document.getElementById("acc-pays").textContent = vg.total_pays ?? "—";
+    // Géographie
+    barChart("obs-pays-chart", geo.par_pays?.map(r=>({...r,label:r.pays})), "#2563EB");
+    barChart("obs-ville-chart", geo.par_ville?.map(r=>({...r,label:r.ville+" ("+r.pays+")"})), "#7C3AED");
+    // Compétences
+    barChart("obs-comp-chart", comp.competences?.map(r=>({...r,label:r.label})), "#F97316");
+    // Secteurs
+    barChart("obs-sect-chart", sect.secteurs?.map(r=>({...r})), "#10B981");
+    // Initiatives
+    document.getElementById("oi-total").textContent = init.total?.n ?? "—";
+    document.getElementById("oi-membres").textContent = init.total?.membres ?? "—";
+    document.getElementById("oi-abonnes").textContent = init.total?.abonnes ?? "—";
+    barChart("obs-init-domaine", init.par_domaine?.map(r=>({...r,label:r.domaine})), "#0EA5E9");
+    barChart("obs-init-pays", init.par_pays?.map(r=>({...r,label:r.pays})), "#6366F1");
+  } catch(e) {
+    document.getElementById("obs-content").innerHTML = `<div class="notice">Erreur lors du chargement : ${escH(e.message)}</div>`;
+  }
+}
+
+/* ===== Communications ===== */
+async function loadCommHistorique() {
+  const el = document.getElementById("comm-historique");
+  try {
+    const r = await api("GET", "/communications");
+    const comms = r.communications || [];
+    if (!comms.length) { el.innerHTML = `<div class="empty">Aucune communication envoyée.</div>`; return; }
+    el.innerHTML = comms.map(c => `
+      <div class="comm-hist-row">
+        <span class="comm-type-badge ${c.type}">${escH(c.type||"info")}</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:14px;">${escH(c.titre)}</div>
+          <div style="font-size:12.5px;color:var(--muted);">${fmtDateGlobal(c.created_at)} · ${c.nb_destinataires} destinataires potentiels</div>
+          <div style="font-size:13px;margin-top:4px;color:var(--text);">${escH(c.contenu.slice(0,120))}${c.contenu.length>120?"…":""}</div>
+        </div>
+      </div>
+    `).join("");
+  } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+}
+
+function resetCommForm() {
+  document.getElementById("comm-titre").value = "";
+  document.getElementById("comm-contenu").value = "";
+  document.querySelectorAll("#cible-pays .cible-chip").forEach((c,i) => { c.classList.toggle("active", i===0); });
+  document.querySelectorAll("#cible-nats .cible-chip").forEach((c,i) => { c.classList.toggle("active", i===0); });
+  document.querySelectorAll(".comm-type-btn").forEach((b,i) => { b.classList.toggle("active", i===0); });
+  COMM_TYPE = "info";
+}
+
+/* ===== Consultations ===== */
+async function loadConsultations() {
+  const el = document.getElementById("consultations-list");
+  try {
+    const r = await api("GET", "/consultations");
+    const list = r.consultations || [];
+    if (!list.length) { el.innerHTML = `<div class="empty">Aucune consultation créée. Lancez votre première consultation !</div>`; return; }
+    el.innerHTML = list.map(c => `
+      <div class="consult-card">
+        <div class="consult-card-head">
+          <div>
+            <div style="font-weight:700;font-size:15px;">${escH(c.titre)}</div>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:3px;">${escH(c.type.replace(/_/g," "))} · Créée le ${fmtDateGlobal(c.created_at)}${c.date_cloture?" · Clôture le "+fmtDateGlobal(c.date_cloture):""}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+            <span class="consult-status ${c.statut}">${c.statut}</span>
+            <span style="font-size:12px;color:var(--muted);">${c.nb_reponses||0} réponse(s)</span>
+          </div>
+        </div>
+        ${c.description ? `<p style="font-size:13px;margin:8px 0 0;color:var(--muted);">${escH(c.description)}</p>` : ""}
+        <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+          <button class="btn btn-sm btn-outline" onclick="viewResultats(${c.id},'${escH(c.titre)}')">Voir les résultats</button>
+          ${c.statut==="ouverte" ? `<button class="btn btn-sm btn-outline" style="color:#B91C1C;border-color:#B91C1C;" onclick="cloturerConsultation(${c.id})">Clôturer</button>` : ""}
+        </div>
+      </div>
+    `).join("");
+  } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+}
+
+function openConsultModal() {
+  document.getElementById("cm-titre").value = "";
+  document.getElementById("cm-desc").value = "";
+  document.getElementById("cm-questions").innerHTML = "";
+  document.getElementById("consult-modal").style.display = "flex";
+  addQuestion();
+}
+function closeConsultModal() { document.getElementById("consult-modal").style.display = "none"; }
+
+let qIdx = 0;
+function addQuestion() {
+  const idx = qIdx++;
+  const el = document.createElement("div");
+  el.className = "question-builder";
+  el.id = "q-" + idx;
+  el.innerHTML = `
+    <div class="qb-row">
+      <input class="input-field qb-texte" style="flex:1" placeholder="Question…">
+      <select class="input-field qb-type" style="width:160px">
+        <option value="texte_libre">Texte libre</option>
+        <option value="choix_unique">Choix unique</option>
+        <option value="choix_multiple">Choix multiple</option>
+        <option value="echelle">Échelle (1-5)</option>
+      </select>
+      <button class="btn btn-sm btn-outline" style="color:#B91C1C;" onclick="document.getElementById('q-${idx}').remove()">✕</button>
+    </div>
+    <div class="qb-options" style="display:none;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Options (une par ligne) :</div>
+      <textarea class="input-field qb-opts-txt" style="width:100%;min-height:70px;font-size:13px;" placeholder="Option A\nOption B\nOption C"></textarea>
+    </div>
+  `;
+  el.querySelector(".qb-type").addEventListener("change", function() {
+    el.querySelector(".qb-options").style.display = ["choix_unique","choix_multiple"].includes(this.value) ? "" : "none";
+  });
+  document.getElementById("cm-questions").appendChild(el);
+}
+
+async function saveConsultation() {
+  const titre = document.getElementById("cm-titre").value.trim();
+  if (!titre) { alert("Le titre est requis."); return; }
+  const questions = [...document.querySelectorAll(".question-builder")].map(el => {
+    const type = el.querySelector(".qb-type").value;
+    const opts = ["choix_unique","choix_multiple"].includes(type)
+      ? el.querySelector(".qb-opts-txt").value.split("\n").map(o=>o.trim()).filter(Boolean)
+      : [];
+    return { texte: el.querySelector(".qb-texte").value.trim(), type, options: opts };
+  }).filter(q => q.texte);
+  try {
+    await api("POST", "/consultations", {
+      titre, description: document.getElementById("cm-desc").value.trim(),
+      type: document.getElementById("cm-type").value,
+      date_cloture: document.getElementById("cm-cloture").value || null,
+      statut: "ouverte", questions,
+    });
+    closeConsultModal();
+    loadConsultations();
+  } catch(e) { alert("Erreur : " + e.message); }
+}
+
+async function viewResultats(id, titre) {
+  document.getElementById("rm-titre").textContent = titre;
+  document.getElementById("rm-content").innerHTML = "<div class='notice'>Chargement…</div>";
+  document.getElementById("results-modal").style.display = "flex";
+  try {
+    const r = await api("GET", "/consultations/" + id + "/resultats");
+    document.getElementById("rm-repondants").textContent = r.nb_repondants + " répondant(s)";
+    document.getElementById("rm-content").innerHTML = r.resultats.map(res => `
+      <div style="margin-bottom:16px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;">${escH(res.question.texte)}</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">${res.nb_reponses} réponse(s)</div>
+        ${res.repartition.length ? res.repartition.map(rep => {
+          const pct = res.nb_reponses ? Math.round(rep.n/res.nb_reponses*100) : 0;
+          return `<div class="bar-row">
+            <span class="bar-label" title="${escH(rep.reponse||'(vide)')}">${escH((rep.reponse||"(vide)").slice(0,40))}</span>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--accent);"></div></div>
+            <span class="bar-val">${rep.n}</span>
+          </div>`;
+        }).join("") : `<div class="empty">Aucune réponse.</div>`}
+      </div>
+    `).join("<hr style='border:none;border-top:1px solid var(--border);margin:12px 0;'>");
+  } catch(e) { document.getElementById("rm-content").innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+}
+
+async function cloturerConsultation(id) {
+  if (!confirm("Clôturer cette consultation ? Les membres ne pourront plus répondre.")) return;
+  try { await api("POST", "/consultations/" + id + "/cloturer"); loadConsultations(); }
+  catch(e) { alert("Erreur : " + e.message); }
+}
+
+/* ===== Publications ===== */
+async function loadPublications() {
+  const el = document.getElementById("mes-publications");
+  try {
+    const r = await api("GET", "/fil");
+    const posts = (r.posts||[]).filter(p => p.auteur_id === ME?.id);
+    if (!posts.length) { el.innerHTML = `<div class="empty">Aucune publication.</div>`; return; }
+    el.innerHTML = posts.slice(0,10).map(p => `
+      <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:4px;">${fmtDateGlobal(p.created_at)} · ${p.nb_reactions||0} réaction(s)</div>
+        <div style="font-size:14px;">${escH(p.contenu.slice(0,160))}${p.contenu.length>160?"…":""}</div>
+      </div>
+    `).join("");
+  } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+}
+
+/* ===== Partenariats ===== */
+async function loadPartenariats() {
+  const el = document.getElementById("initiatives-partenaires");
+  try {
+    const r = await api("GET", "/initiatives");
+    const inits = r.initiatives || [];
+    if (!inits.length) { el.innerHTML = `<div class="empty">Aucune initiative disponible.</div>`; return; }
+    el.innerHTML = inits.slice(0,12).map(i => `
+      <div class="partner-card">
+        <div class="avatar" style="flex-shrink:0;font-size:20px;">${(i.sigle||i.nom)[0]}</div>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:14px;">${escH(i.nom)}</div>
+          <div style="font-size:12.5px;color:var(--muted);">${escH(i.domaine||"")}${i.ville?" · "+escH(i.ville):""}${i.pays?" · "+escH(i.pays):""}</div>
+          ${i.description ? `<p style="font-size:13px;margin:6px 0 0;">${escH(i.description.slice(0,120))}…</p>` : ""}
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="alert('Messagerie partenariat — contactez cette initiative via la messagerie.')">Contacter</button>
+      </div>
+    `).join("");
+  } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+}
+
+/* ===== Init ===== */
 (async () => {
-  const me = await fetchCurrentUser();
-  if (!me) { window.location.href = "connexion.html"; return; }
-  if (me.role !== "collectivite") { window.location.href = ROLE_DASHBOARD[me.role] || "index.html"; return; }
+  ME = await fetchCurrentUser();
+  if (!ME) { window.location.href = "connexion.html"; return; }
+  if (ME.role !== "collectivite") { window.location.href = ROLE_DASHBOARD[ME.role] || "index.html"; return; }
 
-  document.getElementById("collectivite-nom").textContent = me.nom + (me.ville ? " · " + me.ville : "");
+  document.getElementById("inst-nom").textContent = ME.nom;
+  document.getElementById("inst-infos").textContent = [ME.ville, ME.pays].filter(Boolean).join(", ") + " · Collectivité";
 
-  // Navigation
+  // Vérifier l'accréditation
+  try {
+    const r = await api("GET", "/observatoire/statut");
+    if (r.accreditee) {
+      ACCRED = r.accreditation;
+      const expEl = document.getElementById("accred-expire");
+      expEl.textContent = ACCRED.date_fin ? "Valide jusqu'au " + fmtDateGlobal(ACCRED.date_fin) : "Accréditation permanente";
+      document.getElementById("accred-banner").style.display = "";
+
+      // Périmètre
+      const nats = ACCRED.nationalites_autorisees;
+      const terrs = ACCRED.territoires_autorises;
+      let html = "";
+      if (nats.length) html += `<div style="margin-bottom:8px;"><div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;">NATIONALITÉS AUTORISÉES</div><div class="obs-scope">${nats.map(n=>`<span class="obs-scope-item">🌍 ${escH(n)}</span>`).join("")}</div></div>`;
+      if (terrs.length) html += `<div><div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;">TERRITOIRES AUTORISÉS</div><div class="obs-scope">${terrs.map(t=>`<span class="obs-scope-item">📍 ${escH(t.pays)}${t.region?", "+escH(t.region):""}${t.ville?", "+escH(t.ville):""}</span>`).join("")}</div></div>`;
+      if (!html) html = `<div style="color:var(--muted);font-size:13.5px;">Accès complet à toutes les données de la plateforme.</div>`;
+      document.getElementById("perimetre-content").innerHTML = html;
+    } else {
+      document.getElementById("no-accred-banner").style.display = "";
+      document.getElementById("perimetre-content").innerHTML = `<div class="empty">Aucune accréditation active. Contactez Diaspo'Actif.</div>`;
+    }
+  } catch(e) {
+    document.getElementById("no-accred-banner").style.display = "";
+  }
+
+  // Activité récente
+  try {
+    const rc = await api("GET", "/communications");
+    const rq = await api("GET", "/consultations");
+    const comms = rc.communications||[];
+    const consults = rq.consultations||[];
+    document.getElementById("activite-recente").innerHTML = [
+      ...comms.slice(0,3).map(c=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13.5px;">✉️ <strong>${escH(c.titre)}</strong> <span style="color:var(--muted);font-size:12px;">${fmtDateGlobal(c.created_at)}</span></div>`),
+      ...consults.slice(0,3).map(c=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13.5px;">📋 <strong>${escH(c.titre)}</strong> <span style="color:var(--muted);font-size:12px;">${c.nb_reponses||0} rép.</span></div>`),
+    ].slice(0,5).join("") || `<div class="empty">Aucune activité récente.</div>`;
+  } catch(e) {}
+
+  // Navigation sidebar
   document.querySelectorAll(".sidebar a[data-section]").forEach(a => {
-    a.addEventListener("click", e => {
-      e.preventDefault();
-      document.querySelectorAll(".sidebar a").forEach(l => l.classList.remove("active"));
-      a.classList.add("active");
-      document.querySelectorAll("section[id^='section-']").forEach(s => s.style.display = "none");
-      document.getElementById("section-" + a.dataset.section).style.display = "";
-      if (a.dataset.section === "partenariats") loadPartenariats();
+    a.addEventListener("click", e => { e.preventDefault(); showSection(a.dataset.section); });
+  });
+
+  // Communications — type select
+  document.querySelectorAll(".comm-type-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".comm-type-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      COMM_TYPE = btn.dataset.type;
     });
   });
 
-  // Charger données
-  let data = {};
-  try {
-    data = await api("GET", "/dashboard/collectivite");
-  } catch(e) {
-    document.getElementById("dashboard-error").textContent = "Erreur : " + e.message;
-    document.getElementById("dashboard-error").style.display = "block";
-  }
-
-  document.getElementById("stat-membres").textContent = data.total_membres ?? "—";
-  document.getElementById("stat-initiatives").textContent = data.total_initiatives ?? "—";
-
-  // Pays chart
-  const pays = data.repartition_pays || [];
-  document.getElementById("stat-pays").textContent = pays.length;
-  const maxPays = Math.max(...pays.map(p => p.n), 1);
-  document.getElementById("pays-chart").innerHTML = pays.length
-    ? pays.map(p => `
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-        <span style="width:100px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.pays}</span>
-        <div style="flex:1;background:var(--surface2);border-radius:6px;height:16px;overflow:hidden;">
-          <div style="width:${Math.round(p.n/maxPays*100)}%;background:var(--accent);height:100%;border-radius:6px;"></div>
-        </div>
-        <span style="font-size:12px;color:var(--muted);width:24px;text-align:right;">${p.n}</span>
-      </div>
-    `).join("")
-    : `<div class="empty">Données insuffisantes (seuil de confidentialité : 10 membres minimum).</div>`;
-
-  // Secteurs statiques (données simulées)
-  const secteurs = OBSERVATOIRE_DIASPORA?.secteur_activite || [
-    {label:"Santé / Social",pct:28}, {label:"Technologie",pct:22}, {label:"Éducation",pct:18},
-    {label:"Commerce / Artisanat",pct:15}, {label:"Agriculture",pct:10}, {label:"Autres",pct:7}
-  ];
-  document.getElementById("secteur-chart").innerHTML = secteurs.map(s => `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-      <span style="width:140px;font-size:12.5px;">${s.label}</span>
-      <div style="flex:1;background:var(--surface2);border-radius:6px;height:16px;overflow:hidden;">
-        <div style="width:${s.pct}%;background:#7C3AED;height:100%;border-radius:6px;"></div>
-      </div>
-      <span style="font-size:12px;color:var(--muted);width:30px;">${s.pct}%</span>
-    </div>
-  `).join("");
-
-  const ages = OBSERVATOIRE_DIASPORA?.tranche_age || [
-    {label:"18-25 ans",pct:16},{label:"26-35 ans",pct:38},{label:"36-45 ans",pct:28},{label:"46-55 ans",pct:12},{label:"55+ ans",pct:6}
-  ];
-  document.getElementById("age-chart").innerHTML = ages.map(a => `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-      <span style="width:90px;font-size:12.5px;">${a.label}</span>
-      <div style="flex:1;background:var(--surface2);border-radius:6px;height:16px;overflow:hidden;">
-        <div style="width:${a.pct}%;background:#F97316;height:100%;border-radius:6px;"></div>
-      </div>
-      <span style="font-size:12px;color:var(--muted);width:30px;">${a.pct}%</span>
-    </div>
-  `).join("");
-
-  const etudes = OBSERVATOIRE_DIASPORA?.niveau_etudes || [
-    {label:"Bac+5 et +",pct:42},{label:"Bac+3/4",pct:31},{label:"Bac+1/2",pct:16},{label:"Bac",pct:8},{label:"Sans diplôme",pct:3}
-  ];
-  document.getElementById("etudes-chart").innerHTML = etudes.map(e => `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-      <span style="width:110px;font-size:12.5px;">${e.label}</span>
-      <div style="flex:1;background:var(--surface2);border-radius:6px;height:16px;overflow:hidden;">
-        <div style="width:${e.pct}%;background:#10B981;height:100%;border-radius:6px;"></div>
-      </div>
-      <span style="font-size:12px;color:var(--muted);width:30px;">${e.pct}%</span>
-    </div>
-  `).join("");
-
-  // Ciblage nationalités
-  document.querySelectorAll("#ciblage-nationalites .chip").forEach(chip => {
+  // Ciblage pays (multi-select, sauf "tous" exclusif)
+  document.querySelectorAll("#cible-pays .cible-chip").forEach(chip => {
     chip.addEventListener("click", () => {
-      document.querySelectorAll("#ciblage-nationalites .chip").forEach(c => c.classList.remove("chip-active"));
-      chip.classList.add("chip-active");
-      const nat = chip.dataset.nat;
-      document.getElementById("audience-preview").textContent = nat === "toutes"
-        ? "Tous les membres de la plateforme"
-        : `Les membres de nationalité ${nat} (données agrégées uniquement)`;
+      if (chip.dataset.val === "tous") {
+        document.querySelectorAll("#cible-pays .cible-chip").forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+        document.getElementById("comm-audience").textContent = "Tous pays";
+      } else {
+        document.querySelector("#cible-pays .cible-chip[data-val='tous']").classList.remove("active");
+        chip.classList.toggle("active");
+        const sel = [...document.querySelectorAll("#cible-pays .cible-chip.active")].map(c=>c.dataset.val);
+        if (!sel.length) { document.querySelector("#cible-pays .cible-chip[data-val='tous']").classList.add("active"); }
+        document.getElementById("comm-audience").textContent = sel.length ? sel.join(", ") : "Tous pays";
+      }
+    });
+  });
+
+  // Ciblage nationalités (idem)
+  document.querySelectorAll("#cible-nats .cible-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      if (chip.dataset.val === "toutes") {
+        document.querySelectorAll("#cible-nats .cible-chip").forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+      } else {
+        document.querySelector("#cible-nats .cible-chip[data-val='toutes']").classList.remove("active");
+        chip.classList.toggle("active");
+        if (![...document.querySelectorAll("#cible-nats .cible-chip.active")].length) {
+          document.querySelector("#cible-nats .cible-chip[data-val='toutes']").classList.add("active");
+        }
+      }
     });
   });
 
   // Envoyer communication
   document.getElementById("btn-envoyer-comm").addEventListener("click", async () => {
+    const titre = document.getElementById("comm-titre").value.trim();
     const contenu = document.getElementById("comm-contenu").value.trim();
-    if (!contenu) return;
+    if (!titre || !contenu) { alert("L'objet et le contenu sont requis."); return; }
+    const pays = [...document.querySelectorAll("#cible-pays .cible-chip.active")].map(c=>c.dataset.val).filter(v=>v!=="tous");
+    const nats = [...document.querySelectorAll("#cible-nats .cible-chip.active")].map(c=>c.dataset.val).filter(v=>v!=="toutes");
     try {
-      await api("POST", "/fil", {
-        type: "institutionnel",
-        categorie: document.getElementById("comm-categorie").value,
-        contenu
-      });
-      document.getElementById("comm-contenu").value = "";
-      document.getElementById("comm-objet").value = "";
-      alert("Communication publiée sur le fil d'actualité. (Simulation)");
+      const r = await api("POST", "/communications", { titre, contenu, type: COMM_TYPE, cible: { pays, nationalites: nats } });
+      alert(`Communication envoyée avec succès ! Audience estimée : ${r.nb_destinataires} destinataire(s).`);
+      resetCommForm();
+      loadCommHistorique();
     } catch(e) { alert("Erreur : " + e.message); }
   });
 
-  async function loadPartenariats() {
-    const el = document.getElementById("initiatives-partenaires");
+  // Publier sur le fil
+  document.getElementById("btn-publier").addEventListener("click", async () => {
+    const contenu = document.getElementById("pub-contenu").value.trim();
+    if (!contenu) return;
     try {
-      const r = await api("GET", "/initiatives");
-      const inits = r.initiatives || [];
-      if (!inits.length) { el.innerHTML = `<div class="empty">Aucune initiative disponible.</div>`; return; }
-      el.innerHTML = inits.slice(0,6).map(i => `
-        <div class="card" style="margin-bottom:12px;display:flex;gap:14px;align-items:flex-start;">
-          <div class="avatar" style="flex-shrink:0;">${(i.sigle||i.nom)[0]}</div>
-          <div style="flex:1;">
-            <div style="font-weight:700;font-size:14px;">${i.nom}</div>
-            <div style="font-size:12.5px;color:var(--muted);">${i.domaine||""} ${i.ville ? "· " + i.ville : ""} ${i.pays ? "· " + i.pays : ""}</div>
-            ${i.description ? `<p style="font-size:13px;margin:6px 0 0;">${i.description.slice(0,120)}…</p>` : ""}
-          </div>
-          <button class="btn btn-sm btn-outline" onclick="alert('Messagerie partenariat (simulation) — contactez cette initiative via la messagerie.')">Contacter</button>
-        </div>
-      `).join("");
-    } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
-  }
+      await api("POST", "/fil", { type: "publication", categorie: "institutionnel", contenu });
+      document.getElementById("pub-contenu").value = "";
+      alert("Publication envoyée sur le fil d'actualité !");
+      loadPublications();
+    } catch(e) { alert("Erreur : " + e.message); }
+  });
+
+  // Charger données initiales
+  if (ACCRED) loadObservatoire();
 })();
 </script>
 </body>
