@@ -1277,12 +1277,16 @@ function enrichPost(p, cu) {
     const u = db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur,role FROM users WHERE id=?").get(p.auteur_id);
     if (u) {
       auteur = u;
-      // Si l'auteur est une initiative, chercher sa certification
       if (u.role === "initiative") {
         const init = db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(p.auteur_id);
         if (init) auteur_certif = getCertif(init.id);
       }
     }
+  }
+  // Fallback : posts seedés sans auteur_id — chercher par nom d'initiative
+  if (!auteur_certif && p.auteur_nom) {
+    const initByName = db.prepare("SELECT id FROM initiatives WHERE nom=? OR sigle=?").get(p.auteur_nom, p.auteur_nom);
+    if (initByName) auteur_certif = getCertif(initByName.id);
   }
 
   // Score de popularité : likes×3 + commentaires×2 + reposts×1
