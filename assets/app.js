@@ -155,13 +155,14 @@ function renderNotifItem(n) {
     <div class="notif-content">
       <div class="notif-titre">${escapeHtml(n.titre || "")}</div>
       <div class="notif-contenu">${escapeHtml(n.contenu || "")}</div>
-      <div class="notif-date">${fmtDate(n.created_at)}</div>
+      <div class="notif-date">${fmtDateGlobal(n.created_at)}</div>
     </div>
     ${unread ? `<div class="notif-unread-dot"></div>` : ""}
   </a>`;
 }
 
 function escapeHtml(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function fmtDateGlobal(str){ try{ return new Date(str.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"}); } catch{ return str||""; } }
 
 window.markNotifRead = async function(id) {
   try { await api("PATCH", `/notifications/${id}/lire`); } catch{}
