@@ -38,6 +38,7 @@
       <a href="#publications">📰 Publications</a>
       <a href="#evenements">📅 Événements</a>
       <a href="#paiement">💳 Module paiement</a>
+      <a href="#accreditations">🎖 Accréditations DA</a>
       <a href="messagerie.html">💬 Messages <span class="pill" id="msg-count">—</span></a>
       <a href="confidentialite.html">🔐 Confidentialité</a>
     </aside>
@@ -267,6 +268,24 @@
       <p style="color:var(--muted);font-size:11px;margin-top:8px;">⚠️ Démonstration uniquement — aucune transaction réelle n'est traitée.</p>
     </div>
 
+    <div class="card" style="margin-bottom:20px;" id="accreditations">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">🎖 Accréditations Diaspo'Actif</h3>
+        <button class="btn btn-sm btn-outline" onclick="loadInitAccred()" style="font-size:12px;">↺ Actualiser</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 18px;">Les accréditations DA distinguent les initiatives les plus actives et créatrices d'impact. Elles confèrent un badge visible sur votre profil, vos publications et dans l'annuaire.</p>
+
+      <!-- Accréditations actives -->
+      <div id="init-accred-actives"></div>
+
+      <!-- Catalogue des accréditations disponibles -->
+      <h4 style="margin:20px 0 14px;font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.6px;font-weight:700;">Accréditations disponibles</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;" id="init-accred-catalogue"></div>
+
+      <!-- Demandes en cours -->
+      <div id="init-accred-demandes"></div>
+    </div>
+
     <div id="ad-dashboard-initiative" data-ad-slot="4"></div>`;
 
   /* Moyens de paiement */
@@ -309,6 +328,122 @@
   });
 
   renderAllAds();
+
+  /* ── Accréditations DA ── */
+  async function loadInitAccred() {
+    const [rMes, rDem] = await Promise.all([
+      api('GET', '/accreditations/mes').catch(() => ({ accreditations: [] })),
+      api('GET', '/accreditations/demandes').catch(() => ({ demandes: [] }))
+    ]);
+    const actives = rMes.accreditations || [];
+    const demandes = rDem.demandes || [];
+
+    // Bloc accréditations actives
+    const activesEl = document.getElementById('init-accred-actives');
+    if (activesEl) {
+      if (actives.filter(a => a.statut === 'active').length) {
+        activesEl.innerHTML = `
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+            ${actives.filter(a => a.statut === 'active').map(a => {
+              const def = (ACCREDITATIONS_DA || []).find(d => d.type === a.type) || {};
+              return `<div style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:12px;background:${def.couleurBg || '#f0fdf4'};border:1.5px solid ${def.couleurBorder || '#22c55e'};">
+                <span style="font-size:18px;">${def.emoji || '🎖'}</span>
+                <div>
+                  <div style="font-weight:700;font-size:13px;color:${def.couleurText || '#166534'};">${def.label || a.type}</div>
+                  <div style="font-size:11px;color:var(--muted);">Active${a.date_expiration ? ' · Expire le ' + a.date_expiration.slice(0,10) : ''}</div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>`;
+      } else {
+        activesEl.innerHTML = '';
+      }
+    }
+
+    // Catalogue
+    const catEl = document.getElementById('init-accred-catalogue');
+    if (catEl && typeof ACCREDITATIONS_DA !== 'undefined') {
+      catEl.innerHTML = ACCREDITATIONS_DA.map(def => {
+        const active = actives.find(a => a.type === def.type && a.statut === 'active');
+        const demandeEnCours = demandes.find(d => d.type === def.type && d.statut === 'en_attente');
+        const refusee = demandes.find(d => d.type === def.type && d.statut === 'refusee');
+        const prix = def.prix?.initiative || 0;
+        let btnHTML;
+        if (active) {
+          btnHTML = `<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#dcfce7;color:#16a34a;font-weight:700;font-size:13px;">✅ Accréditation active</div>`;
+        } else if (demandeEnCours) {
+          btnHTML = `<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#fef9c3;color:#a16207;font-weight:700;font-size:13px;">⏳ Demande en cours d'examen</div>`;
+        } else {
+          btnHTML = `<button class="btn btn-orange btn-block" onclick="demanderAccredInit('${def.type}','${def.label.replace(/'/g, "\\'")}')">
+            Demander cette accréditation${prix > 0 ? ' — ' + prix + ' €/an' : ' — Gratuit'}
+          </button>`;
+          if (refusee) {
+            btnHTML = `<div style="font-size:12px;color:#dc2626;margin-bottom:8px;">Demande précédente refusée${refusee.motif_refus ? ' : ' + refusee.motif_refus : ''}.</div>` + btnHTML;
+          }
+        }
+        return `
+          <div style="border:1.5px solid ${active ? def.couleurBorder : 'var(--border)'};border-radius:14px;padding:18px;background:${active ? def.couleurBg : ''};transition:border-color .2s;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+              <span style="font-size:28px;">${def.emoji}</span>
+              <div>
+                <div style="font-weight:800;font-size:15px;">${def.label}</div>
+                <div style="font-size:12px;font-weight:700;color:${def.couleurText};">${prix > 0 ? prix + ' €/an' : 'Gratuit pour les initiatives'}</div>
+              </div>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">${def.description}</p>
+            <ul style="margin:0 0 14px;padding-left:18px;font-size:12.5px;color:var(--text);">
+              ${(def.avantages || []).map(a => `<li style="margin-bottom:4px;">${a}</li>`).join('')}
+            </ul>
+            ${btnHTML}
+          </div>`;
+      }).join('');
+    }
+
+    // Demandes en cours
+    const demEl = document.getElementById('init-accred-demandes');
+    if (demEl) {
+      const recentes = demandes.slice(0, 5);
+      if (recentes.length) {
+        demEl.innerHTML = `
+          <h4 style="margin:24px 0 12px;font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.6px;font-weight:700;">Historique de mes demandes</h4>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="border-bottom:2px solid var(--border);">
+              <th style="text-align:left;padding:8px;">Type</th>
+              <th style="text-align:left;padding:8px;">Statut</th>
+              <th style="text-align:left;padding:8px;">Date</th>
+            </tr></thead>
+            <tbody>
+              ${recentes.map(d => {
+                const def = (ACCREDITATIONS_DA || []).find(x => x.type === d.type) || {};
+                const statuts = { en_attente: ['⏳ En attente', '#fef9c3', '#a16207'], approuvee: ['✅ Approuvée', '#dcfce7', '#16a34a'], refusee: ['❌ Refusée', '#fee2e2', '#dc2626'] };
+                const [lbl, bg, col] = statuts[d.statut] || [d.statut, '#f3f4f6', '#374151'];
+                return `<tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:10px 8px;font-weight:600;">${def.emoji || '🎖'} ${def.label || d.type}</td>
+                  <td style="padding:10px 8px;"><span style="padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:${bg};color:${col};">${lbl}</span></td>
+                  <td style="padding:10px 8px;color:var(--muted);font-size:12px;">${(d.created_at || '').slice(0,10)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>`;
+      } else {
+        demEl.innerHTML = '';
+      }
+    }
+  }
+
+  async function demanderAccredInit(type, label) {
+    const message = prompt(`Votre message de candidature pour « ${label} » (optionnel) :\n\nDécrivez brièvement vos activités et pourquoi vous méritez cette accréditation.`, '');
+    if (message === null) return;
+    try {
+      await api('POST', '/accreditations/demande', { type, message });
+      await loadInitAccred();
+      alert(`✅ Votre demande d'accréditation « ${label} » a été envoyée. L'équipe Diaspo'Actif l'examinera dans les meilleurs délais.`);
+    } catch (e) {
+      alert('Erreur : ' + (e.message || 'Impossible d\'envoyer la demande.'));
+    }
+  }
+
+  loadInitAccred();
 })();
 </script>
 </body>

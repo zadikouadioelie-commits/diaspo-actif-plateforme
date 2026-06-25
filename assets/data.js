@@ -261,6 +261,44 @@ const RECHERCHES = [
 /* ---------- Modèle économique ---------- */
 const TARIF_INITIATIVE_ANNUEL = 50; // € / an / initiative
 
+/* ---------- Accréditations Diaspo'Actif ---------- */
+const ACCREDITATIONS_DA = [
+  {
+    type: 'mobilisation_active',
+    label: 'Mobilisation Active',
+    emoji: '📢',
+    couleur: '#f59e0b',
+    couleurBg: '#fffbeb',
+    couleurBorder: '#f59e0b',
+    couleurText: '#92400e',
+    description: 'Reconnue pour sa capacité à mobiliser la diaspora autour de causes, d\'événements et de projets collectifs. Confère une visibilité accrue et un badge distinctif.',
+    avantages: [
+      'Badge 📢 visible sur votre profil et vos publications',
+      'Mise en avant prioritaire dans l\'annuaire',
+      'Filtre dédié dans la recherche Diaspo\'Actif',
+      'Accès aux outils de mobilisation avancés'
+    ],
+    prix: { initiative: 29, collectivite: 0 }
+  },
+  {
+    type: 'createur_opportunites',
+    label: 'Créateur d\'Opportunités',
+    emoji: '💼',
+    couleur: '#3b82f6',
+    couleurBg: '#eff6ff',
+    couleurBorder: '#3b82f6',
+    couleurText: '#1e40af',
+    description: 'Reconnue pour la création d\'emplois, de stages, d\'appels à projets et d\'opportunités économiques au service de la diaspora.',
+    avantages: [
+      'Badge 💼 visible sur votre profil et vos publications',
+      'Accès prioritaire à la section "Offres & Opportunités"',
+      'Filtre dédié dans la recherche et l\'annuaire',
+      'Mise en relation facilitée avec les membres'
+    ],
+    prix: { initiative: 39, collectivite: 0 }
+  }
+];
+
 /* ---------- Compte Institutionnel : organismes publics partenaires ---------- */
 const INSTITUTIONS = [
   { nom: "Ambassade de Côte d'Ivoire en France", type: "Ambassade", pays: "Côte d'Ivoire", abonnes: 4820 },

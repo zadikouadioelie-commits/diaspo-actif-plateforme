@@ -90,6 +90,7 @@
       <a href="#" data-section="consultations">📋 Consultations</a>
       <a href="#" data-section="publications">📢 Publications</a>
       <a href="#" data-section="partenariats">🤝 Partenariats</a>
+      <a href="#" data-section="accreditations-da" style="display:flex;justify-content:space-between;align-items:center;">🎖 Accréditations DA <span id="coll-accred-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
     </aside>
 
     <main class="content">
@@ -319,6 +320,25 @@
         <div id="initiatives-partenaires"><div class="notice">Chargement…</div></div>
       </section>
 
+      <!-- ===================== ACCRÉDITATIONS DA ===================== -->
+      <section id="section-accreditations-da" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <h2 style="margin:0;">🎖 Accréditations Diaspo'Actif</h2>
+          <button class="btn btn-sm btn-outline" onclick="loadCollAccred()" style="font-size:12px;">↺ Actualiser</button>
+        </div>
+        <p style="color:var(--muted);font-size:13.5px;margin:0 0 20px;">Les accréditations DA distinguent les collectivités les plus engagées dans l'accompagnement de leur diaspora. Elles confèrent un badge visible sur votre profil et dans l'annuaire. <strong>Gratuites pour les collectivités partenaires.</strong></p>
+
+        <!-- Accréditations actives -->
+        <div id="coll-accred-actives"></div>
+
+        <!-- Catalogue -->
+        <h4 style="margin:20px 0 14px;font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.6px;font-weight:700;">Accréditations disponibles</h4>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;" id="coll-accred-catalogue"></div>
+
+        <!-- Historique demandes -->
+        <div id="coll-accred-demandes"></div>
+      </section>
+
     </main>
   </div>
 </div>
@@ -416,6 +436,117 @@ function showSection(name) {
   if (name === "consultations") loadConsultations();
   if (name === "publications") loadPublications();
   if (name === "partenariats") loadPartenariats();
+  if (name === "accreditations-da") loadCollAccred();
+}
+
+/* ===== Accréditations DA ===== */
+async function loadCollAccred() {
+  const [rMes, rDem] = await Promise.all([
+    api('GET', '/accreditations/mes').catch(() => ({ accreditations: [] })),
+    api('GET', '/accreditations/demandes').catch(() => ({ demandes: [] }))
+  ]);
+  const actives = rMes.accreditations || [];
+  const demandes = rDem.demandes || [];
+
+  // Badge sidebar
+  const pending = demandes.filter(d => d.statut === 'en_attente').length;
+  const badge = document.getElementById('coll-accred-badge');
+  if (badge) { if (pending > 0) { badge.textContent = pending; badge.style.display = 'inline-block'; } else badge.style.display = 'none'; }
+
+  // Accréditations actives
+  const activesEl = document.getElementById('coll-accred-actives');
+  if (activesEl) {
+    const liste = actives.filter(a => a.statut === 'active');
+    activesEl.innerHTML = liste.length ? `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        ${liste.map(a => {
+          const def = (ACCREDITATIONS_DA || []).find(d => d.type === a.type) || {};
+          return `<div style="display:inline-flex;align-items:center;gap:10px;padding:10px 16px;border-radius:12px;background:${def.couleurBg||'#f0fdf4'};border:1.5px solid ${def.couleurBorder||'#22c55e'};">
+            <span style="font-size:22px;">${def.emoji||'🎖'}</span>
+            <div>
+              <div style="font-weight:700;font-size:14px;color:${def.couleurText||'#166534'};">${def.label||a.type}</div>
+              <div style="font-size:11px;color:var(--muted);">Active${a.date_expiration?' · Expire le '+a.date_expiration.slice(0,10):' · Permanent'}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>` : '';
+  }
+
+  // Catalogue
+  const catEl = document.getElementById('coll-accred-catalogue');
+  if (catEl && typeof ACCREDITATIONS_DA !== 'undefined') {
+    catEl.innerHTML = ACCREDITATIONS_DA.map(def => {
+      const active = actives.find(a => a.type === def.type && a.statut === 'active');
+      const demandeEnCours = demandes.find(d => d.type === def.type && d.statut === 'en_attente');
+      const refusee = demandes.find(d => d.type === def.type && d.statut === 'refusee');
+      const prix = def.prix?.collectivite || 0;
+      let btnHTML;
+      if (active) {
+        btnHTML = `<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#dcfce7;color:#16a34a;font-weight:700;font-size:13px;">✅ Accréditation active</div>`;
+      } else if (demandeEnCours) {
+        btnHTML = `<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#fef9c3;color:#a16207;font-weight:700;font-size:13px;">⏳ Demande en cours d'examen</div>`;
+      } else {
+        btnHTML = `<button class="btn btn-orange btn-block" onclick="demanderAccredColl('${def.type}','${def.label.replace(/'/g,"\\'")}')">
+          Demander cette accréditation${prix > 0 ? ' — ' + prix + ' €/an' : ' — Gratuit'}
+        </button>`;
+        if (refusee) btnHTML = `<div style="font-size:12px;color:#dc2626;margin-bottom:8px;">Demande précédente refusée${refusee.motif_refus?' : '+refusee.motif_refus:''}.</div>` + btnHTML;
+      }
+      return `
+        <div style="border:1.5px solid ${active ? def.couleurBorder : 'var(--border)'};border-radius:14px;padding:18px;background:${active ? def.couleurBg : ''};transition:border-color .2s;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <span style="font-size:28px;">${def.emoji}</span>
+            <div>
+              <div style="font-weight:800;font-size:15px;">${def.label}</div>
+              <div style="font-size:12px;font-weight:700;color:${def.couleurText};">${prix > 0 ? prix + ' €/an' : 'Gratuit pour les collectivités'}</div>
+            </div>
+          </div>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">${def.description}</p>
+          <ul style="margin:0 0 14px;padding-left:18px;font-size:12.5px;">
+            ${(def.avantages||[]).map(a => `<li style="margin-bottom:4px;">${a}</li>`).join('')}
+          </ul>
+          ${btnHTML}
+        </div>`;
+    }).join('');
+  }
+
+  // Historique demandes
+  const demEl = document.getElementById('coll-accred-demandes');
+  if (demEl) {
+    demEl.innerHTML = demandes.length ? `
+      <h4 style="margin:24px 0 12px;font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.6px;font-weight:700;">Historique de mes demandes</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:8px;">Type</th>
+          <th style="text-align:left;padding:8px;">Statut</th>
+          <th style="text-align:left;padding:8px;">Date</th>
+          <th style="text-align:left;padding:8px;">Motif refus</th>
+        </tr></thead>
+        <tbody>
+          ${demandes.slice(0,8).map(d => {
+            const def = (ACCREDITATIONS_DA||[]).find(x => x.type === d.type) || {};
+            const [lbl,bg,col] = {en_attente:['⏳ En attente','#fef9c3','#a16207'],approuvee:['✅ Approuvée','#dcfce7','#16a34a'],refusee:['❌ Refusée','#fee2e2','#dc2626']}[d.statut] || [d.statut,'#f3f4f6','#374151'];
+            return `<tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 8px;font-weight:600;">${def.emoji||'🎖'} ${def.label||d.type}</td>
+              <td style="padding:10px 8px;"><span style="padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:${bg};color:${col};">${lbl}</span></td>
+              <td style="padding:10px 8px;color:var(--muted);font-size:12px;">${(d.created_at||'').slice(0,10)}</td>
+              <td style="padding:10px 8px;font-size:12px;color:#dc2626;">${escH(d.motif_refus||'')}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>` : '';
+  }
+}
+
+async function demanderAccredColl(type, label) {
+  const message = prompt(`Votre message de candidature pour « ${label} » (optionnel) :\n\nDécrivez brièvement vos initiatives en faveur de la diaspora.`, '');
+  if (message === null) return;
+  try {
+    await api('POST', '/accreditations/demande', { type, message });
+    await loadCollAccred();
+    alert(`✅ Votre demande d'accréditation « ${label} » a été envoyée à l'équipe Diaspo'Actif.`);
+  } catch (e) {
+    alert('Erreur : ' + (e.message || 'Impossible d\'envoyer la demande.'));
+  }
 }
 
 /* ===== Observatoire ===== */
