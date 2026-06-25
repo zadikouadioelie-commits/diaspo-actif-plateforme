@@ -41,7 +41,7 @@
       <a href="#membres" data-section="membres">👥 Membres</a>
       <a href="#initiatives" data-section="initiatives">🌐 Initiatives</a>
       <a href="#certifications" data-section="certifications">🛡️ Certifications</a>
-      <a href="#accreditations" data-section="accreditations">🏛️ Accréditations</a>
+      <a href="#accreditations" data-section="accreditations" style="display:flex;justify-content:space-between;align-items:center;">🏛️ Accréditations <span id="accred-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#publicites" data-section="publicites">📣 Publicités</a>
       <a href="#formations" data-section="formations">📚 Formations</a>
       <a href="#publications" data-section="publications">📢 Publications</a>
@@ -239,7 +239,7 @@
         </div>
 
         <!-- ── Bloc 6 : Dernières inscriptions + Publications ── -->
-        <div class="grid grid-2" style="gap:16px;">
+        <div class="grid grid-2" style="gap:16px;margin-bottom:24px;">
           <div class="card">
             <h3 style="margin:0 0 14px;">Dernières inscriptions</h3>
             <div id="derniers-inscrits"><div class="notice">Chargement…</div></div>
@@ -247,6 +247,27 @@
           <div class="card">
             <h3 style="margin:0 0 14px;">Publications récentes</h3>
             <div id="publis-recentes"><div class="notice">Chargement…</div></div>
+          </div>
+        </div>
+
+        <!-- ── Bloc 7 : Widget Accréditations DA ── -->
+        <div style="margin-bottom:8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Accréditations Diaspo'Actif</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:stretch;margin-bottom:0;" id="widget-accred-da">
+          <div class="card" style="border-left:4px solid #f59e0b;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('demandes'),200)">
+            <div style="font-size:28px;font-weight:800;color:#92400e;" id="da-widget-pending">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">⏳ Demandes en attente</div>
+          </div>
+          <div class="card" style="border-left:4px solid #fef3c7;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
+            <div style="font-size:28px;font-weight:800;color:#f59e0b;" id="da-widget-mobilisation">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">📢 Mobilisation Active</div>
+          </div>
+          <div class="card" style="border-left:4px solid #dbeafe;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
+            <div style="font-size:28px;font-weight:800;color:#1e40af;" id="da-widget-opportunites">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">💼 Créateur d'Opportunités</div>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:180px;">
+            <button class="btn btn-orange" style="font-size:13px;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('demandes'),200)">⏳ Voir les demandes</button>
+            <button class="btn btn-outline" style="font-size:13px;" onclick="goSection('accreditations');setTimeout(()=>openAccordDirectModal(),200)">➕ Accorder directement</button>
           </div>
         </div>
       </section>
@@ -696,10 +717,11 @@
         <div id="section-accred-da" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
           <h2 style="margin:0 0 6px;">Accréditations Diaspo'Actif</h2>
           <p style="color:var(--muted);font-size:13px;margin:0 0 16px;">Gérez les demandes et attributions des accréditations « Mobilisation Active » et « Créateur d'Opportunités ».</p>
-          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-            <button class="btn btn-orange" id="da-tab-demandes" onclick="switchDATab('demandes')">⏳ Demandes en attente</button>
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-orange" id="da-tab-demandes" onclick="switchDATab('demandes')">⏳ Demandes en attente <span id="da-demandes-count" style="display:none;background:rgba(255,255,255,.3);padding:1px 6px;border-radius:99px;font-size:11px;margin-left:4px;"></span></button>
             <button class="btn btn-outline" id="da-tab-actives" onclick="switchDATab('actives')">✅ Accréditations actives</button>
             <button class="btn btn-outline" id="da-tab-histo" onclick="switchDATab('histo')">📋 Historique</button>
+            <button class="btn btn-outline" style="margin-left:auto;border-color:var(--orange);color:var(--orange);font-weight:700;" onclick="openAccordDirectModal()">➕ Accorder une accréditation</button>
           </div>
           <div id="da-panel-demandes">
             <div class="card" style="padding:0;overflow:hidden;">
@@ -746,6 +768,67 @@
           </div>
         </div>
       </section>
+
+      <!-- Modal : Accorder directement une accréditation DA -->
+      <div id="modal-accord-direct" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:var(--surface);border-radius:18px;max-width:520px;width:100%;padding:28px;max-height:90vh;overflow-y:auto;">
+          <div class="flex-between" style="margin-bottom:20px;">
+            <h3 style="margin:0;">➕ Accorder une accréditation DA</h3>
+            <button style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);" onclick="document.getElementById('modal-accord-direct').style.display='none'">✕</button>
+          </div>
+
+          <!-- Recherche de compte -->
+          <label class="form-label">Rechercher un compte *</label>
+          <div style="display:flex;gap:8px;margin-bottom:4px;">
+            <input id="ad-search" class="input-field" style="flex:1;" placeholder="Nom, email, initiative…" oninput="searchCompteDA(this.value)">
+          </div>
+          <div id="ad-search-results" style="border:1px solid var(--border);border-radius:10px;max-height:160px;overflow-y:auto;margin-bottom:14px;display:none;"></div>
+          <div id="ad-selected" style="display:none;padding:10px 14px;background:var(--bg);border-radius:10px;border:1px solid var(--border);margin-bottom:14px;">
+            <span id="ad-selected-label" style="font-weight:700;"></span>
+            <button onclick="clearSelectedDA()" style="float:right;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;">✕</button>
+          </div>
+          <input type="hidden" id="ad-user-id">
+
+          <!-- Type d'accréditation -->
+          <label class="form-label">Type d'accréditation *</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:14px;transition:border-color .2s;" id="ad-card-mob" onclick="selectTypeDA('mobilisation_active')">
+              <input type="radio" name="ad-type" value="mobilisation_active" style="display:none;">
+              <div style="font-size:20px;margin-bottom:4px;">📢</div>
+              <div style="font-weight:700;font-size:13px;">Mobilisation Active</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">Sondages · Consultations · Appels à projets</div>
+            </label>
+            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:14px;transition:border-color .2s;" id="ad-card-opp" onclick="selectTypeDA('createur_opportunites')">
+              <input type="radio" name="ad-type" value="createur_opportunites" style="display:none;">
+              <div style="font-size:20px;margin-bottom:4px;">💼</div>
+              <div style="font-weight:700;font-size:13px;">Créateur d'Opportunités</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">Emploi · Partenariats · Mentorat · B2B</div>
+            </label>
+          </div>
+
+          <!-- Frais + Note -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div>
+              <label class="form-label">Frais d'accès (€/an)</label>
+              <input id="ad-frais" class="input-field" style="width:100%;" type="number" min="0" value="0" placeholder="0 = gratuit">
+            </div>
+            <div>
+              <label class="form-label">Date d'expiration (optionnel)</label>
+              <input id="ad-expiration" class="input-field" style="width:100%;" type="date">
+            </div>
+          </div>
+          <div style="margin-bottom:18px;">
+            <label class="form-label">Note admin (visible en interne)</label>
+            <textarea id="ad-motif" class="input-field" style="width:100%;min-height:70px;" placeholder="Motif d'attribution, conditions particulières…"></textarea>
+          </div>
+
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-orange" style="flex:1;" onclick="submitAccordDirect()">✅ Accorder l'accréditation</button>
+            <button class="btn btn-outline" onclick="document.getElementById('modal-accord-direct').style.display='none'">Annuler</button>
+          </div>
+          <div id="ad-error" style="display:none;color:#B91C1C;font-size:13px;margin-top:10px;padding:8px;background:#fef2f2;border-radius:8px;"></div>
+        </div>
+      </div>
 
       <!-- Modal nouvelle accréditation -->
       <div id="accred-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;">
@@ -1887,6 +1970,126 @@ async function retirerDA(userId, type){
 document.querySelector('[data-section="accreditations"]')?.addEventListener('click',()=>{
   setTimeout(loadDADemandes,150);
 });
+
+/* ── Navigation helper ── */
+function goSection(name){
+  document.querySelectorAll('section[id^="section-"]').forEach(s=>s.style.display='none');
+  document.querySelectorAll('aside a[data-section]').forEach(a=>a.classList.remove('active'));
+  const sec=document.getElementById('section-'+name);
+  if(sec) sec.style.display='';
+  const lnk=document.querySelector('[data-section="'+name+'"]');
+  if(lnk) lnk.classList.add('active');
+}
+
+/* ── Widget stats accréditations DA (vue d'ensemble) ── */
+async function loadDAWidgetStats(){
+  try{
+    const [dem,act]=await Promise.all([
+      api('GET','/admin/accreditations/demandes?statut=en_attente'),
+      api('GET','/admin/accreditations')
+    ]);
+    const pending=(dem.demandes||[]).length;
+    const mob=(act.accreditations||[]).filter(a=>a.type==='mobilisation_active'&&a.statut==='active').length;
+    const opp=(act.accreditations||[]).filter(a=>a.type==='createur_opportunites'&&a.statut==='active').length;
+    const wp=document.getElementById('da-widget-pending');
+    const wm=document.getElementById('da-widget-mobilisation');
+    const wo=document.getElementById('da-widget-opportunites');
+    if(wp) wp.textContent=pending;
+    if(wm) wm.textContent=mob;
+    if(wo) wo.textContent=opp;
+    // Badge sidebar
+    const badge=document.getElementById('accred-pending-badge');
+    if(badge){ if(pending>0){badge.textContent=pending;badge.style.display='inline-block';}else badge.style.display='none'; }
+    // Badge bouton demandes
+    const cnt=document.getElementById('da-demandes-count');
+    if(cnt){ if(pending>0){cnt.textContent=pending;cnt.style.display='inline-block';}else cnt.style.display='none'; }
+  }catch(e){}
+}
+
+/* ── Modal : Accorder directement ── */
+let _adSelectedType='';
+
+function openAccordDirectModal(){
+  document.getElementById('ad-search').value='';
+  document.getElementById('ad-search-results').style.display='none';
+  document.getElementById('ad-search-results').innerHTML='';
+  document.getElementById('ad-selected').style.display='none';
+  document.getElementById('ad-user-id').value='';
+  document.getElementById('ad-frais').value='0';
+  document.getElementById('ad-expiration').value='';
+  document.getElementById('ad-motif').value='';
+  document.getElementById('ad-error').style.display='none';
+  _adSelectedType='';
+  ['ad-card-mob','ad-card-opp'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.style.borderColor='var(--border)';el.style.background='';}
+  });
+  document.getElementById('modal-accord-direct').style.display='flex';
+}
+
+let _adSearchTimer=null;
+async function searchCompteDA(q){
+  clearTimeout(_adSearchTimer);
+  const box=document.getElementById('ad-search-results');
+  if(!q||q.length<2){box.style.display='none';return;}
+  _adSearchTimer=setTimeout(async()=>{
+    try{
+      const r=await api('GET','/admin/comptes');
+      const rows=(r.users||[]).filter(u=>
+        (u.nom||'').toLowerCase().includes(q.toLowerCase())||
+        (u.email||'').toLowerCase().includes(q.toLowerCase())
+      ).slice(0,8);
+      if(!rows.length){box.innerHTML='<div style="padding:10px 14px;color:var(--muted);font-size:13px;">Aucun compte trouvé</div>';box.style.display='block';return;}
+      box.innerHTML=rows.map(u=>`<div style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:10px;"
+        onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
+        onclick="pickCompteDA(${u.id},'${escDA((u.nom||'')+(u.email?' ('+u.email+')':''))}')">
+        <span style="font-weight:600;">${escDA(u.nom||'')}</span>
+        <span style="color:var(--muted);font-size:12px;">${escDA(u.email||'')}</span>
+        <span style="margin-left:auto;font-size:11px;opacity:.6;">${escDA(u.role||'')}</span>
+      </div>`).join('');
+      box.style.display='block';
+    }catch(e){box.innerHTML='<div style="padding:10px;color:red;font-size:13px;">Erreur: '+escDA(e.message)+'</div>';box.style.display='block';}
+  },300);
+}
+
+function pickCompteDA(id,label){
+  document.getElementById('ad-user-id').value=id;
+  document.getElementById('ad-selected-label').textContent=label;
+  document.getElementById('ad-selected').style.display='block';
+  document.getElementById('ad-search-results').style.display='none';
+  document.getElementById('ad-search').value='';
+}
+function clearSelectedDA(){
+  document.getElementById('ad-user-id').value='';
+  document.getElementById('ad-selected').style.display='none';
+}
+function selectTypeDA(type){
+  _adSelectedType=type;
+  const mob=document.getElementById('ad-card-mob');
+  const opp=document.getElementById('ad-card-opp');
+  if(mob){mob.style.borderColor=type==='mobilisation_active'?'#f59e0b':'var(--border)';mob.style.background=type==='mobilisation_active'?'#fffbeb':'';}
+  if(opp){opp.style.borderColor=type==='createur_opportunites'?'#3b82f6':'var(--border)';opp.style.background=type==='createur_opportunites'?'#eff6ff':'';}
+}
+async function submitAccordDirect(){
+  const userId=document.getElementById('ad-user-id').value;
+  const errEl=document.getElementById('ad-error');
+  errEl.style.display='none';
+  if(!userId){errEl.textContent='Veuillez sélectionner un compte.';errEl.style.display='block';return;}
+  if(!_adSelectedType){errEl.textContent="Veuillez choisir un type d'accréditation.";errEl.style.display='block';return;}
+  const frais=Math.max(0,parseFloat(document.getElementById('ad-frais').value)||0);
+  const expiration=document.getElementById('ad-expiration').value||null;
+  const motif=document.getElementById('ad-motif').value.trim();
+  try{
+    await api('PATCH','/admin/accreditations/'+userId+'/'+_adSelectedType+'/accorder',{motif,notes:motif,frais_acces:frais,date_expiration:expiration});
+    document.getElementById('modal-accord-direct').style.display='none';
+    loadDADemandes();loadDAActives();loadDAWidgetStats();
+    alert('✅ Accréditation accordée avec succès.');
+  }catch(e){
+    errEl.textContent='Erreur : '+(e.message||'Inconnue');
+    errEl.style.display='block';
+  }
+}
+
 /* ===== Fin accréditations DA ===== */
 
 (async () => {
@@ -2252,6 +2455,9 @@ document.querySelector('[data-section="accreditations"]')?.addEventListener('cli
   api("GET", "/admin/finances").then(fin => {
     populateKpiBar(data, fin);
   }).catch(() => populateKpiBar(data, null));
+
+  // Charger widget accréditations DA au démarrage
+  loadDAWidgetStats();
 
   // ══ RÉSEAU & DIASPORA ══════════════════════════════════════
   async function loadReseau() {
@@ -2694,6 +2900,8 @@ document.querySelector('[data-section="accreditations"]')?.addEventListener('cli
       api("GET", "/admin/finances").then(fin => populateKpiBar(fresh, fin)).catch(() => {});
     } catch(e) { alert("Erreur de rafraîchissement : " + e.message); }
     finally { if (btn) { btn.disabled = false; btn.textContent = "↺ Actualiser"; } }
+    // Refresh widget accréditations
+    loadDAWidgetStats();
   };
 
   // Publier
