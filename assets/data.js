@@ -341,6 +341,26 @@ const ACCREDITATIONS_DA = [
     ],
     eligible: ['collectivite'],
     prix: { collectivite: 0 }
+  },
+  {
+    type: 'creation_publicite',
+    label: 'Création de Publicité',
+    emoji: '📣',
+    couleur: '#dc2626',
+    couleurBg: '#fef2f2',
+    couleurBorder: '#dc2626',
+    couleurText: '#991b1b',
+    description: 'Autorisation de créer et soumettre des publicités sur la plateforme Diaspo\'Actif. Chaque publicité est soumise à validation par l\'équipe avant diffusion.',
+    droits: [
+      'Créer des campagnes publicitaires complètes (6 paramètres)',
+      'Définir le ciblage géographique et démographique',
+      'Choisir les emplacements de diffusion',
+      'Définir les périodes et fréquences d\'affichage',
+      'Suivre les statistiques d\'impressions et de clics',
+      'Soumettre des publicités à validation administrative'
+    ],
+    eligible: ['initiative'],
+    prix: { initiative: 49 }
   }
 ];
 

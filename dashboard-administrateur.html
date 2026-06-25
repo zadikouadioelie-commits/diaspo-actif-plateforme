@@ -273,6 +273,10 @@
             <div style="font-size:28px;font-weight:800;color:#4c1d95;" id="da-widget-institutionnelle">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">🏛️ Institutionnelle</div>
           </div>
+          <div class="card" style="border-left:4px solid #fecaca;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
+            <div style="font-size:28px;font-weight:800;color:#991b1b;" id="da-widget-pub">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">📣 Création Publicité</div>
+          </div>
           <div class="card" style="display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:160px;">
             <button class="btn btn-orange" style="font-size:13px;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('demandes'),200)">⏳ Voir les demandes</button>
             <button class="btn btn-outline" style="font-size:13px;" onclick="goSection('accreditations');setTimeout(()=>openAccordDirectModal(),200)">➕ Accorder directement</button>
@@ -826,6 +830,12 @@
               <div style="font-size:18px;margin-bottom:4px;">🏛️</div>
               <div style="font-weight:700;font-size:12px;">Institutionnelle</div>
               <div style="font-size:10px;color:var(--muted);margin-top:2px;">Communications · Consultations · Territoire</div>
+            </label>
+            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;transition:border-color .2s;" id="ad-card-pub" onclick="selectTypeDA('creation_publicite')">
+              <input type="radio" name="ad-type" value="creation_publicite" style="display:none;">
+              <div style="font-size:18px;margin-bottom:4px;">📣</div>
+              <div style="font-weight:700;font-size:12px;">Création de Publicité</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Campagnes · Ciblage · Diffusion</div>
             </label>
           </div>
 
@@ -1855,7 +1865,7 @@ document.querySelectorAll(".sidebar a[data-section='moderation']").forEach(a => 
 /* ===== ACCRÉDITATIONS DIASPO'ACTIF ===== */
 function escDA(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmtDA(d){if(!d)return '—';try{return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
-const DA_TYPE_LBL={mobilisation_active:'📢 Mobilisation Active',createur_opportunites:'💼 Créateur d\'Opportunités',observatoire_diaspora:'📊 Observatoire Diaspora',institutionnelle:'🏛️ Institutionnelle'};
+const DA_TYPE_LBL={mobilisation_active:'📢 Mobilisation Active',createur_opportunites:'💼 Créateur d\'Opportunités',observatoire_diaspora:'📊 Observatoire Diaspora',institutionnelle:'🏛️ Institutionnelle',creation_publicite:'📣 Création de Publicité'};
 const DA_STAT_LBL={active:'✅ Active',suspendue:'⚠️ Suspendue',retiree:'❌ Retirée'};
 const DA_ACT_LBL={accorde:'Accordée',refuse:'Refusée',suspendu:'Suspendue',retire:'Retirée',reactiver:'Réactivée'};
 
@@ -2017,16 +2027,19 @@ async function loadDAWidgetStats(){
     const opp=accreds.filter(a=>a.type==='createur_opportunites'&&a.statut==='active').length;
     const obs=accreds.filter(a=>a.type==='observatoire_diaspora'&&a.statut==='active').length;
     const ins=accreds.filter(a=>a.type==='institutionnelle'&&a.statut==='active').length;
+    const pub=accreds.filter(a=>a.type==='creation_publicite'&&a.statut==='active').length;
     const wp=document.getElementById('da-widget-pending');
     const wm=document.getElementById('da-widget-mobilisation');
     const wo=document.getElementById('da-widget-opportunites');
     const wb=document.getElementById('da-widget-observatoire');
     const wi=document.getElementById('da-widget-institutionnelle');
+    const wpb=document.getElementById('da-widget-pub');
     if(wp) wp.textContent=pending;
     if(wm) wm.textContent=mob;
     if(wo) wo.textContent=opp;
     if(wb) wb.textContent=obs;
     if(wi) wi.textContent=ins;
+    if(wpb) wpb.textContent=pub;
     // Badge sidebar
     const badge=document.getElementById('accred-pending-badge');
     if(badge){ if(pending>0){badge.textContent=pending;badge.style.display='inline-block';}else badge.style.display='none'; }
@@ -2050,7 +2063,7 @@ function openAccordDirectModal(){
   document.getElementById('ad-motif').value='';
   document.getElementById('ad-error').style.display='none';
   _adSelectedType='';
-  ['ad-card-mob','ad-card-opp','ad-card-obs','ad-card-ins'].forEach(id=>{
+  ['ad-card-mob','ad-card-opp','ad-card-obs','ad-card-ins','ad-card-pub'].forEach(id=>{
     const el=document.getElementById(id);
     if(el){el.style.borderColor='var(--border)';el.style.background='';}
   });
@@ -2093,7 +2106,7 @@ function clearSelectedDA(){
   document.getElementById('ad-user-id').value='';
   document.getElementById('ad-selected').style.display='none';
 }
-const DA_CARD_COLORS={mobilisation_active:['#f59e0b','#fffbeb','ad-card-mob'],createur_opportunites:['#3b82f6','#eff6ff','ad-card-opp'],observatoire_diaspora:['#059669','#f0fdf4','ad-card-obs'],institutionnelle:['#7c3aed','#f5f3ff','ad-card-ins']};
+const DA_CARD_COLORS={mobilisation_active:['#f59e0b','#fffbeb','ad-card-mob'],createur_opportunites:['#3b82f6','#eff6ff','ad-card-opp'],observatoire_diaspora:['#059669','#f0fdf4','ad-card-obs'],institutionnelle:['#7c3aed','#f5f3ff','ad-card-ins'],creation_publicite:['#dc2626','#fef2f2','ad-card-pub']};
 function selectTypeDA(type){
   _adSelectedType=type;
   Object.entries(DA_CARD_COLORS).forEach(([t,[col,bg,id]])=>{
@@ -3115,7 +3128,7 @@ async function submitAccordDirect(){
       const periode = [p.date_debut, p.date_fin].filter(Boolean).join(" → ") || "Toujours";
       return `<tr style="border-bottom:1px solid var(--border);">
         <td style="padding:12px 16px;">
-          <div style="font-weight:600;">${esc(p.titre)}</div>
+          <div style="font-weight:600;">${esc(p.titre)}${p.type_sponsor==='initiative'?'<span style="margin-left:6px;font-size:10px;background:#fef2f2;color:#dc2626;padding:1px 7px;border-radius:99px;font-weight:700;">Initiative</span>':''}</div>
           <div style="font-size:12px;color:var(--muted);">${esc(p.annonceur)}</div>
         </td>
         <td style="padding:8px;text-align:center;font-size:12px;">${PUB_FORMAT_LABEL[p.format]||p.format}</td>

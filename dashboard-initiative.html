@@ -39,6 +39,7 @@
       <a href="#evenements">📅 Événements</a>
       <a href="#paiement">💳 Module paiement</a>
       <a href="#accreditations">🎖 Accréditations DA</a>
+      <a href="#publicites-init">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
       <a href="messagerie.html">💬 Messages <span class="pill" id="msg-count">—</span></a>
       <a href="confidentialite.html">🔐 Confidentialité</a>
     </aside>
@@ -69,7 +70,11 @@ if (typeof ACCREDITATIONS_DA === 'undefined') {
     { type:'institutionnelle', label:'Institutionnelle', emoji:'🏛️', couleur:'#7c3aed', couleurBg:'#f5f3ff', couleurBorder:'#7c3aed', couleurText:'#4c1d95',
       description:"Autorisation d'exercer des fonctions institutionnelles sur la plateforme.",
       droits:["Diffuser des communications officielles","Organiser des consultations publiques","Interagir avec un territoire donné","Accéder à certains outils institutionnels"],
-      eligible:['collectivite'], prix:{collectivite:0} }
+      eligible:['collectivite'], prix:{collectivite:0} },
+    { type:'creation_publicite', label:'Création de Publicité', emoji:'📣', couleur:'#dc2626', couleurBg:'#fef2f2', couleurBorder:'#dc2626', couleurText:'#991b1b',
+      description:"Autorisation de créer et soumettre des publicités sur la plateforme Diaspo'Actif. Chaque publicité est soumise à validation avant diffusion.",
+      droits:["Créer des campagnes publicitaires complètes","Définir le ciblage géographique et démographique","Choisir les emplacements de diffusion","Définir les périodes d'affichage","Suivre les statistiques","Soumettre des publicités à validation"],
+      eligible:['initiative'], prix:{initiative:49} }
   ];
 }
 if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
@@ -313,7 +318,252 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div id="init-accred-demandes"></div>
     </div>
 
-    <div id="ad-dashboard-initiative" data-ad-slot="4"></div>`;
+    <div id="ad-dashboard-initiative" data-ad-slot="4"></div>
+
+    <!-- ── Section Publicités Initiative ── -->
+    <div class="card" style="margin-bottom:20px;" id="publicites-init">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">📣 Mes Publicités</h3>
+        <button class="btn btn-sm btn-outline" onclick="loadInitPubs()" style="font-size:12px;">↺ Actualiser</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Créez et gérez vos campagnes publicitaires sur la plateforme. Chaque publicité est soumise à validation avant diffusion.</p>
+      <!-- Gate : affiché si pas d'accréditation creation_publicite -->
+      <div id="init-pub-gate">
+        <div style="background:#fef2f2;border:1.5px solid #dc2626;border-radius:12px;padding:20px;text-align:center;">
+          <div style="font-size:36px;margin-bottom:8px;">🔒</div>
+          <div style="font-weight:700;font-size:15px;margin-bottom:6px;">Accréditation requise</div>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Pour créer des publicités, vous devez obtenir l'accréditation <strong>📣 Création de Publicité</strong> (49 €/an).<br>Elle permet de soumettre des campagnes complètes avec ciblage, visuels et contacts.</p>
+          <a href="#accreditations" class="btn btn-orange">Demander l'accréditation →</a>
+        </div>
+      </div>
+      <!-- Contenu : affiché si accréditation active -->
+      <div id="init-pub-content" style="display:none;">
+        <div style="margin-bottom:18px;">
+          <button class="btn btn-orange" onclick="openInitPubModal()">➕ Nouvelle publicité</button>
+        </div>
+        <div id="init-pub-list">
+          <div style="color:var(--muted);font-size:13px;">Chargement…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Modal Nouvelle publicité (initiative) ── -->
+    <div id="init-pub-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
+      <div style="background:var(--bg);border-radius:16px;max-width:760px;margin:40px auto;padding:0;position:relative;">
+        <div style="padding:20px 24px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <h3 style="margin:0;" id="init-pub-modal-title">Nouvelle publicité</h3>
+          <button onclick="closeInitPubModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+        </div>
+        <input type="hidden" id="init-pub-id">
+        <!-- Onglets -->
+        <div style="display:flex;border-bottom:2px solid var(--border);overflow-x:auto;">
+          <button class="pub-tab" data-tab="1" onclick="initPubSwitchTab(1)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid var(--orange);background:none;cursor:pointer;font-size:12px;font-weight:800;color:var(--orange);min-width:80px;white-space:nowrap;">1 · Général</button>
+          <button class="pub-tab" data-tab="2" onclick="initPubSwitchTab(2)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);min-width:80px;white-space:nowrap;">2 · Contenu</button>
+          <button class="pub-tab" data-tab="3" onclick="initPubSwitchTab(3)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);min-width:80px;white-space:nowrap;">3 · Liens</button>
+          <button class="pub-tab" data-tab="4" onclick="initPubSwitchTab(4)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);min-width:80px;white-space:nowrap;">4 · Ciblage</button>
+          <button class="pub-tab" data-tab="5" onclick="initPubSwitchTab(5)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);min-width:80px;white-space:nowrap;">5 · Affichage</button>
+          <button class="pub-tab" data-tab="6" onclick="initPubSwitchTab(6)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);min-width:80px;white-space:nowrap;">6 · Aperçu</button>
+        </div>
+        <div style="padding:20px 24px;">
+          <!-- Tab 1 : Général -->
+          <div class="pub-tab-content">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div><label style="font-size:12px;font-weight:700;">Nom de campagne *</label><input id="pub-nom-campagne" class="form-control" placeholder="Ex : Lancement été 2025"></div>
+              <div><label style="font-size:12px;font-weight:700;">Référence interne</label><input id="pub-reference" class="form-control" placeholder="REF-001"></div>
+              <div><label style="font-size:12px;font-weight:700;">Annonceur *</label><input id="pub-annonceur" class="form-control" placeholder="Nom de votre organisation"></div>
+              <div><label style="font-size:12px;font-weight:700;">Catégorie</label>
+                <select id="pub-categorie-pub" class="form-control">
+                  <option value="general">Général</option><option value="emploi">Emploi</option><option value="evenement">Événement</option>
+                  <option value="formation">Formation</option><option value="investissement">Investissement</option><option value="service">Service</option>
+                  <option value="immobilier">Immobilier</option><option value="culture">Culture</option><option value="solidarite">Solidarité</option>
+                </select>
+              </div>
+              <div><label style="font-size:12px;font-weight:700;">Format</label>
+                <select id="pub-format" class="form-control" onchange="initPubDebouncedPreview()">
+                  <option value="banniere">Bannière</option><option value="native">Natif (fil)</option><option value="annuaire">Annuaire</option>
+                  <option value="profil">Profil</option><option value="video">Vidéo</option><option value="native_article">Article sponsorisé</option>
+                </select>
+              </div>
+              <div><label style="font-size:12px;font-weight:700;">Type sponsor</label>
+                <select id="pub-type-sponsor" class="form-control">
+                  <option value="initiative">Initiative</option><option value="partenaire">Partenaire</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <!-- Tab 2 : Contenu -->
+          <div class="pub-tab-content" style="display:none;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div style="grid-column:1/-1;"><label style="font-size:12px;font-weight:700;">Titre principal *</label><input id="pub-titre" class="form-control" placeholder="Titre accrocheur" oninput="initPubDebouncedPreview()"></div>
+              <div><label style="font-size:12px;font-weight:700;">Sous-titre</label><input id="pub-sous-titre" class="form-control" placeholder="Complément de titre" oninput="initPubDebouncedPreview()"></div>
+              <div><label style="font-size:12px;font-weight:700;">Description courte</label><input id="pub-desc-courte" class="form-control" placeholder="Description affichée" oninput="initPubDebouncedPreview()"></div>
+              <div style="grid-column:1/-1;"><label style="font-size:12px;font-weight:700;">Description détaillée</label><textarea id="pub-desc-detaillee" class="form-control" rows="3" placeholder="Texte complet…"></textarea></div>
+              <div><label style="font-size:12px;font-weight:700;">Bouton d'action</label>
+                <select id="pub-bouton" class="form-control" onchange="initPubDebouncedPreview()">
+                  <option>En savoir plus</option><option>S'inscrire</option><option>Réserver</option><option>Investir</option>
+                  <option>Acheter</option><option>Nous contacter</option><option>Participer</option><option>Télécharger</option><option>Voir l'offre</option>
+                </select>
+              </div>
+              <div><label style="font-size:12px;font-weight:700;">Texte personnalisé (override)</label><input id="pub-bouton-custom" class="form-control" placeholder="Mon texte…" oninput="initPubDebouncedPreview()"></div>
+              <div>
+                <label style="font-size:12px;font-weight:700;">Logo (URL ou fichier)</label>
+                <input id="pub-logo" class="form-control" placeholder="https://…" oninput="initPubPreviewImg('pub-logo','pub-logo-thumb');initPubDebouncedPreview()">
+                <input type="file" accept="image/*" style="margin-top:6px;font-size:12px;" onchange="initPubLoadFile(event,'pub-logo','pub-logo-thumb')">
+                <div id="pub-logo-thumb" style="display:none;margin-top:6px;"><img style="height:48px;border-radius:6px;border:1px solid var(--border);"></div>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:700;">Image principale (URL ou fichier)</label>
+                <input id="pub-image" class="form-control" placeholder="https://…" oninput="initPubPreviewImg('pub-image','pub-image-thumb');initPubDebouncedPreview()">
+                <input type="file" accept="image/*" style="margin-top:6px;font-size:12px;" onchange="initPubLoadFile(event,'pub-image','pub-image-thumb')">
+                <div id="pub-image-thumb" style="display:none;margin-top:6px;"><img style="height:72px;border-radius:8px;border:1px solid var(--border);object-fit:cover;"></div>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:700;">Galerie (fichiers multiples)</label>
+                <input id="pub-galerie" class="form-control" placeholder="URL1, URL2…">
+                <input type="file" accept="image/*" multiple style="margin-top:6px;font-size:12px;" onchange="initPubLoadGalerie(event)">
+                <div id="pub-galerie-thumb" style="display:none;gap:6px;flex-wrap:wrap;margin-top:6px;"></div>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:700;">Vidéo (URL ou fichier)</label>
+                <input id="pub-video" class="form-control" placeholder="https://…">
+                <input type="file" accept="video/*" style="margin-top:6px;font-size:12px;" onchange="initPubLoadFile(event,'pub-video','pub-video-thumb',true)">
+                <div id="pub-video-thumb" style="display:none;margin-top:6px;"><video style="height:80px;border-radius:8px;" controls></video></div>
+              </div>
+            </div>
+          </div>
+          <!-- Tab 3 : Liens & Contacts -->
+          <div class="pub-tab-content" style="display:none;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div><label style="font-size:12px;font-weight:700;">Type de lien</label>
+                <select id="pub-lien-type" class="form-control">
+                  <option value="externe">Lien externe</option><option value="interne">Page interne</option><option value="aucun">Aucun</option>
+                </select>
+              </div>
+              <div><label style="font-size:12px;font-weight:700;">URL du lien</label><input id="pub-lien" class="form-control" placeholder="https://…"></div>
+              <div><label style="font-size:12px;font-weight:700;">Site web</label><input id="pub-site" class="form-control" placeholder="https://…"></div>
+              <div><label style="font-size:12px;font-weight:700;">Téléphone</label><input id="pub-tel" class="form-control" placeholder="+33 6…" oninput="initPubDebouncedPreview()"></div>
+              <div><label style="font-size:12px;font-weight:700;">WhatsApp</label><input id="pub-whatsapp" class="form-control" placeholder="+33 6…" oninput="initPubDebouncedPreview()"></div>
+              <div><label style="font-size:12px;font-weight:700;">E-mail contact</label><input id="pub-email-contact" class="form-control" placeholder="contact@…" oninput="initPubDebouncedPreview()"></div>
+              <div style="grid-column:1/-1;"><label style="font-size:12px;font-weight:700;">Adresse</label><input id="pub-adresse" class="form-control" placeholder="Adresse complète" oninput="initPubDebouncedPreview()"></div>
+              <div><label style="font-size:12px;font-weight:700;">Facebook</label><input id="pub-rs-facebook" class="form-control" placeholder="https://facebook.com/…"></div>
+              <div><label style="font-size:12px;font-weight:700;">Instagram</label><input id="pub-rs-instagram" class="form-control" placeholder="https://instagram.com/…"></div>
+              <div><label style="font-size:12px;font-weight:700;">LinkedIn</label><input id="pub-rs-linkedin" class="form-control" placeholder="https://linkedin.com/…"></div>
+              <div><label style="font-size:12px;font-weight:700;">Twitter / X</label><input id="pub-rs-twitter" class="form-control" placeholder="https://twitter.com/…"></div>
+              <div><label style="font-size:12px;font-weight:700;">YouTube</label><input id="pub-rs-youtube" class="form-control" placeholder="https://youtube.com/…"></div>
+              <div><label style="font-size:12px;font-weight:700;">TikTok</label><input id="pub-rs-tiktok" class="form-control" placeholder="https://tiktok.com/…"></div>
+              <div style="grid-column:1/-1;">
+                <label style="font-size:12px;font-weight:700;display:block;margin-bottom:8px;">Moyens de paiement acceptés</label>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-paiement" value="carte_bancaire"> 💳 Carte bancaire</label>
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-paiement" value="paypal"> 🅿️ PayPal</label>
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-paiement" value="virement"> 🏦 Virement</label>
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-paiement" value="mobile_money"> 📱 Mobile Money</label>
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-paiement" value="orange_money"> 🟠 Orange Money</label>
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-paiement" value="mtn_money"> 🟡 MTN Money</label>
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-paiement" value="moov_money"> 🔵 Moov Money</label>
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-paiement" value="wave"> 🌊 Wave</label>
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-paiement" value="crypto"> ₿ Crypto</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Tab 4 : Ciblage -->
+          <div class="pub-tab-content" style="display:none;">
+            <div style="margin-bottom:14px;">
+              <label style="font-size:12px;font-weight:700;display:block;margin-bottom:8px;">Zone géographique</label>
+              <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                <label style="font-size:13px;"><input type="radio" name="pub-zone-geo" value="monde" checked> 🌍 Monde entier</label>
+                <label style="font-size:13px;"><input type="radio" name="pub-zone-geo" value="continent"> Continent</label>
+                <label style="font-size:13px;"><input type="radio" name="pub-zone-geo" value="pays"> Pays spécifiques</label>
+                <label style="font-size:13px;"><input type="radio" name="pub-zone-geo" value="region"> Régions</label>
+                <label style="font-size:13px;"><input type="radio" name="pub-zone-geo" value="ville"> Villes</label>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div><label style="font-size:12px;font-weight:700;">Pays d'origine cibles</label><input id="pub-cible-pays" class="form-control" placeholder="Sénégal, Côte d'Ivoire…"></div>
+              <div><label style="font-size:12px;font-weight:700;">Pays de résidence cibles</label><input id="pub-cible-pays-res" class="form-control" placeholder="France, Belgique…"></div>
+              <div><label style="font-size:12px;font-weight:700;">Régions cibles</label><input id="pub-cible-regions" class="form-control" placeholder="Île-de-France, Grand Est…"></div>
+              <div><label style="font-size:12px;font-weight:700;">Villes cibles</label><input id="pub-cible-villes" class="form-control" placeholder="Paris, Lyon, Dakar…"></div>
+              <div><label style="font-size:12px;font-weight:700;">Nationalités 1</label><input id="pub-cible-nat1" class="form-control" placeholder="Sénégalaise, Malienne…"></div>
+              <div><label style="font-size:12px;font-weight:700;">Nationalités 2</label><input id="pub-cible-nat2" class="form-control" placeholder="Guinéenne, Camerounaise…"></div>
+              <div style="grid-column:1/-1;"><label style="font-size:12px;font-weight:700;">Origines / ethnies</label><input id="pub-cible-origines" class="form-control" placeholder="Wolof, Mandingue…"></div>
+              <div style="grid-column:1/-1;">
+                <label style="font-size:12px;font-weight:700;display:block;margin-bottom:8px;">Rôles ciblés</label>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-roles" value="utilisateur"> Utilisateurs</label>
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-roles" value="initiative"> Initiatives</label>
+                  <label style="font-size:12px;"><input type="checkbox" class="pub-roles" value="collectivite"> Collectivités</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Tab 5 : Affichage -->
+          <div class="pub-tab-content" style="display:none;">
+            <div style="margin-bottom:14px;">
+              <label style="font-size:12px;font-weight:700;display:block;margin-bottom:8px;">Emplacements souhaités</label>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <label style="font-size:12px;"><input type="checkbox" class="pub-emplacements" value="fil" checked> Fil d'actualité</label>
+                <label style="font-size:12px;"><input type="checkbox" class="pub-emplacements" value="annuaire"> Annuaire</label>
+                <label style="font-size:12px;"><input type="checkbox" class="pub-emplacements" value="offres"> Offres d'emploi</label>
+                <label style="font-size:12px;"><input type="checkbox" class="pub-emplacements" value="evenements"> Événements</label>
+                <label style="font-size:12px;"><input type="checkbox" class="pub-emplacements" value="marches"> Marchés</label>
+                <label style="font-size:12px;"><input type="checkbox" class="pub-emplacements" value="profils"> Profils</label>
+                <label style="font-size:12px;"><input type="checkbox" class="pub-emplacements" value="dashboard"> Dashboard</label>
+                <label style="font-size:12px;"><input type="checkbox" class="pub-emplacements" value="messagerie"> Messagerie</label>
+                <label style="font-size:12px;"><input type="checkbox" class="pub-emplacements" value="sidebar"> Sidebar</label>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+              <div><label style="font-size:12px;font-weight:700;">Max affichages/user</label><input id="pub-max-user" type="number" class="form-control" min="0" placeholder="0 = illimité"></div>
+              <div><label style="font-size:12px;font-weight:700;">Max affichages/jour</label><input id="pub-max-jour" type="number" class="form-control" min="0" placeholder="0 = illimité"></div>
+              <div><label style="font-size:12px;font-weight:700;">Max clics total</label><input id="pub-max-clics" type="number" class="form-control" min="0" placeholder="0 = illimité"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;">
+              <div><label style="font-size:12px;font-weight:700;">Date début</label><input id="pub-debut" type="date" class="form-control"></div>
+              <div><label style="font-size:12px;font-weight:700;">Date fin</label><input id="pub-fin" type="date" class="form-control"></div>
+              <div><label style="font-size:12px;font-weight:700;">Heure début</label><input id="pub-heure-debut" type="time" class="form-control"></div>
+              <div><label style="font-size:12px;font-weight:700;">Heure fin</label><input id="pub-heure-fin" type="time" class="form-control"></div>
+            </div>
+            <div style="margin-top:14px;background:#fef9c3;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;">
+              ℹ️ Votre publicité sera soumise à l'examen de l'équipe Diaspo'Actif avant toute diffusion. Le statut passera à <strong>active</strong> après validation.
+            </div>
+          </div>
+          <!-- Tab 6 : Aperçu -->
+          <div class="pub-tab-content" style="display:none;">
+            <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+              <span style="font-size:12px;font-weight:700;color:var(--muted);">Format affiché :</span>
+              <span id="init-pub-preview-format-label" style="font-size:12px;font-weight:700;background:var(--surface);padding:2px 10px;border-radius:99px;"></span>
+            </div>
+            <div id="init-pub-preview-main" style="margin-bottom:20px;"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Bannière</div>
+                <div id="init-pub-prev-banniere"></div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Natif</div>
+                <div id="init-pub-prev-native"></div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Annuaire</div>
+                <div id="init-pub-prev-annuaire"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Pied du modal -->
+        <div style="padding:14px 24px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <button id="init-pub-btn-prev" onclick="initPubSwitchTab(window._initPubCurrentTab-1)" style="display:none;" class="btn btn-outline">← Précédent</button>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button onclick="closeInitPubModal()" class="btn btn-outline">Annuler</button>
+            <button id="init-pub-btn-next" onclick="initPubSwitchTab(window._initPubCurrentTab+1)" class="btn btn-navy">Suivant →</button>
+            <button id="init-pub-btn-save" onclick="saveInitPub()" style="display:none;" class="btn btn-orange">📣 Soumettre pour validation</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
 
   /* Moyens de paiement */
   if (typeof MOYENS_PAIEMENT !== "undefined") {
@@ -471,6 +721,349 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   loadInitAccred();
+
+  /* ── Publicités Initiative ── */
+
+  async function loadInitPubs() {
+    const listEl = document.getElementById('init-pub-list');
+    if (!listEl) return;
+    try {
+      const r = await api('GET', '/publicites/mes');
+      const pubs = r.publicites || [];
+      if (!pubs.length) {
+        listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune publicité soumise pour l\'instant.</p>';
+        return;
+      }
+      const statuts = { en_attente: ['⏳ En attente', '#fef9c3', '#a16207'], active: ['✅ Active', '#dcfce7', '#16a34a'], refusee: ['❌ Refusée', '#fee2e2', '#dc2626'], suspendue: ['⏸ Suspendue', '#f3f4f6', '#374151'], archivee: ['📦 Archivée', '#f3f4f6', '#374151'], brouillon: ['📝 Brouillon', '#f3f4f6', '#374151'] };
+      listEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:8px;">Campagne</th>
+          <th style="text-align:left;padding:8px;">Format</th>
+          <th style="text-align:left;padding:8px;">Statut</th>
+          <th style="text-align:right;padding:8px;">Impressions</th>
+          <th style="text-align:right;padding:8px;">Clics</th>
+          <th style="text-align:left;padding:8px;">Date</th>
+        </tr></thead>
+        <tbody>${pubs.map(p => {
+          const [lbl, bg, col] = statuts[p.statut] || [p.statut, '#f3f4f6', '#374151'];
+          return `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 8px;font-weight:600;">${p.nom_campagne || p.titre || '—'}</td>
+            <td style="padding:10px 8px;color:var(--muted);">${p.format || '—'}</td>
+            <td style="padding:10px 8px;"><span style="padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:${bg};color:${col};">${lbl}</span></td>
+            <td style="padding:10px 8px;text-align:right;color:var(--muted);">${p.nb_impressions || 0}</td>
+            <td style="padding:10px 8px;text-align:right;color:var(--muted);">${p.nb_clics || 0}</td>
+            <td style="padding:10px 8px;color:var(--muted);font-size:12px;">${(p.created_at || '').slice(0,10)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+    } catch (e) {
+      listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">Impossible de charger les publicités.</p>';
+    }
+  }
+
+  window._initPubCurrentTab = 1;
+  const INIT_PUB_TAB_MAX = 6;
+
+  function initPubSwitchTab(n) {
+    if (n < 1 || n > INIT_PUB_TAB_MAX) return;
+    window._initPubCurrentTab = n;
+    const modal = document.getElementById('init-pub-modal');
+    modal.querySelectorAll('.pub-tab-content').forEach((el, i) => {
+      el.style.display = (i + 1 === n) ? '' : 'none';
+    });
+    modal.querySelectorAll('.pub-tab').forEach(btn => {
+      const active = parseInt(btn.dataset.tab) === n;
+      btn.style.borderBottomColor = active ? 'var(--orange)' : 'transparent';
+      btn.style.color = active ? 'var(--orange)' : 'var(--muted)';
+      btn.style.fontWeight = active ? '800' : '700';
+    });
+    const prev = document.getElementById('init-pub-btn-prev');
+    const next = document.getElementById('init-pub-btn-next');
+    const save = document.getElementById('init-pub-btn-save');
+    if (prev) prev.style.display = n > 1 ? '' : 'none';
+    if (next) next.style.display = n < INIT_PUB_TAB_MAX ? '' : 'none';
+    if (save) save.style.display = n >= 5 ? '' : 'none';
+    if (n === 6) initPubUpdatePreview();
+  }
+
+  function initPubLoadFile(event, targetId, thumbId, isVideo = false) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const data = e.target.result;
+      const input = document.getElementById(targetId);
+      if (input) input.value = data;
+      if (thumbId) {
+        const wrap = document.getElementById(thumbId);
+        if (wrap) {
+          const media = wrap.querySelector(isVideo ? 'video' : 'img');
+          if (media) { media.src = data; wrap.style.display = ''; }
+        }
+      }
+      initPubDebouncedPreview();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function initPubLoadGalerie(event) {
+    const files = [...event.target.files];
+    if (!files.length) return;
+    const promises = files.map(f => new Promise(res => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.readAsDataURL(f);
+    }));
+    Promise.all(promises).then(results => {
+      const input = document.getElementById('pub-galerie');
+      const existing = (input.value || '').split(',').map(s => s.trim()).filter(Boolean);
+      const combined = [...existing, ...results];
+      input.value = combined.join(', ');
+      const thumb = document.getElementById('pub-galerie-thumb');
+      thumb.innerHTML = combined.slice(0, 8).map(src =>
+        `<img src="${src}" style="height:48px;width:48px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">`
+      ).join('');
+      thumb.style.display = combined.length ? 'flex' : 'none';
+    });
+  }
+
+  function initPubPreviewImg(srcId, thumbId) {
+    const src = document.getElementById(srcId)?.value?.trim();
+    const wrap = document.getElementById(thumbId);
+    if (!wrap) return;
+    if (src && (src.startsWith('http') || src.startsWith('data:'))) {
+      wrap.querySelector('img').src = src;
+      wrap.style.display = '';
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
+
+  let _initPubPreviewTimer = null;
+  function initPubDebouncedPreview() {
+    clearTimeout(_initPubPreviewTimer);
+    _initPubPreviewTimer = setTimeout(initPubUpdatePreview, 300);
+  }
+
+  function _initPubPreviewData() {
+    const custom = (document.getElementById('pub-bouton-custom')?.value || '').trim();
+    const jp = (id, def = []) => {
+      try { const v = document.getElementById(id)?.value || ''; if (!v) return def;
+        return v.split(',').map(s => s.trim()).filter(Boolean); } catch { return def; }
+    };
+    return {
+      id: 0,
+      nom_campagne: document.getElementById('pub-nom-campagne')?.value || '',
+      annonceur: document.getElementById('pub-annonceur')?.value || 'Annonceur',
+      titre: document.getElementById('pub-titre')?.value || 'Titre de la publicité',
+      sous_titre: document.getElementById('pub-sous-titre')?.value || '',
+      description_courte: document.getElementById('pub-desc-courte')?.value || '',
+      logo_annonceur: document.getElementById('pub-logo')?.value || '',
+      image_url: document.getElementById('pub-image')?.value || '',
+      video_url: document.getElementById('pub-video')?.value || '',
+      galerie_images: JSON.stringify(jp('pub-galerie')),
+      bouton_action: custom || document.getElementById('pub-bouton')?.value || 'En savoir plus',
+      lien_texte: custom || document.getElementById('pub-bouton')?.value || 'En savoir plus',
+      lien_url: document.getElementById('pub-lien')?.value || '#',
+      lien_site: document.getElementById('pub-site')?.value || '',
+      contact_telephone: document.getElementById('pub-tel')?.value || '',
+      contact_whatsapp: document.getElementById('pub-whatsapp')?.value || '',
+      contact_email: document.getElementById('pub-email-contact')?.value || '',
+      contact_adresse: document.getElementById('pub-adresse')?.value || '',
+      moyens_paiement: JSON.stringify([...(document.querySelectorAll('.pub-paiement:checked') || [])].map(el => el.value)),
+      statut: 'active',
+    };
+  }
+
+  function _initPubHtmlFull(p, format) {
+    const img  = p.image_url || '';
+    const logo = p.logo_annonceur || '';
+    const desc = p.description_courte || p.description || '';
+    const btn  = p.bouton_action || p.lien_texte || 'En savoir plus';
+    const url  = p.lien_url || p.lien_site || '#';
+    const tel  = p.contact_telephone || '';
+    const wa   = p.contact_whatsapp || '';
+    const mail = p.contact_email || '';
+    const adr  = p.contact_adresse || '';
+    const hasContact = tel || wa || mail || adr;
+    let mp = []; try { mp = JSON.parse(p.moyens_paiement || '[]'); } catch {}
+    const mpLabels = { carte_bancaire:'💳 Carte', paypal:'🅿️ PayPal', virement:'🏦 Virement', mobile_money:'📱 Mobile Money', orange_money:'🟠 Orange Money', mtn_money:'🟡 MTN Money', moov_money:'🔵 Moov Money', wave:'🌊 Wave', crypto:'₿ Crypto' };
+    const _e = s => (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const logoEl = logo ? `<img src="${logo}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:5px;background:#f5f5f5;flex-shrink:0;">` : `<div style="width:32px;height:32px;border-radius:5px;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;">📣</div>`;
+    const sponsoTag = `<div style="font-size:10px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;">Sponsorisé · ${_e(p.annonceur)}</div>`;
+    if (format === 'banniere') {
+      return `<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+        ${img ? `<img src="${img}" alt="" style="width:72px;height:58px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : logo ? `<img src="${logo}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:8px;background:#f5f5f5;flex-shrink:0;">` : ''}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">${logo && img ? `<img src="${logo}" alt="" style="width:16px;height:16px;object-fit:contain;border-radius:3px;">` : ''}${sponsoTag}</div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:2px;">${_e(p.titre)}</div>
+          ${desc ? `<div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_e(desc)}</div>` : ''}
+        </div>
+        <span class="btn btn-orange" style="flex-shrink:0;font-size:13px;">${_e(btn)}</span>
+      </div>`;
+    }
+    if (format === 'native') {
+      const gal = (() => { try { return JSON.parse(p.galerie_images || '[]'); } catch { return []; } })();
+      return `<div class="card" style="border:1.5px solid var(--border);max-width:480px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">${logoEl}<div><div style="font-weight:700;font-size:14px;">${_e(p.annonceur)}</div><div style="font-size:11px;color:var(--muted);background:var(--surface);padding:1px 8px;border-radius:20px;display:inline-block;">Sponsorisé</div></div></div>
+        ${p.titre ? `<div style="font-weight:700;font-size:15px;margin-bottom:6px;">${_e(p.titre)}</div>` : ''}
+        ${desc ? `<p style="margin:0 0 10px;font-size:13px;color:var(--muted);">${_e(desc)}</p>` : ''}
+        ${img ? `<img src="${img}" alt="" style="width:100%;border-radius:10px;max-height:200px;object-fit:cover;margin-bottom:10px;">` : ''}
+        ${gal.length > 1 ? `<div style="display:flex;gap:6px;margin-bottom:10px;">${gal.slice(1,4).map(u=>`<img src="${u}" style="flex:1;height:72px;object-fit:cover;border-radius:6px;">`).join('')}</div>` : ''}
+        ${hasContact ? `<div style="background:var(--surface);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;">${tel?`<span>📞 ${_e(tel)}</span>`:''}${wa?`<span>💬 ${_e(wa)}</span>`:''}${mail?`<span>✉️ ${_e(mail)}</span>`:''}${adr?`<span>📍 ${_e(adr)}</span>`:''}</div>` : ''}
+        ${mp.length ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${mp.map(k=>`<span style="font-size:11px;background:var(--surface);border-radius:20px;padding:2px 8px;">${mpLabels[k]||k}</span>`).join('')}</div>` : ''}
+        <span class="btn btn-orange" style="font-size:13px;display:block;text-align:center;">${_e(btn)}</span>
+      </div>`;
+    }
+    if (format === 'annuaire') {
+      return `<div class="card" style="border:1.5px dashed var(--border);max-width:260px;">
+        ${sponsoTag}
+        ${img ? `<img src="${img}" alt="" style="width:100%;height:110px;object-fit:cover;border-radius:8px;margin:8px 0;">` : logo ? `<img src="${logo}" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:8px;margin:8px 0;background:#f5f5f5;">` : ''}
+        <div style="font-weight:700;margin-bottom:4px;font-size:14px;">${_e(p.titre)}</div>
+        ${desc ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${_e(desc)}</div>` : ''}
+        ${hasContact ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${[tel,wa,mail].filter(Boolean).join(' · ')}</div>` : ''}
+        <span class="btn" style="font-size:12px;width:100%;text-align:center;display:block;">${_e(btn)}</span>
+      </div>`;
+    }
+    return _initPubHtmlFull(p, 'banniere');
+  }
+
+  function initPubUpdatePreview() {
+    const modal = document.getElementById('init-pub-modal');
+    if (!modal || modal.style.display === 'none') return;
+    const p = _initPubPreviewData();
+    const fmt = document.getElementById('pub-format')?.value || 'banniere';
+    const fmtLabels = { banniere:'Bannière', native:'Natif (fil)', annuaire:'Annuaire', profil:'Profil', video:'Vidéo', native_article:'Article sponsorisé' };
+    const lbl = document.getElementById('init-pub-preview-format-label');
+    if (lbl) lbl.textContent = fmtLabels[fmt] || fmt;
+    const main = document.getElementById('init-pub-preview-main');
+    if (main) main.innerHTML = _initPubHtmlFull(p, fmt);
+    const b = document.getElementById('init-pub-prev-banniere'); if (b) b.innerHTML = _initPubHtmlFull(p, 'banniere');
+    const n = document.getElementById('init-pub-prev-native');   if (n) n.innerHTML = _initPubHtmlFull(p, 'native');
+    const a = document.getElementById('init-pub-prev-annuaire'); if (a) a.innerHTML = _initPubHtmlFull(p, 'annuaire');
+  }
+
+  function openInitPubModal() {
+    document.getElementById('init-pub-modal-title').textContent = 'Nouvelle publicité';
+    document.getElementById('init-pub-id').value = '';
+    ['pub-nom-campagne','pub-reference','pub-annonceur','pub-titre','pub-sous-titre',
+     'pub-desc-courte','pub-desc-detaillee','pub-logo','pub-image','pub-galerie','pub-video',
+     'pub-bouton-custom','pub-lien','pub-site','pub-tel','pub-whatsapp','pub-email-contact','pub-adresse',
+     'pub-rs-facebook','pub-rs-instagram','pub-rs-linkedin','pub-rs-twitter','pub-rs-youtube','pub-rs-tiktok',
+     'pub-cible-pays','pub-cible-pays-res','pub-cible-regions','pub-cible-villes',
+     'pub-cible-nat1','pub-cible-nat2','pub-cible-origines',
+     'pub-max-user','pub-max-jour','pub-max-clics','pub-debut','pub-fin','pub-heure-debut','pub-heure-fin'
+    ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('pub-format').value = 'banniere';
+    document.getElementById('pub-bouton').value = 'En savoir plus';
+    document.getElementById('pub-lien-type').value = 'externe';
+    document.getElementById('pub-type-sponsor').value = 'initiative';
+    document.getElementById('pub-categorie-pub').value = 'general';
+    const zoneEl = document.querySelector('[name="pub-zone-geo"][value="monde"]');
+    if (zoneEl) zoneEl.checked = true;
+    document.querySelectorAll('.pub-paiement').forEach(el => { el.checked = false; });
+    document.querySelectorAll('.pub-roles').forEach(el => { el.checked = false; });
+    document.querySelectorAll('.pub-emplacements').forEach(el => { el.checked = el.value === 'fil'; });
+    ['pub-logo-thumb','pub-image-thumb','pub-galerie-thumb','pub-video-thumb'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    initPubSwitchTab(1);
+    document.getElementById('init-pub-modal').style.display = 'block';
+  }
+
+  function closeInitPubModal() {
+    document.getElementById('init-pub-modal').style.display = 'none';
+  }
+
+  async function saveInitPub() {
+    const boutonCustom = (document.getElementById('pub-bouton-custom')?.value || '').trim();
+    const rs = {};
+    ['facebook','instagram','linkedin','twitter','youtube','tiktok'].forEach(k => {
+      const v = (document.getElementById(`pub-rs-${k}`)?.value || '').trim();
+      if (v) rs[k] = v;
+    });
+    const galerie = (document.getElementById('pub-galerie')?.value || '').trim();
+    const body = {
+      nom_campagne: (document.getElementById('pub-nom-campagne')?.value || '').trim() || null,
+      reference_interne: (document.getElementById('pub-reference')?.value || '').trim() || null,
+      annonceur: (document.getElementById('pub-annonceur')?.value || '').trim(),
+      categorie: document.getElementById('pub-categorie-pub')?.value,
+      format: document.getElementById('pub-format')?.value,
+      titre: (document.getElementById('pub-titre')?.value || '').trim() || (document.getElementById('pub-nom-campagne')?.value || '').trim(),
+      sous_titre: (document.getElementById('pub-sous-titre')?.value || '').trim() || null,
+      description_courte: (document.getElementById('pub-desc-courte')?.value || '').trim() || null,
+      description_detaillee: (document.getElementById('pub-desc-detaillee')?.value || '').trim() || null,
+      logo_annonceur: (document.getElementById('pub-logo')?.value || '').trim() || null,
+      image_url: (document.getElementById('pub-image')?.value || '').trim() || null,
+      galerie_images: galerie ? galerie.split(',').map(s => s.trim()).filter(Boolean) : [],
+      video_url: (document.getElementById('pub-video')?.value || '').trim() || null,
+      bouton_action: boutonCustom || document.getElementById('pub-bouton')?.value || 'En savoir plus',
+      lien_url: (document.getElementById('pub-lien')?.value || '').trim() || null,
+      lien_type: document.getElementById('pub-lien-type')?.value,
+      lien_site: (document.getElementById('pub-site')?.value || '').trim() || null,
+      contact_telephone: (document.getElementById('pub-tel')?.value || '').trim() || null,
+      contact_whatsapp: (document.getElementById('pub-whatsapp')?.value || '').trim() || null,
+      contact_email: (document.getElementById('pub-email-contact')?.value || '').trim() || null,
+      contact_adresse: (document.getElementById('pub-adresse')?.value || '').trim() || null,
+      reseaux_sociaux: rs,
+      moyens_paiement: [...document.querySelectorAll('.pub-paiement:checked')].map(el => el.value),
+      zone_geo: document.querySelector('[name="pub-zone-geo"]:checked')?.value || 'monde',
+      cible_pays: (document.getElementById('pub-cible-pays')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+      cible_pays_residence: (document.getElementById('pub-cible-pays-res')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+      cible_regions: (document.getElementById('pub-cible-regions')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+      cible_villes: (document.getElementById('pub-cible-villes')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+      cible_roles: [...document.querySelectorAll('.pub-roles:checked')].map(el => el.value),
+      cible_nationalites: [
+        ...(document.getElementById('pub-cible-nat1')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+        ...(document.getElementById('pub-cible-nat2')?.value || '').split(',').map(s=>s.trim()).filter(Boolean)
+      ],
+      cible_origines: (document.getElementById('pub-cible-origines')?.value || '').split(',').map(s=>s.trim()).filter(Boolean),
+      emplacements: [...document.querySelectorAll('.pub-emplacements:checked')].map(el => el.value),
+      max_affichages_user: parseInt(document.getElementById('pub-max-user')?.value) || 0,
+      max_affichages_jour: parseInt(document.getElementById('pub-max-jour')?.value) || 0,
+      max_clics: parseInt(document.getElementById('pub-max-clics')?.value) || 0,
+      date_debut: document.getElementById('pub-debut')?.value || null,
+      date_fin: document.getElementById('pub-fin')?.value || null,
+      heure_debut: document.getElementById('pub-heure-debut')?.value || null,
+      heure_fin: document.getElementById('pub-heure-fin')?.value || null,
+    };
+    if (!body.titre) { alert('Veuillez renseigner au moins un titre.'); initPubSwitchTab(2); return; }
+    const btn = document.getElementById('init-pub-btn-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Envoi…'; }
+    try {
+      await api('POST', '/publicites', body);
+      closeInitPubModal();
+      await loadInitPubs();
+      alert('✅ Votre publicité a été soumise avec succès. L\'équipe Diaspo\'Actif l\'examinera avant diffusion.');
+    } catch (e) {
+      alert('Erreur : ' + (e.message || 'Impossible de soumettre la publicité.'));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '📣 Soumettre pour validation'; }
+    }
+  }
+
+  /* Initialiser la section pubs selon accréditation */
+  async function initPubSection() {
+    try {
+      const r = await api('GET', '/accreditations/mes');
+      const accreds = r.accreditations || [];
+      const hasPubAccred = accreds.some(a => a.type === 'creation_publicite' && a.statut === 'active');
+      const gate = document.getElementById('init-pub-gate');
+      const content = document.getElementById('init-pub-content');
+      if (hasPubAccred) {
+        if (gate) gate.style.display = 'none';
+        if (content) content.style.display = '';
+        loadInitPubs();
+      } else {
+        if (gate) gate.style.display = '';
+        if (content) content.style.display = 'none';
+      }
+    } catch (e) {
+      console.error('initPubSection error', e);
+    }
+  }
+  initPubSection();
+
 })();
 </script>
 </body>

@@ -2047,6 +2047,60 @@ function pubCibleMatch(cibleJson, valeurs) {
 }
 
 /* Servir une publicité adaptée à l'utilisateur courant */
+/* GET /api/publicites/mes — publicités soumises par l'initiative connectée */
+route("GET", "/api/publicites/mes", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = db.prepare("SELECT id,nom_campagne,titre,statut,format,created_at,updated_at,nb_impressions,nb_clics,date_debut,date_fin FROM publicites WHERE created_by=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { publicites: rows });
+});
+
+/* POST /api/publicites — soumettre une publicité (requiert accréditation creation_publicite) */
+route("POST", "/api/publicites", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!hasAccred(user.id, "creation_publicite")) return sendJSON(res, 403, { error: "Accréditation « Création de Publicité » requise pour soumettre une publicité." });
+  const b = _pubBody(body);
+  b.statut = "en_attente"; // toujours en attente de validation admin
+  b.type_sponsor = "initiative";
+  b.priorite = 2;
+  if (!b.titre && !b.nom_campagne) return sendJSON(res, 400, { error: "Titre requis." });
+  if (!b.annonceur) b.annonceur = user.nom;
+  const id = db.prepare(`
+    INSERT INTO publicites (
+      nom_campagne,reference_interne,annonceur,categorie,type_sponsor,sponsor_id,
+      format,statut,priorite,
+      titre,sous_titre,description_courte,description_detaillee,description,
+      logo_annonceur,image_url,galerie_images,video_url,
+      bouton_action,lien_url,lien_texte,lien_type,lien_interne_id,lien_site,
+      contact_telephone,contact_whatsapp,contact_email,contact_adresse,
+      reseaux_sociaux,moyens_paiement,
+      zone_geo,cible_continents,cible_pays,cible_regions,cible_villes,cible_pays_residence,
+      cible_roles,cible_nationalites,cible_origines,cible_interets,
+      emplacements,max_affichages_user,max_affichages_jour,max_clics,
+      date_debut,date_fin,heure_debut,heure_fin,
+      notes_admin,created_by
+    ) VALUES (${",?".repeat(50).slice(1)})
+  `).run(
+    b.nom_campagne,b.reference_interne,b.annonceur,b.categorie,b.type_sponsor,b.sponsor_id,
+    b.format,b.statut,b.priorite,
+    b.titre,b.sous_titre,b.description_courte,b.description_detaillee,b.description,
+    b.logo_annonceur,b.image_url,b.galerie_images,b.video_url,
+    b.bouton_action,b.lien_url,b.lien_texte,b.lien_type,b.lien_interne_id,b.lien_site,
+    b.contact_telephone,b.contact_whatsapp,b.contact_email,b.contact_adresse,
+    b.reseaux_sociaux,b.moyens_paiement,
+    b.zone_geo,b.cible_continents,b.cible_pays,b.cible_regions,b.cible_villes,b.cible_pays_residence,
+    b.cible_roles,b.cible_nationalites,b.cible_origines,b.cible_interets,
+    b.emplacements,b.max_affichages_user,b.max_affichages_jour,b.max_clics,
+    b.date_debut,b.date_fin,b.heure_debut,b.heure_fin,
+    null,user.id
+  ).lastInsertRowid;
+  // Notifier les admins
+  const admins = db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+  admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle publicité soumise", `${user.nom} a soumis une publicité « ${b.titre||b.nom_campagne} » en attente de validation.`, { publicite_id: Number(id) }));
+  sendJSON(res, 201, { id, ok: true });
+});
+
 route("GET", "/api/publicites/servir", async (req, res, params, body, query) => {
   const format = query.format || "banniere";
   const user = getCurrentUser(req);
@@ -2874,7 +2928,7 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
   const user = getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const { type, message } = body;
-  const TYPES_ACCRED_VALIDES = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle"];
+  const TYPES_ACCRED_VALIDES = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle","creation_publicite"];
   if (!TYPES_ACCRED_VALIDES.includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
   const existing = db.prepare("SELECT id,statut FROM demandes_accreditation WHERE user_id=? AND type=? ORDER BY created_at DESC LIMIT 1").get(user.id, type);
   if (existing && existing.statut === "en_attente") return sendJSON(res, 409, { error: "Une demande est déjà en cours pour ce type." });
@@ -2918,7 +2972,7 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/accorder", async (req, r
   const admin = getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
-  const TYPES_DA = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle"];
+  const TYPES_DA = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle","creation_publicite"];
   if (!TYPES_DA.includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
   db.prepare(`INSERT INTO compte_accreditations (user_id,type,statut,admin_id,frais_acces,notes,date_expiration)
     VALUES (?,?,'active',?,?,?,?)
@@ -2928,7 +2982,7 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/accorder", async (req, r
   // Mettre à jour la demande si elle existe
   db.prepare("UPDATE demandes_accreditation SET statut='approuvee' WHERE user_id=? AND type=? AND statut='en_attente'").run(userId, type);
   db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif,frais_acces) VALUES (?,?,?,?,?,?,?)").run(userId, type, "accorde", admin.id, admin.nom, body.motif||null, body.frais_acces||0);
-  const DA_LBL = { mobilisation_active:"Mobilisation Active 📢", createur_opportunites:"Créateur d'Opportunités 💼", observatoire_diaspora:"Observatoire Diaspora 📊", institutionnelle:"Institutionnelle 🏛️" };
+  const DA_LBL = { mobilisation_active:"Mobilisation Active 📢", createur_opportunites:"Créateur d'Opportunités 💼", observatoire_diaspora:"Observatoire Diaspora 📊", institutionnelle:"Institutionnelle 🏛️", creation_publicite:"Création de Publicité 📣" };
   const label = DA_LBL[type] || type;
   creerNotif(Number(userId), "validation", "Accréditation accordée !", `Félicitations ! Votre accréditation « ${label} » vient d'être validée par l'équipe Diaspo'Actif.`, { type });
   sendJSON(res, 200, { ok: true });
