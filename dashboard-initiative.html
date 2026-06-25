@@ -51,6 +51,19 @@
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
+/* Catalogue accréditations DA — défini ici pour éviter les problèmes de cache data.js */
+if (typeof ACCREDITATIONS_DA === 'undefined') {
+  window.ACCREDITATIONS_DA = [
+    { type:'mobilisation_active', label:'Mobilisation Active', emoji:'📢', couleur:'#f59e0b', couleurBg:'#fffbeb', couleurBorder:'#f59e0b', couleurText:'#92400e',
+      description:"Reconnue pour sa capacité à mobiliser la diaspora autour de causes, d'événements et de projets collectifs.",
+      avantages:["Badge 📢 visible sur votre profil et vos publications","Mise en avant prioritaire dans l'annuaire","Filtre dédié dans la recherche Diaspo'Actif","Accès aux outils de mobilisation avancés"],
+      prix:{initiative:29, collectivite:0} },
+    { type:'createur_opportunites', label:"Créateur d'Opportunités", emoji:'💼', couleur:'#3b82f6', couleurBg:'#eff6ff', couleurBorder:'#3b82f6', couleurText:'#1e40af',
+      description:"Reconnue pour la création d'emplois, de stages, d'appels à projets et d'opportunités économiques pour la diaspora.",
+      avantages:["Badge 💼 visible sur votre profil et vos publications","Accès prioritaire à la section \"Offres & Opportunités\"","Filtre dédié dans la recherche et l'annuaire","Mise en relation facilitée avec les membres"],
+      prix:{initiative:39, collectivite:0} }
+  ];
+}
 (async function initDashboardInitiative() {
   const content = document.getElementById("dashboard-content");
 
