@@ -1,27 +1,66 @@
+/* Diaspo'Actif — Service Worker PWA */
 const CACHE = 'diaspoactif-v1';
 const STATIC = [
-  '/','/index.html','/annuaire.html','/formations.html','/evenements.html',
-  '/fil-actualite.html','/assets/styles.css','/assets/app.js','/assets/data.js',
-  '/assets/logo.svg'
+  '/',
+  '/index.html',
+  '/annuaire.html',
+  '/fil-actualite.html',
+  '/formations.html',
+  '/evenements.html',
+  '/messagerie.html',
+  '/recherche.html',
+  '/login.html',
+  '/inscription.html',
+  '/assets/styles.css',
+  '/assets/app.js',
+  '/assets/data.js',
+  '/assets/logo.svg',
+  '/manifest.json'
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k!==CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', e => {
-  if (e.request.url.includes('/api/')) return; // toujours reseau pour API
+  const url = new URL(e.request.url);
+
+  /* Les requêtes API ne sont jamais mises en cache */
+  if (url.pathname.startsWith('/api/')) {
+    e.respondWith(fetch(e.request).catch(() =>
+      new Response(JSON.stringify({ error: 'Hors ligne' }), {
+        status: 503, headers: { 'Content-Type': 'application/json' }
+      })
+    ));
+    return;
+  }
+
+  /* Stratégie : Cache d'abord, réseau en fallback */
   e.respondWith(
     caches.match(e.request).then(cached => {
-      const fresh = fetch(e.request).then(res => {
-        if(res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+      if (cached) return cached;
+      return fetch(e.request).then(res => {
+        if (res.ok && e.request.method === 'GET') {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
         return res;
-      }).catch(() => cached);
-      return cached || fresh;
+      }).catch(() => {
+        /* Page offline de secours pour la navigation */
+        if (e.request.destination === 'document') {
+          return caches.match('/index.html');
+        }
+      });
     })
   );
 });

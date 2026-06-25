@@ -480,6 +480,88 @@ db.exec(`
     UNIQUE(user_id, institution_id)
   );
 
+  /* ===== MODULE AMBASSADE / COLLECTIVITÉ ===== */
+
+  CREATE TABLE IF NOT EXISTS ambassade_profil (
+    user_id INTEGER PRIMARY KEY,
+    nom_officiel TEXT,
+    pays_represente TEXT,
+    ambassadeur TEXT,
+    adresse TEXT,
+    telephone TEXT,
+    email_officiel TEXT,
+    site_web TEXT,
+    horaires TEXT DEFAULT '{"lun_ven":"09:00-17:00"}',
+    zone_pays TEXT DEFAULT '[]',
+    zone_regions TEXT DEFAULT '[]',
+    zone_villes TEXT DEFAULT '[]',
+    consulats TEXT DEFAULT '[]',
+    logo_url TEXT,
+    photo_couverture TEXT,
+    description TEXT,
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS ambassade_services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    type TEXT DEFAULT 'document',
+    icone TEXT DEFAULT '📄',
+    description TEXT,
+    conditions TEXT,
+    documents_requis TEXT DEFAULT '[]',
+    delai TEXT,
+    tarif TEXT,
+    procedure TEXT,
+    actif INTEGER DEFAULT 1,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS ambassade_agenda (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    type TEXT DEFAULT 'evenement',
+    description TEXT,
+    date_debut TEXT NOT NULL,
+    date_fin TEXT,
+    lieu TEXT,
+    lien TEXT,
+    public INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS ambassade_partenariats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    type TEXT DEFAULT 'institutionnel',
+    description TEXT,
+    logo_url TEXT,
+    site_web TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS ambassade_opportunites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    type TEXT DEFAULT 'appel_offres',
+    description TEXT,
+    date_limite TEXT,
+    lien TEXT,
+    budget TEXT,
+    actif INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
   /* Consultations et sondages officiels */
   CREATE TABLE IF NOT EXISTS consultations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -714,6 +796,135 @@ const MIGRATIONS = [
   ["publicite_events", "user_nationalite TEXT"],
   ["publicite_events", "user_role TEXT"],
 ];
+
+/* ===== SYSTÈME D'ACCRÉDITATIONS DIASPO'ACTIF ===== */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS compte_accreditations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('mobilisation_active','createur_opportunites')),
+    statut TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','suspendue','retiree')),
+    date_attribution TEXT DEFAULT (datetime('now')),
+    date_expiration TEXT,
+    frais_acces REAL DEFAULT 0,
+    admin_id INTEGER,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, type),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS accreditations_da_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    action TEXT NOT NULL,
+    admin_id INTEGER,
+    admin_nom TEXT,
+    motif TEXT,
+    frais_acces REAL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS demandes_accreditation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('mobilisation_active','createur_opportunites')),
+    message TEXT,
+    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','approuvee','refusee')),
+    motif_refus TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS sondages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    createur_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    type TEXT NOT NULL DEFAULT 'sondage' CHECK(type IN ('sondage','consultation_citoyenne','consultation_diaspora','consultation_associative','consultation_sectorielle','appel_projets','mobilisation')),
+    sous_type TEXT,
+    statut TEXT DEFAULT 'ouvert' CHECK(statut IN ('brouillon','ouvert','cloture','archive')),
+    anonyme INTEGER DEFAULT 0,
+    cible_roles TEXT DEFAULT '[]',
+    cible_pays TEXT DEFAULT '[]',
+    date_cloture TEXT,
+    nb_reponses INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(createur_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS sondage_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sondage_id INTEGER NOT NULL,
+    texte TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'choix_unique' CHECK(type IN ('choix_unique','choix_multiple','texte_libre','echelle','classement')),
+    options_json TEXT DEFAULT '[]',
+    obligatoire INTEGER DEFAULT 1,
+    ordre INTEGER DEFAULT 0,
+    FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS sondage_reponses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sondage_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    user_id INTEGER,
+    reponse TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(sondage_id) REFERENCES sondages(id),
+    FOREIGN KEY(question_id) REFERENCES sondage_questions(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS offres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    createur_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'emploi' CHECK(type IN ('emploi','stage','mission','contrat','partenariat','investissement','distribution','fournisseur','representant','incubation','acceleration','mentorat','coaching','forum_emploi','rencontre_b2b','networking','salon')),
+    description TEXT,
+    competences_requises TEXT DEFAULT '[]',
+    localisation TEXT,
+    pays TEXT,
+    remuneration TEXT,
+    date_limite TEXT,
+    nb_postes INTEGER DEFAULT 1,
+    statut TEXT DEFAULT 'publiee' CHECK(statut IN ('brouillon','publiee','cloturee','archivee')),
+    nb_candidatures INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(createur_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS offres_candidatures (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    offre_id INTEGER NOT NULL,
+    candidat_id INTEGER NOT NULL,
+    message TEXT,
+    cv_url TEXT,
+    lettre_url TEXT,
+    statut TEXT DEFAULT 'recu' CHECK(statut IN ('recu','en_etude','entretien','accepte','refuse')),
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(offre_id, candidat_id),
+    FOREIGN KEY(offre_id) REFERENCES offres(id),
+    FOREIGN KEY(candidat_id) REFERENCES users(id)
+  );
+`);
+
+/* Table uploads (créée séparément car hors liste MIGRATIONS) */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS uploads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    nom TEXT,
+    mime TEXT NOT NULL DEFAULT 'image/jpeg',
+    taille INTEGER DEFAULT 0,
+    data BLOB NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`);
 for (const [table, col] of MIGRATIONS) {
   const colName = col.split(" ")[0];
   const exists = db.prepare(`PRAGMA table_info(${table})`).all().some(r => r.name === colName);

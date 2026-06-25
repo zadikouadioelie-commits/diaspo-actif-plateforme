@@ -5,6 +5,11 @@
 <title>Diaspo'Actif — Dashboard Administrateur</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="assets/logo.svg">
 </head>
 <body>
 <div class="page">
@@ -686,6 +691,60 @@
             <div id="af-histo-list"></div>
           </div>
         </div>
+
+        <!-- ACCRÉDITATIONS DA : Mobilisation Active / Créateur d'Opportunités -->
+        <div id="section-accred-da" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
+          <h2 style="margin:0 0 6px;">Accréditations Diaspo'Actif</h2>
+          <p style="color:var(--muted);font-size:13px;margin:0 0 16px;">Gérez les demandes et attributions des accréditations « Mobilisation Active » et « Créateur d'Opportunités ».</p>
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+            <button class="btn btn-orange" id="da-tab-demandes" onclick="switchDATab('demandes')">⏳ Demandes en attente</button>
+            <button class="btn btn-outline" id="da-tab-actives" onclick="switchDATab('actives')">✅ Accréditations actives</button>
+            <button class="btn btn-outline" id="da-tab-histo" onclick="switchDATab('histo')">📋 Historique</button>
+          </div>
+          <div id="da-panel-demandes">
+            <div class="card" style="padding:0;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                  <th style="padding:10px 14px;text-align:left;">Compte</th>
+                  <th style="padding:10px 8px;text-align:left;">Type demandé</th>
+                  <th style="padding:10px 8px;text-align:left;">Message</th>
+                  <th style="padding:10px 8px;">Date</th>
+                  <th style="padding:10px 8px;">Actions</th>
+                </tr></thead>
+                <tbody id="da-demandes-body"><tr><td colspan="5" style="padding:24px;text-align:center;color:var(--muted);">Chargement…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="da-panel-actives" style="display:none;">
+            <div class="card" style="padding:0;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                  <th style="padding:10px 14px;text-align:left;">Compte</th>
+                  <th style="padding:10px 8px;text-align:left;">Type</th>
+                  <th style="padding:10px 8px;">Statut</th>
+                  <th style="padding:10px 8px;">Date attribution</th>
+                  <th style="padding:10px 8px;">Actions</th>
+                </tr></thead>
+                <tbody id="da-actives-body"><tr><td colspan="5" style="padding:24px;text-align:center;color:var(--muted);">Chargement…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="da-panel-histo" style="display:none;">
+            <div class="card" style="padding:0;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                  <th style="padding:10px 14px;text-align:left;">Compte</th>
+                  <th style="padding:10px 8px;">Type</th>
+                  <th style="padding:10px 8px;">Action</th>
+                  <th style="padding:10px 8px;">Par</th>
+                  <th style="padding:10px 8px;">Motif</th>
+                  <th style="padding:10px 8px;">Date</th>
+                </tr></thead>
+                <tbody id="da-histo-body"><tr><td colspan="6" style="padding:24px;text-align:center;color:var(--muted);">Chargement…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- Modal nouvelle accréditation -->
@@ -1324,26 +1383,37 @@
       <!-- MODÉRATION -->
       <section id="section-moderation" style="display:none;">
         <h2>Modération</h2>
-        <div class="notice" style="margin-bottom:16px;">🛡 Aucune action de modération n'est irréversible depuis cette interface. Les suppressions définitives requièrent une confirmation par email. (Simulation)</div>
-        <div class="card">
-          <h3>Signalements en attente</h3>
-          <div style="margin-top:12px;">
-            <div style="display:flex;gap:12px;align-items:center;padding:10px;border-bottom:1px solid var(--border);">
-              <span class="badge badge-ent">Signalement</span>
-              <span style="flex:1;font-size:13.5px;">Publication de «A.I.T.O» signalée pour contenu inapproprié par 2 membres.</span>
-              <button class="btn btn-sm btn-outline">Examiner</button>
-              <button class="btn btn-sm btn-outline" style="color:#D33;">Supprimer</button>
+        <div class="notice" style="margin-bottom:16px;">🛡 Les validations envoient une notification au compte concerné. Les suppressions de contenu sont définitives.</div>
+
+        <!-- Onglets modération -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <button class="btn btn-orange" id="mtab-comptes" onclick="switchModeTab('comptes')">⏳ Comptes en attente</button>
+          <button class="btn btn-outline" id="mtab-contenus" onclick="switchModeTab('contenus')">📋 Contenus récents</button>
+        </div>
+
+        <!-- Comptes en attente de validation -->
+        <div id="mtab-comptes-panel">
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+              <h3 style="margin:0;">Comptes en attente de validation</h3>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-sm btn-outline" id="btn-filtre-attente" onclick="loadModerationComptes('en_attente')" style="font-weight:700;">⏳ En attente</button>
+                <button class="btn btn-sm btn-outline" id="btn-filtre-valide" onclick="loadModerationComptes('valide')">✅ Validés</button>
+                <button class="btn btn-sm btn-outline" id="btn-filtre-rejete" onclick="loadModerationComptes('rejete')">❌ Rejetés</button>
+              </div>
             </div>
-            <div style="display:flex;gap:12px;align-items:center;padding:10px;border-bottom:1px solid var(--border);">
-              <span class="badge badge-ent">Signalement</span>
-              <span style="flex:1;font-size:13.5px;">Compte «diaspora2025@example.com» signalé pour spam par 3 membres.</span>
-              <button class="btn btn-sm btn-outline">Examiner</button>
-              <button class="btn btn-sm btn-outline" style="color:#D33;">Suspendre</button>
+            <div id="moderation-comptes-list"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+          </div>
+        </div>
+
+        <!-- Contenus récents -->
+        <div id="mtab-contenus-panel" style="display:none;">
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <h3 style="margin:0;">Publications récentes</h3>
+              <button class="btn btn-sm btn-outline" onclick="loadModerationContenus()">↺ Rafraîchir</button>
             </div>
-            <div style="display:flex;gap:12px;align-items:center;padding:10px;">
-              <span class="badge badge-asso">Résolu</span>
-              <span style="flex:1;font-size:13.5px;color:var(--muted);">Publication de «Tech For Senegal» : signalement rejeté le 20/06/2026.</span>
-            </div>
+            <div id="moderation-contenus-list"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
           </div>
         </div>
       </section>
@@ -1572,6 +1642,249 @@ document.querySelectorAll(".sidebar a[data-section='certifications']").forEach(a
   a.addEventListener("click", () => setTimeout(() => loadCertifList(), 50));
 });
 /* ===== Fin certifications ===== */
+
+/* ===== Modération — comptes & contenus ===== */
+let _modeTab = 'comptes';
+
+function switchModeTab(tab) {
+  _modeTab = tab;
+  document.getElementById('mtab-comptes-panel').style.display = tab === 'comptes' ? '' : 'none';
+  document.getElementById('mtab-contenus-panel').style.display = tab === 'contenus' ? '' : 'none';
+  document.getElementById('mtab-comptes').className = 'btn ' + (tab === 'comptes' ? 'btn-orange' : 'btn-outline');
+  document.getElementById('mtab-contenus').className = 'btn ' + (tab === 'contenus' ? 'btn-orange' : 'btn-outline');
+  if (tab === 'comptes') loadModerationComptes('en_attente');
+  else loadModerationContenus();
+}
+
+let _comptesStatut = 'en_attente';
+async function loadModerationComptes(statut = 'en_attente') {
+  _comptesStatut = statut;
+  ['attente','valide','rejete'].forEach(s => {
+    const btn = document.getElementById('btn-filtre-' + s);
+    if (btn) btn.style.fontWeight = s === statut ? '800' : '';
+  });
+  const el = document.getElementById('moderation-comptes-list');
+  el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Chargement…</p>';
+  try {
+    const data = await api('GET', '/admin/comptes?statut=' + statut);
+    const comptes = data.comptes || [];
+    if (!comptes.length) {
+      el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0;">Aucun compte dans ce statut.</p>';
+      return;
+    }
+    const ROLE_LABELS = { utilisateur:'Utilisateur', initiative:'Initiative', collectivite:'Collectivité', administrateur:'Admin' };
+    el.innerHTML = comptes.map(c => `
+      <div style="display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;" id="compte-row-${c.id}">
+        <div style="flex:1;min-width:180px;">
+          <div style="font-weight:700;font-size:13.5px;">${esc(c.nom)}${c.prenom ? ' ' + esc(c.prenom) : ''}</div>
+          <div style="font-size:12px;color:var(--muted);">${esc(c.email)} · <strong>${esc(ROLE_LABELS[c.role]||c.role)}</strong>${c.ville ? ' · ' + esc(c.ville) : ''}${c.pays ? ', ' + esc(c.pays) : ''}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Inscrit le ${c.created_at ? c.created_at.slice(0,10) : '—'}</div>
+        </div>
+        ${statut === 'en_attente' ? `
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="validerCompte(${c.id})">✅ Valider</button>
+          <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="rejeterComptePrompt(${c.id})">❌ Rejeter</button>
+        </div>` : `<span style="font-size:12px;padding:3px 10px;border-radius:20px;background:${statut==='valide'?'#d1fae5':'#fee2e2'};color:${statut==='valide'?'#065f46':'#991b1b'};font-weight:700;">${statut==='valide'?'✅ Validé':'❌ Rejeté'}</span>`}
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = '<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>';
+  }
+}
+
+async function validerCompte(id) {
+  if (!confirm('Valider ce compte ?')) return;
+  try {
+    await api('PATCH', '/admin/comptes/' + id + '/valider');
+    document.getElementById('compte-row-' + id)?.remove();
+    const el = document.getElementById('moderation-comptes-list');
+    if (!el.querySelector('[id^=compte-row-]')) el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0;">Aucun compte en attente.</p>';
+  } catch(e) { alert(e.message || 'Erreur.'); }
+}
+
+async function rejeterComptePrompt(id) {
+  const motif = prompt('Motif du rejet (optionnel) :') ?? '';
+  if (motif === null) return;
+  try {
+    await api('PATCH', '/admin/comptes/' + id + '/rejeter', { motif: motif || 'Documents insuffisants' });
+    document.getElementById('compte-row-' + id)?.remove();
+    const el = document.getElementById('moderation-comptes-list');
+    if (!el.querySelector('[id^=compte-row-]')) el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0;">Aucun compte en attente.</p>';
+  } catch(e) { alert(e.message || 'Erreur.'); }
+}
+
+async function loadModerationContenus() {
+  const el = document.getElementById('moderation-contenus-list');
+  el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Chargement…</p>';
+  try {
+    const data = await api('GET', '/admin/contenus');
+    const posts = data.posts || [];
+    if (!posts.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0;">Aucune publication.</p>'; return; }
+    el.innerHTML = posts.map(p => `
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border);" id="contenu-row-${p.id}">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:700;color:var(--orange);margin-bottom:3px;">${esc(p.auteur_nom||p.auteur||'—')} · ${p.created_at ? p.created_at.slice(0,10) : ''}</div>
+          <div style="font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc((p.contenu||'').slice(0,120))}${(p.contenu||'').length>120?'…':''}</div>
+        </div>
+        <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;flex-shrink:0;" onclick="supprimerContenu('post',${p.id})">🗑 Supprimer</button>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = '<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>';
+  }
+}
+
+async function supprimerContenu(type, id) {
+  if (!confirm('Supprimer ce contenu définitivement ?')) return;
+  try {
+    await api('DELETE', '/admin/contenu/' + type + '/' + id);
+    document.getElementById('contenu-row-' + id)?.remove();
+  } catch(e) { alert(e.message || 'Erreur.'); }
+}
+
+/* Charger la modération quand la section s'ouvre */
+document.querySelectorAll(".sidebar a[data-section='moderation']").forEach(a => {
+  a.addEventListener("click", () => setTimeout(() => loadModerationComptes('en_attente'), 50));
+});
+/* ===== Fin modération ===== */
+
+/* ===== ACCRÉDITATIONS DIASPO'ACTIF ===== */
+function escDA(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtDA(d){if(!d)return '—';try{return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
+const DA_TYPE_LBL={mobilisation_active:'📢 Mobilisation Active',createur_opportunites:'💼 Créateur d\'Opportunités'};
+const DA_STAT_LBL={active:'✅ Active',suspendue:'⚠️ Suspendue',retiree:'❌ Retirée'};
+const DA_ACT_LBL={accorde:'Accordée',refuse:'Refusée',suspendu:'Suspendue',retire:'Retirée',reactiver:'Réactivée'};
+
+function switchDATab(tab){
+  ['demandes','actives','histo'].forEach(t=>{
+    document.getElementById('da-panel-'+t).style.display=t===tab?'':'none';
+    const btn=document.getElementById('da-tab-'+t);
+    if(btn){btn.className=t===tab?'btn btn-orange':'btn btn-outline';}
+  });
+  if(tab==='demandes') loadDADemandes();
+  else if(tab==='actives') loadDAActives();
+  else if(tab==='histo') loadDAHisto();
+}
+
+async function loadDADemandes(){
+  const tbody=document.getElementById('da-demandes-body');
+  tbody.innerHTML='<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted);">Chargement…</td></tr>';
+  try{
+    const r=await api('GET','/admin/accreditations/demandes?statut=en_attente');
+    const rows=r.demandes||[];
+    if(!rows.length){tbody.innerHTML='<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted);">Aucune demande en attente.</td></tr>';return;}
+    tbody.innerHTML=rows.map(d=>`<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:10px 14px;">
+        <div style="font-weight:700;">${escDA(d.user_nom)}</div>
+        <div style="font-size:11px;color:var(--muted);">${escDA(d.user_email)} · ${escDA(d.user_role)}</div>
+      </td>
+      <td style="padding:10px 8px;white-space:nowrap;">${DA_TYPE_LBL[d.type]||d.type}</td>
+      <td style="padding:10px 8px;font-size:12px;max-width:200px;word-break:break-word;">${escDA((d.message||'').slice(0,120))||'<span style="color:var(--muted);">—</span>'}</td>
+      <td style="padding:10px 8px;white-space:nowrap;font-size:12px;">${fmtDA(d.created_at)}</td>
+      <td style="padding:10px 8px;white-space:nowrap;">
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" style="background:#22c55e;color:#fff;border:none;" onclick="accordeDA(${d.user_id},'${d.type}')">✅ Accorder</button>
+          <button class="btn btn-sm btn-outline" onclick="refuseDA(${d.user_id},'${d.type}')">❌ Refuser</button>
+        </div>
+      </td>
+    </tr>`).join('');
+  }catch(e){tbody.innerHTML='<tr><td colspan="5" style="padding:20px;color:red;">Erreur : '+escDA(e.message)+'</td></tr>';}
+}
+
+async function loadDAActives(){
+  const tbody=document.getElementById('da-actives-body');
+  tbody.innerHTML='<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted);">Chargement…</td></tr>';
+  try{
+    const r=await api('GET','/admin/accreditations');
+    const rows=r.accreditations||[];
+    if(!rows.length){tbody.innerHTML='<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted);">Aucune accréditation enregistrée.</td></tr>';return;}
+    tbody.innerHTML=rows.map(a=>`<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:10px 14px;">
+        <div style="font-weight:700;">${escDA(a.user_nom)}</div>
+        <div style="font-size:11px;color:var(--muted);">${escDA(a.user_email)} · ${escDA(a.user_role)}</div>
+      </td>
+      <td style="padding:10px 8px;white-space:nowrap;">${DA_TYPE_LBL[a.type]||a.type}</td>
+      <td style="padding:10px 8px;">
+        <span style="padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;background:${a.statut==='active'?'#dcfce7':a.statut==='suspendue'?'#fef9c3':'#fee2e2'};color:${a.statut==='active'?'#16a34a':a.statut==='suspendue'?'#a16207':'#dc2626'};">
+          ${DA_STAT_LBL[a.statut]||a.statut}
+        </span>
+      </td>
+      <td style="padding:10px 8px;font-size:12px;">${fmtDA(a.date_attribution)}</td>
+      <td style="padding:10px 8px;">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          ${a.statut==='active'?`<button class="btn btn-sm btn-outline" onclick="suspendreDA(${a.user_id},'${a.type}')">⚠️ Suspendre</button>`:''}
+          ${a.statut==='suspendue'?`<button class="btn btn-sm btn-outline" onclick="reactiverDA(${a.user_id},'${a.type}')">↩️ Réactiver</button>`:''}
+          ${a.statut!=='retiree'?`<button class="btn btn-sm btn-outline" style="color:#dc2626;" onclick="retirerDA(${a.user_id},'${a.type}')">🗑 Retirer</button>`:''}
+        </div>
+      </td>
+    </tr>`).join('');
+  }catch(e){tbody.innerHTML='<tr><td colspan="5" style="padding:20px;color:red;">Erreur : '+escDA(e.message)+'</td></tr>';}
+}
+
+async function loadDAHisto(){
+  const tbody=document.getElementById('da-histo-body');
+  tbody.innerHTML='<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted);">Chargement…</td></tr>';
+  try{
+    // Réutilise la route admin qui liste tout
+    const r=await api('GET','/admin/accreditations');
+    // L'historique n'est pas encore une route dédiée, on affiche les accreditations par updated_at
+    const rows=r.accreditations||[];
+    tbody.innerHTML=rows.length
+      ? rows.map(a=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 14px;font-weight:700;">${escDA(a.user_nom)}</td>
+          <td style="padding:10px 8px;white-space:nowrap;">${DA_TYPE_LBL[a.type]||a.type}</td>
+          <td style="padding:10px 8px;">${DA_STAT_LBL[a.statut]||a.statut}</td>
+          <td style="padding:10px 8px;font-size:12px;">${escDA(a.admin_id?'Admin #'+a.admin_id:'—')}</td>
+          <td style="padding:10px 8px;font-size:12px;color:var(--muted);">${escDA(a.notes||'—')}</td>
+          <td style="padding:10px 8px;font-size:12px;">${fmtDA(a.updated_at)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted);">Aucun historique.</td></tr>';
+  }catch(e){tbody.innerHTML='<tr><td colspan="6" style="padding:20px;color:red;">Erreur : '+escDA(e.message)+'</td></tr>';}
+}
+
+async function accordeDA(userId, type){
+  const motif=prompt('Note admin (optionnel) :','');
+  if(motif===null)return;
+  try{
+    await api('PATCH','/admin/accreditations/'+userId+'/'+type+'/accorder',{motif,frais_acces:0});
+    loadDADemandes();
+  }catch(e){alert('Erreur : '+e.message);}
+}
+async function refuseDA(userId, type){
+  const motif=prompt('Motif du refus (affiché au demandeur) :','');
+  if(motif===null)return;
+  try{
+    await api('PATCH','/admin/accreditations/'+userId+'/'+type+'/refuser',{motif});
+    loadDADemandes();
+  }catch(e){alert('Erreur : '+e.message);}
+}
+async function suspendreDA(userId, type){
+  const motif=prompt('Motif de la suspension :','');
+  if(motif===null)return;
+  try{
+    await api('PATCH','/admin/accreditations/'+userId+'/'+type+'/suspendre',{motif});
+    loadDAActives();
+  }catch(e){alert('Erreur : '+e.message);}
+}
+async function reactiverDA(userId, type){
+  try{
+    await api('PATCH','/admin/accreditations/'+userId+'/'+type+'/reactiver');
+    loadDAActives();
+  }catch(e){alert('Erreur : '+e.message);}
+}
+async function retirerDA(userId, type){
+  if(!confirm('Retirer définitivement cette accréditation ?'))return;
+  const motif=prompt('Motif du retrait :','');
+  if(motif===null)return;
+  try{
+    await api('PATCH','/admin/accreditations/'+userId+'/'+type+'/retirer',{motif});
+    loadDAActives();
+  }catch(e){alert('Erreur : '+e.message);}
+}
+
+// Charger quand la section accreditations s'ouvre
+document.querySelector('[data-section="accreditations"]')?.addEventListener('click',()=>{
+  setTimeout(loadDADemandes,150);
+});
+/* ===== Fin accréditations DA ===== */
 
 (async () => {
   // Auth guard

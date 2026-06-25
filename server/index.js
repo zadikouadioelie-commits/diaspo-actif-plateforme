@@ -194,7 +194,12 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
   if (query.type) rows = rows.filter(r => r.type === query.type);
   if (query.nationalite_unique === "1") rows = rows.filter(r => r.nationalite_unique === 1);
-  rows = rows.map(r => ({ ...r, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: getCertif(r.id) }));
+  rows = rows.map(r => {
+    const accreds = r.owner_user_id
+      ? db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(r.owner_user_id).map(a => a.type)
+      : [];
+    return { ...r, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: getCertif(r.id), accreditations: accreds };
+  });
   sendJSON(res, 200, { initiatives: rows });
 });
 
@@ -205,6 +210,9 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
   row.nationalite_unique = !!row.nationalite_unique;
   row.abonnement_actif = !!row.abonnement_actif;
   row.certif = getCertif(row.id);
+  row.accreditations = row.owner_user_id
+    ? db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(row.owner_user_id).map(a => a.type)
+    : [];
   sendJSON(res, 200, { initiative: row });
 });
 
@@ -890,11 +898,25 @@ route("GET", "/api/dashboard/collectivite", async (req, res) => {
   const totalMembres = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur', 'initiative')").get().n;
   const totalInitiatives = db.prepare("SELECT COUNT(*) AS n FROM initiatives").get().n;
   const paysRows = db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 10").all();
+  const profil = db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
+  const nbMessages = db.prepare("SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON m.conversation_id=c.id WHERE (c.user1_id=? OR c.user2_id=?) AND m.sender_id!=? AND m.lu=0").get(user.id,user.id,user.id).n;
+  const nbComms = db.prepare("SELECT COUNT(*) AS n FROM communications_institutionnelles WHERE emetteur_id=?").get(user.id).n;
+  const nbServices = db.prepare("SELECT COUNT(*) AS n FROM ambassade_services WHERE user_id=? AND actif=1").get(user.id).n;
+  const nbAgenda = db.prepare("SELECT COUNT(*) AS n FROM ambassade_agenda WHERE user_id=? AND date_debut >= date('now')").get(user.id).n;
+  const nbOpportunites = db.prepare("SELECT COUNT(*) AS n FROM ambassade_opportunites WHERE user_id=? AND actif=1").get(user.id).n;
 
   sendJSON(res, 200, {
     total_membres: totalMembres,
     total_initiatives: totalInitiatives,
-    repartition_pays: paysRows
+    repartition_pays: paysRows,
+    profil: profil || null,
+    prive: {
+      messages_non_lus: nbMessages,
+      communications_envoyees: nbComms,
+      services_actifs: nbServices,
+      evenements_a_venir: nbAgenda,
+      opportunites_actives: nbOpportunites,
+    }
   });
 });
 
@@ -998,9 +1020,32 @@ route("DELETE", "/api/users/:id/suivre", async (req, res, params) => {
 route("POST", "/api/upload", async (req, res, params, body) => {
   const user = getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const ext = (body.nom || "file.jpg").split(".").pop().toLowerCase();
-  const fakeUrl = `/assets/uploads/demo-${Date.now()}.${ext}`;
-  sendJSON(res, 200, { url: fakeUrl, nom: body.nom, note: "Prototype — upload simulé, aucun fichier réel stocké." });
+
+  const { data, nom } = body; // data = "data:<mime>;base64,<b64>"
+  if (!data || !data.startsWith("data:")) return sendJSON(res, 400, { error: "Données image manquantes." });
+
+  const match = data.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return sendJSON(res, 400, { error: "Format de données invalide." });
+
+  const mime = match[1];
+  const allowed = ["image/jpeg","image/png","image/gif","image/webp","image/svg+xml"];
+  if (!allowed.includes(mime)) return sendJSON(res, 400, { error: "Type de fichier non autorisé." });
+
+  const buf = Buffer.from(match[2], "base64");
+  if (buf.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop volumineux (5 Mo max)." });
+
+  const id = db.prepare("INSERT INTO uploads (user_id, nom, mime, taille, data) VALUES (?,?,?,?,?)").run(
+    user.id, nom || "upload", mime, buf.length, buf
+  ).lastInsertRowid;
+
+  sendJSON(res, 200, { url: `/api/uploads/${id}`, id, nom: nom || "upload" });
+});
+
+route("GET", "/api/uploads/:id", async (req, res, params) => {
+  const row = db.prepare("SELECT mime, data FROM uploads WHERE id=?").get(params.id);
+  if (!row) return send(res, 404, "Not found");
+  res.writeHead(200, { "Content-Type": row.mime, "Cache-Control": "public, max-age=86400" });
+  res.end(row.data);
 });
 
 /* ---------- Recherche globale ---------- */
@@ -2582,6 +2627,567 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     db.prepare("UPDATE consultations SET statut='cloturee' WHERE id=?").run(params.id);
     sendJSON(res, 200, { ok: true });
   });
+
+/* ============================================================
+   MODULE AMBASSADE / COLLECTIVITÉ
+   ============================================================ */
+
+function requireCollectivite(req, res) {
+  const user = getCurrentUser(req);
+  if (!user) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
+  if (user.role !== "collectivite") { sendJSON(res, 403, { error: "Réservé aux collectivités." }); return null; }
+  return user;
+}
+
+/* ── Profil ambassade ── */
+route("GET", "/api/collectivite/profil-ambassade", async (req, res) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  let profil = db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
+  if (!profil) profil = { user_id: user.id, nom_officiel: user.nom || "", pays_represente: user.pays || "" };
+  sendJSON(res, 200, profil);
+});
+
+route("PUT", "/api/collectivite/profil-ambassade", async (req, res, params, body) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  const j = v => { try { return JSON.stringify(Array.isArray(v) ? v : JSON.parse(v || "[]")); } catch { return "[]"; } };
+  const exists = db.prepare("SELECT user_id FROM ambassade_profil WHERE user_id=?").get(user.id);
+  const data = {
+    nom_officiel: body.nom_officiel || null,
+    pays_represente: body.pays_represente || null,
+    ambassadeur: body.ambassadeur || null,
+    adresse: body.adresse || null,
+    telephone: body.telephone || null,
+    email_officiel: body.email_officiel || null,
+    site_web: body.site_web || null,
+    horaires: body.horaires || null,
+    zone_pays: j(body.zone_pays),
+    zone_regions: j(body.zone_regions),
+    zone_villes: j(body.zone_villes),
+    consulats: j(body.consulats),
+    logo_url: body.logo_url || null,
+    photo_couverture: body.photo_couverture || null,
+    description: body.description || null,
+  };
+  if (exists) {
+    db.prepare(`UPDATE ambassade_profil SET nom_officiel=?,pays_represente=?,ambassadeur=?,adresse=?,telephone=?,email_officiel=?,site_web=?,horaires=?,zone_pays=?,zone_regions=?,zone_villes=?,consulats=?,logo_url=?,photo_couverture=?,description=?,updated_at=datetime('now') WHERE user_id=?`).run(...Object.values(data), user.id);
+  } else {
+    db.prepare(`INSERT INTO ambassade_profil(nom_officiel,pays_represente,ambassadeur,adresse,telephone,email_officiel,site_web,horaires,zone_pays,zone_regions,zone_villes,consulats,logo_url,photo_couverture,description,user_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(...Object.values(data), user.id);
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Stats diaspora (agrégées, selon pays_represente) ── */
+route("GET", "/api/collectivite/stats-diaspora", async (req, res) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  const profil = db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
+  const pays = profil?.pays_represente || user.pays;
+  const SEUIL = 10;
+  const mask = n => n >= SEUIL ? n : null;
+  const ressortissants = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?)").get(pays, pays).n;
+  const parVille = db.prepare("SELECT ville, COUNT(*) AS n FROM users WHERE role='utilisateur' AND ville IS NOT NULL AND (nationalite1=? OR nationalite2=?) GROUP BY ville ORDER BY n DESC LIMIT 20").all(pays, pays).map(r=>({...r, n: mask(r.n)})).filter(r=>r.n);
+  const parRegion = db.prepare("SELECT pays AS region, COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?) AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 15").all(pays, pays).map(r=>({...r, n: mask(r.n)})).filter(r=>r.n);
+  const initiatives = db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE nationalite1=? OR nationalite2=?").get(pays, pays).n;
+  const associations = db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE (nationalite1=? OR nationalite2=?) AND domaine='associatif'").get(pays, pays).n;
+  const entreprises = db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE (nationalite1=? OR nationalite2=?) AND domaine IN ('commerce','finance','tech','industrie')").get(pays, pays).n;
+  const experts = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?) AND titre_pro IS NOT NULL").get(pays, pays).n;
+  sendJSON(res, 200, {
+    pays, seuil: SEUIL,
+    ressortissants: mask(ressortissants),
+    initiatives: mask(initiatives),
+    associations: mask(associations),
+    entreprises: mask(entreprises),
+    experts: mask(experts),
+    par_ville: parVille,
+    par_region: parRegion,
+  });
+});
+
+/* ── Espace Diaspora (initiatives filtrées) ── */
+route("GET", "/api/collectivite/diaspora-membres", async (req, res, params, body, query) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  const profil = db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
+  const pays = profil?.pays_represente || user.pays;
+  const { ville, secteur, type } = query;
+  let where = "(nationalite1=? OR nationalite2=?)"; const p = [pays, pays];
+  if (ville) { where += " AND ville=?"; p.push(ville); }
+  if (secteur) { where += " AND domaine=?"; p.push(secteur); }
+  const rows = db.prepare(`SELECT id,nom,domaine,ville,pays,logo_url,site_web,membres,abonnes,type_structure,nb_vues FROM initiatives WHERE ${where} ORDER BY membres DESC LIMIT 50`).all(...p);
+  sendJSON(res, 200, { initiatives: rows, pays });
+});
+
+/* ── Services consulaires ── */
+route("GET", "/api/collectivite/services", async (req, res) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  const rows = db.prepare("SELECT * FROM ambassade_services WHERE user_id=? ORDER BY ordre,created_at").all(user.id);
+  sendJSON(res, 200, { services: rows });
+});
+
+route("POST", "/api/collectivite/services", async (req, res, params, body) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  if (!body.nom) return sendJSON(res, 400, { error: "Nom requis." });
+  const j = v => { try { return JSON.stringify(Array.isArray(v) ? v : JSON.parse(v || "[]")); } catch { return "[]"; } };
+  const r = db.prepare("INSERT INTO ambassade_services(user_id,nom,type,icone,description,conditions,documents_requis,delai,tarif,procedure,ordre) VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(user.id, body.nom, body.type||"document", body.icone||"📄", body.description||null, body.conditions||null, j(body.documents_requis), body.delai||null, body.tarif||null, body.procedure||null, body.ordre||0);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/collectivite/services/:id", async (req, res, params, body) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  const j = v => { try { return JSON.stringify(Array.isArray(v) ? v : JSON.parse(v || "[]")); } catch { return "[]"; } };
+  db.prepare("UPDATE ambassade_services SET nom=?,type=?,icone=?,description=?,conditions=?,documents_requis=?,delai=?,tarif=?,procedure=?,actif=?,ordre=? WHERE id=? AND user_id=?").run(body.nom, body.type||"document", body.icone||"📄", body.description||null, body.conditions||null, j(body.documents_requis), body.delai||null, body.tarif||null, body.procedure||null, body.actif??1, body.ordre||0, params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/collectivite/services/:id", async (req, res, params) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  db.prepare("DELETE FROM ambassade_services WHERE id=? AND user_id=?").run(params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Agenda ── */
+route("GET", "/api/collectivite/agenda", async (req, res) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  const rows = db.prepare("SELECT * FROM ambassade_agenda WHERE user_id=? ORDER BY date_debut DESC").all(user.id);
+  sendJSON(res, 200, { agenda: rows });
+});
+
+route("POST", "/api/collectivite/agenda", async (req, res, params, body) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  if (!body.titre || !body.date_debut) return sendJSON(res, 400, { error: "Titre et date requis." });
+  const r = db.prepare("INSERT INTO ambassade_agenda(user_id,titre,type,description,date_debut,date_fin,lieu,lien,public) VALUES(?,?,?,?,?,?,?,?,?)").run(user.id, body.titre, body.type||"evenement", body.description||null, body.date_debut, body.date_fin||null, body.lieu||null, body.lien||null, body.public??1);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/collectivite/agenda/:id", async (req, res, params, body) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  db.prepare("UPDATE ambassade_agenda SET titre=?,type=?,description=?,date_debut=?,date_fin=?,lieu=?,lien=?,public=? WHERE id=? AND user_id=?").run(body.titre, body.type||"evenement", body.description||null, body.date_debut, body.date_fin||null, body.lieu||null, body.lien||null, body.public??1, params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/collectivite/agenda/:id", async (req, res, params) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  db.prepare("DELETE FROM ambassade_agenda WHERE id=? AND user_id=?").run(params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Partenariats institutionnels ── */
+route("GET", "/api/collectivite/partenariats-inst", async (req, res) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  const rows = db.prepare("SELECT * FROM ambassade_partenariats WHERE user_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { partenariats: rows });
+});
+
+route("POST", "/api/collectivite/partenariats-inst", async (req, res, params, body) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  if (!body.nom) return sendJSON(res, 400, { error: "Nom requis." });
+  const r = db.prepare("INSERT INTO ambassade_partenariats(user_id,nom,type,description,logo_url,site_web) VALUES(?,?,?,?,?,?)").run(user.id, body.nom, body.type||"institutionnel", body.description||null, body.logo_url||null, body.site_web||null);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/collectivite/partenariats-inst/:id", async (req, res, params, body) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  db.prepare("UPDATE ambassade_partenariats SET nom=?,type=?,description=?,logo_url=?,site_web=? WHERE id=? AND user_id=?").run(body.nom, body.type||"institutionnel", body.description||null, body.logo_url||null, body.site_web||null, params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/collectivite/partenariats-inst/:id", async (req, res, params) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  db.prepare("DELETE FROM ambassade_partenariats WHERE id=? AND user_id=?").run(params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Opportunités ── */
+route("GET", "/api/collectivite/opportunites", async (req, res) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  const rows = db.prepare("SELECT * FROM ambassade_opportunites WHERE user_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { opportunites: rows });
+});
+
+route("POST", "/api/collectivite/opportunites", async (req, res, params, body) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  if (!body.titre) return sendJSON(res, 400, { error: "Titre requis." });
+  const r = db.prepare("INSERT INTO ambassade_opportunites(user_id,titre,type,description,date_limite,lien,budget) VALUES(?,?,?,?,?,?,?)").run(user.id, body.titre, body.type||"appel_offres", body.description||null, body.date_limite||null, body.lien||null, body.budget||null);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/collectivite/opportunites/:id", async (req, res, params, body) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  db.prepare("UPDATE ambassade_opportunites SET titre=?,type=?,description=?,date_limite=?,lien=?,budget=?,actif=? WHERE id=? AND user_id=?").run(body.titre, body.type||"appel_offres", body.description||null, body.date_limite||null, body.lien||null, body.budget||null, body.actif??1, params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/collectivite/opportunites/:id", async (req, res, params) => {
+  const user = requireCollectivite(req, res); if (!user) return;
+  db.prepare("DELETE FROM ambassade_opportunites WHERE id=? AND user_id=?").run(params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ================================================================
+   SYSTÈME D'ACCRÉDITATIONS DIASPO'ACTIF
+   ================================================================ */
+
+/* Helper : vérifie qu'un user a une accréditation active */
+function hasAccred(userId, type) {
+  const r = db.prepare("SELECT id FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type);
+  return !!r;
+}
+
+/* GET /api/accreditations/mes — mes accréditations */
+route("GET", "/api/accreditations/mes", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = db.prepare("SELECT * FROM compte_accreditations WHERE user_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { accreditations: rows });
+});
+
+/* GET /api/accreditations/demandes — mes propres demandes */
+route("GET", "/api/accreditations/demandes", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = db.prepare("SELECT * FROM demandes_accreditation WHERE user_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { demandes: rows });
+});
+
+/* GET /api/accreditations/user/:id — accréditations publiques d'un compte */
+route("GET", "/api/accreditations/user/:id", async (req, res, params) => {
+  const rows = db.prepare("SELECT type, statut, date_attribution FROM compte_accreditations WHERE user_id=? AND statut='active'").all(params.id);
+  sendJSON(res, 200, { accreditations: rows });
+});
+
+/* POST /api/accreditations/demande — demander une accréditation */
+route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { type, message } = body;
+  if (!["mobilisation_active","createur_opportunites"].includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
+  const existing = db.prepare("SELECT id,statut FROM demandes_accreditation WHERE user_id=? AND type=? ORDER BY created_at DESC LIMIT 1").get(user.id, type);
+  if (existing && existing.statut === "en_attente") return sendJSON(res, 409, { error: "Une demande est déjà en cours pour ce type." });
+  if (hasAccred(user.id, type)) return sendJSON(res, 409, { error: "Vous possédez déjà cette accréditation." });
+  const id = db.prepare("INSERT INTO demandes_accreditation (user_id, type, message) VALUES (?,?,?)").run(user.id, type, message||null).lastInsertRowid;
+  // Notifier les admins
+  const admins = db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+  admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation", `${user.nom} demande l'accréditation « ${type === "mobilisation_active" ? "Mobilisation Active" : "Créateur d'Opportunités"} »`, { demande_id: Number(id) }));
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* ──── Routes Admin : gestion des accréditations ──── */
+
+/* GET /api/admin/accreditations/demandes — liste des demandes */
+route("GET", "/api/admin/accreditations/demandes", async (req, res, params, body, query) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const statut = query.statut || "en_attente";
+  const rows = db.prepare(`
+    SELECT d.*, u.nom AS user_nom, u.email AS user_email, u.role AS user_role, u.ville AS user_ville
+    FROM demandes_accreditation d JOIN users u ON u.id=d.user_id
+    WHERE d.statut=? ORDER BY d.created_at DESC
+  `).all(statut);
+  sendJSON(res, 200, { demandes: rows });
+});
+
+/* GET /api/admin/accreditations — liste de tous les comptes accrédités */
+route("GET", "/api/admin/accreditations", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = db.prepare(`
+    SELECT ca.*, u.nom AS user_nom, u.email AS user_email, u.role AS user_role
+    FROM compte_accreditations ca JOIN users u ON u.id=ca.user_id
+    ORDER BY ca.updated_at DESC
+  `).all();
+  sendJSON(res, 200, { accreditations: rows });
+});
+
+/* PATCH /api/admin/accreditations/:userId/:type/accorder */
+route("PATCH", "/api/admin/accreditations/:userId/:type/accorder", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { userId, type } = params;
+  if (!["mobilisation_active","createur_opportunites"].includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
+  db.prepare(`INSERT INTO compte_accreditations (user_id,type,statut,admin_id,frais_acces,notes,date_expiration)
+    VALUES (?,?,'active',?,?,?,?)
+    ON CONFLICT(user_id,type) DO UPDATE SET statut='active',admin_id=?,frais_acces=?,notes=?,date_expiration=?,updated_at=datetime('now')`
+  ).run(userId, type, admin.id, body.frais_acces||0, body.notes||null, body.date_expiration||null,
+        admin.id, body.frais_acces||0, body.notes||null, body.date_expiration||null);
+  // Mettre à jour la demande si elle existe
+  db.prepare("UPDATE demandes_accreditation SET statut='approuvee' WHERE user_id=? AND type=? AND statut='en_attente'").run(userId, type);
+  db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif,frais_acces) VALUES (?,?,?,?,?,?,?)").run(userId, type, "accorde", admin.id, admin.nom, body.motif||null, body.frais_acces||0);
+  const label = type === "mobilisation_active" ? "Mobilisation Active 📢" : "Créateur d'Opportunités 💼";
+  creerNotif(Number(userId), "validation", "Accréditation accordée !", `Félicitations ! Votre accréditation « ${label} » vient d'être validée par l'équipe Diaspo'Actif.`, { type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accreditations/:userId/:type/refuser */
+route("PATCH", "/api/admin/accreditations/:userId/:type/refuser", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { userId, type } = params;
+  db.prepare("UPDATE demandes_accreditation SET statut='refusee', motif_refus=? WHERE user_id=? AND type=? AND statut='en_attente'").run(body.motif||null, userId, type);
+  db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)").run(userId, type, "refuse", admin.id, admin.nom, body.motif||null);
+  creerNotif(Number(userId), "validation", "Demande d'accréditation non retenue", `Votre demande d'accréditation n'a pas été retenue${body.motif?` : ${body.motif}`:". Contactez-nous pour plus d'informations."}.`, { type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accreditations/:userId/:type/suspendre */
+route("PATCH", "/api/admin/accreditations/:userId/:type/suspendre", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { userId, type } = params;
+  db.prepare("UPDATE compte_accreditations SET statut='suspendue', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
+  db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)").run(userId, type, "suspendu", admin.id, admin.nom, body.motif||null);
+  creerNotif(Number(userId), "validation", "Accréditation suspendue", `Votre accréditation a été suspendue temporairement${body.motif?` : ${body.motif}`:"."}.`, { type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accreditations/:userId/:type/retirer */
+route("PATCH", "/api/admin/accreditations/:userId/:type/retirer", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { userId, type } = params;
+  db.prepare("UPDATE compte_accreditations SET statut='retiree', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
+  db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)").run(userId, type, "retire", admin.id, admin.nom, body.motif||null);
+  creerNotif(Number(userId), "validation", "Accréditation retirée", `Votre accréditation a été définitivement retirée${body.motif?` : ${body.motif}`:"."}.`, { type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accreditations/:userId/:type/reactiver */
+route("PATCH", "/api/admin/accreditations/:userId/:type/reactiver", async (req, res, params) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { userId, type } = params;
+  db.prepare("UPDATE compte_accreditations SET statut='active', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
+  db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom) VALUES (?,?,?,?,?)").run(userId, type, "reactiver", admin.id, admin.nom);
+  creerNotif(Number(userId), "validation", "Accréditation réactivée", "Votre accréditation a été réactivée.", { type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ──── MODULE MOBILISATION ACTIVE — Sondages & Consultations ──── */
+
+/* GET /api/sondages */
+route("GET", "/api/sondages", async (req, res, params, body, query) => {
+  let rows = db.prepare(`
+    SELECT s.*, u.nom AS createur_nom, u.role AS createur_role
+    FROM sondages s JOIN users u ON u.id=s.createur_id
+    WHERE s.statut IN ('ouvert','cloture')
+    ORDER BY s.created_at DESC
+  `).all();
+  if (query.type) rows = rows.filter(r => r.type === query.type);
+  if (query.statut) rows = rows.filter(r => r.statut === query.statut);
+  if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.description||"").toLowerCase().includes(q)); }
+  rows = rows.map(r => ({ ...r, cible_roles: safeParse(r.cible_roles), cible_pays: safeParse(r.cible_pays) }));
+  sendJSON(res, 200, { sondages: rows });
+});
+
+/* POST /api/sondages */
+route("POST", "/api/sondages", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!hasAccred(user.id, "mobilisation_active")) return sendJSON(res, 403, { error: "Accréditation « Mobilisation Active » requise." });
+  const { titre, description, type, sous_type, anonyme, cible_roles, cible_pays, date_cloture, questions } = body;
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  if (!questions || !questions.length) return sendJSON(res, 400, { error: "Au moins une question requise." });
+  const id = db.prepare(`INSERT INTO sondages (createur_id,titre,description,type,sous_type,statut,anonyme,cible_roles,cible_pays,date_cloture)
+    VALUES (?,?,?,?,?,'ouvert',?,?,?,?)`).run(
+    user.id, titre, description||null, type||"sondage", sous_type||null, anonyme?1:0,
+    JSON.stringify(Array.isArray(cible_roles)?cible_roles:[]),
+    JSON.stringify(Array.isArray(cible_pays)?cible_pays:[]),
+    date_cloture||null
+  ).lastInsertRowid;
+  questions.forEach((q, i) => {
+    db.prepare("INSERT INTO sondage_questions (sondage_id,texte,type,options_json,obligatoire,ordre) VALUES (?,?,?,?,?,?)").run(
+      id, q.texte, q.type||"choix_unique",
+      JSON.stringify(Array.isArray(q.options)?q.options:[]),
+      q.obligatoire!==false?1:0, i
+    );
+  });
+  sendJSON(res, 201, { id });
+});
+
+/* GET /api/sondages/:id */
+route("GET", "/api/sondages/:id", async (req, res, params) => {
+  const s = db.prepare("SELECT s.*,u.nom AS createur_nom,u.role AS createur_role FROM sondages s JOIN users u ON u.id=s.createur_id WHERE s.id=?").get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Sondage introuvable." });
+  const questions = db.prepare("SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre ASC").all(params.id);
+  const me = getCurrentUser(req);
+  const dejaRepondu = me ? !!db.prepare("SELECT 1 FROM sondage_reponses WHERE sondage_id=? AND user_id=?").get(params.id, me.id) : false;
+  sendJSON(res, 200, {
+    sondage: { ...s, cible_roles: safeParse(s.cible_roles), cible_pays: safeParse(s.cible_pays) },
+    questions: questions.map(q => ({ ...q, options: safeParse(q.options_json) })),
+    dejaRepondu
+  });
+});
+
+/* POST /api/sondages/:id/repondre */
+route("POST", "/api/sondages/:id/repondre", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = db.prepare("SELECT * FROM sondages WHERE id=?").get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Sondage introuvable." });
+  if (s.statut !== "ouvert") return sendJSON(res, 400, { error: "Ce sondage est clôturé." });
+  const deja = db.prepare("SELECT 1 FROM sondage_reponses WHERE sondage_id=? AND user_id=?").get(params.id, user.id);
+  if (deja) return sendJSON(res, 409, { error: "Vous avez déjà répondu à ce sondage." });
+  const reponses = body.reponses || {}; // { question_id: reponse }
+  const questions = db.prepare("SELECT * FROM sondage_questions WHERE sondage_id=?").all(params.id);
+  for (const q of questions) {
+    const rep = reponses[q.id];
+    if (q.obligatoire && (rep === undefined || rep === null || rep === "")) return sendJSON(res, 400, { error: `Question obligatoire sans réponse : "${q.texte}"` });
+    db.prepare("INSERT INTO sondage_reponses (sondage_id,question_id,user_id,reponse) VALUES (?,?,?,?)").run(
+      params.id, q.id, s.anonyme ? null : user.id,
+      rep !== undefined ? (typeof rep === "object" ? JSON.stringify(rep) : String(rep)) : null
+    );
+  }
+  db.prepare("UPDATE sondages SET nb_reponses=nb_reponses+1 WHERE id=?").run(params.id);
+  creerNotif(s.createur_id, "mention", "Nouvelle réponse à votre sondage", `${user.nom} a répondu à « ${s.titre} »`, { sondage_id: Number(params.id) });
+  sendJSON(res, 201, { ok: true });
+});
+
+/* GET /api/sondages/:id/resultats — créateur uniquement */
+route("GET", "/api/sondages/:id/resultats", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = db.prepare("SELECT * FROM sondages WHERE id=?").get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Sondage introuvable." });
+  if (s.createur_id !== user.id && user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au créateur." });
+  const questions = db.prepare("SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre").all(params.id);
+  const resultats = questions.map(q => {
+    const reps = db.prepare("SELECT reponse, COUNT(*) AS n FROM sondage_reponses WHERE question_id=? GROUP BY reponse").all(q.id);
+    return { question: q.texte, type: q.type, options: safeParse(q.options_json), reponses: reps };
+  });
+  sendJSON(res, 200, { sondage: s, resultats, nb_reponses: s.nb_reponses });
+});
+
+/* PATCH /api/sondages/:id/cloturer */
+route("PATCH", "/api/sondages/:id/cloturer", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = db.prepare("SELECT * FROM sondages WHERE id=?").get(params.id);
+  if (!s || s.createur_id !== user.id) return sendJSON(res, 403, { error: "Non autorisé." });
+  db.prepare("UPDATE sondages SET statut='cloture' WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/mes-sondages */
+route("GET", "/api/mes-sondages", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = db.prepare("SELECT * FROM sondages WHERE createur_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { sondages: rows });
+});
+
+/* ──── MODULE CRÉATEUR D'OPPORTUNITÉS — Offres ──── */
+
+/* GET /api/offres */
+route("GET", "/api/offres", async (req, res, params, body, query) => {
+  let rows = db.prepare(`
+    SELECT o.*, u.nom AS createur_nom, u.role AS createur_role
+    FROM offres o JOIN users u ON u.id=o.createur_id
+    WHERE o.statut='publiee'
+    ORDER BY o.created_at DESC
+  `).all();
+  if (query.type) rows = rows.filter(r => r.type === query.type);
+  if (query.pays) rows = rows.filter(r => r.pays === query.pays);
+  if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+(r.description||"")).toLowerCase().includes(q)); }
+  rows = rows.map(r => ({ ...r, competences_requises: safeParse(r.competences_requises) }));
+  sendJSON(res, 200, { offres: rows });
+});
+
+/* POST /api/offres */
+route("POST", "/api/offres", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!hasAccred(user.id, "createur_opportunites")) return sendJSON(res, 403, { error: "Accréditation « Créateur d'Opportunités » requise." });
+  const { titre, type, description, competences_requises, localisation, pays, remuneration, date_limite, nb_postes } = body;
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  const id = db.prepare(`INSERT INTO offres (createur_id,titre,type,description,competences_requises,localisation,pays,remuneration,date_limite,nb_postes)
+    VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+    user.id, titre, type||"emploi", description||null,
+    JSON.stringify(Array.isArray(competences_requises)?competences_requises:[]),
+    localisation||null, pays||null, remuneration||null, date_limite||null, nb_postes||1
+  ).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+/* GET /api/offres/:id */
+route("GET", "/api/offres/:id", async (req, res, params) => {
+  const o = db.prepare("SELECT o.*,u.nom AS createur_nom,u.role AS createur_role FROM offres o JOIN users u ON u.id=o.createur_id WHERE o.id=?").get(params.id);
+  if (!o) return sendJSON(res, 404, { error: "Offre introuvable." });
+  const me = getCurrentUser(req);
+  const dejaPostule = me ? !!db.prepare("SELECT 1 FROM offres_candidatures WHERE offre_id=? AND candidat_id=?").get(params.id, me.id) : false;
+  sendJSON(res, 200, { offre: { ...o, competences_requises: safeParse(o.competences_requises) }, dejaPostule });
+});
+
+/* POST /api/offres/:id/postuler */
+route("POST", "/api/offres/:id/postuler", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const o = db.prepare("SELECT * FROM offres WHERE id=?").get(params.id);
+  if (!o) return sendJSON(res, 404, { error: "Offre introuvable." });
+  if (o.statut !== "publiee") return sendJSON(res, 400, { error: "Cette offre n'est plus disponible." });
+  if (o.createur_id === user.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas postuler à votre propre offre." });
+  try {
+    db.prepare("INSERT INTO offres_candidatures (offre_id,candidat_id,message,cv_url,lettre_url) VALUES (?,?,?,?,?)").run(
+      params.id, user.id, body.message||null, body.cv_url||null, body.lettre_url||null
+    );
+    db.prepare("UPDATE offres SET nb_candidatures=nb_candidatures+1 WHERE id=?").run(params.id);
+    creerNotif(o.createur_id, "mention", "Nouvelle candidature", `${user.nom} a postulé à « ${o.titre} »`, { offre_id: Number(params.id) });
+    sendJSON(res, 201, { ok: true });
+  } catch(e) {
+    sendJSON(res, 409, { error: "Vous avez déjà postulé à cette offre." });
+  }
+});
+
+/* GET /api/offres/:id/candidatures — créateur uniquement */
+route("GET", "/api/offres/:id/candidatures", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const o = db.prepare("SELECT * FROM offres WHERE id=?").get(params.id);
+  if (!o || o.createur_id !== user.id) return sendJSON(res, 403, { error: "Réservé au créateur." });
+  const cands = db.prepare(`
+    SELECT oc.*, u.nom AS candidat_nom, u.email AS candidat_email, u.ville AS candidat_ville, u.pays AS candidat_pays
+    FROM offres_candidatures oc JOIN users u ON u.id=oc.candidat_id
+    WHERE oc.offre_id=? ORDER BY oc.created_at DESC
+  `).all(params.id);
+  sendJSON(res, 200, { candidatures: cands, offre: o });
+});
+
+/* PATCH /api/offres/:id/candidatures/:cid */
+route("PATCH", "/api/offres/:id/candidatures/:cid", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const o = db.prepare("SELECT * FROM offres WHERE id=?").get(params.id);
+  if (!o || o.createur_id !== user.id) return sendJSON(res, 403, { error: "Non autorisé." });
+  const valid = ["recu","en_etude","entretien","accepte","refuse"];
+  if (!valid.includes(body.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  db.prepare("UPDATE offres_candidatures SET statut=? WHERE id=? AND offre_id=?").run(body.statut, params.cid, params.id);
+  const cand = db.prepare("SELECT candidat_id FROM offres_candidatures WHERE id=?").get(params.cid);
+  if (cand) {
+    const labels = { en_etude:"en cours d'étude", entretien:"retenue pour entretien", accepte:"acceptée ✅", refuse:"non retenue" };
+    creerNotif(cand.candidat_id, "validation", "Mise à jour de votre candidature", `Votre candidature pour « ${o.titre} » est ${labels[body.statut]||body.statut}.`, { offre_id: Number(params.id) });
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/mes-offres */
+route("GET", "/api/mes-offres", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = db.prepare("SELECT * FROM offres WHERE createur_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { offres: rows.map(r => ({ ...r, competences_requises: safeParse(r.competences_requises) })) });
+});
+
+/* GET /api/mes-candidatures-offres — mes candidatures aux offres */
+route("GET", "/api/mes-candidatures-offres", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = db.prepare(`
+    SELECT oc.*, o.titre AS offre_titre, o.type AS offre_type, u.nom AS createur_nom
+    FROM offres_candidatures oc
+    JOIN offres o ON o.id=oc.offre_id
+    JOIN users u ON u.id=o.createur_id
+    WHERE oc.candidat_id=? ORDER BY oc.created_at DESC
+  `).all(user.id);
+  sendJSON(res, 200, { candidatures: rows });
+});
+
+/* ================================================================= */
 
 const _trackStmt = db.prepare(
   "INSERT OR IGNORE INTO user_activity (user_id, date) VALUES (?, date('now'))"

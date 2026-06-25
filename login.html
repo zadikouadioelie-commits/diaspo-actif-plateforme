@@ -5,6 +5,11 @@
 <title>Diaspo'Actif — Connexion</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="assets/logo.svg">
 </head>
 <body>
 <div class="page">
@@ -43,9 +48,34 @@
       <p style="margin-top:18px;font-size:13px;color:var(--muted);">Pas encore de compte ? <a href="inscription.html" style="color:var(--orange);font-weight:700;">Créer un compte</a></p>
 
       <div class="notice" style="margin-top:18px;">
-        🔎 Comptes de démonstration (mot de passe <strong>Demo1234!</strong>) :<br>
-        jean@diaspoactif.demo (Utilisateur) · contact@aito.diaspoactif.demo (Initiative) ·
-        officiel@diaspoactif.demo (Officiel) · consulat.senegal@diaspoactif.demo (Institutionnel)
+        <strong>🔎 Comptes de démonstration</strong> — mot de passe : <strong>Demo1234!</strong><br>
+        <table style="margin-top:10px;width:100%;font-size:12.5px;border-collapse:collapse;">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:5px 6px;font-weight:700;">jean@diaspoactif.demo</td>
+            <td style="padding:5px 6px;color:var(--muted);">Utilisateur</td>
+            <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('jean@diaspoactif.demo')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:5px 6px;font-weight:700;">ynouss@diaspoactif.demo</td>
+            <td style="padding:5px 6px;color:var(--muted);">Utilisateur (profil complet)</td>
+            <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('ynouss@diaspoactif.demo')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:5px 6px;font-weight:700;">contact@aito.diaspoactif.demo</td>
+            <td style="padding:5px 6px;color:var(--muted);">Initiative (A.I.T.O)</td>
+            <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('contact@aito.diaspoactif.demo')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:5px 6px;font-weight:700;">admin@diaspoactif.demo</td>
+            <td style="padding:5px 6px;color:var(--muted);">Administrateur</td>
+            <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('admin@diaspoactif.demo')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
+          </tr>
+          <tr>
+            <td style="padding:5px 6px;font-weight:700;">consulat.senegal@diaspoactif.demo</td>
+            <td style="padding:5px 6px;color:var(--muted);">Collectivité (Consulat)</td>
+            <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('consulat.senegal@diaspoactif.demo')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
+          </tr>
+        </table>
       </div>
     </div>
   </main>
@@ -56,6 +86,12 @@
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
+  function fillDemo(email) {
+    document.getElementById("email").value = email;
+    document.getElementById("password").value = "Demo1234!";
+    document.getElementById("email").focus();
+  }
+
   document.getElementById("login-form").addEventListener("submit", async (e)=>{
     e.preventDefault();
     const email = document.getElementById("email").value.trim();

@@ -1,15 +1,16 @@
 {
   "name": "Diaspo'Actif",
   "short_name": "DiaspoActif",
-  "description": "La plateforme des initiatives diaspora — Du Sud au Nord",
-  "start_url": "/",
+  "description": "Connecter les initiatives de la diaspora mondiale — Du Sud au Nord",
+  "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ff6b00",
   "lang": "fr",
+  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/assets/logo.svg",
+      "src": "assets/logo.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
@@ -17,19 +18,23 @@
   ],
   "shortcuts": [
     {
-      "name": "Fil d'actualite",
+      "name": "Fil d'actualité",
+      "short_name": "Fil",
       "url": "/fil-actualite.html",
-      "description": "Voir le fil"
+      "icons": [{ "src": "assets/logo.svg", "sizes": "any" }]
     },
     {
       "name": "Messagerie",
+      "short_name": "Messages",
       "url": "/messagerie.html",
-      "description": "Mes messages"
+      "icons": [{ "src": "assets/logo.svg", "sizes": "any" }]
     },
     {
-      "name": "Evenements",
-      "url": "/evenements.html",
-      "description": "Agenda"
+      "name": "Annuaire",
+      "short_name": "Annuaire",
+      "url": "/annuaire.html",
+      "icons": [{ "src": "assets/logo.svg", "sizes": "any" }]
     }
-  ]
+  ],
+  "categories": ["social", "business", "education"]
 }

@@ -259,6 +259,56 @@ function seed() {
     insQ.run(consultId, "Quel type d'accompagnement souhaiteriez-vous en priorité ?", "choix_unique",
       '["Accompagnement juridique","Accompagnement fiscal","Mise en réseau","Accès aux financements","Formation entrepreneuriale"]', 1);
     insQ.run(consultId, "Avez-vous des commentaires ou suggestions supplémentaires ?", "texte_libre", "[]", 2);
+
+    /* ── Profil ambassade démo ── */
+    db.prepare(`INSERT OR IGNORE INTO ambassade_profil(user_id,nom_officiel,pays_represente,ambassadeur,adresse,telephone,email_officiel,site_web,horaires,zone_pays,zone_regions,zone_villes,consulats,description)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(consulatId,
+        "Ambassade du Sénégal en France",
+        "Sénégal",
+        "S.E. Amadou Diallo",
+        "22 Rue Hamelin, 75116 Paris, France",
+        "+33 1 47 20 26 37",
+        "contact@ambafrance-senegal.sn",
+        "https://www.ambafrance-sn.org",
+        '{"lun_ven":"09:00-17:00","sam":"09:00-12:00"}',
+        '["France","Belgique","Luxembourg"]',
+        '["Île-de-France","Normandie","Bretagne","Hauts-de-France","Grand Est","Occitanie","Nouvelle-Aquitaine","PACA"]',
+        '["Paris","Lyon","Marseille","Toulouse","Bordeaux","Strasbourg","Nantes","Lille","Rennes"]',
+        '[{"nom":"Consulat de Paris","adresse":"22 Rue Hamelin, 75116 Paris"},{"nom":"Consulat de Lyon","adresse":"16 Rue Vaubecour, 69002 Lyon"},{"nom":"Consulat de Marseille","adresse":"3 Quai Rive Neuve, 13007 Marseille"}]',
+        "L'Ambassade du Sénégal en France représente la République du Sénégal et assure la protection des ressortissants sénégalais résidant en France, Belgique et Luxembourg.");
+
+    /* ── Services consulaires démo ── */
+    const insServ = db.prepare("INSERT INTO ambassade_services(user_id,nom,type,icone,description,conditions,documents_requis,delai,tarif,procedure,ordre) VALUES(?,?,?,?,?,?,?,?,?,?,?)");
+    insServ.run(consulatId,"Passeport biométrique","document","🛂","Délivrance et renouvellement du passeport biométrique sénégalais.","Être ressortissant sénégalais. Justifier d'un domicile dans la circonscription consulaire.",'["Acte de naissance","Photo d\'identité récente","Ancien passeport ou CNI","Justificatif de domicile"]',"6 à 8 semaines","70 €","Dépôt du dossier au guichet. Prise de rendez-vous obligatoire sur le site consulaire.",1);
+    insServ.run(consulatId,"Carte consulaire","document","🪪","La carte consulaire permet de justifier de son identité et de sa résidence à l'étranger.","Être inscrit au registre consulaire.",'["Acte de naissance","2 photos d\'identité","Justificatif de domicile","Passeport sénégalais valide"]',"3 à 4 semaines","15 €","Dépôt du dossier complet au guichet. Retrait en personne.",2);
+    insServ.run(consulatId,"Légalisation de documents","document","📜","Authentification de documents officiels pour usage à l'international.","Le document doit avoir été délivré par une autorité compétente française ou sénégalaise.",'["Document original","Copie du document","Passeport ou CNI"]',"2 à 5 jours ouvrables","30 € par document","Dépôt au guichet avec les originaux et copies. Retrait 2 à 5 jours après.",3);
+    insServ.run(consulatId,"Visa de retour","visa","✈️","Pour les ressortissants sénégalais souhaitant rentrer au pays sans passeport valide.","Passeport expiré ou perdu. Nécessite une enquête consulaire préalable.",'["Déclaration de perte ou passeport expiré","2 photos d\'identité","Justificatif de nationalité","Billet d\'avion"]',"24 à 48 heures","Gratuit","Demande urgente à formuler directement au guichet ou par appel téléphonique.",4);
+    insServ.run(consulatId,"Acte d'état civil","document","📋","Transcription d'actes de naissance, mariage ou décès sur les registres consulaires.","Concerne les faits d'état civil survenus en France ou dans la circonscription consulaire.",'["Documents originaux de l\'état civil","Livret de famille","Passeport"]',"3 à 6 semaines","Gratuit","Constitution du dossier en ligne ou au guichet. Instruction par le service d'état civil.",5);
+    insServ.run(consulatId,"Inscription registre consulaire","service","📝","Inscription officielle auprès de l'ambassade pour les ressortissants résidant en France.","Tout ressortissant sénégalais résidant dans la circonscription consulaire.",'["Passeport sénégalais valide","Justificatif de domicile","1 photo d\'identité"]',"Immédiat","Gratuit","Formulaire disponible sur place ou en ligne. Inscription définitive après vérification des pièces.",6);
+
+    /* ── Agenda démo ── */
+    const insAgenda = db.prepare("INSERT INTO ambassade_agenda(user_id,titre,type,description,date_debut,date_fin,lieu,public) VALUES(?,?,?,?,?,?,?,?)");
+    insAgenda.run(consulatId,"Journée consulaire à Lyon","journee_consulaire","Services consulaires délocalisés à Lyon : passeport, carte consulaire, légalisation de documents. Présence des agents consulaires toute la journée.","2026-07-12","2026-07-12","Maison Rhône-Alpes, 16 Rue Vaubecour, 69002 Lyon",1);
+    insAgenda.run(consulatId,"Forum Économique Diaspora Sénégal","forum","Rencontres entre entrepreneurs de la diaspora sénégalaise, investisseurs et partenaires institutionnels. Tables rondes, pitches de projets et networking.","2026-07-26","2026-07-27","Palais des Congrès, Paris",1);
+    insAgenda.run(consulatId,"Réunion avec les associations sénégalaises de France","reunion","Rencontre annuelle de S.E. l'Ambassadeur avec les présidents des associations sénégalaises établies en France. Ordre du jour : bilan et perspectives 2026-2027.","2026-08-08","2026-08-08","Ambassade du Sénégal, 22 Rue Hamelin, 75116 Paris",1);
+    insAgenda.run(consulatId,"Journée consulaire à Marseille","journee_consulaire","Services consulaires délocalisés à Marseille et région PACA.","2026-09-05","2026-09-05","Centre culturel, 3 Quai Rive Neuve, 13007 Marseille",1);
+    insAgenda.run(consulatId,"Missions administratives — Bordeaux","mission","Déplacement du consul pour rencontrer les associations sénégalaises de la région Nouvelle-Aquitaine.","2026-09-20","2026-09-21","Bordeaux",1);
+
+    /* ── Partenariats démo ── */
+    const insPart = db.prepare("INSERT INTO ambassade_partenariats(user_id,nom,type,description,site_web) VALUES(?,?,?,?,?)");
+    insPart.run(consulatId,"Diaspo'Actif","plateforme","Partenaire numérique officiel pour la mise en réseau et le suivi de la diaspora sénégalaise en Europe.","https://diaspoactif.com");
+    insPart.run(consulatId,"Agence pour la Promotion des Investissements et Grands Travaux (APIX)","institutionnel","Facilitation des investissements de la diaspora au Sénégal.",null);
+    insPart.run(consulatId,"Fédération des Associations Sénégalaises de France (FASF)","associatif","Réseau regroupant plus de 200 associations sénégalaises en France.","https://fasf.fr");
+    insPart.run(consulatId,"Chambre de Commerce et d'Industrie franco-sénégalaise","economique","Promotion des échanges commerciaux et des investissements bilatéraux.",null);
+    insPart.run(consulatId,"Organisation Internationale pour les Migrations (OIM)","international","Coopération sur les programmes de retour volontaire et de développement.","https://iom.int");
+
+    /* ── Opportunités démo ── */
+    const insOpp = db.prepare("INSERT INTO ambassade_opportunites(user_id,titre,type,description,date_limite,budget,actif) VALUES(?,?,?,?,?,?,?)");
+    insOpp.run(consulatId,"Appel à projets diaspora 2026 — Investissement productif","appel_projets","Le gouvernement sénégalais lance un appel à projets destiné aux membres de la diaspora souhaitant créer ou développer une activité économique au Sénégal. Secteurs prioritaires : agriculture, santé, numérique, tourisme.","2026-09-30","500 000 € (enveloppe globale)",1);
+    insOpp.run(consulatId,"Programme de retour volontaire assisté","retour","En partenariat avec l'OIM, programme d'accompagnement pour les ressortissants souhaitant rentrer s'installer au Sénégal. Aide à la réinstallation, formation et appui à l'entrepreneuriat.","2026-12-31",null,1);
+    insOpp.run(consulatId,"Bourses d'excellence pour étudiants sénégalais en France","bourse","Le gouvernement sénégalais offre 50 bourses d'excellence aux étudiants sénégalais inscrits en master ou doctorat dans des universités françaises pour l'année 2026-2027.","2026-07-31","50 bourses × 5 000 €/an",1);
+    insOpp.run(consulatId,"Recrutement — Attaché commercial (Paris)","recrutement","L'Ambassade du Sénégal en France recrute un(e) Attaché(e) Commercial(e) pour accompagner les opérateurs économiques sénégalais en Europe.","2026-07-15",null,1);
   }
 
   /* ===== ACTIVITÉ PLATEFORME (DAU/WAU/MAU) ===== */

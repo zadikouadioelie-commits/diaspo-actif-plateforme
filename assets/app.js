@@ -4,6 +4,13 @@
    Les modules paiement réel restent simulés (aucune transaction réelle).
    =========================================================== */
 
+/* ---------- PWA — enregistrement du Service Worker ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
 /* ---------- Client API ---------- */
 const API_BASE = "/api";
 async function api(method, path, body) {
@@ -432,6 +439,11 @@ function renderInitiativeCard(it){
   const membres = it.membres ? `<span class="ann-membres">👥 ${it.membres}</span>` : '';
 
   const certifBadgeHtml = it.certif ? `<div class="ann-certif-wrap">${badgeCertif(it.certif, { small: true })}</div>` : "";
+  const accredBadges = (it.accreditations||[]).map(a =>
+    a === 'mobilisation_active'
+      ? '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;">📢 Mobilisation</span>'
+      : '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:#dbeafe;color:#1e40af;border:1px solid #3b82f6;">💼 Opportunités</span>'
+  ).join(' ');
 
   return `
   <a class="ann-card" href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}">
@@ -450,6 +462,7 @@ function renderInitiativeCard(it){
       ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
       ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
+      ${accredBadges ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${accredBadges}</div>` : ''}
       <div class="ann-card-foot">
         ${membres}
         <span class="ann-arrow">→</span>
@@ -1627,8 +1640,14 @@ async function initFilActualite(){
           contenu: ta.value.trim(),
         };
         if(currentType==="article"){ payload.article_titre=titre; payload.article_contenu=ta.value.trim(); }
-        if(currentType==="photo" && mediaDataUrl)  payload.media_url = mediaDataUrl;
-        if(currentType==="video" && mediaDataUrl){ payload.media_url=mediaDataUrl; payload.video_duree=Math.round(videoDuree); }
+        try {
+          if((currentType==="photo"||currentType==="video") && mediaDataUrl) {
+            const ext = mediaFile?.name?.split(".").pop() || (currentType==="video"?"mp4":"jpg");
+            const up = await api("POST","/upload",{ data: mediaDataUrl, nom: mediaFile?.name || `media.${ext}` });
+            payload.media_url = up.url;
+            if(currentType==="video") payload.video_duree = Math.round(videoDuree);
+          }
+        } catch(upErr) { /* si upload échoue, on envoie sans media */ }
 
         try {
           const res = await api("POST","/fil", payload);

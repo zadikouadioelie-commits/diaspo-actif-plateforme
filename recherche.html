@@ -5,6 +5,11 @@
 <title>Diaspo'Actif — Recherche</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="assets/logo.svg">
 <style>
 .search-hero{background:linear-gradient(135deg,#ff6b00,#ff9f43);padding:40px 20px;text-align:center;color:#fff}
 .search-hero h1{margin:0 0 16px;font-size:28px}
@@ -81,6 +86,7 @@ async function doSearch(forceQ) {
   try {
     const r = await api('GET','/recherche?q='+encodeURIComponent(q));
     lastRes = r;
+    try{const h=JSON.parse(localStorage.getItem('diaspo_search_history')||'[]');if(!h.includes(q)){h.unshift(q);localStorage.setItem('diaspo_search_history',JSON.stringify(h.slice(0,10)));}}catch(e){}
     renderTabs();
     renderResults();
   } catch(e) {
