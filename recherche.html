@@ -128,7 +128,14 @@ function renderResults() {
   }
   if(show('initiatives') && (lastRes.initiatives||[]).length) {
     html+='<div class="result-section"><h3>🏢 Initiatives <span class="result-count">'+lastRes.initiatives.length+'</span></h3>';
-    html+=lastRes.initiatives.map(i=>'<a href="initiative.html?id='+i.id+'" class="result-item"><div class="result-icon">🏢</div><div class="result-body"><div class="result-title">'+escHtml(i.nom)+'</div><div class="result-sub">'+(i.domaine?escHtml(i.domaine)+', ':'')+escHtml(i.pays||'')+'</div></div></a>').join('');
+    html+=lastRes.initiatives.map(i=>{
+      const accredBadges=(i.accreditations||[]).map(a=>
+        a==='mobilisation_active'
+          ? '<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:99px;font-size:10px;font-weight:700;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;">📢 Mobilisation</span>'
+          : '<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:99px;font-size:10px;font-weight:700;background:#dbeafe;color:#1e40af;border:1px solid #3b82f6;">💼 Opportunités</span>'
+      ).join(' ');
+      return '<a href="initiative.html?id='+i.id+'" class="result-item"><div class="result-icon">🏢</div><div class="result-body"><div class="result-title">'+escHtml(i.nom)+(accredBadges?' '+accredBadges:'')+'</div><div class="result-sub">'+(i.domaine?escHtml(i.domaine)+', ':'')+escHtml(i.pays||'')+'</div></div></a>';
+    }).join('');
     html+='</div>';
   }
   if(show('publications') && (lastRes.publications||[]).length) {

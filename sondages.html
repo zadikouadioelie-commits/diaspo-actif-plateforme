@@ -319,8 +319,40 @@ async function voirResultats(id){
   document.getElementById('modal-resultats').style.display='flex';
   try{
     const r=await api('GET','/sondages/'+id+'/resultats');
-    let html=`<h2 style="margin-top:0;">📊 Résultats — ${esc(r.sondage.titre)}</h2>
-      <p style="font-size:13px;color:var(--muted);">Total : <strong>${r.nb_reponses}</strong> réponse${r.nb_reponses!==1?'s':''}</p>`;
+    let html=`<h2 style="margin-top:0;">📊 Résultats — ${esc(r.sondage.titre)}</h2>`;
+
+    /* ── Stats globales ── */
+    html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+      <div style="flex:1;min-width:120px;background:var(--bg);border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:var(--orange);">${r.nb_reponses}</div>
+        <div style="font-size:11px;color:var(--muted);">Réponses</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:var(--bg);border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:var(--navy);">${r.nb_repondants||0}</div>
+        <div style="font-size:11px;color:var(--muted);">Participants</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:var(--bg);border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:#059669;">${r.taux_participation||0}%</div>
+        <div style="font-size:11px;color:var(--muted);">Taux participation</div>
+      </div>
+    </div>`;
+
+    /* ── Répartition géographique ── */
+    if((r.repartition_pays||[]).length){
+      const maxN=Math.max(...r.repartition_pays.map(p=>p.n),1);
+      html+=`<div class="question-block"><div style="font-weight:700;margin-bottom:10px;">🌍 Répartition géographique des participants</div>`;
+      html+=r.repartition_pays.map(row=>{
+        const pct=Math.round((row.n/maxN)*100);
+        return `<div class="resultats-bar">
+          <span style="width:140px;font-size:13px;flex-shrink:0;">${esc(row.pays)}</span>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#3b82f6;"></div></div>
+          <span style="font-size:12px;color:var(--muted);width:60px;text-align:right;">${row.n} pers.</span>
+        </div>`;
+      }).join('');
+      html+=`</div>`;
+    }
+
+    /* ── Questions ── */
     for(const res of r.resultats){
       html+=`<div class="question-block"><div style="font-weight:700;margin-bottom:10px;">${esc(res.question)}</div>`;
       if(res.type==='texte_libre'){

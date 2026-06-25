@@ -194,6 +194,14 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
   if (query.type) rows = rows.filter(r => r.type === query.type);
   if (query.nationalite_unique === "1") rows = rows.filter(r => r.nationalite_unique === 1);
+  // Filtre par accréditation DA
+  if (query.accreditation) {
+    const type = query.accreditation;
+    rows = rows.filter(r => {
+      if (!r.owner_user_id) return false;
+      return !!db.prepare("SELECT 1 FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(r.owner_user_id, type);
+    });
+  }
   rows = rows.map(r => {
     const accreds = r.owner_user_id
       ? db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(r.owner_user_id).map(a => a.type)
@@ -1093,7 +1101,12 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
     ? db.prepare("SELECT id,nom,role,ville,pays FROM users WHERE (nom LIKE ? OR ville LIKE ?) AND role != 'administrateur' LIMIT 8").all(like, like)
     : [];
   const initiatives = (type === "tous" || type === "initiatives")
-    ? db.prepare("SELECT id,slug,nom,domaine,pays,ville,description FROM initiatives WHERE nom LIKE ? OR description LIKE ? OR domaine LIKE ? LIMIT 8").all(like, like, like)
+    ? db.prepare("SELECT id,slug,nom,domaine,pays,ville,description,owner_user_id FROM initiatives WHERE nom LIKE ? OR description LIKE ? OR domaine LIKE ? LIMIT 8").all(like, like, like).map(i => ({
+        ...i,
+        accreditations: i.owner_user_id
+          ? db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(i.owner_user_id).map(a => a.type)
+          : []
+      }))
     : [];
   const publications = (type === "tous" || type === "publications")
     ? db.prepare("SELECT id,auteur_nom,contenu,categorie,created_at FROM fil_posts WHERE contenu LIKE ? OR auteur_nom LIKE ? LIMIT 8").all(like, like)
@@ -1454,7 +1467,10 @@ function enrichPost(p, cu) {
       original_post = { ...orig, reactions: orig_counts, auteur_profil: orig_auteur };
     }
   }
-  return { ...p, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, score, original_post };
+  const auteur_accreditations = p.auteur_id
+    ? db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(p.auteur_id).map(a => a.type)
+    : [];
+  return { ...p, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post };
 }
 
 /* ---------- Fil intelligent ---------- */
@@ -3051,7 +3067,21 @@ route("GET", "/api/sondages/:id/resultats", async (req, res, params) => {
     const reps = db.prepare("SELECT reponse, COUNT(*) AS n FROM sondage_reponses WHERE question_id=? GROUP BY reponse").all(q.id);
     return { question: q.texte, type: q.type, options: safeParse(q.options_json), reponses: reps };
   });
-  sendJSON(res, 200, { sondage: s, resultats, nb_reponses: s.nb_reponses });
+  // Stats géographiques des répondants
+  const repartition_pays = db.prepare(
+    "SELECT u.pays, COUNT(DISTINCT sr.user_id) AS n FROM sondage_reponses sr JOIN users u ON u.id=sr.user_id WHERE sr.sondage_id=? AND u.pays IS NOT NULL GROUP BY u.pays ORDER BY n DESC LIMIT 10"
+  ).all(params.id);
+  const nb_repondants = db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM sondage_reponses WHERE sondage_id=?").get(params.id).n;
+  const taux_participation = s.cible_roles
+    ? (() => {
+        const cibles = safeParse(s.cible_roles);
+        const total = Array.isArray(cibles) && cibles.length
+          ? db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN (" + cibles.map(()=>"?").join(",") + ")").get(...cibles).n
+          : db.prepare("SELECT COUNT(*) AS n FROM users").get().n;
+        return total > 0 ? Math.round((nb_repondants / total) * 100) : 0;
+      })()
+    : 0;
+  sendJSON(res, 200, { sondage: s, resultats, nb_reponses: s.nb_reponses, nb_repondants, taux_participation, repartition_pays });
 });
 
 /* PATCH /api/sondages/:id/cloturer */

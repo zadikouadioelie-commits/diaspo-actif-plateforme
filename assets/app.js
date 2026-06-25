@@ -526,6 +526,7 @@ async function initAnnuaire(){
     const dom        = sel("f-domaine");
     const type       = sel("f-type");
     const uniqueOnly = document.getElementById("f-unique")?.checked || false;
+    const accred     = sel("f-accred");
 
     const filtered = ALL.filter(it=>{
       if(q && !it.nom.toLowerCase().includes(q) && !(it.description||"").toLowerCase().includes(q)) return false;
@@ -544,6 +545,8 @@ async function initAnnuaire(){
       if(dom  && it.domaine !== dom) return false;
       if(type && it.type !== type) return false;
       if(uniqueOnly && !it.nationalite_unique) return false;
+      /* Accréditation DA */
+      if(accred && !(it.accreditations||[]).includes(accred)) return false;
       return true;
     });
 
@@ -553,7 +556,7 @@ async function initAnnuaire(){
       : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">Aucune initiative ne correspond à ces critères.</div>`;
   }
 
-  ["f-q","f-pays","f-nat2","f-orig1","f-orig2","f-pays-res","f-region","f-ville","f-ray","f-domaine","f-type"].forEach(id=>{
+  ["f-q","f-pays","f-nat2","f-orig1","f-orig2","f-pays-res","f-region","f-ville","f-ray","f-domaine","f-type","f-accred"].forEach(id=>{
     const el = document.getElementById(id);
     if(el){ el.addEventListener("input", apply); el.addEventListener("change", apply); }
   });
@@ -1815,6 +1818,11 @@ async function initFilActualite(){
     const { banner, avHtml, locHtml, origHtml, titreHtml, bioHtml, nom, typeIcon, typeLabel } = buildAuthorHeader(p);
     const { mediaHtml, bodyHtml } = buildPostBody(p);
     const postCertifBadge = p.auteur_certif ? badgeCertif(p.auteur_certif, { small: true }) : "";
+    const postAccredBadges = (p.auteur_accreditations||[]).map(a =>
+      a === 'mobilisation_active'
+        ? `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:99px;font-size:10px;font-weight:700;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;">📢</span>`
+        : `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:99px;font-size:10px;font-weight:700;background:#dbeafe;color:#1e40af;border:1px solid #3b82f6;">💼</span>`
+    ).join(" ");
 
     return `<div class="feed-post" id="fp-${p.id}">
       <div class="fp-author-banner" style="background:${banner};">
@@ -1824,7 +1832,7 @@ async function initFilActualite(){
       <div class="fp-head">
         <a href="profil.html?id=${p.auteur_id||''}" class="fp-av-link">${avHtml}</a>
         <div class="fp-meta">
-          <div class="fp-nom"><a href="profil.html?id=${p.auteur_id||''}" class="fp-nom-link">${escH(nom)}</a>${postCertifBadge ? " " + postCertifBadge : ""}</div>
+          <div class="fp-nom"><a href="profil.html?id=${p.auteur_id||''}" class="fp-nom-link">${escH(nom)}</a>${postCertifBadge ? " " + postCertifBadge : ""}${postAccredBadges ? " " + postAccredBadges : ""}</div>
           ${titreHtml}
           <div class="fp-sub-row">${locHtml}${origHtml}<span class="fp-date">🕐 ${fmtDate(p.created_at)}</span></div>
         </div>

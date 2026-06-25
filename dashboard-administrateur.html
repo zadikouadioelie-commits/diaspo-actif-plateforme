@@ -1843,9 +1843,12 @@ async function loadDAHisto(){
 async function accordeDA(userId, type){
   const motif=prompt('Note admin (optionnel) :','');
   if(motif===null)return;
+  const fraisStr=prompt('Frais d\'accès (€/an) — laisser vide ou 0 pour gratuit :','0');
+  if(fraisStr===null)return;
+  const frais_acces=Math.max(0,parseFloat(fraisStr)||0);
   try{
-    await api('PATCH','/admin/accreditations/'+userId+'/'+type+'/accorder',{motif,frais_acces:0});
-    loadDADemandes();
+    await api('PATCH','/admin/accreditations/'+userId+'/'+type+'/accorder',{motif,frais_acces});
+    loadDADemandes();loadDAActives();
   }catch(e){alert('Erreur : '+e.message);}
 }
 async function refuseDA(userId, type){
