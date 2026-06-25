@@ -2874,14 +2874,15 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
   const user = getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const { type, message } = body;
-  if (!["mobilisation_active","createur_opportunites"].includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
+  const TYPES_ACCRED_VALIDES = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle"];
+  if (!TYPES_ACCRED_VALIDES.includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
   const existing = db.prepare("SELECT id,statut FROM demandes_accreditation WHERE user_id=? AND type=? ORDER BY created_at DESC LIMIT 1").get(user.id, type);
   if (existing && existing.statut === "en_attente") return sendJSON(res, 409, { error: "Une demande est déjà en cours pour ce type." });
   if (hasAccred(user.id, type)) return sendJSON(res, 409, { error: "Vous possédez déjà cette accréditation." });
   const id = db.prepare("INSERT INTO demandes_accreditation (user_id, type, message) VALUES (?,?,?)").run(user.id, type, message||null).lastInsertRowid;
-  // Notifier les admins
+  const DA_LABELS = { mobilisation_active:"Mobilisation Active", createur_opportunites:"Créateur d'Opportunités", observatoire_diaspora:"Observatoire Diaspora", institutionnelle:"Institutionnelle" };
   const admins = db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
-  admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation", `${user.nom} demande l'accréditation « ${type === "mobilisation_active" ? "Mobilisation Active" : "Créateur d'Opportunités"} »`, { demande_id: Number(id) }));
+  admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation", `${user.nom} demande l'accréditation « ${DA_LABELS[type]||type} »`, { demande_id: Number(id) }));
   sendJSON(res, 201, { id, ok: true });
 });
 
@@ -2917,7 +2918,8 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/accorder", async (req, r
   const admin = getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
-  if (!["mobilisation_active","createur_opportunites"].includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
+  const TYPES_DA = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle"];
+  if (!TYPES_DA.includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
   db.prepare(`INSERT INTO compte_accreditations (user_id,type,statut,admin_id,frais_acces,notes,date_expiration)
     VALUES (?,?,'active',?,?,?,?)
     ON CONFLICT(user_id,type) DO UPDATE SET statut='active',admin_id=?,frais_acces=?,notes=?,date_expiration=?,updated_at=datetime('now')`
@@ -2926,7 +2928,8 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/accorder", async (req, r
   // Mettre à jour la demande si elle existe
   db.prepare("UPDATE demandes_accreditation SET statut='approuvee' WHERE user_id=? AND type=? AND statut='en_attente'").run(userId, type);
   db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif,frais_acces) VALUES (?,?,?,?,?,?,?)").run(userId, type, "accorde", admin.id, admin.nom, body.motif||null, body.frais_acces||0);
-  const label = type === "mobilisation_active" ? "Mobilisation Active 📢" : "Créateur d'Opportunités 💼";
+  const DA_LBL = { mobilisation_active:"Mobilisation Active 📢", createur_opportunites:"Créateur d'Opportunités 💼", observatoire_diaspora:"Observatoire Diaspora 📊", institutionnelle:"Institutionnelle 🏛️" };
+  const label = DA_LBL[type] || type;
   creerNotif(Number(userId), "validation", "Accréditation accordée !", `Félicitations ! Votre accréditation « ${label} » vient d'être validée par l'équipe Diaspo'Actif.`, { type });
   sendJSON(res, 200, { ok: true });
 });

@@ -262,6 +262,9 @@ const RECHERCHES = [
 const TARIF_INITIATIVE_ANNUEL = 50; // € / an / initiative
 
 /* ---------- Accréditations Diaspo'Actif ---------- */
+
+const REGLE_ACCREDITATIONS_DA = "Les accréditations Diaspo'Actif ne constituent ni une récompense, ni une distinction honorifique. Elles correspondent à des autorisations opérationnelles accordées à un utilisateur ou à une organisation afin d'exercer certaines fonctions ou d'accéder à des services spécifiques de la plateforme.";
+
 const ACCREDITATIONS_DA = [
   {
     type: 'mobilisation_active',
@@ -271,14 +274,16 @@ const ACCREDITATIONS_DA = [
     couleurBg: '#fffbeb',
     couleurBorder: '#f59e0b',
     couleurText: '#92400e',
-    description: 'Reconnue pour sa capacité à mobiliser la diaspora autour de causes, d\'événements et de projets collectifs. Confère une visibilité accrue et un badge distinctif.',
-    avantages: [
-      'Badge 📢 visible sur votre profil et vos publications',
-      'Mise en avant prioritaire dans l\'annuaire',
-      'Filtre dédié dans la recherche Diaspo\'Actif',
-      'Accès aux outils de mobilisation avancés'
+    description: 'Autorisation d\'exercer des fonctions de mobilisation au sein de Diaspo\'Actif. Permet de participer activement aux missions, campagnes et appels de terrain.',
+    droits: [
+      'Participer à des missions rémunérées',
+      'Répondre à des appels de mobilisation',
+      'Réaliser des enquêtes de terrain',
+      'Participer à des campagnes de sensibilisation',
+      'Être sollicité par des partenaires'
     ],
-    prix: { initiative: 29, collectivite: 0 }
+    eligible: ['initiative', 'utilisateur'],
+    prix: { initiative: 29, collectivite: 0, utilisateur: 19 }
   },
   {
     type: 'createur_opportunites',
@@ -288,14 +293,54 @@ const ACCREDITATIONS_DA = [
     couleurBg: '#eff6ff',
     couleurBorder: '#3b82f6',
     couleurText: '#1e40af',
-    description: 'Reconnue pour la création d\'emplois, de stages, d\'appels à projets et d\'opportunités économiques au service de la diaspora.',
-    avantages: [
-      'Badge 💼 visible sur votre profil et vos publications',
-      'Accès prioritaire à la section "Offres & Opportunités"',
-      'Filtre dédié dans la recherche et l\'annuaire',
-      'Mise en relation facilitée avec les membres'
+    description: 'Autorisation de publier des offres et de créer des opportunités professionnelles ou économiques pour la diaspora sur la plateforme.',
+    droits: [
+      'Publier certaines offres (emplois, stages, marchés)',
+      'Mettre en relation des acteurs',
+      'Participer à des programmes de recrutement',
+      'Créer des opportunités professionnelles',
+      'Accéder au module offres prioritaires'
     ],
+    eligible: ['initiative', 'collectivite'],
     prix: { initiative: 39, collectivite: 0 }
+  },
+  {
+    type: 'observatoire_diaspora',
+    label: 'Observatoire Diaspora',
+    emoji: '📊',
+    couleur: '#059669',
+    couleurBg: '#f0fdf4',
+    couleurBorder: '#059669',
+    couleurText: '#065f46',
+    description: 'Autorisation d\'accéder aux données statistiques et outils d\'analyse de la plateforme Diaspo\'Actif pour des usages institutionnels ou de recherche.',
+    droits: [
+      'Accéder aux statistiques autorisées',
+      'Consulter les tableaux de bord',
+      'Réaliser des consultations publiques',
+      'Obtenir des rapports périodiques',
+      'Analyser les tendances diasporiques'
+    ],
+    eligible: ['collectivite'],
+    prix: { collectivite: 0 }
+  },
+  {
+    type: 'institutionnelle',
+    label: 'Institutionnelle',
+    emoji: '🏛️',
+    couleur: '#7c3aed',
+    couleurBg: '#f5f3ff',
+    couleurBorder: '#7c3aed',
+    couleurText: '#4c1d95',
+    description: 'Autorisation d\'exercer des fonctions institutionnelles sur la plateforme : diffusion de communications officielles, organisation de consultations et interaction avec un territoire.',
+    droits: [
+      'Diffuser des communications officielles',
+      'Organiser des consultations publiques',
+      'Interagir avec un territoire donné',
+      'Accéder à certains outils institutionnels',
+      'Publier des avis et informations officiels'
+    ],
+    eligible: ['collectivite'],
+    prix: { collectivite: 0 }
   }
 ];
 

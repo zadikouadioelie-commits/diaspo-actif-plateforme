@@ -252,7 +252,7 @@
 
         <!-- ── Bloc 7 : Widget Accréditations DA ── -->
         <div style="margin-bottom:8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Accréditations Diaspo'Actif</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:stretch;margin-bottom:0;" id="widget-accred-da">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;align-items:stretch;margin-bottom:0;" id="widget-accred-da">
           <div class="card" style="border-left:4px solid #f59e0b;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('demandes'),200)">
             <div style="font-size:28px;font-weight:800;color:#92400e;" id="da-widget-pending">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">⏳ Demandes en attente</div>
@@ -265,7 +265,15 @@
             <div style="font-size:28px;font-weight:800;color:#1e40af;" id="da-widget-opportunites">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">💼 Créateur d'Opportunités</div>
           </div>
-          <div class="card" style="display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:180px;">
+          <div class="card" style="border-left:4px solid #bbf7d0;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
+            <div style="font-size:28px;font-weight:800;color:#065f46;" id="da-widget-observatoire">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">📊 Observatoire</div>
+          </div>
+          <div class="card" style="border-left:4px solid #e9d5ff;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
+            <div style="font-size:28px;font-weight:800;color:#4c1d95;" id="da-widget-institutionnelle">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">🏛️ Institutionnelle</div>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:160px;">
             <button class="btn btn-orange" style="font-size:13px;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('demandes'),200)">⏳ Voir les demandes</button>
             <button class="btn btn-outline" style="font-size:13px;" onclick="goSection('accreditations');setTimeout(()=>openAccordDirectModal(),200)">➕ Accorder directement</button>
           </div>
@@ -716,7 +724,10 @@
         <!-- ACCRÉDITATIONS DA : Mobilisation Active / Créateur d'Opportunités -->
         <div id="section-accred-da" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
           <h2 style="margin:0 0 6px;">Accréditations Diaspo'Actif</h2>
-          <p style="color:var(--muted);font-size:13px;margin:0 0 16px;">Gérez les demandes et attributions des accréditations « Mobilisation Active » et « Créateur d'Opportunités ».</p>
+          <p style="color:var(--muted);font-size:13px;margin:0 0 8px;">Gérez les demandes et attributions des 4 accréditations opérationnelles Diaspo'Actif.</p>
+          <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
+            📋 <em>Les accréditations DA ne constituent ni une récompense, ni une distinction honorifique. Elles correspondent à des <strong>autorisations opérationnelles</strong> accordées afin d'exercer certaines fonctions ou d'accéder à des services spécifiques de la plateforme.</em>
+          </div>
           <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
             <button class="btn btn-orange" id="da-tab-demandes" onclick="switchDATab('demandes')">⏳ Demandes en attente <span id="da-demandes-count" style="display:none;background:rgba(255,255,255,.3);padding:1px 6px;border-radius:99px;font-size:11px;margin-left:4px;"></span></button>
             <button class="btn btn-outline" id="da-tab-actives" onclick="switchDATab('actives')">✅ Accréditations actives</button>
@@ -792,17 +803,29 @@
           <!-- Type d'accréditation -->
           <label class="form-label">Type d'accréditation *</label>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:14px;transition:border-color .2s;" id="ad-card-mob" onclick="selectTypeDA('mobilisation_active')">
+            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;transition:border-color .2s;" id="ad-card-mob" onclick="selectTypeDA('mobilisation_active')">
               <input type="radio" name="ad-type" value="mobilisation_active" style="display:none;">
-              <div style="font-size:20px;margin-bottom:4px;">📢</div>
-              <div style="font-weight:700;font-size:13px;">Mobilisation Active</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px;">Sondages · Consultations · Appels à projets</div>
+              <div style="font-size:18px;margin-bottom:4px;">📢</div>
+              <div style="font-weight:700;font-size:12px;">Mobilisation Active</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Missions · Campagnes · Terrain</div>
             </label>
-            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:14px;transition:border-color .2s;" id="ad-card-opp" onclick="selectTypeDA('createur_opportunites')">
+            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;transition:border-color .2s;" id="ad-card-opp" onclick="selectTypeDA('createur_opportunites')">
               <input type="radio" name="ad-type" value="createur_opportunites" style="display:none;">
-              <div style="font-size:20px;margin-bottom:4px;">💼</div>
-              <div style="font-weight:700;font-size:13px;">Créateur d'Opportunités</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px;">Emploi · Partenariats · Mentorat · B2B</div>
+              <div style="font-size:18px;margin-bottom:4px;">💼</div>
+              <div style="font-weight:700;font-size:12px;">Créateur d'Opportunités</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Offres · Recrutement · Mise en relation</div>
+            </label>
+            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;transition:border-color .2s;" id="ad-card-obs" onclick="selectTypeDA('observatoire_diaspora')">
+              <input type="radio" name="ad-type" value="observatoire_diaspora" style="display:none;">
+              <div style="font-size:18px;margin-bottom:4px;">📊</div>
+              <div style="font-weight:700;font-size:12px;">Observatoire Diaspora</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Statistiques · Tableaux de bord · Rapports</div>
+            </label>
+            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;transition:border-color .2s;" id="ad-card-ins" onclick="selectTypeDA('institutionnelle')">
+              <input type="radio" name="ad-type" value="institutionnelle" style="display:none;">
+              <div style="font-size:18px;margin-bottom:4px;">🏛️</div>
+              <div style="font-weight:700;font-size:12px;">Institutionnelle</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Communications · Consultations · Territoire</div>
             </label>
           </div>
 
@@ -1832,7 +1855,7 @@ document.querySelectorAll(".sidebar a[data-section='moderation']").forEach(a => 
 /* ===== ACCRÉDITATIONS DIASPO'ACTIF ===== */
 function escDA(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmtDA(d){if(!d)return '—';try{return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
-const DA_TYPE_LBL={mobilisation_active:'📢 Mobilisation Active',createur_opportunites:'💼 Créateur d\'Opportunités'};
+const DA_TYPE_LBL={mobilisation_active:'📢 Mobilisation Active',createur_opportunites:'💼 Créateur d\'Opportunités',observatoire_diaspora:'📊 Observatoire Diaspora',institutionnelle:'🏛️ Institutionnelle'};
 const DA_STAT_LBL={active:'✅ Active',suspendue:'⚠️ Suspendue',retiree:'❌ Retirée'};
 const DA_ACT_LBL={accorde:'Accordée',refuse:'Refusée',suspendu:'Suspendue',retire:'Retirée',reactiver:'Réactivée'};
 
@@ -1989,14 +2012,21 @@ async function loadDAWidgetStats(){
       api('GET','/admin/accreditations')
     ]);
     const pending=(dem.demandes||[]).length;
-    const mob=(act.accreditations||[]).filter(a=>a.type==='mobilisation_active'&&a.statut==='active').length;
-    const opp=(act.accreditations||[]).filter(a=>a.type==='createur_opportunites'&&a.statut==='active').length;
+    const accreds=act.accreditations||[];
+    const mob=accreds.filter(a=>a.type==='mobilisation_active'&&a.statut==='active').length;
+    const opp=accreds.filter(a=>a.type==='createur_opportunites'&&a.statut==='active').length;
+    const obs=accreds.filter(a=>a.type==='observatoire_diaspora'&&a.statut==='active').length;
+    const ins=accreds.filter(a=>a.type==='institutionnelle'&&a.statut==='active').length;
     const wp=document.getElementById('da-widget-pending');
     const wm=document.getElementById('da-widget-mobilisation');
     const wo=document.getElementById('da-widget-opportunites');
+    const wb=document.getElementById('da-widget-observatoire');
+    const wi=document.getElementById('da-widget-institutionnelle');
     if(wp) wp.textContent=pending;
     if(wm) wm.textContent=mob;
     if(wo) wo.textContent=opp;
+    if(wb) wb.textContent=obs;
+    if(wi) wi.textContent=ins;
     // Badge sidebar
     const badge=document.getElementById('accred-pending-badge');
     if(badge){ if(pending>0){badge.textContent=pending;badge.style.display='inline-block';}else badge.style.display='none'; }
@@ -2020,7 +2050,7 @@ function openAccordDirectModal(){
   document.getElementById('ad-motif').value='';
   document.getElementById('ad-error').style.display='none';
   _adSelectedType='';
-  ['ad-card-mob','ad-card-opp'].forEach(id=>{
+  ['ad-card-mob','ad-card-opp','ad-card-obs','ad-card-ins'].forEach(id=>{
     const el=document.getElementById(id);
     if(el){el.style.borderColor='var(--border)';el.style.background='';}
   });
@@ -2063,12 +2093,13 @@ function clearSelectedDA(){
   document.getElementById('ad-user-id').value='';
   document.getElementById('ad-selected').style.display='none';
 }
+const DA_CARD_COLORS={mobilisation_active:['#f59e0b','#fffbeb','ad-card-mob'],createur_opportunites:['#3b82f6','#eff6ff','ad-card-opp'],observatoire_diaspora:['#059669','#f0fdf4','ad-card-obs'],institutionnelle:['#7c3aed','#f5f3ff','ad-card-ins']};
 function selectTypeDA(type){
   _adSelectedType=type;
-  const mob=document.getElementById('ad-card-mob');
-  const opp=document.getElementById('ad-card-opp');
-  if(mob){mob.style.borderColor=type==='mobilisation_active'?'#f59e0b':'var(--border)';mob.style.background=type==='mobilisation_active'?'#fffbeb':'';}
-  if(opp){opp.style.borderColor=type==='createur_opportunites'?'#3b82f6':'var(--border)';opp.style.background=type==='createur_opportunites'?'#eff6ff':'';}
+  Object.entries(DA_CARD_COLORS).forEach(([t,[col,bg,id]])=>{
+    const el=document.getElementById(id);
+    if(el){el.style.borderColor=type===t?col:'var(--border)';el.style.background=type===t?bg:'';}
+  });
 }
 async function submitAccordDirect(){
   const userId=document.getElementById('ad-user-id').value;

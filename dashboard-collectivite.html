@@ -326,7 +326,10 @@
           <h2 style="margin:0;">🎖 Accréditations Diaspo'Actif</h2>
           <button class="btn btn-sm btn-outline" onclick="loadCollAccred()" style="font-size:12px;">↺ Actualiser</button>
         </div>
-        <p style="color:var(--muted);font-size:13.5px;margin:0 0 20px;">Les accréditations DA distinguent les collectivités les plus engagées dans l'accompagnement de leur diaspora. Elles confèrent un badge visible sur votre profil et dans l'annuaire. <strong>Gratuites pour les collectivités partenaires.</strong></p>
+        <p style="color:var(--muted);font-size:13.5px;margin:0 0 10px;">Les accréditations DA sont des <strong>autorisations opérationnelles</strong> — pas des récompenses. Chaque accréditation donne le droit d'exercer une fonction spécifique sur la plateforme. <strong>Gratuites pour les collectivités partenaires.</strong></p>
+        <div style="background:#f8fafc;border:1px solid var(--border);border-left:3px solid #1B3A6B;border-radius:0 10px 10px 0;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
+          📋 <em>Les accréditations Diaspo'Actif ne constituent ni une récompense, ni une distinction honorifique. Elles correspondent à des autorisations opérationnelles accordées à un utilisateur ou à une organisation afin d'exercer certaines fonctions ou d'accéder à des services spécifiques de la plateforme.</em>
+        </div>
 
         <!-- Accréditations actives -->
         <div id="coll-accred-actives"></div>
@@ -400,14 +403,25 @@
 if (typeof ACCREDITATIONS_DA === 'undefined') {
   window.ACCREDITATIONS_DA = [
     { type:'mobilisation_active', label:'Mobilisation Active', emoji:'📢', couleur:'#f59e0b', couleurBg:'#fffbeb', couleurBorder:'#f59e0b', couleurText:'#92400e',
-      description:"Reconnue pour sa capacité à mobiliser la diaspora autour de causes, d'événements et de projets collectifs.",
-      avantages:["Badge 📢 visible sur votre profil et vos publications","Mise en avant prioritaire dans l'annuaire","Filtre dédié dans la recherche Diaspo'Actif","Accès aux outils de mobilisation avancés"],
-      prix:{initiative:29, collectivite:0} },
+      description:"Autorisation d'exercer des fonctions de mobilisation au sein de Diaspo'Actif.",
+      droits:["Participer à des missions rémunérées","Répondre à des appels de mobilisation","Réaliser des enquêtes de terrain","Participer à des campagnes de sensibilisation","Être sollicité par des partenaires"],
+      eligible:['initiative','utilisateur'], prix:{initiative:29,collectivite:0,utilisateur:19} },
     { type:'createur_opportunites', label:"Créateur d'Opportunités", emoji:'💼', couleur:'#3b82f6', couleurBg:'#eff6ff', couleurBorder:'#3b82f6', couleurText:'#1e40af',
-      description:"Reconnue pour la création d'emplois, de stages, d'appels à projets et d'opportunités économiques pour la diaspora.",
-      avantages:["Badge 💼 visible sur votre profil et vos publications","Accès prioritaire à la section \"Offres & Opportunités\"","Filtre dédié dans la recherche et l'annuaire","Mise en relation facilitée avec les membres"],
-      prix:{initiative:39, collectivite:0} }
+      description:"Autorisation de publier des offres et de créer des opportunités professionnelles pour la diaspora.",
+      droits:["Publier certaines offres (emplois, stages, marchés)","Mettre en relation des acteurs","Participer à des programmes de recrutement","Créer des opportunités professionnelles","Accéder au module offres prioritaires"],
+      eligible:['initiative','collectivite'], prix:{initiative:39,collectivite:0} },
+    { type:'observatoire_diaspora', label:'Observatoire Diaspora', emoji:'📊', couleur:'#059669', couleurBg:'#f0fdf4', couleurBorder:'#059669', couleurText:'#065f46',
+      description:"Autorisation d'accéder aux données statistiques et outils d'analyse de la plateforme pour des usages institutionnels ou de recherche.",
+      droits:["Accéder aux statistiques autorisées","Consulter les tableaux de bord","Réaliser des consultations publiques","Obtenir des rapports périodiques","Analyser les tendances diasporiques"],
+      eligible:['collectivite'], prix:{collectivite:0} },
+    { type:'institutionnelle', label:'Institutionnelle', emoji:'🏛️', couleur:'#7c3aed', couleurBg:'#f5f3ff', couleurBorder:'#7c3aed', couleurText:'#4c1d95',
+      description:"Autorisation d'exercer des fonctions institutionnelles sur la plateforme : communications officielles, consultations et interaction territoriale.",
+      droits:["Diffuser des communications officielles","Organiser des consultations publiques","Interagir avec un territoire donné","Accéder à certains outils institutionnels","Publier des avis et informations officiels"],
+      eligible:['collectivite'], prix:{collectivite:0} }
   ];
+}
+if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
+  window.REGLE_ACCREDITATIONS_DA = "Les accréditations Diaspo'Actif ne constituent ni une récompense, ni une distinction honorifique. Elles correspondent à des autorisations opérationnelles accordées à un utilisateur ou à une organisation afin d'exercer certaines fonctions ou d'accéder à des services spécifiques de la plateforme.";
 }
 /* ===== Helpers ===== */
 let ME = null;
@@ -487,7 +501,8 @@ async function loadCollAccred() {
   // Catalogue
   const catEl = document.getElementById('coll-accred-catalogue');
   if (catEl && typeof ACCREDITATIONS_DA !== 'undefined') {
-    catEl.innerHTML = ACCREDITATIONS_DA.map(def => {
+    const eligibles = ACCREDITATIONS_DA.filter(d => (d.eligible||[]).includes('collectivite'));
+    catEl.innerHTML = eligibles.map(def => {
       const active = actives.find(a => a.type === def.type && a.statut === 'active');
       const demandeEnCours = demandes.find(d => d.type === def.type && d.statut === 'en_attente');
       const refusee = demandes.find(d => d.type === def.type && d.statut === 'refusee');
@@ -505,16 +520,17 @@ async function loadCollAccred() {
       }
       return `
         <div style="border:1.5px solid ${active ? def.couleurBorder : 'var(--border)'};border-radius:14px;padding:18px;background:${active ? def.couleurBg : ''};transition:border-color .2s;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
             <span style="font-size:28px;">${def.emoji}</span>
             <div>
               <div style="font-weight:800;font-size:15px;">${def.label}</div>
               <div style="font-size:12px;font-weight:700;color:${def.couleurText};">${prix > 0 ? prix + ' €/an' : 'Gratuit pour les collectivités'}</div>
             </div>
           </div>
-          <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">${def.description}</p>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">${def.description}</p>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px;">Ce que cette accréditation vous permet de faire</div>
           <ul style="margin:0 0 14px;padding-left:18px;font-size:12.5px;">
-            ${(def.avantages||[]).map(a => `<li style="margin-bottom:4px;">${a}</li>`).join('')}
+            ${(def.droits||[]).map(d => `<li style="margin-bottom:4px;">${d}</li>`).join('')}
           </ul>
           ${btnHTML}
         </div>`;
