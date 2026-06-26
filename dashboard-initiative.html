@@ -41,6 +41,7 @@
       <a href="#publications">📰 Publications</a>
       <a href="#evenements">📅 Événements</a>
       <a href="#paiement">💳 Module paiement</a>
+      <a href="#recrutement">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
       <a href="#accreditations">🎖 Accréditations DA</a>
       <a href="#publicites-init">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
       <a href="messagerie.html">💬 Messages <span class="pill" id="msg-count">—</span></a>
@@ -298,6 +299,16 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div class="payment-grid" id="moyens-paiement"></div>
       <button class="btn btn-navy btn-block" style="margin-top:14px;" disabled>Activer le module de paiement (démonstration)</button>
       <p style="color:var(--muted);font-size:11px;margin-top:8px;">⚠️ Démonstration uniquement — aucune transaction réelle n'est traitée.</p>
+    </div>
+
+    <!-- ── Section Recrutement / Candidatures ── -->
+    <div class="card" style="margin-bottom:20px;" id="recrutement">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">📋 Gestion des candidatures</h3>
+        <button class="btn btn-sm btn-outline" onclick="loadRecrutement()" style="font-size:12px;">↺ Actualiser</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Consultez et gérez les candidatures reçues sur vos offres publiées.</p>
+      <div id="recrutement-content"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
     </div>
 
     <div class="card" style="margin-bottom:20px;" id="accreditations">
@@ -1066,6 +1077,195 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     }
   }
   initPubSection();
+
+  /* ===== RECRUTEMENT / CANDIDATURES ===== */
+  const STATUT_REC = {
+    envoyee:'📤 Envoyée', recue:'📥 Reçue', consultee:'👁 Consultée',
+    preselectionnee:'⭐ Présélectionnée', entretien_demande:'📞 Entretien demandé',
+    entretien_programme:'📅 Entretien programmé', entretien_realise:'✅ Entretien réalisé',
+    docs_demandes:'📎 Docs demandés', en_attente:'⏳ En attente',
+    acceptee:'🎉 Acceptée', refusee:'❌ Refusée', cloturee:'🔒 Clôturée',
+    recu:'📥 Reçue', en_etude:'🔍 En étude', entretien:'📅 Entretien',
+    accepte:'🎉 Accepté', refuse:'❌ Refusé'
+  };
+  const STATUT_COLORS_R = {
+    acceptee:'#27ae60',accepte:'#27ae60',refusee:'#e74c3c',refuse:'#e74c3c',
+    preselectionnee:'#9b59b6',entretien_programme:'#3498db',entretien:'#3498db',
+    envoyee:'#2980b9',recue:'#16a085',consultee:'#8e44ad',entretien_demande:'#e67e22'
+  };
+  function esc2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function fd(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
+
+  window.loadRecrutement = async function() {
+    const el = document.getElementById('recrutement-content');
+    if (!init?.id) { el.innerHTML='<p style="color:var(--muted);font-size:13px;">Initiative non chargée.</p>'; return; }
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Chargement…</p>';
+    // Récupérer les offres de l'initiative
+    let offres = [];
+    try {
+      const r = await api('GET', '/offres?createur_id=' + init.user_id);
+      offres = r.offres || r || [];
+    } catch(e) { el.innerHTML='<p style="color:var(--muted);font-size:13px;">Erreur de chargement des offres.</p>'; return; }
+    if (!offres.length) {
+      el.innerHTML='<p style="color:var(--muted);font-size:13px;">Aucune offre publiée. <a href="annuaire.html">Créer une offre</a></p>';
+      return;
+    }
+    // Pour chaque offre, charger les candidatures
+    let html = '';
+    let totalCands = 0;
+    for (const offre of offres.slice(0, 10)) {
+      let cands = [];
+      try {
+        const r2 = await fetch('/api/offres/' + offre.id + '/candidatures', {credentials:'include'});
+        if (r2.ok) cands = await r2.json();
+      } catch(e) {}
+      totalCands += cands.length;
+      const consultees = cands.filter(c => ['consultee','preselectionnee','entretien_demande','entretien_programme','entretien_realise','acceptee','accepte'].includes(c.statut_detail||c.statut)).length;
+      const presels = cands.filter(c => ['preselectionnee'].includes(c.statut_detail||c.statut)).length;
+      html += `<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:16px;overflow:hidden;">
+        <div style="background:#f8f9ff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div style="font-weight:700;font-size:.92rem;">${esc2(offre.titre)}</div>
+            <div style="font-size:11px;color:var(--muted);">${esc2(offre.type)} · ${esc2(offre.localisation||offre.pays||'')}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <span style="background:#4a90d915;color:#4a90d9;border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;">${cands.length} candidature${cands.length>1?'s':''}</span>
+            ${presels ? `<span style="background:#9b59b615;color:#9b59b6;border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;">${presels} présélectionné${presels>1?'s':''}</span>` : ''}
+          </div>
+        </div>
+        ${cands.length ? `
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:#fafafa;font-size:10px;font-weight:700;text-transform:uppercase;color:#888;">
+              <th style="padding:8px 12px;text-align:left;">Candidat</th>
+              <th style="padding:8px;text-align:left;">CV</th>
+              <th style="padding:8px;text-align:left;">Lettre</th>
+              <th style="padding:8px;text-align:left;">Date</th>
+              <th style="padding:8px;text-align:left;">Statut</th>
+              <th style="padding:8px;text-align:left;">Actions</th>
+            </tr></thead>
+            <tbody>
+              ${cands.map(c => {
+                const st = c.statut_detail || c.statut || 'recue';
+                const col = STATUT_COLORS_R[st] || '#666';
+                return `<tr style="border-bottom:1px solid #f0f0f0;">
+                  <td style="padding:10px 12px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      ${c.photo_url ? `<img src="${esc2(c.photo_url)}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;" alt="">` : `<div style="width:30px;height:30px;border-radius:50%;background:#4a90d9;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">${(c.prenom||c.nom||'?')[0].toUpperCase()}</div>`}
+                      <div>
+                        <div style="font-weight:700;">${esc2([c.prenom,c.nom].filter(Boolean).join(' ')||'Candidat')}</div>
+                        <div style="font-size:10px;color:var(--muted);">${esc2(c.titre_pro||c.candidat_pays||'')}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style="padding:10px 8px;">${c.cv_titre ? `<a href="cv-builder.html?id=${c.cv_profile_id}" target="_blank" style="font-size:11px;color:#4a90d9;">📄 ${esc2(c.cv_titre)}</a>` : '<span style="color:#ccc;font-size:11px;">—</span>'}</td>
+                  <td style="padding:10px 8px;">${c.lettre_titre ? `<span style="font-size:11px;">✉️ ${esc2(c.lettre_titre)}</span>` : '<span style="color:#ccc;font-size:11px;">—</span>'}</td>
+                  <td style="padding:10px 8px;font-size:11px;color:var(--muted);white-space:nowrap;">${fd(c.created_at)}</td>
+                  <td style="padding:10px 8px;">
+                    <select onchange="changerStatut(${c.id}, this.value)" style="font-size:11px;padding:3px 6px;border:1px solid ${col}44;border-radius:6px;color:${col};background:${col}11;font-weight:700;">
+                      ${['recue','consultee','preselectionnee','entretien_demande','entretien_programme','entretien_realise','docs_demandes','en_attente','acceptee','refusee','cloturee'].map(s=>`<option value="${s}" ${st===s?'selected':''}>${STATUT_REC[s]||s}</option>`).join('')}
+                    </select>
+                  </td>
+                  <td style="padding:10px 8px;">
+                    <div style="display:flex;gap:4px;">
+                      <button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="voirFicheCandidat(${JSON.stringify(c).replace(/"/g,'&quot;')})">👤 Fiche</button>
+                      <a href="messagerie.html?user=${c.candidat_id}" class="btn btn-sm btn-outline" style="font-size:11px;">💬</a>
+                    </div>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>` : '<p style="padding:12px 16px;font-size:12px;color:var(--muted);">Aucune candidature reçue.</p>'}
+      </div>`;
+    }
+    // Badge dans sidebar
+    if (totalCands > 0) {
+      const badge = document.getElementById('cand-badge');
+      if (badge) { badge.textContent = totalCands; badge.style.display=''; }
+    }
+    el.innerHTML = html;
+  };
+
+  window.changerStatut = async function(candId, newStatut) {
+    try {
+      await fetch('/api/candidatures/' + candId + '/statut', {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        credentials: 'include',
+        body: JSON.stringify({ statut_detail: newStatut })
+      });
+    } catch(e) { alert('Erreur lors de la mise à jour du statut'); }
+  };
+
+  window.voirFicheCandidat = function(c) {
+    const evJson = JSON.parse(c.evaluation_json || '{}');
+    const evFields = ['Compétences','Motivation','Expérience','Communication'];
+    const evalHTML = evFields.map(f => `
+      <div style="margin-bottom:8px;">
+        <label style="font-size:11px;font-weight:700;display:block;margin-bottom:2px;">${f}</label>
+        <div style="display:flex;gap:4px;">${[1,2,3,4,5].map(n=>`<button onclick="noterEval(${c.id},'${f}',${n},this)" style="width:28px;height:28px;border-radius:50%;border:1px solid #ddd;cursor:pointer;font-size:13px;background:${(evJson[f]||0)>=n?'#f5a623':'#f9f9f9'};">★</button>`).join('')}</div>
+      </div>`).join('');
+    const modal = document.createElement('div');
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;';
+    modal.innerHTML=`<div style="background:#fff;border-radius:14px;padding:24px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:1rem;">👤 Fiche candidat</h3>
+        <button onclick="this.closest('.modal-fiche').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;">×</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        ${c.photo_url?`<img src="${esc2(c.photo_url)}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;" alt="">`:`<div style="width:56px;height:56px;border-radius:50%;background:#4a90d9;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;">${(c.prenom||c.nom||'?')[0].toUpperCase()}</div>`}
+        <div>
+          <div style="font-weight:800;font-size:1rem;">${esc2([c.prenom,c.nom].filter(Boolean).join(' ')||'Candidat')}</div>
+          ${c.titre_pro?`<div style="font-size:12px;color:#666;">${esc2(c.titre_pro)}</div>`:''}
+          ${c.candidat_pays?`<div style="font-size:11px;color:#999;">📍 ${esc2(c.candidat_pays)}</div>`:''}
+        </div>
+      </div>
+      ${c.message?`<div style="background:#f8f9ff;border-radius:8px;padding:10px 14px;font-size:12px;color:#333;margin-bottom:16px;"><strong>Message :</strong><br>${esc2(c.message)}</div>`:''}
+      <div style="margin-bottom:16px;">
+        <strong style="font-size:12px;text-transform:uppercase;color:#888;letter-spacing:.5px;">Évaluation interne (privée)</strong>
+        <div style="margin-top:8px;">${evalHTML}</div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">Notes internes (non visibles du candidat)</label>
+        <textarea id="notes-rec-${c.id}" rows="3" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;" placeholder="Vos notes privées…">${esc2(c.notes_recruteur||'')}</textarea>
+        <button class="btn btn-sm btn-outline" style="margin-top:6px;font-size:12px;" onclick="sauvegarderNotes(${c.id})">💾 Sauvegarder les notes</button>
+      </div>
+      ${c.cv_titre?`<a href="cv-builder.html?id=${c.cv_profile_id}" target="_blank" class="btn btn-outline" style="font-size:12px;display:inline-flex;align-items:center;gap:6px;">📄 Voir le CV — ${esc2(c.cv_titre)}</a>`:''}
+    </div>`;
+    modal.classList.add('modal-fiche');
+    modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+    document.body.appendChild(modal);
+    // Fix close button
+    modal.querySelector('button').onclick = () => modal.remove();
+  };
+
+  window.noterEval = async function(candId, champ, note, btn) {
+    try {
+      const r = await fetch('/api/candidatures/' + candId + '/recruteur', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        credentials: 'include', body: JSON.stringify({ evaluation_json: { [champ]: note } })
+      });
+      // Colorier les étoiles
+      const row = btn.parentElement;
+      [...row.children].forEach((b, i) => {
+        b.style.background = i < note ? '#f5a623' : '#f9f9f9';
+      });
+    } catch(e) {}
+  };
+
+  window.sauvegarderNotes = async function(candId) {
+    const notes = document.getElementById('notes-rec-' + candId)?.value || '';
+    try {
+      await fetch('/api/candidatures/' + candId + '/recruteur', {
+        method: 'PATCH', headers: {'Content-Type':'application/json'},
+        credentials: 'include', body: JSON.stringify({ notes_recruteur: notes })
+      });
+      alert('Notes sauvegardées');
+    } catch(e) { alert('Erreur'); }
+  };
+
+  loadRecrutement();
 
 })();
 </script>

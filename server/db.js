@@ -795,6 +795,17 @@ const MIGRATIONS = [
   // Publicité events — champs supplémentaires
   ["publicite_events", "user_nationalite TEXT"],
   ["publicite_events", "user_role TEXT"],
+  // CV & Lettres de motivation
+  ["offres_candidatures", "cv_profile_id INTEGER"],
+  ["offres_candidatures", "lettre_id INTEGER"],
+  ["offres_candidatures", "statut_detail TEXT DEFAULT 'envoyee'"],
+  ["offres_candidatures", "vu_recruteur INTEGER DEFAULT 0"],
+  ["offres_candidatures", "notes_recruteur TEXT"],
+  ["offres_candidatures", "evaluation_json TEXT DEFAULT '{}'"],
+  ["offres_candidatures", "date_entretien TEXT"],
+  ["offres_candidatures", "lieu_entretien TEXT"],
+  ["offres_candidatures", "type_entretien TEXT DEFAULT 'presentiel'"],
+  ["offres_candidatures", "type_candidature TEXT DEFAULT 'offre'"],
 ];
 
 /* ===== SYSTÈME D'ACCRÉDITATIONS DIASPO'ACTIF ===== */
@@ -931,6 +942,42 @@ db.exec(`
     contenu TEXT NOT NULL,
     ordre INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS cv_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    numero INTEGER NOT NULL DEFAULT 1 CHECK(numero IN (1,2)),
+    titre TEXT DEFAULT 'Mon CV',
+    theme TEXT DEFAULT 'bleu',
+    data_json TEXT DEFAULT '{}',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, numero),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS lettres_motivation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    numero INTEGER NOT NULL DEFAULT 1 CHECK(numero IN (1,2)),
+    titre TEXT DEFAULT 'Ma lettre',
+    data_json TEXT DEFAULT '{}',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, numero),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS candidature_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    candidature_id INTEGER NOT NULL,
+    statut TEXT NOT NULL,
+    note TEXT,
+    auteur_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(candidature_id) REFERENCES offres_candidatures(id),
+    FOREIGN KEY(auteur_id) REFERENCES users(id)
   );
 `);
 for (const [table, col] of MIGRATIONS) {

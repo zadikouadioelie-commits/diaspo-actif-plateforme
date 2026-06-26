@@ -40,6 +40,9 @@
       <a href="#localisation">📍 Ma Localisation</a>
       <a href="#nationalites">🌍 Mes Nationalités</a>
       <a href="#financements">💚 J'ai Financé</a>
+      <a href="#cv">📄 Mes CV</a>
+      <a href="#lettres">✉️ Mes Lettres</a>
+      <a href="#candidatures">📋 Mes Candidatures</a>
       <a href="#collaborations">🤝 Mes Collaborations</a>
       <a href="#recherches">🔍 Mes Recherches</a>
       <a href="messagerie.html">💬 Mes Conversations <span class="pill">2</span></a>
@@ -76,6 +79,37 @@
       <div class="card" id="recherches" style="margin-bottom:20px;">
         <h3>Historique des recherches récentes</h3>
         <div id="dv-recherches"></div>
+      </div>
+
+      <!-- ===== MES CV ===== -->
+      <div class="card" id="cv" style="margin-bottom:20px;">
+        <div class="flex-between" style="margin-bottom:12px;">
+          <h3 style="margin:0;">📄 Mes CV</h3>
+          <span style="font-size:12px;color:var(--muted);">2 CV disponibles</span>
+        </div>
+        <div id="dv-cv" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+      </div>
+
+      <!-- ===== MES LETTRES ===== -->
+      <div class="card" id="lettres" style="margin-bottom:20px;">
+        <div class="flex-between" style="margin-bottom:12px;">
+          <h3 style="margin:0;">✉️ Mes Lettres de motivation</h3>
+          <span style="font-size:12px;color:var(--muted);">2 lettres disponibles</span>
+        </div>
+        <div id="dv-lettres" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+      </div>
+
+      <!-- ===== MES CANDIDATURES ===== -->
+      <div class="card" id="candidatures" style="margin-bottom:20px;">
+        <div class="flex-between" style="margin-bottom:12px;">
+          <h3 style="margin:0;">📋 Mes Candidatures</h3>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span id="cand-stats" style="font-size:12px;color:var(--muted);"></span>
+          </div>
+        </div>
+        <!-- Tableau de bord mini -->
+        <div id="cand-kpis" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"></div>
+        <div id="dv-candidatures"></div>
       </div>
 
       <div id="ad-dashboard-utilisateur" data-ad-slot="0"></div>
@@ -155,6 +189,171 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
       ? hist.map(q=>`<a href="recherche.html?q=${encodeURIComponent(q)}" style="display:inline-block;margin:3px;padding:4px 12px;background:var(--bg);border:1px solid var(--border);border-radius:99px;font-size:12px;text-decoration:none;color:inherit;">🔍 ${esc(q)}</a>`).join('')
       : '<p style="color:var(--muted);font-size:13px;">Aucune recherche récente.</p>';
   }catch(e){rechEl.innerHTML='';}
+
+  // ===== MES CV =====
+  async function loadCVs() {
+    const el = document.getElementById('dv-cv');
+    const slots = [1, 2];
+    let cvs = [];
+    try { const r = await fetch('/api/cv', {credentials:'include'}); cvs = await r.json(); } catch(e) {}
+    el.innerHTML = slots.map(n => {
+      const cv = cvs.find(c => c.numero === n);
+      return cv ? `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--bg);">
+          <div style="font-weight:700;font-size:.9rem;margin-bottom:4px;">CV n°${n} — ${esc(cv.titre)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Modifié le ${fmtDate(cv.updated_at)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <a href="cv-builder.html?id=${cv.id}" class="btn btn-outline btn-sm">✏️ Modifier</a>
+            <a href="cv-builder.html?id=${cv.id}" target="_blank" class="btn btn-outline btn-sm">👁 Aperçu</a>
+            <button class="btn btn-outline btn-sm" style="color:#e74c3c;" onclick="deleteCV(${cv.id})">🗑 Supprimer</button>
+          </div>
+        </div>` : `
+        <div style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;background:#fafafa;">
+          <div style="font-size:.85rem;color:var(--muted);margin-bottom:10px;">CV n°${n}<br><span style="font-size:11px;">Non créé</span></div>
+          <a href="cv-builder.html?numero=${n}" class="btn btn-primary btn-sm">+ Créer CV n°${n}</a>
+        </div>`;
+    }).join('');
+  }
+  window.deleteCV = async (id) => {
+    if (!confirm('Supprimer ce CV ?')) return;
+    await fetch('/api/cv/'+id, {method:'DELETE',credentials:'include'});
+    loadCVs();
+  };
+  loadCVs();
+
+  // ===== MES LETTRES =====
+  async function loadLettres() {
+    const el = document.getElementById('dv-lettres');
+    let lettres = [];
+    try { const r = await fetch('/api/lettres', {credentials:'include'}); lettres = await r.json(); } catch(e) {}
+    const slots = [1, 2];
+    el.innerHTML = slots.map(n => {
+      const lm = lettres.find(l => l.numero === n);
+      return lm ? `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--bg);">
+          <div style="font-weight:700;font-size:.9rem;margin-bottom:4px;">Lettre n°${n} — ${esc(lm.titre)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Modifiée le ${fmtDate(lm.updated_at)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <a href="lettre-builder.html?id=${lm.id}" class="btn btn-outline btn-sm">✏️ Modifier</a>
+            <button class="btn btn-outline btn-sm" style="color:#e74c3c;" onclick="deleteLM(${lm.id})">🗑 Supprimer</button>
+          </div>
+        </div>` : `
+        <div style="border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;background:#fafafa;">
+          <div style="font-size:.85rem;color:var(--muted);margin-bottom:10px;">Lettre n°${n}<br><span style="font-size:11px;">Non créée</span></div>
+          <a href="lettre-builder.html?numero=${n}" class="btn btn-primary btn-sm">+ Créer Lettre n°${n}</a>
+        </div>`;
+    }).join('');
+  }
+  window.deleteLM = async (id) => {
+    if (!confirm('Supprimer cette lettre ?')) return;
+    await fetch('/api/lettres/'+id, {method:'DELETE',credentials:'include'});
+    loadLettres();
+  };
+  loadLettres();
+
+  // ===== MES CANDIDATURES =====
+  const STATUT_LABELS = {
+    brouillon:'📝 Brouillon', envoyee:'📤 Envoyée', recue:'📥 Reçue', consultee:'👁 Consultée',
+    preselectionnee:'⭐ Présélectionnée', entretien_demande:'📞 Entretien demandé',
+    entretien_programme:'📅 Entretien programmé', entretien_realise:'✅ Entretien réalisé',
+    docs_demandes:'📎 Documents demandés', en_attente:'⏳ En attente',
+    acceptee:'🎉 Acceptée', refusee:'❌ Refusée', cloturee:'🔒 Clôturée',
+    recu:'📥 Reçue', en_etude:'🔍 En étude', entretien:'📅 Entretien', accepte:'🎉 Acceptée', refuse:'❌ Refusée'
+  };
+  const STATUT_COLORS = {
+    acceptee:'#27ae60', accepte:'#27ae60', refusee:'#e74c3c', refuse:'#e74c3c',
+    preselectionnee:'#9b59b6', entretien_programme:'#3498db', entretien:'#3498db',
+    envoyee:'#2980b9', recue:'#16a085', consultee:'#8e44ad'
+  };
+  async function loadCandidatures() {
+    const el = document.getElementById('dv-candidatures');
+    const kpiEl = document.getElementById('cand-kpis');
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Chargement…</p>';
+    try {
+      const r = await fetch('/api/candidatures/mes', {credentials:'include'});
+      const cands = await r.json();
+      // KPIs
+      const total = cands.length;
+      const enCours = cands.filter(c => !['acceptee','accepte','refusee','refuse','cloturee'].includes(c.statut_detail||c.statut)).length;
+      const entretiens = cands.filter(c => ['entretien_programme','entretien','entretien_realise'].includes(c.statut_detail||c.statut)).length;
+      const acceptees = cands.filter(c => ['acceptee','accepte'].includes(c.statut_detail||c.statut)).length;
+      const refusees = cands.filter(c => ['refusee','refuse'].includes(c.statut_detail||c.statut)).length;
+      kpiEl.innerHTML = [
+        ['Total', total, '#4a90d9'],
+        ['En cours', enCours, '#f5a623'],
+        ['Entretiens', entretiens, '#3498db'],
+        ['Acceptées', acceptees, '#27ae60'],
+        ['Refusées', refusees, '#e74c3c']
+      ].map(([l,v,c])=>`<div style="background:${c}15;border:1px solid ${c}33;border-radius:8px;padding:10px 16px;text-align:center;min-width:80px;">
+        <div style="font-size:1.3rem;font-weight:800;color:${c};">${v}</div>
+        <div style="font-size:.72rem;color:#555;font-weight:600;">${l}</div>
+      </div>`).join('');
+      if (!cands.length) {
+        el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune candidature pour le moment. <a href="annuaire.html">Parcourir les offres</a></p>';
+        return;
+      }
+      el.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f4f6f9;font-size:11px;font-weight:700;text-transform:uppercase;color:#666;">
+          <th style="padding:8px 10px;text-align:left;white-space:nowrap;">Offre / Organisation</th>
+          <th style="padding:8px;text-align:left;">Type</th>
+          <th style="padding:8px;text-align:left;">CV utilisé</th>
+          <th style="padding:8px;text-align:left;">Lettre</th>
+          <th style="padding:8px;text-align:left;">Date</th>
+          <th style="padding:8px;text-align:left;">Statut</th>
+          <th style="padding:8px;text-align:left;">Historique</th>
+        </tr></thead>
+        <tbody>${cands.map(c => {
+          const statut = c.statut_detail || c.statut || 'envoyee';
+          const color = STATUT_COLORS[statut] || '#666';
+          return `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px;"><div style="font-weight:700;">${esc(c.offre_titre||'Candidature')}</div><div style="font-size:11px;color:var(--muted);">${esc(c.org_nom||'')}</div></td>
+            <td style="padding:10px;font-size:11px;color:var(--muted);">${esc(c.offre_type||'—')}</td>
+            <td style="padding:10px;font-size:12px;">${c.cv_titre ? '📄 '+esc(c.cv_titre) : '<span style="color:var(--muted)">—</span>'}</td>
+            <td style="padding:10px;font-size:12px;">${c.lettre_titre ? '✉️ '+esc(c.lettre_titre) : '<span style="color:var(--muted)">—</span>'}</td>
+            <td style="padding:10px;font-size:11px;color:var(--muted);white-space:nowrap;">${fmtDate(c.created_at)}</td>
+            <td style="padding:10px;"><span style="background:${color}15;color:${color};border:1px solid ${color}33;border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;">${STATUT_LABELS[statut]||statut}</span></td>
+            <td style="padding:10px;"><button class="btn btn-outline btn-sm" onclick="voirHistorique(${c.id})">📜</button></td>
+          </tr>`;
+        }).join('')}</tbody></table></div>`;
+    } catch(e) {
+      el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Erreur de chargement.</p>';
+    }
+  }
+  window.voirHistorique = async (id) => {
+    try {
+      const r = await fetch('/api/candidatures/'+id+'/historique', {credentials:'include'});
+      const hist = await r.json();
+      const html = hist.length
+        ? hist.map(h=>`<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:12px;">
+            <span style="color:#888;white-space:nowrap;">${fmtDate(h.created_at)}</span>
+            <span>${STATUT_LABELS[h.statut]||h.statut}</span>
+            ${h.note?`<span style="color:#666;font-style:italic;">${esc(h.note)}</span>`:''}
+          </div>`).join('')
+        : '<p style="color:#888;font-size:12px;">Aucun historique.</p>';
+      showModal('Historique de candidature', html);
+    } catch(e) { alert('Erreur lors du chargement de l\'historique'); }
+  };
+  loadCandidatures();
+
+  // Modal générique
+  function showModal(titre, contenu) {
+    let bg = document.getElementById('generic-modal-bg');
+    if (!bg) {
+      bg = document.createElement('div');
+      bg.id = 'generic-modal-bg';
+      bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+      bg.addEventListener('click', e => { if(e.target===bg) bg.remove(); });
+      document.body.appendChild(bg);
+    }
+    bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:20px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <strong style="font-size:.95rem;">${esc(titre)}</strong>
+        <button onclick="document.getElementById('generic-modal-bg').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">×</button>
+      </div>
+      ${contenu}
+    </div>`;
+    bg.style.display = 'flex';
+  }
 
   // Conversations actives
   const convEl = document.getElementById('dv-conversations');

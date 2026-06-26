@@ -3499,6 +3499,204 @@ async function handleRequest(req, res) {
       }
     }
 
+    /* ============================================================
+       MODULE CV & LETTRES DE MOTIVATION
+    ============================================================ */
+
+    /* --- GET /api/cv — liste CVs de l'utilisateur connecté --- */
+    if (req.method === "GET" && pathname === "/api/cv") {
+      const me = requireAuth(req, res); if (!me) return;
+      const cvs = db.prepare(`SELECT id, numero, titre, theme, updated_at FROM cv_profiles WHERE user_id = ? ORDER BY numero`).all(me.id);
+      return sendJSON(res, 200, cvs);
+    }
+
+    /* --- GET /api/cv/:id --- */
+    if (req.method === "GET" && /^\/api\/cv\/\d+$/.test(pathname)) {
+      const me = requireAuth(req, res); if (!me) return;
+      const id = parseInt(pathname.split('/')[3]);
+      const cv = db.prepare(`SELECT * FROM cv_profiles WHERE id = ? AND user_id = ?`).get(id, me.id);
+      if (!cv) return sendJSON(res, 404, { error: "CV introuvable" });
+      cv.data = JSON.parse(cv.data_json || '{}');
+      return sendJSON(res, 200, cv);
+    }
+
+    /* --- POST /api/cv — créer ou mettre à jour un CV (upsert par numero) --- */
+    if (req.method === "POST" && pathname === "/api/cv") {
+      const me = requireAuth(req, res); if (!me) return;
+      const { numero = 1, titre = 'Mon CV', theme = 'bleu', data = {} } = body;
+      if (![1, 2].includes(Number(numero))) return sendJSON(res, 400, { error: "numero doit être 1 ou 2" });
+      const existing = db.prepare(`SELECT id FROM cv_profiles WHERE user_id = ? AND numero = ?`).get(me.id, numero);
+      if (existing) {
+        db.prepare(`UPDATE cv_profiles SET titre=?, theme=?, data_json=?, updated_at=datetime('now') WHERE id=?`)
+          .run(titre, theme, JSON.stringify(data), existing.id);
+        return sendJSON(res, 200, { id: existing.id, saved: true });
+      } else {
+        const r = db.prepare(`INSERT INTO cv_profiles(user_id,numero,titre,theme,data_json) VALUES(?,?,?,?,?)`)
+          .run(me.id, numero, titre, theme, JSON.stringify(data));
+        return sendJSON(res, 201, { id: r.lastInsertRowid, saved: true });
+      }
+    }
+
+    /* --- DELETE /api/cv/:id --- */
+    if (req.method === "DELETE" && /^\/api\/cv\/\d+$/.test(pathname)) {
+      const me = requireAuth(req, res); if (!me) return;
+      const id = parseInt(pathname.split('/')[3]);
+      db.prepare(`DELETE FROM cv_profiles WHERE id = ? AND user_id = ?`).run(id, me.id);
+      return sendJSON(res, 200, { deleted: true });
+    }
+
+    /* --- GET /api/lettres --- */
+    if (req.method === "GET" && pathname === "/api/lettres") {
+      const me = requireAuth(req, res); if (!me) return;
+      const lettres = db.prepare(`SELECT id, numero, titre, updated_at FROM lettres_motivation WHERE user_id = ? ORDER BY numero`).all(me.id);
+      return sendJSON(res, 200, lettres);
+    }
+
+    /* --- GET /api/lettres/:id --- */
+    if (req.method === "GET" && /^\/api\/lettres\/\d+$/.test(pathname)) {
+      const me = requireAuth(req, res); if (!me) return;
+      const id = parseInt(pathname.split('/')[3]);
+      const l = db.prepare(`SELECT * FROM lettres_motivation WHERE id = ? AND user_id = ?`).get(id, me.id);
+      if (!l) return sendJSON(res, 404, { error: "Lettre introuvable" });
+      l.data = JSON.parse(l.data_json || '{}');
+      return sendJSON(res, 200, l);
+    }
+
+    /* --- POST /api/lettres --- */
+    if (req.method === "POST" && pathname === "/api/lettres") {
+      const me = requireAuth(req, res); if (!me) return;
+      const { numero = 1, titre = 'Ma lettre', data = {} } = body;
+      if (![1, 2].includes(Number(numero))) return sendJSON(res, 400, { error: "numero doit être 1 ou 2" });
+      const existing = db.prepare(`SELECT id FROM lettres_motivation WHERE user_id = ? AND numero = ?`).get(me.id, numero);
+      if (existing) {
+        db.prepare(`UPDATE lettres_motivation SET titre=?, data_json=?, updated_at=datetime('now') WHERE id=?`)
+          .run(titre, JSON.stringify(data), existing.id);
+        return sendJSON(res, 200, { id: existing.id, saved: true });
+      } else {
+        const r = db.prepare(`INSERT INTO lettres_motivation(user_id,numero,titre,data_json) VALUES(?,?,?,?)`)
+          .run(me.id, numero, titre, JSON.stringify(data));
+        return sendJSON(res, 201, { id: r.lastInsertRowid, saved: true });
+      }
+    }
+
+    /* --- DELETE /api/lettres/:id --- */
+    if (req.method === "DELETE" && /^\/api\/lettres\/\d+$/.test(pathname)) {
+      const me = requireAuth(req, res); if (!me) return;
+      const id = parseInt(pathname.split('/')[3]);
+      db.prepare(`DELETE FROM lettres_motivation WHERE id = ? AND user_id = ?`).run(id, me.id);
+      return sendJSON(res, 200, { deleted: true });
+    }
+
+    /* --- GET /api/candidatures/mes — candidatures du candidat connecté --- */
+    if (req.method === "GET" && pathname === "/api/candidatures/mes") {
+      const me = requireAuth(req, res); if (!me) return;
+      const rows = db.prepare(`
+        SELECT oc.*, o.titre AS offre_titre, o.type AS offre_type, o.localisation, o.pays,
+               i.nom AS org_nom, i.logo_url AS org_logo,
+               cv.titre AS cv_titre, cv.numero AS cv_numero,
+               lm.titre AS lettre_titre, lm.numero AS lettre_numero
+        FROM offres_candidatures oc
+        LEFT JOIN offres o ON oc.offre_id = o.id
+        LEFT JOIN initiatives i ON o.createur_id = i.user_id
+        LEFT JOIN cv_profiles cv ON oc.cv_profile_id = cv.id
+        LEFT JOIN lettres_motivation lm ON oc.lettre_id = lm.id
+        WHERE oc.candidat_id = ?
+        ORDER BY oc.created_at DESC
+      `).all(me.id);
+      return sendJSON(res, 200, rows);
+    }
+
+    /* --- GET /api/candidatures/:id/historique --- */
+    if (req.method === "GET" && /^\/api\/candidatures\/\d+\/historique$/.test(pathname)) {
+      const me = requireAuth(req, res); if (!me) return;
+      const id = parseInt(pathname.split('/')[3]);
+      const cand = db.prepare(`SELECT * FROM offres_candidatures WHERE id = ?`).get(id);
+      if (!cand || (cand.candidat_id !== me.id && me.role !== 'admin')) {
+        const offre = cand ? db.prepare(`SELECT createur_id FROM offres WHERE id=?`).get(cand.offre_id) : null;
+        if (!offre || offre.createur_id !== me.id) return sendJSON(res, 403, { error: "Accès refusé" });
+      }
+      const hist = db.prepare(`SELECT * FROM candidature_historique WHERE candidature_id = ? ORDER BY created_at`).all(id);
+      return sendJSON(res, 200, hist);
+    }
+
+    /* --- PATCH /api/candidatures/:id/statut — changer le statut (recruteur ou admin) --- */
+    if (req.method === "PATCH" && /^\/api\/candidatures\/\d+\/statut$/.test(pathname)) {
+      const me = requireAuth(req, res); if (!me) return;
+      const id = parseInt(pathname.split('/')[3]);
+      const cand = db.prepare(`SELECT * FROM offres_candidatures WHERE id=?`).get(id);
+      if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable" });
+      const offre = db.prepare(`SELECT createur_id FROM offres WHERE id=?`).get(cand.offre_id);
+      if (me.role !== 'admin' && offre?.createur_id !== me.id) return sendJSON(res, 403, { error: "Accès refusé" });
+      const { statut_detail, note, date_entretien, lieu_entretien, type_entretien } = body;
+      db.prepare(`UPDATE offres_candidatures SET statut_detail=?, date_entretien=?, lieu_entretien=?, type_entretien=?, vu_recruteur=1 WHERE id=?`)
+        .run(statut_detail || cand.statut_detail, date_entretien || cand.date_entretien, lieu_entretien || cand.lieu_entretien, type_entretien || cand.type_entretien, id);
+      db.prepare(`INSERT INTO candidature_historique(candidature_id,statut,note,auteur_id) VALUES(?,?,?,?)`)
+        .run(id, statut_detail, note || null, me.id);
+      // Notif candidat
+      try {
+        db.prepare(`INSERT INTO notifications(user_id,type,titre,message,lien) VALUES(?,?,?,?,?)`)
+          .run(cand.candidat_id, 'candidature', 'Mise à jour candidature', `Votre candidature a été mise à jour : ${statut_detail}`, `/dashboard-utilisateur.html#candidatures`);
+      } catch(e) {}
+      return sendJSON(res, 200, { updated: true });
+    }
+
+    /* --- PATCH /api/candidatures/:id/recruteur — notes & évaluation recruteur --- */
+    if (req.method === "PATCH" && /^\/api\/candidatures\/\d+\/recruteur$/.test(pathname)) {
+      const me = requireAuth(req, res); if (!me) return;
+      const id = parseInt(pathname.split('/')[3]);
+      const cand = db.prepare(`SELECT * FROM offres_candidatures WHERE id=?`).get(id);
+      if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable" });
+      const offre = db.prepare(`SELECT createur_id FROM offres WHERE id=?`).get(cand.offre_id);
+      if (me.role !== 'admin' && offre?.createur_id !== me.id) return sendJSON(res, 403, { error: "Accès refusé" });
+      const { notes_recruteur, evaluation_json } = body;
+      db.prepare(`UPDATE offres_candidatures SET notes_recruteur=?, evaluation_json=?, vu_recruteur=1 WHERE id=?`)
+        .run(notes_recruteur ?? cand.notes_recruteur, JSON.stringify(evaluation_json) ?? cand.evaluation_json, id);
+      return sendJSON(res, 200, { updated: true });
+    }
+
+    /* --- GET /api/offres/:id/candidatures — candidatures d'une offre (recruteur) --- */
+    if (req.method === "GET" && /^\/api\/offres\/\d+\/candidatures$/.test(pathname)) {
+      const me = requireAuth(req, res); if (!me) return;
+      const offreId = parseInt(pathname.split('/')[3]);
+      const offre = db.prepare(`SELECT * FROM offres WHERE id=?`).get(offreId);
+      if (!offre) return sendJSON(res, 404, { error: "Offre introuvable" });
+      if (me.role !== 'admin' && offre.createur_id !== me.id) return sendJSON(res, 403, { error: "Accès refusé" });
+      const rows = db.prepare(`
+        SELECT oc.*,
+               u.nom, u.prenom, u.email, u.photo_url, u.pays AS candidat_pays, u.titre_pro,
+               cv.titre AS cv_titre, cv.data_json AS cv_data, cv.theme AS cv_theme,
+               lm.titre AS lettre_titre, lm.data_json AS lettre_data
+        FROM offres_candidatures oc
+        LEFT JOIN users u ON oc.candidat_id = u.id
+        LEFT JOIN cv_profiles cv ON oc.cv_profile_id = cv.id
+        LEFT JOIN lettres_motivation lm ON oc.lettre_id = lm.id
+        WHERE oc.offre_id = ?
+        ORDER BY oc.created_at DESC
+      `).all(offreId);
+      return sendJSON(res, 200, rows);
+    }
+
+    /* --- POST /api/offres/:id/postuler — postuler avec CV+LM --- */
+    if (req.method === "POST" && /^\/api\/offres\/\d+\/postuler$/.test(pathname)) {
+      const me = requireAuth(req, res); if (!me) return;
+      const offreId = parseInt(pathname.split('/')[3]);
+      const { message, cv_profile_id, lettre_id } = body;
+      const existing = db.prepare(`SELECT id FROM offres_candidatures WHERE offre_id=? AND candidat_id=?`).get(offreId, me.id);
+      if (existing) return sendJSON(res, 409, { error: "Vous avez déjà postulé à cette offre" });
+      const r = db.prepare(`INSERT INTO offres_candidatures(offre_id,candidat_id,message,cv_profile_id,lettre_id,statut,statut_detail,type_candidature) VALUES(?,?,?,?,?,'recu','envoyee','offre')`)
+        .run(offreId, me.id, message || null, cv_profile_id || null, lettre_id || null);
+      db.prepare(`UPDATE offres SET nb_candidatures = nb_candidatures + 1 WHERE id=?`).run(offreId);
+      db.prepare(`INSERT INTO candidature_historique(candidature_id,statut,auteur_id) VALUES(?,?,?)`)
+        .run(r.lastInsertRowid, 'envoyee', me.id);
+      // Notif recruteur
+      try {
+        const offre = db.prepare(`SELECT createur_id, titre FROM offres WHERE id=?`).get(offreId);
+        db.prepare(`INSERT INTO notifications(user_id,type,titre,message,lien) VALUES(?,?,?,?,?)`)
+          .run(offre.createur_id, 'candidature', 'Nouvelle candidature', `Nouvelle candidature reçue pour "${offre.titre}"`, `/dashboard-initiative.html#candidatures`);
+      } catch(e) {}
+      return sendJSON(res, 201, { id: r.lastInsertRowid, success: true });
+    }
+
     return sendJSON(res, 404, { error: "Route API inconnue." });
   }
 

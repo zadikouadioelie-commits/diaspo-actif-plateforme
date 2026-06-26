@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lettre de motivation – Diaspo'Actif</title>
+<link rel="stylesheet" href="assets/style.css?v=1">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#f4f6f9;min-height:100vh}
+.lmb-header{background:#1a2b4a;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.lmb-header h1{font-size:1.1rem;font-weight:700}
+.lmb-header h1 span{color:#f5a623}
+.lmb-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:.85rem;font-weight:600;transition:.15s}
+.btn-primary{background:#f5a623;color:#1a2b4a}
+.btn-primary:hover{background:#d4891a}
+.btn-outline{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff}
+.btn-outline:hover{background:rgba(255,255,255,.1)}
+.btn-sm{padding:6px 12px;font-size:.8rem}
+
+.lmb-layout{display:grid;grid-template-columns:420px 1fr;min-height:calc(100vh - 58px)}
+
+/* FORM */
+.lmb-form{background:#fff;border-right:1px solid #e0e0e0;overflow-y:auto;max-height:calc(100vh - 58px);padding:20px}
+.lmb-form h2{font-size:.9rem;color:#1a2b4a;font-weight:700;margin:16px 0 10px;padding-top:16px;border-top:1px solid #f0f0f0}
+.lmb-form h2:first-child{margin-top:0;padding-top:0;border-top:none}
+label{font-size:.78rem;color:#555;display:block;margin-bottom:2px;font-weight:600}
+input,textarea,select{width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:5px;font-size:.82rem;font-family:inherit;outline:none;transition:.15s;margin-bottom:8px}
+input:focus,textarea:focus,select:focus{border-color:#4a90d9}
+textarea{resize:vertical}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* Editeur de corps */
+.editor-toolbar{display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap}
+.editor-toolbar button{padding:5px 10px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;cursor:pointer;font-size:.78rem;font-weight:600}
+.editor-toolbar button:hover{background:#eee}
+#corps-lettre{min-height:240px;border:1px solid #ddd;border-radius:5px;padding:10px;font-size:.83rem;line-height:1.7;outline:none;font-family:inherit}
+#corps-lettre:focus{border-color:#4a90d9}
+
+/* PREVIEW */
+.lmb-preview{overflow-y:auto;max-height:calc(100vh - 58px);padding:20px;display:flex;flex-direction:column;align-items:center;background:#e8eaef}
+.lettre-sheet{width:210mm;min-height:297mm;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.15);padding:30mm 25mm;font-family:'Georgia',serif;font-size:11pt;line-height:1.7;position:relative}
+.lettre-expediteur{margin-bottom:20pt;font-size:10pt}
+.lettre-expediteur strong{font-size:12pt;color:#1a2b4a}
+.lettre-destinataire{margin-bottom:20pt;text-align:right;font-size:10pt;color:#333}
+.lettre-date{margin-bottom:20pt;font-size:10pt;color:#555}
+.lettre-objet{margin-bottom:20pt;font-size:10.5pt}
+.lettre-objet strong{color:#1a2b4a}
+.lettre-corps{font-size:11pt;color:#222;white-space:pre-wrap}
+.lettre-signature{margin-top:30pt;font-size:10.5pt}
+.sig-image{max-height:60px;margin-top:8px;display:block}
+
+@media print{
+  .lmb-header,.lmb-form{display:none!important}
+  body{background:#fff}
+  .lettre-sheet{box-shadow:none;width:100%;min-height:auto;padding:20mm 15mm}
+  .lmb-preview{padding:0;max-height:none;background:#fff}
+}
+@media(max-width:900px){
+  .lmb-layout{grid-template-columns:1fr}
+  .lmb-preview{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="lmb-header">
+  <h1>✉️ Lettre de <span>motivation</span></h1>
+  <div class="lmb-actions">
+    <button class="btn btn-outline btn-sm" onclick="printLettre()">🖨 Imprimer / PDF</button>
+    <button class="btn btn-primary btn-sm" onclick="saveLettre()">💾 Enregistrer</button>
+    <a href="dashboard-utilisateur.html#cv" class="btn btn-outline btn-sm">← Retour</a>
+  </div>
+</div>
+
+<div class="lmb-layout">
+  <div class="lmb-form">
+    <h2>Configuration</h2>
+    <div class="form-row">
+      <div>
+        <label>Numéro</label>
+        <select id="lm-numero"><option value="1">Lettre n°1</option><option value="2">Lettre n°2</option></select>
+      </div>
+      <div>
+        <label>Titre / Nom</label>
+        <input id="lm-titre" type="text" placeholder="Ma lettre principale" value="Ma lettre">
+      </div>
+    </div>
+
+    <h2>Vos coordonnées</h2>
+    <div class="form-row">
+      <div><label>Prénom</label><input id="exp-prenom" type="text" oninput="render()" placeholder="Marie"></div>
+      <div><label>Nom</label><input id="exp-nom" type="text" oninput="render()" placeholder="DUPONT"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Adresse</label><input id="exp-adresse" type="text" oninput="render()"></div>
+      <div><label>Ville, Code postal</label><input id="exp-ville" type="text" oninput="render()"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Téléphone</label><input id="exp-tel" type="text" oninput="render()"></div>
+      <div><label>E-mail</label><input id="exp-email" type="email" oninput="render()"></div>
+    </div>
+
+    <h2>Destinataire</h2>
+    <div class="form-row">
+      <div><label>Nom du contact</label><input id="dest-nom" type="text" oninput="render()" placeholder="M. Jean Martin"></div>
+      <div><label>Fonction</label><input id="dest-fonction" type="text" oninput="render()" placeholder="Directeur RH"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Entreprise / Organisation</label><input id="dest-entreprise" type="text" oninput="render()"></div>
+      <div><label>Adresse</label><input id="dest-adresse" type="text" oninput="render()"></div>
+    </div>
+
+    <h2>Lettre</h2>
+    <label>Lieu et date</label>
+    <input id="lieu-date" type="text" oninput="render()" placeholder="Paris, le 26 juin 2026">
+
+    <label>Objet</label>
+    <input id="objet" type="text" oninput="render()" placeholder="Candidature au poste de Chargé(e) de projet">
+
+    <label style="margin-top:4px">Corps de la lettre</label>
+    <div class="editor-toolbar">
+      <button onclick="fmt('bold')"><b>G</b></button>
+      <button onclick="fmt('italic')"><i>I</i></button>
+      <button onclick="fmt('underline')"><u>S</u></button>
+      <button onclick="insertText('\n\n')">¶</button>
+    </div>
+    <div id="corps-lettre" contenteditable="true" oninput="render()" spellcheck="true">Madame, Monsieur,
+
+Passionné(e) par le développement international et fort(e) d'une expérience de X ans dans [domaine], je me permets de vous adresser ma candidature au poste de [poste] au sein de [organisation].
+
+[Votre paragraphe d'accroche et de motivation...]
+
+[Vos compétences et expériences en lien avec le poste...]
+
+[Votre conclusion et appel à l'action...]
+
+Dans l'attente d'un entretien que vous voudrez bien m'accorder, je vous adresse mes sincères salutations.</div>
+
+    <h2>Signature</h2>
+    <label>Signature texte</label>
+    <input id="sig-texte" type="text" oninput="render()" placeholder="Marie DUPONT">
+    <label>Signature manuscrite (image optionnelle)</label>
+    <input type="file" accept="image/*" onchange="loadSig(this)">
+  </div>
+
+  <div class="lmb-preview">
+    <div class="lettre-sheet" id="lettre-sheet">
+      <!-- Filled by render() -->
+    </div>
+  </div>
+</div>
+
+<script>
+let lettreId = null;
+let sigData = '';
+const params = new URLSearchParams(location.search);
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const id = params.get('id');
+  if (id) await loadLettre(id);
+  else render();
+});
+
+async function loadLettre(id) {
+  try {
+    const r = await fetch('/api/lettres/' + id, { credentials: 'include' });
+    if (!r.ok) return render();
+    const l = await r.json();
+    lettreId = l.id;
+    const d = l.data || {};
+    document.getElementById('lm-numero').value = l.numero;
+    document.getElementById('lm-titre').value = l.titre;
+    ['exp-prenom','exp-nom','exp-adresse','exp-ville','exp-tel','exp-email',
+     'dest-nom','dest-fonction','dest-entreprise','dest-adresse',
+     'lieu-date','objet','sig-texte'].forEach(fid => {
+      const key = fid.replace(/-/g,'_');
+      const el = document.getElementById(fid);
+      if (el && d[key]) el.value = d[key];
+    });
+    if (d.corps) document.getElementById('corps-lettre').innerText = d.corps;
+    if (d.sig_image) sigData = d.sig_image;
+    render();
+  } catch(e) { render(); }
+}
+
+function fmt(cmd) {
+  document.getElementById('corps-lettre').focus();
+  document.execCommand(cmd, false, null);
+  render();
+}
+function insertText(t) {
+  const el = document.getElementById('corps-lettre');
+  el.focus();
+  document.execCommand('insertText', false, t);
+  render();
+}
+function loadSig(input) {
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => { sigData = e.target.result; render(); };
+  r.readAsDataURL(f);
+}
+
+function g(id) { return (document.getElementById(id)||{}).value || ''; }
+
+function render() {
+  const prenom = g('exp-prenom'), nom = g('exp-nom');
+  const adresse = g('exp-adresse'), ville = g('exp-ville');
+  const tel = g('exp-tel'), email = g('exp-email');
+  const destNom = g('dest-nom'), destFonction = g('dest-fonction');
+  const destEntreprise = g('dest-entreprise'), destAdresse = g('dest-adresse');
+  const lieuDate = g('lieu-date');
+  const objet = g('objet');
+  const corps = document.getElementById('corps-lettre')?.innerText || '';
+  const sigTexte = g('sig-texte');
+
+  const sheet = document.getElementById('lettre-sheet');
+  sheet.innerHTML = `
+    <div class="lettre-expediteur">
+      <strong>${_esc(prenom)} ${_esc(nom)}</strong><br>
+      ${adresse ? _esc(adresse)+'<br>' : ''}
+      ${ville ? _esc(ville)+'<br>' : ''}
+      ${tel ? _esc(tel)+'<br>' : ''}
+      ${email ? _esc(email) : ''}
+    </div>
+
+    ${destNom||destEntreprise ? `<div class="lettre-destinataire">
+      ${destNom ? _esc(destNom)+'<br>' : ''}
+      ${destFonction ? _esc(destFonction)+'<br>' : ''}
+      ${destEntreprise ? '<strong>'+_esc(destEntreprise)+'</strong><br>' : ''}
+      ${destAdresse ? _esc(destAdresse) : ''}
+    </div>` : ''}
+
+    ${lieuDate ? `<div class="lettre-date">${_esc(lieuDate)}</div>` : ''}
+
+    ${objet ? `<div class="lettre-objet"><strong>Objet :</strong> ${_esc(objet)}</div>` : ''}
+
+    <div class="lettre-corps">${_esc(corps)}</div>
+
+    <div class="lettre-signature">
+      ${sigTexte ? _esc(sigTexte) : (prenom||nom ? _esc(prenom+' '+nom).trim() : '')}
+      ${sigData ? `<img src="${sigData}" class="sig-image" alt="Signature">` : ''}
+    </div>
+  `;
+}
+
+async function saveLettre() {
+  const corps = document.getElementById('corps-lettre')?.innerText || '';
+  const data = {
+    exp_prenom: g('exp-prenom'), exp_nom: g('exp-nom'),
+    exp_adresse: g('exp-adresse'), exp_ville: g('exp-ville'),
+    exp_tel: g('exp-tel'), exp_email: g('exp-email'),
+    dest_nom: g('dest-nom'), dest_fonction: g('dest-fonction'),
+    dest_entreprise: g('dest-entreprise'), dest_adresse: g('dest-adresse'),
+    lieu_date: g('lieu-date'), objet: g('objet'),
+    corps, sig_texte: g('sig-texte'), sig_image: sigData
+  };
+  const payload = {
+    numero: parseInt(g('lm-numero')),
+    titre: g('lm-titre') || 'Ma lettre',
+    data
+  };
+  try {
+    const r = await fetch('/api/lettres', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      credentials: 'include', body: JSON.stringify(payload)
+    });
+    if (r.ok) {
+      const j = await r.json(); lettreId = j.id;
+      history.replaceState({}, '', '?id=' + lettreId);
+      showToast('Lettre enregistrée !', 'success');
+    } else showToast('Erreur sauvegarde', 'error');
+  } catch(e) { showToast('Erreur réseau', 'error'); }
+}
+
+function printLettre() { window.print(); }
+
+function showToast(msg, type='info') {
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:20px;right:20px;background:${type==='success'?'#27ae60':'#e74c3c'};color:#fff;padding:12px 20px;border-radius:8px;z-index:9999;font-size:.85rem;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.2)`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 3000);
+}
+
+function _esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

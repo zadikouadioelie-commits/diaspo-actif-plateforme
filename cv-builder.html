@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Créer mon CV – Diaspo'Actif</title>
+<link rel="stylesheet" href="assets/style.css?v=1">
+<style>
+/* ===== LAYOUT ===== */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#f4f6f9;min-height:100vh}
+.cvb-header{background:#1a2b4a;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.cvb-header h1{font-size:1.1rem;font-weight:700;display:flex;align-items:center;gap:8px}
+.cvb-header h1 span{color:#f5a623}
+.cvb-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:.85rem;font-weight:600;transition:.15s}
+.btn-primary{background:#f5a623;color:#1a2b4a}
+.btn-primary:hover{background:#d4891a}
+.btn-outline{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff}
+.btn-outline:hover{background:rgba(255,255,255,.1)}
+.btn-sm{padding:6px 12px;font-size:.8rem}
+.btn-danger{background:#e74c3c;color:#fff}
+
+.cvb-layout{display:grid;grid-template-columns:380px 1fr;min-height:calc(100vh - 58px)}
+
+/* ===== FORM PANEL ===== */
+.cvb-form{background:#fff;border-right:1px solid #e0e0e0;overflow-y:auto;max-height:calc(100vh - 58px);padding:0}
+.cvb-section{border-bottom:1px solid #f0f0f0}
+.cvb-section-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:#fafafa;user-select:none;gap:8px}
+.cvb-section-header h3{font-size:.88rem;font-weight:700;color:#1a2b4a;display:flex;align-items:center;gap:6px}
+.cvb-section-header .toggle{font-size:.7rem;color:#999;transition:.2s}
+.cvb-section-body{padding:12px 16px;display:none}
+.cvb-section.open .cvb-section-body{display:block}
+.cvb-section.open .toggle{transform:rotate(180deg)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.form-row.full{grid-template-columns:1fr}
+label{font-size:.78rem;color:#555;display:block;margin-bottom:2px;font-weight:600}
+input,textarea,select{width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:5px;font-size:.82rem;font-family:inherit;outline:none;transition:.15s}
+input:focus,textarea:focus,select:focus{border-color:#4a90d9}
+textarea{resize:vertical;min-height:70px}
+.photo-zone{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.photo-preview{width:60px;height:60px;border-radius:50%;border:2px dashed #ccc;object-fit:cover;background:#f0f0f0}
+.photo-zone input[type=file]{flex:1;font-size:.75rem}
+
+/* Répéteurs */
+.repeater-item{background:#f9f9f9;border:1px solid #eee;border-radius:6px;padding:10px;margin-bottom:8px;position:relative}
+.repeater-remove{position:absolute;top:6px;right:6px;background:none;border:none;color:#e74c3c;cursor:pointer;font-size:1rem;line-height:1}
+.btn-add{display:flex;align-items:center;gap:6px;background:#f0f7ff;color:#4a90d9;border:1px dashed #4a90d9;border-radius:5px;padding:6px 12px;font-size:.8rem;cursor:pointer;width:100%;justify-content:center;margin-top:6px}
+.btn-add:hover{background:#ddeeff}
+
+/* Compétences & Tags */
+.tags-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{background:#e8f0fe;color:#1a2b4a;padding:3px 10px;border-radius:20px;font-size:.78rem;display:flex;align-items:center;gap:4px}
+.tag button{background:none;border:none;color:#e74c3c;cursor:pointer;font-size:.75rem;padding:0;line-height:1}
+.tag-input-row{display:flex;gap:6px;margin-top:6px}
+.tag-input-row input{flex:1}
+.tag-input-row button{padding:7px 12px;background:#4a90d9;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:.82rem}
+
+/* Thèmes */
+.themes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+.theme-btn{border:2px solid transparent;border-radius:8px;padding:10px 6px;cursor:pointer;text-align:center;font-size:.72rem;font-weight:700;transition:.15s;background:#fff}
+.theme-btn.active{border-color:#1a2b4a}
+.theme-swatch{width:100%;height:18px;border-radius:4px;margin-bottom:4px}
+
+/* Numéro & Titre CV */
+.cv-meta{padding:14px 16px;border-bottom:1px solid #f0f0f0;background:#f8f9ff}
+.cv-meta h3{font-size:.85rem;color:#555;margin-bottom:8px;font-weight:700}
+
+/* ===== PREVIEW PANEL ===== */
+.cvb-preview{overflow-y:auto;max-height:calc(100vh - 58px);padding:20px;display:flex;flex-direction:column;align-items:center;background:#e8eaef}
+
+/* A4 sheet */
+.cv-sheet{width:210mm;min-height:297mm;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.15);position:relative;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif}
+
+/* THEMES */
+:root{
+  --cv-accent:#4a90d9;
+  --cv-accent2:#d6eaff;
+  --cv-sidebar-bg:#1a3a5c;
+  --cv-header-bg:#4a90d9;
+  --cv-text:#1a2b4a;
+}
+.theme-sauge{--cv-accent:#7a9e7e;--cv-accent2:#eaf2eb;--cv-sidebar-bg:#2d5c32;--cv-header-bg:#7a9e7e;--cv-text:#1a2b1c}
+.theme-gris{--cv-accent:#6c757d;--cv-accent2:#f0f1f2;--cv-sidebar-bg:#343a40;--cv-header-bg:#6c757d;--cv-text:#212529}
+.theme-beige{--cv-accent:#c4956a;--cv-accent2:#f5ede3;--cv-sidebar-bg:#5c3d1e;--cv-header-bg:#c4956a;--cv-text:#2c1a00}
+.theme-petrole{--cv-accent:#3d7a8a;--cv-accent2:#e3eff2;--cv-sidebar-bg:#1a4a57;--cv-header-bg:#3d7a8a;--cv-text:#0d2b33}
+.theme-terra{--cv-accent:#c4705a;--cv-accent2:#f5ede9;--cv-sidebar-bg:#5c2318;--cv-header-bg:#c4705a;--cv-text:#2c0d06}
+
+/* CV Layout: header + 2 colonnes */
+.cv-header-band{background:var(--cv-header-bg);color:#fff;padding:22px 26px;display:flex;align-items:center;gap:18px}
+.cv-header-photo{width:80px;height:80px;border-radius:50%;border:3px solid rgba(255,255,255,.6);object-fit:cover;flex-shrink:0;background:rgba(255,255,255,.2)}
+.cv-header-info h2{font-size:1.4rem;font-weight:800;letter-spacing:.5px;margin-bottom:2px}
+.cv-header-info p{font-size:.85rem;opacity:.9;margin-bottom:4px}
+.cv-header-contact{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.cv-header-contact span{font-size:.72rem;background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px}
+
+.cv-body{display:grid;grid-template-columns:200px 1fr}
+.cv-sidebar{background:var(--cv-sidebar-bg);color:#fff;padding:16px;min-height:250px}
+.cv-main{padding:16px 20px}
+
+.cv-s-title{font-size:.72rem;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--cv-accent);border-bottom:2px solid var(--cv-accent);padding-bottom:3px;margin-bottom:8px;margin-top:14px}
+.cv-sidebar .cv-s-title{color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.3);font-size:.65rem}
+.cv-sidebar .cv-s-title:first-child{margin-top:0}
+
+/* Main sections */
+.cv-exp-item,.cv-edu-item{margin-bottom:12px}
+.cv-exp-item h4,.cv-edu-item h4{font-size:.82rem;font-weight:700;color:var(--cv-text)}
+.cv-exp-item .sub,.cv-edu-item .sub{font-size:.75rem;color:var(--cv-accent);font-weight:600;margin:.5px 0}
+.cv-exp-item .date,.cv-edu-item .date{font-size:.7rem;color:#888;margin-bottom:3px}
+.cv-exp-item p,.cv-edu-item p{font-size:.73rem;color:#444;line-height:1.5}
+
+/* Sidebar items */
+.cv-skill-bar{margin-bottom:6px}
+.cv-skill-bar .name{font-size:.72rem;margin-bottom:2px}
+.cv-skill-bar .bar{height:4px;background:rgba(255,255,255,.2);border-radius:2px}
+.cv-skill-bar .fill{height:100%;background:var(--cv-accent2);border-radius:2px;transition:.3s}
+.cv-lang-item{display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:5px}
+.cv-lang-level{opacity:.7;font-size:.68rem}
+.cv-tag-list{display:flex;flex-wrap:wrap;gap:3px}
+.cv-tag{font-size:.65rem;background:rgba(255,255,255,.15);padding:2px 7px;border-radius:10px}
+.cv-summary{font-size:.78rem;color:#333;line-height:1.6;margin-bottom:4px}
+.cv-interest-list{display:flex;flex-wrap:wrap;gap:4px}
+.cv-interest{font-size:.68rem;color:#fff;background:rgba(255,255,255,.15);padding:2px 8px;border-radius:10px}
+.cv-cert-item{margin-bottom:5px;font-size:.72rem}
+.cv-cert-item strong{display:block}
+
+/* Print */
+@media print{
+  .cvb-header,.cvb-form,.cvb-preview{display:none!important}
+  body{background:#fff!important}
+  .cv-sheet{box-shadow:none;width:100%;min-height:auto}
+  .cv-sheet-print{display:block!important;position:fixed;top:0;left:0;right:0}
+}
+.cv-sheet-print{display:none}
+
+/* Responsive */
+@media(max-width:900px){
+  .cvb-layout{grid-template-columns:1fr}
+  .cvb-preview{display:none}
+  .cvb-form{max-height:none}
+  .show-preview .cvb-preview{display:flex}
+  .show-preview .cvb-form{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="cvb-header">
+  <h1>📄 Éditeur <span>CV</span> Diaspo'Actif</h1>
+  <div class="cvb-actions">
+    <button class="btn btn-outline btn-sm" id="btn-toggle-view" onclick="toggleView()">👁 Aperçu</button>
+    <button class="btn btn-outline btn-sm" onclick="printCV()">🖨 Imprimer / PDF</button>
+    <button class="btn btn-primary btn-sm" onclick="saveCV()">💾 Enregistrer</button>
+    <a href="dashboard-utilisateur.html#cv" class="btn btn-outline btn-sm">← Retour</a>
+  </div>
+</div>
+
+<div class="cvb-layout" id="cvb-layout">
+
+  <!-- FORM -->
+  <div class="cvb-form" id="cvb-form">
+
+    <!-- Meta -->
+    <div class="cv-meta">
+      <h3>Configuration</h3>
+      <div class="form-row">
+        <div>
+          <label>Numéro du CV</label>
+          <select id="cv-numero"><option value="1">CV n°1</option><option value="2">CV n°2</option></select>
+        </div>
+        <div>
+          <label>Titre / Nom du CV</label>
+          <input type="text" id="cv-titre" placeholder="Mon CV principal" value="Mon CV">
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <label>Thème graphique</label>
+        <div class="themes-grid">
+          <button class="theme-btn active" data-theme="bleu" onclick="setTheme('bleu',this)">
+            <div class="theme-swatch" style="background:linear-gradient(135deg,#4a90d9,#1a3a5c)"></div>Bleu pastel
+          </button>
+          <button class="theme-btn" data-theme="sauge" onclick="setTheme('sauge',this)">
+            <div class="theme-swatch" style="background:linear-gradient(135deg,#7a9e7e,#2d5c32)"></div>Vert sauge
+          </button>
+          <button class="theme-btn" data-theme="gris" onclick="setTheme('gris',this)">
+            <div class="theme-swatch" style="background:linear-gradient(135deg,#6c757d,#343a40)"></div>Gris moderne
+          </button>
+          <button class="theme-btn" data-theme="beige" onclick="setTheme('beige',this)">
+            <div class="theme-swatch" style="background:linear-gradient(135deg,#c4956a,#5c3d1e)"></div>Beige élégant
+          </button>
+          <button class="theme-btn" data-theme="petrole" onclick="setTheme('petrole',this)">
+            <div class="theme-swatch" style="background:linear-gradient(135deg,#3d7a8a,#1a4a57)"></div>Bleu pétrole
+          </button>
+          <button class="theme-btn" data-theme="terra" onclick="setTheme('terra',this)">
+            <div class="theme-swatch" style="background:linear-gradient(135deg,#c4705a,#5c2318)"></div>Terracotta
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Infos perso -->
+    <div class="cvb-section open">
+      <div class="cvb-section-header" onclick="toggleSection(this)">
+        <h3>👤 Informations personnelles</h3><span class="toggle">▼</span>
+      </div>
+      <div class="cvb-section-body">
+        <div class="photo-zone">
+          <img src="" id="photo-preview" class="photo-preview" alt="">
+          <div>
+            <label>Photo de profil</label>
+            <input type="file" accept="image/*" onchange="loadPhoto(this)">
+          </div>
+        </div>
+        <div class="form-row">
+          <div><label>Prénom</label><input id="prenom" type="text" oninput="render()" placeholder="Marie"></div>
+          <div><label>Nom</label><input id="nom" type="text" oninput="render()" placeholder="DUPONT"></div>
+        </div>
+        <div class="form-row full"><label>Titre professionnel</label><input id="titre-pro" type="text" oninput="render()" placeholder="Ingénieure en développement durable"></div>
+        <div class="form-row">
+          <div><label>Nationalité</label><input id="nationalite" type="text" oninput="render()" placeholder="Française"></div>
+          <div><label>Pays de résidence</label><input id="pays-residence" type="text" oninput="render()" placeholder="France"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Ville</label><input id="ville" type="text" oninput="render()"></div>
+          <div><label>Téléphone</label><input id="telephone" type="text" oninput="render()" placeholder="+33 6 XX XX XX XX"></div>
+        </div>
+        <div class="form-row">
+          <div><label>E-mail</label><input id="email" type="email" oninput="render()"></div>
+          <div><label>LinkedIn</label><input id="linkedin" type="text" oninput="render()" placeholder="linkedin.com/in/…"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Site / Portfolio</label><input id="site" type="text" oninput="render()"></div>
+          <div><label>Adresse</label><input id="adresse" type="text" oninput="render()"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Présentation -->
+    <div class="cvb-section open">
+      <div class="cvb-section-header" onclick="toggleSection(this)">
+        <h3>📝 Présentation</h3><span class="toggle">▼</span>
+      </div>
+      <div class="cvb-section-body">
+        <label>Résumé / Objectif professionnel</label>
+        <textarea id="resume" rows="4" oninput="render()" placeholder="Décrivez votre profil en 2-4 phrases…"></textarea>
+      </div>
+    </div>
+
+    <!-- Expériences -->
+    <div class="cvb-section open">
+      <div class="cvb-section-header" onclick="toggleSection(this)">
+        <h3>💼 Expériences professionnelles</h3><span class="toggle">▼</span>
+      </div>
+      <div class="cvb-section-body">
+        <div id="exp-list"></div>
+        <button class="btn-add" onclick="addExp()">+ Ajouter une expérience</button>
+      </div>
+    </div>
+
+    <!-- Formations -->
+    <div class="cvb-section">
+      <div class="cvb-section-header" onclick="toggleSection(this)">
+        <h3>🎓 Formations</h3><span class="toggle">▼</span>
+      </div>
+      <div class="cvb-section-body">
+        <div id="edu-list"></div>
+        <button class="btn-add" onclick="addEdu()">+ Ajouter une formation</button>
+      </div>
+    </div>
+
+    <!-- Compétences -->
+    <div class="cvb-section">
+      <div class="cvb-section-header" onclick="toggleSection(this)">
+        <h3>⚡ Compétences</h3><span class="toggle">▼</span>
+      </div>
+      <div class="cvb-section-body">
+        <label>Compétences techniques</label>
+        <div class="tag-input-row"><input id="comp-tech-in" type="text" placeholder="Ex: Python, AutoCAD…" onkeydown="if(event.key==='Enter'){addTag('comp-tech',this);event.preventDefault()}"><button onclick="addTag('comp-tech',document.getElementById('comp-tech-in'))">+</button></div>
+        <div class="tags-wrap" id="comp-tech"></div>
+
+        <label style="margin-top:10px">Compétences métiers</label>
+        <div class="tag-input-row"><input id="comp-metier-in" type="text" placeholder="Ex: Gestion de projet…" onkeydown="if(event.key==='Enter'){addTag('comp-metier',this);event.preventDefault()}"><button onclick="addTag('comp-metier',document.getElementById('comp-metier-in'))">+</button></div>
+        <div class="tags-wrap" id="comp-metier"></div>
+
+        <label style="margin-top:10px">Compétences numériques</label>
+        <div class="tag-input-row"><input id="comp-num-in" type="text" placeholder="Ex: Excel, Adobe XD…" onkeydown="if(event.key==='Enter'){addTag('comp-num',this);event.preventDefault()}"><button onclick="addTag('comp-num',document.getElementById('comp-num-in'))">+</button></div>
+        <div class="tags-wrap" id="comp-num"></div>
+      </div>
+    </div>
+
+    <!-- Langues -->
+    <div class="cvb-section">
+      <div class="cvb-section-header" onclick="toggleSection(this)">
+        <h3>🌍 Langues</h3><span class="toggle">▼</span>
+      </div>
+      <div class="cvb-section-body">
+        <div id="lang-list"></div>
+        <button class="btn-add" onclick="addLang()">+ Ajouter une langue</button>
+      </div>
+    </div>
+
+    <!-- Certifications -->
+    <div class="cvb-section">
+      <div class="cvb-section-header" onclick="toggleSection(this)">
+        <h3>🏆 Certifications</h3><span class="toggle">▼</span>
+      </div>
+      <div class="cvb-section-body">
+        <div id="cert-list"></div>
+        <button class="btn-add" onclick="addCert()">+ Ajouter une certification</button>
+      </div>
+    </div>
+
+    <!-- Centres d'intérêt -->
+    <div class="cvb-section">
+      <div class="cvb-section-header" onclick="toggleSection(this)">
+        <h3>❤️ Centres d'intérêt</h3><span class="toggle">▼</span>
+      </div>
+      <div class="cvb-section-body">
+        <div class="tag-input-row"><input id="interest-in" type="text" placeholder="Ex: Entrepreneuriat, Sport…" onkeydown="if(event.key==='Enter'){addTag('interests',this);event.preventDefault()}"><button onclick="addTag('interests',document.getElementById('interest-in'))">+</button></div>
+        <div class="tags-wrap" id="interests"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+          <button class="btn btn-sm btn-outline" style="color:#333" onclick="addTag('interests',null,'Culture')">Culture</button>
+          <button class="btn btn-sm btn-outline" style="color:#333" onclick="addTag('interests',null,'Sport')">Sport</button>
+          <button class="btn btn-sm btn-outline" style="color:#333" onclick="addTag('interests',null,'Bénévolat')">Bénévolat</button>
+          <button class="btn btn-sm btn-outline" style="color:#333" onclick="addTag('interests',null,'Diaspora')">Diaspora</button>
+          <button class="btn btn-sm btn-outline" style="color:#333" onclick="addTag('interests',null,'Entrepreneuriat')">Entrepreneuriat</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /cvb-form -->
+
+  <!-- PREVIEW -->
+  <div class="cvb-preview">
+    <div class="cv-sheet" id="cv-sheet">
+      <!-- Filled by render() -->
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ===== STATE ===== */
+let state = {
+  numero: 1,
+  titre: 'Mon CV',
+  theme: 'bleu',
+  photo: '',
+  prenom: '', nom: '', titre_pro: '', nationalite: '', pays_residence: '',
+  ville: '', telephone: '', email: '', linkedin: '', site: '', adresse: '',
+  resume: '',
+  experiences: [],
+  formations: [],
+  comp_tech: [], comp_metier: [], comp_num: [],
+  langues: [],
+  certifications: [],
+  interests: []
+};
+let cvId = null;
+const params = new URLSearchParams(location.search);
+
+/* ===== INIT ===== */
+window.addEventListener('DOMContentLoaded', async () => {
+  const id = params.get('id');
+  const num = params.get('numero');
+  if (id) {
+    await loadCV(id);
+  } else {
+    if (num) { state.numero = parseInt(num); document.getElementById('cv-numero').value = state.numero; }
+    addExp(); addEdu(); addLang();
+    render();
+  }
+});
+
+async function loadCV(id) {
+  try {
+    const r = await fetch('/api/cv/' + id, { credentials: 'include' });
+    if (!r.ok) return render();
+    const cv = await r.json();
+    cvId = cv.id;
+    state = { ...state, ...cv.data, numero: cv.numero, titre: cv.titre, theme: cv.theme };
+    document.getElementById('cv-numero').value = state.numero;
+    document.getElementById('cv-titre').value = state.titre;
+    setTheme(state.theme, document.querySelector(`.theme-btn[data-theme="${state.theme}"]`));
+    // Remplir les champs
+    const fields = ['prenom','nom','titre_pro','nationalite','pays_residence','ville','telephone','email','linkedin','site','adresse','resume'];
+    fields.forEach(f => { const el = document.getElementById(f); if(el) el.value = state[f]||''; });
+    if (state.photo) { document.getElementById('photo-preview').src = state.photo; }
+    // Repeaters
+    renderExpList(); renderEduList(); renderLangList(); renderCertList();
+    // Tags
+    ['comp_tech','comp_metier','comp_num','interests'].forEach(k => renderTags(k.replace('_','-'), k));
+    render();
+  } catch(e) { render(); }
+}
+
+/* ===== THEME ===== */
+function setTheme(name, btn) {
+  state.theme = name;
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const sheet = document.getElementById('cv-sheet');
+  sheet.className = 'cv-sheet' + (name !== 'bleu' ? ' theme-'+name : '');
+  render();
+}
+
+/* ===== SECTIONS TOGGLE ===== */
+function toggleSection(header) {
+  header.parentElement.classList.toggle('open');
+}
+
+/* ===== PHOTO ===== */
+function loadPhoto(input) {
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => { state.photo = e.target.result; document.getElementById('photo-preview').src = e.target.result; render(); };
+  r.readAsDataURL(f);
+}
+
+/* ===== VIEW TOGGLE (mobile) ===== */
+let showingPreview = false;
+function toggleView() {
+  showingPreview = !showingPreview;
+  document.getElementById('cvb-layout').classList.toggle('show-preview', showingPreview);
+  document.getElementById('btn-toggle-view').textContent = showingPreview ? '✏️ Formulaire' : '👁 Aperçu';
+}
+
+/* ===== TAGS ===== */
+const tagsData = { 'comp-tech': [], 'comp-metier': [], 'comp-num': [], interests: [] };
+const tagStateMap = { 'comp-tech': 'comp_tech', 'comp-metier': 'comp_metier', 'comp-num': 'comp_num', interests: 'interests' };
+
+function addTag(containerId, inputEl, value) {
+  const val = value || (inputEl && inputEl.value.trim());
+  if (!val) return;
+  const key = tagStateMap[containerId] || containerId;
+  if (!state[key]) state[key] = [];
+  if (state[key].includes(val)) { if(inputEl) inputEl.value=''; return; }
+  state[key].push(val);
+  if (inputEl) inputEl.value = '';
+  renderTags(containerId, key);
+  render();
+}
+function removeTag(containerId, val) {
+  const key = tagStateMap[containerId] || containerId;
+  state[key] = (state[key]||[]).filter(v => v !== val);
+  renderTags(containerId, key);
+  render();
+}
+function renderTags(containerId, key) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = (state[key]||[]).map(v =>
+    `<span class="tag">${_esc(v)}<button onclick="removeTag('${containerId}','${v.replace(/'/g,"\\'")}')">×</button></span>`
+  ).join('');
+}
+
+/* ===== EXPERIENCES ===== */
+function addExp() {
+  state.experiences.push({ poste:'', entreprise:'', ville:'', pays:'', date_debut:'', date_fin:'', actuel:false, description:'' });
+  renderExpList();
+}
+function removeExp(i) { state.experiences.splice(i,1); renderExpList(); render(); }
+function renderExpList() {
+  document.getElementById('exp-list').innerHTML = state.experiences.map((e,i) => `
+    <div class="repeater-item">
+      <button class="repeater-remove" onclick="removeExp(${i})">×</button>
+      <div class="form-row"><div><label>Poste</label><input value="${_esc(e.poste)}" oninput="state.experiences[${i}].poste=this.value;render()"></div><div><label>Entreprise</label><input value="${_esc(e.entreprise)}" oninput="state.experiences[${i}].entreprise=this.value;render()"></div></div>
+      <div class="form-row"><div><label>Ville</label><input value="${_esc(e.ville)}" oninput="state.experiences[${i}].ville=this.value;render()"></div><div><label>Pays</label><input value="${_esc(e.pays)}" oninput="state.experiences[${i}].pays=this.value;render()"></div></div>
+      <div class="form-row"><div><label>Début</label><input type="month" value="${e.date_debut}" oninput="state.experiences[${i}].date_debut=this.value;render()"></div><div><label>Fin</label><input type="month" value="${e.date_fin}" ${e.actuel?'disabled':''} oninput="state.experiences[${i}].date_fin=this.value;render()"></div></div>
+      <div class="form-row full"><label><input type="checkbox" ${e.actuel?'checked':''} onchange="state.experiences[${i}].actuel=this.checked;renderExpList();render()"> Poste actuel</label></div>
+      <div class="form-row full"><label>Description</label><textarea oninput="state.experiences[${i}].description=this.value;render()" rows="3">${_esc(e.description)}</textarea></div>
+    </div>
+  `).join('');
+}
+
+/* ===== FORMATIONS ===== */
+function addEdu() {
+  state.formations.push({ diplome:'', etablissement:'', pays:'', ville:'', annee:'', description:'' });
+  renderEduList();
+}
+function removeEdu(i) { state.formations.splice(i,1); renderEduList(); render(); }
+function renderEduList() {
+  document.getElementById('edu-list').innerHTML = state.formations.map((e,i) => `
+    <div class="repeater-item">
+      <button class="repeater-remove" onclick="removeEdu(${i})">×</button>
+      <div class="form-row"><div><label>Diplôme</label><input value="${_esc(e.diplome)}" oninput="state.formations[${i}].diplome=this.value;render()"></div><div><label>Établissement</label><input value="${_esc(e.etablissement)}" oninput="state.formations[${i}].etablissement=this.value;render()"></div></div>
+      <div class="form-row"><div><label>Pays</label><input value="${_esc(e.pays)}" oninput="state.formations[${i}].pays=this.value;render()"></div><div><label>Ville</label><input value="${_esc(e.ville)}" oninput="state.formations[${i}].ville=this.value;render()"></div></div>
+      <div class="form-row"><div><label>Année</label><input type="number" min="1980" max="2030" value="${e.annee}" oninput="state.formations[${i}].annee=this.value;render()"></div><div><label>Description</label><input value="${_esc(e.description)}" oninput="state.formations[${i}].description=this.value;render()"></div></div>
+    </div>
+  `).join('');
+}
+
+/* ===== LANGUES ===== */
+const NIVEAUX = ['Débutant','Intermédiaire','Courant','Professionnel','Natif / Bilingue'];
+function addLang() {
+  state.langues.push({ langue:'', niveau:'Courant' });
+  renderLangList();
+}
+function removeLang(i) { state.langues.splice(i,1); renderLangList(); render(); }
+function renderLangList() {
+  document.getElementById('lang-list').innerHTML = state.langues.map((l,i) => `
+    <div class="repeater-item">
+      <button class="repeater-remove" onclick="removeLang(${i})">×</button>
+      <div class="form-row">
+        <div><label>Langue</label><input value="${_esc(l.langue)}" oninput="state.langues[${i}].langue=this.value;render()" placeholder="Français"></div>
+        <div><label>Niveau</label><select oninput="state.langues[${i}].niveau=this.value;render()">${NIVEAUX.map(n=>`<option ${l.niveau===n?'selected':''}>${n}</option>`).join('')}</select></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ===== CERTIFICATIONS ===== */
+function addCert() {
+  state.certifications.push({ nom:'', organisme:'', date:'' });
+  renderCertList();
+}
+function removeCert(i) { state.certifications.splice(i,1); renderCertList(); render(); }
+function renderCertList() {
+  document.getElementById('cert-list').innerHTML = state.certifications.map((c,i) => `
+    <div class="repeater-item">
+      <button class="repeater-remove" onclick="removeCert(${i})">×</button>
+      <div class="form-row"><div><label>Certification</label><input value="${_esc(c.nom)}" oninput="state.certifications[${i}].nom=this.value;render()"></div><div><label>Organisme</label><input value="${_esc(c.organisme)}" oninput="state.certifications[${i}].organisme=this.value;render()"></div></div>
+      <div class="form-row"><div><label>Date</label><input type="month" value="${c.date}" oninput="state.certifications[${i}].date=this.value;render()"></div></div>
+    </div>
+  `).join('');
+}
+
+/* ===== RENDER PREVIEW ===== */
+function collectState() {
+  const fields = ['prenom','nom','titre_pro','nationalite','pays_residence','ville','telephone','email','linkedin','site','adresse','resume'];
+  fields.forEach(f => { const el = document.getElementById(f); if(el) state[f] = el.value; });
+}
+function render() {
+  collectState();
+  const s = state;
+  const sheet = document.getElementById('cv-sheet');
+  const name = [s.prenom, s.nom].filter(Boolean).join(' ') || 'Votre Nom';
+  const contacts = [];
+  if (s.email) contacts.push('✉ '+s.email);
+  if (s.telephone) contacts.push('📞 '+s.telephone);
+  if (s.ville || s.pays_residence) contacts.push('📍 '+[s.ville,s.pays_residence].filter(Boolean).join(', '));
+  if (s.linkedin) contacts.push('🔗 '+s.linkedin);
+  if (s.site) contacts.push('🌐 '+s.site);
+
+  const fmtDate = d => { if(!d) return ''; const [y,m] = d.split('-'); return ['','Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'][parseInt(m)]||m + ' '+y; };
+
+  sheet.innerHTML = `
+    <div class="cv-header-band">
+      ${s.photo ? `<img src="${s.photo}" class="cv-header-photo" alt="">` : ''}
+      <div class="cv-header-info" style="flex:1">
+        <h2>${_esc(name)}</h2>
+        ${s.titre_pro ? `<p>${_esc(s.titre_pro)}</p>` : ''}
+        ${contacts.length ? `<div class="cv-header-contact">${contacts.map(c=>`<span>${_esc(c)}</span>`).join('')}</div>` : ''}
+      </div>
+    </div>
+    <div class="cv-body">
+      <div class="cv-sidebar">
+        ${s.nationalite ? `<div class="cv-s-title">Nationalité</div><div style="font-size:.72rem;margin-bottom:8px">${_esc(s.nationalite)}</div>` : ''}
+
+        ${(s.comp_tech||[]).length || (s.comp_metier||[]).length || (s.comp_num||[]).length ? `
+          <div class="cv-s-title">Compétences</div>
+          ${(s.comp_tech||[]).length ? `<div style="font-size:.65rem;opacity:.6;margin-bottom:3px">TECHNIQUES</div><div class="cv-tag-list" style="margin-bottom:6px">${(s.comp_tech||[]).map(t=>`<span class="cv-tag">${_esc(t)}</span>`).join('')}</div>` : ''}
+          ${(s.comp_metier||[]).length ? `<div style="font-size:.65rem;opacity:.6;margin-bottom:3px">MÉTIERS</div><div class="cv-tag-list" style="margin-bottom:6px">${(s.comp_metier||[]).map(t=>`<span class="cv-tag">${_esc(t)}</span>`).join('')}</div>` : ''}
+          ${(s.comp_num||[]).length ? `<div style="font-size:.65rem;opacity:.6;margin-bottom:3px">NUMÉRIQUES</div><div class="cv-tag-list" style="margin-bottom:6px">${(s.comp_num||[]).map(t=>`<span class="cv-tag">${_esc(t)}</span>`).join('')}</div>` : ''}
+        ` : ''}
+
+        ${(s.langues||[]).length ? `
+          <div class="cv-s-title">Langues</div>
+          ${(s.langues||[]).map(l=>`<div class="cv-lang-item"><span>${_esc(l.langue)}</span><span class="cv-lang-level">${_esc(l.niveau)}</span></div>`).join('')}
+        ` : ''}
+
+        ${(s.certifications||[]).length ? `
+          <div class="cv-s-title">Certifications</div>
+          ${(s.certifications||[]).map(c=>`<div class="cv-cert-item"><strong>${_esc(c.nom)}</strong>${c.organisme ? '<span style="opacity:.7"> — '+_esc(c.organisme)+'</span>' : ''}${c.date ? '<br><span style="opacity:.5;font-size:.65rem">'+fmtDate(c.date)+'</span>' : ''}</div>`).join('')}
+        ` : ''}
+
+        ${(s.interests||[]).length ? `
+          <div class="cv-s-title">Centres d'intérêt</div>
+          <div class="cv-interest-list">${(s.interests||[]).map(i=>`<span class="cv-interest">${_esc(i)}</span>`).join('')}</div>
+        ` : ''}
+      </div>
+
+      <div class="cv-main">
+        ${s.resume ? `<div class="cv-s-title">Profil</div><p class="cv-summary">${_esc(s.resume).replace(/\n/g,'<br>')}</p>` : ''}
+
+        ${(s.experiences||[]).length ? `
+          <div class="cv-s-title">Expériences professionnelles</div>
+          ${(s.experiences||[]).map(e=>`
+            <div class="cv-exp-item">
+              <h4>${_esc(e.poste||'Poste')}</h4>
+              <div class="sub">${_esc(e.entreprise||'')}${e.ville||e.pays?' · '+[e.ville,e.pays].filter(Boolean).join(', '):''}</div>
+              <div class="date">${fmtDate(e.date_debut)}${e.actuel?' — Présent':e.date_fin?' — '+fmtDate(e.date_fin):''}</div>
+              ${e.description ? `<p>${_esc(e.description).replace(/\n/g,'<br>')}</p>` : ''}
+            </div>
+          `).join('')}
+        ` : ''}
+
+        ${(s.formations||[]).length ? `
+          <div class="cv-s-title">Formations</div>
+          ${(s.formations||[]).map(e=>`
+            <div class="cv-edu-item">
+              <h4>${_esc(e.diplome||'Diplôme')}</h4>
+              <div class="sub">${_esc(e.etablissement||'')}${e.pays?' · '+_esc(e.pays):''}</div>
+              ${e.annee ? `<div class="date">${e.annee}</div>` : ''}
+              ${e.description ? `<p>${_esc(e.description)}</p>` : ''}
+            </div>
+          `).join('')}
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+/* ===== SAVE ===== */
+async function saveCV() {
+  collectState();
+  const data = { ...state };
+  const payload = {
+    numero: parseInt(document.getElementById('cv-numero').value),
+    titre: document.getElementById('cv-titre').value || 'Mon CV',
+    theme: state.theme,
+    data
+  };
+  try {
+    const r = await fetch('/api/cv', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+    if (r.ok) {
+      const j = await r.json();
+      cvId = j.id;
+      // Update URL
+      history.replaceState({}, '', '?id=' + cvId);
+      showToast('CV enregistré avec succès !', 'success');
+    } else {
+      showToast('Erreur lors de la sauvegarde', 'error');
+    }
+  } catch(e) { showToast('Erreur réseau', 'error'); }
+}
+
+/* ===== PRINT ===== */
+function printCV() {
+  // Clone la feuille CV pour l'impression
+  const sheet = document.getElementById('cv-sheet');
+  const clone = sheet.cloneNode(true);
+  clone.id = 'cv-sheet-print';
+  clone.style.cssText = 'position:fixed;top:0;left:0;right:0;width:100%;display:block;box-shadow:none;z-index:99999';
+  document.body.appendChild(clone);
+  window.print();
+  document.body.removeChild(clone);
+}
+
+/* ===== TOAST ===== */
+function showToast(msg, type='info') {
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:20px;right:20px;background:${type==='success'?'#27ae60':'#e74c3c'};color:#fff;padding:12px 20px;border-radius:8px;z-index:9999;font-size:.85rem;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.2)`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 3000);
+}
+
+/* ===== UTILS ===== */
+function _esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
