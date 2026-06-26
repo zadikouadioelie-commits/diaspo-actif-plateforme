@@ -97,6 +97,16 @@
           </div>
         </div>
 
+        <!-- QR Code personnel -->
+        <div class="card" style="margin-bottom:20px;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;">
+          <div style="flex:1;min-width:200px;">
+            <h3 style="margin:0 0 8px;font-size:15px;">📷 Mon QR Code Diaspo'Actif</h3>
+            <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Votre identifiant numérique officiel. Partagez-le sur vos cartes de visite, badges ou affiches pour un accès instantané à votre profil public.</p>
+            <a href="profil.html" style="font-size:12px;color:var(--orange);text-decoration:none;font-weight:700;">Voir mon profil public →</a>
+          </div>
+          <div id="u-qr-container" style="flex-shrink:0;"></div>
+        </div>
+
         <!-- Actions rapides -->
         <div class="card" style="margin-bottom:20px;">
           <h3 style="margin:0 0 14px;font-size:15px;">⚡ Actions rapides</h3>
@@ -297,6 +307,18 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   // Titre
   const nom = [me.profil?.prenom, me.nom].filter(Boolean).join(' ') || me.nom;
   document.getElementById('dash-title').textContent = 'Bonjour, ' + nom + ' 👋';
+
+  // QR Code personnel
+  const qrEl = document.getElementById('u-qr-container');
+  if (qrEl && window.ProfileQR) {
+    ProfileQR.render(qrEl, {
+      userId: me.id,
+      userName: nom,
+      userRole: 'Membre Diaspo\'Actif',
+      userOrg: me.organisation || '',
+      size: 140,
+    });
+  }
 
   // Localisation
   const locEl = document.getElementById('dv-localisation');
@@ -717,6 +739,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     <a class="mobile-bottom-nav__item" href="agenda.html"><span class="nav-icon">📅</span><span>Agenda</span></a>
     <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
   </nav>
+<script src="assets/profile-qr.js"></script>
 <script src="assets/chatbot.js"></script>
 </body>
 </html>

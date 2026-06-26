@@ -370,6 +370,23 @@ const DOMAIN_GRAD = {
     twEl.innerHTML = '<div style="color:var(--muted);font-size:12px;">Score non disponible.</div>';
   }
 
+  /* ---- QR Code initiative ---- */
+  const qrSection = document.createElement('div');
+  qrSection.className = 'init-section';
+  qrSection.style.textAlign = 'center';
+  qrSection.innerHTML = '<h3>📷 QR Code de l\'initiative</h3><div id="init-qr-container"></div>';
+  const trustSec = document.getElementById('init-trust-section');
+  if (trustSec) trustSec.after(qrSection);
+  if (window.ProfileQR && document.getElementById('init-qr-container')) {
+    ProfileQR.render(document.getElementById('init-qr-container'), {
+      initId: init.id,
+      initNom: init.nom || 'Initiative',
+      userRole: init.type_label || init.type || 'Initiative',
+      userOrg: init.sigle || '',
+      size: 180,
+    });
+  }
+
   /* ---- Publications ---- */
   try {
     const r = await api("GET", "/fil?limit=30");
@@ -398,6 +415,7 @@ const DOMAIN_GRAD = {
 })();
 </script>
 <script src="assets/trust-score.js"></script>
+<script src="assets/profile-qr.js"></script>
 <script src="assets/chatbot.js"></script>
 </body>
 </html>

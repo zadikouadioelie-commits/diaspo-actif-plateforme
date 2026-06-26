@@ -671,6 +671,21 @@ function renderSidebar() {
   sb.appendChild(tsDiv);
   if (window.TrustWidget) TrustWidget.render(profil.id, tsDiv, { isMine: isOwn });
 
+  // ── QR Code profil ──
+  const qrDiv = document.createElement('div');
+  qrDiv.style.cssText = 'background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:16px;text-align:center;';
+  qrDiv.innerHTML = '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:12px;">📷 Mon QR Code profil</div><div id="sidebar-qr-container"></div>';
+  sb.appendChild(qrDiv);
+  if (window.ProfileQR) {
+    ProfileQR.render(document.getElementById('sidebar-qr-container'), {
+      userId: profil.id,
+      userName: [profil.prenom, profil.nom].filter(Boolean).join(' ') || 'Profil',
+      userRole: profil.role_label || profil.role || 'Membre',
+      userOrg:  profil.organisation || '',
+      size: 160,
+    });
+  }
+
   // Suggestion de personnes
   sb.appendChild(buildSidebarSuggestions());
 
@@ -1180,6 +1195,7 @@ function rebuildSection(id, newEl) {
 init();
 </script>
 <script src="assets/trust-score.js"></script>
+<script src="assets/profile-qr.js"></script>
 <script src="assets/chatbot.js"></script>
 </body>
 </html>
