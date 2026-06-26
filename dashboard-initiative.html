@@ -108,6 +108,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 (async function initDashboardInitiative() {
   const content = document.getElementById("dashboard-content");
 
+  /* Helper fetch JSON — utilisé partout dans ce dashboard */
+  const api = (m, p, b) => fetch('/api' + p, {
+    method: m, credentials: 'include',
+    headers: b ? { 'Content-Type': 'application/json' } : {},
+    body: b ? JSON.stringify(b) : undefined
+  }).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || r.statusText); return d; });
+
   /* Vérification session */
   const me = await fetchCurrentUser();
   if (!me) {
@@ -1506,8 +1513,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
   /* ══ SECTION BILLETTERIE — INITIATIVE ══ */
   function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-  const api = (m,p,b) => fetch('/api'+p, {method:m,credentials:'include',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined})
-    .then(async r => { const d = await r.json(); if(!r.ok) throw new Error(d.error||r.statusText); return d; });
   const BILLET_STATUTS = {brouillon:'📝 Brouillon',publie:'🟢 Publié',ferme:'🔒 Fermé',archive:'📁 Archivé'};
   const BILLET_TYPE_COLOR = {standard:'',vip:'background:#f3e5f5;color:#6a1b9a;',early:'background:#e8f5e9;color:#1b5e20;',sponsor:'background:#e3f2fd;color:#0d47a1;'};
 
