@@ -293,6 +293,12 @@ const DOMAIN_GRAD = {
       </div>
     </div>` : ''}
 
+    <!-- ===== TRUST SCORE & SIGNALEMENT ===== -->
+    <div class="init-section" id="init-trust-section">
+      <h3>🛡️ Score de confiance</h3>
+      <div id="init-trust-widget">Chargement…</div>
+    </div>
+
     <!-- ===== PUBLICATIONS ===== -->
     <div class="init-section">
       <h3>📰 Publications récentes</h3>
@@ -355,6 +361,15 @@ const DOMAIN_GRAD = {
   bindBtn('btn-suivre');
   bindBtn('btn-suivre-2');
 
+  /* ---- Trust Score widget ---- */
+  const twEl = document.getElementById('init-trust-widget');
+  if (twEl && init.owner_user_id && window.TrustWidget) {
+    const isMine = me && Number(me.id) === Number(init.owner_user_id);
+    TrustWidget.render(init.owner_user_id, twEl, { isMine, targetType: 'initiative' });
+  } else if (twEl) {
+    twEl.innerHTML = '<div style="color:var(--muted);font-size:12px;">Score non disponible.</div>';
+  }
+
   /* ---- Publications ---- */
   try {
     const r = await api("GET", "/fil?limit=30");
@@ -382,6 +397,7 @@ const DOMAIN_GRAD = {
   }
 })();
 </script>
+<script src="assets/trust-score.js"></script>
 <script src="assets/chatbot.js"></script>
 </body>
 </html>

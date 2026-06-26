@@ -663,6 +663,14 @@ function renderSidebar() {
   if (!sb) return;
   sb.innerHTML = '';
 
+  // ── Trust Score widget ──
+  const tsDiv = document.createElement('div');
+  tsDiv.style.marginBottom = '16px';
+  tsDiv.dataset.trustWidget = profil.id;
+  tsDiv.dataset.trustMine = isOwn ? '1' : '0';
+  sb.appendChild(tsDiv);
+  if (window.TrustWidget) TrustWidget.render(profil.id, tsDiv, { isMine: isOwn });
+
   // Suggestion de personnes
   sb.appendChild(buildSidebarSuggestions());
 
@@ -1171,6 +1179,7 @@ function rebuildSection(id, newEl) {
 /* ---- démarrage ---- */
 init();
 </script>
+<script src="assets/trust-score.js"></script>
 <script src="assets/chatbot.js"></script>
 </body>
 </html>

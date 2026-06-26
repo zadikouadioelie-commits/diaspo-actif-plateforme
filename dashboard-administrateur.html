@@ -1861,6 +1861,7 @@
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
           <button class="btn btn-orange" id="mtab-comptes" onclick="switchModeTab('comptes')">⏳ Comptes en attente</button>
           <button class="btn btn-outline" id="mtab-contenus" onclick="switchModeTab('contenus')">📋 Contenus récents</button>
+          <button class="btn btn-outline" id="mtab-signalements" onclick="switchModeTab('signalements')">🚩 Signalements <span id="signalements-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:99px;margin-left:4px;"></span></button>
         </div>
 
         <!-- Comptes en attente de validation -->
@@ -1886,6 +1887,23 @@
               <button class="btn btn-sm btn-outline" onclick="loadModerationContenus()">↺ Rafraîchir</button>
             </div>
             <div id="moderation-contenus-list"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+          </div>
+        </div>
+
+        <!-- Signalements -->
+        <div id="mtab-signalements-panel" style="display:none;">
+          <!-- Signalements comptes inactifs -->
+          <div class="card" style="margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <h3 style="margin:0;">🚩 Comptes signalés comme inactifs</h3>
+              <button class="btn btn-sm btn-outline" onclick="loadSignalements()">↺ Rafraîchir</button>
+            </div>
+            <div id="sig-comptes-list"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+          </div>
+          <!-- Signalements initiatives -->
+          <div class="card">
+            <h3 style="margin:0 0 12px;">🚩 Initiatives signalées</h3>
+            <div id="sig-init-list"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
           </div>
         </div>
       </section>
@@ -2120,13 +2138,100 @@ let _modeTab = 'comptes';
 
 function switchModeTab(tab) {
   _modeTab = tab;
-  document.getElementById('mtab-comptes-panel').style.display = tab === 'comptes' ? '' : 'none';
-  document.getElementById('mtab-contenus-panel').style.display = tab === 'contenus' ? '' : 'none';
-  document.getElementById('mtab-comptes').className = 'btn ' + (tab === 'comptes' ? 'btn-orange' : 'btn-outline');
-  document.getElementById('mtab-contenus').className = 'btn ' + (tab === 'contenus' ? 'btn-orange' : 'btn-outline');
+  ['comptes','contenus','signalements'].forEach(t => {
+    const panel = document.getElementById(`mtab-${t}-panel`);
+    const btn   = document.getElementById(`mtab-${t}`);
+    if (panel) panel.style.display = t === tab ? '' : 'none';
+    if (btn)   btn.className = 'btn ' + (t === tab ? 'btn-orange' : 'btn-outline');
+  });
   if (tab === 'comptes') loadModerationComptes('en_attente');
-  else loadModerationContenus();
+  else if (tab === 'contenus') loadModerationContenus();
+  else if (tab === 'signalements') loadSignalements();
 }
+
+/* ===== Signalements ===== */
+async function loadSignalements() {
+  const [el1, el2] = [document.getElementById('sig-comptes-list'), document.getElementById('sig-init-list')];
+  if (el1) el1.innerHTML = '<p style="color:var(--muted);font-size:13px;">Chargement…</p>';
+  if (el2) el2.innerHTML = '<p style="color:var(--muted);font-size:13px;">Chargement…</p>';
+  try {
+    const data = await api('GET', '/admin/signalements');
+    // Badge
+    const total = (data.stats.comptes_en_attente || 0) + (data.stats.init_en_attente || 0);
+    const badge = document.getElementById('signalements-badge');
+    if (badge) { badge.textContent = total; badge.style.display = total ? '' : 'none'; }
+
+    // Comptes
+    if (el1) {
+      if (!data.comptes.length) { el1.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun signalement de compte.</p>'; }
+      else el1.innerHTML = data.comptes.map(r => `
+        <div style="padding:12px 0;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;">
+          <div style="flex:1;min-width:200px;">
+            <strong style="font-size:13px;">${r.reported_nom || 'Utilisateur #'+r.reported_id}</strong>
+            <span style="font-size:11px;color:var(--muted);margin-left:8px;">${r.reported_role||''}</span><br>
+            <span style="font-size:11.5px;color:var(--muted);">Signalé par : ${r.reporter_nom||'#'+r.reporter_id} · ${r.created_at?.slice(0,10)||''}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+            <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;background:${r.statut==='en_attente'?'#fef3c7':'#dcfce7'};color:${r.statut==='en_attente'?'#92400e':'#166534'};">${r.statut}</span>
+            ${r.statut === 'en_attente' ? `
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-outline" onclick="actSigCompte(${r.id},'classe')">Classer</button>
+                <button class="btn btn-sm btn-outline" onclick="actSigCompte(${r.id},'rappel_envoye')">📧 Rappel</button>
+                <button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;" onclick="actSigCompte(${r.id},'masque')">🚫 Masquer</button>
+              </div>` : ''}
+          </div>
+        </div>`).join('');
+    }
+
+    // Initiatives
+    if (el2) {
+      if (!data.initiatives.length) { el2.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun signalement d\'initiative.</p>'; }
+      else el2.innerHTML = data.initiatives.map(r => `
+        <div style="padding:12px 0;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;">
+          <div style="flex:1;min-width:200px;">
+            <strong style="font-size:13px;">${r.init_nom || 'Initiative #'+r.initiative_id}</strong><br>
+            <span style="font-size:11.5px;color:var(--muted);">Motif : <em>${r.motif}</em></span><br>
+            <span style="font-size:11px;color:var(--muted);">Signalé par : ${r.reporter_nom||'#'+r.reporter_id} · ${r.created_at?.slice(0,10)||''}</span>
+            ${r.description ? `<p style="font-size:12px;margin:4px 0 0;color:#374151;">${r.description}</p>` : ''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+            <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;background:${r.statut==='en_attente'?'#fef3c7':'#dcfce7'};color:${r.statut==='en_attente'?'#92400e':'#166534'};">${r.statut}</span>
+            ${r.statut === 'en_attente' ? `
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-outline" onclick="actSigInit(${r.id},'classe')">Classer</button>
+                <button class="btn btn-sm btn-outline" onclick="actSigInit(${r.id},'en_cours')">🔍 En cours</button>
+                <button class="btn btn-sm" style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;" onclick="actSigInit(${r.id},'suspendu')">⏸️ Suspendre</button>
+                <button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;" onclick="actSigInit(${r.id},'masque')">🚫 Masquer</button>
+              </div>` : ''}
+          </div>
+        </div>`).join('');
+    }
+  } catch(e) {
+    if (el1) el1.innerHTML = `<p style="color:red;font-size:13px;">Erreur : ${e.message}</p>`;
+  }
+}
+
+async function actSigCompte(id, action) {
+  const note = action === 'masque' ? prompt('Note interne (facultatif)') : null;
+  await api('PATCH', `/admin/signalements/compte/${id}`, { action, note });
+  loadSignalements();
+}
+async function actSigInit(id, action) {
+  const note = ['suspendu','masque'].includes(action) ? prompt('Note interne (facultatif)') : null;
+  await api('PATCH', `/admin/signalements/initiative/${id}`, { action, note });
+  loadSignalements();
+}
+
+// Charger le badge au chargement de la section modération
+document.querySelectorAll(".sidebar a[data-section='moderation']").forEach(a => {
+  a.addEventListener('click', () => setTimeout(() => {
+    api('GET', '/admin/signalements').then(d => {
+      const total = (d.stats?.comptes_en_attente||0) + (d.stats?.init_en_attente||0);
+      const badge = document.getElementById('signalements-badge');
+      if (badge) { badge.textContent = total; badge.style.display = total ? '' : 'none'; }
+    }).catch(()=>{});
+  }, 100));
+});
 
 let _comptesStatut = 'en_attente';
 async function loadModerationComptes(statut = 'en_attente') {

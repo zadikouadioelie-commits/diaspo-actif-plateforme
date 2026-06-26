@@ -4911,6 +4911,327 @@ async function handleRequest(req, res) {
     }
 
     /* ============================================================
+       TRUST SCORE · RÉACTIVITÉ · ABSENCE · SIGNALEMENTS
+    ============================================================ */
+
+    /* ── Calcul du Trust Score (fonction partagée) ── */
+    function computeTrustScore(userId) {
+      const user = db.prepare(`SELECT *,
+        CAST((julianday('now') - julianday(COALESCE(created_at,datetime('now')))) / 30 AS INTEGER) AS months_old
+        FROM users WHERE id=?`).get(userId);
+      if (!user) return { score: 0, detail: [], label: 'Inconnu' };
+
+      const detail = [];
+      let total = 0;
+
+      // Ancienneté max 15 pts (1 pt/mois)
+      const anciennete = Math.min(15, user.months_old || 0);
+      if (anciennete > 0) detail.push({ icon:'🕐', label:`Ancienneté : ${user.months_old} mois`, pts: anciennete, max: 15 });
+
+      // Vérifications identité
+      if (user.is_verified || user.identite_verifiee) { total += 15; detail.push({ icon:'✅', label:'Identité vérifiée', pts:15, max:15 }); }
+      if (user.documents_verifies)  { total += 10; detail.push({ icon:'📄', label:'Documents vérifiés', pts:10, max:10 }); }
+      if (user.diplomes_verifies)   { total += 10; detail.push({ icon:'🎓', label:'Diplômes vérifiés', pts:10, max:10 }); }
+      if (user.entreprise_verifiee) { total += 8;  detail.push({ icon:'🏢', label:'Entreprise vérifiée', pts:8, max:8 }); }
+      total += anciennete;
+
+      // Accréditations DA max 20 pts
+      const nbAccred = db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE user_id=? AND statut='active'`).get(userId)?.n || 0;
+      const accredPts = Math.min(20, nbAccred * 10);
+      if (accredPts > 0) detail.push({ icon:'🏅', label:`${nbAccred} accréditation(s) Diaspo'Actif`, pts: accredPts, max:20 });
+      total += accredPts;
+
+      // Initiative immatriculée 8 pts
+      const init = db.prepare(`SELECT numero_immatriculation FROM initiatives WHERE owner_user_id=?`).get(userId);
+      if (init?.numero_immatriculation) { total += 8; detail.push({ icon:'🏛️', label:'Initiative officiellement immatriculée', pts:8, max:8 }); }
+
+      // Activité plateforme max 10 pts
+      const nbPosts = db.prepare(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?`).get(userId)?.n || 0;
+      const nbCollabs = db.prepare(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`).get(userId)?.n || 0;
+      const nbFollowers = db.prepare(`SELECT COUNT(*) n FROM user_follows WHERE following_id=?`).get(userId)?.n || 0;
+      const activPts = Math.min(10, Math.floor(nbPosts/5) + nbCollabs * 2 + Math.floor(nbFollowers/10));
+      if (activPts > 0) detail.push({ icon:'📊', label:`Activité : ${nbPosts} publications, ${nbFollowers} abonnés`, pts: activPts, max:10 });
+      total += activPts;
+
+      // Profil complet max 6 pts
+      let complete = 0;
+      if (user.photo_url)              complete++;
+      if (user.bio?.length > 60)       complete += 2;
+      if (user.titre_pro)              complete++;
+      if (user.competences?.length > 5) complete++;
+      if (user.ville)                  complete++;
+      const completePts = Math.min(6, complete);
+      if (completePts > 0) detail.push({ icon:'👤', label:'Profil complet', pts: completePts, max:6 });
+      total += completePts;
+
+      // Absence de signalements 5 pts
+      const nbSignal = user.signalements_confirmes || 0;
+      if (nbSignal === 0) { total += 5; detail.push({ icon:'✅', label:'Aucun signalement confirmé', pts:5, max:5 }); }
+      else                detail.push({ icon:'⚠️', label:`${nbSignal} signalement(s) confirmé(s)`, pts:0, max:5, warning:true });
+
+      const score = Math.min(100, Math.round(total));
+      const label = score >= 90 ? 'Excellent' : score >= 75 ? 'Élevé' : score >= 50 ? 'Moyen' : 'Faible';
+      const color = score >= 90 ? '#10b981' : score >= 75 ? '#f59e0b' : score >= 50 ? '#6366f1' : '#ef4444';
+
+      // Mise en cache
+      try {
+        db.prepare(`INSERT OR REPLACE INTO trust_cache (user_id,score,detail_json,label,computed_at) VALUES (?,?,?,?,datetime('now'))`)
+          .run(userId, score, JSON.stringify(detail), label);
+        db.prepare(`UPDATE users SET trust_score=?, trust_computed_at=datetime('now') WHERE id=?`).run(score, userId);
+      } catch(e){}
+
+      return { score, detail, label, color };
+    }
+
+    /* ── Calcul Réactivité (fonction partagée) ── */
+    function computeReactivity(userId) {
+      const msgs = db.prepare(`
+        SELECT m.auteur_id, m.created_at, m.conversation_id
+        FROM messages m
+        JOIN conversations c ON c.id=m.conversation_id
+        WHERE (c.user1_id=? OR c.user2_id=?) AND m.created_at >= datetime('now','-90 days')
+        ORDER BY m.conversation_id, m.created_at ASC
+      `).all(userId, userId);
+
+      if (!msgs.length) {
+        const lastActive = db.prepare(`SELECT last_active FROM users WHERE id=?`).get(userId)?.last_active;
+        return { stars: 0, label: 'Aucune donnée disponible', avg_hours: null, lastActive };
+      }
+
+      // Regrouper par conversation
+      const convs = {};
+      msgs.forEach(m => { (convs[m.conversation_id] = convs[m.conversation_id]||[]).push(m); });
+
+      const responseTimes = [];
+      let unanswered = 0;
+      const now = Date.now();
+
+      for (const msgList of Object.values(convs)) {
+        for (let i = 0; i < msgList.length - 1; i++) {
+          const curr = msgList[i], next = msgList[i+1];
+          if (curr.auteur_id !== userId && next.auteur_id === userId) {
+            const h = (new Date(next.created_at) - new Date(curr.created_at)) / 3600000;
+            if (h >= 0 && h < 720) responseTimes.push(h);
+          }
+        }
+        const last = msgList[msgList.length - 1];
+        if (last.auteur_id !== userId) {
+          const daysOld = (now - new Date(last.created_at)) / 86400000;
+          if (daysOld > 5) unanswered++;
+        }
+      }
+
+      const avgHours = responseTimes.length
+        ? responseTimes.reduce((s,t) => s+t, 0) / responseTimes.length
+        : null;
+
+      let stars, label;
+      if (avgHours === null) { stars = 3; label = 'Données limitées'; }
+      else if (avgHours < 2)  { stars = 5; label = 'Répond généralement en moins de 2 heures'; }
+      else if (avgHours < 12) { stars = 5; label = 'Répond généralement en moins de 12 heures'; }
+      else if (avgHours < 24) { stars = 4; label = 'Répond généralement sous 24 heures'; }
+      else if (avgHours < 72) { stars = 3; label = `Répond généralement en 1 à 3 jours`; }
+      else                    { stars = 2; label = `Réactivité moyenne : ${Math.round((avgHours||0)/24)} jours`; }
+
+      if (unanswered >= 3) stars = Math.max(1, stars - 1);
+
+      // Maj en base
+      try {
+        db.prepare(`UPDATE users SET reactivity_stars=?, avg_response_hours=? WHERE id=?`).run(stars, avgHours, userId);
+      } catch(e){}
+
+      return { stars, label, avg_hours: avgHours, unanswered };
+    }
+
+    /* ── GET /api/users/:id/trust-score ── */
+    if (req.method === 'GET' && /^\/api\/users\/\d+\/trust-score$/.test(pathname)) {
+      const uid = parseInt(pathname.split('/')[3]);
+      // Check cache (5 minutes)
+      const cached = db.prepare(`SELECT * FROM trust_cache WHERE user_id=? AND computed_at >= datetime('now','-5 minutes')`).get(uid);
+      if (cached) {
+        return sendJSON(res, 200, { score: cached.score, detail: JSON.parse(cached.detail_json||'[]'), label: cached.label });
+      }
+      const result = computeTrustScore(uid);
+      const reactivity = computeReactivity(uid);
+      return sendJSON(res, 200, { ...result, reactivity });
+    }
+
+    /* ── GET /api/users/:id/absence — mode absence public ── */
+    if (req.method === 'GET' && /^\/api\/users\/\d+\/absence$/.test(pathname)) {
+      const uid = parseInt(pathname.split('/')[3]);
+      const absence = db.prepare(`SELECT * FROM user_absence WHERE user_id=? AND (fin IS NULL OR fin >= date('now'))`).get(uid);
+      return sendJSON(res, 200, { absence: absence || null });
+    }
+
+    /* ── PUT /api/users/me/absence — activer mode absence ── */
+    if (req.method === 'PUT' && pathname === '/api/users/me/absence') {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const { mode, fin, message } = body;
+      const MODES = ['vacances','deplacement','indisponible','mission','conge','autre'];
+      if (!MODES.includes(mode)) return sendJSON(res, 400, { error: 'Mode invalide.' });
+      db.prepare(`INSERT OR REPLACE INTO user_absence (user_id,mode,debut,fin,message,updated_at) VALUES (?,?,date('now'),?,?,datetime('now'))`)
+        .run(me.id, mode, fin||null, message||null);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── DELETE /api/users/me/absence — désactiver mode absence ── */
+    if (req.method === 'DELETE' && pathname === '/api/users/me/absence') {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      db.prepare(`DELETE FROM user_absence WHERE user_id=?`).run(me.id);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/users/:id/signaler — signaler compte inactif ── */
+    if (req.method === 'POST' && /^\/api\/users\/\d+\/signaler$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const uid = parseInt(pathname.split('/')[3]);
+      if (uid === me.id) return sendJSON(res, 400, { error: 'Vous ne pouvez pas vous signaler vous-même.' });
+
+      // Vérif : mode absence actif ?
+      const absence = db.prepare(`SELECT id FROM user_absence WHERE user_id=? AND (fin IS NULL OR fin >= date('now'))`).get(uid);
+      if (absence) return sendJSON(res, 400, { error: 'Cet utilisateur est en mode absence. Aucun signalement possible.' });
+
+      // Vérif : une conversation existe avec un message non répondu depuis 14 jours
+      const conv = db.prepare(`
+        SELECT c.id, MAX(m.created_at) AS last_from_me
+        FROM conversations c
+        JOIN messages m ON m.conversation_id=c.id
+        WHERE ((c.user1_id=? AND c.user2_id=?) OR (c.user1_id=? AND c.user2_id=?))
+          AND m.auteur_id=?
+          AND m.created_at <= datetime('now','-14 days')
+        HAVING last_from_me IS NOT NULL
+      `).get(me.id, uid, uid, me.id, me.id);
+
+      if (!conv) return sendJSON(res, 400, { error: 'Condition non remplie : vous devez avoir envoyé un message il y a au moins 14 jours sans réponse.' });
+
+      // Vérif : pas déjà signalé
+      const existing = db.prepare(`SELECT id FROM account_reports WHERE reporter_id=? AND reported_id=?`).get(me.id, uid);
+      if (existing) return sendJSON(res, 400, { error: 'Vous avez déjà signalé ce compte.' });
+
+      db.prepare(`INSERT INTO account_reports (reporter_id,reported_id,conv_id) VALUES (?,?,?)`).run(me.id, uid, conv.id);
+
+      // Auto-action si plusieurs signalements (≥3 en 30 jours)
+      const recentCount = db.prepare(`SELECT COUNT(*) n FROM account_reports WHERE reported_id=? AND created_at >= datetime('now','-30 days')`).get(uid).n;
+      if (recentCount >= 3) {
+        db.prepare(`UPDATE users SET last_active=NULL WHERE id=?`).run(uid);
+      }
+      return sendJSON(res, 201, { ok: true, message: 'Signalement enregistré. Nos modérateurs vont examiner ce compte.' });
+    }
+
+    /* ── POST /api/initiatives/:id/signaler — signaler une initiative ── */
+    if (req.method === 'POST' && /^\/api\/initiatives\/\d+\/signaler$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const iid = parseInt(pathname.split('/')[3]);
+      const init = db.prepare(`SELECT * FROM initiatives WHERE id=?`).get(iid);
+      if (!init) return sendJSON(res, 404, { error: 'Initiative introuvable.' });
+      if (init.owner_user_id === me.id) return sendJSON(res, 400, { error: 'Vous ne pouvez pas signaler votre propre initiative.' });
+
+      const MOTIFS_VALIDES = [
+        'Suspicion d\'escroquerie','Faux documents','Informations mensongères',
+        'Collecte de fonds suspecte','Usurpation d\'identité','Contenu illégal',
+        'Discours haineux','Spam','Publicité abusive',
+        'Violation des règles Diaspo\'Actif','Conflit d\'intérêt non déclaré','Autre'
+      ];
+      const { motif, description, preuves } = body;
+      if (!MOTIFS_VALIDES.includes(motif)) return sendJSON(res, 400, { error: 'Motif invalide.' });
+
+      // Anti-doublon dans les 30 jours
+      const existing = db.prepare(`SELECT id FROM initiative_reports WHERE reporter_id=? AND initiative_id=? AND created_at >= datetime('now','-30 days')`).get(me.id, iid);
+      if (existing) return sendJSON(res, 400, { error: 'Vous avez déjà signalé cette initiative récemment.' });
+
+      db.prepare(`INSERT INTO initiative_reports (reporter_id,initiative_id,motif,description,preuves) VALUES (?,?,?,?,?)`)
+        .run(me.id, iid, motif, description||null, JSON.stringify(preuves||[]));
+
+      // Auto-compteur
+      const nbRep = db.prepare(`SELECT COUNT(*) n FROM initiative_reports WHERE initiative_id=? AND statut IN ('en_attente','en_cours')`).get(iid).n;
+      if (nbRep >= 5) {
+        db.prepare(`UPDATE initiatives SET signalements_confirmes=signalements_confirmes+1 WHERE id=?`).run(iid);
+      }
+      return sendJSON(res, 201, { ok: true, message: 'Signalement transmis aux modérateurs.' });
+    }
+
+    /* ── GET /api/admin/signalements — tous les signalements (admin) ── */
+    if (req.method === 'GET' && pathname === '/api/admin/signalements') {
+      const me = getCurrentUser(req);
+      if (!me || !['administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé.' });
+      const comptes = db.prepare(`
+        SELECT ar.*, u1.nom AS reporter_nom, u2.nom AS reported_nom, u2.role AS reported_role
+        FROM account_reports ar
+        LEFT JOIN users u1 ON u1.id=ar.reporter_id
+        LEFT JOIN users u2 ON u2.id=ar.reported_id
+        ORDER BY ar.created_at DESC LIMIT 100`).all();
+      const initiatives = db.prepare(`
+        SELECT ir.*, u.nom AS reporter_nom, i.nom AS init_nom
+        FROM initiative_reports ir
+        LEFT JOIN users u ON u.id=ir.reporter_id
+        LEFT JOIN initiatives i ON i.id=ir.initiative_id
+        ORDER BY ir.created_at DESC LIMIT 100`).all();
+      const stats = {
+        comptes_en_attente: comptes.filter(r=>r.statut==='en_attente').length,
+        init_en_attente: initiatives.filter(r=>r.statut==='en_attente').length,
+      };
+      return sendJSON(res, 200, { comptes, initiatives, stats });
+    }
+
+    /* ── PATCH /api/admin/signalements/compte/:id — modérer signalement compte ── */
+    if (req.method === 'PATCH' && /^\/api\/admin\/signalements\/compte\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const rid = parseInt(pathname.split('/')[5]);
+      const { action, note } = body;
+      const ACTIONS = ['classe','rappel_envoye','masque','resolu'];
+      if (!ACTIONS.includes(action)) return sendJSON(res, 400, { error: 'Action invalide.' });
+      db.prepare(`UPDATE account_reports SET statut=?,admin_id=?,admin_note=?,updated_at=datetime('now') WHERE id=?`)
+        .run(action, me.id, note||null, rid);
+      db.prepare(`INSERT INTO report_history (report_type,report_id,admin_id,admin_nom,action,note) VALUES ('account',?,?,?,?,?)`)
+        .run(rid, me.id, me.nom, action, note||null);
+      // Si masqué : incrémenter signalements_confirmes
+      if (action === 'masque') {
+        const rep = db.prepare(`SELECT reported_id FROM account_reports WHERE id=?`).get(rid);
+        if (rep) db.prepare(`UPDATE users SET signalements_confirmes=signalements_confirmes+1 WHERE id=?`).run(rep.reported_id);
+      }
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── PATCH /api/admin/signalements/initiative/:id — modérer signalement initiative ── */
+    if (req.method === 'PATCH' && /^\/api\/admin\/signalements\/initiative\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const rid = parseInt(pathname.split('/')[5]);
+      const { action, note } = body;
+      const ACTIONS_INIT = ['classe','en_cours','suspendu','masque','transmis'];
+      if (!ACTIONS_INIT.includes(action)) return sendJSON(res, 400, { error: 'Action invalide.' });
+      db.prepare(`UPDATE initiative_reports SET statut=?,admin_id=?,admin_note=?,admin_action=?,updated_at=datetime('now') WHERE id=?`)
+        .run(action, me.id, note||null, action, rid);
+      db.prepare(`INSERT INTO report_history (report_type,report_id,admin_id,admin_nom,action,note) VALUES ('initiative',?,?,?,?,?)`)
+        .run(rid, me.id, me.nom, action, note||null);
+      if (action === 'suspendu' || action === 'masque') {
+        const rep = db.prepare(`SELECT initiative_id FROM initiative_reports WHERE id=?`).get(rid);
+        if (rep) db.prepare(`UPDATE initiatives SET signalements_confirmes=signalements_confirmes+1 WHERE id=?`).run(rep.initiative_id);
+      }
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── PATCH /api/admin/users/:id/verify — vérifier un compte (admin) ── */
+    if (req.method === 'PATCH' && /^\/api\/admin\/users\/\d+\/verify$/.test(pathname)) {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const uid = parseInt(pathname.split('/')[4]);
+      const { identite_verifiee, documents_verifies, diplomes_verifies, entreprise_verifiee, is_verified } = body;
+      const fields = [];
+      if (identite_verifiee !== undefined) { fields.push(`identite_verifiee=${identite_verifiee?1:0}`); }
+      if (documents_verifies !== undefined) { fields.push(`documents_verifies=${documents_verifies?1:0}`); }
+      if (diplomes_verifies !== undefined) { fields.push(`diplomes_verifies=${diplomes_verifies?1:0}`); }
+      if (entreprise_verifiee !== undefined) { fields.push(`entreprise_verifiee=${entreprise_verifiee?1:0}`); }
+      if (is_verified !== undefined) { fields.push(`is_verified=${is_verified?1:0}`); }
+      if (!fields.length) return sendJSON(res, 400, { error: 'Aucun champ fourni.' });
+      db.prepare(`UPDATE users SET ${fields.join(',')} WHERE id=?`).run(uid);
+      // Invalider le cache trust score
+      db.prepare(`DELETE FROM trust_cache WHERE user_id=?`).run(uid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ============================================================
        CHATBOT — MOTEUR DE RECOMMANDATION INTELLIGENT
        Scoring multi-critères, NLP léger, respect confidentialité
     ============================================================ */
@@ -4955,16 +5276,21 @@ async function handleRequest(req, res) {
       const candidates = db.prepare(`
         SELECT u.id, u.nom, u.prenom, u.role, u.pays, u.ville, u.bio, u.titre_pro,
           u.competences, u.photo_url, u.experiences,
+          u.is_verified, u.identite_verifiee, u.documents_verifies, u.diplomes_verifies,
+          u.trust_score, u.reactivity_stars, u.signalements_confirmes,
           i.id AS init_id, i.nom AS init_nom, i.secteur, i.services, i.langues AS init_langues,
           i.numero_immatriculation, i.taille_structure,
           (SELECT COUNT(*) FROM compte_accreditations ca WHERE ca.user_id=u.id AND ca.statut='active') AS nb_accreds,
           (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id=u.id) AS nb_followers,
           (SELECT COUNT(*) FROM fil_posts fp WHERE fp.auteur_id=u.id) AS nb_posts,
-          (SELECT COUNT(*) FROM collaborations co WHERE co.user_id=u.id) AS nb_collabs
+          (SELECT COUNT(*) FROM collaborations co WHERE co.user_id=u.id) AS nb_collabs,
+          CASE WHEN ua.user_id IS NOT NULL THEN 1 ELSE 0 END AS en_absence
         FROM users u
         LEFT JOIN initiatives i ON i.owner_user_id=u.id
+        LEFT JOIN user_absence ua ON ua.user_id=u.id AND (ua.fin IS NULL OR ua.fin >= date('now'))
         WHERE u.role NOT IN ('administrateur')
           AND u.id != ?
+          AND (u.signalements_confirmes IS NULL OR u.signalements_confirmes < 3)
         LIMIT 800
       `).all(currentUserId);
 
@@ -4996,9 +5322,24 @@ async function handleRequest(req, res) {
         const uLang = norm((u.init_langues||'[]') + ' ' + (u.bio||'') + ' ' + (u.competences||''));
         for (const lang of langues) { if (uLang.includes(lang)) score += 15; }
 
-        // Signaux de confiance (boost)
+        // Signaux de confiance (boost) — COMPTES VÉRIFIÉS EN PRIORITÉ
+        if (u.is_verified || u.identite_verifiee) score += 30; // priorité absolue
+        if (u.documents_verifies) score += 15;
+        if (u.diplomes_verifies)  score += 12;
         if (u.nb_accreds > 0) score += 25;
         if (u.numero_immatriculation) score += 12;
+        // Réactivité
+        if (u.reactivity_stars >= 5) score += 10;
+        else if (u.reactivity_stars >= 4) score += 6;
+        else if (u.reactivity_stars >= 3) score += 3;
+        // Trust score cumulatif
+        if (u.trust_score >= 90) score += 15;
+        else if (u.trust_score >= 75) score += 8;
+        else if (u.trust_score >= 50) score += 3;
+        // Malus absence / signalements
+        if (u.en_absence) score -= 20;
+        if (u.signalements_confirmes > 0) score -= 10 * u.signalements_confirmes;
+        // Activité
         if (u.nb_followers > 10) score += 12;
         else if (u.nb_followers > 2) score += 6;
         if (u.photo_url) score += 5;
@@ -5040,8 +5381,12 @@ async function handleRequest(req, res) {
         const uLang = norm(u.init_langues||'');
         const matchedLangs = langues.filter(l => uLang.includes(l));
         if (matchedLangs.length) reasons.push(`Parle ${matchedLangs.join(', ')}`);
-        if (u.nb_accreds > 0) reasons.push(`${u.nb_accreds} accréditation(s) Diaspo'Actif`);
-        if (u.numero_immatriculation) reasons.push('Initiative officiellement immatriculée');
+        if (u.is_verified || u.identite_verifiee) reasons.unshift('✅ Compte vérifié Diaspo\'Actif');
+        if (u.documents_verifies) reasons.push('📄 Documents vérifiés');
+        if (u.diplomes_verifies) reasons.push('🎓 Diplômes vérifiés');
+        if (u.nb_accreds > 0) reasons.push(`🏅 ${u.nb_accreds} accréditation(s) Diaspo'Actif`);
+        if (u.numero_immatriculation) reasons.push('🏛️ Initiative officiellement immatriculée');
+        if (u.reactivity_stars >= 4) reasons.push('⚡ Très réactif');
         if (u.nb_followers > 10) reasons.push(`${u.nb_followers} abonnés sur la plateforme`);
         if (u.nb_collabs > 0) reasons.push(`${u.nb_collabs} collaboration(s) réalisée(s)`);
         if (!reasons.length) reasons.push('Profil actif correspondant à votre recherche');

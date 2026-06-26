@@ -980,6 +980,20 @@ const MIGRATIONS = [
   ["event_checkins", "device_info TEXT"],
   ["event_checkins", "latitude REAL"],
   ["event_checkins", "longitude REAL"],
+  // ── Trust & Réactivité ──
+  ["users", "identite_verifiee INTEGER DEFAULT 0"],
+  ["users", "documents_verifies INTEGER DEFAULT 0"],
+  ["users", "diplomes_verifies INTEGER DEFAULT 0"],
+  ["users", "entreprise_verifiee INTEGER DEFAULT 0"],
+  ["users", "trust_score REAL DEFAULT 0"],
+  ["users", "trust_computed_at TEXT"],
+  ["users", "reactivity_stars INTEGER DEFAULT 0"],
+  ["users", "avg_response_hours REAL"],
+  ["users", "response_rate REAL"],
+  ["users", "last_active TEXT DEFAULT (datetime('now'))"],
+  ["users", "signalements_confirmes INTEGER DEFAULT 0"],
+  ["users", "is_verified INTEGER DEFAULT 0"],       -- badge "Compte vérifié" global
+  ["initiatives", "signalements_confirmes INTEGER DEFAULT 0"],
 ];
 
 /* ===== SYSTÈME D'ACCRÉDITATIONS DIASPO'ACTIF ===== */
@@ -1421,5 +1435,82 @@ for (const [table, col] of MIGRATIONS) {
     try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`); } catch (e) { /* déjà présent */ }
   }
 }
+
+/* =====================================================================
+   TRUST SCORE · RÉACTIVITÉ · ABSENCE · SIGNALEMENTS
+   ===================================================================== */
+db.exec(`
+
+  /* ── Mode absence utilisateur ── */
+  CREATE TABLE IF NOT EXISTS user_absence (
+    user_id   INTEGER PRIMARY KEY,
+    mode      TEXT NOT NULL CHECK(mode IN ('vacances','deplacement','indisponible','mission','conge','autre')),
+    debut     TEXT DEFAULT (date('now')),
+    fin       TEXT,
+    message   TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* ── Signalements compte inactif ── */
+  CREATE TABLE IF NOT EXISTS account_reports (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id INTEGER NOT NULL,
+    reported_id INTEGER NOT NULL,
+    conv_id     INTEGER,                              -- preuve : conversation concernée
+    statut      TEXT DEFAULT 'en_attente'
+                  CHECK(statut IN ('en_attente','classe','rappel_envoye','masque','resolu')),
+    admin_id    INTEGER,
+    admin_note  TEXT,
+    created_at  TEXT DEFAULT (datetime('now')),
+    updated_at  TEXT DEFAULT (datetime('now')),
+    UNIQUE(reporter_id, reported_id),                 -- un seul signalement par paire
+    FOREIGN KEY(reporter_id) REFERENCES users(id),
+    FOREIGN KEY(reported_id) REFERENCES users(id)
+  );
+
+  /* ── Signalements d'initiative ── */
+  CREATE TABLE IF NOT EXISTS initiative_reports (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id   INTEGER NOT NULL,
+    initiative_id INTEGER NOT NULL,
+    motif         TEXT NOT NULL,
+    description   TEXT,
+    preuves       TEXT DEFAULT '[]',                  -- JSON [{type,url,nom}]
+    statut        TEXT DEFAULT 'en_attente'
+                    CHECK(statut IN ('en_attente','en_cours','classe','suspendu','masque','transmis')),
+    admin_id      INTEGER,
+    admin_note    TEXT,
+    admin_action  TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(reporter_id) REFERENCES users(id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
+  /* ── Historique des actions de modération (immuable) ── */
+  CREATE TABLE IF NOT EXISTS report_history (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_type TEXT NOT NULL CHECK(report_type IN ('account','initiative')),
+    report_id   INTEGER NOT NULL,
+    admin_id    INTEGER,
+    admin_nom   TEXT,
+    action      TEXT NOT NULL,
+    note        TEXT,
+    created_at  TEXT DEFAULT (datetime('now'))
+  );
+
+  /* ── Cache du score de confiance ── */
+  CREATE TABLE IF NOT EXISTS trust_cache (
+    user_id     INTEGER PRIMARY KEY,
+    score       REAL NOT NULL DEFAULT 0,
+    detail_json TEXT DEFAULT '[]',
+    label       TEXT DEFAULT 'Faible',
+    computed_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+`);
 
 module.exports = db;
