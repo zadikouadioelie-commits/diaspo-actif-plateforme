@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Réseau Professionnel — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B3A6B">
+<style>
+/* ── HERO ── */
+.reseau-hero{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1B3A6B 100%);color:#fff;padding:48px 24px 36px;text-align:center;position:relative;overflow:hidden;}
+.reseau-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 70% 50%,rgba(255,165,60,.12) 0%,transparent 60%);}
+.reseau-hero h1{font-size:2rem;font-weight:900;margin:0 0 10px;position:relative;}
+.reseau-hero p{font-size:.95rem;opacity:.8;max-width:560px;margin:0 auto 24px;position:relative;}
+.hero-stats{display:flex;gap:24px;justify-content:center;position:relative;flex-wrap:wrap;}
+.hero-stat{text-align:center;}
+.hero-stat .val{font-size:1.8rem;font-weight:900;color:#f97316;}
+.hero-stat .lbl{font-size:.72rem;opacity:.7;text-transform:uppercase;letter-spacing:.5px;}
+
+/* ── SEARCH BAR ── */
+.search-bar{background:#fff;border-bottom:1px solid var(--border);padding:16px 0;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.search-bar-inner{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;gap:10px;flex-wrap:wrap;}
+.search-bar input,.search-bar select{padding:9px 14px;border:1px solid var(--border);border-radius:10px;font-size:.85rem;font-family:inherit;background:#fff;}
+.search-bar input{flex:1;min-width:200px;}
+.search-bar select{width:150px;}
+.btn-search{background:#1B3A6B;color:#fff;border:none;padding:9px 20px;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+.btn-search:hover{background:#0f2a4f;}
+.btn-reset{background:none;border:1px solid var(--border);padding:9px 14px;border-radius:10px;font-size:.82rem;cursor:pointer;color:var(--muted);}
+
+/* ── TABS ── */
+.rtab-bar{display:flex;gap:0;border-bottom:2px solid var(--border);background:#fff;position:sticky;top:57px;z-index:40;}
+.rtab{padding:12px 20px;font-size:.85rem;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;background:none;border-top:none;border-left:none;border-right:none;white-space:nowrap;}
+.rtab.active{color:#1B3A6B;border-bottom-color:#1B3A6B;}
+.rtab-badge{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#ef4444;color:#fff;font-size:.65rem;font-weight:800;margin-left:5px;}
+.rtab-pane{display:none;padding:24px 0;}
+.rtab-pane.active{display:block;}
+
+/* ── INITIATIVE CARD ── */
+.init-net-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+.init-net-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px;transition:box-shadow .15s,transform .1s;}
+.init-net-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1);transform:translateY(-1px);}
+.init-card-head{display:flex;gap:12px;align-items:flex-start;}
+.init-logo-box{width:52px;height:52px;border-radius:12px;overflow:hidden;flex-shrink:0;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:1.4rem;border:1px solid var(--border);}
+.init-logo-box img{width:100%;height:100%;object-fit:cover;}
+.init-card-meta{flex:1;min-width:0;}
+.init-card-nom{font-size:.95rem;font-weight:800;margin:0 0 3px;color:var(--text);}
+.init-card-type{font-size:.73rem;color:var(--muted);font-weight:600;}
+.init-card-loc{font-size:.75rem;color:var(--muted);margin-top:2px;}
+.init-card-desc{font-size:.8rem;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.init-card-tags{display:flex;flex-wrap:wrap;gap:5px;}
+.init-tag{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:20px;background:#eff6ff;color:#1d4ed8;}
+.init-tag.secteur{background:#f5f3ff;color:#6d28d9;}
+.init-tag.badge-verif{background:#f0fdf4;color:#166534;}
+.init-tag.badge-partner{background:#fef3c7;color:#92400e;}
+.init-card-footer{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:auto;}
+.init-card-stat{font-size:.72rem;color:var(--muted);display:flex;align-items:center;gap:4px;}
+.init-card-actions{display:flex;gap:6px;}
+.btn-contact{background:#1B3A6B;color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px;}
+.btn-contact:hover{background:#0f2a4f;}
+.btn-affil{background:#fff;border:1px solid #1B3A6B;color:#1B3A6B;padding:7px 12px;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;}
+.btn-affil:hover{background:#eff6ff;}
+.btn-affil.sent{border-color:var(--border);color:var(--muted);cursor:default;}
+.btn-affil.membre{background:#f0fdf4;border-color:#166534;color:#166534;cursor:default;}
+
+/* ── DEMANDE CARD ── */
+.dem-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:12px;display:flex;gap:14px;align-items:flex-start;}
+.dem-card .dem-logo{width:44px;height:44px;border-radius:10px;overflow:hidden;flex-shrink:0;background:#f1f5f9;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1.1rem;}
+.dem-card .dem-logo img{width:100%;height:100%;object-fit:cover;}
+.dem-info{flex:1;min-width:0;}
+.dem-nom{font-size:.93rem;font-weight:800;margin:0 0 3px;}
+.dem-sub{font-size:.77rem;color:var(--muted);}
+.dem-msg{font-size:.8rem;font-style:italic;color:var(--text);background:var(--bg);padding:8px 12px;border-radius:8px;margin-top:8px;border-left:3px solid var(--border);}
+.dem-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;}
+.dem-statut{font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px;}
+.dem-en_attente{background:#fef3c7;color:#92400e;}
+.dem-accepte{background:#f0fdf4;color:#166534;}
+.dem-refuse{background:#fef2f2;color:#991b1b;}
+.dem-suspendu{background:#f1f5f9;color:#64748b;}
+.dem-info_demandee{background:#eff6ff;color:#1d4ed8;}
+
+/* ── PROFIL FORM ── */
+.profil-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-field label{font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px;}
+.tag-editor{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px solid var(--border);border-radius:10px;min-height:44px;cursor:text;}
+.tag-editor .te-tag{display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1d4ed8;border-radius:20px;padding:3px 10px;font-size:.78rem;font-weight:700;}
+.tag-editor .te-tag button{background:none;border:none;cursor:pointer;color:#1d4ed8;font-size:.9rem;padding:0;line-height:1;}
+.tag-editor input{border:none;outline:none;font-size:.85rem;min-width:120px;background:none;font-family:inherit;}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;}
+.stat-box-r{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;}
+.stat-box-r .sv{font-size:2rem;font-weight:900;color:#1B3A6B;}
+.stat-box-r .sl{font-size:.75rem;color:var(--muted);margin-top:4px;}
+.bar-item{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.bar-label{font-size:.8rem;min-width:100px;color:var(--text);}
+.bar-track{flex:1;background:#f1f5f9;border-radius:20px;height:8px;overflow:hidden;}
+.bar-fill{height:100%;background:#1B3A6B;border-radius:20px;}
+.bar-count{font-size:.78rem;font-weight:700;color:var(--muted);min-width:24px;text-align:right;}
+
+/* ── IMMAT BANNER ── */
+.immat-banner{background:#fef3c7;border:1px solid #fbbf24;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:.87rem;color:#92400e;}
+.immat-banner strong{display:block;margin-bottom:4px;}
+
+/* ── EMPTY ── */
+.rnet-empty{text-align:center;padding:60px 20px;}
+.rnet-empty .e-icon{font-size:3rem;margin-bottom:12px;}
+.rnet-empty .e-title{font-size:1rem;font-weight:800;margin-bottom:6px;}
+.rnet-empty .e-sub{font-size:.85rem;color:var(--muted);}
+
+/* ── MODAL AFFILIATION ── */
+.modal-back{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;overflow-y:auto;padding:20px;}
+.modal-back.open{display:flex;align-items:flex-start;justify-content:center;}
+.modal-box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:100%;max-width:520px;margin:auto;}
+
+/* ── MISE EN AVANT ── */
+.star-btn{background:none;border:none;font-size:1.2rem;cursor:pointer;opacity:.4;transition:opacity .15s;}
+.star-btn.on{opacity:1;}
+
+@media(max-width:640px){
+  .search-bar-inner{flex-direction:column;}
+  .search-bar select{width:100%;}
+  .profil-grid{grid-template-columns:1fr;}
+  .init-net-grid{grid-template-columns:1fr;}
+  .rtab{padding:10px 12px;font-size:.78rem;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <div class="reseau-hero">
+    <h1>🌐 Réseau Professionnel</h1>
+    <p>Un écosystème professionnel interconnecté d'initiatives de la diaspora mondiale. Réservé exclusivement aux organisations immatriculées.</p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val" id="hero-total">—</div><div class="lbl">Initiatives</div></div>
+      <div class="hero-stat"><div class="val" id="hero-pays">—</div><div class="lbl">Pays</div></div>
+      <div class="hero-stat"><div class="val" id="hero-affiliations">—</div><div class="lbl">Affiliations actives</div></div>
+      <div class="hero-stat"><div class="val" id="hero-secteurs">—</div><div class="lbl">Secteurs</div></div>
+    </div>
+  </div>
+
+  <!-- SEARCH BAR -->
+  <div class="search-bar">
+    <div class="search-bar-inner">
+      <input id="s-q" placeholder="Nom, description, secteur…" onkeydown="if(event.key==='Enter')doSearch()">
+      <select id="s-secteur"><option value="">Tous les secteurs</option></select>
+      <select id="s-type"><option value="">Tous les types</option></select>
+      <select id="s-pays"><option value="">Tous les pays</option></select>
+      <input id="s-ville" placeholder="Ville…" style="width:120px;min-width:unset;" onkeydown="if(event.key==='Enter')doSearch()">
+      <button class="btn-search" onclick="doSearch()">🔍 Rechercher</button>
+      <button class="btn-reset" onclick="resetSearch()">✕ Réinitialiser</button>
+    </div>
+  </div>
+
+  <div style="max-width:1180px;margin:0 auto;padding:0 24px;">
+
+    <!-- TABS -->
+    <div class="rtab-bar">
+      <button class="rtab active" data-tab="annuaire">🔍 Annuaire</button>
+      <button class="rtab" data-tab="mon-reseau" id="tab-mon-reseau">🏢 Mon Réseau</button>
+      <button class="rtab" data-tab="demandes" id="tab-demandes">📬 Demandes <span class="rtab-badge" id="badge-demandes" style="display:none;"></span></button>
+      <button class="rtab" data-tab="stats">📊 Statistiques</button>
+      <button class="rtab" data-tab="profil-reseau">⚙️ Mon profil réseau</button>
+    </div>
+
+    <!-- TAB: ANNUAIRE -->
+    <div class="rtab-pane active" id="tab-annuaire">
+      <div id="annuaire-result"><div class="notice">Chargement…</div></div>
+    </div>
+
+    <!-- TAB: MON RÉSEAU -->
+    <div class="rtab-pane" id="tab-mon-reseau">
+      <div id="mon-reseau-content"><div class="notice">Chargement…</div></div>
+    </div>
+
+    <!-- TAB: DEMANDES -->
+    <div class="rtab-pane" id="tab-demandes">
+      <div id="demandes-content"><div class="notice">Chargement…</div></div>
+    </div>
+
+    <!-- TAB: STATS -->
+    <div class="rtab-pane" id="tab-stats">
+      <div id="stats-content"><div class="notice">Chargement…</div></div>
+    </div>
+
+    <!-- TAB: PROFIL RÉSEAU -->
+    <div class="rtab-pane" id="tab-profil-reseau">
+      <div id="profil-reseau-content"><div class="notice">Chargement…</div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL: Demander affiliation -->
+<div class="modal-back" id="modal-affil">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="margin:0;font-size:1.1rem;">📬 Demande d'affiliation</h2>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-affil').classList.remove('open')">✕</button>
+    </div>
+    <div id="modal-affil-target" style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:16px;font-size:.87rem;"></div>
+    <div class="form-field" style="margin-bottom:14px;">
+      <label>Message de présentation (facultatif)</label>
+      <textarea id="affil-msg" style="width:100%;min-height:100px;border:1px solid var(--border);border-radius:10px;padding:10px;font-family:inherit;font-size:.87rem;" placeholder="Bonjour, nous souhaitons rejoindre votre Réseau Professionnel afin de mettre nos services à disposition de votre communauté…"></textarea>
+    </div>
+    <button class="btn btn-primary" style="width:100%;background:#1B3A6B;border-color:#1B3A6B;" id="btn-send-affil">Envoyer la demande</button>
+  </div>
+</div>
+
+<!-- MODAL: Voir fiche initiative -->
+<div class="modal-back" id="modal-fiche">
+  <div class="modal-box" style="max-width:660px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="margin:0;font-size:1.05rem;" id="modal-fiche-titre">Fiche initiative</h2>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-fiche').classList.remove('open')">✕</button>
+    </div>
+    <div id="modal-fiche-content"></div>
+  </div>
+</div>
+
+<!-- MODAL: Répondre à une demande -->
+<div class="modal-back" id="modal-reponse">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="margin:0;font-size:1.1rem;" id="reponse-titre">Répondre à la demande</h2>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-reponse').classList.remove('open')">✕</button>
+    </div>
+    <textarea id="reponse-msg" style="width:100%;min-height:80px;border:1px solid var(--border);border-radius:10px;padding:10px;font-family:inherit;font-size:.87rem;margin-bottom:12px;" placeholder="Message de réponse (facultatif)…"></textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-sm" style="background:#10b981;color:#fff;border-color:#10b981;" onclick="repondre('accepte')">✓ Accepter</button>
+      <button class="btn btn-sm btn-outline" onclick="repondre('info_demandee')">❓ Demander infos</button>
+      <button class="btn btn-sm" style="background:#ef4444;color:#fff;border-color:#ef4444;" onclick="repondre('refuse')">✕ Refuser</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/ds.js"></script>
+<script>
+/* ── HELPERS ── */
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function safeParse(v,def=[]){try{return v?JSON.parse(v):def;}catch{return def;}}
+
+const apiCall=(m,p,b)=>fetch('/api'+p,{method:m,credentials:'include',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined})
+  .then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+
+/* ── ÉTAT ── */
+let ME=null, MY_INIT=null, MY_AFFIL_IDS=new Set(), MY_SENT_IDS=new Set();
+let currentAffilId=null, currentTargetId=null;
+
+const TYPES_ORG=['Association','Entreprise','Fédération','ONG','Institution','Coopérative','Entrepreneur individuel','Fondation','Collectif','Réseau'];
+const SECTEURS=['Action Sociale','Agriculture','Santé','Éducation','Technologie','Culture','Économie','Finance','Droit','Environnement','Commerce','Immobilier','Transport','Tourisme','Médias','Sport','Énergie','Mode','Alimentation','Sécurité'];
+
+/* ── INIT ── */
+async function init(){
+  ME=await fetchCurrentUser();
+  populateFilters();
+  await Promise.all([loadAnnuaire(), loadHeroStats()]);
+  if(ME){
+    await loadMyState();
+    loadDemandesTab();
+  }
+}
+
+function populateFilters(){
+  const sSect=document.getElementById('s-secteur');
+  SECTEURS.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sSect.appendChild(o);});
+  const sType=document.getElementById('s-type');
+  TYPES_ORG.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;sType.appendChild(o);});
+}
+
+async function loadHeroStats(){
+  try{
+    const{initiatives}=await apiCall('GET','/reseau?limit=200');
+    document.getElementById('hero-total').textContent=initiatives.length;
+    document.getElementById('hero-pays').textContent=new Set(initiatives.map(i=>i.pays).filter(Boolean)).size;
+    const totalAffil=initiatives.reduce((s,i)=>s+(i.nb_affiliations||0),0);
+    document.getElementById('hero-affiliations').textContent=totalAffil;
+    document.getElementById('hero-secteurs').textContent=new Set(initiatives.map(i=>i.domaine).filter(Boolean)).size;
+  }catch(e){}
+}
+
+async function loadMyState(){
+  try{
+    const{moi,mon_reseau,membre_de}=await apiCall('GET','/reseau/me');
+    MY_INIT=moi;
+    if(mon_reseau) mon_reseau.forEach(i=>MY_AFFIL_IDS.add(i.id));
+  }catch(e){}
+  try{
+    const{envoyees}=await apiCall('GET','/reseau/me/envoyees');
+    (envoyees||[]).forEach(e=>{if(e.statut==='en_attente'||e.statut==='accepte') MY_SENT_IDS.add(e.destinataire_id);});
+  }catch(e){}
+}
+
+/* ── ANNUAIRE ── */
+async function loadAnnuaire(){
+  const q=document.getElementById('s-q').value.trim();
+  const secteur=document.getElementById('s-secteur').value;
+  const type=document.getElementById('s-type').value;
+  const pays=document.getElementById('s-pays').value;
+  const ville=document.getElementById('s-ville').value.trim();
+  let url='/reseau?';
+  if(q) url+=`q=${encodeURIComponent(q)}&`;
+  if(secteur) url+=`secteur=${encodeURIComponent(secteur)}&`;
+  if(type) url+=`type=${encodeURIComponent(type)}&`;
+  if(pays) url+=`pays=${encodeURIComponent(pays)}&`;
+  if(ville) url+=`ville=${encodeURIComponent(ville)}&`;
+  const el=document.getElementById('annuaire-result');
+  el.innerHTML='<div class="notice">Recherche en cours…</div>';
+  try{
+    const{initiatives}=await apiCall('GET',url);
+    // Peupler filtre pays dynamiquement
+    const allPays=[...new Set(initiatives.map(i=>i.pays).filter(Boolean))].sort();
+    const pEl=document.getElementById('s-pays');
+    if(pEl.children.length<=1){
+      allPays.forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;pEl.appendChild(o);});
+    }
+    if(!initiatives.length){
+      el.innerHTML=`<div class="rnet-empty"><div class="e-icon">🔍</div><div class="e-title">Aucune initiative trouvée</div><div class="e-sub">Modifiez vos critères de recherche.</div></div>`;
+      return;
+    }
+    el.innerHTML=`<div style="font-size:.82rem;color:var(--muted);margin-bottom:16px;">${initiatives.length} initiative(s) trouvée(s)</div>
+      <div class="init-net-grid">${initiatives.map(i=>initCardHTML(i)).join('')}</div>`;
+  }catch(e){el.innerHTML=`<div class="notice" style="color:#D33;">Erreur : ${escH(e.message)}</div>`;}
+}
+function doSearch(){loadAnnuaire();}
+function resetSearch(){
+  ['s-q','s-ville'].forEach(id=>document.getElementById(id).value='');
+  ['s-secteur','s-type','s-pays'].forEach(id=>document.getElementById(id).value='');
+  loadAnnuaire();
+}
+
+function initCardHTML(i){
+  const isMembre=MY_AFFIL_IDS.has(i.id);
+  const hasSent=MY_SENT_IDS.has(i.id);
+  const isMe=MY_INIT?.id===i.id;
+  const services=safeParse(i.services,[]).slice(0,3);
+  const accreds=safeParse(i.accreditations||'[]',[]);
+  return `<div class="init-net-card">
+    <div class="init-card-head">
+      <div class="init-logo-box">${i.logo_url?`<img src="${escH(i.logo_url)}" alt="">`:(i.nom||'?')[0].toUpperCase()}</div>
+      <div class="init-card-meta">
+        <div class="init-card-nom">${escH(i.nom)}</div>
+        <div class="init-card-type">${escH(i.type||'—')}</div>
+        <div class="init-card-loc">📍 ${escH([i.ville,i.pays].filter(Boolean).join(', ')||'—')}</div>
+      </div>
+    </div>
+    ${i.description?`<div class="init-card-desc">${escH(i.description)}</div>`:''}
+    <div class="init-card-tags">
+      ${i.domaine?`<span class="init-tag secteur">${escH(i.domaine)}</span>`:''}
+      ${services.map(s=>`<span class="init-tag">${escH(s)}</span>`).join('')}
+      ${accreds.includes('verifie')||accreds.includes('initiative_verifiee')?'<span class="init-tag badge-verif">✓ Vérifiée</span>':''}
+      ${accreds.includes('partenaire')||accreds.includes('partenaire_officiel')?'<span class="init-tag badge-partner">⭐ Partenaire</span>':''}
+    </div>
+    <div class="init-card-footer">
+      <div class="init-card-stat">
+        <span>👍 ${i.nb_recommandations||0}</span>
+        <span style="margin-left:8px;">🔗 ${i.nb_affiliations||0} membres</span>
+      </div>
+      <div class="init-card-actions">
+        <button class="btn-contact" onclick="voirFiche(${i.id})">Voir</button>
+        ${ME&&!isMe?`<button class="btn-affil${isMembre?' membre':hasSent?' sent':''}" onclick="${!isMembre&&!hasSent?`demanderAffil(${i.id},'${escH(i.nom||'')}')`:''}">
+          ${isMembre?'✓ Membre':hasSent?'⏳ Envoyé':'+ Rejoindre'}</button>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ── FICHE DÉTAIL ── */
+async function voirFiche(id){
+  const modal=document.getElementById('modal-fiche');
+  const content=document.getElementById('modal-fiche-content');
+  modal.classList.add('open');
+  content.innerHTML='<div class="notice">Chargement…</div>';
+  try{
+    const{initiative:i,recommandations,en_avant}=await apiCall('GET',`/reseau/${id}`);
+    document.getElementById('modal-fiche-titre').textContent=i.nom;
+    const services=safeParse(i.services,[]);
+    const langues=safeParse(i.langues,[]);
+    const accreds=safeParse(i.accreditations||'[]',[]);
+    const isMe=MY_INIT?.id===i.id;
+    content.innerHTML=`
+      <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:16px;">
+        <div class="init-logo-box" style="width:64px;height:64px;font-size:1.6rem;">${i.logo_url?`<img src="${escH(i.logo_url)}" alt="">`:(i.nom||'?')[0]}</div>
+        <div>
+          <div style="font-size:1rem;font-weight:800;">${escH(i.nom)}</div>
+          <div style="font-size:.8rem;color:var(--muted);">${escH(i.type||'—')} ${i.domaine?'· '+escH(i.domaine):''}</div>
+          <div style="font-size:.8rem;color:var(--muted);">📍 ${escH([i.ville,i.pays].filter(Boolean).join(', ')||'—')}</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;">
+            ${accreds.includes('verifie')||accreds.includes('initiative_verifiee')?'<span class="init-tag badge-verif">✓ Vérifiée</span>':''}
+            ${accreds.includes('partenaire')||accreds.includes('partenaire_officiel')?'<span class="init-tag badge-partner">⭐ Partenaire</span>':''}
+          </div>
+        </div>
+      </div>
+      ${i.description?`<p style="font-size:.87rem;color:var(--muted);margin:0 0 14px;">${escH(i.description)}</p>`:''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;font-size:.82rem;">
+        ${i.annee_creation?`<div><b>Fondée en :</b> ${i.annee_creation}</div>`:''}
+        ${i.taille_structure?`<div><b>Taille :</b> ${escH(i.taille_structure)}</div>`:''}
+        ${i.pays_immatriculation?`<div><b>Pays d'immatriculation :</b> ${escH(i.pays_immatriculation)}</div>`:''}
+        <div><b>👍 Recommandations :</b> ${i.nb_recommandations||0}</div>
+        <div><b>🔗 Membres du réseau :</b> ${i.nb_affiliations||0}</div>
+      </div>
+      ${services.length?`<div style="margin-bottom:12px;"><b style="font-size:.8rem;">Services proposés :</b><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;">${services.map(s=>`<span class="init-tag">${escH(s)}</span>`).join('')}</div></div>`:''}
+      ${langues.length?`<div style="margin-bottom:12px;"><b style="font-size:.8rem;">Langues :</b> <span style="font-size:.82rem;">${langues.map(escH).join(', ')}</span></div>`:''}
+      ${recommandations.length?`<div style="margin-bottom:12px;">
+        <b style="font-size:.8rem;">Recommandées par :</b>
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">
+          ${recommandations.map(r=>`<div style="font-size:.8rem;background:var(--bg);padding:8px 10px;border-radius:8px;"><span style="font-weight:700;">${escH(r.nom)}</span>${r.contenu?` — "${escH(r.contenu)}"`:''}</div>`).join('')}
+        </div>
+      </div>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;padding-top:14px;border-top:1px solid var(--border);">
+        ${ME&&!isMe?`<button class="btn-contact" onclick="contacter(${i.owner_user_id||0},'${escH(i.nom||'')}',document.getElementById('modal-fiche'))">💬 Contacter</button>`:''}
+        ${ME&&!isMe&&MY_INIT?.numero_immatriculation&&!MY_AFFIL_IDS.has(i.id)&&!MY_SENT_IDS.has(i.id)?`<button class="btn-affil" onclick="demanderAffil(${i.id},'${escH(i.nom||'')}')">+ Rejoindre le réseau</button>`:''}
+        ${ME&&!isMe&&MY_INIT?.numero_immatriculation?`<button class="btn-affil" style="border-color:#f97316;color:#f97316;" onclick="recommander(${i.id},'${escH(i.nom||'')}')">👍 Recommander</button>`:''}
+      </div>`;
+  }catch(e){content.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+/* ── CONTACTER (ouvre messagerie) ── */
+async function contacter(userId,nom,closeModal){
+  if(!ME){DA.toast('Connectez-vous pour contacter.',{type:'warning'});return;}
+  if(closeModal) closeModal.classList.remove('open');
+  try{
+    const r=await apiCall('POST','/conversations',{user_id:userId,message:`Bonjour, je vous contacte via le Réseau Professionnel de Diaspo'Actif.`});
+    window.location.href=`messagerie.html?conv=${r.conversation_id||''}`;
+  }catch(e){DA.toast('Erreur : '+e.message,{type:'danger'});}
+}
+
+/* ── DEMANDE AFFILIATION ── */
+let pendingAffilId=null;
+function demanderAffil(initId,nom){
+  if(!ME){DA.toast('Connectez-vous pour faire une demande.',{type:'warning'});return;}
+  if(!MY_INIT){DA.toast('Vous devez avoir une initiative pour rejoindre un réseau.',{type:'warning'});return;}
+  if(!MY_INIT.numero_immatriculation){DA.toast('Votre initiative doit avoir un numéro d\'immatriculation.',{type:'warning'});return;}
+  pendingAffilId=initId;
+  document.getElementById('modal-affil-target').innerHTML=`<strong>Réseau de :</strong> ${escH(nom)}`;
+  document.getElementById('affil-msg').value='';
+  document.getElementById('modal-affil').classList.add('open');
+}
+document.getElementById('btn-send-affil').addEventListener('click',async()=>{
+  if(!pendingAffilId) return;
+  const msg=document.getElementById('affil-msg').value.trim();
+  try{
+    await apiCall('POST',`/reseau/${pendingAffilId}/affiliation`,{message:msg||null});
+    DA.toast('Demande envoyée avec succès !',{type:'success'});
+    document.getElementById('modal-affil').classList.remove('open');
+    MY_SENT_IDS.add(pendingAffilId);
+    loadAnnuaire();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+});
+
+/* ── RECOMMANDER ── */
+async function recommander(initId,nom){
+  if(!confirm(`Recommander "${nom}" sur Diaspo'Actif ?`)) return;
+  try{
+    await apiCall('POST',`/reseau/${initId}/recommander`,{});
+    DA.toast('Recommandation envoyée !',{type:'success'});
+    voirFiche(initId);
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+/* ── MON RÉSEAU ── */
+async function loadMonReseauTab(){
+  const el=document.getElementById('mon-reseau-content');
+  el.innerHTML='<div class="notice">Chargement…</div>';
+  if(!ME){el.innerHTML='<div class="notice">Connectez-vous pour accéder à votre réseau.</div>';return;}
+  try{
+    const{moi,mon_reseau,membre_de}=await apiCall('GET','/reseau/me');
+    if(!moi){
+      el.innerHTML='<div class="notice">Aucune initiative associée à votre compte.</div>';
+      return;
+    }
+    const hasImmat=!!(moi.numero_immatriculation);
+    let html='';
+    if(!hasImmat){
+      html+=`<div class="immat-banner"><strong>⚠️ Immatriculation requise</strong>Votre initiative doit avoir un numéro d'immatriculation officiel pour apparaître dans les réseaux. Complétez votre profil dans l'onglet "Mon profil réseau".</div>`;
+    }
+    html+=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+      <div><h2 style="margin:0;">Mon réseau — ${escH(moi.nom)}</h2>
+      <div style="font-size:.82rem;color:var(--muted);margin-top:4px;">${mon_reseau.length} membre(s) dans votre réseau · Membre de ${membre_de.length} réseau(x)</div></div>
+    </div>`;
+    if(mon_reseau.length){
+      html+=`<h3 style="font-size:.85rem;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin-bottom:12px;">MEMBRES DE MON RÉSEAU (${mon_reseau.length})</h3>
+      <div class="init-net-grid">`;
+      html+=mon_reseau.map(i=>`<div class="init-net-card">
+        <div class="init-card-head">
+          <div class="init-logo-box">${i.logo_url?`<img src="${escH(i.logo_url)}" alt="">`:(i.nom||'?')[0]}</div>
+          <div class="init-card-meta">
+            <div class="init-card-nom">${escH(i.nom)} ${i.mise_en_avant?'⭐':''}</div>
+            <div class="init-card-type">${escH(i.type||'—')}</div>
+            <div class="init-card-loc">📍 ${escH([i.ville,i.pays].filter(Boolean).join(', ')||'—')}</div>
+          </div>
+        </div>
+        <div class="init-card-footer">
+          <div class="init-card-stat">👍 ${i.nb_recommandations||0} · ${escH(i.domaine||'—')}</div>
+          <div style="display:flex;gap:6px;">
+            <button class="star-btn ${i.mise_en_avant?'on':''}" title="Mettre en avant" onclick="toggleMiseEnAvant(${i._aff_id||0},${!i.mise_en_avant},this)">⭐</button>
+            <button class="btn-contact" onclick="voirFiche(${i.id})">Voir</button>
+            <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="retirerDuReseau(${i.id},'${escH(i.nom||'')}')">Retirer</button>
+          </div>
+        </div>
+      </div>`).join('');
+      html+='</div>';
+    } else {
+      html+=`<div class="rnet-empty"><div class="e-icon">🌐</div><div class="e-title">Votre réseau est vide</div><div class="e-sub">Invitez des initiatives à rejoindre votre réseau professionnel.</div></div>`;
+    }
+    if(membre_de.length){
+      html+=`<h3 style="font-size:.85rem;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin:24px 0 12px;">JE SUIS MEMBRE DE (${membre_de.length})</h3>
+      <div class="init-net-grid">`;
+      html+=membre_de.map(i=>`<div class="init-net-card">
+        <div class="init-card-head">
+          <div class="init-logo-box">${i.logo_url?`<img src="${escH(i.logo_url)}" alt="">`:(i.nom||'?')[0]}</div>
+          <div class="init-card-meta">
+            <div class="init-card-nom">${escH(i.nom)}</div>
+            <div class="init-card-type">${escH(i.type||'—')}</div>
+            <div class="init-card-loc">📍 ${escH([i.ville,i.pays].filter(Boolean).join(', ')||'—')}</div>
+          </div>
+        </div>
+        <div class="init-card-footer">
+          <div></div>
+          <button class="btn-contact" onclick="voirFiche(${i.id})">Voir</button>
+        </div>
+      </div>`).join('');
+      html+='</div>';
+    }
+    el.innerHTML=html;
+  }catch(e){el.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+/* ── DEMANDES ── */
+async function loadDemandesTab(){
+  const el=document.getElementById('demandes-content');
+  if(!ME){el.innerHTML='<div class="notice">Connectez-vous.</div>';return;}
+  try{
+    const{demandes}=await apiCall('GET','/reseau/me/demandes');
+    const enAttente=demandes.filter(d=>d.statut==='en_attente'||d.statut==='info_demandee');
+    const badge=document.getElementById('badge-demandes');
+    if(enAttente.length){badge.style.display='';badge.textContent=enAttente.length;}
+    if(!demandes.length){
+      el.innerHTML=`<div class="rnet-empty"><div class="e-icon">📬</div><div class="e-title">Aucune demande</div><div class="e-sub">Les demandes d'affiliation à votre réseau apparaîtront ici.</div></div>`;
+      return;
+    }
+    const statutMap={en_attente:'En attente',accepte:'Accepté',refuse:'Refusé',suspendu:'Suspendu',info_demandee:'Info demandée'};
+    el.innerHTML=demandes.map(d=>`<div class="dem-card" id="dem-${d.id}">
+      <div class="dem-logo">${d.logo_url?`<img src="${escH(d.logo_url)}" alt="">`:(d.nom||'?')[0]}</div>
+      <div class="dem-info">
+        <div class="dem-nom">${escH(d.nom)}</div>
+        <div class="dem-sub">${escH(d.type||'—')} · ${escH(d.domaine||'—')} · 📍 ${escH([d.ville,d.pays].filter(Boolean).join(', ')||'—')}</div>
+        ${d.numero_immatriculation?`<div class="dem-sub" style="margin-top:2px;">N° ${escH(d.numero_immatriculation)}</div>`:''}
+        ${d.message?`<div class="dem-msg">"${escH(d.message)}"</div>`:''}
+        ${d.reponse&&d.statut!=='en_attente'?`<div style="font-size:.78rem;color:var(--muted);margin-top:6px;">Votre réponse : "${escH(d.reponse)}"</div>`:''}
+      </div>
+      <div class="dem-actions">
+        <span class="dem-statut dem-${d.statut}">${statutMap[d.statut]||d.statut}</span>
+        ${d.statut==='en_attente'||d.statut==='info_demandee'?`
+          <button class="btn btn-sm" style="background:#10b981;color:#fff;border-color:#10b981;" onclick="ouvrirReponse(${d.id},'${escH(d.nom||'')}')">Répondre</button>
+          <button class="btn btn-sm btn-outline" onclick="voirFiche(${d.demandeur_id})">Voir fiche</button>
+        `:''}
+        ${d.statut==='accepte'?`<button class="btn btn-sm btn-outline" style="color:#f97316;border-color:#f97316;" onclick="suspendre(${d.id})">Suspendre</button>`:''}
+      </div>
+    </div>`).join('');
+  }catch(e){el.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+let repondreId=null;
+function ouvrirReponse(affId,nom){
+  repondreId=affId;
+  document.getElementById('reponse-titre').textContent=`Répondre à "${nom}"`;
+  document.getElementById('reponse-msg').value='';
+  document.getElementById('modal-reponse').classList.add('open');
+}
+async function repondre(statut){
+  if(!repondreId) return;
+  const reponse=document.getElementById('reponse-msg').value.trim();
+  try{
+    await apiCall('PATCH',`/reseau/affiliations/${repondreId}`,{statut,reponse:reponse||null});
+    DA.toast({accepte:'Affiliation acceptée !',refuse:'Demande refusée.',info_demandee:'Demande d\'informations envoyée.'}[statut]||'OK',{type:statut==='accepte'?'success':statut==='refuse'?'warning':'info'});
+    document.getElementById('modal-reponse').classList.remove('open');
+    loadDemandesTab();
+    loadMyState();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+async function suspendre(affId){
+  if(!confirm('Suspendre cette affiliation ?')) return;
+  try{await apiCall('PATCH',`/reseau/affiliations/${affId}`,{statut:'suspendu'});DA.toast('Affiliation suspendue.',{type:'info'});loadDemandesTab();loadMonReseauTab();}
+  catch(e){DA.toast(e.message,{type:'danger'});}
+}
+async function retirerDuReseau(initId,nom){
+  if(!confirm(`Retirer "${nom}" de votre réseau ?`)) return;
+  try{
+    const{demandes}=await apiCall('GET','/reseau/me/demandes');
+    const aff=demandes.find(d=>d.demandeur_id===initId);
+    if(aff) await apiCall('DELETE',`/reseau/affiliations/${aff.id}`);
+    DA.toast('Retiré du réseau.',{type:'success'});loadMonReseauTab();loadDemandesTab();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+async function toggleMiseEnAvant(affId,val,btn){
+  try{await apiCall('PATCH',`/reseau/affiliations/${affId}`,{mise_en_avant:val});btn.classList.toggle('on',val);}
+  catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+/* ── STATS ── */
+async function loadStatsTab(){
+  const el=document.getElementById('stats-content');
+  if(!ME){el.innerHTML='<div class="notice">Connectez-vous.</div>';return;}
+  try{
+    const{total,enAttente,recos,membreDe,parPays,parSecteur}=await apiCall('GET','/reseau/me/stats');
+    el.innerHTML=`
+      <div class="stats-grid">
+        <div class="stat-box-r"><div class="sv">${total}</div><div class="sl">Membres dans mon réseau</div></div>
+        <div class="stat-box-r"><div class="sv" style="color:#f97316;">${enAttente}</div><div class="sl">Demandes en attente</div></div>
+        <div class="stat-box-r"><div class="sv" style="color:#10b981;">${recos}</div><div class="sl">Recommandations reçues</div></div>
+        <div class="stat-box-r"><div class="sv" style="color:#7c3aed;">${membreDe}</div><div class="sl">Réseaux dont je suis membre</div></div>
+      </div>
+      ${parPays.length?`<div class="card" style="margin-bottom:16px;"><h3 style="margin:0 0 14px;font-size:.9rem;">🌍 Membres par pays</h3>${parPays.map(r=>`<div class="bar-item"><div class="bar-label">${escH(r.pays||'—')}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(r.nb/(parPays[0].nb||1)*100)}%;"></div></div><div class="bar-count">${r.nb}</div></div>`).join('')}</div>`:''}
+      ${parSecteur.length?`<div class="card"><h3 style="margin:0 0 14px;font-size:.9rem;">🏭 Membres par secteur</h3>${parSecteur.map(r=>`<div class="bar-item"><div class="bar-label">${escH(r.domaine||'—')}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(r.nb/(parSecteur[0].nb||1)*100)}%;background:#7c3aed;"></div></div><div class="bar-count">${r.nb}</div></div>`).join('')}</div>`:''}
+    `;
+  }catch(e){el.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+/* ── PROFIL RÉSEAU ── */
+async function loadProfilReseauTab(){
+  const el=document.getElementById('profil-reseau-content');
+  if(!ME){el.innerHTML='<div class="notice">Connectez-vous.</div>';return;}
+  try{
+    const{moi}=await apiCall('GET','/reseau/me');
+    if(!moi){el.innerHTML='<div class="notice">Aucune initiative trouvée sur ce compte.</div>';return;}
+    const services=safeParse(moi.services,[]);
+    const langues=safeParse(moi.langues,[]);
+    const PAYS_IMMAT={FR:'France — SIRET',BE:'Belgique — BCE',CI:"Côte d'Ivoire — RCCM/IF",SN:'Sénégal — NINEA',CA:'Canada — Numéro d\'entreprise',MA:'Maroc — ICE',TN:'Tunisie — MF',CM:'Cameroun — RCCM',ML:'Mali — RCCM',BF:'Burkina Faso — IFU',MG:'Madagascar — NIF',GA:'Gabon — NIF',CG:'Congo — RCCM',CD:'RDC — ID Nat.',DE:'Allemagne — HRB',GB:'Royaume-Uni — Companies House',US:'États-Unis — EIN',CH:'Suisse — IDE'};
+    el.innerHTML=`
+      <h2 style="margin:0 0 6px;">⚙️ Profil réseau de <strong>${escH(moi.nom)}</strong></h2>
+      <p style="color:var(--muted);font-size:.85rem;margin:0 0 20px;">Ces informations sont visibles dans les annuaires des réseaux professionnels. Aucun téléphone ni e-mail n'est jamais affiché.</p>
+      ${!moi.numero_immatriculation?`<div class="immat-banner"><strong>⚠️ Immatriculation obligatoire</strong>Sans numéro officiel, votre initiative ne peut pas rejoindre un réseau ni apparaître dans les annuaires.</div>`:''}
+      <div class="profil-grid" style="gap:14px;">
+        <div class="form-field">
+          <label>Pays d'immatriculation</label>
+          <select id="pr-pays-immat" class="input-field" style="width:100%;">
+            <option value="">— Sélectionner —</option>
+            ${Object.entries(PAYS_IMMAT).map(([k,v])=>`<option value="${k}" ${moi.pays_immatriculation===k?'selected':''}>${escH(v)}</option>`).join('')}
+            <option value="AUTRE" ${moi.pays_immatriculation&&!PAYS_IMMAT[moi.pays_immatriculation]?'selected':''}>Autre pays</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Numéro officiel d'immatriculation *</label>
+          <input id="pr-immat" class="input-field" style="width:100%;" value="${escH(moi.numero_immatriculation||'')}" placeholder="SIRET, BCE, RCCM, NINEA…">
+        </div>
+        <div class="form-field">
+          <label>Année de création</label>
+          <input id="pr-annee" type="number" class="input-field" style="width:100%;" min="1900" max="2099" value="${moi.annee_creation||''}">
+        </div>
+        <div class="form-field">
+          <label>Taille de la structure</label>
+          <select id="pr-taille" class="input-field" style="width:100%;">
+            <option value="">— Sélectionner —</option>
+            ${['1 (auto-entrepreneur)','2-10 personnes','11-50 personnes','51-200 personnes','201-500 personnes','500+ personnes'].map(t=>`<option ${moi.taille_structure===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-field" style="margin-top:14px;">
+        <label>Services proposés <span style="font-weight:400;color:var(--muted);">(appuyer Entrée pour ajouter)</span></label>
+        <div class="tag-editor" id="services-editor" onclick="document.getElementById('services-input').focus()">
+          ${services.map(s=>`<span class="te-tag">${escH(s)}<button onclick="removeTag('services',this,'${escH(s).replace(/'/g,"\\'")}')">×</button></span>`).join('')}
+          <input id="services-input" placeholder="Ajouter un service…" onkeydown="addTag(event,'services')">
+        </div>
+      </div>
+      <div class="form-field" style="margin-top:14px;">
+        <label>Langues <span style="font-weight:400;color:var(--muted);">(appuyer Entrée pour ajouter)</span></label>
+        <div class="tag-editor" id="langues-editor" onclick="document.getElementById('langues-input').focus()">
+          ${langues.map(l=>`<span class="te-tag">${escH(l)}<button onclick="removeTag('langues',this,'${escH(l).replace(/'/g,"\\'")}')">×</button></span>`).join('')}
+          <input id="langues-input" placeholder="Ajouter une langue…" onkeydown="addTag(event,'langues')">
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:16px;flex-wrap:wrap;">
+        <label style="display:flex;gap:8px;align-items:center;cursor:pointer;">
+          <input type="checkbox" id="pr-visible" ${moi.reseau_visible!==0?'checked':''}> Visible dans les annuaires
+        </label>
+        <label style="display:flex;gap:8px;align-items:center;cursor:pointer;">
+          <input type="checkbox" id="pr-messages" ${moi.accepte_messages!==0?'checked':''}> Accepter les messages entrants
+        </label>
+      </div>
+      <button class="btn btn-primary" style="margin-top:20px;background:#1B3A6B;border-color:#1B3A6B;" onclick="sauvegarderProfil()">💾 Sauvegarder le profil réseau</button>
+    `;
+    window._currentServices=[...services];
+    window._currentLangues=[...langues];
+  }catch(e){el.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+function addTag(e,type){
+  if(e.key!=='Enter') return;
+  e.preventDefault();
+  const input=document.getElementById(type+'-input');
+  const val=input.value.trim();
+  if(!val) return;
+  const arr=type==='services'?window._currentServices:window._currentLangues;
+  if(!arr.includes(val)){
+    arr.push(val);
+    const editor=document.getElementById(type+'-editor');
+    const span=document.createElement('span');span.className='te-tag';
+    span.innerHTML=`${escH(val)}<button onclick="removeTag('${type}',this,'${escH(val).replace(/'/g,"\\'")}')">×</button>`;
+    editor.insertBefore(span,input);
+  }
+  input.value='';
+}
+function removeTag(type,btn,val){
+  const arr=type==='services'?window._currentServices:window._currentLangues;
+  const i=arr.indexOf(val);if(i>-1)arr.splice(i,1);
+  btn.parentElement.remove();
+}
+async function sauvegarderProfil(){
+  const immat=document.getElementById('pr-immat')?.value.trim();
+  if(!immat){DA.toast('Le numéro d\'immatriculation est obligatoire.',{type:'warning'});return;}
+  try{
+    await apiCall('PATCH','/reseau/me/profil',{
+      numero_immatriculation:immat,
+      pays_immatriculation:document.getElementById('pr-pays-immat').value||null,
+      annee_creation:parseInt(document.getElementById('pr-annee').value)||null,
+      taille_structure:document.getElementById('pr-taille').value||null,
+      services:window._currentServices||[],
+      langues:window._currentLangues||[],
+      reseau_visible:document.getElementById('pr-visible').checked,
+      accepte_messages:document.getElementById('pr-messages').checked,
+    });
+    DA.toast('Profil réseau sauvegardé !',{type:'success'});
+    MY_INIT=null;
+    loadMyState();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+/* ── TABS ── */
+document.querySelectorAll('.rtab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.rtab-pane').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    const tab=btn.dataset.tab;
+    document.getElementById('tab-'+tab).classList.add('active');
+    if(tab==='mon-reseau') loadMonReseauTab();
+    else if(tab==='demandes') loadDemandesTab();
+    else if(tab==='stats') loadStatsTab();
+    else if(tab==='profil-reseau') loadProfilReseauTab();
+  });
+});
+
+/* Fermer modals au clic extérieur */
+['modal-affil','modal-fiche','modal-reponse'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+});
+
+/* Sidebar toggle */
+(function(){
+  const toggle=document.getElementById('sidebar-toggle');
+  const sb=document.querySelector('.sidebar');
+  toggle?.addEventListener('click',()=>sb?.classList.toggle('open'));
+})();
+
+init();
+</script>
+</body>
+</html>

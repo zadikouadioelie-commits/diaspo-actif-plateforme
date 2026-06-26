@@ -967,6 +967,15 @@ const MIGRATIONS = [
   ["offres_candidatures", "type_candidature TEXT DEFAULT 'offre'"],
   // CV versions history
   ["cv_profiles", "versions_json TEXT DEFAULT '[]'"],
+  // ── Module Réseau Professionnel ──
+  ["initiatives", "numero_immatriculation TEXT"],
+  ["initiatives", "pays_immatriculation TEXT"],
+  ["initiatives", "taille_structure TEXT"],
+  ["initiatives", "annee_creation INTEGER"],
+  ["initiatives", "services TEXT DEFAULT '[]'"],
+  ["initiatives", "langues TEXT DEFAULT '[]'"],
+  ["initiatives", "reseau_visible INTEGER DEFAULT 1"],
+  ["initiatives", "accepte_messages INTEGER DEFAULT 1"],
 ];
 
 /* ===== SYSTÈME D'ACCRÉDITATIONS DIASPO'ACTIF ===== */
@@ -1300,6 +1309,36 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(event_id) REFERENCES agenda_events(id)
+  );
+
+  /* ============================================================
+     MODULE RÉSEAU PROFESSIONNEL — Annuaires des Initiatives
+  ============================================================ */
+
+  CREATE TABLE IF NOT EXISTS reseau_affiliations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    demandeur_id INTEGER NOT NULL,    -- initiative qui demande
+    destinataire_id INTEGER NOT NULL, -- initiative qui reçoit / tient l'annuaire
+    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','accepte','refuse','suspendu','info_demandee')),
+    message TEXT,
+    mise_en_avant INTEGER DEFAULT 0,
+    reponse TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(demandeur_id, destinataire_id),
+    FOREIGN KEY(demandeur_id) REFERENCES initiatives(id),
+    FOREIGN KEY(destinataire_id) REFERENCES initiatives(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS reseau_recommandations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,        -- initiative recommandée
+    auteur_initiative_id INTEGER NOT NULL,  -- initiative qui recommande
+    contenu TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(initiative_id, auteur_initiative_id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(auteur_initiative_id) REFERENCES initiatives(id)
   );
 
   /* ============================================================

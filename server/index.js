@@ -4837,6 +4837,285 @@ async function handleRequest(req, res) {
     }
 
     /* ============================================================
+       MODULE RÉSEAU PROFESSIONNEL — Annuaires des Initiatives
+       RÈGLE FONDAMENTALE : uniquement role='initiative' + immatriculées
+    ============================================================ */
+
+    /* Helper — récupère l'initiative de l'utilisateur connecté */
+    function getMyInit(userId) {
+      return db.prepare(`SELECT * FROM initiatives WHERE owner_user_id=? ORDER BY created_at DESC LIMIT 1`).get(userId);
+    }
+    /* Helper — sécurité : initiative immatriculée uniquement */
+    function initImmat(id) {
+      return db.prepare(`SELECT i.* FROM initiatives i WHERE i.id=? AND i.numero_immatriculation IS NOT NULL AND i.numero_immatriculation != ''`).get(id);
+    }
+    /* Helper — accréditations d'une initiative */
+    function initAccreds(initId) {
+      const row = db.prepare(`SELECT owner_user_id FROM initiatives WHERE id=?`).get(initId);
+      if (!row?.owner_user_id) return [];
+      return db.prepare(`SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'`).all(row.owner_user_id).map(a => a.type);
+    }
+    /* Helper — nb recommandations */
+    function countRecos(initId) {
+      return db.prepare(`SELECT COUNT(*) as c FROM reseau_recommandations WHERE initiative_id=?`).get(initId)?.c || 0;
+    }
+    /* Helper — enrichir fiche init pour le réseau */
+    function enrichInit(row) {
+      if (!row) return null;
+      return {
+        ...row,
+        services: safeParse(row.services) || [],
+        langues: safeParse(row.langues) || [],
+        nationalites_concernees: safeParse(row.nationalites_concernees) || [],
+        accreditations: initAccreds(row.id),
+        nb_recommandations: countRecos(row.id),
+        nb_affiliations: db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(row.id)?.c || 0,
+      };
+    }
+
+    /* GET /api/reseau — recherche d'initiatives immatriculées */
+    if (req.method === "GET" && pathname === "/api/reseau") {
+      const { q, secteur, type, pays, ville, langue, services, accreditation, limit: lim } = qs;
+      let sql = `SELECT i.* FROM initiatives i WHERE i.numero_immatriculation IS NOT NULL AND i.numero_immatriculation != '' AND (i.reseau_visible IS NULL OR i.reseau_visible=1)`;
+      const params = [];
+      if (q) { sql += ` AND (i.nom LIKE ? OR i.description LIKE ? OR i.domaine LIKE ?)`; params.push(`%${q}%`,`%${q}%`,`%${q}%`); }
+      if (secteur) { sql += ` AND i.domaine=?`; params.push(secteur); }
+      if (type) { sql += ` AND i.type=?`; params.push(type); }
+      if (pays) { sql += ` AND i.pays=?`; params.push(pays); }
+      if (ville) { sql += ` AND i.ville LIKE ?`; params.push(`%${ville}%`); }
+      sql += ` ORDER BY i.nb_vues DESC, i.created_at DESC LIMIT ?`;
+      params.push(parseInt(lim) || 60);
+      let rows = db.prepare(sql).all(...params);
+      // Filtre langue/services côté JS (stockés JSON)
+      if (langue) rows = rows.filter(r => { try{return JSON.parse(r.langues||'[]').includes(langue);}catch{return false;} });
+      if (services) rows = rows.filter(r => { try{return JSON.parse(r.services||'[]').some(s=>s.toLowerCase().includes(services.toLowerCase()));}catch{return false;} });
+      if (accreditation) {
+        rows = rows.filter(r => initAccreds(r.id).includes(accreditation));
+      }
+      return sendJSON(res, 200, { initiatives: rows.map(enrichInit) });
+    }
+
+    /* GET /api/reseau/me — mon réseau (initiative connectée) */
+    if (req.method === "GET" && pathname === "/api/reseau/me") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const myInit = getMyInit(me.id);
+      if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative associée à ce compte." });
+      // Affiliations acceptées (réseaux où je suis membre)
+      const affilies = db.prepare(`
+        SELECT i.*, ra.mise_en_avant, ra.created_at AS affilie_depuis FROM reseau_affiliations ra
+        JOIN initiatives i ON i.id=ra.demandeur_id
+        WHERE ra.destinataire_id=? AND ra.statut='accepte'
+        ORDER BY ra.mise_en_avant DESC, ra.created_at ASC
+      `).all(myInit.id);
+      // Réseaux dont je suis membre (j'ai demandé + accepté)
+      const membrede = db.prepare(`
+        SELECT i.*, ra.statut, ra.created_at AS affilie_depuis FROM reseau_affiliations ra
+        JOIN initiatives i ON i.id=ra.destinataire_id
+        WHERE ra.demandeur_id=? AND ra.statut='accepte'
+        ORDER BY i.nom ASC
+      `).all(myInit.id);
+      return sendJSON(res, 200, {
+        moi: enrichInit(myInit),
+        mon_reseau: affilies.map(r => ({ ...enrichInit(r), mise_en_avant: r.mise_en_avant })),
+        membre_de: membrede.map(enrichInit),
+      });
+    }
+
+    /* GET /api/reseau/me/demandes — demandes reçues */
+    if (req.method === "GET" && pathname === "/api/reseau/me/demandes") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const myInit = getMyInit(me.id);
+      if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
+      const rows = db.prepare(`
+        SELECT ra.*, i.nom, i.logo_url, i.type, i.domaine, i.ville, i.pays, i.numero_immatriculation, i.description
+        FROM reseau_affiliations ra JOIN initiatives i ON i.id=ra.demandeur_id
+        WHERE ra.destinataire_id=?
+        ORDER BY CASE ra.statut WHEN 'en_attente' THEN 0 WHEN 'info_demandee' THEN 1 ELSE 2 END, ra.updated_at DESC
+      `).all(myInit.id);
+      return sendJSON(res, 200, { demandes: rows, init_id: myInit.id });
+    }
+
+    /* GET /api/reseau/me/envoyees — mes demandes envoyées */
+    if (req.method === "GET" && pathname === "/api/reseau/me/envoyees") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const myInit = getMyInit(me.id);
+      if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
+      const rows = db.prepare(`
+        SELECT ra.*, i.nom, i.logo_url, i.type, i.domaine, i.ville, i.pays
+        FROM reseau_affiliations ra JOIN initiatives i ON i.id=ra.destinataire_id
+        WHERE ra.demandeur_id=? ORDER BY ra.updated_at DESC
+      `).all(myInit.id);
+      return sendJSON(res, 200, { envoyees: rows });
+    }
+
+    /* GET /api/reseau/me/stats — statistiques de mon réseau */
+    if (req.method === "GET" && pathname === "/api/reseau/me/stats") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const myInit = getMyInit(me.id);
+      if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
+      const total = db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(myInit.id)?.c || 0;
+      const enAttente = db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='en_attente'`).get(myInit.id)?.c || 0;
+      const recos = countRecos(myInit.id);
+      const membreDe = db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE demandeur_id=? AND statut='accepte'`).get(myInit.id)?.c || 0;
+      const parPays = db.prepare(`
+        SELECT i.pays, COUNT(*) as nb FROM reseau_affiliations ra
+        JOIN initiatives i ON i.id=ra.demandeur_id
+        WHERE ra.destinataire_id=? AND ra.statut='accepte' GROUP BY i.pays ORDER BY nb DESC LIMIT 10
+      `).all(myInit.id);
+      const parSecteur = db.prepare(`
+        SELECT i.domaine, COUNT(*) as nb FROM reseau_affiliations ra
+        JOIN initiatives i ON i.id=ra.demandeur_id
+        WHERE ra.destinataire_id=? AND ra.statut='accepte' GROUP BY i.domaine ORDER BY nb DESC LIMIT 10
+      `).all(myInit.id);
+      return sendJSON(res, 200, { total, enAttente, recos, membreDe, parPays, parSecteur });
+    }
+
+    /* GET /api/reseau/:id — fiche publique d'une initiative */
+    if (req.method === "GET" && /^\/api\/reseau\/\d+$/.test(pathname)) {
+      const initId = parseInt(pathname.split('/')[3]);
+      const row = db.prepare(`SELECT * FROM initiatives WHERE id=? AND numero_immatriculation IS NOT NULL AND numero_immatriculation != ''`).get(initId);
+      if (!row) return sendJSON(res, 404, { error: "Initiative introuvable ou non immatriculée." });
+      const affilies = db.prepare(`
+        SELECT i.id, i.nom, i.logo_url, i.type, i.domaine, i.ville, i.pays FROM reseau_affiliations ra
+        JOIN initiatives i ON i.id=ra.demandeur_id
+        WHERE ra.destinataire_id=? AND ra.statut='accepte' AND ra.mise_en_avant=1 LIMIT 6
+      `).all(initId);
+      const recos = db.prepare(`
+        SELECT rr.contenu, i.nom, i.logo_url FROM reseau_recommandations rr
+        JOIN initiatives i ON i.id=rr.auteur_initiative_id
+        WHERE rr.initiative_id=? ORDER BY rr.created_at DESC LIMIT 5
+      `).all(initId);
+      return sendJSON(res, 200, { initiative: enrichInit(row), en_avant: affilies, recommandations: recos });
+    }
+
+    /* GET /api/reseau/:id/membres — membres du réseau d'une initiative */
+    if (req.method === "GET" && /^\/api\/reseau\/\d+\/membres$/.test(pathname)) {
+      const initId = parseInt(pathname.split('/')[3]);
+      const rows = db.prepare(`
+        SELECT i.*, ra.mise_en_avant FROM reseau_affiliations ra
+        JOIN initiatives i ON i.id=ra.demandeur_id
+        WHERE ra.destinataire_id=? AND ra.statut='accepte'
+        ORDER BY ra.mise_en_avant DESC, i.nom ASC
+      `).all(initId);
+      return sendJSON(res, 200, { membres: rows.map(r => ({ ...enrichInit(r), mise_en_avant: r.mise_en_avant })) });
+    }
+
+    /* POST /api/reseau/:id/affiliation — demander une affiliation */
+    if (req.method === "POST" && /^\/api\/reseau\/\d+\/affiliation$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const destId = parseInt(pathname.split('/')[3]);
+      const myInit = getMyInit(me.id);
+      if (!myInit) return sendJSON(res, 400, { error: "Vous devez avoir une initiative pour faire une demande." });
+      if (!myInit.numero_immatriculation) return sendJSON(res, 400, { error: "Votre initiative doit avoir un numéro d'immatriculation pour rejoindre un réseau." });
+      if (myInit.id === destId) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous affilier à votre propre réseau." });
+      const dest = initImmat(destId);
+      if (!dest) return sendJSON(res, 404, { error: "Initiative destinataire introuvable ou non immatriculée." });
+      const { message } = body;
+      try {
+        const r = db.prepare(`INSERT INTO reseau_affiliations(demandeur_id,destinataire_id,message) VALUES(?,?,?)`).run(myInit.id, destId, message||null);
+        // Notification au destinataire
+        db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          dest.owner_user_id, 'reseau_affiliation',
+          `Nouvelle demande d'affiliation`,
+          `"${myInit.nom}" souhaite rejoindre votre Réseau Professionnel`,
+          JSON.stringify({ affiliation_id: r.lastInsertRowid, init_id: myInit.id })
+        );
+        return sendJSON(res, 201, { id: r.lastInsertRowid });
+      } catch(e) {
+        if (e.message?.includes('UNIQUE')) return sendJSON(res, 409, { error: "Une demande existe déjà pour ce réseau." });
+        throw e;
+      }
+    }
+
+    /* PATCH /api/reseau/affiliations/:id — traiter une demande */
+    if (req.method === "PATCH" && /^\/api\/reseau\/affiliations\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const affId = parseInt(pathname.split('/')[4]);
+      const aff = db.prepare(`SELECT ra.*, i.owner_user_id, i.nom AS dest_nom FROM reseau_affiliations ra JOIN initiatives i ON i.id=ra.destinataire_id WHERE ra.id=?`).get(affId);
+      if (!aff) return sendJSON(res, 404, { error: "Demande introuvable." });
+      if (aff.owner_user_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      const { statut, reponse, mise_en_avant } = body;
+      if (statut) {
+        db.prepare(`UPDATE reseau_affiliations SET statut=?,reponse=COALESCE(?,reponse),updated_at=datetime('now') WHERE id=?`).run(statut, reponse||null, affId);
+        // Notification au demandeur
+        const demInit = db.prepare(`SELECT * FROM initiatives WHERE id=?`).get(aff.demandeur_id);
+        if (demInit?.owner_user_id) {
+          const msgs = { accepte:`Votre demande d'affiliation au réseau "${aff.dest_nom}" a été acceptée !`, refuse:`Votre demande d'affiliation au réseau "${aff.dest_nom}" a été refusée.`, info_demandee:`Des informations complémentaires vous sont demandées pour rejoindre "${aff.dest_nom}".`, suspendu:`Votre affiliation au réseau "${aff.dest_nom}" a été suspendue.` };
+          if (msgs[statut]) db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(demInit.owner_user_id,'reseau_statut',`Réseau professionnel`,msgs[statut],JSON.stringify({affiliation_id:affId}));
+        }
+      }
+      if (mise_en_avant !== undefined) db.prepare(`UPDATE reseau_affiliations SET mise_en_avant=? WHERE id=?`).run(mise_en_avant?1:0, affId);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* DELETE /api/reseau/affiliations/:id — retirer du réseau */
+    if (req.method === "DELETE" && /^\/api\/reseau\/affiliations\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const affId = parseInt(pathname.split('/')[4]);
+      const aff = db.prepare(`SELECT ra.*, id.owner_user_id AS dest_owner, id2.owner_user_id AS dem_owner FROM reseau_affiliations ra JOIN initiatives id ON id.id=ra.destinataire_id JOIN initiatives id2 ON id2.id=ra.demandeur_id WHERE ra.id=?`).get(affId);
+      if (!aff) return sendJSON(res, 404, { error: "Affiliation introuvable." });
+      if (aff.dest_owner !== me.id && aff.dem_owner !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      db.prepare(`DELETE FROM reseau_affiliations WHERE id=?`).run(affId);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* POST /api/reseau/:id/recommander — recommander une initiative */
+    if (req.method === "POST" && /^\/api\/reseau\/\d+\/recommander$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const targetId = parseInt(pathname.split('/')[3]);
+      const myInit = getMyInit(me.id);
+      if (!myInit?.numero_immatriculation) return sendJSON(res, 400, { error: "Votre initiative doit être immatriculée pour recommander." });
+      if (myInit.id === targetId) return sendJSON(res, 400, { error: "Impossible de se recommander soi-même." });
+      const { contenu } = body;
+      try {
+        db.prepare(`INSERT INTO reseau_recommandations(initiative_id,auteur_initiative_id,contenu) VALUES(?,?,?)`).run(targetId, myInit.id, contenu||null);
+        const target = db.prepare(`SELECT owner_user_id, nom FROM initiatives WHERE id=?`).get(targetId);
+        if (target?.owner_user_id) db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(target.owner_user_id,'reseau_reco',`Nouvelle recommandation`,`"${myInit.nom}" a recommandé votre initiative.`,JSON.stringify({init_id:targetId}));
+        return sendJSON(res, 201, { ok: true });
+      } catch(e) {
+        if (e.message?.includes('UNIQUE')) return sendJSON(res, 409, { error: "Vous avez déjà recommandé cette initiative." });
+        throw e;
+      }
+    }
+
+    /* DELETE /api/reseau/:id/recommander — retirer sa recommandation */
+    if (req.method === "DELETE" && /^\/api\/reseau\/\d+\/recommander$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const targetId = parseInt(pathname.split('/')[3]);
+      const myInit = getMyInit(me.id);
+      if (!myInit) return sendJSON(res, 400, { error: "Aucune initiative." });
+      db.prepare(`DELETE FROM reseau_recommandations WHERE initiative_id=? AND auteur_initiative_id=?`).run(targetId, myInit.id);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* PATCH /api/reseau/me/profil — enrichir le profil réseau */
+    if (req.method === "PATCH" && pathname === "/api/reseau/me/profil") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const myInit = getMyInit(me.id);
+      if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
+      const { numero_immatriculation, pays_immatriculation, taille_structure, annee_creation, services, langues, reseau_visible, accepte_messages } = body;
+      db.prepare(`UPDATE initiatives SET
+        numero_immatriculation=COALESCE(?,numero_immatriculation),
+        pays_immatriculation=COALESCE(?,pays_immatriculation),
+        taille_structure=COALESCE(?,taille_structure),
+        annee_creation=COALESCE(?,annee_creation),
+        services=COALESCE(?,services),
+        langues=COALESCE(?,langues),
+        reseau_visible=COALESCE(?,reseau_visible),
+        accepte_messages=COALESCE(?,accepte_messages)
+        WHERE id=?`).run(
+        numero_immatriculation||null, pays_immatriculation||null,
+        taille_structure||null, annee_creation||null,
+        services!==undefined?JSON.stringify(services):null,
+        langues!==undefined?JSON.stringify(langues):null,
+        reseau_visible!==undefined?(reseau_visible?1:0):null,
+        accepte_messages!==undefined?(accepte_messages?1:0):null,
+        myInit.id
+      );
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ============================================================
        MODULE RÉUNIONS COLLABORATIVES
     ============================================================ */
 
