@@ -7,6 +7,10 @@
 
   const _cache = {};
 
+  function _lang() {
+    return (document.documentElement.lang || 'fr').slice(0, 5).toLowerCase();
+  }
+
   async function geoFetch(path) {
     if (_cache[path]) return _cache[path];
     try {
@@ -21,19 +25,22 @@
   }
 
   window.geoGetCountries = async function () {
-    const d = await geoFetch('/geo/countries');
+    const lang = _lang();
+    const d = await geoFetch('/geo/countries?lang=' + lang);
     return d.countries || [];
   };
 
   window.geoGetStates = async function (country) {
     if (!country) return [];
-    const d = await geoFetch('/geo/states?country=' + encodeURIComponent(country));
+    const lang = _lang();
+    const d = await geoFetch('/geo/states?lang=' + lang + '&country=' + encodeURIComponent(country));
     return d.states || [];
   };
 
   window.geoGetCities = async function (country, state) {
     if (!country) return [];
-    let path = '/geo/cities?country=' + encodeURIComponent(country);
+    const lang = _lang();
+    let path = '/geo/cities?lang=' + lang + '&country=' + encodeURIComponent(country);
     if (state) path += '&state=' + encodeURIComponent(state);
     const d = await geoFetch(path);
     return d.cities || [];

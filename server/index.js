@@ -3297,22 +3297,47 @@ async function geoFetch(path, body = null) {
   return d;
 }
 
-route("GET", "/api/geo/countries", async (req, res) => {
-  try {
-    const d = await geoFetch("countries");
-    const countries = (d.data || []).map(c => c.country).sort((a, b) => a.localeCompare(b, "fr"));
-    sendJSON(res, 200, { countries });
-  } catch (e) {
-    sendJSON(res, 502, { error: "Service géographique indisponible." });
+const _restCountriesCache = {};
+route("GET", "/api/geo/countries", async (req, res, params, body, query) => {
+  const lang = (query.lang || "fr").slice(0, 5).toLowerCase();
+  const cacheKey = "countries_" + lang;
+  if (!_restCountriesCache[cacheKey]) {
+    try {
+      const r = await fetch("https://restcountries.com/v3.1/all?fields=name,translations");
+      const data = await r.json();
+      const countries = [];
+      const map = {};
+      const LANG_CODE = { fr: "fra", es: "spa", pt: "por", de: "deu", ar: "ara", zh: "zho" };
+      const code = LANG_CODE[lang] || null;
+      for (const c of data) {
+        const enName = c.name?.common || "";
+        const localName = (code && c.translations?.[code]?.common) || enName;
+        if (localName) { countries.push(localName); map[localName] = enName; }
+      }
+      countries.sort((a, b) => a.localeCompare(b, lang));
+      _restCountriesCache[cacheKey] = { countries, map };
+    } catch (e) {
+      const d = await geoFetch("countries");
+      const countries = (d.data || []).map(c => c.country).sort((a, b) => a.localeCompare(b));
+      _restCountriesCache[cacheKey] = { countries, map: {} };
+    }
   }
+  sendJSON(res, 200, _restCountriesCache[cacheKey]);
 });
 
+function _toEnCountry(localName, lang) {
+  const code = "countries_" + (lang || "fr");
+  const map = (_restCountriesCache[code] || {}).map || {};
+  return map[localName] || localName;
+}
+
 route("GET", "/api/geo/states", async (req, res, params, body, query) => {
-  const country = (query.country || "").trim();
+  const lang    = (query.lang || "fr").slice(0, 5).toLowerCase();
+  const country = _toEnCountry((query.country || "").trim(), lang);
   if (!country) return sendJSON(res, 400, { error: "Paramètre country requis." });
   try {
     const d = await geoFetch("countries/states", JSON.stringify({ country }));
-    const states = ((d.data || {}).states || []).map(s => s.name).sort((a, b) => a.localeCompare(b, "fr"));
+    const states = ((d.data || {}).states || []).map(s => s.name).sort((a, b) => a.localeCompare(b, lang));
     sendJSON(res, 200, { states });
   } catch (e) {
     sendJSON(res, 502, { error: "Service géographique indisponible." });
@@ -3320,8 +3345,9 @@ route("GET", "/api/geo/states", async (req, res, params, body, query) => {
 });
 
 route("GET", "/api/geo/cities", async (req, res, params, body, query) => {
-  const country = (query.country || "").trim();
-  const state   = (query.state   || "").trim();
+  const lang    = (query.lang || "fr").slice(0, 5).toLowerCase();
+  const country = _toEnCountry((query.country || "").trim(), lang);
+  const state   = (query.state || "").trim();
   if (!country) return sendJSON(res, 400, { error: "Paramètre country requis." });
   try {
     let cities;
@@ -3332,7 +3358,7 @@ route("GET", "/api/geo/cities", async (req, res, params, body, query) => {
       const d = await geoFetch("countries/cities", JSON.stringify({ country }));
       cities = (d.data || []);
     }
-    sendJSON(res, 200, { cities: cities.sort((a, b) => a.localeCompare(b, "fr")) });
+    sendJSON(res, 200, { cities: cities.sort((a, b) => a.localeCompare(b, lang)) });
   } catch (e) {
     sendJSON(res, 502, { error: "Service géographique indisponible." });
   }
