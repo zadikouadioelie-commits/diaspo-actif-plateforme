@@ -562,12 +562,12 @@ async function saveEvent() {
     date_fin: document.getElementById('ev-date-fin').value.replace('T',' ').slice(0,16)+':00',
     couleur: selectedColor
   };
-  if (!data.titre) { alert('Le titre est requis'); return; }
+  if (!data.titre) { showMsg('Le titre est requis', 'warning'); return; }
   const url = id ? `/api/agenda/events/${id}` : '/api/agenda/events';
   const method = id ? 'PUT' : 'POST';
   const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(data) });
   if (r.ok) { closeModal('modal-event'); await loadAndRender(); }
-  else alert('Erreur : ' + (await r.json()).error);
+  else { const j = await r.json(); showMsg('Erreur : ' + j.error, 'danger'); }
 }
 
 async function deleteEvent() {
@@ -637,7 +637,7 @@ async function proposerRdv() {
   const date = document.getElementById('rdv-date').value;
   const heureDebut = document.getElementById('rdv-heure-debut').value;
   const heureFin = document.getElementById('rdv-heure-fin').value;
-  if (!destId||!titre||!date||!heureDebut) { alert('Veuillez remplir tous les champs obligatoires'); return; }
+  if (!destId||!titre||!date||!heureDebut) { showMsg('Veuillez remplir tous les champs obligatoires', 'warning'); return; }
   const dispo = document.getElementById('rdv-dispo-result');
   dispo.textContent = '⏳ Vérification des disponibilités…';
   // Vérif dispo
@@ -664,7 +664,7 @@ async function proposerRdv() {
   };
   const r = await fetch('/api/rdv', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(body) });
   const j = await r.json();
-  if (r.ok) { closeModal('modal-rdv'); await loadRdv(); if (currentView==='rdv') renderRdvPanel(); alert('✅ Proposition de RDV envoyée !'); }
+  if (r.ok) { closeModal('modal-rdv'); await loadRdv(); if (currentView==='rdv') renderRdvPanel(); showMsg('Proposition de RDV envoyée !', 'success'); }
   else dispo.innerHTML = `<span style="color:var(--red);">❌ ${j.error}</span>`;
 }
 
@@ -706,8 +706,8 @@ async function respondRdv(action) {
     await loadRdv(); await loadAndRender();
     if (action==='accepte' && j.meeting) {
       if (confirm(`✅ RDV accepté ! Une salle de réunion a été créée.\nRejoindre maintenant ?`)) joinMeetingByRoomId(j.meeting.room_id, j.meeting.token_host || j.meeting.token_guest);
-    } else alert(action==='accepte'?'✅ RDV accepté !':action==='refuse'?'❌ RDV refusé':action==='contre_proposition'?'🔄 Contre-proposition envoyée':'✅ Action effectuée');
-  } else alert('Erreur : ' + j.error);
+    } else showMsg(action==='accepte'?'RDV accepté !':action==='refuse'?'RDV refusé':action==='contre_proposition'?'Contre-proposition envoyée':'Action effectuée', action==='refuse'?'warning':'success');
+  } else showMsg('Erreur : ' + j.error, 'danger');
 }
 
 async function joinMeeting(meetingId) {
@@ -726,6 +726,17 @@ function _esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
 function openModal(id) { document.getElementById(id).style.display='flex'; }
 function closeModal(id) { document.getElementById(id).style.display='none'; }
 document.querySelectorAll('.modal-backdrop').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.style.display='none'; }));
+
+/* ═══ Toast helper ═══ */
+function showMsg(msg, type='info') {
+  if (typeof DA !== 'undefined') { DA.toast(msg, {type}); return; }
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;bottom:20px;right:20px;z-index:9999;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;color:#fff;background:${type==='success'?'#10b981':type==='warning'?'#f59e0b':'#ef4444'};box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:340px;`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
 </script>
+<script src="assets/ds.js"></script>
 </body>
 </html>

@@ -389,7 +389,7 @@ async function openEvent(eid) {
       ${!ME ? '<div class="notice" style="margin-top:16px;">🔐 <a href="login.html">Connectez-vous</a> pour acheter des billets.</div>' : ''}
       ${ME && ME.role !== 'utilisateur' ? '<div class="notice" style="margin-top:16px;">ℹ️ Seuls les membres Diaspora peuvent acheter des billets.</div>' : ''}`;
     document.getElementById('modal-event-bg').classList.add('open');
-  } catch(e) { alert('Erreur : '+e.message); }
+  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
 }
 
 /* ══ ACHAT BILLET ══ */
@@ -398,10 +398,10 @@ async function buyTicket(eid, ttid, nom, prix) {
   try {
     const r = await api('POST', '/events/'+eid+'/buy', { ticket_type_id: ttid });
     closeMod('modal-event-bg');
-    alert(`✅ Billet acheté avec succès ! Ticket ID: #${r.ticket_id}\nRetrouvez votre QR code dans "Mes Billets".`);
+    DA.toast(`Billet #${r.ticket_id} acheté ! Retrouvez votre QR dans "Mes Billets".`, {type:'success', duration:6000});
     loadEvents();
     switchTab('mes-billets');
-  } catch(e) { alert('Erreur : '+e.message); }
+  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
 }
 
 /* ══ MES BILLETS ══ */
@@ -472,7 +472,7 @@ async function openTicket(tid) {
         }
       }, 100);
     }
-  } catch(e) { alert('Erreur : '+e.message); }
+  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
 }
 
 /* ══ SCANNER ══ */
@@ -491,7 +491,7 @@ async function startScanner() {
     document.getElementById('btn-stop-scan').style.display = '';
     video.onloadedmetadata = () => { video.play(); scanFrame(); };
   } catch(e) {
-    alert('Impossible d\'accéder à la caméra : ' + e.message);
+    DA.toast('Impossible d\'accéder à la caméra : ' + e.message, {type:'danger'});
   }
 }
 
@@ -644,7 +644,7 @@ async function openOrgDetail(eid) {
           </div>`).join('') : '<div style="padding:20px;text-align:center;color:var(--muted);">Aucun scan enregistré.</div>'}
       </div>`;
     document.getElementById('modal-org-detail-bg').classList.add('open');
-  } catch(e) { alert('Erreur : '+e.message); }
+  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
 }
 
 /* ══ CRÉER ÉVÉNEMENT ══ */
@@ -671,7 +671,7 @@ function addTicketTypeRow() {
 async function saveEvent() {
   const titre = document.getElementById('ev-titre').value.trim();
   const date_debut = document.getElementById('ev-debut').value;
-  if (!titre || !date_debut) { alert('Titre et date de début requis.'); return; }
+  if (!titre || !date_debut) { DA.toast('Titre et date de début requis.', {type:'warning'}); return; }
   const ticket_types = [];
   document.querySelectorAll('#tt-rows .tt-row').forEach(row => {
     const i = row.dataset.idx;
@@ -697,9 +697,9 @@ async function saveEvent() {
   try {
     await api('POST', '/events', data);
     closeMod('modal-create-bg');
-    alert('✅ Événement créé avec succès !');
+    DA.toast('Événement créé avec succès !', {type:'success'});
     loadOrgEvents(); loadEvents();
-  } catch(e) { alert('Erreur : '+e.message); }
+  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
   finally { btn.disabled = false; btn.textContent = 'Créer l\'événement'; }
 }
 

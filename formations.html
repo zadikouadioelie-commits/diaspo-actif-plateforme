@@ -167,20 +167,18 @@
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
-  document.getElementById("formations-count-badge").addEventListener("DOMContentLoaded", ()=>{});
-
-  // Mise à jour du badge count quand #formations-count change
   const countEl = document.getElementById("formations-count");
-  const observer = new MutationObserver(()=>{
-    document.getElementById("formations-count-badge").textContent = countEl.textContent + " formations";
-  });
-  if(countEl) observer.observe(countEl, {childList:true, characterData:true, subtree:true});
+  const badgeEl = document.getElementById("formations-count-badge");
+  function syncBadge() { if(badgeEl && countEl && countEl.textContent !== '—') badgeEl.textContent = countEl.textContent; }
+  if(countEl && badgeEl) {
+    new MutationObserver(syncBadge).observe(countEl, {childList:true, characterData:true, subtree:true});
+  }
 
   // Modal proposer formation
   document.getElementById("btn-proposer").addEventListener("click", async ()=>{
     const me = await fetchCurrentUser();
-    if(!me){ alert("Connectez-vous pour proposer une formation."); return; }
-    if(!["initiative","administrateur"].includes(me.role)){ alert("Seuls les comptes Initiative et Administrateur peuvent proposer des formations."); return; }
+    if(!me){ showMsg("Connectez-vous pour proposer une formation.", "warning"); return; }
+    if(!["initiative","administrateur"].includes(me.role)){ showMsg("Seuls les comptes Initiative et Administrateur peuvent proposer des formations.", "warning"); return; }
     document.getElementById("modal-formation").style.display = "block";
   });
   document.getElementById("modal-close").addEventListener("click", ()=>{ document.getElementById("modal-formation").style.display = "none"; });
@@ -224,5 +222,16 @@
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSidebar(); });
 })();
 </script>
+<script>
+function showMsg(msg, type='info') {
+  if (typeof DA !== 'undefined') { DA.toast(msg, {type}); return; }
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;bottom:20px;right:20px;z-index:9999;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;color:#fff;background:${type==='success'?'#10b981':type==='warning'?'#f59e0b':'#ef4444'};box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:340px;`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+</script>
+<script src="assets/ds.js"></script>
 </body>
 </html>

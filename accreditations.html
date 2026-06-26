@@ -159,9 +159,9 @@ async function submitDemande(){
   try{
     await api('POST','/accreditations/demande',{type:pendingType,message});
     closeModalDemande();
-    alert('Demande envoyée ! L\'équipe Diaspo\'Actif vous répondra sous 5 jours ouvrés.');
+    showMsg('Demande envoyée ! L\'équipe vous répondra sous 5 jours ouvrés.', 'success');
     loadMesAccreds();
-  }catch(e){alert(e.message||'Erreur lors de la demande.');}
+  }catch(e){showMsg(e.message||'Erreur lors de la demande.', 'danger');}
 }
 
 const STAT_LBL={active:'✅ Active',suspendue:'⚠️ Suspendue',retiree:'❌ Retirée'};
@@ -221,10 +221,20 @@ async function loadMesAccreds(){
   }catch(e){el.innerHTML='<p style="color:red;">Erreur : '+esc(e.message)+'</p>';}
 }
 
+function showMsg(msg, type='info') {
+  if (typeof DA !== 'undefined') { DA.toast(msg, {type}); return; }
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;bottom:20px;right:20px;z-index:9999;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;color:#fff;background:${type==='success'?'#10b981':type==='warning'?'#f59e0b':'#ef4444'};box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:340px;`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
 (async()=>{
   await applyAuthState();
   loadMesAccreds();
 })();
 </script>
+<script src="assets/ds.js"></script>
 </body>
 </html>
