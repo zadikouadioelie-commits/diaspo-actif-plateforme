@@ -912,42 +912,114 @@
         </div>
       </div>
 
-      <!-- Modal nouvelle accréditation -->
-      <div id="accred-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;">
-        <div style="background:var(--surface);border-radius:18px;max-width:560px;width:100%;padding:28px;max-height:90vh;overflow-y:auto;">
-          <div class="flex-between" style="margin-bottom:16px;">
-            <h3 style="margin:0;">Nouvelle accréditation Observatoire</h3>
-            <button style="background:none;border:none;font-size:22px;cursor:pointer;" onclick="document.getElementById('accred-modal').style.display='none'">✕</button>
+      <!-- Modal nouvelle accréditation Observatoire (interface guidée) -->
+      <div id="accred-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;">
+        <div style="background:var(--surface);border-radius:18px;max-width:680px;width:100%;padding:28px;margin:auto;">
+          <div class="flex-between" style="margin-bottom:20px;">
+            <div>
+              <h3 style="margin:0;">🏛️ Nouvelle accréditation Observatoire</h3>
+              <p style="margin:4px 0 0;font-size:13px;color:var(--muted);">Définissez précisément le périmètre d'accès aux données de la diaspora.</p>
+            </div>
+            <button style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);" onclick="closeAccredModal()">✕</button>
           </div>
-          <div style="margin-bottom:12px;">
-            <label class="form-label">Institution *</label>
+
+          <!-- Institution -->
+          <div style="margin-bottom:14px;">
+            <label class="form-label">Institution accréditée *</label>
             <select id="am-institution" class="input-field" style="width:100%">
               <option value="">Sélectionner une institution…</option>
             </select>
           </div>
-          <div class="grid grid-2" style="gap:12px;margin-bottom:12px;">
+
+          <!-- Dates -->
+          <div class="grid grid-2" style="gap:12px;margin-bottom:14px;">
             <div>
-              <label class="form-label">Date de fin (vide = illimitée)</label>
+              <label class="form-label">Date de début</label>
+              <input id="am-date-debut" class="input-field" style="width:100%" type="date" value="">
+            </div>
+            <div>
+              <label class="form-label">Date d'expiration (vide = permanente)</label>
               <input id="am-date-fin" class="input-field" style="width:100%" type="date">
             </div>
-            <div>
-              <label class="form-label">Notes admin</label>
-              <input id="am-notes" class="input-field" style="width:100%" placeholder="Contexte de la demande…">
+          </div>
+
+          <!-- Nationalités -->
+          <div style="margin-bottom:14px;">
+            <label class="form-label">Diasporas autorisées <span style="font-weight:400;color:var(--muted);">(vide = toutes)</span></label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;" id="am-nats-chips"></div>
+            <div style="display:flex;gap:8px;">
+              <input id="am-nat-input" class="input-field" style="flex:1;" placeholder="ex: Ivoirienne, Sénégalaise…" list="nat-suggestions">
+              <datalist id="nat-suggestions">
+                <option value="Ivoirienne"><option value="Sénégalaise"><option value="Malienne">
+                <option value="Camerounaise"><option value="Congolaise"><option value="Marocaine">
+                <option value="Tunisienne"><option value="Algérienne"><option value="Guinéenne">
+                <option value="Burkinabé"><option value="Togolaise"><option value="Béninoise">
+                <option value="Gabonaise"><option value="Malgache"><option value="Mauricienne">
+              </datalist>
+              <button class="btn btn-sm btn-outline" onclick="addNat()">Ajouter</button>
             </div>
           </div>
-          <div class="grid grid-2" style="gap:12px;margin-bottom:16px;">
-            <div>
-              <label class="form-label">Nationalités (JSON, vide = toutes)</label>
-              <textarea id="am-nats" class="input-field" style="width:100%;min-height:80px;font-size:13px;" placeholder='["Sénégalaise"]'></textarea>
-            </div>
-            <div>
-              <label class="form-label">Territoires (JSON, vide = tous)</label>
-              <textarea id="am-terr" class="input-field" style="width:100%;min-height:80px;font-size:13px;" placeholder='[{"pays":"France"}]'></textarea>
+
+          <!-- Territoires -->
+          <div style="margin-bottom:14px;">
+            <label class="form-label">Territoires autorisés <span style="font-weight:400;color:var(--muted);">(vide = tous)</span></label>
+            <div id="am-terr-list" style="margin-bottom:8px;"></div>
+            <div style="background:var(--surface2);border-radius:10px;padding:12px;">
+              <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">AJOUTER UN TERRITOIRE</div>
+              <div class="grid grid-3" style="gap:8px;margin-bottom:8px;">
+                <div>
+                  <label class="form-label" style="font-size:11px;">Pays *</label>
+                  <input id="am-t-pays" class="input-field" style="width:100%;font-size:13px;" placeholder="France" list="pays-suggestions">
+                  <datalist id="pays-suggestions">
+                    <option value="France"><option value="Belgique"><option value="Suisse"><option value="Canada">
+                    <option value="États-Unis"><option value="Allemagne"><option value="Espagne"><option value="Italie">
+                    <option value="Royaume-Uni"><option value="Maroc"><option value="Côte d'Ivoire"><option value="Sénégal">
+                    <option value="Mali"><option value="Cameroun"><option value="Congo"><option value="Gabon">
+                  </datalist>
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:11px;">Région (optionnel)</label>
+                  <input id="am-t-region" class="input-field" style="width:100%;font-size:13px;" placeholder="Île-de-France">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:11px;">Ville (optionnel)</label>
+                  <input id="am-t-ville" class="input-field" style="width:100%;font-size:13px;" placeholder="Paris">
+                </div>
+              </div>
+              <button class="btn btn-sm btn-outline" onclick="addTerritory()" style="width:100%;">+ Ajouter ce territoire</button>
             </div>
           </div>
+
+          <!-- Droits spécifiques -->
+          <div style="margin-bottom:14px;">
+            <label class="form-label">Droits spécifiques</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--surface2);border-radius:10px;padding:12px;">
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" id="dr-geo" checked> 🌍 Géographie</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" id="dr-comp" checked> 👔 Compétences</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" id="dr-sect" checked> 🏭 Secteurs</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" id="dr-init" checked> 🌱 Initiatives</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" id="dr-asso" checked> 🤝 Associations</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" id="dr-emploi" checked> 💼 Emploi</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" id="dr-invest" checked> 💰 Investissements</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" id="dr-consult" checked> 📋 Consultations</label>
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div style="margin-bottom:18px;">
+            <label class="form-label">Notes internes</label>
+            <textarea id="am-notes" class="input-field" style="width:100%;min-height:60px;resize:vertical;" placeholder="Contexte, conditions, références…"></textarea>
+          </div>
+
+          <!-- Aperçu du périmètre -->
+          <div id="am-preview" style="background:linear-gradient(135deg,#EFF6FF,#F0FDF4);border:1px solid #BFDBFE;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;">
+            <div style="font-weight:700;margin-bottom:6px;">📋 Récapitulatif de l'accréditation</div>
+            <div id="am-preview-content" style="color:var(--muted);">Remplissez les champs pour voir l'aperçu.</div>
+          </div>
+
           <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button class="btn btn-outline" onclick="document.getElementById('accred-modal').style.display='none'">Annuler</button>
-            <button class="btn btn-orange" onclick="createAccreditation()">Créer l'accréditation</button>
+            <button class="btn btn-outline" onclick="closeAccredModal()">Annuler</button>
+            <button class="btn btn-orange" onclick="createAccreditation()">🏛️ Créer l'accréditation</button>
           </div>
         </div>
       </div>
@@ -3110,30 +3182,119 @@ async function submitAccordDirect(){
     } catch(e) { document.getElementById("af-histo-list").innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
   }
 
+  // ── État interne de la nouvelle modale guidée ──
+  let AM_NATS = [];
+  let AM_TERR = [];
+
+  function closeAccredModal() {
+    document.getElementById("accred-modal").style.display = "none";
+  }
+
   function openAccredModal() {
+    AM_NATS = []; AM_TERR = [];
     document.getElementById("am-institution").value = "";
+    document.getElementById("am-date-debut").value = new Date().toISOString().slice(0,10);
     document.getElementById("am-date-fin").value = "";
     document.getElementById("am-notes").value = "";
-    document.getElementById("am-nats").value = "[]";
-    document.getElementById("am-terr").value = "[]";
+    document.getElementById("am-nat-input").value = "";
+    document.getElementById("am-t-pays").value = "";
+    document.getElementById("am-t-region").value = "";
+    document.getElementById("am-t-ville").value = "";
+    ["dr-geo","dr-comp","dr-sect","dr-init","dr-asso","dr-emploi","dr-invest","dr-consult"].forEach(id => {
+      const el = document.getElementById(id); if(el) el.checked = true;
+    });
+    renderNatsChips(); renderTerrList(); updateAccredPreview();
     document.getElementById("accred-modal").style.display = "flex";
     loadAccredList();
   }
 
+  function renderNatsChips() {
+    const el = document.getElementById("am-nats-chips");
+    if (!el) return;
+    if (!AM_NATS.length) { el.innerHTML = `<span style="color:var(--muted);font-size:13px;font-style:italic;">Toutes les nationalités (aucune restriction)</span>`; return; }
+    el.innerHTML = AM_NATS.map((n,i) => `
+      <span style="display:inline-flex;align-items:center;gap:5px;background:#DBEAFE;color:#1D4ED8;border-radius:20px;padding:3px 10px;font-size:12.5px;font-weight:600;">
+        ${escH(n)} <button onclick="removeNat(${i})" style="background:none;border:none;cursor:pointer;color:#1D4ED8;font-size:14px;padding:0;line-height:1;">×</button>
+      </span>`).join("");
+  }
+
+  function addNat() {
+    const v = document.getElementById("am-nat-input").value.trim();
+    if (!v) return;
+    if (!AM_NATS.includes(v)) { AM_NATS.push(v); renderNatsChips(); updateAccredPreview(); }
+    document.getElementById("am-nat-input").value = "";
+  }
+  function removeNat(i) { AM_NATS.splice(i,1); renderNatsChips(); updateAccredPreview(); }
+
+  function renderTerrList() {
+    const el = document.getElementById("am-terr-list");
+    if (!el) return;
+    if (!AM_TERR.length) { el.innerHTML = `<span style="color:var(--muted);font-size:13px;font-style:italic;">Tous les territoires (aucune restriction)</span>`; return; }
+    el.innerHTML = AM_TERR.map((t,i) => {
+      const label = [t.pays, t.region, t.ville].filter(Boolean).join(" › ");
+      return `<span style="display:inline-flex;align-items:center;gap:5px;background:#D1FAE5;color:#065F46;border-radius:20px;padding:3px 10px;font-size:12.5px;font-weight:600;margin-bottom:4px;">
+        📍 ${escH(label)} <button onclick="removeTerr(${i})" style="background:none;border:none;cursor:pointer;color:#065F46;font-size:14px;padding:0;line-height:1;">×</button>
+      </span>`;
+    }).join(" ");
+  }
+
+  function addTerritory() {
+    const pays = document.getElementById("am-t-pays").value.trim();
+    if (!pays) { alert("Le pays est obligatoire."); return; }
+    const region = document.getElementById("am-t-region").value.trim() || undefined;
+    const ville = document.getElementById("am-t-ville").value.trim() || undefined;
+    const obj = { pays }; if(region) obj.region=region; if(ville) obj.ville=ville;
+    AM_TERR.push(obj);
+    renderTerrList(); updateAccredPreview();
+    document.getElementById("am-t-pays").value = "";
+    document.getElementById("am-t-region").value = "";
+    document.getElementById("am-t-ville").value = "";
+  }
+  function removeTerr(i) { AM_TERR.splice(i,1); renderTerrList(); updateAccredPreview(); }
+
+  function updateAccredPreview() {
+    const el = document.getElementById("am-preview-content");
+    if (!el) return;
+    const instSel = document.getElementById("am-institution");
+    const instNom = instSel?.options[instSel.selectedIndex]?.text || "—";
+    const dateFin = document.getElementById("am-date-fin")?.value;
+    const natsLabel = AM_NATS.length ? AM_NATS.join(", ") : "<em>Toutes</em>";
+    const terrLabel = AM_TERR.length
+      ? AM_TERR.map(t => [t.pays,t.region,t.ville].filter(Boolean).join(" › ")).join(", ")
+      : "<em>Tous</em>";
+    el.innerHTML = `
+      <span style="font-weight:600;">Institution :</span> ${escH(instNom)}<br>
+      <span style="font-weight:600;">Validité :</span> ${dateFin ? "jusqu'au " + dateFin : "Permanente"}<br>
+      <span style="font-weight:600;">Diasporas autorisées :</span> ${natsLabel}<br>
+      <span style="font-weight:600;">Territoires autorisés :</span> ${terrLabel}
+    `;
+  }
+
+  // Mettre à jour l'aperçu en temps réel
+  document.addEventListener("change", e => {
+    if (["am-institution","am-date-fin"].includes(e.target.id)) updateAccredPreview();
+  });
+
   async function createAccreditation() {
     const institution_id = parseInt(document.getElementById("am-institution").value);
     if (!institution_id) { alert("Sélectionnez une institution."); return; }
-    let nats, terr;
-    try { nats = JSON.parse(document.getElementById("am-nats").value||"[]"); } catch(e) { alert("JSON nationalités invalide."); return; }
-    try { terr = JSON.parse(document.getElementById("am-terr").value||"[]"); } catch(e) { alert("JSON territoires invalide."); return; }
+    const droits = [];
+    [["dr-geo","geographie"],["dr-comp","competences"],["dr-sect","secteurs"],
+     ["dr-init","initiatives"],["dr-asso","associations"],["dr-emploi","emploi"],
+     ["dr-invest","investissements"],["dr-consult","consultations"]]
+      .forEach(([id,key]) => { if(document.getElementById(id)?.checked) droits.push(key); });
     try {
       await api("POST", "/admin/accreditations", {
-        institution_id, date_fin: document.getElementById("am-date-fin").value||null,
+        institution_id,
+        date_debut: document.getElementById("am-date-debut").value || null,
+        date_fin: document.getElementById("am-date-fin").value || null,
         notes_admin: document.getElementById("am-notes").value,
-        nationalites_autorisees: nats, territoires_autorises: terr,
+        nationalites_autorisees: AM_NATS,
+        territoires_autorises: AM_TERR,
+        droits,
       });
-      document.getElementById("accred-modal").style.display = "none";
-      alert("Accréditation créée et notification envoyée à l'institution.");
+      closeAccredModal();
+      alert("✅ Accréditation Observatoire créée. L'institution a été notifiée.");
       loadAccredList();
     } catch(e) { alert("Erreur : " + e.message); }
   }

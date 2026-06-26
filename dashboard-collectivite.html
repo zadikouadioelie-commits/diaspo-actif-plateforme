@@ -161,11 +161,21 @@
           <a href="mailto:contact@diaspoactif.fr" class="btn btn-orange" style="margin-top:12px;">Demander l'accréditation</a>
         </div>
         <div id="obs-content" style="display:none;">
-          <div class="obs-tab-bar">
-            <button class="obs-tab active" onclick="switchObsTab('geo')">🌍 Géographie</button>
-            <button class="obs-tab" onclick="switchObsTab('competences')">👔 Compétences</button>
-            <button class="obs-tab" onclick="switchObsTab('secteurs')">🏭 Secteurs</button>
-            <button class="obs-tab" onclick="switchObsTab('initiatives')">🌱 Initiatives</button>
+          <!-- Barre d'outils -->
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <div class="obs-tab-bar" style="border:none;margin:0;padding:0;">
+              <button class="obs-tab active" onclick="switchObsTab('geo')">🌍 Géographie</button>
+              <button class="obs-tab" onclick="switchObsTab('competences')">👔 Compétences</button>
+              <button class="obs-tab" onclick="switchObsTab('secteurs')">🏭 Secteurs</button>
+              <button class="obs-tab" onclick="switchObsTab('initiatives')">🌱 Initiatives</button>
+              <button class="obs-tab" onclick="switchObsTab('associations')">🤝 Associations</button>
+              <button class="obs-tab" onclick="switchObsTab('emploi')">💼 Emploi</button>
+              <button class="obs-tab" onclick="switchObsTab('investissements')">💰 Investissements</button>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-sm btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
+              <button class="btn btn-sm btn-outline" onclick="genererRapport('mensuel')">📄 Rapport mensuel</button>
+            </div>
           </div>
 
           <!-- Géographie -->
@@ -184,6 +194,10 @@
                 <h3 style="margin:0 0 14px;">Répartition par ville</h3>
                 <div id="obs-ville-chart"></div>
               </div>
+            </div>
+            <div class="card" style="margin-top:16px;">
+              <h3 style="margin:0 0 14px;">Répartition par région</h3>
+              <div id="obs-region-chart"></div>
             </div>
           </div>
 
@@ -213,6 +227,51 @@
             <div class="grid grid-2" style="gap:16px;">
               <div class="card"><h3 style="margin:0 0 14px;">Par domaine</h3><div id="obs-init-domaine"></div></div>
               <div class="card"><h3 style="margin:0 0 14px;">Par pays</h3><div id="obs-init-pays"></div></div>
+            </div>
+          </div>
+
+          <!-- Associations -->
+          <div class="obs-panel" id="obs-associations">
+            <div class="grid grid-2" style="gap:12px;margin-bottom:16px;">
+              <div class="stat-card-obs"><div class="stat-num" id="oa-total">—</div><div class="stat-lbl">Associations</div></div>
+              <div class="stat-card-obs"><div class="stat-num" id="oa-membres">—</div><div class="stat-lbl">Membres cumulés</div></div>
+            </div>
+            <div class="grid grid-2" style="gap:16px;">
+              <div class="card"><h3 style="margin:0 0 14px;">Par domaine</h3><div id="obs-asso-domaine"></div></div>
+              <div class="card"><h3 style="margin:0 0 14px;">Par pays d'activité</h3><div id="obs-asso-pays"></div></div>
+            </div>
+          </div>
+
+          <!-- Emploi -->
+          <div class="obs-panel" id="obs-emploi">
+            <div class="grid grid-3" style="gap:12px;margin-bottom:16px;">
+              <div class="stat-card-obs"><div class="stat-num" id="oe-offres">—</div><div class="stat-lbl">Offres publiées</div></div>
+              <div class="stat-card-obs"><div class="stat-num" id="oe-candidatures">—</div><div class="stat-lbl">Candidatures</div></div>
+              <div class="stat-card-obs"><div class="stat-num" id="oe-secteurs">—</div><div class="stat-lbl">Secteurs</div></div>
+            </div>
+            <div class="grid grid-2" style="gap:16px;">
+              <div class="card"><h3 style="margin:0 0 14px;">Types d'offres</h3><div id="obs-emploi-type"></div></div>
+              <div class="card"><h3 style="margin:0 0 14px;">Par secteur</h3><div id="obs-emploi-secteur"></div></div>
+            </div>
+            <div class="card" style="margin-top:16px;">
+              <h3 style="margin:0 0 14px;">Évolution mensuelle (12 derniers mois)</h3>
+              <div id="obs-emploi-mois"></div>
+            </div>
+          </div>
+
+          <!-- Investissements -->
+          <div class="obs-panel" id="obs-investissements">
+            <div class="grid grid-2" style="gap:12px;margin-bottom:16px;">
+              <div class="stat-card-obs"><div class="stat-num" id="oi2-total">—</div><div class="stat-lbl">Projets d'investissement</div></div>
+              <div class="stat-card-obs"><div class="stat-num" id="oi2-secteurs">—</div><div class="stat-lbl">Secteurs concernés</div></div>
+            </div>
+            <div class="grid grid-2" style="gap:16px;">
+              <div class="card"><h3 style="margin:0 0 14px;">Par type</h3><div id="obs-invest-type"></div></div>
+              <div class="card"><h3 style="margin:0 0 14px;">Par secteur</h3><div id="obs-invest-secteur"></div></div>
+            </div>
+            <div class="card" style="margin-top:16px;">
+              <h3 style="margin:0 0 14px;">Par territoire</h3>
+              <div id="obs-invest-pays"></div>
             </div>
           </div>
         </div>
@@ -582,6 +641,7 @@ async function demanderAccredColl(type, label) {
 }
 
 /* ===== Observatoire ===== */
+let obsLoaded = false;
 async function loadObservatoire() {
   if (!ACCRED) {
     document.getElementById("obs-locked").style.display = "";
@@ -590,39 +650,132 @@ async function loadObservatoire() {
   }
   document.getElementById("obs-locked").style.display = "none";
   document.getElementById("obs-content").style.display = "";
+  if (obsLoaded) return;
+  obsLoaded = true;
 
   try {
-    const [vg, geo, comp, sect, init] = await Promise.all([
+    const [vg, geo, comp, sect, init, asso, emploi, invest] = await Promise.all([
       api("GET", "/observatoire/vue-generale"),
       api("GET", "/observatoire/geographie"),
       api("GET", "/observatoire/competences"),
       api("GET", "/observatoire/secteurs"),
       api("GET", "/observatoire/initiatives-stats"),
+      api("GET", "/observatoire/associations").catch(() => ({})),
+      api("GET", "/observatoire/emploi").catch(() => ({})),
+      api("GET", "/observatoire/investissements").catch(() => ({})),
     ]);
+
     // Stats globales
-    document.getElementById("og-membres").textContent = vg.total_membres ?? "< 10";
-    document.getElementById("og-initiatives").textContent = vg.total_initiatives ?? "—";
-    document.getElementById("og-pays").textContent = vg.total_pays ?? "—";
-    // Accueil stats
-    document.getElementById("acc-membres").textContent = vg.total_membres ?? "< 10";
-    document.getElementById("acc-initiatives").textContent = vg.total_initiatives ?? "—";
-    document.getElementById("acc-pays").textContent = vg.total_pays ?? "—";
+    const fmt = n => n == null ? "< 10" : n.toLocaleString("fr-FR");
+    document.getElementById("og-membres").textContent = fmt(vg.total_membres);
+    document.getElementById("og-initiatives").textContent = fmt(vg.total_initiatives);
+    document.getElementById("og-pays").textContent = fmt(vg.total_pays);
+    document.getElementById("acc-membres").textContent = fmt(vg.total_membres);
+    document.getElementById("acc-initiatives").textContent = fmt(vg.total_initiatives);
+    document.getElementById("acc-pays").textContent = fmt(vg.total_pays);
+
     // Géographie
     barChart("obs-pays-chart", geo.par_pays?.map(r=>({...r,label:r.pays})), "#2563EB");
-    barChart("obs-ville-chart", geo.par_ville?.map(r=>({...r,label:r.ville+" ("+r.pays+")"})), "#7C3AED");
+    barChart("obs-ville-chart", geo.par_ville?.map(r=>({...r,label:`${r.ville} (${r.pays})`})), "#7C3AED");
+    barChart("obs-region-chart", geo.par_region?.map(r=>({...r,label:`${r.region}, ${r.pays}`})), "#0891B2");
+
     // Compétences
-    barChart("obs-comp-chart", comp.competences?.map(r=>({...r,label:r.label})), "#F97316");
+    barChart("obs-comp-chart", comp.competences, "#F97316");
+
     // Secteurs
-    barChart("obs-sect-chart", sect.secteurs?.map(r=>({...r})), "#10B981");
+    barChart("obs-sect-chart", sect.secteurs, "#10B981");
+
     // Initiatives
-    document.getElementById("oi-total").textContent = init.total?.n ?? "—";
-    document.getElementById("oi-membres").textContent = init.total?.membres ?? "—";
-    document.getElementById("oi-abonnes").textContent = init.total?.abonnes ?? "—";
+    document.getElementById("oi-total").textContent = fmt(init.total?.n);
+    document.getElementById("oi-membres").textContent = fmt(init.total?.membres);
+    document.getElementById("oi-abonnes").textContent = fmt(init.total?.abonnes);
     barChart("obs-init-domaine", init.par_domaine?.map(r=>({...r,label:r.domaine})), "#0EA5E9");
     barChart("obs-init-pays", init.par_pays?.map(r=>({...r,label:r.pays})), "#6366F1");
+
+    // Associations
+    document.getElementById("oa-total").textContent = fmt(asso.total?.n);
+    document.getElementById("oa-membres").textContent = fmt(asso.total?.membres);
+    barChart("obs-asso-domaine", asso.par_domaine, "#059669");
+    barChart("obs-asso-pays", asso.par_pays, "#0284C7");
+
+    // Emploi
+    const nbOffresEmploi = (emploi.par_type||[]).reduce((s,r)=>s+r.n,0);
+    document.getElementById("oe-offres").textContent = fmt(nbOffresEmploi);
+    document.getElementById("oe-candidatures").textContent = fmt(emploi.total_candidatures);
+    document.getElementById("oe-secteurs").textContent = fmt((emploi.par_secteur||[]).length);
+    barChart("obs-emploi-type", emploi.par_type, "#D97706");
+    barChart("obs-emploi-secteur", emploi.par_secteur, "#7C3AED");
+    // Graphique timeline mensuel
+    renderTimeline("obs-emploi-mois", emploi.par_mois||[]);
+
+    // Investissements
+    const nbInvest = (invest.par_type||[]).reduce((s,r)=>s+r.n,0);
+    document.getElementById("oi2-total").textContent = fmt(nbInvest);
+    document.getElementById("oi2-secteurs").textContent = fmt((invest.par_secteur||[]).length);
+    barChart("obs-invest-type", invest.par_type, "#047857");
+    barChart("obs-invest-secteur", invest.par_secteur, "#1D4ED8");
+    barChart("obs-invest-pays", invest.par_pays, "#7E22CE");
+
   } catch(e) {
     document.getElementById("obs-content").innerHTML = `<div class="notice">Erreur lors du chargement : ${escH(e.message)}</div>`;
   }
+}
+
+function renderTimeline(containerId, data) {
+  const el = document.getElementById(containerId);
+  if (!el || !data.length) { if(el) el.innerHTML = `<div class="empty">Données insuffisantes.</div>`; return; }
+  const max = Math.max(...data.map(d=>d.n), 1);
+  const h = 80;
+  const w = Math.max(data.length * 36, 200);
+  const bars = data.map((d,i) => {
+    const bh = Math.round(d.n / max * h);
+    const x = i * 36 + 4;
+    return `<g>
+      <rect x="${x}" y="${h-bh}" width="28" height="${bh}" fill="#2563EB" rx="3" opacity=".85"/>
+      <text x="${x+14}" y="${h+14}" text-anchor="middle" font-size="9" fill="#94a3b8">${d.mois?.slice(5)||d.mois||""}</text>
+      <text x="${x+14}" y="${h-bh-4}" text-anchor="middle" font-size="10" font-weight="700" fill="#1e293b">${d.n}</text>
+    </g>`;
+  }).join("");
+  el.innerHTML = `<div style="overflow-x:auto;"><svg viewBox="0 0 ${w+8} ${h+24}" style="width:100%;min-width:${w}px;height:${h+24}px;">${bars}</svg></div>`;
+}
+
+async function exportCSV() {
+  window.open("/api/observatoire/export-csv", "_blank");
+}
+
+async function genererRapport(periode = "mensuel") {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Génération…"; }
+  try {
+    const r = await api("GET", "/observatoire/rapport?periode=" + periode);
+    const lines = [
+      `RAPPORT OBSERVATOIRE DIASPORA — ${r.periode?.toUpperCase()} — ${r.date_rapport?.slice(0,10)}`,
+      `Institution : ${r.institution?.nom}`,
+      ``,
+      `MEMBRES`,
+      `  Total observable : ${r.membres?.total}`,
+      `  Nouveaux (période) : ${r.membres?.nouveaux}`,
+      ``,
+      `INITIATIVES`,
+      `  Total : ${r.initiatives?.total}`,
+      `  Nouvelles (période) : ${r.initiatives?.nouvelles}`,
+      ``,
+      `CONSULTATIONS`,
+      `  Lancées (période) : ${r.consultations?.lancees}`,
+      `  Réponses reçues : ${r.consultations?.reponses}`,
+      ``,
+      `PÉRIMÈTRE D'ACCRÉDITATION`,
+      `  Nationalités : ${(r.accreditation?.nationalites||[]).join(", ")||"Toutes"}`,
+      `  Territoires : ${(r.accreditation?.territoires||[]).map(t=>t.pays+(t.region?", "+t.region:"")).join(" | ")||"Tous"}`,
+      `  Validité : ${r.accreditation?.date_fin?.slice(0,10)||"Permanente"}`,
+    ];
+    const blob = new Blob([lines.join("\r\n")], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `rapport-observatoire-${periode}-${r.date_rapport?.slice(0,10)}.txt`;
+    a.click(); URL.revokeObjectURL(url);
+  } catch(e) { alert("Erreur rapport : " + e.message); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = "📄 Rapport mensuel"; } }
 }
 
 /* ===== Communications ===== */

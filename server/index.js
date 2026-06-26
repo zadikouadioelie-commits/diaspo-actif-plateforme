@@ -2565,6 +2565,117 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     sendJSON(res, 200, { total, par_domaine: parDomaine, par_pays: parPays });
   });
 
+  route("GET", "/api/observatoire/investissements", async (req, res) => {
+    const user = getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const accred = getAccred(user.id);
+    if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
+    // Offres de type investissement
+    const parType = db.prepare(`SELECT type, COUNT(*) AS n FROM offres WHERE type IN ('investissement','financement','incubation','acceleration') GROUP BY type ORDER BY n DESC`).all();
+    const parSecteur = db.prepare(`SELECT secteur, COUNT(*) AS n FROM offres WHERE secteur IS NOT NULL AND type IN ('investissement','financement') GROUP BY secteur ORDER BY n DESC LIMIT 10`).all();
+    const parPays = db.prepare(`SELECT pays, COUNT(*) AS n FROM offres WHERE pays IS NOT NULL AND type='investissement' GROUP BY pays ORDER BY n DESC LIMIT 10`).all();
+    const totalMontant = db.prepare(`SELECT SUM(salaire_min) AS min, SUM(salaire_max) AS max FROM offres WHERE type='investissement'`).get();
+    sendJSON(res, 200, {
+      par_type: parType,
+      par_secteur: parSecteur.map(r => ({ ...r, label: r.secteur })),
+      par_pays: parPays.map(r => ({ ...r, label: r.pays })),
+      montants: { min: totalMontant?.min || 0, max: totalMontant?.max || 0 },
+    });
+  });
+
+  route("GET", "/api/observatoire/emploi", async (req, res) => {
+    const user = getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const accred = getAccred(user.id);
+    if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
+    const parType = db.prepare(`SELECT type, COUNT(*) AS n FROM offres WHERE type IN ('emploi','stage','mission','contrat') GROUP BY type ORDER BY n DESC`).all();
+    const parSecteur = db.prepare(`SELECT secteur, COUNT(*) AS n FROM offres WHERE secteur IS NOT NULL AND type IN ('emploi','stage','mission','contrat') GROUP BY secteur ORDER BY n DESC LIMIT 10`).all();
+    const parPays = db.prepare(`SELECT pays, COUNT(*) AS n FROM offres WHERE pays IS NOT NULL AND type IN ('emploi','stage','mission','contrat') GROUP BY pays ORDER BY n DESC LIMIT 10`).all();
+    const parMois = db.prepare(`SELECT strftime('%Y-%m', created_at) AS mois, COUNT(*) AS n FROM offres WHERE type IN ('emploi','stage','mission','contrat') AND created_at >= datetime('now','-12 months') GROUP BY mois ORDER BY mois`).all();
+    const totalCandidatures = db.prepare(`SELECT COUNT(*) AS n FROM offres_candidatures`).get().n;
+    sendJSON(res, 200, {
+      par_type: parType.map(r => ({ ...r, label: r.type })),
+      par_secteur: parSecteur.map(r => ({ ...r, label: r.secteur })),
+      par_pays: parPays.map(r => ({ ...r, label: r.pays })),
+      par_mois: parMois,
+      total_candidatures: totalCandidatures,
+    });
+  });
+
+  route("GET", "/api/observatoire/associations", async (req, res) => {
+    const user = getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const accred = getAccred(user.id);
+    if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
+    const { where, params: p } = buildObsWhere(accred);
+    const parDomaine = db.prepare(`SELECT i.domaine, COUNT(*) AS n FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') ${where.replace(/u\./g,"i.")} GROUP BY i.domaine ORDER BY n DESC LIMIT 15`).all(...p);
+    const parPays = db.prepare(`SELECT i.pays, COUNT(*) AS n FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') AND i.pays IS NOT NULL ${where.replace(/u\./g,"i.")} GROUP BY i.pays ORDER BY n DESC LIMIT 15`).all(...p);
+    const total = db.prepare(`SELECT COUNT(*) AS n, SUM(membres) AS membres FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') ${where.replace(/u\./g,"i.")}`).get(...p);
+    const mask = n => n >= SEUIL_CONFIDENTIALITE ? n : null;
+    sendJSON(res, 200, {
+      total: { n: total?.n || 0, membres: mask(total?.membres) },
+      par_domaine: parDomaine.map(r => ({ ...r, label: r.domaine })),
+      par_pays: parPays.map(r => ({ ...r, label: r.pays })),
+    });
+  });
+
+  route("GET", "/api/observatoire/export-csv", async (req, res) => {
+    const user = getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const accred = getAccred(user.id);
+    if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
+    const { where, params: p } = buildObsWhere(accred);
+    const geo = db.prepare(`SELECT u.pays, u.ville, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.pays IS NOT NULL ${where} GROUP BY u.pays, u.ville ORDER BY n DESC`).all(...p);
+    const comp = db.prepare(`SELECT u.situation_pro, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.situation_pro IS NOT NULL ${where} GROUP BY u.situation_pro ORDER BY n DESC`).all(...p);
+    // Build CSV
+    const lines = ["Type,Catégorie,Valeur,Nombre"];
+    geo.forEach(r => r.n >= SEUIL_CONFIDENTIALITE && lines.push(`Géographie,${r.pays},${r.ville||''},${r.n}`));
+    comp.forEach(r => r.n >= SEUIL_CONFIDENTIALITE && lines.push(`Compétences,,${r.situation_pro},${r.n}`));
+    const csv = lines.join("\r\n");
+    res.writeHead(200, {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="observatoire-${new Date().toISOString().slice(0,10)}.csv"`,
+    });
+    res.end("﻿" + csv); // BOM pour Excel
+  });
+
+  /* ===========================
+     RAPPORTS AUTOMATIQUES OBSERVATOIRE
+  =========================== */
+  route("GET", "/api/observatoire/rapport", async (req, res, params, body, query) => {
+    const user = getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const accred = getAccred(user.id);
+    if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
+    const { where, params: p } = buildObsWhere(accred);
+    const periode = query.periode || "mensuel";
+    const dateRef = periodo => {
+      if (periodo === "mensuel") return "datetime('now','-1 month')";
+      if (periodo === "trimestriel") return "datetime('now','-3 months')";
+      return "datetime('now','-1 year')";
+    };
+    const dr = dateRef(periode);
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='utilisateur' ${where}`).get(...p);
+    const nouveaux = db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.created_at >= ${dr} ${where}`).get(...p);
+    const initiatives = db.prepare(`SELECT COUNT(*) AS n FROM initiatives i WHERE 1=1 ${where.replace(/u\./g,"i.")}`).get(...p);
+    const nouvInits = db.prepare(`SELECT COUNT(*) AS n FROM initiatives i WHERE i.created_at >= ${dr} ${where.replace(/u\./g,"i.")}`).get(...p);
+    const consultations = db.prepare(`SELECT COUNT(*) AS n FROM consultations WHERE emetteur_id=? AND created_at >= ${dr}`).get(user.id).n;
+    const reponses = db.prepare(`SELECT COUNT(*) AS n FROM consultation_reponses cr JOIN consultations c ON c.id=cr.consultation_id WHERE c.emetteur_id=? AND cr.created_at >= ${dr}`).get(user.id).n;
+    sendJSON(res, 200, {
+      periode,
+      date_rapport: new Date().toISOString(),
+      institution: { id: user.id, nom: user.nom },
+      accreditation: {
+        date_fin: accred.date_fin,
+        nationalites: safeParse(accred.nationalites_autorisees),
+        territoires: safeParse(accred.territoires_autorises),
+      },
+      membres: { total: total.n, nouveaux: nouveaux.n },
+      initiatives: { total: initiatives.n, nouvelles: nouvInits.n },
+      consultations: { lancees: consultations, reponses },
+    });
+  });
+
   /* ===========================
      COMMUNICATIONS INSTITUTIONNELLES
   =========================== */
