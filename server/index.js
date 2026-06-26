@@ -4911,6 +4911,172 @@ async function handleRequest(req, res) {
     }
 
     /* ============================================================
+       CHATBOT — MOTEUR DE RECOMMANDATION INTELLIGENT
+       Scoring multi-critères, NLP léger, respect confidentialité
+    ============================================================ */
+
+    if (req.method === 'POST' && pathname === '/api/chatbot/recommend') {
+      const { query = '', limit = 4 } = body;
+      if (!query.trim()) return sendJSON(res, 400, { error: 'query requis' });
+
+      /* ── NLP : normalisation + extraction d'entités ── */
+      const norm = s => (s||'').toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g,'')
+        .replace(/['']/g,"'");
+      const q = norm(query);
+
+      // Extraction localisation (ville après preposition)
+      const villeRx = /(?:^|\s)(?:a|à|en|au|aux|dans|de|du)\s+([a-z][a-z\-]{1,25}(?:\s[a-z][a-z\-]{1,20})?)/g;
+      let villeQ = null;
+      let m;
+      while ((m = villeRx.exec(q)) !== null) { villeQ = m[1].trim(); }
+
+      // Pays connus (mapping)
+      const PAYS_MAP = {'france':'France','cote d\'ivoire':'Côte d\'Ivoire','cote ivoire':'Côte d\'Ivoire','senegal':'Sénégal','cameroun':'Cameroun','mali':'Mali','burkina':'Burkina Faso','guinee':'Guinée','togo':'Togo','benin':'Bénin','niger':'Niger','belgique':'Belgique','suisse':'Suisse','canada':'Canada','etats-unis':'États-Unis','usa':'États-Unis','maroc':'Maroc','algerie':'Algérie','tunisie':'Tunisie','congo':'Congo','rdc':'RDC','gabon':'Gabon','madagascar':'Madagascar','mauritanie':'Mauritanie','rwanda':'Rwanda','angola':'Angola','mozambique':'Mozambique','ethiopie':'Éthiopie','kenya':'Kenya','ghana':'Ghana','nigeria':'Nigéria','afrique du sud':'Afrique du Sud'};
+      let paysQ = null;
+      for (const [k,v] of Object.entries(PAYS_MAP)) { if (q.includes(k)) { paysQ = v; break; } }
+
+      // Langues
+      const LANG_DETECT = [['français','francoph','french'],['anglais','angloph','english'],['arabe','arabic'],['portugais','portuguese'],['espagnol','spanish','hispanoph'],['wolof'],['bambara'],['mandingue'],['haoussa','hausa'],['peul','fula'],['swahili'],['lingala'],['mooré']];
+      const langues = LANG_DETECT
+        .filter(variants => variants.some(k => q.includes(k)))
+        .map(variants => variants[0]);
+
+      // Mots-clés nettoyés (sans stopwords)
+      const STOPS = new Set(['je','tu','il','nous','vous','ils','cherche','cherches','cherchent','trouve','trouver','besoin','dun','dune','des','les','une','qui','que','quoi','pour','avec','dans','sur','par','est','sont','dont','mais','aussi','alors','votre','notre','mon','ma','mes','ses','son','quel','quelle','comment','quand','lieu','autre','autres','celui','celle','parle','parles','parler','peut','pouvez','avoir','faire','bien','tres','plus','moins','trop','assez','tout','tous','toute','toutes','aucun','aucune']);
+      const keywords = q.split(/[\s,;.!?()\[\]'"\/\\]+/)
+        .map(w => w.replace(/^(d|l|j|n|m|s|c|qu)['']/i,''))
+        .filter(w => w.length >= 3 && !STOPS.has(w) && !/^\d+$/.test(w));
+
+      /* ── Requête DB — candidats ── */
+      const me = getCurrentUser(req);
+      const currentUserId = me?.id || 0;
+
+      const candidates = db.prepare(`
+        SELECT u.id, u.nom, u.prenom, u.role, u.pays, u.ville, u.bio, u.titre_pro,
+          u.competences, u.photo_url, u.experiences,
+          i.id AS init_id, i.nom AS init_nom, i.secteur, i.services, i.langues AS init_langues,
+          i.numero_immatriculation, i.taille_structure,
+          (SELECT COUNT(*) FROM compte_accreditations ca WHERE ca.user_id=u.id AND ca.statut='active') AS nb_accreds,
+          (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id=u.id) AS nb_followers,
+          (SELECT COUNT(*) FROM fil_posts fp WHERE fp.auteur_id=u.id) AS nb_posts,
+          (SELECT COUNT(*) FROM collaborations co WHERE co.user_id=u.id) AS nb_collabs
+        FROM users u
+        LEFT JOIN initiatives i ON i.owner_user_id=u.id
+        WHERE u.role NOT IN ('administrateur')
+          AND u.id != ?
+        LIMIT 800
+      `).all(currentUserId);
+
+      /* ── Scoring multi-critères ── */
+      function scoreProfile(u) {
+        let score = 0;
+        const haystack = norm([
+          u.nom, u.prenom, u.titre_pro, u.bio,
+          u.competences, u.init_nom, u.secteur, u.services,
+          u.experiences
+        ].join(' '));
+
+        // Keyword matching (pondéré selon la position dans les champs importants)
+        const titleHay = norm((u.titre_pro||'') + ' ' + (u.init_nom||'') + ' ' + (u.secteur||''));
+        for (const kw of keywords) {
+          if (titleHay.includes(kw)) score += 35;         // profession / titre : fort signal
+          else if (haystack.includes(kw)) score += 18;    // bio / compétences
+        }
+
+        // Localisation
+        if (villeQ) {
+          const villeNorm = norm(u.ville||'');
+          if (villeNorm === villeQ) score += 40;
+          else if (villeNorm.includes(villeQ) || villeQ.includes(villeNorm)) score += 25;
+        }
+        if (paysQ && u.pays === paysQ) score += 20;
+
+        // Langues
+        const uLang = norm((u.init_langues||'[]') + ' ' + (u.bio||'') + ' ' + (u.competences||''));
+        for (const lang of langues) { if (uLang.includes(lang)) score += 15; }
+
+        // Signaux de confiance (boost)
+        if (u.nb_accreds > 0) score += 25;
+        if (u.numero_immatriculation) score += 12;
+        if (u.nb_followers > 10) score += 12;
+        else if (u.nb_followers > 2) score += 6;
+        if (u.photo_url) score += 5;
+        if (u.bio && u.bio.length > 80) score += 6;
+        if (u.nb_posts > 5) score += 5;
+        if (u.nb_collabs > 0) score += 8;
+
+        // Bonus par rôle
+        const roleBonus = { initiative: 6, collectivite: 8, institution: 8 };
+        score += roleBonus[u.role] || 0;
+
+        return score;
+      }
+
+      const scored = candidates
+        .map(u => ({ ...u, _score: scoreProfile(u) }))
+        .filter(u => u._score > 0)
+        .sort((a,b) => b._score - a._score)
+        .slice(0, Math.min(limit, 4));
+
+      if (!scored.length) {
+        return sendJSON(res, 200, { profiles: [], query_info: { keywords, villeQ, paysQ, langues } });
+      }
+
+      /* ── Construction des profils enrichis ── */
+      const topScore = scored[0]._score;
+      const ROLE_LABELS = { utilisateur:'Membre', initiative:'Initiative', collectivite:'Collectivité', institution:'Institution', administrateur:'Admin' };
+      const profiles = scored.map((u, idx) => {
+        // Génération de l'explication
+        const reasons = [];
+        const titleHay = norm((u.titre_pro||'')+' '+(u.init_nom||'')+' '+(u.secteur||'')+' '+(u.bio||''));
+        const matchedKws = keywords.filter(k => titleHay.includes(k));
+        if (matchedKws.length) {
+          const proper = matchedKws.map(k => k.charAt(0).toUpperCase()+k.slice(1));
+          reasons.push(`Spécialisé en ${proper.join(', ')}`);
+        }
+        if (villeQ && norm(u.ville||'').includes(villeQ)) reasons.push(`Basé à ${u.ville}`);
+        if (paysQ && u.pays === paysQ && !reasons.some(r=>r.includes('Basé'))) reasons.push(`En ${u.pays}`);
+        const uLang = norm(u.init_langues||'');
+        const matchedLangs = langues.filter(l => uLang.includes(l));
+        if (matchedLangs.length) reasons.push(`Parle ${matchedLangs.join(', ')}`);
+        if (u.nb_accreds > 0) reasons.push(`${u.nb_accreds} accréditation(s) Diaspo'Actif`);
+        if (u.numero_immatriculation) reasons.push('Initiative officiellement immatriculée');
+        if (u.nb_followers > 10) reasons.push(`${u.nb_followers} abonnés sur la plateforme`);
+        if (u.nb_collabs > 0) reasons.push(`${u.nb_collabs} collaboration(s) réalisée(s)`);
+        if (!reasons.length) reasons.push('Profil actif correspondant à votre recherche');
+
+        // Compatibilité en % (normalisée sur 95% max pour les suivants)
+        const compat = idx === 0
+          ? Math.min(99, Math.max(70, Math.round((u._score / Math.max(topScore,1)) * 99)))
+          : Math.min(96, Math.max(60, Math.round((u._score / Math.max(topScore,1)) * 96)));
+
+        return {
+          id: u.id,
+          nom: u.nom || '',
+          prenom: u.prenom || '',
+          role: u.role || 'utilisateur',
+          role_label: ROLE_LABELS[u.role] || 'Membre',
+          titre_pro: u.titre_pro || u.init_nom || u.secteur || '',
+          organisation: u.init_nom || '',
+          pays: u.pays || '',
+          ville: u.ville || '',
+          bio: (u.bio || '').slice(0, 140),
+          photo_url: u.photo_url || null,
+          nb_accreds: u.nb_accreds || 0,
+          nb_followers: u.nb_followers || 0,
+          immatricule: !!u.numero_immatriculation,
+          nb_posts: u.nb_posts || 0,
+          compatibilite: compat,
+          explication: reasons.join('. ') + '.',
+          rank: idx + 1,
+        };
+      });
+
+      return sendJSON(res, 200, { profiles, query_info: { keywords, villeQ, paysQ, langues, total_candidates: candidates.length } });
+    }
+
+    /* ============================================================
        MODULE RÉSEAU PROFESSIONNEL — Annuaires des Initiatives
        RÈGLE FONDAMENTALE : uniquement role='initiative' + immatriculées
     ============================================================ */

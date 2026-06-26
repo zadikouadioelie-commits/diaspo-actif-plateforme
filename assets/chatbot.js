@@ -784,6 +784,15 @@
         { label: "Contacter l'équipe", intent: "contact" },
       ],
     },
+
+    /* ── AIDE RECHERCHE DE PROFIL ──────────────────────────────── */
+    _search_hint: {
+      text: "🔍 Je peux trouver les meilleurs profils pour vous !\n\nDécrivez simplement ce que vous cherchez en une phrase naturelle :\n\n• \"Je cherche un avocat à Abidjan\"\n• \"Un architecte francophone au Canada\"\n• \"Un développeur web disponible à Paris\"\n• \"Une ONG spécialisée en éducation au Sénégal\"",
+      quickReplies: [
+        { label: "👤 Chercher un expert", intent: "_search_hint" },
+        { label: "🔍 Ouvrir l'annuaire", action: "annuaire.html" },
+      ],
+    },
   };
 
   /* ═══════════════════════════════════════════════════════════════
@@ -1016,21 +1025,37 @@
     input.value = '';
     clearQuick();
 
-    setTimeout(() => {
-      const intent = detectIntent(text);
-      if (intent && KB[intent]) {
+    // 1. Détecter les intents FAQ connus
+    const intent = detectIntent(text);
+    if (intent && KB[intent]) {
+      setTimeout(() => {
         const { html, quickReplies } = renderResponse(intent);
         appendBotMessage(html, quickReplies);
+      }, 350);
+      return;
+    }
+
+    // 2. Détecter les requêtes de recherche/recommandation (priorité haute)
+    if (isSearchQuery(text)) {
+      handleRecommend(text);
+      return;
+    }
+
+    // 3. Chercher dans le contexte enrichi
+    setTimeout(() => {
+      const hit = searchContext(text);
+      if (hit) {
+        const { html, quickReplies } = renderContextHit(hit, text);
+        appendBotMessage(html, quickReplies);
       } else {
-        const hit = searchContext(text);
-        if (hit) {
-          const { html, quickReplies } = renderContextHit(hit, text);
-          appendBotMessage(html, quickReplies);
-        } else {
-          const { html, quickReplies } = renderResponse('fallback');
-          appendBotMessage(html, quickReplies);
-          logUnanswered(text);
-        }
+        // 4. Fallback : proposer aussi la recherche de profils
+        const { html, quickReplies } = renderResponse('fallback');
+        const enrichedQR = [
+          ...quickReplies,
+          { label: '🔍 Chercher un profil / expert', intent: '_search_hint' },
+        ];
+        appendBotMessage(html, enrichedQR);
+        logUnanswered(text);
       }
     }, 350);
   }
@@ -1043,6 +1068,140 @@
         body: JSON.stringify({ question, langue: navigator.language?.slice(0,2) || 'fr' })
       }).catch(() => {});
     } catch(e) {}
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     MOTEUR DE RECOMMANDATION IA — Recherche de profils
+     ═══════════════════════════════════════════════════════════════ */
+
+  // Mots déclencheurs d'une recherche de profil
+  const SEARCH_TRIGGERS = [
+    'cherche','chercher','trouve','trouver','besoin','recommendation','recommande','recommander',
+    'connais-tu','propose','suggestion','qui peut','qui est','qui sait','contact','mettre en relation',
+    'avocat','médecin','docteur','architecte','ingénieur','comptable','développeur','designer',
+    'juriste','consultant','expert','professeur','formateur','mentor','entrepreneur',
+    'investisseur','recruteur','traducteur','interprète','notaire','huissier','chirurgien',
+    'psychologue','coach','directeur','manager','chef de projet','urbaniste','géomètre',
+    'économiste','sociologue','journaliste','communicant','graphiste','photographe',
+    'réalisateur','musicien','artiste','écrivain','auteur','enseignant','chercheur',
+    'philanthrope','association','ong','fondation','initiative','collectivité','institution',
+    'université','école','cabinet','entreprise','start-up','startup','agence',
+    'spécialisé','spécialiste','professionnel','freelance','indépendant',
+    'partenaire','collaborateur','prestataire','fournisseur','sous-traitant',
+    'qui parle','francophone','anglophone','arabophone','lusophone',
+    'disponible','basé','localisé','situé',
+  ];
+
+  function isSearchQuery(text) {
+    const q = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    return SEARCH_TRIGGERS.some(t => q.includes(t));
+  }
+
+  /* Typing indicator standalone (pour l'async) */
+  let _typingEl = null;
+  function appendTyping() {
+    _typingEl = document.createElement('div');
+    _typingEl.className = 'cb-msg cb-msg-bot cb-typing';
+    _typingEl.innerHTML = '<span></span><span></span><span></span>';
+    getMessages().appendChild(_typingEl);
+    scrollBottom();
+  }
+  function removeTyping() {
+    if (_typingEl) { _typingEl.remove(); _typingEl = null; }
+  }
+
+  function renderProfileCards(profiles) {
+    const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const avatarBg = ['#7c3aed','#0284c7','#059669','#dc2626','#d97706','#0f766e','#7c3aed'];
+    const roleIcon = { initiative:'🚀', collectivite:'🏛️', institution:'🏦', utilisateur:'👤', administrateur:'⚙️' };
+
+    let html = '';
+    profiles.forEach((p, i) => {
+      const initials = ((p.prenom||p.nom||'?')[0] + (p.nom||'?')[0]).toUpperCase();
+      const bg = avatarBg[p.id % avatarBg.length];
+      const isChamp = i === 0;
+      const scoreColor = p.compatibilite >= 90 ? '#10b981' : p.compatibilite >= 75 ? '#f59e0b' : '#6366f1';
+      const loc = [p.ville, p.pays].filter(Boolean).join(', ');
+
+      if (i === 0) {
+        html += `<div class="cb-rec-label cb-rec-top">🏆 Meilleure recommandation</div>`;
+      } else if (i === 1) {
+        html += `<div class="cb-rec-label">Autres recommandations</div>`;
+      }
+
+      html += `
+        <div class="cb-pcard${isChamp ? ' cb-pcard-champ' : ''}">
+          <div class="cb-pcard-top">
+            <div class="cb-pcard-av" style="background:${bg}">
+              ${p.photo_url ? `<img src="${esc(p.photo_url)}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : esc(initials)}
+            </div>
+            <div class="cb-pcard-info">
+              <div class="cb-pcard-name">${esc((p.prenom ? p.prenom+' ' : '') + p.nom)}</div>
+              ${p.titre_pro ? `<div class="cb-pcard-title">${esc(p.titre_pro)}</div>` : ''}
+              ${p.organisation && p.organisation !== p.titre_pro ? `<div class="cb-pcard-org">🏢 ${esc(p.organisation)}</div>` : ''}
+            </div>
+            <div class="cb-pcard-score" style="background:${scoreColor}15;color:${scoreColor};border-color:${scoreColor}30">
+              ${p.compatibilite}%
+            </div>
+          </div>
+          <div class="cb-pcard-meta">
+            ${loc ? `<span>📍 ${esc(loc)}</span>` : ''}
+            <span>${roleIcon[p.role]||'👤'} ${esc(p.role_label||'')}</span>
+            ${p.nb_accreds > 0 ? `<span class="cb-pcard-badge accred">✅ Accrédité</span>` : ''}
+            ${p.immatricule ? `<span class="cb-pcard-badge immat">🏅 Immatriculé</span>` : ''}
+            ${p.nb_followers > 0 ? `<span>👥 ${p.nb_followers}</span>` : ''}
+          </div>
+          <div class="cb-pcard-why">💡 ${esc(p.explication)}</div>
+          <div class="cb-pcard-actions">
+            <a class="cb-pcard-btn cb-pcard-btn-main" href="${p.role === 'initiative' ? 'initiative.html?id='+p.id : 'profil.html?id='+p.id}" target="_blank">Voir le profil →</a>
+            <a class="cb-pcard-btn" href="messagerie.html?to=${p.id}" target="_blank">✉️ Contacter</a>
+          </div>
+        </div>`;
+    });
+
+    html += `<div style="font-size:11px;color:#94a3b8;margin-top:8px;text-align:center;">Scores calculés en temps réel · ${profiles.length} résultat(s)</div>`;
+    return html;
+  }
+
+  async function handleRecommend(text) {
+    appendTyping();
+    try {
+      const r = await fetch('/api/chatbot/recommend', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: text, limit: 4 })
+      });
+      const d = await r.json();
+      removeTyping();
+
+      if (!d.profiles || !d.profiles.length) {
+        appendBotMessage(
+          `<p>🔍 Je n'ai pas trouvé de profil correspondant à <em>"${_esc(text)}"</em>.</p><p>Essayez avec des mots différents, ou explorez directement l'annuaire.</p>`,
+          [{ label: '🔍 Ouvrir l\'annuaire', action: 'annuaire.html' }, { label: '↩ Réessayer', intent: 'nav_aide' }]
+        );
+        return;
+      }
+
+      const intro = d.profiles.length === 1
+        ? `<p>🎯 J'ai trouvé <strong>1 profil</strong> correspondant à votre recherche :</p>`
+        : `<p>🎯 Voici les <strong>${d.profiles.length} meilleurs profils</strong> pour votre recherche :</p>`;
+
+      appendBotMessage(
+        intro + renderProfileCards(d.profiles),
+        [
+          { label: '🔍 Voir l\'annuaire complet', action: 'annuaire.html' },
+          { label: '🔄 Affiner la recherche', intent: 'nav_aide' },
+          { label: '📩 Autre question', intent: 'welcome' },
+        ]
+      );
+    } catch(e) {
+      removeTyping();
+      appendBotMessage(
+        `<p>Désolé, le moteur de recommandation n'est pas disponible pour l'instant.</p>`,
+        [{ label: '🔍 Annuaire', action: 'annuaire.html' }]
+      );
+    }
   }
 
   function appendUserMessage(text) {
@@ -1241,6 +1400,66 @@
   .cb-panel { bottom: 90px; right: 12px; left: 12px; width: auto; max-height: 78dvh; border-radius: 14px 14px 14px 14px; }
   .cb-fab { bottom: 20px; right: 18px; }
 }
+
+/* ═══ CARTES PROFILS — RECOMMANDATION IA ═══ */
+.cb-rec-label {
+  font-size: 11px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .06em; color: #64748b; margin: 8px 0 4px; padding: 0 2px;
+}
+.cb-rec-label.cb-rec-top { color: #d97706; }
+
+.cb-pcard {
+  background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px;
+  padding: 12px; margin-bottom: 8px; transition: box-shadow .18s;
+}
+.cb-pcard:hover { box-shadow: 0 4px 18px rgba(0,0,0,.1); }
+.cb-pcard-champ {
+  border-color: #f59e0b; background: linear-gradient(135deg,#fffbeb,#fff);
+  box-shadow: 0 2px 12px rgba(245,158,11,.15);
+}
+
+.cb-pcard-top { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+.cb-pcard-av {
+  width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #fff; overflow: hidden;
+}
+.cb-pcard-info { flex: 1; min-width: 0; }
+.cb-pcard-name { font-weight: 800; font-size: 13.5px; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-pcard-title { font-size: 11.5px; color: #475569; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cb-pcard-org { font-size: 11px; color: #7c3aed; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.cb-pcard-score {
+  font-size: 13px; font-weight: 900; padding: 3px 9px; border-radius: 99px;
+  border: 1.5px solid; white-space: nowrap; flex-shrink: 0;
+}
+
+.cb-pcard-meta {
+  display: flex; flex-wrap: wrap; gap: 5px; font-size: 11px; color: #64748b; margin-bottom: 7px;
+}
+.cb-pcard-badge {
+  padding: 2px 7px; border-radius: 99px; font-weight: 700; font-size: 10.5px;
+}
+.cb-pcard-badge.accred { background: #dcfce7; color: #166534; }
+.cb-pcard-badge.immat  { background: #ede9fe; color: #5b21b6; }
+
+.cb-pcard-why {
+  font-size: 11.5px; color: #475569; background: #f8fafc; border-radius: 8px;
+  padding: 7px 9px; margin-bottom: 8px; line-height: 1.5; border-left: 3px solid #7c3aed;
+}
+
+.cb-pcard-actions { display: flex; gap: 6px; }
+.cb-pcard-btn {
+  flex: 1; text-align: center; padding: 7px 10px; border-radius: 8px; font-size: 12px;
+  font-weight: 700; text-decoration: none; border: 1.5px solid #e2e8f0; color: #475569;
+  transition: all .15s; cursor: pointer;
+}
+.cb-pcard-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+.cb-pcard-btn.cb-pcard-btn-main {
+  background: linear-gradient(135deg, var(--orange,#ff6b00), #e55a00);
+  color: #fff; border-color: transparent;
+}
+.cb-pcard-btn.cb-pcard-btn-main:hover { opacity: .9; }
     `;
     const style = document.createElement('style');
     style.textContent = css;
