@@ -3723,7 +3723,7 @@ async function handleRequest(req, res) {
     /* GET /api/agenda/events — événements de l'utilisateur (avec range dates) */
     if (req.method === "GET" && pathname === "/api/agenda/events") {
       const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const p = new URLSearchParams(reqUrl.search || "");
+      const p = new URLSearchParams(parsed.search || "");
       const from = p.get("from") || new Date(Date.now() - 30*24*3600000).toISOString().slice(0,10);
       const to   = p.get("to")   || new Date(Date.now() + 60*24*3600000).toISOString().slice(0,10);
       const events = db.prepare(`
@@ -3785,7 +3785,7 @@ async function handleRequest(req, res) {
     /* GET /api/agenda/availability — vérifier dispo d'un user sur un créneau */
     if (req.method === "GET" && pathname === "/api/agenda/availability") {
       const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const p = new URLSearchParams(reqUrl.search || "");
+      const p = new URLSearchParams(parsed.search || "");
       const userId = parseInt(p.get("user_id") || me.id);
       const debut  = p.get("debut");
       const fin    = p.get("fin");
@@ -4027,7 +4027,7 @@ async function handleRequest(req, res) {
     /* GET /api/meetings/:room_id/signal — polling signaux WebRTC */
     if (req.method === "GET" && /^\/api\/meetings\/[^/]+\/signal$/.test(pathname)) {
       const roomId = pathname.split('/')[3];
-      const p = new URLSearchParams(reqUrl.search || "");
+      const p = new URLSearchParams(parsed.search || "");
       const peer = p.get("peer");
       const after = parseInt(p.get("after") || "0");
       const signals = db.prepare(`
@@ -4047,7 +4047,7 @@ async function handleRequest(req, res) {
     /* GET /api/meetings/:room_id/validate-token — vérifier accès */
     if (req.method === "GET" && /^\/api\/meetings\/[^/]+\/validate-token$/.test(pathname)) {
       const roomId = pathname.split('/')[3];
-      const p = new URLSearchParams(reqUrl.search || "");
+      const p = new URLSearchParams(parsed.search || "");
       const token = p.get("token");
       const meeting = db.prepare(`SELECT * FROM meetings WHERE room_id=?`).get(roomId);
       if (!meeting) return sendJSON(res, 404, { error: "Salle introuvable" });
