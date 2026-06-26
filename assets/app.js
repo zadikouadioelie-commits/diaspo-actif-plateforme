@@ -512,8 +512,9 @@ async function initAnnuaire(){
     const ray        = sel("f-ray");
     const dom        = sel("f-domaine");
     const type       = sel("f-type");
-    const uniqueOnly = document.getElementById("f-unique")?.checked || false;
-    const accred     = sel("f-accred");
+    const uniqueOnly   = document.getElementById("f-unique")?.checked   || false;
+    const verifiedOnly = document.getElementById("f-verified")?.checked  || false;
+    const accred       = sel("f-accred");
 
     const filtered = ALL.filter(it=>{
       if(q && !it.nom.toLowerCase().includes(q) && !(it.description||"").toLowerCase().includes(q)) return false;
@@ -527,7 +528,8 @@ async function initAnnuaire(){
       if(ray && it.rayonnement !== ray) return false;
       if(dom  && it.domaine !== dom) return false;
       if(type && it.type !== type) return false;
-      if(uniqueOnly && !it.nationalite_unique) return false;
+      if(uniqueOnly   && !it.nationalite_unique) return false;
+      if(verifiedOnly && !(it.accreditations||[]).length) return false;
       if(accred && !(it.accreditations||[]).includes(accred)) return false;
       return true;
     });
