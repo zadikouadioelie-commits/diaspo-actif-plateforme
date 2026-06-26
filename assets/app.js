@@ -494,35 +494,14 @@ async function initAnnuaire(){
     return;
   }
 
-  /* Listes mondiales (avec fallback si data.js pas encore chargé) */
-  const _PAYS  = typeof PAYS_DU_MONDE  !== "undefined" ? PAYS_DU_MONDE  : [];
-  const _VILLES= typeof VILLES_DU_MONDE!== "undefined" ? VILLES_DU_MONDE: [];
-
-  /* Nationalités : données locales + tous les pays du monde */
-  const paysData1 = ALL.map(i=>i.nationalite1).filter(Boolean);
-  const paysData2 = ALL.map(i=>i.nationalite2).filter(Boolean);
-  const listePays = [...new Set([...paysData1, ..._PAYS])].sort();
-  populateSelect("f-pays", listePays);
-  populateSelect("f-nat2", listePays);
-  /* Origines : données locales + tous les pays du monde */
-  const originesData = [...ALL.map(i=>i.origine1), ...ALL.map(i=>i.origine2)].filter(Boolean);
-  const listeOrigines = [...new Set([...originesData, ..._PAYS])].sort();
-  populateSelect("f-orig1", listeOrigines);
-  populateSelect("f-orig2", listeOrigines);
-  /* Localisation : pays de résidence + villes mondiales */
-  const paysResData = ALL.map(i=>i.pays).filter(Boolean);
-  populateSelect("f-pays-res",[...new Set([...paysResData, ..._PAYS])].sort());
-  populateSelect("f-region",  [...new Set(ALL.map(i=>i.region).filter(Boolean))].sort());
-  const villesData = ALL.map(i=>i.ville).filter(Boolean);
-  populateSelect("f-ville",   [...new Set([...villesData, ..._VILLES])].sort());
-  /* Domaine + Type */
+  /* Domaine + Type (restent des selects classiques) */
   populateSelect("f-domaine", [...new Set(ALL.map(i=>i.domaine).filter(Boolean))].sort());
   populateSelect("f-type",    [...new Set(ALL.map(i=>i.type).filter(Boolean))].sort());
 
   function sel(id){ return (document.getElementById(id)||{}).value || ""; }
 
   function apply(){
-    const q          = sel("f-q").toLowerCase();
+    const q          = (document.getElementById("f-q")||{}).value?.toLowerCase() || "";
     const nat1       = sel("f-pays");
     const nat2       = sel("f-nat2");
     const orig1      = sel("f-orig1");
@@ -538,22 +517,17 @@ async function initAnnuaire(){
 
     const filtered = ALL.filter(it=>{
       if(q && !it.nom.toLowerCase().includes(q) && !(it.description||"").toLowerCase().includes(q)) return false;
-      /* Nationalités — cherche dans nat1 OU nat2 */
       if(nat1 && it.nationalite1 !== nat1 && it.nationalite2 !== nat1) return false;
       if(nat2 && it.nationalite1 !== nat2 && it.nationalite2 !== nat2) return false;
-      /* Origines — cherche dans origine1 OU origine2 */
       if(orig1 && it.origine1 !== orig1 && it.origine2 !== orig1) return false;
       if(orig2 && it.origine1 !== orig2 && it.origine2 !== orig2) return false;
-      /* Localisation combinable */
       if(paysRes && it.pays !== paysRes) return false;
       if(region  && it.region !== region) return false;
       if(ville   && it.ville !== ville) return false;
-      /* Rayonnement */
       if(ray && it.rayonnement !== ray) return false;
       if(dom  && it.domaine !== dom) return false;
       if(type && it.type !== type) return false;
       if(uniqueOnly && !it.nationalite_unique) return false;
-      /* Accréditation DA */
       if(accred && !(it.accreditations||[]).includes(accred)) return false;
       return true;
     });
@@ -564,7 +538,39 @@ async function initAnnuaire(){
       : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">Aucune initiative ne correspond à ces critères.</div>`;
   }
 
-  ["f-q","f-pays","f-nat2","f-orig1","f-orig2","f-pays-res","f-region","f-ville","f-ray","f-domaine","f-type","f-accred"].forEach(id=>{
+  /* ── GeoAutocomplete pour nationalités et origines (pays seuls) ── */
+  if(typeof GeoAutocomplete !== "undefined"){
+    ["f-pays","f-nat2","f-orig1","f-orig2"].forEach(id => {
+      const anchor = document.getElementById(id);
+      if(!anchor) return;
+      new GeoAutocomplete(anchor, {
+        id,
+        placeholder: id.startsWith("f-orig") ? "Origine…" : "Nationalité…",
+        getList: () => geoGetCountries(),
+        onSelect: apply,
+      });
+    });
+
+    /* ── Triplet hiérarchique Pays résidence → Région → Ville ── */
+    const prAnchor = document.getElementById("f-pays-res");
+    const rgAnchor = document.getElementById("f-region");
+    const vlAnchor = document.getElementById("f-ville");
+    if(prAnchor && rgAnchor && vlAnchor){
+      GeoTriple({
+        countryAnchor: prAnchor, stateAnchor: rgAnchor, cityAnchor: vlAnchor,
+        countryId: "f-pays-res", stateId: "f-region", cityId: "f-ville",
+        countryPlaceholder: "Pays de résidence…",
+        statePlaceholder:   "Région / État…",
+        cityPlaceholder:    "Ville…",
+        onCountrySelect: apply,
+        onStateSelect:   apply,
+        onCitySelect:    apply,
+      });
+    }
+  }
+
+  /* ── Selects et inputs classiques ── */
+  ["f-q","f-ray","f-domaine","f-type","f-accred"].forEach(id=>{
     const el = document.getElementById(id);
     if(el){ el.addEventListener("input", apply); el.addEventListener("change", apply); }
   });

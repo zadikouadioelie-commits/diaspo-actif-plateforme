@@ -200,20 +200,20 @@
       <!-- Ligne 1 : Nationalités + Origines -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%;">
         <span class="ann-filter-label">🏛 Nationalités</span>
-        <select id="f-pays"    style="flex:1;min-width:140px;"><option value="">Nationalité 1</option></select>
-        <select id="f-nat2"    style="flex:1;min-width:140px;"><option value="">Nationalité 2</option></select>
+        <div id="f-pays"    style="flex:1;min-width:140px;"></div>
+        <div id="f-nat2"    style="flex:1;min-width:140px;"></div>
         <span class="ann-filter-label" style="margin-left:8px;">🌍 Origines</span>
-        <select id="f-orig1"   style="flex:1;min-width:140px;"><option value="">Origine 1</option></select>
-        <select id="f-orig2"   style="flex:1;min-width:140px;"><option value="">Origine 2</option></select>
+        <div id="f-orig1"   style="flex:1;min-width:140px;"></div>
+        <div id="f-orig2"   style="flex:1;min-width:140px;"></div>
         <label class="ann-unique-chk"><input type="checkbox" id="f-unique"> Nationalité unique</label>
       </div>
 
       <!-- Ligne 2 : Localisation + Rayonnement + Domaine + Recherche -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%;">
         <span class="ann-filter-label">📍 Localisation</span>
-        <select id="f-pays-res" style="flex:1;min-width:110px;"><option value="">Pays</option></select>
-        <select id="f-region"   style="flex:1;min-width:110px;"><option value="">Région</option></select>
-        <select id="f-ville"    style="flex:1;min-width:110px;"><option value="">Ville</option></select>
+        <div id="f-pays-res" style="flex:1;min-width:130px;"></div>
+        <div id="f-region"   style="flex:1;min-width:130px;"></div>
+        <div id="f-ville"    style="flex:1;min-width:130px;"></div>
         <span class="ann-filter-label" style="margin-left:8px;">🌐 Portée</span>
         <select id="f-ray" style="flex:1;min-width:120px;">
           <option value="">Tout rayonnement</option>
@@ -277,6 +277,7 @@
 </div>
 
 <script src="assets/data.js?v=6"></script>
+<script src="assets/geo.js?v=1"></script>
 <script src="assets/app.js?v=6"></script>
 </body>
 </html>

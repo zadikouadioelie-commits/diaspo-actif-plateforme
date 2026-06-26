@@ -281,6 +281,40 @@ button{font-family:inherit;cursor:pointer;}
 .auth-error{background:#FFE2E2;color:#B3261E;border-radius:10px;padding:10px 14px;font-size:13px;margin-top:14px;display:none;}
 .auth-success{background:#E7F4EE;color:var(--green);border-radius:10px;padding:10px 14px;font-size:13px;margin-top:14px;display:none;}
 
+/* ──────────────── GEO AUTOCOMPLETE ──────────────── */
+.geo-wrap{position:relative;display:flex;align-items:center;}
+.geo-input{
+  width:100%;padding:9px 32px 9px 11px;border:1px solid var(--border);border-radius:8px;
+  font-size:13px;font-family:inherit;background:#fff;color:var(--text);
+  outline:none;transition:border-color .15s;
+}
+.geo-input:focus{border-color:var(--orange);}
+.geo-clear{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);
+  padding:2px 4px;line-height:1;
+}
+.geo-clear:hover{color:var(--text);}
+.geo-loader{
+  position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:300;
+  background:#fff;border:1px solid var(--border);border-radius:8px;
+  padding:8px 12px;font-size:12px;color:var(--muted);
+}
+.geo-dropdown{
+  position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:300;
+  background:#fff;border:1px solid var(--border);border-radius:8px;
+  box-shadow:0 6px 24px rgba(0,0,0,.1);
+  max-height:220px;overflow-y:auto;overflow-x:hidden;
+  list-style:none;margin:0;padding:4px 0;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+.geo-dropdown li{
+  padding:8px 12px;font-size:13px;cursor:pointer;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.geo-dropdown li:hover,.geo-dropdown li.geo-active{background:var(--orange-light);color:var(--orange);}
+.geo-dropdown li strong{font-weight:800;color:var(--navy);}
+
 /* ──────────────── RESPONSIVE MOBILE ──────────────── */
 
 /* Bouton hamburger (caché sur desktop) */

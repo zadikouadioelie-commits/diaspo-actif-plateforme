@@ -3283,6 +3283,61 @@ function trackActivity(req) {
   try { const u = getCurrentUser(req); if (u) _trackStmt.run(u.id); } catch {}
 }
 
+/* ── Géographie mondiale — proxy CountriesNow API ── */
+const _geoCache = {};
+async function geoFetch(path, body = null) {
+  const key = path + (body || "");
+  if (_geoCache[key]) return _geoCache[key];
+  const opts = body
+    ? { method: "POST", headers: { "Content-Type": "application/json" }, body }
+    : { method: "GET" };
+  const r = await fetch("https://countriesnow.space/api/v0.1/" + path, opts);
+  const d = await r.json();
+  if (!d.error) _geoCache[key] = d;
+  return d;
+}
+
+route("GET", "/api/geo/countries", async (req, res) => {
+  try {
+    const d = await geoFetch("countries");
+    const countries = (d.data || []).map(c => c.country).sort((a, b) => a.localeCompare(b, "fr"));
+    sendJSON(res, 200, { countries });
+  } catch (e) {
+    sendJSON(res, 502, { error: "Service géographique indisponible." });
+  }
+});
+
+route("GET", "/api/geo/states", async (req, res, params, body, query) => {
+  const country = (query.country || "").trim();
+  if (!country) return sendJSON(res, 400, { error: "Paramètre country requis." });
+  try {
+    const d = await geoFetch("countries/states", JSON.stringify({ country }));
+    const states = ((d.data || {}).states || []).map(s => s.name).sort((a, b) => a.localeCompare(b, "fr"));
+    sendJSON(res, 200, { states });
+  } catch (e) {
+    sendJSON(res, 502, { error: "Service géographique indisponible." });
+  }
+});
+
+route("GET", "/api/geo/cities", async (req, res, params, body, query) => {
+  const country = (query.country || "").trim();
+  const state   = (query.state   || "").trim();
+  if (!country) return sendJSON(res, 400, { error: "Paramètre country requis." });
+  try {
+    let cities;
+    if (state) {
+      const d = await geoFetch("countries/state/cities", JSON.stringify({ country, state }));
+      cities = (d.data || []);
+    } else {
+      const d = await geoFetch("countries/cities", JSON.stringify({ country }));
+      cities = (d.data || []);
+    }
+    sendJSON(res, 200, { cities: cities.sort((a, b) => a.localeCompare(b, "fr")) });
+  } catch (e) {
+    sendJSON(res, 502, { error: "Service géographique indisponible." });
+  }
+});
+
 async function handleRequest(req, res) {
   const parsed = url.parse(req.url, true);
   const pathname = decodeURIComponent(parsed.pathname);
