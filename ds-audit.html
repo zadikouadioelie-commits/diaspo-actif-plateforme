@@ -100,7 +100,8 @@ const RULES = [
     label: 'Design System JS chargé',
     severity: 'warning',
     check: html => html.includes('/assets/ds.js') || html.includes('ds.js'),
-    fix: 'Ajouter <script src="/assets/ds.js"></script> avant </body>',
+    fix: 'Ajouter <script src="/assets/ds.js"></script> avant <script src="assets/chatbot.js"></script>
+</body>',
   },
   {
     id: 'viewport-meta',
@@ -347,5 +348,6 @@ function exportReport() {
   DA.toastSuccess('Rapport exporté en CSV');
 }
 </script>
+<script src="assets/chatbot.js"></script>
 </body>
 </html>
