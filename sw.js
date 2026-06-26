@@ -1,5 +1,5 @@
 /* Diaspo'Actif — Service Worker PWA */
-const CACHE = 'diaspoactif-v1';
+const CACHE = 'diaspoactif-v3';
 const STATIC = [
   '/',
   '/index.html',
@@ -14,6 +14,7 @@ const STATIC = [
   '/assets/styles.css',
   '/assets/app.js',
   '/assets/data.js',
+  '/assets/geo.js',
   '/assets/logo.svg',
   '/manifest.json'
 ];
