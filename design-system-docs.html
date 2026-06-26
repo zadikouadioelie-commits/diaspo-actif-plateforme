@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design System — Diaspo'Actif</title>
+<link rel="icon" href="/assets/logo.svg">
+<link rel="stylesheet" href="/assets/ds.css">
+<style>
+.ds-section{margin-bottom:3rem;}
+.ds-section-title{font-size:1.4rem;font-weight:800;color:var(--da-color-primary);margin-bottom:1rem;padding-bottom:.5rem;border-bottom:2px solid var(--da-color-accent);}
+.ds-subsection{margin-bottom:1.5rem;}
+.ds-subsection-title{font-size:.95rem;font-weight:700;color:var(--da-color-text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;}
+.ds-preview{background:var(--da-color-bg);border:1px solid var(--da-color-border);border-radius:var(--da-radius-lg);padding:1.5rem;margin-bottom:.5rem;display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;}
+.ds-preview--dark{background:var(--da-color-primary);border-color:var(--da-color-primary);}
+.ds-preview--col{flex-direction:column;align-items:flex-start;}
+.ds-code{background:#f0f2f7;border-radius:var(--da-radius-md);padding:.5rem .75rem;font-family:var(--da-font-mono);font-size:.75rem;color:#333;overflow-x:auto;white-space:pre;margin-bottom:1rem;}
+.ds-token-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.5rem;margin-bottom:.75rem;}
+.ds-color-chip{border-radius:var(--da-radius-md);overflow:hidden;border:1px solid var(--da-color-border);}
+.ds-color-swatch{height:48px;}
+.ds-color-label{padding:.35rem .5rem;font-size:.7rem;font-weight:700;background:#fff;}
+.ds-spacing-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.35rem;}
+.ds-spacing-bar{background:var(--da-color-accent);height:16px;border-radius:3px;}
+.ds-spec{font-size:.7rem;color:var(--da-color-text-muted);font-family:var(--da-font-mono);}
+.ds-prop-table{width:100%;border-collapse:collapse;font-size:.82rem;}
+.ds-prop-table th{background:var(--da-color-bg-subtle);padding:.4rem .75rem;text-align:left;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--da-color-text-muted);}
+.ds-prop-table td{padding:.4rem .75rem;border-bottom:1px solid var(--da-color-border);}
+.ds-prop-table tr:last-child td{border-bottom:none;}
+.ds-nav-dots{position:fixed;right:1rem;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:.35rem;z-index:100;}
+.ds-nav-dot{width:8px;height:8px;border-radius:50%;background:var(--da-color-border);cursor:pointer;transition:all .15s;}
+.ds-nav-dot.active{background:var(--da-color-accent);transform:scale(1.3);}
+@media(max-width:900px){.ds-nav-dots{display:none;}}
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="da-navbar" role="navigation" aria-label="Navigation principale">
+  <a href="/index.html" class="da-navbar__brand">
+    <span style="font-size:1.3rem;">🌍</span>
+    <span>Diaspo'Actif</span>
+  </a>
+  <span class="da-navbar__spacer"></span>
+  <div class="da-navbar__actions">
+    <span class="da-navbar__btn" style="opacity:.7;">Design System v1.0</span>
+    <a href="/dashboard-utilisateur.html" class="da-navbar__btn">← Dashboard</a>
+  </div>
+</nav>
+
+<!-- NAV DOTS -->
+<nav class="ds-nav-dots" aria-label="Navigation sections" id="nav-dots"></nav>
+
+<!-- LAYOUT -->
+<div class="da-layout">
+  <aside class="da-sidebar" id="sidebar" role="complementary" aria-label="Sections du Design System">
+    <div class="da-sidebar__section">
+      <div class="da-sidebar__label">Fondamentaux</div>
+      <a href="#tokens" class="da-sidebar__item"><span class="da-sidebar__icon">🎨</span>Design Tokens</a>
+      <a href="#typography" class="da-sidebar__item"><span class="da-sidebar__icon">🖋</span>Typographie</a>
+      <a href="#spacing" class="da-sidebar__item"><span class="da-sidebar__icon">📐</span>Espacement</a>
+      <a href="#icons" class="da-sidebar__item"><span class="da-sidebar__icon">🔣</span>Icônes</a>
+    </div>
+    <div class="da-sidebar__section">
+      <div class="da-sidebar__label">Navigation</div>
+      <a href="#navbar" class="da-sidebar__item"><span class="da-sidebar__icon">📍</span>Navbar</a>
+      <a href="#sidebar-comp" class="da-sidebar__item"><span class="da-sidebar__icon">☰</span>Sidebar</a>
+      <a href="#tabs" class="da-sidebar__item"><span class="da-sidebar__icon">📑</span>Onglets</a>
+      <a href="#breadcrumb" class="da-sidebar__item"><span class="da-sidebar__icon">›</span>Fil d'Ariane</a>
+    </div>
+    <div class="da-sidebar__section">
+      <div class="da-sidebar__label">Composants</div>
+      <a href="#buttons" class="da-sidebar__item"><span class="da-sidebar__icon">🖱</span>Boutons</a>
+      <a href="#forms" class="da-sidebar__item"><span class="da-sidebar__icon">📝</span>Formulaires</a>
+      <a href="#cards" class="da-sidebar__item"><span class="da-sidebar__icon">🃏</span>Cartes</a>
+      <a href="#modals" class="da-sidebar__item"><span class="da-sidebar__icon">⬜</span>Fenêtres</a>
+      <a href="#alerts" class="da-sidebar__item"><span class="da-sidebar__icon">⚠️</span>Alertes</a>
+      <a href="#tables" class="da-sidebar__item"><span class="da-sidebar__icon">📊</span>Tableaux</a>
+      <a href="#badges" class="da-sidebar__item"><span class="da-sidebar__icon">🏷</span>Indicateurs</a>
+      <a href="#avatars" class="da-sidebar__item"><span class="da-sidebar__icon">👤</span>Avatars</a>
+      <a href="#loading" class="da-sidebar__item"><span class="da-sidebar__icon">⏳</span>Chargement</a>
+    </div>
+    <div class="da-sidebar__section">
+      <div class="da-sidebar__label">Utilitaires</div>
+      <a href="#toasts" class="da-sidebar__item"><span class="da-sidebar__icon">🔔</span>Notifications</a>
+      <a href="#tooltips" class="da-sidebar__item"><span class="da-sidebar__icon">💬</span>Tooltips</a>
+      <a href="#dropdowns" class="da-sidebar__item"><span class="da-sidebar__icon">▾</span>Dropdowns</a>
+    </div>
+  </aside>
+
+  <main class="da-content" id="main-content" role="main">
+    <div class="da-page-header">
+      <h1 class="da-page-title">📚 Design System Diaspo'Actif</h1>
+      <p class="da-page-subtitle">Documentation technique complète des composants, tokens et patterns de la plateforme.</p>
+    </div>
+
+    <!-- ALERT INTRO -->
+    <div class="da-alert da-alert--info" style="margin-bottom:2rem;">
+      <span class="da-alert__icon">ℹ️</span>
+      <div class="da-alert__body">
+        <div class="da-alert__title">Comment utiliser ce Design System</div>
+        Incluez <code>/assets/ds.css</code> et <code>/assets/ds.js</code> dans chaque page. Tous les composants sont disponibles via les classes CSS <code>da-*</code> et l'API JavaScript <code>window.DA.*</code>.
+      </div>
+    </div>
+
+    <!-- ═══ DESIGN TOKENS ═══ -->
+    <section class="ds-section" id="tokens">
+      <h2 class="ds-section-title">🎨 Design Tokens</h2>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Couleurs Primaires</div>
+        <div class="ds-token-grid">
+          <div class="ds-color-chip"><div class="ds-color-swatch" style="background:#1a3a5c"></div><div class="ds-color-label">--da-color-primary<br>#1a3a5c</div></div>
+          <div class="ds-color-chip"><div class="ds-color-swatch" style="background:#2a5585"></div><div class="ds-color-label">--da-color-primary-light<br>#2a5585</div></div>
+          <div class="ds-color-chip"><div class="ds-color-swatch" style="background:#4a90d9"></div><div class="ds-color-label">--da-color-accent<br>#4a90d9</div></div>
+          <div class="ds-color-chip"><div class="ds-color-swatch" style="background:#27ae60"></div><div class="ds-color-label">--da-color-success<br>#27ae60</div></div>
+          <div class="ds-color-chip"><div class="ds-color-swatch" style="background:#e67e22"></div><div class="ds-color-label">--da-color-warning<br>#e67e22</div></div>
+          <div class="ds-color-chip"><div class="ds-color-swatch" style="background:#e74c3c"></div><div class="ds-color-label">--da-color-danger<br>#e74c3c</div></div>
+          <div class="ds-color-chip"><div class="ds-color-swatch" style="background:#9b59b6"></div><div class="ds-color-label">--da-color-purple<br>#9b59b6</div></div>
+          <div class="ds-color-chip"><div class="ds-color-swatch" style="background:#f0f2f7;border:1px solid #ddd;"></div><div class="ds-color-label">--da-color-bg<br>#f0f2f7</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ TYPOGRAPHIE ═══ -->
+    <section class="ds-section" id="typography">
+      <h2 class="ds-section-title">🖋 Typographie</h2>
+      <div class="ds-preview ds-preview--col">
+        <div style="font-size:var(--da-text-3xl);font-weight:var(--da-font-black);color:var(--da-color-text);">Titre 3XL — 1.875rem Black</div>
+        <div style="font-size:var(--da-text-2xl);font-weight:var(--da-font-bold);">Titre 2XL — 1.5rem Bold</div>
+        <div style="font-size:var(--da-text-xl);font-weight:var(--da-font-bold);">Titre XL — 1.25rem Bold</div>
+        <div style="font-size:var(--da-text-lg);font-weight:var(--da-font-semi);">Titre LG — 1.125rem Semi</div>
+        <div style="font-size:var(--da-text-md);font-weight:var(--da-font-medium);">Corps MD — 1rem Medium</div>
+        <div style="font-size:var(--da-text-base);">Corps BASE — 0.875rem Normal</div>
+        <div style="font-size:var(--da-text-sm);color:var(--da-color-text-secondary);">Corps SM — 0.80rem — Texte secondaire</div>
+        <div style="font-size:var(--da-text-xs);color:var(--da-color-text-muted);">Corps XS — 0.70rem — Texte muted, labels</div>
+        <div style="font-family:var(--da-font-mono);font-size:var(--da-text-sm);background:#f0f2f7;padding:.25rem .5rem;border-radius:4px;">Code — font-mono</div>
+      </div>
+    </section>
+
+    <!-- ═══ ESPACEMENT ═══ -->
+    <section class="ds-section" id="spacing">
+      <h2 class="ds-section-title">📐 Espacement</h2>
+      <div style="background:var(--da-color-bg-card);border-radius:var(--da-radius-lg);padding:1rem;border:1px solid var(--da-color-border);">
+        ${[1,2,3,4,5,6,8,10,12,16].map(n => `
+          <div class="ds-spacing-row">
+            <div class="ds-spacing-bar" style="width:calc(var(--da-sp-${n}) * 4);"></div>
+            <span class="ds-spec">--da-sp-${n} = ${n * 4}px (${(n * 4 / 16).toFixed(3)}rem)</span>
+          </div>`).join('')}
+      </div>
+    </section>
+
+    <!-- ═══ BOUTONS ═══ -->
+    <section class="ds-section" id="buttons">
+      <h2 class="ds-section-title">🖱 Boutons</h2>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Variantes</div>
+        <div class="ds-preview">
+          <button class="da-btn da-btn--primary">Principal</button>
+          <button class="da-btn da-btn--accent">Accent</button>
+          <button class="da-btn da-btn--success">Succès</button>
+          <button class="da-btn da-btn--danger">Danger</button>
+          <button class="da-btn da-btn--warning">Avertissement</button>
+          <button class="da-btn da-btn--outline">Contour</button>
+          <button class="da-btn da-btn--ghost">Fantôme</button>
+          <button class="da-btn da-btn--link">Lien</button>
+        </div>
+      </div>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Tailles</div>
+        <div class="ds-preview">
+          <button class="da-btn da-btn--primary da-btn--xs">XS</button>
+          <button class="da-btn da-btn--primary da-btn--sm">SM</button>
+          <button class="da-btn da-btn--primary">Base</button>
+          <button class="da-btn da-btn--primary da-btn--lg">LG</button>
+          <button class="da-btn da-btn--primary da-btn--xl">XL</button>
+        </div>
+      </div>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">États spéciaux</div>
+        <div class="ds-preview">
+          <button class="da-btn da-btn--primary" disabled>Désactivé</button>
+          <button class="da-btn da-btn--accent da-btn--loading">Chargement</button>
+          <button class="da-btn da-btn--primary da-btn--round">Arrondi</button>
+          <button class="da-btn da-btn--outline da-btn--icon" aria-label="Icône">❤️</button>
+        </div>
+      </div>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Groupe de boutons</div>
+        <div class="ds-preview">
+          <div class="da-btn-group">
+            <button class="da-btn da-btn--outline">Gauche</button>
+            <button class="da-btn da-btn--outline">Centre</button>
+            <button class="da-btn da-btn--outline">Droite</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Bouton flottant (FAB)</div>
+        <div class="ds-preview">
+          <span class="ds-spec">Voir coin bas-droite →</span>
+        </div>
+      </div>
+
+      <table class="ds-prop-table">
+        <tr><th>Classe</th><th>Description</th><th>Usage</th></tr>
+        <tr><td><code>.da-btn--primary</code></td><td>Bouton principal (action primaire)</td><td>CTA, soumettre formulaire</td></tr>
+        <tr><td><code>.da-btn--accent</code></td><td>Bouton accentué</td><td>Actions importantes secondaires</td></tr>
+        <tr><td><code>.da-btn--success</code></td><td>Confirmation, validation</td><td>Accepter, enregistrer</td></tr>
+        <tr><td><code>.da-btn--danger</code></td><td>Action destructive</td><td>Supprimer, rejeter</td></tr>
+        <tr><td><code>.da-btn--outline</code></td><td>Contour, action secondaire</td><td>Annuler, voir plus</td></tr>
+        <tr><td><code>.da-btn--ghost</code></td><td>Discret, sans fond</td><td>Actions dans des listes</td></tr>
+        <tr><td><code>.da-btn--loading</code></td><td>Spinner de chargement</td><td>Après soumission</td></tr>
+        <tr><td><code>.da-fab</code></td><td>Bouton d'action flottant</td><td>Action principale de la page</td></tr>
+      </table>
+    </section>
+
+    <!-- ═══ FORMULAIRES ═══ -->
+    <section class="ds-section" id="forms">
+      <h2 class="ds-section-title">📝 Formulaires</h2>
+
+      <div class="ds-preview ds-preview--col" style="max-width:500px;">
+        <div class="da-form-field da-w-full">
+          <label class="da-label da-label--required">Prénom</label>
+          <input class="da-input" type="text" placeholder="Votre prénom">
+          <span class="da-hint">Votre prénom tel qu'il apparaîtra sur votre profil.</span>
+        </div>
+        <div class="da-form-row" style="width:100%">
+          <div class="da-form-field">
+            <label class="da-label">Email</label>
+            <div class="da-input-group">
+              <span class="da-input-group__icon">✉️</span>
+              <input class="da-input" type="email" placeholder="email@exemple.com">
+            </div>
+          </div>
+          <div class="da-form-field">
+            <label class="da-label">Téléphone</label>
+            <input class="da-input" type="tel" placeholder="+33 6 00 00 00 00">
+          </div>
+        </div>
+        <div class="da-form-field da-w-full">
+          <label class="da-label">Pays</label>
+          <select class="da-select">
+            <option value="">Sélectionner un pays</option>
+            <option>France</option><option>Sénégal</option><option>Côte d'Ivoire</option>
+          </select>
+        </div>
+        <div class="da-form-field da-w-full">
+          <label class="da-label">Champ avec erreur</label>
+          <input class="da-input da-input--error" type="text" value="">
+          <span class="da-error-text">⚠ Ce champ est requis.</span>
+        </div>
+        <div class="da-form-field da-w-full">
+          <label class="da-label">Biographie</label>
+          <textarea class="da-textarea" rows="3" placeholder="Décrivez-vous…"></textarea>
+        </div>
+        <div class="da-form-field da-w-full">
+          <label class="da-label">Recherche</label>
+          <div class="da-search">
+            <span class="da-search__icon">🔍</span>
+            <input class="da-input da-search__input" type="search" placeholder="Rechercher…">
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.5rem;width:100%">
+          <label class="da-check"><input type="checkbox" checked><span class="da-check__label">Recevoir les notifications</span></label>
+          <label class="da-check"><input type="checkbox"><span class="da-check__label">Profil public</span></label>
+          <label class="da-radio"><input type="radio" name="r1" checked><span class="da-radio__label">Utilisateur</span></label>
+          <label class="da-radio"><input type="radio" name="r1"><span class="da-radio__label">Initiative</span></label>
+          <label class="da-switch">
+            <div class="da-switch__input">
+              <input type="checkbox" checked>
+              <div class="da-switch__track"></div>
+              <div class="da-switch__thumb"></div>
+            </div>
+            <span>Notifications email</span>
+          </label>
+        </div>
+        <div class="da-form-field da-w-full">
+          <label class="da-label">Téléchargement</label>
+          <div class="da-file-drop">
+            <input type="file" accept="image/*">
+            <div class="da-file-drop__icon">📁</div>
+            <div class="da-file-drop__text">Glissez un fichier ou <strong>cliquez pour parcourir</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ CARTES ═══ -->
+    <section class="ds-section" id="cards">
+      <h2 class="ds-section-title">🃏 Cartes</h2>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Carte de base</div>
+        <div class="da-cards-grid">
+          <div class="da-card">
+            <div class="da-card__header">
+              <div>
+                <div class="da-card__title">Titre de la carte</div>
+                <div class="da-card__subtitle">Sous-titre descriptif</div>
+              </div>
+              <button class="da-btn da-btn--outline da-btn--xs">Action</button>
+            </div>
+            <div class="da-card__body">Contenu principal de la carte avec une description plus longue qui peut s'étaler sur plusieurs lignes.</div>
+            <div class="da-card__footer">
+              <span class="da-badge da-badge--success da-badge--dot">Actif</span>
+              <div class="da-card__actions">
+                <button class="da-btn da-btn--ghost da-btn--sm">Voir</button>
+                <button class="da-btn da-btn--primary da-btn--sm">Modifier</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="da-card da-card--user">
+            <img class="da-card__avatar" src="https://api.dicebear.com/7.x/initials/svg?seed=JD&backgroundColor=4a90d9" alt="Avatar">
+            <div class="da-card__name">Jean Dupont</div>
+            <div class="da-card__role">Développeur Web · Paris, France</div>
+            <div class="da-card__tags">
+              <span class="da-tag">React</span>
+              <span class="da-tag">Node.js</span>
+              <span class="da-tag">UX</span>
+            </div>
+            <button class="da-btn da-btn--primary da-btn--sm da-btn--full" style="margin-top:.75rem;">Voir le profil</button>
+          </div>
+
+          <div class="da-card da-card--stat">
+            <div class="da-card__icon" style="background:#eff6ff;">🌍</div>
+            <div>
+              <div class="da-card__value">1 240</div>
+              <div class="da-card__label">Membres actifs</div>
+              <div class="da-card__trend da-card__trend--up">↑ +12% ce mois</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ ONGLETS ═══ -->
+    <section class="ds-section" id="tabs">
+      <h2 class="ds-section-title">📑 Onglets</h2>
+      <div class="ds-preview ds-preview--col" style="gap:0;padding:0;">
+        <div class="da-tabs" data-da-tabs id="demo-tabs">
+          <button class="da-tab active" data-panel="tab-info" aria-selected="true">ℹ️ Informations</button>
+          <button class="da-tab" data-panel="tab-stats">📊 Statistiques</button>
+          <button class="da-tab" data-panel="tab-history">📋 Historique</button>
+        </div>
+        <div style="padding:1.25rem;background:#fff;border:1px solid var(--da-color-border);border-top:none;border-radius:0 0 var(--da-radius-lg) var(--da-radius-lg);">
+          <div class="da-tab-panel active" id="tab-info">Panneau des informations générales.</div>
+          <div class="da-tab-panel" id="tab-stats">Panneau des statistiques.</div>
+          <div class="da-tab-panel" id="tab-history">Panneau de l'historique.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ FENÊTRES ═══ -->
+    <section class="ds-section" id="modals">
+      <h2 class="ds-section-title">⬜ Fenêtres modales</h2>
+      <div class="ds-preview">
+        <button class="da-btn da-btn--primary" data-da-modal-open="demo-modal">Ouvrir la modale</button>
+        <button class="da-btn da-btn--warning" onclick="DA.confirm({title:'Supprimer ?',message:'Cette action est irréversible.',confirmLabel:'Supprimer',type:'danger',icon:'🗑️'}).then(r=>DA.toastInfo(r?'Confirmé':'Annulé'))">Boîte de confirmation</button>
+        <button class="da-btn da-btn--outline" onclick="DA.toastSuccess('Opération réussie !');DA.toastDanger('Une erreur est survenue.');DA.toastWarning('Attention : ceci est un avertissement.');DA.toastInfo('Information importante.');">Tester les toasts</button>
+      </div>
+
+      <div class="da-modal-backdrop" id="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-modal-title">
+        <div class="da-modal">
+          <div class="da-modal__header">
+            <span class="da-modal__icon" aria-hidden="true">📝</span>
+            <h3 class="da-modal__title" id="demo-modal-title">Exemple de modale</h3>
+            <button class="da-modal__close" aria-label="Fermer">×</button>
+          </div>
+          <div class="da-modal__body">
+            <p style="margin-bottom:1rem;color:var(--da-color-text-secondary);">Ceci est un exemple de modale standard avec header, body et footer. Elle gère le focus trap et se ferme avec Échap.</p>
+            <div class="da-form-field">
+              <label class="da-label da-label--required">Nom</label>
+              <input class="da-input" type="text" placeholder="Votre nom">
+            </div>
+          </div>
+          <div class="da-modal__footer">
+            <button class="da-btn da-btn--outline" data-da-modal-close>Annuler</button>
+            <button class="da-btn da-btn--primary">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ ALERTES ═══ -->
+    <section class="ds-section" id="alerts">
+      <h2 class="ds-section-title">⚠️ Alertes</h2>
+      <div class="ds-preview ds-preview--col">
+        <div class="da-alert da-alert--info da-w-full">
+          <span class="da-alert__icon">ℹ️</span>
+          <div class="da-alert__body"><div class="da-alert__title">Information</div>Voici une information utile pour l'utilisateur.</div>
+          <button class="da-alert__close">×</button>
+        </div>
+        <div class="da-alert da-alert--success da-w-full">
+          <span class="da-alert__icon">✅</span>
+          <div class="da-alert__body"><div class="da-alert__title">Succès</div>L'opération a été effectuée avec succès.</div>
+        </div>
+        <div class="da-alert da-alert--warning da-w-full">
+          <span class="da-alert__icon">⚠️</span>
+          <div class="da-alert__body"><div class="da-alert__title">Attention</div>Cette action nécessite une vérification.</div>
+        </div>
+        <div class="da-alert da-alert--danger da-w-full">
+          <span class="da-alert__icon">🚨</span>
+          <div class="da-alert__body"><div class="da-alert__title">Erreur</div>Une erreur est survenue. Veuillez réessayer.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ TABLEAUX ═══ -->
+    <section class="ds-section" id="tables">
+      <h2 class="ds-section-title">📊 Tableaux</h2>
+      <div id="demo-table"></div>
+    </section>
+
+    <!-- ═══ BADGES & INDICATEURS ═══ -->
+    <section class="ds-section" id="badges">
+      <h2 class="ds-section-title">🏷 Indicateurs</h2>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Badges</div>
+        <div class="ds-preview">
+          <span class="da-badge da-badge--primary">Primary</span>
+          <span class="da-badge da-badge--accent">Accent</span>
+          <span class="da-badge da-badge--success">Succès</span>
+          <span class="da-badge da-badge--warning">Avert.</span>
+          <span class="da-badge da-badge--danger">Danger</span>
+          <span class="da-badge da-badge--purple">Purple</span>
+          <span class="da-badge da-badge--neutral">Neutre</span>
+          <span class="da-badge da-badge--success da-badge--dot">En ligne</span>
+        </div>
+      </div>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Statuts</div>
+        <div class="ds-preview">
+          <span class="da-status da-status--active">Actif</span>
+          <span class="da-status da-status--inactive">Inactif</span>
+          <span class="da-status da-status--pending">En attente</span>
+          <span class="da-status da-status--error">Erreur</span>
+        </div>
+      </div>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Tags</div>
+        <div class="ds-preview">
+          <div class="da-tag-list">
+            <span class="da-tag">Développement</span>
+            <span class="da-tag">Design</span>
+            <span class="da-tag">Marketing</span>
+            <span class="da-tag da-tag--removable">Supprimable</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Barres de progression</div>
+        <div class="ds-preview ds-preview--col" style="gap:.75rem;">
+          <div style="width:100%;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:.35rem;font-size:.75rem;"><span>Profil complété</span><span>75%</span></div>
+            <div class="da-progress"><div class="da-progress__bar" data-value="75" style="width:75%"></div></div>
+          </div>
+          <div style="width:100%">
+            <div class="da-progress da-progress--success"><div class="da-progress__bar" style="width:92%"></div></div>
+          </div>
+          <div style="width:100%">
+            <div class="da-progress da-progress--danger da-progress--sm"><div class="da-progress__bar" style="width:30%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Compteurs</div>
+        <div class="ds-preview">
+          <span class="da-counter">3</span>
+          <span class="da-counter da-counter--accent">12</span>
+          <span class="da-counter da-counter--success">99+</span>
+          <span>Niveaux : </span>
+          <div class="da-level">
+            <div class="da-level__dot filled"></div>
+            <div class="da-level__dot filled"></div>
+            <div class="da-level__dot filled"></div>
+            <div class="da-level__dot"></div>
+            <div class="da-level__dot"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ AVATARS ═══ -->
+    <section class="ds-section" id="avatars">
+      <h2 class="ds-section-title">👤 Avatars</h2>
+      <div class="ds-preview" style="align-items:center;">
+        <img class="da-avatar da-avatar--xs" src="https://api.dicebear.com/7.x/initials/svg?seed=A&backgroundColor=1a3a5c" alt="">
+        <img class="da-avatar da-avatar--sm" src="https://api.dicebear.com/7.x/initials/svg?seed=B&backgroundColor=4a90d9" alt="">
+        <img class="da-avatar" src="https://api.dicebear.com/7.x/initials/svg?seed=C&backgroundColor=27ae60" alt="">
+        <img class="da-avatar da-avatar--lg" src="https://api.dicebear.com/7.x/initials/svg?seed=D&backgroundColor=e67e22" alt="">
+        <img class="da-avatar da-avatar--xl" src="https://api.dicebear.com/7.x/initials/svg?seed=E&backgroundColor=9b59b6" alt="">
+        <div class="da-avatar-group" style="margin-left:1rem;">
+          <img class="da-avatar da-avatar--sm" src="https://api.dicebear.com/7.x/initials/svg?seed=X&backgroundColor=1a3a5c" alt="">
+          <img class="da-avatar da-avatar--sm" src="https://api.dicebear.com/7.x/initials/svg?seed=Y&backgroundColor=4a90d9" alt="">
+          <img class="da-avatar da-avatar--sm" src="https://api.dicebear.com/7.x/initials/svg?seed=Z&backgroundColor=27ae60" alt="">
+          <div class="da-avatar-placeholder da-avatar--sm" style="font-size:.6rem;">+5</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ CHARGEMENT ═══ -->
+    <section class="ds-section" id="loading">
+      <h2 class="ds-section-title">⏳ États de chargement</h2>
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Spinners</div>
+        <div class="ds-preview" style="align-items:center;">
+          <div class="da-spinner da-spinner--sm"></div>
+          <div class="da-spinner"></div>
+          <div class="da-spinner da-spinner--lg"></div>
+        </div>
+      </div>
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">Skeletons</div>
+        <div class="ds-preview ds-preview--col" style="gap:.5rem;">
+          <div class="da-skeleton da-skeleton--avatar" style="margin-bottom:.5rem;"></div>
+          <div class="da-skeleton da-skeleton--title"></div>
+          <div class="da-skeleton da-skeleton--text"></div>
+          <div class="da-skeleton da-skeleton--text" style="width:70%;"></div>
+        </div>
+      </div>
+      <div class="ds-subsection">
+        <div class="ds-subsection-title">État vide</div>
+        <div class="ds-preview" style="background:var(--da-color-bg-card);">
+          <div class="da-empty">
+            <div class="da-empty__icon">📭</div>
+            <div class="da-empty__title">Aucun résultat</div>
+            <div class="da-empty__desc">Il n'y a pas encore de contenu ici. Commencez par en créer un.</div>
+            <button class="da-btn da-btn--primary da-btn--sm">+ Créer</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ TOOLTIPS ═══ -->
+    <section class="ds-section" id="tooltips">
+      <h2 class="ds-section-title">💬 Tooltips</h2>
+      <div class="ds-preview" style="padding:2rem;">
+        <button class="da-btn da-btn--outline" data-tooltip="Tooltip en haut (défaut)">Haut</button>
+        <button class="da-btn da-btn--outline" data-tooltip="Tooltip en bas" data-tooltip-pos="bottom">Bas</button>
+        <button class="da-btn da-btn--outline" data-tooltip="Tooltip à droite" data-tooltip-pos="right">Droite</button>
+      </div>
+    </section>
+
+    <!-- ═══ DROPDOWNS ═══ -->
+    <section class="ds-section" id="dropdowns">
+      <h2 class="ds-section-title">▾ Menus déroulants</h2>
+      <div class="ds-preview">
+        <div class="da-dropdown">
+          <button class="da-btn da-btn--outline" data-da-dropdown>Actions ▾</button>
+          <div class="da-dropdown__menu">
+            <button class="da-dropdown__item">✏️ Modifier</button>
+            <button class="da-dropdown__item">👁 Voir</button>
+            <button class="da-dropdown__item">📋 Dupliquer</button>
+            <div class="da-dropdown__divider"></div>
+            <button class="da-dropdown__item da-dropdown__item--danger">🗑 Supprimer</button>
+          </div>
+        </div>
+        <div class="da-dropdown">
+          <button class="da-btn da-btn--primary" data-da-dropdown>Options ▾</button>
+          <div class="da-dropdown__menu da-dropdown--left">
+            <button class="da-dropdown__item">📥 Exporter CSV</button>
+            <button class="da-dropdown__item">📤 Importer</button>
+            <button class="da-dropdown__item">⚙️ Paramètres</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ FIL D'ARIANE ═══ -->
+    <section class="ds-section" id="breadcrumb">
+      <h2 class="ds-section-title">› Fil d'Ariane</h2>
+      <div class="ds-preview">
+        <nav class="da-breadcrumb" aria-label="Fil d'ariane">
+          <span class="da-breadcrumb__item"><a href="#">Accueil</a></span>
+          <span class="da-breadcrumb__sep" aria-hidden="true">›</span>
+          <span class="da-breadcrumb__item"><a href="#">Dashboard</a></span>
+          <span class="da-breadcrumb__sep" aria-hidden="true">›</span>
+          <span class="da-breadcrumb__item"><span aria-current="page">Design System</span></span>
+        </nav>
+      </div>
+    </section>
+
+    <!-- ═══ API JS ═══ -->
+    <section class="ds-section">
+      <h2 class="ds-section-title">⚡ API JavaScript (window.DA)</h2>
+      <table class="ds-prop-table">
+        <tr><th>Méthode</th><th>Description</th><th>Exemple</th></tr>
+        <tr><td><code>DA.openModal(id)</code></td><td>Ouvrir une modale</td><td><code>DA.openModal('mon-modal')</code></td></tr>
+        <tr><td><code>DA.closeModal(id)</code></td><td>Fermer une modale</td><td><code>DA.closeModal('mon-modal')</code></td></tr>
+        <tr><td><code>DA.confirm(opts)</code></td><td>Boîte de confirmation (Promise)</td><td><code>await DA.confirm({title:'…'})</code></td></tr>
+        <tr><td><code>DA.toastSuccess(msg)</code></td><td>Toast succès</td><td><code>DA.toastSuccess('Sauvegardé !')</code></td></tr>
+        <tr><td><code>DA.toastDanger(msg)</code></td><td>Toast erreur</td><td><code>DA.toastDanger('Erreur')</code></td></tr>
+        <tr><td><code>DA.toastWarning(msg)</code></td><td>Toast avertissement</td><td><code>DA.toastWarning('Attention')</code></td></tr>
+        <tr><td><code>DA.toastInfo(msg)</code></td><td>Toast information</td><td><code>DA.toastInfo('Info')</code></td></tr>
+        <tr><td><code>DA.createTable(opts)</code></td><td>Tableau dynamique avec tri/filtre/pagination</td><td><code>DA.createTable({containerId, columns, data})</code></td></tr>
+        <tr><td><code>DA.showContextMenu(e, items)</code></td><td>Menu contextuel au clic droit</td><td><code>el.oncontextmenu = e => DA.showContextMenu(e, items)</code></td></tr>
+        <tr><td><code>DA.fmtDate(iso)</code></td><td>Formater une date</td><td><code>DA.fmtDate('2026-06-26')</code> → '26 juin 2026'</td></tr>
+        <tr><td><code>DA.relTime(iso)</code></td><td>Temps relatif</td><td><code>DA.relTime(date)</code> → 'Il y a 2h'</td></tr>
+        <tr><td><code>DA.avatarHtml(name, size)</code></td><td>Avatar placeholder HTML</td><td><code>DA.avatarHtml('Jean D', 40)</code></td></tr>
+        <tr><td><code>DA.badgeHtml(text, type)</code></td><td>Badge HTML</td><td><code>DA.badgeHtml('Actif', 'success')</code></td></tr>
+        <tr><td><code>DA.skeleton(count, type)</code></td><td>HTML skeleton loader</td><td><code>DA.skeleton(3, 'card')</code></td></tr>
+        <tr><td><code>DA.buildBreadcrumb(id, items)</code></td><td>Construire un fil d'Ariane</td><td><code>DA.buildBreadcrumb('bc', [{label,href}])</code></td></tr>
+      </table>
+    </section>
+
+    <!-- ═══ INCLUSION ═══ -->
+    <section class="ds-section">
+      <h2 class="ds-section-title">📦 Intégration dans une page</h2>
+      <pre class="ds-code">&lt;!-- Dans le &lt;head&gt; --&gt;
+&lt;link rel="stylesheet" href="/assets/ds.css"&gt;
+
+&lt;!-- Avant &lt;/body&gt; --&gt;
+&lt;script src="/assets/ds.js"&gt;&lt;/script&gt;</pre>
+
+      <div class="da-alert da-alert--success">
+        <span class="da-alert__icon">✅</span>
+        <div class="da-alert__body">
+          <div class="da-alert__title">Compatibilité</div>
+          Chrome 90+, Firefox 88+, Safari 14+, Edge 90+. Responsive de 320px à 2560px+. Compatible PWA et mode impression.
+        </div>
+      </div>
+    </section>
+
+    <div style="height:2rem;"></div>
+  </main>
+</div>
+
+<!-- FAB démo -->
+<button class="da-fab" onclick="DA.toastInfo('Bouton d\'action flottant (FAB)')" aria-label="Action principale" data-tooltip="Action principale">＋</button>
+
+<script src="/assets/ds.js"></script>
+<script>
+// Tableau de démonstration
+DA.createTable({
+  containerId: 'demo-table',
+  title: 'Membres récents',
+  searchable: true,
+  exportable: true,
+  pageSize: 5,
+  columns: [
+    { key: 'nom',    label: 'Nom',     sortValue: r => r.nom },
+    { key: 'role',   label: 'Rôle',   render: r => DA.badgeHtml(r.role, r.role === 'admin' ? 'danger' : r.role === 'initiative' ? 'accent' : 'success') },
+    { key: 'pays',   label: 'Pays',    sortValue: r => r.pays },
+    { key: 'statut', label: 'Statut', render: r => `<span class="da-status da-status--${r.statut === 'actif' ? 'active' : 'inactive'}">${r.statut}</span>` },
+    { key: 'date',   label: 'Inscrit', render: r => DA.fmtDate(r.date), sortValue: r => r.date },
+    { label: 'Actions', render: r => `<button class="da-btn da-btn--ghost da-btn--xs" onclick="DA.toastInfo('Voir ${DA.esc(r.nom)}')">Voir</button>` },
+  ],
+  data: [
+    { id:1, nom:'Jean Kouadio',    role:'utilisateur', pays:'France',         statut:'actif',    date:'2026-06-01' },
+    { id:2, nom:'Aïcha Diallo',    role:'initiative',  pays:'Sénégal',        statut:'actif',    date:'2026-05-20' },
+    { id:3, nom:'Consulat Sénégal',role:'officiel',    pays:'France',         statut:'actif',    date:'2026-04-15' },
+    { id:4, nom:'Marc Ndiaye',     role:'utilisateur', pays:'Belgique',       statut:'inactif',  date:'2026-03-10' },
+    { id:5, nom:'Fatou Traoré',    role:'utilisateur', pays:"Côte d'Ivoire",  statut:'actif',    date:'2026-06-10' },
+    { id:6, nom:'Pierre Martin',   role:'initiative',  pays:'Canada',         statut:'actif',    date:'2026-06-15' },
+    { id:7, nom:'Amina Koné',      role:'utilisateur', pays:'Mali',           statut:'inactif',  date:'2026-02-28' },
+    { id:8, nom:'David Sow',       role:'utilisateur', pays:'Allemagne',      statut:'actif',    date:'2026-06-20' },
+  ],
+});
+
+// Nav dots
+const sections = document.querySelectorAll('.ds-section');
+const dotsContainer = document.getElementById('nav-dots');
+sections.forEach((sec, i) => {
+  const dot = document.createElement('div');
+  dot.className = 'ds-nav-dot';
+  dot.title = sec.querySelector('.ds-section-title')?.textContent?.slice(2) || '';
+  dot.onclick = () => sec.scrollIntoView({ behavior: 'smooth' });
+  dotsContainer.appendChild(dot);
+});
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const i = [...sections].indexOf(e.target);
+      document.querySelectorAll('.ds-nav-dot').forEach((d,j) => d.classList.toggle('active', j===i));
+    }
+  });
+}, { threshold: 0.3 });
+sections.forEach(s => observer.observe(s));
+
+// Alert closable
+document.querySelectorAll('.da-alert__close').forEach(btn => {
+  btn.addEventListener('click', () => btn.closest('.da-alert')?.remove());
+});
+</script>
+</body>
+</html>

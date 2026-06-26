@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit Design System — Diaspo'Actif</title>
+<link rel="icon" href="/assets/logo.svg">
+<link rel="stylesheet" href="/assets/ds.css">
+<style>
+.audit-result{margin-bottom:2rem;}
+.audit-file{background:#fff;border-radius:var(--da-radius-lg);border:1px solid var(--da-color-border);overflow:hidden;margin-bottom:1rem;}
+.audit-file-header{padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem;border-bottom:1px solid var(--da-color-border);cursor:pointer;user-select:none;}
+.audit-file-header:hover{background:var(--da-color-bg-subtle);}
+.audit-file-name{font-weight:700;font-size:.85rem;flex:1;}
+.audit-file-score{font-size:.75rem;font-weight:800;padding:2px 8px;border-radius:20px;}
+.score-good{background:#eafaf1;color:#155a2d;}
+.score-warn{background:#fef9e7;color:#7a4010;}
+.score-bad{background:#fdedec;color:#7b1e1e;}
+.audit-issues{padding:.75rem 1rem;display:none;}
+.audit-file.open .audit-issues{display:block;}
+.issue-item{display:flex;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--da-color-border);font-size:.78rem;align-items:flex-start;}
+.issue-item:last-child{border-bottom:none;}
+.issue-icon{flex-shrink:0;font-size:.9rem;}
+.issue-type{font-size:.65rem;font-weight:700;text-transform:uppercase;color:var(--da-color-text-muted);min-width:100px;}
+.issue-desc{flex:1;color:var(--da-color-text-secondary);}
+.progress-header{display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:.25rem;}
+.stat-row{display:flex;align-items:center;gap:1rem;padding:.5rem 0;border-bottom:1px solid var(--da-color-border);}
+.stat-row:last-child{border-bottom:none;}
+</style>
+</head>
+<body>
+<nav class="da-navbar">
+  <a href="/design-system-docs.html" class="da-navbar__brand">🔍 DS Audit</a>
+  <span class="da-navbar__spacer"></span>
+  <a href="/design-system-docs.html" class="da-navbar__btn">📚 Documentation</a>
+  <a href="/dashboard-utilisateur.html" class="da-navbar__btn">← Dashboard</a>
+</nav>
+
+<div style="padding:calc(56px + 1.5rem) 1.5rem 2rem;max-width:1000px;margin:0 auto;">
+  <div class="da-page-header">
+    <h1 class="da-page-title">🔍 Audit du Design System</h1>
+    <p class="da-page-subtitle">Analyse automatique des pages de la plateforme pour détecter les incohérences et composants non conformes au Design System.</p>
+  </div>
+
+  <div class="da-alert da-alert--info" style="margin-bottom:1.5rem;">
+    <span class="da-alert__icon">ℹ️</span>
+    <div class="da-alert__body">L'audit analyse les pages HTML de la plateforme en les chargeant dans un iframe. Les résultats sont basés sur une analyse statique des classes CSS et des patterns utilisés.</div>
+  </div>
+
+  <div class="da-card" style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <button class="da-btn da-btn--primary" id="btn-audit" onclick="runAudit()">▶ Lancer l'audit complet</button>
+      <button class="da-btn da-btn--outline" onclick="exportReport()">📥 Exporter le rapport</button>
+      <span id="audit-status" style="font-size:.8rem;color:var(--da-color-text-muted);">Cliquez sur "Lancer l'audit" pour commencer.</span>
+    </div>
+  </div>
+
+  <!-- Résumé -->
+  <div id="audit-summary" style="display:none;" class="da-cards-grid" style="margin-bottom:1.5rem;"></div>
+
+  <!-- Résultats -->
+  <div id="audit-results"></div>
+</div>
+
+<script src="/assets/ds.js"></script>
+<script>
+const PAGES_TO_AUDIT = [
+  '/index.html',
+  '/agenda.html',
+  '/meeting.html',
+  '/cv-builder.html',
+  '/annuaire.html',
+  '/messagerie.html',
+  '/fil-actualite.html',
+  '/evenements.html',
+  '/formations.html',
+  '/login.html',
+  '/inscription.html',
+  '/dashboard-utilisateur.html',
+  '/dashboard-officiel.html',
+  '/dashboard-institutionnel.html',
+  '/dashboard-initiative.html',
+  '/dashboard-administrateur.html',
+  '/design-system-docs.html',
+];
+
+// Règles d'audit
+const RULES = [
+  {
+    id: 'ds-css-loaded',
+    label: 'Design System CSS chargé',
+    severity: 'error',
+    check: html => html.includes('/assets/ds.css') || html.includes('ds.css'),
+    fix: 'Ajouter <link rel="stylesheet" href="/assets/ds.css"> dans le <head>',
+  },
+  {
+    id: 'ds-js-loaded',
+    label: 'Design System JS chargé',
+    severity: 'warning',
+    check: html => html.includes('/assets/ds.js') || html.includes('ds.js'),
+    fix: 'Ajouter <script src="/assets/ds.js"></script> avant </body>',
+  },
+  {
+    id: 'viewport-meta',
+    label: 'Meta viewport présente',
+    severity: 'error',
+    check: html => html.includes('name="viewport"'),
+    fix: 'Ajouter <meta name="viewport" content="width=device-width, initial-scale=1">',
+  },
+  {
+    id: 'lang-attr',
+    label: 'Attribut lang sur <html>',
+    severity: 'warning',
+    check: html => /<html[^>]+lang=/i.test(html),
+    fix: 'Ajouter lang="fr" sur la balise <html>',
+  },
+  {
+    id: 'aria-labels',
+    label: 'Navigation avec aria-label',
+    severity: 'warning',
+    check: html => !/<nav(?![^>]*aria-label)/i.test(html) || html.includes('aria-label'),
+    fix: 'Ajouter aria-label sur les éléments <nav>',
+  },
+  {
+    id: 'alt-images',
+    label: 'Attribut alt sur les images',
+    severity: 'error',
+    check: html => !/<img(?![^>]*alt=)/i.test(html),
+    fix: 'Ajouter l\'attribut alt sur toutes les balises <img>',
+  },
+  {
+    id: 'font-consistency',
+    label: 'Police cohérente (pas de Google Fonts externe)',
+    severity: 'info',
+    check: html => !html.includes('fonts.googleapis.com'),
+    fix: 'Utiliser les polices système via --da-font-body défini dans ds.css',
+  },
+  {
+    id: 'hardcoded-colors',
+    label: 'Couleurs non codées en dur (style inline)',
+    severity: 'info',
+    check: html => {
+      const matches = html.match(/style="[^"]*color:\s*#[0-9a-fA-F]{3,6}/g) || [];
+      return matches.length < 10; // Tolérance de 10 couleurs inline
+    },
+    fix: 'Remplacer les couleurs inline par des variables CSS --da-color-*',
+  },
+  {
+    id: 'responsive-grid',
+    label: 'Grilles responsives utilisées',
+    severity: 'info',
+    check: html => html.includes('da-cards-grid') || html.includes('da-stats-grid') || html.includes('da-form-grid') || html.includes('grid-template-columns') || html.includes('display:grid') || html.includes('display: grid'),
+    fix: 'Utiliser .da-cards-grid ou .da-stats-grid pour les mises en page en grille',
+  },
+  {
+    id: 'no-deprecated-btn',
+    label: 'Pas de classes de bouton personnalisées (btn-custom)',
+    severity: 'info',
+    check: html => !html.includes('class="btn "') && !html.includes('"btn-primary"') && !html.includes('"btn-secondary"'),
+    fix: 'Remplacer les classes btn-* par les classes da-btn da-btn--*',
+  },
+  {
+    id: 'skip-link',
+    label: 'Lien d\'évitement (accessibilité)',
+    severity: 'info',
+    check: html => html.includes('da-skip-link') || html.includes('skip') || html.includes('main-content'),
+    fix: 'Ajouter un lien <a href="#main-content" class="da-skip-link">Aller au contenu</a>',
+  },
+  {
+    id: 'focus-management',
+    label: 'Gestion du focus (tabindex ou focus-visible)',
+    severity: 'info',
+    check: html => html.includes('focus') || html.includes('tabindex'),
+    fix: 'Assurer la navigabilité au clavier avec tabindex et :focus-visible',
+  },
+];
+
+let auditData = [];
+
+async function fetchPage(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.text();
+  } catch { return null; }
+}
+
+function auditPage(html, url) {
+  const issues = [];
+  let score = 100;
+  const penalties = { error: 20, warning: 10, info: 3 };
+
+  RULES.forEach(rule => {
+    const pass = rule.check(html);
+    if (!pass) {
+      issues.push({ ...rule, pass: false });
+      score -= penalties[rule.severity] || 5;
+    }
+  });
+
+  // Vérifs supplémentaires
+  const inlineStyles = (html.match(/style="[^"]{50,}"/g) || []).length;
+  if (inlineStyles > 20) {
+    issues.push({ id: 'inline-styles', label: `${inlineStyles} styles inline longs`, severity: 'info', fix: 'Extraire les styles dans ds.css ou utiliser des classes da-*', pass: false });
+    score -= 5;
+  }
+
+  const missingLabels = (html.match(/<input(?![^>]*aria-label)(?![^>]*id=)[^>]*>/gi) || []).length;
+  if (missingLabels > 0) {
+    issues.push({ id: 'input-labels', label: `${missingLabels} champ(s) sans label ou aria-label`, severity: 'warning', fix: 'Associer chaque <input> à un <label> ou lui ajouter aria-label', pass: false });
+    score -= missingLabels * 3;
+  }
+
+  score = Math.max(0, score);
+
+  const dsClasses = (html.match(/\bda-[a-z-]+/g) || []).length;
+  const uniqueDsClasses = new Set(html.match(/\bda-[a-z-]+/g) || []).size;
+
+  return { url, score, issues, dsClasses, uniqueDsClasses, htmlSize: Math.round(html.length / 1024) };
+}
+
+async function runAudit() {
+  const btn = document.getElementById('btn-audit');
+  const status = document.getElementById('audit-status');
+  const resultsEl = document.getElementById('audit-results');
+  const summaryEl = document.getElementById('audit-summary');
+
+  btn.classList.add('da-btn--loading');
+  btn.disabled = true;
+  auditData = [];
+
+  resultsEl.innerHTML = '<div class="da-empty"><div class="da-spinner"></div><div class="da-empty__title">Analyse en cours…</div></div>';
+  summaryEl.style.display = 'none';
+
+  let done = 0;
+  for (const page of PAGES_TO_AUDIT) {
+    status.textContent = `Analyse de ${page}… (${done + 1}/${PAGES_TO_AUDIT.length})`;
+    const html = await fetchPage(page);
+    if (html) {
+      auditData.push(auditPage(html, page));
+    } else {
+      auditData.push({ url: page, score: 0, issues: [{ id:'not-found', label:'Page inaccessible', severity:'error', fix:'Vérifier que la page existe', pass:false }], dsClasses: 0, uniqueDsClasses: 0, htmlSize: 0 });
+    }
+    done++;
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  renderResults();
+  btn.classList.remove('da-btn--loading');
+  btn.disabled = false;
+  status.textContent = `✅ Audit terminé — ${PAGES_TO_AUDIT.length} pages analysées.`;
+}
+
+function renderResults() {
+  const summaryEl = document.getElementById('audit-summary');
+  const resultsEl = document.getElementById('audit-results');
+
+  const avgScore = Math.round(auditData.reduce((s, p) => s + p.score, 0) / auditData.length);
+  const totalIssues = auditData.reduce((s, p) => s + p.issues.length, 0);
+  const errors = auditData.reduce((s, p) => s + p.issues.filter(i => i.severity === 'error').length, 0);
+  const warnings = auditData.reduce((s, p) => s + p.issues.filter(i => i.severity === 'warning').length, 0);
+  const dsPages = auditData.filter(p => p.dsClasses > 0).length;
+
+  summaryEl.innerHTML = `
+    <div class="da-card da-card--stat">
+      <div class="da-card__icon" style="background:#eff6ff;font-size:1.5rem;">📊</div>
+      <div>
+        <div class="da-card__value" style="color:${avgScore >= 80 ? 'var(--da-color-success)' : avgScore >= 60 ? 'var(--da-color-warning)' : 'var(--da-color-danger)'};">${avgScore}/100</div>
+        <div class="da-card__label">Score moyen</div>
+      </div>
+    </div>
+    <div class="da-card da-card--stat">
+      <div class="da-card__icon" style="background:#fdedec;font-size:1.5rem;">🚨</div>
+      <div>
+        <div class="da-card__value" style="color:var(--da-color-danger);">${errors}</div>
+        <div class="da-card__label">Erreurs critiques</div>
+      </div>
+    </div>
+    <div class="da-card da-card--stat">
+      <div class="da-card__icon" style="background:#fef9e7;font-size:1.5rem;">⚠️</div>
+      <div>
+        <div class="da-card__value" style="color:var(--da-color-warning);">${warnings}</div>
+        <div class="da-card__label">Avertissements</div>
+      </div>
+    </div>
+    <div class="da-card da-card--stat">
+      <div class="da-card__icon" style="background:#eafaf1;font-size:1.5rem;">✅</div>
+      <div>
+        <div class="da-card__value" style="color:var(--da-color-success);">${dsPages}/${auditData.length}</div>
+        <div class="da-card__label">Pages avec DS</div>
+      </div>
+    </div>`;
+  summaryEl.style.display = 'grid';
+
+  const sorted = [...auditData].sort((a, b) => a.score - b.score);
+
+  resultsEl.innerHTML = `
+    <h2 class="da-section-title" style="font-size:1.1rem;margin-bottom:1rem;">Résultats par page</h2>
+    ${sorted.map(page => {
+      const scoreClass = page.score >= 80 ? 'score-good' : page.score >= 60 ? 'score-warn' : 'score-bad';
+      const scoreEmoji = page.score >= 80 ? '✅' : page.score >= 60 ? '⚠️' : '❌';
+      return `
+        <div class="audit-file" id="af-${slugify(page.url)}">
+          <div class="audit-file-header" onclick="this.closest('.audit-file').classList.toggle('open')">
+            <span style="font-size:1rem;">${scoreEmoji}</span>
+            <span class="audit-file-name">${page.url}</span>
+            <span style="font-size:.72rem;color:var(--da-color-text-muted);">${page.htmlSize}KB · ${page.uniqueDsClasses} classes DS</span>
+            <span class="audit-file-score ${scoreClass}">${page.score}/100</span>
+            <span style="font-size:.75rem;color:var(--da-color-text-muted);margin-left:.25rem;">▾</span>
+          </div>
+          <div class="audit-issues">
+            ${page.issues.length === 0
+              ? '<div style="color:var(--da-color-success);font-size:.82rem;padding:.35rem 0;">✅ Aucun problème détecté sur cette page.</div>'
+              : page.issues.map(issue => `
+                <div class="issue-item">
+                  <span class="issue-icon">${issue.severity === 'error' ? '🚨' : issue.severity === 'warning' ? '⚠️' : 'ℹ️'}</span>
+                  <span class="issue-type">${issue.severity}</span>
+                  <div class="issue-desc">
+                    <strong>${escHtml(issue.label)}</strong><br>
+                    <span style="color:var(--da-color-text-muted);">Correction : ${escHtml(issue.fix)}</span>
+                  </div>
+                </div>`).join('')
+            }
+          </div>
+        </div>`;
+    }).join('')}`;
+}
+
+function slugify(s) { return s.replace(/[^a-z0-9]/gi, '-'); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function exportReport() {
+  if (!auditData.length) { DA.toastWarning('Lancez d\'abord l\'audit.'); return; }
+  const lines = ['Page,Score,Erreurs,Avertissements,Classes DS'];
+  auditData.forEach(p => {
+    const errors = p.issues.filter(i => i.severity === 'error').length;
+    const warns = p.issues.filter(i => i.severity === 'warning').length;
+    lines.push(`"${p.url}",${p.score},${errors},${warns},${p.uniqueDsClasses}`);
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'audit-design-system.csv';
+  a.click();
+  DA.toastSuccess('Rapport exporté en CSV');
+}
+</script>
+</body>
+</html>
