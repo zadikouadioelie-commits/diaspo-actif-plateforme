@@ -391,10 +391,11 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSidebar(); });
 })();
 </script>
+
   <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
     <a class="mobile-bottom-nav__item active" href="dashboard-utilisateur.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
     <a class="mobile-bottom-nav__item" href="profil.html"><span class="nav-icon">👤</span><span>Profil</span></a>
-    <a class="mobile-bottom-nav__item" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span><span class="mobile-bottom-nav__badge" id="mob-msg-badge" style="display:none"></span></a>
+    <a class="mobile-bottom-nav__item" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span></a>
     <a class="mobile-bottom-nav__item" href="agenda.html"><span class="nav-icon">📅</span><span>Agenda</span></a>
     <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
   </nav>

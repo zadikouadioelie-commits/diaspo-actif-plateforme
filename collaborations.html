@@ -167,5 +167,14 @@ function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt
   loadCollabs();
 })();
 </script>
+
+  <!-- ─── Mobile Bottom Navigation ─── -->
+  <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
+    <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+    <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
+    <a class="mobile-bottom-nav__item" href="evenements.html"><span class="nav-icon">📅</span><span>Événements</span></a>
+    <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
+  </nav>
 </body>
 </html>
