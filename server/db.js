@@ -992,7 +992,7 @@ const MIGRATIONS = [
   ["users", "response_rate REAL"],
   ["users", "last_active TEXT DEFAULT (datetime('now'))"],
   ["users", "signalements_confirmes INTEGER DEFAULT 0"],
-  ["users", "is_verified INTEGER DEFAULT 0"],       -- badge "Compte vérifié" global
+  ["users", "is_verified INTEGER DEFAULT 0"],
   ["initiatives", "signalements_confirmes INTEGER DEFAULT 0"],
 ];
 
