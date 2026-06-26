@@ -5232,6 +5232,162 @@ async function handleRequest(req, res) {
     }
 
     /* ============================================================
+       MODULE STATISTIQUES MONDIAL — Observatoire Diaspo'Actif
+    ============================================================ */
+
+    if (req.method === 'GET' && pathname === '/api/stats') {
+      const me = getCurrentUser(req);
+      const p = q.period || 'all';   // today|week|month|year|all
+      const paysFilt = q.pays || null;
+      const contFilt = q.continent || null;
+      const roleFilt = q.role || null;
+
+      // Plage temporelle
+      function since(period) {
+        if (period === 'today')  return `AND created_at >= datetime('now','start of day')`;
+        if (period === 'week')   return `AND created_at >= datetime('now','-7 days')`;
+        if (period === 'month')  return `AND created_at >= datetime('now','start of month')`;
+        if (period === 'year')   return `AND created_at >= datetime('now','start of year')`;
+        return '';
+      }
+      const sw = since(p);
+
+      const fPays = paysFilt ? `AND pays=?` : '';
+      const fPaysArg = paysFilt ? [paysFilt] : [];
+
+      try {
+        // ── Membres par rôle ──
+        const roles = db.prepare(`
+          SELECT role, COUNT(*) n FROM users
+          WHERE role NOT IN ('administrateur') ${fPays} ${sw.replace('created_at','created_at')}
+          GROUP BY role
+        `).all(...fPaysArg);
+        const byRole = {};
+        roles.forEach(r => byRole[r.role] = r.n);
+        const totalMembres = roles.reduce((s,r)=>s+r.n,0);
+
+        // ── Vérifications ──
+        const verified = db.prepare(`SELECT COUNT(*) n FROM users WHERE is_verified=1 ${fPays} ${sw}`).get(...fPaysArg).n;
+        const docsVerif = db.prepare(`SELECT COUNT(*) n FROM users WHERE documents_verifies=1 ${fPays}`).get(...fPaysArg).n;
+
+        // ── Géographie ──
+        const countryRows = db.prepare(`
+          SELECT pays, COUNT(*) n FROM users
+          WHERE pays IS NOT NULL AND pays!='' AND role NOT IN ('administrateur')
+          ${fPays} GROUP BY pays ORDER BY n DESC LIMIT 50
+        `).all(...fPaysArg);
+        const nbPays = db.prepare(`SELECT COUNT(DISTINCT pays) n FROM users WHERE pays IS NOT NULL AND pays!=''`).get().n;
+        const nbVilles = db.prepare(`SELECT COUNT(DISTINCT ville) n FROM users WHERE ville IS NOT NULL AND ville!=''`).get().n;
+        const nbRegions = db.prepare(`SELECT COUNT(DISTINCT region) n FROM users WHERE region IS NOT NULL AND region!=''`).get().n;
+
+        // Continents mapping simplifié
+        const CONTINENTS = {
+          'France':'Europe','Belgique':'Europe','Suisse':'Europe','Luxembourg':'Europe','Allemagne':'Europe',
+          'Italie':'Europe','Espagne':'Europe','Portugal':'Europe','Royaume-Uni':'Europe','Pays-Bas':'Europe',
+          'Canada':'Amérique du Nord','États-Unis':'Amérique du Nord','Mexique':'Amérique du Nord',
+          'Brésil':'Amérique du Sud','Argentine':'Amérique du Sud','Colombie':'Amérique du Sud',
+          'Côte d\'Ivoire':'Afrique','Sénégal':'Afrique','Cameroun':'Afrique','Mali':'Afrique',
+          'Burkina Faso':'Afrique','Guinée':'Afrique','Bénin':'Afrique','Togo':'Afrique',
+          'Congo':'Afrique','RDC':'Afrique','Gabon':'Afrique','Maroc':'Afrique',
+          'Algérie':'Afrique','Tunisie':'Afrique','Égypte':'Afrique','Nigéria':'Afrique',
+          'Ghana':'Afrique','Kenya':'Afrique','Éthiopie':'Afrique','Sénégal':'Afrique',
+          'Chine':'Asie','Japon':'Asie','Inde':'Asie','Vietnam':'Asie','Thaïlande':'Asie',
+          'Australie':'Océanie','Nouvelle-Zélande':'Océanie',
+        };
+        const continentMap = {};
+        countryRows.forEach(r => {
+          const c = CONTINENTS[r.pays] || 'Autre';
+          continentMap[c] = (continentMap[c] || 0) + r.n;
+        });
+
+        // ── Compétences & métiers ──
+        const titres = db.prepare(`
+          SELECT titre_pro, COUNT(*) n FROM users
+          WHERE titre_pro IS NOT NULL AND titre_pro!=''
+          GROUP BY titre_pro ORDER BY n DESC LIMIT 20
+        `).all();
+        const secteurs = db.prepare(`
+          SELECT secteur, COUNT(*) n FROM initiatives
+          WHERE secteur IS NOT NULL AND secteur!=''
+          GROUP BY secteur ORDER BY n DESC LIMIT 15
+        `).all();
+        const nbMetiers = db.prepare(`SELECT COUNT(DISTINCT titre_pro) n FROM users WHERE titre_pro IS NOT NULL AND titre_pro!=''`).get().n;
+
+        // ── Activité plateforme ──
+        const now_str = "datetime('now')";
+        const actStats = {
+          connexions_jour:  db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','start of day')`).get().n,
+          connexions_semaine: db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','-7 days')`).get().n,
+          nouveaux_membres: db.prepare(`SELECT COUNT(*) n FROM users WHERE created_at >= datetime('now','-30 days')`).get().n,
+          messages:         db.prepare(`SELECT COUNT(*) n FROM messages ${sw?'WHERE 1=1 '+sw:''}`).get().n,
+          evenements:       db.prepare(`SELECT COUNT(*) n FROM evenements ${sw?'WHERE 1=1 '+sw:''}`).get().n,
+          billets_vendus:   db.prepare(`SELECT COUNT(*) n FROM event_tickets WHERE statut IN ('paye','valide') ${sw}`).get().n,
+          qr_codes:         db.prepare(`SELECT COUNT(*) n FROM event_tickets ${sw?'WHERE 1=1 '+sw:''}`).get().n,
+          initiatives_pub:  db.prepare(`SELECT COUNT(*) n FROM initiatives WHERE statut='publiee' ${sw}`).get().n,
+          reunions:         db.prepare(`SELECT COUNT(*) n FROM reunions ${sw?'WHERE 1=1 '+sw:''}`).get().n,
+          resumes_ia:       db.prepare(`SELECT COUNT(*) n FROM reunions WHERE resume_ai IS NOT NULL AND resume_ai!='' ${sw}`).get().n,
+          candidatures:     db.prepare(`SELECT COUNT(*) n FROM candidatures ${sw?'WHERE 1=1 '+sw:''}`).get().n,
+          collaborations:   db.prepare(`SELECT COUNT(*) n FROM collaborations ${sw?'WHERE 1=1 '+sw:''}`).get().n,
+          posts:            db.prepare(`SELECT COUNT(*) n FROM fil_posts ${sw?'WHERE 1=1 '+sw:''}`).get().n,
+          accreditations:   db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE statut='active' ${sw}`).get().n,
+        };
+
+        // Évolution membres par mois (12 derniers mois)
+        const evolutionMois = db.prepare(`
+          SELECT strftime('%Y-%m', created_at) AS mois, COUNT(*) n
+          FROM users WHERE created_at >= datetime('now','-12 months') AND role NOT IN ('administrateur')
+          GROUP BY mois ORDER BY mois ASC
+        `).all();
+
+        // ── Emploi & opportunités ──
+        const emploiStats = {
+          offres_emploi:    db.prepare(`SELECT COUNT(*) n FROM offres_emploi`).get()?.n ?? 0,
+          candidatures:     actStats.candidatures,
+          collaborations:   actStats.collaborations,
+        };
+
+        // ── Indicateurs de confiance ──
+        const trustStats = {
+          verified,
+          docs_verifies:    docsVerif,
+          pct_verified:     totalMembres > 0 ? Math.round(verified * 100 / totalMembres) : 0,
+          score_moyen:      db.prepare(`SELECT AVG(trust_score) avg FROM users WHERE trust_score > 0`).get()?.avg?.toFixed(1) ?? 0,
+          reactivity_moy:   db.prepare(`SELECT AVG(reactivity_stars) avg FROM users WHERE reactivity_stars > 0`).get()?.avg?.toFixed(1) ?? 0,
+          actifs_30j:       db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','-30 days')`).get().n,
+          absents:          db.prepare(`SELECT COUNT(*) n FROM user_absence WHERE fin IS NULL OR fin >= date('now')`).get().n,
+          suspendus:        db.prepare(`SELECT COUNT(*) n FROM account_reports WHERE statut='masque'`).get().n,
+          accrédités:       db.prepare(`SELECT COUNT(DISTINCT user_id) n FROM compte_accreditations WHERE statut='active'`).get().n,
+        };
+
+        // ── Stats IA ──
+        const iaStats = {
+          recommandations: db.prepare(`SELECT COUNT(*) n FROM chatbot_history WHERE type='recommend'`).get()?.n ?? 0,
+          recherches: db.prepare(`SELECT COUNT(*) n FROM chatbot_history`).get()?.n ?? 0,
+        };
+
+        // ── Top villes ──
+        const topVilles = db.prepare(`
+          SELECT ville, COUNT(*) n FROM users WHERE ville IS NOT NULL AND ville!=''
+          AND role NOT IN ('administrateur') GROUP BY ville ORDER BY n DESC LIMIT 20
+        `).all();
+
+        return sendJSON(res, 200, {
+          general: { totalMembres, byRole, verified, pct_verified: trustStats.pct_verified },
+          geo: { nbPays, nbVilles, nbRegions, byCountry: countryRows, byCont: continentMap, topVilles },
+          competences: { nbMetiers, topTitres: titres, topSecteurs: secteurs },
+          activite: actStats,
+          evolution: evolutionMois,
+          emploi: emploiStats,
+          confiance: trustStats,
+          ia: iaStats,
+          meta: { period: p, generated_at: new Date().toISOString() }
+        });
+      } catch(e) {
+        return sendJSON(res, 500, { error: e.message });
+      }
+    }
+
+    /* ============================================================
        CHATBOT — MOTEUR DE RECOMMANDATION INTELLIGENT
        Scoring multi-critères, NLP léger, respect confidentialité
     ============================================================ */

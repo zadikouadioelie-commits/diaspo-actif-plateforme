@@ -892,13 +892,18 @@
         <div class="hp-stat-lbl">Initiatives référencées</div>
       </div>
       <div class="hp-stat-item">
-        <div class="hp-stat-n">28</div>
+        <div class="hp-stat-n" id="stat-pays">—</div>
         <div class="hp-stat-lbl">Pays représentés</div>
       </div>
-      <div class="hp-stat-item">
-        <div class="hp-stat-n">6</div>
-        <div class="hp-stat-lbl">Domaines d'action</div>
+      <div class="hp-stat-item" style="position:relative;">
+        <div class="hp-stat-n" id="stat-messages">—</div>
+        <div class="hp-stat-lbl">Messages échangés</div>
       </div>
+    </div>
+    <div style="text-align:center;padding:10px 0 14px;border-top:1px solid var(--border);">
+      <a href="statistiques.html" style="font-size:12px;font-weight:800;color:#1565C0;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+        📊 Voir l'observatoire complet →
+      </a>
     </div>
   </div>
 
@@ -1411,7 +1416,11 @@
     const r = await fetch('/api/stats');
     if (r.ok) {
       const d = await r.json();
-      if (d.membres) document.getElementById('stat-membres').textContent = d.membres + '+';
+      const fmt = n => n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n);
+      if (d.general?.totalMembres) document.getElementById('stat-membres').textContent = fmt(d.general.totalMembres) + '+';
+      if (d.geo?.nbPays) document.getElementById('stat-pays').textContent = d.geo.nbPays + '+';
+      const msgs = d.activite?.messages;
+      if (msgs !== undefined) document.getElementById('stat-messages').textContent = fmt(msgs) + '+';
     }
   } catch {}
 })();

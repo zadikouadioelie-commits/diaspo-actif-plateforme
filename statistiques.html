@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Diaspo'Actif — Observatoire Mondial</title>
+<link rel="icon" href="assets/logo.svg">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<style>
+:root{--orange:#ff6b00;--navy:#0F2A50;--bg:#f8fafc;--card:#fff;--border:#e2e8f0;--muted:#64748b;--radius:14px;--shadow:0 2px 12px rgba(0,0,0,.06);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:#0f172a;min-height:100vh;}
+
+/* ── Layout ── */
+.st-wrap{max-width:1280px;margin:0 auto;padding:24px 16px 64px;}
+.st-hero{background:linear-gradient(135deg,var(--navy) 0%,#1565C0 60%,#0d47a1 100%);border-radius:20px;padding:40px 32px 36px;color:#fff;margin-bottom:28px;position:relative;overflow:hidden;}
+.st-hero::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");}
+.st-hero h1{font-size:clamp(22px,4vw,36px);font-weight:900;margin-bottom:8px;position:relative;}
+.st-hero p{font-size:15px;opacity:.8;position:relative;}
+.st-hero-live{position:absolute;top:20px;right:24px;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#fff;opacity:.9;}
+.st-live-dot{width:8px;height:8px;border-radius:50%;background:#10b981;animation:pulse-dot 2s infinite;}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.6;transform:scale(1.3);}}
+
+/* ── Filtres ── */
+.st-filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:center;}
+.st-filter-btn{padding:7px 16px;border-radius:99px;border:1.5px solid var(--border);background:var(--card);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;color:var(--muted);}
+.st-filter-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+.st-filter-sel{padding:7px 14px;border-radius:99px;border:1.5px solid var(--border);background:var(--card);font-size:12px;font-weight:600;color:#374151;cursor:pointer;}
+.st-export-grp{margin-left:auto;display:flex;gap:6px;}
+.st-exp-btn{padding:7px 14px;border-radius:99px;border:1.5px solid var(--border);background:var(--card);font-size:11px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:5px;color:#374151;transition:all .15s;}
+.st-exp-btn:hover{background:var(--navy);color:#fff;border-color:var(--navy);}
+
+/* ── Grilles ── */
+.st-grid-6{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:28px;}
+.st-grid-3{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:28px;}
+.st-grid-2{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;margin-bottom:28px;}
+
+/* ── KPI Cards ── */
+.st-kpi{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 16px;text-align:center;transition:box-shadow .2s;position:relative;}
+.st-kpi:hover{box-shadow:0 6px 24px rgba(0,0,0,.1);}
+.st-kpi-icon{font-size:26px;margin-bottom:6px;}
+.st-kpi-val{font-size:28px;font-weight:900;color:var(--navy);line-height:1;margin-bottom:3px;}
+.st-kpi-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+.st-kpi-delta{font-size:10.5px;font-weight:800;margin-top:5px;padding:2px 7px;border-radius:99px;display:inline-block;}
+.delta-up{background:#dcfce7;color:#166534;}
+.delta-dn{background:#fef2f2;color:#991b1b;}
+
+/* ── Sections ── */
+.st-section{margin-bottom:28px;}
+.st-section-title{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.st-section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── Card générique ── */
+.st-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.st-card h3{font-size:14px;font-weight:800;margin-bottom:14px;color:var(--navy);}
+
+/* ── Barres horizontales ── */
+.st-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.st-bar-label{font-size:12px;color:#374151;width:140px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-bar-track{flex:1;height:8px;background:#f1f5f9;border-radius:99px;overflow:hidden;}
+.st-bar-fill{height:100%;border-radius:99px;transition:width .6s ease;}
+.st-bar-n{font-size:11px;font-weight:800;color:var(--muted);width:36px;text-align:right;flex-shrink:0;}
+
+/* ── Carte continents ── */
+.st-cont-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+.st-cont-card{border-radius:12px;padding:14px 12px;text-align:center;border:1.5px solid var(--border);}
+.st-cont-emoji{font-size:28px;margin-bottom:6px;}
+.st-cont-name{font-size:11.5px;font-weight:800;color:#374151;margin-bottom:3px;}
+.st-cont-n{font-size:20px;font-weight:900;color:var(--navy);}
+.st-cont-pct{font-size:11px;color:var(--muted);}
+
+/* ── Graphique en ligne (évolution) ── */
+.st-chart-wrap{position:relative;height:160px;margin-top:10px;}
+.st-chart-svg{width:100%;height:100%;}
+
+/* ── Tags / badges ── */
+.st-tag{display:inline-block;padding:4px 10px;border-radius:99px;font-size:11.5px;font-weight:700;background:#f1f5f9;color:#374151;margin:3px;}
+.st-tag.orange{background:#fff7ed;color:#c2410c;}
+.st-tag.blue{background:#eff6ff;color:#1d4ed8;}
+.st-tag.green{background:#f0fdf4;color:#166534;}
+.st-tag.purple{background:#faf5ff;color:#6b21a8;}
+
+/* ── Tableau pays ── */
+.st-country-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;}
+.st-country-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:9px;background:#f8fafc;border:1px solid var(--border);}
+.st-country-flag{font-size:18px;flex-shrink:0;}
+.st-country-name{font-size:12px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.st-country-n{font-size:12px;font-weight:800;color:var(--orange);}
+
+/* ── Score anneau ── */
+.st-ring{display:flex;align-items:center;gap:16px;margin-bottom:8px;}
+.st-ring-svg{flex-shrink:0;}
+.st-ring-label{font-size:13px;font-weight:700;color:#374151;}
+.st-ring-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* ── Indicateurs IA ── */
+.st-ia-kpi{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
+.st-ia-kpi:last-child{border-bottom:none;}
+.st-ia-icon{font-size:22px;width:36px;text-align:center;}
+.st-ia-val{font-size:18px;font-weight:900;color:var(--navy);}
+.st-ia-label{font-size:12px;color:var(--muted);}
+
+/* ── Loader ── */
+.st-loading{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--muted);gap:10px;font-size:14px;}
+.st-spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:640px){
+  .st-hero{padding:24px 18px;}.st-hero-live{display:none;}
+  .st-grid-6{grid-template-columns:repeat(2,1fr);}
+  .st-export-grp{margin-left:0;width:100%;}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="logo"><img src="assets/logo.svg" alt="Diaspo'Actif" height="36"></a>
+    <nav class="main-nav" id="main-nav"></nav>
+    <div class="header-actions" id="header-actions"></div>
+  </div>
+</header>
+
+<div class="st-wrap" id="app">
+
+  <!-- Hero -->
+  <div class="st-hero">
+    <div class="st-hero-live"><span class="st-live-dot"></span> Temps réel</div>
+    <h1>🌍 Observatoire Mondial Diaspo'Actif</h1>
+    <p>Tableau de bord statistique — diversité, compétences et impact de la communauté</p>
+  </div>
+
+  <!-- Filtres période + pays + export -->
+  <div class="st-filters" id="st-filters">
+    <button class="st-filter-btn" data-period="today">Aujourd'hui</button>
+    <button class="st-filter-btn" data-period="week">7 jours</button>
+    <button class="st-filter-btn" data-period="month">Ce mois</button>
+    <button class="st-filter-btn" data-period="year">Cette année</button>
+    <button class="st-filter-btn active" data-period="all">Depuis le début</button>
+    <select class="st-filter-sel" id="filter-pays" title="Filtrer par pays">
+      <option value="">🌍 Tous les pays</option>
+    </select>
+    <div class="st-export-grp">
+      <button class="st-exp-btn" onclick="exportCSV()">📊 CSV</button>
+      <button class="st-exp-btn" onclick="exportPDF()">🖨️ PDF</button>
+    </div>
+  </div>
+
+  <!-- Contenu dynamique -->
+  <div id="st-content">
+    <div class="st-loading"><div class="st-spinner"></div> Chargement des statistiques…</div>
+  </div>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+/* ══════════════════════════════════════════════
+   OBSERVATOIRE DIASPO'ACTIF — Tableau de bord
+══════════════════════════════════════════════ */
+
+let STATS = null;
+let currentPeriod = 'all';
+let currentPays = '';
+let refreshTimer = null;
+
+/* ── Flags pays ── */
+const FLAGS = {
+  'France':'🇫🇷','Belgique':'🇧🇪','Suisse':'🇨🇭','Luxembourg':'🇱🇺','Allemagne':'🇩🇪',
+  'Italie':'🇮🇹','Espagne':'🇪🇸','Portugal':'🇵🇹','Royaume-Uni':'🇬🇧','Pays-Bas':'🇳🇱',
+  'Canada':'🇨🇦','États-Unis':'🇺🇸','Mexique':'🇲🇽','Brésil':'🇧🇷','Argentine':'🇦🇷',
+  'Côte d\'Ivoire':'🇨🇮','Sénégal':'🇸🇳','Cameroun':'🇨🇲','Mali':'🇲🇱',
+  'Burkina Faso':'🇧🇫','Guinée':'🇬🇳','Bénin':'🇧🇯','Togo':'🇹🇬','Maroc':'🇲🇦',
+  'Algérie':'🇩🇿','Tunisie':'🇹🇳','Nigéria':'🇳🇬','Ghana':'🇬🇭','Kenya':'🇰🇪',
+  'Congo':'🇨🇬','RDC':'🇨🇩','Gabon':'🇬🇦','Éthiopie':'🇪🇹','Chine':'🇨🇳',
+  'Japon':'🇯🇵','Inde':'🇮🇳','Australie':'🇦🇺',
+};
+
+/* ── Couleurs rôles ── */
+const ROLE_COLORS = {
+  utilisateur:'#6366f1', initiative:'#f59e0b', collectivite:'#10b981',
+  expert:'#3b82f6', recruteur:'#8b5cf6', investisseur:'#ec4899',
+  porteur_projet:'#14b8a6', benevolat:'#f97316', consultant:'#64748b',
+};
+const ROLE_LABELS = {
+  utilisateur:'Membres', initiative:'Initiatives / Assos / ONG',
+  collectivite:'Collectivités', expert:'Experts', recruteur:'Recruteurs',
+  investisseur:'Investisseurs', porteur_projet:'Porteurs de projets',
+  benevolat:'Bénévoles', consultant:'Consultants & Formateurs',
+};
+
+const CONT_EMOJIS = {
+  'Afrique':'🌍','Europe':'🌍','Amérique du Nord':'🌎','Amérique du Sud':'🌎',
+  'Asie':'🌏','Océanie':'🌏','Autre':'🌐'
+};
+const CONT_COLORS = {
+  'Afrique':'#f59e0b','Europe':'#6366f1','Amérique du Nord':'#10b981',
+  'Amérique du Sud':'#14b8a6','Asie':'#ec4899','Océanie':'#3b82f6','Autre':'#94a3b8'
+};
+
+/* ────── Formatage ────── */
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  n = parseFloat(n);
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'k';
+  return n.toString();
+}
+function pct(a, b) { return b > 0 ? Math.round(a*100/b) : 0; }
+
+/* ────── Fetch stats ────── */
+async function loadStats() {
+  try {
+    const params = new URLSearchParams({ period: currentPeriod });
+    if (currentPays) params.set('pays', currentPays);
+    STATS = await fetch('/api/stats?' + params).then(r => r.json());
+    render();
+  } catch(e) {
+    document.getElementById('st-content').innerHTML =
+      `<div class="st-loading" style="color:#ef4444">⚠️ Erreur : ${e.message}</div>`;
+  }
+}
+
+/* ────── Render complet ────── */
+function render() {
+  const S = STATS;
+  const { general, geo, competences, activite, evolution, emploi, confiance, ia } = S;
+
+  // Populer le sélecteur pays une seule fois
+  const paysSel = document.getElementById('filter-pays');
+  if (paysSel.options.length <= 1 && geo.byCountry?.length) {
+    geo.byCountry.forEach(r => {
+      const o = document.createElement('option');
+      o.value = r.pays; o.textContent = (FLAGS[r.pays]||'🏳️') + ' ' + r.pays + ' (' + r.n + ')';
+      paysSel.appendChild(o);
+    });
+    paysSel.value = currentPays;
+  }
+
+  const maxCountry = Math.max(...(geo.byCountry||[]).map(r=>r.n), 1);
+  const maxTitre   = Math.max(...(competences.topTitres||[]).map(r=>r.n), 1);
+  const maxSecteur = Math.max(...(competences.topSecteurs||[]).map(r=>r.n), 1);
+  const totalCont  = Object.values(geo.byCont||{}).reduce((s,n)=>s+n,0)||1;
+  const totalRole  = general.totalMembres || 1;
+
+  /* ── Graphique évolution (SVG sparkline) ── */
+  function sparkline(data, color='#6366f1') {
+    if (!data?.length) return '';
+    const vals = data.map(d=>d.n);
+    const mx = Math.max(...vals, 1);
+    const mn = Math.min(...vals, 0);
+    const H = 100, W = 100;
+    const pts = vals.map((v,i) => {
+      const x = (i/(vals.length-1||1))*W;
+      const y = H - ((v-mn)/(mx-mn||1))*H*0.8 - H*0.1;
+      return `${x},${y}`;
+    });
+    return `
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:100%;">
+        <defs>
+          <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${color}" stop-opacity=".25"/>
+            <stop offset="100%" stop-color="${color}" stop-opacity=".02"/>
+          </linearGradient>
+        </defs>
+        <path d="M ${pts.join(' L ')} L ${W},${H} L 0,${H} Z" fill="url(#sg)"/>
+        <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        ${pts.map((p,i)=>i===pts.length-1?`<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="3" fill="${color}"/>`:``).join('')}
+      </svg>`;
+  }
+
+  /* ── Anneau SVG ── */
+  function ring(pct, color, size=64) {
+    const r = (size-8)/2, c = size/2;
+    const circ = 2*Math.PI*r;
+    const dash = (pct/100)*circ;
+    return `<svg class="st-ring-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="#f1f5f9" stroke-width="7"/>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="7"
+        stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${circ/4}" stroke-linecap="round"
+        style="transition:stroke-dasharray .8s ease"/>
+      <text x="${c}" y="${c+5}" text-anchor="middle" font-size="13" font-weight="900" fill="${color}">${pct}%</text>
+    </svg>`;
+  }
+
+  document.getElementById('st-content').innerHTML = `
+
+    <!-- ═══ CHIFFRES CLÉS ═══ -->
+    <div class="st-section">
+      <div class="st-section-title">📊 Chiffres clés</div>
+      <div class="st-grid-6">
+        ${kpiCard('👥', fmt(general.totalMembres), 'Membres total', '#6366f1')}
+        ${kpiCard('✅', fmt(confiance.verified), 'Comptes vérifiés', '#10b981')}
+        ${kpiCard('🌍', fmt(geo.nbPays), 'Pays représentés', '#f59e0b')}
+        ${kpiCard('🏙️', fmt(geo.nbVilles), 'Villes représentées', '#3b82f6')}
+        ${kpiCard('🏛️', fmt(general.byRole?.initiative||0), 'Initiatives actives', '#ec4899')}
+        ${kpiCard('💼', fmt(competences.nbMetiers), 'Métiers représentés', '#14b8a6')}
+        ${kpiCard('💬', fmt(activite.messages), 'Messages échangés', '#8b5cf6')}
+        ${kpiCard('🎟️', fmt(activite.billets_vendus), 'Billets vendus', '#f97316')}
+        ${kpiCard('📅', fmt(activite.evenements), 'Événements', '#0ea5e9')}
+        ${kpiCard('📰', fmt(activite.posts), 'Publications', '#84cc16')}
+        ${kpiCard('🤝', fmt(activite.collaborations), 'Collaborations', '#f59e0b')}
+        ${kpiCard('🏅', fmt(activite.accreditations), 'Accréditations DA', '#ef4444')}
+      </div>
+    </div>
+
+    <!-- ═══ MEMBRES PAR TYPE ═══ -->
+    <div class="st-section">
+      <div class="st-section-title">🏷️ Répartition par type de compte</div>
+      <div class="st-card">
+        ${Object.entries(general.byRole||{}).sort((a,b)=>b[1]-a[1]).map(([role,n])=>`
+          <div class="st-bar-row">
+            <div class="st-bar-label">${ROLE_LABELS[role]||role}</div>
+            <div class="st-bar-track"><div class="st-bar-fill" style="width:${pct(n,totalRole)}%;background:${ROLE_COLORS[role]||'#94a3b8'};"></div></div>
+            <div class="st-bar-n">${fmt(n)}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- ═══ GÉOGRAPHIE ═══ -->
+    <div class="st-section">
+      <div class="st-section-title">🌐 Couverture géographique</div>
+      <div class="st-grid-2">
+
+        <!-- Continents -->
+        <div class="st-card">
+          <h3>Répartition par continent</h3>
+          <div class="st-cont-grid">
+            ${Object.entries(geo.byCont||{}).sort((a,b)=>b[1]-a[1]).map(([cont,n])=>`
+              <div class="st-cont-card" style="background:${CONT_COLORS[cont]||'#94a3b8'}11;border-color:${CONT_COLORS[cont]||'#94a3b8'}44">
+                <div class="st-cont-emoji">${CONT_EMOJIS[cont]||'🌐'}</div>
+                <div class="st-cont-name">${cont}</div>
+                <div class="st-cont-n">${fmt(n)}</div>
+                <div class="st-cont-pct">${pct(n,totalCont)}%</div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <!-- Top pays -->
+        <div class="st-card">
+          <h3>Top ${Math.min(20,(geo.byCountry||[]).length)} pays</h3>
+          <div style="max-height:280px;overflow-y:auto;">
+            ${(geo.byCountry||[]).slice(0,20).map(r=>`
+              <div class="st-bar-row">
+                <div class="st-bar-label">${FLAGS[r.pays]||'🏳️'} ${r.pays}</div>
+                <div class="st-bar-track"><div class="st-bar-fill" style="width:${pct(r.n,maxCountry)}%;background:#6366f1;"></div></div>
+                <div class="st-bar-n">${fmt(r.n)}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Top villes -->
+      <div class="st-card">
+        <h3>Top villes</h3>
+        <div class="st-country-grid">
+          ${(geo.topVilles||[]).slice(0,20).map(r=>`
+            <div class="st-country-row">
+              <span class="st-country-flag">📍</span>
+              <span class="st-country-name">${r.ville}</span>
+              <span class="st-country-n">${fmt(r.n)}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ COMPÉTENCES ═══ -->
+    <div class="st-section">
+      <div class="st-section-title">💡 Compétences & Métiers</div>
+      <div class="st-grid-2">
+        <div class="st-card">
+          <h3>Top 20 métiers représentés</h3>
+          ${(competences.topTitres||[]).map(r=>`
+            <div class="st-bar-row">
+              <div class="st-bar-label" title="${r.titre_pro}">${r.titre_pro}</div>
+              <div class="st-bar-track"><div class="st-bar-fill" style="width:${pct(r.n,maxTitre)}%;background:#6366f1;"></div></div>
+              <div class="st-bar-n">${r.n}</div>
+            </div>`).join('')}
+        </div>
+        <div class="st-card">
+          <h3>Secteurs d'activité</h3>
+          ${(competences.topSecteurs||[]).map(r=>`
+            <div class="st-bar-row">
+              <div class="st-bar-label" title="${r.secteur}">${r.secteur}</div>
+              <div class="st-bar-track"><div class="st-bar-fill" style="width:${pct(r.n,maxSecteur)}%;background:#f59e0b;"></div></div>
+              <div class="st-bar-n">${r.n}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ ACTIVITÉ ═══ -->
+    <div class="st-section">
+      <div class="st-section-title">⚡ Activité de la plateforme</div>
+      <div class="st-grid-3">
+        ${actCard('🔴','Connexions aujourd\'hui',activite.connexions_jour,'#ef4444')}
+        ${actCard('📅','Connexions 7 derniers jours',activite.connexions_semaine,'#6366f1')}
+        ${actCard('🆕','Nouveaux membres (30j)',activite.nouveaux_membres,'#10b981')}
+        ${actCard('✉️','Messages échangés',activite.messages,'#3b82f6')}
+        ${actCard('📅','Événements organisés',activite.evenements,'#f59e0b')}
+        ${actCard('🎟️','Billets vendus',activite.billets_vendus,'#ec4899')}
+        ${actCard('📷','QR codes générés',activite.qr_codes,'#8b5cf6')}
+        ${actCard('🖥️','Visioconférences',activite.reunions,'#14b8a6')}
+        ${actCard('🤖','Résumés IA générés',activite.resumes_ia,'#f97316')}
+        ${actCard('🤝','Candidatures',activite.candidatures,'#0ea5e9')}
+        ${actCard('🏅','Accréditations actives',activite.accreditations,'#f59e0b')}
+        ${actCard('🌐','Initiatives publiées',activite.initiatives_pub,'#10b981')}
+      </div>
+
+      <!-- Évolution membres -->
+      <div class="st-card" style="margin-top:4px;">
+        <h3>📈 Évolution des membres (12 derniers mois)</h3>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:11px;color:var(--muted);">
+          ${(evolution||[]).map(d=>`<span>${d.mois.slice(5)}</span>`).join('')}
+        </div>
+        <div class="st-chart-wrap">${sparkline(evolution,'#6366f1')}</div>
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;font-weight:800;color:var(--muted);margin-top:4px;">
+          ${(evolution||[]).map(d=>`<span>${d.n}</span>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CONFIANCE ═══ -->
+    <div class="st-section">
+      <div class="st-section-title">🛡️ Indicateurs de confiance</div>
+      <div class="st-grid-3">
+        <div class="st-card">
+          <h3>Comptes vérifiés</h3>
+          <div class="st-ring">
+            ${ring(confiance.pct_verified||0, '#10b981')}
+            <div>
+              <div class="st-ring-label">${fmt(confiance.verified)} vérifiés</div>
+              <div class="st-ring-sub">sur ${fmt(general.totalMembres)} membres</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
+            <span class="st-tag green">✅ ${fmt(confiance.verified)} identités vérifiées</span>
+            <span class="st-tag green">📄 ${fmt(confiance.docs_verifies||0)} docs vérifiés</span>
+          </div>
+        </div>
+        <div class="st-card">
+          <h3>Score de confiance moyen</h3>
+          <div class="st-ring">
+            ${ring(Math.round(parseFloat(confiance.score_moyen)||0), '#6366f1')}
+            <div>
+              <div class="st-ring-label">Score moyen : ${confiance.score_moyen||0}%</div>
+              <div class="st-ring-sub">Réactivité : ${confiance.reactivity_moy||0} ★/5</div>
+            </div>
+          </div>
+        </div>
+        <div class="st-card">
+          <h3>Statuts des comptes</h3>
+          <div class="st-ia-kpi"><span class="st-ia-icon">🟢</span><div><div class="st-ia-val">${fmt(confiance.actifs_30j)}</div><div class="st-ia-label">Actifs (30 derniers jours)</div></div></div>
+          <div class="st-ia-kpi"><span class="st-ia-icon">⏸️</span><div><div class="st-ia-val">${fmt(confiance.absents)}</div><div class="st-ia-label">En mode absence</div></div></div>
+          <div class="st-ia-kpi"><span class="st-ia-icon">🏅</span><div><div class="st-ia-val">${fmt(confiance.accrédités)}</div><div class="st-ia-label">Membres accrédités DA</div></div></div>
+          <div class="st-ia-kpi"><span class="st-ia-icon">🚫</span><div><div class="st-ia-val">${fmt(confiance.suspendus)}</div><div class="st-ia-label">Comptes signalés masqués</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ EMPLOI & OPPORTUNITÉS ═══ -->
+    <div class="st-section">
+      <div class="st-section-title">💼 Emploi & Opportunités</div>
+      <div class="st-grid-3">
+        ${actCard('📋','Offres d\'emploi',emploi.offres_emploi,'#3b82f6')}
+        ${actCard('📬','Candidatures',emploi.candidatures,'#6366f1')}
+        ${actCard('🤝','Collaborations actives',emploi.collaborations,'#10b981')}
+      </div>
+    </div>
+
+    <!-- ═══ INTELLIGENCE ARTIFICIELLE ═══ -->
+    <div class="st-section">
+      <div class="st-section-title">🤖 Intelligence artificielle</div>
+      <div class="st-card" style="max-width:560px;">
+        <h3>Statistiques du chatbot IA</h3>
+        <div class="st-ia-kpi"><span class="st-ia-icon">🔍</span><div><div class="st-ia-val">${fmt(ia.recherches||0)}</div><div class="st-ia-label">Requêtes chatbot traitées</div></div></div>
+        <div class="st-ia-kpi"><span class="st-ia-icon">🏆</span><div><div class="st-ia-val">${fmt(ia.recommandations||0)}</div><div class="st-ia-label">Recommandations de profils générées</div></div></div>
+        <div class="st-ia-kpi"><span class="st-ia-icon">📝</span><div><div class="st-ia-val">${fmt(activite.resumes_ia||0)}</div><div class="st-ia-label">Résumés de réunions générés par l'IA</div></div></div>
+      </div>
+    </div>
+
+    <!-- ═══ FOOTER timestamp ═══ -->
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+      Dernière mise à jour : ${new Date(S.meta.generated_at).toLocaleString('fr-FR')} — Actualisation automatique toutes les 5 min.
+    </div>
+  `;
+
+  // Animation des compteurs
+  animateCounters();
+}
+
+function kpiCard(icon, val, label, color) {
+  return `<div class="st-kpi">
+    <div class="st-kpi-icon">${icon}</div>
+    <div class="st-kpi-val" style="color:${color}" data-count="${val}">${val}</div>
+    <div class="st-kpi-label">${label}</div>
+  </div>`;
+}
+function actCard(icon, label, val, color) {
+  return `<div class="st-kpi" style="text-align:left;padding:14px 16px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <span style="font-size:20px;">${icon}</span>
+      <span class="st-kpi-val" style="font-size:22px;color:${color};margin:0;">${fmt(val)}</span>
+    </div>
+    <div class="st-kpi-label">${label}</div>
+  </div>`;
+}
+
+function animateCounters() {
+  document.querySelectorAll('[data-count]').forEach(el => {
+    const raw = el.dataset.count;
+    const isNum = /^[\d.]+[kM]?$/.test(raw);
+    if (!isNum) return;
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(8px)';
+    el.style.transition = 'opacity .4s, transform .4s';
+    requestAnimationFrame(() => {
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+    });
+  });
+}
+
+/* ── Export CSV ── */
+function exportCSV() {
+  if (!STATS) return;
+  const rows = [['Indicateur','Valeur','Période']];
+  const S = STATS;
+  rows.push(['Membres total', S.general.totalMembres, S.meta.period]);
+  rows.push(['Comptes vérifiés', S.confiance.verified, S.meta.period]);
+  rows.push(['Pays représentés', S.geo.nbPays, S.meta.period]);
+  rows.push(['Villes représentées', S.geo.nbVilles, S.meta.period]);
+  rows.push(['Messages échangés', S.activite.messages, S.meta.period]);
+  rows.push(['Événements', S.activite.evenements, S.meta.period]);
+  rows.push(['Billets vendus', S.activite.billets_vendus, S.meta.period]);
+  rows.push(['Score confiance moyen', S.confiance.score_moyen + '%', S.meta.period]);
+  (S.geo.byCountry||[]).forEach(r => rows.push(['Pays: '+r.pays, r.n, S.meta.period]));
+  (S.competences.topTitres||[]).forEach(r => rows.push(['Métier: '+r.titre_pro, r.n, S.meta.period]));
+
+  const csv = rows.map(r => r.map(v => `"${(v||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `diaspoactif-stats-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+/* ── Export PDF ── */
+function exportPDF() {
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Diaspo'Actif — Statistiques</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:30px;color:#0f172a;font-size:13px;}
+    h1{font-size:22px;color:#0F2A50;margin-bottom:4px;}
+    h2{font-size:15px;color:#0F2A50;margin:20px 0 8px;border-bottom:2px solid #e2e8f0;padding-bottom:6px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+    th{background:#0F2A50;color:#fff;padding:8px 10px;text-align:left;font-size:12px;}
+    td{padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:12px;}
+    tr:nth-child(even){background:#f8fafc;}
+    .meta{font-size:11px;color:#64748b;margin-bottom:20px;}
+    @media print{button{display:none}}
+  </style></head><body>
+  <h1>🌍 Observatoire Mondial Diaspo'Actif</h1>
+  <div class="meta">Généré le ${new Date().toLocaleString('fr-FR')} · Période : ${currentPeriod}</div>
+  <h2>Chiffres clés</h2>
+  <table><tr><th>Indicateur</th><th>Valeur</th></tr>
+  ${[
+    ['Membres total', fmt(STATS.general.totalMembres)],
+    ['Comptes vérifiés', fmt(STATS.confiance.verified)],
+    ['Pays représentés', STATS.geo.nbPays],
+    ['Villes représentées', STATS.geo.nbVilles],
+    ['Messages échangés', fmt(STATS.activite.messages)],
+    ['Événements organisés', fmt(STATS.activite.evenements)],
+    ['Billets vendus', fmt(STATS.activite.billets_vendus)],
+    ['Score de confiance moyen', (STATS.confiance.score_moyen||0)+'%'],
+    ['Actifs (30 jours)', fmt(STATS.confiance.actifs_30j)],
+  ].map(r=>`<tr><td>${r[0]}</td><td><strong>${r[1]}</strong></td></tr>`).join('')}
+  </table>
+  <h2>Répartition géographique</h2>
+  <table><tr><th>Pays</th><th>Membres</th></tr>
+  ${(STATS.geo.byCountry||[]).slice(0,20).map(r=>`<tr><td>${r.pays}</td><td>${r.n}</td></tr>`).join('')}
+  </table>
+  <h2>Top métiers</h2>
+  <table><tr><th>Métier</th><th>Membres</th></tr>
+  ${(STATS.competences.topTitres||[]).map(r=>`<tr><td>${r.titre_pro}</td><td>${r.n}</td></tr>`).join('')}
+  </table>
+  </body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
+}
+
+/* ── Filtres ── */
+document.getElementById('st-filters').addEventListener('click', e => {
+  const btn = e.target.closest('[data-period]');
+  if (!btn) return;
+  document.querySelectorAll('[data-period]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentPeriod = btn.dataset.period;
+  loadStats();
+});
+document.getElementById('filter-pays').addEventListener('change', e => {
+  currentPays = e.target.value;
+  loadStats();
+});
+
+/* ── Auto-refresh 5 min ── */
+function startAutoRefresh() {
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(loadStats, 5 * 60 * 1000);
+}
+
+/* ── Init ── */
+(async function init() {
+  if (typeof fetchCurrentUser === 'function') {
+    await fetchCurrentUser();
+    if (typeof applyAuthState === 'function') applyAuthState();
+  }
+  await loadStats();
+  startAutoRefresh();
+})();
+</script>
+<script src="assets/chatbot.js"></script>
+</body>
+</html>
