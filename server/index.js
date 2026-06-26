@@ -3386,7 +3386,7 @@ async function scrapeSite() {
       "&ntilde;":"ñ","&Agrave;":"À","&Aacute;":"Á","&Acirc;":"Â","&Eacute;":"É","&Egrave;":"È",
       "&Ecirc;":"Ê","&Icirc;":"Î","&Ocirc;":"Ô","&Ugrave;":"Ù","&Ucirc;":"Û","&Uuml;":"Ü",
       "&laquo;":"«","&raquo;":"»","&nbsp;":" ","&mdash;":"—","&ndash;":"–","&hellip;":"…",
-      "&euro;":"€","&rsquo;":"'","&lsquo;":"'","&ldquo;":""","&rdquo;":""",
+      "&euro;":"€","&rsquo;":"’","&lsquo;":"‘","&ldquo;":"“","&rdquo;":"”",
     };
     const decodeEntities = s => s
       .replace(/&[a-zA-Z]+;/g, m => HTML_ENTITIES[m.toLowerCase()] || m)
