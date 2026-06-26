@@ -3376,10 +3376,25 @@ async function scrapeSite() {
   try {
     const r = await fetch("https://www.diaspo-actif.com/", { headers: { "User-Agent": "Mozilla/5.0" } });
     const html = await r.text();
-    const clean = html
+    const HTML_ENTITIES = {
+      "&amp;":"&","&lt;":"<","&gt;":">","&quot;":'"',"&#039;":"'","&apos;":"'",
+      "&agrave;":"à","&aacute;":"á","&acirc;":"â","&atilde;":"ã","&auml;":"ä","&aring;":"å","&aelig;":"æ",
+      "&ccedil;":"ç","&egrave;":"è","&eacute;":"é","&ecirc;":"ê","&euml;":"ë",
+      "&igrave;":"ì","&iacute;":"í","&icirc;":"î","&iuml;":"ï",
+      "&ograve;":"ò","&oacute;":"ó","&ocirc;":"ô","&otilde;":"õ","&ouml;":"ö",
+      "&ugrave;":"ù","&uacute;":"ú","&ucirc;":"û","&uuml;":"ü",
+      "&ntilde;":"ñ","&Agrave;":"À","&Aacute;":"Á","&Acirc;":"Â","&Eacute;":"É","&Egrave;":"È",
+      "&Ecirc;":"Ê","&Icirc;":"Î","&Ocirc;":"Ô","&Ugrave;":"Ù","&Ucirc;":"Û","&Uuml;":"Ü",
+      "&laquo;":"«","&raquo;":"»","&nbsp;":" ","&mdash;":"—","&ndash;":"–","&hellip;":"…",
+      "&euro;":"€","&rsquo;":"'","&lsquo;":"'","&ldquo;":""","&rdquo;":""",
+    };
+    const decodeEntities = s => s
+      .replace(/&[a-zA-Z]+;/g, m => HTML_ENTITIES[m.toLowerCase()] || m)
+      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n))
+      .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
+    const clean = decodeEntities(html
       .replace(/<(script|style|nav|footer|iframe)[^>]*>[\s\S]*?<\/\1>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&[a-z]+;/gi, " ")
+      .replace(/<[^>]+>/g, " "))
       .replace(/\s+/g, " ")
       .trim();
     const sentences = clean.split(/(?<=[.!?])\s+/)
