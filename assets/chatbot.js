@@ -208,6 +208,60 @@
     },
   };
 
+  /* ── Contexte enrichi (mémoire admin + site diaspo-actif.com) ── */
+  let _ctx = [];      // [{titre, texte}]
+  let _ctxLoaded = false;
+
+  async function loadContext() {
+    try {
+      const r = await fetch('/api/chatbot/context');
+      if (!r.ok) return;
+      const d = await r.json();
+      _ctx = [
+        ...(d.memories || []).map(m => ({ titre: m.titre, texte: m.contenu, priority: true })),
+        ...(d.siteContent || []).map(s => ({ titre: '', texte: s, priority: false })),
+      ];
+    } catch (e) { /* silencieux */ }
+    _ctxLoaded = true;
+  }
+
+  function searchContext(question) {
+    if (!_ctx.length) return null;
+    const norm = t => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const words = norm(question).split(/\s+/).filter(w => w.length >= 4);
+    if (!words.length) return null;
+
+    let best = null, bestScore = 0;
+    for (const entry of _ctx) {
+      const haystack = norm(entry.titre + ' ' + entry.texte);
+      let score = words.reduce((s, w) => s + (haystack.includes(w) ? (entry.priority ? 2 : 1) : 0), 0);
+      if (score > bestScore) { bestScore = score; best = entry; }
+    }
+    return bestScore >= 2 ? best : null;
+  }
+
+  function renderContextHit(entry, question) {
+    // Retourner les 2 phrases les plus pertinentes du texte
+    const norm = t => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const words = norm(question).split(/\s+/).filter(w => w.length >= 4);
+    const sentences = entry.texte.split(/(?<=[.!?])\s+/).filter(s => s.length > 20);
+    const ranked = sentences.map(s => ({
+      s,
+      score: words.reduce((n, w) => n + (norm(s).includes(w) ? 1 : 0), 0),
+    })).sort((a, b) => b.score - a.score);
+    const best = ranked.slice(0, 3).map(x => x.s).join(' ');
+    const html = (entry.titre ? `<p><strong>${_esc(entry.titre)}</strong></p>` : '')
+      + `<p>${_esc(best || entry.texte.slice(0, 300))}</p>`;
+    return {
+      html,
+      quickReplies: [
+        { label: "En savoir plus sur Diaspo'Actif", intent: 'fondation' },
+        { label: 'Voir les offres et tarifs', intent: 'valeur' },
+        { label: 'Créer un compte', action: 'inscription.html' },
+      ],
+    };
+  }
+
   /* ── Détection d'intention ── */
   const INTENTS_MAP = [
     { intent: "fondation",   words: ["c'est quoi","diaspoactif","diaspo actif","pourquoi ce projet","origine","histoire","mission","à quoi ça sert","pour qui","c'est qui"] },
@@ -295,6 +349,9 @@
 
     /* Message de bienvenue après 800ms */
     setTimeout(() => showWelcome(), 800);
+
+    /* Charger le contexte enrichi en arrière-plan */
+    loadContext();
   }
 
   let _open = false;
@@ -325,9 +382,20 @@
 
     setTimeout(() => {
       const intent = detectIntent(text);
-      const key    = intent || 'fallback';
-      const { html, quickReplies } = renderResponse(key);
-      appendBotMessage(html, quickReplies);
+      if (intent) {
+        const { html, quickReplies } = renderResponse(intent);
+        appendBotMessage(html, quickReplies);
+      } else {
+        // Chercher dans le contexte enrichi (mémoire admin + site)
+        const hit = searchContext(text);
+        if (hit) {
+          const { html, quickReplies } = renderContextHit(hit, text);
+          appendBotMessage(html, quickReplies);
+        } else {
+          const { html, quickReplies } = renderResponse('fallback');
+          appendBotMessage(html, quickReplies);
+        }
+      }
     }, 400);
   }
 
@@ -390,6 +458,11 @@
   function scrollBottom() {
     const el = getMessages();
     requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+  }
+
+  /* ── Utilitaires ── */
+  function _esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   /* ── Styles injectés ── */

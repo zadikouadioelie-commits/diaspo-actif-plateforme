@@ -3364,6 +3364,77 @@ route("GET", "/api/geo/cities", async (req, res, params, body, query) => {
   }
 });
 
+/* ══════════════════════════════════════════════════════════════
+   CHATBOT — Mémoire admin + contenu site diaspo-actif.com
+   ══════════════════════════════════════════════════════════════ */
+
+let _siteCache = { data: null, ts: 0 };
+const SITE_TTL = 12 * 3600 * 1000; // 12h
+
+async function scrapeSite() {
+  if (_siteCache.data && Date.now() - _siteCache.ts < SITE_TTL) return _siteCache.data;
+  try {
+    const r = await fetch("https://www.diaspo-actif.com/", { headers: { "User-Agent": "Mozilla/5.0" } });
+    const html = await r.text();
+    const clean = html
+      .replace(/<(script|style|nav|footer|iframe)[^>]*>[\s\S]*?<\/\1>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&[a-z]+;/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const sentences = clean.split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 50 && s.length < 600 && /[a-zà-ü]/i.test(s));
+    _siteCache = { data: sentences, ts: Date.now() };
+    return sentences;
+  } catch (e) {
+    return _siteCache.data || [];
+  }
+}
+
+/* GET /api/chatbot/context — public */
+route("GET", "/api/chatbot/context", async (req, res) => {
+  const memories = db.prepare("SELECT id, titre, contenu, ordre FROM chatbot_memoire ORDER BY ordre ASC, created_at ASC").all();
+  const siteContent = await scrapeSite();
+  sendJSON(res, 200, { memories, siteContent });
+});
+
+/* GET /api/chatbot/memoire — admin */
+route("GET", "/api/chatbot/memoire", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const rows = db.prepare("SELECT * FROM chatbot_memoire ORDER BY ordre ASC, created_at ASC").all();
+  sendJSON(res, 200, { memoires: rows });
+});
+
+/* POST /api/chatbot/memoire — admin */
+route("POST", "/api/chatbot/memoire", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const { titre, contenu, ordre = 0 } = body || {};
+  if (!titre?.trim() || !contenu?.trim()) return sendJSON(res, 400, { error: "Titre et contenu requis." });
+  const r = db.prepare("INSERT INTO chatbot_memoire (titre, contenu, ordre) VALUES (?, ?, ?)").run(titre.trim(), contenu.trim(), ordre);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* PUT /api/chatbot/memoire/:id — admin */
+route("PUT", "/api/chatbot/memoire/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const { titre, contenu, ordre } = body || {};
+  db.prepare("UPDATE chatbot_memoire SET titre=COALESCE(?,titre), contenu=COALESCE(?,contenu), ordre=COALESCE(?,ordre) WHERE id=?")
+    .run(titre||null, contenu||null, ordre!=null?ordre:null, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/chatbot/memoire/:id — admin */
+route("DELETE", "/api/chatbot/memoire/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  db.prepare("DELETE FROM chatbot_memoire WHERE id = ?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 async function handleRequest(req, res) {
   const parsed = url.parse(req.url, true);
   const pathname = decodeURIComponent(parsed.pathname);

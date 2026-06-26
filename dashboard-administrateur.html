@@ -50,6 +50,7 @@
       <a href="#publications" data-section="publications">📢 Publications</a>
       <a href="#moderation" data-section="moderation">🛡 Modération</a>
       <a href="#communication" data-section="communication">✉ Communication</a>
+      <a href="#chatbot" data-section="chatbot">🧠 Mémoire Chatbot</a>
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
     </aside>
 
@@ -492,6 +493,50 @@
           </table>
         </div>
       </section>
+
+      <!-- MÉMOIRE CHATBOT -->
+      <section id="section-chatbot" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <h2 style="margin:0;">🧠 Mémoire du Chatbot</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Informations que le chatbot utilise pour répondre aux visiteurs</p>
+          </div>
+          <button class="btn btn-orange" onclick="openAddMemoireModal()">+ Ajouter une information</button>
+        </div>
+
+        <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:13px;">
+          💡 <strong>Comment ça marche :</strong> Le chatbot consulte automatiquement le site <a href="https://www.diaspo-actif.com" target="_blank">diaspo-actif.com</a> et ces entrées pour répondre aux questions des visiteurs. Les entrées ajoutées ici ont la <strong>priorité maximale</strong>.
+        </div>
+
+        <div id="chatbot-memoire-list" style="display:flex;flex-direction:column;gap:12px;">
+          <div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+        </div>
+      </section>
+
+      <!-- Modal ajout mémoire -->
+      <div id="modal-memoire-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:16px;padding:28px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">
+          <h3 style="margin:0 0 18px;">🧠 <span id="modal-memoire-title">Ajouter une information</span></h3>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Titre <span style="color:var(--orange)">*</span></label>
+            <input type="text" id="mem-titre" placeholder="Ex : Qu'est-ce que Diaspo'Actif ?" style="width:100%;box-sizing:border-box;" class="input-field">
+          </div>
+          <div style="margin-bottom:14px;">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Contenu <span style="color:var(--orange)">*</span></label>
+            <textarea id="mem-contenu" rows="6" placeholder="Rédigez ici la réponse que le chatbot devra utiliser…" style="width:100%;box-sizing:border-box;resize:vertical;" class="input-field"></textarea>
+          </div>
+          <div style="margin-bottom:18px;">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Ordre d'affichage (priorité)</label>
+            <input type="number" id="mem-ordre" value="0" min="0" style="width:100px;" class="input-field">
+            <span style="font-size:12px;color:var(--muted);margin-left:8px;">0 = priorité maximale</span>
+          </div>
+          <div id="mem-error" style="display:none;color:#ef4444;font-size:13px;margin-bottom:12px;"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button class="btn" onclick="closeMemoireModal()">Annuler</button>
+            <button class="btn btn-orange" onclick="saveMemoireEntry()">Enregistrer</button>
+          </div>
+        </div>
+      </div>
 
       <!-- PARAMÈTRES -->
       <section id="section-parametres" style="display:none;">
@@ -2156,6 +2201,7 @@ async function submitAccordDirect(){
     ventes:      () => loadTransactions(),
     parametres:  () => loadParametres(),
     publicites:  () => loadPublicites(),
+    chatbot:     () => loadChatbotMemoire(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
@@ -3654,6 +3700,111 @@ async function submitAccordDirect(){
   window.pubPreviewImg       = pubPreviewImg;
   window.pubDebouncedPreview = pubDebouncedPreview;
   window.pubUpdatePreview    = pubUpdatePreview;
+
+  /* ══════════════════════════════════════
+     MÉMOIRE CHATBOT
+  ══════════════════════════════════════ */
+  let _editMemoireId = null;
+
+  async function loadChatbotMemoire() {
+    const list = document.getElementById('chatbot-memoire-list');
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+    try {
+      const r = await api('GET', '/chatbot/memoire');
+      const rows = r.memoires || [];
+      if (!rows.length) {
+        list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);">
+          <div style="font-size:36px;margin-bottom:12px;">🧠</div>
+          <p>Aucune information mémorisée pour l'instant.</p>
+          <p style="font-size:13px;">Ajoutez des informations pour enrichir les réponses du chatbot.</p>
+        </div>`;
+        return;
+      }
+      list.innerHTML = rows.map(m => `
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;gap:14px;align-items:flex-start;">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <strong style="font-size:14px;">${esc(m.titre)}</strong>
+              ${m.ordre === 0 ? '<span style="background:#fef3c7;color:#92400e;border-radius:99px;padding:1px 8px;font-size:11px;font-weight:700;">Priorité max</span>' : ''}
+            </div>
+            <p style="margin:0;font-size:13px;color:var(--muted);line-height:1.5;white-space:pre-wrap;">${esc(m.contenu.slice(0, 220))}${m.contenu.length > 220 ? '…' : ''}</p>
+            <div style="margin-top:8px;font-size:11px;color:#aaa;">Ajouté le ${m.created_at?.slice(0,10) || ''} · Ordre : ${m.ordre}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+            <button class="btn" style="font-size:12px;padding:4px 10px;" onclick="editMemoire(${m.id},'${esc(m.titre).replace(/'/g,"\\'")}',${JSON.stringify(m.contenu).replace(/</g,'\\u003c')},${m.ordre})">✏️ Modifier</button>
+            <button class="btn" style="font-size:12px;padding:4px 10px;color:#ef4444;border-color:#ef4444;" onclick="deleteMemoire(${m.id})">🗑 Supprimer</button>
+          </div>
+        </div>`).join('');
+    } catch(e) {
+      list.innerHTML = `<div style="color:red;padding:20px;">Erreur de chargement : ${e.message}</div>`;
+    }
+  }
+
+  window.openAddMemoireModal = function() {
+    _editMemoireId = null;
+    document.getElementById('modal-memoire-title').textContent = 'Ajouter une information';
+    document.getElementById('mem-titre').value = '';
+    document.getElementById('mem-contenu').value = '';
+    document.getElementById('mem-ordre').value = '0';
+    document.getElementById('mem-error').style.display = 'none';
+    document.getElementById('modal-memoire-bg').style.display = 'flex';
+    document.getElementById('mem-titre').focus();
+  };
+
+  window.editMemoire = function(id, titre, contenu, ordre) {
+    _editMemoireId = id;
+    document.getElementById('modal-memoire-title').textContent = 'Modifier l\'information';
+    document.getElementById('mem-titre').value = titre;
+    document.getElementById('mem-contenu').value = contenu;
+    document.getElementById('mem-ordre').value = ordre;
+    document.getElementById('mem-error').style.display = 'none';
+    document.getElementById('modal-memoire-bg').style.display = 'flex';
+    document.getElementById('mem-titre').focus();
+  };
+
+  window.closeMemoireModal = function() {
+    document.getElementById('modal-memoire-bg').style.display = 'none';
+  };
+
+  window.saveMemoireEntry = async function() {
+    const titre   = document.getElementById('mem-titre').value.trim();
+    const contenu = document.getElementById('mem-contenu').value.trim();
+    const ordre   = parseInt(document.getElementById('mem-ordre').value) || 0;
+    const errBox  = document.getElementById('mem-error');
+    errBox.style.display = 'none';
+    if (!titre || !contenu) {
+      errBox.textContent = 'Le titre et le contenu sont obligatoires.';
+      errBox.style.display = 'block';
+      return;
+    }
+    try {
+      if (_editMemoireId) {
+        await api('PUT', '/chatbot/memoire/' + _editMemoireId, { titre, contenu, ordre });
+      } else {
+        await api('POST', '/chatbot/memoire', { titre, contenu, ordre });
+      }
+      closeMemoireModal();
+      loadChatbotMemoire();
+    } catch(e) {
+      errBox.textContent = e.message || 'Erreur lors de l\'enregistrement.';
+      errBox.style.display = 'block';
+    }
+  };
+
+  window.deleteMemoire = async function(id) {
+    if (!confirm('Supprimer cette entrée de la mémoire ?')) return;
+    try {
+      await api('DELETE', '/chatbot/memoire/' + id);
+      loadChatbotMemoire();
+    } catch(e) {
+      alert('Erreur : ' + e.message);
+    }
+  };
+
+  /* Fermer modal sur clic extérieur */
+  document.getElementById('modal-memoire-bg').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeMemoireModal();
+  });
 
 })();
 </script>
