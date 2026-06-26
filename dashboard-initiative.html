@@ -1599,26 +1599,113 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#10b981;">${balance.toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Solde wallet</div></div>
           <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;">${totalBillets}</div><div style="font-size:12px;color:var(--muted);">Billets vendus</div></div>
         </div>
+        <!-- Actions rapides scanner -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+          <a href="scanner.html" target="_blank" style="display:flex;align-items:center;gap:10px;background:#0f172a;border:2px solid #1e293b;border-radius:12px;padding:14px;text-decoration:none;color:inherit;transition:border-color .15s;" onmouseover="this.style.borderColor='#7c3aed'" onmouseout="this.style.borderColor='#1e293b'">
+            <span style="font-size:1.8rem;">📷</span>
+            <div><div style="font-weight:800;font-size:13px;">Scanner QR</div><div style="font-size:11px;color:var(--muted);">Contrôle d'accès</div></div>
+          </a>
+          <a href="billetterie.html" target="_blank" style="display:flex;align-items:center;gap:10px;background:#0f172a;border:2px solid #1e293b;border-radius:12px;padding:14px;text-decoration:none;color:inherit;transition:border-color .15s;" onmouseover="this.style.borderColor='#f97316'" onmouseout="this.style.borderColor='#1e293b'">
+            <span style="font-size:1.8rem;">🎟️</span>
+            <div><div style="font-weight:800;font-size:13px;">Billetterie</div><div style="font-size:11px;color:var(--muted);">Événements & ventes</div></div>
+          </a>
+        </div>
+
+        <!-- Tableau des événements avec stats -->
+        <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+          <strong style="font-size:14px;">Vos événements</strong>
+          <button class="btn btn-sm btn-orange" onclick="window.open('billetterie.html','_blank')">+ Créer</button>
+        </div>
         ${events.length ? events.map(e=>`
-          <div class="card" style="margin-bottom:12px;padding:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
-              <div>
-                <strong style="font-size:14px;">${escH(e.titre)}</strong>
-                <span style="margin-left:8px;font-size:11px;padding:2px 8px;background:#f1f5f9;color:#475569;border-radius:4px;">${BILLET_STATUTS[e.statut]||e.statut}</span>
+          <div class="card" style="margin-bottom:10px;padding:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+              <div style="flex:1;min-width:0;">
+                <strong style="font-size:13px;">${escH(e.titre)}</strong>
+                <span style="margin-left:6px;font-size:11px;padding:2px 7px;background:#f1f5f9;color:#475569;border-radius:4px;">${BILLET_STATUTS[e.statut]||e.statut}</span>
                 <div style="font-size:12px;color:var(--muted);margin-top:2px;">📅 ${fmtDateInit(e.date_debut)} · 📍 ${escH(e.ville||'—')}</div>
               </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 ${e.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="initPublishEvent(${e.id})">🟢 Publier</button>`:''}
                 ${e.statut==='publie'?`<button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="initCloseEvent(${e.id})">🔒 Fermer</button>`:''}
+                <button class="btn btn-sm btn-outline" onclick="initShowEventFinancier(${e.id})">📊 Stats</button>
               </div>
             </div>
-            <div style="font-size:13px;color:var(--muted);margin-top:8px;">🎫 ${e.billets_vendus||0} billets vendus · 🏷️ ${e.nb_types||0} type(s)</div>
-          </div>`).join('') : `<div class="notice">Vous n'avez pas encore d'événements. <a href="billetterie.html" target="_blank">Créer depuis la billetterie →</a></div>`}
-        <div style="margin-top:16px;">
-          <a href="billetterie.html" target="_blank" class="btn btn-outline">📲 Ouvrir la billetterie complète (scanner + stats)</a>
-        </div>`;
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+              <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:800;color:var(--orange);">${e.billets_vendus||0}</div>
+                <div style="font-size:10px;color:var(--muted);">billets</div>
+              </div>
+              <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:800;color:#10b981;">${((e.billets_vendus||0)*0).toFixed(0)}</div>
+                <div style="font-size:10px;color:var(--muted);">scans</div>
+              </div>
+              <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:800;">${e.nb_types||0}</div>
+                <div style="font-size:10px;color:var(--muted);">types</div>
+              </div>
+            </div>
+            <!-- Panel stats financier (affiché sur demande) -->
+            <div id="fin-panel-${e.id}" style="display:none;margin-top:12px;"></div>
+          </div>`).join('') : `<div class="notice">Vous n'avez pas encore d'événements. <a href="billetterie.html" target="_blank">Créer depuis la billetterie →</a></div>`}`;
     } catch(e) { document.getElementById('billetterie-init').innerHTML = '<div class="notice">Erreur chargement billetterie.</div>'; }
   }
+
+  window.initShowEventFinancier = async function(eid) {
+    const panel = document.getElementById('fin-panel-'+eid);
+    if (!panel) return;
+    if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    panel.innerHTML = '<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px;">Chargement…</div>';
+    try {
+      const r = await api('GET', '/events/'+eid+'/financier');
+      const k = r.kpis || {};
+      const pt = r.par_type || [];
+      const pj = r.par_jour || [];
+      const ch = r.checkins || {};
+      panel.innerHTML = `
+        <div style="border-top:1px solid var(--border);padding-top:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">📊 Tableau financier</div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;">
+            <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:20px;font-weight:800;color:#10b981;">${(k.ca_brut||0).toFixed(2)} €</div>
+              <div style="font-size:10px;color:var(--muted);">CA brut</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:20px;font-weight:800;color:var(--orange);">${(k.revenu_net||0).toFixed(2)} €</div>
+              <div style="font-size:10px;color:var(--muted);">Revenu net (95%)</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:20px;font-weight:800;">${k.nb_billets||0}</div>
+              <div style="font-size:10px;color:var(--muted);">Billets vendus</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:20px;font-weight:800;color:#7c3aed;">${ch.accepted||0} / ${ch.total||0}</div>
+              <div style="font-size:10px;color:var(--muted);">Entrées / Scans</div>
+            </div>
+          </div>
+          ${pt.length ? `
+          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">PAR TYPE DE BILLET</div>
+          ${pt.map(t=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;">
+              <span>${escH(t.nom)} <span style="opacity:.5;">(${t.nb_vendus}/${t.quantite||'∞'})</span></span>
+              <strong style="color:#10b981;">${(t.ca||0).toFixed(2)} €</strong>
+            </div>`).join('')}
+          ` : ''}
+          ${pj.length ? `
+          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:10px;margin-bottom:6px;">VENTES PAR JOUR</div>
+          <div style="display:flex;gap:4px;align-items:flex-end;height:50px;">
+            ${(()=>{ const maxCa=Math.max(...pj.map(p=>p.ca),1); return pj.map(p=>`<div title="${p.jour}: ${p.nb} billets, ${(p.ca).toFixed(0)}€" style="flex:1;background:var(--orange);border-radius:3px 3px 0 0;height:${Math.round((p.ca/maxCa)*100)}%;min-height:4px;"></div>`).join(''); })()}
+          </div>
+          ` : ''}
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <a href="scanner.html" target="_blank" style="flex:1;text-align:center;background:#0f172a;border:1px solid #1e293b;color:inherit;text-decoration:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;">📷 Scanner</a>
+            <a href="billetterie.html" target="_blank" style="flex:1;text-align:center;background:var(--bg);border:1px solid var(--border);color:inherit;text-decoration:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;">🎟️ Billetterie</a>
+          </div>
+        </div>`;
+    } catch(err) {
+      panel.innerHTML = '<div style="color:#ef4444;font-size:12px;padding:8px;">Erreur : '+err.message+'</div>';
+    }
+  };
 
   function fmtDateInit(s) {
     if(!s) return '—';

@@ -4592,6 +4592,10 @@ async function handleRequest(req, res) {
       if (q.categorie) { sql += ' AND e.categorie=?'; args.push(q.categorie); }
       if (q.organisateur_id) { sql += ' AND e.organisateur_id=?'; args.push(q.organisateur_id); }
       if (q.all === '1') { sql = sql.replace("AND e.statut IN ('publie','ferme')", ''); }
+      if (q.mine === '1') {
+        const me = getCurrentUser(req);
+        if (me) { sql += ' AND e.organisateur_id=?'; args.push(me.id); sql = sql.replace("AND e.statut IN ('publie','ferme')", ''); }
+      }
       sql += ' ORDER BY e.date_debut ASC LIMIT 100';
       const events = db.prepare(sql).all(...args);
       return sendJSON(res, 200, { events });
@@ -4834,6 +4838,76 @@ async function handleRequest(req, res) {
         (SELECT COALESCE(SUM(prix_paye),0) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') revenu
         FROM events e LEFT JOIN users u ON u.id=e.organisateur_id ORDER BY e.created_at DESC LIMIT 200`).all();
       return sendJSON(res, 200, { events });
+    }
+
+    /* ── GET /api/events/:id/financier — tableau de bord financier d'un événement ── */
+    if (req.method === 'GET' && /^\/api\/events\/\d+\/financier$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const eid = parseInt(pathname.split('/')[3]);
+      const ev = db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
+      if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
+      if (ev.organisateur_id !== me.id && !['administrateur','collectivite'].includes(me.role))
+        return sendJSON(res, 403, { error: 'Accès refusé.' });
+
+      const kpis = db.prepare(`SELECT
+        COUNT(*) AS nb_billets,
+        COALESCE(SUM(prix_paye),0) AS ca_brut,
+        COALESCE(SUM(commission),0) AS total_commission,
+        COALESCE(SUM(prix_paye - commission),0) AS revenu_net,
+        SUM(CASE WHEN statut='valid' THEN 1 ELSE 0 END) AS billets_valides,
+        SUM(CASE WHEN statut='used'  THEN 1 ELSE 0 END) AS billets_utilises,
+        SUM(CASE WHEN statut='cancelled' THEN 1 ELSE 0 END) AS billets_annules
+        FROM tickets WHERE event_id=? AND payment_status='paid'`).get(eid);
+
+      const par_type = db.prepare(`SELECT tt.nom, tt.type, COUNT(t.id) AS nb_vendus,
+        COALESCE(SUM(t.prix_paye),0) AS ca, tt.prix, tt.quantite, tt.quantite_vendue
+        FROM ticket_types tt LEFT JOIN tickets t ON t.ticket_type_id=tt.id AND t.payment_status='paid'
+        WHERE tt.event_id=? GROUP BY tt.id ORDER BY ca DESC`).all(eid);
+
+      const par_jour = db.prepare(`SELECT DATE(created_at) AS jour, COUNT(*) AS nb,
+        COALESCE(SUM(prix_paye),0) AS ca
+        FROM tickets WHERE event_id=? AND payment_status='paid'
+        GROUP BY DATE(created_at) ORDER BY jour ASC`).all(eid);
+
+      const checkins = db.prepare(`SELECT COUNT(*) total,
+        SUM(CASE WHEN resultat='accepted' THEN 1 ELSE 0 END) accepted
+        FROM event_checkins WHERE event_id=?`).get(eid);
+
+      const derniers_achats = db.prepare(`SELECT t.id, t.prix_paye, t.statut, t.created_at,
+        u.nom AS acheteur, tt.nom AS type_nom
+        FROM tickets t JOIN users u ON u.id=t.user_id JOIN ticket_types tt ON tt.id=t.ticket_type_id
+        WHERE t.event_id=? AND t.payment_status='paid' ORDER BY t.created_at DESC LIMIT 20`).all(eid);
+
+      return sendJSON(res, 200, { event: ev, kpis, par_type, par_jour, checkins, derniers_achats });
+    }
+
+    /* ── GET /api/dashboard/financier — tableau de bord global billetterie (initiative) ── */
+    if (req.method === 'GET' && pathname === '/api/dashboard/financier') {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+
+      const events = db.prepare(`SELECT e.id, e.titre, e.date_debut, e.statut, e.pays, e.ville,
+        (SELECT COUNT(*) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') AS nb_billets,
+        (SELECT COALESCE(SUM(prix_paye),0) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') AS ca_brut,
+        (SELECT COALESCE(SUM(prix_paye-commission),0) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') AS revenu_net,
+        (SELECT COUNT(*) FROM event_checkins c WHERE c.event_id=e.id AND c.resultat='accepted') AS nb_entrees
+        FROM events e WHERE e.organisateur_id=? ORDER BY e.date_debut DESC LIMIT 50`).all(me.id);
+
+      const totaux = events.reduce((a, e) => ({
+        nb_billets: a.nb_billets + (e.nb_billets||0),
+        ca_brut: a.ca_brut + (e.ca_brut||0),
+        revenu_net: a.revenu_net + (e.revenu_net||0),
+        nb_entrees: a.nb_entrees + (e.nb_entrees||0),
+      }), { nb_billets:0, ca_brut:0, revenu_net:0, nb_entrees:0 });
+
+      const wallet = db.prepare(`SELECT wallet_balance FROM users WHERE id=?`).get(me.id);
+
+      const par_mois = db.prepare(`SELECT strftime('%Y-%m', t.created_at) AS mois,
+        COUNT(*) AS nb, COALESCE(SUM(prix_paye),0) AS ca
+        FROM tickets t JOIN events e ON e.id=t.event_id
+        WHERE e.organisateur_id=? AND t.payment_status='paid'
+        GROUP BY mois ORDER BY mois DESC LIMIT 12`).all(me.id);
+
+      return sendJSON(res, 200, { events, totaux, wallet_balance: wallet?.wallet_balance||0, par_mois });
     }
 
     /* ============================================================

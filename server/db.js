@@ -976,6 +976,10 @@ const MIGRATIONS = [
   ["initiatives", "langues TEXT DEFAULT '[]'"],
   ["initiatives", "reseau_visible INTEGER DEFAULT 1"],
   ["initiatives", "accepte_messages INTEGER DEFAULT 1"],
+  // Scanner billets — info appareil et localisation
+  ["event_checkins", "device_info TEXT"],
+  ["event_checkins", "latitude REAL"],
+  ["event_checkins", "longitude REAL"],
 ];
 
 /* ===== SYSTÈME D'ACCRÉDITATIONS DIASPO'ACTIF ===== */

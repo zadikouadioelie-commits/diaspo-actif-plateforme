@@ -282,15 +282,33 @@ async function joinRoom() {
   const roomId = JITSI_ROOM || `diaspoactif-legacy-${REUNION_ID||'rdv'}`;
 
   // Charger Jitsi via iframe avec URL de configuration
+  const isOrganisateur = reunionData?.reunion?.organisateur_id === ME?.id;
   const jitsiParams = new URLSearchParams({
     'config.startWithAudioMuted': (!micOn).toString(),
     'config.startWithVideoMuted': (!camOn).toString(),
     'config.disableDeepLinking': 'true',
     'config.prejoinPageEnabled': 'false',
-    'config.toolbarButtons': JSON.stringify(['microphone','camera','desktop','chat','raisehand','tileview','fullscreen']),
+    'config.enableClosePage': 'false',
+    'config.requireDisplayName': 'true',
+    'config.enableLayerSuspension': 'true',
+    'config.startAudioOnly': 'false',
+    'config.enableNoisyMicDetection': 'true',
+    'config.reactions.enabled': 'true',
+    'config.disableReactions': 'false',
+    'config.disablePolls': 'false',
+    'config.toolbarButtons': JSON.stringify([
+      'microphone','camera','desktop','chat',
+      'raisehand','reactions','tileview',
+      'fullscreen','security','participants-pane',
+      'invite','settings','stats',
+      ...(isOrganisateur ? ['mute-everyone','kick','recording'] : [])
+    ]),
     'userInfo.displayName': name,
     'interfaceConfig.SHOW_JITSI_WATERMARK': 'false',
     'interfaceConfig.SHOW_WATERMARK_FOR_GUESTS': 'false',
+    'interfaceConfig.TOOLBAR_ALWAYS_VISIBLE': 'true',
+    'interfaceConfig.TILE_VIEW_MAX_COLUMNS': '5',
+    'interfaceConfig.VERTICAL_FILMSTRIP': 'false',
   });
 
   const jitsiSrc = `https://meet.jit.si/${encodeURIComponent(roomId)}#${jitsiParams.toString()}`;

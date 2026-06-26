@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Scanner Billets — Diaspo'Actif</title>
+<link rel="icon" href="/assets/logo.svg">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1117">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;
+  --border:#30363d;--text:#e6edf3;--sub:#8b949e;
+  --green:#10b981;--red:#ef4444;--orange:#f59e0b;--accent:#7c3aed;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;overscroll-behavior:none;}
+
+/* ── Header ── */
+.top-bar{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;}
+.top-bar a{color:var(--sub);text-decoration:none;font-size:.85rem;}
+.top-bar a:hover{color:var(--text);}
+.top-title{font-weight:800;font-size:1rem;flex:1;}
+.top-badge{background:var(--green);color:#fff;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:20px;}
+
+/* ── Auth gate ── */
+#auth-gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80dvh;text-align:center;padding:24px;gap:12px;}
+#auth-gate h2{font-size:1.2rem;font-weight:800;}
+#auth-gate p{color:var(--sub);font-size:.85rem;}
+
+/* ── Event selector ── */
+#event-selector{padding:16px;}
+.select-label{font-size:.78rem;color:var(--sub);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;}
+select{width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:10px;font-size:.9rem;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+select:focus{outline:none;border-color:var(--accent);}
+
+/* ── Scanner area ── */
+#scanner-area{padding:0 16px 16px;}
+.cam-wrap{position:relative;width:100%;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:4/3;}
+#video{width:100%;height:100%;object-fit:cover;display:block;}
+#canvas{display:none;}
+.scan-guide{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.scan-frame{width:220px;height:220px;position:relative;}
+.scan-frame::before,.scan-frame::after{content:'';position:absolute;width:40px;height:40px;border-color:var(--accent);border-style:solid;}
+.scan-frame::before{top:0;left:0;border-width:3px 0 0 3px;border-radius:6px 0 0 0;}
+.scan-frame::after{bottom:0;right:0;border-width:0 3px 3px 0;border-radius:0 0 6px 0;}
+.scan-frame .c2,.scan-frame .c3{position:absolute;width:40px;height:40px;border-color:var(--accent);border-style:solid;}
+.scan-frame .c2{top:0;right:0;border-width:3px 3px 0 0;border-radius:0 6px 0 0;}
+.scan-frame .c3{bottom:0;left:0;border-width:0 0 3px 3px;border-radius:0 0 0 6px;}
+.scan-line{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanmove 2s linear infinite;}
+@keyframes scanmove{0%{top:0;}100%{top:100%;}}
+.cam-status{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:.75rem;color:rgba(255,255,255,.6);}
+.cam-disabled{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--sub);}
+.cam-disabled span{font-size:3rem;}
+
+/* ── Controls ── */
+.cam-controls{display:flex;gap:8px;margin-top:12px;justify-content:center;}
+.cam-btn{background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:9px 18px;border-radius:20px;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .15s;}
+.cam-btn:hover{background:var(--bg3);}
+.cam-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.cam-btn.danger{background:var(--red);border-color:var(--red);color:#fff;}
+
+/* ── Result overlay ── */
+#result-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;align-items:center;justify-content:center;padding:24px;}
+#result-overlay.show{display:flex;}
+.result-card{background:var(--bg2);border-radius:20px;padding:32px 24px;max-width:360px;width:100%;text-align:center;border:2px solid var(--border);}
+.result-card.ok{border-color:var(--green);}
+.result-card.fail{border-color:var(--red);}
+.result-card.warn{border-color:var(--orange);}
+.result-icon{font-size:4rem;margin-bottom:12px;}
+.result-label{font-size:1.4rem;font-weight:900;margin-bottom:6px;}
+.result-label.ok{color:var(--green);}
+.result-label.fail{color:var(--red);}
+.result-label.warn{color:var(--orange);}
+.result-sub{font-size:.85rem;color:var(--sub);margin-bottom:20px;}
+.result-detail{background:var(--bg3);border-radius:10px;padding:12px;text-align:left;font-size:.8rem;margin-bottom:20px;}
+.result-detail div{display:flex;justify-content:space-between;gap:8px;padding:3px 0;}
+.result-detail span.v{font-weight:700;text-align:right;}
+.result-close{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:11px;border-radius:12px;font-size:.9rem;font-weight:700;cursor:pointer;}
+
+/* ── Stats bar ── */
+.stats-bar{display:flex;gap:0;margin:16px 16px 0;}
+.stat-chip{flex:1;background:var(--bg2);border:1px solid var(--border);padding:10px;text-align:center;font-size:.7rem;color:var(--sub);}
+.stat-chip:first-child{border-radius:10px 0 0 10px;}
+.stat-chip:last-child{border-radius:0 10px 10px 0;}
+.stat-chip strong{display:block;font-size:1.3rem;font-weight:900;color:var(--text);}
+.stat-chip.ok strong{color:var(--green);}
+.stat-chip.fail strong{color:var(--red);}
+
+/* ── History ── */
+.hist-section{padding:16px;}
+.hist-title{font-size:.8rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;}
+.hist-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.82rem;}
+.hist-item:last-child{border-bottom:none;}
+.hist-badge{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;}
+.hist-badge.accepted{background:#052e16;}
+.hist-badge.rejected{background:#450a0a;}
+.hist-info{flex:1;min-width:0;}
+.hist-nom{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hist-time{font-size:.72rem;color:var(--sub);}
+.hist-motif{font-size:.72rem;color:var(--red);}
+.empty-hist{color:var(--sub);font-size:.82rem;text-align:center;padding:20px 0;}
+
+/* ── Manual entry ── */
+.manual-section{padding:0 16px 16px;}
+.manual-row{display:flex;gap:8px;margin-top:8px;}
+.manual-input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:10px;font-size:.85rem;}
+.manual-input:focus{outline:none;border-color:var(--accent);}
+.manual-btn{background:var(--accent);border:none;color:#fff;padding:9px 16px;border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="billetterie.html">← Billetterie</a>
+  <span class="top-title">📷 Scanner de Billets</span>
+  <span id="online-badge" class="top-badge" style="display:none;">EN LIGNE</span>
+</div>
+
+<!-- Auth gate -->
+<div id="auth-gate" style="display:none;">
+  <span style="font-size:3rem;">🔒</span>
+  <h2>Accès réservé</h2>
+  <p>Connectez-vous avec un compte initiative, admin ou collectivité pour scanner des billets.</p>
+  <a href="login.html" style="background:var(--accent);color:#fff;padding:10px 24px;border-radius:12px;text-decoration:none;font-weight:700;">Se connecter</a>
+</div>
+
+<!-- Main scanner app -->
+<div id="app" style="display:none;">
+
+  <!-- Event selector -->
+  <div id="event-selector">
+    <div class="select-label">Événement à contrôler</div>
+    <select id="event-select" onchange="onEventChange()">
+      <option value="">— Sélectionner un événement —</option>
+    </select>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-chip ok"><strong id="stat-accepted">0</strong>Valides</div>
+    <div class="stat-chip"><strong id="stat-total">0</strong>Scans</div>
+    <div class="stat-chip fail"><strong id="stat-rejected">0</strong>Refusés</div>
+  </div>
+
+  <!-- Camera scanner -->
+  <div id="scanner-area">
+    <div class="cam-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="scan-guide">
+        <div class="scan-frame">
+          <div class="c2"></div>
+          <div class="c3"></div>
+          <div class="scan-line"></div>
+        </div>
+      </div>
+      <div class="cam-status" id="cam-status">Pointez vers un QR code</div>
+      <div class="cam-disabled" id="cam-disabled">
+        <span>📷</span>
+        <p style="font-size:.8rem;text-align:center;">Caméra inactive</p>
+      </div>
+    </div>
+    <div class="cam-controls">
+      <button class="cam-btn primary" id="btn-start" onclick="startCamera()">▶ Démarrer la caméra</button>
+      <button class="cam-btn danger" id="btn-stop" onclick="stopCamera()" style="display:none;">⏹ Arrêter</button>
+      <button class="cam-btn" onclick="switchCamera()" id="btn-switch" style="display:none;">🔄 Caméra</button>
+    </div>
+  </div>
+
+  <!-- Manual entry -->
+  <div class="manual-section">
+    <div class="select-label">Saisie manuelle du token QR</div>
+    <div class="manual-row">
+      <input class="manual-input" id="manual-token" placeholder="Collez le payload base64…" type="text">
+      <button class="manual-btn" onclick="manualValidate()">Valider</button>
+    </div>
+  </div>
+
+  <!-- Scan history -->
+  <div class="hist-section">
+    <div class="hist-title">Historique de ce contrôle</div>
+    <div id="hist-list"><div class="empty-hist">Aucun scan effectué.</div></div>
+  </div>
+</div>
+
+<!-- Result overlay -->
+<div id="result-overlay">
+  <div class="result-card" id="result-card">
+    <div class="result-icon" id="result-icon">✅</div>
+    <div class="result-label" id="result-label">BILLET VALIDE</div>
+    <div class="result-sub" id="result-sub"></div>
+    <div class="result-detail" id="result-detail" style="display:none;"></div>
+    <button class="result-close" onclick="closeResult()">Fermer et continuer</button>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script src="assets/chatbot.js"></script>
+<script>
+(async function init() {
+  const me = await DA.me().catch(() => null);
+  if (!me || !['initiative','administrateur','collectivite'].includes(me.role)) {
+    document.getElementById('auth-gate').style.display = 'flex';
+    return;
+  }
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('online-badge').style.display = '';
+  loadEvents(me);
+})();
+
+let scannerStream = null;
+let scanInterval = null;
+let currentFacingMode = 'environment';
+let scanHistory = [];
+let scanStats = { accepted: 0, rejected: 0 };
+let lastScanTime = 0;
+let selectedEventId = null;
+
+async function loadEvents(me) {
+  try {
+    const r = await api('GET', '/events?mine=1');
+    const events = r.events || [];
+    const sel = document.getElementById('event-select');
+    events.forEach(e => {
+      const o = document.createElement('option');
+      o.value = e.id;
+      o.textContent = `${e.titre} — ${new Date(e.date_debut).toLocaleDateString('fr-FR')}`;
+      sel.appendChild(o);
+    });
+    if (events.length === 1) { sel.value = events[0].id; onEventChange(); }
+  } catch(e) { console.warn('Pas d\'événements:', e.message); }
+}
+
+function onEventChange() {
+  const v = document.getElementById('event-select').value;
+  selectedEventId = v ? parseInt(v) : null;
+  scanHistory = [];
+  scanStats = { accepted: 0, rejected: 0 };
+  updateStats();
+  renderHistory();
+  if (selectedEventId) loadCheckinHistory();
+}
+
+async function loadCheckinHistory() {
+  if (!selectedEventId) return;
+  try {
+    const r = await api('GET', `/events/${selectedEventId}/checkins`);
+    const { checkins = [], totaux = {} } = r;
+    scanStats.accepted = totaux.accepted || 0;
+    scanStats.rejected = (totaux.total || 0) - (totaux.accepted || 0);
+    scanHistory = checkins.slice(0, 30).map(c => ({
+      nom: c.nom_display || 'Participant',
+      statut: c.resultat,
+      motif: c.motif_rejet || '',
+      time: c.timestamp
+    }));
+    updateStats();
+    renderHistory();
+  } catch(e) {}
+}
+
+function updateStats() {
+  document.getElementById('stat-accepted').textContent = scanStats.accepted;
+  document.getElementById('stat-rejected').textContent = scanStats.rejected;
+  document.getElementById('stat-total').textContent = scanStats.accepted + scanStats.rejected;
+}
+
+function renderHistory() {
+  const el = document.getElementById('hist-list');
+  if (!scanHistory.length) { el.innerHTML = '<div class="empty-hist">Aucun scan effectué.</div>'; return; }
+  el.innerHTML = scanHistory.map(h => `
+    <div class="hist-item">
+      <div class="hist-badge ${h.statut}">${h.statut === 'accepted' ? '✅' : '❌'}</div>
+      <div class="hist-info">
+        <div class="hist-nom">${escH(h.nom)}</div>
+        ${h.motif ? `<div class="hist-motif">${escH(h.motif)}</div>` : ''}
+        <div class="hist-time">${formatTime(h.time)}</div>
+      </div>
+    </div>`).join('');
+}
+
+async function startCamera() {
+  try {
+    const constraints = { video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } } };
+    scannerStream = await navigator.mediaDevices.getUserMedia(constraints);
+    const video = document.getElementById('video');
+    video.srcObject = scannerStream;
+    await video.play();
+    document.getElementById('cam-disabled').style.display = 'none';
+    document.getElementById('btn-start').style.display = 'none';
+    document.getElementById('btn-stop').style.display = '';
+    document.getElementById('btn-switch').style.display = '';
+    document.getElementById('cam-status').textContent = 'Recherche de QR code…';
+    startScanning();
+  } catch(e) {
+    document.getElementById('cam-status').textContent = 'Caméra inaccessible : ' + e.message;
+  }
+}
+
+function stopCamera() {
+  if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+  document.getElementById('video').srcObject = null;
+  document.getElementById('cam-disabled').style.display = 'flex';
+  document.getElementById('btn-start').style.display = '';
+  document.getElementById('btn-stop').style.display = 'none';
+  document.getElementById('btn-switch').style.display = 'none';
+  document.getElementById('cam-status').textContent = 'Caméra arrêtée';
+}
+
+async function switchCamera() {
+  currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+  stopCamera();
+  await startCamera();
+}
+
+function startScanning() {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  scanInterval = setInterval(() => {
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    if (Date.now() - lastScanTime < 2500) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+    if (code && code.data) {
+      lastScanTime = Date.now();
+      processQR(code.data);
+    }
+  }, 200);
+}
+
+async function processQR(raw) {
+  document.getElementById('cam-status').textContent = '⏳ Validation en cours…';
+  try {
+    const r = await api('POST', '/scanner/validate', { qr_payload: raw });
+    showResult(r);
+    if (r.valid) {
+      scanStats.accepted++;
+      scanHistory.unshift({ nom: r.nom || 'Participant', statut: 'accepted', motif: '', time: new Date().toISOString() });
+    } else {
+      scanStats.rejected++;
+      scanHistory.unshift({ nom: 'Inconnu', statut: 'rejected', motif: r.motif || 'Refusé', time: new Date().toISOString() });
+    }
+    updateStats();
+    renderHistory();
+  } catch(e) {
+    showResult({ valid: false, motif: e.message });
+    scanStats.rejected++;
+    updateStats();
+  }
+  document.getElementById('cam-status').textContent = 'Recherche de QR code…';
+}
+
+function showResult(r) {
+  const overlay = document.getElementById('result-overlay');
+  const card = document.getElementById('result-card');
+  const icon = document.getElementById('result-icon');
+  const label = document.getElementById('result-label');
+  const sub = document.getElementById('result-sub');
+  const detail = document.getElementById('result-detail');
+
+  card.className = 'result-card';
+  label.className = 'result-label';
+
+  if (r.valid) {
+    card.classList.add('ok');
+    label.classList.add('ok');
+    icon.textContent = '✅';
+    label.textContent = 'BILLET VALIDE';
+    sub.textContent = `Entrée autorisée pour ${r.nom || 'ce participant'}`;
+    detail.style.display = 'none';
+  } else {
+    const motif = r.motif || 'Billet non valide';
+    if (motif.includes('déjà') || motif.includes('utilisé')) {
+      card.classList.add('warn');
+      label.classList.add('warn');
+      icon.textContent = '⚠️';
+      label.textContent = 'DÉJÀ UTILISÉ';
+    } else if (motif.includes('annulé')) {
+      card.classList.add('fail');
+      label.classList.add('fail');
+      icon.textContent = '🚫';
+      label.textContent = 'BILLET ANNULÉ';
+    } else if (motif.includes('introuvable') || motif.includes('Inconnu')) {
+      card.classList.add('fail');
+      label.classList.add('fail');
+      icon.textContent = '❓';
+      label.textContent = 'INCONNU';
+    } else if (motif.includes('falsifié') || motif.includes('Signature')) {
+      card.classList.add('fail');
+      label.classList.add('fail');
+      icon.textContent = '🔴';
+      label.textContent = 'FRAUDE DÉTECTÉE';
+    } else {
+      card.classList.add('fail');
+      label.classList.add('fail');
+      icon.textContent = '❌';
+      label.textContent = 'REFUSÉ';
+    }
+    sub.textContent = motif;
+    detail.style.display = 'none';
+  }
+
+  overlay.classList.add('show');
+  if (r.valid) setTimeout(closeResult, 2500);
+}
+
+function closeResult() {
+  document.getElementById('result-overlay').classList.remove('show');
+  lastScanTime = Date.now();
+}
+
+async function manualValidate() {
+  const v = document.getElementById('manual-token').value.trim();
+  if (!v) return;
+  await processQR(v);
+  document.getElementById('manual-token').value = '';
+}
+
+function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function formatTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+</script>
+</body>
+</html>
