@@ -806,6 +806,8 @@ const MIGRATIONS = [
   ["offres_candidatures", "lieu_entretien TEXT"],
   ["offres_candidatures", "type_entretien TEXT DEFAULT 'presentiel'"],
   ["offres_candidatures", "type_candidature TEXT DEFAULT 'offre'"],
+  // CV versions history
+  ["cv_profiles", "versions_json TEXT DEFAULT '[]'"],
 ];
 
 /* ===== SYSTÈME D'ACCRÉDITATIONS DIASPO'ACTIF ===== */

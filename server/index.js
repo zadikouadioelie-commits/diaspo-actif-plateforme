@@ -3521,23 +3521,31 @@ async function handleRequest(req, res) {
       const cv = db.prepare(`SELECT * FROM cv_profiles WHERE id = ? AND user_id = ?`).get(id, me.id);
       if (!cv) return sendJSON(res, 404, { error: "CV introuvable" });
       cv.data = JSON.parse(cv.data_json || '{}');
+      cv.versions = JSON.parse(cv.versions_json || '[]');
       return sendJSON(res, 200, cv);
     }
 
     /* --- POST /api/cv — créer ou mettre à jour un CV (upsert par numero) --- */
     if (req.method === "POST" && pathname === "/api/cv") {
       const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const { numero = 1, titre = 'Mon CV', theme = 'bleu', data = {} } = body;
+      const { numero = 1, titre = 'Mon CV', theme = 'bleu', data = {}, save_version = false } = body;
       if (![1, 2].includes(Number(numero))) return sendJSON(res, 400, { error: "numero doit être 1 ou 2" });
-      const existing = db.prepare(`SELECT id FROM cv_profiles WHERE user_id = ? AND numero = ?`).get(me.id, numero);
+      const existing = db.prepare(`SELECT id, data_json, versions_json FROM cv_profiles WHERE user_id = ? AND numero = ?`).get(me.id, numero);
       if (existing) {
-        db.prepare(`UPDATE cv_profiles SET titre=?, theme=?, data_json=?, updated_at=datetime('now') WHERE id=?`)
-          .run(titre, theme, JSON.stringify(data), existing.id);
-        return sendJSON(res, 200, { id: existing.id, saved: true });
+        let versions = JSON.parse(existing.versions_json || '[]');
+        let version_saved = false;
+        if (save_version) {
+          versions.unshift({ saved_at: new Date().toISOString(), data: JSON.parse(existing.data_json || '{}') });
+          if (versions.length > 10) versions = versions.slice(0, 10);
+          version_saved = true;
+        }
+        db.prepare(`UPDATE cv_profiles SET titre=?, theme=?, data_json=?, versions_json=?, updated_at=datetime('now') WHERE id=?`)
+          .run(titre, theme, JSON.stringify(data), JSON.stringify(versions), existing.id);
+        return sendJSON(res, 200, { id: existing.id, saved: true, version_saved, versions });
       } else {
-        const r = db.prepare(`INSERT INTO cv_profiles(user_id,numero,titre,theme,data_json) VALUES(?,?,?,?,?)`)
-          .run(me.id, numero, titre, theme, JSON.stringify(data));
-        return sendJSON(res, 201, { id: r.lastInsertRowid, saved: true });
+        const r = db.prepare(`INSERT INTO cv_profiles(user_id,numero,titre,theme,data_json,versions_json) VALUES(?,?,?,?,?,?)`)
+          .run(me.id, numero, titre, theme, JSON.stringify(data), '[]');
+        return sendJSON(res, 201, { id: r.lastInsertRowid, saved: true, versions: [] });
       }
     }
 
