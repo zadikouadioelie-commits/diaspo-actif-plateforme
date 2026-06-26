@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -136,6 +136,7 @@ textarea { resize: vertical; }
   #cv-titre { width: 110px; }
 }
 </style>
+  <link rel="stylesheet" href="/assets/responsive.css">
 </head>
 <body>
 
@@ -298,7 +299,7 @@ textarea { resize: vertical; }
     <div class="tab-content" id="tab-media">
       <div class="media-block">
         <h4>📷 Photo de profil</h4>
-        <div class="photo-preview-container"><img id="photo-preview" alt="Photo" src=""></div>
+        <div class="photo-preview-container"><img loading="lazy" id="photo-preview" alt="Photo" src=""></div>
         <div class="photo-actions">
           <button onclick="openPhotoPicker()">📁 Importer</button>
           <button onclick="removePhoto()" style="color:var(--red);">🗑 Supprimer</button>
@@ -315,7 +316,7 @@ textarea { resize: vertical; }
 
       <div class="media-block">
         <h4>✍️ Signature</h4>
-        <img id="sig-preview" src="" alt="Signature" style="display:none;max-height:60px;border:1px solid #eee;border-radius:6px;padding:4px;margin-bottom:8px;">
+        <img loading="lazy" id="sig-preview" src="" alt="Signature" style="display:none;max-height:60px;border:1px solid #eee;border-radius:6px;padding:4px;margin-bottom:8px;">
         <div class="media-actions">
           <button onclick="openSignatureModal()">✏️ Dessiner</button>
           <button onclick="importSignatureImage()">📁 Importer</button>
@@ -356,7 +357,7 @@ textarea { resize: vertical; }
       <div class="media-block">
         <h4>🔲 QR Code CV numérique</h4>
         <div style="font-size:.75rem;color:#888;margin-bottom:8px;">Lien vers votre CV interactif (photo, audio, vidéo).</div>
-        <div style="text-align:center;"><img id="qr-img" alt="QR Code"><div id="qr-url"></div></div>
+        <div style="text-align:center;"><img loading="lazy" id="qr-img" alt="QR Code"><div id="qr-url"></div></div>
         <div class="media-actions">
           <button onclick="generateQR()">🔲 Générer</button>
           <button onclick="toggleQR(false)" style="color:var(--red);">❌ Désactiver</button>

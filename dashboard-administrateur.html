@@ -1,10 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <title>Diaspo'Actif — Dashboard Administrateur</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="/assets/responsive.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +16,7 @@
 <div class="page">
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
       <nav class="nav"><a href="index.html">Accueil</a><a href="annuaire.html">Annuaire</a><a href="fil-actualite.html">Fil</a></nav>
       <div class="topbar-right">
         <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">☰</button>
@@ -1221,7 +1222,7 @@
                         </label>
                       </div>
                       <div id="pub-logo-thumb" style="margin-top:6px;display:none;">
-                        <img style="height:52px;width:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#f5f5f5;">
+                        <img loading="lazy" style="height:52px;width:52px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#f5f5f5;">
                       </div>
                     </div>
 
@@ -1236,7 +1237,7 @@
                         </label>
                       </div>
                       <div id="pub-image-thumb" style="margin-top:6px;display:none;">
-                        <img style="height:60px;width:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border);">
+                        <img loading="lazy" style="height:60px;width:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border);">
                       </div>
                     </div>
 
@@ -3263,7 +3264,7 @@ async function submitAccordDirect(){
       input.value = combined.join(", ");
       const thumb = document.getElementById("pub-galerie-thumb");
       thumb.innerHTML = combined.slice(0, 8).map(src =>
-        `<img src="${src}" style="height:48px;width:48px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">`
+        `<img loading="lazy" src="${src}" style="height:48px;width:48px;object-fit:cover;border-radius:6px;border:1px solid var(--border);">`
       ).join("");
       thumb.style.display = combined.length ? "flex" : "none";
     });
@@ -3350,15 +3351,15 @@ async function submitAccordDirect(){
     const mpLabels = { carte_bancaire:"💳 Carte", paypal:"🅿️ PayPal", virement:"🏦 Virement",
       mobile_money:"📱 Mobile Money", orange_money:"🟠 Orange Money",
       mtn_money:"🟡 MTN Money", moov_money:"🔵 Moov Money", wave:"🌊 Wave", crypto:"₿ Crypto" };
-    const logoEl  = logo ? `<img src="${logo}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:5px;background:#f5f5f5;flex-shrink:0;">` : `<div style="width:32px;height:32px;border-radius:5px;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;">📣</div>`;
+    const logoEl  = logo ? `<img loading="lazy" src="${logo}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:5px;background:#f5f5f5;flex-shrink:0;">` : `<div style="width:32px;height:32px;border-radius:5px;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;">📣</div>`;
     const sponsoTag = `<div style="font-size:10px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;">Sponsorisé · ${esc(p.annonceur)}</div>`;
 
     if (format === "banniere") {
       return `<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
-        ${img ? `<img src="${img}" alt="" style="width:72px;height:58px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : logo ? `<img src="${logo}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:8px;background:#f5f5f5;flex-shrink:0;">` : ""}
+        ${img ? `<img loading="lazy" src="${img}" alt="" style="width:72px;height:58px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : logo ? `<img loading="lazy" src="${logo}" alt="" style="width:52px;height:52px;object-fit:contain;border-radius:8px;background:#f5f5f5;flex-shrink:0;">` : ""}
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-            ${logo && img ? `<img src="${logo}" alt="" style="width:16px;height:16px;object-fit:contain;border-radius:3px;">` : ""}
+            ${logo && img ? `<img loading="lazy" src="${logo}" alt="" style="width:16px;height:16px;object-fit:contain;border-radius:3px;">` : ""}
             ${sponsoTag}
           </div>
           <div style="font-weight:700;font-size:14px;margin-bottom:2px;">${esc(p.titre)}</div>
@@ -3380,8 +3381,8 @@ async function submitAccordDirect(){
         </div>
         ${p.titre ? `<div style="font-weight:700;font-size:15px;margin-bottom:6px;">${esc(p.titre)}</div>` : ""}
         ${desc ? `<p style="margin:0 0 10px;font-size:13px;color:var(--muted);">${esc(desc)}</p>` : ""}
-        ${img ? `<img src="${img}" alt="" style="width:100%;border-radius:10px;max-height:200px;object-fit:cover;margin-bottom:10px;">` : ""}
-        ${galerie.length > 1 ? `<div style="display:flex;gap:6px;margin-bottom:10px;overflow:hidden;border-radius:8px;">${galerie.slice(1,4).map(u=>`<img src="${u}" style="flex:1;height:72px;object-fit:cover;border-radius:6px;">`).join("")}</div>` : ""}
+        ${img ? `<img loading="lazy" src="${img}" alt="" style="width:100%;border-radius:10px;max-height:200px;object-fit:cover;margin-bottom:10px;">` : ""}
+        ${galerie.length > 1 ? `<div style="display:flex;gap:6px;margin-bottom:10px;overflow:hidden;border-radius:8px;">${galerie.slice(1,4).map(u=>`<img loading="lazy" src="${u}" style="flex:1;height:72px;object-fit:cover;border-radius:6px;">`).join("")}</div>` : ""}
         ${hasContact ? `<div style="background:var(--surface);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;">
           ${tel ? `<span>📞 ${esc(tel)}</span>` : ""}${wa ? `<span>💬 ${esc(wa)}</span>` : ""}${mail ? `<span>✉️ ${esc(mail)}</span>` : ""}${adr ? `<span>📍 ${esc(adr)}</span>` : ""}
         </div>` : ""}
@@ -3393,7 +3394,7 @@ async function submitAccordDirect(){
     if (format === "annuaire") {
       return `<div class="card" style="border:1.5px dashed var(--border);max-width:260px;">
         ${sponsoTag}
-        ${img ? `<img src="${img}" alt="" style="width:100%;height:110px;object-fit:cover;border-radius:8px;margin:8px 0;">` : logo ? `<img src="${logo}" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:8px;margin:8px 0;background:#f5f5f5;">` : ""}
+        ${img ? `<img loading="lazy" src="${img}" alt="" style="width:100%;height:110px;object-fit:cover;border-radius:8px;margin:8px 0;">` : logo ? `<img loading="lazy" src="${logo}" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:8px;margin:8px 0;background:#f5f5f5;">` : ""}
         <div style="font-weight:700;margin-bottom:4px;font-size:14px;">${esc(p.titre)}</div>
         ${desc ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${esc(desc)}</div>` : ""}
         ${hasContact ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${[tel,wa,mail].filter(Boolean).join(" · ")}</div>` : ""}

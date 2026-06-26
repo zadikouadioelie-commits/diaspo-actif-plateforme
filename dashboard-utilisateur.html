@@ -1,10 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <title>Diaspo'Actif — Tableau de bord Utilisateur</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="/assets/responsive.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,7 +17,8 @@
 
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
       <nav class="nav">
         <a href="index.html">Accueil</a>
         <a href="annuaire.html">Annuaire</a>
@@ -32,8 +34,10 @@
     </div>
   </header>
 
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <div class="with-sidebar">
     <aside class="sidebar">
+      <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
       <div class="brand">Mon espace</div>
       <a class="active" href="dashboard-utilisateur.html">🌐 Accueil</a>
       <a href="profil.html">👤 Mon profil public</a>
@@ -373,5 +377,26 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   }catch(e){convEl.innerHTML='<a href="messagerie.html" class="btn btn-outline btn-sm">Ouvrir la messagerie</a>';}
 })();
 </script>
+<script>
+(function(){
+  var toggle = document.getElementById('sidebar-toggle');
+  var close  = document.getElementById('sidebar-close');
+  var back   = document.getElementById('sidebar-backdrop');
+  var sb     = document.querySelector('.sidebar');
+  function openSidebar(){ sb && sb.classList.add('open'); back && back.classList.add('open'); document.body.style.overflow='hidden'; }
+  function closeSidebar(){ sb && sb.classList.remove('open'); back && back.classList.remove('open'); document.body.style.overflow=''; }
+  if(toggle) toggle.addEventListener('click', openSidebar);
+  if(close)  close.addEventListener('click', closeSidebar);
+  if(back)   back.addEventListener('click', closeSidebar);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSidebar(); });
+})();
+</script>
+  <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
+    <a class="mobile-bottom-nav__item active" href="dashboard-utilisateur.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+    <a class="mobile-bottom-nav__item" href="profil.html"><span class="nav-icon">👤</span><span>Profil</span></a>
+    <a class="mobile-bottom-nav__item" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span><span class="mobile-bottom-nav__badge" id="mob-msg-badge" style="display:none"></span></a>
+    <a class="mobile-bottom-nav__item" href="agenda.html"><span class="nav-icon">📅</span><span>Agenda</span></a>
+    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+  </nav>
 </body>
 </html>

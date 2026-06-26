@@ -1,0 +1,642 @@
+/* ═══════════════════════════════════════════════════════════════════
+   DIASPO'ACTIF — Responsive Universal Patch v1.0
+   Incluire dans TOUTES les pages après styles.css et ds.css
+   Couvre : mobile-first, tablette, desktop, 2K/4K, rotation
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── VARIABLES RESPONSIVE ──────────────────────────────────────── */
+:root {
+  /* Touch targets minimaux (WCAG 2.5.5 recommande 44px) */
+  --touch-target: 44px;
+  --touch-target-sm: 36px;
+
+  /* Marges mobiles */
+  --page-px: clamp(12px, 4vw, 24px);
+  --page-py: clamp(12px, 3vw, 24px);
+
+  /* Type scale fluide (clamp = min, preferred, max) */
+  --fs-xs:   clamp(0.65rem, 2vw, 0.70rem);
+  --fs-sm:   clamp(0.75rem, 2.5vw, 0.82rem);
+  --fs-base: clamp(0.82rem, 3vw, 0.875rem);
+  --fs-md:   clamp(0.9rem,  3.5vw, 1.0rem);
+  --fs-lg:   clamp(1.0rem,  4vw,   1.125rem);
+  --fs-xl:   clamp(1.1rem,  4.5vw, 1.25rem);
+  --fs-2xl:  clamp(1.2rem,  5vw,   1.5rem);
+  --fs-3xl:  clamp(1.3rem,  6vw,   1.875rem);
+  --fs-hero: clamp(1.4rem,  7vw,   2.5rem);
+}
+
+/* ─── RESET UNIVERSEL MOBILE ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  /* Évite le scroll horizontal accidentel */
+  overflow-x: hidden;
+}
+body {
+  overflow-x: hidden;
+  min-width: 320px; /* Plus petit iPhone SE */
+}
+img, video, svg, canvas, iframe {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+table { border-collapse: collapse; }
+
+/* ─── TOUCH TARGETS ──────────────────────────────────────────────── */
+/* Tous les éléments interactifs ont une zone de touch suffisante */
+button, [role="button"], a, input[type="checkbox"], input[type="radio"],
+select, .btn, .da-btn, .nav a, .sidebar a, .da-sidebar__item {
+  min-height: var(--touch-target-sm);
+  display: inline-flex;
+  align-items: center;
+}
+/* Taille explicite pour boutons */
+.btn, .da-btn {
+  min-height: var(--touch-target);
+  padding-top: max(8px, env(safe-area-inset-top, 8px));
+}
+.btn-sm, .da-btn--sm { min-height: var(--touch-target-sm); }
+.btn-xs, .da-btn--xs { min-height: 32px; }
+
+/* Checkboxes et radios plus grands sur mobile */
+input[type="checkbox"], input[type="radio"] {
+  width: 20px; height: 20px;
+  cursor: pointer;
+}
+
+/* ─── SAFE AREAS (iPhone notch/Dynamic Island) ───────────────────── */
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.topbar, .da-navbar {
+  padding-top: env(safe-area-inset-top);
+}
+/* Contenu bas — navigation mobile */
+.page-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ─── NAVIGATION MOBILE BOTTOM BAR ──────────────────────────────── */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(60px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: #fff;
+  border-top: 1px solid #e0e8f0;
+  box-shadow: 0 -2px 16px rgba(0,0,0,.08);
+  z-index: 150;
+  justify-content: space-around;
+  align-items: center;
+}
+.mobile-bottom-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex: 1;
+  padding: 6px 4px;
+  min-height: 52px;
+  justify-content: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: color .15s;
+  position: relative;
+}
+.mobile-bottom-nav__item.active { color: #1a3a5c; }
+.mobile-bottom-nav__item .nav-icon { font-size: 1.3rem; }
+.mobile-bottom-nav__badge {
+  position: absolute;
+  top: 4px;
+  right: calc(50% - 16px);
+  background: #e74c3c;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 20px;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* ─── FORMULAIRES MOBILE-FIRST ───────────────────────────────────── */
+/* Taille minimale des inputs pour le confort tactile */
+input, select, textarea,
+.da-input, .da-select, .da-textarea,
+.geo-input, .chat-input input,
+.auth-form-card input, .auth-form-card select,
+.search-row input {
+  min-height: var(--touch-target);
+  font-size: 16px !important; /* Empêche le zoom iOS sur focus */
+  border-radius: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* Exception : textarea peut être plus petit en hauteur initiale */
+textarea, .da-textarea { min-height: 80px; font-size: 16px !important; }
+
+/* Espacement entre champs */
+.da-form-field, .form-field, .auth-form-card label + input,
+.auth-form-card label + select { margin-bottom: 12px; }
+
+/* ─── TABLEAUX ADAPTATIFS ────────────────────────────────────────── */
+/* Wrapper scrollable sur petit écran */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  /* Ombre pour indiquer le scroll */
+  background:
+    linear-gradient(to right, white 30%, rgba(255,255,255,0)) left center,
+    linear-gradient(to right, rgba(255,255,255,0), white 70%) right center,
+    radial-gradient(farthest-side at 0 50%, rgba(0,0,0,.08), transparent) left center,
+    radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,.08), transparent) right center;
+  background-repeat: no-repeat;
+  background-size: 60px 100%, 60px 100%, 16px 100%, 16px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Autorisé à défiler horizontalement sur petit écran */
+.simple-table, .card table, .da-table {
+  min-width: 500px;
+}
+
+/* ─── MODALES RESPONSIVES ────────────────────────────────────────── */
+/* Centré sur desktop, bottom-sheet sur mobile */
+.modal-overlay, .da-modal-backdrop {
+  padding: 16px;
+  align-items: center;
+}
+.modal-box, .da-modal {
+  width: 100%;
+  max-height: 90dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── IMAGES LAZY LOADING ────────────────────────────────────────── */
+img[loading="lazy"] {
+  /* Placeholder pendant le chargement */
+  background: linear-gradient(90deg, #e0e8f0 25%, #f0f4f8 50%, #e0e8f0 75%);
+  background-size: 200% 100%;
+  animation: img-loading 1.4s ease infinite;
+}
+@keyframes img-loading {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+img[loading="lazy"].loaded { background: none; animation: none; }
+
+/* ─── OVERFLOW SCROLL INDICATORS ────────────────────────────────── */
+/* Fading aux bords pour les contenus scrollables */
+.scroll-fade-x {
+  position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-fade-x::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 32px;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,.9));
+  pointer-events: none;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Tabs scrollables */
+.da-tabs, .feed-filter-bar, .chip-group {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  flex-wrap: nowrap !important;
+  display: flex !important;
+}
+.da-tabs::-webkit-scrollbar, .feed-filter-bar::-webkit-scrollbar { display: none; }
+.da-tab, .feed-filter-bar button { white-space: nowrap; flex-shrink: 0; }
+
+/* ─── MESSAGERIE RESPONSIVE ──────────────────────────────────────── */
+/* Gestion du panneau de conversation sur mobile */
+.chat-mobile-back {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fff;
+  border-bottom: 1px solid #e0e8f0;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: .85rem;
+}
+.chat-wrap.conversation-open .chat-list { display: none; }
+.chat-wrap.conversation-open .chat-mobile-back { display: flex; }
+
+/* ─── TEXTE FLUIDE ───────────────────────────────────────────────── */
+/* Typography fluid optionnelle — à activer avec .fluid-type */
+.fluid-type h1, .fluid-type .page-title { font-size: var(--fs-hero); }
+.fluid-type h2 { font-size: var(--fs-2xl); }
+.fluid-type h3 { font-size: var(--fs-xl); }
+.fluid-type p, .fluid-type li { font-size: var(--fs-base); }
+
+/* ─── GRILLES ADAPTATIVES ────────────────────────────────────────── */
+/* Auto-fill responsive sans media queries */
+.auto-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: 16px;
+}
+.auto-grid-sm {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+  gap: 12px;
+}
+.auto-grid-lg {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
+  gap: 20px;
+}
+
+/* ─── BREAKPOINT : TRÈS PETIT MOBILE (< 360px) ──────────────────── */
+@media (max-width: 359px) {
+  :root { --page-px: 10px; }
+  .btn, .da-btn { padding-left: 10px; padding-right: 10px; font-size: 13px; }
+  .da-modal-backdrop { padding: 0; }
+  .da-modal { border-radius: 0; max-height: 100dvh; }
+  .topbar-inner, .da-navbar { padding-left: 10px; padding-right: 10px; }
+  h1, .da-page-title { font-size: 1.2rem; }
+  .card, .da-card { padding: 12px; }
+}
+
+/* ─── BREAKPOINT : MOBILE STANDARD (< 480px) ────────────────────── */
+@media (max-width: 479px) {
+  /* Layout */
+  .container { padding: 0 var(--page-px); }
+  .content { padding: 14px var(--page-px); }
+
+  /* Boutons */
+  .btn, .da-btn { min-height: 46px; font-size: 14px; }
+
+  /* Sidebar */
+  .with-sidebar { flex-direction: column; }
+
+  /* Stat cards : 1 colonne */
+  .stat-row, .stats-row,
+  [style*="grid-template-columns:repeat(3"],
+  [style*="grid-template-columns: repeat(3"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Cards : pleine largeur */
+  .da-cards-grid, .da-stats-grid { grid-template-columns: 1fr; }
+
+  /* Modales bottom-sheet */
+  .da-modal-backdrop { padding: 0; align-items: flex-end; }
+  .da-modal { border-radius: 20px 20px 0 0; max-height: 92dvh; }
+  .modal-box { max-width: 100% !important; border-radius: 20px 20px 0 0 !important; margin: 0 !important; }
+  .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+
+  /* Tableaux → cartes */
+  .simple-table, .card table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Hero */
+  .hero-inner { padding: 24px var(--page-px); }
+  .hero h1 { font-size: 1.4rem; }
+  .network { height: 200px; }
+
+  /* Chat */
+  .chat-wrap { flex-direction: column; height: auto; min-height: 400px; }
+  .chat-list { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid #e0e8f0; }
+
+  /* Profil */
+  .profile-head { flex-direction: column; align-items: center; text-align: center; }
+
+  /* Formulaires */
+  .search-row { flex-direction: column; }
+  .filters { grid-template-columns: 1fr; }
+  .form-row, .da-form-row { grid-template-columns: 1fr !important; }
+
+  /* Bottom nav visible */
+  .mobile-bottom-nav { display: flex; }
+  /* Compensation du bottom nav */
+  .page { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+  .da-layout { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+
+  /* Grilles style= inline */
+  [style*="display:grid"],[style*="display: grid"] { grid-template-columns: 1fr !important; }
+  /* Sauf exclusions explicites */
+  .no-mobile-stack,[data-no-stack] { grid-template-columns: unset !important; }
+}
+
+/* ─── BREAKPOINT : MOBILE LARGE / PHABLET (480px - 639px) ──────── */
+@media (min-width: 480px) and (max-width: 639px) {
+  .da-cards-grid { grid-template-columns: repeat(2, 1fr); }
+  .da-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+  .mobile-bottom-nav { display: flex; }
+  .page { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+
+  .da-modal-backdrop { padding: 0; align-items: flex-end; }
+  .da-modal { border-radius: 20px 20px 0 0; max-height: 90dvh; }
+  .modal-box { max-width: 100% !important; border-radius: 20px 20px 0 0 !important; }
+}
+
+/* ─── BREAKPOINT : TABLET PORTRAIT (640px - 767px) ──────────────── */
+@media (min-width: 640px) and (max-width: 767px) {
+  .container { padding: 0 20px; }
+  .da-cards-grid { grid-template-columns: repeat(2, 1fr); }
+  .da-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .filters { grid-template-columns: repeat(2, 1fr); }
+  .chat-list { max-height: 220px; }
+}
+
+/* ─── BREAKPOINT : TABLET LANDSCAPE (768px - 1023px) ────────────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .container { padding: 0 20px; }
+  .da-cards-grid { grid-template-columns: repeat(2, 1fr); }
+  .da-stats-grid { grid-template-columns: repeat(3, 1fr); }
+  .stat-row { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Sidebar réduite sur tablette */
+  .da-sidebar { width: 220px; }
+  .with-sidebar .sidebar { width: 200px; }
+  .content { padding: 20px 24px; }
+
+  /* Chat : panneau liste plus étroit */
+  .chat-list { width: 220px; }
+}
+
+/* ─── BREAKPOINT : DESKTOP (1024px - 1279px) ────────────────────── */
+@media (min-width: 1024px) {
+  /* Sidebar toujours visible */
+  .mobile-bottom-nav { display: none !important; }
+  .da-navbar__hamburger { display: none; }
+
+  /* Grilles 3 colonnes */
+  .da-cards-grid { grid-template-columns: repeat(3, 1fr); }
+  .da-stats-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ─── BREAKPOINT : LARGE DESKTOP (1280px - 1535px) ──────────────── */
+@media (min-width: 1280px) {
+  .container, .da-content { max-width: 1200px; }
+  .da-cards-grid { grid-template-columns: repeat(3, 1fr); }
+  .da-stats-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ─── BREAKPOINT : TRÈS GRAND ÉCRAN 2K (1536px - 2559px) ─────────  */
+@media (min-width: 1536px) {
+  .container { max-width: 1400px; padding: 0 40px; }
+  .da-content { max-width: 1400px; }
+  body { font-size: 15px; }
+  .da-cards-grid { grid-template-columns: repeat(4, 1fr); }
+  .da-stats-grid { grid-template-columns: repeat(5, 1fr); }
+  .sidebar { width: 260px; }
+  .da-sidebar { width: 280px; }
+  .topbar-inner { max-width: 1400px; padding: 14px 40px; }
+}
+
+/* ─── BREAKPOINT : 4K ET ULTRA-WIDE (>= 2560px) ─────────────────── */
+@media (min-width: 2560px) {
+  :root { font-size: 18px; }
+  .container { max-width: 1800px; padding: 0 60px; }
+  .da-content { max-width: 1800px; }
+  .da-cards-grid { grid-template-columns: repeat(5, 1fr); }
+  .da-stats-grid { grid-template-columns: repeat(6, 1fr); }
+  .da-sidebar { width: 300px; }
+  .topbar-inner { max-width: 1800px; padding: 18px 60px; }
+}
+
+/* ─── ROTATION (ORIENTATION) ─────────────────────────────────────── */
+/* Portrait → paysage : réajustements spéciaux */
+@media (orientation: landscape) and (max-height: 500px) {
+  /* Petits mobiles en paysage (iPhone SE etc.) */
+  .hero-inner { padding: 16px var(--page-px) 20px; }
+  .hero h1 { font-size: 1.2rem; }
+  .network { height: 160px; }
+  .da-modal { max-height: 80dvh; }
+  .modal-box { max-height: 80dvh !important; overflow-y: auto; }
+  .da-sidebar, .sidebar { height: calc(100dvh - 56px); overflow-y: auto; }
+  /* Bottom nav en paysage : côté ou caché */
+  .mobile-bottom-nav {
+    height: calc(48px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Tablette/mobile landscape : sidebar visible */
+@media (orientation: landscape) and (min-width: 640px) {
+  .chat-wrap { height: min(520px, 80vh); }
+}
+
+/* ─── PERFORMANCES MOBILES ───────────────────────────────────────── */
+/* Désactiver animations complexes sur mobile bas de gamme */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Lazy loading natif */
+img:not([loading]) { loading: auto; }
+
+/* Contenu en dehors du viewport : will-change pour GPU */
+.da-modal-backdrop, .da-sidebar, .sidebar {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* ─── TYPOGRAPHIE RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  h1, .page-title, .da-page-title { font-size: clamp(1.2rem, 5vw, 1.6rem); }
+  h2, .section h2 { font-size: clamp(1.0rem, 4vw, 1.3rem); }
+  h3 { font-size: clamp(0.95rem, 3.5vw, 1.1rem); }
+  p, li, td { font-size: clamp(0.82rem, 3vw, 0.9rem); }
+}
+
+/* ─── CARTES INIT MOBILE ─────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .init-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .init-card .meta .tags { margin-top: 8px; }
+  .feed-post { padding: 14px; }
+  .feed-actions { gap: 12px; font-size: 0.78rem; }
+  .ad-banner { flex-wrap: wrap; }
+  .profile-cover { height: 100px; }
+  .profile-head { padding: 0 14px 14px; margin-top: -24px; }
+  .profile-head .init-logo { width: 52px; height: 52px; font-size: 18px; }
+  .nat-card { flex-direction: column; align-items: flex-start; }
+
+  /* Timeline vertical compact */
+  .timeline-item { gap: 10px; }
+  .date-chip { width: 44px; height: 44px; font-size: 11px; }
+}
+
+/* ─── FORMULAIRES TACTILES ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Espacement entre éléments de formulaire */
+  .auth-form-card label, .da-label { margin-bottom: 6px; font-size: 0.8rem; }
+  .auth-form-card input,
+  .auth-form-card select,
+  .da-input, .da-select, .da-textarea {
+    padding: 12px 14px;
+    font-size: 16px !important;
+    border-radius: 10px;
+    margin-bottom: 6px;
+  }
+  /* Select personnalisé */
+  .da-select, select { padding-right: 36px; }
+
+  /* Boutons de formulaire pleine largeur sur mobile */
+  .auth-form-card .btn,
+  .auth-form-card .da-btn,
+  .modal-box .btn-block { width: 100%; justify-content: center; }
+
+  /* Cases à cocher + radios */
+  .da-check, .da-radio { gap: 10px; min-height: var(--touch-target-sm); }
+  .da-check input[type="checkbox"],
+  .da-radio input[type="radio"] { width: 20px; height: 20px; }
+
+  /* Switch */
+  .da-switch__input { width: 44px; height: 24px; }
+  .da-switch__thumb { width: 18px; height: 18px; top: 3px; left: 3px; }
+  .da-switch__input input:checked ~ .da-switch__thumb { transform: translateX(20px); }
+}
+
+/* ─── MESSAGERIE MOBILE ──────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .chat-wrap {
+    flex-direction: column;
+    height: calc(100dvh - 56px - 60px);
+  }
+  .chat-list {
+    width: 100%;
+    max-height: 45%;
+    overflow-y: auto;
+    border-right: none;
+    border-bottom: 1px solid #e0e8f0;
+  }
+  .chat-main { flex: 1; overflow: hidden; }
+  .chat-body { padding: 12px; gap: 8px; }
+  .bubble { max-width: 80%; font-size: 0.85rem; padding: 8px 12px; }
+  .chat-input { padding: 10px 12px; gap: 8px; }
+  .chat-input input {
+    font-size: 16px !important;
+    padding: 10px 12px;
+  }
+}
+
+/* ─── AGENDA MOBILE ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  #ag-header { flex-wrap: wrap; gap: 6px; height: auto; padding: 8px 10px; }
+  #ag-period { font-size: 0.78rem; }
+  .ag-nav-btn { padding: 5px 8px; font-size: 0.75rem; }
+  #ag-main { padding: 8px; }
+  .month-grid { gap: 0px; }
+  .month-day { min-height: 44px; padding: 2px 3px; }
+  .day-num { font-size: 0.72rem; }
+  .month-event { display: none; }
+  .month-more { font-size: 0.6rem; }
+  /* Semaine : réduire hauteur slots */
+  .week-day-slots, .day-slots { height: 700px; }
+  .week-hour-label { height: 29px; font-size: 0.58rem; }
+  .week-slot { font-size: 0.62rem; padding: 1px 2px; }
+}
+
+/* ─── CV BUILDER MOBILE ──────────────────────────────────────────── */
+@media (max-width: 900px) {
+  #cvb-sidebar {
+    position: static;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid #e0e8f0;
+    max-height: 50dvh;
+    overflow-y: auto;
+  }
+  #cvb-preview-wrapper { padding: 10px; }
+  .a4-wrapper { transform: scale(0.65); transform-origin: top center; margin-bottom: -180px; }
+}
+@media (max-width: 600px) {
+  .a4-wrapper { transform: scale(0.48); margin-bottom: -340px; }
+}
+
+/* ─── MEETING MOBILE ─────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  #video-grid { padding: 2px; gap: 2px; }
+  .vid-tile { border-radius: 6px; }
+  #toolbar { padding: 6px 8px; flex-wrap: nowrap; overflow-x: auto; gap: 4px; }
+  .t-btn { padding: 8px; font-size: 0.75rem; white-space: nowrap; flex-shrink: 0; }
+  .t-btn span { display: none; }
+  #timer { font-size: 0.75rem; }
+  #chat-panel { width: 100%; }
+}
+
+/* ─── ACCESSIBILITÉ FOCUS VISIBLE ───────────────────────────────── */
+@media (pointer: coarse) {
+  /* Appareils tactiles : pas de :hover, utiliser :focus-visible */
+  a:hover, button:hover { text-decoration: none; }
+  .btn:focus-visible, .da-btn:focus-visible,
+  .sidebar a:focus-visible, .da-sidebar__item:focus-visible {
+    outline: 3px solid #4a90d9;
+    outline-offset: 2px;
+  }
+}
+
+/* ─── IMPRESSION ─────────────────────────────────────────────────── */
+@media print {
+  .topbar, .sidebar, .da-navbar, .da-sidebar,
+  .mobile-bottom-nav, .da-fab, .da-toast-container,
+  .feed-filter-bar, .sidebar-toggle, .chat-list,
+  #ag-header, #ag-view-tabs, #toolbar, #chat-panel, #parts-panel {
+    display: none !important;
+  }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .container, .content, .da-layout, .da-content { padding: 0; max-width: 100%; }
+  .card, .da-card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+  .chat-main, .chat-body { height: auto !important; }
+  a[href]::after { content: ' (' attr(href) ')'; font-size: 9pt; color: #666; }
+  .page { padding-bottom: 0; }
+}
+
+/* ─── SCROLLBAR STYLING (desktop) ───────────────────────────────── */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(26,58,92,.15); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(26,58,92,.25); }
+}
+
+/* ─── FOCUS OUTLINE UNIVERSEL ────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:focus:not(:focus-visible) { outline: none; }

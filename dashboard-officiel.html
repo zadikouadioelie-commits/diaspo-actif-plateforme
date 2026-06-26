@@ -1,20 +1,43 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <title>Diaspo'Actif — Redirection</title>
 <meta http-equiv="refresh" content="0;url=dashboard-administrateur.html">
+  <link rel="stylesheet" href="/assets/responsive.css">
 </head>
 <body>
 <p>Redirection vers <a href="dashboard-administrateur.html">dashboard-administrateur.html</a>…</p>
 <script>window.location.replace("dashboard-administrateur.html");</script>
+<script>
+(function(){
+  var toggle = document.getElementById('sidebar-toggle');
+  var close  = document.getElementById('sidebar-close');
+  var back   = document.getElementById('sidebar-backdrop');
+  var sb     = document.querySelector('.sidebar');
+  function openSidebar(){ sb && sb.classList.add('open'); back && back.classList.add('open'); document.body.style.overflow='hidden'; }
+  function closeSidebar(){ sb && sb.classList.remove('open'); back && back.classList.remove('open'); document.body.style.overflow=''; }
+  if(toggle) toggle.addEventListener('click', openSidebar);
+  if(close)  close.addEventListener('click', closeSidebar);
+  if(back)   back.addEventListener('click', closeSidebar);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSidebar(); });
+})();
+</script>
+  <nav class="mobile-bottom-nav">
+    <a class="mobile-bottom-nav__item active" href="dashboard-officiel.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+    <a class="mobile-bottom-nav__item" href="profil.html"><span class="nav-icon">👤</span><span>Profil</span></a>
+    <a class="mobile-bottom-nav__item" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span></a>
+    <a class="mobile-bottom-nav__item" href="agenda.html"><span class="nav-icon">📅</span><span>Agenda</span></a>
+    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Réseau</span></a>
+  </nav>
 </body>
 </html>
 <!-- LEGACY: ce fichier redirige vers dashboard-administrateur.html -->
 
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
       <nav class="nav">
         <a href="index.html">Accueil</a>
         <a href="annuaire.html">Annuaire</a>
@@ -29,8 +52,10 @@
     </div>
   </header>
 
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   <div class="with-sidebar">
     <aside class="sidebar">
+      <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
       <div class="brand">Compte Officiel</div>
       <a class="active" href="#diffuser">📣 Diffuser</a>
       <a href="#publications">📋 Publications récentes</a>
@@ -202,5 +227,26 @@
   });
 })();
 </script>
+<script>
+(function(){
+  var toggle = document.getElementById('sidebar-toggle');
+  var close  = document.getElementById('sidebar-close');
+  var back   = document.getElementById('sidebar-backdrop');
+  var sb     = document.querySelector('.sidebar');
+  function openSidebar(){ sb && sb.classList.add('open'); back && back.classList.add('open'); document.body.style.overflow='hidden'; }
+  function closeSidebar(){ sb && sb.classList.remove('open'); back && back.classList.remove('open'); document.body.style.overflow=''; }
+  if(toggle) toggle.addEventListener('click', openSidebar);
+  if(close)  close.addEventListener('click', closeSidebar);
+  if(back)   back.addEventListener('click', closeSidebar);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSidebar(); });
+})();
+</script>
+  <nav class="mobile-bottom-nav">
+    <a class="mobile-bottom-nav__item active" href="dashboard-officiel.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+    <a class="mobile-bottom-nav__item" href="profil.html"><span class="nav-icon">👤</span><span>Profil</span></a>
+    <a class="mobile-bottom-nav__item" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span></a>
+    <a class="mobile-bottom-nav__item" href="agenda.html"><span class="nav-icon">📅</span><span>Agenda</span></a>
+    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Réseau</span></a>
+  </nav>
 </body>
 </html>

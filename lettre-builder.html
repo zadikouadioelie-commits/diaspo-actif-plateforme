@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -62,6 +62,7 @@ textarea{resize:vertical}
   .lmb-preview{display:none}
 }
 </style>
+  <link rel="stylesheet" href="/assets/responsive.css">
 </head>
 <body>
 
@@ -241,7 +242,7 @@ function render() {
 
     <div class="lettre-signature">
       ${sigTexte ? _esc(sigTexte) : (prenom||nom ? _esc(prenom+' '+nom).trim() : '')}
-      ${sigData ? `<img src="${sigData}" class="sig-image" alt="Signature">` : ''}
+      ${sigData ? `<img loading="lazy" src="${sigData}" class="sig-image" alt="Signature">` : ''}
     </div>
   `;
 }

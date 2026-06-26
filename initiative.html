@@ -1,10 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <title>Diaspo'Actif — Profil initiative</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="/assets/responsive.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -97,7 +98,7 @@
 <div class="page">
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
       <nav class="nav">
         <a href="index.html">Accueil</a>
         <a href="annuaire.html">Annuaire</a>
@@ -198,7 +199,7 @@ const DOMAIN_GRAD = {
       <div class="init-profile-header">
         <div class="init-profile-logo-wrap">
           <div class="init-profile-logo">
-            <img src="${logoUrl}" alt="${init.nom}">
+            <img loading="lazy" src="${logoUrl}" alt="${init.nom}">
           </div>
         </div>
         <div class="init-profile-info">
@@ -305,7 +306,7 @@ const DOMAIN_GRAD = {
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
         ${galerie.map(img => `
           <div style="border-radius:6px;height:120px;overflow:hidden;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:32px;">
-            ${img.url ? `<img src="${img.url}" style="width:100%;height:100%;object-fit:cover;" alt="${img.caption||''}">` : '🖼'}
+            ${img.url ? `<img loading="lazy" src="${img.url}" style="width:100%;height:100%;object-fit:cover;" alt="${img.caption||''}">` : '🖼'}
           </div>
         `).join('')}
       </div>

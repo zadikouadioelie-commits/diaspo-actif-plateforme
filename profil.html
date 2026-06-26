@@ -1,10 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <title>Diaspo'Actif — Profil</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="/assets/responsive.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -367,7 +368,7 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
     <nav class="nav">
       <a href="index.html">Accueil</a>
       <a href="annuaire.html">Annuaire</a>
@@ -383,7 +384,7 @@
 
 <!-- BANNIÈRE -->
 <div class="p-banner" id="p-banner">
-  <img id="banner-img" alt="Bannière" style="display:none">
+  <img loading="lazy" id="banner-img" alt="Bannière" style="display:none">
   <button class="p-banner-edit" onclick="pickBannerColor()">📷 Modifier la bannière</button>
 </div>
 
@@ -400,7 +401,7 @@
       <div class="p-avatar-wrap">
         <div class="p-avatar" id="p-avatar" onclick="isOwn&&editAvatar()">
           <span id="av-initials"></span>
-          <img id="av-img" alt="Photo" style="display:none">
+          <img loading="lazy" id="av-img" alt="Photo" style="display:none">
           <div class="p-avatar-overlay" id="av-overlay">📷</div>
         </div>
       </div>
@@ -738,7 +739,7 @@ function buildSidebarSuggestions() {
   el.className = 'side-card';
   el.innerHTML = `<h4>👥 Vous connaissez peut-être</h4>` +
     SUGGESTIONS.map(s => `<div class="suggest-item">
-      <div class="sug-av"><img src="${esc(s.av)}" alt="${esc(s.nom)}"></div>
+      <div class="sug-av"><img loading="lazy" src="${esc(s.av)}" alt="${esc(s.nom)}"></div>
       <div class="sug-body">
         <div class="sb-nom">${esc(s.nom)}</div>
         <div class="sb-sub">${esc(s.sub)}</div>
@@ -758,7 +759,7 @@ function buildSidebarInitiatives() {
   el.className = 'side-card';
   el.innerHTML = `<h4>🌱 Initiatives à découvrir</h4>` +
     INITS.map(i => `<div class="suggest-item">
-      <div class="sug-av" style="border-radius:8px;"><img src="${esc(i.img)}" alt="${esc(i.nom)}" style="border-radius:8px;"></div>
+      <div class="sug-av" style="border-radius:8px;"><img loading="lazy" src="${esc(i.img)}" alt="${esc(i.nom)}" style="border-radius:8px;"></div>
       <div class="sug-body">
         <div class="sb-nom">${esc(i.nom)}</div>
         <div class="sb-sub">${esc(i.sub)}</div>
@@ -1006,7 +1007,7 @@ function buildSectionPubs() {
   const allPosts = [...apiPubs, ...DEMO_POSTS];
   const nom   = [profil.prenom, profil.nom].filter(Boolean).join(' ') || 'Jean K.';
   const avHtml = profil.photo_url
-    ? `<img src="${esc(profil.photo_url)}" alt="${esc(nom)}">`
+    ? `<img loading="lazy" src="${esc(profil.photo_url)}" alt="${esc(nom)}">`
     : `<span style="font-size:13px;font-weight:800;">${initials(nom)}</span>`;
 
   wrap.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
@@ -1021,7 +1022,7 @@ function buildSectionPubs() {
     let mediaHtml = '';
     if (p.img) mediaHtml = `<img class="post-img" src="${esc(p.img)}" alt="Image" loading="lazy">`;
     else if (p.link) mediaHtml = `<a class="post-link-card" href="#" onclick="return false">
-      <img src="${esc(p.link.img)}" alt="" style="width:100px;height:80px;object-fit:cover;flex-shrink:0;">
+      <img loading="lazy" src="${esc(p.link.img)}" alt="" style="width:100px;height:80px;object-fit:cover;flex-shrink:0;">
       <div class="post-link-body"><div class="plb-src">${esc(p.link.src)}</div><div class="plb-title">${esc(p.link.titre)}</div></div>
     </a>`;
     else if (p.shared) mediaHtml = `<div class="post-shared">
@@ -1105,7 +1106,7 @@ function buildSectionUsers() {
     ? `<div class="follow-grid">${list.map(u => {
         const nom  = [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom || '?';
         const avEl = u.photo_url
-          ? `<img src="${esc(u.photo_url)}" alt="${esc(nom)}">`
+          ? `<img loading="lazy" src="${esc(u.photo_url)}" alt="${esc(nom)}">`
           : initials(nom);
         return `<a class="fc" href="profil.html?id=${u.id}">
           <div class="fc-av">${avEl}</div>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -6,6 +6,7 @@
 <title>Audit Design System — Diaspo'Actif</title>
 <link rel="icon" href="/assets/logo.svg">
 <link rel="stylesheet" href="/assets/ds.css">
+  <link rel="stylesheet" href="/assets/responsive.css">
 <style>
 .audit-result{margin-bottom:2rem;}
 .audit-file{background:#fff;border-radius:var(--da-radius-lg);border:1px solid var(--da-color-border);overflow:hidden;margin-bottom:1rem;}
@@ -91,7 +92,8 @@ const RULES = [
     label: 'Design System CSS chargé',
     severity: 'error',
     check: html => html.includes('/assets/ds.css') || html.includes('ds.css'),
-    fix: 'Ajouter <link rel="stylesheet" href="/assets/ds.css"> dans le <head>',
+    fix: 'Ajouter <link rel="stylesheet" href="/assets/ds.css">
+  <link rel="stylesheet" href="/assets/responsive.css"> dans le <head>',
   },
   {
     id: 'ds-js-loaded',
@@ -125,8 +127,8 @@ const RULES = [
     id: 'alt-images',
     label: 'Attribut alt sur les images',
     severity: 'error',
-    check: html => !/<img(?![^>]*alt=)/i.test(html),
-    fix: 'Ajouter l\'attribut alt sur toutes les balises <img>',
+    check: html => !/<img loading="lazy"(?![^>]*alt=)/i.test(html),
+    fix: 'Ajouter l\'attribut alt sur toutes les balises <img loading="lazy">',
   },
   {
     id: 'font-consistency',
