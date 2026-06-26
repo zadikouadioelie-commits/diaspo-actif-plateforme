@@ -981,6 +981,123 @@ db.exec(`
     FOREIGN KEY(candidature_id) REFERENCES offres_candidatures(id),
     FOREIGN KEY(auteur_id) REFERENCES users(id)
   );
+
+  /* ===== AGENDA PERSONNEL ===== */
+  CREATE TABLE IF NOT EXISTS agenda_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    date_debut TEXT NOT NULL,
+    date_fin TEXT NOT NULL,
+    lieu TEXT,
+    lieu_type TEXT DEFAULT 'physique',
+    couleur TEXT DEFAULT '#4a90d9',
+    participants_json TEXT DEFAULT '[]',
+    notes_privees TEXT,
+    rdv_id INTEGER,
+    meeting_id INTEGER,
+    all_day INTEGER DEFAULT 0,
+    recurrence TEXT DEFAULT 'none',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* ===== RENDEZ-VOUS (PROPOSITIONS) ===== */
+  CREATE TABLE IF NOT EXISTS rdv_proposals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    proposeur_id INTEGER NOT NULL,
+    destinataire_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    date_proposee TEXT NOT NULL,
+    heure_debut TEXT NOT NULL,
+    heure_fin TEXT NOT NULL,
+    duree_minutes INTEGER DEFAULT 30,
+    lieu TEXT,
+    lieu_type TEXT DEFAULT 'virtuel',
+    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','accepte','refuse','contre_proposition','annule','expire')),
+    contre_date TEXT,
+    contre_heure_debut TEXT,
+    contre_heure_fin TEXT,
+    message_reponse TEXT,
+    document_url TEXT,
+    meeting_id INTEGER,
+    event_proposeur_id INTEGER,
+    event_destinataire_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(proposeur_id) REFERENCES users(id),
+    FOREIGN KEY(destinataire_id) REFERENCES users(id)
+  );
+
+  /* ===== SALLES DE RÉUNION VIRTUELLE ===== */
+  CREATE TABLE IF NOT EXISTS meetings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id TEXT UNIQUE NOT NULL,
+    token_host TEXT NOT NULL,
+    token_guest TEXT NOT NULL,
+    titre TEXT,
+    host_id INTEGER NOT NULL,
+    rdv_id INTEGER,
+    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','actif','termine','expire')),
+    duree_max_minutes INTEGER DEFAULT 40,
+    started_at TEXT,
+    ended_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(host_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS meeting_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    meeting_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role TEXT DEFAULT 'guest',
+    rejoint_at TEXT,
+    quitte_at TEXT,
+    UNIQUE(meeting_id, user_id),
+    FOREIGN KEY(meeting_id) REFERENCES meetings(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Signaux WebRTC (offres, réponses, ICE candidates) via polling */
+  CREATE TABLE IF NOT EXISTS meeting_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id TEXT NOT NULL,
+    from_peer TEXT NOT NULL,
+    to_peer TEXT,
+    type TEXT NOT NULL,
+    data TEXT NOT NULL,
+    consumed INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  /* Historique des réunions */
+  CREATE TABLE IF NOT EXISTS meeting_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    meeting_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    duree_effective_minutes INTEGER DEFAULT 0,
+    statut TEXT DEFAULT 'termine',
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(meeting_id) REFERENCES meetings(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Rappels programmés */
+  CREATE TABLE IF NOT EXISTS agenda_reminders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    event_id INTEGER NOT NULL,
+    remind_at TEXT NOT NULL,
+    type TEXT DEFAULT '1h',
+    sent INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(event_id) REFERENCES agenda_events(id)
+  );
 `);
 for (const [table, col] of MIGRATIONS) {
   const colName = col.split(" ")[0];

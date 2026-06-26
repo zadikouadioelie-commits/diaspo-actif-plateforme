@@ -3714,6 +3714,372 @@ async function handleRequest(req, res) {
       return sendJSON(res, 201, { id: r.lastInsertRowid, success: true });
     }
 
+    /* ================================================================
+       AGENDA PERSONNEL
+    ================================================================ */
+    const crypto = require("node:crypto");
+    const genId = (n=16) => crypto.randomBytes(n).toString("hex");
+
+    /* GET /api/agenda/events — événements de l'utilisateur (avec range dates) */
+    if (req.method === "GET" && pathname === "/api/agenda/events") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const p = new URLSearchParams(reqUrl.search || "");
+      const from = p.get("from") || new Date(Date.now() - 30*24*3600000).toISOString().slice(0,10);
+      const to   = p.get("to")   || new Date(Date.now() + 60*24*3600000).toISOString().slice(0,10);
+      const events = db.prepare(`
+        SELECT e.*, u.prenom, u.nom FROM agenda_events e
+        LEFT JOIN users u ON e.user_id = u.id
+        WHERE e.user_id = ? AND date(e.date_debut) >= ? AND date(e.date_debut) <= ?
+        ORDER BY e.date_debut ASC
+      `).all(me.id, from, to);
+      return sendJSON(res, 200, events);
+    }
+
+    /* POST /api/agenda/events */
+    if (req.method === "POST" && pathname === "/api/agenda/events") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const { titre, description, date_debut, date_fin, lieu, lieu_type, couleur, notes_privees, all_day, rdv_id, meeting_id } = body;
+      if (!titre || !date_debut || !date_fin) return sendJSON(res, 400, { error: "Champs requis manquants" });
+      const r = db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,notes_privees,all_day,rdv_id,meeting_id)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(me.id, titre, description||null, date_debut, date_fin, lieu||null, lieu_type||'physique', couleur||'#4a90d9', notes_privees||null, all_day?1:0, rdv_id||null, meeting_id||null);
+      // Créer rappels
+      try {
+        const evDate = new Date(date_debut);
+        const reminders = [
+          { type: '24h', ms: 24*3600*1000 },
+          { type: '1h',  ms: 3600*1000 },
+          { type: '15m', ms: 15*60*1000 }
+        ];
+        for (const rem of reminders) {
+          const remAt = new Date(evDate.getTime() - rem.ms).toISOString();
+          if (new Date(remAt) > new Date()) {
+            db.prepare(`INSERT INTO agenda_reminders(user_id,event_id,remind_at,type) VALUES(?,?,?,?)`)
+              .run(me.id, r.lastInsertRowid, remAt, rem.type);
+          }
+        }
+      } catch(e) {}
+      return sendJSON(res, 201, { id: r.lastInsertRowid });
+    }
+
+    /* PUT /api/agenda/events/:id */
+    if (req.method === "PUT" && /^\/api\/agenda\/events\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const evId = parseInt(pathname.split('/')[4]);
+      const ev = db.prepare(`SELECT * FROM agenda_events WHERE id=? AND user_id=?`).get(evId, me.id);
+      if (!ev) return sendJSON(res, 404, { error: "Événement introuvable" });
+      const { titre, description, date_debut, date_fin, lieu, lieu_type, couleur, notes_privees, all_day } = body;
+      db.prepare(`UPDATE agenda_events SET titre=?,description=?,date_debut=?,date_fin=?,lieu=?,lieu_type=?,couleur=?,notes_privees=?,all_day=?,updated_at=datetime('now') WHERE id=?`)
+        .run(titre||ev.titre, description??ev.description, date_debut||ev.date_debut, date_fin||ev.date_fin, lieu??ev.lieu, lieu_type||ev.lieu_type, couleur||ev.couleur, notes_privees??ev.notes_privees, all_day?1:0, evId);
+      return sendJSON(res, 200, { updated: true });
+    }
+
+    /* DELETE /api/agenda/events/:id */
+    if (req.method === "DELETE" && /^\/api\/agenda\/events\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const evId = parseInt(pathname.split('/')[4]);
+      db.prepare(`DELETE FROM agenda_events WHERE id=? AND user_id=?`).run(evId, me.id);
+      db.prepare(`DELETE FROM agenda_reminders WHERE event_id=? AND user_id=?`).run(evId, me.id);
+      return sendJSON(res, 200, { deleted: true });
+    }
+
+    /* GET /api/agenda/availability — vérifier dispo d'un user sur un créneau */
+    if (req.method === "GET" && pathname === "/api/agenda/availability") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const p = new URLSearchParams(reqUrl.search || "");
+      const userId = parseInt(p.get("user_id") || me.id);
+      const debut  = p.get("debut");
+      const fin    = p.get("fin");
+      if (!debut || !fin) return sendJSON(res, 400, { error: "debut et fin requis" });
+      // Chercher conflits
+      const conflits = db.prepare(`
+        SELECT id, titre, date_debut, date_fin FROM agenda_events
+        WHERE user_id=? AND NOT (date_fin <= ? OR date_debut >= ?)
+      `).all(userId, debut, fin);
+      const libre = conflits.length === 0;
+      // Si occupé, suggérer créneaux libres autour
+      let suggestions = [];
+      if (!libre) {
+        const dureeMs = new Date(fin) - new Date(debut);
+        const bases = [-2,-1,1,2,3,4].map(h => new Date(new Date(debut).getTime() + h*3600000));
+        for (const base of bases) {
+          const s = base.toISOString();
+          const e = new Date(base.getTime() + dureeMs).toISOString();
+          const c = db.prepare(`SELECT id FROM agenda_events WHERE user_id=? AND NOT (date_fin <= ? OR date_debut >= ?)`).all(userId, s, e);
+          if (c.length === 0) suggestions.push({ debut: s, fin: e });
+          if (suggestions.length >= 3) break;
+        }
+      }
+      return sendJSON(res, 200, { libre, conflits, suggestions });
+    }
+
+    /* ================================================================
+       RENDEZ-VOUS (PROPOSITIONS)
+    ================================================================ */
+
+    /* GET /api/rdv — mes RDV */
+    if (req.method === "GET" && pathname === "/api/rdv") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rdvs = db.prepare(`
+        SELECT r.*,
+          up.prenom AS proposeur_prenom, up.nom AS proposeur_nom, up.photo_url AS proposeur_photo,
+          ud.prenom AS dest_prenom, ud.nom AS dest_nom, ud.photo_url AS dest_photo
+        FROM rdv_proposals r
+        LEFT JOIN users up ON r.proposeur_id = up.id
+        LEFT JOIN users ud ON r.destinataire_id = ud.id
+        WHERE r.proposeur_id=? OR r.destinataire_id=?
+        ORDER BY r.created_at DESC
+      `).all(me.id, me.id);
+      return sendJSON(res, 200, rdvs);
+    }
+
+    /* POST /api/rdv — proposer un RDV */
+    if (req.method === "POST" && pathname === "/api/rdv") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const { destinataire_id, titre, description, date_proposee, heure_debut, heure_fin, duree_minutes, lieu, lieu_type } = body;
+      if (!destinataire_id || !titre || !date_proposee || !heure_debut || !heure_fin)
+        return sendJSON(res, 400, { error: "Champs requis manquants" });
+      // Vérif dispo des deux
+      const debut = `${date_proposee}T${heure_debut}:00`;
+      const fin   = `${date_proposee}T${heure_fin}:00`;
+      const conflitProposeur = db.prepare(`SELECT id FROM agenda_events WHERE user_id=? AND NOT (date_fin <= ? OR date_debut >= ?)`).all(me.id, debut, fin);
+      const conflitDest = db.prepare(`SELECT id FROM agenda_events WHERE user_id=? AND NOT (date_fin <= ? OR date_debut >= ?)`).all(destinataire_id, debut, fin);
+      if (conflitProposeur.length > 0) return sendJSON(res, 409, { error: "Vous avez déjà un événement sur ce créneau", who: 'proposeur' });
+      if (conflitDest.length > 0) return sendJSON(res, 409, { error: "Le destinataire a déjà un événement sur ce créneau", who: 'destinataire' });
+      const r = db.prepare(`INSERT INTO rdv_proposals(proposeur_id,destinataire_id,titre,description,date_proposee,heure_debut,heure_fin,duree_minutes,lieu,lieu_type)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(me.id, destinataire_id, titre, description||null, date_proposee, heure_debut, heure_fin, duree_minutes||30, lieu||null, lieu_type||'virtuel');
+      // Notif destinataire
+      const moi = db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+      try {
+        db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          destinataire_id, 'rdv_proposition',
+          `Nouveau rendez-vous proposé`,
+          `${moi.prenom} ${moi.nom} vous propose un RDV : "${titre}" le ${date_proposee} à ${heure_debut}`,
+          JSON.stringify({ rdv_id: r.lastInsertRowid })
+        );
+      } catch(e) {}
+      return sendJSON(res, 201, { id: r.lastInsertRowid });
+    }
+
+    /* PATCH /api/rdv/:id/respond — accepter/refuser/contre-proposer */
+    if (req.method === "PATCH" && /^\/api\/rdv\/\d+\/respond$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rdvId = parseInt(pathname.split('/')[3]);
+      const rdv = db.prepare(`SELECT * FROM rdv_proposals WHERE id=?`).get(rdvId);
+      if (!rdv) return sendJSON(res, 404, { error: "RDV introuvable" });
+      if (rdv.destinataire_id !== me.id && rdv.proposeur_id !== me.id) return sendJSON(res, 403, { error: "Accès refusé" });
+      const { action, contre_date, contre_heure_debut, contre_heure_fin, message_reponse } = body;
+
+      if (action === 'accepte') {
+        // Créer les événements dans les deux agendas
+        const debut = `${rdv.date_proposee}T${rdv.heure_debut}:00`;
+        const fin   = `${rdv.date_proposee}T${rdv.heure_fin}:00`;
+        let meetingId = null;
+        // Créer salle de réunion si virtuel
+        if (rdv.lieu_type === 'virtuel' || !rdv.lieu) {
+          const roomId = genId(12);
+          const tokenHost  = genId(16);
+          const tokenGuest = genId(16);
+          const mr = db.prepare(`INSERT INTO meetings(room_id,token_host,token_guest,titre,host_id,rdv_id,duree_max_minutes) VALUES(?,?,?,?,?,?,40)`)
+            .run(roomId, tokenHost, tokenGuest, rdv.titre, rdv.proposeur_id, rdvId);
+          meetingId = mr.lastInsertRowid;
+          db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, rdv.proposeur_id, 'host');
+          try { db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, rdv.destinataire_id, 'guest'); } catch(e) {}
+        }
+        const evP = db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+          .run(rdv.proposeur_id, rdv.titre, rdv.description||null, debut, fin, rdv.lieu||null, rdv.lieu_type||'physique', '#27ae60', rdvId, meetingId);
+        const evD = db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+          .run(rdv.destinataire_id, rdv.titre, rdv.description||null, debut, fin, rdv.lieu||null, rdv.lieu_type||'physique', '#27ae60', rdvId, meetingId);
+        db.prepare(`UPDATE rdv_proposals SET statut='accepte',event_proposeur_id=?,event_destinataire_id=?,meeting_id=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
+          .run(evP.lastInsertRowid, evD.lastInsertRowid, meetingId, message_reponse||null, rdvId);
+        // Notif proposeur
+        try {
+          const dest = db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+            rdv.proposeur_id, 'rdv_accepte', 'Rendez-vous accepté',
+            `${dest.prenom} ${dest.nom} a accepté votre RDV "${rdv.titre}"`,
+            JSON.stringify({ rdv_id: rdvId, meeting_id: meetingId })
+          );
+        } catch(e) {}
+        const meeting = meetingId ? db.prepare(`SELECT * FROM meetings WHERE id=?`).get(meetingId) : null;
+        return sendJSON(res, 200, { statut: 'accepte', meeting });
+
+      } else if (action === 'refuse') {
+        db.prepare(`UPDATE rdv_proposals SET statut='refuse',message_reponse=?,updated_at=datetime('now') WHERE id=?`).run(message_reponse||null, rdvId);
+        try {
+          const dest = db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+            rdv.proposeur_id, 'rdv_refuse', 'Rendez-vous refusé',
+            `${dest.prenom} ${dest.nom} a refusé votre RDV "${rdv.titre}"`,
+            JSON.stringify({ rdv_id: rdvId })
+          );
+        } catch(e) {}
+        return sendJSON(res, 200, { statut: 'refuse' });
+
+      } else if (action === 'contre_proposition') {
+        if (!contre_date || !contre_heure_debut || !contre_heure_fin)
+          return sendJSON(res, 400, { error: "Nouvelle date/heure requise" });
+        db.prepare(`UPDATE rdv_proposals SET statut='contre_proposition',contre_date=?,contre_heure_debut=?,contre_heure_fin=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
+          .run(contre_date, contre_heure_debut, contre_heure_fin, message_reponse||null, rdvId);
+        try {
+          const dest = db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+            rdv.proposeur_id, 'rdv_contre_prop', 'Contre-proposition de RDV',
+            `${dest.prenom} ${dest.nom} propose une autre date pour "${rdv.titre}" : ${contre_date} à ${contre_heure_debut}`,
+            JSON.stringify({ rdv_id: rdvId })
+          );
+        } catch(e) {}
+        return sendJSON(res, 200, { statut: 'contre_proposition' });
+
+      } else if (action === 'annule') {
+        db.prepare(`UPDATE rdv_proposals SET statut='annule',message_reponse=?,updated_at=datetime('now') WHERE id=?`).run(message_reponse||null, rdvId);
+        // Supprimer les événements liés
+        if (rdv.event_proposeur_id) db.prepare(`DELETE FROM agenda_events WHERE id=?`).run(rdv.event_proposeur_id);
+        if (rdv.event_destinataire_id) db.prepare(`DELETE FROM agenda_events WHERE id=?`).run(rdv.event_destinataire_id);
+        if (rdv.meeting_id) db.prepare(`UPDATE meetings SET statut='expire' WHERE id=?`).run(rdv.meeting_id);
+        const autreUser = me.id === rdv.proposeur_id ? rdv.destinataire_id : rdv.proposeur_id;
+        try {
+          const dest = db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+            autreUser, 'rdv_annule', 'Rendez-vous annulé',
+            `${dest.prenom} ${dest.nom} a annulé le RDV "${rdv.titre}"`,
+            JSON.stringify({ rdv_id: rdvId })
+          );
+        } catch(e) {}
+        return sendJSON(res, 200, { statut: 'annule' });
+      }
+      return sendJSON(res, 400, { error: "Action inconnue" });
+    }
+
+    /* ================================================================
+       MEETINGS (VISIOCONFÉRENCE)
+    ================================================================ */
+
+    /* POST /api/meetings — créer une salle de réunion directe */
+    if (req.method === "POST" && pathname === "/api/meetings") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const { titre, destinataire_id, rdv_id } = body;
+      const roomId = genId(12);
+      const tokenHost  = genId(16);
+      const tokenGuest = genId(16);
+      const r = db.prepare(`INSERT INTO meetings(room_id,token_host,token_guest,titre,host_id,rdv_id,duree_max_minutes) VALUES(?,?,?,?,?,?,40)`)
+        .run(roomId, tokenHost, tokenGuest, titre||'Réunion', me.id, rdv_id||null);
+      db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(r.lastInsertRowid, me.id, 'host');
+      if (destinataire_id) {
+        try { db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(r.lastInsertRowid, destinataire_id, 'guest'); } catch(e) {}
+        const moi = db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+        try {
+          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+            destinataire_id, 'meeting_invite', 'Invitation à une réunion',
+            `${moi.prenom} ${moi.nom} vous invite à rejoindre une réunion : "${titre||'Réunion'}"`,
+            JSON.stringify({ meeting_id: r.lastInsertRowid, room_id: roomId, token: tokenGuest })
+          );
+        } catch(e) {}
+      }
+      return sendJSON(res, 201, { id: r.lastInsertRowid, room_id: roomId, token_host: tokenHost, token_guest: tokenGuest });
+    }
+
+    /* GET /api/meetings/:id — infos salle (par id ou room_id) */
+    if (req.method === "GET" && /^\/api\/meetings\/[^/]+$/.test(pathname)) {
+      const idOrRoom = pathname.split('/')[3];
+      const meeting = db.prepare(`SELECT m.*, u.prenom AS host_prenom, u.nom AS host_nom FROM meetings m LEFT JOIN users u ON m.host_id = u.id WHERE m.id=? OR m.room_id=?`).get(idOrRoom, idOrRoom);
+      if (!meeting) return sendJSON(res, 404, { error: "Salle introuvable" });
+      const participants = db.prepare(`SELECT mp.*, u.prenom, u.nom, u.photo_url FROM meeting_participants mp LEFT JOIN users u ON mp.user_id = u.id WHERE mp.meeting_id=?`).all(meeting.id);
+      return sendJSON(res, 200, { ...meeting, participants });
+    }
+
+    /* PATCH /api/meetings/:id/start — démarrer la réunion */
+    if (req.method === "PATCH" && /^\/api\/meetings\/\d+\/start$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const meetId = parseInt(pathname.split('/')[3]);
+      db.prepare(`UPDATE meetings SET statut='actif', started_at=datetime('now') WHERE id=? AND host_id=?`).run(meetId, me.id);
+      return sendJSON(res, 200, { started: true });
+    }
+
+    /* PATCH /api/meetings/:id/end — terminer la réunion */
+    if (req.method === "PATCH" && /^\/api\/meetings\/\d+\/end$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const meetId = parseInt(pathname.split('/')[3]);
+      const m = db.prepare(`SELECT * FROM meetings WHERE id=?`).get(meetId);
+      if (!m) return sendJSON(res, 404, { error: "Salle introuvable" });
+      db.prepare(`UPDATE meetings SET statut='termine', ended_at=datetime('now') WHERE id=?`).run(meetId);
+      if (m.started_at) {
+        const duree = Math.round((Date.now() - new Date(m.started_at).getTime()) / 60000);
+        const parts = db.prepare(`SELECT user_id FROM meeting_participants WHERE meeting_id=?`).all(meetId);
+        for (const p of parts) {
+          try { db.prepare(`INSERT INTO meeting_history(meeting_id,user_id,duree_effective_minutes,statut) VALUES(?,?,?,?)`).run(meetId, p.user_id, duree, 'termine'); } catch(e) {}
+        }
+      }
+      return sendJSON(res, 200, { ended: true });
+    }
+
+    /* POST /api/meetings/:room_id/signal — envoyer signal WebRTC */
+    if (req.method === "POST" && /^\/api\/meetings\/[^/]+\/signal$/.test(pathname)) {
+      const roomId = pathname.split('/')[3];
+      const { from_peer, to_peer, type, data } = body;
+      if (!from_peer || !type || !data) return sendJSON(res, 400, { error: "Manque from_peer/type/data" });
+      db.prepare(`INSERT INTO meeting_signals(room_id,from_peer,to_peer,type,data) VALUES(?,?,?,?,?)`)
+        .run(roomId, from_peer, to_peer||null, type, JSON.stringify(data));
+      // Purger les vieux signaux (>5 min)
+      try { db.prepare(`DELETE FROM meeting_signals WHERE room_id=? AND datetime(created_at) < datetime('now','-5 minutes')`).run(roomId); } catch(e) {}
+      return sendJSON(res, 200, { sent: true });
+    }
+
+    /* GET /api/meetings/:room_id/signal — polling signaux WebRTC */
+    if (req.method === "GET" && /^\/api\/meetings\/[^/]+\/signal$/.test(pathname)) {
+      const roomId = pathname.split('/')[3];
+      const p = new URLSearchParams(reqUrl.search || "");
+      const peer = p.get("peer");
+      const after = parseInt(p.get("after") || "0");
+      const signals = db.prepare(`
+        SELECT * FROM meeting_signals
+        WHERE room_id=? AND id > ? AND consumed=0
+        AND (to_peer IS NULL OR to_peer=?)
+        ORDER BY id ASC LIMIT 50
+      `).all(roomId, after, peer||'');
+      // Marquer comme consommés pour ce peer
+      if (signals.length > 0 && peer) {
+        const ids = signals.map(s=>s.id).join(',');
+        try { db.prepare(`UPDATE meeting_signals SET consumed=1 WHERE id IN (${ids}) AND (to_peer=? OR to_peer IS NULL)`).run(peer); } catch(e) {}
+      }
+      return sendJSON(res, 200, signals.map(s => ({ ...s, data: JSON.parse(s.data) })));
+    }
+
+    /* GET /api/meetings/:room_id/validate-token — vérifier accès */
+    if (req.method === "GET" && /^\/api\/meetings\/[^/]+\/validate-token$/.test(pathname)) {
+      const roomId = pathname.split('/')[3];
+      const p = new URLSearchParams(reqUrl.search || "");
+      const token = p.get("token");
+      const meeting = db.prepare(`SELECT * FROM meetings WHERE room_id=?`).get(roomId);
+      if (!meeting) return sendJSON(res, 404, { error: "Salle introuvable" });
+      if (meeting.statut === 'termine') return sendJSON(res, 410, { error: "Réunion terminée" });
+      if (token !== meeting.token_host && token !== meeting.token_guest) return sendJSON(res, 403, { error: "Token invalide" });
+      const role = token === meeting.token_host ? 'host' : 'guest';
+      return sendJSON(res, 200, { valid: true, role, meeting: { id: meeting.id, room_id: meeting.room_id, titre: meeting.titre, duree_max_minutes: meeting.duree_max_minutes, statut: meeting.statut, started_at: meeting.started_at } });
+    }
+
+    /* GET /api/agenda/reminders — check & envoyer rappels dus */
+    if (req.method === "GET" && pathname === "/api/agenda/reminders") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const now = new Date().toISOString();
+      const dues = db.prepare(`
+        SELECT r.*, e.titre, e.date_debut FROM agenda_reminders r
+        LEFT JOIN agenda_events e ON r.event_id = e.id
+        WHERE r.user_id=? AND r.sent=0 AND r.remind_at <= ?
+      `).all(me.id, now);
+      for (const rem of dues) {
+        try {
+          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+            me.id, 'agenda_rappel',
+            `Rappel : ${rem.titre}`,
+            `Votre événement "${rem.titre}" commence dans ${rem.type === '24h' ? '24 heures' : rem.type === '1h' ? '1 heure' : '15 minutes'}`,
+            JSON.stringify({ event_id: rem.event_id })
+          );
+          db.prepare(`UPDATE agenda_reminders SET sent=1 WHERE id=?`).run(rem.id);
+        } catch(e) {}
+      }
+      return sendJSON(res, 200, { reminders_sent: dues.length });
+    }
+
     return sendJSON(res, 404, { error: "Route API inconnue." });
   }
 
