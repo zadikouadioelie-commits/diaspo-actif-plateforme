@@ -47,6 +47,7 @@
       <a href="#mes-projets" data-section="mes-projets">🟩 Mes projets <span class="pill" id="init-projets-badge" style="display:none;"></span></a>
       <a href="#publications" data-section="publications">📰 Publications</a>
       <a href="#evenements" data-section="evenements">📅 Événements</a>
+      <a href="#billetterie-init" data-section="billetterie-init">🎟️ Billetterie <span class="pill" id="init-billets-badge" style="display:none;"></span></a>
 
       <div class="sb-group-lbl">03 — TERRITOIRES</div>
       <a href="#zones" data-section="zones">🟨 Zones d'action</a>
@@ -302,8 +303,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>
         </div>
       </div>
-      <button class="btn btn-outline" style="margin-top:14px;">+ Créer un événement</button>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+        <button class="btn btn-orange" onclick="initShowSection('billetterie-init')">🎟️ Gérer la billetterie</button>
+        <button class="btn btn-outline" onclick="initShowSection('billetterie-init')">+ Créer un événement</button>
+      </div>
     </div>
+
+    <!-- ═══ SECTION BILLETTERIE INITIATIVE ═══ -->
+    <div id="billetterie-init" style="display:none;"></div>
 
     <div class="card" style="margin-bottom:20px;" id="paiement">
       <h3>Module de paiement — billetterie &amp; cotisations</h3>
@@ -1484,7 +1491,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','zones','stats-impact','paiement','accreditations','publicites-init','recrutement'];
+  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -1493,7 +1500,73 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
       a.classList.toggle('active', a.dataset.section===name);
     });
+    if (name === 'billetterie-init') renderInitBilletterie();
     window.scrollTo(0,0);
+  };
+
+  /* ══ SECTION BILLETTERIE — INITIATIVE ══ */
+  const BILLET_STATUTS = {brouillon:'📝 Brouillon',publie:'🟢 Publié',ferme:'🔒 Fermé',archive:'📁 Archivé'};
+  const BILLET_TYPE_COLOR = {standard:'',vip:'background:#f3e5f5;color:#6a1b9a;',early:'background:#e8f5e9;color:#1b5e20;',sponsor:'background:#e3f2fd;color:#0d47a1;'};
+
+  async function renderInitBilletterie() {
+    const el = document.getElementById('billetterie-init');
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+    try {
+      const r = await api('GET', '/events?organisateur_id='+ME.id+'&all=1');
+      const events = r.events || [];
+      const badge = document.getElementById('init-billets-badge');
+      const pubCount = events.filter(e=>e.statut==='publie').length;
+      if (badge && pubCount > 0) { badge.textContent = pubCount; badge.style.display = ''; }
+
+      el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="margin:0;">🎟️ Billetterie</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Créez et gérez vos événements, vendez des billets, scannez les QR codes</p>
+          </div>
+          <button class="btn btn-orange" onclick="window.open('billetterie.html','_blank')">🔗 Ouvrir la billetterie</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px;">
+          <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:var(--orange);">${events.length}</div><div style="font-size:12px;color:var(--muted);">Événements</div></div>
+          <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#10b981;">${pubCount}</div><div style="font-size:12px;color:var(--muted);">Publiés</div></div>
+          <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;">${events.reduce((s,e)=>s+(e.billets_vendus||0),0)}</div><div style="font-size:12px;color:var(--muted);">Billets vendus</div></div>
+        </div>
+        ${events.length ? events.map(e=>`
+          <div class="card" style="margin-bottom:12px;padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+              <div>
+                <strong style="font-size:14px;">${escH(e.titre)}</strong>
+                <span style="margin-left:8px;font-size:11px;padding:2px 8px;background:#f1f5f9;color:#475569;border-radius:4px;">${BILLET_STATUTS[e.statut]||e.statut}</span>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px;">📅 ${fmtDateInit(e.date_debut)} · 📍 ${escH(e.ville||'—')}</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                ${e.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="initPublishEvent(${e.id})">🟢 Publier</button>`:''}
+                ${e.statut==='publie'?`<button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="initCloseEvent(${e.id})">🔒 Fermer</button>`:''}
+              </div>
+            </div>
+            <div style="font-size:13px;color:var(--muted);margin-top:8px;">🎫 ${e.billets_vendus||0} billets vendus · 🏷️ ${e.nb_types||0} type(s)</div>
+          </div>`).join('') : `<div class="notice">Vous n'avez pas encore d'événements. <a href="billetterie.html" target="_blank">Créer depuis la billetterie →</a></div>`}
+        <div style="margin-top:16px;">
+          <a href="billetterie.html" target="_blank" class="btn btn-outline">📲 Ouvrir la billetterie complète (scanner + stats)</a>
+        </div>`;
+    } catch(e) { document.getElementById('billetterie-init').innerHTML = '<div class="notice">Erreur chargement billetterie.</div>'; }
+  }
+
+  function fmtDateInit(s) {
+    if(!s) return '—';
+    const d=new Date(s);
+    const M=['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
+    return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`;
+  }
+  window.initPublishEvent = async function(id) {
+    if(!confirm('Publier cet événement ? Les billets seront mis en vente.')) return;
+    try { await api('PUT','/events/'+id,{statut:'publie'}); renderInitBilletterie(); }
+    catch(e){alert('Erreur : '+e.message);}
+  };
+  window.initCloseEvent = async function(id) {
+    if(!confirm('Fermer les ventes pour cet événement ?')) return;
+    try { await api('PUT','/events/'+id,{statut:'ferme'}); renderInitBilletterie(); }
+    catch(e){alert('Erreur : '+e.message);}
   };
   document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
     a.addEventListener('click', e => {

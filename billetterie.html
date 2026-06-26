@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Billetterie</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js" defer></script>
+<style>
+/* ── Layout ── */
+.billet-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
+.billet-tab{padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
+.billet-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.billet-section{display:none;}.billet-section.active{display:block;}
+
+/* ── Cartes événements ── */
+.evt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:20px;}
+.evt-card{border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:box-shadow .15s;cursor:pointer;}
+.evt-card:hover{box-shadow:0 6px 24px rgba(0,0,0,.1);}
+.evt-cover{width:100%;height:150px;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:54px;background:linear-gradient(135deg,#ff6b00,#ff9f43);}
+.evt-cover img{width:100%;height:150px;object-fit:cover;}
+.evt-body{padding:16px;}
+.evt-date{font-size:11px;color:var(--orange);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+.evt-title{font-size:15px;font-weight:700;margin:0 0 6px;line-height:1.3;}
+.evt-meta{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.tag-type{background:#fff3e0;color:#e65100;border-radius:99px;padding:2px 8px;font-size:11px;font-weight:700;}
+.tag-type.vip{background:#f3e5f5;color:#6a1b9a;}
+.tag-type.early{background:#e8f5e9;color:#1b5e20;}
+.tag-type.sponsor{background:#e3f2fd;color:#0d47a1;}
+.ticket-type-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
+.ticket-type-row:last-child{border:none;}
+.dispo-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;}
+.dispo-ok{background:#d1fae5;color:#065f46;}
+.dispo-low{background:#fef3c7;color:#92400e;}
+.dispo-none{background:#fee2e2;color:#991b1b;}
+/* ── QR ticket ── */
+.ticket-card{background:#fff;border:2px dashed var(--border);border-radius:16px;padding:24px;max-width:420px;margin:0 auto;}
+.ticket-header{background:linear-gradient(135deg,var(--orange),#ff9f43);border-radius:10px;padding:16px;color:#fff;margin-bottom:20px;}
+.qr-box{display:flex;justify-content:center;margin:20px 0;padding:16px;background:#f8fafc;border-radius:12px;}
+.ticket-info-row{display:flex;gap:8px;margin-bottom:8px;font-size:13px;}
+.ticket-info-row .lbl{color:var(--muted);min-width:100px;}
+.ticket-info-row .val{font-weight:700;}
+.statut-pill{display:inline-block;padding:3px 12px;border-radius:99px;font-size:12px;font-weight:800;text-transform:uppercase;}
+.statut-valid{background:#d1fae5;color:#065f46;}
+.statut-used{background:#f1f5f9;color:#64748b;}
+.statut-cancelled{background:#fee2e2;color:#991b1b;}
+/* ── Scanner ── */
+.scanner-wrap{position:relative;width:100%;max-width:500px;margin:0 auto;}
+#scanner-video{width:100%;border-radius:16px;background:#000;}
+#scanner-canvas{display:none;}
+.scan-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:200px;border:3px solid var(--orange);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.4);}
+.scan-result{margin-top:16px;padding:20px;border-radius:12px;text-align:center;}
+.scan-ok{background:#d1fae5;border:2px solid #10b981;color:#064e3b;}
+.scan-err{background:#fee2e2;border:2px solid #ef4444;color:#7f1d1d;}
+/* ── Dashboard organisateur ── */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px;}
+.stat-box{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;}
+.stat-num{font-size:28px;font-weight:800;color:var(--orange);}
+.stat-lbl{font-size:12px;color:var(--muted);margin-top:4px;}
+.attendee-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.checkin-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+/* ── Filtres ── */
+.filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:center;}
+.filters select,.filters input{height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;}
+/* ── Modal ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center;padding:20px;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff;border-radius:18px;padding:28px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;}
+.modal h3{margin:0 0 18px;}
+.form-row{margin-bottom:14px;}
+.form-row label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;}
+.form-row input,.form-row textarea,.form-row select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;}
+.form-row textarea{height:80px;resize:vertical;}
+.tt-list{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;}
+.tt-row{display:flex;gap:8px;padding:10px;border-bottom:1px solid var(--border);align-items:center;}
+.tt-row:last-child{border:none;}
+.tt-row input{flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;}
+.notice{background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:14px;}
+</style>
+</head>
+<body>
+<div id="app">
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="brand"><img src="assets/logo.svg" alt="DA" style="height:28px;"> Diaspo'Actif</a>
+    <div class="nav-links">
+      <a href="index.html">Accueil</a>
+      <a href="annuaire.html">Annuaire</a>
+      <a href="evenements.html">Événements</a>
+      <a href="billetterie.html" class="active">Billetterie</a>
+    </div>
+    <div id="nav-user"></div>
+  </div>
+</nav>
+
+<div class="container" style="padding-top:20px;">
+  <div class="flex-between" style="margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+    <div>
+      <h1 style="margin:0;">🎟️ Billetterie</h1>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Événements, billets, check-in — module complet</p>
+    </div>
+    <div id="top-actions"></div>
+  </div>
+
+  <!-- ONGLETS -->
+  <nav class="billet-nav">
+    <button class="billet-tab active" onclick="switchTab('evenements')">🗓️ Événements</button>
+    <button class="billet-tab" onclick="switchTab('mes-billets')" id="tab-mes-billets">🎫 Mes Billets</button>
+    <button class="billet-tab" onclick="switchTab('scanner')" id="tab-scanner" style="display:none">📷 Scanner</button>
+    <button class="billet-tab" onclick="switchTab('organisateur')" id="tab-organisateur" style="display:none">📊 Organisateur</button>
+    <button class="billet-tab" onclick="switchTab('admin-events')" id="tab-admin" style="display:none">🔧 Admin</button>
+  </nav>
+
+  <!-- ══ SECTION : ÉVÉNEMENTS ══ -->
+  <div class="billet-section active" id="sec-evenements">
+    <div class="filters">
+      <input type="text" id="f-search" placeholder="🔍 Rechercher un événement…" oninput="filterEvents()" style="min-width:200px;">
+      <select id="f-pays" onchange="filterEvents()"><option value="">Tous les pays</option></select>
+      <select id="f-cat" onchange="filterEvents()">
+        <option value="">Toutes catégories</option>
+        <option>Culture</option><option>Business</option><option>Formation</option>
+        <option>Sport</option><option>Diaspora</option><option>Gastronomie</option><option>Autre</option>
+      </select>
+    </div>
+    <div id="events-grid" class="evt-grid"><div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement des événements…</div></div>
+  </div>
+
+  <!-- ══ SECTION : MES BILLETS ══ -->
+  <div class="billet-section" id="sec-mes-billets">
+    <div id="mes-billets-list"><div style="text-align:center;padding:40px;color:var(--muted);">Chargement de vos billets…</div></div>
+  </div>
+
+  <!-- ══ SECTION : SCANNER ══ -->
+  <div class="billet-section" id="sec-scanner">
+    <div style="max-width:520px;margin:0 auto;">
+      <div class="notice">📷 Pointez la caméra vers le QR code du billet pour valider l'entrée.</div>
+      <div class="form-row">
+        <label>Événement à scanner</label>
+        <select id="scanner-event-select"><option value="">— Sélectionner un événement —</option></select>
+      </div>
+      <div class="scanner-wrap" id="scanner-wrap" style="display:none;">
+        <video id="scanner-video" autoplay playsinline muted></video>
+        <canvas id="scanner-canvas"></canvas>
+        <div class="scan-overlay"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin:12px 0;">
+        <button class="btn btn-orange" id="btn-start-scan" onclick="startScanner()">▶️ Activer la caméra</button>
+        <button class="btn btn-outline" id="btn-stop-scan" onclick="stopScanner()" style="display:none">⏹ Arrêter</button>
+      </div>
+      <div id="scan-result"></div>
+      <div id="scan-history" style="margin-top:20px;"></div>
+    </div>
+  </div>
+
+  <!-- ══ SECTION : ORGANISATEUR ══ -->
+  <div class="billet-section" id="sec-organisateur">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+      <h2 style="margin:0;">📊 Mes événements</h2>
+      <button class="btn btn-orange" onclick="openCreateEvent()">＋ Créer un événement</button>
+    </div>
+    <div id="org-events-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+  </div>
+
+  <!-- ══ SECTION : ADMIN ══ -->
+  <div class="billet-section" id="sec-admin-events">
+    <h2 style="margin:0 0 20px;">🔧 Administration — Billetterie</h2>
+    <div class="stat-row" id="admin-stats-row"></div>
+    <div id="admin-events-table"></div>
+  </div>
+</div><!-- /container -->
+
+<!-- ══ MODAL DÉTAIL ÉVÉNEMENT + ACHAT ══ -->
+<div class="modal-bg" id="modal-event-bg" onclick="if(event.target===this)closeMod('modal-event-bg')">
+  <div class="modal" id="modal-event-content"></div>
+</div>
+
+<!-- ══ MODAL TICKET QR ══ -->
+<div class="modal-bg" id="modal-ticket-bg" onclick="if(event.target===this)closeMod('modal-ticket-bg')">
+  <div class="modal" id="modal-ticket-content" style="max-width:460px;"></div>
+</div>
+
+<!-- ══ MODAL CRÉER ÉVÉNEMENT ══ -->
+<div class="modal-bg" id="modal-create-bg" onclick="if(event.target===this)closeMod('modal-create-bg')">
+  <div class="modal" style="max-width:680px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <h3 style="margin:0;" id="create-modal-title">＋ Créer un événement</h3>
+      <button onclick="closeMod('modal-create-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
+    </div>
+    <div id="create-event-form">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="form-row" style="grid-column:1/-1;">
+          <label>Titre de l'événement *</label>
+          <input type="text" id="ev-titre" placeholder="Ex : Gala de la Diaspora Africaine 2026">
+        </div>
+        <div class="form-row" style="grid-column:1/-1;">
+          <label>Description</label>
+          <textarea id="ev-desc" placeholder="Présentation de l'événement…"></textarea>
+        </div>
+        <div class="form-row">
+          <label>Pays</label>
+          <input type="text" id="ev-pays" placeholder="France">
+        </div>
+        <div class="form-row">
+          <label>Ville</label>
+          <input type="text" id="ev-ville" placeholder="Paris">
+        </div>
+        <div class="form-row" style="grid-column:1/-1;">
+          <label>Adresse</label>
+          <input type="text" id="ev-adresse" placeholder="123 rue de la Paix, 75001 Paris">
+        </div>
+        <div class="form-row">
+          <label>Date de début *</label>
+          <input type="datetime-local" id="ev-debut">
+        </div>
+        <div class="form-row">
+          <label>Date de fin</label>
+          <input type="datetime-local" id="ev-fin">
+        </div>
+        <div class="form-row">
+          <label>Capacité totale</label>
+          <input type="number" id="ev-capacite" placeholder="500" min="1">
+        </div>
+        <div class="form-row">
+          <label>Catégorie</label>
+          <select id="ev-cat">
+            <option>Culture</option><option>Business</option><option>Formation</option>
+            <option>Sport</option><option>Diaspora</option><option>Gastronomie</option><option>Autre</option>
+          </select>
+        </div>
+      </div>
+      <!-- Types de billets -->
+      <div style="margin:18px 0 10px;"><strong style="font-size:14px;">🎟️ Types de billets</strong> <button onclick="addTicketTypeRow()" class="btn btn-sm btn-outline" style="margin-left:10px;font-size:12px;">＋ Ajouter</button></div>
+      <div class="tt-list" id="tt-rows">
+        <div class="tt-row" data-idx="0">
+          <input placeholder="Nom (ex: Standard)" id="tt-nom-0">
+          <input placeholder="Prix (€)" type="number" min="0" step="0.01" id="tt-prix-0" style="max-width:90px;">
+          <input placeholder="Qté" type="number" min="1" id="tt-qte-0" style="max-width:70px;" value="100">
+          <select id="tt-type-0" style="max-width:100px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+            <option value="standard">Standard</option><option value="vip">VIP</option>
+            <option value="early">Early Access</option><option value="sponsor">Sponsor</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;flex-wrap:wrap;gap:10px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;">
+          <input type="checkbox" id="ev-publier"> Publier immédiatement
+        </label>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-outline" onclick="closeMod('modal-create-bg')">Annuler</button>
+          <button class="btn btn-orange" onclick="saveEvent()" id="btn-save-event">Créer l'événement</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL DASHBOARD ÉVÉNEMENT ══ -->
+<div class="modal-bg" id="modal-org-detail-bg" onclick="if(event.target===this)closeMod('modal-org-detail-bg')">
+  <div class="modal" id="modal-org-detail-content" style="max-width:720px;"></div>
+</div>
+</div><!-- /app -->
+
+<script src="assets/ds.js"></script>
+<script src="assets/app.js"></script>
+<script>
+/* ════════════════════════════════════════════════
+   DIASPO'ACTIF — BILLETTERIE
+   ════════════════════════════════════════════════ */
+let ME = null;
+let ALL_EVENTS = [];
+let scanStream = null;
+let scanAnimFrame = null;
+let scanEventId = null;
+let ttIdx = 1;
+let editingEventId = null;
+
+const STATUTS = { brouillon:'📝 Brouillon', publie:'🟢 Publié', archive:'📁 Archivé', ferme:'🔒 Fermé' };
+const TYPES_COLOR = { standard:'', vip:'vip', early:'early', sponsor:'sponsor' };
+const MONTH = ['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return `${d.getDate()} ${MONTH[d.getMonth()]} ${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}h${d.getMinutes().toString().padStart(2,'0')}`;
+}
+function closeMod(id) { document.getElementById(id).classList.remove('open'); }
+
+/* ══ NAV TABS ══ */
+function switchTab(name) {
+  document.querySelectorAll('.billet-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.billet-section').forEach(s=>s.classList.remove('active'));
+  document.querySelector(`.billet-tab[onclick*="${name}"]`)?.classList.add('active');
+  document.getElementById('sec-'+name)?.classList.add('active');
+  if (name === 'mes-billets') loadMesBillets();
+  if (name === 'organisateur') loadOrgEvents();
+  if (name === 'admin-events') loadAdminEvents();
+  if (name !== 'scanner') stopScanner();
+}
+
+/* ══ CHARGEMENT ÉVÉNEMENTS ══ */
+async function loadEvents() {
+  try {
+    const r = await api('GET', '/events');
+    ALL_EVENTS = r.events || [];
+    /* Pays uniques pour le filtre */
+    const pays = [...new Set(ALL_EVENTS.map(e=>e.pays).filter(Boolean))].sort();
+    const sel = document.getElementById('f-pays');
+    pays.forEach(p => { const o=document.createElement('option');o.value=p;o.textContent=p;sel.appendChild(o); });
+    renderEvents(ALL_EVENTS);
+  } catch(e) {
+    document.getElementById('events-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucun événement disponible.</div>';
+  }
+}
+
+function filterEvents() {
+  const search = document.getElementById('f-search').value.toLowerCase();
+  const pays = document.getElementById('f-pays').value;
+  const cat = document.getElementById('f-cat').value;
+  renderEvents(ALL_EVENTS.filter(e =>
+    (!search || e.titre.toLowerCase().includes(search) || (e.ville||'').toLowerCase().includes(search)) &&
+    (!pays || e.pays === pays) && (!cat || e.categorie === cat)
+  ));
+}
+
+function renderEvents(events) {
+  const grid = document.getElementById('events-grid');
+  if (!events.length) { grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucun événement trouvé.</div>'; return; }
+  grid.innerHTML = events.map(e => `
+    <div class="evt-card" onclick="openEvent(${e.id})">
+      <div class="evt-cover">
+        ${e.image_b64 ? `<img src="${e.image_b64}" alt="">` : '🎪'}
+      </div>
+      <div class="evt-body">
+        <div class="evt-date">${fmtDate(e.date_debut)}</div>
+        <div class="evt-title">${escH(e.titre)}</div>
+        <div class="evt-meta">
+          ${e.ville ? `<span>📍 ${escH(e.ville)}${e.pays?', '+escH(e.pays):''}</span>` : ''}
+          <span>🏷️ ${escH(e.categorie||'Général')}</span>
+          ${e.nb_billets>0 ? `<span>🎫 ${e.nb_billets} billets vendus</span>` : ''}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:var(--muted);">${e.nb_types||0} type(s) de billets</span>
+          <button class="btn btn-sm btn-orange">Voir & Acheter</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+/* ══ MODAL DÉTAIL ÉVÉNEMENT ══ */
+async function openEvent(eid) {
+  try {
+    const r = await api('GET', '/events/'+eid);
+    const e = r.event; const types = r.ticket_types || []; const stats = r.stats || {};
+    const canBuy = ME && ME.role === 'utilisateur';
+    document.getElementById('modal-event-content').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
+        <div><h3 style="margin:0;">${escH(e.titre)}</h3>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">${e.categorie||''} · ${e.ville||''}${e.pays?', '+e.pays:''}</p>
+        </div>
+        <button onclick="closeMod('modal-event-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
+      </div>
+      ${e.image_b64 ? `<img src="${e.image_b64}" style="width:100%;height:200px;object-fit:cover;border-radius:10px;margin-bottom:16px;">` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;font-size:13px;">
+        <div>📅 <strong>Début :</strong> ${fmtDate(e.date_debut)}</div>
+        ${e.date_fin ? `<div>⏰ <strong>Fin :</strong> ${fmtDate(e.date_fin)}</div>` : '<div></div>'}
+        ${e.adresse ? `<div style="grid-column:1/-1">📍 ${escH(e.adresse)}</div>` : ''}
+        ${e.capacite ? `<div>👥 Capacité : ${e.capacite}</div>` : ''}
+        <div>🎫 Billets vendus : ${stats.nb||0}</div>
+      </div>
+      ${e.description ? `<p style="font-size:13.5px;line-height:1.6;color:var(--text);margin-bottom:16px;">${escH(e.description)}</p>` : ''}
+      <h4 style="margin:0 0 12px;">🎟️ Types de billets</h4>
+      ${types.length ? types.map(tt => `
+        <div class="ticket-type-row">
+          <div>
+            <span class="tag-type ${TYPES_COLOR[tt.type]||''}">${tt.type?.toUpperCase()||'STANDARD'}</span>
+            <strong style="margin-left:8px;font-size:14px;">${escH(tt.nom)}</strong>
+            ${tt.description ? `<div style="font-size:12px;color:var(--muted);margin-top:2px;">${escH(tt.description)}</div>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="dispo-badge ${tt.dispo<=0?'dispo-none':tt.dispo<10?'dispo-low':'dispo-ok'}">${tt.dispo<=0?'Épuisé':tt.dispo+'  dispo.'}</span>
+            <strong style="font-size:15px;">${tt.prix===0?'Gratuit':tt.prix.toFixed(2)+' €'}</strong>
+            ${canBuy && tt.dispo>0 ? `<button class="btn btn-sm btn-orange" onclick="buyTicket(${e.id},${tt.id},'${escH(tt.nom)}',${tt.prix})">Acheter</button>` : ''}
+          </div>
+        </div>`).join('') : '<p style="color:var(--muted);font-size:13px;">Aucun billet disponible pour cet événement.</p>'}
+      ${!ME ? '<div class="notice" style="margin-top:16px;">🔐 <a href="login.html">Connectez-vous</a> pour acheter des billets.</div>' : ''}
+      ${ME && ME.role !== 'utilisateur' ? '<div class="notice" style="margin-top:16px;">ℹ️ Seuls les membres Diaspora peuvent acheter des billets.</div>' : ''}`;
+    document.getElementById('modal-event-bg').classList.add('open');
+  } catch(e) { alert('Erreur : '+e.message); }
+}
+
+/* ══ ACHAT BILLET ══ */
+async function buyTicket(eid, ttid, nom, prix) {
+  if (!confirm(`Confirmer l'achat : "${nom}" — ${prix===0?'Gratuit':prix.toFixed(2)+' €'} ?`)) return;
+  try {
+    const r = await api('POST', '/events/'+eid+'/buy', { ticket_type_id: ttid });
+    closeMod('modal-event-bg');
+    alert(`✅ Billet acheté avec succès ! Ticket ID: #${r.ticket_id}\nRetrouvez votre QR code dans "Mes Billets".`);
+    loadEvents();
+    switchTab('mes-billets');
+  } catch(e) { alert('Erreur : '+e.message); }
+}
+
+/* ══ MES BILLETS ══ */
+async function loadMesBillets() {
+  if (!ME) { document.getElementById('mes-billets-list').innerHTML='<div class="notice">🔐 <a href="login.html">Connectez-vous</a> pour voir vos billets.</div>'; return; }
+  try {
+    const r = await api('GET', '/tickets/mes');
+    const list = document.getElementById('mes-billets-list');
+    if (!r.tickets.length) { list.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);">Vous n\'avez aucun billet pour le moment.</div>'; return; }
+    list.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">` +
+      r.tickets.map(t => `
+        <div class="ticket-card" style="max-width:none;cursor:pointer;" onclick="openTicket(${t.id})">
+          <div style="background:${t.statut==='valid'?'linear-gradient(135deg,var(--orange),#ff9f43)':t.statut==='used'?'#94a3b8':'#ef4444'};border-radius:10px;padding:14px;color:#fff;margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div><div style="font-weight:800;font-size:15px;">${escH(t.event_titre)}</div>
+                <div style="font-size:12px;opacity:.9;margin-top:2px;">${fmtDate(t.date_debut)}</div></div>
+              <span class="statut-pill statut-${t.statut}" style="font-size:10px;">${t.statut.toUpperCase()}</span>
+            </div>
+          </div>
+          <div style="font-size:13px;">
+            <div class="ticket-info-row"><span class="lbl">📍 Lieu</span><span class="val">${escH(t.ville||'—')}${t.pays?', '+escH(t.pays):''}</span></div>
+            <div class="ticket-info-row"><span class="lbl">🎟️ Type</span><span class="val"><span class="tag-type ${TYPES_COLOR[t.type_cat]||''}">${t.type_cat?.toUpperCase()||'STANDARD'}</span> ${escH(t.type_nom)}</span></div>
+            <div class="ticket-info-row"><span class="lbl">💶 Prix</span><span class="val">${t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €'}</span></div>
+          </div>
+          <div style="text-align:center;margin-top:12px;">
+            <button class="btn btn-sm btn-orange" onclick="event.stopPropagation();openTicket(${t.id})">🔍 Voir QR code</button>
+          </div>
+        </div>`).join('') + '</div>';
+  } catch(e) { document.getElementById('mes-billets-list').innerHTML='<div class="notice">Erreur chargement billets.</div>'; }
+}
+
+/* ══ MODAL QR TICKET ══ */
+async function openTicket(tid) {
+  try {
+    const r = await api('GET', '/tickets/'+tid);
+    const t = r.ticket;
+    document.getElementById('modal-ticket-content').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+        <h3 style="margin:0;">🎫 Mon Billet</h3>
+        <button onclick="closeMod('modal-ticket-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div class="ticket-header">
+        <div style="font-size:17px;font-weight:800;">${escH(t.event_titre)}</div>
+        <div style="font-size:13px;opacity:.9;margin-top:4px;">${fmtDate(t.date_debut)} · ${escH(t.ville||'')}${t.pays?', '+escH(t.pays):''}</div>
+      </div>
+      <div style="text-align:center;margin-bottom:12px;">
+        <span class="statut-pill statut-${t.statut}" style="font-size:13px;">${t.statut==='valid'?'✅ VALIDE':t.statut==='used'?'✔️ UTILISÉ':'❌ ANNULÉ'}</span>
+      </div>
+      ${t.statut === 'valid' ? `
+        <div class="qr-box" id="qr-render-zone">
+          <div id="qr-container-${tid}"></div>
+        </div>
+        <p style="text-align:center;font-size:11px;color:var(--muted);margin:0 0 16px;">Présentez ce QR code à l'entrée de l'événement.</p>` : ''}
+      <div style="font-size:13px;">
+        <div class="ticket-info-row"><span class="lbl">🆔 Ticket #</span><span class="val">${t.id}</span></div>
+        <div class="ticket-info-row"><span class="lbl">🎟️ Type</span><span class="val">${escH(t.type_nom)}</span></div>
+        <div class="ticket-info-row"><span class="lbl">💶 Prix payé</span><span class="val">${t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €'}</span></div>
+        <div class="ticket-info-row"><span class="lbl">📅 Acheté le</span><span class="val">${fmtDate(t.created_at)}</span></div>
+        <div class="ticket-info-row"><span class="lbl">👤 Titulaire</span><span class="val">${escH(t.user_nom)}</span></div>
+      </div>`;
+    document.getElementById('modal-ticket-bg').classList.add('open');
+    /* Générer QR code si valide */
+    if (t.statut === 'valid' && r.qr_payload) {
+      setTimeout(() => {
+        const el = document.getElementById('qr-container-'+tid);
+        if (el && typeof QRCode !== 'undefined') {
+          new QRCode(el, { text: r.qr_payload, width: 220, height: 220, colorDark: '#1a1a2e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+        }
+      }, 100);
+    }
+  } catch(e) { alert('Erreur : '+e.message); }
+}
+
+/* ══ SCANNER ══ */
+document.getElementById('scanner-event-select').addEventListener('change', function() {
+  scanEventId = this.value ? parseInt(this.value) : null;
+});
+
+async function startScanner() {
+  const wrap = document.getElementById('scanner-wrap');
+  const video = document.getElementById('scanner-video');
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = scanStream;
+    wrap.style.display = '';
+    document.getElementById('btn-start-scan').style.display = 'none';
+    document.getElementById('btn-stop-scan').style.display = '';
+    video.onloadedmetadata = () => { video.play(); scanFrame(); };
+  } catch(e) {
+    alert('Impossible d\'accéder à la caméra : ' + e.message);
+  }
+}
+
+function stopScanner() {
+  if (scanStream) { scanStream.getTracks().forEach(t=>t.stop()); scanStream = null; }
+  if (scanAnimFrame) { cancelAnimationFrame(scanAnimFrame); scanAnimFrame = null; }
+  document.getElementById('scanner-wrap').style.display = 'none';
+  document.getElementById('btn-start-scan').style.display = '';
+  document.getElementById('btn-stop-scan').style.display = 'none';
+}
+
+let lastScanTime = 0;
+function scanFrame() {
+  const video = document.getElementById('scanner-video');
+  const canvas = document.getElementById('scanner-canvas');
+  if (!video || !scanStream) return;
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    if (typeof jsQR !== 'undefined') {
+      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+      if (code && code.data && Date.now() - lastScanTime > 2500) {
+        lastScanTime = Date.now();
+        validateQR(code.data);
+      }
+    }
+  }
+  scanAnimFrame = requestAnimationFrame(scanFrame);
+}
+
+async function validateQR(payload) {
+  try {
+    const r = await api('POST', '/scanner/validate', { qr_payload: payload });
+    showScanResult(r);
+    loadScanHistory();
+  } catch(e) { showScanResult({ valid: false, motif: e.message }); }
+}
+
+function showScanResult(r) {
+  const el = document.getElementById('scan-result');
+  if (r.valid) {
+    el.innerHTML = `<div class="scan-result scan-ok"><div style="font-size:32px;margin-bottom:8px;">✅</div><strong style="font-size:18px;">ACCÈS AUTORISÉ</strong><div style="margin-top:8px;font-size:15px;">Bienvenue, <strong>${escH(r.nom||'Participant')}</strong></div><div style="font-size:12px;opacity:.7;margin-top:4px;">Billet #${r.ticket_id} — check-in enregistré</div></div>`;
+  } else {
+    el.innerHTML = `<div class="scan-result scan-err"><div style="font-size:32px;margin-bottom:8px;">❌</div><strong style="font-size:18px;">ACCÈS REFUSÉ</strong><div style="margin-top:8px;font-size:14px;">${escH(r.motif||'QR code invalide')}</div></div>`;
+  }
+  setTimeout(() => { el.innerHTML = ''; }, 5000);
+}
+
+async function loadScanHistory() {
+  if (!scanEventId) return;
+  try {
+    const r = await api('GET', '/events/'+scanEventId+'/checkins');
+    const checkins = r.checkins || []; const tot = r.totaux || {};
+    const el = document.getElementById('scan-history');
+    el.innerHTML = `<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+      <div class="card" style="padding:10px 16px;text-align:center;flex:1;min-width:80px;"><strong style="font-size:20px;color:#10b981;">${tot.accepted||0}</strong><div style="font-size:11px;color:var(--muted);">Admis</div></div>
+      <div class="card" style="padding:10px 16px;text-align:center;flex:1;min-width:80px;"><strong style="font-size:20px;color:#ef4444;">${(tot.total||0)-(tot.accepted||0)}</strong><div style="font-size:11px;color:var(--muted);">Refusés</div></div>
+      <div class="card" style="padding:10px 16px;text-align:center;flex:1;min-width:80px;"><strong style="font-size:20px;">${tot.total||0}</strong><div style="font-size:11px;color:var(--muted);">Total scans</div></div>
+    </div>
+    <div style="max-height:250px;overflow-y:auto;">
+      ${checkins.slice(0,20).map(c=>`
+        <div class="checkin-row">
+          <span>${c.nom_display||'#'+c.ticket_id}</span>
+          <span style="color:var(--muted);">${new Date(c.timestamp).toLocaleTimeString('fr-FR')}</span>
+          <span style="font-weight:700;color:${c.resultat==='accepted'?'#10b981':'#ef4444'};">${c.resultat==='accepted'?'✅ Admis':'❌ Refusé'}</span>
+        </div>`).join('')}
+    </div>`;
+  } catch(e) {}
+}
+
+/* ══ ORGANISATEUR ══ */
+async function loadOrgEvents() {
+  if (!ME) return;
+  try {
+    const r = await api('GET', '/events?organisateur_id='+ME.id+'&all=1');
+    const events = r.events || [];
+    const el = document.getElementById('org-events-list');
+    if (!events.length) { el.innerHTML='<div class="notice">Vous n\'avez pas encore créé d\'événement. <button class="btn btn-sm btn-orange" onclick="openCreateEvent()">Créer</button></div>'; return; }
+    el.innerHTML = events.map(e => `
+      <div class="card" style="margin-bottom:12px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+          <div>
+            <strong style="font-size:15px;">${escH(e.titre)}</strong>
+            <span style="margin-left:10px;font-size:12px;background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:4px;">${STATUTS[e.statut]||e.statut}</span>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">📅 ${fmtDate(e.date_debut)} · 📍 ${escH(e.ville||'—')}</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" onclick="openOrgDetail(${e.id})">📊 Tableau de bord</button>
+            ${e.statut==='brouillon' ? `<button class="btn btn-sm btn-orange" onclick="publishEvent(${e.id})">🟢 Publier</button>` : ''}
+            ${e.statut==='publie' ? `<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="closeEvent(${e.id})">🔒 Fermer</button>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;font-size:13px;color:var(--muted);">
+          <span>🎫 ${e.billets_vendus||0} billets vendus</span>
+          <span>🏷️ ${e.nb_types||0} type(s)</span>
+        </div>
+      </div>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function publishEvent(id) {
+  if (!confirm('Publier cet événement ? Les billets seront mis en vente.')) return;
+  try { await api('PUT', '/events/'+id, { statut: 'publie' }); loadOrgEvents(); loadEvents(); }
+  catch(e) { alert('Erreur : '+e.message); }
+}
+async function closeEvent(id) {
+  if (!confirm('Fermer les ventes pour cet événement ?')) return;
+  try { await api('PUT', '/events/'+id, { statut: 'ferme' }); loadOrgEvents(); loadEvents(); }
+  catch(e) { alert('Erreur : '+e.message); }
+}
+
+async function openOrgDetail(eid) {
+  try {
+    const [rEv, rAtt, rCk] = await Promise.all([
+      api('GET','/events/'+eid),
+      api('GET','/events/'+eid+'/attendees'),
+      api('GET','/events/'+eid+'/checkins')
+    ]);
+    const e = rEv.event; const att = rAtt.attendees||[]; const ck = rCk.checkins||[]; const tot = rCk.totaux||{};
+    const revenu = att.reduce((s,a)=>s+(a.prix_paye||0),0);
+    document.getElementById('modal-org-detail-content').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+        <h3 style="margin:0;">📊 ${escH(e.titre)}</h3>
+        <button onclick="closeMod('modal-org-detail-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div class="stat-row">
+        <div class="stat-box"><div class="stat-num">${att.length}</div><div class="stat-lbl">Billets vendus</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:#10b981;">${revenu.toFixed(2)} €</div><div class="stat-lbl">Revenus</div></div>
+        <div class="stat-box"><div class="stat-num">${tot.accepted||0}</div><div class="stat-lbl">Check-ins</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:#8b5cf6;">${att.length>0?Math.round((tot.accepted||0)/att.length*100):0}%</div><div class="stat-lbl">Taux présence</div></div>
+      </div>
+      <h4 style="margin:18px 0 10px;">👥 Participants (${att.length})</h4>
+      <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">
+        ${att.length ? att.map(a=>`
+          <div class="attendee-row" style="padding:8px 14px;">
+            <span>${a.anonymise?'[Anonymisé]':escH(a.nom_display||'—')}</span>
+            <span style="color:var(--muted);">${escH(a.pays||'')}</span>
+            <span class="tag-type">${escH(a.type_nom||'')}</span>
+            <span style="color:var(--muted);font-size:11px;">${a.ticket_statut==='used'?'✅ Présent':'⏳ En attente'}</span>
+          </div>`).join('') : '<div style="padding:20px;text-align:center;color:var(--muted);">Aucun participant.</div>'}
+      </div>
+      <h4 style="margin:18px 0 10px;">📋 Derniers scans</h4>
+      <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">
+        ${ck.length ? ck.slice(0,20).map(c=>`
+          <div class="checkin-row" style="padding:8px 14px;">
+            <span>${escH(c.nom_display||'#'+c.ticket_id)}</span>
+            <span style="color:var(--muted);">${new Date(c.timestamp).toLocaleTimeString('fr-FR')}</span>
+            <span style="font-weight:700;color:${c.resultat==='accepted'?'#10b981':'#ef4444'};">${c.resultat==='accepted'?'✅':'❌'}</span>
+          </div>`).join('') : '<div style="padding:20px;text-align:center;color:var(--muted);">Aucun scan enregistré.</div>'}
+      </div>`;
+    document.getElementById('modal-org-detail-bg').classList.add('open');
+  } catch(e) { alert('Erreur : '+e.message); }
+}
+
+/* ══ CRÉER ÉVÉNEMENT ══ */
+function openCreateEvent(eid) {
+  editingEventId = eid || null;
+  document.getElementById('create-modal-title').textContent = eid ? '✏️ Modifier l\'événement' : '＋ Créer un événement';
+  document.getElementById('modal-create-bg').classList.add('open');
+}
+function addTicketTypeRow() {
+  const container = document.getElementById('tt-rows');
+  const idx = ttIdx++;
+  const row = document.createElement('div');
+  row.className = 'tt-row'; row.dataset.idx = idx;
+  row.innerHTML = `<input placeholder="Nom" id="tt-nom-${idx}">
+    <input placeholder="Prix (€)" type="number" min="0" step="0.01" id="tt-prix-${idx}" style="max-width:90px;">
+    <input placeholder="Qté" type="number" min="1" id="tt-qte-${idx}" style="max-width:70px;" value="100">
+    <select id="tt-type-${idx}" style="max-width:100px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+      <option value="standard">Standard</option><option value="vip">VIP</option>
+      <option value="early">Early Access</option><option value="sponsor">Sponsor</option>
+    </select>
+    <button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#ef4444;">×</button>`;
+  container.appendChild(row);
+}
+async function saveEvent() {
+  const titre = document.getElementById('ev-titre').value.trim();
+  const date_debut = document.getElementById('ev-debut').value;
+  if (!titre || !date_debut) { alert('Titre et date de début requis.'); return; }
+  const ticket_types = [];
+  document.querySelectorAll('#tt-rows .tt-row').forEach(row => {
+    const i = row.dataset.idx;
+    const nom = document.getElementById('tt-nom-'+i)?.value?.trim();
+    const prix = parseFloat(document.getElementById('tt-prix-'+i)?.value)||0;
+    const quantite = parseInt(document.getElementById('tt-qte-'+i)?.value)||100;
+    const type = document.getElementById('tt-type-'+i)?.value||'standard';
+    if (nom) ticket_types.push({ nom, prix, quantite, type });
+  });
+  const data = {
+    titre, description: document.getElementById('ev-desc').value||null,
+    pays: document.getElementById('ev-pays').value||null,
+    ville: document.getElementById('ev-ville').value||null,
+    adresse: document.getElementById('ev-adresse').value||null,
+    date_debut, date_fin: document.getElementById('ev-fin').value||null,
+    capacite: parseInt(document.getElementById('ev-capacite').value)||0,
+    categorie: document.getElementById('ev-cat').value||'Général',
+    ticket_types,
+    statut: document.getElementById('ev-publier').checked ? 'publie' : 'brouillon'
+  };
+  const btn = document.getElementById('btn-save-event');
+  btn.disabled = true; btn.textContent = '⏳ Création…';
+  try {
+    await api('POST', '/events', data);
+    closeMod('modal-create-bg');
+    alert('✅ Événement créé avec succès !');
+    loadOrgEvents(); loadEvents();
+  } catch(e) { alert('Erreur : '+e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Créer l\'événement'; }
+}
+
+/* ══ ADMIN EVENTS ══ */
+async function loadAdminEvents() {
+  try {
+    const [rStats, rEvents] = await Promise.all([
+      api('GET','/events/stats'),
+      api('GET','/admin/events')
+    ]);
+    const s = rStats;
+    document.getElementById('admin-stats-row').innerHTML = `
+      <div class="stat-box"><div class="stat-num">${s.total_events||0}</div><div class="stat-lbl">Événements total</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:#10b981;">${s.publies||0}</div><div class="stat-lbl">Publiés</div></div>
+      <div class="stat-box"><div class="stat-num">${s.total_tickets||0}</div><div class="stat-lbl">Billets vendus</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--orange);">${(s.revenu_total||0).toFixed(2)} €</div><div class="stat-lbl">Revenus globaux</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:#8b5cf6;">${(s.commission_total||0).toFixed(2)} €</div><div class="stat-lbl">Commission DA</div></div>`;
+    const events = rEvents.events||[];
+    document.getElementById('admin-events-table').innerHTML = `
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:var(--bg);">
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Événement</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Organisateur</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Date</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Statut</th>
+          <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Billets</th>
+          <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Revenu</th>
+        </tr></thead>
+        <tbody>${events.map(e=>`
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px;"><strong>${escH(e.titre)}</strong><div style="font-size:11px;color:var(--muted);">${escH(e.ville||'')}${e.pays?', '+escH(e.pays):''}</div></td>
+            <td style="padding:10px;">${escH(e.organisateur_nom||'—')}</td>
+            <td style="padding:10px;white-space:nowrap;">${fmtDate(e.date_debut)}</td>
+            <td style="padding:10px;">${STATUTS[e.statut]||e.statut}</td>
+            <td style="padding:10px;text-align:right;">${e.nb_billets||0}</td>
+            <td style="padding:10px;text-align:right;font-weight:700;">${(e.revenu||0).toFixed(2)} €</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+  } catch(e) { console.error(e); }
+}
+
+/* ══ INIT ══ */
+function escH(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+(async () => {
+  try { ME = await fetchCurrentUser(); } catch(e) { ME = null; }
+
+  /* Actions selon rôle */
+  if (ME) {
+    if (ME.role === 'initiative') {
+      document.getElementById('tab-scanner').style.display = '';
+      document.getElementById('tab-organisateur').style.display = '';
+      document.getElementById('top-actions').innerHTML = '<button class="btn btn-orange" onclick="switchTab(\'organisateur\');openCreateEvent()">＋ Créer un événement</button>';
+      /* Charger événements de l'init pour le scanner */
+      try {
+        const r = await api('GET', '/events?organisateur_id='+ME.id+'&all=1');
+        const sel = document.getElementById('scanner-event-select');
+        (r.events||[]).filter(e=>e.statut==='publie').forEach(e=>{
+          const o=document.createElement('option'); o.value=e.id; o.textContent=e.titre; sel.appendChild(o);
+        });
+      } catch(e){}
+    }
+    if (ME.role === 'administrateur') {
+      document.getElementById('tab-scanner').style.display = '';
+      document.getElementById('tab-organisateur').style.display = '';
+      document.getElementById('tab-admin').style.display = '';
+    }
+    if (ME.role === 'collectivite') {
+      document.getElementById('tab-scanner').style.display = '';
+    }
+  }
+
+  loadEvents();
+})();
+</script>
+</body>
+</html>

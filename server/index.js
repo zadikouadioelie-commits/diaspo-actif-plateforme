@@ -5,7 +5,14 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const url = require("node:url");
+const crypto = require("node:crypto");
 const db = require("./db");
+
+const TICKET_SECRET = process.env.TICKET_SECRET || "diaspoactif-qr-2026-secret";
+function signTicket(ticketId, eventId, ts) {
+  return crypto.createHmac("sha256", TICKET_SECRET)
+    .update(`${ticketId}:${eventId}:${ts}`).digest("hex").slice(0, 40);
+}
 const { hashPassword, verifyPassword, createSession, getSession, destroySession, parseCookies, signAuthToken, verifyAuthToken, TOKEN_TTL } = require("./auth");
 
 const PORT = process.env.PORT || 3000;
@@ -4557,6 +4564,230 @@ async function handleRequest(req, res) {
       if (p.createur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé' });
       db.prepare(`DELETE FROM projets WHERE id=?`).run(id);
       return sendJSON(res, 200, { deleted: true });
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       MODULE BILLETTERIE — ÉVÉNEMENTS / TICKETS / SCANNER
+    ═══════════════════════════════════════════════════════════ */
+
+    /* ── GET /api/events — liste publique ── */
+    if (req.method === 'GET' && pathname === '/api/events') {
+      const q = Object.fromEntries(new URL('http://x'+req.url).searchParams);
+      let sql = `SELECT e.*, u.nom AS organisateur_nom,
+        (SELECT COUNT(*) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') AS billets_vendus,
+        (SELECT COUNT(*) FROM ticket_types tt WHERE tt.event_id=e.id AND tt.actif=1) AS nb_types
+        FROM events e LEFT JOIN users u ON u.id=e.organisateur_id WHERE 1=1`;
+      const args = [];
+      if (q.statut) { sql += ' AND e.statut=?'; args.push(q.statut); }
+      else { sql += " AND e.statut IN ('publie','ferme')"; }
+      if (q.pays) { sql += ' AND e.pays=?'; args.push(q.pays); }
+      if (q.categorie) { sql += ' AND e.categorie=?'; args.push(q.categorie); }
+      if (q.organisateur_id) { sql += ' AND e.organisateur_id=?'; args.push(q.organisateur_id); }
+      if (q.all === '1') { sql = sql.replace("AND e.statut IN ('publie','ferme')", ''); }
+      sql += ' ORDER BY e.date_debut ASC LIMIT 100';
+      const events = db.prepare(sql).all(...args);
+      return sendJSON(res, 200, { events });
+    }
+
+    /* ── GET /api/events/stats — admin stats globales ── */
+    if (req.method === 'GET' && pathname === '/api/events/stats') {
+      const me = getCurrentUser(req);
+      if (!me || !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé.' });
+      const total_events = db.prepare("SELECT COUNT(*) n FROM events").get().n;
+      const publies = db.prepare("SELECT COUNT(*) n FROM events WHERE statut='publie'").get().n;
+      const total_tickets = db.prepare("SELECT COUNT(*) n FROM tickets WHERE payment_status='paid'").get().n;
+      const revenu_total = db.prepare("SELECT COALESCE(SUM(prix_paye),0) n FROM tickets WHERE payment_status='paid'").get().n;
+      const commission_total = db.prepare("SELECT COALESCE(SUM(commission),0) n FROM tickets WHERE payment_status='paid'").get().n;
+      const par_pays = db.prepare(`SELECT pays, COUNT(*) n FROM events WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 10`).all();
+      const top_events = db.prepare(`SELECT e.titre, COUNT(t.id) nb_billets, COALESCE(SUM(t.prix_paye),0) revenu
+        FROM events e LEFT JOIN tickets t ON t.event_id=e.id AND t.payment_status='paid'
+        GROUP BY e.id ORDER BY revenu DESC LIMIT 10`).all();
+      return sendJSON(res, 200, { total_events, publies, total_tickets, revenu_total, commission_total, par_pays, top_events });
+    }
+
+    /* ── POST /api/events — créer un événement ── */
+    if (req.method === 'POST' && pathname === '/api/events') {
+      const me = getCurrentUser(req);
+      if (!me || !['initiative','administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé aux initiatives.' });
+      const { titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie, image_b64, ticket_types } = body;
+      if (!titre || !date_debut) return sendJSON(res, 400, { error: 'Titre et date_debut requis.' });
+      const ts = new Date().toISOString();
+      const eid = db.prepare(`INSERT INTO events (titre,description,organisateur_id,pays,ville,adresse,date_debut,date_fin,capacite,categorie,image_b64,statut,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,'brouillon',?,?)`)
+        .run(titre, description||null, me.id, pays||null, ville||null, adresse||null, date_debut, date_fin||null, capacite||0, categorie||'Général', image_b64||null, ts, ts).lastInsertRowid;
+      if (Array.isArray(ticket_types)) {
+        for (const tt of ticket_types) {
+          if (!tt.nom || tt.prix == null) continue;
+          db.prepare(`INSERT INTO ticket_types (event_id,nom,description,prix,quantite_totale,type) VALUES (?,?,?,?,?,?)`)
+            .run(eid, tt.nom, tt.description||null, parseFloat(tt.prix)||0, parseInt(tt.quantite)||100, tt.type||'standard');
+        }
+      }
+      return sendJSON(res, 201, { id: eid });
+    }
+
+    /* ── GET /api/events/:id ── */
+    if (req.method === 'GET' && /^\/api\/events\/\d+$/.test(pathname)) {
+      const eid = parseInt(pathname.split('/')[3]);
+      const ev = db.prepare(`SELECT e.*, u.nom AS organisateur_nom FROM events e LEFT JOIN users u ON u.id=e.organisateur_id WHERE e.id=?`).get(eid);
+      if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
+      const types = db.prepare(`SELECT tt.*, (tt.quantite_totale - tt.quantite_vendue) AS dispo FROM ticket_types tt WHERE tt.event_id=? AND tt.actif=1`).all(eid);
+      const stats = db.prepare(`SELECT COUNT(*) nb, COALESCE(SUM(prix_paye),0) revenu FROM tickets WHERE event_id=? AND payment_status='paid'`).get(eid);
+      return sendJSON(res, 200, { event: ev, ticket_types: types, stats });
+    }
+
+    /* ── PUT /api/events/:id ── */
+    if (req.method === 'PUT' && /^\/api\/events\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const eid = parseInt(pathname.split('/')[3]);
+      const ev = db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
+      if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
+      if (ev.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
+      const { titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie, image_b64, statut } = body;
+      db.prepare(`UPDATE events SET titre=COALESCE(?,titre), description=COALESCE(?,description), pays=COALESCE(?,pays), ville=COALESCE(?,ville), adresse=COALESCE(?,adresse), date_debut=COALESCE(?,date_debut), date_fin=COALESCE(?,date_fin), capacite=COALESCE(?,capacite), categorie=COALESCE(?,categorie), image_b64=COALESCE(?,image_b64), statut=COALESCE(?,statut), updated_at=datetime('now') WHERE id=?`)
+        .run(titre||null, description||null, pays||null, ville||null, adresse||null, date_debut||null, date_fin||null, capacite||null, categorie||null, image_b64||null, statut||null, eid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/events/:id/ticket-types ── */
+    if (req.method === 'POST' && /^\/api\/events\/\d+\/ticket-types$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const eid = parseInt(pathname.split('/')[3]);
+      const ev = db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
+      if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
+      if (ev.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
+      const { nom, description: desc, prix, quantite, type } = body;
+      if (!nom || prix == null) return sendJSON(res, 400, { error: 'Nom et prix requis.' });
+      const id = db.prepare(`INSERT INTO ticket_types (event_id,nom,description,prix,quantite_totale,type) VALUES (?,?,?,?,?,?)`)
+        .run(eid, nom, desc||null, parseFloat(prix)||0, parseInt(quantite)||100, type||'standard').lastInsertRowid;
+      return sendJSON(res, 201, { id });
+    }
+
+    /* ── POST /api/events/:id/buy — achat billet ── */
+    if (req.method === 'POST' && /^\/api\/events\/\d+\/buy$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const eid = parseInt(pathname.split('/')[3]);
+      const { ticket_type_id } = body;
+      if (!ticket_type_id) return sendJSON(res, 400, { error: 'ticket_type_id requis.' });
+      const ev = db.prepare(`SELECT * FROM events WHERE id=? AND statut='publie'`).get(eid);
+      if (!ev) return sendJSON(res, 400, { error: 'Événement non disponible.' });
+      const tt = db.prepare(`SELECT * FROM ticket_types WHERE id=? AND event_id=? AND actif=1`).get(ticket_type_id, eid);
+      if (!tt) return sendJSON(res, 400, { error: 'Type de billet introuvable.' });
+      if (tt.quantite_totale > 0 && tt.quantite_vendue >= tt.quantite_totale) return sendJSON(res, 400, { error: 'Billets épuisés.' });
+      /* Anti-doublon : 1 billet par utilisateur par type */
+      const existing = db.prepare(`SELECT id FROM tickets WHERE user_id=? AND ticket_type_id=? AND payment_status='paid' AND statut='valid'`).get(me.id, ticket_type_id);
+      if (existing) return sendJSON(res, 409, { error: 'Vous possédez déjà un billet pour ce type.' });
+      const commission = parseFloat((tt.prix * ev.commission_pct / 100).toFixed(2));
+      const ts = new Date().toISOString();
+      const tempSig = crypto.randomBytes(8).toString('hex'); // placeholder pour l'ID
+      const tid = db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at) VALUES (?,?,?,?,?,'paid','valid',?,?)`)
+        .run(eid, me.id, tt.id, tt.prix, commission, tempSig, ts).lastInsertRowid;
+      /* Générer vrai QR token maintenant qu'on a l'ID */
+      const qrToken = signTicket(tid, eid, ts);
+      db.prepare(`UPDATE tickets SET qr_token=? WHERE id=?`).run(qrToken, tid);
+      db.prepare(`UPDATE ticket_types SET quantite_vendue=quantite_vendue+1 WHERE id=?`).run(tt.id);
+      /* Enregistrement participant (immuable) */
+      db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) VALUES (?,?,?,?,?)`)
+        .run(tid, eid, me.id, me.nom, me.pays||null);
+      /* Transaction financière (audit) */
+      try {
+        db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'billet_evenement',?,?,'reussi',?)`)
+          .run(me.id, tt.prix, 'billet_evenement', ts);
+      } catch(e) { /* table transactions peut avoir schema différent */ }
+      return sendJSON(res, 201, { ticket_id: tid, qr_token: qrToken, prix: tt.prix });
+    }
+
+    /* ── GET /api/tickets/mes — mes billets ── */
+    if (req.method === 'GET' && pathname === '/api/tickets/mes') {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const tickets = db.prepare(`SELECT t.*, e.titre AS event_titre, e.date_debut, e.ville, e.pays, e.image_b64,
+        tt.nom AS type_nom, tt.type AS type_cat
+        FROM tickets t JOIN events e ON e.id=t.event_id JOIN ticket_types tt ON tt.id=t.ticket_type_id
+        WHERE t.user_id=? ORDER BY t.created_at DESC`).all(me.id);
+      return sendJSON(res, 200, { tickets });
+    }
+
+    /* ── GET /api/tickets/:id — détail + QR ── */
+    if (req.method === 'GET' && /^\/api\/tickets\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const tid = parseInt(pathname.split('/')[3]);
+      const t = db.prepare(`SELECT t.*, e.titre AS event_titre, e.date_debut, e.date_fin, e.ville, e.pays, e.adresse, u.nom AS user_nom, tt.nom AS type_nom, tt.type AS type_cat
+        FROM tickets t JOIN events e ON e.id=t.event_id JOIN ticket_types tt ON tt.id=t.ticket_type_id JOIN users u ON u.id=t.user_id WHERE t.id=?`).get(tid);
+      if (!t) return sendJSON(res, 404, { error: 'Billet introuvable.' });
+      if (t.user_id !== me.id && !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      /* Payload QR encodé en base64 pour le frontend */
+      const qrPayload = Buffer.from(JSON.stringify({ tid, eid: t.event_id, sig: t.qr_token })).toString('base64');
+      return sendJSON(res, 200, { ticket: t, qr_payload: qrPayload });
+    }
+
+    /* ── GET /api/events/:id/attendees ── */
+    if (req.method === 'GET' && /^\/api\/events\/\d+\/attendees$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const eid = parseInt(pathname.split('/')[3]);
+      const ev = db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
+      if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
+      if (ev.organisateur_id !== me.id && !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      const attendees = db.prepare(`SELECT a.*, t.prix_paye, t.statut AS ticket_statut, t.created_at AS achat_date, tt.nom AS type_nom
+        FROM event_attendees a JOIN tickets t ON t.id=a.ticket_id JOIN ticket_types tt ON tt.id=t.ticket_type_id
+        WHERE a.event_id=? ORDER BY a.created_at DESC`).all(eid);
+      return sendJSON(res, 200, { attendees });
+    }
+
+    /* ── GET /api/events/:id/checkins ── */
+    if (req.method === 'GET' && /^\/api\/events\/\d+\/checkins$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const eid = parseInt(pathname.split('/')[3]);
+      const ev = db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
+      if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
+      if (ev.organisateur_id !== me.id && !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      const checkins = db.prepare(`SELECT c.*, a.nom_display, u.nom AS scanner_nom
+        FROM event_checkins c LEFT JOIN event_attendees a ON a.ticket_id=c.ticket_id LEFT JOIN users u ON u.id=c.scanner_id
+        WHERE c.event_id=? ORDER BY c.timestamp DESC LIMIT 200`).all(eid);
+      const totaux = db.prepare(`SELECT COUNT(*) total, SUM(CASE WHEN resultat='accepted' THEN 1 ELSE 0 END) accepted FROM event_checkins WHERE event_id=?`).get(eid);
+      return sendJSON(res, 200, { checkins, totaux });
+    }
+
+    /* ── POST /api/scanner/validate — valider QR code ── */
+    if (req.method === 'POST' && pathname === '/api/scanner/validate') {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      if (!['initiative','administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Rôle non autorisé à scanner.' });
+      const { qr_payload } = body;
+      if (!qr_payload) return sendJSON(res, 400, { error: 'qr_payload manquant.' });
+      let parsed;
+      try { parsed = JSON.parse(Buffer.from(qr_payload, 'base64').toString()); } catch(e) { return sendJSON(res, 400, { error: 'QR code illisible.' }); }
+      const { tid, eid, sig } = parsed;
+      if (!tid || !eid || !sig) return sendJSON(res, 400, { error: 'QR code incomplet.' });
+      const ticket = db.prepare(`SELECT t.*, e.organisateur_id FROM tickets t JOIN events e ON e.id=t.event_id WHERE t.id=? AND t.event_id=?`).get(tid, eid);
+
+      const logRejection = (motif) => {
+        try { db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat,motif_rejet) VALUES (?,?,?,'rejected',?)`).run(tid||0, eid||0, me.id, motif); } catch(e){}
+        return sendJSON(res, 200, { valid: false, motif });
+      };
+
+      if (!ticket) return logRejection('Billet introuvable ou mauvais événement');
+      /* Vérifier autorisation scanner : organisateur ou admin */
+      if (ticket.organisateur_id !== me.id && !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Non autorisé pour cet événement.' });
+      /* Vérifier signature HMAC */
+      const expectedSig = signTicket(tid, eid, ticket.created_at);
+      if (sig !== expectedSig) return logRejection('Signature QR invalide — billet falsifié');
+      if (ticket.payment_status !== 'paid') return logRejection('Paiement non confirmé');
+      if (ticket.statut === 'used') return logRejection('Billet déjà utilisé');
+      if (ticket.statut === 'cancelled') return logRejection('Billet annulé');
+      /* ✅ Valide — marquer comme utilisé + log immuable */
+      db.prepare(`UPDATE tickets SET statut='used' WHERE id=?`).run(tid);
+      db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat) VALUES (?,?,?,'accepted')`).run(tid, eid, me.id);
+      const attendee = db.prepare(`SELECT nom_display FROM event_attendees WHERE ticket_id=?`).get(tid);
+      return sendJSON(res, 200, { valid: true, nom: attendee?.nom_display || 'Participant', ticket_id: tid });
+    }
+
+    /* ── GET /api/admin/events ── */
+    if (req.method === 'GET' && pathname === '/api/admin/events') {
+      const me = getCurrentUser(req);
+      if (!me || !['administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé.' });
+      const events = db.prepare(`SELECT e.*, u.nom AS organisateur_nom,
+        (SELECT COUNT(*) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') nb_billets,
+        (SELECT COALESCE(SUM(prix_paye),0) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') revenu
+        FROM events e LEFT JOIN users u ON u.id=e.organisateur_id ORDER BY e.created_at DESC LIMIT 200`).all();
+      return sendJSON(res, 200, { events });
     }
 
     return sendJSON(res, 404, { error: "Route API inconnue." });

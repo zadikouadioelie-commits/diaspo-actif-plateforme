@@ -40,6 +40,7 @@
 
       <span class="sb-group-lbl">🟩 Initiatives</span>
       <a href="#initiatives" data-section="initiatives">🌐 Initiatives & Projets</a>
+      <a href="#billetterie" data-section="billetterie">🎟️ Billetterie</a>
       <a href="#accreditations" data-section="accreditations" style="display:flex;justify-content:space-between;align-items:center;">🏛️ Accréditations <span id="accred-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#certifications" data-section="certifications">🛡️ Certifications</a>
 
@@ -502,6 +503,35 @@
             </tr></thead>
             <tbody id="tx-table"></tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- BILLETTERIE ADMIN -->
+      <section id="section-billetterie" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+          <div>
+            <h2 style="margin:0;">🎟️ Billetterie — Vue globale</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Événements, ventes, revenus, commissions et audit des check-ins</p>
+          </div>
+          <a href="billetterie.html" target="_blank" class="btn btn-orange">🔗 Ouvrir la billetterie</a>
+        </div>
+        <div id="admin-billet-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;" class="responsive-grid-1">
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:14px;">🌍 Événements par pays</h3>
+            <div id="admin-billet-pays"></div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:14px;">🏆 Top événements (revenus)</h3>
+            <div id="admin-billet-top"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+            <h3 style="margin:0;font-size:14px;">📋 Tous les événements</h3>
+            <button class="btn btn-sm btn-outline" onclick="loadAdminBilletterie()">↺ Actualiser</button>
+          </div>
+          <div id="admin-billet-table" style="overflow-x:auto;"></div>
         </div>
       </section>
 
@@ -2452,6 +2482,7 @@ async function submitAccordDirect(){
     parametres:  () => loadParametres(),
     publicites:  () => loadPublicites(),
     chatbot:     () => switchCbTab('stats'),
+    billetterie: () => loadAdminBilletterie(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
@@ -4387,6 +4418,80 @@ async function submitAccordDirect(){
   });
 
 })();
+
+/* ═══ BILLETTERIE ADMIN ═══ */
+async function loadAdminBilletterie() {
+  const fmtDate = s => { if(!s) return '—'; const d=new Date(s); const M=['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']; return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`; };
+  const STATUTS = { brouillon:'📝 Brouillon', publie:'🟢 Publié', ferme:'🔒 Fermé', archive:'📁 Archivé' };
+  try {
+    const [rStats, rEvents] = await Promise.all([
+      api('GET','/events/stats'),
+      api('GET','/admin/events')
+    ]);
+    const s = rStats;
+    /* KPIs */
+    document.getElementById('admin-billet-stats').innerHTML = `
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;">${s.total_events||0}</div><div style="font-size:12px;color:var(--muted);">Événements total</div></div>
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#10b981;">${s.publies||0}</div><div style="font-size:12px;color:var(--muted);">Publiés</div></div>
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;">${s.total_tickets||0}</div><div style="font-size:12px;color:var(--muted);">Billets vendus</div></div>
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:var(--orange);">${(s.revenu_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Revenus bruts</div></div>
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#8b5cf6;">${(s.commission_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Commission DA (5%)</div></div>`;
+    /* Par pays */
+    const pays = s.par_pays||[];
+    document.getElementById('admin-billet-pays').innerHTML = pays.length
+      ? pays.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <span>🌍 ${p.pays||'—'}</span><strong>${p.n} événement${p.n>1?'s':''}</strong></div>`).join('')
+      : '<div style="color:var(--muted);font-size:13px;padding:10px 0;">Aucune donnée.</div>';
+    /* Top événements */
+    const top = s.top_events||[];
+    document.getElementById('admin-billet-top').innerHTML = top.length
+      ? top.map((e,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <span><strong style="color:var(--orange);">#${i+1}</strong> ${e.titre}</span>
+          <strong>${(e.revenu||0).toFixed(2)} €</strong></div>`).join('')
+      : '<div style="color:var(--muted);font-size:13px;padding:10px 0;">Aucun événement avec revenus.</div>';
+    /* Table complète */
+    const events = rEvents.events||[];
+    document.getElementById('admin-billet-table').innerHTML = events.length
+      ? `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="background:var(--bg);">
+            <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Événement</th>
+            <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Organisateur</th>
+            <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Date</th>
+            <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Statut</th>
+            <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Billets</th>
+            <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Revenu</th>
+            <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Commission</th>
+            <th style="padding:10px;text-align:center;border-bottom:1px solid var(--border);">Actions</th>
+          </tr></thead>
+          <tbody>${events.map(e=>`
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px;"><strong>${e.titre}</strong><div style="font-size:11px;color:var(--muted);">${e.ville||''}${e.pays?', '+e.pays:''}</div></td>
+              <td style="padding:10px;">${e.organisateur_nom||'—'}</td>
+              <td style="padding:10px;white-space:nowrap;">${fmtDate(e.date_debut)}</td>
+              <td style="padding:10px;">${STATUTS[e.statut]||e.statut}</td>
+              <td style="padding:10px;text-align:right;">${e.nb_billets||0}</td>
+              <td style="padding:10px;text-align:right;font-weight:700;">${(e.revenu||0).toFixed(2)} €</td>
+              <td style="padding:10px;text-align:right;color:#8b5cf6;">${((e.revenu||0)*0.05).toFixed(2)} €</td>
+              <td style="padding:10px;text-align:center;">
+                ${e.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="adminPublishEvent(${e.id})">Publier</button>`:''}
+                ${e.statut==='publie'?`<button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="adminCloseEvent(${e.id})">Fermer</button>`:''}
+              </td>
+            </tr>`).join('')}
+          </tbody></table>`
+      : '<div style="text-align:center;padding:30px;color:var(--muted);">Aucun événement créé sur la plateforme.</div>';
+  } catch(e) { console.error('billetterie admin', e); }
+}
+
+window.adminPublishEvent = async function(id) {
+  if (!confirm('Publier cet événement ?')) return;
+  try { await api('PUT','/events/'+id,{statut:'publie'}); loadAdminBilletterie(); }
+  catch(e) { alert('Erreur : '+e.message); }
+};
+window.adminCloseEvent = async function(id) {
+  if (!confirm('Fermer les ventes ?')) return;
+  try { await api('PUT','/events/'+id,{statut:'ferme'}); loadAdminBilletterie(); }
+  catch(e) { alert('Erreur : '+e.message); }
+};
 </script>
 </body>
 </html>

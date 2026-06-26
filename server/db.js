@@ -716,6 +716,90 @@ db.exec(`
   );
 `);
 
+/* ══ MODULE BILLETTERIE / ÉVÉNEMENTS ══ */
+db.exec(`
+  /* ── ÉVÉNEMENTS (modifiable) ── */
+  CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titre TEXT NOT NULL,
+    description TEXT,
+    organisateur_id INTEGER NOT NULL,       -- user.id (role initiative)
+    pays TEXT,
+    ville TEXT,
+    adresse TEXT,
+    date_debut TEXT NOT NULL,
+    date_fin TEXT,
+    capacite INTEGER DEFAULT 0,
+    image_b64 TEXT,
+    categorie TEXT DEFAULT 'Général',
+    statut TEXT DEFAULT 'brouillon',        -- brouillon|publie|archive|ferme
+    commission_pct REAL DEFAULT 5.0,        -- % plateforme
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(organisateur_id) REFERENCES users(id)
+  );
+
+  /* ── TYPES DE BILLETS (modifiable si 0 ventes) ── */
+  CREATE TABLE IF NOT EXISTS ticket_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    description TEXT,
+    prix REAL NOT NULL DEFAULT 0,
+    quantite_totale INTEGER NOT NULL DEFAULT 100,
+    quantite_vendue INTEGER DEFAULT 0,
+    type TEXT DEFAULT 'standard',           -- standard|vip|early|sponsor
+    actif INTEGER DEFAULT 1,
+    FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE
+  );
+
+  /* ── BILLETS ACHETÉS (IMMUABLE — pas de DELETE ni UPDATE statut sauf used/cancelled) ── */
+  CREATE TABLE IF NOT EXISTS tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    ticket_type_id INTEGER NOT NULL,
+    prix_paye REAL NOT NULL,
+    commission REAL NOT NULL DEFAULT 0,
+    payment_status TEXT DEFAULT 'pending',  -- pending|paid|failed|refunded
+    statut TEXT DEFAULT 'valid',            -- valid|used|cancelled
+    qr_token TEXT NOT NULL UNIQUE,          -- HMAC signé
+    transaction_ref TEXT,                   -- ref transaction paiement
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(event_id) REFERENCES events(id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(ticket_type_id) REFERENCES ticket_types(id)
+  );
+
+  /* ── CHECK-IN LOGS (IMMUABLE — INSERT ONLY) ── */
+  CREATE TABLE IF NOT EXISTS event_checkins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL,
+    event_id INTEGER NOT NULL,
+    scanner_id INTEGER NOT NULL,            -- user.id du scanneur
+    resultat TEXT NOT NULL,                 -- accepted|rejected
+    motif_rejet TEXT,                       -- raison si rejected
+    timestamp TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(ticket_id) REFERENCES tickets(id),
+    FOREIGN KEY(event_id) REFERENCES events(id),
+    FOREIGN KEY(scanner_id) REFERENCES users(id)
+  );
+
+  /* ── PARTICIPANTS (IMMUABLE — anonymisation seulement) ── */
+  CREATE TABLE IF NOT EXISTS event_attendees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL UNIQUE,
+    event_id INTEGER NOT NULL,
+    user_id INTEGER,                        -- NULL si anonymisé
+    nom_display TEXT,
+    pays TEXT,
+    anonymise INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(ticket_id) REFERENCES tickets(id),
+    FOREIGN KEY(event_id) REFERENCES events(id)
+  );
+`);
+
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
 const MIGRATIONS = [
   ["conversations", "sujet TEXT"],
