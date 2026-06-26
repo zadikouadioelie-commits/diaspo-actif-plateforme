@@ -64,13 +64,30 @@
     <aside class="sidebar">
       <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
       <div class="brand" id="sidebar-brand">Compte Institutionnel</div>
-      <a class="active" href="#ciblage">🎯 Communication ciblée</a>
-      <a href="#collectifs">✉️ Messages collectifs</a>
-      <a href="#communautes">👥 Communautés</a>
+
+      <div class="sb-group-lbl">01 — COCKPIT</div>
+      <a class="active" href="#cockpit">🟦 Tableau de bord</a>
+
+      <div class="sb-group-lbl">02 — INITIATIVES</div>
+      <a href="#initiatives-valider">🟩 Initiatives à valider <span class="pill" id="inst-valid-badge" style="display:none;"></span></a>
+      <a href="#initiatives-validees">✅ Initiatives validées</a>
+
+      <div class="sb-group-lbl">03 — TERRITOIRES</div>
+      <a href="#communautes">🟨 Communautés</a>
       <a href="#competences">🧠 Compétences diaspora</a>
-      <a href="#observatoire">📊 Observatoire statistique</a>
+
+      <div class="sb-group-lbl">04 — INTELLIGENCE</div>
+      <a href="#observatoire">🟪 Observatoire statistique</a>
+
+      <div class="sb-group-lbl">05 — COMMUNICATION</div>
+      <a href="#ciblage">🟥 Communication ciblée</a>
+      <a href="#collectifs">✉️ Messages collectifs</a>
       <a href="agenda.html">📅 Mon Agenda</a>
+
+      <div class="sb-group-lbl">06 — OUTILS</div>
       <a href="confidentialite.html">🔐 Confidentialité</a>
+
+      <style>.sb-group-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:rgba(255,255,255,.4);padding:12px 16px 4px;margin-top:4px;}</style>
     </aside>
     <main class="content" id="dashboard-content">
       <div class="notice">Chargement de votre espace institutionnel…</div>
@@ -565,6 +582,169 @@
         <span class="tag">${i.abonnes.toLocaleString("fr-FR")} abonnés</span>
       </div>`
     ).join("");
+  }
+
+  /* ══ COCKPIT + INITIATIVES sections ══ */
+  const instContent = document.getElementById("dashboard-content");
+  const cockpitDiv = document.createElement('div');
+  cockpitDiv.id = 'section-cockpit';
+  cockpitDiv.style.display = 'none';
+  cockpitDiv.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+      <div>
+        <h1 style="margin:0;">${me.nom}</h1>
+        <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Cockpit institutionnel — supervision, initiatives et communications</p>
+      </div>
+      <span class="badge badge-instit">🏛️ Compte Institutionnel</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+      <div class="card" style="text-align:center;padding:16px;">
+        <div style="font-size:28px;font-weight:800;color:var(--orange);">${Number(totalMembresReel||0).toLocaleString('fr-FR')}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Membres inscrits</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px;">
+        <div style="font-size:28px;font-weight:800;color:#f59e0b;" id="inst-kpi-valider">—</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Initiatives à valider</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px;">
+        <div style="font-size:28px;font-weight:800;color:#10b981;" id="inst-kpi-validees">—</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Initiatives validées</div>
+      </div>
+      <div class="card" style="text-align:center;padding:16px;">
+        <div style="font-size:28px;font-weight:800;color:#8b5cf6;">${obs && obs.par_pays ? obs.par_pays.length : '—'}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Pays représentés</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:20px;">
+      <button class="btn btn-orange" onclick="instShowSection('initiatives-valider')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
+        <span style="font-size:20px;">🟩</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Valider des initiatives</div><div style="font-size:11px;opacity:.8;">Projets en attente</div></div>
+      </button>
+      <button class="btn btn-outline" onclick="instShowSection('ciblage')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
+        <span style="font-size:20px;">🟥</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Communication ciblée</div><div style="font-size:11px;color:var(--muted);">Envoyer à la diaspora</div></div>
+      </button>
+      <button class="btn btn-outline" onclick="instShowSection('observatoire')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
+        <span style="font-size:20px;">🟪</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Observatoire</div><div style="font-size:11px;color:var(--muted);">Statistiques diaspora</div></div>
+      </button>
+    </div>
+    <div class="notice">🏛️ Réservé aux ambassades, consulats, mairies, préfectures et organismes publics.</div>`;
+  instContent.insertBefore(cockpitDiv, instContent.firstChild);
+
+  /* Section initiatives à valider */
+  const validDiv = document.createElement('div');
+  validDiv.id = 'section-initiatives-valider';
+  validDiv.style.display = 'none';
+  validDiv.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+      <h2 style="margin:0;">🟩 Initiatives à valider</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="u-proj-filter active" onclick="filterInstProjets(this,'en_attente')">⏳ En attente</button>
+        <button class="u-proj-filter" onclick="filterInstProjets(this,'verification')">🔍 Vérification</button>
+        <button class="u-proj-filter" onclick="filterInstProjets(this,'validation')">🏛️ Validation</button>
+      </div>
+    </div>
+    <div id="inst-projets-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>`;
+  instContent.appendChild(validDiv);
+
+  const valideeDiv = document.createElement('div');
+  valideeDiv.id = 'section-initiatives-validees';
+  valideeDiv.style.display = 'none';
+  valideeDiv.innerHTML = `
+    <h2 style="margin:0 0 20px;">✅ Initiatives validées</h2>
+    <div id="inst-projets-validees"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>`;
+  instContent.appendChild(valideeDiv);
+
+  /* Charger et afficher projets institutions */
+  const INST_STATUT = {brouillon:'📝 Brouillon',en_attente:'⏳ En attente',verification:'🔍 Vérification',validation:'🏛️ Validation',execution:'⚡ Exécution',evaluation:'⭐ Évaluation',termine:'✅ Terminé',rejete:'❌ Rejeté'};
+  let _instProjets = [];
+  let _instFilter = 'en_attente';
+
+  async function loadInstProjets() {
+    try {
+      const r = await api('GET', '/projets');
+      _instProjets = r.projets || [];
+      const valider = _instProjets.filter(p=>['en_attente','verification','validation'].includes(p.statut)).length;
+      const validees = _instProjets.filter(p=>p.statut==='execution'||p.statut==='termine').length;
+      if(document.getElementById('inst-kpi-valider')) document.getElementById('inst-kpi-valider').textContent = valider||'0';
+      if(document.getElementById('inst-kpi-validees')) document.getElementById('inst-kpi-validees').textContent = validees||'0';
+      if(document.getElementById('inst-valid-badge')) { document.getElementById('inst-valid-badge').textContent=valider; document.getElementById('inst-valid-badge').style.display=valider>0?'':'none'; }
+      renderInstProjets(_instFilter);
+      document.getElementById('inst-projets-validees').innerHTML = _instProjets.filter(p=>['execution','evaluation','termine'].includes(p.statut)).map(p=>`
+        <div class="u-proj-card"><div style="display:flex;justify-content:space-between;align-items:center;">
+          <div><strong style="font-size:13px;">${p.titre}</strong> <span style="font-size:11px;color:var(--muted);">par ${p.createur_nom||'—'}</span></div>
+          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#d1fae5;color:#065f46;">${INST_STATUT[p.statut]}</span>
+        </div></div>`).join('') || '<div style="color:var(--muted);padding:20px;text-align:center;">Aucune initiative validée.</div>';
+    } catch(e) { console.error(e); }
+  }
+
+  function renderInstProjets(statut) {
+    const rows = _instProjets.filter(p=>p.statut===statut);
+    const el = document.getElementById('inst-projets-list');
+    if(!el) return;
+    if(!rows.length) { el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted);">Aucun projet avec ce statut.</div>'; return; }
+    el.innerHTML = rows.map(p=>`
+      <div class="u-proj-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+          <div>
+            <strong style="font-size:14px;">${p.titre}</strong>
+            <span style="font-size:12px;color:var(--muted);margin-left:8px;">par ${p.createur_nom||'—'}</span>
+          </div>
+          <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;background:#fef3c7;color:#92400e;">${INST_STATUT[p.statut]||p.statut}</span>
+        </div>
+        ${p.description?`<p style="margin:0 0 10px;font-size:13px;color:var(--muted);">${p.description.slice(0,160)}…</p>`:''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-orange" onclick="instValiderProjet(${p.id})">✅ Valider → Exécution</button>
+          <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="instRejeterProjet(${p.id})">❌ Rejeter</button>
+        </div>
+      </div>`).join('');
+  }
+
+  window.filterInstProjets = function(btn, statut) {
+    document.querySelectorAll('#section-initiatives-valider .u-proj-filter').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    _instFilter = statut;
+    renderInstProjets(statut);
+  };
+  window.instValiderProjet = async function(id) {
+    if(!confirm('Valider ce projet et le passer en phase Exécution ?')) return;
+    try { await api('PUT','/projets/'+id+'/statut',{statut:'execution',commentaire:'Validé par l\'institution'}); loadInstProjets(); }
+    catch(e){alert('Erreur : '+e.message);}
+  };
+  window.instRejeterProjet = async function(id) {
+    const motif = prompt('Motif du rejet (obligatoire) :');
+    if(!motif) return;
+    try { await api('PUT','/projets/'+id+'/statut',{statut:'rejete',motif_rejet:motif,commentaire:'Rejeté : '+motif}); loadInstProjets(); }
+    catch(e){alert('Erreur : '+e.message);}
+  };
+
+  /* Router sections institutionnel */
+  const INST_SECTIONS = ['cockpit','ciblage','collectifs','communautes','competences','observatoire','initiatives-valider','initiatives-validees'];
+  window.instShowSection = function(name) {
+    INST_SECTIONS.forEach(s => {
+      const el = document.getElementById('section-'+s);
+      if(el) el.style.display = s===name ? '' : 'none';
+    });
+    document.querySelectorAll('.sidebar a').forEach(a => {
+      const href = a.getAttribute('href')||'';
+      a.classList.toggle('active', href==='#'+name||href.endsWith('#'+name));
+    });
+    if(name==='initiatives-valider'||name==='initiatives-validees') loadInstProjets();
+    window.scrollTo(0,0);
+  };
+  document.querySelectorAll('.sidebar a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const sec = a.getAttribute('href').replace('#','');
+      if(INST_SECTIONS.includes(sec)) { e.preventDefault(); instShowSection(sec); }
+    });
+  });
+
+  /* Afficher cockpit par défaut */
+  instShowSection('cockpit');
+  loadInstProjets();
+
+  if(!document.getElementById('inst-proj-style')){
+    const s=document.createElement('style');s.id='inst-proj-style';
+    s.textContent='.u-proj-filter{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}.u-proj-filter.active{background:var(--orange);color:#fff;border-color:var(--orange);}.u-proj-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}';
+    document.head.appendChild(s);
   }
 })();
 </script>

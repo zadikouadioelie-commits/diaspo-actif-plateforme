@@ -4428,6 +4428,137 @@ async function handleRequest(req, res) {
       return sendJSON(res, 200, { reminders_sent: dues.length });
     }
 
+    /* ============================================================
+       MODULE PROJETS — cycle de vie (brouillon→en_attente→verification→validation→execution→evaluation→termine|rejete)
+    ============================================================ */
+    const STATUTS_PROJETS = ['brouillon','en_attente','verification','validation','execution','evaluation','termine','rejete'];
+    const STATUT_TRANSITIONS = {
+      brouillon:    ['en_attente'],
+      en_attente:   ['verification','rejete'],
+      verification: ['validation','rejete'],
+      validation:   ['execution','rejete'],
+      execution:    ['evaluation'],
+      evaluation:   ['termine'],
+      termine:      [],
+      rejete:       ['en_attente']
+    };
+
+    /* GET /api/projets — liste selon rôle */
+    if (req.method === 'GET' && pathname === '/api/projets') {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const q = parsed.query;
+      let rows;
+      if (me.role === 'administrateur' || me.role === 'collectivite') {
+        const statut = q.statut || null;
+        const sql = statut
+          ? `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.statut=? ORDER BY p.updated_at DESC`
+          : `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id ORDER BY p.updated_at DESC`;
+        rows = statut ? db.prepare(sql).all(statut) : db.prepare(sql).all();
+      } else {
+        rows = db.prepare(`SELECT p.*, u.nom AS createur_nom FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.createur_id=? ORDER BY p.updated_at DESC`).all(me.id);
+      }
+      return sendJSON(res, 200, { projets: rows });
+    }
+
+    /* POST /api/projets — créer */
+    if (req.method === 'POST' && pathname === '/api/projets') {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const { titre, description, type, categorie, pays, region, ville, budget_estime, date_debut, date_fin, tags } = body;
+      if (!titre) return sendJSON(res, 400, { error: 'Titre obligatoire' });
+      const r = db.prepare(`INSERT INTO projets (titre,description,type,categorie,pays,region,ville,budget_estime,date_debut,date_fin,tags,createur_id,statut) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'brouillon')`)
+        .run(titre, description||null, type||'projet', categorie||'Général', pays||null, region||null, ville||null, budget_estime||null, date_debut||null, date_fin||null, JSON.stringify(tags||[]), me.id);
+      return sendJSON(res, 201, { id: r.lastInsertRowid });
+    }
+
+    /* GET /api/projets/stats — stats cockpit */
+    if (req.method === 'GET' && pathname === '/api/projets/stats') {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      let stats;
+      if (me.role === 'administrateur' || me.role === 'collectivite') {
+        const total = db.prepare(`SELECT COUNT(*) AS n FROM projets`).get().n;
+        const en_attente = db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='en_attente'`).get().n;
+        const validation = db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='validation'`).get().n;
+        const execution = db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='execution'`).get().n;
+        const termine = db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='termine'`).get().n;
+        const rejete = db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='rejete'`).get().n;
+        stats = { total, en_attente, validation, execution, termine, rejete };
+      } else {
+        const mes = db.prepare(`SELECT statut, COUNT(*) AS n FROM projets WHERE createur_id=? GROUP BY statut`).all(me.id);
+        stats = { total: 0, brouillon: 0, en_attente: 0, execution: 0, termine: 0 };
+        mes.forEach(r => { stats[r.statut] = r.n; stats.total += r.n; });
+      }
+      return sendJSON(res, 200, stats);
+    }
+
+    /* GET /api/projets/:id */
+    if (req.method === 'GET' && /^\/api\/projets\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const id = parseInt(pathname.split('/')[3]);
+      const p = db.prepare(`SELECT p.*, u.nom AS createur_nom FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.id=?`).get(id);
+      if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
+      if (p.createur_id !== me.id && me.role !== 'administrateur' && me.role !== 'collectivite') return sendJSON(res, 403, { error: 'Accès refusé' });
+      const commentaires = db.prepare(`SELECT pc.*, u.nom AS auteur_nom FROM projets_commentaires pc JOIN users u ON u.id=pc.auteur_id WHERE pc.projet_id=? ORDER BY pc.created_at`).all(id);
+      return sendJSON(res, 200, { projet: p, commentaires });
+    }
+
+    /* PUT /api/projets/:id — modifier */
+    if (req.method === 'PUT' && /^\/api\/projets\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const id = parseInt(pathname.split('/')[3]);
+      const p = db.prepare(`SELECT * FROM projets WHERE id=?`).get(id);
+      if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
+      if (p.createur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé' });
+      const { titre, description, type, categorie, pays, region, ville, budget_estime, date_debut, date_fin, tags } = body;
+      db.prepare(`UPDATE projets SET titre=?,description=?,type=?,categorie=?,pays=?,region=?,ville=?,budget_estime=?,date_debut=?,date_fin=?,tags=?,updated_at=datetime('now') WHERE id=?`)
+        .run(titre||p.titre, description??p.description, type||p.type, categorie||p.categorie, pays??p.pays, region??p.region, ville??p.ville, budget_estime??p.budget_estime, date_debut??p.date_debut, date_fin??p.date_fin, JSON.stringify(tags||JSON.parse(p.tags||'[]')), id);
+      return sendJSON(res, 200, { updated: true });
+    }
+
+    /* PUT /api/projets/:id/statut — transition lifecycle */
+    if (req.method === 'PUT' && /^\/api\/projets\/\d+\/statut$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const id = parseInt(pathname.split('/')[3]);
+      const p = db.prepare(`SELECT * FROM projets WHERE id=?`).get(id);
+      if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
+      const { statut, commentaire, motif_rejet } = body;
+      if (!STATUTS_PROJETS.includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide' });
+      const allowed = STATUT_TRANSITIONS[p.statut] || [];
+      const isOwner = p.createur_id === me.id;
+      const isValidator = me.role === 'administrateur' || me.role === 'collectivite';
+      if (!isValidator && !(isOwner && statut === 'en_attente' && p.statut === 'brouillon')) {
+        if (!allowed.includes(statut)) return sendJSON(res, 403, { error: 'Transition non autorisée' });
+        if (!isValidator) return sendJSON(res, 403, { error: 'Action réservée aux validateurs' });
+      }
+      db.prepare(`UPDATE projets SET statut=?,motif_rejet=?,validateur_id=?,date_validation=datetime('now'),updated_at=datetime('now') WHERE id=?`)
+        .run(statut, motif_rejet||null, isValidator ? me.id : null, id);
+      if (commentaire) {
+        db.prepare(`INSERT INTO projets_commentaires (projet_id,auteur_id,contenu,type) VALUES (?,?,?,?)`)
+          .run(id, me.id, commentaire, statut === 'rejete' ? 'rejet' : 'validation');
+      }
+      return sendJSON(res, 200, { updated: true, statut });
+    }
+
+    /* POST /api/projets/:id/commentaires */
+    if (req.method === 'POST' && /^\/api\/projets\/\d+\/commentaires$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const id = parseInt(pathname.split('/')[3]);
+      const { contenu } = body;
+      if (!contenu) return sendJSON(res, 400, { error: 'Contenu obligatoire' });
+      db.prepare(`INSERT INTO projets_commentaires (projet_id,auteur_id,contenu) VALUES (?,?,?)`).run(id, me.id, contenu);
+      return sendJSON(res, 201, { ok: true });
+    }
+
+    /* DELETE /api/projets/:id */
+    if (req.method === 'DELETE' && /^\/api\/projets\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const id = parseInt(pathname.split('/')[3]);
+      const p = db.prepare(`SELECT * FROM projets WHERE id=?`).get(id);
+      if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
+      if (p.createur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé' });
+      db.prepare(`DELETE FROM projets WHERE id=?`).run(id);
+      return sendJSON(res, 200, { deleted: true });
+    }
+
     return sendJSON(res, 404, { error: "Route API inconnue." });
   }
 

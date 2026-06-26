@@ -38,93 +38,245 @@
   <div class="with-sidebar">
     <aside class="sidebar">
       <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
-      <div class="brand">Mon espace</div>
-      <a class="active" href="dashboard-utilisateur.html">🌐 Accueil</a>
-      <a href="profil.html">👤 Mon profil public</a>
-      <a href="#localisation">📍 Ma Localisation</a>
-      <a href="#nationalites">🌍 Mes Nationalités</a>
-      <a href="#financements">💚 J'ai Financé</a>
-      <a href="#cv">📄 Mes CV</a>
-      <a href="#lettres">✉️ Mes Lettres</a>
-      <a href="#candidatures">📋 Mes Candidatures</a>
-      <a href="#collaborations">🤝 Mes Collaborations</a>
-      <a href="#recherches">🔍 Mes Recherches</a>
-      <a href="messagerie.html">💬 Mes Conversations <span class="pill">2</span></a>
+      <div class="brand" id="u-sidebar-brand">Mon espace</div>
+
+      <div class="sb-group-lbl">01 — COCKPIT</div>
+      <a class="active" href="#" data-usection="cockpit">🟦 Tableau de bord</a>
+
+      <div class="sb-group-lbl">02 — INITIATIVES</div>
+      <a href="#" data-usection="projets">🟩 Mes projets <span class="pill" id="u-projets-pill" style="display:none;"></span></a>
+      <a href="annuaire.html">🔍 Parcourir les initiatives</a>
+
+      <div class="sb-group-lbl">03 — TERRITOIRES</div>
+      <a href="#" data-usection="territoires">🟨 Ma localisation</a>
+
+      <div class="sb-group-lbl">04 — INTELLIGENCE</div>
+      <a href="#" data-usection="intelligence">🟪 Mes statistiques</a>
+
+      <div class="sb-group-lbl">05 — COMMUNICATION</div>
+      <a href="messagerie.html">🟥 Messagerie <span class="pill" id="u-msg-pill" style="display:none;"></span></a>
       <a href="agenda.html">📅 Mon Agenda</a>
+
+      <div class="sb-group-lbl">06 — OUTILS</div>
+      <a href="#" data-usection="outils">🟧 CV, Lettres, Candidatures</a>
+      <a href="profil.html">👤 Mon profil public</a>
       <a href="confidentialite.html">🔐 Confidentialité</a>
     </aside>
+
     <main class="content">
-      <h1 id="dash-title">Tableau de bord</h1>
-      <div class="notice">Compte Utilisateur — créez votre profil, publiez, réagissez, rejoignez des initiatives et développez votre réseau, gratuitement.</div>
-
-      <div class="card" id="localisation" style="margin-bottom:20px;">
-        <div class="flex-between"><h3 style="margin:0;">Ma localisation</h3><span class="conf-tag conf-public">🌍 Ville publique (optionnel) · <a href="confidentialite.html" style="color:inherit;">détails</a></span></div>
-        <div id="dv-localisation"></div>
-        <button id="btn-edit-loc" class="btn btn-outline btn-sm" style="margin-top:8px;">Modifier ma localisation</button>
-      </div>
-
-      <div class="card" id="nationalites" style="margin-bottom:20px;">
-        <div class="flex-between"><h3 style="margin:0;">Mes nationalités déclarées</h3><span class="conf-tag conf-confidentiel">🔐 Confidentiel · <a href="confidentialite.html" style="color:inherit;">détails</a></span></div>
-        <p style="margin-bottom:12px;">Jusqu'à deux nationalités peuvent être déclarées. Chaque nationalité est soumise à vérification via un justificatif (CNI, passeport ou certificat de nationalité).</p>
-        <div id="dv-nationalites"></div>
-        <button id="btn-add-nat" class="btn btn-outline btn-sm" style="margin-top:8px;">+ Ajouter un justificatif</button>
-      </div>
-
-      <div class="card" id="financements" style="margin-bottom:20px;">
-        <h3>J'ai Financé</h3>
-        <p style="margin-bottom:8px;">Historique de vos contributions aux campagnes de financement participatif de la diaspora.</p>
-        <div id="dv-financements"></div>
-      </div>
-
-      <div class="card" id="collaborations" style="margin-bottom:20px;">
-        <h3>Mes Collaborations en cours</h3>
-        <div id="dv-collaborations"></div>
-      </div>
-
-      <div class="card" id="recherches" style="margin-bottom:20px;">
-        <h3>Historique des recherches récentes</h3>
-        <div id="dv-recherches"></div>
-      </div>
-
-      <!-- ===== MES CV ===== -->
-      <div class="card" id="cv" style="margin-bottom:20px;">
-        <div class="flex-between" style="margin-bottom:12px;">
-          <h3 style="margin:0;">📄 Mes CV</h3>
-          <span style="font-size:12px;color:var(--muted);">2 CV disponibles</span>
-        </div>
-        <div id="dv-cv" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
-      </div>
-
-      <!-- ===== MES LETTRES ===== -->
-      <div class="card" id="lettres" style="margin-bottom:20px;">
-        <div class="flex-between" style="margin-bottom:12px;">
-          <h3 style="margin:0;">✉️ Mes Lettres de motivation</h3>
-          <span style="font-size:12px;color:var(--muted);">2 lettres disponibles</span>
-        </div>
-        <div id="dv-lettres" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
-      </div>
-
-      <!-- ===== MES CANDIDATURES ===== -->
-      <div class="card" id="candidatures" style="margin-bottom:20px;">
-        <div class="flex-between" style="margin-bottom:12px;">
-          <h3 style="margin:0;">📋 Mes Candidatures</h3>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <span id="cand-stats" style="font-size:12px;color:var(--muted);"></span>
+      <!-- ── SECTION COCKPIT ── -->
+      <section id="usec-cockpit">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+          <div>
+            <h1 style="margin:0;" id="dash-title">Tableau de bord</h1>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Votre cockpit personnel — actions, projets et activité en un coup d'œil</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-orange" onclick="uShowSection('projets');openNouveauProjet()">+ Nouveau projet</button>
+            <button class="btn btn-outline" onclick="uShowSection('projets')">Mes projets →</button>
           </div>
         </div>
-        <!-- Tableau de bord mini -->
-        <div id="cand-kpis" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"></div>
-        <div id="dv-candidatures"></div>
-      </div>
 
-      <div id="ad-dashboard-utilisateur" data-ad-slot="0"></div>
+        <!-- KPIs -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px;">
+          <div class="card" style="text-align:center;padding:16px;">
+            <div style="font-size:28px;font-weight:800;color:var(--orange);" id="u-kpi-projets">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Projets actifs</div>
+          </div>
+          <div class="card" style="text-align:center;padding:16px;">
+            <div style="font-size:28px;font-weight:800;color:#3b82f6;" id="u-kpi-cands">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Candidatures</div>
+          </div>
+          <div class="card" style="text-align:center;padding:16px;">
+            <div style="font-size:28px;font-weight:800;color:#10b981;" id="u-kpi-msgs">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Messages non lus</div>
+          </div>
+          <div class="card" style="text-align:center;padding:16px;">
+            <div style="font-size:28px;font-weight:800;color:#8b5cf6;" id="u-kpi-reputation">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Score réputation</div>
+          </div>
+        </div>
 
-      <div class="card" id="conversations">
-        <h3>Conversations actives</h3>
-        <div id="dv-conversations" style="margin-top:10px;"></div>
-      </div>
+        <!-- Actions rapides -->
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 14px;font-size:15px;">⚡ Actions rapides</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;">
+            <button class="btn btn-orange" onclick="uShowSection('projets');openNouveauProjet()" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
+              <span style="font-size:20px;">🟩</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Créer un projet</div><div style="font-size:11px;opacity:.8;">Déposer une initiative</div></div>
+            </button>
+            <a href="collaborations.html" class="btn btn-outline" style="justify-content:flex-start;gap:10px;padding:12px 16px;text-decoration:none;">
+              <span style="font-size:20px;">📋</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Appels à projets</div><div style="font-size:11px;color:var(--muted);">Voir les opportunités</div></div>
+            </a>
+            <a href="messagerie.html" class="btn btn-outline" style="justify-content:flex-start;gap:10px;padding:12px 16px;text-decoration:none;">
+              <span style="font-size:20px;">💬</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Messagerie</div><div style="font-size:11px;color:var(--muted);">Voir mes conversations</div></div>
+            </a>
+          </div>
+        </div>
+
+        <!-- Activité récente -->
+        <div class="grid grid-2" style="gap:16px;">
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:15px;">🟩 Derniers projets</h3>
+            <div id="u-cockpit-projets"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
+            <a href="#" onclick="uShowSection('projets');return false;" style="font-size:12px;color:var(--orange);text-decoration:none;display:block;margin-top:10px;">Voir tous mes projets →</a>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:15px;">💬 Conversations récentes</h3>
+            <div id="dv-conversations"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
+            <a href="messagerie.html" style="font-size:12px;color:var(--orange);text-decoration:none;display:block;margin-top:10px;">Ouvrir la messagerie →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECTION PROJETS / INITIATIVES ── -->
+      <section id="usec-projets" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+          <div>
+            <h2 style="margin:0;">🟩 Mes Projets & Initiatives</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Suivi du cycle de vie de vos projets</p>
+          </div>
+          <button class="btn btn-orange" onclick="openNouveauProjet()">+ Nouveau projet</button>
+        </div>
+
+        <!-- Pipeline statuts -->
+        <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:20px;">
+          <button class="u-proj-filter active" data-f="">Tous</button>
+          <button class="u-proj-filter" data-f="brouillon">📝 Brouillon</button>
+          <button class="u-proj-filter" data-f="en_attente">⏳ En attente</button>
+          <button class="u-proj-filter" data-f="verification">🔍 Vérification</button>
+          <button class="u-proj-filter" data-f="validation">🏛️ Validation</button>
+          <button class="u-proj-filter" data-f="execution">⚡ Exécution</button>
+          <button class="u-proj-filter" data-f="evaluation">⭐ Évaluation</button>
+          <button class="u-proj-filter" data-f="termine">✅ Terminé</button>
+          <button class="u-proj-filter" data-f="rejete">❌ Rejeté</button>
+        </div>
+        <div id="u-projets-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+      </section>
+
+      <!-- ── SECTION TERRITOIRES ── -->
+      <section id="usec-territoires" style="display:none;">
+        <h2 style="margin:0 0 20px;">🟨 Territoires & Identité</h2>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="flex-between"><h3 style="margin:0;">Ma localisation</h3><span class="conf-tag conf-public">🌍 Ville publique (optionnel)</span></div>
+          <div id="dv-localisation" style="margin-top:8px;"></div>
+          <button id="btn-edit-loc" class="btn btn-outline btn-sm" style="margin-top:8px;">Modifier ma localisation</button>
+        </div>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="flex-between"><h3 style="margin:0;">Mes nationalités déclarées</h3><span class="conf-tag conf-confidentiel">🔐 Confidentiel</span></div>
+          <p style="margin:8px 0;font-size:13px;color:var(--muted);">Jusqu'à deux nationalités peuvent être déclarées et soumises à vérification.</p>
+          <div id="dv-nationalites"></div>
+          <button id="btn-add-nat" class="btn btn-outline btn-sm" style="margin-top:8px;">+ Ajouter un justificatif</button>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 8px;">J'ai financé</h3>
+          <p style="margin-bottom:8px;font-size:13px;color:var(--muted);">Historique de vos contributions aux projets de la diaspora.</p>
+          <div id="dv-financements"></div>
+        </div>
+      </section>
+
+      <!-- ── SECTION INTELLIGENCE ── -->
+      <section id="usec-intelligence" style="display:none;">
+        <h2 style="margin:0 0 20px;">🟪 Mes Statistiques</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+          <div class="card" style="text-align:center;padding:16px;"><div style="font-size:28px;font-weight:800;color:var(--orange);" id="u-stat-total-projets">—</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">Projets créés</div></div>
+          <div class="card" style="text-align:center;padding:16px;"><div style="font-size:28px;font-weight:800;color:#10b981;" id="u-stat-termines">—</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">Projets terminés</div></div>
+          <div class="card" style="text-align:center;padding:16px;"><div style="font-size:28px;font-weight:800;color:#3b82f6;" id="u-stat-cands">—</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">Candidatures</div></div>
+          <div class="card" style="text-align:center;padding:16px;"><div style="font-size:28px;font-weight:800;color:#8b5cf6;" id="u-stat-rep">—</div><div style="font-size:12px;color:var(--muted);margin-top:4px;">Réputation</div></div>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 12px;">Activité récente</h3>
+          <div id="dv-collaborations"></div>
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+            <h4 style="margin:0 0 8px;font-size:13px;">Recherches récentes</h4>
+            <div id="dv-recherches"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECTION OUTILS ── -->
+      <section id="usec-outils" style="display:none;">
+        <h2 style="margin:0 0 20px;">🟧 Outils &amp; Documents</h2>
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <h3 style="margin:0;">📄 Mes CV</h3>
+            <a href="cv-builder.html" class="btn btn-orange btn-sm">+ Créer un CV</a>
+          </div>
+          <div id="dv-cv" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <h3 style="margin:0;">✉️ Mes Lettres de motivation</h3>
+            <a href="lettre-builder.html" class="btn btn-orange btn-sm">+ Créer une lettre</a>
+          </div>
+          <div id="dv-lettres" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <h3 style="margin:0;">📋 Mes Candidatures</h3>
+            <span id="cand-stats" style="font-size:12px;color:var(--muted);"></span>
+          </div>
+          <div id="cand-kpis" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"></div>
+          <div id="dv-candidatures"></div>
+        </div>
+
+        <div id="ad-dashboard-utilisateur" data-ad-slot="0"></div>
+      </section>
     </main>
   </div>
+
+  <!-- ── Modal : Nouveau projet ── -->
+  <div id="u-modal-projet-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+    <div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:600px;margin:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+        <h3 style="margin:0;">🟩 Nouveau projet</h3>
+        <button onclick="document.getElementById('u-modal-projet-bg').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div style="margin-bottom:12px;"><label class="form-label">Titre <span style="color:var(--orange)">*</span></label><input id="proj-titre" class="input-field" style="width:100%;" placeholder="Ex : Projet eau potable Abidjan"></div>
+      <div class="grid grid-2" style="gap:12px;margin-bottom:12px;">
+        <div><label class="form-label">Catégorie</label>
+          <select id="proj-categorie" class="input-field" style="width:100%;">
+            <option>Général</option><option>Action sociale</option><option>Santé</option><option>Éducation</option><option>Agriculture</option><option>Technologie</option><option>Culture</option><option>Économie</option><option>Environnement</option>
+          </select>
+        </div>
+        <div><label class="form-label">Type</label>
+          <select id="proj-type" class="input-field" style="width:100%;">
+            <option value="projet">Projet</option><option value="initiative">Initiative</option><option value="appel">Appel à contribution</option><option value="campagne">Campagne</option>
+          </select>
+        </div>
+        <div><label class="form-label">Pays</label><input id="proj-pays" class="input-field" style="width:100%;" placeholder="Côte d'Ivoire"></div>
+        <div><label class="form-label">Ville</label><input id="proj-ville" class="input-field" style="width:100%;" placeholder="Abidjan"></div>
+        <div><label class="form-label">Budget estimé (€)</label><input id="proj-budget" type="number" class="input-field" style="width:100%;" placeholder="0"></div>
+        <div><label class="form-label">Date de début</label><input id="proj-debut" type="date" class="input-field" style="width:100%;"></div>
+      </div>
+      <div style="margin-bottom:16px;"><label class="form-label">Description</label><textarea id="proj-desc" class="input-field" rows="4" style="width:100%;resize:vertical;" placeholder="Décrivez votre projet…"></textarea></div>
+      <div id="proj-error" style="display:none;background:#fef2f2;color:#B91C1C;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="document.getElementById('u-modal-projet-bg').style.display='none'">Annuler</button>
+        <button class="btn btn-outline" onclick="saveProjet('brouillon')">💾 Sauvegarder en brouillon</button>
+        <button class="btn btn-orange" onclick="saveProjet('en_attente')">📤 Soumettre</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .sb-group-lbl { font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:rgba(255,255,255,.4);padding:12px 16px 4px;margin-top:4px; }
+    .u-proj-filter { background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s; }
+    .u-proj-filter.active { background:var(--orange);color:#fff;border-color:var(--orange); }
+    .u-proj-card { background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px; }
+    .u-proj-card:hover { border-color:var(--orange); }
+    .u-statut { display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px; }
+    .u-statut-brouillon { background:#f1f5f9;color:#475569; }
+    .u-statut-en_attente { background:#fef3c7;color:#92400e; }
+    .u-statut-verification { background:#dbeafe;color:#1e40af; }
+    .u-statut-validation { background:#f3e8ff;color:#6b21a8; }
+    .u-statut-execution { background:#d1fae5;color:#065f46; }
+    .u-statut-evaluation { background:#fce7f3;color:#831843; }
+    .u-statut-termine { background:#d1fae5;color:#065f46; }
+    .u-statut-rejete { background:#fee2e2;color:#991b1b; }
+  </style>
 </div>
 
 <script src="assets/data.js"></script>
@@ -360,21 +512,180 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     bg.style.display = 'flex';
   }
 
-  // Conversations actives
+  /* ── Conversations (cockpit) ── */
   const convEl = document.getElementById('dv-conversations');
   try{
     const r = await api('GET','/conversations?filtre=tous');
     const convs = (r.conversations||[]).slice(0,5);
+    const nonLus = convs.reduce((a,c)=>a+(c.non_lus||0),0);
+    if(nonLus>0){ const p=document.getElementById('u-msg-pill'); if(p){p.textContent=nonLus;p.style.display='';} }
+    document.getElementById('u-kpi-msgs').textContent = nonLus || '0';
     convEl.innerHTML = convs.length
-      ? convs.map(c=>`<a href="messagerie.html" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;">
-          <div style="width:36px;height:36px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${esc((c.avec_nom||'?')[0].toUpperCase())}</div>
+      ? convs.map(c=>`<a href="messagerie.html" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;">
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${esc((c.avec_nom||'?')[0].toUpperCase())}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-weight:700;font-size:13px;">${esc(c.avec_nom||'Utilisateur')} ${c.non_lus>0?`<span style="background:var(--orange);color:#fff;border-radius:99px;padding:1px 6px;font-size:10px;">${c.non_lus}</span>`:''}</div>
             <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc((c.derniere||'').slice(0,60))}</div>
           </div>
         </a>`).join('')
-      : '<p style="color:var(--muted);font-size:13px;">Aucune conversation. <a href="messagerie.html">Démarrer une conversation</a></p>';
+      : '<p style="color:var(--muted);font-size:13px;">Aucune conversation. <a href="messagerie.html">Démarrer →</a></p>';
   }catch(e){convEl.innerHTML='<a href="messagerie.html" class="btn btn-outline btn-sm">Ouvrir la messagerie</a>';}
+
+  /* ── Projets cockpit preview ── */
+  async function loadProjetsCockpit() {
+    try {
+      const r = await api('GET','/projets');
+      const ps = (r.projets||[]).slice(0,3);
+      const el = document.getElementById('u-cockpit-projets');
+      const actifs = (r.projets||[]).filter(p=>!['termine','rejete','brouillon'].includes(p.statut)).length;
+      document.getElementById('u-kpi-projets').textContent = actifs||'0';
+      if((r.projets||[]).length>0){const pill=document.getElementById('u-projets-pill');if(pill){pill.textContent=r.projets.length;pill.style.display='';}}
+      document.getElementById('u-stat-total-projets').textContent = (r.projets||[]).length||'0';
+      document.getElementById('u-stat-termines').textContent = (r.projets||[]).filter(p=>p.statut==='termine').length||'0';
+      el.innerHTML = ps.length ? ps.map(p=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:13px;font-weight:600;">${esc(p.titre)}</span>
+          <span class="u-statut u-statut-${p.statut}">${U_STATUT_LABELS[p.statut]||p.statut}</span>
+        </div>`).join('')
+        : '<p style="color:var(--muted);font-size:13px;">Aucun projet. <button class="btn btn-orange btn-sm" onclick="uShowSection(\'projets\');openNouveauProjet()">Créer →</button></p>';
+    } catch(e) { document.getElementById('u-kpi-projets').textContent='0'; }
+  }
+
+  /* ── Projets liste ── */
+  let _allProjets = [];
+  window.loadMesProjets = async function() {
+    const el = document.getElementById('u-projets-list');
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+    try {
+      const r = await api('GET','/projets');
+      _allProjets = r.projets||[];
+      renderProjets(_allProjets);
+    } catch(e) { el.innerHTML='<div style="color:#ef4444;padding:20px;">Erreur : '+e.message+'</div>'; }
+  };
+
+  const U_STATUT_LABELS = {brouillon:'📝 Brouillon',en_attente:'⏳ En attente',verification:'🔍 Vérification',validation:'🏛️ Validation',execution:'⚡ Exécution',evaluation:'⭐ Évaluation',termine:'✅ Terminé',rejete:'❌ Rejeté'};
+
+  function renderProjets(rows) {
+    const el = document.getElementById('u-projets-list');
+    if (!rows.length) {
+      el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);">
+        <div style="font-size:36px;margin-bottom:12px;">🟩</div>
+        <p>Aucun projet pour ce filtre.</p>
+        <button class="btn btn-orange" onclick="openNouveauProjet()" style="margin-top:12px;">+ Créer votre premier projet</button>
+      </div>`;
+      return;
+    }
+    el.innerHTML = rows.map(p=>`
+      <div class="u-proj-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+          <div>
+            <strong style="font-size:14px;">${esc(p.titre)}</strong>
+            <span style="margin-left:8px;font-size:11px;background:#f1f5f9;color:#475569;padding:2px 7px;border-radius:4px;">${esc(p.categorie||'Général')}</span>
+          </div>
+          <span class="u-statut u-statut-${p.statut}">${U_STATUT_LABELS[p.statut]||p.statut}</span>
+        </div>
+        ${p.description?`<p style="margin:0 0 8px;font-size:13px;color:var(--muted);line-height:1.5;">${esc(p.description.slice(0,160))}${p.description.length>160?'…':''}</p>`:''}
+        <div style="display:flex;gap:12px;font-size:12px;color:var(--muted);flex-wrap:wrap;margin-bottom:10px;">
+          ${p.pays?`<span>📍 ${esc(p.pays)}</span>`:''}
+          ${p.budget_estime?`<span>💰 ${Number(p.budget_estime).toLocaleString('fr-FR')} €</span>`:''}
+          <span>🕐 ${p.created_at?.slice(0,10)||''}</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${p.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="soumettreProjet(${p.id})">📤 Soumettre</button>`:''}
+          <button class="btn btn-sm btn-outline" onclick="voirProjet(${p.id})">👁 Détails</button>
+          ${['brouillon','rejete'].includes(p.statut)?`<button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="supprimerProjet(${p.id})">🗑 Supprimer</button>`:''}
+        </div>
+        ${p.motif_rejet?`<div style="margin-top:8px;padding:8px;background:#fef2f2;border-radius:8px;font-size:12px;color:#B91C1C;">❌ Motif de rejet : ${esc(p.motif_rejet)}</div>`:''}
+      </div>`).join('');
+  }
+
+  document.querySelectorAll('.u-proj-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.u-proj-filter').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const f = btn.dataset.f;
+      renderProjets(f ? _allProjets.filter(p=>p.statut===f) : _allProjets);
+    });
+  });
+
+  window.openNouveauProjet = function() {
+    document.getElementById('u-modal-projet-bg').style.display='flex';
+    setTimeout(()=>document.getElementById('proj-titre').focus(),50);
+  };
+  window.saveProjet = async function(statut) {
+    const titre = document.getElementById('proj-titre').value.trim();
+    const err = document.getElementById('proj-error');
+    err.style.display='none';
+    if(!titre){err.textContent='Le titre est obligatoire.';err.style.display='block';return;}
+    try {
+      const r = await api('POST','/projets',{
+        titre, statut,
+        description: document.getElementById('proj-desc').value.trim(),
+        categorie: document.getElementById('proj-categorie').value,
+        type: document.getElementById('proj-type').value,
+        pays: document.getElementById('proj-pays').value.trim(),
+        ville: document.getElementById('proj-ville').value.trim(),
+        budget_estime: parseFloat(document.getElementById('proj-budget').value)||null,
+        date_debut: document.getElementById('proj-debut').value||null
+      });
+      document.getElementById('u-modal-projet-bg').style.display='none';
+      loadMesProjets(); loadProjetsCockpit();
+    } catch(e){err.textContent=e.message||'Erreur';err.style.display='block';}
+  };
+  window.soumettreProjet = async function(id) {
+    if(!confirm('Soumettre ce projet pour vérification ?')) return;
+    try { await api('PUT','/projets/'+id+'/statut',{statut:'en_attente',commentaire:'Soumission initiale'}); loadMesProjets(); loadProjetsCockpit(); }
+    catch(e){alert('Erreur : '+e.message);}
+  };
+  window.supprimerProjet = async function(id) {
+    if(!confirm('Supprimer ce projet ?')) return;
+    try { await api('DELETE','/projets/'+id); loadMesProjets(); loadProjetsCockpit(); }
+    catch(e){alert('Erreur : '+e.message);}
+  };
+  window.voirProjet = async function(id) {
+    try {
+      const r = await api('GET','/projets/'+id);
+      const p = r.projet;
+      const comms = r.commentaires||[];
+      showModal('📋 '+esc(p.titre), `
+        <p style="font-size:13px;color:var(--muted);">Statut : <strong>${U_STATUT_LABELS[p.statut]||p.statut}</strong></p>
+        ${p.description?`<p style="font-size:13px;line-height:1.6;">${esc(p.description)}</p>`:''}
+        ${comms.length?`<h4 style="font-size:13px;margin-top:16px;">Commentaires :</h4>`+comms.map(c=>`<div style="padding:8px;background:#f8fafc;border-radius:8px;margin-bottom:6px;font-size:12px;"><strong>${esc(c.auteur_nom)}</strong> · ${c.created_at?.slice(0,10)}<br>${esc(c.contenu)}</div>`).join(''):''}
+      `);
+    } catch(e){alert('Erreur : '+e.message);}
+  };
+
+  /* ── Réputation + stats ── */
+  try {
+    const pStats = await api('GET','/projets/stats');
+    document.getElementById('u-stat-cands').textContent = '—';
+    document.getElementById('u-stat-rep').textContent = '0';
+    document.getElementById('u-kpi-reputation').textContent = '0';
+  } catch(e){}
+
+  /* ── Section switching ── */
+  window.uShowSection = function(name) {
+    document.querySelectorAll('main > section[id^="usec-"]').forEach(s=>s.style.display='none');
+    const el = document.getElementById('usec-'+name);
+    if(el) el.style.display='';
+    document.querySelectorAll('.sidebar a[data-usection]').forEach(a=>{
+      a.classList.toggle('active', a.dataset.usection===name);
+    });
+    if(name==='projets') loadMesProjets();
+  };
+  document.querySelectorAll('.sidebar a[data-usection]').forEach(a=>{
+    a.addEventListener('click', e=>{ e.preventDefault(); uShowSection(a.dataset.usection); });
+  });
+
+  /* KPIs candidatures */
+  try {
+    const rc = await fetch('/api/candidatures/mes',{credentials:'include'});
+    const cands = await rc.json();
+    document.getElementById('u-kpi-cands').textContent = cands.length||'0';
+    document.getElementById('u-stat-cands').textContent = cands.length||'0';
+  }catch(e){}
+
+  loadProjetsCockpit();
 })();
 </script>
 <script>
@@ -389,6 +700,10 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   if(close)  close.addEventListener('click', closeSidebar);
   if(back)   back.addEventListener('click', closeSidebar);
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSidebar(); });
+  /* Section switching quand la sidebar est ouverte en mobile */
+  document.querySelectorAll('.sidebar a[data-usection]').forEach(a=>{
+    a.addEventListener('click', () => closeSidebar());
+  });
 })();
 </script>
 

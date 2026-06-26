@@ -38,16 +38,34 @@
     <aside class="sidebar" id="sidebar">
       <button class="sidebar-close" id="sidebar-close">×</button>
       <div class="brand" id="sidebar-brand">Mon espace initiative</div>
-      <a class="active" href="#presentation">📋 Présentation</a>
-      <a href="#publications">📰 Publications</a>
-      <a href="#evenements">📅 Événements</a>
-      <a href="#paiement">💳 Module paiement</a>
-      <a href="#recrutement">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
-      <a href="#accreditations">🎖 Accréditations DA</a>
-      <a href="#publicites-init">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
-      <a href="messagerie.html">💬 Messages <span class="pill" id="msg-count">—</span></a>
+
+      <div class="sb-group-lbl">01 — COCKPIT</div>
+      <a class="active" href="#cockpit" data-section="cockpit">🟦 Tableau de bord</a>
+
+      <div class="sb-group-lbl">02 — INITIATIVES</div>
+      <a href="#presentation" data-section="presentation">📋 Ma fiche initiative</a>
+      <a href="#mes-projets" data-section="mes-projets">🟩 Mes projets <span class="pill" id="init-projets-badge" style="display:none;"></span></a>
+      <a href="#publications" data-section="publications">📰 Publications</a>
+      <a href="#evenements" data-section="evenements">📅 Événements</a>
+
+      <div class="sb-group-lbl">03 — TERRITOIRES</div>
+      <a href="#zones" data-section="zones">🟨 Zones d'action</a>
+
+      <div class="sb-group-lbl">04 — INTELLIGENCE</div>
+      <a href="#stats-impact" data-section="stats-impact">🟪 Stats & Impact</a>
+
+      <div class="sb-group-lbl">05 — COMMUNICATION</div>
+      <a href="messagerie.html">🟥 Messages <span class="pill" id="msg-count">—</span></a>
+      <a href="#recrutement" data-section="recrutement">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
       <a href="agenda.html">📅 Mon Agenda</a>
+
+      <div class="sb-group-lbl">06 — OUTILS</div>
+      <a href="#paiement" data-section="paiement">💳 Module paiement</a>
+      <a href="#accreditations" data-section="accreditations">🎖 Accréditations DA</a>
+      <a href="#publicites-init" data-section="publicites-init">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
       <a href="confidentialite.html">🔐 Confidentialité</a>
+
+      <style>.sb-group-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:rgba(255,255,255,.4);padding:12px 16px 4px;margin-top:4px;}</style>
     </aside>
     <main class="content" id="dashboard-content">
       <div class="notice">Chargement de votre espace initiative…</div>
@@ -1268,6 +1286,231 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   };
 
   loadRecrutement();
+
+  /* ══ COCKPIT INITIATIVE — injection avant #presentation ══ */
+  if (init) {
+    const cockpitHTML = `
+    <div id="cockpit" style="margin-bottom:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+          <h1 style="margin:0;">${init.nom}</h1>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Cockpit de pilotage — projets, performance et actions</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-orange" onclick="initShowSection('mes-projets')">+ Nouveau projet</button>
+          <a href="initiative.html?id=${init.slug||init.id}" class="btn btn-outline" target="_blank">Voir ma fiche →</a>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;">
+        <div class="card" style="text-align:center;padding:14px;">
+          <div style="font-size:26px;font-weight:800;color:var(--orange);" id="init-kpi-membres">${(init.membres||0).toLocaleString('fr-FR')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Membres réseau</div>
+        </div>
+        <div class="card" style="text-align:center;padding:14px;">
+          <div style="font-size:26px;font-weight:800;color:#3b82f6;" id="init-kpi-msgs">${messages_non_lus||0}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Messages non lus</div>
+        </div>
+        <div class="card" style="text-align:center;padding:14px;">
+          <div style="font-size:26px;font-weight:800;color:#10b981;" id="init-kpi-vues">${(init.vues||0).toLocaleString('fr-FR')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Vues du profil</div>
+        </div>
+        <div class="card" style="text-align:center;padding:14px;">
+          <div style="font-size:26px;font-weight:800;color:#8b5cf6;" id="init-kpi-projets">—</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Projets actifs</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:0;">
+        <button class="btn btn-orange" onclick="initShowSection('mes-projets')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
+          <span style="font-size:20px;">🟩</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Créer un projet</div><div style="font-size:11px;opacity:.8;">Déposer une initiative terrain</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="initShowSection('publications')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
+          <span style="font-size:20px;">📰</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Nouvelle publication</div><div style="font-size:11px;color:var(--muted);">Fil d'actualité</div></div>
+        </button>
+        <button class="btn btn-outline" onclick="initShowSection('recrutement')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
+          <span style="font-size:20px;">📋</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Candidatures</div><div style="font-size:11px;color:var(--muted);">Gérer les dossiers</div></div>
+        </button>
+      </div>
+    </div>`;
+    content.insertAdjacentHTML('afterbegin', cockpitHTML);
+
+    /* Section mes-projets */
+    const projetsSec = document.createElement('div');
+    projetsSec.id = 'mes-projets';
+    projetsSec.innerHTML = `
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h2 style="margin:0;">🟩 Mes Projets</h2>
+          <button class="btn btn-orange btn-sm" onclick="initOpenProjet()">+ Nouveau projet</button>
+        </div>
+        <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:16px;">
+          <button class="u-proj-filter active" data-pf="" onclick="initFilterProjets(this,'')">Tous</button>
+          <button class="u-proj-filter" data-pf="brouillon" onclick="initFilterProjets(this,'brouillon')">📝 Brouillon</button>
+          <button class="u-proj-filter" data-pf="en_attente" onclick="initFilterProjets(this,'en_attente')">⏳ En attente</button>
+          <button class="u-proj-filter" data-pf="verification" onclick="initFilterProjets(this,'verification')">🔍 Vérification</button>
+          <button class="u-proj-filter" data-pf="validation" onclick="initFilterProjets(this,'validation')">🏛️ Validation</button>
+          <button class="u-proj-filter" data-pf="execution" onclick="initFilterProjets(this,'execution')">⚡ Exécution</button>
+          <button class="u-proj-filter" data-pf="termine" onclick="initFilterProjets(this,'termine')">✅ Terminé</button>
+        </div>
+        <div id="init-projets-list"><div style="color:var(--muted);font-size:13px;text-align:center;padding:20px;">Chargement…</div></div>
+      </div>`;
+    content.insertBefore(projetsSec, document.getElementById('presentation'));
+
+    /* Section zones */
+    const zonesSec = document.createElement('div');
+    zonesSec.id = 'zones';
+    zonesSec.innerHTML = `<div class="card" style="margin-bottom:20px;">
+      <h2 style="margin:0 0 14px;">🟨 Zones d'action</h2>
+      <div class="tags">
+        ${init.pays ? `<span class="tag">🌍 Pays d'origine : ${init.pays}</span>` : ''}
+        ${init.region ? `<span class="tag">📍 Région : ${init.region}</span>` : ''}
+        ${init.ville ? `<span class="tag">📍 Ville : ${init.ville}</span>` : ''}
+        ${init.zone ? `<span class="tag">🗺️ Zone : ${init.zone}</span>` : ''}
+        ${(JSON.parse(init.pays_intervention||'[]')).map(p=>`<span class="tag">🌐 ${p}</span>`).join('')}
+      </div>
+      <p style="margin-top:12px;font-size:13px;color:var(--muted);">Pour modifier vos zones d'intervention, mettez à jour votre fiche initiative.</p>
+    </div>`;
+    content.appendChild(zonesSec);
+
+    /* Section stats-impact */
+    const statsSec = document.createElement('div');
+    statsSec.id = 'stats-impact';
+    statsSec.innerHTML = `<div class="card" style="margin-bottom:20px;">
+      <h2 style="margin:0 0 16px;">🟪 Statistiques & Impact</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
+        <div style="text-align:center;padding:14px;background:#f8fafc;border-radius:10px;">
+          <div style="font-size:26px;font-weight:800;color:var(--orange);">${(init.membres||0).toLocaleString('fr-FR')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Membres réseau</div>
+        </div>
+        <div style="text-align:center;padding:14px;background:#f8fafc;border-radius:10px;">
+          <div style="font-size:26px;font-weight:800;color:#10b981;">${(init.vues||0).toLocaleString('fr-FR')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Vues profil</div>
+        </div>
+        <div style="text-align:center;padding:14px;background:#f8fafc;border-radius:10px;">
+          <div style="font-size:26px;font-weight:800;color:#3b82f6;" id="init-stat-projets">—</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Projets créés</div>
+        </div>
+        <div style="text-align:center;padding:14px;background:#f8fafc;border-radius:10px;">
+          <div style="font-size:26px;font-weight:800;color:#8b5cf6;" id="init-stat-termines">—</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Projets terminés</div>
+        </div>
+      </div>
+    </div>`;
+    content.appendChild(statsSec);
+
+    /* Charger projets */
+    let _initProjets = [];
+    const INIT_STATUT = {brouillon:'📝 Brouillon',en_attente:'⏳ En attente',verification:'🔍 Vérification',validation:'🏛️ Validation',execution:'⚡ Exécution',evaluation:'⭐ Évaluation',termine:'✅ Terminé',rejete:'❌ Rejeté'};
+    async function loadInitProjetsSection() {
+      try {
+        const r = await api('GET','/projets');
+        _initProjets = r.projets||[];
+        const actifs = _initProjets.filter(p=>!['termine','rejete','brouillon'].includes(p.statut)).length;
+        document.getElementById('init-kpi-projets').textContent = actifs||'0';
+        if(actifs>0){const b=document.getElementById('init-projets-badge');if(b){b.textContent=actifs;b.style.display='';}}
+        if(document.getElementById('init-stat-projets')) document.getElementById('init-stat-projets').textContent=_initProjets.length;
+        if(document.getElementById('init-stat-termines')) document.getElementById('init-stat-termines').textContent=_initProjets.filter(p=>p.statut==='termine').length;
+        renderInitProjets(_initProjets);
+      } catch(e){}
+    }
+    function renderInitProjets(rows) {
+      const el = document.getElementById('init-projets-list');
+      if(!el) return;
+      if(!rows.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted);">Aucun projet.<br><button class="btn btn-orange btn-sm" style="margin-top:10px;" onclick="initOpenProjet()">+ Créer</button></div>';return;}
+      el.innerHTML=rows.map(p=>`<div class="u-proj-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <strong style="font-size:13px;">${p.titre}</strong>
+          <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;background:#f1f5f9;color:#475569;">${INIT_STATUT[p.statut]||p.statut}</span>
+        </div>
+        ${p.description?`<p style="margin:0 0 8px;font-size:12px;color:var(--muted);">${p.description.slice(0,120)}${p.description.length>120?'…':''}</p>`:''}
+        <div style="display:flex;gap:8px;">
+          ${p.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="initSoumettreProjet(${p.id})">📤 Soumettre</button>`:''}
+          ${['brouillon','rejete'].includes(p.statut)?`<button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="initDeleteProjet(${p.id})">🗑</button>`:''}
+        </div>
+      </div>`).join('');
+    }
+    window.initFilterProjets = function(btn,f){
+      document.querySelectorAll('#mes-projets .u-proj-filter').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      renderInitProjets(f?_initProjets.filter(p=>p.statut===f):_initProjets);
+    };
+
+    /* Modal nouveau projet */
+    const mhtml=`<div id="init-modal-projet" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+      <div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:560px;margin:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3 style="margin:0;">🟩 Nouveau projet</h3>
+          <button onclick="document.getElementById('init-modal-projet').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;">✕</button>
+        </div>
+        <div style="margin-bottom:10px;"><label class="form-label">Titre *</label><input id="iproj-titre" class="input-field" style="width:100%;"></div>
+        <div class="grid grid-2" style="gap:10px;margin-bottom:10px;">
+          <div><label class="form-label">Catégorie</label>
+            <select id="iproj-cat" class="input-field" style="width:100%;">
+              <option>Général</option><option>Action sociale</option><option>Santé</option><option>Éducation</option><option>Agriculture</option><option>Technologie</option><option>Culture</option>
+            </select>
+          </div>
+          <div><label class="form-label">Pays</label><input id="iproj-pays" class="input-field" style="width:100%;" value="${init.pays||''}"></div>
+        </div>
+        <div style="margin-bottom:12px;"><label class="form-label">Description</label><textarea id="iproj-desc" class="input-field" rows="4" style="width:100%;resize:vertical;"></textarea></div>
+        <div id="iproj-err" style="display:none;background:#fef2f2;color:#B91C1C;border-radius:8px;padding:10px;font-size:13px;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-outline" onclick="document.getElementById('init-modal-projet').style.display='none'">Annuler</button>
+          <button class="btn btn-outline" onclick="initSaveProjet('brouillon')">💾 Brouillon</button>
+          <button class="btn btn-orange" onclick="initSaveProjet('en_attente')">📤 Soumettre</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', mhtml);
+
+    window.initOpenProjet=()=>{document.getElementById('init-modal-projet').style.display='flex';};
+    window.initSaveProjet=async(statut)=>{
+      const titre=document.getElementById('iproj-titre').value.trim();
+      const err=document.getElementById('iproj-err');err.style.display='none';
+      if(!titre){err.textContent='Titre obligatoire';err.style.display='block';return;}
+      try{
+        await api('POST','/projets',{titre,statut,categorie:document.getElementById('iproj-cat').value,pays:document.getElementById('iproj-pays').value,description:document.getElementById('iproj-desc').value});
+        document.getElementById('init-modal-projet').style.display='none';
+        loadInitProjetsSection();
+      }catch(e){err.textContent=e.message;err.style.display='block';}
+    };
+    window.initSoumettreProjet=async(id)=>{
+      if(!confirm('Soumettre ce projet ?'))return;
+      try{await api('PUT','/projets/'+id+'/statut',{statut:'en_attente'});loadInitProjetsSection();}catch(e){alert(e.message);}
+    };
+    window.initDeleteProjet=async(id)=>{
+      if(!confirm('Supprimer ?'))return;
+      try{await api('DELETE','/projets/'+id);loadInitProjetsSection();}catch(e){alert(e.message);}
+    };
+    loadInitProjetsSection();
+  }
+
+  /* ══ ROUTER DE SECTIONS ══ */
+  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','zones','stats-impact','paiement','accreditations','publicites-init','recrutement'];
+  window.initShowSection = function(name) {
+    INIT_SECTIONS.forEach(s => {
+      const el = document.getElementById(s);
+      if(el) el.style.display = s===name ? '' : 'none';
+    });
+    document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
+      a.classList.toggle('active', a.dataset.section===name);
+    });
+    window.scrollTo(0,0);
+  };
+  document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
+    a.addEventListener('click', e => {
+      if(a.href && !a.href.endsWith('#'+a.dataset.section)) return;
+      e.preventDefault();
+      initShowSection(a.dataset.section);
+    });
+  });
+  /* Afficher cockpit par défaut */
+  initShowSection('cockpit');
+
+  /* Style commun projets */
+  if(!document.getElementById('init-proj-style')){
+    const s=document.createElement('style');s.id='init-proj-style';
+    s.textContent='.u-proj-filter{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}.u-proj-filter.active{background:var(--orange);color:#fff;border-color:var(--orange);}.u-proj-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}';
+    document.head.appendChild(s);
+  }
 
 })();
 </script>

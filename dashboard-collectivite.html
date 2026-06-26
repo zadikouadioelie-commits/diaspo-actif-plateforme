@@ -87,21 +87,93 @@
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar">
       <button class="sidebar-close" id="sidebar-close">×</button>
-      <div class="brand">Collectivité</div>
-      <a href="#" class="active" data-section="accueil">🏛️ Accueil</a>
-      <a href="#" data-section="observatoire">📊 Observatoire Diaspora</a>
-      <a href="#" data-section="communications">✉️ Communications</a>
+      <div class="brand" id="coll-brand">Collectivité</div>
+
+      <div class="sb-group-lbl">01 — COCKPIT</div>
+      <a href="#" class="active" data-section="cockpit">🟦 Tableau de bord</a>
+
+      <div class="sb-group-lbl">02 — INITIATIVES</div>
+      <a href="#" data-section="initiatives-valider">🟩 Initiatives à valider <span class="pill" id="coll-valid-badge" style="display:none;"></span></a>
+      <a href="#" data-section="initiatives-validees">✅ Initiatives validées</a>
+
+      <div class="sb-group-lbl">03 — TERRITOIRES</div>
+      <a href="#" data-section="partenariats">🟨 Partenariats</a>
+      <a href="#" data-section="accreditations-da" style="display:flex;justify-content:space-between;align-items:center;">🎖 Accréditations DA <span id="coll-accred-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
+
+      <div class="sb-group-lbl">04 — INTELLIGENCE</div>
+      <a href="#" data-section="observatoire">🟪 Observatoire Diaspora</a>
+
+      <div class="sb-group-lbl">05 — COMMUNICATION</div>
+      <a href="#" data-section="communications">🟥 Communications</a>
       <a href="#" data-section="consultations">📋 Consultations</a>
       <a href="#" data-section="publications">📢 Publications</a>
-      <a href="#" data-section="partenariats">🤝 Partenariats</a>
-      <a href="#" data-section="accreditations-da" style="display:flex;justify-content:space-between;align-items:center;">🎖 Accréditations DA <span id="coll-accred-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
+      <a href="agenda.html">📅 Mon Agenda</a>
+
+      <div class="sb-group-lbl">06 — OUTILS</div>
+      <a href="confidentialite.html">🔐 Confidentialité</a>
+
+      <style>.sb-group-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:rgba(255,255,255,.4);padding:12px 16px 4px;margin-top:4px;}</style>
     </aside>
 
     <main class="content">
       <div id="dashboard-error" style="display:none;" class="notice"></div>
 
-      <!-- ===================== ACCUEIL ===================== -->
-      <section id="section-accueil">
+      <!-- ===================== COCKPIT ===================== -->
+      <section id="section-cockpit" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+          <div>
+            <h1 style="margin:0;" id="cockpit-nom">Chargement…</h1>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Cockpit collectivité — pilotage, initiatives et intelligence territoriale</p>
+          </div>
+          <span class="badge badge-inst">Collectivité</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+          <div class="card stat-card"><div class="stat-number" id="ck-membres">—</div><div class="stat-label">Membres territoire</div></div>
+          <div class="card stat-card"><div class="stat-number" id="ck-valider" style="color:#f59e0b;">—</div><div class="stat-label">Initiatives à valider</div></div>
+          <div class="card stat-card"><div class="stat-number" id="ck-validees" style="color:#10b981;">—</div><div class="stat-label">En exécution</div></div>
+          <div class="card stat-card"><div class="stat-number" id="ck-pays">—</div><div class="stat-label">Pays couverts</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:20px;">
+          <button class="btn btn-orange" onclick="showSection('initiatives-valider')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
+            <span style="font-size:20px;">🟩</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Valider des initiatives</div><div style="font-size:11px;opacity:.8;">Projets en attente</div></div>
+          </button>
+          <button class="btn btn-outline" onclick="showSection('communications')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
+            <span style="font-size:20px;">🟥</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Envoyer une communication</div><div style="font-size:11px;color:var(--muted);">Diaspora du territoire</div></div>
+          </button>
+          <button class="btn btn-outline" onclick="showSection('observatoire')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
+            <span style="font-size:20px;">🟪</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Observatoire</div><div style="font-size:11px;color:var(--muted);">Intelligence territoriale</div></div>
+          </button>
+        </div>
+        <div id="cockpit-perimetre" class="card">
+          <h3 style="margin:0 0 12px;font-size:15px;">Périmètre d'accréditation</h3>
+          <div id="perimetre-content-ck"></div>
+        </div>
+      </section>
+
+      <!-- ===================== INITIATIVES À VALIDER ===================== -->
+      <section id="section-initiatives-valider" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="margin:0;">🟩 Initiatives à valider</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Projets soumis par la diaspora en attente de décision institutionnelle</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="u-proj-filter active" onclick="collFilterProjets(this,'en_attente')">⏳ En attente</button>
+            <button class="u-proj-filter" onclick="collFilterProjets(this,'verification')">🔍 Vérification</button>
+            <button class="u-proj-filter" onclick="collFilterProjets(this,'validation')">🏛️ Validation</button>
+          </div>
+        </div>
+        <div id="coll-projets-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+      </section>
+
+      <!-- ===================== INITIATIVES VALIDÉES ===================== -->
+      <section id="section-initiatives-validees" style="display:none;">
+        <h2 style="margin:0 0 20px;">✅ Initiatives validées / en exécution</h2>
+        <div id="coll-projets-validees"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+      </section>
+
+      <!-- ===================== ACCUEIL (legacy — redirigé vers cockpit) ===================== -->
+      <section id="section-accueil" style="display:none;">
         <div class="flex-between" style="margin-bottom:20px;">
           <div>
             <h1 style="margin:0;" id="inst-nom">Chargement…</h1>
@@ -571,13 +643,113 @@ function showSection(name) {
   document.querySelectorAll(".sidebar a[data-section]").forEach(a => a.classList.remove("active"));
   document.querySelector(`.sidebar a[data-section="${name}"]`)?.classList.add("active");
   document.querySelectorAll("section[id^='section-']").forEach(s => s.style.display = "none");
-  document.getElementById("section-" + name).style.display = "";
+  const sec = document.getElementById("section-" + name);
+  if(sec) sec.style.display = "";
+  if (name === "cockpit") loadCockpit();
+  if (name === "initiatives-valider" || name === "initiatives-validees") loadCollProjets();
   if (name === "observatoire") loadObservatoire();
   if (name === "communications") loadCommHistorique();
   if (name === "consultations") loadConsultations();
   if (name === "publications") loadPublications();
   if (name === "partenariats") loadPartenariats();
   if (name === "accreditations-da") loadCollAccred();
+  window.scrollTo(0,0);
+}
+
+/* ===== COCKPIT ===== */
+async function loadCockpit() {
+  try {
+    const [rObs, rProjets] = await Promise.all([
+      api('GET', '/observatoire').catch(() => null),
+      api('GET', '/projets').catch(() => ({ projets: [] }))
+    ]);
+    const projets = rProjets.projets || [];
+    const valider = projets.filter(p=>['en_attente','verification','validation'].includes(p.statut)).length;
+    const validees = projets.filter(p=>['execution','evaluation'].includes(p.statut)).length;
+    const el = id => document.getElementById(id);
+    if(el('ck-membres')) el('ck-membres').textContent = rObs ? Number(rObs.total_membres||0).toLocaleString('fr-FR') : '—';
+    if(el('ck-valider')) el('ck-valider').textContent = valider;
+    if(el('ck-validees')) el('ck-validees').textContent = validees;
+    if(el('ck-pays')) el('ck-pays').textContent = rObs && rObs.par_pays ? rObs.par_pays.length : '—';
+    if(el('coll-valid-badge') && valider > 0) { el('coll-valid-badge').textContent = valider; el('coll-valid-badge').style.display = ''; }
+    /* Périmètre */
+    const per = el('perimetre-content-ck') || el('perimetre-content');
+    if(per) { per.innerHTML = el('perimetre-content') ? el('perimetre-content').innerHTML : '<p style="color:var(--muted);font-size:13px;">Aucun périmètre défini.</p>'; }
+    /* Nom */
+    const nomEl = document.getElementById('cockpit-nom');
+    if(nomEl) { const n = document.getElementById('inst-nom'); nomEl.textContent = n ? n.textContent : 'Collectivité'; }
+  } catch(e) { console.error('cockpit', e); }
+}
+
+/* ===== PROJETS COLLECTIVITE ===== */
+const COLL_STATUT = {brouillon:'📝 Brouillon',en_attente:'⏳ En attente',verification:'🔍 Vérification',validation:'🏛️ Validation',execution:'⚡ Exécution',evaluation:'⭐ Évaluation',termine:'✅ Terminé',rejete:'❌ Rejeté'};
+let _collProjets = [];
+let _collFilter = 'en_attente';
+
+async function loadCollProjets() {
+  try {
+    const r = await api('GET', '/projets');
+    _collProjets = r.projets || [];
+    renderCollProjets(_collFilter);
+    /* Validées */
+    const validees = _collProjets.filter(p=>['execution','evaluation','termine'].includes(p.statut));
+    const vEl = document.getElementById('coll-projets-validees');
+    if(vEl) vEl.innerHTML = validees.length ? validees.map(p=>`
+      <div class="u-proj-card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div><strong style="font-size:13px;">${p.titre}</strong> <span style="font-size:12px;color:var(--muted);">par ${p.createur_nom||'—'}</span></div>
+        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;background:#d1fae5;color:#065f46;">${COLL_STATUT[p.statut]}</span>
+      </div></div>`).join('') : '<div style="text-align:center;padding:30px;color:var(--muted);">Aucune initiative validée.</div>';
+  } catch(e) { console.error(e); }
+}
+
+function renderCollProjets(statut) {
+  const rows = _collProjets.filter(p=>p.statut===statut);
+  const el = document.getElementById('coll-projets-list');
+  if(!el) return;
+  if(!rows.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted);">Aucun projet avec ce statut.</div>';return;}
+  el.innerHTML = rows.map(p=>`
+    <div class="u-proj-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+        <div><strong style="font-size:14px;">${p.titre}</strong><span style="font-size:12px;color:var(--muted);margin-left:8px;">par ${p.createur_nom||'—'}</span>
+          ${p.pays?`<span style="margin-left:8px;font-size:11px;background:#f1f5f9;color:#475569;padding:2px 7px;border-radius:4px;">📍 ${p.pays}</span>`:''}
+        </div>
+        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;background:#fef3c7;color:#92400e;">${COLL_STATUT[p.statut]||p.statut}</span>
+      </div>
+      ${p.description?`<p style="margin:0 0 10px;font-size:13px;color:var(--muted);line-height:1.5;">${p.description.slice(0,180)}${p.description.length>180?'…':''}</p>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-orange" onclick="collValiderProjet(${p.id})">✅ Valider → Exécution</button>
+        <button class="btn btn-sm" style="border-color:#f59e0b;color:#92400e;" onclick="collAvancerProjet(${p.id},'verification')">🔍 Passer en vérification</button>
+        <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="collRejeterProjet(${p.id})">❌ Rejeter</button>
+      </div>
+    </div>`).join('');
+}
+
+window.collFilterProjets = function(btn, statut) {
+  document.querySelectorAll('#section-initiatives-valider .u-proj-filter').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  _collFilter = statut;
+  renderCollProjets(statut);
+};
+window.collValiderProjet = async function(id) {
+  if(!confirm('Valider ce projet ?')) return;
+  try { await api('PUT','/projets/'+id+'/statut',{statut:'execution',commentaire:'Validé par la collectivité'}); loadCollProjets(); loadCockpit(); }
+  catch(e){alert('Erreur : '+e.message);}
+};
+window.collAvancerProjet = async function(id, statut) {
+  try { await api('PUT','/projets/'+id+'/statut',{statut}); loadCollProjets(); }
+  catch(e){alert('Erreur : '+e.message);}
+};
+window.collRejeterProjet = async function(id) {
+  const motif = prompt('Motif du rejet :'); if(!motif) return;
+  try { await api('PUT','/projets/'+id+'/statut',{statut:'rejete',motif_rejet:motif}); loadCollProjets(); loadCockpit(); }
+  catch(e){alert('Erreur : '+e.message);}
+};
+
+/* Style commun */
+if(!document.getElementById('coll-proj-style')){
+  const s=document.createElement('style');s.id='coll-proj-style';
+  s.textContent='.u-proj-filter{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}.u-proj-filter.active{background:var(--orange);color:#fff;border-color:var(--orange);}.u-proj-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}';
+  document.head.appendChild(s);
 }
 
 /* ===== Accréditations DA ===== */
@@ -1257,6 +1429,9 @@ async function loadPartenariats() {
 
   // Charger données initiales
   if (ACCRED) loadObservatoire();
+
+  // Section par défaut = cockpit
+  showSection('cockpit');
 })();
 </script>
 </body>

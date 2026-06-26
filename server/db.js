@@ -674,6 +674,48 @@ db.exec(`
   );
 `);
 
+/* ── MODULE PROJETS / INITIATIVES (cycle de vie) ── */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS projets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titre TEXT NOT NULL,
+    description TEXT,
+    type TEXT DEFAULT 'projet',
+    statut TEXT DEFAULT 'brouillon',
+    createur_id INTEGER NOT NULL,
+    categorie TEXT DEFAULT 'Général',
+    pays TEXT,
+    region TEXT,
+    ville TEXT,
+    budget_estime REAL,
+    date_debut TEXT,
+    date_fin TEXT,
+    pieces_jointes TEXT DEFAULT '[]',
+    tags TEXT DEFAULT '[]',
+    note_evaluation INTEGER,
+    score_reputation INTEGER DEFAULT 0,
+    validateur_id INTEGER,
+    date_validation TEXT,
+    motif_rejet TEXT,
+    nb_vues INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(createur_id) REFERENCES users(id),
+    FOREIGN KEY(validateur_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS projets_commentaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projet_id INTEGER NOT NULL,
+    auteur_id INTEGER NOT NULL,
+    contenu TEXT NOT NULL,
+    type TEXT DEFAULT 'commentaire',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(projet_id) REFERENCES projets(id) ON DELETE CASCADE,
+    FOREIGN KEY(auteur_id) REFERENCES users(id)
+  );
+`);
+
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
 const MIGRATIONS = [
   ["conversations", "sujet TEXT"],
