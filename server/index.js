@@ -3502,17 +3502,21 @@ async function handleRequest(req, res) {
     /* ============================================================
        MODULE CV & LETTRES DE MOTIVATION
     ============================================================ */
+    let body = {};
+    if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") {
+      try { body = await readBody(req); } catch(e) {}
+    }
 
     /* --- GET /api/cv — liste CVs de l'utilisateur connecté --- */
     if (req.method === "GET" && pathname === "/api/cv") {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const cvs = db.prepare(`SELECT id, numero, titre, theme, updated_at FROM cv_profiles WHERE user_id = ? ORDER BY numero`).all(me.id);
       return sendJSON(res, 200, cvs);
     }
 
     /* --- GET /api/cv/:id --- */
     if (req.method === "GET" && /^\/api\/cv\/\d+$/.test(pathname)) {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const cv = db.prepare(`SELECT * FROM cv_profiles WHERE id = ? AND user_id = ?`).get(id, me.id);
       if (!cv) return sendJSON(res, 404, { error: "CV introuvable" });
@@ -3522,7 +3526,7 @@ async function handleRequest(req, res) {
 
     /* --- POST /api/cv — créer ou mettre à jour un CV (upsert par numero) --- */
     if (req.method === "POST" && pathname === "/api/cv") {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { numero = 1, titre = 'Mon CV', theme = 'bleu', data = {} } = body;
       if (![1, 2].includes(Number(numero))) return sendJSON(res, 400, { error: "numero doit être 1 ou 2" });
       const existing = db.prepare(`SELECT id FROM cv_profiles WHERE user_id = ? AND numero = ?`).get(me.id, numero);
@@ -3539,7 +3543,7 @@ async function handleRequest(req, res) {
 
     /* --- DELETE /api/cv/:id --- */
     if (req.method === "DELETE" && /^\/api\/cv\/\d+$/.test(pathname)) {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       db.prepare(`DELETE FROM cv_profiles WHERE id = ? AND user_id = ?`).run(id, me.id);
       return sendJSON(res, 200, { deleted: true });
@@ -3547,14 +3551,14 @@ async function handleRequest(req, res) {
 
     /* --- GET /api/lettres --- */
     if (req.method === "GET" && pathname === "/api/lettres") {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const lettres = db.prepare(`SELECT id, numero, titre, updated_at FROM lettres_motivation WHERE user_id = ? ORDER BY numero`).all(me.id);
       return sendJSON(res, 200, lettres);
     }
 
     /* --- GET /api/lettres/:id --- */
     if (req.method === "GET" && /^\/api\/lettres\/\d+$/.test(pathname)) {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const l = db.prepare(`SELECT * FROM lettres_motivation WHERE id = ? AND user_id = ?`).get(id, me.id);
       if (!l) return sendJSON(res, 404, { error: "Lettre introuvable" });
@@ -3564,7 +3568,7 @@ async function handleRequest(req, res) {
 
     /* --- POST /api/lettres --- */
     if (req.method === "POST" && pathname === "/api/lettres") {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { numero = 1, titre = 'Ma lettre', data = {} } = body;
       if (![1, 2].includes(Number(numero))) return sendJSON(res, 400, { error: "numero doit être 1 ou 2" });
       const existing = db.prepare(`SELECT id FROM lettres_motivation WHERE user_id = ? AND numero = ?`).get(me.id, numero);
@@ -3581,7 +3585,7 @@ async function handleRequest(req, res) {
 
     /* --- DELETE /api/lettres/:id --- */
     if (req.method === "DELETE" && /^\/api\/lettres\/\d+$/.test(pathname)) {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       db.prepare(`DELETE FROM lettres_motivation WHERE id = ? AND user_id = ?`).run(id, me.id);
       return sendJSON(res, 200, { deleted: true });
@@ -3589,7 +3593,7 @@ async function handleRequest(req, res) {
 
     /* --- GET /api/candidatures/mes — candidatures du candidat connecté --- */
     if (req.method === "GET" && pathname === "/api/candidatures/mes") {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rows = db.prepare(`
         SELECT oc.*, o.titre AS offre_titre, o.type AS offre_type, o.localisation, o.pays,
                i.nom AS org_nom, i.logo_url AS org_logo,
@@ -3608,7 +3612,7 @@ async function handleRequest(req, res) {
 
     /* --- GET /api/candidatures/:id/historique --- */
     if (req.method === "GET" && /^\/api\/candidatures\/\d+\/historique$/.test(pathname)) {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const cand = db.prepare(`SELECT * FROM offres_candidatures WHERE id = ?`).get(id);
       if (!cand || (cand.candidat_id !== me.id && me.role !== 'admin')) {
@@ -3621,7 +3625,7 @@ async function handleRequest(req, res) {
 
     /* --- PATCH /api/candidatures/:id/statut — changer le statut (recruteur ou admin) --- */
     if (req.method === "PATCH" && /^\/api\/candidatures\/\d+\/statut$/.test(pathname)) {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const cand = db.prepare(`SELECT * FROM offres_candidatures WHERE id=?`).get(id);
       if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable" });
@@ -3642,7 +3646,7 @@ async function handleRequest(req, res) {
 
     /* --- PATCH /api/candidatures/:id/recruteur — notes & évaluation recruteur --- */
     if (req.method === "PATCH" && /^\/api\/candidatures\/\d+\/recruteur$/.test(pathname)) {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const cand = db.prepare(`SELECT * FROM offres_candidatures WHERE id=?`).get(id);
       if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable" });
@@ -3656,7 +3660,7 @@ async function handleRequest(req, res) {
 
     /* --- GET /api/offres/:id/candidatures — candidatures d'une offre (recruteur) --- */
     if (req.method === "GET" && /^\/api\/offres\/\d+\/candidatures$/.test(pathname)) {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const offreId = parseInt(pathname.split('/')[3]);
       const offre = db.prepare(`SELECT * FROM offres WHERE id=?`).get(offreId);
       if (!offre) return sendJSON(res, 404, { error: "Offre introuvable" });
@@ -3678,7 +3682,7 @@ async function handleRequest(req, res) {
 
     /* --- POST /api/offres/:id/postuler — postuler avec CV+LM --- */
     if (req.method === "POST" && /^\/api\/offres\/\d+\/postuler$/.test(pathname)) {
-      const me = requireAuth(req, res); if (!me) return;
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const offreId = parseInt(pathname.split('/')[3]);
       const { message, cv_profile_id, lettre_id } = body;
       const existing = db.prepare(`SELECT id FROM offres_candidatures WHERE offre_id=? AND candidat_id=?`).get(offreId, me.id);
