@@ -149,13 +149,219 @@
         <option value="Information consulaire">🏛️ Information consulaire</option>
         <option value="Événement">📅 Événement institutionnel</option>
       </select>
-      <textarea id="inst-contenu" placeholder="Rédiger le message à diffuser à l'audience sélectionnée…" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;"></textarea>
-      <button class="btn btn-navy btn-block" id="inst-send" style="margin-top:12px;">Envoyer à l'audience ciblée</button>
+      <textarea id="inst-contenu" placeholder="Rédiger le message à diffuser à l'audience sélectionnée…" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-bottom:14px;"></textarea>
+
+      <!-- ── Médias ── -->
+      <div style="border:1.5px dashed var(--border);border-radius:14px;padding:16px;background:var(--surface2,#F8FAFC);">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;">📎 Médias joints</div>
+
+        <!-- 4 Photos -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Photos (max 4)</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="inst-photo-grid">
+            <label id="inst-ph-0" class="inst-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;">
+              <span style="font-size:22px;">📷</span>
+              <span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
+              <input type="file" accept="image/*" style="display:none;" onchange="instAddPhoto(this,0)">
+            </label>
+            <label id="inst-ph-1" class="inst-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;">
+              <span style="font-size:22px;">📷</span>
+              <span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
+              <input type="file" accept="image/*" style="display:none;" onchange="instAddPhoto(this,1)">
+            </label>
+            <label id="inst-ph-2" class="inst-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;">
+              <span style="font-size:22px;">📷</span>
+              <span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
+              <input type="file" accept="image/*" style="display:none;" onchange="instAddPhoto(this,2)">
+            </label>
+            <label id="inst-ph-3" class="inst-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;">
+              <span style="font-size:22px;">📷</span>
+              <span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
+              <input type="file" accept="image/*" style="display:none;" onchange="instAddPhoto(this,3)">
+            </label>
+          </div>
+        </div>
+
+        <!-- Vidéo -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Vidéo (max 2 min)</div>
+          <div id="inst-video-zone" style="border:1.5px dashed #CBD5E1;border-radius:10px;background:#fff;padding:14px;text-align:center;cursor:pointer;position:relative;" onclick="document.getElementById('inst-video-input').click()">
+            <div id="inst-video-placeholder">
+              <div style="font-size:28px;">🎬</div>
+              <div style="font-size:13px;color:var(--muted);margin-top:4px;">Cliquer pour ajouter une vidéo</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:2px;">MP4, WebM, MOV — max 2 min recommandé</div>
+            </div>
+            <video id="inst-video-preview" style="display:none;width:100%;max-height:160px;border-radius:8px;" controls></video>
+            <button id="inst-video-remove" style="display:none;position:absolute;top:8px;right:8px;background:#EF4444;color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1;" onclick="event.stopPropagation();instRemoveVideo()">×</button>
+          </div>
+          <input type="file" id="inst-video-input" accept="video/*" style="display:none;" onchange="instAddVideo(this)">
+          <div id="inst-video-info" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+        </div>
+
+        <!-- Audio -->
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Message audio (max 20 sec)</div>
+          <div id="inst-audio-zone" style="border:1.5px dashed #CBD5E1;border-radius:10px;background:#fff;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="document.getElementById('inst-audio-input').click()">
+            <div id="inst-audio-placeholder" style="display:flex;align-items:center;gap:10px;width:100%;">
+              <span style="font-size:28px;">🎙️</span>
+              <div>
+                <div style="font-size:13px;color:var(--muted);">Ajouter un message audio</div>
+                <div style="font-size:11px;color:#94a3b8;">MP3, AAC, WAV — max 20 secondes</div>
+              </div>
+            </div>
+            <div id="inst-audio-preview" style="display:none;width:100%;align-items:center;gap:10px;">
+              <span style="font-size:22px;">🎵</span>
+              <audio id="inst-audio-player" controls style="flex:1;height:36px;"></audio>
+              <button style="background:#EF4444;color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;flex-shrink:0;" onclick="event.stopPropagation();instRemoveAudio()">×</button>
+            </div>
+          </div>
+          <input type="file" id="inst-audio-input" accept="audio/*" style="display:none;" onchange="instAddAudio(this)">
+          <div id="inst-audio-info" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+        </div>
+      </div>
+      <!-- fin médias -->
+
+      <button class="btn btn-navy btn-block" id="inst-send" style="margin-top:14px;">Envoyer à l'audience ciblée</button>
       <div id="inst-confirm" style="display:none;color:var(--green);font-size:13px;margin-top:8px;font-weight:700;">✅ Message envoyé sur le fil d'actualité.</div>
       <div class="notice" style="margin-top:12px;">
         🔒 Stats envoyées après diffusion (simulation) : nb destinataires, taux d'ouverture, taux de participation — jamais les identités individuelles.
       </div>
     </div>
+
+    <style>
+      .inst-photo-slot:hover { border-color: var(--orange) !important; background:#FFF7ED !important; }
+    </style>
+
+    <script>
+    /* ── Médias communications institutionnelles ── */
+    const instPhotos = [null, null, null, null];
+    let instVideoB64 = null;
+    let instAudioB64 = null;
+
+    function instCompressPhoto(file, cb) {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX = 1200;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        cb(c.toDataURL("image/jpeg", 0.8));
+      };
+      img.src = url;
+    }
+
+    function instAddPhoto(input, idx) {
+      const file = input.files[0];
+      if (!file) return;
+      instCompressPhoto(file, b64 => {
+        instPhotos[idx] = b64;
+        const slot = document.getElementById("inst-ph-" + idx);
+        slot.style.padding = "0";
+        slot.style.border = "none";
+        slot.innerHTML = `
+          <img src="${b64}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+          <button onclick="event.preventDefault();instRemovePhoto(${idx})" style="position:absolute;top:4px;right:4px;background:#EF4444;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;line-height:1;">×</button>
+          <input type="file" accept="image/*" style="display:none;" onchange="instAddPhoto(this,${idx})">
+        `;
+      });
+    }
+
+    function instRemovePhoto(idx) {
+      instPhotos[idx] = null;
+      const slot = document.getElementById("inst-ph-" + idx);
+      slot.style.padding = "";
+      slot.style.border = "1.5px dashed #CBD5E1";
+      slot.innerHTML = `
+        <span style="font-size:22px;">📷</span>
+        <span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
+        <input type="file" accept="image/*" style="display:none;" onchange="instAddPhoto(this,${idx})">
+      `;
+    }
+
+    function instAddVideo(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const MAX_MB = 50;
+      if (file.size > MAX_MB * 1024 * 1024) {
+        document.getElementById("inst-video-info").textContent = `⚠️ Fichier trop volumineux (${(file.size/1024/1024).toFixed(1)} Mo). Maximum recommandé : ${MAX_MB} Mo.`;
+        input.value = "";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = e => {
+        instVideoB64 = e.target.result;
+        const preview = document.getElementById("inst-video-preview");
+        const placeholder = document.getElementById("inst-video-placeholder");
+        const removeBtn = document.getElementById("inst-video-remove");
+        preview.src = instVideoB64;
+        preview.style.display = "block";
+        placeholder.style.display = "none";
+        removeBtn.style.display = "flex";
+        // Vérifier durée
+        preview.onloadedmetadata = () => {
+          const dur = preview.duration;
+          if (dur > 130) {
+            document.getElementById("inst-video-info").innerHTML = `⚠️ Vidéo trop longue (${Math.round(dur)}s). Recommandé : max 2 min (120s).`;
+          } else {
+            document.getElementById("inst-video-info").textContent = `✅ ${(file.size/1024/1024).toFixed(1)} Mo — ${Math.round(dur)}s`;
+          }
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function instRemoveVideo() {
+      instVideoB64 = null;
+      const preview = document.getElementById("inst-video-preview");
+      preview.src = ""; preview.style.display = "none";
+      document.getElementById("inst-video-placeholder").style.display = "";
+      document.getElementById("inst-video-remove").style.display = "none";
+      document.getElementById("inst-video-info").textContent = "";
+      document.getElementById("inst-video-input").value = "";
+    }
+
+    function instAddAudio(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        instAudioB64 = e.target.result;
+        const player = document.getElementById("inst-audio-player");
+        player.src = instAudioB64;
+        // Afficher
+        document.getElementById("inst-audio-placeholder").style.display = "none";
+        const prev = document.getElementById("inst-audio-preview");
+        prev.style.display = "flex";
+        // Vérifier durée
+        player.onloadedmetadata = () => {
+          const dur = player.duration;
+          if (dur > 25) {
+            document.getElementById("inst-audio-info").innerHTML = `⚠️ Audio trop long (${Math.round(dur)}s). Maximum : 20 secondes.`;
+          } else {
+            document.getElementById("inst-audio-info").textContent = `✅ ${(file.size/1024).toFixed(0)} Ko — ${Math.round(dur)}s`;
+          }
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function instRemoveAudio() {
+      instAudioB64 = null;
+      document.getElementById("inst-audio-player").src = "";
+      document.getElementById("inst-audio-placeholder").style.display = "flex";
+      document.getElementById("inst-audio-preview").style.display = "none";
+      document.getElementById("inst-audio-info").textContent = "";
+      document.getElementById("inst-audio-input").value = "";
+    }
+
+    </script>
 
     <!-- COMMUNAUTÉS -->
     <div class="card" id="communautes" style="margin-bottom:20px;">
@@ -292,19 +498,37 @@
   /* --- Envoyer message institutionnel → POST /api/fil --- */
   document.getElementById("inst-send").addEventListener("click", async () => {
     const contenu = document.getElementById("inst-contenu").value.trim();
-    const categorie = document.getElementById("inst-categorie").value;
-    if (!contenu) return;
+    const type = document.getElementById("inst-categorie").value;
+    if (!contenu) { alert("Veuillez rédiger un message."); return; }
     const btn = document.getElementById("inst-send");
     btn.disabled = true;
+    btn.textContent = "⏳ Envoi en cours…";
     try {
-      await api("POST", "/fil", { contenu, categorie });
+      const photos = instPhotos.filter(Boolean);
+      const payload = {
+        titre: type,
+        contenu,
+        type: "info",
+        photos_json: photos,
+        video_b64: instVideoB64 || null,
+        audio_b64: instAudioB64 || null,
+      };
+      const result = await api("POST", "/communications", payload);
+      // Réinitialiser le formulaire
       document.getElementById("inst-contenu").value = "";
-      document.getElementById("inst-confirm").style.display = "block";
-      setTimeout(() => { document.getElementById("inst-confirm").style.display = "none"; }, 4000);
+      for (let i = 0; i < 4; i++) instRemovePhoto(i);
+      instRemoveVideo();
+      instRemoveAudio();
+      const nb = result.nb_destinataires ?? 0;
+      const confirm = document.getElementById("inst-confirm");
+      confirm.innerHTML = `✅ Message envoyé à ${nb.toLocaleString("fr-FR")} destinataire${nb > 1 ? "s" : ""}${photos.length ? ` · ${photos.length} photo${photos.length > 1 ? "s" : ""}` : ""}${instVideoB64 ? " · 1 vidéo" : ""}${instAudioB64 ? " · 1 audio" : ""}.`;
+      confirm.style.display = "block";
+      setTimeout(() => { confirm.style.display = "none"; }, 5000);
     } catch (e) {
       alert("Erreur : " + (e.message || "Impossible d'envoyer."));
     } finally {
       btn.disabled = false;
+      btn.textContent = "Envoyer à l'audience ciblée";
     }
   });
 

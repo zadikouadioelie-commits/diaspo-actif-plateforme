@@ -333,6 +333,58 @@
             </div>
           </div>
 
+          <!-- ── Médias joints ── -->
+          <div style="border:1.5px dashed var(--border);border-radius:14px;padding:16px;background:var(--surface2);margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:12px;">📎 Médias joints</div>
+
+            <!-- 4 Photos -->
+            <div style="margin-bottom:14px;">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Photos (max 4)</div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="coll-photo-grid">
+                <label id="coll-ph-0" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;transition:border-color .2s;">
+                  <span style="font-size:22px;">📷</span><span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
+                  <input type="file" accept="image/*" style="display:none;" onchange="collAddPhoto(this,0)">
+                </label>
+                <label id="coll-ph-1" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;transition:border-color .2s;">
+                  <span style="font-size:22px;">📷</span><span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
+                  <input type="file" accept="image/*" style="display:none;" onchange="collAddPhoto(this,1)">
+                </label>
+                <label id="coll-ph-2" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;transition:border-color .2s;">
+                  <span style="font-size:22px;">📷</span><span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
+                  <input type="file" accept="image/*" style="display:none;" onchange="collAddPhoto(this,2)">
+                </label>
+                <label id="coll-ph-3" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;transition:border-color .2s;">
+                  <span style="font-size:22px;">📷</span><span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
+                  <input type="file" accept="image/*" style="display:none;" onchange="collAddPhoto(this,3)">
+                </label>
+              </div>
+            </div>
+
+            <!-- Vidéo -->
+            <div style="margin-bottom:14px;">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Vidéo (max 2 min)</div>
+              <div id="coll-video-zone" style="border:1.5px dashed #CBD5E1;border-radius:10px;background:#fff;padding:14px;text-align:center;cursor:pointer;position:relative;" onclick="document.getElementById('coll-video-input').click()">
+                <div id="coll-video-placeholder"><div style="font-size:28px;">🎬</div><div style="font-size:13px;color:var(--muted);margin-top:4px;">Cliquer pour ajouter une vidéo</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">MP4, WebM, MOV — max 2 min</div></div>
+                <video id="coll-video-preview" style="display:none;width:100%;max-height:160px;border-radius:8px;" controls></video>
+                <button id="coll-video-remove" style="display:none;position:absolute;top:8px;right:8px;background:#EF4444;color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1;" onclick="event.stopPropagation();collRemoveVideo()">×</button>
+              </div>
+              <input type="file" id="coll-video-input" accept="video/*" style="display:none;" onchange="collAddVideo(this)">
+              <div id="coll-video-info" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+            </div>
+
+            <!-- Audio -->
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Message audio (max 20 sec)</div>
+              <div id="coll-audio-zone" style="border:1.5px dashed #CBD5E1;border-radius:10px;background:#fff;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="document.getElementById('coll-audio-input').click()">
+                <div id="coll-audio-placeholder" style="display:flex;align-items:center;gap:10px;width:100%;"><span style="font-size:28px;">🎙️</span><div><div style="font-size:13px;color:var(--muted);">Ajouter un message audio</div><div style="font-size:11px;color:#94a3b8;">MP3, AAC, WAV — max 20 secondes</div></div></div>
+                <div id="coll-audio-preview" style="display:none;width:100%;align-items:center;gap:10px;"><span style="font-size:22px;">🎵</span><audio id="coll-audio-player" controls style="flex:1;height:36px;"></audio><button style="background:#EF4444;color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;flex-shrink:0;" onclick="event.stopPropagation();collRemoveAudio()">×</button></div>
+              </div>
+              <input type="file" id="coll-audio-input" accept="audio/*" style="display:none;" onchange="collAddAudio(this)">
+              <div id="coll-audio-info" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+            </div>
+          </div>
+          <!-- fin médias -->
+
           <div class="notice" style="margin-bottom:12px;">
             <strong>Audience estimée :</strong> <span id="comm-audience">Tous les membres de la plateforme</span>.
             <br><span style="font-size:12px;color:var(--muted);">Les membres peuvent se désabonner des communications de votre institution.</span>
@@ -805,6 +857,11 @@ function resetCommForm() {
   document.querySelectorAll("#cible-nats .cible-chip").forEach((c,i) => { c.classList.toggle("active", i===0); });
   document.querySelectorAll(".comm-type-btn").forEach((b,i) => { b.classList.toggle("active", i===0); });
   COMM_TYPE = "info";
+  // Réinitialiser médias si disponibles
+  if (typeof collRemoveVideo === "function") {
+    for (let i = 0; i < 4; i++) collRemovePhoto(i);
+    collRemoveVideo(); collRemoveAudio();
+  }
 }
 
 /* ===== Consultations ===== */
@@ -1055,6 +1112,108 @@ async function loadPartenariats() {
     });
   });
 
+  /* ── Médias communications collectivité ── */
+  const collPhotos = [null, null, null, null];
+  let collVideoB64 = null;
+  let collAudioB64 = null;
+
+  function collCompressPhoto(file, cb) {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1200;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) { if (w > h) { h = Math.round(h * MAX / w); w = MAX; } else { w = Math.round(w * MAX / h); h = MAX; } }
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      cb(c.toDataURL("image/jpeg", 0.8));
+    };
+    img.src = url;
+  }
+
+  function collAddPhoto(input, idx) {
+    const file = input.files[0];
+    if (!file) return;
+    collCompressPhoto(file, b64 => {
+      collPhotos[idx] = b64;
+      const slot = document.getElementById("coll-ph-" + idx);
+      slot.style.padding = "0"; slot.style.border = "none";
+      slot.innerHTML = `<img src="${b64}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+        <button onclick="event.preventDefault();collRemovePhoto(${idx})" style="position:absolute;top:4px;right:4px;background:#EF4444;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;line-height:1;">×</button>
+        <input type="file" accept="image/*" style="display:none;" onchange="collAddPhoto(this,${idx})">`;
+    });
+  }
+
+  function collRemovePhoto(idx) {
+    collPhotos[idx] = null;
+    const slot = document.getElementById("coll-ph-" + idx);
+    slot.style.padding = ""; slot.style.border = "1.5px dashed #CBD5E1";
+    slot.innerHTML = `<span style="font-size:22px;">📷</span><span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
+      <input type="file" accept="image/*" style="display:none;" onchange="collAddPhoto(this,${idx})">`;
+  }
+
+  function collAddVideo(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) { document.getElementById("coll-video-info").textContent = `⚠️ Fichier trop lourd (${(file.size/1024/1024).toFixed(1)} Mo). Max recommandé : 50 Mo.`; input.value = ""; return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      collVideoB64 = e.target.result;
+      const preview = document.getElementById("coll-video-preview");
+      preview.src = collVideoB64; preview.style.display = "block";
+      document.getElementById("coll-video-placeholder").style.display = "none";
+      document.getElementById("coll-video-remove").style.display = "flex";
+      preview.onloadedmetadata = () => {
+        const dur = preview.duration;
+        document.getElementById("coll-video-info").textContent = dur > 130
+          ? `⚠️ Vidéo trop longue (${Math.round(dur)}s). Recommandé : max 2 min.`
+          : `✅ ${(file.size/1024/1024).toFixed(1)} Mo — ${Math.round(dur)}s`;
+      };
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function collRemoveVideo() {
+    collVideoB64 = null;
+    const preview = document.getElementById("coll-video-preview");
+    preview.src = ""; preview.style.display = "none";
+    document.getElementById("coll-video-placeholder").style.display = "";
+    document.getElementById("coll-video-remove").style.display = "none";
+    document.getElementById("coll-video-info").textContent = "";
+    document.getElementById("coll-video-input").value = "";
+  }
+
+  function collAddAudio(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      collAudioB64 = e.target.result;
+      const player = document.getElementById("coll-audio-player");
+      player.src = collAudioB64;
+      document.getElementById("coll-audio-placeholder").style.display = "none";
+      document.getElementById("coll-audio-preview").style.display = "flex";
+      player.onloadedmetadata = () => {
+        const dur = player.duration;
+        document.getElementById("coll-audio-info").textContent = dur > 25
+          ? `⚠️ Audio trop long (${Math.round(dur)}s). Maximum : 20 secondes.`
+          : `✅ ${(file.size/1024).toFixed(0)} Ko — ${Math.round(dur)}s`;
+      };
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function collRemoveAudio() {
+    collAudioB64 = null;
+    document.getElementById("coll-audio-player").src = "";
+    document.getElementById("coll-audio-placeholder").style.display = "flex";
+    document.getElementById("coll-audio-preview").style.display = "none";
+    document.getElementById("coll-audio-info").textContent = "";
+    document.getElementById("coll-audio-input").value = "";
+  }
+
   // Envoyer communication
   document.getElementById("btn-envoyer-comm").addEventListener("click", async () => {
     const titre = document.getElementById("comm-titre").value.trim();
@@ -1062,12 +1221,26 @@ async function loadPartenariats() {
     if (!titre || !contenu) { alert("L'objet et le contenu sont requis."); return; }
     const pays = [...document.querySelectorAll("#cible-pays .cible-chip.active")].map(c=>c.dataset.val).filter(v=>v!=="tous");
     const nats = [...document.querySelectorAll("#cible-nats .cible-chip.active")].map(c=>c.dataset.val).filter(v=>v!=="toutes");
+    const photos = collPhotos.filter(Boolean);
+    const btn = document.getElementById("btn-envoyer-comm");
+    btn.disabled = true; btn.textContent = "⏳ Envoi…";
     try {
-      const r = await api("POST", "/communications", { titre, contenu, type: COMM_TYPE, cible: { pays, nationalites: nats } });
-      alert(`Communication envoyée avec succès ! Audience estimée : ${r.nb_destinataires} destinataire(s).`);
+      const r = await api("POST", "/communications", {
+        titre, contenu, type: COMM_TYPE,
+        cible: { pays, nationalites: nats },
+        photos_json: photos,
+        video_b64: collVideoB64 || null,
+        audio_b64: collAudioB64 || null,
+      });
+      const nb = r.nb_destinataires ?? 0;
+      alert(`✅ Communication envoyée à ${nb.toLocaleString("fr-FR")} destinataire(s)${photos.length ? ` · ${photos.length} photo(s)` : ""}${collVideoB64 ? " · 1 vidéo" : ""}${collAudioB64 ? " · 1 audio" : ""}.`);
       resetCommForm();
+      // Réinitialiser médias
+      for (let i = 0; i < 4; i++) collRemovePhoto(i);
+      collRemoveVideo(); collRemoveAudio();
       loadCommHistorique();
     } catch(e) { alert("Erreur : " + e.message); }
+    finally { btn.disabled = false; btn.textContent = "Envoyer la communication"; }
   });
 
   // Publier sur le fil

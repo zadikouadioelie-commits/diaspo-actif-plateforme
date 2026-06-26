@@ -2682,9 +2682,16 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   route("POST", "/api/communications", async (req, res, params, body) => {
     const user = getCurrentUser(req);
     if (!user || !["collectivite","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux collectivités et administrateurs." });
-    const { titre, contenu, type, cible } = body;
+    const { titre, contenu, type, cible, photos_json, video_b64, audio_b64 } = body;
     if (!titre || !contenu) return sendJSON(res, 400, { error: "titre et contenu requis." });
-    // Compter les destinataires potentiels (membres non désabonnés)
+    // Valider médias
+    const photos = Array.isArray(photos_json) ? photos_json.slice(0, 4) : [];
+    for (const p of photos) {
+      if (typeof p !== "string" || !p.startsWith("data:image/")) return sendJSON(res, 400, { error: "Format photo invalide." });
+    }
+    if (video_b64 && !video_b64.startsWith("data:video/")) return sendJSON(res, 400, { error: "Format vidéo invalide." });
+    if (audio_b64 && !audio_b64.startsWith("data:audio/")) return sendJSON(res, 400, { error: "Format audio invalide." });
+    // Compter les destinataires potentiels
     let nb = 0;
     try {
       const c = cible || {};
@@ -2695,9 +2702,17 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
       if (c.nationalites?.length) { const ph = c.nationalites.map(()=>"?").join(","); conds.push(`(nationalite1 IN (${ph}) OR nationalite2 IN (${ph}))`); p.push(...c.nationalites,...c.nationalites); }
       nb = db.prepare(`SELECT COUNT(*) AS n FROM users WHERE ${conds.join(" AND ")}`).get(...p).n;
     } catch(e) { nb = 0; }
-    const id = db.prepare("INSERT INTO communications_institutionnelles (emetteur_id,titre,contenu,type,cible_json,nb_destinataires) VALUES (?,?,?,?,?,?)")
-      .run(user.id, titre, contenu, type||"info", JSON.stringify(cible||{}), nb).lastInsertRowid;
-    // Publication aussi sur le fil
+    // Alter table si colonnes manquantes (migration SQLite)
+    try {
+      db.prepare("ALTER TABLE communications_institutionnelles ADD COLUMN photos_json TEXT DEFAULT '[]'").run();
+      db.prepare("ALTER TABLE communications_institutionnelles ADD COLUMN video_b64 TEXT DEFAULT NULL").run();
+      db.prepare("ALTER TABLE communications_institutionnelles ADD COLUMN audio_b64 TEXT DEFAULT NULL").run();
+    } catch(e) {} // colonnes déjà présentes
+    const id = db.prepare(
+      "INSERT INTO communications_institutionnelles (emetteur_id,titre,contenu,type,cible_json,nb_destinataires,photos_json,video_b64,audio_b64) VALUES (?,?,?,?,?,?,?,?,?)"
+    ).run(user.id, titre, contenu, type||"info", JSON.stringify(cible||{}), nb,
+          JSON.stringify(photos), video_b64||null, audio_b64||null).lastInsertRowid;
+    // Publication sur le fil (sans médias lourds)
     try {
       db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)")
         .run(user.id, user.nom, "institutionnel", type||"info", `**${titre}**\n\n${contenu}`);
@@ -2708,8 +2723,11 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   route("GET", "/api/communications", async (req, res) => {
     const user = getCurrentUser(req);
     if (!user || !["collectivite","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux collectivités." });
-    const rows = db.prepare("SELECT * FROM communications_institutionnelles WHERE emetteur_id=? ORDER BY created_at DESC LIMIT 50").all(user.id);
-    sendJSON(res, 200, { communications: rows });
+    const rows = db.prepare("SELECT id,emetteur_id,titre,contenu,type,cible_json,nb_destinataires,statut,photos_json,video_b64,audio_b64,created_at FROM communications_institutionnelles WHERE emetteur_id=? ORDER BY created_at DESC LIMIT 50").all(user.id);
+    sendJSON(res, 200, { communications: rows.map(r => ({
+      ...r,
+      photos_json: (() => { try { return JSON.parse(r.photos_json||"[]"); } catch(e){ return []; } })()
+    })) });
   });
 
   route("GET", "/api/communications/recues", async (req, res) => {

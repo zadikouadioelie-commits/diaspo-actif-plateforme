@@ -468,6 +468,9 @@ db.exec(`
     cible_json TEXT DEFAULT '{}',
     nb_destinataires INTEGER DEFAULT 0,
     statut TEXT DEFAULT 'envoyee',
+    photos_json TEXT DEFAULT '[]',
+    video_b64 TEXT DEFAULT NULL,
+    audio_b64 TEXT DEFAULT NULL,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(emetteur_id) REFERENCES users(id)
   );
