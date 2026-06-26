@@ -4688,12 +4688,31 @@ async function handleRequest(req, res) {
       /* Enregistrement participant (immuable) */
       db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) VALUES (?,?,?,?,?)`)
         .run(tid, eid, me.id, me.nom, me.pays||null);
+      /* ── SPLIT AUTOMATIQUE : 5% plateforme / 95% initiative ── */
+      const COMMISSION_RATE = 0.05;
+      const platform_fee    = parseFloat((tt.prix * COMMISSION_RATE).toFixed(2));
+      const organizer_amount = parseFloat((tt.prix - platform_fee).toFixed(2));
+
+      /* Ledger immuable — 2 lignes : une pour la plateforme, une pour l'initiative */
+      const walletBase = { ticket_id: tid, event_id: eid, commission_rate: COMMISSION_RATE, prix_billet: tt.prix, platform_fee, organizer_amount };
+      db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,?,'platform_fee',NULL,?,?,?,?,?)`)
+        .run(tid, eid, platform_fee, COMMISSION_RATE, tt.prix, platform_fee, organizer_amount);
+      db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,?,'organizer_credit',?,?,?,?,?,?)`)
+        .run(tid, eid, ev.organisateur_id, organizer_amount, COMMISSION_RATE, tt.prix, platform_fee, organizer_amount);
+
+      /* Créditer wallet initiative (+95%) */
+      db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, ev.organisateur_id);
+
+      /* Créditer platform_wallet (+5%) */
+      db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+
       /* Transaction financière (audit) */
       try {
         db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'billet_evenement',?,?,'reussi',?)`)
           .run(me.id, tt.prix, 'billet_evenement', ts);
       } catch(e) { /* table transactions peut avoir schema différent */ }
-      return sendJSON(res, 201, { ticket_id: tid, qr_token: qrToken, prix: tt.prix });
+
+      return sendJSON(res, 201, { ticket_id: tid, qr_token: qrToken, prix: tt.prix, platform_fee, organizer_amount });
     }
 
     /* ── GET /api/tickets/mes — mes billets ── */
@@ -4777,6 +4796,25 @@ async function handleRequest(req, res) {
       db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat) VALUES (?,?,?,'accepted')`).run(tid, eid, me.id);
       const attendee = db.prepare(`SELECT nom_display FROM event_attendees WHERE ticket_id=?`).get(tid);
       return sendJSON(res, 200, { valid: true, nom: attendee?.nom_display || 'Participant', ticket_id: tid });
+    }
+
+    /* ── GET /api/wallet/balance — solde wallet initiative ── */
+    if (req.method === 'GET' && pathname === '/api/wallet/balance') {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const user = db.prepare(`SELECT wallet_balance FROM users WHERE id=?`).get(me.id);
+      const historique = db.prepare(`SELECT wt.*, e.titre AS event_titre FROM wallet_transactions wt LEFT JOIN events e ON e.id=wt.event_id WHERE wt.beneficiaire_id=? AND wt.type='organizer_credit' ORDER BY wt.timestamp DESC LIMIT 50`).all(me.id);
+      return sendJSON(res, 200, { balance: user?.wallet_balance || 0, commission_rate: 0.05, historique });
+    }
+
+    /* ── GET /api/admin/wallet — wallet plateforme (admin only) ── */
+    if (req.method === 'GET' && pathname === '/api/admin/wallet') {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const pw = db.prepare(`SELECT * FROM platform_wallet WHERE id=1`).get();
+      const par_event = db.prepare(`SELECT e.titre, e.pays, COUNT(wt.id) nb_transactions, COALESCE(SUM(wt.montant),0) total_fees FROM wallet_transactions wt JOIN events e ON e.id=wt.event_id WHERE wt.type='platform_fee' GROUP BY wt.event_id ORDER BY total_fees DESC LIMIT 20`).all();
+      const par_pays = db.prepare(`SELECT e.pays, COUNT(wt.id) nb, COALESCE(SUM(wt.montant),0) total FROM wallet_transactions wt JOIN events e ON e.id=wt.event_id WHERE wt.type='platform_fee' AND e.pays IS NOT NULL GROUP BY e.pays ORDER BY total DESC LIMIT 10`).all();
+      const historique = db.prepare(`SELECT wt.*, e.titre AS event_titre, u.nom AS organisateur_nom FROM wallet_transactions wt LEFT JOIN events e ON e.id=wt.event_id LEFT JOIN users u ON u.id=wt.beneficiaire_id WHERE wt.type='platform_fee' ORDER BY wt.timestamp DESC LIMIT 100`).all();
+      return sendJSON(res, 200, { wallet: pw, par_event, par_pays, historique });
     }
 
     /* ── GET /api/admin/events ── */

@@ -800,6 +800,34 @@ db.exec(`
   );
 `);
 
+/* ══ WALLET SYSTÈME ══ */
+db.exec(`
+  /* ── WALLET LEDGER (IMMUABLE — INSERT ONLY) ── */
+  CREATE TABLE IF NOT EXISTS wallet_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER,                        -- billet source
+    event_id INTEGER,
+    type TEXT NOT NULL,                       -- 'platform_fee' | 'organizer_credit'
+    beneficiaire_id INTEGER,                  -- NULL = plateforme, sinon user.id initiative
+    montant REAL NOT NULL,                    -- toujours positif
+    commission_rate REAL DEFAULT 0.05,
+    prix_billet REAL NOT NULL,
+    platform_fee REAL NOT NULL,               -- 5% du prix billet
+    organizer_amount REAL NOT NULL,           -- 95% du prix billet
+    timestamp TEXT DEFAULT (datetime('now'))
+    -- PAS de FOREIGN KEY sur ticket_id pour préserver l'immuabilité même si ticket est modifié
+  );
+
+  /* ── PLATFORM WALLET SUMMARY ── */
+  CREATE TABLE IF NOT EXISTS platform_wallet (
+    id INTEGER PRIMARY KEY CHECK (id = 1),    -- ligne unique
+    total_commissions REAL DEFAULT 0,
+    total_transactions INTEGER DEFAULT 0,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+  INSERT OR IGNORE INTO platform_wallet (id, total_commissions, total_transactions) VALUES (1, 0, 0);
+`);
+
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
 const MIGRATIONS = [
   ["conversations", "sujet TEXT"],
@@ -810,6 +838,8 @@ const MIGRATIONS = [
   ["messages", "type TEXT DEFAULT 'text'"],
   ["messages", "fichier_json TEXT"],
   ["messages", "lu INTEGER DEFAULT 0"],
+  // Wallet initiative
+  ["users", "wallet_balance REAL DEFAULT 0"],
   // Champs étendus utilisateurs
   ["users", "prenom TEXT"],
   ["users", "date_naissance TEXT"],

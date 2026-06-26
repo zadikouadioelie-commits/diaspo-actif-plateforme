@@ -515,6 +515,33 @@
           </div>
           <a href="billetterie.html" target="_blank" class="btn btn-orange">🔗 Ouvrir la billetterie</a>
         </div>
+
+        <!-- WALLET PLATEFORME -->
+        <div class="card" style="margin-bottom:20px;border-left:4px solid var(--orange);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+            <div>
+              <h3 style="margin:0;font-size:15px;">💰 Wallet Diaspo'Actif — Revenus plateforme</h3>
+              <p style="margin:4px 0 0;font-size:12px;color:var(--muted);">5% prélevé automatiquement sur chaque billet vendu · Non modifiable</p>
+            </div>
+            <span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:800;padding:4px 10px;border-radius:99px;">COMMISSION RATE : 5%</span>
+          </div>
+          <div id="admin-wallet-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="responsive-grid-1">
+            <div>
+              <h4 style="margin:0 0 10px;font-size:13px;">📊 Commissions par événement</h4>
+              <div id="admin-wallet-events" style="max-height:200px;overflow-y:auto;"></div>
+            </div>
+            <div>
+              <h4 style="margin:0 0 10px;font-size:13px;">🌍 Commissions par pays</h4>
+              <div id="admin-wallet-pays"></div>
+            </div>
+          </div>
+          <div style="margin-top:16px;">
+            <h4 style="margin:0 0 10px;font-size:13px;">📋 Historique des commissions (100 dernières)</h4>
+            <div id="admin-wallet-historique" style="max-height:250px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
+          </div>
+        </div>
+
         <div id="admin-billet-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;" class="responsive-grid-1">
           <div class="card">
@@ -4422,12 +4449,73 @@ async function submitAccordDirect(){
 /* ═══ BILLETTERIE ADMIN ═══ */
 async function loadAdminBilletterie() {
   const fmtDate = s => { if(!s) return '—'; const d=new Date(s); const M=['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']; return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`; };
+  const fmtTs = s => { if(!s) return '—'; const d=new Date(s); return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; };
   const STATUTS = { brouillon:'📝 Brouillon', publie:'🟢 Publié', ferme:'🔒 Fermé', archive:'📁 Archivé' };
   try {
-    const [rStats, rEvents] = await Promise.all([
+    const [rStats, rEvents, rWallet] = await Promise.all([
       api('GET','/events/stats'),
-      api('GET','/admin/events')
+      api('GET','/admin/events'),
+      api('GET','/admin/wallet').catch(() => null)
     ]);
+
+    /* ── WALLET PLATEFORME ── */
+    if (rWallet) {
+      const w = rWallet.wallet || {};
+      document.getElementById('admin-wallet-kpis').innerHTML = `
+        <div class="card" style="padding:14px;text-align:center;border:2px solid var(--orange);">
+          <div style="font-size:28px;font-weight:800;color:var(--orange);">${(w.total_commissions||0).toFixed(2)} €</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Total commissions reçues</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;">${w.total_transactions||0}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Transactions billetterie</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:#10b981;">${w.total_transactions>0?((w.total_commissions||0)/w.total_transactions).toFixed(2)+' €':'—'}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Commission moyenne / billet</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;background:#fff3e0;">
+          <div style="font-size:22px;font-weight:800;color:#e65100;">5%</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Taux fixe · Non modifiable</div>
+        </div>`;
+
+      const evts = rWallet.par_event || [];
+      document.getElementById('admin-wallet-events').innerHTML = evts.length
+        ? evts.map(e=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;">
+            <span>${e.titre}</span>
+            <strong style="color:var(--orange);white-space:nowrap;">${(e.total_fees||0).toFixed(2)} €</strong>
+          </div>`).join('')
+        : '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune commission encore.</div>';
+
+      const pays = rWallet.par_pays || [];
+      document.getElementById('admin-wallet-pays').innerHTML = pays.length
+        ? pays.map(p=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;">
+            <span>🌍 ${p.pays}</span>
+            <strong style="color:var(--orange);">${(p.total||0).toFixed(2)} €</strong>
+          </div>`).join('')
+        : '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune donnée par pays.</div>';
+
+      const hist = rWallet.historique || [];
+      document.getElementById('admin-wallet-historique').innerHTML = hist.length
+        ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:var(--bg);position:sticky;top:0;">
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">Événement</th>
+              <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">Prix billet</th>
+              <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">95% → Initiative</th>
+              <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);color:var(--orange);">5% → DA</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">Date</th>
+            </tr></thead>
+            <tbody>${hist.map(h=>`
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:7px 10px;">${h.event_titre||'—'}</td>
+                <td style="padding:7px 10px;text-align:right;">${(h.prix_billet||0).toFixed(2)} €</td>
+                <td style="padding:7px 10px;text-align:right;color:#10b981;">${(h.organizer_amount||0).toFixed(2)} €</td>
+                <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--orange);">${(h.platform_fee||0).toFixed(2)} €</td>
+                <td style="padding:7px 10px;color:var(--muted);">${fmtTs(h.timestamp)}</td>
+              </tr>`).join('')}
+            </tbody></table>`
+        : '<div style="padding:20px;text-align:center;color:var(--muted);">Aucune commission enregistrée.</div>';
+    }
     const s = rStats;
     /* KPIs */
     document.getElementById('admin-billet-stats').innerHTML = `
