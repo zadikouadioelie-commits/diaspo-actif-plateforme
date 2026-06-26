@@ -4836,6 +4836,301 @@ async function handleRequest(req, res) {
       return sendJSON(res, 200, { events });
     }
 
+    /* ============================================================
+       MODULE RÉUNIONS COLLABORATIVES
+    ============================================================ */
+
+    /* POST /api/reunions — créer une réunion */
+    if (req.method === "POST" && pathname === "/api/reunions") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const { titre, description, type, acces, date_debut, date_fin, ordre_du_jour, enregistrement_active } = body;
+      if (!titre || !date_debut) return sendJSON(res, 400, { error: "Titre et date de début requis." });
+      const jitsi_room = `diaspoactif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const r = db.prepare(`INSERT INTO reunions(titre,description,type,acces,date_debut,date_fin,ordre_du_jour,enregistrement_active,jitsi_room,organisateur_id)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+        titre.trim(), description||null, type||'reunion', acces||'prive',
+        date_debut, date_fin||null, ordre_du_jour||null, enregistrement_active?1:0, jitsi_room, me.id
+      );
+      /* L'organisateur est invité comme coorganisateur + accepté */
+      db.prepare(`INSERT OR IGNORE INTO reunion_invites(reunion_id,user_id,role,statut) VALUES(?,?,?,?)`).run(r.lastInsertRowid, me.id, 'coorganisateur', 'accepte');
+      return sendJSON(res, 201, { id: r.lastInsertRowid, jitsi_room });
+    }
+
+    /* GET /api/reunions — liste des réunions */
+    if (req.method === "GET" && pathname === "/api/reunions") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const { statut, search, role } = qs;
+      let where = `WHERE (r.organisateur_id=? OR ri.user_id=?)`;
+      const params = [me.id, me.id];
+      if (statut) { where += ` AND r.statut=?`; params.push(statut); }
+      if (search) { where += ` AND (r.titre LIKE ? OR r.description LIKE ?)`; params.push(`%${search}%`, `%${search}%`); }
+      const rows = db.prepare(`
+        SELECT DISTINCT r.*, u.prenom AS org_prenom, u.nom AS org_nom, u.photo_url AS org_photo,
+          ri2.statut AS mon_statut, ri2.role AS mon_role,
+          (SELECT COUNT(*) FROM reunion_invites WHERE reunion_id=r.id AND statut='accepte') AS nb_participants
+        FROM reunions r
+        LEFT JOIN reunion_invites ri ON ri.reunion_id=r.id AND ri.user_id=?
+        LEFT JOIN reunion_invites ri2 ON ri2.reunion_id=r.id AND ri2.user_id=?
+        JOIN users u ON u.id=r.organisateur_id
+        ${where}
+        ORDER BY r.date_debut DESC LIMIT 100
+      `).all(me.id, me.id, ...params);
+      return sendJSON(res, 200, { reunions: rows });
+    }
+
+    /* GET /api/reunions/decisions — toutes mes décisions */
+    if (req.method === "GET" && pathname === "/api/reunions/decisions") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const decisions = db.prepare(`
+        SELECT d.*, r.titre AS reunion_titre, r.date_debut, u.prenom, u.nom, u.photo_url
+        FROM reunion_decisions d
+        JOIN reunions r ON r.id=d.reunion_id
+        LEFT JOIN users u ON u.id=d.responsable_id
+        WHERE d.responsable_id=? OR r.organisateur_id=?
+        ORDER BY d.echeance ASC, d.created_at DESC LIMIT 200
+      `).all(me.id, me.id);
+      return sendJSON(res, 200, { decisions });
+    }
+
+    /* GET /api/reunions/:id — détail réunion */
+    if (req.method === "GET" && /^\/api\/reunions\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const reunion = db.prepare(`
+        SELECT r.*, u.prenom AS org_prenom, u.nom AS org_nom, u.photo_url AS org_photo
+        FROM reunions r JOIN users u ON u.id=r.organisateur_id WHERE r.id=?
+      `).get(rid);
+      if (!reunion) return sendJSON(res, 404, { error: "Réunion introuvable." });
+      const invites = db.prepare(`
+        SELECT ri.*, u.prenom, u.nom, u.photo_url, u.role AS user_role
+        FROM reunion_invites ri JOIN users u ON u.id=ri.user_id WHERE ri.reunion_id=?
+        ORDER BY ri.role DESC, u.prenom ASC
+      `).all(rid);
+      const myInvite = invites.find(i => i.user_id === me.id);
+      const canAccess = reunion.organisateur_id === me.id || myInvite || me.role === 'administrateur';
+      if (!canAccess) return sendJSON(res, 403, { error: "Accès refusé." });
+      return sendJSON(res, 200, { reunion, invites, myInvite: myInvite || null });
+    }
+
+    /* PATCH /api/reunions/:id — modifier */
+    if (req.method === "PATCH" && /^\/api\/reunions\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const r = db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
+      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
+      if (r.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      const { titre, description, date_debut, date_fin, ordre_du_jour, statut } = body;
+      db.prepare(`UPDATE reunions SET titre=COALESCE(?,titre),description=COALESCE(?,description),date_debut=COALESCE(?,date_debut),date_fin=COALESCE(?,date_fin),ordre_du_jour=COALESCE(?,ordre_du_jour),statut=COALESCE(?,statut) WHERE id=?`)
+        .run(titre||null, description||null, date_debut||null, date_fin||null, ordre_du_jour||null, statut||null, rid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* PATCH /api/reunions/:id/start — démarrer */
+    if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/start$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const r = db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
+      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
+      if (r.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      db.prepare(`UPDATE reunions SET statut='en_cours', started_at=datetime('now') WHERE id=?`).run(rid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* PATCH /api/reunions/:id/end — terminer */
+    if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/end$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const r = db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
+      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
+      if (r.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      const now = new Date().toISOString();
+      let duree = null;
+      if (r.started_at) { duree = Math.round((new Date(now) - new Date(r.started_at)) / 60000); }
+      db.prepare(`UPDATE reunions SET statut='terminee', ended_at=?, duree_minutes=? WHERE id=?`).run(now, duree, rid);
+      /* Marquer quitte_at pour les présents */
+      db.prepare(`UPDATE reunion_invites SET quitte_at=? WHERE reunion_id=? AND quitte_at IS NULL AND rejoint_at IS NOT NULL`).run(now, rid);
+      /* Créer résumé brouillon si pas encore */
+      try { db.prepare(`INSERT OR IGNORE INTO reunion_resumes(reunion_id,redacteur_id) VALUES(?,?)`).run(rid, me.id); } catch(e) {}
+      return sendJSON(res, 200, { ok: true, duree_minutes: duree });
+    }
+
+    /* POST /api/reunions/:id/invites — inviter des participants */
+    if (req.method === "POST" && /^\/api\/reunions\/\d+\/invites$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const r = db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
+      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
+      if (r.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      const { users: userIds, role } = body; // userIds: array of user IDs
+      if (!Array.isArray(userIds) || userIds.length === 0) return sendJSON(res, 400, { error: "Liste d'utilisateurs requise." });
+      let added = 0;
+      for (const uid of userIds) {
+        try {
+          db.prepare(`INSERT OR IGNORE INTO reunion_invites(reunion_id,user_id,role) VALUES(?,?,?)`).run(rid, uid, role||'participant');
+          /* Notification */
+          const org = db.prepare(`SELECT prenom,nom FROM users WHERE id=?`).get(me.id);
+          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+            uid, 'reunion_invite', `Invitation à une réunion`,
+            `${org?.prenom||''} ${org?.nom||''} vous invite à "${r.titre}"`,
+            JSON.stringify({ reunion_id: rid })
+          );
+          added++;
+        } catch(e) {}
+      }
+      return sendJSON(res, 200, { added });
+    }
+
+    /* PATCH /api/reunions/:id/invites/me — accepter ou refuser */
+    if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/invites\/me$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const { statut } = body;
+      if (!['accepte','refuse'].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+      db.prepare(`UPDATE reunion_invites SET statut=? WHERE reunion_id=? AND user_id=?`).run(statut, rid, me.id);
+      if (statut === 'accepte') {
+        /* Ajouter à l'agenda */
+        const r = db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
+        if (r) {
+          try {
+            db.prepare(`INSERT OR IGNORE INTO agenda_events(user_id,titre,description,date_debut,date_fin,couleur,type,source_id,source_type)
+              VALUES(?,?,?,?,?,?,?,?,?)`).run(
+              me.id, `📹 ${r.titre}`, r.description||`Réunion ${r.type}`,
+              r.date_debut, r.date_fin||r.date_debut, '#7c3aed', 'reunion', rid, 'reunion'
+            );
+          } catch(e) {}
+        }
+      }
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* POST /api/reunions/:id/presence — pointer arrivée */
+    if (req.method === "POST" && /^\/api\/reunions\/\d+\/presence$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      db.prepare(`UPDATE reunion_invites SET rejoint_at=COALESCE(rejoint_at,datetime('now')),statut='accepte' WHERE reunion_id=? AND user_id=?`).run(rid, me.id);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* PATCH /api/reunions/:id/presence — pointer départ */
+    if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/presence$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const inv = db.prepare(`SELECT * FROM reunion_invites WHERE reunion_id=? AND user_id=?`).get(rid, me.id);
+      const now = new Date().toISOString();
+      let duree = null;
+      if (inv?.rejoint_at) { duree = Math.round((new Date(now) - new Date(inv.rejoint_at)) / 60000); }
+      db.prepare(`UPDATE reunion_invites SET quitte_at=?, duree_presence_minutes=? WHERE reunion_id=? AND user_id=?`).run(now, duree, rid, me.id);
+      return sendJSON(res, 200, { ok: true, duree_minutes: duree });
+    }
+
+    /* GET /api/reunions/:id/resume — obtenir le résumé */
+    if (req.method === "GET" && /^\/api\/reunions\/\d+\/resume$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const resume = db.prepare(`SELECT rr.*, u.prenom AS red_prenom, u.nom AS red_nom FROM reunion_resumes rr LEFT JOIN users u ON u.id=rr.redacteur_id WHERE rr.reunion_id=?`).get(rid);
+      const decisions = db.prepare(`SELECT d.*, u.prenom, u.nom FROM reunion_decisions d LEFT JOIN users u ON u.id=d.responsable_id WHERE d.reunion_id=? ORDER BY d.created_at ASC`).all(rid);
+      return sendJSON(res, 200, { resume: resume || null, decisions });
+    }
+
+    /* PUT /api/reunions/:id/resume — sauvegarder le résumé */
+    if (req.method === "PUT" && /^\/api\/reunions\/\d+\/resume$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const r = db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
+      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
+      const canEdit = r.organisateur_id === me.id || me.role === 'administrateur';
+      if (!canEdit) return sendJSON(res, 403, { error: "Accès refusé." });
+      const { sujets, decisions: decisionsData, actions, notes } = body;
+      db.prepare(`INSERT INTO reunion_resumes(reunion_id,redacteur_id,sujets,decisions,actions,notes,updated_at)
+        VALUES(?,?,?,?,?,?,datetime('now'))
+        ON CONFLICT(reunion_id) DO UPDATE SET sujets=excluded.sujets,decisions=excluded.decisions,actions=excluded.actions,notes=excluded.notes,redacteur_id=excluded.redacteur_id,updated_at=datetime('now')
+      `).run(rid, me.id, JSON.stringify(sujets||[]), JSON.stringify(decisionsData||[]), JSON.stringify(actions||[]), notes||null);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* PATCH /api/reunions/:id/resume/valider — valider le résumé */
+    if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/resume\/valider$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const r = db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
+      if (!r || (r.organisateur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: "Accès refusé." });
+      db.prepare(`UPDATE reunion_resumes SET statut='valide',valide_at=datetime('now'),valide_par=? WHERE reunion_id=?`).run(me.id, rid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* POST /api/reunions/:id/resume/partager — envoyer résumé via messagerie */
+    if (req.method === "POST" && /^\/api\/reunions\/\d+\/resume\/partager$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const r = db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
+      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
+      const resume = db.prepare(`SELECT * FROM reunion_resumes WHERE reunion_id=?`).get(rid);
+      const { user_ids } = body; // array of user IDs to send to
+      if (!Array.isArray(user_ids) || user_ids.length === 0) return sendJSON(res, 400, { error: "Destinataires requis." });
+      const contenu = `📋 Résumé de réunion : **${r.titre}**\n\nDate : ${r.date_debut ? r.date_debut.slice(0,10) : '—'}\n\n${resume?.notes || 'Aucune note.'}\n\n_Consultez le résumé complet sur Diaspo'Actif_`;
+      let sent = 0;
+      for (const uid of user_ids) {
+        try {
+          db.prepare(`INSERT INTO messages(expediteur_id,destinataire_id,contenu) VALUES(?,?,?)`).run(me.id, uid, contenu);
+          sent++;
+        } catch(e) {}
+      }
+      return sendJSON(res, 200, { sent });
+    }
+
+    /* POST /api/reunions/:id/decisions — ajouter une décision */
+    if (req.method === "POST" && /^\/api\/reunions\/\d+\/decisions$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rid = parseInt(pathname.split('/')[3]);
+      const { titre, description, responsable_id, type_suivi, echeance } = body;
+      if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+      const d = db.prepare(`INSERT INTO reunion_decisions(reunion_id,titre,description,responsable_id,type_suivi,echeance) VALUES(?,?,?,?,?,?)`)
+        .run(rid, titre.trim(), description||null, responsable_id||null, type_suivi||'action', echeance||null);
+      if (responsable_id) {
+        const r = db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
+        try {
+          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+            responsable_id, 'reunion_decision', `Action assignée`,
+            `Vous avez été désigné responsable de : "${titre}" (réunion "${r?.titre||'—'}")`,
+            JSON.stringify({ reunion_id: rid, decision_id: d.lastInsertRowid })
+          );
+          if (echeance) {
+            db.prepare(`INSERT OR IGNORE INTO agenda_events(user_id,titre,date_debut,couleur,type) VALUES(?,?,?,?,?)`).run(
+              responsable_id, `✅ ${titre}`, echeance.slice(0,10), '#10b981', 'tache'
+            );
+          }
+        } catch(e) {}
+      }
+      return sendJSON(res, 201, { id: d.lastInsertRowid });
+    }
+
+    /* PATCH /api/decisions/:id — modifier statut d'une décision */
+    if (req.method === "PATCH" && /^\/api\/decisions\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const did = parseInt(pathname.split('/')[3]);
+      const { statut, echeance } = body;
+      db.prepare(`UPDATE reunion_decisions SET statut=COALESCE(?,statut),echeance=COALESCE(?,echeance) WHERE id=?`).run(statut||null, echeance||null, did);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* GET /api/reunions/search — recherche avancée */
+    if (req.method === "GET" && pathname === "/api/reunions/search") {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const { q } = qs;
+      if (!q) return sendJSON(res, 200, { reunions: [] });
+      const rows = db.prepare(`
+        SELECT DISTINCT r.*, u.prenom AS org_prenom, u.nom AS org_nom
+        FROM reunions r
+        LEFT JOIN reunion_invites ri ON ri.reunion_id=r.id
+        LEFT JOIN reunion_resumes rr ON rr.reunion_id=r.id
+        JOIN users u ON u.id=r.organisateur_id
+        WHERE (r.organisateur_id=? OR ri.user_id=?)
+          AND (r.titre LIKE ? OR r.description LIKE ? OR rr.notes LIKE ?)
+        ORDER BY r.date_debut DESC LIMIT 50
+      `).all(me.id, me.id, `%${q}%`, `%${q}%`, `%${q}%`);
+      return sendJSON(res, 200, { reunions: rows });
+    }
+
     return sendJSON(res, 404, { error: "Route API inconnue." });
   }
 

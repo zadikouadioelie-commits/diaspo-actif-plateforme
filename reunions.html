@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Réunions — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#7c3aed">
+<style>
+/* ========= TABS ========= */
+.tab-bar{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto;}
+.tab-btn{padding:10px 18px;border:none;background:none;font-size:.88rem;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s,border-color .15s;}
+.tab-btn.active{color:#7c3aed;border-bottom-color:#7c3aed;}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+/* ========= REUNION CARD ========= */
+.reunion-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:12px;display:flex;gap:16px;align-items:flex-start;transition:box-shadow .15s;}
+.reunion-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.08);}
+.reunion-date-col{min-width:56px;text-align:center;background:#f5f3ff;border-radius:10px;padding:10px 8px;color:#7c3aed;}
+.reunion-date-col .r-day{font-size:1.5rem;font-weight:900;line-height:1;}
+.reunion-date-col .r-mon{font-size:.72rem;font-weight:700;text-transform:uppercase;}
+.reunion-meta{flex:1;min-width:0;}
+.reunion-title{font-size:.97rem;font-weight:800;margin:0 0 4px;color:var(--text);}
+.reunion-sub{font-size:.8rem;color:var(--muted);margin:0 0 8px;}
+.reunion-badges{display:flex;gap:6px;flex-wrap:wrap;}
+.r-badge{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:20px;}
+.r-badge-planifiee{background:#eff6ff;color:#1d4ed8;}
+.r-badge-en_cours{background:#f0fdf4;color:#166534;}
+.r-badge-terminee{background:#f9fafb;color:#6b7280;}
+.r-badge-annulee{background:#fef2f2;color:#991b1b;}
+.r-badge-type{background:#f5f3ff;color:#6d28d9;}
+.r-badge-role{background:#fef3c7;color:#92400e;}
+.reunion-actions{display:flex;gap:6px;flex-direction:column;align-items:flex-end;}
+
+/* ========= STATS STRIP ========= */
+.stats-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
+.stat-box .s-val{font-size:1.7rem;font-weight:900;color:#7c3aed;}
+.stat-box .s-lbl{font-size:.75rem;color:var(--muted);margin-top:2px;}
+
+/* ========= RESUME CARD ========= */
+.resume-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:12px;}
+.resume-card .rc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.resume-stat{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:700;background:#f5f3ff;color:#6d28d9;padding:3px 10px;border-radius:20px;}
+.resume-stat.valide{background:#f0fdf4;color:#166534;}
+.resume-stat.brouillon{background:#fef3c7;color:#92400e;}
+.resume-stat.archive{background:#f9fafb;color:#6b7280;}
+
+/* ========= DECISION CARD ========= */
+.dec-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;}
+.dec-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;}
+.dec-action{background:#eff6ff;}
+.dec-tache{background:#f5f3ff;}
+.dec-projet{background:#fef3c7;}
+.dec-rappel{background:#fef2f2;}
+.dec-initiative{background:#f0fdf4;}
+.dec-info{flex:1;min-width:0;}
+.dec-title{font-size:.9rem;font-weight:800;margin:0 0 3px;}
+.dec-meta{font-size:.75rem;color:var(--muted);}
+.dec-statut{display:inline-block;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:4px;}
+.dec-ouvert{background:#eff6ff;color:#1d4ed8;}
+.dec-en_cours{background:#fef3c7;color:#92400e;}
+.dec-termine{background:#f0fdf4;color:#166534;}
+
+/* ========= MODAL ========= */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;overflow-y:auto;padding:20px;}
+.modal-backdrop.open{display:flex;align-items:flex-start;justify-content:center;}
+.modal-box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;width:100%;max-width:640px;margin:auto;}
+.modal-box h2{margin:0 0 20px;font-size:1.15rem;}
+
+/* ========= PARTICIPANTS ========= */
+.participant-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.participant-row:last-child{border-bottom:none;}
+.p-avatar{width:36px;height:36px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem;overflow:hidden;flex-shrink:0;}
+.p-avatar img{width:100%;height:100%;object-fit:cover;}
+.p-info{flex:1;min-width:0;}
+.p-name{font-size:.88rem;font-weight:700;}
+.p-meta{font-size:.73rem;color:var(--muted);}
+.p-status{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:20px;}
+.p-accepte{background:#f0fdf4;color:#166534;}
+.p-en_attente{background:#fef3c7;color:#92400e;}
+.p-refuse{background:#fef2f2;color:#991b1b;}
+
+/* ========= EMPTY STATE ========= */
+.empty-state{text-align:center;padding:60px 20px;}
+.empty-state .e-icon{font-size:3rem;margin-bottom:12px;}
+.empty-state .e-title{font-size:1rem;font-weight:800;margin-bottom:6px;}
+.empty-state .e-sub{font-size:.85rem;color:var(--muted);}
+
+/* ========= RESUME FORM ========= */
+.item-list-editor{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.item-row{display:flex;gap:8px;align-items:flex-start;}
+.item-row input,.item-row select{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:.85rem;font-family:inherit;background:var(--bg);}
+.item-row .btn-rm{background:none;border:1px solid var(--border);border-radius:6px;padding:0 8px;cursor:pointer;color:var(--muted);font-size:.9rem;}
+.btn-add-item{background:none;border:1px dashed var(--border);border-radius:8px;padding:8px;width:100%;font-size:.83rem;color:var(--muted);cursor:pointer;margin-top:4px;}
+.btn-add-item:hover{border-color:#7c3aed;color:#7c3aed;}
+
+@media(max-width:640px){
+  .stats-strip{grid-template-columns:repeat(2,1fr);}
+  .reunion-card{flex-direction:column;}
+  .reunion-actions{flex-direction:row;align-self:stretch;justify-content:flex-end;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <div class="with-sidebar">
+    <aside class="sidebar">
+      <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+      <div class="brand">Réunions</div>
+      <a href="#" data-tab="reunions" class="sidebar-tab active">📹 Mes réunions</a>
+      <a href="#" data-tab="resumes" class="sidebar-tab">📋 Résumés</a>
+      <a href="#" data-tab="decisions" class="sidebar-tab">✅ Décisions &amp; Actions</a>
+      <a href="#" data-tab="historique" class="sidebar-tab">🕐 Historique</a>
+      <hr style="margin:12px 0;border-color:var(--border)">
+      <a href="agenda.html">📅 Mon agenda</a>
+      <a href="messagerie.html">💬 Messagerie</a>
+    </aside>
+
+    <main class="content">
+      <div class="flex-between" style="margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h1 style="margin:0;font-size:1.4rem;">Réunions collaboratives</h1>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Organisez, suivez et documentez vos réunions</p>
+        </div>
+        <button class="btn btn-primary" id="btn-nouvelle-reunion" style="background:#7c3aed;border-color:#7c3aed;">+ Nouvelle réunion</button>
+      </div>
+
+      <!-- Stats strip -->
+      <div class="stats-strip" id="stats-strip">
+        <div class="stat-box"><div class="s-val" id="stat-total">—</div><div class="s-lbl">Réunions totales</div></div>
+        <div class="stat-box"><div class="s-val" id="stat-en-cours" style="color:#10b981;">—</div><div class="s-lbl">En cours</div></div>
+        <div class="stat-box"><div class="s-val" id="stat-planifiees" style="color:#f59e0b;">—</div><div class="s-lbl">Planifiées</div></div>
+        <div class="stat-box"><div class="s-val" id="stat-decisions" style="color:#ef4444;">—</div><div class="s-lbl">Actions ouvertes</div></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="reunions">📹 Mes réunions</button>
+        <button class="tab-btn" data-tab="resumes">📋 Résumés</button>
+        <button class="tab-btn" data-tab="decisions">✅ Décisions</button>
+        <button class="tab-btn" data-tab="historique">🕐 Historique</button>
+      </div>
+
+      <!-- TAB: Mes réunions -->
+      <div class="tab-pane active" id="tab-reunions">
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+          <input id="search-reunions" class="input-field" style="flex:1;min-width:180px;" placeholder="Rechercher une réunion…">
+          <select id="filter-statut" class="input-field" style="width:160px;">
+            <option value="">Tous les statuts</option>
+            <option value="planifiee">Planifiées</option>
+            <option value="en_cours">En cours</option>
+            <option value="terminee">Terminées</option>
+            <option value="annulee">Annulées</option>
+          </select>
+        </div>
+        <div id="list-reunions"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- TAB: Résumés -->
+      <div class="tab-pane" id="tab-resumes">
+        <div id="list-resumes"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- TAB: Décisions -->
+      <div class="tab-pane" id="tab-decisions">
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+          <select id="filter-dec-statut" class="input-field" style="width:160px;">
+            <option value="">Tous les statuts</option>
+            <option value="ouvert">Ouvertes</option>
+            <option value="en_cours">En cours</option>
+            <option value="termine">Terminées</option>
+          </select>
+        </div>
+        <div id="list-decisions"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- TAB: Historique -->
+      <div class="tab-pane" id="tab-historique">
+        <div id="list-historique"><div class="notice">Chargement…</div></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ===== MODAL: Nouvelle réunion ===== -->
+<div class="modal-backdrop" id="modal-reunion">
+  <div class="modal-box">
+    <div class="flex-between" style="margin-bottom:20px;">
+      <h2 style="margin:0;">📹 Nouvelle réunion</h2>
+      <button class="btn btn-sm btn-outline" id="close-modal-reunion">✕ Fermer</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label style="font-size:13px;font-weight:700;">Titre *</label>
+        <input id="r-titre" class="input-field" style="width:100%;margin-top:5px;" placeholder="Ex : Réunion mensuelle du bureau">
+      </div>
+      <div class="grid grid-2" style="gap:10px;">
+        <div>
+          <label style="font-size:13px;font-weight:700;">Type</label>
+          <select id="r-type" class="input-field" style="width:100%;margin-top:5px;">
+            <option value="reunion">Réunion</option>
+            <option value="rdv">Rendez-vous</option>
+            <option value="conference">Conférence</option>
+            <option value="webinaire">Webinaire</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:700;">Accès</label>
+          <select id="r-acces" class="input-field" style="width:100%;margin-top:5px;">
+            <option value="prive">Privé</option>
+            <option value="public">Public</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-2" style="gap:10px;">
+        <div>
+          <label style="font-size:13px;font-weight:700;">Date et heure de début *</label>
+          <input id="r-debut" type="datetime-local" class="input-field" style="width:100%;margin-top:5px;">
+        </div>
+        <div>
+          <label style="font-size:13px;font-weight:700;">Date et heure de fin</label>
+          <input id="r-fin" type="datetime-local" class="input-field" style="width:100%;margin-top:5px;">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:13px;font-weight:700;">Description</label>
+        <textarea id="r-description" style="width:100%;min-height:70px;border:1px solid var(--border);border-radius:10px;padding:10px;font-family:inherit;font-size:.88rem;margin-top:5px;" placeholder="Objet de la réunion…"></textarea>
+      </div>
+      <div>
+        <label style="font-size:13px;font-weight:700;">Ordre du jour</label>
+        <textarea id="r-odj" style="width:100%;min-height:80px;border:1px solid var(--border);border-radius:10px;padding:10px;font-family:inherit;font-size:.88rem;margin-top:5px;" placeholder="1. Point d'avancement&#10;2. Prises de décisions&#10;3. Questions diverses"></textarea>
+      </div>
+      <div>
+        <label style="font-size:13px;font-weight:700;">Inviter des participants</label>
+        <input id="r-search-users" class="input-field" style="width:100%;margin-top:5px;" placeholder="Rechercher un utilisateur…">
+        <div id="r-user-results" style="background:var(--card);border:1px solid var(--border);border-radius:10px;margin-top:4px;display:none;max-height:180px;overflow-y:auto;"></div>
+        <div id="r-invites-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+      </div>
+      <label style="display:flex;gap:10px;align-items:center;cursor:pointer;">
+        <input type="checkbox" id="r-enreg">
+        <span style="font-size:13px;font-weight:700;">🔴 Activer l'enregistrement (les participants seront informés)</span>
+      </label>
+      <div id="r-error" style="color:#D33;font-size:13px;display:none;"></div>
+      <button class="btn btn-primary" id="btn-creer-reunion" style="background:#7c3aed;border-color:#7c3aed;">Créer la réunion</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Détail réunion ===== -->
+<div class="modal-backdrop" id="modal-detail">
+  <div class="modal-box" style="max-width:720px;">
+    <div class="flex-between" style="margin-bottom:20px;">
+      <h2 style="margin:0;" id="detail-titre">Réunion</h2>
+      <button class="btn btn-sm btn-outline" id="close-modal-detail">✕</button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Résumé ===== -->
+<div class="modal-backdrop" id="modal-resume">
+  <div class="modal-box" style="max-width:760px;">
+    <div class="flex-between" style="margin-bottom:20px;">
+      <h2 style="margin:0;">📋 Résumé de réunion</h2>
+      <button class="btn btn-sm btn-outline" id="close-modal-resume">✕</button>
+    </div>
+    <div id="resume-content"></div>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/ds.js"></script>
+<script>
+// ========= HELPERS =========
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtDate(s){if(!s)return'—';const d=new Date(s);return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'});}
+function fmtDateTime(s){if(!s)return'—';const d=new Date(s);return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function fmtTime(s){if(!s)return'—';return new Date(s).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});}
+function avatarHTML(u,size=36){
+  const s=`width:${size}px;height:${size}px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:${size*.38}px;flex-shrink:0;overflow:hidden;`;
+  if(u?.photo_url) return `<div style="${s}"><img src="${escH(u.photo_url)}" style="width:100%;height:100%;object-fit:cover;"></div>`;
+  return `<div style="${s}">${escH((u?.prenom||'?')[0])}</div>`;
+}
+function statutBadgeR(s){
+  const map={planifiee:'r-badge-planifiee Planifiée',en_cours:'r-badge-en_cours 🟢 En cours',terminee:'r-badge-terminee Terminée',annulee:'r-badge-annulee Annulée'};
+  const v=map[s]||'r-badge-terminee —';
+  const [cls,...rest]=v.split(' ');
+  return `<span class="r-badge ${cls}">${rest.join(' ')}</span>`;
+}
+function typeIcon(t){return{reunion:'📹',rdv:'🤝',conference:'🎙️',webinaire:'🌐'}[t]||'📹';}
+function decIcon(t){return{action:'⚡',tache:'📌',projet:'📁',rappel:'🔔',initiative:'🚀'}[t]||'✅';}
+function decIconCls(t){return{action:'dec-action',tache:'dec-tache',projet:'dec-projet',rappel:'dec-rappel',initiative:'dec-initiative'}[t]||'dec-action';}
+
+const api=(m,p,b)=>fetch('/api'+p,{method:m,credentials:'include',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined})
+  .then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+
+// ========= STATE =========
+let ME=null, allReunions=[], allDecisions=[];
+const invitesList=[]; // {id,prenom,nom} en cours de création
+
+async function init(){
+  ME=await fetchCurrentUser();
+  if(!ME){window.location.href='login.html?r='+encodeURIComponent(location.pathname);return;}
+  await Promise.all([loadReunions(),loadDecisions()]);
+  updateStats();
+}
+
+// ========= LOAD =========
+async function loadReunions(){
+  try{
+    const {reunions}=await api('GET','/reunions');
+    allReunions=reunions||[];
+    renderReunions();
+    renderHistorique();
+    renderResumes();
+  }catch(e){document.getElementById('list-reunions').innerHTML=`<div class="notice" style="color:#D33;">Erreur : ${escH(e.message)}</div>`;}
+}
+async function loadDecisions(){
+  try{
+    const {decisions}=await api('GET','/reunions/decisions');
+    allDecisions=decisions||[];
+    renderDecisions();
+  }catch(e){}
+}
+function updateStats(){
+  document.getElementById('stat-total').textContent=allReunions.length;
+  document.getElementById('stat-en-cours').textContent=allReunions.filter(r=>r.statut==='en_cours').length;
+  document.getElementById('stat-planifiees').textContent=allReunions.filter(r=>r.statut==='planifiee').length;
+  document.getElementById('stat-decisions').textContent=allDecisions.filter(d=>d.statut==='ouvert').length;
+}
+
+// ========= RENDER RÉUNIONS =========
+function renderReunions(){
+  const q=document.getElementById('search-reunions').value.toLowerCase();
+  const st=document.getElementById('filter-statut').value;
+  let list=allReunions.filter(r=>!['terminee','annulee'].includes(r.statut)||st==='terminee'||st==='annulee');
+  if(st) list=allReunions.filter(r=>r.statut===st);
+  if(q) list=list.filter(r=>(r.titre+r.description+'').toLowerCase().includes(q));
+  const el=document.getElementById('list-reunions');
+  if(!list.length){
+    el.innerHTML=`<div class="empty-state"><div class="e-icon">📅</div><div class="e-title">Aucune réunion</div><div class="e-sub">Créez votre première réunion collaborative</div></div>`;
+    return;
+  }
+  el.innerHTML=list.map(r=>reunionCardHTML(r)).join('');
+}
+
+function reunionCardHTML(r){
+  const d=new Date(r.date_debut);
+  const isOrg=r.organisateur_id===ME?.id;
+  const canJoin=r.statut==='en_cours'||(r.statut==='planifiee'&&isOrg);
+  return `<div class="reunion-card">
+    <div class="reunion-date-col">
+      <div class="r-day">${d.getDate()}</div>
+      <div class="r-mon">${d.toLocaleDateString('fr-FR',{month:'short'})}</div>
+      <div style="font-size:.68rem;color:#7c3aed;margin-top:2px;">${fmtTime(r.date_debut)}</div>
+    </div>
+    <div class="reunion-meta">
+      <div class="reunion-title">${typeIcon(r.type)} ${escH(r.titre)}</div>
+      <div class="reunion-sub">Organisé par ${escH(r.org_prenom||'')} ${escH(r.org_nom||'')} · ${r.nb_participants||1} participant(s)</div>
+      <div class="reunion-badges">
+        ${statutBadgeR(r.statut)}
+        <span class="r-badge r-badge-type">${r.type}</span>
+        ${r.mon_role?`<span class="r-badge r-badge-role">${r.mon_role==='coorganisateur'?'Organisateur':r.mon_role}</span>`:''}
+        ${r.enregistrement_active?'<span class="r-badge" style="background:#fee2e2;color:#991b1b;">🔴 Enregistrement</span>':''}
+      </div>
+    </div>
+    <div class="reunion-actions">
+      ${canJoin?`<button class="btn btn-sm btn-primary" style="background:#7c3aed;border-color:#7c3aed;" onclick="rejoindre(${r.id},'${escH(r.jitsi_room||'')}')">Rejoindre</button>`:''}
+      ${isOrg&&r.statut==='planifiee'?`<button class="btn btn-sm" style="background:#10b981;color:#fff;border-color:#10b981;" onclick="demarrer(${r.id})">▶ Démarrer</button>`:''}
+      ${isOrg&&r.statut==='en_cours'?`<button class="btn btn-sm" style="background:#ef4444;color:#fff;border-color:#ef4444;" onclick="terminer(${r.id})">⬛ Terminer</button>`:''}
+      <button class="btn btn-sm btn-outline" onclick="voirDetail(${r.id})">Détail</button>
+      ${r.mon_statut==='en_attente'?`<button class="btn btn-sm" style="background:#f59e0b;color:#fff;border-color:#f59e0b;" onclick="repondreInvit(${r.id})">Répondre</button>`:''}
+    </div>
+  </div>`;
+}
+
+// ========= RENDER RÉSUMÉS =========
+function renderResumes(){
+  const withResume=allReunions.filter(r=>r.statut==='terminee');
+  const el=document.getElementById('list-resumes');
+  if(!withResume.length){
+    el.innerHTML=`<div class="empty-state"><div class="e-icon">📋</div><div class="e-title">Aucun résumé</div><div class="e-sub">Les résumés apparaîtront après la fin de vos réunions</div></div>`;
+    return;
+  }
+  el.innerHTML=withResume.map(r=>`<div class="resume-card">
+    <div class="rc-header">
+      <div>
+        <div style="font-size:.97rem;font-weight:800;">${typeIcon(r.type)} ${escH(r.titre)}</div>
+        <div style="font-size:.78rem;color:var(--muted);margin-top:2px;">${fmtDate(r.date_debut)} · ${r.duree_minutes?r.duree_minutes+' min':'durée inconnue'}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-sm btn-outline" onclick="ouvrirResume(${r.id})">📋 Voir / Modifier</button>
+      </div>
+    </div>
+  </div>`).join('');
+}
+
+// ========= RENDER DECISIONS =========
+function renderDecisions(){
+  const st=document.getElementById('filter-dec-statut').value;
+  let list=st?allDecisions.filter(d=>d.statut===st):allDecisions;
+  const el=document.getElementById('list-decisions');
+  if(!list.length){
+    el.innerHTML=`<div class="empty-state"><div class="e-icon">✅</div><div class="e-title">Aucune décision</div><div class="e-sub">Les décisions prises en réunion apparaîtront ici</div></div>`;
+    return;
+  }
+  el.innerHTML=list.map(d=>`<div class="dec-card">
+    <div class="dec-icon ${decIconCls(d.type_suivi)}">${decIcon(d.type_suivi)}</div>
+    <div class="dec-info">
+      <div class="dec-title">${escH(d.titre)}</div>
+      <div class="dec-meta">Réunion : ${escH(d.reunion_titre||'—')} · ${fmtDate(d.date_debut)}${d.prenom?' · Responsable : '+escH(d.prenom+' '+d.nom):''}</div>
+      ${d.echeance?`<div class="dec-meta">Échéance : ${fmtDate(d.echeance)}</div>`:''}
+      <span class="dec-statut dec-${d.statut}">${{ouvert:'Ouvert',en_cours:'En cours',termine:'Terminé'}[d.statut]||d.statut}</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      ${d.statut!=='termine'?`<button class="btn btn-sm btn-outline" onclick="changerStatutDec(${d.id},'${d.statut==='ouvert'?'en_cours':'termine'}',this)">
+        ${d.statut==='ouvert'?'Démarrer':'Terminer'}</button>`:''}
+    </div>
+  </div>`).join('');
+}
+
+// ========= RENDER HISTORIQUE =========
+function renderHistorique(){
+  const list=allReunions.filter(r=>['terminee','annulee'].includes(r.statut));
+  const el=document.getElementById('list-historique');
+  if(!list.length){
+    el.innerHTML=`<div class="empty-state"><div class="e-icon">🕐</div><div class="e-title">Aucun historique</div><div class="e-sub">Les réunions passées apparaîtront ici</div></div>`;
+    return;
+  }
+  el.innerHTML=list.map(r=>`<div class="reunion-card">
+    <div class="reunion-date-col">
+      <div class="r-day">${new Date(r.date_debut).getDate()}</div>
+      <div class="r-mon">${new Date(r.date_debut).toLocaleDateString('fr-FR',{month:'short'})}</div>
+      <div style="font-size:.68rem;color:#7c3aed;margin-top:2px;">${new Date(r.date_debut).getFullYear()}</div>
+    </div>
+    <div class="reunion-meta">
+      <div class="reunion-title">${typeIcon(r.type)} ${escH(r.titre)}</div>
+      <div class="reunion-sub">${r.nb_participants||1} participant(s)${r.duree_minutes?' · '+r.duree_minutes+' min':''}</div>
+      <div class="reunion-badges">${statutBadgeR(r.statut)}<span class="r-badge r-badge-type">${r.type}</span></div>
+    </div>
+    <div class="reunion-actions">
+      <button class="btn btn-sm btn-outline" onclick="voirDetail(${r.id})">Détail</button>
+      <button class="btn btn-sm btn-outline" onclick="ouvrirResume(${r.id})">📋 Résumé</button>
+    </div>
+  </div>`).join('');
+}
+
+// ========= ACTIONS =========
+async function demarrer(rid){
+  try{await api('PATCH',`/reunions/${rid}/start`);DA.toast('Réunion démarrée !',{type:'success'});await loadReunions();}
+  catch(e){DA.toast(e.message,{type:'danger'});}
+}
+async function terminer(rid){
+  if(!confirm('Terminer la réunion ?')) return;
+  try{
+    await api('PATCH',`/reunions/${rid}/end`);
+    DA.toast('Réunion terminée.',{type:'success'});
+    await loadReunions();
+    // Ouvrir le résumé automatiquement
+    setTimeout(()=>ouvrirResume(rid),500);
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+function rejoindre(rid,jitsiRoom){
+  // Pointer la présence
+  api('POST',`/reunions/${rid}/presence`).catch(()=>{});
+  window.open(`meeting.html?reunion_id=${rid}&jitsi_room=${encodeURIComponent(jitsiRoom)}`,'_blank');
+}
+async function repondreInvit(rid){
+  const rep=confirm('Accepter cette invitation ?\n(Cliquez Annuler pour refuser)');
+  const statut=rep?'accepte':'refuse';
+  try{
+    await api('PATCH',`/reunions/${rid}/invites/me`,{statut});
+    DA.toast(rep?'Invitation acceptée ! Ajoutée à votre agenda.':'Invitation refusée.',{type:rep?'success':'info'});
+    await loadReunions();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+async function changerStatutDec(did,statut,btn){
+  try{await api('PATCH',`/decisions/${did}`,{statut});DA.toast('Statut mis à jour.',{type:'success'});await loadDecisions();}
+  catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+// ========= DETAIL MODAL =========
+async function voirDetail(rid){
+  const backdrop=document.getElementById('modal-detail');
+  const content=document.getElementById('detail-content');
+  document.getElementById('detail-titre').textContent='Chargement…';
+  backdrop.classList.add('open');
+  try{
+    const {reunion,invites,myInvite}=await api('GET',`/reunions/${rid}`);
+    document.getElementById('detail-titre').textContent=`${typeIcon(reunion.type)} ${reunion.titre}`;
+    const isOrg=reunion.organisateur_id===ME?.id;
+    content.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+        <div><div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:4px;">DATE ET HEURE</div>
+          <div style="font-size:.9rem;font-weight:700;">${fmtDateTime(reunion.date_debut)}</div>
+          ${reunion.date_fin?`<div style="font-size:.8rem;color:var(--muted);">Fin : ${fmtDateTime(reunion.date_fin)}</div>`:''}
+        </div>
+        <div><div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:4px;">STATUT</div>
+          ${statutBadgeR(reunion.statut)}
+          ${reunion.duree_minutes?`<div style="font-size:.8rem;color:var(--muted);margin-top:4px;">Durée : ${reunion.duree_minutes} min</div>`:''}
+        </div>
+        ${reunion.description?`<div style="grid-column:1/-1;"><div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:4px;">DESCRIPTION</div>
+          <div style="font-size:.88rem;">${escH(reunion.description)}</div></div>`:''}
+        ${reunion.ordre_du_jour?`<div style="grid-column:1/-1;"><div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:4px;">ORDRE DU JOUR</div>
+          <pre style="font-size:.83rem;font-family:inherit;white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:8px;">${escH(reunion.ordre_du_jour)}</pre></div>`:''}
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:10px;">PARTICIPANTS (${invites.length})</div>
+        ${invites.map(i=>`<div class="participant-row">
+          ${avatarHTML(i)}
+          <div class="p-info"><div class="p-name">${escH(i.prenom||'')} ${escH(i.nom||'')}</div>
+            <div class="p-meta">${{coorganisateur:'Organisateur',moderateur:'Modérateur',participant:'Participant'}[i.role]||i.role}
+              ${i.rejoint_at?` · Arrivé ${fmtTime(i.rejoint_at)}`:''} ${i.quitte_at?`· Parti ${fmtTime(i.quitte_at)}`:''}</div>
+          </div>
+          <span class="p-status p-${i.statut}">${{accepte:'✓ Accepté',en_attente:'En attente',refuse:'Refusé'}[i.statut]||i.statut}</span>
+        </div>`).join('')}
+      </div>
+      ${isOrg?`<div style="margin-bottom:12px;">
+        <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:8px;">INVITER D'AUTRES PARTICIPANTS</div>
+        <div style="display:flex;gap:8px;">
+          <input id="inv-search-add" class="input-field" style="flex:1;" placeholder="Rechercher un utilisateur…">
+          <button class="btn btn-sm btn-outline" onclick="searchToAdd()">Chercher</button>
+        </div>
+        <div id="inv-results" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:160px;overflow-y:auto;"></div>
+        <div id="inv-pending" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+        <button class="btn btn-sm" style="background:#7c3aed;color:#fff;border-color:#7c3aed;margin-top:8px;" onclick="envoyerInvits(${rid})">Envoyer les invitations</button>
+      </div>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${reunion.statut==='terminee'||reunion.statut==='en_cours'?`<button class="btn btn-sm btn-outline" onclick="ouvrirResume(${rid})">📋 Résumé</button>`:''}
+        ${reunion.statut==='en_cours'?`<button class="btn btn-sm" style="background:#7c3aed;color:#fff;border-color:#7c3aed;" onclick="rejoindre(${rid},'${escH(reunion.jitsi_room||'')}')">📹 Rejoindre</button>`:''}
+      </div>`;
+    // Pending invites state for the modal
+    window._detailRid=rid;
+    window._pendingInvites=[];
+    if(isOrg){
+      document.getElementById('inv-search-add').addEventListener('keydown',e=>{if(e.key==='Enter')searchToAdd();});
+    }
+  }catch(e){content.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+async function searchToAdd(){
+  const q=document.getElementById('inv-search-add')?.value?.trim();
+  if(!q||q.length<2) return;
+  const el=document.getElementById('inv-results');
+  try{
+    const {users}=await api('GET',`/users/search?q=${encodeURIComponent(q)}&limit=8`);
+    el.style.display='block';
+    if(!users?.length){el.innerHTML='<div style="padding:10px;font-size:.83rem;color:var(--muted);">Aucun résultat</div>';return;}
+    el.innerHTML=users.map(u=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onclick="addPendingInvite(${u.id},'${escH(u.prenom||'')}','${escH(u.nom||'')}')">
+      ${avatarHTML(u,30)}<span style="font-size:.88rem;font-weight:700;">${escH(u.prenom||'')} ${escH(u.nom||'')}</span>
+      <span style="font-size:.75rem;color:var(--muted);">${escH(u.role||'')}</span>
+    </div>`).join('');
+  }catch(e){}
+}
+function addPendingInvite(uid,prenom,nom){
+  if(!window._pendingInvites) window._pendingInvites=[];
+  if(window._pendingInvites.find(i=>i.id===uid)) return;
+  window._pendingInvites.push({id:uid,prenom,nom});
+  document.getElementById('inv-results').style.display='none';
+  document.getElementById('inv-search-add').value='';
+  renderPendingInvites();
+}
+function renderPendingInvites(){
+  const el=document.getElementById('inv-pending');
+  if(!el) return;
+  el.innerHTML=(window._pendingInvites||[]).map(i=>`<span style="display:inline-flex;align-items:center;gap:5px;background:#f5f3ff;color:#6d28d9;border-radius:20px;padding:4px 10px;font-size:.8rem;font-weight:700;">
+    ${escH(i.prenom)} ${escH(i.nom)} <button onclick="removePendingInvite(${i.id})" style="background:none;border:none;cursor:pointer;color:#6d28d9;font-size:.85rem;padding:0;">✕</button>
+  </span>`).join('');
+}
+function removePendingInvite(uid){
+  window._pendingInvites=(window._pendingInvites||[]).filter(i=>i.id!==uid);
+  renderPendingInvites();
+}
+async function envoyerInvits(rid){
+  const ids=(window._pendingInvites||[]).map(i=>i.id);
+  if(!ids.length){DA.toast('Aucun utilisateur sélectionné.',{type:'warning'});return;}
+  try{
+    const {added}=await api('POST',`/reunions/${rid}/invites`,{users:ids});
+    DA.toast(`${added} invitation(s) envoyée(s) !`,{type:'success'});
+    window._pendingInvites=[];
+    voirDetail(rid);
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+// ========= RESUME MODAL =========
+async function ouvrirResume(rid){
+  const backdrop=document.getElementById('modal-resume');
+  const content=document.getElementById('resume-content');
+  backdrop.classList.add('open');
+  content.innerHTML='<div class="notice">Chargement…</div>';
+  try{
+    const [detailData,resumeData]=await Promise.all([api('GET',`/reunions/${rid}`),api('GET',`/reunions/${rid}/resume`)]);
+    const {reunion,invites}=detailData;
+    const {resume,decisions}=resumeData;
+    const isOrg=reunion.organisateur_id===ME?.id;
+    const canEdit=isOrg&&resume?.statut!=='valide';
+
+    const presentsHTML=invites.filter(i=>i.rejoint_at).map(i=>`${escH(i.prenom||'')} ${escH(i.nom||'')}`).join(', ')||'—';
+    const absentsHTML=invites.filter(i=>!i.rejoint_at&&i.statut!=='refuse').map(i=>`${escH(i.prenom||'')} ${escH(i.nom||'')}`).join(', ')||'—';
+
+    // Parse existing data
+    let sujets=[],decList=[],actions=[];
+    try{sujets=JSON.parse(resume?.sujets||'[]');}catch(e){sujets=[];}
+    try{decList=JSON.parse(resume?.decisions||'[]');}catch(e){decList=[];}
+    try{actions=JSON.parse(resume?.actions||'[]');}catch(e){actions=[];}
+
+    content.innerHTML=`
+      <div style="background:var(--bg);border-radius:12px;padding:16px;margin-bottom:20px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:.85rem;">
+          <div><b>Titre :</b> ${escH(reunion.titre)}</div>
+          <div><b>Date :</b> ${fmtDate(reunion.date_debut)}</div>
+          <div><b>Début :</b> ${fmtTime(reunion.started_at||reunion.date_debut)}</div>
+          <div><b>Fin :</b> ${fmtTime(reunion.ended_at||reunion.date_fin||'—')}</div>
+          <div><b>Durée :</b> ${reunion.duree_minutes?reunion.duree_minutes+' min':'—'}</div>
+          <div><b>Statut résumé :</b> <span class="resume-stat ${resume?.statut||'brouillon'}">${{brouillon:'Brouillon',valide:'✓ Validé',archive:'Archivé'}[resume?.statut]||'Brouillon'}</span></div>
+        </div>
+        <div style="margin-top:10px;font-size:.85rem;"><b>Présents :</b> ${presentsHTML}</div>
+        <div style="margin-top:4px;font-size:.85rem;"><b>Absents :</b> ${absentsHTML}</div>
+      </div>
+
+      ${canEdit?`
+      <div style="margin-bottom:16px;">
+        <label style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Principaux sujets abordés</label>
+        <div class="item-list-editor" id="sujets-editor">
+          ${sujets.map((s,i)=>`<div class="item-row"><input value="${escH(s)}" placeholder="Sujet ${i+1}…"><button class="btn-rm" onclick="this.parentElement.remove()">✕</button></div>`).join('')}
+        </div>
+        <button class="btn-add-item" onclick="addItemRow('sujets-editor','Sujet…')">+ Ajouter un sujet</button>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Décisions prises</label>
+        <div class="item-list-editor" id="decisions-editor">
+          ${decList.map((d,i)=>`<div class="item-row"><input value="${escH(d)}" placeholder="Décision ${i+1}…"><button class="btn-rm" onclick="this.parentElement.remove()">✕</button></div>`).join('')}
+        </div>
+        <button class="btn-add-item" onclick="addItemRow('decisions-editor','Décision…')">+ Ajouter une décision</button>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Actions à mener</label>
+        <div class="item-list-editor" id="actions-editor">
+          ${actions.map((a)=>`<div class="item-row"><input value="${escH(a.titre||a)}" placeholder="Action…" style="flex:2;"><input value="${escH(a.responsable||'')}" placeholder="Responsable" style="flex:1;"><input type="date" value="${escH(a.echeance||'')}" style="flex:1;"><button class="btn-rm" onclick="this.parentElement.remove()">✕</button></div>`).join('')}
+        </div>
+        <button class="btn-add-item" onclick="addActionRow('actions-editor')">+ Ajouter une action</button>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Notes et observations</label>
+        <textarea id="resume-notes" style="width:100%;min-height:100px;border:1px solid var(--border);border-radius:10px;padding:10px;font-family:inherit;font-size:.85rem;">${escH(resume?.notes||'')}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <button class="btn btn-sm" style="background:#7c3aed;color:#fff;border-color:#7c3aed;" onclick="sauvegarderResume(${rid})">💾 Sauvegarder</button>
+        <button class="btn btn-sm" style="background:#10b981;color:#fff;border-color:#10b981;" onclick="validerResume(${rid})">✓ Valider le résumé</button>
+      </div>`:`
+      <div style="margin-bottom:16px;">
+        <div style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Sujets abordés</div>
+        ${sujets.length?sujets.map(s=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:.88rem;">• ${escH(s)}</div>`).join(''):'<div style="color:var(--muted);font-size:.85rem;">—</div>'}
+        <div style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin:12px 0 8px;">Décisions prises</div>
+        ${decList.length?decList.map(d=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:.88rem;">✓ ${escH(d)}</div>`).join(''):'<div style="color:var(--muted);font-size:.85rem;">—</div>'}
+        <div style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin:12px 0 8px;">Actions</div>
+        ${actions.length?actions.map(a=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:.88rem;">⚡ ${escH(a.titre||a)}${a.responsable?' · '+escH(a.responsable):''}${a.echeance?' · '+fmtDate(a.echeance):''}</div>`).join(''):'<div style="color:var(--muted);font-size:.85rem;">—</div>'}
+        ${resume?.notes?`<div style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin:12px 0 8px;">Notes</div><div style="font-size:.88rem;white-space:pre-wrap;">${escH(resume.notes)}</div>`:''}
+      </div>`}
+
+      <!-- Partager -->
+      <div style="border-top:1px solid var(--border);padding-top:14px;">
+        <div style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Partager le résumé</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" onclick="partagerTous(${rid},${JSON.stringify(invites.filter(i=>i.rejoint_at).map(i=>i.user_id))})">📨 Envoyer aux présents</button>
+          <button class="btn btn-sm btn-outline" onclick="partagerTous(${rid},${JSON.stringify(invites.map(i=>i.user_id))})">📨 Envoyer à tous les invités</button>
+        </div>
+      </div>
+
+      <!-- Décisions/actions liées -->
+      ${decisions.length?`<div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;">
+        <div style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px;">SUIVI DES DÉCISIONS (${decisions.length})</div>
+        ${decisions.map(d=>`<div class="dec-card" style="margin-bottom:8px;">
+          <div class="dec-icon ${decIconCls(d.type_suivi)}">${decIcon(d.type_suivi)}</div>
+          <div class="dec-info"><div class="dec-title">${escH(d.titre)}</div>
+            <div class="dec-meta">${d.prenom?'Responsable : '+escH(d.prenom+' '+d.nom):''}${d.echeance?' · Échéance : '+fmtDate(d.echeance):''}</div>
+            <span class="dec-statut dec-${d.statut}">${{ouvert:'Ouvert',en_cours:'En cours',termine:'Terminé'}[d.statut]||d.statut}</span>
+          </div>
+        </div>`).join('')}
+      </div>`:''}
+      ${isOrg?`<div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;">
+        <div style="font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px;">AJOUTER UNE DÉCISION / ACTION</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <input id="new-dec-titre" class="input-field" placeholder="Titre de la décision ou action *">
+          <div class="grid grid-2" style="gap:8px;">
+            <select id="new-dec-type" class="input-field">
+              <option value="action">Action</option><option value="tache">Tâche</option>
+              <option value="projet">Projet</option><option value="rappel">Rappel</option><option value="initiative">Initiative</option>
+            </select>
+            <input type="date" id="new-dec-echeance" class="input-field" placeholder="Échéance">
+          </div>
+          <input id="new-dec-resp-search" class="input-field" placeholder="Rechercher un responsable…">
+          <div id="new-dec-resp-results" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:10px;max-height:120px;overflow-y:auto;"></div>
+          <input type="hidden" id="new-dec-resp-id">
+          <button class="btn btn-sm" style="background:#7c3aed;color:#fff;border-color:#7c3aed;" onclick="ajouterDecision(${rid})">+ Ajouter la décision</button>
+        </div>
+      </div>`:''}
+    `;
+    // Wire up responsable search
+    if(isOrg){
+      document.getElementById('new-dec-resp-search')?.addEventListener('input',async function(){
+        const q=this.value.trim();if(q.length<2)return;
+        const el=document.getElementById('new-dec-resp-results');
+        try{const{users}=await api('GET',`/users/search?q=${encodeURIComponent(q)}&limit=5`);
+          el.style.display='block';
+          el.innerHTML=users.map(u=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onclick="selectResp(${u.id},'${escH(u.prenom||'')} ${escH(u.nom||'')}')">
+            ${avatarHTML(u,28)}<span style="font-size:.85rem;font-weight:700;">${escH(u.prenom||'')} ${escH(u.nom||'')}</span></div>`).join('');
+        }catch(e){}
+      });
+    }
+  }catch(e){content.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+function selectResp(id,name){
+  document.getElementById('new-dec-resp-id').value=id;
+  document.getElementById('new-dec-resp-search').value=name;
+  document.getElementById('new-dec-resp-results').style.display='none';
+}
+function addItemRow(containerId,placeholder){
+  const c=document.getElementById(containerId);
+  const div=document.createElement('div');div.className='item-row';
+  div.innerHTML=`<input placeholder="${escH(placeholder)}"><button class="btn-rm" onclick="this.parentElement.remove()">✕</button>`;
+  c.appendChild(div);
+}
+function addActionRow(containerId){
+  const c=document.getElementById(containerId);
+  const div=document.createElement('div');div.className='item-row';
+  div.innerHTML=`<input placeholder="Action…" style="flex:2;"><input placeholder="Responsable" style="flex:1;"><input type="date" style="flex:1;"><button class="btn-rm" onclick="this.parentElement.remove()">✕</button>`;
+  c.appendChild(div);
+}
+async function sauvegarderResume(rid){
+  const sujets=[...document.querySelectorAll('#sujets-editor .item-row input')].map(i=>i.value.trim()).filter(Boolean);
+  const decisions=[...document.querySelectorAll('#decisions-editor .item-row input')].map(i=>i.value.trim()).filter(Boolean);
+  const actionRows=[...document.querySelectorAll('#actions-editor .item-row')];
+  const actions=actionRows.map(row=>{
+    const inputs=row.querySelectorAll('input');
+    return{titre:inputs[0]?.value.trim()||'',responsable:inputs[1]?.value.trim()||'',echeance:inputs[2]?.value||''};
+  }).filter(a=>a.titre);
+  const notes=document.getElementById('resume-notes')?.value||'';
+  try{
+    await api('PUT',`/reunions/${rid}/resume`,{sujets,decisions,actions,notes});
+    DA.toast('Résumé sauvegardé !',{type:'success'});
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+async function validerResume(rid){
+  await sauvegarderResume(rid);
+  try{
+    await api('PATCH',`/reunions/${rid}/resume/valider`);
+    DA.toast('Résumé validé !',{type:'success'});
+    document.getElementById('modal-resume').classList.remove('open');
+    await loadReunions();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+async function partagerTous(rid,userIds){
+  if(!userIds.length){DA.toast('Aucun destinataire.',{type:'warning'});return;}
+  try{
+    const{sent}=await api('POST',`/reunions/${rid}/resume/partager`,{user_ids:userIds});
+    DA.toast(`Résumé envoyé à ${sent} personne(s) !`,{type:'success'});
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+async function ajouterDecision(rid){
+  const titre=document.getElementById('new-dec-titre')?.value.trim();
+  if(!titre){DA.toast('Titre requis.',{type:'warning'});return;}
+  const resp_id=document.getElementById('new-dec-resp-id')?.value;
+  const type_suivi=document.getElementById('new-dec-type')?.value||'action';
+  const echeance=document.getElementById('new-dec-echeance')?.value||null;
+  try{
+    await api('POST',`/reunions/${rid}/decisions`,{titre,type_suivi,responsable_id:resp_id?parseInt(resp_id):null,echeance});
+    DA.toast('Décision ajoutée !',{type:'success'});
+    ouvrirResume(rid);
+    loadDecisions();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+// ========= CRÉER RÉUNION MODAL =========
+const pendingNewInvites=[];
+document.getElementById('btn-nouvelle-reunion').addEventListener('click',()=>{
+  // Pré-remplir date à maintenant + 1h
+  const now=new Date();now.setHours(now.getHours()+1);now.setMinutes(0,0,0);
+  const fin=new Date(now);fin.setHours(fin.getHours()+1);
+  document.getElementById('r-debut').value=now.toISOString().slice(0,16);
+  document.getElementById('r-fin').value=fin.toISOString().slice(0,16);
+  document.getElementById('modal-reunion').classList.add('open');
+});
+document.getElementById('close-modal-reunion').addEventListener('click',()=>document.getElementById('modal-reunion').classList.remove('open'));
+document.getElementById('close-modal-detail').addEventListener('click',()=>document.getElementById('modal-detail').classList.remove('open'));
+document.getElementById('close-modal-resume').addEventListener('click',()=>document.getElementById('modal-resume').classList.remove('open'));
+
+// Fermer si clic en dehors de la box
+['modal-reunion','modal-detail','modal-resume'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+});
+
+// Recherche utilisateurs pour nouvelle réunion
+document.getElementById('r-search-users').addEventListener('input',async function(){
+  const q=this.value.trim();
+  if(q.length<2){document.getElementById('r-user-results').style.display='none';return;}
+  try{
+    const{users}=await api('GET',`/users/search?q=${encodeURIComponent(q)}&limit=6`);
+    const el=document.getElementById('r-user-results');
+    el.style.display='block';
+    el.innerHTML=users.map(u=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onclick="addNewInvite(${u.id},'${escH(u.prenom||'')}','${escH(u.nom||'')}')">
+      ${avatarHTML(u,30)}<span style="font-size:.88rem;font-weight:700;">${escH(u.prenom||'')} ${escH(u.nom||'')}</span>
+      <span style="font-size:.75rem;color:var(--muted);">${escH(u.role||'')}</span>
+    </div>`).join('');
+  }catch(e){}
+});
+function addNewInvite(id,prenom,nom){
+  if(pendingNewInvites.find(i=>i.id===id)) return;
+  pendingNewInvites.push({id,prenom,nom});
+  document.getElementById('r-user-results').style.display='none';
+  document.getElementById('r-search-users').value='';
+  renderNewInvitesList();
+}
+function removeNewInvite(id){
+  const i=pendingNewInvites.findIndex(x=>x.id===id);
+  if(i>-1) pendingNewInvites.splice(i,1);
+  renderNewInvitesList();
+}
+function renderNewInvitesList(){
+  document.getElementById('r-invites-list').innerHTML=pendingNewInvites.map(i=>`
+    <span style="display:inline-flex;align-items:center;gap:5px;background:#f5f3ff;color:#6d28d9;border-radius:20px;padding:4px 10px;font-size:.8rem;font-weight:700;">
+      ${escH(i.prenom)} ${escH(i.nom)} <button onclick="removeNewInvite(${i.id})" style="background:none;border:none;cursor:pointer;color:#6d28d9;">✕</button>
+    </span>`).join('');
+}
+
+document.getElementById('btn-creer-reunion').addEventListener('click',async()=>{
+  const titre=document.getElementById('r-titre').value.trim();
+  const date_debut=document.getElementById('r-debut').value;
+  const errEl=document.getElementById('r-error');
+  if(!titre||!date_debut){errEl.textContent='Titre et date de début requis.';errEl.style.display='block';return;}
+  errEl.style.display='none';
+  try{
+    const{id}=await api('POST','/reunions',{
+      titre,
+      description:document.getElementById('r-description').value.trim()||null,
+      type:document.getElementById('r-type').value,
+      acces:document.getElementById('r-acces').value,
+      date_debut,
+      date_fin:document.getElementById('r-fin').value||null,
+      ordre_du_jour:document.getElementById('r-odj').value.trim()||null,
+      enregistrement_active:document.getElementById('r-enreg').checked
+    });
+    // Inviter les participants sélectionnés
+    if(pendingNewInvites.length){
+      await api('POST',`/reunions/${id}/invites`,{users:pendingNewInvites.map(i=>i.id)});
+    }
+    DA.toast('Réunion créée avec succès !',{type:'success'});
+    document.getElementById('modal-reunion').classList.remove('open');
+    // Reset form
+    ['r-titre','r-description','r-odj'].forEach(id=>document.getElementById(id).value='');
+    pendingNewInvites.length=0;
+    renderNewInvitesList();
+    await loadReunions();
+    updateStats();
+  }catch(e){errEl.textContent=e.message||'Erreur.';errEl.style.display='block';}
+});
+
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    // Sync sidebar
+    document.querySelectorAll('.sidebar-tab').forEach(a=>a.classList.remove('active'));
+    document.querySelector(`.sidebar-tab[data-tab="${btn.dataset.tab}"]`)?.classList.add('active');
+  });
+});
+document.querySelectorAll('.sidebar-tab').forEach(a=>{
+  a.addEventListener('click',e=>{
+    e.preventDefault();
+    document.querySelector(`.tab-btn[data-tab="${a.dataset.tab}"]`)?.click();
+  });
+});
+
+// Filtres
+document.getElementById('search-reunions').addEventListener('input',renderReunions);
+document.getElementById('filter-statut').addEventListener('change',renderReunions);
+document.getElementById('filter-dec-statut').addEventListener('change',renderDecisions);
+
+// Sidebar toggle
+(function(){
+  var toggle=document.getElementById('sidebar-toggle');
+  var close=document.getElementById('sidebar-close');
+  var back=document.getElementById('sidebar-backdrop');
+  var sb=document.querySelector('.sidebar');
+  function openSidebar(){sb?.classList.add('open');back?.classList.add('open');document.body.style.overflow='hidden';}
+  function closeSidebar(){sb?.classList.remove('open');back?.classList.remove('open');document.body.style.overflow='';}
+  toggle?.addEventListener('click',openSidebar);
+  close?.addEventListener('click',closeSidebar);
+  back?.addEventListener('click',closeSidebar);
+})();
+
+init();
+</script>
+</body>
+</html>

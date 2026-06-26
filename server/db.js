@@ -1301,6 +1301,75 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(event_id) REFERENCES agenda_events(id)
   );
+
+  /* ============================================================
+     MODULE RÉUNIONS COLLABORATIVES
+  ============================================================ */
+
+  CREATE TABLE IF NOT EXISTS reunions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titre TEXT NOT NULL,
+    description TEXT,
+    organisateur_id INTEGER NOT NULL,
+    type TEXT DEFAULT 'reunion' CHECK(type IN ('reunion','rdv','conference','webinaire')),
+    acces TEXT DEFAULT 'prive' CHECK(acces IN ('prive','public')),
+    statut TEXT DEFAULT 'planifiee' CHECK(statut IN ('planifiee','en_cours','terminee','annulee')),
+    date_debut TEXT NOT NULL,
+    date_fin TEXT,
+    duree_minutes INTEGER,
+    jitsi_room TEXT UNIQUE,
+    enregistrement_active INTEGER DEFAULT 0,
+    ordre_du_jour TEXT,
+    started_at TEXT,
+    ended_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(organisateur_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS reunion_invites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reunion_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role TEXT DEFAULT 'participant' CHECK(role IN ('participant','moderateur','coorganisateur')),
+    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','accepte','refuse')),
+    rejoint_at TEXT,
+    quitte_at TEXT,
+    duree_presence_minutes INTEGER,
+    invited_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(reunion_id, user_id),
+    FOREIGN KEY(reunion_id) REFERENCES reunions(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS reunion_resumes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reunion_id INTEGER NOT NULL UNIQUE,
+    redacteur_id INTEGER,
+    sujets TEXT DEFAULT '[]',
+    decisions TEXT DEFAULT '[]',
+    actions TEXT DEFAULT '[]',
+    notes TEXT,
+    statut TEXT DEFAULT 'brouillon' CHECK(statut IN ('brouillon','valide','archive')),
+    valide_at TEXT,
+    valide_par INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(reunion_id) REFERENCES reunions(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS reunion_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reunion_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    responsable_id INTEGER,
+    type_suivi TEXT DEFAULT 'action' CHECK(type_suivi IN ('action','tache','projet','rappel','initiative')),
+    echeance TEXT,
+    statut TEXT DEFAULT 'ouvert' CHECK(statut IN ('ouvert','en_cours','termine')),
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(reunion_id) REFERENCES reunions(id),
+    FOREIGN KEY(responsable_id) REFERENCES users(id)
+  );
 `);
 for (const [table, col] of MIGRATIONS) {
   const colName = col.split(" ")[0];
