@@ -3594,20 +3594,25 @@ async function handleRequest(req, res) {
     /* --- GET /api/candidatures/mes — candidatures du candidat connecté --- */
     if (req.method === "GET" && pathname === "/api/candidatures/mes") {
       const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rows = db.prepare(`
-        SELECT oc.*, o.titre AS offre_titre, o.type AS offre_type, o.localisation, o.pays,
-               i.nom AS org_nom, i.logo_url AS org_logo,
-               cv.titre AS cv_titre, cv.numero AS cv_numero,
-               lm.titre AS lettre_titre, lm.numero AS lettre_numero
-        FROM offres_candidatures oc
-        LEFT JOIN offres o ON oc.offre_id = o.id
-        LEFT JOIN initiatives i ON o.createur_id = i.user_id
-        LEFT JOIN cv_profiles cv ON oc.cv_profile_id = cv.id
-        LEFT JOIN lettres_motivation lm ON oc.lettre_id = lm.id
-        WHERE oc.candidat_id = ?
-        ORDER BY oc.created_at DESC
-      `).all(me.id);
-      return sendJSON(res, 200, rows);
+      try {
+        const rows = db.prepare(`
+          SELECT oc.id, oc.offre_id, oc.candidat_id, oc.message, oc.statut, oc.created_at,
+                 oc.cv_profile_id, oc.lettre_id, oc.statut_detail, oc.vu_recruteur,
+                 o.titre AS offre_titre, o.localisation, o.pays,
+                 cv.titre AS cv_titre, cv.numero AS cv_numero,
+                 lm.titre AS lettre_titre, lm.numero AS lettre_numero
+          FROM offres_candidatures oc
+          LEFT JOIN offres o ON oc.offre_id = o.id
+          LEFT JOIN cv_profiles cv ON oc.cv_profile_id = cv.id
+          LEFT JOIN lettres_motivation lm ON oc.lettre_id = lm.id
+          WHERE oc.candidat_id = ?
+          ORDER BY oc.created_at DESC
+        `).all(me.id);
+        return sendJSON(res, 200, rows);
+      } catch(e) {
+        console.error('candidatures/mes error:', e.message);
+        return sendJSON(res, 500, { error: e.message });
+      }
     }
 
     /* --- GET /api/candidatures/:id/historique --- */
