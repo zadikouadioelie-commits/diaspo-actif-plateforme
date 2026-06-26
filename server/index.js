@@ -962,7 +962,15 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   const isFollowing  = me ? !!db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, u.id) : false;
   const initiativesSuivies = db.prepare("SELECT i.id,i.slug,i.nom,i.domaine,i.pays FROM abonnements a JOIN initiatives i ON i.id=a.initiative_id WHERE a.user_id=? LIMIT 12").all(u.id);
   const usersSuivis  = db.prepare("SELECT u2.id,u2.nom,u2.prenom,u2.titre_pro,u2.ville,u2.photo_url FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? LIMIT 12").all(u.id);
-  const publications = db.prepare("SELECT id,type,categorie,contenu,created_at FROM fil_posts WHERE auteur_id=? ORDER BY id DESC LIMIT 5").all(u.id);
+  const publications = db.prepare(`
+    SELECT p.id, p.type, p.categorie, p.contenu, p.created_at,
+      COUNT(DISTINCT r.id) AS nb_reactions,
+      COUNT(DISTINCT c.id) AS nb_commentaires
+    FROM fil_posts p
+    LEFT JOIN fil_reactions r ON r.post_id = p.id
+    LEFT JOIN fil_commentaires c ON c.post_id = p.id
+    WHERE p.auteur_id = ?
+    GROUP BY p.id ORDER BY p.id DESC LIMIT 10`).all(u.id);
   sendJSON(res, 200, { profil: {
     ...publicUser(u),
     bio: u.bio, photo_url: u.photo_url, banner_url: u.banner_url,

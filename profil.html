@@ -938,52 +938,7 @@ async function deleteSkill(idx) {
   } catch(e) {}
 }
 
-/* ======================================================
-   DONNÉES DÉMO — Publications & activité
-   ====================================================== */
-const DEMO_POSTS = [
-  {
-    id:'d1', type:'photo', cat:'Voyage', likes:47, comments:12, shares:6,
-    date:'Il y a 2 jours',
-    text:'🌍 Retour de mission à Dakar ! Trois semaines intenses avec les équipes de l\'initiative AgriConnect pour structurer leur programme de formation agricole. Des rencontres humaines extraordinaires, une énergie collective rare.\n\nMerci à toute l\'équipe locale pour leur accueil et leur engagement. On continue ! 🙏',
-    img:'https://picsum.photos/seed/dakar2026/700/380',
-  },
-  {
-    id:'d2', type:'lien', cat:'Entrepreneuriat', likes:31, comments:8, shares:14,
-    date:'Il y a 5 jours',
-    text:'📊 Un rapport essentiel sur l\'entrepreneuriat diasporique en 2025. Les chiffres confirment ce qu\'on observe sur le terrain : +34% de projets d\'investissement vers l\'Afrique subsaharienne en 5 ans.',
-    link: {
-      img:'https://picsum.photos/seed/rapport2025/200/120',
-      src:'Le Monde Afrique',
-      titre:'Diaspora et investissement : les nouvelles routes du capital'
-    }
-  },
-  {
-    id:'d3', type:'texte', cat:'Formation', likes:89, comments:23, shares:19,
-    date:'Il y a 1 semaine',
-    text:'💡 Après 3 ans sur la plateforme, voici ce que j\'ai appris :\n\n1️⃣ Le réseau est tout. Les connexions que j\'ai faites ici ont changé la trajectoire de mes projets.\n2️⃣ La diaspora n\'est pas un bloc homogène — chaque expérience est unique.\n3️⃣ L\'impact réel demande de la durée, pas de la vitesse.\n\nQu\'est-ce que vous en pensez ? 👇',
-  },
-  {
-    id:'d4', type:'partage', cat:'Initiative', likes:24, comments:5, shares:31,
-    date:'Il y a 2 semaines',
-    text:'👇 Cette initiative mérite vraiment d\'être connue. Je la suis depuis le début et les résultats sont là.',
-    shared: {
-      nom:'AgriConnect Sahel',
-      text:'🌱 Nous venons de former notre 500ème agriculteur au Burkina Faso ! Un jalon historique pour notre programme. En 2 ans, nos membres ont augmenté leurs rendements de 40% en moyenne. Merci à tous nos soutiens de la diaspora 🙏'
-    }
-  },
-  {
-    id:'d5', type:'photo', cat:'Événement', likes:112, comments:34, shares:8,
-    date:'Il y a 3 semaines',
-    text:'📸 Forum Diaspora & Développement à Paris — une journée mémorable. Plus de 400 membres présents, des panels de haute qualité et surtout… des projets concrets lancés en direct !',
-    img:'https://picsum.photos/seed/forum2026/700/380',
-  },
-  {
-    id:'d6', type:'texte', cat:'Santé', likes:56, comments:18, shares:22,
-    date:'Il y a 1 mois',
-    text:'🏥 J\'ai participé au programme de télémédecine SantéDiaspo cette semaine. Incroyable de voir comment la technologie peut connecter des médecins en Europe avec des patients en Afrique de l\'Ouest. Le futur de la médecine diasporique est là.',
-  },
-];
+/* DEMO_POSTS supprimé — données réelles uniquement via API */
 
 /* ======================================================
    SECTION — Publications & activité (cartes riches)
@@ -996,15 +951,15 @@ function buildSectionPubs() {
     const d = new Date(p.created_at);
     const dateStr = isNaN(d) ? 'Récemment' : `${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
     return {
-      id:'api_'+p.id, type:'texte', cat: p.categorie||p.type||'Publication',
-      likes: Math.floor(Math.random()*40)+5,
-      comments: Math.floor(Math.random()*12),
-      shares: Math.floor(Math.random()*8),
+      id:'api_'+p.id, type: p.type||'texte', cat: p.categorie||'Publication',
+      likes: p.nb_reactions || 0,
+      comments: p.nb_commentaires || 0,
+      shares: 0,
       date: dateStr, text: p.contenu||''
     };
   });
 
-  const allPosts = [...apiPubs, ...DEMO_POSTS];
+  const allPosts = apiPubs;
   const nom   = [profil.prenom, profil.nom].filter(Boolean).join(' ') || 'Jean K.';
   const avHtml = profil.photo_url
     ? `<img loading="lazy" src="${esc(profil.photo_url)}" alt="${esc(nom)}">`
