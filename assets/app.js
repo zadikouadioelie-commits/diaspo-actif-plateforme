@@ -494,19 +494,27 @@ async function initAnnuaire(){
     return;
   }
 
-  /* Nationalités */
-  populateSelect("f-pays",    [...new Set(ALL.map(i=>i.nationalite1).filter(Boolean))].sort());
-  populateSelect("f-nat2",    [...new Set(ALL.map(i=>i.nationalite2).filter(Boolean))].sort());
-  /* Origines */
-  const toutesOrigines = [...new Set([
-    ...ALL.map(i=>i.origine1), ...ALL.map(i=>i.origine2)
-  ].filter(Boolean))].sort();
-  populateSelect("f-orig1", toutesOrigines);
-  populateSelect("f-orig2", toutesOrigines);
-  /* Localisation */
-  populateSelect("f-pays-res",[...new Set(ALL.map(i=>i.pays).filter(Boolean))].sort());
+  /* Listes mondiales (avec fallback si data.js pas encore chargé) */
+  const _PAYS  = typeof PAYS_DU_MONDE  !== "undefined" ? PAYS_DU_MONDE  : [];
+  const _VILLES= typeof VILLES_DU_MONDE!== "undefined" ? VILLES_DU_MONDE: [];
+
+  /* Nationalités : données locales + tous les pays du monde */
+  const paysData1 = ALL.map(i=>i.nationalite1).filter(Boolean);
+  const paysData2 = ALL.map(i=>i.nationalite2).filter(Boolean);
+  const listePays = [...new Set([...paysData1, ..._PAYS])].sort();
+  populateSelect("f-pays", listePays);
+  populateSelect("f-nat2", listePays);
+  /* Origines : données locales + tous les pays du monde */
+  const originesData = [...ALL.map(i=>i.origine1), ...ALL.map(i=>i.origine2)].filter(Boolean);
+  const listeOrigines = [...new Set([...originesData, ..._PAYS])].sort();
+  populateSelect("f-orig1", listeOrigines);
+  populateSelect("f-orig2", listeOrigines);
+  /* Localisation : pays de résidence + villes mondiales */
+  const paysResData = ALL.map(i=>i.pays).filter(Boolean);
+  populateSelect("f-pays-res",[...new Set([...paysResData, ..._PAYS])].sort());
   populateSelect("f-region",  [...new Set(ALL.map(i=>i.region).filter(Boolean))].sort());
-  populateSelect("f-ville",   [...new Set(ALL.map(i=>i.ville).filter(Boolean))].sort());
+  const villesData = ALL.map(i=>i.ville).filter(Boolean);
+  populateSelect("f-ville",   [...new Set([...villesData, ..._VILLES])].sort());
   /* Domaine + Type */
   populateSelect("f-domaine", [...new Set(ALL.map(i=>i.domaine).filter(Boolean))].sort());
   populateSelect("f-type",    [...new Set(ALL.map(i=>i.type).filter(Boolean))].sort());

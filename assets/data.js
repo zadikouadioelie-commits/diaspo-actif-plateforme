@@ -627,3 +627,75 @@ const BADGES_ENGAGEMENT = [
   { niveau: "argent", label: "Contributeur Argent", icone: "🥈" },
   { niveau: "or", label: "Contributeur Or", icone: "🥇" }
 ];
+
+/* ── Liste complète des pays du monde ── */
+const PAYS_DU_MONDE = [
+  "Afghanistan","Afrique du Sud","Albanie","Algérie","Allemagne","Andorre","Angola","Antigua-et-Barbuda",
+  "Arabie Saoudite","Argentine","Arménie","Australie","Autriche","Azerbaïdjan",
+  "Bahamas","Bahreïn","Bangladesh","Barbade","Bélarus","Belgique","Belize","Bénin","Bhoutan","Bolivie",
+  "Bosnie-Herzégovine","Botswana","Brésil","Brunei","Bulgarie","Burkina Faso","Burundi",
+  "Cabo Verde","Cambodge","Cameroun","Canada","Centrafrique","Chili","Chine","Chypre","Colombie",
+  "Comores","Congo","Costa Rica","Côte d'Ivoire","Croatie","Cuba",
+  "Danemark","Djibouti","Dominique",
+  "Égypte","Émirats Arabes Unis","Équateur","Érythrée","Espagne","Estonie","Eswatini","États-Unis","Éthiopie",
+  "Fidji","Finlande","France",
+  "Gabon","Gambie","Géorgie","Ghana","Grèce","Grenade","Guatemala","Guinée","Guinée Équatoriale",
+  "Guinée-Bissau","Guyana",
+  "Haïti","Honduras","Hongrie",
+  "Inde","Indonésie","Irak","Iran","Irlande","Islande","Israël","Italie",
+  "Jamaïque","Japon","Jordanie",
+  "Kazakhstan","Kenya","Kirghizistan","Kiribati","Kosovo","Koweït",
+  "Laos","Lesotho","Lettonie","Liban","Libéria","Libye","Liechtenstein","Lituanie","Luxembourg",
+  "Macédoine du Nord","Madagascar","Malaisie","Malawi","Maldives","Mali","Malte","Maroc","Marshall",
+  "Maurice","Mauritanie","Mexique","Micronésie","Moldavie","Monaco","Mongolie","Monténégro","Mozambique",
+  "Myanmar",
+  "Namibie","Nauru","Népal","Nicaragua","Niger","Nigéria","Norvège","Nouvelle-Zélande",
+  "Oman","Ouganda","Ouzbékistan",
+  "Pakistan","Palaos","Palestine","Panama","Papouasie-Nouvelle-Guinée","Paraguay","Pays-Bas","Pérou",
+  "Philippines","Pologne","Portugal",
+  "Qatar",
+  "République Démocratique du Congo","République Dominicaine","République Tchèque","Roumanie",
+  "Royaume-Uni","Russie","Rwanda",
+  "Saint-Kitts-et-Nevis","Saint-Vincent-et-les-Grenadines","Sainte-Lucie","Salvador","Samoa",
+  "São Tomé-et-Príncipe","Sénégal","Serbie","Seychelles","Sierra Leone","Singapour","Slovaquie",
+  "Slovénie","Somalie","Soudan","Soudan du Sud","Sri Lanka","Suède","Suisse","Suriname",
+  "Syrie",
+  "Tadjikistan","Tanzanie","Tchad","Thaïlande","Timor-Leste","Togo","Tonga","Trinité-et-Tobago",
+  "Tunisie","Turkménistan","Turquie","Tuvalu",
+  "Ukraine","Uruguay",
+  "Vanuatu","Venezuela","Vietnam",
+  "Yémen",
+  "Zambie","Zimbabwe"
+].sort();
+
+/* ── Villes majeures du monde ── */
+const VILLES_DU_MONDE = [
+  // Afrique (prioritaire pour la diaspora)
+  "Abidjan","Accra","Addis-Abeba","Alger","Antananarivo","Asmara","Bamako","Bangui","Banjul","Bissau",
+  "Brazzaville","Bujumbura","Cabo","Caire (Le)","Cape Town","Casablanca","Conakry","Cotonou","Dakar",
+  "Dar es Salaam","Djibouti","Douala","Durban","Freetown","Gaborone","Harare","Johannesburg","Kampala",
+  "Khartoum","Kinshasa","Kigali","Lagos","Libreville","Lilongwe","Lomé","Luanda","Lusaka","Malabo",
+  "Maputo","Marrakech","Mogadiscio","Monrovia","Moroni","Nairobi","N'Djamena","Niamey","Nouakchott",
+  "Ouagadougou","Port-Louis","Porto-Novo","Praia","Rabat","São Tomé","Tripoli","Tunis","Windhoek",
+  "Yaoundé",
+  // Europe
+  "Athènes","Berlin","Bruxelles","Bucarest","Budapest","Copenhague","Dublin","Genève","Helsinki",
+  "Lisbonne","Ljubljana","Londres","Luxembourg","Lyon","Madrid","Marseille","Milan","Minsk","Monaco",
+  "Montpellier","Moscou","Munich","Nice","Nicosie","Oslo","Paris","Prague","Reims","Riga","Rome",
+  "Rotterdam","Saint-Pétersbourg","Sofia","Stockholm","Strasbourg","Tallinn","Tirana","Toulouse",
+  "Vaduz","Vienne","Vilnius","Varsovie","Zurich",
+  // Amérique du Nord
+  "Atlanta","Boston","Calgary","Chicago","Dallas","Denver","Houston","Las Vegas","Los Angeles","Miami",
+  "Montréal","New York","Ottawa","Philadelphie","Phoenix","San Francisco","Seattle","Toronto",
+  "Vancouver","Washington D.C.",
+  // Amérique Latine & Caraïbes
+  "Bogotá","Buenos Aires","Caracas","Havane","Lima","Mexico","Panama City","Port-au-Prince",
+  "Port-of-Spain","Quito","Rio de Janeiro","Saint-Domingue","Santiago","São Paulo",
+  // Asie
+  "Ankara","Bagdad","Bangkok","Beyrouth","Dacca","Delhi","Dhaka","Doha","Dubaï","Hanoi","Hong Kong",
+  "Istanbul","Jakarta","Kaboul","Karachi","Katmandou","Kuala Lumpur","Manille","Mumbai","Muscat",
+  "Nicosie","Nur-Sultan","Pékin","Phnom Penh","Rangoun","Riyad","Séoul","Shanghai","Singapour",
+  "Taipei","Tachkent","Téhéran","Tel Aviv","Tokyo","Vientiane","Yangon",
+  // Océanie / autres
+  "Auckland","Canberra","Melbourne","Nuku'alofa","Port Moresby","Suva","Sydney","Wellington"
+].sort();

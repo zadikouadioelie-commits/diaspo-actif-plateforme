@@ -64,7 +64,7 @@
     <input type="text" id="q" placeholder="Rechercher..." style="min-width:180px">
     <select id="f-domaine"><option value="">Tous les domaines</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Autre</option></select>
     <select id="f-type"><option value="">Tous types</option><option value="evenement">Evenement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conference</option></select>
-    <select id="f-pays"><option value="">Tous pays</option><option>France</option><option>Senegal</option><option>Cote d'Ivoire</option><option>Mali</option><option>Cameroun</option><option>Maroc</option></select>
+    <select id="f-pays"><option value="">Tous pays</option></select>
     <button class="btn" id="btn-reset" style="font-size:12px;padding:0 12px">Reinitialiser</button>
   </div>
   <div id="evt-count" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
@@ -168,6 +168,14 @@ async function quitter(id,btn){
   try{await api('DELETE','/evenements/'+id+'/quitter');inscritSet.delete(id);renderEvts();}
   catch(e){btn.disabled=false;}
 }
+
+// Peupler le select pays avec la liste mondiale
+(function(){
+  const sel = document.getElementById('f-pays');
+  if(sel && typeof PAYS_DU_MONDE !== 'undefined'){
+    PAYS_DU_MONDE.forEach(p => { const o=document.createElement('option'); o.value=p; o.textContent=p; sel.appendChild(o); });
+  }
+})();
 
 // Filtres
 ['q','f-domaine','f-type','f-pays'].forEach(id=>document.getElementById(id).addEventListener('change',loadEvts));
