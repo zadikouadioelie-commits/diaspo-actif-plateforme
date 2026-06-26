@@ -367,6 +367,9 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
   .filters { grid-template-columns: repeat(2, 1fr); }
   .chat-list { max-height: 220px; }
+  /* Bottom nav visible sur tablette portrait */
+  .mobile-bottom-nav { display: flex; }
+  .page { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
 }
 
 /* ─── BREAKPOINT : TABLET LANDSCAPE (768px - 1023px) ────────────── */
@@ -376,6 +379,10 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   .da-stats-grid { grid-template-columns: repeat(3, 1fr); }
   .stat-row { grid-template-columns: repeat(3, 1fr); }
   .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Bottom nav visible sur tablette paysage */
+  .mobile-bottom-nav { display: flex; }
+  .page { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
 
   /* Sidebar réduite sur tablette */
   .da-sidebar { width: 220px; }
