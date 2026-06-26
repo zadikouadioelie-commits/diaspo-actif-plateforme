@@ -1521,7 +1521,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
     try {
       const [rEv, rWallet] = await Promise.all([
-        api('GET', '/events?organisateur_id='+ME.id+'&all=1'),
+        api('GET', '/events?organisateur_id='+me.id+'&all=1'),
         api('GET', '/wallet/balance').catch(() => ({ balance: 0, historique: [] }))
       ]);
       const r = rEv;
