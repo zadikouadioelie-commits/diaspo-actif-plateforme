@@ -2621,6 +2621,42 @@ document.addEventListener("DOMContentLoaded", ()=>{
   renderAllAds();
   applyTranslations();
 
+  // ── Sidebar mobile : hamburger toggle ──
+  (function initSidebarMobile() {
+    const toggle   = document.getElementById("sidebar-toggle");
+    const close    = document.getElementById("sidebar-close");
+    const backdrop = document.getElementById("sidebar-backdrop");
+    const sidebar  = document.getElementById("sidebar");
+    if (!toggle || !sidebar) return;
+
+    function openSidebar() {
+      sidebar.classList.add("open");
+      backdrop.classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+    function closeSidebar() {
+      sidebar.classList.remove("open");
+      backdrop.classList.remove("open");
+      document.body.style.overflow = "";
+    }
+
+    toggle.addEventListener("click", openSidebar);
+    if (close)    close.addEventListener("click", closeSidebar);
+    if (backdrop) backdrop.addEventListener("click", closeSidebar);
+
+    // Fermer automatiquement quand on clique un lien dans la sidebar
+    sidebar.querySelectorAll("a").forEach(a => {
+      a.addEventListener("click", () => {
+        if (window.innerWidth <= 768) closeSidebar();
+      });
+    });
+
+    // Fermer avec Échap
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") closeSidebar();
+    });
+  })();
+
   // Barre de recherche globale dans la topbar (si présente)
   const searchInput = document.getElementById("global-search");
   if(searchInput) {

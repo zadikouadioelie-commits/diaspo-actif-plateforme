@@ -75,6 +75,7 @@
       <div class="logo"><img class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
       <nav class="nav"><a href="index.html">Accueil</a><a href="annuaire.html">Annuaire</a><a href="fil-actualite.html">Fil d'actualité</a></nav>
       <div class="topbar-right">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">☰</button>
         <select class="lang-select" id="lang-select"></select>
         <div id="auth-area" class="auth-area"></div>
       </div>
@@ -82,7 +83,9 @@
   </header>
 
   <div class="with-sidebar">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar">
+      <button class="sidebar-close" id="sidebar-close">×</button>
       <div class="brand">Collectivité</div>
       <a href="#" class="active" data-section="accueil">🏛️ Accueil</a>
       <a href="#" data-section="observatoire">📊 Observatoire Diaspora</a>
