@@ -1029,9 +1029,20 @@
         } else {
           const { html, quickReplies } = renderResponse('fallback');
           appendBotMessage(html, quickReplies);
+          logUnanswered(text);
         }
       }
     }, 350);
+  }
+
+  function logUnanswered(question) {
+    try {
+      fetch('/api/chatbot/questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, langue: navigator.language?.slice(0,2) || 'fr' })
+      }).catch(() => {});
+    } catch(e) {}
   }
 
   function appendUserMessage(text) {

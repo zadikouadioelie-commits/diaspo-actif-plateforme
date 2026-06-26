@@ -945,8 +945,52 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     titre TEXT NOT NULL,
     contenu TEXT NOT NULL,
+    categorie TEXT DEFAULT 'Général',
+    mots_cles TEXT DEFAULT '[]',
+    priorite INTEGER DEFAULT 5,
+    liens_json TEXT DEFAULT '[]',
+    source TEXT DEFAULT 'admin',
+    actif INTEGER DEFAULT 1,
+    nb_consultations INTEGER DEFAULT 0,
     ordre INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(created_by) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS chatbot_memoire_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    memoire_id INTEGER NOT NULL,
+    auteur_id INTEGER,
+    auteur_nom TEXT,
+    ancien_titre TEXT,
+    nouveau_titre TEXT,
+    ancien_contenu TEXT,
+    nouveau_contenu TEXT,
+    ancien_categorie TEXT,
+    nouveau_categorie TEXT,
+    commentaire TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(memoire_id) REFERENCES chatbot_memoire(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS chatbot_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question TEXT NOT NULL,
+    question_norm TEXT NOT NULL,
+    nb_fois INTEGER DEFAULT 1,
+    langue TEXT DEFAULT 'fr',
+    categorie_estimee TEXT,
+    utilisateur_id INTEGER,
+    contexte TEXT,
+    statut TEXT DEFAULT 'ouvert',
+    memoire_id INTEGER,
+    reponse_admin TEXT,
+    first_asked_at TEXT DEFAULT (datetime('now')),
+    last_asked_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(utilisateur_id) REFERENCES users(id),
+    FOREIGN KEY(memoire_id) REFERENCES chatbot_memoire(id)
   );
 
   CREATE TABLE IF NOT EXISTS cv_profiles (

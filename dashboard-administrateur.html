@@ -497,47 +497,214 @@
 
       <!-- MÉMOIRE CHATBOT -->
       <section id="section-chatbot" style="display:none;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
           <div style="flex:1;">
             <h2 style="margin:0;">🧠 Mémoire du Chatbot</h2>
-            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Informations que le chatbot utilise pour répondre aux visiteurs</p>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Gestion avancée des connaissances — priorité : Mémoire › Import site › Base interne</p>
           </div>
-          <button class="btn btn-orange" onclick="openAddMemoireModal()">+ Ajouter une information</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" onclick="importerSite()">⬇ Importer diaspo-actif.com</button>
+            <button class="btn btn-orange" onclick="openMemoireModal()">+ Nouvelle connaissance</button>
+          </div>
         </div>
 
-        <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:13px;">
-          💡 <strong>Comment ça marche :</strong> Le chatbot consulte automatiquement le site <a href="https://www.diaspo-actif.com" target="_blank">diaspo-actif.com</a> et ces entrées pour répondre aux questions des visiteurs. Les entrées ajoutées ici ont la <strong>priorité maximale</strong>.
+        <!-- Onglets -->
+        <div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:20px;gap:0;">
+          <button class="cb-admin-tab active" data-tab="stats" onclick="switchCbTab('stats')">📊 Statistiques</button>
+          <button class="cb-admin-tab" data-tab="memoire" onclick="switchCbTab('memoire')">🧠 Mémoire</button>
+          <button class="cb-admin-tab" data-tab="questions" onclick="switchCbTab('questions')">
+            ❓ Questions sans réponse <span id="cb-q-badge" style="display:none;background:#EF4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;margin-left:6px;"></span>
+          </button>
         </div>
 
-        <div id="chatbot-memoire-list" style="display:flex;flex-direction:column;gap:12px;">
-          <div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+        <!-- ── TAB : Statistiques ── -->
+        <div id="cb-tab-stats">
+          <div class="grid grid-4" style="gap:12px;margin-bottom:20px;" id="cb-stats-cards">
+            <div class="stat-card-obs"><div class="stat-num" id="cbs-total">—</div><div class="stat-lbl">Connaissances actives</div></div>
+            <div class="stat-card-obs"><div class="stat-num" id="cbs-mois">—</div><div class="stat-lbl">Créées ce mois</div></div>
+            <div class="stat-card-obs"><div class="stat-num" id="cbs-modifs">—</div><div class="stat-lbl">Modifications totales</div></div>
+            <div class="stat-card-obs"><div class="stat-num" id="cbs-sans">—</div><div class="stat-lbl">Questions sans réponse</div></div>
+          </div>
+          <div class="grid grid-2" style="gap:16px;margin-bottom:16px;">
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 style="margin:0;font-size:15px;">Taux de réponse</h3>
+                <span id="cbs-taux" style="font-size:22px;font-weight:800;color:var(--orange);">—%</span>
+              </div>
+              <div style="background:#e2e8f0;border-radius:99px;height:10px;overflow:hidden;">
+                <div id="cbs-taux-bar" style="height:100%;background:linear-gradient(90deg,#10b981,#34d399);border-radius:99px;width:0%;transition:width .8s;"></div>
+              </div>
+              <div style="font-size:12px;color:var(--muted);margin-top:8px;">Pourcentage de questions auxquelles le chatbot a su répondre</div>
+            </div>
+            <div class="card">
+              <h3 style="margin:0 0 12px;font-size:15px;">Catégories les plus riches</h3>
+              <div id="cbs-top-cats"></div>
+            </div>
+          </div>
+          <div class="grid grid-2" style="gap:16px;">
+            <div class="card">
+              <h3 style="margin:0 0 12px;font-size:15px;">Connaissances les plus consultées</h3>
+              <div id="cbs-top-connus"></div>
+            </div>
+            <div class="card">
+              <h3 style="margin:0 0 12px;font-size:15px;">Questions fréquentes sans réponse</h3>
+              <div id="cbs-q-freq"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TAB : Mémoire ── -->
+        <div id="cb-tab-memoire" style="display:none;">
+          <!-- Barre recherche + filtres -->
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+            <input id="cb-search" class="input-field" style="flex:1;min-width:200px;" placeholder="🔍 Rechercher par titre, contenu ou mot-clé…" oninput="filterMemoire()">
+            <select id="cb-filter-cat" class="input-field" style="width:180px;" onchange="filterMemoire()">
+              <option value="">Toutes les catégories</option>
+              <option value="Général">Général</option>
+              <option value="Histoire">Histoire</option>
+              <option value="Fonctionnalités">Fonctionnalités</option>
+              <option value="Navigation">Navigation</option>
+              <option value="Abonnements">Abonnements</option>
+              <option value="Technique">Technique</option>
+              <option value="Import site">Import site</option>
+            </select>
+            <select id="cb-filter-src" class="input-field" style="width:140px;" onchange="filterMemoire()">
+              <option value="">Toutes sources</option>
+              <option value="admin">Admin</option>
+              <option value="import">Import site</option>
+            </select>
+          </div>
+          <div id="cb-memoire-list" style="display:flex;flex-direction:column;gap:10px;">
+            <div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- ── TAB : Questions sans réponse ── -->
+        <div id="cb-tab-questions" style="display:none;">
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+            <div style="flex:1;font-size:13px;color:var(--muted);">Chaque question posée sans réponse apparaît ici. Répondez et convertissez-la en connaissance pour enrichir la mémoire du chatbot.</div>
+            <select id="cb-q-statut" class="input-field" style="width:160px;" onchange="loadQuestions()">
+              <option value="ouvert">❓ En attente</option>
+              <option value="repondu">✅ Répondues</option>
+              <option value="ignore">🚫 Ignorées</option>
+              <option value="fusionne">🔗 Fusionnées</option>
+            </select>
+          </div>
+          <div id="cb-questions-list" style="display:flex;flex-direction:column;gap:10px;">
+            <div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+          </div>
         </div>
       </section>
 
-      <!-- Modal ajout mémoire -->
-      <div id="modal-memoire-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;">
-        <div style="background:#fff;border-radius:16px;padding:28px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">
-          <h3 style="margin:0 0 18px;">🧠 <span id="modal-memoire-title">Ajouter une information</span></h3>
-          <div style="margin-bottom:14px;">
-            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Titre <span style="color:var(--orange)">*</span></label>
-            <input type="text" id="mem-titre" placeholder="Ex : Qu'est-ce que Diaspo'Actif ?" style="width:100%;box-sizing:border-box;" class="input-field">
+      <!-- ══ Modal : Ajouter / Modifier connaissance ══ -->
+      <div id="modal-memoire-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+        <div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:640px;margin:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+            <h3 style="margin:0;">🧠 <span id="modal-mem-title">Nouvelle connaissance</span></h3>
+            <button onclick="closeMemoireModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
           </div>
-          <div style="margin-bottom:14px;">
-            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Contenu <span style="color:var(--orange)">*</span></label>
-            <textarea id="mem-contenu" rows="6" placeholder="Rédigez ici la réponse que le chatbot devra utiliser…" style="width:100%;box-sizing:border-box;resize:vertical;" class="input-field"></textarea>
+          <input type="hidden" id="mem-id">
+          <div class="grid grid-2" style="gap:12px;margin-bottom:12px;">
+            <div style="grid-column:1/-1;">
+              <label class="form-label">Titre <span style="color:var(--orange)">*</span></label>
+              <input id="mem-titre" class="input-field" style="width:100%;" placeholder="Ex : Pourquoi Diaspo'Actif a-t-il été créé ?">
+            </div>
+            <div>
+              <label class="form-label">Catégorie</label>
+              <select id="mem-categorie" class="input-field" style="width:100%;">
+                <option>Général</option><option>Histoire</option><option>Fonctionnalités</option>
+                <option>Navigation</option><option>Abonnements</option><option>Technique</option>
+                <option>Commercial</option><option>Confidentialité</option><option>Contact</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Priorité <span style="font-weight:400;color:var(--muted)">(1=max · 10=min)</span></label>
+              <input id="mem-priorite" type="number" class="input-field" style="width:100%;" value="5" min="1" max="10">
+            </div>
           </div>
-          <div style="margin-bottom:18px;">
-            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Ordre d'affichage (priorité)</label>
-            <input type="number" id="mem-ordre" value="0" min="0" style="width:100px;" class="input-field">
-            <span style="font-size:12px;color:var(--muted);margin-left:8px;">0 = priorité maximale</span>
+          <div style="margin-bottom:12px;">
+            <label class="form-label">Contenu <span style="color:var(--orange)">*</span></label>
+            <textarea id="mem-contenu" class="input-field" rows="7" style="width:100%;resize:vertical;" placeholder="Rédigez ici la réponse que le chatbot utilisera…"></textarea>
           </div>
-          <div id="mem-error" style="display:none;color:#ef4444;font-size:13px;margin-bottom:12px;"></div>
-          <div style="display:flex;gap:10px;justify-content:flex-end;">
-            <button class="btn" onclick="closeMemoireModal()">Annuler</button>
-            <button class="btn btn-orange" onclick="saveMemoireEntry()">Enregistrer</button>
+          <div style="margin-bottom:12px;">
+            <label class="form-label">Mots-clés <span style="font-weight:400;color:var(--muted)">(séparés par des virgules)</span></label>
+            <input id="mem-mots-cles" class="input-field" style="width:100%;" placeholder="création, histoire, fondation, origine…">
+          </div>
+          <div style="margin-bottom:16px;">
+            <label class="form-label">Commentaire de modification <span style="font-weight:400;color:var(--muted)">(optionnel)</span></label>
+            <input id="mem-commentaire" class="input-field" style="width:100%;" placeholder="Raison de la modification…">
+          </div>
+          <div id="mem-error" style="display:none;background:#fef2f2;color:#B91C1C;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px;"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="closeMemoireModal()">Annuler</button>
+            <button class="btn btn-orange" onclick="saveMemoireEntry()">💾 Enregistrer</button>
           </div>
         </div>
       </div>
+
+      <!-- ══ Modal : Historique ══ -->
+      <div id="modal-historique-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+        <div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:700px;margin:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+            <h3 style="margin:0;">🕐 Historique des modifications</h3>
+            <button onclick="document.getElementById('modal-historique-bg').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
+          </div>
+          <div id="historique-list"></div>
+        </div>
+      </div>
+
+      <!-- ══ Modal : Répondre à une question ══ -->
+      <div id="modal-question-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+        <div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:640px;margin:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="margin:0;">❓ Répondre à la question</h3>
+            <button onclick="document.getElementById('modal-question-bg').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
+          </div>
+          <input type="hidden" id="q-id">
+          <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;">
+            <div style="font-weight:700;color:var(--muted);font-size:11px;text-transform:uppercase;margin-bottom:6px;">Question posée :</div>
+            <div id="q-question-text" style="font-size:15px;font-weight:600;"></div>
+            <div id="q-meta" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="form-label">Titre de la connaissance <span style="color:var(--orange)">*</span></label>
+            <input id="q-titre" class="input-field" style="width:100%;">
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="form-label">Réponse / Contenu <span style="color:var(--orange)">*</span></label>
+            <textarea id="q-contenu" class="input-field" rows="6" style="width:100%;resize:vertical;" placeholder="Rédigez la réponse que le chatbot utilisera pour cette question…"></textarea>
+          </div>
+          <div class="grid grid-2" style="gap:10px;margin-bottom:16px;">
+            <div>
+              <label class="form-label">Catégorie</label>
+              <select id="q-categorie" class="input-field" style="width:100%;">
+                <option>Général</option><option>Histoire</option><option>Fonctionnalités</option>
+                <option>Navigation</option><option>Abonnements</option><option>Technique</option>
+                <option>Commercial</option><option>Contact</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Priorité (1=max · 10=min)</label>
+              <input id="q-priorite" type="number" class="input-field" style="width:100%;" value="5" min="1" max="10">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="document.getElementById('modal-question-bg').style.display='none'">Annuler</button>
+            <button class="btn btn-orange" onclick="convertirQuestion()">✅ Convertir en connaissance</button>
+          </div>
+        </div>
+      </div>
+
+      <style>
+        .cb-admin-tab { background:none;border:none;padding:10px 18px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s; }
+        .cb-admin-tab.active { color:var(--orange);border-bottom-color:var(--orange); }
+        .cb-mem-card { background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px; }
+        .cb-mem-card:hover { border-color:var(--orange); }
+        .cb-src-admin { background:#DCFCE7;color:#166534;border-radius:4px;font-size:11px;font-weight:700;padding:2px 7px; }
+        .cb-src-import { background:#DBEAFE;color:#1E40AF;border-radius:4px;font-size:11px;font-weight:700;padding:2px 7px; }
+        .cb-q-card { background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px; }
+        .cb-q-badge-n { background:#FEE2E2;color:#991B1B;border-radius:99px;font-size:11px;font-weight:800;padding:2px 8px; }
+      </style>
 
       <!-- PARAMÈTRES -->
       <section id="section-parametres" style="display:none;">
@@ -2274,7 +2441,7 @@ async function submitAccordDirect(){
     ventes:      () => loadTransactions(),
     parametres:  () => loadParametres(),
     publicites:  () => loadPublicites(),
-    chatbot:     () => loadChatbotMemoire(),
+    chatbot:     () => switchCbTab('stats'),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
@@ -3866,62 +4033,175 @@ async function submitAccordDirect(){
   /* ══════════════════════════════════════
      MÉMOIRE CHATBOT
   ══════════════════════════════════════ */
+  /* ══ CHATBOT ADMIN — état ══ */
+  let _cbTab = 'stats';
+  let _memoireAll = [];
   let _editMemoireId = null;
 
-  async function loadChatbotMemoire() {
-    const list = document.getElementById('chatbot-memoire-list');
+  /* ── Onglets ── */
+  window.switchCbTab = function(tab) {
+    _cbTab = tab;
+    document.querySelectorAll('.cb-admin-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    ['stats','memoire','questions'].forEach(t => {
+      document.getElementById('cb-tab-' + t).style.display = t === tab ? '' : 'none';
+    });
+    if (tab === 'stats')     loadCbStats();
+    if (tab === 'memoire')   loadMemoire();
+    if (tab === 'questions') loadQuestions();
+  };
+
+  /* ── Importer le site ── */
+  window.importerSite = async function() {
+    if (!confirm('Importer le contenu de diaspo-actif.com dans la base de données ?\n\nCela remplacera les entrées d\'import précédentes.')) return;
+    try {
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = '⏳ Import en cours…';
+      const r = await api('POST', '/chatbot/importer-site');
+      btn.disabled = false; btn.textContent = '⬇ Importer diaspo-actif.com';
+      alert(`✅ Import terminé — ${r.nb || 0} entrées importées.`);
+      loadCbStats(); loadMemoire();
+    } catch(e) {
+      event.target.disabled = false; event.target.textContent = '⬇ Importer diaspo-actif.com';
+      alert('Erreur import : ' + e.message);
+    }
+  };
+
+  /* ── Statistiques ── */
+  async function loadCbStats() {
+    try {
+      const s = await api('GET', '/chatbot/stats');
+      setText('cbs-total', s.total_memoires ?? '—');
+      setText('cbs-mois',  s.ce_mois ?? '—');
+      setText('cbs-modifs', s.total_modifications ?? '—');
+      setText('cbs-sans', s.questions_ouvertes ?? '—');
+      const taux = s.taux_reponse ?? 0;
+      setText('cbs-taux', taux + '%');
+      document.getElementById('cbs-taux-bar').style.width = taux + '%';
+
+      const topCats = document.getElementById('cbs-top-cats');
+      const cats = s.top_categories || [];
+      topCats.innerHTML = cats.length ? cats.map(c => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:13px;">${esc(c.categorie)}</span>
+          <span style="font-weight:700;font-size:13px;">${c.nb}</span>
+        </div>`).join('') : '<div style="color:var(--muted);font-size:13px;">Aucune donnée</div>';
+
+      const topConnus = document.getElementById('cbs-top-connus');
+      const connus = s.plus_consultes || [];
+      topConnus.innerHTML = connus.length ? connus.map((c,i) => `
+        <div style="display:flex;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:12px;color:var(--muted);width:18px;">${i+1}.</span>
+          <span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(c.titre)}</span>
+          <span style="font-size:12px;color:var(--muted);">${c.nb_consultations}x</span>
+        </div>`).join('') : '<div style="color:var(--muted);font-size:13px;">Aucune consultation</div>';
+
+      const qFreq = document.getElementById('cbs-q-freq');
+      const qs = s.questions_frequentes || [];
+      qFreq.innerHTML = qs.length ? qs.map(q => `
+        <div style="display:flex;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);">
+          <span class="cb-q-badge-n">${q.nb_fois}x</span>
+          <span style="flex:1;font-size:13px;">${esc(q.question)}</span>
+        </div>`).join('') : '<div style="color:var(--muted);font-size:13px;">Aucune question en attente</div>';
+
+      const badge = document.getElementById('cb-q-badge');
+      if ((s.questions_ouvertes ?? 0) > 0) {
+        badge.textContent = s.questions_ouvertes;
+        badge.style.display = '';
+      } else badge.style.display = 'none';
+    } catch(e) { console.error(e); }
+  }
+
+  function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+  /* ── Mémoire ── */
+  async function loadMemoire() {
+    const list = document.getElementById('cb-memoire-list');
     list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
     try {
       const r = await api('GET', '/chatbot/memoire');
-      const rows = r.memoires || [];
-      if (!rows.length) {
-        list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);">
-          <div style="font-size:36px;margin-bottom:12px;">🧠</div>
-          <p>Aucune information mémorisée pour l'instant.</p>
-          <p style="font-size:13px;">Ajoutez des informations pour enrichir les réponses du chatbot.</p>
-        </div>`;
-        return;
-      }
-      list.innerHTML = rows.map(m => `
-        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;gap:14px;align-items:flex-start;">
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-              <strong style="font-size:14px;">${esc(m.titre)}</strong>
-              ${m.ordre === 0 ? '<span style="background:#fef3c7;color:#92400e;border-radius:99px;padding:1px 8px;font-size:11px;font-weight:700;">Priorité max</span>' : ''}
-            </div>
-            <p style="margin:0;font-size:13px;color:var(--muted);line-height:1.5;white-space:pre-wrap;">${esc(m.contenu.slice(0, 220))}${m.contenu.length > 220 ? '…' : ''}</p>
-            <div style="margin-top:8px;font-size:11px;color:#aaa;">Ajouté le ${m.created_at?.slice(0,10) || ''} · Ordre : ${m.ordre}</div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-            <button class="btn" style="font-size:12px;padding:4px 10px;" onclick="editMemoire(${m.id},'${esc(m.titre).replace(/'/g,"\\'")}',${JSON.stringify(m.contenu).replace(/</g,'\\u003c')},${m.ordre})">✏️ Modifier</button>
-            <button class="btn" style="font-size:12px;padding:4px 10px;color:#ef4444;border-color:#ef4444;" onclick="deleteMemoire(${m.id})">🗑 Supprimer</button>
-          </div>
-        </div>`).join('');
+      _memoireAll = r.memoires || [];
+      renderMemoire(_memoireAll);
     } catch(e) {
-      list.innerHTML = `<div style="color:red;padding:20px;">Erreur de chargement : ${e.message}</div>`;
+      list.innerHTML = `<div style="color:#ef4444;padding:20px;">Erreur : ${e.message}</div>`;
     }
   }
 
-  window.openAddMemoireModal = function() {
-    _editMemoireId = null;
-    document.getElementById('modal-memoire-title').textContent = 'Ajouter une information';
-    document.getElementById('mem-titre').value = '';
-    document.getElementById('mem-contenu').value = '';
-    document.getElementById('mem-ordre').value = '0';
-    document.getElementById('mem-error').style.display = 'none';
-    document.getElementById('modal-memoire-bg').style.display = 'flex';
-    document.getElementById('mem-titre').focus();
+  function renderMemoire(rows) {
+    const list = document.getElementById('cb-memoire-list');
+    if (!rows.length) {
+      list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);">
+        <div style="font-size:36px;margin-bottom:12px;">🧠</div>
+        <p>Aucune connaissance pour ces filtres.</p>
+      </div>`;
+      return;
+    }
+    list.innerHTML = rows.map(m => {
+      const mots = JSON.parse(m.mots_cles || '[]');
+      const srcBadge = m.source === 'import' ? '<span class="cb-src-import">Import site</span>' : '<span class="cb-src-admin">Admin</span>';
+      const prioBadge = m.priorite <= 2 ? '<span style="background:#FEF3C7;color:#92400E;border-radius:4px;font-size:11px;font-weight:700;padding:2px 7px;">Priorité haute</span>' : '';
+      return `<div class="cb-mem-card">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;">
+              <strong style="font-size:14px;">${esc(m.titre)}</strong>
+              ${srcBadge}${prioBadge}
+              <span style="background:#f1f5f9;color:#475569;border-radius:4px;font-size:11px;padding:2px 7px;">${esc(m.categorie || 'Général')}</span>
+            </div>
+            <p style="margin:0 0 6px;font-size:13px;color:var(--muted);line-height:1.5;">${esc(m.contenu.slice(0,200))}${m.contenu.length>200?'…':''}</p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+              ${mots.map(k=>`<span style="background:#e0f2fe;color:#075985;border-radius:4px;font-size:11px;padding:1px 6px;">${esc(k)}</span>`).join('')}
+            </div>
+            <div style="font-size:11px;color:#aaa;">Priorité ${m.priorite} · ${m.nb_consultations||0} consult. · ${m.created_at?.slice(0,10)||''}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+            <button class="btn btn-sm" onclick="openMemoireModal(${m.id})">✏️ Modifier</button>
+            <button class="btn btn-sm" onclick="voirHistorique(${m.id})">🕐 Historique</button>
+            <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="deleteMemoire(${m.id})">🗑 Supprimer</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  window.filterMemoire = function() {
+    const q = (document.getElementById('cb-search')?.value || '').toLowerCase();
+    const cat = document.getElementById('cb-filter-cat')?.value || '';
+    const src = document.getElementById('cb-filter-src')?.value || '';
+    const filtered = _memoireAll.filter(m => {
+      const mots = JSON.parse(m.mots_cles || '[]').join(' ').toLowerCase();
+      const txt = (m.titre + ' ' + m.contenu + ' ' + mots).toLowerCase();
+      return (!q || txt.includes(q)) &&
+             (!cat || m.categorie === cat) &&
+             (!src || m.source === src);
+    });
+    renderMemoire(filtered);
   };
 
-  window.editMemoire = function(id, titre, contenu, ordre) {
-    _editMemoireId = id;
-    document.getElementById('modal-memoire-title').textContent = 'Modifier l\'information';
-    document.getElementById('mem-titre').value = titre;
-    document.getElementById('mem-contenu').value = contenu;
-    document.getElementById('mem-ordre').value = ordre;
+  window.openMemoireModal = async function(id) {
+    _editMemoireId = id || null;
+    document.getElementById('modal-mem-title').textContent = id ? 'Modifier la connaissance' : 'Nouvelle connaissance';
+    document.getElementById('mem-id').value = id || '';
+    document.getElementById('mem-titre').value = '';
+    document.getElementById('mem-contenu').value = '';
+    document.getElementById('mem-categorie').value = 'Général';
+    document.getElementById('mem-priorite').value = '5';
+    document.getElementById('mem-mots-cles').value = '';
+    document.getElementById('mem-commentaire').value = '';
     document.getElementById('mem-error').style.display = 'none';
+    if (id) {
+      try {
+        const m = _memoireAll.find(x => x.id === id);
+        if (m) {
+          document.getElementById('mem-titre').value = m.titre;
+          document.getElementById('mem-contenu').value = m.contenu;
+          document.getElementById('mem-categorie').value = m.categorie || 'Général';
+          document.getElementById('mem-priorite').value = m.priorite || 5;
+          document.getElementById('mem-mots-cles').value = JSON.parse(m.mots_cles || '[]').join(', ');
+        }
+      } catch(e) {}
+    }
     document.getElementById('modal-memoire-bg').style.display = 'flex';
-    document.getElementById('mem-titre').focus();
+    setTimeout(() => document.getElementById('mem-titre').focus(), 50);
   };
 
   window.closeMemoireModal = function() {
@@ -3929,24 +4209,29 @@ async function submitAccordDirect(){
   };
 
   window.saveMemoireEntry = async function() {
-    const titre   = document.getElementById('mem-titre').value.trim();
-    const contenu = document.getElementById('mem-contenu').value.trim();
-    const ordre   = parseInt(document.getElementById('mem-ordre').value) || 0;
-    const errBox  = document.getElementById('mem-error');
+    const titre      = document.getElementById('mem-titre').value.trim();
+    const contenu    = document.getElementById('mem-contenu').value.trim();
+    const categorie  = document.getElementById('mem-categorie').value;
+    const priorite   = parseInt(document.getElementById('mem-priorite').value) || 5;
+    const motsCles   = document.getElementById('mem-mots-cles').value.split(',').map(k=>k.trim()).filter(Boolean);
+    const commentaire= document.getElementById('mem-commentaire').value.trim();
+    const errBox     = document.getElementById('mem-error');
     errBox.style.display = 'none';
     if (!titre || !contenu) {
       errBox.textContent = 'Le titre et le contenu sont obligatoires.';
       errBox.style.display = 'block';
       return;
     }
+    const payload = { titre, contenu, categorie, priorite, mots_cles: motsCles, commentaire };
     try {
       if (_editMemoireId) {
-        await api('PUT', '/chatbot/memoire/' + _editMemoireId, { titre, contenu, ordre });
+        await api('PUT', '/chatbot/memoire/' + _editMemoireId, payload);
       } else {
-        await api('POST', '/chatbot/memoire', { titre, contenu, ordre });
+        await api('POST', '/chatbot/memoire', payload);
       }
       closeMemoireModal();
-      loadChatbotMemoire();
+      loadMemoire();
+      loadCbStats();
     } catch(e) {
       errBox.textContent = e.message || 'Erreur lors de l\'enregistrement.';
       errBox.style.display = 'block';
@@ -3954,18 +4239,141 @@ async function submitAccordDirect(){
   };
 
   window.deleteMemoire = async function(id) {
-    if (!confirm('Supprimer cette entrée de la mémoire ?')) return;
+    if (!confirm('Supprimer cette connaissance ? Cette action est irréversible.')) return;
     try {
       await api('DELETE', '/chatbot/memoire/' + id);
-      loadChatbotMemoire();
+      loadMemoire(); loadCbStats();
+    } catch(e) { alert('Erreur : ' + e.message); }
+  };
+
+  window.voirHistorique = async function(id) {
+    const list = document.getElementById('historique-list');
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+    document.getElementById('modal-historique-bg').style.display = 'flex';
+    try {
+      const r = await api('GET', '/chatbot/memoire/' + id + '/historique');
+      const rows = r.historique || [];
+      if (!rows.length) {
+        list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Aucune modification enregistrée.</div>';
+        return;
+      }
+      list.innerHTML = rows.map(h => `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+            <div>
+              <strong style="font-size:13px;">${esc(h.auteur_nom || 'Admin')}</strong>
+              <span style="font-size:12px;color:var(--muted);margin-left:8px;">${h.created_at?.slice(0,16)||''}</span>
+            </div>
+            ${h.commentaire ? `<span style="font-size:12px;font-style:italic;color:var(--muted);">"${esc(h.commentaire)}"</span>` : ''}
+            <button class="btn btn-sm" onclick="restaurerVersion(${id},${h.id})">↩ Restaurer</button>
+          </div>
+          ${h.ancien_titre !== h.nouveau_titre ? `
+            <div style="font-size:12px;margin-bottom:4px;">
+              <span style="color:#ef4444;">Titre : ${esc(h.ancien_titre||'')}</span>
+              <span style="margin:0 6px;">→</span>
+              <span style="color:#10b981;">${esc(h.nouveau_titre||'')}</span>
+            </div>` : ''}
+          ${h.ancien_contenu !== h.nouveau_contenu ? `
+            <div style="background:#f8fafc;border-radius:6px;padding:8px;font-size:12px;color:var(--muted);line-height:1.4;">
+              <div style="font-weight:600;margin-bottom:4px;">Contenu modifié :</div>
+              <div style="color:#ef4444;text-decoration:line-through;">${esc((h.ancien_contenu||'').slice(0,120))}…</div>
+              <div style="color:#10b981;margin-top:4px;">${esc((h.nouveau_contenu||'').slice(0,120))}…</div>
+            </div>` : ''}
+        </div>`).join('');
     } catch(e) {
-      alert('Erreur : ' + e.message);
+      list.innerHTML = `<div style="color:#ef4444;">Erreur : ${e.message}</div>`;
     }
   };
 
-  /* Fermer modal sur clic extérieur */
-  document.getElementById('modal-memoire-bg').addEventListener('click', e => {
-    if (e.target === e.currentTarget) closeMemoireModal();
+  window.restaurerVersion = async function(memoireId, histId) {
+    if (!confirm('Restaurer cette version ? Le contenu actuel sera écrasé.')) return;
+    try {
+      await api('POST', '/chatbot/memoire/' + memoireId + '/restaurer', { historique_id: histId });
+      document.getElementById('modal-historique-bg').style.display = 'none';
+      loadMemoire();
+    } catch(e) { alert('Erreur : ' + e.message); }
+  };
+
+  /* ── Questions sans réponse ── */
+  window.loadQuestions = async function() {
+    const statut = document.getElementById('cb-q-statut')?.value || 'ouvert';
+    const list = document.getElementById('cb-questions-list');
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+    try {
+      const r = await api('GET', '/chatbot/questions?statut=' + statut);
+      const rows = r.questions || [];
+      if (!rows.length) {
+        list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);">
+          <div style="font-size:36px;margin-bottom:12px;">✅</div>
+          <p>Aucune question avec ce statut.</p>
+        </div>`;
+        return;
+      }
+      list.innerHTML = rows.map(q => `
+        <div class="cb-q-card">
+          <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;">
+                <span class="cb-q-badge-n">${q.nb_fois}x</span>
+                <strong style="font-size:14px;">${esc(q.question)}</strong>
+              </div>
+              <div style="font-size:12px;color:var(--muted);">
+                Première fois : ${q.first_asked_at?.slice(0,10)||''}
+                · Dernière : ${q.last_asked_at?.slice(0,10)||''}
+                ${q.langue !== 'fr' ? ` · Langue : ${esc(q.langue)}` : ''}
+              </div>
+              ${q.reponse_admin ? `<div style="margin-top:8px;font-size:13px;background:#f0fdf4;border-left:3px solid #10b981;padding:6px 10px;border-radius:0 6px 6px 0;">${esc(q.reponse_admin)}</div>` : ''}
+            </div>
+            ${statut === 'ouvert' ? `<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+              <button class="btn btn-sm btn-orange" onclick="ouvrirModalQuestion(${q.id},'${esc(q.question).replace(/'/g,"\\'")}',${q.nb_fois})">💡 Répondre + convertir</button>
+              <button class="btn btn-sm" onclick="ignorerQuestion(${q.id})">🚫 Ignorer</button>
+            </div>` : ''}
+          </div>
+        </div>`).join('');
+    } catch(e) {
+      list.innerHTML = `<div style="color:#ef4444;padding:20px;">Erreur : ${e.message}</div>`;
+    }
+  };
+
+  window.ouvrirModalQuestion = function(id, question, nb) {
+    document.getElementById('q-id').value = id;
+    document.getElementById('q-question-text').textContent = question;
+    document.getElementById('q-meta').textContent = `Posée ${nb} fois`;
+    document.getElementById('q-titre').value = question;
+    document.getElementById('q-contenu').value = '';
+    document.getElementById('q-categorie').value = 'Général';
+    document.getElementById('q-priorite').value = '4';
+    document.getElementById('modal-question-bg').style.display = 'flex';
+    setTimeout(() => document.getElementById('q-contenu').focus(), 50);
+  };
+
+  window.convertirQuestion = async function() {
+    const id       = document.getElementById('q-id').value;
+    const titre    = document.getElementById('q-titre').value.trim();
+    const contenu  = document.getElementById('q-contenu').value.trim();
+    const categorie= document.getElementById('q-categorie').value;
+    const priorite = parseInt(document.getElementById('q-priorite').value) || 4;
+    if (!titre || !contenu) { alert('Titre et contenu obligatoires.'); return; }
+    try {
+      await api('POST', '/chatbot/questions/' + id + '/convertir', { titre, contenu, categorie, priorite });
+      document.getElementById('modal-question-bg').style.display = 'none';
+      loadQuestions(); loadMemoire(); loadCbStats();
+    } catch(e) { alert('Erreur : ' + e.message); }
+  };
+
+  window.ignorerQuestion = async function(id) {
+    if (!confirm('Ignorer cette question ? Elle sera archivée.')) return;
+    try {
+      await api('DELETE', '/chatbot/questions/' + id);
+      loadQuestions(); loadCbStats();
+    } catch(e) { alert('Erreur : ' + e.message); }
+  };
+
+  /* Fermer modals sur clic extérieur */
+  ['modal-memoire-bg','modal-historique-bg','modal-question-bg'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', e => {
+      if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+    });
   });
 
 })();

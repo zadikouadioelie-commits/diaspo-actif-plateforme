@@ -3536,47 +3536,266 @@ async function scrapeSite() {
   }
 }
 
-/* GET /api/chatbot/context — public */
+/* ── Migration colonnes chatbot (exécutée une seule fois au démarrage) ── */
+(function migrateChatbot() {
+  const cols = db.prepare("PRAGMA table_info(chatbot_memoire)").all().map(c => c.name);
+  const add = (col, def) => { if (!cols.includes(col)) { try { db.prepare(`ALTER TABLE chatbot_memoire ADD COLUMN ${col} ${def}`).run(); } catch(e){} } };
+  add("categorie", "TEXT DEFAULT 'Général'");
+  add("mots_cles", "TEXT DEFAULT '[]'");
+  add("priorite",  "INTEGER DEFAULT 5");
+  add("liens_json","TEXT DEFAULT '[]'");
+  add("source",    "TEXT DEFAULT 'admin'");
+  add("actif",     "INTEGER DEFAULT 1");
+  add("nb_consultations","INTEGER DEFAULT 0");
+  add("created_by","INTEGER");
+  add("updated_at","TEXT DEFAULT (datetime('now'))");
+  // Tables annexes
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS chatbot_memoire_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, memoire_id INTEGER NOT NULL,
+    auteur_id INTEGER, auteur_nom TEXT,
+    ancien_titre TEXT, nouveau_titre TEXT,
+    ancien_contenu TEXT, nouveau_contenu TEXT,
+    ancien_categorie TEXT, nouveau_categorie TEXT,
+    commentaire TEXT, created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(memoire_id) REFERENCES chatbot_memoire(id) ON DELETE CASCADE)`).run(); } catch(e){}
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS chatbot_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT NOT NULL,
+    question_norm TEXT NOT NULL, nb_fois INTEGER DEFAULT 1,
+    langue TEXT DEFAULT 'fr', categorie_estimee TEXT,
+    utilisateur_id INTEGER, contexte TEXT,
+    statut TEXT DEFAULT 'ouvert', memoire_id INTEGER,
+    reponse_admin TEXT,
+    first_asked_at TEXT DEFAULT (datetime('now')),
+    last_asked_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+})();
+
+/* ── Helpers ── */
+function normQuestion(q) {
+  return (q||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g,"").replace(/\s+/g," ").trim().slice(0,200);
+}
+
+/* GET /api/chatbot/context — public (priorité : mémoire > import > vide) */
 route("GET", "/api/chatbot/context", async (req, res) => {
-  const memories = db.prepare("SELECT id, titre, contenu, ordre FROM chatbot_memoire ORDER BY ordre ASC, created_at ASC").all();
-  const siteContent = await scrapeSite();
-  sendJSON(res, 200, { memories, siteContent });
+  // Incrémenter nb_consultations est fait côté chatbot via /api/chatbot/memoire/:id/consulter
+  const memories = db.prepare(
+    "SELECT id, titre, contenu, categorie, mots_cles, priorite, source, actif FROM chatbot_memoire WHERE actif=1 ORDER BY priorite ASC, ordre ASC, created_at ASC"
+  ).all().map(m => ({ ...m, mots_cles: (() => { try { return JSON.parse(m.mots_cles||"[]"); } catch(e){ return []; } })() }));
+
+  // Contenu importé depuis le site (source='import') déjà dans la table, sinon scrape live
+  const importedInDb = memories.filter(m => m.source === "import");
+  let siteContent = [];
+  if (importedInDb.length === 0) {
+    // Scrape live seulement si pas encore importé
+    siteContent = await scrapeSite();
+  }
+  sendJSON(res, 200, { memories, siteContent, imported_in_db: importedInDb.length > 0 });
 });
 
-/* GET /api/chatbot/memoire — admin */
+/* POST /api/chatbot/memoire/:id/consulter — public, incrémente le compteur */
+route("POST", "/api/chatbot/memoire/:id/consulter", async (req, res, params) => {
+  try { db.prepare("UPDATE chatbot_memoire SET nb_consultations=nb_consultations+1 WHERE id=?").run(params.id); } catch(e){}
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/chatbot/memoire — admin, liste complète */
 route("GET", "/api/chatbot/memoire", async (req, res) => {
-  const user = await getCurrentUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
-  const rows = db.prepare("SELECT * FROM chatbot_memoire ORDER BY ordre ASC, created_at ASC").all();
-  sendJSON(res, 200, { memoires: rows });
+  const q = db.prepare("SELECT * FROM chatbot_memoire ORDER BY priorite ASC, ordre ASC, created_at ASC").all();
+  sendJSON(res, 200, { memoires: q.map(m => ({
+    ...m,
+    mots_cles: (() => { try { return JSON.parse(m.mots_cles||"[]"); } catch(e){ return []; } })(),
+    liens_json: (() => { try { return JSON.parse(m.liens_json||"[]"); } catch(e){ return []; } })(),
+  })) });
 });
 
-/* POST /api/chatbot/memoire — admin */
+/* POST /api/chatbot/memoire — admin, créer */
 route("POST", "/api/chatbot/memoire", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
-  const { titre, contenu, ordre = 0 } = body || {};
+  const { titre, contenu, categorie="Général", mots_cles=[], priorite=5, liens_json=[], ordre=0 } = body || {};
   if (!titre?.trim() || !contenu?.trim()) return sendJSON(res, 400, { error: "Titre et contenu requis." });
-  const r = db.prepare("INSERT INTO chatbot_memoire (titre, contenu, ordre) VALUES (?, ?, ?)").run(titre.trim(), contenu.trim(), ordre);
+  const r = db.prepare(
+    "INSERT INTO chatbot_memoire (titre,contenu,categorie,mots_cles,priorite,liens_json,source,ordre,created_by,updated_at) VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))"
+  ).run(titre.trim(), contenu.trim(), categorie, JSON.stringify(mots_cles), priorite, JSON.stringify(liens_json), "admin", ordre, user.id);
+  // Historique
+  db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,nouveau_titre,nouveau_contenu,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?)")
+    .run(r.lastInsertRowid, user.id, user.nom, titre.trim(), contenu.trim(), categorie, "Création");
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
-/* PUT /api/chatbot/memoire/:id — admin */
+/* PUT /api/chatbot/memoire/:id — admin, modifier */
 route("PUT", "/api/chatbot/memoire/:id", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
-  const { titre, contenu, ordre } = body || {};
-  db.prepare("UPDATE chatbot_memoire SET titre=COALESCE(?,titre), contenu=COALESCE(?,contenu), ordre=COALESCE(?,ordre) WHERE id=?")
-    .run(titre||null, contenu||null, ordre!=null?ordre:null, params.id);
+  const id = params.id;
+  const ancien = db.prepare("SELECT * FROM chatbot_memoire WHERE id=?").get(id);
+  if (!ancien) return sendJSON(res, 404, { error: "Connaissance introuvable." });
+  const { titre, contenu, categorie, mots_cles, priorite, liens_json, ordre, actif, commentaire } = body || {};
+  db.prepare(`UPDATE chatbot_memoire SET
+    titre=COALESCE(?,titre), contenu=COALESCE(?,contenu),
+    categorie=COALESCE(?,categorie), mots_cles=COALESCE(?,mots_cles),
+    priorite=COALESCE(?,priorite), liens_json=COALESCE(?,liens_json),
+    ordre=COALESCE(?,ordre), actif=COALESCE(?,actif),
+    updated_at=datetime('now') WHERE id=?`)
+    .run(titre||null, contenu||null, categorie||null,
+         mots_cles!=null?JSON.stringify(mots_cles):null,
+         priorite!=null?priorite:null,
+         liens_json!=null?JSON.stringify(liens_json):null,
+         ordre!=null?ordre:null, actif!=null?actif:null, id);
+  // Historique si contenu ou titre modifié
+  if ((titre && titre !== ancien.titre) || (contenu && contenu !== ancien.contenu) || (categorie && categorie !== ancien.categorie)) {
+    db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,ancien_titre,nouveau_titre,ancien_contenu,nouveau_contenu,ancien_categorie,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?,?,?,?)")
+      .run(id, user.id, user.nom, ancien.titre, titre||ancien.titre, ancien.contenu, contenu||ancien.contenu, ancien.categorie, categorie||ancien.categorie, commentaire||"Modification");
+  }
   sendJSON(res, 200, { ok: true });
 });
 
 /* DELETE /api/chatbot/memoire/:id — admin */
 route("DELETE", "/api/chatbot/memoire/:id", async (req, res, params) => {
-  const user = await getCurrentUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   db.prepare("DELETE FROM chatbot_memoire WHERE id = ?").run(params.id);
   sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/chatbot/memoire/:id/historique — admin */
+route("GET", "/api/chatbot/memoire/:id/historique", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const rows = db.prepare("SELECT * FROM chatbot_memoire_historique WHERE memoire_id=? ORDER BY created_at DESC").all(params.id);
+  sendJSON(res, 200, { historique: rows });
+});
+
+/* POST /api/chatbot/memoire/:id/restaurer — admin, restaure une version */
+route("POST", "/api/chatbot/memoire/:id/restaurer", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const { historique_id } = body || {};
+  const version = db.prepare("SELECT * FROM chatbot_memoire_historique WHERE id=? AND memoire_id=?").get(historique_id, params.id);
+  if (!version) return sendJSON(res, 404, { error: "Version introuvable." });
+  const ancien = db.prepare("SELECT * FROM chatbot_memoire WHERE id=?").get(params.id);
+  db.prepare("UPDATE chatbot_memoire SET titre=?,contenu=?,categorie=?,updated_at=datetime('now') WHERE id=?")
+    .run(version.ancien_titre||ancien.titre, version.ancien_contenu||ancien.contenu, version.ancien_categorie||ancien.categorie, params.id);
+  db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,ancien_titre,nouveau_titre,ancien_contenu,nouveau_contenu,ancien_categorie,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?,?,?,?)")
+    .run(params.id, user.id, user.nom, ancien.titre, version.ancien_titre, ancien.contenu, version.ancien_contenu, ancien.categorie, version.ancien_categorie, `Restauration vers version du ${version.created_at}`);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/chatbot/importer-site — admin, snapshot permanent du site */
+route("POST", "/api/chatbot/importer-site", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const sentences = await scrapeSite();
+  if (!sentences.length) return sendJSON(res, 502, { error: "Site inaccessible ou vide." });
+  // Supprimer les anciennes entrées importées
+  db.prepare("DELETE FROM chatbot_memoire WHERE source='import'").run();
+  // Insérer les nouvelles
+  const insert = db.prepare("INSERT INTO chatbot_memoire (titre,contenu,categorie,source,priorite,ordre,created_by,updated_at) VALUES (?,?,?,?,?,?,?,datetime('now'))");
+  let count = 0;
+  sentences.forEach((s, i) => {
+    if (s.length > 30) {
+      insert.run("Contenu importé #" + (i+1), s, "Import site", "import", 8, 100+i, user.id);
+      count++;
+    }
+  });
+  sendJSON(res, 200, { imported: count, message: `${count} extraits importés définitivement depuis diaspo-actif.com` });
+});
+
+/* GET /api/chatbot/stats — admin */
+route("GET", "/api/chatbot/stats", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const total       = db.prepare("SELECT COUNT(*) n FROM chatbot_memoire WHERE actif=1").get().n;
+  const ce_mois     = db.prepare("SELECT COUNT(*) n FROM chatbot_memoire WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now') AND actif=1").get().n;
+  const modifs      = db.prepare("SELECT COUNT(*) n FROM chatbot_memoire_historique").get().n;
+  const sans_rep    = db.prepare("SELECT COUNT(*) n FROM chatbot_questions WHERE statut='ouvert'").get().n;
+  const total_q     = db.prepare("SELECT COUNT(*) n FROM chatbot_questions").get().n;
+  const top_cats    = db.prepare("SELECT categorie, COUNT(*) n FROM chatbot_memoire WHERE actif=1 GROUP BY categorie ORDER BY n DESC LIMIT 5").all();
+  const top_connus  = db.prepare("SELECT titre, nb_consultations FROM chatbot_memoire WHERE actif=1 ORDER BY nb_consultations DESC LIMIT 5").all();
+  const questions_freq = db.prepare("SELECT question, nb_fois, categorie_estimee, last_asked_at FROM chatbot_questions WHERE statut='ouvert' ORDER BY nb_fois DESC LIMIT 10").all();
+  const taux_reponse = total_q > 0 ? Math.round(((total_q - sans_rep) / total_q) * 100) : 100;
+  sendJSON(res, 200, { total, ce_mois, modifs, sans_rep, total_q, top_cats, top_connus, questions_freq, taux_reponse });
+});
+
+/* GET /api/chatbot/questions — admin */
+route("GET", "/api/chatbot/questions", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const { statut = "ouvert" } = url.parse(req.url, true).query;
+  const rows = db.prepare("SELECT * FROM chatbot_questions WHERE statut=? ORDER BY nb_fois DESC, last_asked_at DESC LIMIT 100").all(statut);
+  sendJSON(res, 200, { questions: rows });
+});
+
+/* POST /api/chatbot/questions — public, enregistrer une question sans réponse */
+route("POST", "/api/chatbot/questions", async (req, res, params, body) => {
+  const { question, langue="fr", categorie_estimee, contexte } = body || {};
+  if (!question?.trim()) return sendJSON(res, 400, { error: "Question requise." });
+  const user = getCurrentUser(req);
+  const norm = normQuestion(question);
+  const existing = db.prepare("SELECT id, nb_fois FROM chatbot_questions WHERE question_norm=? AND statut='ouvert'").get(norm);
+  if (existing) {
+    db.prepare("UPDATE chatbot_questions SET nb_fois=nb_fois+1, last_asked_at=datetime('now') WHERE id=?").run(existing.id);
+    return sendJSON(res, 200, { id: existing.id, incremented: true });
+  }
+  const r = db.prepare(
+    "INSERT INTO chatbot_questions (question,question_norm,langue,categorie_estimee,utilisateur_id,contexte) VALUES (?,?,?,?,?,?)"
+  ).run(question.trim(), norm, langue, categorie_estimee||null, user?.id||null, contexte||null);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* PUT /api/chatbot/questions/:id — admin, répondre / changer statut */
+route("PUT", "/api/chatbot/questions/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const { reponse_admin, statut } = body || {};
+  db.prepare("UPDATE chatbot_questions SET reponse_admin=COALESCE(?,reponse_admin), statut=COALESCE(?,statut) WHERE id=?")
+    .run(reponse_admin||null, statut||null, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/chatbot/questions/:id/convertir — admin, convertit en connaissance */
+route("POST", "/api/chatbot/questions/:id/convertir", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const q = db.prepare("SELECT * FROM chatbot_questions WHERE id=?").get(params.id);
+  if (!q) return sendJSON(res, 404, { error: "Question introuvable." });
+  const { titre, contenu, categorie="Général", mots_cles=[], priorite=5 } = body || {};
+  if (!titre?.trim() || !contenu?.trim()) return sendJSON(res, 400, { error: "Titre et contenu requis." });
+  const r = db.prepare(
+    "INSERT INTO chatbot_memoire (titre,contenu,categorie,mots_cles,priorite,source,ordre,created_by,updated_at) VALUES (?,?,?,?,?,?,?,?,datetime('now'))"
+  ).run(titre.trim(), contenu.trim(), categorie, JSON.stringify(mots_cles), priorite, "admin", 0, user.id);
+  db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,nouveau_titre,nouveau_contenu,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?)")
+    .run(r.lastInsertRowid, user.id, user.nom, titre.trim(), contenu.trim(), categorie, `Créé depuis la question : "${q.question}"`);
+  // Marquer la question comme répondue
+  db.prepare("UPDATE chatbot_questions SET statut='repondu', memoire_id=?, reponse_admin=? WHERE id=?")
+    .run(r.lastInsertRowid, contenu.trim(), params.id);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* DELETE /api/chatbot/questions/:id — admin */
+route("DELETE", "/api/chatbot/questions/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  db.prepare("UPDATE chatbot_questions SET statut='ignore' WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/chatbot/questions/fusionner — admin */
+route("POST", "/api/chatbot/questions/fusionner", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const { ids, id_principal } = body || {};
+  if (!Array.isArray(ids) || !id_principal) return sendJSON(res, 400, { error: "ids et id_principal requis." });
+  const total = ids.reduce((sum, id) => {
+    const q = db.prepare("SELECT nb_fois FROM chatbot_questions WHERE id=?").get(id);
+    return sum + (q?.nb_fois || 0);
+  }, 0);
+  db.prepare("UPDATE chatbot_questions SET nb_fois=? WHERE id=?").run(total, id_principal);
+  ids.filter(id => id !== id_principal).forEach(id =>
+    db.prepare("UPDATE chatbot_questions SET statut='fusionne' WHERE id=?").run(id)
+  );
+  sendJSON(res, 200, { ok: true, total_fusionnes: ids.length - 1 });
 });
 
 async function handleRequest(req, res) {
