@@ -143,10 +143,19 @@
       <!-- Tab Explorer -->
       <div class="tuto-tab-content active" id="tab-explorer">
         <div class="tuto-tags" id="tuto-tags-bar"></div>
-        <div class="tuto-section-title">⭐ Tutoriels recommandés</div>
-        <div class="tuto-cards" id="cards-recommandes"></div>
-        <div class="tuto-section-title">🆕 Derniers ajoutés</div>
-        <div class="tuto-cards" id="cards-recents"></div>
+        <!-- Section résultats de recherche/tag (visible uniquement si _searchQ actif) -->
+        <div id="section-search" style="display:none">
+          <div class="tuto-section-title" id="search-label">🔍 Résultats</div>
+          <div class="tuto-cards" id="cards-search"></div>
+          <div class="tuto-empty" id="search-empty" style="display:none"><div class="tuto-empty-icon">🔍</div><p>Aucun tutoriel trouvé pour cette recherche.</p></div>
+        </div>
+        <!-- Sections par défaut (masquées quand recherche active) -->
+        <div id="section-default">
+          <div class="tuto-section-title">⭐ Tutoriels recommandés</div>
+          <div class="tuto-cards" id="cards-recommandes"></div>
+          <div class="tuto-section-title">🆕 Derniers ajoutés</div>
+          <div class="tuto-cards" id="cards-recents"></div>
+        </div>
       </div>
 
       <!-- Tab Par rôle -->
@@ -341,10 +350,22 @@ function renderAll() {
   document.getElementById('cnt-fav').textContent       = _favs.length;
   document.getElementById('cnt-hist').textContent      = _hist.length;
 
-  /* Tab Explorer */
+  /* Tab Explorer — afficher résultats si recherche/tag actif, sinon vue par défaut */
   const base = filtered(CATALOGUE);
-  renderCards(document.getElementById('cards-recommandes'), base.filter(t=>t.recommande));
-  renderCards(document.getElementById('cards-recents'),     base.filter(t=>t.nouveau));
+  const secSearch  = document.getElementById('section-search');
+  const secDefault = document.getElementById('section-default');
+  if (_searchQ) {
+    secSearch.style.display  = 'block';
+    secDefault.style.display = 'none';
+    document.getElementById('search-label').textContent = `🔍 ${base.length} tutoriel${base.length!==1?'s':''} pour « ${_searchQ} »`;
+    renderCards(document.getElementById('cards-search'), base);
+    document.getElementById('search-empty').style.display = base.length === 0 ? 'block' : 'none';
+  } else {
+    secSearch.style.display  = 'none';
+    secDefault.style.display = 'block';
+    renderCards(document.getElementById('cards-recommandes'), CATALOGUE.filter(t=>t.recommande));
+    renderCards(document.getElementById('cards-recents'),     CATALOGUE.filter(t=>t.nouveau));
+  }
 
   /* Tab fonctionnalités */
   renderCards(document.getElementById('cards-fonctions'), filtered(CATALOGUE.filter(t=>t.cat!=='demarrage')));
@@ -417,6 +438,7 @@ function renderTags() {
     b.textContent = tag;
     b.addEventListener('click', () => {
       _searchQ = _searchQ === tag ? '' : tag;
+      document.getElementById('tuto-search').value = '';
       bar.querySelectorAll('.tuto-tag').forEach(el => el.classList.toggle('active', el.textContent === _searchQ));
       renderAll();
     });
@@ -447,6 +469,8 @@ document.querySelectorAll('.tuto-cat-btn[data-cat]').forEach(btn => {
 /* ── Recherche ── */
 document.getElementById('tuto-search').addEventListener('input', e => {
   _searchQ = e.target.value.trim().toLowerCase();
+  /* Désactiver tout tag actif quand on tape */
+  document.querySelectorAll('.tuto-tag.active').forEach(el => el.classList.remove('active'));
   renderAll();
 });
 
