@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Hall of Fame – Deal Masters | Diaspo'Actif</title>
+  <link rel="stylesheet" href="assets/styles.css?v=8">
+  <link rel="stylesheet" href="assets/responsive.css?v=4">
+  <style>
+    :root { --dm-gold:#f59e0b; --dm-gold-light:#fef3c7; --dm-gold-dark:#b45309; }
+
+    .hof-hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #0f172a 100%);
+      color: #fff;
+      text-align: center;
+      padding: 64px 24px 48px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hof-hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, rgba(245,158,11,.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hof-hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(245,158,11,.15); border: 1.5px solid rgba(245,158,11,.5);
+      border-radius: 99px; padding: 5px 18px;
+      font-size: 12px; font-weight: 800; color: var(--dm-gold);
+      letter-spacing: .06em; margin-bottom: 18px;
+    }
+    .hof-hero h1 { font-size: clamp(26px,5vw,42px); font-weight: 900; margin: 0 0 12px; }
+    .hof-hero p  { font-size: 14px; color: #94a3b8; max-width: 520px; margin: 0 auto 24px; }
+    .hof-hero-stats { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; }
+    .hof-hero-stat { text-align: center; }
+    .hof-hero-stat .val { font-size: 28px; font-weight: 900; color: var(--dm-gold); }
+    .hof-hero-stat .lbl { font-size: 11px; color: #94a3b8; font-weight: 600; }
+
+    .hof-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); max-width: 900px; margin: 0 auto; padding: 0 16px; }
+    .hof-tab { padding: 14px 20px; font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; background: none; border-left: none; border-right: none; border-top: none; }
+    .hof-tab.active { color: var(--dm-gold-dark); border-bottom-color: var(--dm-gold); }
+
+    .hof-section { max-width: 900px; margin: 0 auto; padding: 32px 16px; }
+
+    /* Carte lauréat */
+    .dm-card { background: #fff; border: 1.5px solid var(--border); border-radius: 16px; overflow: hidden; transition: box-shadow .2s, transform .15s; cursor: pointer; }
+    .dm-card:hover { box-shadow: 0 6px 28px rgba(245,158,11,.18); transform: translateY(-2px); border-color: var(--dm-gold); }
+    .dm-banner { height: 72px; background: linear-gradient(135deg,#1e3a8a,#0f172a); position: relative; }
+    .dm-banner img { width: 100%; height: 100%; object-fit: cover; }
+    .dm-rank-badge {
+      position: absolute; top: 8px; right: 10px;
+      background: var(--dm-gold); color: #78350f; font-size: 11px; font-weight: 900;
+      border-radius: 99px; padding: 2px 10px;
+    }
+    .dm-avatar { position: absolute; bottom: -22px; left: 14px; width: 48px; height: 48px; border-radius: 50%; border: 3px solid #fff; background: #1e3a8a; color: #fff; font-size: 17px; font-weight: 800; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+    .dm-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .dm-body { padding: 30px 14px 14px; }
+    .dm-badge-label { display: inline-flex; align-items: center; gap: 4px; background: var(--dm-gold-light); color: var(--dm-gold-dark); border: 1px solid #fde68a; border-radius: 99px; padding: 2px 9px; font-size: 10px; font-weight: 800; margin-bottom: 5px; }
+    .dm-nom { font-size: 14px; font-weight: 800; color: #0D1B2A; margin-bottom: 2px; }
+    .dm-titre { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+    .dm-score { font-size: 12px; font-weight: 700; color: var(--dm-gold-dark); }
+    .dm-card-actions { display: flex; gap: 6px; margin-top: 10px; }
+    .dm-btn { border-radius: 8px; padding: 6px 13px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+    .dm-btn-primary { background: #1e3a8a; color: #fff; }
+    .dm-btn-primary:hover { background: #1e40af; color: #fff; }
+
+    /* Podium top 3 */
+    .dm-podium { display: flex; align-items: flex-end; justify-content: center; gap: 12px; margin-bottom: 32px; }
+    .dm-podium-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .dm-podium-step { background: linear-gradient(180deg,#1e3a8a,#0f172a); border-radius: 12px 12px 0 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; font-weight: 900; }
+    .dm-podium-1 .dm-podium-step { height: 90px; width: 100px; }
+    .dm-podium-2 .dm-podium-step { height: 68px; width: 88px; }
+    .dm-podium-3 .dm-podium-step { height: 52px; width: 80px; }
+
+    /* Critères */
+    .critere-bar { background: var(--dm-gold-light); border-radius: 8px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
+    .critere-poids { font-size: 18px; font-weight: 900; color: var(--dm-gold-dark); min-width: 36px; text-align: center; }
+    .critere-info { flex: 1; }
+    .critere-nom { font-size: 13px; font-weight: 800; color: #0D1B2A; }
+    .critere-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- Header commun -->
+<div id="app-header"></div>
+
+<!-- Hero -->
+<section class="hof-hero">
+  <div class="hof-hero-badge">⭐ Distinction d'excellence Diaspo'Actif</div>
+  <h1>Hall of Fame<br><span style="color:var(--dm-gold);">Deal Masters</span></h1>
+  <p>Les profils les plus performants dans la création, la gestion et la réussite de Deals sur Diaspo'Actif.</p>
+  <div class="hof-hero-stats">
+    <div class="hof-hero-stat"><div class="val" id="stat-total-laureats">—</div><div class="lbl">Lauréats au total</div></div>
+    <div class="hof-hero-stat"><div class="val" id="stat-editions">—</div><div class="lbl">Éditions</div></div>
+    <div class="hof-hero-stat"><div class="val" id="stat-pct">10%</div><div class="lbl">Top des performants</div></div>
+  </div>
+</section>
+
+<!-- Onglets -->
+<div style="background:#fff;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:50;">
+  <div class="hof-tabs">
+    <button class="hof-tab active" onclick="showTab('actuel')">🏆 Edition actuelle</button>
+    <button class="hof-tab" onclick="showTab('historique')">📜 Historique</button>
+    <button class="hof-tab" onclick="showTab('criteres')">📊 Critères</button>
+    <button class="hof-tab" onclick="showTab('mon-score')">⭐ Mon score</button>
+  </div>
+</div>
+
+<!-- PANEL : Edition actuelle -->
+<div id="panel-actuel" class="hof-section">
+  <div id="edition-actuelle-label" style="text-align:center;margin-bottom:24px;"></div>
+  <div id="podium-container" style="margin-bottom:32px;"></div>
+  <div id="laureats-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;">
+    <div style="text-align:center;padding:48px;color:var(--muted);">Chargement…</div>
+  </div>
+</div>
+
+<!-- PANEL : Historique -->
+<div id="panel-historique" class="hof-section" style="display:none;">
+  <div id="hof-historique-content">
+    <div style="text-align:center;padding:48px;color:var(--muted);">Chargement…</div>
+  </div>
+</div>
+
+<!-- PANEL : Critères -->
+<div id="panel-criteres" class="hof-section" style="display:none;">
+  <div style="text-align:center;margin-bottom:28px;">
+    <h2 style="font-size:20px;font-weight:900;margin:0 0 8px;">Critères de sélection</h2>
+    <p style="font-size:13px;color:var(--muted);max-width:520px;margin:0 auto;">Le classement Deal Master repose sur un score global calculé selon les critères ci-dessous. Le poids de chaque critère peut évoluer selon les éditions.</p>
+  </div>
+  <div id="criteres-list" style="display:flex;flex-direction:column;gap:10px;max-width:620px;margin:0 auto;"></div>
+  <div style="background:#f8fafc;border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-top:24px;max-width:620px;margin-left:auto;margin-right:auto;">
+    <h4 style="font-size:13px;font-weight:800;margin:0 0 8px;">ℹ️ Attribution automatique</h4>
+    <p style="font-size:12px;color:var(--muted);margin:0;line-height:1.65;">La distinction Deal Master est attribuée <strong>exclusivement par un moteur de calcul automatique</strong>. Aucune intervention humaine n'est possible. Elle récompense les 10% les plus performants à chaque semestre selon ces critères objectifs.</p>
+  </div>
+</div>
+
+<!-- PANEL : Mon score -->
+<div id="panel-mon-score" class="hof-section" style="display:none;">
+  <div id="mon-score-content">
+    <div style="text-align:center;padding:48px;color:var(--muted);">Chargement…</div>
+  </div>
+</div>
+
+<div id="app-footer"></div>
+<script src="assets/ds.js?v=4"></script>
+<script src="assets/app.js?v=6"></script>
+<script>
+/* ═══════ HALL OF FAME – DEAL MASTERS ═══════ */
+
+let _hofData = null;
+let _scoreData = null;
+
+function showTab(tab) {
+  ['actuel','historique','criteres','mon-score'].forEach(t => {
+    document.getElementById(`panel-${t}`).style.display = t === tab ? '' : 'none';
+    document.querySelectorAll('.hof-tab').forEach((btn, i) => {
+      const tabs = ['actuel','historique','criteres','mon-score'];
+      btn.className = 'hof-tab' + (tabs[i] === tab ? ' active' : '');
+    });
+  });
+  if (tab === 'criteres' && !document.querySelector('.critere-bar')) loadCriteres();
+  if (tab === 'mon-score' && !_scoreData) loadMonScore();
+  if (tab === 'historique' && _hofData) renderHistorique();
+}
+
+/* ─── Chargement principal ─── */
+async function loadHof() {
+  try {
+    const d = await fetch('/api/deal-master/hall-of-fame', { credentials: 'include' }).then(r => r.json());
+    _hofData = d;
+
+    // Stats hero
+    document.getElementById('stat-total-laureats').textContent = d.laureats.length;
+    document.getElementById('stat-editions').textContent = d.editions.length;
+
+    // Edition courante
+    const actuelle = d.editions.find(e => e.statut === 'publiee') || d.editions[0];
+    renderEditionActuelle(d, actuelle);
+  } catch(e) {
+    document.getElementById('laureats-grid').innerHTML = `<div style="color:#dc2626;padding:24px;">Erreur de chargement.</div>`;
+  }
+}
+
+function renderEditionActuelle(d, ed) {
+  if (!ed) {
+    document.getElementById('laureats-grid').innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted);">Aucune édition publiée pour l'instant.<br>Revenez bientôt !</div>`;
+    return;
+  }
+  document.getElementById('edition-actuelle-label').innerHTML =
+    `<span style="background:#eff6ff;color:#1e40af;border:1.5px solid #bfdbfe;border-radius:99px;padding:5px 18px;font-size:13px;font-weight:800;">
+      🏆 ${ed.label} · ${ed.nb_laureats} lauréat${ed.nb_laureats!==1?'s':''}
+    </span>`;
+
+  const edLaureats = d.laureats.filter(l => l.edition_id === ed.id);
+
+  // Podium top 3
+  const top3 = edLaureats.slice(0, 3);
+  const podiumOrder = [1, 0, 2]; // 2ème, 1er, 3ème
+  if (top3.length) {
+    const pIcons = ['🥇','🥈','🥉'];
+    const heights = [90, 68, 52];
+    document.getElementById('podium-container').innerHTML = `
+      <div style="display:flex;align-items:flex-end;justify-content:center;gap:12px;margin-bottom:32px;">
+        ${podiumOrder.filter(i=>top3[i]).map(i => {
+          const l = top3[i];
+          const nom = [l.prenom,l.nom].filter(Boolean).join(' ');
+          return `<div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);">${nom}</div>
+            <div style="width:56px;height:56px;border-radius:50%;border:3px solid #fde68a;overflow:hidden;background:#1e3a8a;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;">
+              ${l.photo_url?`<img src="${l.photo_url}" style="width:100%;height:100%;object-fit:cover;">`:(nom.charAt(0)||'?').toUpperCase()}
+            </div>
+            <div style="background:linear-gradient(180deg,#1e3a8a,#0f172a);border-radius:10px 10px 0 0;width:${88+i*12}px;height:${heights[i===0?1:i===1?0:2]}px;display:flex;align-items:center;justify-content:center;font-size:24px;">${pIcons[i]}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  // Grille complète
+  if (!edLaureats.length) {
+    document.getElementById('laureats-grid').innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted);">Aucun lauréat pour cette édition.</div>`;
+    return;
+  }
+  document.getElementById('laureats-grid').innerHTML = edLaureats.map(l => cardHtml(l)).join('');
+}
+
+function cardHtml(l) {
+  const nom = [l.prenom, l.nom].filter(Boolean).join(' ') || '—';
+  return `<div class="dm-card" onclick="window.location.href='profil.html?id=${l.user_id}'">
+    <div class="dm-banner">
+      ${l.banner_url ? `<img src="${l.banner_url}" alt="">` : ''}
+      <div class="dm-rank-badge">#${l.rang}</div>
+      <div class="dm-avatar">${l.photo_url?`<img src="${l.photo_url}" alt="">`:(nom.charAt(0)||'?').toUpperCase()}</div>
+    </div>
+    <div class="dm-body">
+      <div class="dm-badge-label">⭐ Deal Master</div>
+      <div class="dm-nom">${nom}</div>
+      ${l.titre_pro?`<div class="dm-titre">${l.titre_pro}</div>`:''}
+      <div class="dm-score">Score : ${l.score?.toFixed(1)}/100</div>
+      <div class="dm-card-actions">
+        <a href="profil.html?id=${l.user_id}" class="dm-btn dm-btn-primary" onclick="event.stopPropagation()">Voir le profil →</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderHistorique() {
+  const d = _hofData;
+  if (!d) return;
+  const archivees = d.editions.filter(e => e.statut === 'archivee' || e.statut === 'publiee');
+  if (!archivees.length) {
+    document.getElementById('hof-historique-content').innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted);">Aucune édition archivée pour le moment.</div>`;
+    return;
+  }
+  let html = '';
+  archivees.forEach(ed => {
+    const edL = d.laureats.filter(l => l.edition_id === ed.id);
+    html += `<div style="margin-bottom:36px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <span style="background:#eff6ff;color:#1e40af;border:1.5px solid #bfdbfe;border-radius:99px;padding:4px 16px;font-size:12px;font-weight:800;">
+          📅 ${ed.label}
+        </span>
+        <span style="font-size:12px;color:var(--muted);">${ed.nb_laureats} lauréat${ed.nb_laureats!==1?'s':''} · Calculé le ${(ed.calcule_at||'').slice(0,10)}</span>
+        ${ed.statut==='publiee'?'<span style="background:#dcfce7;color:#15803d;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;">Edition actuelle</span>':''}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
+        ${edL.length ? edL.map(l=>cardHtml(l)).join('') : '<div style="color:var(--muted);font-size:13px;">Aucun lauréat enregistré.</div>'}
+      </div>
+    </div>`;
+  });
+  document.getElementById('hof-historique-content').innerHTML = html;
+}
+
+async function loadCriteres() {
+  try {
+    const d = await fetch('/api/deal-master/criteres').then(r => r.json());
+    const poidsMax = Math.max(...(d.criteres||[]).map(c=>c.poids), 1);
+    document.getElementById('criteres-list').innerHTML = (d.criteres||[]).map(c => {
+      const barW = Math.round((c.poids / poidsMax) * 100);
+      return `<div class="critere-bar">
+        <div class="critere-poids">${c.poids}</div>
+        <div class="critere-info">
+          <div class="critere-nom">${c.label}</div>
+          <div class="critere-desc">${c.description||''}</div>
+          <div style="height:5px;background:#fde68a;border-radius:99px;margin-top:6px;"><div style="height:5px;background:var(--dm-gold-dark);border-radius:99px;width:${barW}%;transition:width .5s;"></div></div>
+        </div>
+      </div>`;
+    }).join('') || '<div style="color:var(--muted);">Aucun critère défini.</div>';
+  } catch(e) {}
+}
+
+async function loadMonScore() {
+  const el = document.getElementById('mon-score-content');
+  try {
+    const d = await fetch('/api/deal-master/mon-score', { credentials: 'include' }).then(r => r.json());
+    _scoreData = d;
+    if (!d || d.error) {
+      el.innerHTML = `<div style="text-align:center;padding:48px;">
+        <div style="font-size:32px;margin-bottom:12px;">🔒</div>
+        <p style="color:var(--muted);">Connectez-vous pour voir votre score Deal Master.</p>
+        <a href="login.html" style="display:inline-flex;padding:9px 20px;background:#1e3a8a;color:#fff;border-radius:8px;font-weight:700;text-decoration:none;font-size:13px;">Se connecter</a>
+      </div>`; return;
+    }
+    const { score, is_deal_master, laureat_actuel, criteres, edition_courante } = d;
+
+    let html = '';
+    if (is_deal_master) {
+      html += `<div style="background:linear-gradient(135deg,#fef3c7,#fffbeb);border:2px solid var(--dm-gold);border-radius:16px;padding:24px;text-align:center;margin-bottom:24px;">
+        <div style="font-size:36px;margin-bottom:8px;">⭐</div>
+        <div style="font-size:18px;font-weight:900;color:var(--dm-gold-dark);margin-bottom:4px;">Félicitations ! Vous êtes Deal Master</div>
+        <div style="font-size:13px;color:var(--muted);">Édition : ${laureat_actuel?.edition_label||'—'} · Rang #${laureat_actuel?.rang||'—'}</div>
+        <div style="font-size:22px;font-weight:900;color:var(--dm-gold-dark);margin-top:10px;">Score : ${score?.score?.toFixed(1)||'—'}/100</div>
+      </div>`;
+    } else {
+      const s = score?.score || 0;
+      html += `<div style="background:#fff;border:1.5px solid var(--border);border-radius:16px;padding:24px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div>
+            <div style="font-size:14px;font-weight:800;">Votre score actuel</div>
+            <div style="font-size:12px;color:var(--muted);">${edition_courante?.label||'Édition en cours'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:28px;font-weight:900;color:#1e3a8a;">${s.toFixed(1)}<span style="font-size:14px;color:var(--muted);">/100</span></div>
+            ${score?.rang?`<div style="font-size:12px;color:var(--muted);">Rang #${score.rang} / ${score.rang_total}</div>`:''}
+          </div>
+        </div>
+        <div style="height:10px;background:#f1f5f9;border-radius:99px;overflow:hidden;">
+          <div style="height:10px;background:linear-gradient(90deg,#1e3a8a,var(--dm-gold));border-radius:99px;width:${Math.min(s,100)}%;transition:width 1s;"></div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px;">Le top 10% des performants obtiennent la distinction Deal Master.</div>
+      </div>`;
+    }
+
+    // Détail par critère
+    const det = score?.score_detail || {};
+    if (criteres?.length) {
+      html += `<div style="background:#fff;border:1.5px solid var(--border);border-radius:16px;padding:20px;">
+        <div style="font-size:14px;font-weight:800;margin-bottom:14px;">Détail par critère</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          ${criteres.map(c => {
+            const val = det[c.cle] ?? null;
+            const pct = val !== null ? Math.min(Math.round(val * 100), 100) : null;
+            const c_key = c.cle === 'deals_finalises' ? Math.min((val||0)/10*100,100) : (pct||0);
+            return `<div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;font-weight:700;">${c.label}</span>
+                <span style="font-size:12px;color:var(--muted);">${val !== null ? (c.cle==='deals_finalises'?val+' deals':(Math.round(val*100)+'%')) : 'N/A'}</span>
+              </div>
+              <div style="height:6px;background:#f1f5f9;border-radius:99px;overflow:hidden;">
+                <div style="height:6px;background:#1e3a8a;border-radius:99px;width:${c_key}%;"></div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
+
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted);">Connectez-vous pour voir votre score.</div>`;
+  }
+}
+
+loadHof();
+</script>
+</body>
+</html>

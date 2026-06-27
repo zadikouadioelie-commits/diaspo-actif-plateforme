@@ -70,6 +70,7 @@
       <a href="#packages" data-section="packages">📦 Package Diaspo'Actif</a>
       <a href="#deals-admin" data-section="deals-admin">🤝 Gérer un Deal</a>
       <a href="#partenaires-admin" data-section="partenaires-admin">🏅 Partenaires Officiels</a>
+      <a href="#deal-master-admin" data-section="deal-master-admin">⭐ Deal Master</a>
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
     </aside>
 
@@ -1586,6 +1587,62 @@
             </div>
             <div id="po-att-msg" style="font-size:12px;margin-top:8px;display:none;"></div>
           </div>
+        </div>
+      </section>
+
+      <!-- ══════════ SECTION DEAL MASTER ══════════ -->
+      <section id="section-deal-master-admin" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <h2 style="margin:0;">⭐ Deal Master — Distinction d'excellence</h2>
+          <a href="hall-of-fame.html" target="_blank" class="btn btn-outline" style="font-size:13px;">🏆 Voir le Hall of Fame</a>
+        </div>
+
+        <!-- Onglets -->
+        <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;">
+          <button id="dm-tab-editions" class="btn btn-sm" style="border-bottom:2px solid #f59e0b;border-radius:0;" onclick="showDmTab('editions')">📅 Éditions</button>
+          <button id="dm-tab-criteres" class="btn btn-sm btn-outline" style="border-radius:0;" onclick="showDmTab('criteres')">⚖️ Critères</button>
+        </div>
+
+        <!-- Panel Éditions -->
+        <div id="dm-panel-editions">
+          <div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:18px;margin-bottom:20px;">
+            <h4 style="font-size:13px;font-weight:800;margin:0 0 12px;">➕ Créer une nouvelle édition</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);">Libellé</label>
+                <input id="dm-new-label" placeholder="Semestre 2 – 2026" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:4px;">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);">Début</label>
+                <input id="dm-new-debut" type="date" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:4px;">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);">Fin</label>
+                <input id="dm-new-fin" type="date" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:4px;">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);">% lauréats</label>
+                <input id="dm-new-pct" type="number" min="1" max="50" value="10" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:4px;">
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;align-items:center;">
+              <button onclick="createDmEdition()" style="padding:8px 18px;background:#1e3a8a;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">Créer l'édition</button>
+              <span id="dm-new-msg" style="font-size:12px;display:none;"></span>
+            </div>
+          </div>
+
+          <div id="dm-editions-list" style="display:flex;flex-direction:column;gap:12px;">
+            <div style="text-align:center;padding:32px;color:var(--muted);">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- Panel Critères -->
+        <div id="dm-panel-criteres" style="display:none;">
+          <div class="notice" style="margin-bottom:16px;">Modifiez le poids de chaque critère. Un poids plus élevé signifie une influence plus forte sur le classement.</div>
+          <div id="dm-criteres-list" style="display:flex;flex-direction:column;gap:10px;">
+            <div style="text-align:center;padding:32px;color:var(--muted);">Chargement…</div>
+          </div>
+          <div id="dm-crit-msg" style="font-size:12px;margin-top:10px;display:none;"></div>
         </div>
       </section>
 
@@ -3429,6 +3486,7 @@ async function submitAccordDirect(){
     packages:    () => loadPackages(),
     'deals-admin':       () => loadAdminDeals(),
     'partenaires-admin': () => loadPartenairesAdmin(),
+    'deal-master-admin': () => loadDmAdmin(),
     parametres:  () => loadParametres(),
     publicites:  () => loadPublicites(),
     chatbot:     () => switchCbTab('stats'),
@@ -6792,6 +6850,122 @@ async function submitAttribuerPo() {
     const msg = document.getElementById('po-att-msg');
     msg.style.display='block'; msg.style.color='#dc2626'; msg.textContent=`Erreur : ${e.message}`;
   }
+}
+
+/* ══════ DEAL MASTER ADMIN ══════ */
+function showDmTab(tab) {
+  ['editions','criteres'].forEach(t => {
+    document.getElementById(`dm-panel-${t}`).style.display = t===tab?'':'none';
+    const btn = document.getElementById(`dm-tab-${t}`);
+    if(btn){ btn.className='btn btn-sm'+(t===tab?'':' btn-outline'); btn.style.cssText='border-radius:0;border-bottom:'+(t===tab?'2px solid #f59e0b':'none'); }
+  });
+  if(tab==='criteres') loadDmCriteres();
+}
+
+async function loadDmAdmin() {
+  showDmTab('editions');
+  await loadDmEditions();
+}
+
+async function loadDmEditions() {
+  const el = document.getElementById('dm-editions-list');
+  try {
+    const d = await api('GET','/admin/deal-master/editions');
+    const eds = d.editions||[];
+    if(!eds.length){ el.innerHTML='<div style="color:var(--muted);text-align:center;padding:32px;">Aucune édition créée.</div>'; return; }
+    const statutLabel = { planifiee:'🕐 Planifiée', en_cours:'🟢 En cours', calculee:'🔵 Calculée', publiee:'⭐ Publiée', archivee:'📦 Archivée' };
+    const statutColor = { planifiee:'#64748b', en_cours:'#16a34a', calculee:'#2563eb', publiee:'#b45309', archivee:'#94a3b8' };
+    el.innerHTML = eds.map(e=>`
+      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;">
+        <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span style="font-size:14px;font-weight:800;">${e.label}</span>
+              <span style="font-size:11px;font-weight:700;color:${statutColor[e.statut]||'#64748b'};background:${statutColor[e.statut]||'#64748b'}18;border-radius:99px;padding:2px 9px;">${statutLabel[e.statut]||e.statut}</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);">📅 ${e.periode_debut} → ${e.periode_fin} · Top ${e.top_pct}% · ${e.nb_laureats||0} lauréat(s)</div>
+            ${e.calcule_at?`<div style="font-size:11px;color:#2563eb;margin-top:4px;">Calculé le ${e.calcule_at.slice(0,10)}</div>`:''}
+            ${e.publie_at?`<div style="font-size:11px;color:#b45309;margin-top:2px;">Publié le ${e.publie_at.slice(0,10)}</div>`:''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:160px;">
+            ${e.statut!=='publiee'&&e.statut!=='archivee'?`<button onclick="lancerCalculDm(${e.id})" style="padding:7px 12px;background:#1e3a8a;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">🔄 Lancer le calcul</button>`:''}
+            ${e.statut==='calculee'?`<button onclick="publierDm(${e.id})" style="padding:7px 12px;background:#b45309;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">⭐ Publier</button>`:''}
+            ${e.nb_laureats>0?`<a href="hall-of-fame.html" target="_blank" style="padding:6px 12px;background:#fff;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;text-align:center;text-decoration:none;color:var(--text);">🏆 Hall of Fame</a>`:''}
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML=`<div style="color:#dc2626;padding:20px;">Erreur : ${e.message}</div>`; }
+}
+
+async function createDmEdition() {
+  const label  = document.getElementById('dm-new-label').value.trim();
+  const debut  = document.getElementById('dm-new-debut').value;
+  const fin    = document.getElementById('dm-new-fin').value;
+  const top_pct= parseFloat(document.getElementById('dm-new-pct').value)||10;
+  const msg    = document.getElementById('dm-new-msg');
+  if(!label||!debut||!fin){ msg.style.display='block';msg.style.color='#dc2626';msg.textContent='⚠️ Remplissez tous les champs.'; return; }
+  try {
+    await api('POST','/admin/deal-master/editions',{label,periode_debut:debut,periode_fin:fin,top_pct});
+    msg.style.display='block';msg.style.color='#16a34a';msg.textContent='✅ Édition créée !';
+    setTimeout(()=>{ msg.style.display='none'; loadDmEditions(); },1500);
+  } catch(e){ msg.style.display='block';msg.style.color='#dc2626';msg.textContent='Erreur : '+e.message; }
+}
+
+async function lancerCalculDm(id) {
+  if(!confirm('Lancer le calcul Deal Master pour cette édition ? Cette opération peut prendre quelques secondes.')) return;
+  try {
+    const d = await api('POST',`/admin/deal-master/editions/${id}/calculer`);
+    alert(`✅ Calcul terminé !\n${d.nb_scores} profils analysés · ${d.nb_laureats} lauréats (top ${d.top_pct}%).`);
+    loadDmEditions();
+  } catch(e){ alert('Erreur : '+e.message); }
+}
+
+async function publierDm(id) {
+  if(!confirm('Publier cette édition ? Les résultats seront visibles publiquement et les badges Deal Master activés.')) return;
+  try {
+    await api('POST',`/admin/deal-master/editions/${id}/publier`);
+    alert('✅ Édition publiée ! Les Deal Masters sont maintenant visibles sur le Hall of Fame.');
+    loadDmEditions();
+  } catch(e){ alert('Erreur : '+e.message); }
+}
+
+async function loadDmCriteres() {
+  const el = document.getElementById('dm-criteres-list');
+  try {
+    const d = await api('GET','/admin/deal-master/criteres');
+    const crits = d.criteres||[];
+    el.innerHTML = crits.map(c=>`
+      <div style="background:${c.actif?'#fffbeb':'#f8fafc'};border:1.5px solid ${c.actif?'#fde68a':'var(--border)'};border-radius:10px;padding:14px;">
+        <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:180px;">
+            <div style="font-size:13px;font-weight:800;">${c.label}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${c.description||''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div>
+              <label style="font-size:11px;color:var(--muted);">Poids</label>
+              <input id="dm-poids-${c.cle}" type="number" step="0.5" min="0" max="10" value="${c.poids}" style="width:70px;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;font-weight:700;margin-left:4px;">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <input type="checkbox" id="dm-actif-${c.cle}" ${c.actif?'checked':''} style="width:14px;height:14px;">
+              <label for="dm-actif-${c.cle}" style="font-size:12px;">Actif</label>
+            </div>
+            <button onclick="saveDmCritere('${c.cle}')" style="padding:6px 12px;background:#1e3a8a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">Sauver</button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e){ el.innerHTML=`<div style="color:#dc2626;">${e.message}</div>`; }
+}
+
+async function saveDmCritere(cle) {
+  const poids = parseFloat(document.getElementById(`dm-poids-${cle}`).value)||0;
+  const actif = document.getElementById(`dm-actif-${cle}`).checked ? 1 : 0;
+  const msg = document.getElementById('dm-crit-msg');
+  try {
+    await api('PUT',`/admin/deal-master/criteres/${cle}`,{poids,actif});
+    msg.style.display='block';msg.style.color='#16a34a';msg.textContent=`✅ Critère "${cle}" mis à jour.`;
+    setTimeout(()=>msg.style.display='none',2500);
+  } catch(e){ msg.style.display='block';msg.style.color='#dc2626';msg.textContent='Erreur : '+e.message; }
 }
 
 async function changerStatutPo(id, statut) {

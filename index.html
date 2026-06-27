@@ -1111,6 +1111,23 @@
     </div>
   </section>
 
+  <!-- ===== SECTION 9b : DEAL MASTERS DU SEMESTRE ===== -->
+  <section id="section-deal-masters-hp" style="padding:48px 24px 40px;background:#fff;display:none;">
+    <div style="max-width:1100px;margin:0 auto;">
+      <div style="text-align:center;margin-bottom:28px;">
+        <div style="display:inline-flex;align-items:center;gap:6px;background:#fef3c7;color:#b45309;border:1.5px solid #fde68a;border-radius:99px;padding:4px 16px;font-size:12px;font-weight:800;letter-spacing:.04em;margin-bottom:14px;">⭐ Distinction d'excellence</div>
+        <h2 style="font-size:24px;font-weight:900;margin:0 0 8px;color:#0D1B2A;">Deal Masters du Semestre</h2>
+        <p style="font-size:14px;color:#64748b;max-width:480px;margin:0 auto;" id="dm-hp-edition-label">Les 10% des profils les plus performants dans la gestion de Deals.</p>
+      </div>
+      <div id="dm-hp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;"></div>
+      <div style="text-align:center;margin-top:22px;">
+        <a href="hall-of-fame.html" style="display:inline-flex;align-items:center;gap:6px;background:#1e3a8a;color:#fff;border-radius:10px;padding:10px 22px;font-size:13px;font-weight:700;text-decoration:none;">
+          ⭐ Voir le Hall of Fame →
+        </a>
+      </div>
+    </div>
+  </section>
+
   <!-- ===== SECTION 10 : PARTENAIRES OFFICIELS ===== -->
   <section id="section-partenaires-hp" style="padding:52px 24px 40px;background:linear-gradient(180deg,#f8fafc 0%,#fff 100%);">
     <div style="max-width:1100px;margin:0 auto;">
@@ -1620,6 +1637,36 @@ document.getElementById('hp-q')?.addEventListener('keydown', e => {
       overlay?.classList.add('active');
     }
   });
+})();
+</script>
+
+<script>
+/* ═══════ DEAL MASTERS HOMEPAGE ═══════ */
+(async function loadDealMastersHp() {
+  try {
+    const d = await fetch('/api/deal-master/actuel').then(r => r.json());
+    const laureats = d.laureats || [];
+    if (!laureats.length) return;
+    const sect = document.getElementById('section-deal-masters-hp');
+    sect.style.display = '';
+    const lbl = document.getElementById('dm-hp-edition-label');
+    if (d.edition) lbl.textContent = `${d.edition.label} · Top 10% des performants Deals`;
+    const grid = document.getElementById('dm-hp-grid');
+    grid.innerHTML = laureats.slice(0, 8).map((l, i) => {
+      const nom = [l.prenom, l.nom].filter(Boolean).join(' ') || '—';
+      const icons = ['🥇','🥈','🥉'];
+      return `<div onclick="window.location.href='profil.html?id=${l.user_id}'" style="background:#fff;border:1.5px solid #fde68a;border-radius:14px;padding:16px;text-align:center;cursor:pointer;transition:box-shadow .2s;position:relative;" onmouseover="this.style.boxShadow='0 4px 20px rgba(245,158,11,.2)'" onmouseout="this.style.boxShadow='none'">
+        ${i<3?`<span style="position:absolute;top:8px;right:10px;font-size:16px;">${icons[i]}</span>`:''}
+        <div style="width:52px;height:52px;border-radius:50%;background:#1e3a8a;color:#fff;font-size:17px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;overflow:hidden;border:2px solid #fde68a;">
+          ${l.photo_url?`<img src="${l.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`:(nom.charAt(0)||'?').toUpperCase()}
+        </div>
+        <div style="font-size:13px;font-weight:800;color:#0D1B2A;">${nom}</div>
+        ${l.titre_pro?`<div style="font-size:11px;color:#64748b;margin-top:2px;">${l.titre_pro}</div>`:''}
+        <div style="display:inline-flex;align-items:center;gap:3px;background:#fef3c7;color:#b45309;border-radius:99px;padding:2px 9px;font-size:10px;font-weight:800;margin-top:6px;">⭐ Deal Master</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px;">Score : ${(l.score||0).toFixed(1)}/100</div>
+      </div>`;
+    }).join('');
+  } catch(e) {}
 })();
 </script>
 

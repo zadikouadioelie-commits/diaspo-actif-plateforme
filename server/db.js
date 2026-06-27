@@ -995,6 +995,8 @@ const MIGRATIONS = [
   ["users", "signalements_confirmes INTEGER DEFAULT 0"],
   ["users", "is_verified INTEGER DEFAULT 0"],
   ["users", "is_official INTEGER DEFAULT 0"],
+  ["users", "is_deal_master INTEGER DEFAULT 0"],
+  ["users", "deal_master_edition_id INTEGER"],
   ["initiatives", "signalements_confirmes INTEGER DEFAULT 0"],
   // Partenaires Officiels — champs de configuration visibilité
   ["partenaires_officiels", "priorite INTEGER DEFAULT 0"],
@@ -1775,6 +1777,78 @@ db.exec(`
     description   TEXT,
     updated_at    TEXT DEFAULT (datetime('now'))
   );
+
+  /* ═══════════════════════════════════════════════
+     DEAL MASTER — Distinction d'excellence semestrielle
+     ═══════════════════════════════════════════════ */
+
+  /* Éditions semestrielles */
+  CREATE TABLE IF NOT EXISTS deal_master_editions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    label           TEXT NOT NULL,            -- ex: "Semestre 1 – 2026"
+    periode_debut   TEXT NOT NULL,            -- date ISO début
+    periode_fin     TEXT NOT NULL,            -- date ISO fin
+    statut          TEXT NOT NULL DEFAULT 'en_cours'
+                    CHECK(statut IN ('planifiee','en_cours','calculee','publiee','archivee')),
+    top_pct         REAL  DEFAULT 10.0,       -- % de lauréats (ex: 10.0)
+    nb_laureats     INTEGER DEFAULT 0,
+    calcule_at      TEXT,
+    publie_at       TEXT,
+    criteres_json   TEXT DEFAULT '{}',        -- snapshot des critères utilisés
+    created_at      TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now'))
+  );
+
+  /* Critères configurables (poids) */
+  CREATE TABLE IF NOT EXISTS deal_master_criteres (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    cle         TEXT NOT NULL UNIQUE,
+    label       TEXT NOT NULL,
+    description TEXT,
+    poids       REAL NOT NULL DEFAULT 1.0,
+    actif       INTEGER DEFAULT 1,
+    updated_at  TEXT DEFAULT (datetime('now'))
+  );
+
+  /* Lauréats par édition */
+  CREATE TABLE IF NOT EXISTS deal_master_laureats (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    edition_id  INTEGER NOT NULL,
+    user_id     INTEGER NOT NULL,
+    score       REAL NOT NULL DEFAULT 0,
+    rang        INTEGER NOT NULL,
+    score_detail TEXT DEFAULT '{}',          -- JSON détail par critère
+    date_attribution TEXT DEFAULT (datetime('now')),
+    date_expiration  TEXT NOT NULL,
+    actif       INTEGER DEFAULT 1,
+    UNIQUE(edition_id, user_id),
+    FOREIGN KEY(edition_id) REFERENCES deal_master_editions(id),
+    FOREIGN KEY(user_id)    REFERENCES users(id)
+  );
+
+  /* Scores courants par utilisateur (pour affichage personnel) */
+  CREATE TABLE IF NOT EXISTS deal_master_scores (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL UNIQUE,
+    score       REAL DEFAULT 0,
+    score_detail TEXT DEFAULT '{}',
+    rang        INTEGER,
+    rang_total  INTEGER,
+    computed_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Témoignages Deal Master */
+  CREATE TABLE IF NOT EXISTS deal_master_temoignages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    edition_id INTEGER,
+    contenu    TEXT NOT NULL,
+    visible    INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id)    REFERENCES users(id),
+    FOREIGN KEY(edition_id) REFERENCES deal_master_editions(id)
+  );
 `);
 
 /* backfillOfficialFollow est appelé depuis seed.js après création du compte officiel */
@@ -1790,6 +1864,37 @@ function backfillOfficialFollow() {
     users.forEach(u => ins.run(u.id, oid));
   } catch(e) { /* ignoré */ }
 }
+
+/* ═══ DEAL MASTER — Seed critères par défaut ═══ */
+;(function seedDealMasterCriteres() {
+  const existing = db.prepare("SELECT COUNT(*) AS n FROM deal_master_criteres").get().n;
+  if (existing > 0) return;
+  const ins = db.prepare(`INSERT INTO deal_master_criteres (cle,label,description,poids,actif)
+    VALUES (?,?,?,?,1)`);
+  [
+    ["deals_finalises",     "Deals finalisés",            "Nombre de Deals clôturés avec succès sur la période",       3.0],
+    ["taux_reussite",       "Taux de réussite",           "% de Deals actifs clôturés positivement vs abandonnés",     2.5],
+    ["progression_deals",   "Progression des Deals",      "Avancement moyen des Deals actifs (jalons, objectifs)",     1.5],
+    ["evaluations_recues",  "Évaluations reçues",         "Note moyenne des évaluations reçues des partenaires",       2.0],
+    ["qualite_collaboration","Qualité des collaborations", "Nombre de participants acceptés et actifs dans les Deals",  1.5],
+    ["respect_engagements", "Respect des engagements",    "Tâches complétées vs assignées, jalons respectés",          2.0],
+    ["diversite_partenaires","Diversité des partenaires", "Nombre de partenaires distincts impliqués dans les Deals",  1.0],
+  ].forEach(r => ins.run(...r));
+})();
+
+/* ═══ DEAL MASTER — Edition courante ═══ */
+;(function seedDealMasterEdition() {
+  const existing = db.prepare("SELECT COUNT(*) AS n FROM deal_master_editions").get().n;
+  if (existing > 0) return;
+  const now = new Date();
+  const year = now.getFullYear();
+  const sem = now.getMonth() < 6 ? 1 : 2;
+  const debutMois = sem === 1 ? `${year}-01-01` : `${year}-07-01`;
+  const finMois   = sem === 1 ? `${year}-06-30` : `${year}-12-31`;
+  db.prepare(`INSERT INTO deal_master_editions (label,periode_debut,periode_fin,statut,top_pct)
+    VALUES (?,?,?,'en_cours',10.0)`)
+    .run(`Semestre ${sem} – ${year}`, debutMois, finMois);
+})();
 
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;

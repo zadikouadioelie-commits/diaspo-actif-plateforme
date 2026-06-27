@@ -987,6 +987,10 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     WHERE p.auteur_id = ?
     GROUP BY p.id ORDER BY p.id DESC LIMIT 10`).all(u.id);
   const po = db.prepare("SELECT statut,domaines_expertise,pays_intervention,services,description_complete,site_web,liens_utiles,date_attribution FROM partenaires_officiels WHERE user_id=?").get(u.id);
+  const dmLaureat = db.prepare(`SELECT dml.rang, dml.score, dme.label AS edition_label, dme.periode_fin
+    FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
+    WHERE dml.user_id=? AND dml.actif=1 ORDER BY dml.edition_id DESC LIMIT 1`).get(u.id);
+  const dmHistorique = db.prepare(`SELECT COUNT(*) AS n FROM deal_master_laureats WHERE user_id=?`).get(u.id).n;
   sendJSON(res, 200, { profil: {
     ...publicUser(u),
     bio: u.bio, photo_url: u.photo_url, banner_url: u.banner_url,
@@ -1009,6 +1013,8 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
       liens_utiles: safeParse(po.liens_utiles||'[]'),
       date_attribution: po.date_attribution,
     } : null,
+    is_deal_master: !!dmLaureat,
+    deal_master: dmLaureat ? { ...dmLaureat, nb_editions: dmHistorique } : null,
   }});
 });
 
@@ -8103,6 +8109,271 @@ async function handleRequest(req, res) {
         db.prepare("DELETE FROM deal_jalons WHERE id=? AND deal_id=?").run(jalItem[2],did);
         return sendJSON(res, 200, { ok:true });
       }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       DEAL MASTER — Moteur de distinction d'excellence
+    ═══════════════════════════════════════════════════════════ */
+
+    /* GET /api/deal-master/hall-of-fame — lauréats actuels + anciens */
+    if (req.method === "GET" && pathname === "/api/deal-master/hall-of-fame") {
+      const editions = db.prepare("SELECT * FROM deal_master_editions WHERE statut='publiee' OR statut='archivee' ORDER BY periode_debut DESC").all();
+      const editionIds = editions.map(e => e.id);
+      const activeEd = db.prepare("SELECT * FROM deal_master_editions WHERE statut='publiee' ORDER BY periode_debut DESC LIMIT 1").get();
+      const laureats = editionIds.length
+        ? db.prepare(`SELECT dml.*, u.nom, u.prenom, u.photo_url, u.banner_url, u.titre_pro, u.ville, u.pays,
+            dme.label AS edition_label, dme.periode_debut, dme.periode_fin
+          FROM deal_master_laureats dml
+          JOIN users u ON u.id = dml.user_id
+          JOIN deal_master_editions dme ON dme.id = dml.edition_id
+          WHERE dml.edition_id IN (${editionIds.join(',')})
+          ORDER BY dml.edition_id DESC, dml.rang ASC`).all()
+        : [];
+      const temoignages = db.prepare(`SELECT dmt.*, u.nom, u.prenom, u.photo_url, dme.label AS edition_label
+        FROM deal_master_temoignages dmt
+        JOIN users u ON u.id = dmt.user_id
+        LEFT JOIN deal_master_editions dme ON dme.id = dmt.edition_id
+        WHERE dmt.visible=1 ORDER BY dmt.created_at DESC LIMIT 20`).all();
+      return sendJSON(res, 200, {
+        editions,
+        edition_active: activeEd || null,
+        laureats: laureats.map(l => ({ ...l, score_detail: safeParse(l.score_detail || '{}') })),
+        temoignages,
+      });
+    }
+
+    /* GET /api/deal-master/actuel — lauréats de l'édition courante publiée */
+    if (req.method === "GET" && pathname === "/api/deal-master/actuel") {
+      const ed = db.prepare("SELECT * FROM deal_master_editions WHERE statut='publiee' ORDER BY periode_debut DESC LIMIT 1").get();
+      if (!ed) return sendJSON(res, 200, { laureats: [], edition: null });
+      const laureats = db.prepare(`SELECT dml.*, u.nom, u.prenom, u.photo_url, u.titre_pro, u.ville, u.pays
+        FROM deal_master_laureats dml JOIN users u ON u.id=dml.user_id
+        WHERE dml.edition_id=? AND dml.actif=1 ORDER BY dml.rang ASC`).all(ed.id);
+      return sendJSON(res, 200, { laureats, edition: ed });
+    }
+
+    /* GET /api/deal-master/mon-score — score personnel (connecté) */
+    if (req.method === "GET" && pathname === "/api/deal-master/mon-score") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const score = db.prepare("SELECT * FROM deal_master_scores WHERE user_id=?").get(me.id);
+      const isMaster = db.prepare("SELECT * FROM deal_master_laureats WHERE user_id=? AND actif=1 ORDER BY edition_id DESC LIMIT 1").get(me.id);
+      const criteres = db.prepare("SELECT * FROM deal_master_criteres WHERE actif=1 ORDER BY poids DESC").all();
+      const ed = db.prepare("SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee') ORDER BY periode_debut DESC LIMIT 1").get();
+      return sendJSON(res, 200, {
+        score: score ? { ...score, score_detail: safeParse(score.score_detail || '{}') } : null,
+        is_deal_master: !!isMaster,
+        laureat_actuel: isMaster || null,
+        criteres,
+        edition_courante: ed || null,
+      });
+    }
+
+    /* GET /api/deal-master/criteres — liste des critères publics */
+    if (req.method === "GET" && pathname === "/api/deal-master/criteres") {
+      const criteres = db.prepare("SELECT cle,label,description,poids FROM deal_master_criteres WHERE actif=1 ORDER BY poids DESC").all();
+      return sendJSON(res, 200, { criteres });
+    }
+
+    /* POST /api/deal-master/temoignage — soumettre un témoignage (lauréat) */
+    if (req.method === "POST" && pathname === "/api/deal-master/temoignage") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const isMaster = db.prepare("SELECT * FROM deal_master_laureats WHERE user_id=? AND actif=1 ORDER BY edition_id DESC LIMIT 1").get(me.id);
+      if (!isMaster) return sendJSON(res, 403, { error: "Réservé aux Deal Masters actifs." });
+      const { contenu } = body;
+      if (!contenu || contenu.trim().length < 20) return sendJSON(res, 400, { error: "Témoignage trop court (min 20 caractères)." });
+      db.prepare("INSERT INTO deal_master_temoignages (user_id,edition_id,contenu) VALUES (?,?,?)")
+        .run(me.id, isMaster.edition_id, contenu.trim().slice(0, 1000));
+      return sendJSON(res, 201, { ok: true });
+    }
+
+    /* ── ADMIN DEAL MASTER ── */
+
+    /* GET /api/admin/deal-master/editions */
+    if (req.method === "GET" && pathname === "/api/admin/deal-master/editions") {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
+      const eds = db.prepare("SELECT * FROM deal_master_editions ORDER BY periode_debut DESC").all();
+      return sendJSON(res, 200, { editions: eds });
+    }
+
+    /* POST /api/admin/deal-master/editions — créer une nouvelle édition */
+    if (req.method === "POST" && pathname === "/api/admin/deal-master/editions") {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
+      const { label, periode_debut, periode_fin, top_pct = 10 } = body;
+      if (!label || !periode_debut || !periode_fin) return sendJSON(res, 400, { error: "label, periode_debut, periode_fin requis." });
+      const r = db.prepare("INSERT INTO deal_master_editions (label,periode_debut,periode_fin,statut,top_pct) VALUES (?,?,?,'planifiee',?)").run(label, periode_debut, periode_fin, top_pct);
+      return sendJSON(res, 201, { id: r.lastInsertRowid });
+    }
+
+    /* POST /api/admin/deal-master/editions/:id/calculer — lancer le calcul */
+    const dmCalcM = pathname.match(/^\/api\/admin\/deal-master\/editions\/(\d+)\/calculer$/);
+    if (req.method === "POST" && dmCalcM) {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
+      const edId = parseInt(dmCalcM[1]);
+      const ed = db.prepare("SELECT * FROM deal_master_editions WHERE id=?").get(edId);
+      if (!ed) return sendJSON(res, 404, { error: "Édition introuvable." });
+
+      // Critères pondérés
+      const criteres = db.prepare("SELECT * FROM deal_master_criteres WHERE actif=1").all();
+      const poidsTotal = criteres.reduce((s, c) => s + c.poids, 0) || 1;
+
+      // Calculer le score pour chaque initiative/user ayant des deals
+      const debut = ed.periode_debut, fin = ed.periode_fin;
+      const initiativesWithDeals = db.prepare(`
+        SELECT DISTINCT dp.initiative_id FROM deal_participants dp
+        JOIN deals d ON d.id = dp.deal_id
+        WHERE d.created_at BETWEEN ? AND ? AND dp.statut='accepte'`).all(debut + ' 00:00:00', fin + ' 23:59:59');
+
+      // Récupérer le user_id depuis initiative
+      const scores = [];
+      for (const { initiative_id } of initiativesWithDeals) {
+        const init = db.prepare("SELECT user_id FROM initiatives WHERE id=?").get(initiative_id);
+        if (!init?.user_id) continue;
+        const uid = init.user_id;
+
+        // Calcul par critère
+        const detail = {};
+
+        // deals_finalises
+        const finalises = db.prepare(`SELECT COUNT(*) AS n FROM deals d
+          JOIN deal_participants dp ON dp.deal_id=d.id
+          WHERE dp.initiative_id=? AND d.statut='cloture' AND d.created_at BETWEEN ? AND ?`).get(initiative_id, debut+' 00:00:00', fin+' 23:59:59').n;
+        detail.deals_finalises = finalises;
+
+        // taux_reussite
+        const totalDeals = db.prepare(`SELECT COUNT(*) AS n FROM deal_participants dp
+          JOIN deals d ON d.id=dp.deal_id WHERE dp.initiative_id=? AND dp.statut='accepte' AND d.created_at BETWEEN ? AND ?`)
+          .get(initiative_id, debut+' 00:00:00', fin+' 23:59:59').n || 1;
+        detail.taux_reussite = Math.round((finalises / totalDeals) * 100) / 100;
+
+        // progression_deals — jalons complétés
+        const jalonsTotal = db.prepare(`SELECT COUNT(*) AS n FROM deal_jalons dj
+          JOIN deal_participants dp ON dp.deal_id=dj.deal_id
+          WHERE dp.initiative_id=?`).get(initiative_id).n || 1;
+        const jalonsOk = db.prepare(`SELECT COUNT(*) AS n FROM deal_jalons dj
+          JOIN deal_participants dp ON dp.deal_id=dj.deal_id
+          WHERE dp.initiative_id=? AND dj.statut='atteint'`).get(initiative_id).n;
+        detail.progression_deals = Math.round((jalonsOk / jalonsTotal) * 100) / 100;
+
+        // evaluations_recues — deal_notes
+        const noteMoy = db.prepare(`SELECT AVG(CAST(dn.contenu AS REAL)) AS avg FROM deal_notes dn
+          JOIN deals d ON d.id=dn.deal_id
+          JOIN deal_participants dp ON dp.deal_id=d.id
+          WHERE dp.initiative_id=? AND dn.type='evaluation'`).get(initiative_id).avg || 0;
+        detail.evaluations_recues = Math.min(noteMoy / 5, 1);
+
+        // qualite_collaboration — participants acceptés
+        const partenaires = db.prepare(`SELECT COUNT(DISTINCT dp2.initiative_id) AS n FROM deal_participants dp
+          JOIN deal_participants dp2 ON dp2.deal_id=dp.deal_id AND dp2.initiative_id!=dp.initiative_id
+          WHERE dp.initiative_id=? AND dp2.statut='accepte'`).get(initiative_id).n;
+        detail.qualite_collaboration = Math.min(partenaires / 10, 1);
+
+        // respect_engagements — tâches
+        const tachesTotal = db.prepare(`SELECT COUNT(*) AS n FROM deal_tasks dt
+          JOIN deal_participants dp ON dp.deal_id=dt.deal_id
+          WHERE dp.initiative_id=?`).get(initiative_id).n || 1;
+        const tachesOk = db.prepare(`SELECT COUNT(*) AS n FROM deal_tasks dt
+          JOIN deal_participants dp ON dp.deal_id=dt.deal_id
+          WHERE dp.initiative_id=? AND dt.statut='terminee'`).get(initiative_id).n;
+        detail.respect_engagements = Math.round((tachesOk / tachesTotal) * 100) / 100;
+
+        // diversite_partenaires
+        detail.diversite_partenaires = Math.min(partenaires / 5, 1);
+
+        // Score global pondéré
+        let scoreGlobal = 0;
+        for (const c of criteres) {
+          const val = detail[c.cle] ?? 0;
+          // Normaliser deals_finalises sur 10 max
+          const normalized = c.cle === 'deals_finalises' ? Math.min(val / 10, 1) : val;
+          scoreGlobal += (c.poids / poidsTotal) * normalized * 100;
+        }
+
+        scores.push({ user_id: uid, score: Math.round(scoreGlobal * 100) / 100, detail });
+      }
+
+      // Tri par score DESC, calcul rang
+      scores.sort((a, b) => b.score - a.score);
+      const topN = Math.max(1, Math.ceil(scores.length * (ed.top_pct / 100)));
+      const laureats = scores.slice(0, topN);
+
+      // Persister les scores
+      const upsertScore = db.prepare(`INSERT INTO deal_master_scores (user_id,score,score_detail,rang,rang_total,computed_at)
+        VALUES (?,?,?,?,?,datetime('now'))
+        ON CONFLICT(user_id) DO UPDATE SET score=excluded.score, score_detail=excluded.score_detail,
+        rang=excluded.rang, rang_total=excluded.rang_total, computed_at=excluded.computed_at`);
+      scores.forEach((s, i) => upsertScore.run(s.user_id, s.score, JSON.stringify(s.detail), i + 1, scores.length));
+
+      // Expirer les anciens lauréats de cette édition
+      db.prepare("UPDATE deal_master_laureats SET actif=0 WHERE edition_id=?").run(edId);
+
+      // Insérer les nouveaux lauréats
+      const insLaureat = db.prepare(`INSERT INTO deal_master_laureats (edition_id,user_id,score,rang,score_detail,date_expiration,actif)
+        VALUES (?,?,?,?,?,?,1) ON CONFLICT(edition_id,user_id) DO UPDATE SET score=excluded.score,rang=excluded.rang,score_detail=excluded.score_detail,actif=1`);
+      laureats.forEach((l, i) => insLaureat.run(edId, l.user_id, l.score, i + 1, JSON.stringify(l.detail), ed.periode_fin));
+
+      // Mettre à jour le flag users
+      db.prepare("UPDATE users SET is_deal_master=0, deal_master_edition_id=NULL WHERE is_deal_master=1").run();
+      laureats.forEach(l => db.prepare("UPDATE users SET is_deal_master=1, deal_master_edition_id=? WHERE id=?").run(edId, l.user_id));
+
+      // Mettre à jour l'édition
+      db.prepare("UPDATE deal_master_editions SET statut='calculee', nb_laureats=?, calcule_at=datetime('now'), criteres_json=?, updated_at=datetime('now') WHERE id=?")
+        .run(laureats.length, JSON.stringify(Object.fromEntries(criteres.map(c=>[c.cle,c.poids]))), edId);
+
+      return sendJSON(res, 200, { ok: true, nb_scores: scores.length, nb_laureats: laureats.length, top_pct: ed.top_pct });
+    }
+
+    /* POST /api/admin/deal-master/editions/:id/publier */
+    const dmPubM = pathname.match(/^\/api\/admin\/deal-master\/editions\/(\d+)\/publier$/);
+    if (req.method === "POST" && dmPubM) {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
+      const edId = parseInt(dmPubM[1]);
+      const ed = db.prepare("SELECT * FROM deal_master_editions WHERE id=?").get(edId);
+      if (!ed) return sendJSON(res, 404, { error: "Édition introuvable." });
+      if (ed.statut !== 'calculee') return sendJSON(res, 400, { error: "L'édition doit être calculée avant publication." });
+      // Archiver les autres publiées
+      db.prepare("UPDATE deal_master_editions SET statut='archivee', updated_at=datetime('now') WHERE statut='publiee'").run();
+      db.prepare("UPDATE deal_master_editions SET statut='publiee', publie_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(edId);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* PUT /api/admin/deal-master/criteres/:cle */
+    const dmCritM = pathname.match(/^\/api\/admin\/deal-master\/criteres\/([a-z_]+)$/);
+    if (req.method === "PUT" && dmCritM) {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
+      const { poids, actif, label, description } = body;
+      db.prepare(`UPDATE deal_master_criteres SET
+        poids=COALESCE(?,poids), actif=COALESCE(?,actif),
+        label=COALESCE(?,label), description=COALESCE(?,description),
+        updated_at=datetime('now') WHERE cle=?`)
+        .run(poids??null, actif??null, label||null, description||null, dmCritM[1]);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* GET /api/admin/deal-master/criteres */
+    if (req.method === "GET" && pathname === "/api/admin/deal-master/criteres") {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
+      return sendJSON(res, 200, { criteres: db.prepare("SELECT * FROM deal_master_criteres ORDER BY poids DESC").all() });
+    }
+
+    /* GET /api/profil/:id/deal-master — badge info */
+    const dmProfilM = pathname.match(/^\/api\/profil\/(\d+)\/deal-master$/);
+    if (req.method === "GET" && dmProfilM) {
+      const uid = parseInt(dmProfilM[1]);
+      const laureat = db.prepare(`SELECT dml.*, dme.label AS edition_label, dme.periode_debut, dme.periode_fin
+        FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
+        WHERE dml.user_id=? AND dml.actif=1 ORDER BY dml.edition_id DESC LIMIT 1`).get(uid);
+      const historique = db.prepare(`SELECT dml.rang, dml.score, dme.label AS edition_label, dme.periode_debut
+        FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
+        WHERE dml.user_id=? ORDER BY dml.edition_id DESC`).all(uid);
+      return sendJSON(res, 200, { laureat: laureat || null, historique });
     }
 
     /* ═══════════════════════════════════════════════════════════

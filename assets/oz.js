@@ -180,6 +180,14 @@
     { re: /sant[eé]|m[eé]decin|clinique|pharmacie|assistance\s+m[eé]dicale/i, id: 'partenaires_sante' },
     { re: /recommand[ea]?\s+(moi|des?)\s+partenaire|quel\s+partenaire|qui\s+peut\s+m.aider/i, id: 'partenaires_recommander' },
 
+    // ── Deal Master ──
+    { re: /deal\s*master|distinction\s+deal|meilleurs?\s+(profils?|deal)/i, id: 'dm_info' },
+    { re: /comment\s+(devenir|obtenir|avoir)\s+(le?\s+)?badge?\s+deal|comment\s+gagner\s+deal\s*master/i, id: 'dm_comment_devenir' },
+    { re: /mon\s+(score|classement|rang)\s+deal|ou\s+(en\s+suis[-\s]?je|est\s+mon\s+classement)\s+deal/i, id: 'dm_mon_score' },
+    { re: /pourquoi\s+(je\s+n.ai\s+pas|pas\s+(obtenu|eu))\s+deal\s*master|criteres?\s+deal\s*master/i, id: 'dm_criteres' },
+    { re: /hall\s+of\s+fame|laureats?\s+deal\s*master|voir\s+(les?\s+)?deal\s*masters?/i, id: 'dm_hall_of_fame' },
+    { re: /deal\s*master\s+(actuel|du\s+semestre|ce\s+semestre)|qui\s+est\s+(deal\s*master|le\s+meilleur)/i, id: 'dm_actuel' },
+
     // ── Profil public — réseau & communs
     { re: /affiche?\s+(mes?\s+)?abonn[eé]s?\b|mes?\s+abonn[eé]s?\b|qui\s+(me\s+)?suit/i, id: 'profil_abonnes' },
     { re: /comptes?\s+que\s+je\s+suis|affiche?\s+(mes?\s+)?suivis?|qui\s+est\-ce\s+que\s+je\s+suis/i, id: 'profil_suivis' },
@@ -855,6 +863,74 @@
         } catch(e) {
           addMsg('oz', `Consultez l'[annuaire des Partenaires Officiels](/partenaires.html) pour trouver des experts de confiance.`);
         }
+        break;
+      }
+
+      /* ── DEAL MASTER ── */
+      case 'dm_info': {
+        const criteres = await fetch('/api/deal-master/criteres').then(r=>r.json()).catch(()=>({criteres:[]}));
+        let msg = `⭐ **La distinction Deal Master** est une reconnaissance d'excellence semestrielle sur Diaspo'Actif.\n\n`;
+        msg += `Elle est attribuée **automatiquement** aux **10% des profils les plus performants** dans la gestion de Deals, sur la base de :\n`;
+        (criteres.criteres||[]).forEach(c => { msg += `• **${c.label}** (poids: ${c.poids}) — ${c.description}\n`; });
+        msg += `\n📅 Le calcul a lieu chaque semestre. La distinction est temporaire et peut être obtenue plusieurs fois.\n`;
+        msg += `\n[Voir le Hall of Fame →](/hall-of-fame.html)`;
+        addMsg('oz', msg); break;
+      }
+      case 'dm_comment_devenir': {
+        const criteres = await fetch('/api/deal-master/criteres').then(r=>r.json()).catch(()=>({criteres:[]}));
+        let msg = `🎯 **Pour devenir Deal Master**, améliorez vos performances sur ces critères :\n\n`;
+        (criteres.criteres||[]).sort((a,b)=>b.poids-a.poids).forEach(c => {
+          msg += `**${c.label}** (×${c.poids}) — ${c.description}\n`;
+        });
+        msg += `\n💡 Les critères sont pondérés : concentrez-vous en priorité sur les Deals finalisés et le taux de réussite.\n`;
+        msg += `\nLa distinction est attribuée automatiquement — aucune candidature n'est nécessaire. [Consulter les critères →](/hall-of-fame.html)`;
+        addMsg('oz', msg); break;
+      }
+      case 'dm_mon_score': {
+        try {
+          const d = await fetch('/api/deal-master/mon-score', { credentials:'include' }).then(r=>r.json());
+          if (d.error) { addMsg('oz', 'Connectez-vous pour consulter votre score Deal Master. [Se connecter →](/login.html)'); break; }
+          let msg = '';
+          if (d.is_deal_master) {
+            msg = `⭐ **Félicitations ! Vous êtes Deal Master** (${d.laureat_actuel?.edition_label||''}).\n`;
+            msg += `Score : **${d.score?.score?.toFixed(1)||'—'}/100** · Rang : **#${d.score?.rang||'—'}** sur ${d.score?.rang_total||'—'} profils.\n`;
+            msg += `\n[Voir votre profil dans le Hall of Fame →](/hall-of-fame.html)`;
+          } else {
+            const s = d.score?.score || 0;
+            msg = `📊 **Votre score Deal Master actuel : ${s.toFixed(1)}/100**\n`;
+            if (d.score?.rang) msg += `Rang : **#${d.score.rang}** sur ${d.score.rang_total} profils.\n`;
+            msg += `\nPour rejoindre le top 10%, finalisez plus de Deals avec succès et obtenez de bonnes évaluations. [Voir les critères →](/hall-of-fame.html#criteres)`;
+          }
+          addMsg('oz', msg);
+        } catch(e) { addMsg('oz', 'Connectez-vous pour consulter votre score Deal Master. [Se connecter →](/login.html)'); }
+        break;
+      }
+      case 'dm_criteres': {
+        const criteres = await fetch('/api/deal-master/criteres').then(r=>r.json()).catch(()=>({criteres:[]}));
+        let msg = `📋 **Critères de sélection Deal Master :**\n\n`;
+        (criteres.criteres||[]).forEach(c => { msg += `• **${c.label}** (poids ${c.poids}) — ${c.description}\n`; });
+        msg += `\nSi vous n'avez pas obtenu le badge, c'est que d'autres profils ont obtenu de meilleures performances sur ces critères lors du dernier calcul semestriel.\n`;
+        msg += `\n[Voir les critères détaillés →](/hall-of-fame.html)`;
+        addMsg('oz', msg); break;
+      }
+      case 'dm_hall_of_fame': {
+        addMsg('oz', `🏆 **Hall of Fame – Deal Masters** : découvrez les profils les plus performants sur Diaspo'Actif, leurs éditions, scores et témoignages.\n\n[Ouvrir le Hall of Fame →](/hall-of-fame.html)`);
+        break;
+      }
+      case 'dm_actuel': {
+        try {
+          const d = await fetch('/api/deal-master/actuel').then(r=>r.json());
+          const laureats = d.laureats || [];
+          if (!laureats.length) { addMsg('oz', `Aucun Deal Master n'a encore été désigné. Le prochain calcul aura lieu en fin de semestre. [En savoir plus →](/hall-of-fame.html)`); break; }
+          let msg = `⭐ **Deal Masters du ${d.edition?.label||'semestre en cours'}** :\n\n`;
+          laureats.slice(0,5).forEach(l => {
+            const nom = [l.prenom,l.nom].filter(Boolean).join(' ') || '—';
+            msg += `**#${l.rang} ${nom}** — Score : ${(l.score||0).toFixed(1)}/100\n`;
+          });
+          if (laureats.length > 5) msg += `\n… et ${laureats.length - 5} autres lauréats.`;
+          msg += `\n\n[Voir le Hall of Fame complet →](/hall-of-fame.html)`;
+          addMsg('oz', msg);
+        } catch(e) { addMsg('oz', `[Consultez le Hall of Fame →](/hall-of-fame.html) pour voir les Deal Masters du semestre.`); }
         break;
       }
 
