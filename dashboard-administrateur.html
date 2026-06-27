@@ -65,6 +65,7 @@
       <a href="#chatbot" data-section="chatbot">🧠 Mémoire Chatbot</a>
       <a href="#faq" data-section="faq">💡 Gestion FAQ</a>
       <a href="#faq-sr" data-section="faq-sr">❓ Questions sans réponse</a>
+      <a href="#oz-admin" data-section="oz-admin">🤖 O-Z Intelligence</a>
       <a href="#onboarding" data-section="onboarding">🎓 Tutoriels d'accueil</a>
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
     </aside>
@@ -1106,6 +1107,109 @@
           </div>
         </div>
       </section>
+
+      <!-- ══════════ O-Z ADMINISTRATION ══════════ -->
+      <section id="section-oz-admin" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div>
+            <h2 style="font-size:20px;font-weight:800;color:#1a1a2e;">🤖 O-Z — Intelligence Artificielle</h2>
+            <p style="color:#6b7280;font-size:13px;margin-top:2px;">Superviser, former et analyser O-Z, l'assistant officiel Diaspo'Actif.</p>
+          </div>
+        </div>
+
+        <!-- Onglets -->
+        <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #e5e7eb;padding-bottom:0;">
+          <button class="oz-adm-tab active" data-tab="stats" onclick="ozAdmTab('stats')" style="padding:8px 18px;border:none;background:none;font-weight:700;font-size:13px;color:#4a90d9;border-bottom:3px solid #4a90d9;cursor:pointer;margin-bottom:-2px;">📊 Statistiques</button>
+          <button class="oz-adm-tab" data-tab="audit" onclick="ozAdmTab('audit')" style="padding:8px 18px;border:none;background:none;font-weight:600;font-size:13px;color:#6b7280;cursor:pointer;margin-bottom:-2px;">📋 Journal d'audit</button>
+          <button class="oz-adm-tab" data-tab="kb" onclick="ozAdmTab('kb')" style="padding:8px 18px;border:none;background:none;font-weight:600;font-size:13px;color:#6b7280;cursor:pointer;margin-bottom:-2px;">📚 Base de connaissances</button>
+        </div>
+
+        <!-- Tab: Statistiques -->
+        <div id="oz-tab-stats">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;">
+            <div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:14px;padding:18px;text-align:center;">
+              <div style="font-size:28px;font-weight:800;color:#4a90d9;" id="oz-k-total">—</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:4px;">Actions totales</div>
+            </div>
+            <div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:14px;padding:18px;text-align:center;">
+              <div style="font-size:28px;font-weight:800;color:#10b981;" id="oz-k-today">—</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:4px;">Aujourd'hui</div>
+            </div>
+            <div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:14px;padding:18px;text-align:center;">
+              <div style="font-size:28px;font-weight:800;color:#f59e0b;" id="oz-k-users">—</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:4px;">Utilisateurs actifs (7j)</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:14px;padding:16px;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:12px;color:#1a1a2e;">🎯 Top actions</div>
+              <div id="oz-top-actions" style="font-size:12px;color:#6b7280;">Chargement...</div>
+            </div>
+            <div style="background:#fff;border:1.5px solid #e5e7eb;border-radius:14px;padding:16px;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:12px;color:#1a1a2e;">📦 Modules les plus visités</div>
+              <div id="oz-top-modules" style="font-size:12px;color:#6b7280;">Chargement...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Audit -->
+        <div id="oz-tab-audit" style="display:none;">
+          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <input id="oz-audit-q" placeholder="🔍 Filtrer les actions..." oninput="filterOzAudit()"
+              style="flex:1;min-width:160px;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;">
+            <button onclick="loadOzAudit()" style="padding:8px 16px;background:#4a90d9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">🔄 Actualiser</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="background:#f8faff;">
+                  <th style="padding:8px 12px;text-align:left;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb;">Date</th>
+                  <th style="padding:8px 12px;text-align:left;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb;">Utilisateur</th>
+                  <th style="padding:8px 12px;text-align:left;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb;">Action</th>
+                  <th style="padding:8px 12px;text-align:left;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb;">Module/Cible</th>
+                  <th style="padding:8px 12px;text-align:left;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb;">Résultat</th>
+                </tr>
+              </thead>
+              <tbody id="oz-audit-tbody"></tbody>
+            </table>
+            <div id="oz-audit-empty" style="text-align:center;padding:30px;color:#6b7280;display:none;">Aucune action enregistrée pour le moment.</div>
+          </div>
+        </div>
+
+        <!-- Tab: Base de connaissances -->
+        <div id="oz-tab-kb" style="display:none;">
+          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <button onclick="openOzKbModal(null)" style="padding:8px 16px;background:#10b981;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">+ Ajouter une connaissance</button>
+            <button onclick="loadOzKb()" style="padding:8px 16px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;cursor:pointer;font-size:12px;">🔄 Actualiser</button>
+          </div>
+          <div id="oz-kb-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
+          <div id="oz-kb-empty" style="text-align:center;padding:30px;color:#6b7280;display:none;">Aucune connaissance dans la base. Ajoutez-en une !</div>
+        </div>
+      </section>
+
+      <!-- Modal KB -->
+      <div id="oz-kb-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:16px;padding:24px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;">
+          <h3 style="font-size:16px;font-weight:800;margin-bottom:16px;color:#1a1a2e;">📚 Connaissance O-Z</h3>
+          <input type="hidden" id="oz-kb-id">
+          <div style="margin-bottom:12px;">
+            <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px;">Sujet / Titre *</label>
+            <input id="oz-kb-topic" placeholder="Ex: événement, billetterie, contrat..." style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;box-sizing:border-box;">
+          </div>
+          <div style="margin-bottom:12px;">
+            <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px;">Contenu (réponse que O-Z donnera) *</label>
+            <textarea id="oz-kb-content" rows="5" placeholder="Expliquez ici ce que O-Z doit répondre sur ce sujet..." style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;box-sizing:border-box;resize:vertical;font-family:inherit;"></textarea>
+          </div>
+          <div style="margin-bottom:16px;">
+            <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px;">Mots-clés (séparés par des virgules)</label>
+            <input id="oz-kb-tags" placeholder="Ex: création,guide,formulaire" style="width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;box-sizing:border-box;">
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button onclick="closeOzKbModal()" style="padding:9px 20px;border:1.5px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;">Annuler</button>
+            <button onclick="saveOzKb()" style="padding:9px 20px;background:#10b981;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">💾 Enregistrer</button>
+          </div>
+        </div>
+      </div>
 
       <!-- ══════════ ONBOARDING ══════════ -->
       <section id="section-onboarding" style="display:none;">
@@ -3056,6 +3160,7 @@ async function submitAccordDirect(){
     billetterie: () => loadAdminBilletterie(),
     faq:         () => loadFaqAdmin(),
     'faq-sr':    () => loadFaqSansReponse(),
+    'oz-admin':  () => loadOzAdmin(),
     onboarding:  () => loadObAdmin(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
@@ -5764,6 +5869,166 @@ async function executeFusion(ids, gi) {
     showToast('Erreur lors de la fusion', 'error');
   }
 }
+
+/* ═══════════════════════════════════════════
+   O-Z ADMIN
+   ═══════════════════════════════════════════ */
+
+let _ozAuditRows = [];
+let _ozKbRows    = [];
+let _ozKbId      = null;
+
+function ozAdmTab(tab) {
+  ['stats','audit','kb'].forEach(t => {
+    document.getElementById('oz-tab-'+t).style.display = t===tab ? '' : 'none';
+  });
+  document.querySelectorAll('.oz-adm-tab').forEach(b => {
+    const active = b.dataset.tab === tab;
+    b.style.fontWeight = active ? '700' : '600';
+    b.style.color      = active ? '#4a90d9' : '#6b7280';
+    b.style.borderBottom = active ? '3px solid #4a90d9' : 'none';
+  });
+  if (tab==='audit')  loadOzAudit();
+  if (tab==='kb')     loadOzKb();
+  if (tab==='stats')  loadOzStats();
+}
+
+async function loadOzAdmin() {
+  await loadOzStats();
+}
+
+async function loadOzStats() {
+  try {
+    const s = await _obFetch('GET', '/api/oz/stats');
+    if (!s || s.error) return;
+    document.getElementById('oz-k-total').textContent  = s.total_actions ?? '—';
+    document.getElementById('oz-k-today').textContent  = s.today         ?? '—';
+    document.getElementById('oz-k-users').textContent  = s.users_actifs  ?? '—';
+
+    const ta = document.getElementById('oz-top-actions');
+    if (ta && s.by_action?.length) {
+      ta.innerHTML = s.by_action.map(a =>
+        `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f3f4f6;">
+          <span style="color:#374151;">${a.action}</span>
+          <span style="font-weight:700;color:#4a90d9;">${a.n}</span>
+        </div>`
+      ).join('');
+    } else if (ta) ta.innerHTML = '<span>Aucune donnée.</span>';
+
+    const tm = document.getElementById('oz-top-modules');
+    if (tm && s.top_modules?.length) {
+      tm.innerHTML = s.top_modules.map(m =>
+        `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f3f4f6;">
+          <span style="color:#374151;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.module}</span>
+          <span style="font-weight:700;color:#10b981;">${m.n}</span>
+        </div>`
+      ).join('');
+    } else if (tm) tm.innerHTML = '<span>Aucune navigation enregistrée.</span>';
+  } catch(e) { console.error(e); }
+}
+
+async function loadOzAudit() {
+  const rows = await _obFetch('GET', '/api/oz/audit?limit=100');
+  _ozAuditRows = Array.isArray(rows) ? rows : [];
+  renderOzAudit(_ozAuditRows);
+}
+
+function renderOzAudit(rows) {
+  const tbody = document.getElementById('oz-audit-tbody');
+  const empty = document.getElementById('oz-audit-empty');
+  if (!tbody) return;
+  if (!rows.length) { tbody.innerHTML=''; if(empty) empty.style.display=''; return; }
+  if(empty) empty.style.display='none';
+  tbody.innerHTML = rows.map(r => {
+    const dt = r.created_at ? new Date(r.created_at) : null;
+    const dtStr = dt ? `${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()} ${dt.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'})}` : '—';
+    return `<tr style="border-bottom:1px solid #f3f4f6;">
+      <td style="padding:8px 12px;color:#6b7280;font-size:11px;white-space:nowrap;">${dtStr}</td>
+      <td style="padding:8px 12px;font-size:12px;">${r.user_nom||'<span style="color:#9ca3af">Anonyme</span>'}</td>
+      <td style="padding:8px 12px;"><span style="background:#f0f5ff;color:#4a90d9;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">${r.action||'—'}</span></td>
+      <td style="padding:8px 12px;font-size:11px;color:#374151;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.module||'—'}</td>
+      <td style="padding:8px 12px;"><span style="color:${r.result==='ok'?'#10b981':'#ef4444'};font-size:11px;font-weight:600;">${r.result||'—'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterOzAudit() {
+  const q = (document.getElementById('oz-audit-q')?.value||'').toLowerCase();
+  if (!q) { renderOzAudit(_ozAuditRows); return; }
+  renderOzAudit(_ozAuditRows.filter(r => (r.action||'').includes(q)||(r.module||'').includes(q)||(r.user_nom||'').toLowerCase().includes(q)));
+}
+
+async function loadOzKb() {
+  const rows = await _obFetch('GET', '/api/oz/knowledge/all');
+  _ozKbRows = Array.isArray(rows) ? rows : [];
+  const grid  = document.getElementById('oz-kb-grid');
+  const empty = document.getElementById('oz-kb-empty');
+  if (!grid) return;
+  if (!_ozKbRows.length) { grid.innerHTML=''; if(empty) empty.style.display=''; return; }
+  if(empty) empty.style.display='none';
+  grid.innerHTML = _ozKbRows.map(r => `
+    <div style="background:#fff;border:1.5px solid ${r.actif?'#e5e7eb':'#fca5a5'};border-radius:12px;padding:14px;position:relative;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-weight:700;font-size:13px;color:#1a1a2e;">${r.topic}</span>
+        <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${r.actif?'#dcfce7':'#fee2e2'};color:${r.actif?'#166534':'#991b1b'};font-weight:600;">${r.actif?'Actif':'Inactif'}</span>
+      </div>
+      <p style="font-size:12px;color:#374151;line-height:1.55;margin-bottom:8px;">${r.content.length>150?r.content.slice(0,150)+'…':r.content}</p>
+      ${r.tags ? `<div style="font-size:10px;color:#9ca3af;margin-bottom:10px;">🏷️ ${r.tags}</div>` : ''}
+      <div style="display:flex;gap:6px;">
+        <button onclick="openOzKbModal(${r.id})" style="padding:5px 12px;background:#f3f4f6;border:none;border-radius:7px;cursor:pointer;font-size:11px;font-weight:600;color:#374151;">✏️ Modifier</button>
+        <button onclick="toggleOzKb(${r.id},${r.actif?0:1})" style="padding:5px 12px;background:${r.actif?'#fee2e2':'#dcfce7'};border:none;border-radius:7px;cursor:pointer;font-size:11px;font-weight:600;color:${r.actif?'#dc2626':'#166534'};">${r.actif?'🚫 Désactiver':'✅ Activer'}</button>
+      </div>
+    </div>`
+  ).join('');
+}
+
+function openOzKbModal(id) {
+  _ozKbId = id;
+  const row = id ? _ozKbRows.find(r=>r.id===id) : null;
+  document.getElementById('oz-kb-id').value       = id||'';
+  document.getElementById('oz-kb-topic').value    = row?.topic  || '';
+  document.getElementById('oz-kb-content').value  = row?.content|| '';
+  document.getElementById('oz-kb-tags').value     = row?.tags   || '';
+  document.getElementById('oz-kb-modal-bg').style.display = 'flex';
+}
+
+function closeOzKbModal() {
+  document.getElementById('oz-kb-modal-bg').style.display = 'none';
+  _ozKbId = null;
+}
+
+async function saveOzKb() {
+  const topic   = document.getElementById('oz-kb-topic').value.trim();
+  const content = document.getElementById('oz-kb-content').value.trim();
+  const tags    = document.getElementById('oz-kb-tags').value.trim();
+  if (!topic||!content) { showToast('Sujet et contenu requis','error'); return; }
+  const id = document.getElementById('oz-kb-id').value;
+  if (id) {
+    await _obFetch('PUT', `/api/oz/knowledge/${id}`, { topic, content, tags, actif: 1 });
+  } else {
+    await _obFetch('POST', '/api/oz/knowledge', { topic, content, tags });
+  }
+  closeOzKbModal(); await loadOzKb();
+  showToast('✅ Connaissance enregistrée !');
+}
+
+async function toggleOzKb(id, actif) {
+  const row = _ozKbRows.find(r=>r.id===id);
+  if (!row) return;
+  await _obFetch('PUT', `/api/oz/knowledge/${id}`, { topic:row.topic, content:row.content, tags:row.tags||'', actif });
+  await loadOzKb();
+  showToast(actif ? '✅ Connaissance activée' : 'Connaissance désactivée');
+}
+
+window.loadOzAdmin    = loadOzAdmin;
+window.ozAdmTab       = ozAdmTab;
+window.loadOzAudit    = loadOzAudit;
+window.filterOzAudit  = filterOzAudit;
+window.loadOzKb       = loadOzKb;
+window.openOzKbModal  = openOzKbModal;
+window.closeOzKbModal = closeOzKbModal;
+window.saveOzKb       = saveOzKb;
+window.toggleOzKb     = toggleOzKb;
 
 window.loadFaqSansReponse = loadFaqSansReponse;
 window.filterSrLocal      = filterSrLocal;

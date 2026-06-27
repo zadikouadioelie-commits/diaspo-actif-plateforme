@@ -4007,6 +4007,58 @@ async function scrapeSite() {
     first_asked_at TEXT DEFAULT (datetime('now')),
     last_asked_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  /* ── O-Z : tables ── */
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS oz_settings (
+    user_id INTEGER PRIMARY KEY,
+    avatar TEXT DEFAULT 'robot',
+    avatar_custom TEXT,
+    theme TEXT DEFAULT 'auto',
+    size TEXT DEFAULT 'medium',
+    animations INTEGER DEFAULT 1,
+    voice_enabled INTEGER DEFAULT 0,
+    language TEXT DEFAULT 'fr',
+    pos_x INTEGER,
+    pos_y INTEGER,
+    updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS oz_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    action TEXT,
+    module TEXT,
+    params TEXT,
+    result TEXT,
+    ip TEXT,
+    created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS oz_knowledge (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topic TEXT NOT NULL,
+    content TEXT NOT NULL,
+    tags TEXT,
+    actif INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  /* ── O-Z : seed base de connaissance ── */
+  if ((db.prepare('SELECT COUNT(*) n FROM oz_knowledge').get()?.n || 0) === 0) {
+    const kbItems = [
+      ['événement', "Pour créer un événement, allez dans le module Événements et cliquez sur 'Créer un événement'. Vous pouvez définir un titre, une date, un lieu et inviter des participants.", 'evenement,creation,guide'],
+      ['initiative', "Les initiatives permettent de lancer des projets communautaires. Rendez-vous dans le module Initiatives et cliquez sur 'Nouvelle initiative'.", 'initiative,projet,diaspora'],
+      ['billetterie', "La billetterie vous permet de vendre des billets pour vos événements. Créez d'abord un événement puis activez la billetterie dans ses paramètres.", 'billetterie,billet,vente'],
+      ['contrat', "Le module Contrats permet de générer et signer des contrats de partenariat. Accédez-y depuis votre tableau de bord.", 'contrat,partenariat,legal'],
+      ['profil', "Pour modifier votre profil, allez dans Paramètres > Mon profil. Vous pouvez mettre à jour vos informations, photo et préférences.", 'profil,compte,parametre'],
+      ['messagerie', "Pour envoyer un message, allez dans la Messagerie ou cliquez sur le profil d'un membre et utilisez 'Envoyer un message'.", 'message,messagerie,communication'],
+      ['partenariat', "Pour trouver des partenaires, utilisez l'Annuaire et filtrez par type de compte, pays ou secteur d'activité.", 'partenariat,annuaire,recherche'],
+      ["Diaspo'Actif", "Diaspo'Actif est la plateforme officielle de la diaspora africaine. Elle connecte membres, initiatives, collectivités et institutions pour faciliter le développement.", 'diaspoactif,plateforme,diaspora'],
+      ['formation', "Le module Formations permet d'accéder à des contenus pédagogiques et d'organiser des sessions de formation pour la diaspora.", 'formation,education,apprentissage'],
+      ['visioconférence', "La visioconférence permet d'organiser des réunions en ligne avec des membres de la diaspora partout dans le monde.", 'visio,reunion,conference,video'],
+      ['statistiques', "Le module Statistiques donne accès aux indicateurs clés de la plateforme : membres actifs, événements, initiatives, engagement.", 'statistiques,analytics,donnees'],
+      ['annuaire', "L'annuaire recense tous les membres, initiatives, entreprises et associations présents sur Diaspo'Actif. Filtrez par pays, secteur ou type de compte.", 'annuaire,membres,recherche,repertoire'],
+    ];
+    kbItems.forEach(([t,c,g]) => db.prepare('INSERT INTO oz_knowledge (topic,content,tags) VALUES (?,?,?)').run(t,c,g));
+  }
 })();
 
 /* ── Helpers ── */
@@ -4780,6 +4832,100 @@ route("GET", "/api/onboarding/admin/stats", async (req, res) => {
   const top_abandon     = db.prepare(`SELECT step_id, COUNT(*) n FROM onboarding_stats WHERE action='abandon' GROUP BY step_id ORDER BY n DESC LIMIT 5`).all();
   const top_skip_steps  = db.prepare(`SELECT step_id, COUNT(*) n FROM onboarding_stats WHERE action='step_skip' GROUP BY step_id ORDER BY n DESC LIMIT 5`).all();
   sendJSON(res, 200, { total_started, total_finished, total_skipped, avg_note, by_role, top_abandon, top_skip_steps });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   O-Z — INTELLIGENCE ARTIFICIELLE OFFICIELLE
+   ════════════════════════════════════════════════════════════════ */
+
+route("GET", "/api/oz/settings", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 200, {});
+  const s = db.prepare('SELECT * FROM oz_settings WHERE user_id=?').get(user.id);
+  sendJSON(res, 200, s || {});
+});
+
+route("PUT", "/api/oz/settings", async (req, res, _p, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Non connecté' });
+  const { avatar, theme, size, animations, voice_enabled, language, pos_x, pos_y } = body;
+  db.prepare(`INSERT INTO oz_settings (user_id,avatar,theme,size,animations,voice_enabled,language,pos_x,pos_y,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET
+    avatar=excluded.avatar, theme=excluded.theme, size=excluded.size,
+    animations=excluded.animations, voice_enabled=excluded.voice_enabled,
+    language=excluded.language, pos_x=excluded.pos_x, pos_y=excluded.pos_y,
+    updated_at=datetime('now')
+  `).run(user.id, avatar||'robot', theme||'auto', size||'medium', animations??1, voice_enabled??0, language||'fr', pos_x||null, pos_y||null);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/oz/audit", async (req, res, _p, body) => {
+  const user = getCurrentUser(req);
+  const { action, module, params, result } = body;
+  db.prepare('INSERT INTO oz_audit (user_id,action,module,params,result) VALUES (?,?,?,?,?)')
+    .run(user?.id||null, action||'', module||'', params||null, result||'ok');
+  sendJSON(res, 201, { ok: true });
+});
+
+route("GET", "/api/oz/audit", async (req, res, _p, _b, query) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const limit = parseInt(query.limit)||100;
+  const rows = db.prepare(
+    `SELECT a.*, u.nom user_nom, u.prenom user_prenom
+     FROM oz_audit a LEFT JOIN users u ON u.id=a.user_id
+     ORDER BY a.id DESC LIMIT ?`
+  ).all(limit);
+  sendJSON(res, 200, rows);
+});
+
+route("GET", "/api/oz/stats", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const total_actions = db.prepare('SELECT COUNT(*) n FROM oz_audit').get()?.n || 0;
+  const today         = db.prepare("SELECT COUNT(*) n FROM oz_audit WHERE date(created_at)=date('now')").get()?.n || 0;
+  const by_action     = db.prepare('SELECT action, COUNT(*) n FROM oz_audit GROUP BY action ORDER BY n DESC LIMIT 10').all();
+  const users_actifs  = db.prepare("SELECT COUNT(DISTINCT user_id) n FROM oz_audit WHERE date(created_at)>=date('now','-7 days')").get()?.n || 0;
+  const top_modules   = db.prepare("SELECT module, COUNT(*) n FROM oz_audit WHERE module IS NOT NULL AND module!='' GROUP BY module ORDER BY n DESC LIMIT 5").all();
+  sendJSON(res, 200, { total_actions, today, by_action, users_actifs, top_modules });
+});
+
+route("GET", "/api/oz/knowledge", async (req, res) => {
+  const rows = db.prepare('SELECT * FROM oz_knowledge WHERE actif=1 ORDER BY id').all();
+  sendJSON(res, 200, rows);
+});
+
+route("GET", "/api/oz/knowledge/all", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const rows = db.prepare('SELECT * FROM oz_knowledge ORDER BY actif DESC, id').all();
+  sendJSON(res, 200, rows);
+});
+
+route("POST", "/api/oz/knowledge", async (req, res, _p, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const { topic, content, tags } = body;
+  if (!topic || !content) return sendJSON(res, 400, { error: 'topic + content requis' });
+  const r = db.prepare('INSERT INTO oz_knowledge (topic,content,tags) VALUES (?,?,?)').run(topic.trim(), content.trim(), tags||'');
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/oz/knowledge/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const { topic, content, tags, actif } = body;
+  db.prepare(`UPDATE oz_knowledge SET topic=?,content=?,tags=?,actif=?,updated_at=datetime('now') WHERE id=?`)
+    .run(topic||'', content||'', tags||'', actif??1, parseInt(params.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/oz/knowledge/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  db.prepare('UPDATE oz_knowledge SET actif=0 WHERE id=?').run(parseInt(params.id));
+  sendJSON(res, 200, { ok: true });
 });
 
 async function handleRequest(req, res) {

@@ -2720,4 +2720,12 @@ document.addEventListener("DOMContentLoaded", ()=>{
     setTimeout(beat, 10000);
     setInterval(beat, 30000);
   })();
+
+  // ── O-Z : chargement automatique sur toutes les pages
+  if (!window.__OZ_LOADED && !document.getElementById('oz-root')) {
+    const _ozS = document.createElement('script');
+    _ozS.src = '/assets/oz.js';
+    _ozS.defer = true;
+    document.head.appendChild(_ozS);
+  }
 });
