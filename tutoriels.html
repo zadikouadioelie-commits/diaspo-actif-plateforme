@@ -280,7 +280,8 @@ let _favs    = JSON.parse(localStorage.getItem('da_tuto_favs') || '[]');
 let _hist    = JSON.parse(localStorage.getItem('da_tuto_hist') || '[]');
 let _activeRole = null;
 let _activeCat  = 'all';
-let _searchQ    = '';
+let _searchQ    = '';   /* saisie libre dans la barre de recherche */
+let _activeTag  = '';   /* clic sur un bouton tag — correspondance exacte */
 
 function toggleFav(id) {
   const idx = _favs.indexOf(id);
@@ -332,9 +333,18 @@ function renderCards(container, list) {
 function filtered(list) {
   return list.filter(t => {
     if (_activeCat !== 'all' && t.cat !== _activeCat) return false;
-    if (_searchQ && !t.titre.toLowerCase().includes(_searchQ) && !t.desc.toLowerCase().includes(_searchQ) && !t.tags.join(' ').includes(_searchQ)) return false;
+    /* Tag exact : doit figurer dans le tableau t.tags */
+    if (_activeTag && !t.tags.includes(_activeTag)) return false;
+    /* Recherche texte libre : sous-chaîne dans titre ou desc */
+    if (_searchQ && !t.titre.toLowerCase().includes(_searchQ) && !t.desc.toLowerCase().includes(_searchQ)) return false;
     return true;
   });
+}
+function hasActiveFilter() { return !!_searchQ || !!_activeTag; }
+function activeFilterLabel() {
+  if (_activeTag) return `🏷️ ${CATALOGUE.filter(t=>t.tags.includes(_activeTag)).length} tutoriel${CATALOGUE.filter(t=>t.tags.includes(_activeTag)).length!==1?'s':''} pour le tag « ${_activeTag} »`;
+  if (_searchQ)   return `🔍 ${filtered(CATALOGUE).length} résultat${filtered(CATALOGUE).length!==1?'s':''} pour « ${_searchQ} »`;
+  return '';
 }
 
 /* ── Rendu complet ── */
@@ -350,14 +360,14 @@ function renderAll() {
   document.getElementById('cnt-fav').textContent       = _favs.length;
   document.getElementById('cnt-hist').textContent      = _hist.length;
 
-  /* Tab Explorer — afficher résultats si recherche/tag actif, sinon vue par défaut */
+  /* Tab Explorer — résultats si filtre actif, sinon recommandés + nouveaux */
   const base = filtered(CATALOGUE);
   const secSearch  = document.getElementById('section-search');
   const secDefault = document.getElementById('section-default');
-  if (_searchQ) {
+  if (hasActiveFilter()) {
     secSearch.style.display  = 'block';
     secDefault.style.display = 'none';
-    document.getElementById('search-label').textContent = `🔍 ${base.length} tutoriel${base.length!==1?'s':''} pour « ${_searchQ} »`;
+    document.getElementById('search-label').textContent = activeFilterLabel();
     renderCards(document.getElementById('cards-search'), base);
     document.getElementById('search-empty').style.display = base.length === 0 ? 'block' : 'none';
   } else {
@@ -437,9 +447,10 @@ function renderTags() {
     b.className = 'tuto-tag';
     b.textContent = tag;
     b.addEventListener('click', () => {
-      _searchQ = _searchQ === tag ? '' : tag;
+      _activeTag = _activeTag === tag ? '' : tag;
+      _searchQ   = '';
       document.getElementById('tuto-search').value = '';
-      bar.querySelectorAll('.tuto-tag').forEach(el => el.classList.toggle('active', el.textContent === _searchQ));
+      bar.querySelectorAll('.tuto-tag').forEach(el => el.classList.toggle('active', el.textContent === _activeTag));
       renderAll();
     });
     bar.appendChild(b);
@@ -468,8 +479,8 @@ document.querySelectorAll('.tuto-cat-btn[data-cat]').forEach(btn => {
 
 /* ── Recherche ── */
 document.getElementById('tuto-search').addEventListener('input', e => {
-  _searchQ = e.target.value.trim().toLowerCase();
-  /* Désactiver tout tag actif quand on tape */
+  _searchQ   = e.target.value.trim().toLowerCase();
+  _activeTag = '';
   document.querySelectorAll('.tuto-tag.active').forEach(el => el.classList.remove('active'));
   renderAll();
 });
