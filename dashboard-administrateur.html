@@ -71,6 +71,7 @@
       <a href="#deals-admin" data-section="deals-admin">🤝 Gérer un Deal</a>
       <a href="#partenaires-admin" data-section="partenaires-admin">🏅 Partenaires Officiels</a>
       <a href="#deal-master-admin" data-section="deal-master-admin">⭐ Deal Master</a>
+      <a href="#temoignages-admin" data-section="temoignages-admin">💬 Témoignages</a>
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
     </aside>
 
@@ -1643,6 +1644,29 @@
             <div style="text-align:center;padding:32px;color:var(--muted);">Chargement…</div>
           </div>
           <div id="dm-crit-msg" style="font-size:12px;margin-top:10px;display:none;"></div>
+        </div>
+      </section>
+
+      <!-- ══════════ SECTION TÉMOIGNAGES ══════════ -->
+      <section id="section-temoignages-admin" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;"><h2 style="margin:0;">💬 Ils ont rejoint Diaspo'Actif — Modération</h2></div>
+          <button onclick="loadTemoignagesAdmin()" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;">↻ Actualiser</button>
+        </div>
+        <div id="temoignages-admin-stats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;"></div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;white-space:nowrap;">Utilisateur</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Note</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Aperçu</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Type</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Score</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Statut</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Actions</th>
+            </tr></thead>
+            <tbody id="temoignages-admin-tbody"></tbody>
+          </table>
         </div>
       </section>
 
@@ -3486,7 +3510,8 @@ async function submitAccordDirect(){
     packages:    () => loadPackages(),
     'deals-admin':       () => loadAdminDeals(),
     'partenaires-admin': () => loadPartenairesAdmin(),
-    'deal-master-admin': () => loadDmAdmin(),
+    'deal-master-admin':   () => loadDmAdmin(),
+    'temoignages-admin':   () => loadTemoignagesAdmin(),
     parametres:  () => loadParametres(),
     publicites:  () => loadPublicites(),
     chatbot:     () => switchCbTab('stats'),
@@ -7094,6 +7119,67 @@ async function savePoConfig() {
   } catch(e) {
     msg.style.display='block'; msg.style.color='#dc2626'; msg.textContent='Erreur : '+e.message;
   }
+}
+
+/* ═══ TÉMOIGNAGES ADMIN ═══ */
+const STATUT_LABEL = { en_attente:'🕐 En attente', approuve:'✅ Approuvé', rejete:'❌ Rejeté', signale:'🚩 Signalé' };
+const STATUT_COLOR = { en_attente:'#92400e', approuve:'#15803d', rejete:'#dc2626', signale:'#9333ea' };
+const STATUT_BG    = { en_attente:'#fef3c7', approuve:'#f0fdf4', rejete:'#fef2f2', signale:'#f3e8ff' };
+
+async function loadTemoignagesAdmin() {
+  const tbody = document.getElementById('temoignages-admin-tbody');
+  const stats = document.getElementById('temoignages-admin-stats');
+  try {
+    const d = await api('GET', '/admin/temoignages');
+    const temos = d.temoignages || [];
+    // Stats
+    const counts = { en_attente:0, approuve:0, rejete:0, signale:0 };
+    temos.forEach(t => { if (counts[t.statut] !== undefined) counts[t.statut]++; });
+    stats.innerHTML = [
+      ['Total',temos.length,'#1e3a8a','#eff6ff'],
+      ['En attente',counts.en_attente,'#92400e','#fef3c7'],
+      ['Approuvés',counts.approuve,'#15803d','#f0fdf4'],
+      ['Rejetés',counts.rejete,'#dc2626','#fef2f2'],
+    ].map(([l,v,c,bg]) => `<div style="background:${bg};border-radius:12px;padding:14px 16px;text-align:center;">
+      <div style="font-size:22px;font-weight:900;color:${c};">${v}</div>
+      <div style="font-size:11px;color:#64748b;font-weight:600;">${l}</div>
+    </div>`).join('');
+    // Table
+    tbody.innerHTML = temos.map(t => `<tr style="border-bottom:1px solid #f1f5f9;">
+      <td style="padding:10px 12px;">
+        <div style="font-weight:700;font-size:13px;">${t.user_nom}</div>
+        <div style="font-size:11px;color:#64748b;">${t.user_email}</div>
+        ${t.pays_utilisateur?`<div style="font-size:11px;color:#94a3b8;">${t.pays_utilisateur}</div>`:''}
+      </td>
+      <td style="padding:10px 12px;color:#f59e0b;">${t.note ? '★'.repeat(t.note)+'☆'.repeat(5-t.note) : '—'}</td>
+      <td style="padding:10px 12px;max-width:260px;">
+        <div style="font-size:12px;color:#374151;font-style:italic;">"${(t.description||'').slice(0,120)}${(t.description||'').length>120?'…':''}"</div>
+        ${t.points_positifs?`<div style="font-size:11px;color:#15803d;margin-top:4px;">✅ ${t.points_positifs.slice(0,80)}</div>`:''}
+        ${t.consentement_affichage?`<div style="font-size:11px;color:#1d4ed8;margin-top:2px;">👤 Affiché : ${t.nom_affichage||'—'}</div>`:'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">Anonyme uniquement</div>'}
+      </td>
+      <td style="padding:10px 12px;font-size:12px;color:#475569;">${{personnel:'Particulier',professionnel:'Pro',organisation:'Organisation',collectivite:'Collectivité'}[t.type_usage]||t.type_usage}</td>
+      <td style="padding:10px 12px;font-weight:700;color:#1e3a8a;">${(t.score_pertinence||0).toFixed(1)}</td>
+      <td style="padding:10px 12px;">
+        <span style="background:${STATUT_BG[t.statut]};color:${STATUT_COLOR[t.statut]};border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;">${STATUT_LABEL[t.statut]||t.statut}</span>
+      </td>
+      <td style="padding:10px 12px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${t.statut!=='approuve'?`<button onclick="setTemoignageStatut(${t.id},'approuve')" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">✅ Approuver</button>`:''}
+          ${t.statut!=='rejete'?`<button onclick="setTemoignageStatut(${t.id},'rejete')" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">❌ Rejeter</button>`:''}
+          ${t.statut!=='signale'?`<button onclick="setTemoignageStatut(${t.id},'signale')" style="background:#9333ea;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">🚩 Signaler</button>`:''}
+        </div>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;padding:24px;color:#94a3b8;">Aucun témoignage reçu</td></tr>';
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:#dc2626;padding:12px;">Erreur : ${e.message}</td></tr>`;
+  }
+}
+
+async function setTemoignageStatut(id, statut) {
+  try {
+    await api('PUT', `/admin/temoignages/${id}/statut`, { statut });
+    loadTemoignagesAdmin();
+  } catch(e) { alert('Erreur : '+e.message); }
 }
 </script>
 </body>

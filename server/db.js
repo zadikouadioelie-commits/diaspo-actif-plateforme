@@ -47,6 +47,9 @@ db.exec(`
     is_official         INTEGER DEFAULT 0,
     is_deal_master      INTEGER DEFAULT 0,
     deal_master_edition_id INTEGER,
+    nb_connexions       INTEGER DEFAULT 0,
+    temoignage_statut   TEXT DEFAULT 'non_demande' CHECK(temoignage_statut IN ('non_demande','en_attente','fourni','refuse')),
+    temoignage_derniere_demande TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -1009,6 +1012,9 @@ const MIGRATIONS = [
   ["users", "is_official INTEGER DEFAULT 0"],
   ["users", "is_deal_master INTEGER DEFAULT 0"],
   ["users", "deal_master_edition_id INTEGER"],
+  ["users", "nb_connexions INTEGER DEFAULT 0"],
+  ["users", "temoignage_statut TEXT DEFAULT 'non_demande'"],
+  ["users", "temoignage_derniere_demande TEXT"],
   ["initiatives", "signalements_confirmes INTEGER DEFAULT 0"],
   // Partenaires Officiels — champs de configuration visibilité
   ["partenaires_officiels", "priorite INTEGER DEFAULT 0"],
@@ -1867,6 +1873,30 @@ db.exec(`
     FOREIGN KEY(user_id)    REFERENCES users(id),
     FOREIGN KEY(edition_id) REFERENCES deal_master_editions(id)
   );
+
+  /* ── Ils ont rejoint Diaspo'Actif — Témoignages utilisateurs ── */
+  CREATE TABLE IF NOT EXISTS temoignages (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id                 INTEGER NOT NULL UNIQUE,
+    note                    INTEGER CHECK(note BETWEEN 1 AND 5),
+    description             TEXT NOT NULL,
+    fonctionnalites         TEXT DEFAULT '[]',
+    points_positifs         TEXT,
+    suggestions             TEXT,
+    type_usage              TEXT DEFAULT 'personnel' CHECK(type_usage IN ('personnel','professionnel','organisation','collectivite')),
+    consentement_affichage  INTEGER DEFAULT 0,
+    nom_affichage           TEXT,
+    pays_utilisateur        TEXT,
+    role_utilisateur        TEXT,
+    statut                  TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','approuve','rejete','signale')),
+    score_pertinence        REAL DEFAULT 0,
+    admin_id                INTEGER,
+    admin_note              TEXT,
+    created_at              TEXT DEFAULT (datetime('now')),
+    updated_at              TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id)  REFERENCES users(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
 `);
 
 /* backfillOfficialFollow est appelé depuis seed.js après création du compte officiel */
@@ -1912,6 +1942,38 @@ function backfillOfficialFollow() {
   db.prepare(`INSERT INTO deal_master_editions (label,periode_debut,periode_fin,statut,top_pct)
     VALUES (?,?,?,'en_cours',10.0)`)
     .run(`Semestre ${sem} – ${year}`, debutMois, finMois);
+})();
+
+/* ═══ TÉMOIGNAGES DÉMO — Ils ont rejoint Diaspo'Actif ═══ */
+;(function seedTemoignages() {
+  const existing = db.prepare("SELECT COUNT(*) AS n FROM temoignages").get().n;
+  if (existing > 0) return;
+  const ins = db.prepare(`
+    INSERT INTO temoignages (user_id,note,description,fonctionnalites,points_positifs,suggestions,
+      type_usage,consentement_affichage,nom_affichage,pays_utilisateur,role_utilisateur,statut,score_pertinence)
+    VALUES (?,?,?,?,?,?,?,1,?,?,?,'approuve',?)
+  `);
+  const demos = [
+    [2, 5,
+      "Diaspo'Actif a complètement transformé ma façon de gérer mes projets entre la France et la Côte d'Ivoire. Je trouve des partenaires fiables en quelques jours, c'est incroyable.",
+      '["Deals","Annuaire","Messagerie"]',
+      "La qualité des profils vérifiés et la facilité de mise en relation avec des acteurs sérieux.",
+      "Ajouter plus de filtres par secteur d'activité pour l'annuaire.",
+      "professionnel", "Ynouss D.", "France", "utilisateur", 9.0],
+    [3, 5,
+      "Grâce à Diaspo'Actif, notre association A.I.T.O a multiplié ses partenariats en 6 mois. La plateforme nous donne une visibilité que nous n'aurions jamais pu avoir seuls.",
+      '["Initiatives","Événements","Formations"]',
+      "La section Initiatives et la possibilité d'organiser des événements directement sur la plateforme.",
+      "Intégrer un outil de gestion des adhésions pour les associations.",
+      "organisation", "A.I.T.O Toulouse", "France", "initiative", 9.5],
+    [1, 4,
+      "Je cherchais des opportunités d'investissement en Afrique de l'Ouest et Diaspo'Actif m'a mis en contact avec des porteurs de projets sérieux. Une expérience vraiment positive.",
+      '["Deals","Recherche","Annuaire"]',
+      "Le système de Deals est très bien conçu, transparent et sécurisé. Les profils sont complets.",
+      "Avoir une application mobile native serait un vrai plus.",
+      "personnel", "Jean K.", "France", "utilisateur", 7.5],
+  ];
+  demos.forEach(d => ins.run(...d));
 })();
 
 module.exports = db;

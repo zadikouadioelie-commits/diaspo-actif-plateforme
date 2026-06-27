@@ -188,6 +188,10 @@
     { re: /hall\s+of\s+fame|laureats?\s+deal\s*master|voir\s+(les?\s+)?deal\s*masters?/i, id: 'dm_hall_of_fame' },
     { re: /deal\s*master\s+(actuel|du\s+semestre|ce\s+semestre)|qui\s+est\s+(deal\s*master|le\s+meilleur)/i, id: 'dm_actuel' },
 
+    // ── Témoignages — Ils ont rejoint Diaspo'Actif
+    { re: /t[eé]moignage|avis.*(plateforme|diaspo)|ils ont rejoint|retour.*(exp[eé]rience|utilisateur)|ce que (pensent|disent) les membres/i, id: 'temo_voir' },
+    { re: /donner\s+(mon\s+)?avis|partager\s+(mon\s+)?exp[eé]rience|laisser\s+(un\s+)?t[eé]moignage|noter\s+(la\s+)?plateforme/i, id: 'temo_donner' },
+
     // ── Profil public — réseau & communs
     { re: /affiche?\s+(mes?\s+)?abonn[eé]s?\b|mes?\s+abonn[eé]s?\b|qui\s+(me\s+)?suit/i, id: 'profil_abonnes' },
     { re: /comptes?\s+que\s+je\s+suis|affiche?\s+(mes?\s+)?suivis?|qui\s+est\-ce\s+que\s+je\s+suis/i, id: 'profil_suivis' },
@@ -931,6 +935,32 @@
           msg += `\n\n[Voir le Hall of Fame complet →](/hall-of-fame.html)`;
           addMsg('oz', msg);
         } catch(e) { addMsg('oz', `[Consultez le Hall of Fame →](/hall-of-fame.html) pour voir les Deal Masters du semestre.`); }
+        break;
+      }
+
+      case 'temo_voir': {
+        try {
+          const d = await fetch('/api/temoignages/public?limit=3').then(r => r.json());
+          const temos = d.temoignages || [];
+          if (!temos.length) { addMsg('oz', `💬 Aucun témoignage n'est encore disponible. Soyez le premier à partager votre expérience sur Diaspo'Actif !`); break; }
+          const stars = n => n ? '★'.repeat(n) + '☆'.repeat(5-n) : '';
+          let msg = `💬 **Ils ont rejoint Diaspo'Actif** — voici ce qu'ils en disent :\n\n`;
+          temos.forEach(t => {
+            msg += `> *"${t.description.slice(0,150)}${t.description.length>150?'…':''}"*\n`;
+            msg += `> — **${t.nom_affichage||'Membre'}** ${t.pays_utilisateur?`(${t.pays_utilisateur})`:''}${t.note?` ${stars(t.note)}`:''}\n\n`;
+          });
+          addMsg('oz', msg);
+        } catch(e) { addMsg('oz', `💬 Découvrez les témoignages de nos membres sur la page d'accueil dans la section **"Ils ont rejoint Diaspo'Actif"**.`); }
+        break;
+      }
+
+      case 'temo_donner': {
+        const me = typeof STATE !== 'undefined' ? STATE.user : null;
+        if (!me) {
+          addMsg('oz', `💬 Pour partager votre expérience, connectez-vous d'abord à votre compte. Une invitation vous sera proposée automatiquement après quelques connexions.\n\n[Se connecter →](/login.html)`);
+        } else {
+          addMsg('oz', `💬 Merci de vouloir partager votre expérience ! Le formulaire de témoignage apparaît automatiquement après votre 5ᵉ connexion.\n\nVous pouvez aussi cliquer sur le bouton ci-dessous pour l'ouvrir maintenant.`, [{label:'Donner mon avis', action:'open_temoignage_modal'}]);
+        }
         break;
       }
 

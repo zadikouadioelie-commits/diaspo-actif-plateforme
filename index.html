@@ -1128,6 +1128,19 @@
     </div>
   </section>
 
+  <!-- ===== SECTION 9b : ILS ONT REJOINT DIASPO'ACTIF ===== -->
+  <section id="section-temoignages-hp" style="padding:52px 24px 40px;background:#fff;display:none;">
+    <div style="max-width:1100px;margin:0 auto;">
+      <div style="text-align:center;margin-bottom:32px;">
+        <div style="display:inline-flex;align-items:center;gap:6px;background:#f0fdf4;color:#15803d;border:1.5px solid #bbf7d0;border-radius:99px;padding:4px 16px;font-size:12px;font-weight:800;letter-spacing:.04em;margin-bottom:14px;">💬 Expériences réelles</div>
+        <h2 style="font-size:26px;font-weight:900;margin:0 0 10px;color:#0D1B2A;">Ils ont rejoint Diaspo'Actif</h2>
+        <p style="font-size:14px;color:#64748b;max-width:520px;margin:0 auto;">Découvrez comment les membres de notre communauté utilisent la plateforme pour concrétiser leurs projets.</p>
+      </div>
+      <div id="temoignages-track" style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;"></div>
+      <div id="temoignages-dots" style="display:flex;justify-content:center;gap:6px;margin-top:20px;"></div>
+    </div>
+  </section>
+
   <!-- ===== SECTION 10 : PARTENAIRES OFFICIELS ===== -->
   <section id="section-partenaires-hp" style="padding:52px 24px 40px;background:linear-gradient(180deg,#f8fafc 0%,#fff 100%);">
     <div style="max-width:1100px;margin:0 auto;">
@@ -1776,6 +1789,271 @@ document.getElementById('hp-q')?.addEventListener('keydown', e => {
 .po-hp-btn-contact { background:#fff; border:1.5px solid #e2e8f0; color:#475569; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; }
 .po-hp-btn-contact:hover { border-color:#1e3a8a; color:#1e3a8a; }
 </style>
+
+<!-- ===== MODAL TÉMOIGNAGE ===== -->
+<div id="temoignage-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:20px;max-width:540px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.2);">
+    <div style="background:linear-gradient(135deg,#1e3a8a,#3b82f6);padding:28px 28px 20px;border-radius:20px 20px 0 0;">
+      <div style="font-size:32px;margin-bottom:8px;">💬</div>
+      <h2 style="margin:0 0 6px;font-size:20px;font-weight:900;color:#fff;">Partagez votre expérience</h2>
+      <p style="margin:0;font-size:13px;color:rgba(255,255,255,.85);">Votre avis aide la communauté à grandir. 2 minutes suffisent !</p>
+    </div>
+    <div style="padding:24px 28px;">
+      <form id="temoignage-form">
+        <!-- Note -->
+        <div style="margin-bottom:18px;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:8px;">Note globale (optionnelle)</label>
+          <div id="star-rating" style="display:flex;gap:6px;">
+            <button type="button" class="star-btn" data-v="1" style="font-size:28px;background:none;border:none;cursor:pointer;padding:0;opacity:.4;">★</button>
+            <button type="button" class="star-btn" data-v="2" style="font-size:28px;background:none;border:none;cursor:pointer;padding:0;opacity:.4;">★</button>
+            <button type="button" class="star-btn" data-v="3" style="font-size:28px;background:none;border:none;cursor:pointer;padding:0;opacity:.4;">★</button>
+            <button type="button" class="star-btn" data-v="4" style="font-size:28px;background:none;border:none;cursor:pointer;padding:0;opacity:.4;">★</button>
+            <button type="button" class="star-btn" data-v="5" style="font-size:28px;background:none;border:none;cursor:pointer;padding:0;opacity:.4;">★</button>
+          </div>
+        </div>
+        <!-- Description -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Décrivez votre utilisation <span style="color:#ef4444;">*</span></label>
+          <textarea id="tm-description" rows="3" maxlength="500" required placeholder="Comment utilisez-vous Diaspo'Actif ? Qu'est-ce que ça vous a apporté ?" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+          <div style="text-align:right;font-size:11px;color:#94a3b8;margin-top:3px;"><span id="tm-desc-count">0</span>/500</div>
+        </div>
+        <!-- Fonctionnalités -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:8px;">Fonctionnalités les plus utilisées</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;" id="fonct-chips">
+            <label class="tm-chip"><input type="checkbox" value="Annuaire"> Annuaire</label>
+            <label class="tm-chip"><input type="checkbox" value="Deals"> Deals</label>
+            <label class="tm-chip"><input type="checkbox" value="Messagerie"> Messagerie</label>
+            <label class="tm-chip"><input type="checkbox" value="Événements"> Événements</label>
+            <label class="tm-chip"><input type="checkbox" value="Formations"> Formations</label>
+            <label class="tm-chip"><input type="checkbox" value="Fil d'actualité"> Fil d'actualité</label>
+            <label class="tm-chip"><input type="checkbox" value="Initiatives"> Initiatives</label>
+            <label class="tm-chip"><input type="checkbox" value="O-Z (assistant)"> O-Z (assistant)</label>
+          </div>
+        </div>
+        <!-- Points positifs -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Points positifs</label>
+          <textarea id="tm-positifs" rows="2" maxlength="300" placeholder="Ce que vous appréciez le plus..." style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+        </div>
+        <!-- Suggestions -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Suggestions d'amélioration</label>
+          <textarea id="tm-suggestions" rows="2" maxlength="300" placeholder="Ce que vous aimeriez voir évoluer..." style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+        </div>
+        <!-- Type d'usage -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:8px;">Mon usage est plutôt</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <label class="tm-chip"><input type="radio" name="type_usage" value="personnel" checked> Personnel</label>
+            <label class="tm-chip"><input type="radio" name="type_usage" value="professionnel"> Professionnel</label>
+            <label class="tm-chip"><input type="radio" name="type_usage" value="organisation"> Organisation/Association</label>
+            <label class="tm-chip"><input type="radio" name="type_usage" value="collectivite"> Collectivité</label>
+          </div>
+        </div>
+        <!-- Consentement -->
+        <div style="margin-bottom:20px;padding:12px;background:#f8fafc;border-radius:10px;">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+            <input type="checkbox" id="tm-consent" style="margin-top:3px;flex-shrink:0;">
+            <div>
+              <span style="font-size:13px;font-weight:600;color:#374151;">J'accepte que mon témoignage soit affiché publiquement</span>
+              <div style="font-size:11px;color:#64748b;margin-top:2px;">Votre nom sera affiché tel que défini ci-dessous. Vous pouvez retirer ce consentement à tout moment.</div>
+            </div>
+          </label>
+          <div id="tm-nom-block" style="margin-top:10px;display:none;">
+            <input type="text" id="tm-nom" maxlength="50" placeholder="Nom affiché (ex: Jean K., Association AITO…)" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;box-sizing:border-box;">
+          </div>
+        </div>
+        <div id="tm-error" style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none;"></div>
+        <div style="display:flex;gap:10px;">
+          <button type="submit" id="tm-submit" style="flex:1;background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;">Envoyer mon témoignage</button>
+          <button type="button" id="tm-later" style="background:#f1f5f9;color:#64748b;border:none;border-radius:10px;padding:13px 18px;font-size:13px;font-weight:600;cursor:pointer;">Plus tard</button>
+          <button type="button" id="tm-never" style="background:none;color:#94a3b8;border:none;font-size:12px;cursor:pointer;white-space:nowrap;text-decoration:underline;">Ne plus demander</button>
+        </div>
+      </form>
+      <div id="tm-success" style="display:none;text-align:center;padding:20px 0;">
+        <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+        <h3 style="font-size:18px;font-weight:800;color:#15803d;margin:0 0 8px;">Merci pour votre témoignage !</h3>
+        <p style="font-size:14px;color:#64748b;">Il sera affiché sur la plateforme après validation par notre équipe.</p>
+        <button onclick="closeTemoignageModal()" style="margin-top:16px;background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:11px 28px;font-size:14px;font-weight:700;cursor:pointer;">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.tm-chip { display:inline-flex;align-items:center;gap:5px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:99px;padding:5px 12px;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all .15s; }
+.tm-chip:has(input:checked) { background:#eff6ff;border-color:#3b82f6;color:#1d4ed8; }
+.tm-chip input { display:none; }
+/* Témoignages homepage */
+.temo-card { background:#fff;border:1.5px solid #e2e8f0;border-radius:16px;padding:20px;position:relative;transition:box-shadow .2s; }
+.temo-card:hover { box-shadow:0 6px 20px rgba(0,0,0,.08); }
+.temo-stars { color:#f59e0b;font-size:16px;margin-bottom:8px; }
+.temo-text { font-size:13px;color:#374151;line-height:1.65;font-style:italic;margin-bottom:12px; }
+.temo-author { font-size:12px;font-weight:700;color:#0D1B2A; }
+.temo-meta { font-size:11px;color:#94a3b8;margin-top:2px; }
+.temo-badge { display:inline-block;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700;margin-top:4px; }
+.temo-quote { position:absolute;top:14px;right:18px;font-size:36px;color:#e2e8f0;line-height:1; }
+</style>
+
+<script>
+/* ============================================================
+   TÉMOIGNAGES — Ils ont rejoint Diaspo'Actif
+   ============================================================ */
+(function() {
+  const track  = document.getElementById('temoignages-track');
+  const dotsEl = document.getElementById('temoignages-dots');
+  const sec    = document.getElementById('section-temoignages-hp');
+  let _all = [], _page = 0, _timer = null;
+
+  function stars(n) {
+    if (!n) return '';
+    return '★'.repeat(n) + '☆'.repeat(5 - n);
+  }
+
+  function cardHtml(t) {
+    const usageLabel = { personnel:'Particulier', professionnel:'Professionnel', organisation:'Association/ONG', collectivite:'Collectivité' };
+    const foncts = (t.fonctionnalites || []).slice(0, 3).join(' · ');
+    return `<div class="temo-card">
+      <div class="temo-quote">"</div>
+      ${t.note ? `<div class="temo-stars">${stars(t.note)}</div>` : ''}
+      <p class="temo-text">"${t.description.slice(0, 220)}${t.description.length > 220 ? '…' : ''}"</p>
+      <div class="temo-author">${t.nom_affichage || 'Membre Diaspo\'Actif'}</div>
+      <div class="temo-meta">${[t.pays_utilisateur, foncts].filter(Boolean).join(' · ')}</div>
+      ${t.type_usage ? `<span class="temo-badge">${usageLabel[t.type_usage] || t.type_usage}</span>` : ''}
+    </div>`;
+  }
+
+  function getPerPage() { return window.innerWidth < 640 ? 1 : 2; }
+
+  function renderPage(pg) {
+    const pp = getPerPage();
+    track.style.gridTemplateColumns = pp === 1 ? '1fr' : 'repeat(2,1fr)';
+    const slice = _all.slice(pg * pp, pg * pp + pp);
+    if (!slice.length) return;
+    track.innerHTML = slice.map(cardHtml).join('');
+    const pages = Math.ceil(_all.length / pp);
+    dotsEl.innerHTML = '';
+    for (let i = 0; i < pages; i++) {
+      const d = document.createElement('button');
+      d.style.cssText = `width:8px;height:8px;border-radius:50%;border:none;cursor:pointer;background:${i===pg?'#15803d':'#cbd5e1'};padding:0;transition:background .2s;`;
+      d.onclick = () => { clearTimeout(_timer); _page = i; renderPage(i); startAuto(); };
+      dotsEl.appendChild(d);
+    }
+  }
+
+  function nextPage() {
+    const pp = getPerPage();
+    const pages = Math.ceil(_all.length / pp);
+    _page = (_page + 1) % pages;
+    renderPage(_page);
+  }
+
+  function startAuto() { clearTimeout(_timer); _timer = setTimeout(() => { nextPage(); startAuto(); }, 7000); }
+
+  async function loadTemoignages() {
+    try {
+      const data = await fetch('/api/temoignages/public?limit=8').then(r => r.json());
+      _all = data.temoignages || [];
+      if (!_all.length) return;
+      sec.style.display = 'block';
+      renderPage(0);
+      startAuto();
+    } catch(e) {}
+  }
+
+  loadTemoignages();
+  window.addEventListener('resize', () => renderPage(_page));
+})();
+
+/* ============================================================
+   MODAL TÉMOIGNAGE — déclenchement & logique
+   ============================================================ */
+let _starNote = 0;
+
+function closeTemoignageModal() {
+  document.getElementById('temoignage-modal-overlay').style.display = 'none';
+}
+
+document.querySelectorAll('.star-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _starNote = parseInt(btn.dataset.v);
+    document.querySelectorAll('.star-btn').forEach((b, i) => {
+      b.style.opacity = i < _starNote ? '1' : '.3';
+      b.style.color   = i < _starNote ? '#f59e0b' : '#94a3b8';
+    });
+  });
+});
+
+document.getElementById('tm-description').addEventListener('input', function() {
+  document.getElementById('tm-desc-count').textContent = this.value.length;
+});
+
+document.getElementById('tm-consent').addEventListener('change', function() {
+  document.getElementById('tm-nom-block').style.display = this.checked ? 'block' : 'none';
+});
+
+document.getElementById('temoignage-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('tm-submit');
+  const err = document.getElementById('tm-error');
+  err.style.display = 'none';
+  const foncts = [...document.querySelectorAll('#fonct-chips input:checked')].map(c => c.value);
+  const payload = {
+    note: _starNote || null,
+    description: document.getElementById('tm-description').value.trim(),
+    fonctionnalites: foncts,
+    points_positifs: document.getElementById('tm-positifs').value.trim() || null,
+    suggestions: document.getElementById('tm-suggestions').value.trim() || null,
+    type_usage: document.querySelector('input[name="type_usage"]:checked')?.value || 'personnel',
+    consentement_affichage: document.getElementById('tm-consent').checked ? 1 : 0,
+    nom_affichage: document.getElementById('tm-nom').value.trim() || null,
+  };
+  btn.disabled = true; btn.textContent = 'Envoi…';
+  try {
+    const r = await fetch('/api/temoignage', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const d = await r.json();
+    if (!r.ok) { err.textContent = d.error || 'Erreur.'; err.style.display = 'block'; btn.disabled=false; btn.textContent='Envoyer mon témoignage'; return; }
+    document.getElementById('temoignage-form').style.display = 'none';
+    document.getElementById('tm-success').style.display = 'block';
+  } catch(e) { err.textContent = 'Erreur réseau.'; err.style.display='block'; btn.disabled=false; btn.textContent='Envoyer mon témoignage'; }
+});
+
+document.getElementById('tm-later').addEventListener('click', async () => {
+  await fetch('/api/temoignage/ignorer', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({refus_definitif:false}) });
+  closeTemoignageModal();
+});
+
+document.getElementById('tm-never').addEventListener('click', async () => {
+  await fetch('/api/temoignage/ignorer', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({refus_definitif:true}) });
+  closeTemoignageModal();
+});
+
+/* Déclenchement automatique après login (vérifié via /api/auth/me) */
+(async function checkTemoignageTrigger() {
+  try {
+    const me = await fetch('/api/auth/me', { credentials:'include' }).then(r => r.json());
+    const u = me.user;
+    if (!u) return;
+    if (u.temoignage_statut === 'fourni' || u.temoignage_statut === 'refuse') return;
+    if (u.nb_connexions < 5) return;
+    // Vérifier délai depuis la dernière demande (7 jours)
+    if (u.temoignage_derniere_demande) {
+      const last = new Date(u.temoignage_derniere_demande);
+      const diffDays = (Date.now() - last.getTime()) / 86400000;
+      if (diffDays < 7) return;
+    }
+    // Afficher le modal avec un délai de 3 secondes
+    setTimeout(() => {
+      const modal = document.getElementById('temoignage-modal-overlay');
+      modal.style.display = 'flex';
+      // Pré-remplir le nom
+      const nomInput = document.getElementById('tm-nom');
+      if (nomInput) nomInput.placeholder = u.nom || '';
+    }, 3000);
+  } catch(e) {}
+})();
+</script>
 
   <!-- ─── Mobile Bottom Navigation ─── -->
   <nav class="mobile-bottom-nav" aria-label="Navigation mobile">

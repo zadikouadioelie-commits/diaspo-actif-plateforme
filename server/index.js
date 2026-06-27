@@ -78,7 +78,8 @@ function getCurrentUser(req) {
 
 function publicUser(u) {
   if (!u) return null;
-  return { id: u.id, nom: u.nom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json) };
+  return { id: u.id, nom: u.nom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
+    nb_connexions: u.nb_connexions || 0, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null };
 }
 
 function safeParse(s) {
@@ -186,9 +187,11 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   if (!user || !verifyPassword(password || "", user.password_salt, user.password_hash)) {
     return sendJSON(res, 401, { error: "E-mail ou mot de passe incorrect." });
   }
+  db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
+  const fresh = db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
   const authTok = signAuthToken({ uid: user.id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
-  sendJSON(res, 200, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
+  sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
 });
 
 route("POST", "/api/auth/logout", async (req, res) => {
@@ -8394,6 +8397,97 @@ async function handleRequest(req, res) {
         FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
         WHERE dml.user_id=? ORDER BY dml.edition_id DESC`).all(uid);
       return sendJSON(res, 200, { laureat: laureat || null, historique });
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       TÉMOIGNAGES — ILS ONT REJOINT DIASPO'ACTIF
+    ═══════════════════════════════════════════════════════════ */
+
+    /* GET /api/temoignages/public — témoignages approuvés pour l'accueil */
+    if (req.method === "GET" && pathname === "/api/temoignages/public") {
+      const limit = Math.min(parseInt(query.limit || "6", 10), 20);
+      const rows = db.prepare(`
+        SELECT t.id, t.note, t.description, t.fonctionnalites, t.points_positifs,
+               t.type_usage, t.nom_affichage, t.pays_utilisateur, t.role_utilisateur,
+               t.score_pertinence, t.created_at
+        FROM temoignages t
+        WHERE t.statut = 'approuve' AND t.consentement_affichage = 1
+        ORDER BY t.score_pertinence DESC, t.note DESC, t.created_at DESC
+        LIMIT ?
+      `).all(limit);
+      const enriched = rows.map(r => ({ ...r, fonctionnalites: safeParse(r.fonctionnalites) }));
+      return sendJSON(res, 200, { temoignages: enriched });
+    }
+
+    /* POST /api/temoignage — soumettre un témoignage */
+    if (req.method === "POST" && pathname === "/api/temoignage") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const body2 = await readBody(req);
+      const { note, description, fonctionnalites, points_positifs, suggestions, type_usage, consentement_affichage, nom_affichage } = body2;
+      if (!description || description.trim().length < 20)
+        return sendJSON(res, 400, { error: "Description trop courte (20 caractères min)." });
+      // Modération automatique — mots inappropriés
+      const banned = /\b(spam|fuck|merde|shit|connard|idiot)\b/i;
+      if (banned.test(description) || banned.test(points_positifs || "") || banned.test(suggestions || ""))
+        return sendJSON(res, 400, { error: "Contenu inapproprié détecté. Veuillez réviser votre témoignage." });
+      // Score de pertinence automatique
+      let score = 0;
+      if (note >= 4) score += 2;
+      if (description.trim().length > 100) score += 2;
+      if (points_positifs && points_positifs.trim().length > 20) score += 1;
+      if (suggestions && suggestions.trim().length > 20) score += 1;
+      if (consentement_affichage) score += 1;
+      const nomFinal = consentement_affichage ? (nom_affichage || me.nom) : null;
+      db.prepare(`
+        INSERT INTO temoignages (user_id,note,description,fonctionnalites,points_positifs,suggestions,
+          type_usage,consentement_affichage,nom_affichage,pays_utilisateur,role_utilisateur,statut,score_pertinence)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,'en_attente',?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          note=excluded.note, description=excluded.description, fonctionnalites=excluded.fonctionnalites,
+          points_positifs=excluded.points_positifs, suggestions=excluded.suggestions, type_usage=excluded.type_usage,
+          consentement_affichage=excluded.consentement_affichage, nom_affichage=excluded.nom_affichage,
+          statut='en_attente', score_pertinence=excluded.score_pertinence, updated_at=datetime('now')
+      `).run(me.id, note || null, description.trim(), JSON.stringify(fonctionnalites || []),
+        points_positifs || null, suggestions || null, type_usage || 'personnel',
+        consentement_affichage ? 1 : 0, nomFinal, me.pays || null, me.role, score);
+      db.prepare("UPDATE users SET temoignage_statut='fourni', updated_at=datetime('now') WHERE id=?").run(me.id);
+      return sendJSON(res, 201, { ok: true, message: "Merci pour votre témoignage ! Il sera affiché après validation." });
+    }
+
+    /* POST /api/temoignage/ignorer — reporter/refuser la demande */
+    if (req.method === "POST" && pathname === "/api/temoignage/ignorer") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const body2 = await readBody(req);
+      const statut = body2.refus_definitif ? 'refuse' : 'non_demande';
+      db.prepare("UPDATE users SET temoignage_statut=?, temoignage_derniere_demande=datetime('now') WHERE id=?").run(statut, me.id);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* GET /api/admin/temoignages — liste admin */
+    if (req.method === "GET" && pathname === "/api/admin/temoignages") {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      const rows = db.prepare(`
+        SELECT t.*, u.nom AS user_nom, u.email AS user_email, u.pays AS user_pays
+        FROM temoignages t JOIN users u ON u.id = t.user_id
+        ORDER BY t.created_at DESC
+      `).all();
+      return sendJSON(res, 200, { temoignages: rows.map(r => ({ ...r, fonctionnalites: safeParse(r.fonctionnalites) })) });
+    }
+
+    /* PUT /api/admin/temoignages/:id/statut — approuver/rejeter */
+    if (req.method === "PUT" && /^\/api\/admin\/temoignages\/(\d+)\/statut$/.test(pathname)) {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      const tid = pathname.match(/\/(\d+)\/statut$/)[1];
+      const body2 = await readBody(req);
+      const { statut, admin_note } = body2;
+      if (!['approuve','rejete','signale'].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+      db.prepare("UPDATE temoignages SET statut=?, admin_id=?, admin_note=?, updated_at=datetime('now') WHERE id=?")
+        .run(statut, me.id, admin_note || null, tid);
+      return sendJSON(res, 200, { ok: true });
     }
 
     /* ═══════════════════════════════════════════════════════════
