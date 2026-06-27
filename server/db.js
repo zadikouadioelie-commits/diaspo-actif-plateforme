@@ -50,6 +50,7 @@ db.exec(`
     nb_connexions       INTEGER DEFAULT 0,
     temoignage_statut   TEXT DEFAULT 'non_demande' CHECK(temoignage_statut IN ('non_demande','en_attente','fourni','refuse')),
     temoignage_derniere_demande TEXT,
+    demo_vue                INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -1015,6 +1016,7 @@ const MIGRATIONS = [
   ["users", "nb_connexions INTEGER DEFAULT 0"],
   ["users", "temoignage_statut TEXT DEFAULT 'non_demande'"],
   ["users", "temoignage_derniere_demande TEXT"],
+  ["users", "demo_vue INTEGER DEFAULT 0"],
   ["initiatives", "signalements_confirmes INTEGER DEFAULT 0"],
   // Partenaires Officiels — champs de configuration visibilité
   ["partenaires_officiels", "priorite INTEGER DEFAULT 0"],

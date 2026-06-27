@@ -79,7 +79,8 @@ function getCurrentUser(req) {
 function publicUser(u) {
   if (!u) return null;
   return { id: u.id, nom: u.nom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
-    nb_connexions: u.nb_connexions || 0, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null };
+    nb_connexions: u.nb_connexions || 0, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
+    demo_vue: u.demo_vue || 0 };
 }
 
 function safeParse(s) {
@@ -8462,6 +8463,14 @@ async function handleRequest(req, res) {
       const body2 = await readBody(req);
       const statut = body2.refus_definitif ? 'refuse' : 'non_demande';
       db.prepare("UPDATE users SET temoignage_statut=?, temoignage_derniere_demande=datetime('now') WHERE id=?").run(statut, me.id);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* POST /api/demo/vu — marquer la démo comme vue */
+    if (req.method === "POST" && pathname === "/api/demo/vu") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      db.prepare("UPDATE users SET demo_vue=1 WHERE id=?").run(me.id);
       return sendJSON(res, 200, { ok: true });
     }
 
