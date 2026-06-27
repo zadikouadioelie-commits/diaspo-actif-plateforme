@@ -1487,8 +1487,66 @@
           </select>
         </div>
 
-        <div id="po-admin-list" style="display:flex;flex-direction:column;gap:10px;">
-          <div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+        <!-- Onglets -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1.5px solid var(--border);padding-bottom:0;">
+          <button id="po-tab-liste" class="btn btn-sm" style="border-bottom:2px solid #1e3a8a;border-radius:0;" onclick="showPoTab('liste')">📋 Liste</button>
+          <button id="po-tab-stats" class="btn btn-sm btn-outline" style="border-radius:0;" onclick="showPoTab('stats')">📊 Statistiques</button>
+          <button id="po-tab-config" class="btn btn-sm btn-outline" style="border-radius:0;" onclick="showPoTab('config')">⚙️ Configuration</button>
+        </div>
+
+        <!-- Onglet Liste -->
+        <div id="po-panel-liste">
+          <div id="po-admin-list" style="display:flex;flex-direction:column;gap:10px;">
+            <div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- Onglet Stats -->
+        <div id="po-panel-stats" style="display:none;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;" id="po-stats-totaux"></div>
+          <h4 style="font-size:13px;font-weight:700;margin:0 0 10px;">Performances par partenaire</h4>
+          <div id="po-stats-table" style="overflow-x:auto;"></div>
+          <h4 style="font-size:13px;font-weight:700;margin:16px 0 10px;">Secteurs les plus consultés</h4>
+          <div id="po-stats-secteurs" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        </div>
+
+        <!-- Onglet Config -->
+        <div id="po-panel-config" style="display:none;">
+          <div class="notice" style="margin-bottom:16px;">Sélectionnez un partenaire pour configurer ses paramètres de visibilité.</div>
+          <select id="po-config-select" onchange="loadPoConfig(this.value)" style="width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:16px;">
+            <option value="">— Choisir un partenaire —</option>
+          </select>
+          <div id="po-config-form" style="display:none;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:20px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);">Priorité (0–100)</label>
+                <input id="poc-priorite" type="number" min="0" max="100" style="width:100%;box-sizing:border-box;margin-top:4px;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);">Mise en avant</label>
+                <select id="poc-mea" style="width:100%;box-sizing:border-box;margin-top:4px;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;">
+                  <option value="0">Non</option>
+                  <option value="1">Oui — priorité maximale</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);">Début de diffusion</label>
+                <input id="poc-debut" type="date" style="width:100%;box-sizing:border-box;margin-top:4px;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);">Fin de diffusion</label>
+                <input id="poc-fin" type="date" style="width:100%;box-sizing:border-box;margin-top:4px;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;">
+              </div>
+            </div>
+            <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin:10px 0 4px;">Slogan / phrase d'accroche</label>
+            <input id="poc-slogan" type="text" placeholder="Ex : Votre partenaire financement en Afrique" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;">
+            <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin:10px 0 4px;">Mots-clés de correspondance (virgules) — pour personnalisation O-Z</label>
+            <input id="poc-cles" type="text" placeholder="financement, investissement, subvention…" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;">
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+              <button onclick="savePoConfig()" style="padding:9px 20px;background:#1e3a8a;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">💾 Enregistrer</button>
+            </div>
+            <div id="poc-msg" style="font-size:12px;margin-top:8px;display:none;"></div>
+          </div>
         </div>
 
         <!-- Modal attribuer -->
@@ -6649,8 +6707,11 @@ async function loadPartenairesAdmin() {
     _poAdminCache = data.partenaires || [];
     updatePoStats();
     renderPoAdminList(_poAdminCache);
+    // Initialiser l'onglet liste par défaut
+    showPoTab('liste');
   } catch(e) {
-    document.getElementById('po-admin-list').innerHTML = `<div style="color:#dc2626;padding:20px;">Erreur : ${e.message}</div>`;
+    const el = document.getElementById('po-admin-list');
+    if (el) el.innerHTML = `<div style="color:#dc2626;padding:20px;">Erreur : ${e.message}</div>`;
   }
 }
 
@@ -6740,6 +6801,125 @@ async function changerStatutPo(id, statut) {
     await api('PUT', `/admin/partenaires/${id}/statut`, { statut, motif });
     loadPartenairesAdmin();
   } catch(e) { alert('Erreur : '+e.message); }
+}
+
+/* ── Onglets PO ── */
+function showPoTab(tab) {
+  ['liste','stats','config'].forEach(t => {
+    const panel = document.getElementById(`po-panel-${t}`);
+    const btn   = document.getElementById(`po-tab-${t}`);
+    if (!panel || !btn) return;
+    const active = t === tab;
+    panel.style.display = active ? '' : 'none';
+    btn.className = active ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+    btn.style.borderBottom = active ? '2px solid #1e3a8a' : 'none';
+    btn.style.borderRadius = '0';
+  });
+  if (tab === 'stats') loadPoStats();
+  if (tab === 'config') loadPoConfigSelect();
+}
+
+async function loadPoStats() {
+  try {
+    const d = await api('GET', '/admin/partenaires/stats');
+    // Totaux
+    const tots = d.totals || {};
+    document.getElementById('po-stats-totaux').innerHTML = [
+      ['👁️ Vues', tots.total_vues||0, '#eff6ff','#1e40af'],
+      ['🖱️ Clics', tots.total_clics||0, '#f0fdf4','#15803d'],
+      ['💬 Contacts', tots.total_contacts||0, '#fff7ed','#c2410c'],
+      ['👤 Profils visités', tots.total_profils||0, '#fdf4ff','#7e22ce'],
+    ].map(([label,val,bg,color])=>`
+      <div style="background:${bg};border:1.5px solid ${color}22;border-radius:12px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:900;color:${color};">${val}</div>
+        <div style="font-size:11px;font-weight:700;color:${color};">${label}</div>
+      </div>`).join('');
+
+    // Table by partner
+    const rows = d.byPartner || [];
+    document.getElementById('po-stats-table').innerHTML = rows.length ? `
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#f1f5f9;">
+          <th style="padding:8px;text-align:left;">Partenaire</th>
+          <th style="padding:8px;text-align:right;">Vues</th>
+          <th style="padding:8px;text-align:right;">Clics</th>
+          <th style="padding:8px;text-align:right;">Profils</th>
+          <th style="padding:8px;text-align:right;">Contacts</th>
+          <th style="padding:8px;text-align:right;">Taux clic</th>
+        </tr></thead>
+        <tbody>${rows.map(r=>`<tr style="border-top:1px solid #e2e8f0;">
+          <td style="padding:8px;font-weight:700;">${[r.prenom,r.nom].filter(Boolean).join(' ')}</td>
+          <td style="padding:8px;text-align:right;">${r.nb_vues}</td>
+          <td style="padding:8px;text-align:right;">${r.nb_clics}</td>
+          <td style="padding:8px;text-align:right;">${r.nb_profils}</td>
+          <td style="padding:8px;text-align:right;">${r.nb_contacts}</td>
+          <td style="padding:8px;text-align:right;font-weight:700;color:${r.taux_clic>5?'#16a34a':'#64748b'};">${r.taux_clic}%</td>
+        </tr>`).join('')}</tbody>
+      </table>` : '<div style="color:var(--muted);padding:16px;">Aucune donnée pour l\'instant.</div>';
+
+    // Secteurs
+    const sects = d.bySecteur || [];
+    document.getElementById('po-stats-secteurs').innerHTML = sects.map(s=>
+      `<span style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:99px;padding:4px 12px;font-size:12px;font-weight:600;">${s.categorie||'général'} · ${s.nb_impressions}</span>`
+    ).join('') || '<span style="color:var(--muted);font-size:13px;">Aucune donnée.</span>';
+  } catch(e) {
+    document.getElementById('po-stats-totaux').innerHTML = `<div style="color:#dc2626;">Erreur : ${e.message}</div>`;
+  }
+}
+
+let _poConfigList = [];
+async function loadPoConfigSelect() {
+  if (!_poAdminCache.length) await loadPartenairesAdmin();
+  _poConfigList = _poAdminCache;
+  const sel = document.getElementById('po-config-select');
+  if (!sel) return;
+  const opts = _poConfigList.map(p=>`<option value="${p.id}">${[p.prenom,p.nom].filter(Boolean).join(' ')||p.nom}</option>`).join('');
+  sel.innerHTML = '<option value="">— Choisir un partenaire —</option>' + opts;
+}
+
+async function loadPoConfig(poId) {
+  const form = document.getElementById('po-config-form');
+  if (!poId) { form.style.display='none'; return; }
+  const p = _poConfigList.find(x => x.id == poId);
+  if (!p) return;
+  form.style.display = '';
+  document.getElementById('poc-priorite').value = p.priorite || 0;
+  document.getElementById('poc-mea').value = p.mise_en_avant || 0;
+  document.getElementById('poc-debut').value = p.periode_debut || '';
+  document.getElementById('poc-fin').value = p.periode_fin || '';
+  document.getElementById('poc-slogan').value = p.slogan || '';
+  document.getElementById('poc-cles').value = (p.cles_matching || []).join(', ');
+  const msg = document.getElementById('poc-msg');
+  msg.style.display = 'none';
+}
+
+async function savePoConfig() {
+  const poId = document.getElementById('po-config-select').value;
+  if (!poId) return;
+  const cles = document.getElementById('poc-cles').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const msg = document.getElementById('poc-msg');
+  try {
+    await api('PUT', `/admin/partenaires/${poId}/config`, {
+      priorite: parseInt(document.getElementById('poc-priorite').value)||0,
+      mise_en_avant: parseInt(document.getElementById('poc-mea').value)||0,
+      periode_debut: document.getElementById('poc-debut').value||null,
+      periode_fin:   document.getElementById('poc-fin').value||null,
+      slogan:        document.getElementById('poc-slogan').value.trim()||null,
+      cles_matching: cles,
+    });
+    // Mettre à jour le cache local
+    const idx = _poConfigList.findIndex(x=>x.id==poId);
+    if (idx>=0) {
+      _poConfigList[idx].slogan = document.getElementById('poc-slogan').value.trim();
+      _poConfigList[idx].cles_matching = cles;
+      _poConfigList[idx].priorite = parseInt(document.getElementById('poc-priorite').value)||0;
+      _poConfigList[idx].mise_en_avant = parseInt(document.getElementById('poc-mea').value)||0;
+    }
+    msg.style.display='block'; msg.style.color='#16a34a'; msg.textContent='✅ Configuration enregistrée.';
+    setTimeout(()=>msg.style.display='none', 3000);
+  } catch(e) {
+    msg.style.display='block'; msg.style.color='#dc2626'; msg.textContent='Erreur : '+e.message;
+  }
 }
 </script>
 </body>

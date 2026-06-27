@@ -1111,7 +1111,30 @@
     </div>
   </section>
 
-  <!-- ===== SECTION 10 : CTA FINAL ===== -->
+  <!-- ===== SECTION 10 : PARTENAIRES OFFICIELS ===== -->
+  <section id="section-partenaires-hp" style="padding:52px 24px 40px;background:linear-gradient(180deg,#f8fafc 0%,#fff 100%);">
+    <div style="max-width:1100px;margin:0 auto;">
+      <div style="text-align:center;margin-bottom:32px;">
+        <div style="display:inline-flex;align-items:center;gap:6px;background:#eff6ff;color:#1e40af;border:1.5px solid #bfdbfe;border-radius:99px;padding:4px 16px;font-size:12px;font-weight:800;letter-spacing:.04em;margin-bottom:14px;">🏅 Réseau de Confiance</div>
+        <h2 style="font-size:26px;font-weight:900;margin:0 0 10px;color:#0D1B2A;">Partenaires Officiels Diaspo'Actif</h2>
+        <p style="font-size:14px;color:#64748b;max-width:520px;margin:0 auto;">Organisations et experts officiellement reconnus, recommandés en priorité selon vos centres d'intérêt.</p>
+      </div>
+
+      <!-- Carrousel -->
+      <div style="position:relative;">
+        <div id="po-carousel-track" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;"></div>
+        <div id="po-carousel-dots" style="display:flex;justify-content:center;gap:6px;margin-top:20px;"></div>
+      </div>
+
+      <div style="text-align:center;margin-top:24px;">
+        <a href="partenaires.html" style="display:inline-flex;align-items:center;gap:6px;background:#1e3a8a;color:#fff;border-radius:10px;padding:11px 24px;font-size:13px;font-weight:700;text-decoration:none;">
+          Voir tous les Partenaires Officiels →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 11 : CTA FINAL ===== -->
   <!-- Zone publicitaire bannière -->
   <div style="max-width:900px;margin:0 auto 32px;padding:0 24px;">
     <div id="pub-home-banniere" data-pub-format="banniere"></div>
@@ -1599,6 +1622,112 @@ document.getElementById('hp-q')?.addEventListener('keydown', e => {
   });
 })();
 </script>
+
+<script>
+/* ═══════ CARROUSEL PARTENAIRES OFFICIELS ═══════ */
+(function initPartenaireCarousel() {
+  const track = document.getElementById('po-carousel-track');
+  const dotsEl = document.getElementById('po-carousel-dots');
+  if (!track) return;
+
+  let _allPartners = [], _page = 0, _perPage = 3, _timer = null;
+
+  function cardHtml(p) {
+    const nom = [p.prenom, p.nom].filter(Boolean).join(' ') || p.nom || '—';
+    const domaines = (p.domaines_expertise || []).slice(0, 2).join(' · ') || '';
+    const desc = p.slogan || p.description_complete || p.bio || '';
+    const initial = nom.charAt(0).toUpperCase();
+    return `<div class="po-hp-card" onclick="window.location.href='profil.html?id=${p.user_id}'" style="cursor:pointer;">
+      <div class="po-hp-banner" style="${p.banner_url ? '' : 'background:linear-gradient(135deg,#1e3a8a,#3b82f6);'}">
+        ${p.banner_url ? `<img src="${p.banner_url}" alt="${nom}" style="width:100%;height:100%;object-fit:cover;">` : ''}
+        <div class="po-hp-avatar">${p.photo_url ? `<img src="${p.photo_url}" alt="${nom}">` : initial}</div>
+      </div>
+      <div class="po-hp-body">
+        <div class="po-hp-badge">🏅 Partenaire Officiel</div>
+        <div class="po-hp-nom">${nom}</div>
+        ${domaines ? `<div class="po-hp-dom">${domaines}</div>` : ''}
+        ${desc ? `<div class="po-hp-desc">${desc.slice(0,110)}${desc.length>110?'…':''}</div>` : ''}
+        <div class="po-hp-actions">
+          <a href="profil.html?id=${p.user_id}" class="po-hp-btn-discover" onclick="trackPo(${p.id},'profile_visit','homepage')">Découvrir →</a>
+          <a href="messagerie.html?user=${p.user_id}" class="po-hp-btn-contact" onclick="event.stopPropagation();trackPo(${p.id},'contact','homepage')">💬 Contacter</a>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function getPerPage() {
+    return window.innerWidth < 640 ? 1 : window.innerWidth < 960 ? 2 : 3;
+  }
+
+  function renderPage(pg) {
+    _perPage = getPerPage();
+    const start = pg * _perPage;
+    const slice = _allPartners.slice(start, start + _perPage);
+    if (!slice.length) return;
+    track.innerHTML = slice.map(cardHtml).join('');
+    // track impression
+    slice.forEach(p => trackPo(p.id, 'view', 'homepage'));
+    // dots
+    const pages = Math.ceil(_allPartners.length / _perPage);
+    dotsEl.innerHTML = '';
+    for (let i = 0; i < pages; i++) {
+      const d = document.createElement('button');
+      d.style.cssText = `width:8px;height:8px;border-radius:50%;border:none;cursor:pointer;background:${i===pg?'#1e3a8a':'#cbd5e1'};padding:0;transition:background .2s;`;
+      d.onclick = () => { clearTimeout(_timer); _page = i; renderPage(i); startAuto(); };
+      dotsEl.appendChild(d);
+    }
+  }
+
+  function nextPage() {
+    _perPage = getPerPage();
+    const pages = Math.ceil(_allPartners.length / _perPage);
+    _page = (_page + 1) % pages;
+    renderPage(_page);
+  }
+
+  function startAuto() {
+    clearTimeout(_timer);
+    _timer = setTimeout(() => { nextPage(); startAuto(); }, 6000);
+  }
+
+  async function load() {
+    try {
+      const data = await fetch('/api/partenaires/carousel?limit=12', { credentials: 'include' }).then(r => r.json());
+      _allPartners = data.partenaires || [];
+      if (!_allPartners.length) { document.getElementById('section-partenaires-hp').style.display = 'none'; return; }
+      renderPage(0);
+      startAuto();
+    } catch(e) {
+      document.getElementById('section-partenaires-hp').style.display = 'none';
+    }
+  }
+
+  window.trackPo = async function(id, type, source) {
+    try { await fetch(`/api/partenaires/${id}/impression`, { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({event_type:type,source}) }); } catch(e) {}
+  };
+
+  load();
+  window.addEventListener('resize', () => { _perPage = getPerPage(); renderPage(_page); });
+})();
+</script>
+
+<style>
+.po-hp-card { background:#fff; border:1.5px solid #e2e8f0; border-radius:16px; overflow:hidden; transition:box-shadow .2s,transform .15s; }
+.po-hp-card:hover { box-shadow:0 6px 24px rgba(30,58,138,.12); transform:translateY(-2px); }
+.po-hp-banner { height:70px; position:relative; flex-shrink:0; }
+.po-hp-avatar { position:absolute; bottom:-24px; left:14px; width:50px; height:50px; border-radius:50%; border:3px solid #fff; background:#1e3a8a; color:#fff; font-size:18px; font-weight:800; display:flex; align-items:center; justify-content:center; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+.po-hp-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.po-hp-body { padding:32px 14px 14px; }
+.po-hp-badge { display:inline-flex; align-items:center; gap:4px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:99px; padding:2px 9px; font-size:10px; font-weight:800; margin-bottom:6px; }
+.po-hp-nom { font-size:14px; font-weight:800; color:#0D1B2A; margin-bottom:2px; }
+.po-hp-dom { font-size:11px; color:#64748b; margin-bottom:6px; }
+.po-hp-desc { font-size:12px; color:#475569; line-height:1.55; margin-bottom:10px; }
+.po-hp-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.po-hp-btn-discover { background:#1e3a8a; color:#fff; border-radius:8px; padding:6px 13px; font-size:12px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; }
+.po-hp-btn-discover:hover { background:#1e40af; color:#fff; }
+.po-hp-btn-contact { background:#fff; border:1.5px solid #e2e8f0; color:#475569; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; }
+.po-hp-btn-contact:hover { border-color:#1e3a8a; color:#1e3a8a; }
+</style>
 
   <!-- ─── Mobile Bottom Navigation ─── -->
   <nav class="mobile-bottom-nav" aria-label="Navigation mobile">

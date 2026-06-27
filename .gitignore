@@ -4,3 +4,5 @@ server/diaspoactif.db
 .env
 .env.local
 .vercel
+
+.vercel

@@ -233,6 +233,24 @@ button{font-family:inherit;cursor:pointer;}
 .statut-attente{background:#FFF6DA;color:#B68900;}
 
 /* ---------- Fil d'actualité global ---------- */
+/* ===== POST SPONSORISÉ PARTENAIRE OFFICIEL ===== */
+.po-feed-card{background:#fff;border:1.5px solid #bfdbfe;border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 2px 12px rgba(30,58,138,.07);cursor:pointer;transition:box-shadow .18s;}
+.po-feed-card:hover{box-shadow:0 4px 20px rgba(30,58,138,.13);}
+.po-feed-header{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.po-feed-avatar{width:44px;height:44px;border-radius:50%;background:#1e3a8a;color:#fff;font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+.po-feed-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+.po-feed-meta{flex:1;min-width:0;}
+.po-feed-nom{font-size:13px;font-weight:800;color:#0D1B2A;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.po-feed-badge{display:inline-flex;align-items:center;gap:3px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:99px;padding:1px 8px;font-size:10px;font-weight:800;}
+.po-feed-dom{font-size:11px;color:#64748b;margin-top:2px;}
+.po-feed-sponsored{font-size:10px;color:#64748b;white-space:nowrap;background:#f1f5f9;border-radius:99px;padding:2px 8px;font-weight:600;flex-shrink:0;}
+.po-feed-desc{font-size:13px;color:#475569;line-height:1.6;margin:10px 0;}
+.po-feed-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.po-feed-btn-primary{background:#1e3a8a;color:#fff;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;}
+.po-feed-btn-primary:hover{background:#1e40af;color:#fff;}
+.po-feed-btn-secondary{background:#fff;border:1.5px solid #e2e8f0;color:#475569;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;}
+.po-feed-btn-secondary:hover{border-color:#1e3a8a;color:#1e3a8a;}
+
 .feed-post{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow);}
 .feed-head{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
 .feed-head .meta{flex:1;}

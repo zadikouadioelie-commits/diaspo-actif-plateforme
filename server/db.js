@@ -996,6 +996,13 @@ const MIGRATIONS = [
   ["users", "is_verified INTEGER DEFAULT 0"],
   ["users", "is_official INTEGER DEFAULT 0"],
   ["initiatives", "signalements_confirmes INTEGER DEFAULT 0"],
+  // Partenaires Officiels — champs de configuration visibilité
+  ["partenaires_officiels", "priorite INTEGER DEFAULT 0"],
+  ["partenaires_officiels", "mise_en_avant INTEGER DEFAULT 0"],
+  ["partenaires_officiels", "periode_debut TEXT"],
+  ["partenaires_officiels", "periode_fin TEXT"],
+  ["partenaires_officiels", "slogan TEXT"],
+  ["partenaires_officiels", "cles_matching TEXT DEFAULT '[]'"],
 ];
 
 /* ===== SYSTÈME D'ACCRÉDITATIONS DIASPO'ACTIF ===== */
@@ -1749,6 +1756,24 @@ db.exec(`
     admin_nom  TEXT,
     motif      TEXT,
     created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS partenaires_impressions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    partenaire_id  INTEGER NOT NULL,
+    user_id        INTEGER,
+    event_type     TEXT NOT NULL DEFAULT 'view' CHECK(event_type IN ('view','click','contact','profile_visit')),
+    source         TEXT DEFAULT 'homepage',
+    created_at     TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(partenaire_id) REFERENCES partenaires_officiels(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS partenaires_config (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    cle           TEXT NOT NULL UNIQUE,
+    valeur        TEXT NOT NULL,
+    description   TEXT,
+    updated_at    TEXT DEFAULT (datetime('now'))
   );
 `);
 

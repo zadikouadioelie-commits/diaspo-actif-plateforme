@@ -2008,22 +2008,69 @@ async function initFilActualite(){
     }
   }
 
+  // Cache des partenaires pour le fil
+  let _poFeedCache = null;
+  async function getPoFeed() {
+    if (_poFeedCache !== null) return _poFeedCache;
+    try {
+      const d = await fetch('/api/partenaires/carousel?limit=6', { credentials:'include' }).then(r=>r.json());
+      _poFeedCache = d.partenaires || [];
+    } catch(e) { _poFeedCache = []; }
+    return _poFeedCache;
+  }
+
+  function renderPoSponsoredPost(p) {
+    const nom = [p.prenom, p.nom].filter(Boolean).join(' ') || p.nom || '—';
+    const domaines = (p.domaines_expertise || []).slice(0,2).join(' · ');
+    const desc = p.slogan || p.description_complete || p.bio || '';
+    return `<div class="po-feed-card" onclick="window.location.href='profil.html?id=${p.user_id}';fetch('/api/partenaires/${p.id}/impression',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({event_type:'profile_visit',source:'feed'})})">
+      <div class="po-feed-header">
+        <div class="po-feed-avatar">${p.photo_url?`<img src="${p.photo_url}" alt="${nom}">`:(nom.charAt(0)||'?').toUpperCase()}</div>
+        <div class="po-feed-meta">
+          <div class="po-feed-nom">${nom} <span class="po-feed-badge">🏅 Partenaire Officiel Diaspo'Actif</span></div>
+          ${domaines?`<div class="po-feed-dom">${domaines}</div>`:''}
+        </div>
+        <span class="po-feed-sponsored">Recommandé</span>
+      </div>
+      ${p.banner_url?`<div style="height:140px;overflow:hidden;border-radius:8px;margin:10px 0;"><img src="${p.banner_url}" style="width:100%;height:100%;object-fit:cover;" alt=""></div>`:''}
+      ${desc?`<div class="po-feed-desc">${desc.slice(0,200)}${desc.length>200?'…':''}</div>`:''}
+      <div class="po-feed-actions" onclick="event.stopPropagation()">
+        <a href="profil.html?id=${p.user_id}" class="po-feed-btn-primary" onclick="fetch('/api/partenaires/${p.id}/impression',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({event_type:'click',source:'feed'})})">Découvrir →</a>
+        <a href="messagerie.html?user=${p.user_id}" class="po-feed-btn-secondary" onclick="fetch('/api/partenaires/${p.id}/impression',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({event_type:'contact',source:'feed'})})">💬 Contacter</a>
+      </div>
+    </div>`;
+  }
+
   function render(){
     if(!posts.length){
       el.innerHTML = `<div class="empty">Aucune publication pour ce fil.</div>`;
       return;
     }
     const INSERT_AT = 3;
+    const PO_EVERY  = 8; // injecter 1 post sponsorisé toutes les 8 publications
     let html = "";
+    let poIdx = 0;
     posts.forEach((p, i) => {
       html += renderPost(p, { suivis_users, me });
       if(i === INSERT_AT - 1) html += `<div id="profiles-widget-slot"></div>`;
+      // Injection post sponsorisé
+      if(i > 0 && (i + 1) % PO_EVERY === 0) html += `<div class="po-feed-slot" data-po-idx="${poIdx++}"></div>`;
     });
     if(posts.length < INSERT_AT) html += `<div id="profiles-widget-slot"></div>`;
     el.innerHTML = html;
 
     const slot = document.getElementById("profiles-widget-slot");
     if(slot) buildProfilesWidget().then(html => { slot.outerHTML = html; });
+
+    // Remplir les slots partenaires
+    getPoFeed().then(partners => {
+      if (!partners.length) return;
+      document.querySelectorAll('.po-feed-slot').forEach(slot => {
+        const idx = parseInt(slot.dataset.poIdx || 0);
+        const p = partners[idx % partners.length];
+        if (p) { slot.outerHTML = renderPoSponsoredPost(p); }
+      });
+    });
   }
 
   const bar = document.getElementById("feed-filter-bar");

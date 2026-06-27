@@ -8109,6 +8109,111 @@ async function handleRequest(req, res) {
        PARTENAIRES OFFICIELS DIASPO'ACTIF
     ═══════════════════════════════════════════════════════════ */
 
+    /* GET /api/partenaires/carousel — liste personnalisée pour la homepage */
+    if (req.method === "GET" && pathname === "/api/partenaires/carousel") {
+      const me = getCurrentUser(req);
+      const now = new Date().toISOString().slice(0, 10);
+      let rows = db.prepare(`
+        SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.banner_url, u.titre_pro, u.bio, u.ville, u.pays AS user_pays
+        FROM partenaires_officiels po JOIN users u ON u.id = po.user_id
+        WHERE po.statut = 'active'
+          AND (po.periode_debut IS NULL OR po.periode_debut <= ?)
+          AND (po.periode_fin  IS NULL OR po.periode_fin  >= ?)
+        ORDER BY po.mise_en_avant DESC, po.priorite DESC, po.nbr_recommandations DESC`).all(now, now);
+
+      // Score de pertinence selon le profil utilisateur
+      if (me) {
+        const uData = db.prepare("SELECT centres_interet, situation_pro, pays, role FROM users WHERE id=?").get(me.id);
+        const ciUser = safeParse(uData?.centres_interet || "[]").map(s => s.toLowerCase());
+        const paysUser = (uData?.pays || "").toLowerCase();
+        rows = rows.map(r => {
+          let score = r.mise_en_avant * 100 + r.priorite * 10;
+          const domaines = safeParse(r.domaines_expertise || "[]").map(s => s.toLowerCase());
+          const cles = safeParse(r.cles_matching || "[]").map(s => s.toLowerCase());
+          const allKeys = [...domaines, ...cles];
+          allKeys.forEach(k => { if (ciUser.some(ci => ci.includes(k) || k.includes(ci))) score += 15; });
+          const pays = safeParse(r.pays_intervention || "[]").map(s => s.toLowerCase());
+          if (paysUser && pays.some(p => p.includes(paysUser) || paysUser.includes(p))) score += 10;
+          // Anti-répétition : pénaliser les partenaires récemment affichés
+          const recentViews = db.prepare("SELECT COUNT(*) AS n FROM partenaires_impressions WHERE partenaire_id=? AND user_id=? AND event_type='view' AND created_at > datetime('now','-1 hour')").get(r.id, me.id).n;
+          score -= recentViews * 5;
+          return { ...r, _score: score };
+        }).sort((a, b) => b._score - a._score);
+      }
+
+      const limit = parseInt(new URL("http://x" + req.url).searchParams.get('limit') || '8');
+      const result = rows.slice(0, limit).map(r => ({
+        ...r,
+        domaines_expertise: safeParse(r.domaines_expertise || "[]"),
+        pays_intervention:  safeParse(r.pays_intervention  || "[]"),
+        services:           safeParse(r.services           || "[]"),
+      }));
+      return sendJSON(res, 200, { partenaires: result, total: rows.length });
+    }
+
+    /* POST /api/partenaires/:id/impression — tracking vue/clic */
+    const impM = pathname.match(/^\/api\/partenaires\/(\d+)\/impression$/);
+    if (req.method === "POST" && impM) {
+      const me = getCurrentUser(req);
+      const pid = parseInt(impM[1]);
+      const { event_type = "view", source = "homepage" } = body;
+      if (!['view','click','contact','profile_visit'].includes(event_type)) return sendJSON(res, 400, { error: "event_type invalide." });
+      db.prepare("INSERT INTO partenaires_impressions (partenaire_id,user_id,event_type,source) VALUES (?,?,?,?)")
+        .run(pid, me?.id || null, event_type, source);
+      if (event_type === 'click' || event_type === 'profile_visit') {
+        db.prepare("UPDATE partenaires_officiels SET nbr_recommandations=nbr_recommandations+1 WHERE id=?").run(pid);
+      }
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* GET /api/admin/partenaires/stats — statistiques admin */
+    if (req.method === "GET" && pathname === "/api/admin/partenaires/stats") {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
+      const byPartner = db.prepare(`
+        SELECT po.id, u.nom, u.prenom, po.domaines_expertise,
+          COUNT(CASE WHEN pi.event_type='view'         THEN 1 END) AS nb_vues,
+          COUNT(CASE WHEN pi.event_type='click'        THEN 1 END) AS nb_clics,
+          COUNT(CASE WHEN pi.event_type='profile_visit' THEN 1 END) AS nb_profils,
+          COUNT(CASE WHEN pi.event_type='contact'      THEN 1 END) AS nb_contacts,
+          ROUND(100.0 * COUNT(CASE WHEN pi.event_type='click' THEN 1 END) / MAX(1, COUNT(CASE WHEN pi.event_type='view' THEN 1 END)), 1) AS taux_clic
+        FROM partenaires_officiels po
+        JOIN users u ON u.id = po.user_id
+        LEFT JOIN partenaires_impressions pi ON pi.partenaire_id = po.id
+        WHERE po.statut = 'active'
+        GROUP BY po.id ORDER BY nb_vues DESC`).all();
+      const bySecteur = db.prepare(`
+        SELECT po.categorie, COUNT(pi.id) AS nb_impressions
+        FROM partenaires_impressions pi
+        JOIN partenaires_officiels po ON po.id = pi.partenaire_id
+        GROUP BY po.categorie ORDER BY nb_impressions DESC`).all();
+      const totals = db.prepare(`
+        SELECT
+          COUNT(CASE WHEN event_type='view'         THEN 1 END) AS total_vues,
+          COUNT(CASE WHEN event_type='click'        THEN 1 END) AS total_clics,
+          COUNT(CASE WHEN event_type='contact'      THEN 1 END) AS total_contacts,
+          COUNT(CASE WHEN event_type='profile_visit' THEN 1 END) AS total_profils
+        FROM partenaires_impressions`).get();
+      return sendJSON(res, 200, { byPartner: byPartner.map(r => ({...r, domaines_expertise: safeParse(r.domaines_expertise||'[]')})), bySecteur, totals });
+    }
+
+    /* PUT /api/admin/partenaires/:id/config — admin configure priorité/rotation */
+    const configM = pathname.match(/^\/api\/admin\/partenaires\/(\d+)\/config$/);
+    if (req.method === "PUT" && configM) {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
+      const pid = parseInt(configM[1]);
+      const { priorite, mise_en_avant, periode_debut, periode_fin, slogan, cles_matching } = body;
+      db.prepare(`UPDATE partenaires_officiels SET
+        priorite=COALESCE(?,priorite), mise_en_avant=COALESCE(?,mise_en_avant),
+        periode_debut=COALESCE(?,periode_debut), periode_fin=COALESCE(?,periode_fin),
+        slogan=COALESCE(?,slogan), cles_matching=COALESCE(?,cles_matching),
+        updated_at=datetime('now') WHERE id=?`)
+        .run(priorite??null, mise_en_avant??null, periode_debut||null, periode_fin||null,
+             slogan||null, cles_matching ? JSON.stringify(cles_matching) : null, pid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
     /* GET /api/partenaires — annuaire public */
     if (req.method === "GET" && pathname === "/api/partenaires") {
       const qs = new URL("http://x" + req.url).searchParams;
