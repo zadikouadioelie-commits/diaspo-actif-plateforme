@@ -2008,7 +2008,7 @@ route("GET", "/api/admin/finances", async (req, res) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // Abonnés actifs (abonnements table)
-  const abonnesActifs = db.prepare("SELECT COUNT(*) n FROM abonnements WHERE statut='actif'").get().n;
+  const abonnesActifs = db.prepare("SELECT COUNT(*) n FROM abonnements").get().n;
 
   // Transactions du mois courant
   const txMois = db.prepare(`
