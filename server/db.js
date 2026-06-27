@@ -1531,8 +1531,8 @@ db.exec(`
 
   INSERT OR IGNORE INTO da_packages (slug, name, icon, url, enabled, sort_order, show_on, category) VALUES
     ('site-officiel',  'Site Diaspo''Actif', '🌐', 'https://www.diaspoactif.com',            1, 0,  '["home","footer","profil","menu"]', 'officiel'),
-    ('blog',           'Blog Diaspo''Actif', '✍️', 'https://blog.diaspoactif.com',            1, 1,  '["home","footer"]',                 'officiel'),
-    ('centre-aide',    'Centre d''aide',     '🆘', 'https://aide.diaspoactif.com',            1, 2,  '["home","footer","menu"]',          'officiel'),
+    ('blog',           'Blog Diaspo''Actif', '📝', 'https://blog.diaspoactif.com',            1, 1,  '["home","footer"]',                 'officiel'),
+    ('centre-aide',    'Centre d''aide',     '💡', 'https://aide.diaspoactif.com',            1, 2,  '["home","footer","menu"]',          'officiel'),
     ('documentation',  'Documentation',      '📚', 'https://docs.diaspoactif.com',            0, 3,  '["footer"]',                        'officiel'),
     ('newsletter',     'Newsletter',         '📧', 'https://newsletter.diaspoactif.com',      1, 4,  '["home","footer"]',                 'officiel'),
     ('espace-presse',  'Espace presse',      '📰', 'https://presse.diaspoactif.com',          0, 5,  '["footer"]',                        'officiel'),
@@ -1540,10 +1540,10 @@ db.exec(`
     ('linkedin',       'LinkedIn',           '💼', 'https://linkedin.com/company/diaspoactif',1, 11, '["home","footer","profil"]',        'social'),
     ('instagram',      'Instagram',          '📸', 'https://instagram.com/diaspoactif',       1, 12, '["home","footer","profil"]',        'social'),
     ('facebook',       'Facebook',           '👥', 'https://facebook.com/diaspoactif',        1, 13, '["home","footer"]',                 'social'),
-    ('twitter-x',      'X (Twitter)',        '𝕏', 'https://x.com/diaspoactif',               1, 14, '["home","footer"]',                 'social'),
+    ('twitter-x',      'X (Twitter)',        'X',  'https://x.com/diaspoactif',               1, 14, '["home","footer"]',                 'social'),
     ('tiktok',         'TikTok',             '🎵', 'https://tiktok.com/@diaspoactif',         0, 15, '["home"]',                         'social'),
     ('whatsapp',       'WhatsApp',           '💬', '',                                        0, 20, '["home"]',                         'messagerie'),
-    ('telegram',       'Telegram',           '✈️', '',                                        0, 21, '["home"]',                         'messagerie'),
+    ('telegram',       'Telegram',           '✉', '',                                         0, 21, '["home"]',                         'messagerie'),
     ('discord',        'Discord',            '🎮', '',                                        0, 22, '["home"]',                         'messagerie');
 `);
 
