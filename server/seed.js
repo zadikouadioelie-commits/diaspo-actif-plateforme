@@ -183,8 +183,98 @@ function seed() {
     profil_json: "{}"
   });
 
+  /* ── Compte AKOMCA — Partenaire Officiel ── */
+  const akomcaUserId = insertUser.run({
+    nom: "AKOMCA", email: "contact@akomca.diaspoactif.demo",
+    password_hash: pw.hash, password_salt: pw.salt,
+    role: "initiative", ville: "Paris", pays: "France",
+    profil_json: JSON.stringify({
+      bio: "Agence conseil en Communication, Coopération Internationale et Développement économique. Spécialiste de la coopération franco-africaine depuis plus de 10 ans.",
+      titre_pro: "Agence conseil — Coopération & Communication",
+      photo_url: null
+    })
+  }).lastInsertRowid;
+
   /* Lier A.I.T.O au compte initiative, activer abonnement */
   db.prepare("UPDATE initiatives SET owner_user_id = ?, abonnement_actif = 1 WHERE slug = 'aito'").run(initUserId);
+
+  /* ── Initiative AKOMCA ── */
+  const akomcaInitId = insertInitiative.run({
+    slug: "akomca",
+    nom: "AKOMCA",
+    sigle: "AKOMCA",
+    pays: "France",
+    region: "Île-de-France",
+    ville: "Paris",
+    zone: null,
+    nationalite1: "Ivoirienne",
+    nationalite2: "Française",
+    nationalites_concernees: JSON.stringify(["Ivoirienne","Sénégalaise","Camerounaise","Togolaise","Béninoise","Congolaise","Malienne","Guinéenne","Marocaine","Tunisienne"]),
+    nationalite_unique: 0,
+    origine1: "Côte d'Ivoire",
+    origine2: "France",
+    rayonnement: "internationale",
+    pays_intervention: JSON.stringify([
+      {"pays":"France","ville":"Paris"},
+      {"pays":"Côte d'Ivoire"},
+      {"pays":"Sénégal"},
+      {"pays":"Cameroun"},
+      {"pays":"Togo"},
+      {"pays":"Bénin"}
+    ]),
+    domaine: "Coopération internationale",
+    type: "Agence de conseil",
+    membres: 15,
+    vues: 312,
+    abonnes: 94,
+    description: "AKOMCA est une agence conseil en Communication, Coopération Internationale et Développement économique. Elle accompagne tout type de coopération économique, sociale, culturelle et durable, en lien avec l'Afrique, et dispose d'une bonne connaissance du réseau des décideurs publics et privés en France et dans le monde.",
+    mission: "Favoriser les conditions de l'investissement en Afrique en contribuant à son attractivité et à son développement économique durable, à travers des projets éthiques. Organiser le Forum AKOMCA, lieu incontournable de la coopération franco-africaine.",
+    historique: "L'agence AKOMCA a été fondée pour structurer et dynamiser la coopération franco-africaine. Elle organise régulièrement le Forum AKOMCA qui associe institutions, entreprises et décideurs politiques. Le forum a connu plusieurs éditions réussies (2016, 2017, 2019, Mai 2024, Novembre 2024) et prépare l'édition 2026 à Toulouse sur le financement du développement territorial ivoirien.",
+    site_web: "https://www.akomca.com",
+    lat: 48.8566,
+    lon: 2.3522,
+  }).lastInsertRowid;
+
+  db.prepare("UPDATE initiatives SET owner_user_id = ?, abonnement_actif = 1 WHERE slug = 'akomca'").run(akomcaUserId);
+
+  /* ── Partenaire Officiel AKOMCA ── */
+  db.prepare(`
+    INSERT INTO partenaires_officiels
+      (user_id, statut, domaines_expertise, pays_intervention, services,
+       description_complete, site_web, liens_utiles, categorie,
+       niveau_visibilite, nbr_recommandations, admin_id,
+       priorite, mise_en_avant, slogan, cles_matching,
+       date_attribution, date_expiration)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),date('now','+1 year'))
+  `).run(
+    akomcaUserId,
+    "active",
+    JSON.stringify(["Coopération internationale","Communication institutionnelle","Développement économique","Organisation d'événements"]),
+    JSON.stringify(["France","Côte d'Ivoire","Sénégal","Cameroun","Togo","Bénin","Mali","Guinée"]),
+    JSON.stringify([
+      "Conseil en coopération internationale",
+      "Communication institutionnelle",
+      "Accompagnement de projets en Afrique",
+      "Organisation d'événements — Forum AKOMCA",
+      "Mise en réseau décideurs publics & privés",
+      "Assistance technique et opérationnelle"
+    ]),
+    "AKOMCA est le partenaire privilégié dans les questions de Coopération Internationale et économique Nord-Sud ainsi que de Communication Institutionnelle. L'agence mobilise son savoir-faire, ses réseaux et ses partenariats pour promouvoir l'investissement public et privé sur le continent africain. Elle fournit une assistance technique, des conseils et un accompagnement opérationnel en Afrique, en France et à l'international.",
+    "https://www.akomca.com",
+    JSON.stringify([
+      {"label":"Forum AKOMCA","url":"https://www.akomca.com/le-concept-du-forum/"},
+      {"label":"Actualités","url":"https://www.akomca.com/actualites/"},
+      {"label":"Contact","url":"https://www.akomca.com/contact/"}
+    ]),
+    "cooperation",
+    "public",
+    12,
+    adminId,
+    10,
+    1,
+    "Agence conseil en coopération et communication",
+    JSON.stringify(["coopération","afrique","investissement","diaspora","communication","développement","ivoirien","franco-africain","forum"])
+  );
 
   /* ---- Abonnements démo (Jean suit 3 initiatives) ---- */
   const aitoId = db.prepare("SELECT id FROM initiatives WHERE slug = 'aito'").get().id;
