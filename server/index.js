@@ -7770,6 +7770,124 @@ async function handleRequest(req, res) {
       return sendJSON(res, 200, { ok: true, statut: newStatut });
     }
 
+    /* ── Cockpit de Pilotage ── */
+    const cockpitM = pathname.match(/^\/api\/deals\/(\d+)\/cockpit$/);
+    if (req.method === "GET" && cockpitM) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = parseInt(cockpitM[1]);
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      const objectifs = db.prepare("SELECT * FROM deal_objectifs WHERE deal_id=? ORDER BY ordre,id").all(did);
+      const jalons    = db.prepare("SELECT * FROM deal_jalons WHERE deal_id=? ORDER BY ordre,id").all(did);
+      const taches    = db.prepare("SELECT statut,priorite,date_echeance FROM deal_tasks WHERE deal_id=?").all(did);
+      const docs      = db.prepare("SELECT id,nom,type_mime,created_at FROM deal_documents WHERE deal_id=?").all(did);
+      const events    = db.prepare("SELECT titre,date_debut,type FROM deal_events WHERE deal_id=? ORDER BY date_debut LIMIT 5").all(did);
+      const histo     = db.prepare("SELECT * FROM deal_history WHERE deal_id=? ORDER BY created_at DESC LIMIT 10").all(did);
+      const deal      = db.prepare("SELECT * FROM deals WHERE id=?").get(did);
+      const parts     = db.prepare("SELECT dp.*,i.nom,i.slug FROM deal_participants dp LEFT JOIN initiatives i ON i.id=dp.initiative_id WHERE dp.deal_id=? AND dp.statut='accepte'").all(did);
+
+      const tTotal = taches.length, tDone = taches.filter(t=>t.statut==='terminee').length;
+      const tEnCours = taches.filter(t=>t.statut==='en_cours').length;
+      const tEnRetard = taches.filter(t=>t.statut!=='terminee'&&t.date_echeance&&t.date_echeance<new Date().toISOString().slice(0,10)).length;
+      const oTotal = objectifs.length, oDone = objectifs.filter(o=>o.statut==='atteint').length;
+      const jTotal = jalons.length, jDone = jalons.filter(j=>j.statut==='valide').length;
+
+      let progression = 0;
+      if (oTotal+tTotal+jTotal > 0) {
+        const oScore = oTotal ? (objectifs.reduce((s,o)=>s+o.progression,0)/oTotal) : null;
+        const tScore = tTotal ? (tDone/tTotal*100) : null;
+        const jScore = jTotal ? (jDone/jTotal*100) : null;
+        const weights = [oScore!==null?0.4:0, tScore!==null?0.4:0, jScore!==null?0.2:0];
+        const total = weights.reduce((a,b)=>a+b,0) || 1;
+        progression = Math.round(
+          ((oScore||0)*(oScore!==null?0.4:0) + (tScore||0)*(tScore!==null?0.4:0) + (jScore||0)*(jScore!==null?0.2:0)) / total
+        );
+      }
+
+      const now = new Date().toISOString().slice(0,10);
+      const sante = progression >= 75 ? 'bon' : tEnRetard > tTotal*0.3 ? 'critique' : 'attention';
+
+      return sendJSON(res, 200, { progression, sante, objectifs, jalons, taches_stats: { total:tTotal, done:tDone, en_cours:tEnCours, en_retard:tEnRetard }, docs_stats: { total:docs.length }, prochains_events: events, activite: histo, participants: parts, deal });
+    }
+
+    /* ── Objectifs ── */
+    const objBase = pathname.match(/^\/api\/deals\/(\d+)\/objectifs$/);
+    const objItem = pathname.match(/^\/api\/deals\/(\d+)\/objectifs\/(\d+)$/);
+    if (objBase || objItem) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = parseInt((objBase||objItem)[1]);
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      const body = await readBody(req);
+      if (req.method === "GET" && objBase) {
+        return sendJSON(res, 200, { objectifs: db.prepare("SELECT * FROM deal_objectifs WHERE deal_id=? ORDER BY ordre,id").all(did) });
+      }
+      if (req.method === "POST" && objBase) {
+        const { titre, responsable_nom, date_limite, progression=0, ordre=0 } = body;
+        if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+        const r = db.prepare("INSERT INTO deal_objectifs (deal_id,titre,responsable_nom,date_limite,progression,ordre) VALUES (?,?,?,?,?,?)").run(did,titre,responsable_nom||null,date_limite||null,progression,ordre);
+        dealLog(did, me.id, me.nom, 'objectif_ajouté', titre);
+        return sendJSON(res, 201, { ok:true, id:r.lastInsertRowid });
+      }
+      if (req.method === "PUT" && objItem) {
+        const oid = objItem[2];
+        const { titre, responsable_nom, date_limite, progression, statut, ordre } = body;
+        const sets = [], vals = [];
+        if (titre!==undefined){sets.push("titre=?");vals.push(titre);}
+        if (responsable_nom!==undefined){sets.push("responsable_nom=?");vals.push(responsable_nom);}
+        if (date_limite!==undefined){sets.push("date_limite=?");vals.push(date_limite);}
+        if (progression!==undefined){sets.push("progression=?");vals.push(progression);}
+        if (statut!==undefined){sets.push("statut=?");vals.push(statut);}
+        if (ordre!==undefined){sets.push("ordre=?");vals.push(ordre);}
+        if (!sets.length) return sendJSON(res, 400, { error: "Rien à modifier." });
+        db.prepare(`UPDATE deal_objectifs SET ${sets.join(',')} WHERE id=? AND deal_id=?`).run(...vals,oid,did);
+        return sendJSON(res, 200, { ok:true });
+      }
+      if (req.method === "DELETE" && objItem) {
+        db.prepare("DELETE FROM deal_objectifs WHERE id=? AND deal_id=?").run(objItem[2],did);
+        return sendJSON(res, 200, { ok:true });
+      }
+    }
+
+    /* ── Jalons ── */
+    const jalBase = pathname.match(/^\/api\/deals\/(\d+)\/jalons$/);
+    const jalItem = pathname.match(/^\/api\/deals\/(\d+)\/jalons\/(\d+)$/);
+    if (jalBase || jalItem) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = parseInt((jalBase||jalItem)[1]);
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      const body = await readBody(req);
+      if (req.method === "GET" && jalBase) {
+        return sendJSON(res, 200, { jalons: db.prepare("SELECT * FROM deal_jalons WHERE deal_id=? ORDER BY ordre,date_prevue,id").all(did) });
+      }
+      if (req.method === "POST" && jalBase) {
+        const { titre, description, date_prevue, statut='prevu', ordre=0 } = body;
+        if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+        const r = db.prepare("INSERT INTO deal_jalons (deal_id,titre,description,date_prevue,statut,ordre) VALUES (?,?,?,?,?,?)").run(did,titre,description||null,date_prevue||null,statut,ordre);
+        dealLog(did, me.id, me.nom, 'jalon_ajouté', titre);
+        return sendJSON(res, 201, { ok:true, id:r.lastInsertRowid });
+      }
+      if (req.method === "PUT" && jalItem) {
+        const jid = jalItem[2];
+        const { titre, description, date_prevue, date_reelle, statut, ordre } = body;
+        const sets = [], vals = [];
+        if (titre!==undefined){sets.push("titre=?");vals.push(titre);}
+        if (description!==undefined){sets.push("description=?");vals.push(description);}
+        if (date_prevue!==undefined){sets.push("date_prevue=?");vals.push(date_prevue);}
+        if (date_reelle!==undefined){sets.push("date_reelle=?");vals.push(date_reelle);}
+        if (statut!==undefined){sets.push("statut=?");vals.push(statut);}
+        if (ordre!==undefined){sets.push("ordre=?");vals.push(ordre);}
+        if (!sets.length) return sendJSON(res, 400, { error: "Rien à modifier." });
+        db.prepare(`UPDATE deal_jalons SET ${sets.join(',')} WHERE id=? AND deal_id=?`).run(...vals,jid,did);
+        return sendJSON(res, 200, { ok:true });
+      }
+      if (req.method === "DELETE" && jalItem) {
+        db.prepare("DELETE FROM deal_jalons WHERE id=? AND deal_id=?").run(jalItem[2],did);
+        return sendJSON(res, 200, { ok:true });
+      }
+    }
+
     return sendJSON(res, 404, { error: "Route API inconnue." });
   }
 

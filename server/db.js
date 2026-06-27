@@ -1691,6 +1691,30 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(deal_id) REFERENCES deals(id)
   );
+  CREATE TABLE IF NOT EXISTS deal_objectifs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id         INTEGER NOT NULL,
+    titre           TEXT NOT NULL,
+    responsable_nom TEXT,
+    date_limite     TEXT,
+    progression     INTEGER DEFAULT 0 CHECK(progression BETWEEN 0 AND 100),
+    statut          TEXT DEFAULT 'en_cours' CHECK(statut IN ('en_cours','atteint','abandonne')),
+    ordre           INTEGER DEFAULT 0,
+    created_at      TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+  );
+  CREATE TABLE IF NOT EXISTS deal_jalons (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id     INTEGER NOT NULL,
+    titre       TEXT NOT NULL,
+    description TEXT,
+    date_prevue TEXT,
+    date_reelle TEXT,
+    statut      TEXT DEFAULT 'prevu' CHECK(statut IN ('prevu','en_cours','valide','reporte')),
+    ordre       INTEGER DEFAULT 0,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+  );
 `);
 
 /* backfillOfficialFollow est appelé depuis seed.js après création du compte officiel */

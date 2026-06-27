@@ -139,6 +139,68 @@
 #deal-denied .icon{font-size:48px;}
 #deal-denied h2{font-size:20px;font-weight:700;color:#1e293b;}
 #deal-denied p{font-size:14px;color:#64748b;text-align:center;}
+/* ── Cockpit ── */
+.cockpit-hero{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:24px;margin-bottom:16px;}
+@media(max-width:600px){.cockpit-hero{grid-template-columns:1fr;}}
+.cockpit-ring-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.cockpit-ring{position:relative;width:140px;height:140px;}
+.cockpit-ring svg{transform:rotate(-90deg);}
+.cockpit-ring-bg{fill:none;stroke:#e2e8f0;stroke-width:12;}
+.cockpit-ring-fg{fill:none;stroke-width:12;stroke-linecap:round;transition:stroke-dashoffset 1s ease,stroke .5s;}
+.cockpit-ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.cockpit-ring-pct{font-size:28px;font-weight:800;color:#1e293b;line-height:1;}
+.cockpit-ring-lbl{font-size:10px;color:#94a3b8;margin-top:2px;}
+.cockpit-bar-section{flex:1;}
+.cockpit-bar-title{font-size:15px;font-weight:700;color:#1e293b;margin-bottom:8px;}
+.cockpit-bar-wrap{background:#e2e8f0;border-radius:99px;height:16px;overflow:hidden;position:relative;}
+.cockpit-bar-fill{height:100%;border-radius:99px;transition:width 1s ease,background .5s;}
+.cockpit-bar-labels{display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:4px;}
+.cockpit-health{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;margin-top:10px;}
+.cockpit-health.bon{background:#dcfce7;color:#16a34a;}
+.cockpit-health.attention{background:#fef3c7;color:#d97706;}
+.cockpit-health.critique{background:#fee2e2;color:#dc2626;}
+.cockpit-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;}
+@media(max-width:900px){.cockpit-grid3{grid-template-columns:1fr 1fr;}}
+@media(max-width:600px){.cockpit-grid3{grid-template-columns:1fr;}}
+.cockpit-mini{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;}
+.cockpit-mini-title{font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px;}
+.cockpit-mini-stat{font-size:26px;font-weight:800;color:#1e293b;line-height:1;}
+.cockpit-mini-sub{font-size:11px;color:#94a3b8;margin-top:3px;}
+.ck-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;}
+.ck-bar-row span:first-child{width:70px;color:#64748b;flex-shrink:0;}
+.ck-bar-bg{flex:1;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;}
+.ck-bar-fill{height:100%;border-radius:4px;}
+.ck-bar-row .val{width:32px;text-align:right;font-weight:700;color:#1e293b;}
+.objectif-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;}
+.objectif-row:last-child{border-bottom:none;}
+.objectif-info{flex:1;}
+.objectif-titre{font-size:13px;font-weight:600;color:#1e293b;}
+.objectif-meta{font-size:11px;color:#94a3b8;margin-top:2px;}
+.objectif-bar-wrap{width:120px;background:#e2e8f0;border-radius:4px;height:6px;flex-shrink:0;}
+.objectif-bar-fill{height:6px;border-radius:4px;background:#2563eb;}
+.objectif-pct{font-size:12px;font-weight:700;color:#1e293b;width:36px;text-align:right;flex-shrink:0;}
+.jalon-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;position:relative;}
+.jalon-row:not(:last-child)::after{content:'';position:absolute;left:12px;top:28px;bottom:-10px;width:2px;background:#e2e8f0;}
+.jalon-icon{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:2px;z-index:1;}
+.jalon-icon.valide{background:#dcfce7;}
+.jalon-icon.en_cours{background:#dbeafe;}
+.jalon-icon.prevu{background:#f1f5f9;}
+.jalon-icon.reporte{background:#fef3c7;}
+.jalon-body{flex:1;}
+.jalon-titre{font-size:13px;font-weight:600;color:#1e293b;}
+.jalon-date{font-size:11px;color:#94a3b8;margin-top:2px;}
+.jalon-badge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;}
+.jalon-badge.valide{background:#dcfce7;color:#16a34a;}
+.jalon-badge.en_cours{background:#dbeafe;color:#1d4ed8;}
+.jalon-badge.prevu{background:#f1f5f9;color:#64748b;}
+.jalon-badge.reporte{background:#fef3c7;color:#d97706;}
+.act-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #f8fafc;}
+.act-dot{width:8px;height:8px;background:#2563eb;border-radius:50%;margin-top:5px;flex-shrink:0;}
+.act-body{flex:1;}
+.act-action{font-size:12px;font-weight:600;color:#1e293b;}
+.act-time{font-size:11px;color:#94a3b8;}
+.cockpit-add-btn{font-size:12px;color:#2563eb;cursor:pointer;padding:3px 0;background:none;border:none;font-family:inherit;font-weight:600;}
+.cockpit-add-btn:hover{text-decoration:underline;}
 </style>
 </head>
 <body>
@@ -269,46 +331,94 @@ function invitationBanner() {
   </div>`;
 }
 
+function fmtCkDate(d) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}); } catch(e) { return d; }
+}
+
 function buildDashboard() {
-  const nbPart = PARTICIPANTS.filter(p => p.statut === 'accepte').length;
-  const cat = DEAL.categorie || 'partenariat';
+  const isCreateur = MY_PART?.role === 'createur';
   return `
-    <div class="deal-stats">
-      <div class="deal-stat"><div class="deal-stat-num">${nbPart}</div><div class="deal-stat-label">Participants actifs</div></div>
-      <div class="deal-stat"><div class="deal-stat-num" id="stat-taches">—</div><div class="deal-stat-label">Tâches</div></div>
-      <div class="deal-stat"><div class="deal-stat-num" id="stat-docs">—</div><div class="deal-stat-label">Documents</div></div>
-      <div class="deal-stat"><div class="deal-stat-num" id="stat-msgs">—</div><div class="deal-stat-label">Messages</div></div>
+    <div class="cockpit-hero">
+      <div class="cockpit-ring-wrap">
+        <div class="cockpit-ring">
+          <svg viewBox="0 0 140 140" width="140" height="140">
+            <circle class="cockpit-ring-bg" cx="70" cy="70" r="57"/>
+            <circle class="cockpit-ring-fg" id="ck-ring-arc" cx="70" cy="70" r="57" stroke="#2563eb"
+              stroke-dasharray="358" stroke-dashoffset="358"/>
+          </svg>
+          <div class="cockpit-ring-text">
+            <div class="cockpit-ring-pct" id="ck-pct">0%</div>
+            <div class="cockpit-ring-lbl">Progression</div>
+          </div>
+        </div>
+        <div class="cockpit-health" id="ck-health">⏳ Calcul…</div>
+      </div>
+      <div class="cockpit-bar-section">
+        <div class="cockpit-bar-title">${esc(DEAL.titre)}</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:12px;">${esc(DEAL.objectif||DEAL.description||'')}</div>
+        <div class="cockpit-bar-wrap"><div class="cockpit-bar-fill" id="ck-bar" style="width:0%;background:#94a3b8;"></div></div>
+        <div class="cockpit-bar-labels"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+        <div style="display:flex;gap:24px;margin-top:14px;flex-wrap:wrap;">
+          ${fieldRow('Créateur', DEAL.createur_nom||'—')}
+          ${DEAL.date_echeance ? fieldRow('Échéance', fmtCkDate(DEAL.date_echeance)) : ''}
+          ${DEAL.budget ? fieldRow('Budget', Number(DEAL.budget).toLocaleString('fr-FR') + ' ' + (DEAL.devise||'EUR')) : ''}
+        </div>
+      </div>
+    </div>
+    <div class="cockpit-grid3">
+      <div class="cockpit-mini">
+        <div class="cockpit-mini-title">✅ Tâches</div>
+        <div class="cockpit-mini-stat" id="ck-t-done">—</div>
+        <div class="cockpit-mini-sub" id="ck-t-sub">chargement…</div>
+        <div style="margin-top:10px;" id="ck-t-bars"></div>
+      </div>
+      <div class="cockpit-mini">
+        <div class="cockpit-mini-title">📁 Documents</div>
+        <div class="cockpit-mini-stat" id="ck-d-total">—</div>
+        <div class="cockpit-mini-sub">Documents partagés</div>
+      </div>
+      <div class="cockpit-mini">
+        <div class="cockpit-mini-title">📅 Prochain événement</div>
+        <div class="cockpit-mini-stat" id="ck-evt-title" style="font-size:15px;line-height:1.3;">—</div>
+        <div class="cockpit-mini-sub" id="ck-evt-date"></div>
+      </div>
+    </div>
+    <div class="deal-grid2" style="margin-bottom:16px;">
+      <div class="deal-card">
+        <div class="deal-card-title">🎯 Objectifs
+          ${isCreateur ? `<button class="cockpit-add-btn" onclick="openObjModal()">+ Ajouter</button>` : ''}
+        </div>
+        <div id="ck-objectifs"><span style="font-size:13px;color:#94a3b8;">Chargement…</span></div>
+      </div>
+      <div class="deal-card">
+        <div class="deal-card-title">🏁 Jalons
+          ${isCreateur ? `<button class="cockpit-add-btn" onclick="openJalonModal()">+ Ajouter</button>` : ''}
+        </div>
+        <div id="ck-jalons"><span style="font-size:13px;color:#94a3b8;">Chargement…</span></div>
+      </div>
     </div>
     <div class="deal-grid2">
       <div class="deal-card">
-        <div class="deal-card-title">ℹ️ Informations</div>
-        ${fieldRow('Catégorie', cat)}
-        ${fieldRow('Confidentialité', DEAL.confidentialite)}
-        ${fieldRow('Début', DEAL.date_debut || '—')}
-        ${fieldRow('Fin prévue', DEAL.date_fin_prev || '—')}
-        ${DEAL.objectif ? `<div style="margin-top:10px;font-size:13px;color:#475569"><strong>Objectif :</strong><br>${esc(DEAL.objectif)}</div>` : ''}
-        ${DEAL.description ? `<div style="margin-top:8px;font-size:13px;color:#475569">${esc(DEAL.description)}</div>` : ''}
+        <div class="deal-card-title">👥 Participants actifs</div>
+        ${PARTICIPANTS.filter(p=>p.statut==='accepte').slice(0,6).map(p=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+            <div class="part-avatar" style="width:34px;height:34px;font-size:12px;">${esc(p.nom.charAt(0))}</div>
+            <div><div style="font-size:13px;font-weight:600;color:#1e293b;">${esc(p.nom)}</div>
+            <div style="font-size:11px;color:#94a3b8;">${p.role==='createur'?'Créateur':'Participant'}</div></div>
+          </div>`).join('')}
+        ${PARTICIPANTS.length > 6 ? `<div style="font-size:12px;color:#64748b;margin-top:6px;">+${PARTICIPANTS.length-6} autres</div>` : ''}
       </div>
       <div class="deal-card">
-        <div class="deal-card-title">👥 Participants</div>
-        ${PARTICIPANTS.slice(0,4).map(p => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <div class="part-avatar" style="width:32px;height:32px;font-size:12px;">${p.nom.charAt(0)}</div>
-          <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#1e293b;">${esc(p.nom)}</div>
-          <div style="font-size:11px;color:#94a3b8;">${p.role === 'createur' ? 'Créateur' : 'Participant'}</div></div>
-          <span class="part-statut ${p.statut}">${p.statut}</span>
-        </div>`).join('')}
-        ${PARTICIPANTS.length > 4 ? `<div style="font-size:12px;color:#64748b;margin-top:4px;">+${PARTICIPANTS.length-4} autres</div>` : ''}
+        <div class="deal-card-title">⚡ Activité récente</div>
+        <div id="ck-activite"><span style="font-size:13px;color:#94a3b8;">Chargement…</span></div>
       </div>
-    </div>
-    <div class="deal-card" id="recent-activity">
-      <div class="deal-card-title">⚡ Activité récente</div>
-      <div id="recent-histo"><span style="font-size:13px;color:#94a3b8;">Chargement…</span></div>
     </div>`;
 }
 
 function fieldRow(label, val) {
   return `<div style="display:flex;gap:8px;margin-bottom:6px;font-size:13px;">
-    <span style="color:#94a3b8;min-width:100px;">${label}</span>
+    <span style="color:#94a3b8;min-width:90px;">${label}</span>
     <span style="font-weight:600;color:#1e293b;">${esc(String(val))}</span>
   </div>`;
 }
@@ -340,30 +450,156 @@ async function loadTab(tab) {
   }
 }
 
-/* load recent activity in dashboard */
+/* ══ Cockpit de Pilotage ══ */
 async function loadDashboardStats() {
   try {
-    const [t,d,m,h] = await Promise.all([
-      _obFetch('GET', `/api/deals/${DEAL_ID}/taches`),
-      _obFetch('GET', `/api/deals/${DEAL_ID}/documents`),
-      _obFetch('GET', `/api/deals/${DEAL_ID}/messages`),
-      _obFetch('GET', `/api/deals/${DEAL_ID}/historique`)
-    ]);
-    document.getElementById('stat-taches').textContent = t.taches?.length||0;
-    document.getElementById('stat-docs').textContent = d.documents?.length||0;
-    document.getElementById('stat-msgs').textContent = m.messages?.length||0;
-    const rh = document.getElementById('recent-histo');
-    if (!h.historique?.length) { rh.innerHTML = '<span style="font-size:13px;color:#94a3b8;">Aucune activité enregistrée.</span>'; return; }
-    rh.innerHTML = h.historique.slice(0,5).map(e => `
-      <div class="histo-item">
-        <div class="histo-dot"></div>
-        <div class="histo-body">
-          <div class="histo-action">${esc(e.action)}</div>
-          ${e.detail ? `<div class="histo-detail">${esc(e.detail)}</div>` : ''}
-          <div class="histo-meta">${e.acteur_nom||'—'} · ${fmtDate(e.created_at)}</div>
+    const ck = await _obFetch('GET', `/api/deals/${DEAL_ID}/cockpit`);
+    updateProgressRing(ck.progression || 0);
+    updateHealth(ck.sante || 'attention');
+    updateTachesStats(ck.taches_stats || {});
+    document.getElementById('ck-d-total').textContent = ck.docs_stats?.total || 0;
+    const nextEvt = ck.prochains_events?.[0];
+    if (nextEvt) {
+      document.getElementById('ck-evt-title').textContent = nextEvt.titre;
+      document.getElementById('ck-evt-date').textContent = fmtCkDate(nextEvt.date_debut);
+    }
+    renderCockpitObjectifs(ck.objectifs || []);
+    renderCockpitJalons(ck.jalons || []);
+    renderCockpitActivite(ck.activite || []);
+  } catch(e) {
+    console.warn('Cockpit erreur:', e);
+  }
+}
+
+function updateProgressRing(pct) {
+  const circumference = 358;
+  const arc = document.getElementById('ck-ring-arc');
+  const offset = circumference - (pct / 100) * circumference;
+  if (arc) { arc.style.strokeDashoffset = offset; }
+  const el = document.getElementById('ck-pct');
+  if (el) el.textContent = pct + '%';
+  const bar = document.getElementById('ck-bar');
+  if (bar) {
+    bar.style.width = pct + '%';
+    bar.style.background = pct === 100 ? '#1d4ed8' : pct >= 76 ? '#16a34a' : pct >= 51 ? '#ca8a04' : pct >= 26 ? '#ea580c' : '#dc2626';
+  }
+}
+
+function updateHealth(sante) {
+  const el = document.getElementById('ck-health');
+  if (!el) return;
+  el.className = 'cockpit-health ' + sante;
+  el.textContent = sante === 'bon' ? '✅ Projet en bonne santé' : sante === 'critique' ? '🔴 Retard critique' : '⚠️ Attention requise';
+}
+
+function updateTachesStats(ts) {
+  const el = document.getElementById('ck-t-done');
+  if (el) el.textContent = (ts.done||0) + '/' + (ts.total||0);
+  const sub = document.getElementById('ck-t-sub');
+  if (sub) sub.textContent = `${ts.en_cours||0} en cours · ${ts.en_retard||0} en retard`;
+  const bars = document.getElementById('ck-t-bars');
+  if (!bars || !ts.total) return;
+  const items = [
+    { label:'Terminées', val:ts.done||0, color:'#16a34a' },
+    { label:'En cours', val:ts.en_cours||0, color:'#2563eb' },
+    { label:'En retard', val:ts.en_retard||0, color:'#dc2626' }
+  ];
+  bars.innerHTML = items.map(i => `
+    <div class="ck-bar-row">
+      <span>${i.label}</span>
+      <div class="ck-bar-bg"><div class="ck-bar-fill" style="width:${ts.total?Math.round(i.val/ts.total*100):0}%;background:${i.color};"></div></div>
+      <span class="val">${i.val}</span>
+    </div>`).join('');
+}
+
+function renderCockpitObjectifs(objectifs) {
+  const el = document.getElementById('ck-objectifs');
+  if (!el) return;
+  if (!objectifs.length) { el.innerHTML = '<span style="font-size:13px;color:#94a3b8;">Aucun objectif défini.</span>'; return; }
+  el.innerHTML = objectifs.map(o => {
+    const pct = o.progression || 0;
+    const statusIcon = o.statut==='atteint'?'✅':o.statut==='abandonne'?'❌':'🔵';
+    return `<div class="objectif-row">
+      <div class="objectif-info">
+        <div class="objectif-titre">${statusIcon} ${esc(o.titre)}</div>
+        <div class="objectif-meta">${o.responsable_nom?esc(o.responsable_nom)+' · ':''}${o.date_limite?fmtCkDate(o.date_limite):''}</div>
+      </div>
+      <div class="objectif-bar-wrap"><div class="objectif-bar-fill" style="width:${pct}%;background:${pct===100?'#16a34a':'#2563eb'};"></div></div>
+      <div class="objectif-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+function renderCockpitJalons(jalons) {
+  const el = document.getElementById('ck-jalons');
+  if (!el) return;
+  if (!jalons.length) { el.innerHTML = '<span style="font-size:13px;color:#94a3b8;">Aucun jalon défini.</span>'; return; }
+  const icons = { valide:'✅', en_cours:'🔵', prevu:'⬜', reporte:'🔶' };
+  el.innerHTML = jalons.map((j,i) => `
+    <div class="jalon-row">
+      <div class="jalon-icon ${j.statut}">${icons[j.statut]||'⬜'}</div>
+      <div class="jalon-body">
+        <div class="jalon-titre">${esc(j.titre)}</div>
+        <div class="jalon-date">
+          ${j.date_prevue ? fmtCkDate(j.date_prevue) : '—'}
+          <span class="jalon-badge ${j.statut}" style="margin-left:6px;">${{valide:'Validé',en_cours:'En cours',prevu:'Prévu',reporte:'Reporté'}[j.statut]||j.statut}</span>
         </div>
-      </div>`).join('');
-  } catch(e) {}
+      </div>
+    </div>`).join('');
+}
+
+function renderCockpitActivite(activite) {
+  const el = document.getElementById('ck-activite');
+  if (!el) return;
+  if (!activite.length) { el.innerHTML = '<span style="font-size:13px;color:#94a3b8;">Aucune activité enregistrée.</span>'; return; }
+  el.innerHTML = activite.slice(0,8).map(e => `
+    <div class="act-item">
+      <div class="act-dot"></div>
+      <div class="act-body">
+        <div class="act-action">${esc(e.action)}${e.detail?' — '+esc(e.detail):''}</div>
+        <div class="act-time">${esc(e.acteur_nom||'Système')} · ${fmtDate(e.created_at)}</div>
+      </div>
+    </div>`).join('');
+}
+
+/* Modals objectif / jalon */
+function openObjModal() {
+  document.getElementById('modal-obj').style.display='flex';
+}
+function closeObjModal() {
+  document.getElementById('modal-obj').style.display='none';
+}
+async function saveObjectif() {
+  const titre = document.getElementById('obj-titre').value.trim();
+  if (!titre) return alert('Titre requis');
+  const body = {
+    titre,
+    responsable_nom: document.getElementById('obj-resp').value.trim() || undefined,
+    date_limite: document.getElementById('obj-date').value || undefined,
+    progression: parseInt(document.getElementById('obj-pct').value)||0
+  };
+  await _obFetch('POST', `/api/deals/${DEAL_ID}/objectifs`, body);
+  closeObjModal();
+  loadDashboardStats();
+}
+function openJalonModal() {
+  document.getElementById('modal-jalon').style.display='flex';
+}
+function closeJalonModal() {
+  document.getElementById('modal-jalon').style.display='none';
+}
+async function saveJalon() {
+  const titre = document.getElementById('jalon-titre').value.trim();
+  if (!titre) return alert('Titre requis');
+  const body = {
+    titre,
+    description: document.getElementById('jalon-desc').value.trim() || undefined,
+    date_prevue: document.getElementById('jalon-date').value || undefined,
+    statut: document.getElementById('jalon-statut').value
+  };
+  await _obFetch('POST', `/api/deals/${DEAL_ID}/jalons`, body);
+  closeJalonModal();
+  loadDashboardStats();
 }
 
 /* ══════════════════════════════════════════
@@ -923,6 +1159,45 @@ function modals() {
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="btn btn-primary" onclick="sendInvite()">Envoyer l'invitation</button>
         <button class="btn btn-secondary" onclick="closeModal('modal-invite')">Annuler</button>
+      </div>
+    </div>
+  </div>
+  <!-- Modal Objectif -->
+  <div class="modal-overlay" id="modal-obj" style="display:none;" onclick="if(event.target===this)closeObjModal()">
+    <div class="modal-box">
+      <div class="modal-title">🎯 Nouvel objectif</div>
+      <div class="form-group"><label class="form-label">Titre *</label><input class="form-input" id="obj-titre" placeholder="Ex : Finaliser le prototype"/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Responsable</label><input class="form-input" id="obj-resp" placeholder="Nom"/></div>
+        <div class="form-group"><label class="form-label">Date limite</label><input type="date" class="form-input" id="obj-date"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Progression initiale (%)</label><input type="number" min="0" max="100" value="0" class="form-input" id="obj-pct"/></div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-primary" onclick="saveObjectif()">Ajouter</button>
+        <button class="btn btn-secondary" onclick="closeObjModal()">Annuler</button>
+      </div>
+    </div>
+  </div>
+  <!-- Modal Jalon -->
+  <div class="modal-overlay" id="modal-jalon" style="display:none;" onclick="if(event.target===this)closeJalonModal()">
+    <div class="modal-box">
+      <div class="modal-title">🏁 Nouveau jalon</div>
+      <div class="form-group"><label class="form-label">Titre *</label><input class="form-input" id="jalon-titre" placeholder="Ex : Signature du partenariat"/></div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="jalon-desc" rows="2" style="resize:none;" placeholder="Description optionnelle"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Date prévue</label><input type="date" class="form-input" id="jalon-date"/></div>
+        <div class="form-group"><label class="form-label">Statut</label>
+          <select class="form-select" id="jalon-statut">
+            <option value="prevu">Prévu</option>
+            <option value="en_cours">En cours</option>
+            <option value="valide">Validé</option>
+            <option value="reporte">Reporté</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-primary" onclick="saveJalon()">Ajouter</button>
+        <button class="btn btn-secondary" onclick="closeJalonModal()">Annuler</button>
       </div>
     </div>
   </div>`;

@@ -166,6 +166,10 @@
     // ── Paramètres / profil
     { re: /param[eè]tres?|configuration/i, id: 'nav_parametres' },
 
+    // ── Deals
+    { re: /cr[eé][eé]r?\s+(un\s+)?deal|nouveau\s+deal|lancer?\s+(un\s+)?deal|d[eé]marrer?\s+(un\s+)?deal/i, id: 'deal_create' },
+    { re: /mes?\s+deals?|ouvrir?\s+(mes?\s+)?deals?|acc[eé]der?\s+(à\s+)?(mes?\s+)?deals?|g[eé]rer?\s+(un\s+)?deal/i, id: 'deal_list' },
+
     // ── Admin
     { re: /admin|administration|panneau\s+admin/i, id: 'nav_admin' },
   ];
@@ -783,6 +787,35 @@
         await audit('navigate', 'admin');
         setTimeout(() => { window.location.href = '/dashboard-administrateur.html'; }, 500);
         break;
+
+      // ── Deals
+      case 'deal_create':
+      case 'deal_list': {
+        try {
+          const me = await fetch('/api/auth/me', {credentials:'include'}).then(r=>r.json());
+          if (!me?.user) { addMsg('oz', '🔒 Vous devez être connecté pour accéder aux Deals.'); break; }
+          if (me.user.role !== 'initiative') {
+            addMsg('oz', 'ℹ️ La fonctionnalité **Gérer un Deal** est réservée aux comptes Initiative disposant de l\'accréditation correspondante.\n\nSouhaitez-vous en savoir plus sur les accréditations Diaspo\'Actif ?');
+            break;
+          }
+          const accr = await fetch('/api/initiatives/mes', {credentials:'include'}).then(r=>r.json()).catch(()=>null);
+          const initId = accr?.[0]?.id;
+          if (initId) {
+            const hasDeal = await fetch(`/api/admin/deals/accreditations`, {credentials:'include'}).then(r=>r.json()).catch(()=>null);
+            const accredited = hasDeal?.accreditations?.some?.(a => a.initiative_id === initId && a.statut === 'active');
+            if (!accredited) {
+              addMsg('oz', '🤝 Cette fonctionnalité nécessite l\'accréditation **« Gérer un Deal »**.\n\nSeuls les comptes Initiative accrédités par Diaspo\'Actif peuvent créer, gérer ou rejoindre un Deal.\n\nSouhaitez-vous consulter les conditions d\'obtention ou déposer une demande ?');
+              break;
+            }
+          }
+          addMsg('oz', '🤝 J\'ouvre votre espace Deals...');
+          setTimeout(() => { window.location.href = '/dashboard-initiative.html#deals'; }, 500);
+        } catch(e) {
+          addMsg('oz', '🤝 J\'ouvre votre espace Deals...');
+          setTimeout(() => { window.location.href = '/dashboard-initiative.html#deals'; }, 500);
+        }
+        break;
+      }
 
       // ── Fallback : KB puis confusion
       default: {
