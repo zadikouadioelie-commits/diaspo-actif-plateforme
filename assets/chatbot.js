@@ -23,6 +23,108 @@
     } catch (e) { return 'visiteur'; }
   }
 
+  /* ─── Mode Intelligent : niveaux d'accès ───────────────────────
+     0 = visiteur · 1 = utilisateur · 2 = pro/org · 3 = admin     */
+  const LEVEL_CONFIG = {
+    0: {
+      label: 'Visiteur',     icon: '🌍', color: '#94a3b8',
+      tone: 'découverte',    depth: 'simple',
+    },
+    1: {
+      label: 'Membre',       icon: '👤', color: '#0284c7',
+      tone: 'pédagogique',   depth: 'simple',
+    },
+    2: {
+      label: 'Organisation', icon: '🏢', color: '#059669',
+      tone: 'professionnel', depth: 'structuré',
+    },
+    3: {
+      label: 'Administrateur', icon: '⚙️', color: '#7c3aed',
+      tone: 'technique',     depth: 'complet',
+    },
+  };
+
+  /* Interdit par niveau : intents que le chatbot refuse ou redirige */
+  const LEVEL_FORBIDDEN = {
+    0: ['nav_stats','nav_admin','nav_accred','nav_offre','nav_communications','nav_consultations','nav_recrutement'],
+    1: ['nav_admin','nav_communications','nav_consultations','nav_recrutement'],
+    2: ['nav_admin'],
+    3: [],
+  };
+
+  /* Messages de refus adaptés au niveau */
+  const LEVEL_REFUSE = {
+    0: (intent) => `Pour accéder à cette fonctionnalité, vous devez d'abord créer un compte gratuitement. C'est rapide et sans engagement !`,
+    1: (intent) => `Cette fonctionnalité est réservée aux organisations et initiatives enregistrées sur Diaspo'Actif. Vous pouvez demander une mise à niveau de votre compte depuis votre profil.`,
+    2: (intent) => `Cette section est réservée à l'équipe d'administration de Diaspo'Actif.`,
+    3: () => null,
+  };
+
+  function getLevel(profile) {
+    if (profile === 'administrateur') return 3;
+    if (['initiative','collectivite','institution','officiel'].includes(profile)) return 2;
+    if (profile === 'utilisateur') return 1;
+    return 0;
+  }
+
+  function isForbidden(intent, level) {
+    return (LEVEL_FORBIDDEN[level] || []).includes(intent);
+  }
+
+  /* Filtre les quickReplies selon le niveau */
+  function filterQR(quickReplies, level) {
+    if (!quickReplies) return [];
+    return quickReplies.filter(qr => !qr.intent || !isForbidden(qr.intent, level));
+  }
+
+  /* Prefixe HTML d'ambiance selon niveau et contexte */
+  function levelHint(level, context) {
+    const cfg = LEVEL_CONFIG[level];
+    if (!cfg || level === 0) return '';
+    const hints = {
+      1: { stats: '📊 Les statistiques globales sont visibles dans l\'Observatoire public.', admin: null },
+      2: { stats: '📊 Vos statistiques personnelles sont disponibles dans votre tableau de bord.', admin: null },
+      3: { stats: '📊 Accès complet aux statistiques globales de la plateforme.', admin: '⚙️ Accès administrateur actif.' },
+    };
+    return hints[level]?.[context] ? `<p class="cb-level-hint" style="font-size:11px;color:${cfg.color};margin-bottom:6px;">${hints[level][context]}</p>` : '';
+  }
+
+  /* Suggestions contextuelles selon le niveau, injectées après chaque réponse */
+  function levelSuggestions(level, intent) {
+    const map = {
+      1: {
+        default: [
+          { label: '👤 Mon profil', intent: 'nav_profil' },
+          { label: '🔍 Chercher une initiative', action: 'annuaire.html' },
+          { label: '📅 Événements', action: 'evenements.html' },
+        ],
+        histoire:       [{ label: '✍️ Créer mon compte', action: 'inscription.html' }, { label: '🔍 Explorer l\'annuaire', action: 'annuaire.html' }],
+        fonctionnalites:[{ label: '📬 Messagerie', intent: 'nav_messagerie' }, { label: '📅 Événements', action: 'evenements.html' }],
+      },
+      2: {
+        default: [
+          { label: '📊 Mon tableau de bord', action: 'dashboard-initiative.html' },
+          { label: '📢 Publier une offre', intent: 'nav_offre' },
+          { label: '🤝 Chercher un partenaire', intent: 'nav_partenariat' },
+        ],
+        accreditations: [{ label: '🏅 Demander une accréditation', intent: 'nav_accred' }],
+        fonctionnalites:[{ label: '📊 Mes statistiques', intent: 'nav_stats' }, { label: '📢 Mes offres', intent: 'nav_offre' }],
+      },
+      3: {
+        default: [
+          { label: '⚙️ Dashboard admin', action: 'dashboard-administrateur.html' },
+          { label: '🚩 Signalements', action: 'dashboard-administrateur.html#signalements' },
+          { label: '📊 Observatoire', action: 'statistiques.html' },
+        ],
+        accreditations: [{ label: '✅ Valider les accréditations', action: 'dashboard-administrateur.html' }],
+        fonctionnalites:[{ label: '📊 Stats globales', action: 'statistiques.html' }, { label: '⚙️ Gestion users', action: 'dashboard-administrateur.html' }],
+      },
+    };
+    const levelMap = map[level];
+    if (!levelMap) return [];
+    return levelMap[intent] || levelMap.default || [];
+  }
+
   /* ═══════════════════════════════════════════════════════════════
      BASE DE CONNAISSANCES — organisée en 9 catégories
      ═══════════════════════════════════════════════════════════════ */
@@ -904,7 +1006,8 @@
     return bestScore >= 2 ? best : null;
   }
 
-  function renderContextHit(entry, question) {
+  function renderContextHit(entry, question, level) {
+    const lvl  = (level !== undefined) ? level : getLevel(getProfile());
     const norm = t => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const words = norm(question).split(/\s+/).filter(w => w.length >= 4);
     const sentences = entry.texte.split(/(?<=[.!?])\s+/).filter(s => s.length > 20);
@@ -915,14 +1018,12 @@
     const best = ranked.slice(0, 3).map(x => x.s).join(' ');
     const html = (entry.titre ? `<p><strong>${_esc(entry.titre)}</strong></p>` : '')
       + `<p>${_esc(best || entry.texte.slice(0, 300))}</p>`;
-    return {
-      html,
-      quickReplies: [
-        { label: "En savoir plus sur Diaspo'Actif", intent: 'histoire' },
-        { label: "Les fonctionnalités", intent: 'fonctionnalites' },
-        { label: 'Créer un compte', action: 'inscription.html' },
-      ],
-    };
+    const baseQR = [
+      { label: "En savoir plus sur Diaspo'Actif", intent: 'histoire' },
+      { label: "Les fonctionnalités", intent: 'fonctionnalites' },
+      lvl === 0 ? { label: 'Créer un compte', action: 'inscription.html' } : null,
+    ].filter(Boolean);
+    return { html, quickReplies: filterQR(baseQR, lvl).concat(levelSuggestions(lvl, 'ctx').slice(0,1)) };
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -943,14 +1044,19 @@
   /* ═══════════════════════════════════════════════════════════════
      RENDU D'UNE RÉPONSE
      ═══════════════════════════════════════════════════════════════ */
-  function renderResponse(key) {
-    const r = KB[key] || KB.fallback;
-    let html = '';
+  function renderResponse(key, level) {
+    const r   = KB[key] || KB.fallback;
+    const lvl = (level !== undefined) ? level : getLevel(getProfile());
+    let html  = '';
     if (r.text) html += `<p>${_esc(r.text).replace(/\n/g, '<br>')}</p>`;
     if (r.bullets) html += '<ul>' + r.bullets.map(b => `<li>${_esc(b)}</li>`).join('') + '</ul>';
     if (r.steps)   html += '<ol>' + r.steps.map(s => `<li>${_esc(s)}</li>`).join('') + '</ol>';
     if (r.closing) html += `<p class="cb-closing">${_esc(r.closing)}</p>`;
-    return { html, quickReplies: r.quickReplies || [] };
+    /* Suggestions contextuelles selon le niveau (ajoutées en fin de réponse) */
+    const ctx = levelSuggestions(lvl, key);
+    const base = filterQR(r.quickReplies || [], lvl);
+    const qr   = base.length ? base : ctx;
+    return { html, quickReplies: qr.length ? qr : ctx };
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -968,6 +1074,11 @@
     panel.className = 'cb-panel';
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-label', 'Assistant Diaspo\'Actif');
+    const profile = getProfile();
+    const level   = getLevel(profile);
+    const lcfg    = LEVEL_CONFIG[level];
+    const levelBadgeHtml = `<span class="cb-level-badge" style="background:${lcfg.color}20;color:${lcfg.color};border:1px solid ${lcfg.color}40;">${lcfg.icon} Niveau ${level} — ${lcfg.label}</span>`;
+
     panel.innerHTML = `
       <div class="cb-header">
         <div class="cb-avatar">DA</div>
@@ -977,6 +1088,7 @@
         </div>
         <button class="cb-close" id="cb-close" aria-label="Fermer">✕</button>
       </div>
+      <div class="cb-level-bar" id="cb-level-bar">${levelBadgeHtml}</div>
       <div class="cb-messages" id="cb-messages"></div>
       <div class="cb-quick" id="cb-quick"></div>
       <div class="cb-input-row">
@@ -1012,9 +1124,14 @@
   /* ── Messages ─────────────────────────────────────────────────── */
   function showWelcome() {
     const profile = getProfile();
-    const pw = getProfileWelcome(profile);
-    const html = `<p>${_esc(pw.text).replace(/\n/g, '<br>')}</p>`;
-    appendBotMessage(html, pw.qr);
+    const level   = getLevel(profile);
+    const pw      = getProfileWelcome(profile);
+    const lcfg    = LEVEL_CONFIG[level];
+    const modeTag = level > 0
+      ? `<span style="font-size:11px;background:${lcfg.color}15;color:${lcfg.color};padding:2px 8px;border-radius:99px;border:1px solid ${lcfg.color}30;">${lcfg.icon} Mode ${lcfg.tone}</span> `
+      : '';
+    const html = `${modeTag}<p>${_esc(pw.text).replace(/\n/g, '<br>')}</p>`;
+    appendBotMessage(html, filterQR(pw.qr, level));
   }
 
   function sendMessage() {
@@ -1025,11 +1142,27 @@
     input.value = '';
     clearQuick();
 
+    const profile = getProfile();
+    const level   = getLevel(profile);
+
     // 1. Détecter les intents FAQ connus
     const intent = detectIntent(text);
     if (intent && KB[intent]) {
+      // Vérification de permission par niveau
+      if (isForbidden(intent, level)) {
+        const refuseMsg = LEVEL_REFUSE[level]?.(intent);
+        if (refuseMsg) {
+          const qr = level === 0
+            ? [{ label: '✍️ Créer un compte gratuit', action: 'inscription.html' }, { label: 'En savoir plus', intent: 'inscription' }]
+            : level === 1
+            ? [{ label: '📋 Mon profil', intent: 'nav_profil' }, { label: 'Les abonnements', intent: 'abonnements' }]
+            : [{ label: '🏠 Accueil', action: 'index.html' }];
+          setTimeout(() => appendBotMessage(`<p>🔒 ${_esc(refuseMsg)}</p>`, qr), 350);
+          return;
+        }
+      }
       setTimeout(() => {
-        const { html, quickReplies } = renderResponse(intent);
+        const { html, quickReplies } = renderResponse(intent, level);
         appendBotMessage(html, quickReplies);
       }, 350);
       return;
@@ -1045,13 +1178,13 @@
     setTimeout(() => {
       const hit = searchContext(text);
       if (hit) {
-        const { html, quickReplies } = renderContextHit(hit, text);
+        const { html, quickReplies } = renderContextHit(hit, text, level);
         appendBotMessage(html, quickReplies);
       } else {
-        // 4. Fallback : proposer aussi la recherche de profils
-        const { html, quickReplies } = renderResponse('fallback');
+        // 4. Fallback avec suggestions adaptées au niveau
+        const { html, quickReplies } = renderResponse('fallback', level);
         const enrichedQR = [
-          ...quickReplies,
+          ...quickReplies.slice(0, 2),
           { label: '🔍 Chercher un profil / expert', intent: '_search_hint' },
         ];
         appendBotMessage(html, enrichedQR);
@@ -1322,6 +1455,25 @@
   transition: background .15s; flex-shrink: 0;
 }
 .cb-close:hover { background: rgba(255,255,255,.2); }
+
+/* ── Mode Intelligent : barre de niveau ── */
+.cb-level-bar {
+  padding: 6px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e8edf2;
+  display: flex; align-items: center; gap: 6px;
+  min-height: 30px;
+}
+.cb-level-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .3px;
+  padding: 2px 9px; border-radius: 99px;
+  white-space: nowrap;
+}
+.cb-level-hint {
+  margin: 0 0 6px; padding: 4px 8px;
+  border-radius: 6px; background: #f0f9ff;
+  font-size: 11px; color: #0284c7;
+}
 
 .cb-messages {
   flex: 1; overflow-y: auto; padding: 14px 12px;
