@@ -1943,15 +1943,15 @@
     const css = `
 .cb-fab {
   position: fixed; bottom: 28px; right: 28px; z-index: 1100;
-  width: 60px; height: 60px; border-radius: 50%;
+  width: 36px; height: 36px; border-radius: 50%;
   background: linear-gradient(135deg, var(--orange, #ff6b00), #e55a00);
   color: #fff; border: none; cursor: pointer;
-  box-shadow: 0 4px 20px rgba(255,107,0,.5);
+  box-shadow: 0 3px 12px rgba(255,107,0,.5);
   display: flex; align-items: center; justify-content: center;
   transition: transform .2s, box-shadow .2s;
 }
-.cb-fab:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(255,107,0,.65); }
-.cb-fab svg { width: 26px; height: 26px; }
+.cb-fab:hover { transform: scale(1.1); box-shadow: 0 4px 18px rgba(255,107,0,.65); }
+.cb-fab svg { width: 16px; height: 16px; }
 .cb-notif {
   position: absolute; top: -3px; right: -3px;
   background: #ef4444; color: #fff; border-radius: 99px;
