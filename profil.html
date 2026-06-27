@@ -391,6 +391,39 @@
 .pub-ad-statut.active { background:#dcfce7; color:#16a34a; }
 .pub-ad-statut.terminee { background:#f1f5f9; color:#64748b; }
 
+/* ===== CONTACTS GRID (Suivis / Abonnés) ===== */
+.contacts-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+.contact-card { display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--card); border:1.5px solid var(--border); border-radius:12px; text-decoration:none; color:inherit; transition:box-shadow .15s; }
+.contact-card:hover { box-shadow:0 2px 10px rgba(0,0,0,.08); }
+.cc-avatar { width:42px; height:42px; border-radius:50%; overflow:hidden; flex-shrink:0; background:var(--accent); display:flex; align-items:center; justify-content:center; }
+.cc-avatar img { width:100%; height:100%; object-fit:cover; }
+.cc-initials { font-size:18px; font-weight:700; color:#fff; }
+.cc-body { min-width:0; }
+.cc-nom { font-size:13px; font-weight:700; color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cc-role { font-size:11px; color:var(--muted); margin-top:2px; }
+.cc-titre { font-size:11px; color:var(--accent); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ===== RELATIONS EN COMMUN ===== */
+.communs-suggestions { background:linear-gradient(135deg,#eff6ff,#f0fdf4); border:1.5px solid #bfdbfe; border-radius:14px; padding:16px; margin-bottom:16px; }
+.communs-suggestion { font-size:13px; color:#1e40af; padding:4px 0; }
+.communs-bloc { background:var(--card); border:1.5px solid var(--border); border-radius:14px; padding:16px; margin-bottom:12px; }
+.communs-titre { font-size:14px; font-weight:700; margin-bottom:12px; color:var(--fg); }
+.communs-points { display:flex; flex-direction:column; gap:8px; }
+.communs-point { display:flex; align-items:flex-start; gap:10px; }
+.communs-icon { font-size:16px; flex-shrink:0; margin-top:1px; }
+.communs-label { font-size:13px; font-weight:600; color:var(--fg); }
+.communs-val { font-size:12px; color:var(--muted); margin-top:2px; }
+.communs-init-list { display:flex; flex-direction:column; gap:8px; }
+.communs-init-item { display:flex; align-items:flex-start; gap:10px; padding:8px; border-radius:8px; text-decoration:none; color:inherit; transition:background .15s; }
+.communs-init-item:hover { background:var(--bg); }
+
+/* ===== SIDEBAR "EN COMMUN" ===== */
+.communs-sidebar-widget { background:linear-gradient(135deg,#eff6ff,#f0fdf4); border:1.5px solid #bfdbfe; border-radius:14px; padding:16px; margin-bottom:16px; }
+.csw-head { font-size:13px; font-weight:800; color:#1e40af; margin-bottom:10px; }
+.csw-item { font-size:12px; color:#1e3a8a; padding:4px 0; }
+.csw-btn { margin-top:10px; font-size:12px; color:#2563eb; background:none; border:none; cursor:pointer; padding:0; font-weight:600; }
+.csw-btn:hover { text-decoration:underline; }
+
 /* ===== PRIVACY ===== */
 .privacy-section { background:#fff; border:1px solid var(--border); border-radius:12px; padding:20px 24px; margin-bottom:14px; }
 .privacy-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); }
@@ -771,7 +804,10 @@ function renderSections() {
     { id:'activite',      label:'⚡ Activité' },
     { id:'publications',  label:'📝 Publications' },
     { id:'publicites',    label:'📣 Publicités' },
+    { id:'suivis',        label:'👥 Suivis' },
+    { id:'abonnes',       label:'❤️ Abonnés' },
   ];
+  if (!isOwn && CU) tabs.push({ id:'communs', label:'🤝 En commun' });
   if (isOwn) tabs.push({ id:'confidentialite', label:'🔒 Confidentialité' });
 
   const tabsBar = document.createElement('div');
@@ -814,6 +850,26 @@ function renderSections() {
   publicites.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement des publicités…</div>';
   wrap.appendChild(publicites);
 
+  // Panel Suivis (lazy-loaded)
+  const suivis = document.createElement('div');
+  suivis.id = 'ptab-suivis'; suivis.className = 'p-tab-panel';
+  suivis.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement…</div>';
+  wrap.appendChild(suivis);
+
+  // Panel Abonnés (lazy-loaded)
+  const abonnes = document.createElement('div');
+  abonnes.id = 'ptab-abonnes'; abonnes.className = 'p-tab-panel';
+  abonnes.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement…</div>';
+  wrap.appendChild(abonnes);
+
+  // Panel Relations en commun (visiteur connecté ≠ owner)
+  if (!isOwn && CU) {
+    const communs = document.createElement('div');
+    communs.id = 'ptab-communs'; communs.className = 'p-tab-panel';
+    communs.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement…</div>';
+    wrap.appendChild(communs);
+  }
+
   // Panel Confidentialité (owner only)
   if (isOwn) {
     const conf = document.createElement('div');
@@ -825,9 +881,12 @@ function renderSections() {
 
   renderSidebar();
 
+  // Bannière "En commun" dans la sidebar si visiteur connecté ≠ owner
+  if (!isOwn && CU) loadCommunsSidebar();
+
   // Vérifier si un onglet est demandé via URL hash
   const hash = location.hash.replace('#tab-','');
-  if (['activite','publications','publicites','confidentialite'].includes(hash)) {
+  if (['activite','publications','publicites','suivis','abonnes','communs','confidentialite'].includes(hash)) {
     switchProfileTab(hash);
   }
 }
@@ -841,6 +900,9 @@ function switchProfileTab(id) {
   if (id === 'activite') loadActiviteTab();
   if (id === 'publications') loadPublicationsTab();
   if (id === 'publicites') loadPublicitesTab();
+  if (id === 'suivis') loadSuivisTab();
+  if (id === 'abonnes') loadAbonnesTab();
+  if (id === 'communs') loadCommunsTab();
 }
 
 /* ======================================================
@@ -1055,6 +1117,184 @@ async function savePrivacy() {
     if (msg) { msg.style.display='block'; clearTimeout(_privTimer); _privTimer=setTimeout(()=>msg.style.display='none',2500); }
   } catch(e) {}
 }
+
+/* ======================================================
+   ONGLET — SUIVIS
+   ====================================================== */
+async function loadSuivisTab() {
+  const panel = document.getElementById('ptab-suivis');
+  await loadContactsTab(panel, 'suivis', 'Comptes suivis', '👥');
+}
+
+/* ======================================================
+   ONGLET — ABONNÉS
+   ====================================================== */
+async function loadAbonnesTab() {
+  const panel = document.getElementById('ptab-abonnes');
+  await loadContactsTab(panel, 'abonnes', 'Abonnés', '❤️');
+}
+
+async function loadContactsTab(panel, type, titre, icon) {
+  let page = 1, q = '';
+  async function render(p, search) {
+    try {
+      const data = await api('GET', `/profil/${profilId}/${type}?page=${p}&q=${encodeURIComponent(search||'')}`);
+      if (data.masque) {
+        panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--muted)">🔒 Cette liste est privée.</div>`;
+        return;
+      }
+      const list = data[type] || [];
+      const total = data.total || 0;
+      const pages = data.pages || 1;
+      if (p === 1) {
+        panel.innerHTML = `
+          <div style="padding:16px 0">
+            <h3 style="font-size:15px;font-weight:700;margin-bottom:12px;">${icon} ${titre} <span style="font-size:12px;color:var(--muted);font-weight:400">(${total})</span></h3>
+            <div style="display:flex;gap:8px;margin-bottom:16px;">
+              <input id="contacts-search-${type}" type="text" placeholder="Rechercher…" value="${search||''}"
+                style="flex:1;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;background:var(--card);"
+                oninput="debContacts_${type}(this.value)">
+            </div>
+            <div id="contacts-list-${type}" class="contacts-grid"></div>
+            <div id="contacts-more-${type}" style="text-align:center;margin-top:12px;"></div>
+          </div>`;
+        window[`debContacts_${type}`] = debounce(v => { q = v; render(1, v); }, 300);
+      }
+      const listEl = document.getElementById(`contacts-list-${type}`);
+      if (!listEl) return;
+      if (p === 1) listEl.innerHTML = '';
+      if (!list.length && p === 1) { listEl.innerHTML = '<div style="color:var(--muted);padding:16px;text-align:center;">Aucun résultat.</div>'; }
+      list.forEach(u => {
+        const card = document.createElement('a');
+        card.href = `/profil.html?id=${u.id}`;
+        card.className = 'contact-card';
+        const nom = [u.prenom, u.nom].filter(Boolean).join(' ') || '—';
+        const roleLabel = { individu:'Membre', initiative:'Initiative', association:'Association', entreprise:'Entreprise', etablissement:'Établissement', organisation:'Organisation' }[u.role] || u.role || 'Membre';
+        card.innerHTML = `
+          <div class="cc-avatar">${u.photo_url ? `<img src="${u.photo_url}" alt="">` : `<div class="cc-initials">${nom.charAt(0)}</div>`}</div>
+          <div class="cc-body">
+            <div class="cc-nom">${nom}</div>
+            <div class="cc-role">${roleLabel}${u.pays ? ` · ${u.pays}` : ''}${u.ville ? ` · ${u.ville}` : ''}</div>
+            ${u.titre_pro ? `<div class="cc-titre">${u.titre_pro}</div>` : ''}
+          </div>`;
+        listEl.appendChild(card);
+      });
+      const moreEl = document.getElementById(`contacts-more-${type}`);
+      if (moreEl) {
+        moreEl.innerHTML = p < pages ? `<button class="act-load-more" onclick="loadMore_${type}()">Voir plus</button>` : '';
+        window[`loadMore_${type}`] = () => { page++; render(page, q); };
+      }
+    } catch(e) {
+      panel.innerHTML = `<div style="padding:20px;color:var(--muted)">Erreur de chargement.</div>`;
+    }
+  }
+  render(1, '');
+}
+
+/* ======================================================
+   ONGLET — EN COMMUN
+   ====================================================== */
+async function loadCommunsTab() {
+  const panel = document.getElementById('ptab-communs');
+  try {
+    const d = await api('GET', `/profil/${profilId}/communs`);
+    let html = `<div style="padding:16px 0">`;
+
+    if (d.suggestions && d.suggestions.length) {
+      html += `<div class="communs-suggestions">
+        ${d.suggestions.map(s => `<div class="communs-suggestion">💡 ${s}</div>`).join('')}
+      </div>`;
+    }
+
+    if (d.points && d.points.length) {
+      html += `<div class="communs-bloc">
+        <h3 class="communs-titre">✨ Vous avez en commun</h3>
+        <div class="communs-points">
+          ${d.points.map(p => {
+            const icons = { pays:'🌍', ville:'📍', profession:'💼', interets:'🎯', competences:'🛠️' };
+            return `<div class="communs-point"><span class="communs-icon">${icons[p.type]||'•'}</span><div><div class="communs-label">${p.label}</div><div class="communs-val">${p.valeur}</div></div></div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
+
+    if (d.users_communs && d.users_communs.length) {
+      html += `<div class="communs-bloc">
+        <h3 class="communs-titre">👥 Comptes suivis en commun (${d.users_communs.length})</h3>
+        <div class="contacts-grid">
+          ${d.users_communs.map(u => {
+            const nom = [u.prenom, u.nom].filter(Boolean).join(' ') || '—';
+            return `<a href="/profil.html?id=${u.id}" class="contact-card">
+              <div class="cc-avatar">${u.photo_url ? `<img src="${u.photo_url}" alt="">` : `<div class="cc-initials">${nom.charAt(0)}</div>`}</div>
+              <div class="cc-body"><div class="cc-nom">${nom}</div><div class="cc-role">${u.pays||''} ${u.ville||''}</div>${u.titre_pro?`<div class="cc-titre">${u.titre_pro}</div>`:''}</div>
+            </a>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
+
+    if (d.initiatives_communes && d.initiatives_communes.length) {
+      html += `<div class="communs-bloc">
+        <h3 class="communs-titre">🚀 Initiatives communes (${d.initiatives_communes.length})</h3>
+        <div class="communs-init-list">
+          ${d.initiatives_communes.map(i => `<a href="/profil.html?id=${i.id}" class="communs-init-item">
+            <span class="communs-icon">🚀</span>
+            <div><div class="communs-label">${i.nom}</div><div class="communs-val">${i.domaine||''} ${i.pays?`· ${i.pays}`:''}</div></div>
+          </a>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    if (d.evenements_communs && d.evenements_communs.length) {
+      html += `<div class="communs-bloc">
+        <h3 class="communs-titre">📅 Événements en commun (${d.evenements_communs.length})</h3>
+        <div class="communs-init-list">
+          ${d.evenements_communs.map(e => `<a href="/evenements.html?id=${e.id}" class="communs-init-item">
+            <span class="communs-icon">📅</span>
+            <div><div class="communs-label">${e.titre}</div><div class="communs-val">${e.ville||''} ${e.date_debut?`· ${fmtDate(e.date_debut)}`:''}</div></div>
+          </a>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    if (!d.points?.length && !d.users_communs?.length && !d.initiatives_communes?.length && !d.evenements_communs?.length) {
+      html += `<div style="padding:32px;text-align:center;color:var(--muted);">Pas encore de points en commun détectés.</div>`;
+    }
+
+    html += `</div>`;
+    panel.innerHTML = html;
+  } catch(e) {
+    panel.innerHTML = `<div style="padding:20px;color:var(--muted)">Erreur de chargement.</div>`;
+  }
+}
+
+/* ======================================================
+   SIDEBAR — widget "En commun"
+   ====================================================== */
+async function loadCommunsSidebar() {
+  try {
+    const d = await api('GET', `/profil/${profilId}/communs`);
+    const total = d.nb_communs || 0;
+    if (!total && !d.points?.length) return;
+    const sb = document.getElementById('p-sidebar');
+    if (!sb) return;
+    const widget = document.createElement('div');
+    widget.className = 'communs-sidebar-widget';
+    const items = [
+      ...(d.points||[]).map(p => { const icons={pays:'🌍',ville:'📍',profession:'💼',interets:'🎯',competences:'🛠️'}; return `<div class="csw-item">${icons[p.type]||'•'} ${p.label}</div>`; }),
+      ...(d.users_communs?.length ? [`<div class="csw-item">👥 ${d.users_communs.length} compte(s) suivi(s) en commun</div>`] : []),
+      ...(d.initiatives_communes?.length ? [`<div class="csw-item">🚀 ${d.initiatives_communes.length} initiative(s) commune(s)</div>`] : []),
+    ].slice(0,4);
+    if (!items.length) return;
+    widget.innerHTML = `
+      <div class="csw-head">🤝 Vous avez en commun</div>
+      ${items.join('')}
+      <button class="csw-btn" onclick="switchProfileTab('communs')">Voir tout →</button>`;
+    sb.insertBefore(widget, sb.firstChild);
+  } catch(e) {}
+}
+
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
 /* ======================================================
    SIDEBAR — Pubs + Suggestions

@@ -1125,6 +1125,121 @@ route("GET", "/api/profil/:id/publicites", async (req, res, params) => {
   } catch(e) { sendJSON(res, 200, { publicites: [] }); }
 });
 
+/* ---------- Profil — Comptes suivis ---------- */
+route("GET", "/api/profil/:id/suivis", async (req, res, params) => {
+  const uid = parseInt(params.id);
+  const u = db.prepare("SELECT privacy_json FROM users WHERE id=?").get(uid);
+  if (!u) return sendJSON(res, 404, { error: "Introuvable." });
+  const me = getCurrentUser(req);
+  const privacy = safeParse(u.privacy_json || "{}");
+  const vis = privacy.contacts || 'public';
+  if (vis === 'prive' && !(me && me.id === uid)) return sendJSON(res, 200, { suivis: [], total: 0, masque: true });
+  if (vis === 'membres' && !me) return sendJSON(res, 200, { suivis: [], total: 0, masque: true });
+  if (vis === 'relations' && me && me.id !== uid && !db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, uid))
+    return sendJSON(res, 200, { suivis: [], total: 0, masque: true });
+  const query = new URL("http://x" + req.url).searchParams;
+  const page = Math.max(1, parseInt(query.get('page')||'1'));
+  const q = (query.get('q')||'').toLowerCase();
+  const LIMIT = 20, OFFSET = (page-1)*LIMIT;
+  let rows = db.prepare(`
+    SELECT u2.id, u2.nom, u2.prenom, u2.role, u2.ville, u2.pays, u2.titre_pro, u2.bio, u2.photo_url
+    FROM user_follows uf JOIN users u2 ON u2.id = uf.followed_id
+    WHERE uf.follower_id = ? ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
+  if (q) rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.pays||''}`.toLowerCase().includes(q));
+  const total = db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE follower_id=?").get(uid).n;
+  sendJSON(res, 200, { suivis: rows, total, page, pages: Math.ceil(total/LIMIT) });
+});
+
+/* ---------- Profil — Abonnés ---------- */
+route("GET", "/api/profil/:id/abonnes", async (req, res, params) => {
+  const uid = parseInt(params.id);
+  const u = db.prepare("SELECT privacy_json FROM users WHERE id=?").get(uid);
+  if (!u) return sendJSON(res, 404, { error: "Introuvable." });
+  const me = getCurrentUser(req);
+  const privacy = safeParse(u.privacy_json || "{}");
+  const vis = privacy.contacts || 'public';
+  if (vis === 'prive' && !(me && me.id === uid)) return sendJSON(res, 200, { abonnes: [], total: 0, masque: true });
+  if (vis === 'membres' && !me) return sendJSON(res, 200, { abonnes: [], total: 0, masque: true });
+  const query = new URL("http://x" + req.url).searchParams;
+  const page = Math.max(1, parseInt(query.get('page')||'1'));
+  const q = (query.get('q')||'').toLowerCase();
+  const LIMIT = 20, OFFSET = (page-1)*LIMIT;
+  let rows = db.prepare(`
+    SELECT u2.id, u2.nom, u2.prenom, u2.role, u2.ville, u2.pays, u2.titre_pro, u2.bio, u2.photo_url
+    FROM user_follows uf JOIN users u2 ON u2.id = uf.follower_id
+    WHERE uf.followed_id = ? ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
+  if (q) rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.pays||''}`.toLowerCase().includes(q));
+  const total = db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE followed_id=?").get(uid).n;
+  sendJSON(res, 200, { abonnes: rows, total, page, pages: Math.ceil(total/LIMIT) });
+});
+
+/* ---------- Profil — Relations & points en commun ---------- */
+route("GET", "/api/profil/:id/communs", async (req, res, params) => {
+  const uid = parseInt(params.id);
+  const me = getCurrentUser(req);
+  if (!me || me.id === uid) return sendJSON(res, 200, { users_communs:[], initiatives_communes:[], evenements_communs:[], points:[], suggestions:[] });
+
+  // Utilisateurs suivis en commun
+  const users_communs = db.prepare(`
+    SELECT u.id, u.nom, u.prenom, u.titre_pro, u.ville, u.pays, u.photo_url
+    FROM user_follows f1
+    JOIN user_follows f2 ON f2.followed_id = f1.followed_id AND f2.follower_id = ?
+    JOIN users u ON u.id = f1.followed_id
+    WHERE f1.follower_id = ? AND f1.followed_id != ? AND f1.followed_id != ?
+    LIMIT 12`).all(me.id, uid, me.id, uid);
+
+  // Initiatives suivies en commun
+  const initiatives_communes = db.prepare(`
+    SELECT i.id, i.nom, i.slug, i.domaine, i.pays
+    FROM abonnements a1
+    JOIN abonnements a2 ON a2.initiative_id = a1.initiative_id AND a2.user_id = ?
+    JOIN initiatives i ON i.id = a1.initiative_id
+    WHERE a1.user_id = ?
+    LIMIT 10`).all(me.id, uid);
+
+  // Événements en commun (participants aux mêmes événements)
+  let evenements_communs = [];
+  try {
+    evenements_communs = db.prepare(`
+      SELECT e.id, e.titre, e.date_debut, e.ville
+      FROM event_inscriptions ei1
+      JOIN event_inscriptions ei2 ON ei2.evenement_id = ei1.evenement_id AND ei2.user_id = ?
+      JOIN evenements e ON e.id = ei1.evenement_id
+      WHERE ei1.user_id = ? LIMIT 8`).all(me.id, uid);
+  } catch(e) {}
+
+  // Points en commun (attributs partagés)
+  const uMe = db.prepare("SELECT ville,pays,titre_pro,centres_interet,competences,situation_pro FROM users WHERE id=?").get(me.id);
+  const uThem = db.prepare("SELECT ville,pays,titre_pro,centres_interet,competences,situation_pro FROM users WHERE id=?").get(uid);
+  const points = [];
+  if (uMe && uThem) {
+    if (uMe.pays && uThem.pays && uMe.pays === uThem.pays) points.push({ type:'pays', label:'Même pays', valeur: uMe.pays });
+    if (uMe.ville && uThem.ville && uMe.ville.toLowerCase() === uThem.ville.toLowerCase()) points.push({ type:'ville', label:'Même ville', valeur: uMe.ville });
+    if (uMe.situation_pro && uThem.situation_pro && uMe.situation_pro === uThem.situation_pro) points.push({ type:'profession', label:'Même situation professionnelle', valeur: uMe.situation_pro });
+    const ci1 = safeParse(uMe.centres_interet||"[]");
+    const ci2 = safeParse(uThem.centres_interet||"[]");
+    const ciCommuns = ci1.filter(c => ci2.includes(c));
+    if (ciCommuns.length) points.push({ type:'interets', label:`${ciCommuns.length} centre(s) d'intérêt en commun`, valeur: ciCommuns.join(', ') });
+    const comp1 = safeParse(uMe.competences||"[]");
+    const comp2 = safeParse(uThem.competences||"[]");
+    const compCommuns = comp1.filter(c => comp2.some(c2 => c2.nom === c.nom || c2 === c.nom || c === c2));
+    if (compCommuns.length) points.push({ type:'competences', label:`${compCommuns.length} compétence(s) en commun`, valeur: (compCommuns.map(c=>c.nom||c)).join(', ') });
+  }
+
+  // Suggestions
+  const suggestions = [];
+  if (users_communs.length >= 2) suggestions.push(`Vous suivez ${users_communs.length} comptes en commun.`);
+  if (initiatives_communes.length) suggestions.push(`Vous soutenez ${initiatives_communes.length} initiative(s) diaspora commune(s).`);
+  if (evenements_communs.length) suggestions.push(`Vous participez aux mêmes événements.`);
+  const ciC = points.find(p=>p.type==='interets');
+  if (ciC) suggestions.push(`Vous partagez des centres d'intérêt (${ciC.valeur}).`);
+  const villC = points.find(p=>p.type==='ville');
+  if (villC) suggestions.push(`Vous êtes tous les deux basés à ${villC.valeur}.`);
+  if (suggestions.length === 0 && (users_communs.length > 0 || points.length > 0)) suggestions.push('Vous avez plusieurs points en commun — lancez la conversation !');
+
+  sendJSON(res, 200, { users_communs, initiatives_communes, evenements_communs, points, suggestions, nb_communs: users_communs.length + initiatives_communes.length + evenements_communs.length });
+});
+
 /* ---------- Suivre / ne plus suivre un utilisateur ---------- */
 route("POST", "/api/users/:id/suivre", async (req, res, params) => {
   const me = getCurrentUser(req);

@@ -170,6 +170,13 @@
     { re: /cr[eé][eé]r?\s+(un\s+)?deal|nouveau\s+deal|lancer?\s+(un\s+)?deal|d[eé]marrer?\s+(un\s+)?deal/i, id: 'deal_create' },
     { re: /mes?\s+deals?|ouvrir?\s+(mes?\s+)?deals?|acc[eé]der?\s+(à\s+)?(mes?\s+)?deals?|g[eé]rer?\s+(un\s+)?deal/i, id: 'deal_list' },
 
+    // ── Profil public — réseau & communs
+    { re: /affiche?\s+(mes?\s+)?abonn[eé]s?\b|mes?\s+abonn[eé]s?\b|qui\s+(me\s+)?suit/i, id: 'profil_abonnes' },
+    { re: /comptes?\s+que\s+je\s+suis|affiche?\s+(mes?\s+)?suivis?|qui\s+est\-ce\s+que\s+je\s+suis/i, id: 'profil_suivis' },
+    { re: /relations?\s+commun|comptes?\s+(en\s+)?commun|ce\s+qu[e']on\s+a\s+en\s+commun/i, id: 'profil_communs' },
+    { re: /int[eé]r[eê]ts?\s+commun|points?\s+commun|quels?\s+(sont\s+(nos?|les?)\s+)?points?\s+commun/i, id: 'profil_communs' },
+    { re: /[eé]v[eé]nements?\s+commun|m[eê]mes?\s+[eé]v[eé]nements?/i, id: 'profil_communs' },
+
     // ── Profil public — onglets
     { re: /mes?\s+publications?\s*(profil|publiques?)?|affiche?\s+(mes?\s+)?publications?\s*profil/i, id: 'profil_publications' },
     { re: /mes?\s+publicit[eé]s?\s*(profil)?|affiche?\s+(mes?\s+)?publicit[eé]s?/i, id: 'profil_publicites' },
@@ -797,6 +804,23 @@
         break;
 
       // ── Profil public — onglets
+      case 'profil_abonnes':
+        addMsg('oz', '❤️ J\'ouvre la liste de vos abonnés…');
+        setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-abonnes`; }, 400); break;
+      case 'profil_suivis':
+        addMsg('oz', '👥 J\'ouvre la liste des comptes que vous suivez…');
+        setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-suivis`; }, 400); break;
+      case 'profil_communs': {
+        const profilMatch = window.location.pathname.includes('/profil.html');
+        if (profilMatch) {
+          addMsg('oz', '🤝 J\'ouvre l\'onglet "En commun" pour ce profil…');
+          if (window.switchProfileTab) { switchProfileTab('communs'); }
+          else window.location.hash = '#tab-communs';
+        } else {
+          addMsg('oz', '🤝 Naviguez d\'abord sur un profil pour voir vos relations en commun.');
+        }
+        break;
+      }
       case 'profil_publications':
         addMsg('oz', '📝 J\'ouvre l\'onglet Publications de votre profil…');
         setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-publications`; }, 400); break;
