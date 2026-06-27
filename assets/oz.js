@@ -17,63 +17,156 @@
   };
 
   const MODULES = {
-    evenements:   { label: 'Événements',   url: '/evenements.html',           icon: '🎪' },
-    initiatives:  { label: 'Initiatives',  url: '/initiatives.html',          icon: '🚀' },
-    annuaire:     { label: 'Annuaire',     url: '/annuaire.html',             icon: '📋' },
-    messagerie:   { label: 'Messagerie',   url: '/messagerie.html',           icon: '💬' },
-    formations:   { label: 'Formations',   url: '/formations.html',           icon: '📚' },
-    faq:          { label: 'FAQ',          url: '/faq.html',                  icon: '❓' },
-    actualites:   { label: 'Actualités',   url: '/fil-actualite.html',        icon: '📰' },
-    recherche:    { label: 'Recherche',    url: '/recherche.html',            icon: '🔍' },
-    dashboard:    { label: 'Tableau de bord', url: '/dashboard-utilisateur.html', icon: '🏠' },
-    visio:        { label: 'Visioconférence', url: '/visioconference.html',   icon: '📹' },
-    contrats:     { label: 'Contrats',     url: '/contrats.html',             icon: '📄' },
-    billetterie:  { label: 'Billetterie',  url: '/billetterie.html',          icon: '🎟️' },
-    statistiques: { label: 'Statistiques', url: '/statistiques.html',         icon: '📊' },
-    parametres:   { label: 'Paramètres',   url: '/parametre.html',            icon: '⚙️' },
+    evenements:      { label: 'Événements',      url: '/evenements.html',              icon: '🎪' },
+    initiatives:     { label: 'Initiatives',     url: '/initiative.html',              icon: '🚀' },
+    annuaire:        { label: 'Annuaire',        url: '/annuaire.html',                icon: '📋' },
+    messagerie:      { label: 'Messagerie',      url: '/messagerie.html',              icon: '💬' },
+    formations:      { label: 'Formations',      url: '/formations.html',              icon: '📚' },
+    faq:             { label: 'FAQ',             url: '/faq.html',                     icon: '❓' },
+    actualites:      { label: 'Actualités',      url: '/fil-actualite.html',           icon: '📰' },
+    recherche:       { label: 'Recherche',       url: '/recherche.html',               icon: '🔍' },
+    dashboard:       { label: 'Tableau de bord', url: '/dashboard-utilisateur.html',   icon: '🏠' },
+    visio:           { label: 'Visioconférence', url: '/reunions.html',                icon: '📹' },
+    contrats:        { label: 'Contrats',        url: '/contrats.html',                icon: '📄' },
+    billetterie:     { label: 'Billetterie',     url: '/billetterie.html',             icon: '🎟️' },
+    statistiques:    { label: 'Statistiques',    url: '/statistiques.html',            icon: '📊' },
+    parametres:      { label: 'Paramètres',      url: '/dashboard-utilisateur.html#profil', icon: '⚙️' },
+    accreditations:  { label: 'Accréditations',  url: '/accreditations.html',          icon: '🏅' },
+    cv:              { label: 'CV & Lettres',     url: '/cv-builder.html',              icon: '📝' },
+    agenda:          { label: 'Agenda',          url: '/agenda.html',                  icon: '📅' },
+    profil:          { label: 'Mon profil',      url: '/profil.html',                  icon: '👤' },
+    reseau:          { label: 'Mon réseau',      url: '/reseau.html',                  icon: '🌐' },
+    offres:          { label: 'Offres',          url: '/offres.html',                  icon: '💼' },
+    sondages:        { label: 'Sondages',        url: '/sondages.html',                icon: '📊' },
+    scanner:         { label: 'Scanner QR',      url: '/scanner.html',                 icon: '📷' },
+    reunions:        { label: 'Réunions',        url: '/reunions.html',                icon: '🤝' },
+    collaborations:  { label: 'Collaborations',  url: '/collaborations.html',          icon: '🤝' },
   };
 
+  // Raccourci pour construire un pattern "open" multi-verbes
+  const _nav = (words) => new RegExp(
+    `(ouvr[ei]r?|aller?|acc[eé]der?|afficher?|montrer?|voir?|visiter?|aller\\s+(?:sur|dans|[aà])|affiche[-\\s]moi|montre[-\\s]moi|va\\s+(?:sur|dans|[aà])|d[eé]marrer?|lancer?|acc[eé]der?\\s+[aà])\\s+` + words, 'i'
+  );
+
   const INTENTS = [
-    // Salutations (prioritaires)
-    { re: /^(bonjour|salut|hello|bonsoir|coucou|hey|allo)/i, id: 'greet' },
-    { re: /merci/i, id: 'thanks' },
+    // Salutations
+    { re: /^(bonjour|salut|hello|bonsoir|coucou|hey|allo)\b/i, id: 'greet' },
+    { re: /\bmerci\b/i, id: 'thanks' },
     { re: /au\s*revoir|bye|bonne\s*(soir|nuit|journée)/i, id: 'bye' },
     { re: /que\s+peux[-\s]tu\s+(faire|m[e']?aider)|tes?\s+(fonctions?|capacités?)|quoi\s+(faire|dire)/i, id: 'capabilities' },
-    { re: /aide|help|comment\s+(faire|utiliser?|commencer)|d[eé]buter/i, id: 'help' },
+    { re: /\baide\b|help|comment\s+(faire|utiliser?|commencer)|d[eé]buter/i, id: 'help' },
     { re: /tutoriel|guide\s+(d[e']?accueil|interactif)/i, id: 'tutorial' },
     { re: /quels?\s+(sont\s+)?mes\s+(droits?|permissions?)|que\s+puis[-\s]je\s+faire/i, id: 'my_permissions' },
     // O-Z
-    { re: /personnaliser?\s+(o[-\s]?z|ton\s+apparence|l[e']?avatar)|changer?\s+(d[e']?avatar|ton\s+apparence)/i, id: 'oz_settings' },
+    { re: /personnaliser?\s+(o[-\s]?z|l[e']?avatar|ton\s+apparence)|changer?\s+(d[e']?avatar|ton\s+apparence)/i, id: 'oz_settings' },
     { re: /activer?\s+(la\s+)?voix|mode\s+vocal/i, id: 'enable_voice' },
     { re: /d[eé]sactiver?\s+(la\s+)?voix|couper?\s+(la\s+)?voix/i, id: 'disable_voice' },
-    // Actions spécifiques AVANT navigation générale
-    { re: /cr[eé][eé]r?\s+(un\s+)?[eé]v[eé]nement|organiser?\s+(un[e]?\s+)?(r[eé]union|conf[eé]rence|atelier|webinaire)|planifier\s+(une?\s+)?r[eé]union/i, id: 'create_event' },
-    { re: /cr[eé][eé]r?\s+(une?\s+)?initiative|lancer?\s+(un\s+)?projet/i, id: 'create_initiative' },
+
+    // ── Agenda : ajout avec date/heure (prioritaire sur simple nav)
+    { re: /ajouter?\s+.+\s+[àa]\s+(mon\s+)?agenda|cr[eé][eé]r?\s+(un\s+)?(rendez[-\s]vous|rdv|[eé]v[eé]nement\s+agenda)|planifier\s+.+\s+(?:le\s+\d|\d)/i, id: 'agenda_add' },
+
+    // ── Créations AVANT navigation générale
+    { re: /cr[eé][eé]r?\s+(un\s+)?[eé]v[eé]nement|organiser?\s+(un[e]?\s+)?(conf[eé]rence|atelier|webinaire)|planifier\s+(une?\s+)?(?:r[eé]union|conf[eé]rence)/i, id: 'create_event' },
+    { re: /cr[eé][eé]r?\s+(une?\s+)?initiative|lancer?\s+(un\s+)?projet\s+communautaire/i, id: 'create_initiative' },
     { re: /cr[eé][eé]r?\s+(une?\s+)?campagne/i, id: 'create_campaign' },
     { re: /r[eé]diger?\s+(un\s+)?article|[eé]crire?\s+(un\s+)?article|publier?\s+(un\s+)?article/i, id: 'create_article' },
     { re: /cr[eé][eé]r?\s+(une?\s+)?billett/i, id: 'create_ticket' },
     { re: /g[eé]n[eé]rer?\s+(un\s+)?contrat|cr[eé][eé]r?\s+(un\s+)?contrat|r[eé]diger?\s+(un\s+)?contrat/i, id: 'create_contract' },
+    { re: /cr[eé][eé]r?\s+(un\s+)?(cv|curriculum|lettre\s+de\s+motivation)/i, id: 'create_cv' },
+    { re: /cr[eé][eé]r?\s+(un\s+)?sondage|lancer?\s+(un\s+)?sondage/i, id: 'create_sondage' },
     { re: /trouver?\s+(des?\s+)?partenaires?|chercher?\s+(des?\s+)?partenaires?/i, id: 'find_partners' },
-    { re: /envoyer?\s+(un\s+)?message\s+[aà]/i, id: 'send_message' },
+    { re: /envoyer?\s+(un\s+)?message|[eé]crire?\s+[aà]\s+\w/i, id: 'send_message' },
     { re: /newsletter/i, id: 'create_newsletter' },
-    // Navigation (après les actions spécifiques)
-    { re: /ouvr[ei]r?\s+(les?\s+)?[eé]v[eé]nements?|aller?\s+(aux?\s+)?[eé]v[eé]nements?/i, id: 'nav_evenements' },
-    { re: /ouvr[ei]r?\s+(les?\s+)?initiatives?|aller?\s+(aux?\s+)?initiatives?/i, id: 'nav_initiatives' },
-    { re: /messagerie/i, id: 'nav_messagerie' },
-    { re: /annuaire|membres?/i, id: 'nav_annuaire' },
-    { re: /formation/i, id: 'nav_formations' },
-    { re: /faq|question\s+fr[eé]quente/i, id: 'nav_faq' },
+
+    // ── Navigation : accréditations
+    { re: _nav('(les?\s+)?accr[eé]ditations?|(mon\s+)?badge|ma\s+carte\s+d[e\']accr[eé]ditation'), id: 'nav_accreditations' },
+    { re: /accr[eé]ditations?|accréditation/i, id: 'nav_accreditations' },
+
+    // ── Navigation : CV & Lettres
+    { re: _nav('(mes?\s+)?cvs?|(mes?\s+)?(lettres?|curriculum)'), id: 'nav_cv' },
+    { re: /\bcv[\s\-]builder\b|mes\s+cvs?\b|mes?\s+lettres?\s+de\s+motivation/i, id: 'nav_cv' },
+
+    // ── Navigation : Agenda
+    { re: _nav('(mon\s+)?agenda|(mes?\s+)?rendez[-\s]vous|mes\s+[eé]v[eé]nements?\s+agenda'), id: 'nav_agenda' },
+    { re: /\bagenda\b|rendez[-\s]vous|\brdv\b/i, id: 'nav_agenda' },
+
+    // ── Navigation : Profil
+    { re: _nav('(mon\s+)?profil|(ma\s+)?fiche\s+personnelle|(mon\s+)?compte'), id: 'nav_profil' },
+    { re: /\bmon\s+profil\b|modifier?\s+(mon\s+)?profil/i, id: 'nav_profil' },
+
+    // ── Navigation : Messagerie
+    { re: _nav('(ma\s+|mes?\s+|la\s+)?messageries?|messages?|discussions?|conversations?'), id: 'nav_messagerie' },
+    { re: /messagerie|mes\s+messages?\b|mes\s+discussions?\b|mes\s+conversations?\b/i, id: 'nav_messagerie' },
+
+    // ── Navigation : Événements
+    { re: _nav('(les?\s+)?[eé]v[eé]nements?'), id: 'nav_evenements' },
+
+    // ── Navigation : Initiatives
+    { re: _nav('(les?\s+)?initiatives?|projets?\s+communautaires?'), id: 'nav_initiatives' },
+
+    // ── Navigation : Réseau
+    { re: _nav('(mon\s+)?r[eé]seau|mes?\s+contacts?|mes?\s+connexions?'), id: 'nav_reseau' },
+    { re: /mon\s+r[eé]seau\b|mes\s+contacts?\b/i, id: 'nav_reseau' },
+
+    // ── Navigation : Offres
+    { re: _nav('(les?\s+)?offres?|opportunit[eé]s?|emplois?'), id: 'nav_offres' },
+    { re: /\boffres?\b|opportunit[eé]s?\b/i, id: 'nav_offres' },
+
+    // ── Navigation : Sondages
+    { re: _nav('(les?\s+)?sondages?'), id: 'nav_sondages' },
+    { re: /\bsondages?\b/i, id: 'nav_sondages' },
+
+    // ── Navigation : Réunions / Visio
+    { re: _nav('(mes?\s+|les?\s+)?r[eé]unions?|conf[eé]rences?\s+vid[eé]o|visio'), id: 'nav_reunions' },
+    { re: /\br[eé]unions?\b|visioconf[eé]rence|r[eé]union\s+en\s+ligne/i, id: 'nav_reunions' },
+
+    // ── Navigation : Annuaire
+    { re: _nav('(l[e\']\s*)?annuaire|membres?'), id: 'nav_annuaire' },
+    { re: /\bannuaire\b/i, id: 'nav_annuaire' },
+
+    // ── Navigation : Formations
+    { re: _nav('(les?\s+)?formations?'), id: 'nav_formations' },
+    { re: /\bformations?\b/i, id: 'nav_formations' },
+
+    // ── Navigation : FAQ
+    { re: _nav('(la\s+)?faq|questions?\s+fr[eé]quentes?'), id: 'nav_faq' },
+    { re: /\bfaq\b|questions?\s+fr[eé]quentes?/i, id: 'nav_faq' },
+
+    // ── Navigation : Tableau de bord
+    { re: _nav('(mon\s+)?tableau\s+de\s+bord|dashboard|accueil'), id: 'nav_dashboard' },
     { re: /tableau\s+de\s+bord|dashboard/i, id: 'nav_dashboard' },
+
+    // ── Navigation : Actualités
+    { re: _nav('(les?\s+)?actualit[eé]s?|fil\s+d[e\']actualit[eé]'), id: 'nav_actualites' },
     { re: /actualit[eé]|fil\s+d[e']actualit[eé]/i, id: 'nav_actualites' },
-    { re: /visio|conf[eé]rence\s+vid[eé]o|r[eé]union\s+en\s+ligne/i, id: 'nav_visio' },
-    { re: /contrat/i, id: 'nav_contrats' },
-    { re: /billett/i, id: 'nav_billetterie' },
-    { re: /statistique|stats\b/i, id: 'nav_statistiques' },
-    { re: /param[eè]tre|configuration|profil/i, id: 'nav_parametres' },
-    { re: /recherche/i, id: 'nav_recherche' },
-    { re: /[eé]v[eé]nement/i, id: 'nav_evenements' },
-    { re: /initiative|projet/i, id: 'nav_initiatives' },
-    // Admin
+
+    // ── Navigation : Contrats
+    { re: _nav('(mes?\s+|les?\s+)?contrats?'), id: 'nav_contrats' },
+    { re: /\bcontrats?\b/i, id: 'nav_contrats' },
+
+    // ── Navigation : Billetterie
+    { re: _nav('(la\s+)?billetteries?|billets?'), id: 'nav_billetterie' },
+    { re: /\bbilletterie\b|\bbillets?\b/i, id: 'nav_billetterie' },
+
+    // ── Navigation : Statistiques
+    { re: _nav('(les?\s+)?statistiques?|stats'), id: 'nav_statistiques' },
+    { re: /statistiques?|\bstats\b/i, id: 'nav_statistiques' },
+
+    // ── Navigation : Collaborations
+    { re: _nav('(mes?\s+)?collaborations?'), id: 'nav_collaborations' },
+    { re: /\bcollaborations?\b/i, id: 'nav_collaborations' },
+
+    // ── Navigation : Scanner
+    { re: /scanner?\s+qr|lire\s+un\s+qr/i, id: 'nav_scanner' },
+
+    // ── Navigation : Recherche
+    { re: _nav('(la\s+)?recherche'), id: 'nav_recherche' },
+    { re: /\brecherche\b/i, id: 'nav_recherche' },
+
+    // ── Paramètres / profil
+    { re: /param[eè]tres?|configuration/i, id: 'nav_parametres' },
+
+    // ── Admin
     { re: /admin|administration|panneau\s+admin/i, id: 'nav_admin' },
   ];
 
@@ -627,6 +720,7 @@
     const L = getLang();
 
     switch (id) {
+      // ── Salutations & méta
       case 'greet': {
         const h = new Date().getHours();
         const pool = h < 18 ? L.greet_day : L.greet_eve;
@@ -634,119 +728,193 @@
         addMsg('oz', msg + (getRoleGreeting() ? '\n\n' + getRoleGreeting() : ''));
         showQuickChips(); break;
       }
-      case 'thanks': addMsg('oz', L.thanks[Math.floor(Math.random()*L.thanks.length)]); break;
-      case 'bye':    addMsg('oz', L.bye[0]); setTimeout(closePanel, 2000); break;
-      case 'capabilities': addMsg('oz', L.capabilities); break;
-      case 'my_permissions': addMsg('oz', getPermsText()); break;
-
+      case 'thanks':        addMsg('oz', L.thanks[Math.floor(Math.random()*L.thanks.length)]); break;
+      case 'bye':           addMsg('oz', L.bye[0]); setTimeout(closePanel, 2000); break;
+      case 'capabilities':  addMsg('oz', L.capabilities); break;
+      case 'my_permissions':addMsg('oz', getPermsText()); break;
       case 'help':
-        addMsg('oz', "Je suis là pour vous aider ! Voici ce que vous pouvez me demander :\n\n• **Créer** un événement, une initiative, un article\n• **Trouver** des partenaires ou membres\n• **Naviguer** vers n'importe quel module\n• **Lancer** les tutoriels d'accueil\n• **Répondre** à vos questions\n\nSouhaitez-vous que je lance le guide d'accueil ?",
-          `<div class="oz-card-title">Premiers pas</div><div class="oz-card-btns">
-            <button class="oz-btn oz-btn-p" data-oz="tutorial">🎓 Lancer le tutoriel</button>
-            <button class="oz-btn oz-btn-s" data-oz="nav" data-p="/faq.html">❓ FAQ</button>
-          </div>`);
+        addMsg('oz', "Dites-moi simplement ce que vous voulez faire :\n\n• « **Ouvre mes messages** »\n• « **Ouvre les accréditations** »\n• « **Crée un événement** »\n• « **Ajoute une réunion à mon agenda le 15/03 à 14h** »\n• « **Montre-moi mes CV** »\n• « **Va dans l'annuaire** »\n\nJ'exécute directement — pas besoin de cliquer !");
         break;
-
       case 'tutorial':
         addMsg('oz', '🎓 Lancement du guide interactif...');
-        setTimeout(() => { if (typeof window.daReplayOnboarding === 'function') window.daReplayOnboarding(); else window.location.href = '/dashboard-utilisateur.html'; }, 600);
+        setTimeout(() => { if (typeof window.daReplayOnboarding === 'function') window.daReplayOnboarding(); else window.location.href = '/dashboard-utilisateur.html'; }, 500);
         break;
-
       case 'oz_settings': addMsg('oz', '⚙️ Voici vos options de personnalisation !'); toggleSettings(); break;
-      case 'enable_voice':  _cfg.voiceEnabled=true;  document.getElementById('oz-voice-sw')?.classList.add('on');    addMsg('oz','🎙️ Synthèse vocale activée !'); speak('Synthèse vocale activée.'); break;
-      case 'disable_voice': _cfg.voiceEnabled=false; document.getElementById('oz-voice-sw')?.classList.remove('on'); stopSpeech(); addMsg('oz','🔇 Synthèse vocale désactivée.'); break;
+      case 'enable_voice':
+        _cfg.voiceEnabled = true;
+        document.getElementById('oz-voice-sw')?.classList.add('on');
+        addMsg('oz','🎙️ Synthèse vocale activée !'); speak('Synthèse vocale activée.'); break;
+      case 'disable_voice':
+        _cfg.voiceEnabled = false;
+        document.getElementById('oz-voice-sw')?.classList.remove('on');
+        stopSpeech(); addMsg('oz','🔇 Synthèse vocale désactivée.'); break;
 
-      // Navigation directe
-      case 'nav_evenements':   navTo('evenements');   break;
-      case 'nav_initiatives':  navTo('initiatives');  break;
-      case 'nav_messagerie':   navTo('messagerie');   break;
-      case 'nav_annuaire':     navTo('annuaire');     break;
-      case 'nav_formations':   navTo('formations');   break;
-      case 'nav_faq':          navTo('faq');          break;
-      case 'nav_actualites':   navTo('actualites');   break;
-      case 'nav_visio':        navTo('visio');        break;
-      case 'nav_contrats':     navTo('contrats');     break;
-      case 'nav_billetterie':  navTo('billetterie');  break;
-      case 'nav_statistiques': navTo('statistiques'); break;
-      case 'nav_parametres':   navTo('parametres');   break;
-      case 'nav_recherche':    navTo('recherche');    break;
-      case 'nav_dashboard':    navTo('dashboard');    break;
+      // ── Agenda : création avec date
+      case 'agenda_add': await agendaAdd(text); break;
+
+      // ── Actions directes (navigation immédiate vers le formulaire)
+      case 'create_event':      await execAction('create_event');      break;
+      case 'create_initiative': await execAction('create_initiative'); break;
+      case 'create_campaign':   await execAction('create_campaign');   break;
+      case 'create_article':    await execAction('create_article');    break;
+      case 'create_ticket':     await execAction('create_ticket');     break;
+      case 'create_contract':   await execAction('create_contract');   break;
+      case 'create_newsletter': await execAction('create_newsletter'); break;
+      case 'create_cv':         await execAction('create_cv');         break;
+      case 'create_sondage':    await execAction('create_sondage');    break;
+      case 'find_partners':     await execAction('find_partners');     break;
+      case 'send_message':      await execAction('send_message');      break;
+
+      // ── Navigation directe (tous les modules)
+      case 'nav_evenements':     await navTo('evenements');     break;
+      case 'nav_initiatives':    await navTo('initiatives');    break;
+      case 'nav_messagerie':     await navTo('messagerie');     break;
+      case 'nav_annuaire':       await navTo('annuaire');       break;
+      case 'nav_formations':     await navTo('formations');     break;
+      case 'nav_faq':            await navTo('faq');            break;
+      case 'nav_actualites':     await navTo('actualites');     break;
+      case 'nav_reunions':       await navTo('reunions');       break;
+      case 'nav_visio':          await navTo('reunions');       break;
+      case 'nav_contrats':       await navTo('contrats');       break;
+      case 'nav_billetterie':    await navTo('billetterie');    break;
+      case 'nav_statistiques':   await navTo('statistiques');   break;
+      case 'nav_recherche':      await navTo('recherche');      break;
+      case 'nav_dashboard':      await navTo('dashboard');      break;
+      case 'nav_accreditations': await navTo('accreditations'); break;
+      case 'nav_cv':             await navTo('cv');             break;
+      case 'nav_agenda':         await navTo('agenda');         break;
+      case 'nav_profil':         await navTo('profil');         break;
+      case 'nav_reseau':         await navTo('reseau');         break;
+      case 'nav_offres':         await navTo('offres');         break;
+      case 'nav_sondages':       await navTo('sondages');       break;
+      case 'nav_collaborations': await navTo('collaborations'); break;
+      case 'nav_scanner':        await navTo('scanner');        break;
+      case 'nav_parametres':     await navTo('profil');         break;
       case 'nav_admin':
-        addMsg('oz', "⚙️ Je vous emmène sur le panneau d'administration.",
-          `<div class="oz-card-btns"><button class="oz-btn oz-btn-p" data-oz="nav" data-p="/dashboard-administrateur.html">⚙️ Administration</button></div>`);
+        addMsg('oz', '⚙️ J\'ouvre l\'administration...');
+        await audit('navigate', 'admin');
+        setTimeout(() => { window.location.href = '/dashboard-administrateur.html'; }, 500);
         break;
 
-      // Créations
-      case 'create_event':    proposeAction('create_event',    text); break;
-      case 'create_initiative': proposeAction('create_initiative', text); break;
-      case 'create_campaign': proposeAction('create_campaign', text); break;
-      case 'create_article':  proposeAction('create_article',  text); break;
-      case 'create_ticket':   proposeAction('create_ticket',   text); break;
-      case 'create_contract': proposeAction('create_contract', text); break;
-      case 'create_newsletter': proposeAction('create_newsletter', text); break;
-      case 'find_partners':   proposeAction('find_partners',   text); break;
-      case 'send_message':    navTo('messagerie'); break;
-
+      // ── Fallback : KB puis confusion
       default: {
         const kb = await queryKB(text);
         if (kb) { addMsg('oz', kb); }
         else {
           addMsg('oz', L.confused[Math.floor(Math.random()*L.confused.length)] +
-            '\n\nEssayez par exemple :\n• « **Créer un événement** »\n• « **Trouver des partenaires** »\n• « **Comment utiliser la plateforme ?** »');
+            '\n\nExemples de commandes :\n• « **Ouvre les accréditations** »\n• « **Ouvre mes messages** »\n• « **Montre-moi mon agenda** »\n• « **Crée un événement** »');
+          logUnanswered(text);
         }
       }
     }
   }
 
-  function navTo(key) {
+  /* Navigation IMMÉDIATE — pas de bouton intermédiaire */
+  async function navTo(key) {
     const m = MODULES[key];
     if (!m) return;
-    addMsg('oz', `${m.icon} Je vous emmène sur **${m.label}**.`,
-      `<div class="oz-card-btns"><button class="oz-btn oz-btn-p" data-oz="nav" data-p="${m.url}">${m.icon} Ouvrir ${m.label}</button></div>`);
+    // Si on est déjà sur la page, juste fermer le panel
+    if (window.location.pathname === m.url || window.location.href.endsWith(m.url)) {
+      addMsg('oz', `${m.icon} Vous êtes déjà sur **${m.label}**.`);
+      return;
+    }
+    addMsg('oz', `${m.icon} J'ouvre **${m.label}**...`);
+    await audit('navigate', key);
+    setTimeout(() => { window.location.href = m.url; }, 500);
   }
 
+  /* Actions directes — navigation immédiate vers le formulaire */
   const ACTION_DEFS = {
-    create_event:      { title:'🎪 Créer un événement',         desc:"Je vais vous emmener sur le module Événements. Vous pourrez définir le titre, la date, le lieu et inviter des participants.",            url:'/evenements.html' },
-    create_initiative: { title:'🚀 Créer une initiative',       desc:"Lancez un projet communautaire via le module Initiatives. Recrutez des membres et gérez vos objectifs.",                               url:'/initiatives.html' },
-    create_campaign:   { title:'📣 Créer une campagne',         desc:"Créez une campagne de recrutement ou de communication via le module Initiatives.",                                                     url:'/initiatives.html' },
-    create_article:    { title:'📝 Rédiger un article',         desc:"Publiez un article sur le fil d'actualité pour partager vos news et projets.",                                                        url:'/fil-actualite.html' },
-    create_ticket:     { title:'🎟️ Créer une billetterie',     desc:"Configurez la vente de billets pour votre événement via le module Billetterie.",                                                      url:'/billetterie.html' },
-    create_contract:   { title:'📄 Générer un contrat',         desc:"Créez et signez un contrat de partenariat officiel via le module Contrats.",                                                          url:'/contrats.html' },
-    create_newsletter: { title:'📧 Préparer une newsletter',    desc:"Rédigez et envoyez une newsletter à votre communauté.",                                                                               url:'/messagerie.html' },
-    find_partners:     { title:'🔍 Trouver des partenaires',    desc:"Je vais ouvrir l'Annuaire avec les filtres adaptés pour identifier des partenaires, entreprises ou associations.",                   url:'/annuaire.html' },
+    create_event:      { msg: "🎪 J'ouvre le formulaire de création d'événement...",        url: '/evenements.html' },
+    create_initiative: { msg: "🚀 J'ouvre le module Initiatives...",                        url: '/initiative.html' },
+    create_campaign:   { msg: "📣 J'ouvre le module Initiatives pour votre campagne...",    url: '/initiative.html' },
+    create_article:    { msg: "📝 J'ouvre le fil d'actualité pour rédiger votre article...",url: '/fil-actualite.html' },
+    create_ticket:     { msg: "🎟️ J'ouvre la Billetterie...",                              url: '/billetterie.html' },
+    create_contract:   { msg: "📄 J'ouvre le module Contrats...",                           url: '/contrats.html' },
+    create_newsletter: { msg: "📧 J'ouvre la Messagerie pour votre newsletter...",          url: '/messagerie.html' },
+    create_cv:         { msg: "📝 J'ouvre le CV Builder...",                               url: '/cv-builder.html' },
+    create_sondage:    { msg: "📊 J'ouvre les Sondages...",                                url: '/sondages.html' },
+    find_partners:     { msg: "🔍 J'ouvre l'Annuaire pour trouver des partenaires...",     url: '/annuaire.html' },
+    send_message:      { msg: "💬 J'ouvre la Messagerie...",                               url: '/messagerie.html' },
   };
 
-  function proposeAction(key, originalText) {
+  async function execAction(key) {
     const def = ACTION_DEFS[key];
     if (!def) { addMsg('oz', "Cette fonctionnalité arrive bientôt ! 🚀"); return; }
-    _pending = { url: def.url };
-    addMsg('oz', `✅ ${def.title}\n\n${def.desc}\n\n**Voulez-vous que je vous y emmène maintenant ?**`,
-      `<div class="oz-card-btns">
-        <button class="oz-btn oz-btn-p" data-oz="nav" data-p="${def.url}">→ ${def.title}</button>
-        <button class="oz-btn oz-btn-s" data-oz="cancel">✕ Annuler</button>
-      </div>`);
+    addMsg('oz', def.msg);
+    await audit('action', key);
+    setTimeout(() => { window.location.href = def.url; }, 500);
+  }
+
+  /* Ajout agenda via API si date/heure détectée */
+  async function agendaAdd(text) {
+    // Extraction : titre, date, heure
+    const dateM = text.match(/(?:le\s+)?(\d{1,2})[\/\-\s](\d{1,2})(?:[\/\-\s](\d{2,4}))?/);
+    const timeM  = text.match(/[àa]\s*(\d{1,2})[h:]\s*(\d{0,2})/i);
+    // Titre : tout ce qui est entre "Ajoute" et "à mon agenda" ou avant "le [date]"
+    const titleM = text.match(/ajouter?\s+"?([^"]+?)"?\s+[àa]\s+(?:mon\s+)?agenda/i)
+                || text.match(/ajouter?\s+"?([^"]+?)"?\s+le\s+\d/i)
+                || text.match(/cr[eé][eé]r?\s+(?:un\s+)?rendez[-\s]vous\s+"?([^"]+?)"?\s/i);
+
+    if (!dateM) {
+      // Pas de date fournie : ouvrir l'agenda
+      addMsg('oz', "📅 J'ouvre votre agenda. Précisez la date pour que je crée directement le rendez-vous.");
+      await audit('navigate', 'agenda');
+      setTimeout(() => { window.location.href = MODULES.agenda.url; }, 500);
+      return;
+    }
+
+    const titre = titleM?.[1]?.trim() || 'Nouveau rendez-vous';
+    const jour = dateM[1].padStart(2,'0');
+    const mois = dateM[2].padStart(2,'0');
+    const annee = dateM[3] ? (dateM[3].length===2 ? '20'+dateM[3] : dateM[3]) : new Date().getFullYear();
+    const heure = timeM ? timeM[1].padStart(2,'0') : '09';
+    const min   = timeM ? (timeM[2]||'00').padStart(2,'0') : '00';
+    const dateStr = `${annee}-${mois}-${jour}T${heure}:${min}`;
+
+    addMsg('oz', `📅 Création : **${titre}** le ${jour}/${mois}/${annee} à ${heure}h${min}...`);
+    try {
+      const r = await fetch('/api/agenda', {
+        method:'POST', credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ titre, date_debut: dateStr, date_fin: dateStr, type:'rdv' })
+      });
+      if (r.ok) {
+        addMsg('oz', `✅ Rendez-vous **"${titre}"** ajouté à votre agenda pour le ${jour}/${mois}/${annee} à ${heure}h${min}.`);
+        await audit('action', 'agenda_add', { titre, date: dateStr }, 'ok');
+      } else {
+        addMsg('oz', `📅 Je vous emmène sur l'agenda pour créer ce rendez-vous.`);
+        setTimeout(() => { window.location.href = MODULES.agenda.url; }, 500);
+      }
+    } catch(e) {
+      addMsg('oz', `📅 Je vous emmène sur l'agenda.`);
+      setTimeout(() => { window.location.href = MODULES.agenda.url; }, 500);
+    }
   }
 
   async function execPending() {
     if (!_pending) return;
-    const url = _pending.url; _pending = null;
-    addMsg('oz', '🚀 Parfait ! Je vous emmène...');
-    await audit('navigate', url);
-    setTimeout(() => window.location.href = url, 600);
+    const p = _pending; _pending = null;
+    if (p.fn) { await p.fn(); return; }
+    if (p.url) {
+      addMsg('oz', '✅ Parfait !');
+      await audit('navigate', p.url);
+      setTimeout(() => window.location.href = p.url, 400);
+    }
   }
 
   async function handleBtn(action, param) {
     if (action === 'nav' && param) {
-      addMsg('oz', '🚀 Je vous emmène... À tout de suite !');
+      addMsg('oz', '🚀 J\'y vais...');
       await audit('navigate', param);
-      setTimeout(() => window.location.href = param, 650);
+      setTimeout(() => window.location.href = param, 500);
     } else if (action === 'tutorial') {
       if (typeof window.daReplayOnboarding === 'function') window.daReplayOnboarding();
       else window.location.href = '/dashboard-utilisateur.html';
       closePanel();
     } else if (action === 'cancel') {
       _pending = null;
-      addMsg('oz', '✅ Annulé. Comment puis-je vous aider autrement ?');
+      addMsg('oz', '✅ Annulé. Que puis-je faire d\'autre ?');
     }
   }
 
