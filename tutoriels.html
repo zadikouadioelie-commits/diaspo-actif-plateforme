@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Centre de formation — Diaspo'Actif</title>
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<style>
+/* ── Layout ── */
+.tuto-hero{background:linear-gradient(135deg,#0D1B2A 0%,#1e3a8a 60%,#0369a1 100%);padding:52px 20px 40px;text-align:center;color:#fff;}
+.tuto-hero h1{font-size:clamp(24px,5vw,38px);font-weight:900;margin:0 0 10px;}
+.tuto-hero p{font-size:15px;color:rgba(255,255,255,.78);max-width:560px;margin:0 auto 24px;}
+.tuto-search-wrap{max-width:480px;margin:0 auto;position:relative;}
+.tuto-search{width:100%;padding:13px 48px 13px 18px;border-radius:14px;border:none;font-size:15px;box-shadow:0 4px 20px rgba(0,0,0,.25);}
+.tuto-search:focus{outline:2px solid #6366f1;outline-offset:2px;}
+.tuto-search-icon{position:absolute;right:15px;top:50%;transform:translateY(-50%);font-size:18px;pointer-events:none;}
+
+/* ── Main container ── */
+.tuto-main{max-width:1100px;margin:0 auto;padding:32px 16px;}
+.tuto-grid{display:grid;grid-template-columns:260px 1fr;gap:28px;}
+@media(max-width:768px){.tuto-grid{grid-template-columns:1fr;}}
+
+/* ── Sidebar ── */
+.tuto-sidebar{display:flex;flex-direction:column;gap:12px;}
+.tuto-sidebar-section{background:#fff;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;}
+.tuto-sidebar-title{padding:12px 16px;font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid #f1f5f9;background:#f8fafc;}
+.tuto-cat-btn{display:flex;align-items:center;gap:10px;width:100%;padding:11px 16px;background:none;border:none;text-align:left;font-size:13px;color:#374151;cursor:pointer;transition:background .12s;border-bottom:1px solid #f8fafc;}
+.tuto-cat-btn:hover,.tuto-cat-btn.active{background:#eff6ff;color:#1d4ed8;font-weight:700;}
+.tuto-cat-btn .cat-icon{font-size:16px;width:22px;text-align:center;}
+.tuto-cat-btn .cat-count{margin-left:auto;background:#e2e8f0;color:#64748b;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700;}
+.tuto-cat-btn.active .cat-count{background:#dbeafe;color:#1d4ed8;}
+
+/* ── Contenu principal ── */
+.tuto-content{}
+.tuto-section-title{font-size:18px;font-weight:800;color:#0D1B2A;margin:0 0 16px;display:flex;align-items:center;gap:8px;}
+.tuto-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-bottom:32px;}
+.tuto-card{background:#fff;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s;}
+.tuto-card:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.1);}
+.tuto-card-thumb{height:120px;display:flex;align-items:center;justify-content:center;font-size:48px;position:relative;}
+.tuto-card-duration{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.65);color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;}
+.tuto-card-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;background:rgba(0,0,0,.25);}
+.tuto-card:hover .tuto-card-play{opacity:1;}
+.tuto-card-play-btn{background:#fff;color:#1e3a8a;border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 12px rgba(0,0,0,.25);}
+.tuto-card-body{padding:14px 14px 12px;}
+.tuto-card-tag{display:inline-block;background:#eff6ff;color:#1d4ed8;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700;margin-bottom:7px;text-transform:uppercase;letter-spacing:.4px;}
+.tuto-card-title{font-size:13px;font-weight:800;color:#0D1B2A;margin:0 0 5px;line-height:1.35;}
+.tuto-card-desc{font-size:11.5px;color:#64748b;margin:0;line-height:1.5;}
+.tuto-card-footer{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid #f1f5f9;}
+.tuto-card-meta{font-size:11px;color:#94a3b8;}
+.tuto-card-fav{background:none;border:none;font-size:16px;cursor:pointer;transition:transform .15s;}
+.tuto-card-fav:hover{transform:scale(1.2);}
+.tuto-card-fav.active{color:#f59e0b;}
+
+/* ── Badge rôle ── */
+.role-badge{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;transition:opacity .15s;border:none;}
+.role-badge:hover{opacity:.85;}
+.roles-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}
+
+/* ── Progression ── */
+.tuto-progress-bar{height:6px;background:#e2e8f0;border-radius:3px;margin-top:6px;overflow:hidden;}
+.tuto-progress-fill{height:100%;background:#1e3a8a;border-radius:3px;transition:width .4s;}
+
+/* ── Tabs ── */
+.tuto-tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid #f1f5f9;padding-bottom:0;}
+.tuto-tab{padding:10px 16px;font-size:13px;font-weight:700;color:#64748b;background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;}
+.tuto-tab.active{color:#1e3a8a;border-bottom-color:#1e3a8a;}
+.tuto-tab:hover{color:#1e3a8a;}
+.tuto-tab-content{display:none;}
+.tuto-tab-content.active{display:block;}
+
+/* ── Empty state ── */
+.tuto-empty{text-align:center;padding:48px 20px;color:#94a3b8;}
+.tuto-empty-icon{font-size:48px;margin-bottom:12px;}
+.tuto-empty p{font-size:14px;}
+
+/* ── Tags filtres ── */
+.tuto-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
+.tuto-tag{padding:5px 12px;border-radius:20px;border:1.5px solid #e2e8f0;font-size:12px;font-weight:600;color:#64748b;background:#fff;cursor:pointer;transition:all .12s;}
+.tuto-tag:hover,.tuto-tag.active{background:#1e3a8a;color:#fff;border-color:#1e3a8a;}
+
+/* ── Modal vidéo (tour animé) ── */
+#tuto-player-modal{display:none;position:fixed;inset:0;z-index:99980;background:rgba(0,0,0,.8);align-items:center;justify-content:center;}
+#tuto-player-modal.show{display:flex;}
+#tuto-player-box{background:#fff;border-radius:20px;padding:28px;max-width:500px;width:92%;text-align:center;}
+#tuto-player-box h3{font-size:18px;font-weight:900;color:#0D1B2A;margin:0 0 8px;}
+#tuto-player-box p{font-size:13px;color:#64748b;margin:0 0 20px;}
+.tuto-player-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+.tuto-player-start{background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:800;cursor:pointer;}
+.tuto-player-close{background:#f1f5f9;color:#475569;border:none;border-radius:10px;padding:12px 18px;font-size:14px;font-weight:700;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div id="app-topbar"></div>
+
+<!-- ── Hero ── -->
+<div class="tuto-hero">
+  <h1>📚 Centre de formation</h1>
+  <p>Tutoriels interactifs, guides et ressources pour maîtriser chaque fonctionnalité de Diaspo'Actif.</p>
+  <div class="tuto-search-wrap">
+    <input type="text" id="tuto-search" class="tuto-search" placeholder="Rechercher un tutoriel…">
+    <span class="tuto-search-icon">🔍</span>
+  </div>
+</div>
+
+<!-- ── Contenu ── -->
+<div class="tuto-main">
+  <div class="tuto-grid">
+
+    <!-- ── Sidebar ── -->
+    <aside class="tuto-sidebar">
+      <div class="tuto-sidebar-section">
+        <div class="tuto-sidebar-title">Catégories</div>
+        <button class="tuto-cat-btn active" data-cat="all"><span class="cat-icon">🏠</span>Tous les tutoriels<span class="cat-count" id="cnt-all">0</span></button>
+        <button class="tuto-cat-btn" data-cat="demarrage"><span class="cat-icon">🚀</span>Prise en main<span class="cat-count" id="cnt-demarrage">0</span></button>
+        <button class="tuto-cat-btn" data-cat="profil"><span class="cat-icon">🪪</span>Profil & Compte<span class="cat-count" id="cnt-profil">0</span></button>
+        <button class="tuto-cat-btn" data-cat="communication"><span class="cat-icon">💬</span>Communication<span class="cat-count" id="cnt-communication">0</span></button>
+        <button class="tuto-cat-btn" data-cat="collaboration"><span class="cat-icon">🤝</span>Collaboration<span class="cat-count" id="cnt-collaboration">0</span></button>
+        <button class="tuto-cat-btn" data-cat="evenements"><span class="cat-icon">📅</span>Événements<span class="cat-count" id="cnt-evenements">0</span></button>
+        <button class="tuto-cat-btn" data-cat="admin"><span class="cat-icon">⚙️</span>Administration<span class="cat-count" id="cnt-admin">0</span></button>
+      </div>
+
+      <div class="tuto-sidebar-section" id="sidebar-mon-espace" style="display:none;">
+        <div class="tuto-sidebar-title">Mon espace</div>
+        <button class="tuto-cat-btn" id="btn-mon-tuto"><span class="cat-icon">▶</span>Mon tutoriel de rôle</button>
+        <button class="tuto-cat-btn" data-cat="favoris"><span class="cat-icon">⭐</span>Mes favoris<span class="cat-count" id="cnt-fav">0</span></button>
+        <button class="tuto-cat-btn" data-cat="historique"><span class="cat-icon">🕐</span>Historique<span class="cat-count" id="cnt-hist">0</span></button>
+      </div>
+    </aside>
+
+    <!-- ── Contenu principal ── -->
+    <main class="tuto-content">
+
+      <!-- Tabs -->
+      <div class="tuto-tabs">
+        <button class="tuto-tab active" data-tab="explorer">Explorer</button>
+        <button class="tuto-tab" data-tab="roles">Par type de compte</button>
+        <button class="tuto-tab" data-tab="fonctionnalites">Par fonctionnalité</button>
+        <button class="tuto-tab" data-tab="nouveautes">Nouveautés</button>
+      </div>
+
+      <!-- Tab Explorer -->
+      <div class="tuto-tab-content active" id="tab-explorer">
+        <div class="tuto-tags" id="tuto-tags-bar"></div>
+        <div class="tuto-section-title">⭐ Tutoriels recommandés</div>
+        <div class="tuto-cards" id="cards-recommandes"></div>
+        <div class="tuto-section-title">🆕 Derniers ajoutés</div>
+        <div class="tuto-cards" id="cards-recents"></div>
+      </div>
+
+      <!-- Tab Par rôle -->
+      <div class="tuto-tab-content" id="tab-roles">
+        <p style="font-size:13px;color:#64748b;margin:0 0 16px;">Chaque tutoriel est adapté aux fonctionnalités spécifiques du type de compte.</p>
+        <div class="roles-wrap" id="roles-wrap"></div>
+        <div class="tuto-cards" id="cards-roles"></div>
+      </div>
+
+      <!-- Tab Par fonctionnalité -->
+      <div class="tuto-tab-content" id="tab-fonctionnalites">
+        <div class="tuto-section-title">🛠️ Tutoriels par fonctionnalité</div>
+        <div class="tuto-cards" id="cards-fonctions"></div>
+      </div>
+
+      <!-- Tab Nouveautés -->
+      <div class="tuto-tab-content" id="tab-nouveautes">
+        <div class="tuto-section-title">🆕 Nouveautés de la plateforme</div>
+        <div class="tuto-cards" id="cards-news"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Modal lancement tutoriel -->
+<div id="tuto-player-modal">
+  <div id="tuto-player-box">
+    <div style="font-size:48px;margin-bottom:12px;" id="tuto-player-icon">▶</div>
+    <h3 id="tuto-player-title">Lancer le tutoriel</h3>
+    <p id="tuto-player-desc">Ce tutoriel interactif va vous guider pas à pas.</p>
+    <div class="tuto-player-btns">
+      <button class="tuto-player-start" id="tuto-player-start">▶ Lancer</button>
+      <button class="tuto-player-close" id="tuto-player-close">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div id="app-footer"></div>
+<script src="assets/ds.js?v=4"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js?v=6"></script>
+<script>
+/* ═══════════════════════════════════════════════════
+   CENTRE DE FORMATION — Données & Logique
+═══════════════════════════════════════════════════ */
+
+/* ── Catalogue de tutoriels ── */
+const CATALOGUE = [
+  /* ── PRISE EN MAIN PAR RÔLE ── */
+  { id:'t-visiteur',      cat:'demarrage', role:'visiteur',          titre:"Découvrir Diaspo'Actif",          desc:"Tour complet de la plateforme pour les visiteurs non connectés.", icon:'👋', couleur:'#6366f1', duree:'1 min', tags:['démarrage','visiteur'], recommande:true, nouveau:true },
+  { id:'t-membre',        cat:'demarrage', role:'utilisateur',       titre:"Prise en main — Membre",          desc:"Votre espace Membre de A à Z : profil, fil, messagerie, deals.", icon:'👤', couleur:'#1e3a8a', duree:'1 min', tags:['démarrage','membre'], recommande:true },
+  { id:'t-entrepreneur',  cat:'demarrage', role:'entrepreneur',      titre:"Prise en main — Entrepreneur",    desc:"Développez votre réseau business dans l'écosystème diaspora.", icon:'💼', couleur:'#0f766e', duree:'1 min', tags:['démarrage','entrepreneur'] },
+  { id:'t-association',   cat:'demarrage', role:'association',       titre:"Prise en main — Association",     desc:"Mobilisez la diaspora autour de vos projets associatifs.", icon:'🤲', couleur:'#7c3aed', duree:'1 min', tags:['démarrage','association'] },
+  { id:'t-initiative',    cat:'demarrage', role:'initiative',        titre:"Prise en main — Initiative",      desc:"Gérez et développez votre initiative avec tous les outils.", icon:'🌱', couleur:'#15803d', duree:'1 min', tags:['démarrage','initiative'], recommande:true },
+  { id:'t-diaspora',      cat:'demarrage', role:'diaspora',          titre:"Prise en main — Diaspora",        desc:"Restez connecté à vos origines et contribuez au développement.", icon:'🌍', couleur:'#b45309', duree:'1 min', tags:['démarrage','diaspora'] },
+  { id:'t-commune',       cat:'demarrage', role:'commune',           titre:"Prise en main — Commune",         desc:"Engagez la diaspora de votre commune pour le développement local.", icon:'🏘️', couleur:'#0369a1', duree:'1 min', tags:['démarrage','institution'] },
+  { id:'t-region',        cat:'demarrage', role:'region',            titre:"Prise en main — Région",          desc:"Mobilisez la diaspora régionale avec l'Observatoire.", icon:'🗺️', couleur:'#0369a1', duree:'1 min', tags:['démarrage','institution'] },
+  { id:'t-prefecture',    cat:'demarrage', role:'prefecture',        titre:"Prise en main — Préfecture",      desc:"Coordonnez les politiques diaspora à l'échelle préfectorale.", icon:'🏛️', couleur:'#0369a1', duree:'1 min', tags:['démarrage','institution'] },
+  { id:'t-ministere',     cat:'demarrage', role:'ministere',         titre:"Prise en main — Ministère",       desc:"Pilotez la stratégie nationale diaspora.", icon:'🏦', couleur:'#1e3a8a', duree:'1 min', tags:['démarrage','institution'] },
+  { id:'t-ambassade',     cat:'demarrage', role:'ambassade',         titre:"Prise en main — Ambassade",       desc:"Gérez les relations avec la diaspora depuis votre pays d'accréditation.", icon:'🏴', couleur:'#991b1b', duree:'1 min', tags:['démarrage','institution'] },
+  { id:'t-consulat',      cat:'demarrage', role:'consulat',          titre:"Prise en main — Consulat",        desc:"Services consulaires et lien avec la diaspora locale.", icon:'🏛️', couleur:'#991b1b', duree:'1 min', tags:['démarrage','institution'] },
+  { id:'t-equipementier', cat:'demarrage', role:'equipementier',     titre:"Prise en main — Équipementier",   desc:"Présentez vos solutions aux marchés diaspora.", icon:'🏗️', couleur:'#92400e', duree:'1 min', tags:['démarrage','business'] },
+  { id:'t-investisseur',  cat:'demarrage', role:'investisseur',      titre:"Prise en main — Investisseur",    desc:"Découvrez les meilleures opportunités diaspora.", icon:'💰', couleur:'#065f46', duree:'1 min', tags:['démarrage','investissement'] },
+  { id:'t-partenaire',    cat:'demarrage', role:'partenaire',        titre:"Prise en main — Partenaire Officiel", desc:"Votre visibilité premium et vos outils partenaires.", icon:'🏅', couleur:'#b45309', duree:'1 min', tags:['démarrage','partenaire'], recommande:true },
+  { id:'t-admin',         cat:'demarrage', role:'administrateur',    titre:"Prise en main — Administrateur",  desc:"Maîtrisez tous les outils d'administration et de modération.", icon:'⚙️', couleur:'#374151', duree:'1 min', tags:['démarrage','admin'] },
+  { id:'t-superadmin',    cat:'demarrage', role:'super_administrateur', titre:"Prise en main — Super Admin", desc:"Configuration avancée et gestion globale de la plateforme.", icon:'👑', couleur:'#1e1e2e', duree:'1 min', tags:['démarrage','admin'] },
+
+  /* ── FONCTIONNALITÉS ── */
+  { id:'f-profil',        cat:'profil',         role:null, titre:"Compléter son profil",            desc:"Photo, bio, compétences, localisation et nationalités.", icon:'🪪', couleur:'#6366f1', duree:'2 min', tags:['profil','visibilité'], recommande:true, nouveau:true },
+  { id:'f-qrcode',        cat:'profil',         role:null, titre:"Mon QR Code personnel",           desc:"Générez et partagez votre QR Code pour être trouvé facilement.", icon:'📱', couleur:'#0f172a', duree:'1 min', tags:['profil','qrcode'] },
+  { id:'f-badges',        cat:'profil',         role:null, titre:"Les badges et certifications",    desc:"Débloquez des badges en complétant votre profil et vos activités.", icon:'🎖️', couleur:'#b45309', duree:'1 min', tags:['profil','badges'] },
+  { id:'f-confidentialite',cat:'profil',        role:null, titre:"Niveaux de confidentialité",      desc:"Contrôlez qui peut voir vos informations.", icon:'🔒', couleur:'#374151', duree:'1 min', tags:['profil','sécurité'] },
+  { id:'f-publication',   cat:'communication',  role:null, titre:"Publier une actualité",           desc:"Rédigez, illustrez et diffusez vos publications.", icon:'📝', couleur:'#1e3a8a', duree:'2 min', tags:['fil','publication'], recommande:true },
+  { id:'f-messagerie',    cat:'communication',  role:null, titre:"Utiliser la messagerie",          desc:"Démarrez des conversations, partagez des fichiers.", icon:'💬', couleur:'#7c3aed', duree:'2 min', tags:['messagerie'], nouveau:true },
+  { id:'f-connexion',     cat:'communication',  role:null, titre:"Envoyer une demande de connexion", desc:"Développez votre réseau en quelques clics.", icon:'🤝', couleur:'#15803d', duree:'1 min', tags:['réseau','connexion'] },
+  { id:'f-evenement',     cat:'evenements',     role:null, titre:"Créer un événement",              desc:"Organisez et promouvez votre événement en ligne ou présentiel.", icon:'📅', couleur:'#0369a1', duree:'2 min', tags:['événements'], recommande:true },
+  { id:'f-billetterie',   cat:'evenements',     role:null, titre:"Créer une billetterie",           desc:"Vendez et gérez les billets de vos événements.", icon:'🎫', couleur:'#7c3aed', duree:'2 min', tags:['événements','billetterie'] },
+  { id:'f-agenda',        cat:'evenements',     role:null, titre:"Utiliser l'agenda",               desc:"Organisez vos rendez-vous, réunions et événements.", icon:'📆', couleur:'#0f766e', duree:'1 min', tags:['agenda','rendez-vous'] },
+  { id:'f-deal',          cat:'collaboration',  role:null, titre:"Créer un Deal de collaboration",  desc:"Proposez ou répondez à des opportunités de collaboration.", icon:'🤝', couleur:'#15803d', duree:'2 min', tags:['deals','collaboration'], recommande:true },
+  { id:'f-projet',        cat:'collaboration',  role:null, titre:"Créer un projet collaboratif",    desc:"Lancez un projet, invitez des membres, suivez l'avancement.", icon:'📋', couleur:'#1e3a8a', duree:'2 min', tags:['projets'] },
+  { id:'f-contrat',       cat:'collaboration',  role:null, titre:"Signer un contrat",               desc:"Créez et signez des contrats directement sur la plateforme.", icon:'📄', couleur:'#374151', duree:'2 min', tags:['contrats','signature'] },
+  { id:'f-visio',         cat:'communication',  role:null, titre:"Organiser une visioconférence",   desc:"Lancez un appel vidéo ou planifiez une réunion en ligne.", icon:'📹', couleur:'#0369a1', duree:'2 min', tags:['vidéo','réunion'], nouveau:true },
+  { id:'f-stats',         cat:'admin',          role:null, titre:"Comprendre vos statistiques",     desc:"Analysez vos vues, interactions et l'évolution de votre profil.", icon:'📊', couleur:'#0f766e', duree:'2 min', tags:['statistiques'] },
+  { id:'f-recherche',     cat:'profil',         role:null, titre:"Effectuer une recherche avancée", desc:"Filtres, mots-clés, localisation — trouvez n'importe quel profil.", icon:'🔍', couleur:'#6366f1', duree:'1 min', tags:['recherche'] },
+  { id:'f-oz',            cat:'profil',         role:null, titre:"Utiliser O-Z, l'assistant IA",    desc:"Commandes vocales, recherche intelligente, aide contextuelle.", icon:'🤖', couleur:'#1e3a8a', duree:'1 min', tags:['IA','assistant'], recommande:true, nouveau:true },
+  { id:'f-groupes',       cat:'communication',  role:null, titre:"Créer et gérer un groupe",        desc:"Communautés thématiques, groupes privés ou publics.", icon:'👥', couleur:'#7c3aed', duree:'2 min', tags:['groupes','communauté'] },
+  { id:'f-verification',  cat:'profil',         role:null, titre:"Effectuer une vérification",      desc:"Vérifiez votre identité pour obtenir le badge de confiance.", icon:'✅', couleur:'#15803d', duree:'2 min', tags:['vérification','confiance'] },
+];
+
+/* ── Données rôles pour l'onglet "Par type de compte" ── */
+const ROLES_DISPLAY = [
+  { role:'visiteur',          label:'👋 Visiteur',           couleur:'#6366f1' },
+  { role:'utilisateur',       label:'👤 Membre',             couleur:'#1e3a8a' },
+  { role:'entrepreneur',      label:'💼 Entrepreneur',       couleur:'#0f766e' },
+  { role:'association',       label:'🤲 Association',        couleur:'#7c3aed' },
+  { role:'initiative',        label:'🌱 Initiative',         couleur:'#15803d' },
+  { role:'diaspora',          label:'🌍 Diaspora',           couleur:'#b45309' },
+  { role:'commune',           label:'🏘️ Commune',           couleur:'#0369a1' },
+  { role:'region',            label:'🗺️ Région',            couleur:'#0369a1' },
+  { role:'prefecture',        label:'🏛️ Préfecture',        couleur:'#0369a1' },
+  { role:'ministere',         label:'🏦 Ministère',          couleur:'#1e3a8a' },
+  { role:'ambassade',         label:'🏴 Ambassade',          couleur:'#991b1b' },
+  { role:'consulat',          label:'🏛️ Consulat',          couleur:'#991b1b' },
+  { role:'equipementier',     label:'🏗️ Équipementier',    couleur:'#92400e' },
+  { role:'investisseur',      label:'💰 Investisseur',       couleur:'#065f46' },
+  { role:'partenaire',        label:'🏅 Partenaire Officiel',couleur:'#b45309' },
+  { role:'administrateur',    label:'⚙️ Administrateur',    couleur:'#374151' },
+  { role:'super_administrateur', label:'👑 Super Admin',    couleur:'#1e1e2e' },
+];
+
+/* ── Favoris & historique ── */
+let _favs    = JSON.parse(localStorage.getItem('da_tuto_favs') || '[]');
+let _hist    = JSON.parse(localStorage.getItem('da_tuto_hist') || '[]');
+let _activeRole = null;
+let _activeCat  = 'all';
+let _searchQ    = '';
+
+function toggleFav(id) {
+  const idx = _favs.indexOf(id);
+  if (idx >= 0) _favs.splice(idx, 1); else _favs.unshift(id);
+  localStorage.setItem('da_tuto_favs', JSON.stringify(_favs));
+  renderAll();
+}
+
+function addHist(id) {
+  _hist = [id, ..._hist.filter(x => x !== id)].slice(0, 20);
+  localStorage.setItem('da_tuto_hist', JSON.stringify(_hist));
+}
+
+/* ── Créer une carte ── */
+function makeCard(tuto) {
+  const isFav  = _favs.includes(tuto.id);
+  const d = document.createElement('div');
+  d.className = 'tuto-card';
+  d.innerHTML = `
+    <div class="tuto-card-thumb" style="background:${tuto.couleur}18;">
+      <span style="font-size:46px;">${tuto.icon}</span>
+      <span class="tuto-card-duration" style="background:${tuto.couleur}cc;">${tuto.duree}</span>
+      <div class="tuto-card-play"><div class="tuto-card-play-btn">▶</div></div>
+    </div>
+    <div class="tuto-card-body">
+      <span class="tuto-card-tag" style="background:${tuto.couleur}18;color:${tuto.couleur};">${tuto.cat}</span>
+      <div class="tuto-card-title">${tuto.titre}</div>
+      <p class="tuto-card-desc">${tuto.desc}</p>
+    </div>
+    <div class="tuto-card-footer">
+      <span class="tuto-card-meta">🎯 Tutoriel interactif</span>
+      <button class="tuto-card-fav ${isFav?'active':''}" data-id="${tuto.id}" title="${isFav?'Retirer des favoris':'Ajouter aux favoris'}">${isFav?'⭐':'☆'}</button>
+    </div>`;
+  d.querySelector('.tuto-card-play-btn, .tuto-card-thumb').addEventListener('click', () => openTuto(tuto));
+  d.querySelector('.tuto-card-fav').addEventListener('click', e => { e.stopPropagation(); toggleFav(tuto.id); });
+  return d;
+}
+
+function renderCards(container, list) {
+  container.innerHTML = '';
+  if (!list.length) {
+    container.innerHTML = '<div class="tuto-empty"><div class="tuto-empty-icon">🔍</div><p>Aucun tutoriel trouvé.</p></div>';
+    return;
+  }
+  list.forEach(t => container.appendChild(makeCard(t)));
+}
+
+/* ── Filtres ── */
+function filtered(list) {
+  return list.filter(t => {
+    if (_activeCat !== 'all' && t.cat !== _activeCat) return false;
+    if (_searchQ && !t.titre.toLowerCase().includes(_searchQ) && !t.desc.toLowerCase().includes(_searchQ) && !t.tags.join(' ').includes(_searchQ)) return false;
+    return true;
+  });
+}
+
+/* ── Rendu complet ── */
+function renderAll() {
+  /* Compteurs sidebar */
+  document.getElementById('cnt-all').textContent       = CATALOGUE.length;
+  document.getElementById('cnt-demarrage').textContent = CATALOGUE.filter(t=>t.cat==='demarrage').length;
+  document.getElementById('cnt-profil').textContent    = CATALOGUE.filter(t=>t.cat==='profil').length;
+  document.getElementById('cnt-communication').textContent = CATALOGUE.filter(t=>t.cat==='communication').length;
+  document.getElementById('cnt-collaboration').textContent = CATALOGUE.filter(t=>t.cat==='collaboration').length;
+  document.getElementById('cnt-evenements').textContent= CATALOGUE.filter(t=>t.cat==='evenements').length;
+  document.getElementById('cnt-admin').textContent     = CATALOGUE.filter(t=>t.cat==='admin').length;
+  document.getElementById('cnt-fav').textContent       = _favs.length;
+  document.getElementById('cnt-hist').textContent      = _hist.length;
+
+  /* Tab Explorer */
+  const base = filtered(CATALOGUE);
+  renderCards(document.getElementById('cards-recommandes'), base.filter(t=>t.recommande));
+  renderCards(document.getElementById('cards-recents'),     base.filter(t=>t.nouveau));
+
+  /* Tab fonctionnalités */
+  renderCards(document.getElementById('cards-fonctions'), filtered(CATALOGUE.filter(t=>t.cat!=='demarrage')));
+
+  /* Tab nouveautés */
+  renderCards(document.getElementById('cards-news'), filtered(CATALOGUE.filter(t=>t.nouveau)));
+
+  /* Favoris / historique (sidebar cats) */
+  if (_activeCat === 'favoris') renderCards(document.querySelector('.tuto-content'), CATALOGUE.filter(t=>_favs.includes(t.id)));
+  if (_activeCat === 'historique') renderCards(document.querySelector('.tuto-content'), _hist.map(id=>CATALOGUE.find(t=>t.id===id)).filter(Boolean));
+}
+
+/* ── Ouvrir un tutoriel ── */
+let _pendingRole = null;
+function openTuto(tuto) {
+  addHist(tuto.id);
+  _pendingRole = tuto.role;
+  document.getElementById('tuto-player-icon').textContent  = tuto.icon;
+  document.getElementById('tuto-player-title').textContent = tuto.titre;
+  document.getElementById('tuto-player-desc').textContent  = tuto.desc;
+  document.getElementById('tuto-player-start').style.background = tuto.couleur;
+  document.getElementById('tuto-player-modal').classList.add('show');
+}
+
+document.getElementById('tuto-player-start').addEventListener('click', () => {
+  document.getElementById('tuto-player-modal').classList.remove('show');
+  if (_pendingRole && window.DADemo) DADemo.launch(_pendingRole);
+  else if (window.DADemo) DADemo.launch(_currentUser?.role || 'utilisateur');
+});
+document.getElementById('tuto-player-close').addEventListener('click', () => {
+  document.getElementById('tuto-player-modal').classList.remove('show');
+});
+
+/* ── Badges rôles ── */
+function renderRoleBadges(selected) {
+  const wrap = document.getElementById('roles-wrap');
+  wrap.innerHTML = '';
+  ROLES_DISPLAY.forEach(r => {
+    const btn = document.createElement('button');
+    btn.className = 'role-badge';
+    btn.textContent = r.label;
+    btn.style.background = r.role === selected ? r.couleur : '#e2e8f0';
+    btn.style.color = r.role === selected ? '#fff' : '#374151';
+    btn.addEventListener('click', () => {
+      const tuto = CATALOGUE.find(t => t.role === r.role);
+      if (tuto) openTuto(tuto);
+    });
+    wrap.appendChild(btn);
+  });
+
+  /* Cartes de rôles visibles */
+  renderCards(document.getElementById('cards-roles'), CATALOGUE.filter(t => t.cat === 'demarrage'));
+}
+
+/* ── Tags filtres ── */
+function renderTags() {
+  const allTags = [...new Set(CATALOGUE.flatMap(t=>t.tags))].sort();
+  const bar = document.getElementById('tuto-tags-bar');
+  bar.innerHTML = '';
+  allTags.forEach(tag => {
+    const b = document.createElement('button');
+    b.className = 'tuto-tag';
+    b.textContent = tag;
+    b.addEventListener('click', () => {
+      _searchQ = _searchQ === tag ? '' : tag;
+      bar.querySelectorAll('.tuto-tag').forEach(el => el.classList.toggle('active', el.textContent === _searchQ));
+      renderAll();
+    });
+    bar.appendChild(b);
+  });
+}
+
+/* ── Tabs ── */
+document.querySelectorAll('.tuto-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tuto-tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tuto-tab-content').forEach(c=>c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* ── Sidebar cats ── */
+document.querySelectorAll('.tuto-cat-btn[data-cat]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tuto-cat-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    _activeCat = btn.dataset.cat;
+    renderAll();
+  });
+});
+
+/* ── Recherche ── */
+document.getElementById('tuto-search').addEventListener('input', e => {
+  _searchQ = e.target.value.trim().toLowerCase();
+  renderAll();
+});
+
+/* ── Utilisateur connecté ── */
+let _currentUser = null;
+(async () => {
+  try {
+    const data = await fetch('/api/auth/me', {credentials:'include'}).then(r=>r.json());
+    _currentUser = data.user;
+    if (_currentUser) {
+      document.getElementById('sidebar-mon-espace').style.display = 'block';
+      document.getElementById('btn-mon-tuto').addEventListener('click', () => {
+        const tuto = CATALOGUE.find(t => t.role === _currentUser.role) || CATALOGUE.find(t => t.role === 'utilisateur');
+        if (tuto) openTuto(tuto);
+      });
+    }
+  } catch(e) {}
+  renderAll();
+  renderRoleBadges();
+  renderTags();
+})();
+</script>
+</body>
+</html>

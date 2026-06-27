@@ -8474,6 +8474,12 @@ async function handleRequest(req, res) {
       return sendJSON(res, 200, { ok: true });
     }
 
+    /* POST /api/demo/plus-tard — reporter le tutoriel */
+    if (req.method === "POST" && pathname === "/api/demo/plus-tard") {
+      /* Pas besoin de stocker côté serveur — géré en localStorage */
+      return sendJSON(res, 200, { ok: true });
+    }
+
     /* GET /api/admin/temoignages — liste admin */
     if (req.method === "GET" && pathname === "/api/admin/temoignages") {
       const me = getCurrentUser(req);
