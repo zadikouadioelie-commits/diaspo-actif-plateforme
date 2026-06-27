@@ -1942,16 +1942,18 @@
   function injectStyles() {
     const css = `
 .cb-fab {
-  position: fixed; bottom: 28px; right: 28px; z-index: 1100;
-  width: 36px; height: 36px; border-radius: 50%;
+  position: fixed; top: 8px; right: 62px; z-index: 1100;
+  width: 48px; height: 48px; border-radius: 50%;
   background: linear-gradient(135deg, var(--orange, #ff6b00), #e55a00);
-  color: #fff; border: none; cursor: pointer;
+  color: #fff; border: none; cursor: grab;
   box-shadow: 0 3px 12px rgba(255,107,0,.5);
   display: flex; align-items: center; justify-content: center;
   transition: transform .2s, box-shadow .2s;
+  border: 3px solid #fff;
 }
-.cb-fab:hover { transform: scale(1.1); box-shadow: 0 4px 18px rgba(255,107,0,.65); }
-.cb-fab svg { width: 16px; height: 16px; }
+.cb-fab:hover { transform: scale(1.08); box-shadow: 0 4px 18px rgba(255,107,0,.65); }
+.cb-fab:active { cursor: grabbing; }
+.cb-fab svg { width: 22px; height: 22px; }
 .cb-notif {
   position: absolute; top: -3px; right: -3px;
   background: #ef4444; color: #fff; border-radius: 99px;
@@ -1960,12 +1962,12 @@
 }
 
 .cb-panel {
-  position: fixed; bottom: 100px; right: 28px; z-index: 1099;
+  position: fixed; top: 64px; right: 8px; z-index: 1099;
   width: 380px; max-width: calc(100vw - 32px);
   background: #fff; border-radius: 18px;
   box-shadow: 0 8px 48px rgba(0,0,0,.2);
   display: flex; flex-direction: column;
-  transform: translateY(24px) scale(.95); opacity: 0;
+  transform: translateY(-12px) scale(.95); opacity: 0;
   pointer-events: none; transition: transform .28s cubic-bezier(.34,1.3,.64,1), opacity .22s;
   max-height: 560px; overflow: hidden;
 }

@@ -1,5 +1,5 @@
 /* Diaspo'Actif — Service Worker PWA */
-const CACHE = 'diaspoactif-v27';
+const CACHE = 'diaspoactif-v28';
 const STATIC = [
   '/',
   '/index.html',

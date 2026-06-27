@@ -2728,4 +2728,42 @@ document.addEventListener("DOMContentLoaded", ()=>{
     _ozS.defer = true;
     document.head.appendChild(_ozS);
   }
+
+  // ── Bande "Assistants IA" — fond visuel derrière OZ + Chatbot
+  setTimeout(function () {
+    if (document.getElementById('ia-band')) return;
+
+    // Migration : reset positions pour la nouvelle bande (une seule fois)
+    if (!localStorage.getItem('da_ia_band_v1')) {
+      localStorage.removeItem('da_oz');
+      localStorage.removeItem('da_fab_pos');
+      localStorage.setItem('da_ia_band_v1', '1');
+      fetch('/api/oz/settings', { method:'PUT', credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ pos_x: null, pos_y: null })
+      }).catch(function(){});
+    }
+
+    // Forcer OZ dans la bande
+    const ozRoot = document.getElementById('oz-root');
+    if (ozRoot) { ozRoot.style.left = (window.innerWidth - 56) + 'px'; ozRoot.style.top = '8px'; }
+
+    const band = document.createElement('div');
+    band.id = 'ia-band';
+    band.innerHTML = '<span id="ia-band-lbl">Assistants IA</span>';
+    const bs = band.style;
+    bs.position = 'fixed'; bs.top = '4px'; bs.right = '4px';
+    bs.zIndex = '99990'; bs.width = '122px'; bs.height = '62px';
+    bs.background = 'rgba(255,255,255,0.18)';
+    bs.backdropFilter = bs.webkitBackdropFilter = 'blur(10px)';
+    bs.border = '1px solid rgba(255,255,255,0.45)';
+    bs.borderRadius = '32px';
+    bs.boxShadow = '0 2px 14px rgba(0,0,0,0.10)';
+    bs.display = 'flex'; bs.alignItems = 'flex-end'; bs.justifyContent = 'center';
+    bs.paddingBottom = '5px'; bs.pointerEvents = 'none';
+    const ls = band.querySelector('#ia-band-lbl').style;
+    ls.fontSize = '9px'; ls.fontFamily = '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    ls.color = 'rgba(0,0,0,0.38)'; ls.letterSpacing = '0.5px';
+    ls.textTransform = 'uppercase'; ls.fontWeight = '700';
+    document.body.appendChild(band);
 });
