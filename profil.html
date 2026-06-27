@@ -1244,7 +1244,7 @@ async function loadContactsTab(panel, type, titre, icon) {
   let page = 1, q = '';
   async function render(p, search) {
     try {
-      const data = await api('GET', `/profil/${profilId}/${type}?page=${p}&q=${encodeURIComponent(search||'')}`);
+      const data = await api('GET', `/profil/${profil.id}/${type}?page=${p}&q=${encodeURIComponent(search||'')}`);
       if (data.masque) {
         panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--muted)">🔒 Cette liste est privée.</div>`;
         return;
@@ -1303,7 +1303,7 @@ async function loadContactsTab(panel, type, titre, icon) {
 async function loadCommunsTab() {
   const panel = document.getElementById('ptab-communs');
   try {
-    const d = await api('GET', `/profil/${profilId}/communs`);
+    const d = await api('GET', `/profil/${profil.id}/communs`);
     let html = `<div style="padding:16px 0">`;
 
     if (d.suggestions && d.suggestions.length) {
@@ -1379,7 +1379,7 @@ async function loadCommunsTab() {
    ====================================================== */
 async function loadCommunsSidebar() {
   try {
-    const d = await api('GET', `/profil/${profilId}/communs`);
+    const d = await api('GET', `/profil/${profil.id}/communs`);
     const total = d.nb_communs || 0;
     if (!total && !d.points?.length) return;
     const sb = document.getElementById('p-sidebar');
