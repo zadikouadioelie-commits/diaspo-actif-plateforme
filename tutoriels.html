@@ -235,6 +235,14 @@ const CATALOGUE = [
   { id:'f-oz',            cat:'profil',         role:null, titre:"Utiliser O-Z, l'assistant IA",    desc:"Commandes vocales, recherche intelligente, aide contextuelle.", icon:'🤖', couleur:'#1e3a8a', duree:'1 min', tags:['IA','assistant'], recommande:true, nouveau:true },
   { id:'f-groupes',       cat:'communication',  role:null, titre:"Créer et gérer un groupe",        desc:"Communautés thématiques, groupes privés ou publics.", icon:'👥', couleur:'#7c3aed', duree:'2 min', tags:['groupes','communauté'] },
   { id:'f-verification',  cat:'profil',         role:null, titre:"Effectuer une vérification",      desc:"Vérifiez votre identité pour obtenir le badge de confiance.", icon:'✅', couleur:'#15803d', duree:'2 min', tags:['vérification','confiance'] },
+
+  /* ── ADMINISTRATION ── */
+  { id:'a-users',         cat:'admin',          role:'administrateur', titre:"Gérer les utilisateurs",          desc:"Consulter, vérifier, suspendre ou modifier les comptes depuis le dashboard.", icon:'👥', couleur:'#374151', duree:'2 min', tags:['admin','utilisateurs','modération'], recommande:false, nouveau:true },
+  { id:'a-temoignages',   cat:'admin',          role:'administrateur', titre:"Modérer les témoignages",          desc:"Approuver, refuser ou signaler les témoignages avant leur publication.", icon:'💬', couleur:'#374151', duree:'1 min', tags:['admin','modération','témoignages'] },
+  { id:'a-partenaires',   cat:'admin',          role:'administrateur', titre:"Gérer les Partenaires Officiels",  desc:"Attribuer le statut, configurer la visibilité et la priorité des partenaires.", icon:'🏅', couleur:'#b45309', duree:'2 min', tags:['admin','partenaires'] },
+  { id:'a-deals',         cat:'admin',          role:'administrateur', titre:"Superviser les Deals",             desc:"Valider, modérer les deals, gérer les litiges et configurer la marketplace.", icon:'🤝', couleur:'#374151', duree:'2 min', tags:['admin','deals','modération'] },
+  { id:'a-stats',         cat:'admin',          role:'administrateur', titre:"Statistiques globales",            desc:"Analyser les métriques globales de la plateforme : membres, activité, croissance.", icon:'📊', couleur:'#0f766e', duree:'2 min', tags:['admin','statistiques'] },
+  { id:'a-faq',           cat:'admin',          role:'administrateur', titre:"Gérer la FAQ & les signalements",  desc:"Répondre aux questions sans réponse, traiter les signalements et modérer les contenus.", icon:'🚩', couleur:'#dc2626', duree:'2 min', tags:['admin','modération','FAQ'] },
 ];
 
 /* ── Données rôles pour l'onglet "Par type de compte" ── */
@@ -297,7 +305,7 @@ function makeCard(tuto) {
       <span class="tuto-card-meta">🎯 Tutoriel interactif</span>
       <button class="tuto-card-fav ${isFav?'active':''}" data-id="${tuto.id}" title="${isFav?'Retirer des favoris':'Ajouter aux favoris'}">${isFav?'⭐':'☆'}</button>
     </div>`;
-  d.querySelector('.tuto-card-play-btn, .tuto-card-thumb').addEventListener('click', () => openTuto(tuto));
+  d.addEventListener('click', (e) => { if (!e.target.closest('.tuto-card-fav')) openTuto(tuto); });
   d.querySelector('.tuto-card-fav').addEventListener('click', e => { e.stopPropagation(); toggleFav(tuto.id); });
   return d;
 }
