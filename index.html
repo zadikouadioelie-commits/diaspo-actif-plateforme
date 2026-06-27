@@ -1139,7 +1139,7 @@
 
       <!-- Carrousel -->
       <div style="position:relative;">
-        <div id="po-carousel-track" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;"></div>
+        <div id="po-carousel-track" style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;"></div>
         <div id="po-carousel-dots" style="display:flex;justify-content:center;gap:6px;margin-top:20px;"></div>
       </div>
 
@@ -1703,7 +1703,7 @@ document.getElementById('hp-q')?.addEventListener('keydown', e => {
   }
 
   function getPerPage() {
-    return window.innerWidth < 640 ? 1 : window.innerWidth < 960 ? 2 : 3;
+    return window.innerWidth < 640 ? 1 : 2;
   }
 
   function renderPage(pg) {
@@ -1711,6 +1711,7 @@ document.getElementById('hp-q')?.addEventListener('keydown', e => {
     const start = pg * _perPage;
     const slice = _allPartners.slice(start, start + _perPage);
     if (!slice.length) return;
+    track.style.gridTemplateColumns = _perPage === 1 ? '1fr' : 'repeat(2,1fr)';
     track.innerHTML = slice.map(cardHtml).join('');
     // track impression
     slice.forEach(p => trackPo(p.id, 'view', 'homepage'));
