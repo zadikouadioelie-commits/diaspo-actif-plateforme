@@ -4948,7 +4948,7 @@ async function handleRequest(req, res) {
       // Activité plateforme max 10 pts
       const nbPosts = db.prepare(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?`).get(userId)?.n || 0;
       const nbCollabs = db.prepare(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`).get(userId)?.n || 0;
-      const nbFollowers = db.prepare(`SELECT COUNT(*) n FROM user_follows WHERE following_id=?`).get(userId)?.n || 0;
+      const nbFollowers = db.prepare(`SELECT COUNT(*) n FROM user_follows WHERE followed_id=?`).get(userId)?.n || 0;
       const activPts = Math.min(10, Math.floor(nbPosts/5) + nbCollabs * 2 + Math.floor(nbFollowers/10));
       if (activPts > 0) detail.push({ icon:'📊', label:`Activité : ${nbPosts} publications, ${nbFollowers} abonnés`, pts: activPts, max:10 });
       total += activPts;
