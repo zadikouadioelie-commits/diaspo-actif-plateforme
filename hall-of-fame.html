@@ -105,6 +105,7 @@
     <button class="hof-tab" onclick="showTab('historique')">📜 Historique</button>
     <button class="hof-tab" onclick="showTab('criteres')">📊 Critères</button>
     <button class="hof-tab" onclick="showTab('mon-score')">⭐ Mon score</button>
+    <button class="hof-tab" onclick="showTab('certificat')" id="tab-certificat" style="display:none;">🎓 Mon certificat</button>
   </div>
 </div>
 
@@ -142,6 +143,54 @@
   <div id="mon-score-content">
     <div style="text-align:center;padding:48px;color:var(--muted);">Chargement…</div>
   </div>
+
+  <!-- Témoignage (visible uniquement si Deal Master) -->
+  <div id="temoignage-section" style="display:none;max-width:620px;margin:28px auto 0;">
+    <div style="background:#fff;border:1.5px solid #fde68a;border-radius:16px;padding:20px;">
+      <h4 style="font-size:14px;font-weight:800;margin:0 0 10px;color:#b45309;">✍️ Partager votre expérience</h4>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">En tant que Deal Master, votre témoignage peut inspirer la communauté Diaspo'Actif.</p>
+      <textarea id="temoignage-input" placeholder="Racontez votre parcours, vos conseils, ce que cette distinction représente pour vous…" rows="5" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+        <span id="temoignage-chars" style="font-size:11px;color:var(--muted);">0 / 1000</span>
+        <button onclick="soumettreTemoignage()" style="padding:8px 20px;background:#b45309;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Publier mon témoignage</button>
+      </div>
+      <div id="temoignage-msg" style="font-size:12px;margin-top:8px;display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL : Mon certificat -->
+<div id="panel-certificat" class="hof-section" style="display:none;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <h2 style="font-size:20px;font-weight:900;margin:0 0 8px;">🎓 Votre certificat Deal Master</h2>
+    <p style="font-size:13px;color:var(--muted);">Certificat officiel généré automatiquement. Téléchargez-le et partagez-le.</p>
+  </div>
+
+  <!-- Certificat visuel (canvas) -->
+  <div style="display:flex;justify-content:center;margin-bottom:24px;">
+    <canvas id="cert-canvas" width="800" height="560" style="max-width:100%;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.18);"></canvas>
+  </div>
+
+  <!-- Actions -->
+  <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:32px;">
+    <button onclick="downloadCertificat()" style="padding:10px 22px;background:#1e3a8a;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+      ⬇️ Télécharger le certificat
+    </button>
+    <button onclick="partagerLinkedIn()" style="padding:10px 22px;background:#0a66c2;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+      LinkedIn
+    </button>
+    <button onclick="copierLienPublic()" style="padding:10px 22px;background:#fff;border:1.5px solid var(--border);color:#475569;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+      🔗 Copier le lien public
+    </button>
+  </div>
+
+  <!-- QR Code + lien de vérification -->
+  <div style="max-width:420px;margin:0 auto;background:#f8fafc;border:1.5px solid var(--border);border-radius:14px;padding:20px;text-align:center;">
+    <h4 style="font-size:13px;font-weight:800;margin:0 0 12px;">🔍 Lien de vérification publique</h4>
+    <canvas id="qr-canvas" width="160" height="160" style="border-radius:10px;margin-bottom:12px;"></canvas>
+    <div id="lien-public-display" style="font-size:11px;color:#2563eb;word-break:break-all;margin-bottom:8px;"></div>
+    <p style="font-size:11px;color:var(--muted);margin:0;">Scannez ce QR code ou partagez le lien pour permettre à quiconque de vérifier votre distinction Deal Master.</p>
+  </div>
 </div>
 
 <div id="app-footer"></div>
@@ -154,16 +203,17 @@ let _hofData = null;
 let _scoreData = null;
 
 function showTab(tab) {
-  ['actuel','historique','criteres','mon-score'].forEach(t => {
-    document.getElementById(`panel-${t}`).style.display = t === tab ? '' : 'none';
-    document.querySelectorAll('.hof-tab').forEach((btn, i) => {
-      const tabs = ['actuel','historique','criteres','mon-score'];
-      btn.className = 'hof-tab' + (tabs[i] === tab ? ' active' : '');
-    });
+  ['actuel','historique','criteres','mon-score','certificat'].forEach(t => {
+    const panel = document.getElementById(`panel-${t}`);
+    if (panel) panel.style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.hof-tab').forEach(btn => {
+    btn.className = 'hof-tab' + (btn.getAttribute('onclick')?.includes(`'${tab}'`) ? ' active' : '');
   });
   if (tab === 'criteres' && !document.querySelector('.critere-bar')) loadCriteres();
   if (tab === 'mon-score' && !_scoreData) loadMonScore();
   if (tab === 'historique' && _hofData) renderHistorique();
+  if (tab === 'certificat') renderCertificat();
 }
 
 /* ─── Chargement principal ─── */
@@ -307,11 +357,23 @@ async function loadMonScore() {
 
     let html = '';
     if (is_deal_master) {
+      // Afficher onglet certificat
+      const tabCert = document.getElementById('tab-certificat');
+      if (tabCert) tabCert.style.display = '';
+      // Afficher section témoignage
+      const temSection = document.getElementById('temoignage-section');
+      if (temSection) temSection.style.display = '';
+
       html += `<div style="background:linear-gradient(135deg,#fef3c7,#fffbeb);border:2px solid var(--dm-gold);border-radius:16px;padding:24px;text-align:center;margin-bottom:24px;">
         <div style="font-size:36px;margin-bottom:8px;">⭐</div>
         <div style="font-size:18px;font-weight:900;color:var(--dm-gold-dark);margin-bottom:4px;">Félicitations ! Vous êtes Deal Master</div>
         <div style="font-size:13px;color:var(--muted);">Édition : ${laureat_actuel?.edition_label||'—'} · Rang #${laureat_actuel?.rang||'—'}</div>
         <div style="font-size:22px;font-weight:900;color:var(--dm-gold-dark);margin-top:10px;">Score : ${score?.score?.toFixed(1)||'—'}/100</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap;">
+          <button onclick="showTab('certificat')" style="padding:9px 20px;background:#b45309;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">🎓 Voir mon certificat</button>
+          <button onclick="partagerLinkedIn()" style="padding:9px 20px;background:#0a66c2;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">Partager sur LinkedIn</button>
+          <button onclick="copierLienPublic()" style="padding:9px 20px;background:#fff;border:1.5px solid var(--border);color:#475569;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">🔗 Copier le lien</button>
+        </div>
       </div>`;
     } else {
       const s = score?.score || 0;
@@ -364,6 +426,235 @@ async function loadMonScore() {
 }
 
 loadHof();
+
+/* ══════════════════════════════════════════
+   TÉMOIGNAGE
+══════════════════════════════════════════ */
+document.getElementById('temoignage-input')?.addEventListener('input', function() {
+  document.getElementById('temoignage-chars').textContent = `${this.value.length} / 1000`;
+});
+
+async function soumettreTemoignage() {
+  const msg = document.getElementById('temoignage-msg');
+  const contenu = document.getElementById('temoignage-input').value.trim();
+  if (contenu.length < 20) {
+    msg.style.display='block'; msg.style.color='#dc2626'; msg.textContent='⚠️ Témoignage trop court (min 20 caractères).'; return;
+  }
+  try {
+    const r = await fetch('/api/deal-master/temoignage', {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ contenu })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Erreur');
+    msg.style.display='block'; msg.style.color='#16a34a'; msg.textContent='✅ Témoignage publié ! Merci pour votre partage.';
+    document.getElementById('temoignage-input').value='';
+    document.getElementById('temoignage-chars').textContent='0 / 1000';
+  } catch(e) { msg.style.display='block'; msg.style.color='#dc2626'; msg.textContent='Erreur : '+e.message; }
+}
+
+/* ══════════════════════════════════════════
+   CERTIFICAT NUMÉRIQUE + QR CODE
+══════════════════════════════════════════ */
+
+// Génère le QR code via API Google Charts (SVG URL, sans dépendance externe)
+function generateQRDataURL(text, size=160) {
+  // Utilise une API publique pour générer le QR — rendu dans un canvas via Image
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&format=png&qzone=1`;
+}
+
+async function renderCertificat() {
+  if (!_scoreData?.is_deal_master) return;
+  const laureat = _scoreData.laureat_actuel;
+  const me = _scoreData;
+
+  // Récupère infos utilisateur depuis le profil déjà chargé ou via API
+  let userInfo = window._meInfo;
+  if (!userInfo) {
+    try {
+      const r = await fetch('/api/auth/me', { credentials:'include' }).then(r=>r.json());
+      userInfo = r.user || r;
+      window._meInfo = userInfo;
+    } catch(e) { userInfo = {}; }
+  }
+
+  const nom = [userInfo.prenom, userInfo.nom].filter(Boolean).join(' ') || 'Deal Master';
+  const editionLabel = laureat?.edition_label || 'Semestre en cours';
+  const rang = me.score?.rang || '—';
+  const score = me.score?.score?.toFixed(1) || '—';
+  const lienPublic = `${location.origin}/hall-of-fame.html?verifier=${userInfo.id}`;
+
+  // ── Dessin du certificat ──
+  const canvas = document.getElementById('cert-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = 800, H = 560;
+
+  // Fond dégradé
+  const grad = ctx.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0, '#0f172a');
+  grad.addColorStop(0.5, '#1e3a8a');
+  grad.addColorStop(1, '#0f172a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,W,H);
+
+  // Cadre doré
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(18,18,W-36,H-36);
+  ctx.strokeStyle = 'rgba(245,158,11,.3)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(26,26,W-52,H-52);
+
+  // Étoiles décoratives coins
+  const stars = [[40,40],[W-40,40],[40,H-40],[W-40,H-40]];
+  ctx.fillStyle='#f59e0b'; ctx.font='20px Arial';
+  stars.forEach(([x,y])=>ctx.fillText('✦',x-10,y+7));
+
+  // Badge texte supérieur
+  ctx.fillStyle='rgba(245,158,11,.15)';
+  roundRect(ctx, W/2-130, 50, 260, 32, 16); ctx.fill();
+  ctx.fillStyle='#f59e0b'; ctx.font='bold 12px Arial'; ctx.textAlign='center';
+  ctx.fillText('DISTINCTION OFFICIELLE DIASPO\'ACTIF', W/2, 71);
+
+  // Titre principal
+  ctx.fillStyle='#ffffff'; ctx.font='bold 36px Arial';
+  ctx.fillText('DEAL MASTER', W/2, 140);
+
+  // Étoile centrale
+  ctx.font='48px Arial'; ctx.fillText('⭐', W/2-24, 200);
+
+  // Ligne séparatrice
+  const lineGrad = ctx.createLinearGradient(80,0,W-80,0);
+  lineGrad.addColorStop(0,'transparent'); lineGrad.addColorStop(0.5,'#f59e0b'); lineGrad.addColorStop(1,'transparent');
+  ctx.strokeStyle=lineGrad; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(80,215); ctx.lineTo(W-80,215); ctx.stroke();
+
+  // Texte "Décerné à"
+  ctx.fillStyle='rgba(255,255,255,.6)'; ctx.font='13px Arial';
+  ctx.fillText('Ce certificat est décerné à', W/2, 248);
+
+  // Nom du lauréat
+  ctx.fillStyle='#fef3c7'; ctx.font='bold 32px Arial';
+  ctx.fillText(nom, W/2, 292);
+
+  // Édition
+  ctx.fillStyle='rgba(255,255,255,.75)'; ctx.font='14px Arial';
+  ctx.fillText(`Pour ses performances exceptionnelles lors du ${editionLabel}`, W/2, 328);
+  ctx.fillText(`Rang #${rang} · Score ${score}/100 · Top 10% des performants Deals`, W/2, 352);
+
+  // Ligne séparatrice basse
+  ctx.strokeStyle=lineGrad;
+  ctx.beginPath(); ctx.moveTo(80,372); ctx.lineTo(W-80,372); ctx.stroke();
+
+  // Footer
+  ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='11px Arial';
+  ctx.fillText('Attribution automatique par le moteur Deal Master Ranking Engine', W/2, 400);
+  ctx.fillStyle='#f59e0b'; ctx.font='bold 11px Arial';
+  ctx.fillText('diaspo-actif-plateforme.vercel.app', W/2, 420);
+
+  // Zone QR (droite bas)
+  ctx.fillStyle='rgba(255,255,255,.08)';
+  roundRect(ctx, W-190, H-180, 160, 150, 12); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='10px Arial'; ctx.textAlign='center';
+  ctx.fillText('Vérifier la distinction', W-110, H-168);
+
+  // Date
+  ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,.4)'; ctx.font='10px Arial';
+  ctx.fillText(`Délivré le ${new Date().toLocaleDateString('fr-FR')}`, 48, H-36);
+
+  // ── QR code dans le canvas principal ──
+  const qrImg = new Image();
+  qrImg.crossOrigin='anonymous';
+  qrImg.src = generateQRDataURL(lienPublic, 120);
+  qrImg.onload = () => {
+    ctx.drawImage(qrImg, W-185, H-165, 120, 120);
+    // Même QR dans le petit canvas dédié
+    renderQRCanvas(lienPublic);
+  };
+  qrImg.onerror = () => renderQRCanvas(lienPublic);
+
+  // Lien public affiché
+  document.getElementById('lien-public-display').textContent = lienPublic;
+}
+
+function renderQRCanvas(url) {
+  const qrCanvas = document.getElementById('qr-canvas');
+  const ctx = qrCanvas.getContext('2d');
+  const img = new Image();
+  img.crossOrigin='anonymous';
+  img.src = generateQRDataURL(url, 160);
+  img.onload = () => ctx.drawImage(img, 0, 0, 160, 160);
+  img.onerror = () => {
+    ctx.fillStyle='#f1f5f9'; ctx.fillRect(0,0,160,160);
+    ctx.fillStyle='#64748b'; ctx.font='11px Arial'; ctx.textAlign='center';
+    ctx.fillText('QR Code', 80, 85);
+  };
+}
+
+function roundRect(ctx, x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function downloadCertificat() {
+  const canvas = document.getElementById('cert-canvas');
+  const link = document.createElement('a');
+  link.download = 'certificat-deal-master-diaspoactif.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function partagerLinkedIn() {
+  const userInfo = window._meInfo || {};
+  const lien = encodeURIComponent(`${location.origin}/hall-of-fame.html?verifier=${userInfo.id}`);
+  const texte = encodeURIComponent(`🏆 Je suis fier(e) d'avoir obtenu la distinction Deal Master sur Diaspo'Actif ! Cette reconnaissance récompense l'excellence dans la gestion et la réussite de Deals. Vérifiez ma distinction ici :`);
+  window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${lien}&summary=${texte}`, '_blank');
+}
+
+async function copierLienPublic() {
+  const userInfo = window._meInfo || {};
+  const lien = `${location.origin}/hall-of-fame.html?verifier=${userInfo.id}`;
+  try {
+    await navigator.clipboard.writeText(lien);
+    const btn = event.target.closest('button');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Lien copié !';
+    setTimeout(() => btn.textContent = orig, 2000);
+  } catch(e) { alert('Lien : ' + lien); }
+}
+
+/* ── Vérification publique via URL ?verifier=userId ── */
+(async function checkVerifParam() {
+  const uid = new URLSearchParams(location.search).get('verifier');
+  if (!uid) return;
+  try {
+    const d = await fetch(`/api/deal-master/verifier/${uid}`).then(r=>r.json());
+    const nom = [d.utilisateur?.prenom, d.utilisateur?.nom].filter(Boolean).join(' ') || '—';
+    const modal = document.createElement('div');
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;';
+    modal.innerHTML = `<div style="background:#fff;border-radius:20px;padding:32px;max-width:440px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      ${d.valide
+        ? `<div style="font-size:48px;margin-bottom:12px;">⭐</div>
+           <div style="font-size:18px;font-weight:900;color:#b45309;margin-bottom:4px;">Distinction vérifiée ✅</div>
+           <div style="font-size:15px;font-weight:800;color:#0D1B2A;margin:8px 0;">${nom}</div>
+           <div style="font-size:13px;color:#64748b;">Deal Master — ${d.distinction?.edition_label||''}</div>
+           <div style="font-size:12px;color:#64748b;margin-top:4px;">Rang #${d.distinction?.rang||'—'} · Score ${(d.distinction?.score||0).toFixed(1)}/100</div>
+           <div style="font-size:12px;color:#64748b;margin-top:4px;">Valide jusqu'au ${(d.distinction?.date_expiration||'').slice(0,10)}</div>
+           <div style="margin-top:12px;font-size:11px;color:#94a3b8;">Vérification effectuée le ${new Date(d.verifie_le).toLocaleDateString('fr-FR')}</div>`
+        : `<div style="font-size:48px;margin-bottom:12px;">❌</div>
+           <div style="font-size:16px;font-weight:800;color:#dc2626;">Distinction non valide</div>
+           <div style="font-size:13px;color:#64748b;margin-top:8px;">Ce profil ne détient pas actuellement la distinction Deal Master.</div>`}
+      <button onclick="this.parentElement.parentElement.remove()" style="margin-top:20px;padding:9px 24px;background:#1e3a8a;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:13px;">Fermer</button>
+    </div>`;
+    document.body.appendChild(modal);
+  } catch(e) {}
+})();
 </script>
 </body>
 </html>

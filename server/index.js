@@ -8363,6 +8363,26 @@ async function handleRequest(req, res) {
       return sendJSON(res, 200, { criteres: db.prepare("SELECT * FROM deal_master_criteres ORDER BY poids DESC").all() });
     }
 
+    /* GET /api/deal-master/verifier/:userId — vérification publique */
+    const dmVerifM = pathname.match(/^\/api\/deal-master\/verifier\/(\d+)$/);
+    if (req.method === "GET" && dmVerifM) {
+      const uid = parseInt(dmVerifM[1]);
+      const u = db.prepare("SELECT id,nom,prenom,photo_url,titre_pro FROM users WHERE id=?").get(uid);
+      if (!u) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
+      const laureat = db.prepare(`SELECT dml.rang, dml.score, dml.date_attribution, dml.date_expiration,
+        dme.label AS edition_label, dme.periode_debut, dme.periode_fin, dme.statut AS edition_statut
+        FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
+        WHERE dml.user_id=? AND dml.actif=1 ORDER BY dml.edition_id DESC LIMIT 1`).get(uid);
+      const nb_editions = db.prepare("SELECT COUNT(*) AS n FROM deal_master_laureats WHERE user_id=?").get(uid).n;
+      return sendJSON(res, 200, {
+        valide: !!laureat,
+        utilisateur: { id: u.id, nom: u.nom, prenom: u.prenom, photo_url: u.photo_url, titre_pro: u.titre_pro },
+        distinction: laureat || null,
+        nb_editions,
+        verifie_le: new Date().toISOString(),
+      });
+    }
+
     /* GET /api/profil/:id/deal-master — badge info */
     const dmProfilM = pathname.match(/^\/api\/profil\/(\d+)\/deal-master$/);
     if (req.method === "GET" && dmProfilM) {
