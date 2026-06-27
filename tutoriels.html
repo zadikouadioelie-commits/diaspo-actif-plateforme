@@ -372,11 +372,13 @@ function openTuto(tuto) {
 document.getElementById('tuto-player-start').addEventListener('click', () => {
   document.getElementById('tuto-player-modal').classList.remove('show');
   if (!window.DADemo || !_pendingTuto) return;
-  /* Si le tutoriel a un id fonctionnel dédié → launchFeature, sinon launch(role) */
-  if (_pendingTuto.role) {
+  /* Priorité : tutoriel dédié dans STEPS_FONCTIONS si disponible */
+  if (DADemo.hasFeature(_pendingTuto.id)) {
+    DADemo.launchFeature(_pendingTuto.id);
+  } else if (_pendingTuto.role) {
     DADemo.launch(_pendingTuto.role);
   } else {
-    DADemo.launchFeature(_pendingTuto.id);
+    DADemo.launch(_currentUser?.role || 'utilisateur');
   }
 });
 document.getElementById('tuto-player-close').addEventListener('click', () => {

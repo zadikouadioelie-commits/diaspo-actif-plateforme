@@ -1580,6 +1580,7 @@
   window.DADemo = {
     launch,
     launchFeature,
+    hasFeature: (id) => !!STEPS_FONCTIONS[id],
     showWelcomeModal,
     checkUser(user) {
       if (!user) return;
