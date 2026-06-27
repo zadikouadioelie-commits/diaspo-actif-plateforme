@@ -183,6 +183,18 @@ function seed() {
     profil_json: "{}"
   });
 
+  /* ── Compte ANADER — Partenaire Officiel ── */
+  const anaderUserId = insertUser.run({
+    nom: "ANADER", email: "contact@anader.diaspoactif.demo",
+    password_hash: pw.hash, password_salt: pw.salt,
+    role: "initiative", ville: "Abidjan", pays: "Côte d'Ivoire",
+    profil_json: JSON.stringify({
+      bio: "Agence Nationale d'Appui au Développement Rural — Leader du Conseil Agricole et Rural en Côte d'Ivoire depuis 1993.",
+      titre_pro: "Agence nationale — Développement rural & Agriculture",
+      photo_url: null
+    })
+  }).lastInsertRowid;
+
   /* ── Compte AKOMCA — Partenaire Officiel ── */
   const akomcaUserId = insertUser.run({
     nom: "AKOMCA", email: "contact@akomca.diaspoactif.demo",
@@ -274,6 +286,87 @@ function seed() {
     1,
     "Agence conseil en coopération et communication",
     JSON.stringify(["coopération","afrique","investissement","diaspora","communication","développement","ivoirien","franco-africain","forum"])
+  );
+
+  /* ── Initiative ANADER ── */
+  const anaderInitId = insertInitiative.run({
+    slug: "anader",
+    nom: "ANADER",
+    sigle: "ANADER",
+    pays: "Côte d'Ivoire",
+    region: "Abidjan",
+    ville: "Abidjan",
+    zone: null,
+    nationalite1: "Ivoirienne",
+    nationalite2: null,
+    nationalites_concernees: JSON.stringify(["Ivoirienne"]),
+    nationalite_unique: 0,
+    origine1: "Côte d'Ivoire",
+    origine2: null,
+    rayonnement: "nationale",
+    pays_intervention: JSON.stringify([
+      {"pays":"Côte d'Ivoire","region":"Abidjan"},
+      {"pays":"Côte d'Ivoire","region":"Yamoussoukro"},
+      {"pays":"Côte d'Ivoire","region":"Bouaké"},
+      {"pays":"Côte d'Ivoire","region":"San Pedro"}
+    ]),
+    domaine: "Agriculture",
+    type: "Agence nationale",
+    membres: 3500,
+    vues: 890,
+    abonnes: 214,
+    description: "L'Agence Nationale d'Appui au Développement Rural (ANADER) est le leader du conseil agricole et rural en Côte d'Ivoire. Créée en 1993, elle accompagne les agriculteurs, éleveurs, pêcheurs et acteurs du monde rural ivoirien dans l'amélioration de leurs pratiques et la valorisation de leurs productions.",
+    mission: "Assurer le conseil agricole et rural, la formation, la mécanisation agricole et le développement local au service des communautés rurales de Côte d'Ivoire. Contribuer à la sécurité alimentaire et au développement économique durable du secteur agricole ivoirien.",
+    historique: "Créée par le décret N°93-777 du 29 Septembre 1993, l'ANADER est née de la fusion de la CIDV, la SATMACI et la SODEPRA. Société d'Économie Mixte au capital de 500 000 000 FCFA détenu à plus de 99% par l'État de Côte d'Ivoire, elle couvre l'ensemble du territoire national avec ses directions régionales et centres de formation.",
+    site_web: "https://www.anader.ci",
+    lat: 5.3600,
+    lon: -4.0083,
+  }).lastInsertRowid;
+
+  db.prepare("UPDATE initiatives SET owner_user_id = ?, abonnement_actif = 1 WHERE slug = 'anader'").run(anaderUserId);
+
+  /* ── Partenaire Officiel ANADER ── */
+  db.prepare(`
+    INSERT INTO partenaires_officiels
+      (user_id, statut, domaines_expertise, pays_intervention, services,
+       description_complete, site_web, liens_utiles, categorie,
+       niveau_visibilite, nbr_recommandations, admin_id,
+       priorite, mise_en_avant, slogan, cles_matching,
+       date_attribution, date_expiration)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),date('now','+1 year'))
+  `).run(
+    anaderUserId,
+    "active",
+    JSON.stringify(["Agriculture","Développement rural","Formation agricole","Mécanisation agricole","Génie rural","Planification locale"]),
+    JSON.stringify(["Côte d'Ivoire"]),
+    JSON.stringify([
+      "Conseil agricole et rural",
+      "Formation des agriculteurs",
+      "Mécanisation agricole",
+      "Planification et développement local",
+      "Recherche-développement agricole",
+      "Études de projets agricoles",
+      "Suivi-évaluation et étude d'impact",
+      "Genre et développement rural",
+      "Santé communautaire en milieu rural",
+      "Génie rural"
+    ]),
+    "L'ANADER est le leader du conseil agricole et rural en Côte d'Ivoire. Depuis 1993, elle accompagne les acteurs du monde rural ivoirien : agriculteurs, éleveurs, pêcheurs, artisans ruraux. Elle dispose d'un réseau de directions régionales couvrant l'ensemble du territoire national et de centres de formation spécialisés. Partenaire stratégique pour toute la diaspora ivoirienne souhaitant investir dans l'agriculture et le développement rural en Côte d'Ivoire.",
+    "https://www.anader.ci",
+    JSON.stringify([
+      {"label":"Présentation","url":"https://www.anader.ci/presentation/"},
+      {"label":"Expertises","url":"https://www.anader.ci/expertises/"},
+      {"label":"Projets & Programmes","url":"https://www.anader.ci/projets-et-programmes/"},
+      {"label":"Contact","url":"https://www.anader.ci/contact/"}
+    ]),
+    "agriculture",
+    "public",
+    18,
+    adminId,
+    9,
+    1,
+    "Leader du conseil agricole et rural en Côte d'Ivoire",
+    JSON.stringify(["agriculture","côte d'ivoire","développement rural","ivoirien","investissement agricole","formation","élevage","pêche","diaspora ivoirienne"])
   );
 
   /* ---- Abonnements démo (Jean suit 3 initiatives) ---- */
