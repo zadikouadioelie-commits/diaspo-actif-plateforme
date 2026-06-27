@@ -1560,19 +1560,19 @@ db.exec(`
   });
 })();
 
-/* ── Rétrocompatibilité : abonner les comptes existants au compte officiel ── */
-;(function backfillOfficialFollow() {
+/* backfillOfficialFollow est appelé depuis seed.js après création du compte officiel */
+function backfillOfficialFollow() {
   try {
     const official = db.prepare("SELECT id FROM users WHERE is_official=1 LIMIT 1").get();
     if (!official) return;
     const oid = official.id;
-    // Tous les utilisateurs qui ne suivent pas encore le compte officiel
     const users = db.prepare(
       "SELECT id FROM users WHERE id != ? AND id NOT IN (SELECT follower_id FROM user_follows WHERE followed_id=?)"
     ).all(oid, oid);
     const ins = db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)");
     users.forEach(u => ins.run(u.id, oid));
-  } catch(e) { /* table pas encore migrée, ignoré */ }
-})();
+  } catch(e) { /* ignoré */ }
+}
 
 module.exports = db;
+module.exports.backfillOfficialFollow = backfillOfficialFollow;

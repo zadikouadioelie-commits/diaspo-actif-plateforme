@@ -487,13 +487,18 @@ function seed() {
   insParam.run("nb_max_photos_profil",     "5",     "nombre",  "Nombre maximum de photos par profil utilisateur");
   insParam.run("signature_obligatoire",    "false", "booleen", "Exiger une signature électronique pour les initiatives");
 
-  console.log(`Seed terminé : ${legacy.INITIATIVES.length} initiatives, 5 comptes, 6 formations, ${3} abonnements démo.`);
+  // Abonner tous les comptes demo au compte officiel
+  const { backfillOfficialFollow } = db;
+  if (typeof backfillOfficialFollow === 'function') backfillOfficialFollow();
+
+  console.log(`Seed terminé : ${legacy.INITIATIVES.length} initiatives, 6 comptes, 6 formations, ${3} abonnements démo.`);
   console.log("Comptes démo (mot de passe : Demo1234!) :");
   console.log("  jean@diaspoactif.demo            → utilisateur");
   console.log("  ynouss@diaspoactif.demo          → utilisateur (profil complet)");
   console.log("  contact@aito.diaspoactif.demo    → initiative (A.I.T.O)");
   console.log("  admin@diaspoactif.demo           → administrateur");
   console.log("  consulat.senegal@diaspoactif.demo → collectivite");
+  console.log("  officiel@diaspoactif.com         → compte officiel (is_official=1)");
 }
 
 seed();
