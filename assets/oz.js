@@ -457,8 +457,10 @@
   <button class="oz-btn oz-btn-s" style="width:100%;margin-top:6px;" onclick="window.__OZ.closeSettings()">Fermer</button>
 </div>`;
 
-    // OZ est maintenant injecté dans la topbar via app.js (#ia-slots)
+    // Extraire #oz-panel du root et l'attacher au body (pour qu'il ne soit pas clipé par la topbar)
+    const panel = root.querySelector('#oz-panel');
     document.body.appendChild(root);
+    if (panel) document.body.appendChild(panel);
     showQuickChips();
   }
 
