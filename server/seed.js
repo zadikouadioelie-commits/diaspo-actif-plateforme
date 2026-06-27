@@ -670,6 +670,40 @@ function seed() {
   insParam.run("nb_max_photos_profil",     "5",     "nombre",  "Nombre maximum de photos par profil utilisateur");
   insParam.run("signature_obligatoire",    "false", "booleen", "Exiger une signature électronique pour les initiatives");
 
+  /* ===== TÉMOIGNAGES DÉMO — Ils ont rejoint Diaspo'Actif ===== */
+  const insTemo = db.prepare(`
+    INSERT OR IGNORE INTO temoignages
+      (user_id,note,description,fonctionnalites,points_positifs,suggestions,
+       type_usage,consentement_affichage,nom_affichage,pays_utilisateur,role_utilisateur,statut,score_pertinence)
+    VALUES (?,?,?,?,?,?,?,1,?,?,?,'approuve',?)
+  `);
+  insTemo.run(
+    jeanId, 4,
+    "Je cherchais des opportunités d'investissement en Afrique de l'Ouest et Diaspo'Actif m'a mis en contact avec des porteurs de projets sérieux. Une expérience vraiment positive.",
+    '["Deals","Recherche","Annuaire"]',
+    "Le système de Deals est très bien conçu, transparent et sécurisé. Les profils sont complets.",
+    "Avoir une application mobile native serait un vrai plus.",
+    "personnel", "Jean K.", "France", "utilisateur", 7.5
+  );
+  // Récupérer l'id du compte Ynouss
+  const ynoussId = db.prepare("SELECT id FROM users WHERE email='ynouss@diaspoactif.demo'").get()?.id;
+  if (ynoussId) insTemo.run(
+    ynoussId, 5,
+    "Diaspo'Actif a complètement transformé ma façon de gérer mes projets entre la France et la Côte d'Ivoire. Je trouve des partenaires fiables en quelques jours, c'est incroyable.",
+    '["Deals","Annuaire","Messagerie"]',
+    "La qualité des profils vérifiés et la facilité de mise en relation avec des acteurs sérieux.",
+    "Ajouter plus de filtres par secteur d'activité pour l'annuaire.",
+    "professionnel", "Ynouss D.", "France", "utilisateur", 9.0
+  );
+  insTemo.run(
+    initUserId, 5,
+    "Grâce à Diaspo'Actif, notre association A.I.T.O a multiplié ses partenariats en 6 mois. La plateforme nous donne une visibilité que nous n'aurions jamais pu avoir seuls.",
+    '["Initiatives","Événements","Formations"]',
+    "La section Initiatives et la possibilité d'organiser des événements directement sur la plateforme.",
+    "Intégrer un outil de gestion des adhésions pour les associations.",
+    "organisation", "A.I.T.O Toulouse", "France", "initiative", 9.5
+  );
+
   // Abonner tous les comptes demo au compte officiel
   const { backfillOfficialFollow } = db;
   if (typeof backfillOfficialFollow === 'function') backfillOfficialFollow();

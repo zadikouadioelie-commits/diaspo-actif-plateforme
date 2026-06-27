@@ -8405,7 +8405,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/temoignages/public — témoignages approuvés pour l'accueil */
     if (req.method === "GET" && pathname === "/api/temoignages/public") {
-      const limit = Math.min(parseInt(query.limit || "6", 10), 20);
+      const limit = Math.min(parseInt(parsed.query.limit || "6", 10), 20);
       const rows = db.prepare(`
         SELECT t.id, t.note, t.description, t.fonctionnalites, t.points_positifs,
                t.type_usage, t.nom_affichage, t.pays_utilisateur, t.role_utilisateur,

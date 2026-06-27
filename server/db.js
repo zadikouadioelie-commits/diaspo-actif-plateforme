@@ -1944,37 +1944,5 @@ function backfillOfficialFollow() {
     .run(`Semestre ${sem} – ${year}`, debutMois, finMois);
 })();
 
-/* ═══ TÉMOIGNAGES DÉMO — Ils ont rejoint Diaspo'Actif ═══ */
-;(function seedTemoignages() {
-  const existing = db.prepare("SELECT COUNT(*) AS n FROM temoignages").get().n;
-  if (existing > 0) return;
-  const ins = db.prepare(`
-    INSERT INTO temoignages (user_id,note,description,fonctionnalites,points_positifs,suggestions,
-      type_usage,consentement_affichage,nom_affichage,pays_utilisateur,role_utilisateur,statut,score_pertinence)
-    VALUES (?,?,?,?,?,?,?,1,?,?,?,'approuve',?)
-  `);
-  const demos = [
-    [2, 5,
-      "Diaspo'Actif a complètement transformé ma façon de gérer mes projets entre la France et la Côte d'Ivoire. Je trouve des partenaires fiables en quelques jours, c'est incroyable.",
-      '["Deals","Annuaire","Messagerie"]',
-      "La qualité des profils vérifiés et la facilité de mise en relation avec des acteurs sérieux.",
-      "Ajouter plus de filtres par secteur d'activité pour l'annuaire.",
-      "professionnel", "Ynouss D.", "France", "utilisateur", 9.0],
-    [3, 5,
-      "Grâce à Diaspo'Actif, notre association A.I.T.O a multiplié ses partenariats en 6 mois. La plateforme nous donne une visibilité que nous n'aurions jamais pu avoir seuls.",
-      '["Initiatives","Événements","Formations"]',
-      "La section Initiatives et la possibilité d'organiser des événements directement sur la plateforme.",
-      "Intégrer un outil de gestion des adhésions pour les associations.",
-      "organisation", "A.I.T.O Toulouse", "France", "initiative", 9.5],
-    [1, 4,
-      "Je cherchais des opportunités d'investissement en Afrique de l'Ouest et Diaspo'Actif m'a mis en contact avec des porteurs de projets sérieux. Une expérience vraiment positive.",
-      '["Deals","Recherche","Annuaire"]',
-      "Le système de Deals est très bien conçu, transparent et sécurisé. Les profils sont complets.",
-      "Avoir une application mobile native serait un vrai plus.",
-      "personnel", "Jean K.", "France", "utilisateur", 7.5],
-  ];
-  demos.forEach(d => ins.run(...d));
-})();
-
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
