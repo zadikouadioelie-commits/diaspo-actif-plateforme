@@ -6984,7 +6984,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/reseau — recherche d'initiatives immatriculées */
     if (req.method === "GET" && pathname === "/api/reseau") {
-      const { q, secteur, type, pays, ville, langue, services, accreditation, limit: lim } = qs;
+      const { q, secteur, type, pays, ville, langue, services, accreditation, limit: lim } = parsed.query;
       let sql = `SELECT i.* FROM initiatives i WHERE i.numero_immatriculation IS NOT NULL AND i.numero_immatriculation != '' AND (i.reseau_visible IS NULL OR i.reseau_visible=1)`;
       const params = [];
       if (q) { sql += ` AND (i.nom LIKE ? OR i.description LIKE ? OR i.domaine LIKE ?)`; params.push(`%${q}%`,`%${q}%`,`%${q}%`); }
