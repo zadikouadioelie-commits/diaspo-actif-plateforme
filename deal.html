@@ -147,6 +147,14 @@
 <script src="assets/ds.js"></script>
 
 <script>
+async function _obFetch(method, url, body) {
+  const opts = { method, credentials: 'include', headers: {} };
+  if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(url, opts);
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw Object.assign(new Error(e.error || r.statusText), { status: r.status }); }
+  return r.json();
+}
+
 const DEAL_ID = new URLSearchParams(location.search).get('id');
 let DEAL = null, PARTICIPANTS = [], MY_INIT = null, MY_PART = null, ME = null;
 let currentTab = 'dashboard';
