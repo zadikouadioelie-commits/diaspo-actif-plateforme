@@ -1942,14 +1942,14 @@
   function injectStyles() {
     const css = `
 .cb-fab {
-  position: fixed; top: 72px; right: 62px; z-index: 1100;
-  width: 48px; height: 48px; border-radius: 50%;
+  position: relative;
+  width: 40px; height: 40px; border-radius: 50%;
   background: linear-gradient(135deg, var(--orange, #ff6b00), #e55a00);
-  color: #fff; border: none; cursor: grab;
-  box-shadow: 0 3px 12px rgba(255,107,0,.5);
+  color: #fff; border: none; cursor: pointer;
+  box-shadow: 0 2px 10px rgba(255,107,0,.45);
   display: flex; align-items: center; justify-content: center;
   transition: transform .2s, box-shadow .2s;
-  border: 3px solid #fff;
+  border: 2.5px solid #fff; flex-shrink: 0;
 }
 .cb-fab:hover { transform: scale(1.08); box-shadow: 0 4px 18px rgba(255,107,0,.65); }
 .cb-fab:active { cursor: grabbing; }
@@ -1962,7 +1962,7 @@
 }
 
 .cb-panel {
-  position: fixed; top: 128px; right: 8px; z-index: 1099;
+  position: fixed; top: 64px; right: 8px; z-index: 1099;
   width: 380px; max-width: calc(100vw - 32px);
   background: #fff; border-radius: 18px;
   box-shadow: 0 8px 48px rgba(0,0,0,.2);

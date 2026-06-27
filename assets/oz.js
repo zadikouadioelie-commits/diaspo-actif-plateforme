@@ -252,19 +252,19 @@
     const s = document.createElement('style');
     s.id = 'oz-style';
     s.textContent = `
-#oz-root{position:fixed;z-index:99999;user-select:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+#oz-root{position:relative;display:inline-flex;align-items:center;z-index:auto;user-select:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --oz-bg:#fff;--oz-text:#1a1a2e;--oz-muted:#6b7280;--oz-border:#e5e7eb;
   --oz-primary:#4a90d9;--oz-acc:#10b981;--oz-sh:0 8px 32px rgba(0,0,0,.18);--oz-r:16px;}
 #oz-root.dk{--oz-bg:#1e2130;--oz-text:#f1f5f9;--oz-muted:#94a3b8;--oz-border:#334155;--oz-primary:#60a5fa;--oz-acc:#34d399;}
 
-#oz-bubble{position:absolute;width:62px;height:62px;border-radius:50%;
+#oz-bubble{position:relative;width:40px;height:40px;border-radius:50%;
   background:linear-gradient(135deg,#1a1a2e 0%,#2563eb 60%,#10b981 100%);
-  box-shadow:var(--oz-sh);cursor:grab;display:flex;align-items:center;justify-content:center;
-  font-size:28px;border:3px solid #fff;transition:transform .2s,box-shadow .2s;flex-shrink:0;}
+  box-shadow:0 2px 10px rgba(37,99,235,.35);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:18px;border:2.5px solid #fff;transition:transform .2s,box-shadow .2s;flex-shrink:0;}
 #oz-bubble:hover{transform:scale(1.08);box-shadow:0 12px 40px rgba(74,144,217,.45);}
 #oz-bubble.drag{cursor:grabbing;transform:scale(1.13);}
-#oz-bubble.sm{width:48px;height:48px;font-size:20px;}
-#oz-bubble.lg{width:78px;height:78px;font-size:36px;}
+#oz-bubble.sm{width:40px;height:40px;font-size:18px;}
+#oz-bubble.lg{width:48px;height:48px;font-size:22px;}
 
 #oz-badge{position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;
   background:#ef4444;color:#fff;font-size:10px;font-weight:800;
@@ -272,11 +272,11 @@
   animation:ozPop .3s ease-out;}
 @keyframes ozPop{from{transform:scale(0)}to{transform:scale(1)}}
 
-#oz-panel{position:absolute;width:360px;max-height:520px;background:var(--oz-bg);
+#oz-panel{position:fixed;width:360px;max-height:520px;background:var(--oz-bg);
   border-radius:var(--oz-r);box-shadow:var(--oz-sh);display:flex;flex-direction:column;
   overflow:hidden;border:1.5px solid var(--oz-border);
   opacity:0;transform:translateY(-10px) scale(.96);pointer-events:none;
-  transition:opacity .22s,transform .22s;top:56px;right:0;}
+  transition:opacity .22s,transform .22s;top:64px;right:8px;z-index:99999;}
 #oz-panel.open{opacity:1;transform:translateY(0) scale(1);pointer-events:all;}
 #oz-panel.noanim{transition:none;}
 
@@ -457,12 +457,7 @@
   <button class="oz-btn oz-btn-s" style="width:100%;margin-top:6px;" onclick="window.__OZ.closeSettings()">Fermer</button>
 </div>`;
 
-    // Position — défaut : haut droite
-    const px = _cfg.posX ?? (window.innerWidth  - 56);
-    const py = _cfg.posY ?? 72;
-    root.style.left = Math.max(0, Math.min(px, window.innerWidth  - 60)) + 'px';
-    root.style.top  = Math.max(0, Math.min(py, window.innerHeight - 60)) + 'px';
-
+    // OZ est maintenant injecté dans la topbar via app.js (#ia-slots)
     document.body.appendChild(root);
     showQuickChips();
   }

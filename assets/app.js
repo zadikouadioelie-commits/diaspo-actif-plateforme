@@ -2729,42 +2729,40 @@ document.addEventListener("DOMContentLoaded", ()=>{
     document.head.appendChild(_ozS);
   }
 
-  // ── Bande "Assistants IA" — fond visuel derrière OZ + Chatbot
-  setTimeout(function () {
-    if (document.getElementById('ia-band')) return;
+  // ── Intégrer OZ + Chatbot dans la topbar (même ligne que le sélecteur de langue)
+  function _insertIaSlots() {
+    if (document.getElementById('ia-slots')) return;
+    var tbr = document.querySelector('.topbar-right');
+    if (!tbr) return;
+    var slots = document.createElement('div');
+    slots.id = 'ia-slots';
+    slots.style.cssText = 'display:flex;align-items:center;gap:8px;flex-shrink:0;';
+    var auth = document.getElementById('auth-area');
+    tbr.insertBefore(slots, auth || null);
+  }
 
-    // Migration : reset positions pour la nouvelle bande (une seule fois)
-    if (!localStorage.getItem('da_ia_band_v1')) {
-      localStorage.removeItem('da_oz');
-      localStorage.removeItem('da_fab_pos');
-      localStorage.setItem('da_ia_band_v1', '1');
-      fetch('/api/oz/settings', { method:'PUT', credentials:'include',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ pos_x: null, pos_y: null })
-      }).catch(function(){});
+  function _moveToSlots() {
+    _insertIaSlots();
+    var slots = document.getElementById('ia-slots');
+    if (!slots) return;
+    // Chatbot FAB
+    var fab = document.getElementById('cb-fab');
+    if (fab && fab.parentElement !== slots) {
+      fab.style.position = 'relative';
+      fab.style.top = ''; fab.style.right = ''; fab.style.bottom = '';
+      slots.appendChild(fab);
     }
+    // OZ root
+    var ozRoot = document.getElementById('oz-root');
+    if (ozRoot && ozRoot.parentElement !== slots) {
+      ozRoot.style.position = 'relative';
+      ozRoot.style.top = ''; ozRoot.style.left = '';
+      slots.appendChild(ozRoot);
+    }
+  }
 
-    // Forcer OZ dans la bande
-    const ozRoot = document.getElementById('oz-root');
-    if (ozRoot) { ozRoot.style.left = (window.innerWidth - 56) + 'px'; ozRoot.style.top = '72px'; }
-
-    const band = document.createElement('div');
-    band.id = 'ia-band';
-    band.innerHTML = '<span id="ia-band-lbl">Assistants IA</span>';
-    const bs = band.style;
-    bs.position = 'fixed'; bs.top = '68px'; bs.right = '4px';
-    bs.zIndex = '99990'; bs.width = '122px'; bs.height = '62px';
-    bs.background = 'rgba(255,255,255,0.18)';
-    bs.backdropFilter = bs.webkitBackdropFilter = 'blur(10px)';
-    bs.border = '1px solid rgba(255,255,255,0.45)';
-    bs.borderRadius = '32px';
-    bs.boxShadow = '0 2px 14px rgba(0,0,0,0.10)';
-    bs.display = 'flex'; bs.alignItems = 'flex-end'; bs.justifyContent = 'center';
-    bs.paddingBottom = '5px'; bs.pointerEvents = 'none';
-    const ls = band.querySelector('#ia-band-lbl').style;
-    ls.fontSize = '9px'; ls.fontFamily = '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-    ls.color = 'rgba(0,0,0,0.38)'; ls.letterSpacing = '0.5px';
-    ls.textTransform = 'uppercase'; ls.fontWeight = '700';
-    document.body.appendChild(band);
-  }, 800);
+  // Attendre que OZ et chatbot soient chargés
+  _insertIaSlots();
+  setTimeout(_moveToSlots, 900);
+  setTimeout(_moveToSlots, 1800);
 });
