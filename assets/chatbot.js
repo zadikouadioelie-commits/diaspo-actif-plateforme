@@ -2177,7 +2177,25 @@
   function init() {
     injectStyles();
     buildWidget();
+    loadOnboarding();
   }
+
+  /* Charge le guide d'accueil interactif sur toutes les pages */
+  function loadOnboarding() {
+    if (document.getElementById('ob-styles')) return;
+    const sc = document.createElement('script');
+    sc.src = '/assets/onboarding.js';
+    sc.async = true;
+    document.head.appendChild(sc);
+  }
+
+  /* Sync : quand le tutoriel est terminé, enrichir la mémoire chatbot */
+  window.addEventListener('da:onboarding:done', function (e) {
+    const d = e.detail || {};
+    if (d.statut === 'termine') {
+      _memory.add('system', `Tutoriel d'accueil terminé (rôle: ${d.role}). L'utilisateur connaît les bases.`);
+    }
+  });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

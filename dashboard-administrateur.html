@@ -64,6 +64,7 @@
       <a href="#formations" data-section="formations">📚 Formations</a>
       <a href="#chatbot" data-section="chatbot">🧠 Mémoire Chatbot</a>
       <a href="#faq" data-section="faq">💡 Gestion FAQ</a>
+      <a href="#onboarding" data-section="onboarding">🎓 Tutoriels d'accueil</a>
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
     </aside>
 
@@ -963,6 +964,111 @@
           </div>
         </div>
       </div>
+
+      <!-- ══════════ ONBOARDING ══════════ -->
+      <section id="section-onboarding" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <h2 style="margin:0;">🎓 Tutoriels d'accueil</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Guides interactifs de première connexion — personnalisés par type de compte</p>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;" id="ob-kpis">
+          <div class="stat-card"><div class="stat-num" id="ob-k-started">—</div><div class="stat-lbl">Démarrés</div></div>
+          <div class="stat-card"><div class="stat-num" id="ob-k-finished">—</div><div class="stat-lbl">Terminés</div></div>
+          <div class="stat-card"><div class="stat-num" id="ob-k-skipped">—</div><div class="stat-lbl">Ignorés</div></div>
+          <div class="stat-card"><div class="stat-num" id="ob-k-note">—</div><div class="stat-lbl">Note moy.</div></div>
+        </div>
+
+        <!-- Taux par rôle -->
+        <div style="background:#fff;border-radius:14px;border:1px solid var(--border);padding:20px;margin-bottom:20px;">
+          <h3 style="margin:0 0 14px;font-size:1rem;">📊 Taux de complétion par rôle</h3>
+          <div id="ob-by-role" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+
+        <!-- Liste des tutoriels -->
+        <div style="background:#fff;border-radius:14px;border:1px solid var(--border);padding:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <h3 style="margin:0;font-size:1rem;">📋 Tutoriels disponibles</h3>
+          </div>
+          <div id="ob-tutorial-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+
+        <!-- Modal étapes -->
+        <div id="modal-ob-steps-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;">
+          <div style="background:#fff;border-radius:16px;width:min(700px,95vw);max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+            <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+              <h3 style="margin:0;" id="modal-ob-title">Étapes du tutoriel</h3>
+              <button onclick="closeObModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;">✕</button>
+            </div>
+            <div style="padding:20px 24px;overflow-y:auto;flex:1;" id="modal-ob-body"></div>
+            <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
+              <button onclick="openAddStepModal()" class="btn-primary" style="padding:8px 18px;border-radius:8px;font-size:13px;">+ Ajouter une étape</button>
+              <button onclick="closeObModal()" style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;">Fermer</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal ajouter/modifier étape -->
+        <div id="modal-ob-step-edit-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9001;align-items:center;justify-content:center;">
+          <div style="background:#fff;border-radius:16px;width:min(600px,95vw);max-height:80vh;overflow-y:auto;">
+            <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+              <h3 style="margin:0;" id="modal-ob-step-title">Modifier l'étape</h3>
+              <button onclick="closeObStepModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;">✕</button>
+            </div>
+            <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+              <input type="hidden" id="ob-step-id">
+              <input type="hidden" id="ob-step-tut-id">
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--muted);">TITRE *</label>
+                <input id="ob-step-titre" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;margin-top:4px;" placeholder="Titre de l'étape">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--muted);">CONTENU HTML *</label>
+                <textarea id="ob-step-contenu" rows="5" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;font-family:monospace;" placeholder="<p>Contenu HTML de l'étape...</p>"></textarea>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <label style="font-size:12px;font-weight:600;color:var(--muted);">TYPE</label>
+                  <select id="ob-step-type" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;">
+                    <option value="info">📋 Information</option>
+                    <option value="action">🎯 Action interactive</option>
+                    <option value="demo">👁️ Démonstration</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:12px;font-weight:600;color:var(--muted);">ILLUSTRATION (emoji)</label>
+                  <input id="ob-step-illus" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;margin-top:4px;" placeholder="🚀" maxlength="4">
+                </div>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--muted);">NARRATION (texte lu à voix haute)</label>
+                <textarea id="ob-step-narration" rows="2" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" placeholder="Texte pour la synthèse vocale..."></textarea>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <label style="font-size:12px;font-weight:600;color:var(--muted);">LIEN MODULE</label>
+                  <input id="ob-step-lien" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" placeholder="dashboard-utilisateur.html">
+                </div>
+                <div>
+                  <label style="font-size:12px;font-weight:600;color:var(--muted);">LABEL BOUTON</label>
+                  <input id="ob-step-lbl" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" placeholder="Accéder au module">
+                </div>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--muted);">ORDRE</label>
+                <input id="ob-step-ordre" type="number" min="0" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" placeholder="1">
+              </div>
+            </div>
+            <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
+              <button onclick="saveObStep()" class="btn-primary" style="padding:8px 20px;border-radius:8px;font-size:13px;">Enregistrer</button>
+              <button onclick="closeObStepModal()" style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;">Annuler</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- PARAMÈTRES -->
       <section id="section-parametres" style="display:none;">
@@ -2807,6 +2913,7 @@ async function submitAccordDirect(){
     chatbot:     () => switchCbTab('stats'),
     billetterie: () => loadAdminBilletterie(),
     faq:         () => loadFaqAdmin(),
+    onboarding:  () => loadObAdmin(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
@@ -5037,6 +5144,208 @@ window.openFaqModalFromSearch = openFaqModalFromSearch;
 window.filterFaqLocal       = filterFaqLocal;
 window.createFaqCat         = createFaqCat;
 window.deleteFaqCat         = deleteFaqCat;
+
+/* ═══════════════════════════════════════════
+   ONBOARDING ADMIN
+   ═══════════════════════════════════════════ */
+let _obCurrentTutId = null;
+
+async function _obFetch(method, url, body) {
+  const opts = { method, credentials:'include', headers:{} };
+  if (body) { opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
+  const r = await fetch(url, opts);
+  return r.json().catch(()=>null);
+}
+
+async function loadObAdmin() {
+  try {
+    const [stats, tuts] = await Promise.all([
+      _obFetch('GET', '/api/onboarding/admin/stats'),
+      _obFetch('GET', '/api/onboarding/admin/list'),
+    ]);
+
+    /* KPIs */
+    if (stats) {
+      document.getElementById('ob-k-started').textContent  = stats.total_started  ?? '—';
+      document.getElementById('ob-k-finished').textContent = stats.total_finished ?? '—';
+      document.getElementById('ob-k-skipped').textContent  = stats.total_skipped  ?? '—';
+      document.getElementById('ob-k-note').textContent     = stats.avg_note ? stats.avg_note.toFixed(1) + ' ⭐' : '—';
+
+      /* Taux par rôle */
+      const byRole = document.getElementById('ob-by-role');
+      if (byRole && stats.by_role?.length) {
+        byRole.innerHTML = stats.by_role.map(r => {
+          const pct = r.n ? Math.round((r.done / r.n) * 100) : 0;
+          return `<div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:120px;font-size:13px;font-weight:600;">${r.compte_type}</div>
+            <div style="flex:1;background:#f0f0f0;border-radius:4px;height:8px;overflow:hidden;">
+              <div style="width:${pct}%;background:var(--primary,#2563eb);height:8px;border-radius:4px;transition:width .5s;"></div>
+            </div>
+            <div style="width:60px;text-align:right;font-size:12px;color:var(--muted);">${pct}% (${r.done}/${r.n})</div>
+          </div>`;
+        }).join('');
+      } else if (byRole) {
+        byRole.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune donnée de complétion pour l\'instant.</p>';
+      }
+    }
+
+    /* Liste des tutoriels */
+    const list = document.getElementById('ob-tutorial-list');
+    if (!list) return;
+    if (!tuts || tuts.length === 0) {
+      list.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun tutoriel trouvé.</p>';
+      return;
+    }
+    list.innerHTML = tuts.map(t => `
+      <div style="border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span style="font-weight:700;font-size:14px;">${t.titre}</span>
+            <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${t.actif?'#f0fdf4':'#fef2f2'};color:${t.actif?'#15803d':'#dc2626'};">${t.actif?'Actif':'Inactif'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);">${t.description || ''}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">
+            Rôle : <strong>${t.compte_type}</strong> · ${t.nb_steps} étape(s) · ~${t.duree_estimee} min · v${t.version}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="openObStepsModal(${t.id},this.dataset.titre)" data-titre="${t.titre.replace(/"/g,'&quot;')}"
+            style="padding:7px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:12px;">
+            📋 Étapes
+          </button>
+          <button onclick="toggleObActive(${t.id},${t.actif?0:1})"
+            style="padding:7px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:12px;">
+            ${t.actif ? '⏸ Désactiver' : '▶ Activer'}
+          </button>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    console.error('loadObAdmin error', e);
+  }
+}
+
+async function openObStepsModal(tutId, titre) {
+  _obCurrentTutId = tutId;
+  document.getElementById('modal-ob-title').textContent = `Étapes — ${titre}`;
+  document.getElementById('modal-ob-steps-bg').style.display = 'flex';
+  await refreshObSteps();
+}
+
+async function refreshObSteps() {
+  const body = document.getElementById('modal-ob-body');
+  if (!body) return;
+  const steps = await _obFetch('GET', `/api/onboarding/admin/${_obCurrentTutId}/steps`);
+  if (!steps || steps.length === 0) {
+    body.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune étape. Cliquez "+ Ajouter une étape" pour commencer.</p>';
+    return;
+  }
+  body.innerHTML = steps.map(s => `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;">
+      <div style="font-size:32px;flex-shrink:0;">${s.illustration||'📋'}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:3px;">${s.ordre}. ${s.titre}</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Type : ${s.type} · ${s.actif?'Actif':'Inactif'}</div>
+        <div style="font-size:12px;color:#374151;line-height:1.5;">${(s.contenu||'').replace(/<[^>]+>/g,' ').substring(0,120)}…</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button onclick="editObStep(${JSON.stringify(s).replace(/"/g,'&quot;')})"
+          style="padding:5px 10px;border-radius:7px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:11px;">✏️</button>
+        <button onclick="deleteObStep(${s.id})"
+          style="padding:5px 10px;border-radius:7px;border:1.5px solid #fecaca;background:#fff;cursor:pointer;font-size:11px;color:#dc2626;">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function closeObModal() {
+  document.getElementById('modal-ob-steps-bg').style.display = 'none';
+  _obCurrentTutId = null;
+}
+
+function openAddStepModal() {
+  document.getElementById('modal-ob-step-title').textContent = 'Ajouter une étape';
+  document.getElementById('ob-step-id').value      = '';
+  document.getElementById('ob-step-tut-id').value  = _obCurrentTutId;
+  document.getElementById('ob-step-titre').value   = '';
+  document.getElementById('ob-step-contenu').value = '';
+  document.getElementById('ob-step-type').value    = 'info';
+  document.getElementById('ob-step-illus').value   = '📋';
+  document.getElementById('ob-step-narration').value = '';
+  document.getElementById('ob-step-lien').value    = '';
+  document.getElementById('ob-step-lbl').value     = '';
+  document.getElementById('ob-step-ordre').value   = '';
+  document.getElementById('modal-ob-step-edit-bg').style.display = 'flex';
+}
+
+function editObStep(s) {
+  document.getElementById('modal-ob-step-title').textContent = 'Modifier l\'étape';
+  document.getElementById('ob-step-id').value      = s.id;
+  document.getElementById('ob-step-tut-id').value  = s.tutorial_id;
+  document.getElementById('ob-step-titre').value   = s.titre;
+  document.getElementById('ob-step-contenu').value = s.contenu;
+  document.getElementById('ob-step-type').value    = s.type || 'info';
+  document.getElementById('ob-step-illus').value   = s.illustration || '📋';
+  document.getElementById('ob-step-narration').value = s.narration || '';
+  document.getElementById('ob-step-lien').value    = s.module_lien || '';
+  document.getElementById('ob-step-lbl').value     = s.module_label || '';
+  document.getElementById('ob-step-ordre').value   = s.ordre || 0;
+  document.getElementById('modal-ob-step-edit-bg').style.display = 'flex';
+}
+
+function closeObStepModal() {
+  document.getElementById('modal-ob-step-edit-bg').style.display = 'none';
+}
+
+async function saveObStep() {
+  const id       = document.getElementById('ob-step-id').value;
+  const tutId    = document.getElementById('ob-step-tut-id').value || _obCurrentTutId;
+  const payload  = {
+    titre:        document.getElementById('ob-step-titre').value.trim(),
+    contenu:      document.getElementById('ob-step-contenu').value.trim(),
+    type:         document.getElementById('ob-step-type').value,
+    illustration: document.getElementById('ob-step-illus').value.trim() || '📋',
+    narration:    document.getElementById('ob-step-narration').value.trim(),
+    module_lien:  document.getElementById('ob-step-lien').value.trim(),
+    module_label: document.getElementById('ob-step-lbl').value.trim(),
+    ordre:        parseInt(document.getElementById('ob-step-ordre').value) || 0,
+    actif:        1,
+  };
+  if (!payload.titre) { showToast('Le titre est requis', 'error'); return; }
+  if (!payload.contenu) { showToast('Le contenu est requis', 'error'); return; }
+
+  const r = id
+    ? await _obFetch('PUT',  `/api/onboarding/admin/steps/${id}`, payload)
+    : await _obFetch('POST', `/api/onboarding/admin/${tutId}/steps`, payload);
+
+  if (r?.ok || r?.id) {
+    closeObStepModal();
+    await refreshObSteps();
+    showToast(id ? 'Étape mise à jour' : 'Étape ajoutée');
+  } else {
+    showToast('Erreur lors de l\'enregistrement', 'error');
+  }
+}
+
+async function deleteObStep(id) {
+  if (!confirm('Supprimer cette étape ?')) return;
+  const r = await _obFetch('DELETE', `/api/onboarding/admin/steps/${id}`);
+  if (r?.ok) { await refreshObSteps(); showToast('Étape supprimée'); }
+}
+
+async function toggleObActive(id, actif) {
+  await _obFetch('PUT', `/api/onboarding/admin/${id}`, { actif });
+  await loadObAdmin();
+  showToast(actif ? 'Tutoriel activé' : 'Tutoriel désactivé');
+}
+
+window.loadObAdmin      = loadObAdmin;
+window.openObStepsModal = openObStepsModal;
+window.closeObModal     = closeObModal;
+window.openAddStepModal = openAddStepModal;
+window.editObStep       = editObStep;
+window.closeObStepModal = closeObStepModal;
+window.saveObStep       = saveObStep;
+window.deleteObStep     = deleteObStep;
+window.toggleObActive   = toggleObActive;
 
 /* ═══ BILLETTERIE ADMIN ═══ */
 async function loadAdminBilletterie() {

@@ -3868,6 +3868,124 @@ async function scrapeSite() {
       } catch(e) { console.error('FAQ seed error:', e.message); }
     });
   }
+
+  /* ──────── ONBOARDING ──────── */
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_tutorials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    compte_type TEXT NOT NULL UNIQUE,
+    titre TEXT NOT NULL,
+    description TEXT,
+    duree_estimee INTEGER DEFAULT 3,
+    obligatoire INTEGER DEFAULT 0,
+    actif INTEGER DEFAULT 1,
+    version INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_steps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tutorial_id INTEGER REFERENCES onboarding_tutorials(id) ON DELETE CASCADE,
+    ordre INTEGER DEFAULT 0,
+    titre TEXT NOT NULL,
+    contenu TEXT NOT NULL,
+    type TEXT DEFAULT 'info',
+    illustration TEXT DEFAULT '🚀',
+    action_selector TEXT,
+    action_label TEXT,
+    narration TEXT,
+    module_lien TEXT,
+    module_label TEXT,
+    actif INTEGER DEFAULT 1)`).run(); } catch(e){}
+
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    tutorial_id INTEGER,
+    statut TEXT DEFAULT 'en_cours',
+    etapes_completees TEXT DEFAULT '[]',
+    note INTEGER,
+    commentaire TEXT,
+    started_at TEXT DEFAULT (datetime('now')),
+    completed_at TEXT,
+    updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tutorial_id INTEGER,
+    step_id INTEGER,
+    user_id INTEGER,
+    action TEXT,
+    data TEXT,
+    created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  /* Seed tutoriels */
+  const obCount = db.prepare(`SELECT COUNT(*) c FROM onboarding_tutorials`).get()?.c || 0;
+  if (obCount === 0) {
+    const insT = db.prepare(`INSERT INTO onboarding_tutorials (compte_type,titre,description,duree_estimee,actif) VALUES (?,?,?,?,1)`);
+    const insS = db.prepare(`INSERT INTO onboarding_steps (tutorial_id,ordre,titre,contenu,type,illustration,narration,module_lien,module_label,action_selector,action_label) VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+
+    const tutorials = [
+      { type:'utilisateur', titre:"Bienvenue sur Diaspo'Actif !", description:"Découvrez votre espace personnel et les fonctionnalités essentielles.", duree:3 },
+      { type:'initiative',  titre:"Votre espace Initiative", description:"Maîtrisez votre tableau de bord et amplifiez votre impact.", duree:5 },
+      { type:'collectivite',titre:"Espace Collectivité territoriale", description:"Connectez-vous à la diaspora et pilotez vos communications.", duree:4 },
+      { type:'institution', titre:"Espace Institutionnel", description:"Pilotez vos communications et consultez l'Observatoire Diaspora.", duree:4 },
+      { type:'officiel',    titre:"Espace Officiel", description:"Communications, visioconférences et partenariats diplomatiques.", duree:4 },
+      { type:'administrateur',titre:"Panneau Administrateur", description:"Gérez la plateforme, modérez et analysez les données.", duree:5 },
+    ];
+
+    const steps = {
+      utilisateur: [
+        { ordre:1, titre:"🌍 Bienvenue sur Diaspo'Actif !", contenu:"<p><strong>Diaspo'Actif</strong> est la plateforme mondiale qui connecte les diasporas, valorise les talents et accélère le développement des territoires.</p><p>Ce guide de 3 minutes vous présente les fonctionnalités essentielles de votre espace personnel.</p>", type:'info', illus:'🌍', nar:"Bienvenue sur Diaspo'Actif ! Je suis votre guide interactif. En quelques minutes, nous allons découvrir ensemble les fonctionnalités de votre espace personnel.", lien:null, lbl:null, sel:null, albl:null },
+        { ordre:2, titre:"👤 Complétez votre profil", contenu:"<p>Votre profil est votre carte de visite numérique. Un profil complet :</p><ul><li>📈 Améliore votre <strong>Score de Confiance</strong></li><li>🔍 Vous rend visible dans les recommandations</li><li>🤝 Facilite les contacts avec d'autres membres</li></ul><p>Ajoutez votre photo, votre biographie, vos compétences et vos expériences.</p>", type:'action', illus:'👤', nar:"Commençons par compléter votre profil. Un profil complet augmente votre visibilité et votre score de confiance.", lien:'dashboard-utilisateur.html', lbl:'Ouvrir mon profil', sel:null, albl:'Compléter mon profil' },
+        { ordre:3, titre:"🔍 Explorez l'Annuaire", contenu:"<p>L'<strong>Annuaire</strong> regroupe tous les membres de Diaspo'Actif : professionnels, initiatives, associations, institutions.</p><p>Vous pouvez :</p><ul><li>🔎 Filtrer par pays, domaine, type de compte</li><li>✉️ Contacter directement par messagerie</li><li>🤖 Demander une recommandation au chatbot</li></ul>", type:'demo', illus:'🔍', nar:"L'annuaire est votre carnet d'adresses mondial. Filtrez par pays, domaine, ou décrivez ce que vous cherchez en langage naturel dans le chatbot.", lien:'annuaire.html', lbl:'Explorer l\'annuaire', sel:null, albl:null },
+        { ordre:4, titre:"✉️ La Messagerie", contenu:"<p>Échangez en privé avec n'importe quel membre de la plateforme.</p><p>Depuis la messagerie, vous pouvez :</p><ul><li>💬 Envoyer des messages texte et fichiers</li><li>📹 Démarrer une <strong>réunion vidéo</strong> instantanée</li><li>📅 Planifier une réunion</li></ul><p>Votre indice de réactivité (⭐ à ⭐⭐⭐⭐⭐) est calculé sur vos délais de réponse.</p>", type:'demo', illus:'✉️', nar:"La messagerie vous permet d'échanger en privé et de lancer des visioconférences directement.", lien:'messagerie.html', lbl:'Ouvrir la messagerie', sel:null, albl:null },
+        { ordre:5, titre:"📝 Le Fil d'actualité", contenu:"<p>Partagez vos actualités avec la communauté via le <strong>Fil d'actualité</strong>.</p><p>Publiez :</p><ul><li>📰 Articles et actualités</li><li>🎉 Annonces et opportunités</li><li>💡 Réflexions et idées</li></ul><p>Vos publications sont visibles par les membres qui vous suivent et dans les recommandations.</p>", type:'action', illus:'📝', nar:"Le fil d'actualité vous permet de partager vos nouvelles avec toute la communauté.", lien:'fil-actualite.html', lbl:'Voir le fil', sel:null, albl:'Publier maintenant' },
+        { ordre:6, titre:"🏅 Les Accréditations", contenu:"<p>Les accréditations Diaspo'Actif sont des badges officiels qui attestent votre engagement.</p><ul><li>🌱 <strong>Engagé Diaspora</strong></li><li>🌟 <strong>Mobilisation Active</strong></li><li>💎 <strong>Créateur d'Opportunités</strong></li><li>🏆 <strong>Ambassadeur Diaspora</strong></li></ul><p>Chaque accréditation augmente votre <strong>Score de Confiance de +10 points</strong>.</p>", type:'info', illus:'🏅', nar:"Les accréditations sont des badges officiels qui valorisent votre engagement. Chacune améliore votre score de confiance.", lien:'accreditations.html', lbl:'Découvrir les accréditations', sel:null, albl:null },
+        { ordre:7, titre:"🤖 Votre Assistant IA", contenu:"<p>Le <strong>chatbot Diaspo'Actif</strong> est votre guide permanent.</p><p>Il peut :</p><ul><li>🔍 Trouver les meilleurs profils pour vous</li><li>❓ Répondre à toutes vos questions</li><li>📋 Vous guider étape par étape</li><li>📚 Accéder à la base de connaissances FAQ</li></ul><p>Cliquez sur le bouton 💬 en bas à droite pour l'ouvrir !</p>", type:'action', illus:'🤖', nar:"Votre assistant intelligent est disponible à tout moment via le bouton en bas à droite. N'hésitez pas à lui poser toutes vos questions.", lien:null, lbl:null, sel:'.cb-fab', albl:'Ouvrir le chatbot' },
+      ],
+      initiative: [
+        { ordre:1, titre:"🚀 Votre espace Initiative", contenu:"<p>Bienvenue dans votre espace dédié ! En tant qu'initiative, vous avez accès à des outils puissants pour <strong>amplifier votre impact</strong>.</p><p>Ce guide de 5 minutes vous présente toutes les fonctionnalités à votre disposition.</p>", type:'info', illus:'🚀', nar:"Bienvenue dans votre espace Initiative sur Diaspo'Actif ! Vous allez découvrir tous les outils à votre disposition pour maximiser votre impact.", lien:null, lbl:null, sel:null, albl:null },
+        { ordre:2, titre:"📊 Votre Tableau de Bord", contenu:"<p>Votre tableau de bord centralise toutes vos activités :</p><ul><li>📈 Statistiques en temps réel</li><li>💬 Messages reçus</li><li>👥 Nouvelles candidatures</li><li>📅 Événements à venir</li><li>💰 Wallet et transactions</li></ul>", type:'demo', illus:'📊', nar:"Votre tableau de bord est votre centre de commande. Toutes vos activités y sont centralisées.", lien:'dashboard-initiative.html', lbl:'Mon dashboard', sel:null, albl:null },
+        { ordre:3, titre:"📢 Publications & Annonces", contenu:"<p>Depuis votre dashboard, publiez des annonces qui touchent toute la diaspora :</p><ul><li>📰 Actualités de votre initiative</li><li>📣 Communications officielles ciblées</li><li>🎯 Ciblage par pays, région, profil</li></ul><p>Vos annonces sont mises en avant sur le fil d'actualité des membres ciblés.</p>", type:'action', illus:'📢', nar:"Publiez des annonces officielles et ciblez précisément les membres que vous souhaitez atteindre.", lien:'dashboard-initiative.html', lbl:'Publier une annonce', sel:null, albl:'Créer une annonce' },
+        { ordre:4, titre:"💼 Recrutement & Offres", contenu:"<p>Recrutez des profils qualifiés de la diaspora :</p><ul><li>👔 Offres d'emploi et stages</li><li>🤝 Missions bénévoles</li><li>💡 Appels à projet</li><li>💰 Recherche de financement</li></ul><p>Les candidatures arrivent directement dans votre tableau de bord.</p>", type:'action', illus:'💼', nar:"Publiez des offres d'emploi, de stage ou de bénévolat et recevez des candidatures directement dans votre tableau de bord.", lien:'dashboard-initiative.html', lbl:'Publier une offre', sel:null, albl:null },
+        { ordre:5, titre:"📅 Créer un Événement", contenu:"<p>Organisez des événements présentiel ou en ligne :</p><ul><li>🎫 Billetterie intégrée (gratuite ou payante)</li><li>📷 Scanner QR pour valider les entrées</li><li>📹 Visioconférence intégrée</li><li>📊 Rapport de participation</li></ul>", type:'action', illus:'📅', nar:"Créez des événements avec billetterie intégrée, scanner QR et visioconférence. Tout est disponible depuis votre tableau de bord.", lien:'dashboard-initiative.html', lbl:'Créer un événement', sel:null, albl:null },
+        { ordre:6, titre:"📹 Réunions & Visioconférences", contenu:"<p>Organisez des réunions sécurisées avec vos équipes et partenaires :</p><ul><li>🎥 Visioconférence peer-to-peer</li><li>📝 Notes de réunion intégrées</li><li>📋 Compte-rendu automatique</li><li>📅 Planification avec rappels</li></ul>", type:'demo', illus:'📹', nar:"Les réunions vidéo sont intégrées directement dans la plateforme. Planifiez, invitez et démarrez en quelques clics.", lien:'reunions.html', lbl:'Ouvrir Réunions', sel:null, albl:null },
+        { ordre:7, titre:"🎴 QR Code & Vérification", contenu:"<p>Chaque initiative dispose d'un <strong>QR Code unique</strong> :</p><ul><li>📥 Téléchargeable en PNG ou SVG</li><li>🖨️ Carte de visite imprimable</li><li>🔗 Lien direct vers votre profil</li></ul><p>Faites également vérifier votre initiative pour obtenir le badge <strong>✅ Vérifié</strong> et booster votre score de confiance.</p>", type:'info', illus:'🎴', nar:"Votre QR code unique vous permet de partager votre initiative instantanément. La vérification de compte renforce votre crédibilité.", lien:'dashboard-initiative.html', lbl:'Mon QR Code', sel:null, albl:null },
+        { ordre:8, titre:"📈 Statistiques & Observatoire", contenu:"<p>Suivez l'impact de votre initiative en temps réel :</p><ul><li>👁️ Vues de profil et publications</li><li>👥 Évolution des abonnés</li><li>📊 Engagement et interactions</li><li>🌍 Répartition géographique</li></ul><p>Exportez vos données en CSV ou PDF.</p>", type:'demo', illus:'📈', nar:"Vos statistiques sont disponibles en temps réel depuis votre tableau de bord. Analysez votre impact et exportez vos données.", lien:'statistiques.html', lbl:'Voir l\'Observatoire', sel:null, albl:null },
+      ],
+      collectivite: [
+        { ordre:1, titre:"🏛️ Espace Collectivité territoriale", contenu:"<p>Bienvenue dans votre espace institutionnel. Diaspo'Actif vous offre des outils dédiés pour <strong>connecter votre territoire à sa diaspora</strong>.</p>", type:'info', illus:'🏛️', nar:"Bienvenue dans votre espace collectivité. Vous disposez d'outils puissants pour connecter votre territoire à sa diaspora.", lien:null, lbl:null, sel:null, albl:null },
+        { ordre:2, titre:"📡 Communications ciblées", contenu:"<p>Diffusez des messages officiels directement auprès des membres de votre diaspora :</p><ul><li>🎯 Ciblage par origine, résidence, compétence</li><li>📊 Statistiques de diffusion en temps réel</li><li>📅 Programmation de vos envois</li></ul>", type:'action', illus:'📡', nar:"Diffusez des communications officielles et ciblées auprès des membres de votre diaspora.", lien:'dashboard-collectivite.html', lbl:'Mon dashboard', sel:null, albl:'Envoyer une communication' },
+        { ordre:3, titre:"🗳️ Consultations & Sondages", contenu:"<p>Lancez des consultations participatives auprès de votre diaspora :</p><ul><li>📋 Questionnaires en ligne</li><li>🗳️ Sondages avec résultats en temps réel</li><li>📊 Export des résultats</li><li>💬 Collecte d'avis et suggestions</li></ul>", type:'demo', illus:'🗳️', nar:"Les consultations vous permettent de recueillir l'avis de votre diaspora sur des projets de développement.", lien:'sondages.html', lbl:'Les consultations', sel:null, albl:null },
+        { ordre:4, titre:"🌍 Observatoire Diaspora", contenu:"<p>Accédez à des données statistiques détaillées sur votre diaspora :</p><ul><li>🗺️ Répartition géographique mondiale</li><li>💼 Secteurs d'activité et compétences</li><li>📈 Évolution dans le temps</li><li>📥 Export CSV et PDF</li></ul>", type:'demo', illus:'🌍', nar:"L'observatoire mondial vous donne une vision précise de votre diaspora : où elle vit, ce qu'elle fait, comment elle évolue.", lien:'statistiques.html', lbl:'Ouvrir l\'Observatoire', sel:null, albl:null },
+        { ordre:5, titre:"📅 Événements institutionnels", contenu:"<p>Organisez des événements officiels et invitez votre diaspora :</p><ul><li>🎫 Billetterie officielle</li><li>📹 Conférences en ligne</li><li>🏛️ Réunions institutionnelles</li><li>📊 Rapport de participation</li></ul>", type:'action', illus:'📅', nar:"Créez des événements officiels avec billetterie et visioconférence intégrées.", lien:'evenements.html', lbl:'Les événements', sel:null, albl:null },
+        { ordre:6, titre:"✅ Vérification & Accréditation", contenu:"<p>Renforcez la crédibilité de votre présence institutionnelle :</p><ul><li>✅ Vérification officielle de l'entité</li><li>🏅 Badge institutionnel</li><li>🔒 Score de confiance maximal</li><li>📋 Priorité dans les recommandations</li></ul>", type:'info', illus:'✅', nar:"La vérification institutionnelle renforce votre crédibilité et vous donne accès aux fonctionnalités avancées.", lien:'accreditations.html', lbl:'Demander la vérification', sel:null, albl:null },
+      ],
+      administrateur: [
+        { ordre:1, titre:"⚙️ Panneau Administrateur", contenu:"<p>Bienvenue dans votre espace d'administration. Vous avez accès à <strong>toutes les fonctionnalités</strong> de gestion de la plateforme.</p>", type:'info', illus:'⚙️', nar:"Bienvenue dans le panneau administrateur de Diaspo'Actif. Vous avez accès à toutes les fonctionnalités de gestion.", lien:null, lbl:null, sel:null, albl:null },
+        { ordre:2, titre:"👥 Gestion des utilisateurs", contenu:"<p>Gérez tous les comptes de la plateforme :</p><ul><li>🔍 Recherche avancée par rôle, pays, statut</li><li>✏️ Modification des profils</li><li>🚫 Suspension et suppression</li><li>📊 Statistiques individuelles</li></ul>", type:'demo', illus:'👥', nar:"La gestion des utilisateurs vous permet de superviser tous les comptes et d'intervenir rapidement.", lien:'dashboard-administrateur.html', lbl:'Gestion utilisateurs', sel:null, albl:null },
+        { ordre:3, titre:"🛡️ Modération & Signalements", contenu:"<p>Maintenez la qualité de la plateforme :</p><ul><li>🚩 Traitement des signalements</li><li>📋 File de modération</li><li>⚠️ Actions correctives</li><li>📊 Tableau de bord de modération</li></ul>", type:'demo', illus:'🛡️', nar:"La modération vous permet de traiter les signalements et de maintenir la qualité des contenus.", lien:'dashboard-administrateur.html', lbl:'Modération', sel:null, albl:null },
+        { ordre:4, titre:"💡 FAQ & Tutoriels", contenu:"<p>Gérez la base de connaissances de la plateforme :</p><ul><li>📝 Créer et modifier les questions FAQ</li><li>🎓 Gérer les tutoriels d'accueil</li><li>📊 Statistiques des consultations</li><li>❓ Traiter les questions sans réponse</li></ul>", type:'action', illus:'💡', nar:"La gestion FAQ et tutoriels vous permet de maintenir une documentation toujours à jour pour les utilisateurs.", lien:'dashboard-administrateur.html', lbl:'Gestion FAQ', sel:null, albl:null },
+        { ordre:5, titre:"📊 Observatoire & Statistiques", contenu:"<p>Analysez l'activité de la plateforme en temps réel :</p><ul><li>👥 DAU / WAU / MAU</li><li>💰 Revenus et MRR</li><li>🌍 Répartition mondiale</li><li>📈 Tendances et projections</li></ul>", type:'demo', illus:'📊', nar:"L'observatoire vous donne une vision complète de l'activité et de la croissance de la plateforme.", lien:'statistiques.html', lbl:'Observatoire', sel:null, albl:null },
+        { ordre:6, titre:"⚙️ Paramètres & Configuration", contenu:"<p>Configurez la plateforme selon vos besoins :</p><ul><li>🎨 Personnalisation visuelle</li><li>🔒 Paramètres de sécurité</li><li>📧 Configuration des notifications</li><li>🔧 Modules et intégrations</li></ul>", type:'info', illus:'⚙️', nar:"Les paramètres vous permettent de configurer et personnaliser la plateforme selon les besoins.", lien:'dashboard-administrateur.html', lbl:'Paramètres', sel:null, albl:null },
+      ],
+    };
+
+    /* Alias pour institution et officiel */
+    steps.institution = steps.collectivite.map(s => ({...s, illus: s.illus === '🏛️' ? '🏢' : s.illus }));
+    steps.officiel    = steps.collectivite.map(s => ({...s, illus: s.illus === '🏛️' ? '🏴' : s.illus }));
+
+    tutorials.forEach(t => {
+      try {
+        const tr = insT.run(t.type, t.titre, t.description, t.duree);
+        const tid = tr.lastInsertRowid;
+        const ss  = steps[t.type] || steps.utilisateur;
+        ss.forEach(s => {
+          try { insS.run(tid, s.ordre, s.titre, s.contenu, s.type, s.illus, s.nar, s.lien, s.lbl, s.sel, s.albl); } catch(e){}
+        });
+      } catch(e){ console.error('Onboarding seed error:', e.message); }
+    });
+  }
 })();
 
 /* ── Helpers ── */
@@ -4223,7 +4341,7 @@ route("GET", "/api/faq/:id", async (req, res, params) => {
 route("POST", "/api/faq/:id/view", async (req, res, params, _b) => {
   const id = parseInt(params.id);
   db.prepare(`UPDATE faq_questions SET vues = vues + 1 WHERE id = ?`).run(id);
-  const user = getUser(req);
+  const user = getCurrentUser(req);
   try {
     db.prepare(`INSERT INTO faq_views (question_id, user_id, user_role) VALUES (?,?,?)`)
       .run(id, user?.id || null, user?.role || null);
@@ -4235,7 +4353,7 @@ route("POST", "/api/faq/:id/view", async (req, res, params, _b) => {
 route("POST", "/api/faq/:id/rating", async (req, res, params, body) => {
   const id      = parseInt(params.id);
   const helpful = body.helpful ? 1 : 0;
-  const user    = getUser(req);
+  const user    = getCurrentUser(req);
   db.prepare(`INSERT INTO faq_ratings (question_id, user_id, helpful, comment) VALUES (?,?,?,?)`)
     .run(id, user?.id || null, helpful, body.comment || null);
   sendJSON(res, 200, { ok: true });
@@ -4245,7 +4363,7 @@ route("POST", "/api/faq/:id/rating", async (req, res, params, body) => {
 
 /* POST /api/faq — créer une question */
 route("POST", "/api/faq", async (req, res, _p, body) => {
-  const user = getUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { category_id, compte_types, question, reponse, synonymes, mots_cles, etapes, medias, module_lien, module_label, ordre } = body;
   if (!question?.trim() || !reponse?.trim()) return sendJSON(res, 400, { error: 'Question et réponse requises' });
@@ -4271,7 +4389,7 @@ route("POST", "/api/faq", async (req, res, _p, body) => {
 
 /* PUT /api/faq/:id — modifier */
 route("PUT", "/api/faq/:id", async (req, res, params, body) => {
-  const user = getUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const id = parseInt(params.id);
   const { category_id, compte_types, question, reponse, synonymes, mots_cles, etapes, medias, module_lien, module_label, ordre, statut } = body;
@@ -4294,7 +4412,7 @@ route("PUT", "/api/faq/:id", async (req, res, params, body) => {
 
 /* PATCH /api/faq/:id/statut — changer statut (active/inactive/archived) */
 route("PATCH", "/api/faq/:id/statut", async (req, res, params, body) => {
-  const user = getUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const id     = parseInt(params.id);
   const statut = body.statut;
@@ -4305,7 +4423,7 @@ route("PATCH", "/api/faq/:id/statut", async (req, res, params, body) => {
 
 /* POST /api/faq/:id/duplicate — dupliquer */
 route("POST", "/api/faq/:id/duplicate", async (req, res, params) => {
-  const user = getUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const src = db.prepare(`SELECT * FROM faq_questions WHERE id=?`).get(parseInt(params.id));
   if (!src) return sendJSON(res, 404, { error: 'Introuvable' });
@@ -4321,7 +4439,7 @@ route("POST", "/api/faq/:id/duplicate", async (req, res, params) => {
 
 /* DELETE /api/faq/:id — supprimer */
 route("DELETE", "/api/faq/:id", async (req, res, params) => {
-  const user = getUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   db.prepare(`DELETE FROM faq_questions WHERE id=?`).run(parseInt(params.id));
   sendJSON(res, 200, { ok: true });
@@ -4329,7 +4447,7 @@ route("DELETE", "/api/faq/:id", async (req, res, params) => {
 
 /* POST /api/faq/categories — créer catégorie */
 route("POST", "/api/faq/categories", async (req, res, _p, body) => {
-  const user = getUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { nom, icone, ordre } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: 'Nom requis' });
@@ -4342,7 +4460,7 @@ route("POST", "/api/faq/categories", async (req, res, _p, body) => {
 
 /* PUT /api/faq/categories/:id — modifier catégorie */
 route("PUT", "/api/faq/categories/:id", async (req, res, params, body) => {
-  const user = getUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   db.prepare(`UPDATE faq_categories SET nom=?, icone=?, ordre=? WHERE id=?`)
     .run(body.nom||'', body.icone||'📋', parseInt(body.ordre)||0, parseInt(params.id));
@@ -4351,7 +4469,7 @@ route("PUT", "/api/faq/categories/:id", async (req, res, params, body) => {
 
 /* DELETE /api/faq/categories/:id — supprimer catégorie */
 route("DELETE", "/api/faq/categories/:id", async (req, res, params) => {
-  const user = getUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   db.prepare(`DELETE FROM faq_categories WHERE id=?`).run(parseInt(params.id));
   sendJSON(res, 200, { ok: true });
@@ -4359,7 +4477,7 @@ route("DELETE", "/api/faq/categories/:id", async (req, res, params) => {
 
 /* GET /api/faq/stats/dashboard — admin stats */
 route("GET", "/api/faq/stats/dashboard", async (req, res) => {
-  const user = getUser(req);
+  const user = getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const total_questions  = db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE statut='active'`).get()?.n || 0;
   const total_vues       = db.prepare(`SELECT SUM(vues) n FROM faq_questions`).get()?.n || 0;
@@ -4377,6 +4495,124 @@ route("GET", "/api/faq/stats/dashboard", async (req, res) => {
     top_questions, no_results_searches, top_searches,
     satisfaction: { helpful: helpful_yes, not_helpful: helpful_no, taux: taux_satisfaction },
   });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   ONBOARDING — Routes API
+   ════════════════════════════════════════════════════════════════ */
+
+/* GET /api/onboarding/:role — tutoriel + étapes pour un rôle */
+route("GET", "/api/onboarding/:role", async (req, res, params) => {
+  const role = (params.role || 'utilisateur').toLowerCase();
+  const tut  = db.prepare(`SELECT * FROM onboarding_tutorials WHERE compte_type=? AND actif=1`).get(role);
+  if (!tut) return sendJSON(res, 404, { error: 'Aucun tutoriel pour ce rôle' });
+  const steps = db.prepare(`SELECT * FROM onboarding_steps WHERE tutorial_id=? AND actif=1 ORDER BY ordre`).all(tut.id);
+  sendJSON(res, 200, { ...tut, steps });
+});
+
+/* GET /api/onboarding/progress/me — progression de l'utilisateur connecté */
+route("GET", "/api/onboarding/progress/me", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Non connecté' });
+  const row = db.prepare(`SELECT * FROM onboarding_progress WHERE user_id=? ORDER BY updated_at DESC LIMIT 1`).get(user.id);
+  sendJSON(res, 200, row || null);
+});
+
+/* POST /api/onboarding/progress — sauvegarder la progression */
+route("POST", "/api/onboarding/progress", async (req, res, _p, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Non connecté' });
+  const { tutorial_id, statut, etapes_completees, note, commentaire } = body;
+  const existing = db.prepare(`SELECT id FROM onboarding_progress WHERE user_id=? AND tutorial_id=?`).get(user.id, tutorial_id);
+  if (existing) {
+    db.prepare(`UPDATE onboarding_progress SET statut=?,etapes_completees=?,note=?,commentaire=?,updated_at=datetime('now')${statut==='termine'?",completed_at=datetime('now')":""} WHERE id=?`)
+      .run(statut, JSON.stringify(etapes_completees||[]), note||null, commentaire||null, existing.id);
+  } else {
+    db.prepare(`INSERT INTO onboarding_progress (user_id,tutorial_id,statut,etapes_completees,note,commentaire${statut==='termine'?',completed_at':''}) VALUES (?,?,?,?,?,?${statut==='termine'?",datetime('now')":''})`
+    ).run(user.id, tutorial_id||null, statut, JSON.stringify(etapes_completees||[]), note||null, commentaire||null);
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/onboarding/stats — log d'une action (start, step_complete, abandon…) */
+route("POST", "/api/onboarding/stats", async (req, res, _p, body) => {
+  const user = getCurrentUser(req);
+  const { tutorial_id, step_id, action, data } = body;
+  try {
+    db.prepare(`INSERT INTO onboarding_stats (tutorial_id,step_id,user_id,action,data) VALUES (?,?,?,?,?)`)
+      .run(tutorial_id||null, step_id||null, user?.id||null, action||'', JSON.stringify(data||{}));
+  } catch(e){}
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── ADMIN CRUD Tutoriels ── */
+
+/* GET /api/onboarding/admin/list — liste tous les tutoriels */
+route("GET", "/api/onboarding/admin/list", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const tuts = db.prepare(`SELECT t.*, (SELECT COUNT(*) FROM onboarding_steps WHERE tutorial_id=t.id AND actif=1) nb_steps FROM onboarding_tutorials t ORDER BY t.compte_type`).all();
+  sendJSON(res, 200, tuts);
+});
+
+/* PUT /api/onboarding/admin/:id — modifier un tutoriel */
+route("PUT", "/api/onboarding/admin/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const { titre, description, duree_estimee, obligatoire, actif } = body;
+  db.prepare(`UPDATE onboarding_tutorials SET titre=?,description=?,duree_estimee=?,obligatoire=?,actif=?,version=version+1,updated_at=datetime('now') WHERE id=?`)
+    .run(titre||'', description||'', parseInt(duree_estimee)||3, obligatoire?1:0, actif?1:0, parseInt(params.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/onboarding/admin/:id/steps — étapes d'un tutoriel */
+route("GET", "/api/onboarding/admin/:id/steps", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const steps = db.prepare(`SELECT * FROM onboarding_steps WHERE tutorial_id=? ORDER BY ordre`).all(parseInt(params.id));
+  sendJSON(res, 200, steps);
+});
+
+/* POST /api/onboarding/admin/:id/steps — ajouter une étape */
+route("POST", "/api/onboarding/admin/:id/steps", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const { titre, contenu, type, illustration, narration, module_lien, module_label, ordre } = body;
+  const r = db.prepare(`INSERT INTO onboarding_steps (tutorial_id,ordre,titre,contenu,type,illustration,narration,module_lien,module_label) VALUES (?,?,?,?,?,?,?,?,?)`)
+    .run(parseInt(params.id), parseInt(ordre)||0, titre||'', contenu||'', type||'info', illustration||'📋', narration||'', module_lien||null, module_label||null);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* PUT /api/onboarding/admin/steps/:id — modifier une étape */
+route("PUT", "/api/onboarding/admin/steps/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const { titre, contenu, type, illustration, narration, module_lien, module_label, ordre, actif } = body;
+  db.prepare(`UPDATE onboarding_steps SET titre=?,contenu=?,type=?,illustration=?,narration=?,module_lien=?,module_label=?,ordre=?,actif=? WHERE id=?`)
+    .run(titre||'', contenu||'', type||'info', illustration||'📋', narration||'', module_lien||null, module_label||null, parseInt(ordre)||0, actif?1:0, parseInt(params.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/onboarding/admin/steps/:id — supprimer une étape */
+route("DELETE", "/api/onboarding/admin/steps/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  db.prepare(`DELETE FROM onboarding_steps WHERE id=?`).run(parseInt(params.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/onboarding/admin/stats — statistiques globales */
+route("GET", "/api/onboarding/admin/stats", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const total_started   = db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut != 'en_cours'`).get()?.n || 0;
+  const total_finished  = db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'termine'`).get()?.n || 0;
+  const total_skipped   = db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'ignore'`).get()?.n || 0;
+  const avg_note        = db.prepare(`SELECT AVG(note) n FROM onboarding_progress WHERE note IS NOT NULL`).get()?.n;
+  const by_role         = db.prepare(`SELECT t.compte_type, COUNT(*) n, SUM(CASE WHEN p.statut='termine' THEN 1 ELSE 0 END) done FROM onboarding_progress p JOIN onboarding_tutorials t ON t.id=p.tutorial_id GROUP BY t.compte_type`).all();
+  const top_abandon     = db.prepare(`SELECT step_id, COUNT(*) n FROM onboarding_stats WHERE action='abandon' GROUP BY step_id ORDER BY n DESC LIMIT 5`).all();
+  const top_skip_steps  = db.prepare(`SELECT step_id, COUNT(*) n FROM onboarding_stats WHERE action='step_skip' GROUP BY step_id ORDER BY n DESC LIMIT 5`).all();
+  sendJSON(res, 200, { total_started, total_finished, total_skipped, avg_note, by_role, top_abandon, top_skip_steps });
 });
 
 async function handleRequest(req, res) {
