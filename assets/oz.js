@@ -110,6 +110,7 @@
   let _pending = null;
   let _recog = null;
   let _dragging = false;
+  let _dragActive = false;
   let _dragOff = { x: 0, y: 0 };
   let _dragMoved = false;
   let _settingsOpen = false;
@@ -379,11 +380,11 @@
   function bindEvents() {
     // Drag via mousedown/touchstart on bubble
     document.addEventListener('mousedown',  e => { if (e.target.closest('#oz-bubble')) startDrag(e.clientX, e.clientY, e); });
-    document.addEventListener('mousemove',  e => { if (_dragging) onDrag(e.clientX, e.clientY); });
-    document.addEventListener('mouseup',    ()  => { if (_dragging) endDrag(); });
+    document.addEventListener('mousemove',  e => { if (_dragActive) onDrag(e.clientX, e.clientY); });
+    document.addEventListener('mouseup',    ()  => { if (_dragActive) endDrag(); });
     document.addEventListener('touchstart', e => { if (e.target.closest('#oz-bubble')) startDrag(e.touches[0].clientX, e.touches[0].clientY, e); }, { passive: true });
-    document.addEventListener('touchmove',  e => { if (_dragging) { e.preventDefault(); onDrag(e.touches[0].clientX, e.touches[0].clientY); } }, { passive: false });
-    document.addEventListener('touchend',   () => { if (_dragging) endDrag(); });
+    document.addEventListener('touchmove',  e => { if (_dragActive) { e.preventDefault(); onDrag(e.touches[0].clientX, e.touches[0].clientY); } }, { passive: false });
+    document.addEventListener('touchend',   () => { if (_dragActive) endDrag(); });
 
     // Clicks
     document.addEventListener('click', e => {
@@ -464,7 +465,7 @@
     if (!root) return;
     const rect = root.getBoundingClientRect();
     _dragOff = { x: cx - rect.left, y: cy - rect.top };
-    _dragging = false; _dragMoved = false;
+    _dragActive = true; _dragging = false; _dragMoved = false;
     document.getElementById('oz-bubble')?.classList.add('drag');
   }
 
@@ -479,7 +480,7 @@
   }
 
   function endDrag() {
-    _dragging = false;
+    _dragging = false; _dragActive = false;
     document.getElementById('oz-bubble')?.classList.remove('drag');
     const root = document.getElementById('oz-root');
     if (!root) return;
