@@ -516,15 +516,36 @@ async function initAnnuaire(){
     const verifiedOnly = document.getElementById("f-verified")?.checked  || false;
     const accred       = sel("f-accred");
 
+    /* Normalisation : minuscules + trim + suppression accents */
+    const norm = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g,"");
+
     const filtered = ALL.filter(it=>{
-      if(q && !it.nom.toLowerCase().includes(q) && !(it.description||"").toLowerCase().includes(q)) return false;
-      if(nat1 && it.nationalite1 !== nat1 && it.nationalite2 !== nat1) return false;
-      if(nat2 && it.nationalite1 !== nat2 && it.nationalite2 !== nat2) return false;
-      if(orig1 && it.origine1 !== orig1 && it.origine2 !== orig1) return false;
-      if(orig2 && it.origine1 !== orig2 && it.origine2 !== orig2) return false;
-      if(paysRes && it.pays !== paysRes) return false;
-      if(region  && it.region !== region) return false;
-      if(ville   && it.ville !== ville) return false;
+      /* Extraction pays et ville de résidence depuis it.ville ("Toulouse, France") */
+      const villeParts  = (it.ville||"").split(",");
+      const itVille     = norm(villeParts[0]);
+      const itPaysVille = norm(villeParts.length > 1 ? villeParts[villeParts.length-1] : "");
+      /* it.pays = pays d'origine de la diaspora */
+      const itPaysOrig  = norm(it.pays);
+
+      if(q && !norm(it.nom).includes(norm(q)) && !norm(it.description||"").includes(norm(q))) return false;
+      /* Nationalité / origine : correspondance partielle */
+      const nat1n = norm(nat1);
+      if(nat1n && !norm(it.nationalite1||"").includes(nat1n) && !norm(it.nationalite2||"").includes(nat1n)) return false;
+      const nat2n = norm(nat2);
+      if(nat2n && !norm(it.nationalite1||"").includes(nat2n) && !norm(it.nationalite2||"").includes(nat2n)) return false;
+      const or1n = norm(orig1);
+      if(or1n && !norm(it.origine1||"").includes(or1n) && !norm(it.origine2||"").includes(or1n)) return false;
+      const or2n = norm(orig2);
+      if(or2n && !norm(it.origine1||"").includes(or2n) && !norm(it.origine2||"").includes(or2n)) return false;
+      /* Pays de résidence : cherche dans le pays extrait de it.ville ET dans it.pays */
+      if(paysRes){
+        const pr = norm(paysRes);
+        if(!itPaysVille.includes(pr) && !itPaysOrig.includes(pr)) return false;
+      }
+      /* Région : correspondance partielle */
+      if(region && !norm(it.region||"").includes(norm(region))) return false;
+      /* Ville : cherche dans la partie ville de it.ville */
+      if(ville && !itVille.includes(norm(ville))) return false;
       if(ray && it.rayonnement !== ray) return false;
       if(dom  && it.domaine !== dom) return false;
       if(type && it.type !== type) return false;
