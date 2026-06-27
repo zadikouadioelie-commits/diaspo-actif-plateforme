@@ -272,9 +272,12 @@
   animation:ozPop .3s ease-out;}
 @keyframes ozPop{from{transform:scale(0)}to{transform:scale(1)}}
 
-#oz-panel{position:fixed;width:360px;max-height:520px;background:var(--oz-bg);
-  border-radius:var(--oz-r);box-shadow:var(--oz-sh);display:flex;flex-direction:column;
-  overflow:hidden;border:1.5px solid var(--oz-border);
+#oz-panel{position:fixed;width:360px;max-height:520px;
+  --oz-bg:#fff;--oz-text:#1a1a2e;--oz-muted:#6b7280;--oz-border:#e5e7eb;
+  --oz-primary:#4a90d9;--oz-acc:#10b981;--oz-sh:0 8px 32px rgba(0,0,0,.18);--oz-r:16px;
+  background:#fff;
+  border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);display:flex;flex-direction:column;
+  overflow:hidden;border:1.5px solid #e5e7eb;
   opacity:0;transform:translateY(-10px) scale(.96);pointer-events:none;
   transition:opacity .22s,transform .22s;top:64px;right:8px;z-index:99999;}
 #oz-panel.open{opacity:1;transform:translateY(0) scale(1);pointer-events:all;}
