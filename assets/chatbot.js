@@ -1472,12 +1472,7 @@
     const savedPos = (() => {
       try { return JSON.parse(localStorage.getItem('da_fab_pos') || 'null'); } catch(e) { return null; }
     })();
-    if (savedPos) {
-      fab.style.bottom = 'auto';
-      fab.style.right  = 'auto';
-      fab.style.left   = Math.max(0, Math.min(savedPos.x, window.innerWidth  - 64)) + 'px';
-      fab.style.top    = Math.max(0, Math.min(savedPos.y, window.innerHeight - 64)) + 'px';
-    }
+    // Position sauvegardée ignorée — FAB intégré dans la topbar (#ia-slots)
 
     fab.addEventListener('mousedown', onDown);
     fab.addEventListener('touchstart', onDown, { passive: true });

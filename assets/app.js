@@ -2748,8 +2748,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
     // Chatbot FAB
     var fab = document.getElementById('cb-fab');
     if (fab && fab.parentElement !== slots) {
-      fab.style.position = 'relative';
-      fab.style.top = ''; fab.style.right = ''; fab.style.bottom = '';
+      fab.style.cssText = 'position:relative;';
       slots.appendChild(fab);
     }
     // OZ root
