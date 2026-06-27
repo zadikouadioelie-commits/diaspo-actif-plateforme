@@ -324,6 +324,762 @@
     }
   };
 
+  /* ══════════════════════════════════════════════════════════
+     TUTORIELS PAR FONCTIONNALITÉ — chacun dédié à un seul sujet
+     id = identifiant du catalogue dans tutoriels.html
+  ══════════════════════════════════════════════════════════ */
+  const STEPS_FONCTIONS = {
+
+    /* ── PROFIL ── */
+    'f-profil': {
+      badge:'🪪 Profil', couleur:'#6366f1',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Compléter votre profil public",
+          voice:"Votre profil public est votre vitrine sur Diaspo Actif. Voyons comment le rendre percutant.",
+          desc:"Un profil complet est 5× plus visible dans l'annuaire. Suivez ce guide pas à pas." },
+        { el:'.user-chip,.avatar,.profile-head', pos:'bottom',
+          titre:"📸 Photo & Nom d'affichage",
+          voice:"Commencez par ajouter une photo de profil professionnelle. Elle apparaît sur toutes vos publications.",
+          desc:"Cliquez sur votre avatar pour uploader une photo. Choisissez une image claire, de face.",
+          lien:{href:'profil.html', label:'Mon profil'} },
+        { el:null, pos:'center',
+          titre:"✍️ Biographie & Titre professionnel",
+          voice:"Rédigez une biographie courte qui résume qui vous êtes, votre secteur et vos objectifs.",
+          desc:"80 à 150 mots suffisent. Mentionnez votre domaine, vos expertises et ce que vous cherchez sur la plateforme." },
+        { el:null, pos:'center',
+          titre:"🌍 Localisation & Nationalités",
+          voice:"Renseignez votre localisation actuelle et vos nationalités. Ces données permettent aux initiatives de vous trouver.",
+          desc:"Localisation actuelle + pays d'origine. Vous pouvez en ajouter plusieurs avec justificatifs.",
+          lien:{href:'profil.html', label:'Modifier ma localisation'} },
+        { el:null, pos:'center',
+          titre:"🏷️ Domaines d'expertise",
+          voice:"Ajoutez vos domaines d'expertise pour apparaître dans les bons résultats de recherche.",
+          desc:"Agriculture, Tech, Santé, Finance… Plus vos tags sont précis, plus vous recevez d'opportunités ciblées." },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Profil optimisé !",
+          voice:"Votre profil est prêt. Un profil complet vous rend éligible au badge de vérification.",
+          desc:"Complétez maintenant votre profil pour commencer à être trouvé par la communauté." }
+      ]
+    },
+
+    /* ── QR CODE ── */
+    'f-qrcode': {
+      badge:'📱 QR Code', couleur:'#0f172a',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Votre QR Code Diaspo'Actif",
+          voice:"Votre QR Code personnel est une carte d'identité numérique unique sur la plateforme.",
+          desc:"Chaque compte dispose d'un QR Code unique qui pointe directement vers votre profil public." },
+        { el:'#qr-code-section,.qr-code-wrap,[id*="qrcode"],[class*="qrcode"]', pos:'bottom',
+          titre:"🔑 Trouver votre QR Code",
+          voice:"Votre QR Code est disponible dans votre tableau de bord, dans la section Mon QR Code.",
+          desc:"Rendez-vous dans votre tableau de bord → section 'Mon QR Code Diaspo'Actif'.",
+          lien:{href:'dashboard-utilisateur.html', label:'Mon tableau de bord'} },
+        { el:null, pos:'center',
+          titre:"📲 Partager votre QR Code",
+          voice:"Téléchargez votre QR Code ou partagez-le directement depuis votre profil.",
+          desc:"Téléchargez en PNG ou partagez le lien direct. Idéal pour vos cartes de visite, emails, réseaux sociaux." },
+        { el:null, pos:'center',
+          titre:"🔍 Scanner le QR Code d'un autre membre",
+          voice:"Utilisez l'outil de scan pour accéder directement au profil d'un autre membre.",
+          desc:"Depuis le menu principal, cliquez sur 'Scanner' pour ouvrir le lecteur QR Code.",
+          lien:{href:'scanner.html', label:'Scanner un QR Code'} },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Maîtrisez votre QR Code !",
+          voice:"Votre QR Code est votre identifiant numérique unique sur Diaspo Actif.",
+          desc:"Imprimez-le, partagez-le, scannez ceux des autres membres pour démarrer des connexions instantanées." }
+      ]
+    },
+
+    /* ── BADGES ── */
+    'f-badges': {
+      badge:'🎖️ Badges', couleur:'#b45309',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Les badges et certifications",
+          voice:"Les badges valorisent votre engagement et votre crédibilité sur la plateforme.",
+          desc:"Chaque badge se débloque en accomplissant des actions spécifiques sur la plateforme." },
+        { el:null, pos:'center',
+          titre:"🥇 Types de badges",
+          voice:"Il existe trois catégories de badges : profil, activité et certification.",
+          desc:"• 🪪 Profil vérifié — identité validée\n• 🌟 Membre actif — publications et interactions\n• 🏅 Partenaire certifié — statut officiel" },
+        { el:null, pos:'center',
+          titre:"📈 Comment débloquer des badges",
+          voice:"Complétez votre profil, publiez régulièrement et vérifiez votre identité pour débloquer des badges.",
+          desc:"Complétez 100% du profil → badge Profil complet. 10 publications → badge Contributeur. Vérification → badge Certifié.",
+          lien:{href:'profil.html', label:'Voir mes badges'} },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Démarrez votre collection !",
+          voice:"Les badges renforcent votre crédibilité et augmentent votre visibilité dans l'annuaire.",
+          desc:"Commencez par vérifier votre identité pour obtenir le badge de confiance." }
+      ]
+    },
+
+    /* ── CONFIDENTIALITÉ ── */
+    'f-confidentialite': {
+      badge:'🔒 Confidentialité', couleur:'#374151',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Gérer votre confidentialité",
+          voice:"Diaspo Actif vous donne un contrôle total sur la visibilité de vos informations.",
+          desc:"Choisissez précisément qui peut voir chaque partie de votre profil et de vos activités." },
+        { el:null, pos:'center',
+          titre:"👁️ Niveaux de visibilité",
+          voice:"Trois niveaux sont disponibles : public, membres uniquement, et privé.",
+          desc:"• 🌍 Public — visible par tous les visiteurs\n• 👥 Membres — visible uniquement aux connectés\n• 🔒 Privé — visible uniquement par vous" },
+        { el:null, pos:'center',
+          titre:"⚙️ Paramétrer votre profil",
+          voice:"Accédez aux paramètres de confidentialité depuis votre profil ou votre tableau de bord.",
+          desc:"Choisissez la visibilité de votre email, téléphone, localisation précise et historique d'activité.",
+          lien:{href:'profil.html', label:'Paramètres de confidentialité'} },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Votre vie privée est protégée !",
+          voice:"Vous contrôlez totalement ce que les autres voient de votre profil.",
+          desc:"Vous pouvez modifier ces paramètres à tout moment depuis votre profil." }
+      ]
+    },
+
+    /* ── PUBLICATION ── */
+    'f-publication': {
+      badge:'📝 Publication', couleur:'#1e3a8a',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Publier une actualité",
+          voice:"Publiez vos actualités, réalisations et opportunités directement dans le fil de la communauté.",
+          desc:"Vos publications touchent tous vos abonnés et apparaissent dans le fil d'actualité." },
+        { el:'#post-compose,.post-compose,[id*="compose"],textarea[placeholder*="publi"],textarea[placeholder*="actualit"]', pos:'bottom',
+          titre:"✍️ Rédiger votre publication",
+          voice:"Cliquez dans la zone de texte en haut du fil pour commencer à rédiger votre publication.",
+          desc:"Tapez votre texte, ajoutez des emojis, des hashtags pour améliorer la visibilité.",
+          lien:{href:'fil-actualite.html', label:'Ouvrir le Fil'} },
+        { el:null, pos:'center',
+          titre:"📎 Enrichir votre publication",
+          voice:"Ajoutez des images, des liens, des sondages ou des événements à votre publication.",
+          desc:"• 🖼️ Photos & vidéos\n• 🔗 Liens avec aperçu\n• 📊 Sondages\n• 📅 Événements\n• 📁 Documents" },
+        { el:null, pos:'center',
+          titre:"🎯 Cibler votre audience",
+          voice:"Choisissez si votre publication est publique, réservée aux membres ou ciblée par pays.",
+          desc:"Public = tout le monde. Membres = connectés uniquement. Vous pouvez aussi cibler par pays ou secteur." },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Publiez et engagez la communauté !",
+          voice:"Une publication hebdomadaire suffit pour rester visible et actif dans la communauté.",
+          desc:"Les publications avec images génèrent 3× plus d'interactions. Commencez maintenant !" }
+      ]
+    },
+
+    /* ── MESSAGERIE ── */
+    'f-messagerie': {
+      badge:'💬 Messagerie', couleur:'#7c3aed',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Utiliser la messagerie privée",
+          voice:"La messagerie privée vous permet de contacter directement n'importe quel membre ou initiative.",
+          desc:"Conversations directes, partage de fichiers, notifications en temps réel." },
+        { el:'a[href="messagerie.html"]', pos:'bottom',
+          titre:"💬 Accéder à la messagerie",
+          voice:"Cliquez sur l'icône message dans la barre de navigation pour accéder à vos conversations.",
+          desc:"Ou depuis un profil, cliquez sur le bouton 'Contacter' pour démarrer une conversation.",
+          lien:{href:'messagerie.html', label:'Ouvrir la messagerie'} },
+        { el:null, pos:'center',
+          titre:"✉️ Démarrer une conversation",
+          voice:"Cliquez sur Nouvelle conversation, cherchez le membre et tapez votre message.",
+          desc:"Nouveau message → cherchez le nom → rédigez → envoyez. Vous pouvez joindre des fichiers PDF, images, documents." },
+        { el:null, pos:'center',
+          titre:"🔔 Notifications de messages",
+          voice:"Vous recevez une notification en temps réel dès qu'un message arrive.",
+          desc:"Badge rouge sur l'icône messagerie dans la navbar. Notifications push si activées sur votre navigateur." },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Commencez à échanger !",
+          voice:"La messagerie est le meilleur moyen de transformer une connexion en collaboration concrète.",
+          desc:"Contactez une initiative ou un membre qui vous intéresse dès maintenant." }
+      ]
+    },
+
+    /* ── CONNEXION ── */
+    'f-connexion': {
+      badge:'🤝 Connexion', couleur:'#15803d',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Envoyer une demande de connexion",
+          voice:"Les connexions sont le cœur de votre réseau sur Diaspo Actif.",
+          desc:"Connectez-vous avec des membres, des initiatives et des partenaires pour élargir votre réseau." },
+        { el:'a[href="annuaire.html"]', pos:'bottom',
+          titre:"🔍 Trouver un profil à connecter",
+          voice:"Utilisez l'annuaire pour trouver des profils selon leurs domaines, leur localisation ou leur nationalité.",
+          desc:"Annuaire → filtrez par domaine, pays, type de compte → cliquez sur un profil.",
+          lien:{href:'annuaire.html', label:"Ouvrir l'annuaire"} },
+        { el:null, pos:'center',
+          titre:"➕ Envoyer la demande",
+          voice:"Sur le profil du membre, cliquez sur le bouton Se connecter pour envoyer votre demande.",
+          desc:"Cliquez 'Se connecter' → la demande est envoyée. Vous pouvez ajouter un message personnalisé." },
+        { el:null, pos:'center',
+          titre:"✅ Gérer vos demandes reçues",
+          voice:"Retrouvez vos demandes de connexion reçues dans votre tableau de bord ou vos notifications.",
+          desc:"Tableau de bord → Connexions → Demandes reçues. Acceptez ou refusez en un clic.",
+          lien:{href:'dashboard-utilisateur.html', label:'Mes connexions'} }
+      ]
+    },
+
+    /* ── ÉVÉNEMENT ── */
+    'f-evenement': {
+      badge:'📅 Événement', couleur:'#0369a1',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Créer un événement",
+          voice:"Organisez un événement diaspora et touchez des milliers de membres ciblés.",
+          desc:"Webinaires, ateliers, conférences, rencontres — tous types d'événements en ligne ou en présentiel." },
+        { el:'a[href="evenements.html"]', pos:'bottom',
+          titre:"📅 Accéder aux événements",
+          voice:"Cliquez sur Événements dans le menu pour accéder à l'espace de création.",
+          desc:"Menu → Événements → bouton '+ Créer un événement'.",
+          lien:{href:'evenements.html', label:'Gérer mes événements'} },
+        { el:null, pos:'center',
+          titre:"📋 Informations de l'événement",
+          voice:"Renseignez le titre, la description, la date, le lieu et le type d'événement.",
+          desc:"• Titre accrocheur\n• Description détaillée\n• Date & heure (fuseau horaire)\n• Lieu ou lien visioconférence\n• Catégorie (formation, réseau, culture…)" },
+        { el:null, pos:'center',
+          titre:"🎯 Cibler les participants",
+          voice:"Définissez votre audience cible par pays, secteur ou type de compte.",
+          desc:"Ciblez vos invitations : tous les membres, par pays d'origine, par secteur d'activité." },
+        { el:null, pos:'center',
+          titre:"📢 Promouvoir votre événement",
+          voice:"Votre événement est automatiquement promu dans le fil d'actualité et le calendrier diaspora.",
+          desc:"Publication automatique dans le fil + calendrier communautaire + notifications aux membres ciblés." },
+        { el:null, pos:'center', cta:'initiative',
+          titre:"✅ Votre événement est prêt !",
+          voice:"Votre événement sera visible par des milliers de membres de la diaspora.",
+          desc:"Créez votre premier événement et invitez votre réseau dès maintenant." }
+      ]
+    },
+
+    /* ── BILLETTERIE ── */
+    'f-billetterie': {
+      badge:'🎫 Billetterie', couleur:'#7c3aed',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Créer une billetterie",
+          voice:"La billetterie intégrée vous permet de vendre et gérer des billets directement sur la plateforme.",
+          desc:"Événements payants, entrées gratuites avec inscription, billets VIP — tout est gérable depuis Diaspo'Actif." },
+        { el:null, pos:'center',
+          titre:"🎟️ Configurer vos billets",
+          voice:"Créez plusieurs types de billets : entrée standard, VIP, en ligne ou présentiel.",
+          desc:"• Types de billets (Standard / VIP / Gratuit)\n• Nombre de places disponibles\n• Prix et devise\n• Date limite de vente",
+          lien:{href:'billetterie.html', label:'Gérer ma billetterie'} },
+        { el:null, pos:'center',
+          titre:"💳 Paiement & Validation",
+          voice:"Les participants paient en ligne et reçoivent leur billet par email avec QR Code d'entrée.",
+          desc:"Paiement sécurisé → email automatique avec QR Code → scan à l'entrée de l'événement." },
+        { el:null, pos:'center', cta:'initiative',
+          titre:"✅ Votre billetterie est active !",
+          voice:"Gérez vos ventes, remboursements et listes d'invités depuis votre tableau de bord.",
+          desc:"Tableau de bord → Billetterie → suivez vos ventes en temps réel." }
+      ]
+    },
+
+    /* ── AGENDA ── */
+    'f-agenda': {
+      badge:'📆 Agenda', couleur:'#0f766e',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Utiliser votre agenda",
+          voice:"Votre agenda centralise tous vos rendez-vous, réunions et événements sur la plateforme.",
+          desc:"Synchronisez vos événements, planifiez des rendez-vous et recevez des rappels automatiques." },
+        { el:'a[href="evenements.html"]', pos:'bottom',
+          titre:"📆 Accéder à l'agenda",
+          voice:"Accédez à votre agenda depuis le menu Événements ou votre tableau de bord.",
+          desc:"Menu → Événements → vue Agenda. Ou Tableau de bord → section Calendrier.",
+          lien:{href:'evenements.html', label:'Mon agenda'} },
+        { el:null, pos:'center',
+          titre:"📌 Ajouter un rendez-vous",
+          voice:"Créez des rendez-vous individuels ou collectifs avec d'autres membres de la plateforme.",
+          desc:"+ Nouveau rendez-vous → titre, participants, date, lieu ou lien visio. Les invités reçoivent une notification." },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Organisez votre temps !",
+          voice:"Votre agenda est synchronisable avec Google Calendar et les autres outils de planification.",
+          desc:"Retrouvez tous vos événements, réunions et rendez-vous diaspora au même endroit." }
+      ]
+    },
+
+    /* ── DEAL ── */
+    'f-deal': {
+      badge:'🤝 Deal', couleur:'#15803d',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Créer un Deal de collaboration",
+          voice:"Un Deal est une proposition de collaboration ouverte à toute la communauté diaspora.",
+          desc:"Offres d'emploi, bénévolat, partenariat, prestation de service — publiez et recevez des candidatures." },
+        { el:'a[href="offres.html"],a[href="deals.html"]', pos:'bottom',
+          titre:"📋 Accéder aux Deals",
+          voice:"Accédez aux Deals depuis le menu principal de la plateforme.",
+          desc:"Menu → Deals / Offres → bouton '+ Créer un Deal'.",
+          lien:{href:'offres.html', label:'Créer un Deal'} },
+        { el:null, pos:'center',
+          titre:"✍️ Rédiger votre Deal",
+          voice:"Décrivez précisément votre besoin, les compétences requises et les conditions proposées.",
+          desc:"• Type (emploi / bénévolat / partenariat / prestation)\n• Description détaillée\n• Compétences recherchées\n• Durée et rémunération\n• Localisation ou distanciel" },
+        { el:null, pos:'center',
+          titre:"🎯 Cibler les bons profils",
+          voice:"Définissez les critères de votre Deal pour attirer les profils correspondants.",
+          desc:"Pays cible, secteur, niveau d'expérience, disponibilité. Les profils correspondants reçoivent une notification." },
+        { el:null, pos:'center', cta:'initiative',
+          titre:"✅ Votre Deal est publié !",
+          voice:"Votre Deal est maintenant visible par des milliers de membres qualifiés.",
+          desc:"Gérez vos candidatures depuis le tableau de bord → section Mes Deals." }
+      ]
+    },
+
+    /* ── PROJET ── */
+    'f-projet': {
+      badge:'📋 Projet', couleur:'#1e3a8a',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Créer un projet collaboratif",
+          voice:"La gestion de projet intégrée vous permet de collaborer avec des membres de la diaspora monde entier.",
+          desc:"Lancez un projet, invitez des membres, assignez des tâches et suivez l'avancement en temps réel." },
+        { el:null, pos:'center',
+          titre:"🚀 Lancer un projet",
+          voice:"Depuis votre tableau de bord, créez un nouveau projet et définissez ses objectifs.",
+          desc:"Tableau de bord → Mes Projets → Nouveau Projet → nom, description, date de livraison, membres.",
+          lien:{href:'dashboard-utilisateur.html', label:'Mes projets'} },
+        { el:null, pos:'center',
+          titre:"👥 Inviter des collaborateurs",
+          voice:"Invitez des membres depuis l'annuaire ou parmi vos connexions existantes.",
+          desc:"Recherchez des profils par compétences → Inviter au projet → ils reçoivent une notification." },
+        { el:null, pos:'center',
+          titre:"✅ Assigner des tâches",
+          voice:"Créez des tâches, assignez-les aux membres et suivez la progression avec un tableau Kanban.",
+          desc:"Tâches → Assigner → Délai → Statut (À faire / En cours / Terminé). Notifications automatiques." },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Votre projet collaboratif est lancé !",
+          voice:"Collaborez avec des talents diaspora du monde entier sur vos projets.",
+          desc:"Créez votre premier projet et invitez vos connexions à rejoindre l'aventure." }
+      ]
+    },
+
+    /* ── CONTRAT ── */
+    'f-contrat': {
+      badge:'📄 Contrat', couleur:'#374151',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Signer un contrat sur Diaspo'Actif",
+          voice:"La signature électronique intégrée vous permet de formaliser vos collaborations sans quitter la plateforme.",
+          desc:"Contrats de prestation, accords de partenariat, lettres de mission — signés et archivés en ligne." },
+        { el:null, pos:'center',
+          titre:"📝 Créer un contrat",
+          voice:"Utilisez un modèle existant ou rédigez votre propre contrat depuis votre tableau de bord.",
+          desc:"Tableau de bord → Contrats → Nouveau contrat → choisir un modèle ou rédiger librement.",
+          lien:{href:'dashboard-utilisateur.html', label:'Mes contrats'} },
+        { el:null, pos:'center',
+          titre:"✍️ Signature électronique",
+          voice:"Envoyez le contrat aux signataires. Chacun reçoit un email avec un lien de signature sécurisé.",
+          desc:"Ajoutez les signataires → envoyez → chaque partie signe électroniquement avec horodatage légal." },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Vos collaborations sont sécurisées !",
+          voice:"Les contrats signés sont archivés et téléchargeables en PDF depuis votre espace.",
+          desc:"Retrouvez tous vos contrats signés et en attente dans Tableau de bord → Contrats." }
+      ]
+    },
+
+    /* ── VISIOCONFÉRENCE ── */
+    'f-visio': {
+      badge:'📹 Visioconférence', couleur:'#0369a1',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Organiser une visioconférence",
+          voice:"Lancez des appels vidéo directs ou planifiez des réunions avec plusieurs membres diaspora.",
+          desc:"Appels vidéo HD, réunions de groupe, partage d'écran — directement intégrés à la plateforme." },
+        { el:'a[href="messagerie.html"]', pos:'bottom',
+          titre:"📹 Lancer un appel vidéo",
+          voice:"Dans la messagerie, cliquez sur l'icône caméra pour démarrer un appel vidéo direct.",
+          desc:"Messagerie → ouvrez une conversation → icône 📹 → appel vidéo HD lancé instantanément.",
+          lien:{href:'messagerie.html', label:'Messagerie'} },
+        { el:null, pos:'center',
+          titre:"📅 Planifier une réunion",
+          voice:"Planifiez une réunion avec plusieurs participants et envoyez les invitations automatiquement.",
+          desc:"Agenda → Nouvelle réunion → invitez jusqu'à 50 participants → lien de réunion généré automatiquement.",
+          lien:{href:'reunions.html', label:'Mes réunions'} },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Réunissez votre réseau !",
+          voice:"Les réunions sont enregistrables et les liens restent actifs pour les absents.",
+          desc:"Partage d'écran, tableau blanc, chat en direct — tout ce qu'il faut pour une réunion productive." }
+      ]
+    },
+
+    /* ── RECHERCHE ── */
+    'f-recherche': {
+      badge:'🔍 Recherche', couleur:'#6366f1',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Effectuer une recherche avancée",
+          voice:"Le moteur de recherche Diaspo Actif vous permet de trouver n'importe quel profil, initiative ou contenu.",
+          desc:"Recherche par mots-clés, filtres avancés, localisation, secteur et bien plus encore." },
+        { el:'a[href="recherche.html"],input[type="search"],#search-input,.search-input', pos:'bottom',
+          titre:"🔍 Accéder à la recherche",
+          voice:"Cliquez sur la loupe dans la barre de navigation ou accédez à la page Recherche avancée.",
+          desc:"Barre de navigation → icône 🔍 pour une recherche rapide. Page Recherche pour les filtres avancés.",
+          lien:{href:'recherche.html', label:'Recherche avancée'} },
+        { el:null, pos:'center',
+          titre:"🎛️ Utiliser les filtres",
+          voice:"Affinez vos résultats avec les filtres par type, pays, secteur et disponibilité.",
+          desc:"• Type (membre / initiative / événement / deal)\n• Pays d'origine ou de résidence\n• Secteur d'activité\n• Disponibilité et statut" },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Trouvez exactement ce que vous cherchez !",
+          voice:"La recherche avancée indexe tous les profils, initiatives et contenus de la plateforme.",
+          desc:"Combinez plusieurs filtres pour des résultats ultra-précis." }
+      ]
+    },
+
+    /* ── O-Z ASSISTANT ── */
+    'f-oz': {
+      badge:'🤖 O-Z', couleur:'#1e3a8a',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Utiliser O-Z, votre assistant IA",
+          voice:"O-Z est l'assistant intelligent de Diaspo Actif, disponible vingt-quatre heures sur vingt-quatre.",
+          desc:"Posez n'importe quelle question à O-Z : navigation, recherche, aide, recommandations." },
+        { el:'#oz-fab,.oz-fab,#chatbot-fab', pos:'top',
+          titre:"🤖 Ouvrir O-Z",
+          voice:"Cliquez sur l'icône O-Z en bas à droite de l'écran pour ouvrir le chat.",
+          desc:"L'icône est toujours visible en bas à droite. Cliquez dessus pour démarrer une conversation." },
+        { el:null, pos:'center',
+          titre:"💬 Exemples de questions",
+          voice:"Vous pouvez demander à O-Z de trouver des profils, d'expliquer une fonctionnalité ou de vous guider.",
+          desc:"• 'Trouve-moi des initiatives en agriculture au Sénégal'\n• 'Comment créer un événement ?'\n• 'Montre-moi les derniers Deals disponibles'\n• 'Qui peut m'aider avec du financement ?'" },
+        { el:null, pos:'center',
+          titre:"🌐 O-Z parle plusieurs langues",
+          voice:"O-Z comprend le français, l'anglais, l'espagnol, le portugais et l'arabe.",
+          desc:"Écrivez dans la langue de votre choix. O-Z s'adapte automatiquement à votre langue." },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ O-Z est votre copilote !",
+          voice:"O-Z apprend de vos préférences pour vous proposer des recommandations de plus en plus pertinentes.",
+          desc:"Essayez maintenant en posant votre première question à O-Z !" }
+      ]
+    },
+
+    /* ── GROUPES ── */
+    'f-groupes': {
+      badge:'👥 Groupes', couleur:'#7c3aed',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Créer et gérer un groupe",
+          voice:"Les groupes permettent de rassembler des membres autour d'un thème, d'un pays ou d'un projet commun.",
+          desc:"Groupes publics, privés ou secrets — vous contrôlez l'accès et l'animation." },
+        { el:null, pos:'center',
+          titre:"➕ Créer un groupe",
+          voice:"Depuis le menu, accédez à Groupes et cliquez sur Créer un groupe.",
+          desc:"Nom → description → catégorie → type (public / privé / secret) → photo de couverture → créer.",
+          lien:{href:'fil-actualite.html', label:'Accéder aux groupes'} },
+        { el:null, pos:'center',
+          titre:"📢 Animer votre groupe",
+          voice:"Publiez du contenu, organisez des discussions et des événements exclusifs pour vos membres.",
+          desc:"Publications exclusives, sondages de groupe, événements réservés aux membres, annonces." },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Votre communauté vous attend !",
+          voice:"Les groupes actifs attirent de nouveaux membres automatiquement via l'algorithme de recommandation.",
+          desc:"Créez votre groupe et invitez vos connexions à rejoindre la communauté." }
+      ]
+    },
+
+    /* ── VÉRIFICATION ── */
+    'f-verification': {
+      badge:'✅ Vérification', couleur:'#15803d',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Faire vérifier votre compte",
+          voice:"La vérification d'identité renforce votre crédibilité et débloque des fonctionnalités avancées.",
+          desc:"Un compte vérifié obtient un badge de confiance visible par toute la communauté." },
+        { el:null, pos:'center',
+          titre:"📋 Documents requis",
+          voice:"Préparez une pièce d'identité valide et un justificatif de domicile récent.",
+          desc:"• Passeport ou carte d'identité nationale\n• Justificatif de domicile de moins de 3 mois\n• Photo de profil claire (optionnel)" },
+        { el:null, pos:'center',
+          titre:"📤 Soumettre votre dossier",
+          voice:"Depuis votre profil, accédez à la section Vérification et uploadez vos documents.",
+          desc:"Profil → section Vérification → uploader les documents → soumettre. Traitement sous 24-48h.",
+          lien:{href:'profil.html', label:'Demander la vérification'} },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Badge de confiance débloqué !",
+          voice:"Une fois vérifié, votre badge apparaît sur votre profil, vos publications et dans l'annuaire.",
+          desc:"Les membres vérifiés reçoivent 2× plus de réponses à leurs demandes de connexion." }
+      ]
+    },
+
+    /* ── STATS UTILISATEUR ── */
+    'f-stats': {
+      badge:'📊 Statistiques', couleur:'#0f766e',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Comprendre vos statistiques",
+          voice:"Vos statistiques vous montrent l'impact de votre présence sur la plateforme.",
+          desc:"Vues du profil, interactions, croissance du réseau — tout est mesuré en temps réel." },
+        { el:'a[href="dashboard-utilisateur.html"],a[href="dashboard-initiative.html"]', pos:'bottom',
+          titre:"📈 Accéder aux statistiques",
+          voice:"Retrouvez vos statistiques dans votre tableau de bord, section Statistiques.",
+          desc:"Tableau de bord → section Statistiques. Vue quotidienne, hebdomadaire ou mensuelle.",
+          lien:{href:'dashboard-utilisateur.html', label:'Mon tableau de bord'} },
+        { el:null, pos:'center',
+          titre:"🔑 Indicateurs clés",
+          voice:"Suivez les vues de votre profil, le nombre de connexions, les interactions sur vos publications.",
+          desc:"• 👁️ Vues du profil\n• 🤝 Nouvelles connexions\n• 💬 Interactions (likes, commentaires)\n• 📢 Portée de vos publications\n• 🔍 Apparitions dans la recherche" },
+        { el:null, pos:'center', cta:'utilisateur',
+          titre:"✅ Optimisez votre présence !",
+          voice:"Analysez vos statistiques pour identifier ce qui fonctionne et amplifier votre impact.",
+          desc:"Publiez aux heures de pointe et complétez votre profil pour booster vos statistiques." }
+      ]
+    },
+
+    /* ── ADMIN : GESTION UTILISATEURS ── */
+    'a-users': {
+      badge:'👥 Admin — Utilisateurs', couleur:'#374151',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Gérer les utilisateurs",
+          voice:"Le dashboard administrateur vous donne un accès complet à tous les comptes de la plateforme.",
+          desc:"Recherchez, vérifiez, suspendez ou modifiez n'importe quel compte depuis le dashboard." },
+        { el:'a[href="dashboard-administrateur.html"]', pos:'bottom',
+          titre:"🖥️ Accéder à la gestion",
+          voice:"Depuis le dashboard admin, accédez à la section Utilisateurs.",
+          desc:"Dashboard → section Utilisateurs → liste complète avec filtres.",
+          lien:{href:'dashboard-administrateur.html', label:'Dashboard Admin'} },
+        { el:null, pos:'center',
+          titre:"🔍 Rechercher un compte",
+          voice:"Cherchez un utilisateur par nom, email, rôle ou statut de vérification.",
+          desc:"Filtres : nom, email, rôle, pays, statut (actif / suspendu / vérifié), date d'inscription." },
+        { el:null, pos:'center',
+          titre:"⚙️ Actions disponibles",
+          voice:"Pour chaque compte, vous pouvez voir le profil, modifier le rôle, vérifier, suspendre ou supprimer.",
+          desc:"• Voir le profil public\n• Modifier le rôle\n• Accorder/révoquer la vérification\n• Suspendre le compte\n• Supprimer définitivement" },
+        { el:null, pos:'center', cta:'administrateur',
+          titre:"✅ Maîtrisez la gestion des comptes !",
+          voice:"Toutes les actions sont tracées dans les logs d'administration pour audit.",
+          desc:"Chaque action est horodatée et conservée dans les logs pour traçabilité complète." }
+      ]
+    },
+
+    /* ── ADMIN : MODÉRATION TÉMOIGNAGES ── */
+    'a-temoignages': {
+      badge:'💬 Admin — Témoignages', couleur:'#374151',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Modérer les témoignages",
+          voice:"Les témoignages soumis par les membres doivent être approuvés avant publication sur l'accueil.",
+          desc:"Système de score automatique + validation manuelle avant affichage sur la homepage." },
+        { el:'a[href="dashboard-administrateur.html"]', pos:'bottom',
+          titre:"💬 Accéder aux témoignages",
+          voice:"Dashboard admin, section Témoignages.",
+          desc:"Dashboard → Témoignages → liste de tous les avis soumis avec leur score de pertinence.",
+          lien:{href:'dashboard-administrateur.html', label:'Dashboard Admin'} },
+        { el:null, pos:'center',
+          titre:"⭐ Score de pertinence automatique",
+          voice:"Chaque témoignage reçoit un score automatique basé sur sa longueur, sa note et son contenu.",
+          desc:"Score calculé sur : longueur (2 pts), note ≥4 (2 pts), points positifs (1 pt), suggestions (1 pt), consentement (1 pt). Max : 7 pts." },
+        { el:null, pos:'center', cta:'administrateur',
+          titre:"✅ Modérez et valorisez les avis !",
+          voice:"Les témoignages approuvés apparaissent automatiquement dans le carousel de la page d'accueil.",
+          desc:"Approuvés → affichés homepage. Refusés → notifiés à l'auteur. Signalés → mis de côté pour examen." }
+      ]
+    },
+
+    /* ── ADMIN : PARTENAIRES ── */
+    'a-partenaires': {
+      badge:'🏅 Admin — Partenaires', couleur:'#b45309',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Gérer les Partenaires Officiels",
+          voice:"Les Partenaires Officiels bénéficient d'une visibilité prioritaire sur toute la plateforme.",
+          desc:"Attribuez le statut, configurez la visibilité et gérez les partenariats depuis le dashboard." },
+        { el:'a[href="dashboard-administrateur.html"]', pos:'bottom',
+          titre:"🏅 Section Partenaires",
+          voice:"Dashboard admin, section Partenaires Officiels.",
+          desc:"Dashboard → Partenaires Officiels → liste des partenaires actifs, en attente et expirés.",
+          lien:{href:'dashboard-administrateur.html', label:'Dashboard Admin'} },
+        { el:null, pos:'center',
+          titre:"➕ Attribuer le statut",
+          voice:"Recherchez un compte existant et attribuez-lui le statut de Partenaire Officiel.",
+          desc:"Chercher un compte → Attribuer Partenaire Officiel → configurer : catégorie, priorité, visibilité, durée, slogan." },
+        { el:null, pos:'center',
+          titre:"🔧 Configurer la visibilité",
+          voice:"Choisissez le niveau de visibilité, la priorité d'affichage et les domaines d'expertise affichés.",
+          desc:"Niveaux : Public / Membres / Premium. Priorité 1-10. Mise en avant homepage oui/non. Slogan." },
+        { el:null, pos:'center', cta:'administrateur',
+          titre:"✅ Partenariats gérés !",
+          voice:"Les partenaires expirant bientôt génèrent des alertes automatiques dans le dashboard.",
+          desc:"Alertes automatiques 30 jours avant expiration. Renouvellement en un clic." }
+      ]
+    },
+
+    /* ── ADMIN : DEALS ── */
+    'a-deals': {
+      badge:'🤝 Admin — Deals', couleur:'#374151',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Superviser les Deals",
+          voice:"En tant qu'administrateur, vous supervisez tous les Deals publiés sur la plateforme.",
+          desc:"Validation, modération des contenus inappropriés, gestion des litiges entre parties." },
+        { el:null, pos:'center',
+          titre:"📋 Liste des Deals",
+          voice:"Accédez à la liste complète des Deals depuis le dashboard admin, section Deal Master.",
+          desc:"Dashboard → Deal Master → filtres par statut (actif / en attente / signalé / clôturé).",
+          lien:{href:'dashboard-administrateur.html', label:'Dashboard Admin'} },
+        { el:null, pos:'center',
+          titre:"🚩 Traiter les signalements",
+          voice:"Les Deals signalés par des membres apparaissent en priorité pour modération.",
+          desc:"Deal signalé → examiner le contenu → approuver, modifier, ou retirer le Deal avec notification à l'auteur." },
+        { el:null, pos:'center', cta:'administrateur',
+          titre:"✅ La marketplace est sous contrôle !",
+          voice:"Tous les deals retirés sont archivés et consultables dans les logs d'administration.",
+          desc:"Logs complets de toutes les actions de modération pour audit et traçabilité." }
+      ]
+    },
+
+    /* ── ADMIN : STATS GLOBALES ── */
+    'a-stats': {
+      badge:'📊 Admin — Statistiques', couleur:'#0f766e',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Statistiques globales de la plateforme",
+          voice:"Le dashboard admin présente toutes les métriques globales de Diaspo Actif en temps réel.",
+          desc:"Membres, publications, deals, revenus, croissance — tout en un seul tableau de bord." },
+        { el:'a[href="dashboard-administrateur.html"]', pos:'bottom',
+          titre:"📈 Métriques clés",
+          voice:"Le tableau de bord affiche les indicateurs essentiels de santé de la plateforme.",
+          desc:"• 👥 Total membres & croissance\n• 📝 Publications / jour\n• 🤝 Deals actifs\n• 💬 Messages échangés\n• 🌍 Répartition géographique",
+          lien:{href:'dashboard-administrateur.html', label:'Dashboard Admin'} },
+        { el:null, pos:'center',
+          titre:"📅 Rapports périodiques",
+          voice:"Générez des rapports hebdomadaires et mensuels pour suivre l'évolution de la plateforme.",
+          desc:"Rapport hebdomadaire → export CSV/PDF. Comparaison période précédente. Tendances automatiques." },
+        { el:null, pos:'center', cta:'administrateur',
+          titre:"✅ Pilotez avec les données !",
+          voice:"Les statistiques vous permettent de prendre des décisions basées sur les données réelles.",
+          desc:"Consultez les stats tous les lundis pour piloter les actions de la semaine." }
+      ]
+    },
+
+    /* ── ADMIN : FAQ & SIGNALEMENTS ── */
+    'a-faq': {
+      badge:'🚩 Admin — Signalements', couleur:'#dc2626',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Gérer la FAQ & les signalements",
+          voice:"Les questions sans réponse et les signalements nécessitent une attention prioritaire.",
+          desc:"Interface centralisée pour traiter les questions membres et modérer les contenus signalés." },
+        { el:null, pos:'center',
+          titre:"❓ Questions sans réponse",
+          voice:"Les questions posées à O-Z sans réponse satisfaisante remontent ici pour traitement manuel.",
+          desc:"Dashboard → FAQ SAR → liste des questions non résolues → répondre → publier dans la FAQ.",
+          lien:{href:'dashboard-administrateur.html', label:'Dashboard Admin'} },
+        { el:null, pos:'center',
+          titre:"🚩 Traiter les signalements",
+          voice:"Profils, publications et messages signalés par des membres apparaissent ici pour modération.",
+          desc:"Signalement → examiner → actions : avertir, modifier, supprimer, bannir temporairement ou définitivement." },
+        { el:null, pos:'center', cta:'administrateur',
+          titre:"✅ Plateforme sécurisée !",
+          voice:"Traiter rapidement les signalements garantit un environnement sain et professionnel pour tous.",
+          desc:"Objectif : répondre à tout signalement sous 24h. Alertes automatiques pour les cas urgents." }
+      ]
+    }
+
+  };
+
+  /* ── Lancer un tutoriel fonctionnel par son id ── */
+  function launchFeature(id) {
+    const feat = STEPS_FONCTIONS[id];
+    if (!feat) { launch('utilisateur'); return; }
+    injectStyles();
+    stopSpeech();
+
+    const overlay = buildOverlay();
+    const card    = document.getElementById('da-demo-card');
+    const sp      = document.getElementById('da-demo-spotlight');
+    const progEl  = document.getElementById('da-demo-progress');
+    const badgeWrap = document.getElementById('da-demo-badge-wrap');
+    const badgeEl = document.getElementById('da-demo-badge');
+    const stepLbl = document.getElementById('da-demo-step-label');
+    const titleEl = document.getElementById('da-demo-title');
+    const descEl  = document.getElementById('da-demo-desc');
+    const lienWrap= document.getElementById('da-demo-lien-wrap');
+    const lienEl  = document.getElementById('da-demo-lien');
+    const ctaEl   = document.getElementById('da-demo-cta-block');
+    const nextBtn = document.getElementById('da-demo-next');
+    const prevBtn = document.getElementById('da-demo-prev');
+    const skipBtn = document.getElementById('da-demo-skip');
+    const muteBtn = document.getElementById('da-demo-mute-btn');
+    const langSel = document.getElementById('da-demo-lang-select');
+
+    card.style.setProperty('--da-color', feat.couleur || '#1e3a8a');
+    nextBtn.style.background = feat.couleur || '#1e3a8a';
+
+    /* Sélecteur langue */
+    Object.keys(LANGS).forEach(l => {
+      const opt = document.createElement('option');
+      opt.value = l; opt.textContent = LANGS[l].label;
+      if (l === _lang) opt.selected = true;
+      langSel.appendChild(opt);
+    });
+    langSel.addEventListener('change', () => {
+      _lang = langSel.value; localStorage.setItem('da_tuto_lang', _lang);
+      stopSpeech(); launchFeature(id);
+    });
+
+    function updateMuteBtn() { muteBtn.textContent = _muted ? ui('voix_off') : ui('voix_on'); }
+    updateMuteBtn();
+    muteBtn.addEventListener('click', () => {
+      _muted = !_muted; localStorage.setItem('da_tuto_muted', _muted ? '1' : '0');
+      updateMuteBtn(); if (_muted) stopSpeech();
+    });
+
+    const steps = feat.steps;
+    let cur = 0;
+
+    function render() {
+      const step = steps[cur];
+      progEl.innerHTML = steps.map((_,i) => {
+        let cls = 'da-dot';
+        if (i === cur) cls += ' active'; else if (i < cur) cls += ' done';
+        return `<span class="${cls}"></span>`;
+      }).join('');
+      if (step.badge) { badgeEl.textContent = feat.badge; badgeEl.style.background = feat.couleur || '#1e3a8a'; badgeWrap.style.display = 'block'; }
+      else { badgeWrap.style.display = 'none'; }
+      stepLbl.textContent = `${ui('step')} ${cur+1} ${ui('sur')} ${steps.length}`;
+      titleEl.textContent = step.titre;
+      descEl.textContent  = step.desc;
+      nextBtn.textContent  = cur === steps.length-1 ? ui('terminer') : ui('suivant');
+      prevBtn.textContent  = ui('precedent');
+      skipBtn.textContent  = ui('passer');
+      prevBtn.style.display = cur > 0 ? 'inline-block' : 'none';
+      skipBtn.style.display = cur === steps.length-1 ? 'none' : 'inline-block';
+      if (step.lien) { lienEl.href = step.lien.href; lienEl.textContent = ui('voir') + ' ' + step.lien.label; lienWrap.style.display = 'block'; }
+      else { lienWrap.style.display = 'none'; }
+      if (step.cta) {
+        const ctaBtns = CTA[step.cta] || CTA.utilisateur;
+        ctaEl.innerHTML = ctaBtns.map((b,i) => `<a href="${b.href}" class="da-cta-btn ${i===0?'da-cta-p':'da-cta-s'}" ${i===0?`style="background:${feat.couleur||'#1e3a8a'}"`:''}">${b.label}</a>`).join('');
+        ctaEl.style.display = 'flex';
+      } else { ctaEl.style.display = 'none'; }
+      const targetEl = findEl(step.el);
+      spotlightEl(sp, targetEl);
+      positionCard(card, targetEl, step.pos);
+      showArrow(targetEl);
+      if (targetEl) { targetEl.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(() => animateCursorTo(targetEl), 500); }
+      else { const cur2 = document.getElementById('da-virtual-cursor'); if (cur2) cur2.style.display = 'none'; }
+      speak(step.voice || step.titre);
+    }
+
+    function finish() {
+      stopSpeech(); overlay.style.display = 'none'; overlay.remove();
+      document.getElementById('da-virtual-cursor')?.remove();
+      document.getElementById('da-demo-arrow')?.remove();
+    }
+
+    nextBtn.addEventListener('click', () => { stopSpeech(); if (cur === steps.length-1) finish(); else { cur++; render(); } });
+    prevBtn.addEventListener('click', () => { stopSpeech(); if (cur > 0) { cur--; render(); } });
+    skipBtn.addEventListener('click', () => { stopSpeech(); finish(); });
+    document.getElementById('da-demo-backdrop').addEventListener('click', () => { stopSpeech(); finish(); });
+    overlay.style.display = 'block';
+    render();
+  }
+
   /* Alias de rôles → clé du tutoriel */
   const ROLE_MAP = {
     utilisateur:'utilisateur', membre:'utilisateur', entrepreneur:'entrepreneur',
@@ -823,6 +1579,7 @@
   ══════════════════════════════════════════════════════════ */
   window.DADemo = {
     launch,
+    launchFeature,
     showWelcomeModal,
     checkUser(user) {
       if (!user) return;

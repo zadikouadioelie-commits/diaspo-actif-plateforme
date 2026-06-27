@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Centre de formation — Diaspo'Actif</title>
+<title>Centre des tutos — Diaspo'Actif</title>
 <link rel="stylesheet" href="assets/styles.css">
 <link rel="stylesheet" href="assets/responsive.css">
 <style>
@@ -96,7 +96,7 @@
 
 <!-- ── Hero ── -->
 <div class="tuto-hero">
-  <h1>📚 Centre de formation</h1>
+  <h1>📚 Centre des tutos</h1>
   <p>Tutoriels interactifs, guides et ressources pour maîtriser chaque fonctionnalité de Diaspo'Actif.</p>
   <div class="tuto-search-wrap">
     <input type="text" id="tuto-search" class="tuto-search" placeholder="Rechercher un tutoriel…">
@@ -358,10 +358,10 @@ function renderAll() {
 }
 
 /* ── Ouvrir un tutoriel ── */
-let _pendingRole = null;
+let _pendingTuto = null;
 function openTuto(tuto) {
   addHist(tuto.id);
-  _pendingRole = tuto.role;
+  _pendingTuto = tuto;
   document.getElementById('tuto-player-icon').textContent  = tuto.icon;
   document.getElementById('tuto-player-title').textContent = tuto.titre;
   document.getElementById('tuto-player-desc').textContent  = tuto.desc;
@@ -371,8 +371,13 @@ function openTuto(tuto) {
 
 document.getElementById('tuto-player-start').addEventListener('click', () => {
   document.getElementById('tuto-player-modal').classList.remove('show');
-  if (_pendingRole && window.DADemo) DADemo.launch(_pendingRole);
-  else if (window.DADemo) DADemo.launch(_currentUser?.role || 'utilisateur');
+  if (!window.DADemo || !_pendingTuto) return;
+  /* Si le tutoriel a un id fonctionnel dédié → launchFeature, sinon launch(role) */
+  if (_pendingTuto.role) {
+    DADemo.launch(_pendingTuto.role);
+  } else {
+    DADemo.launchFeature(_pendingTuto.id);
+  }
 });
 document.getElementById('tuto-player-close').addEventListener('click', () => {
   document.getElementById('tuto-player-modal').classList.remove('show');

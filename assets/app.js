@@ -311,7 +311,7 @@ async function applyAuthState() {
         <div class="avatar">${photoAvatar(user.nom, 30)}</div> ${user.nom}
       </a>
       <span class="role-tag">${ROLE_LABEL_FR[user.role] || user.role}</span>
-      <a href="tutoriels.html" class="da-revoir-btn" id="demo-revoir-btn" title="Centre de formation — Tutoriels interactifs">📚 Tutoriels</a>
+      <a href="tutoriels.html" class="da-revoir-btn" id="demo-revoir-btn" title="Centre des tutos — Tutoriels interactifs">📚 Centre des tutos</a>
       <a href="#" id="logout-link" class="btn btn-sm btn-outline">Déconnexion</a>`;
     const logout = document.getElementById("logout-link");
     if (logout) logout.addEventListener("click", async (e) => {
