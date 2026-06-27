@@ -2746,13 +2746,13 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
     // Forcer OZ dans la bande
     const ozRoot = document.getElementById('oz-root');
-    if (ozRoot) { ozRoot.style.left = (window.innerWidth - 56) + 'px'; ozRoot.style.top = '8px'; }
+    if (ozRoot) { ozRoot.style.left = (window.innerWidth - 56) + 'px'; ozRoot.style.top = '72px'; }
 
     const band = document.createElement('div');
     band.id = 'ia-band';
     band.innerHTML = '<span id="ia-band-lbl">Assistants IA</span>';
     const bs = band.style;
-    bs.position = 'fixed'; bs.top = '4px'; bs.right = '4px';
+    bs.position = 'fixed'; bs.top = '68px'; bs.right = '4px';
     bs.zIndex = '99990'; bs.width = '122px'; bs.height = '62px';
     bs.background = 'rgba(255,255,255,0.18)';
     bs.backdropFilter = bs.webkitBackdropFilter = 'blur(10px)';

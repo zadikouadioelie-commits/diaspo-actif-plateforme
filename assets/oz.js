@@ -459,7 +459,7 @@
 
     // Position — défaut : haut droite
     const px = _cfg.posX ?? (window.innerWidth  - 56);
-    const py = _cfg.posY ?? 8;
+    const py = _cfg.posY ?? 72;
     root.style.left = Math.max(0, Math.min(px, window.innerWidth  - 60)) + 'px';
     root.style.top  = Math.max(0, Math.min(py, window.innerHeight - 60)) + 'px';
 

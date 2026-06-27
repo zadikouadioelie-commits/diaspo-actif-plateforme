@@ -1942,7 +1942,7 @@
   function injectStyles() {
     const css = `
 .cb-fab {
-  position: fixed; top: 8px; right: 62px; z-index: 1100;
+  position: fixed; top: 72px; right: 62px; z-index: 1100;
   width: 48px; height: 48px; border-radius: 50%;
   background: linear-gradient(135deg, var(--orange, #ff6b00), #e55a00);
   color: #fff; border: none; cursor: grab;
@@ -1962,7 +1962,7 @@
 }
 
 .cb-panel {
-  position: fixed; top: 64px; right: 8px; z-index: 1099;
+  position: fixed; top: 128px; right: 8px; z-index: 1099;
   width: 380px; max-width: calc(100vw - 32px);
   background: #fff; border-radius: 18px;
   box-shadow: 0 8px 48px rgba(0,0,0,.2);
