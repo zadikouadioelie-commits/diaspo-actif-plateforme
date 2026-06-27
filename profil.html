@@ -34,6 +34,13 @@
   padding:5px 12px; font-size:12px; cursor:pointer; display:none;
 }
 .is-own .p-banner-edit { display:block; }
+.banner-back-btn {
+  position:absolute; top:12px; left:14px; z-index:10;
+  background:rgba(0,0,0,.45); color:#fff; text-decoration:none;
+  border-radius:8px; padding:5px 13px; font-size:13px; font-weight:600;
+  backdrop-filter:blur(4px); transition:background .15s;
+}
+.banner-back-btn:hover { background:rgba(0,0,0,.65); color:#fff; }
 
 /* ===== CARTE PROFIL ===== */
 .p-card {
@@ -486,6 +493,7 @@
 <!-- BANNIÈRE -->
 <div class="p-banner" id="p-banner">
   <img loading="lazy" id="banner-img" alt="Bannière" style="display:none">
+  <a href="#" id="back-link" class="banner-back-btn">← Retour</a>
   <div class="banner-crop-overlay">
     <button class="banner-btn" onclick="pickBannerFile()">📷 Changer la bannière</button>
     <button class="banner-btn" id="banner-dl-btn" onclick="downloadBanner()" style="display:none">⬇️ Télécharger</button>
@@ -499,8 +507,7 @@
 
 <main class="container" style="max-width:820px;padding-top:0;padding-bottom:48px">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;flex-wrap:wrap;gap:8px">
-    <a href="#" id="back-link" style="color:var(--muted);font-size:13px;">← Retour</a>
+  <div style="display:flex;justify-content:flex-end;padding:8px 0;">
     <div id="top-bar-controls"></div>
   </div>
 
@@ -796,19 +803,21 @@ function renderIdentity() {
   if (loc) html += `<div class="p-loc">📍 ${esc(loc)}</div>`;
 
   // ── À propos ──
+  html += `<div class="apropos-block" id="apropos-block">
+    <div class="apropos-header">
+      <span class="apropos-title">À propos</span>
+      ${isOwn ? `<button class="apropos-edit-btn" onclick="openAproposEditor()" title="Modifier">✏️ Modifier</button>` : ''}
+    </div>`;
   if (profil.bio) {
     const long = profil.bio.length > 220;
-    html += `<div class="apropos-block" id="apropos-block">
-      <div class="apropos-header">
-        <span class="apropos-title">À propos</span>
-        ${isOwn ? `<button class="apropos-edit-btn" onclick="openAproposEditor()" title="Modifier">✏️ Modifier</button>` : ''}
-      </div>
-      <div class="apropos-text${long?' collapsed':''}" id="apropos-text">${esc(profil.bio)}</div>
-      ${long ? `<button class="apropos-more-btn" id="apropos-more" onclick="toggleApropos()">Lire la suite ▾</button>` : ''}
-    </div>`;
+    html += `<div class="apropos-text${long?' collapsed':''}" id="apropos-text">${esc(profil.bio)}</div>
+      ${long ? `<button class="apropos-more-btn" id="apropos-more" onclick="toggleApropos()">Lire la suite ▾</button>` : ''}`;
   } else if (isOwn) {
-    html += `<button class="apropos-add-btn" onclick="openAproposEditor()">✏️ Ajouter une présentation « À propos »</button>`;
+    html += `<button class="apropos-add-btn" onclick="openAproposEditor()" style="border:none;text-align:left;padding:4px 0;font-size:13px;color:var(--muted);background:none;cursor:pointer;">✏️ Ajoutez une présentation pour vous faire connaître…</button>`;
+  } else {
+    html += `<p style="font-size:13px;color:var(--muted);margin:0;font-style:italic;">Ce membre n'a pas encore ajouté de présentation.</p>`;
   }
+  html += `</div>`;
 
   if (ci.length) html += `<div class="p-tags">${ci.map(c=>`<span class="p-tag">${esc(c)}</span>`).join('')}</div>`;
 
