@@ -602,6 +602,11 @@ async function init() {
       const ra = await api('GET', '/accreditations/user/' + uid);
       profil._accreditations = (ra.accreditations||[]).map(a=>a.type);
     } catch(e) { profil._accreditations = []; }
+    // Charger le badge association
+    try {
+      const rb = await api('GET', '/asso/badge/' + uid);
+      profil._asso_badge = rb.badge || null;
+    } catch(e) { profil._asso_badge = null; }
     render();
   } catch(e) {
     document.getElementById('p-sections').innerHTML =
@@ -852,12 +857,17 @@ function renderIdentity() {
   if (ci.length) html += `<div class="p-tags">${ci.map(c=>`<span class="p-tag">${esc(c)}</span>`).join('')}</div>`;
 
   const accreds = profil._accreditations || [];
-  if (accreds.length) {
+  const assoBadge = profil._asso_badge;
+  if (accreds.length || assoBadge) {
     html += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">`;
     if (accreds.includes('mobilisation_active'))
       html += `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;">📢 Mobilisation Active</span>`;
     if (accreds.includes('createur_opportunites'))
       html += `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;background:#dbeafe;color:#1e40af;border:1px solid #3b82f6;">💼 Créateur d'Opportunités</span>`;
+    if (assoBadge === 'accreditee')
+      html += `<span title="Association officiellement accréditée par Diaspo'Actif — abonnement actif et vérifiée" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;border:1px solid #7c3aed;">🏅 Association Accréditée DA</span>`;
+    else if (assoBadge === 'verifiee')
+      html += `<span title="Association vérifiée par Diaspo'Actif" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700;background:#e0f2fe;color:#0369a1;border:1px solid #0891b2;">✅ Association Vérifiée DA</span>`;
     html += `</div>`;
   }
 

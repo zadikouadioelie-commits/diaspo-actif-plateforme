@@ -1946,5 +1946,178 @@ function backfillOfficialFollow() {
     .run(`Semestre ${sem} – ${year}`, debutMois, finMois);
 })();
 
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE GESTION DES ASSOCIATIONS
+   Art. 30-33 — Accréditation, abonnement, adhérents, cotisations,
+                finances, documents, votes électroniques
+   ═══════════════════════════════════════════════════════════════════ */
+db.exec(`
+
+  /* ── Accréditation association (vérifiée / accréditée) ── */
+  CREATE TABLE IF NOT EXISTS asso_accreditations (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL UNIQUE,
+    niveau        TEXT NOT NULL DEFAULT 'verifiee'
+                  CHECK(niveau IN ('verifiee','accreditee')),
+    statut        TEXT NOT NULL DEFAULT 'en_attente'
+                  CHECK(statut IN ('en_attente','active','suspendue','retiree','expiree')),
+    plan_id       INTEGER,
+    periodicite   TEXT DEFAULT 'annuel'
+                  CHECK(periodicite IN ('mensuel','trimestriel','annuel')),
+    date_debut    TEXT,
+    date_fin      TEXT,
+    admin_id      INTEGER,
+    motif         TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id)  REFERENCES users(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+
+  /* ── Demandes d'accréditation ── */
+  CREATE TABLE IF NOT EXISTS asso_demandes (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL,
+    niveau        TEXT NOT NULL DEFAULT 'verifiee'
+                  CHECK(niveau IN ('verifiee','accreditee')),
+    periodicite   TEXT DEFAULT 'annuel',
+    nom_asso      TEXT NOT NULL,
+    pays          TEXT,
+    ville         TEXT,
+    siret         TEXT,
+    description   TEXT,
+    documents_json TEXT DEFAULT '[]',
+    statut        TEXT DEFAULT 'en_attente'
+                  CHECK(statut IN ('en_attente','approuvee','refusee','info_demandee')),
+    motif_refus   TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* ── Historique des accréditations ── */
+  CREATE TABLE IF NOT EXISTS asso_accred_historique (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL,
+    action        TEXT NOT NULL,
+    niveau        TEXT,
+    admin_id      INTEGER,
+    motif         TEXT,
+    created_at    TEXT DEFAULT (datetime('now'))
+  );
+
+  /* ── Adhérents ── */
+  CREATE TABLE IF NOT EXISTS asso_adherents (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL,
+    prenom        TEXT NOT NULL,
+    nom           TEXT NOT NULL,
+    email         TEXT,
+    telephone     TEXT,
+    adresse       TEXT,
+    pays          TEXT,
+    date_naissance TEXT,
+    nationalite   TEXT,
+    statut        TEXT DEFAULT 'actif'
+                  CHECK(statut IN ('actif','inactif','suspendu','radie')),
+    type_adhesion TEXT DEFAULT 'standard',
+    date_adhesion TEXT DEFAULT (date('now')),
+    date_expiration TEXT,
+    da_user_id    INTEGER,
+    notes         TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id),
+    FOREIGN KEY(da_user_id)   REFERENCES users(id)
+  );
+
+  /* ── Cotisations ── */
+  CREATE TABLE IF NOT EXISTS asso_cotisations (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL,
+    adherent_id   INTEGER,
+    intitule      TEXT NOT NULL,
+    montant       REAL NOT NULL,
+    devise        TEXT DEFAULT 'EUR',
+    periodicite   TEXT DEFAULT 'annuel',
+    statut        TEXT DEFAULT 'en_attente'
+                  CHECK(statut IN ('en_attente','payee','partielle','en_retard','annulee')),
+    date_echeance TEXT,
+    date_paiement TEXT,
+    mode_paiement TEXT,
+    reference     TEXT,
+    notes         TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id),
+    FOREIGN KEY(adherent_id)  REFERENCES asso_adherents(id)
+  );
+
+  /* ── Finances ── */
+  CREATE TABLE IF NOT EXISTS asso_finances (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL,
+    type          TEXT NOT NULL CHECK(type IN ('recette','depense')),
+    categorie     TEXT,
+    intitule      TEXT NOT NULL,
+    montant       REAL NOT NULL,
+    devise        TEXT DEFAULT 'EUR',
+    date_op       TEXT DEFAULT (date('now')),
+    mode_paiement TEXT,
+    piece_justif  TEXT,
+    notes         TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id)
+  );
+
+  /* ── Documents (GED) ── */
+  CREATE TABLE IF NOT EXISTS asso_documents (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL,
+    nom           TEXT NOT NULL,
+    type          TEXT DEFAULT 'autre',
+    url           TEXT,
+    taille        INTEGER,
+    acces         TEXT DEFAULT 'bureau'
+                  CHECK(acces IN ('public','adherents','bureau','admin')),
+    created_by    INTEGER,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id)
+  );
+
+  /* ── Votes électroniques ── */
+  CREATE TABLE IF NOT EXISTS asso_votes (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL,
+    titre         TEXT NOT NULL,
+    description   TEXT,
+    type          TEXT DEFAULT 'resolution'
+                  CHECK(type IN ('resolution','election','consultation','budget')),
+    statut        TEXT DEFAULT 'brouillon'
+                  CHECK(statut IN ('brouillon','ouvert','clos','annule')),
+    options_json  TEXT DEFAULT '[]',
+    resultat_json TEXT DEFAULT '{}',
+    anonyme       INTEGER DEFAULT 1,
+    date_debut    TEXT,
+    date_fin      TEXT,
+    quorum        INTEGER DEFAULT 0,
+    created_by    INTEGER,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id)
+  );
+
+  /* ── Réponses aux votes ── */
+  CREATE TABLE IF NOT EXISTS asso_votes_reponses (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    vote_id       INTEGER NOT NULL,
+    adherent_id   INTEGER,
+    choix         TEXT NOT NULL,
+    created_at    TEXT DEFAULT (datetime('now')),
+    UNIQUE(vote_id, adherent_id),
+    FOREIGN KEY(vote_id)     REFERENCES asso_votes(id),
+    FOREIGN KEY(adherent_id) REFERENCES asso_adherents(id)
+  );
+
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;

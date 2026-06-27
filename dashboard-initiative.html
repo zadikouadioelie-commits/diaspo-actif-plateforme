@@ -65,9 +65,18 @@
       <div class="sb-group-lbl">06 — COLLABORATION</div>
       <a href="#deals" data-section="deals">🤝 Mes Deals <span class="pill" id="deals-badge" style="display:none;"></span></a>
 
+      <div class="sb-group-lbl" id="sb-asso-lbl" style="display:none;">08 — GESTION ASSOCIATION</div>
+      <a href="#asso-cockpit" data-section="asso-cockpit" id="sb-asso-cockpit" style="display:none;">🏛️ Cockpit Association</a>
+      <a href="#asso-adherents" data-section="asso-adherents" id="sb-asso-adherents" style="display:none;">👥 Adhérents <span class="pill" id="asso-adh-badge" style="display:none;"></span></a>
+      <a href="#asso-cotisations" data-section="asso-cotisations" id="sb-asso-cotisations" style="display:none;">💰 Cotisations</a>
+      <a href="#asso-finances" data-section="asso-finances" id="sb-asso-finances" style="display:none;">📊 Finances</a>
+      <a href="#asso-documents" data-section="asso-documents" id="sb-asso-documents" style="display:none;">📁 Documents</a>
+      <a href="#asso-votes" data-section="asso-votes" id="sb-asso-votes" style="display:none;">🗳️ Votes</a>
+
       <div class="sb-group-lbl">07 — OUTILS</div>
       <a href="#paiement" data-section="paiement">💳 Module paiement</a>
       <a href="#accreditations" data-section="accreditations">🎖 Accréditations DA</a>
+      <a href="#asso-accreditation" data-section="asso-accreditation">🏅 Accréditation Asso</a>
       <a href="#publicites-init" data-section="publicites-init">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
       <a href="confidentialite.html">🔐 Confidentialité</a>
 
@@ -419,6 +428,282 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
         <div id="deals-invites-list" style="margin-bottom:16px;"></div>
         <div id="deals-list"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
+      </div>
+    </div>
+
+    <!-- ══ SECTIONS GESTION ASSOCIATION ══ -->
+    <div class="card" style="margin-bottom:20px;display:none;" id="asso-accreditation">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">🏅 Accréditation Gestion des Associations</h3>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Le module <strong>Gestion des Associations</strong> est une fonctionnalité premium. Il doit être activé par accréditation officielle Diaspo'Actif.</p>
+      <div id="asso-accred-content"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;display:none;" id="asso-cockpit">
+      <h3 style="margin:0 0 16px;">🏛️ Cockpit Association</h3>
+      <div id="asso-cockpit-content"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;display:none;" id="asso-adherents">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">👥 Adhérents</h3>
+        <button class="btn btn-orange btn-sm" onclick="openAssoAdherentModal()">+ Ajouter</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Gérez les membres de votre association.</p>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        <input id="asso-adh-q" class="input-field" placeholder="Rechercher…" style="flex:1;min-width:150px;" oninput="renderAssoAdherents()">
+        <select id="asso-adh-statut" class="input-field" style="max-width:130px;" onchange="renderAssoAdherents()">
+          <option value="">Tous les statuts</option>
+          <option value="actif">Actif</option>
+          <option value="inactif">Inactif</option>
+          <option value="suspendu">Suspendu</option>
+          <option value="radie">Radié</option>
+        </select>
+      </div>
+      <div id="asso-adh-list"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;display:none;" id="asso-cotisations">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">💰 Cotisations</h3>
+        <button class="btn btn-orange btn-sm" onclick="openAssoCotisationModal()">+ Nouvelle</button>
+      </div>
+      <div id="asso-cot-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;"></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        <select id="asso-cot-statut" class="input-field" style="max-width:160px;" onchange="renderAssoCotisations()">
+          <option value="">Tous les statuts</option>
+          <option value="en_attente">En attente</option>
+          <option value="payee">Payée</option>
+          <option value="en_retard">En retard</option>
+          <option value="annulee">Annulée</option>
+        </select>
+      </div>
+      <div id="asso-cot-list"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;display:none;" id="asso-finances">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">📊 Finances</h3>
+        <button class="btn btn-orange btn-sm" onclick="openAssoFinanceModal()">+ Mouvement</button>
+      </div>
+      <div id="asso-fin-bilan" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;"></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <select id="asso-fin-annee" class="input-field" style="max-width:120px;" onchange="renderAssoFinances()">
+          <option value="">Toutes années</option>
+          <option value="2025">2025</option>
+          <option value="2026">2026</option>
+        </select>
+      </div>
+      <div id="asso-fin-list"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;display:none;" id="asso-documents">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">📁 Documents</h3>
+        <button class="btn btn-orange btn-sm" onclick="openAssoDocumentModal()">+ Document</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Gestion électronique des documents de l'association (statuts, PV, contrats…).</p>
+      <div id="asso-doc-list"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;display:none;" id="asso-votes">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">🗳️ Votes électroniques</h3>
+        <button class="btn btn-orange btn-sm" onclick="openAssoVoteModal()">+ Nouveau vote</button>
+      </div>
+      <div id="asso-vote-list"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <!-- Modales Association -->
+    <div id="asso-adh-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
+      <div style="background:var(--bg);border-radius:16px;max-width:560px;margin:40px auto;padding:24px;position:relative;">
+        <button onclick="document.getElementById('asso-adh-modal').style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+        <h3 style="margin:0 0 16px;">👤 Ajouter un adhérent</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="font-size:12px;font-weight:700;">Prénom *</label><input id="asso-adh-prenom" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Nom *</label><input id="asso-adh-nom" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Email</label><input id="asso-adh-email" type="email" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Téléphone</label><input id="asso-adh-tel" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Pays</label><input id="asso-adh-pays" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Type d'adhésion</label>
+            <select id="asso-adh-type" class="input-field" style="width:100%;margin-top:4px;">
+              <option value="standard">Standard</option>
+              <option value="etudiant">Étudiant</option>
+              <option value="bienfaiteur">Bienfaiteur</option>
+              <option value="honoraire">Honoraire</option>
+            </select>
+          </div>
+          <div><label style="font-size:12px;font-weight:700;">Date d'expiration</label><input id="asso-adh-exp" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Notes</label><input id="asso-adh-notes" class="input-field" style="width:100%;margin-top:4px;"></div>
+        </div>
+        <div id="asso-adh-error" style="color:#D33;font-size:13px;margin-top:8px;display:none;"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button class="btn btn-orange" onclick="saveAssoAdherent()">Enregistrer</button>
+          <button class="btn btn-outline" onclick="document.getElementById('asso-adh-modal').style.display='none'">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="asso-cot-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
+      <div style="background:var(--bg);border-radius:16px;max-width:560px;margin:40px auto;padding:24px;position:relative;">
+        <button onclick="document.getElementById('asso-cot-modal').style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+        <h3 style="margin:0 0 16px;">💰 Nouvelle cotisation</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="grid-column:1/-1"><label style="font-size:12px;font-weight:700;">Intitulé *</label><input id="asso-cot-intitule" class="input-field" style="width:100%;margin-top:4px;" placeholder="Cotisation annuelle 2025"></div>
+          <div><label style="font-size:12px;font-weight:700;">Montant (€) *</label><input id="asso-cot-montant" type="number" class="input-field" style="width:100%;margin-top:4px;" min="0" step="0.01"></div>
+          <div><label style="font-size:12px;font-weight:700;">Périodicité</label>
+            <select id="asso-cot-periodicite" class="input-field" style="width:100%;margin-top:4px;">
+              <option value="mensuel">Mensuel</option>
+              <option value="trimestriel">Trimestriel</option>
+              <option value="annuel" selected>Annuel</option>
+              <option value="unique">Unique</option>
+            </select>
+          </div>
+          <div><label style="font-size:12px;font-weight:700;">Date d'échéance</label><input id="asso-cot-echeance" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Statut</label>
+            <select id="asso-cot-st" class="input-field" style="width:100%;margin-top:4px;">
+              <option value="en_attente">En attente</option>
+              <option value="payee">Payée</option>
+              <option value="en_retard">En retard</option>
+            </select>
+          </div>
+        </div>
+        <div id="asso-cot-error" style="color:#D33;font-size:13px;margin-top:8px;display:none;"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button class="btn btn-orange" onclick="saveAssoCotisation()">Enregistrer</button>
+          <button class="btn btn-outline" onclick="document.getElementById('asso-cot-modal').style.display='none'">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="asso-fin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
+      <div style="background:var(--bg);border-radius:16px;max-width:560px;margin:40px auto;padding:24px;position:relative;">
+        <button onclick="document.getElementById('asso-fin-modal').style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+        <h3 style="margin:0 0 16px;">📊 Nouveau mouvement financier</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="font-size:12px;font-weight:700;">Type *</label>
+            <select id="asso-fin-type" class="input-field" style="width:100%;margin-top:4px;">
+              <option value="recette">Recette</option>
+              <option value="depense">Dépense</option>
+            </select>
+          </div>
+          <div><label style="font-size:12px;font-weight:700;">Catégorie</label>
+            <select id="asso-fin-cat" class="input-field" style="width:100%;margin-top:4px;">
+              <option value="cotisations">Cotisations</option>
+              <option value="dons">Dons</option>
+              <option value="subventions">Subventions</option>
+              <option value="evenements">Événements</option>
+              <option value="loyer">Loyer</option>
+              <option value="materiel">Matériel</option>
+              <option value="salaires">Salaires</option>
+              <option value="frais_bancaires">Frais bancaires</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div style="grid-column:1/-1"><label style="font-size:12px;font-weight:700;">Intitulé *</label><input id="asso-fin-intitule" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Montant (€) *</label><input id="asso-fin-montant" type="number" class="input-field" style="width:100%;margin-top:4px;" min="0" step="0.01"></div>
+          <div><label style="font-size:12px;font-weight:700;">Date</label><input id="asso-fin-date" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Notes</label><input id="asso-fin-notes" class="input-field" style="width:100%;margin-top:4px;"></div>
+        </div>
+        <div id="asso-fin-error" style="color:#D33;font-size:13px;margin-top:8px;display:none;"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button class="btn btn-orange" onclick="saveAssoFinance()">Enregistrer</button>
+          <button class="btn btn-outline" onclick="document.getElementById('asso-fin-modal').style.display='none'">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="asso-doc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
+      <div style="background:var(--bg);border-radius:16px;max-width:480px;margin:40px auto;padding:24px;position:relative;">
+        <button onclick="document.getElementById('asso-doc-modal').style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+        <h3 style="margin:0 0 16px;">📁 Référencer un document</h3>
+        <div style="display:grid;gap:12px;">
+          <div><label style="font-size:12px;font-weight:700;">Nom du document *</label><input id="asso-doc-nom" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Type</label>
+            <select id="asso-doc-type" class="input-field" style="width:100%;margin-top:4px;">
+              <option value="statuts">Statuts</option>
+              <option value="pv">Procès-verbal</option>
+              <option value="contrat">Contrat</option>
+              <option value="rapport">Rapport</option>
+              <option value="convention">Convention</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div><label style="font-size:12px;font-weight:700;">Accès</label>
+            <select id="asso-doc-acces" class="input-field" style="width:100%;margin-top:4px;">
+              <option value="bureau">Bureau uniquement</option>
+              <option value="adherents">Adhérents</option>
+              <option value="public">Public</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div><label style="font-size:12px;font-weight:700;">URL (lien vers le fichier)</label><input id="asso-doc-url" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://…"></div>
+        </div>
+        <div id="asso-doc-error" style="color:#D33;font-size:13px;margin-top:8px;display:none;"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button class="btn btn-orange" onclick="saveAssoDocument()">Enregistrer</button>
+          <button class="btn btn-outline" onclick="document.getElementById('asso-doc-modal').style.display='none'">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="asso-vote-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
+      <div style="background:var(--bg);border-radius:16px;max-width:560px;margin:40px auto;padding:24px;position:relative;">
+        <button onclick="document.getElementById('asso-vote-modal').style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+        <h3 style="margin:0 0 16px;">🗳️ Nouveau vote</h3>
+        <div style="display:grid;gap:12px;">
+          <div><label style="font-size:12px;font-weight:700;">Titre *</label><input id="asso-vote-titre" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Type</label>
+            <select id="asso-vote-type" class="input-field" style="width:100%;margin-top:4px;">
+              <option value="resolution">Résolution</option>
+              <option value="election">Élection</option>
+              <option value="consultation">Consultation</option>
+              <option value="budget">Budget</option>
+            </select>
+          </div>
+          <div><label style="font-size:12px;font-weight:700;">Description</label><textarea id="asso-vote-desc" class="input-field" rows="2" style="width:100%;margin-top:4px;resize:none;"></textarea></div>
+          <div><label style="font-size:12px;font-weight:700;">Options (une par ligne, min. 2) *</label><textarea id="asso-vote-options" class="input-field" rows="4" style="width:100%;margin-top:4px;resize:none;" placeholder="Pour&#10;Contre&#10;Abstention"></textarea></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div><label style="font-size:12px;font-weight:700;">Début</label><input id="asso-vote-debut" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
+            <div><label style="font-size:12px;font-weight:700;">Fin</label><input id="asso-vote-fin" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
+          </div>
+        </div>
+        <div id="asso-vote-error" style="color:#D33;font-size:13px;margin-top:8px;display:none;"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button class="btn btn-orange" onclick="saveAssoVote()">Créer</button>
+          <button class="btn btn-outline" onclick="document.getElementById('asso-vote-modal').style.display='none'">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="asso-demande-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
+      <div style="background:var(--bg);border-radius:16px;max-width:560px;margin:40px auto;padding:24px;position:relative;">
+        <button onclick="document.getElementById('asso-demande-modal').style.display='none'" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+        <h3 style="margin:0 0 8px;" id="asso-dem-title">🏅 Demande d'accréditation</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 16px;" id="asso-dem-desc"></p>
+        <div style="display:grid;gap:12px;">
+          <div><label style="font-size:12px;font-weight:700;">Nom de l'association *</label><input id="asso-dem-nom" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div><label style="font-size:12px;font-weight:700;">Pays</label><input id="asso-dem-pays" class="input-field" style="width:100%;margin-top:4px;"></div>
+            <div><label style="font-size:12px;font-weight:700;">Ville</label><input id="asso-dem-ville" class="input-field" style="width:100%;margin-top:4px;"></div>
+          </div>
+          <div><label style="font-size:12px;font-weight:700;">SIRET / Numéro d'enregistrement</label><input id="asso-dem-siret" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label style="font-size:12px;font-weight:700;">Présentation de l'association</label><textarea id="asso-dem-desc-asso" class="input-field" rows="3" style="width:100%;margin-top:4px;resize:none;" placeholder="Décrivez vos activités, votre historique, vos objectifs…"></textarea></div>
+          <div><label style="font-size:12px;font-weight:700;">Abonnement</label>
+            <select id="asso-dem-period" class="input-field" style="width:100%;margin-top:4px;" id="asso-dem-period">
+              <option value="mensuel">Mensuel</option>
+              <option value="trimestriel">Trimestriel</option>
+              <option value="annuel" selected>Annuel</option>
+            </select>
+          </div>
+        </div>
+        <input type="hidden" id="asso-dem-niveau">
+        <div id="asso-dem-error" style="color:#D33;font-size:13px;margin-top:8px;display:none;"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button class="btn btn-orange" onclick="submitAssoDemande()">Envoyer la demande</button>
+          <button class="btn btn-outline" onclick="document.getElementById('asso-demande-modal').style.display='none'">Annuler</button>
+        </div>
       </div>
     </div>
 
@@ -1602,7 +1887,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals'];
+  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -1613,6 +1898,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     });
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'deals') renderDealsSection();
+    if (name === 'asso-accreditation') renderAssoAccreditation();
+    if (name === 'asso-cockpit') renderAssoCockpit();
+    if (name === 'asso-adherents') renderAssoAdherents();
+    if (name === 'asso-cotisations') renderAssoCotisations();
+    if (name === 'asso-finances') renderAssoFinances();
+    if (name === 'asso-documents') renderAssoDocuments();
+    if (name === 'asso-votes') renderAssoVotes();
     window.scrollTo(0,0);
   };
 
@@ -1961,6 +2253,552 @@ function fmtDealDate(s) {
   if (!s) return '—';
   try { return new Date(s).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}); } catch(e) { return s; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MODULE GESTION DES ASSOCIATIONS — JS
+   ═══════════════════════════════════════════════════════════════ */
+const ASSO_STATUT_COLORS = {
+  actif:'background:#dcfce7;color:#166534;',
+  inactif:'background:#f1f5f9;color:#64748b;',
+  suspendu:'background:#fef9c3;color:#854d0e;',
+  radie:'background:#fee2e2;color:#991b1b;',
+  payee:'background:#dcfce7;color:#166534;',
+  en_attente:'background:#fef9c3;color:#854d0e;',
+  en_retard:'background:#fee2e2;color:#991b1b;',
+  partielle:'background:#dbeafe;color:#1e40af;',
+  annulee:'background:#f1f5f9;color:#64748b;',
+};
+function assoBadge(statut) {
+  const s = ASSO_STATUT_COLORS[statut] || 'background:#f1f5f9;color:#64748b;';
+  return `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;${s}">${statut}</span>`;
+}
+function assoFmt(n) { return new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n||0); }
+function assoDate(s) { if(!s) return '—'; try{return new Date(s).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'});}catch(e){return s;} }
+function assoEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* Initialiser la sidebar asso selon le statut accréditation */
+async function initAssoSidebar() {
+  try {
+    const { accreditation } = await api('GET', '/asso/accreditation');
+    const isActive = accreditation && accreditation.statut === 'active';
+    ['sb-asso-lbl','sb-asso-cockpit','sb-asso-adherents','sb-asso-cotisations','sb-asso-finances','sb-asso-documents','sb-asso-votes'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = isActive ? '' : 'none';
+    });
+  } catch(e) { /* silencieux */ }
+}
+
+/* ── Section : accréditation ── */
+async function renderAssoAccreditation() {
+  const el = document.getElementById('asso-accred-content');
+  el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);">Chargement…</div>';
+  try {
+    const { accreditation: ac, demande } = await api('GET', '/asso/accreditation');
+    const isActive = ac && ac.statut === 'active';
+
+    const niveauBadge = (n) => n === 'accreditee'
+      ? '<span style="background:#7c3aed;color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;">🏅 Accréditée</span>'
+      : '<span style="background:#0891b2;color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;">✅ Vérifiée</span>';
+
+    if (isActive) {
+      el.innerHTML = `
+        <div style="background:#f0fdf4;border:1.5px solid #22c55e;border-radius:12px;padding:20px;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+            <span style="font-size:32px;">${ac.niveau==='accreditee'?'🏅':'✅'}</span>
+            <div>
+              <div style="font-weight:700;font-size:15px;margin-bottom:4px;">Accréditation active ${niveauBadge(ac.niveau)}</div>
+              <div style="font-size:12px;color:#16a34a;">Depuis le ${assoDate(ac.date_debut)}${ac.date_fin?' · Expire le '+assoDate(ac.date_fin):''}</div>
+            </div>
+          </div>
+          <div style="font-size:13px;color:#166534;background:#dcfce7;padding:10px 14px;border-radius:8px;margin-top:8px;">
+            ✔ Gestion des adhérents · ✔ Cotisations · ✔ Finances · ✔ Documents · ✔ Votes électroniques<br>
+            ${ac.niveau==='accreditee'?'✔ Badge officiel Diaspo\'Actif affiché sur votre profil':''}
+          </div>
+        </div>
+        ${ac.niveau==='verifiee'?`<div style="background:#eff6ff;border:1.5px solid #3b82f6;border-radius:12px;padding:16px;margin-bottom:16px;">
+          <strong>Passer au niveau Accréditée</strong>
+          <p style="font-size:13px;color:#1e40af;margin:6px 0 12px;">L'accréditation <strong>Accréditée</strong> ajoute le badge officiel Diaspo'Actif et renforce la confiance de vos membres.</p>
+          <button class="btn btn-orange btn-sm" onclick="ouvrirAssoDemandeModal('accreditee')">Demander l'accréditation Accréditée →</button>
+        </div>`:''}`;
+    } else if (demande && demande.statut === 'en_attente') {
+      el.innerHTML = `
+        <div style="background:#fefce8;border:1.5px solid #f59e0b;border-radius:12px;padding:20px;">
+          <div style="font-size:28px;margin-bottom:8px;">⏳</div>
+          <strong>Demande en cours de traitement</strong>
+          <p style="font-size:13px;color:#92400e;margin:6px 0 0;">Votre demande d'accréditation « ${demande.niveau==='accreditee'?'Association Accréditée':'Association Vérifiée'} » pour <strong>${assoEsc(demande.nom_asso)}</strong> est en attente de validation par l'équipe Diaspo'Actif.</p>
+          <p style="font-size:12px;color:#78716c;margin:8px 0 0;">Soumise le ${assoDate(demande.created_at)}</p>
+        </div>`;
+    } else {
+      el.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
+          <!-- Niveau 1 : Vérifiée -->
+          <div style="border:1.5px solid #0891b2;border-radius:12px;padding:20px;">
+            <div style="font-size:28px;margin-bottom:8px;">✅</div>
+            <div style="font-weight:700;font-size:15px;margin-bottom:4px;">Association Vérifiée</div>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Vérification de l'identité et des documents. Badge de confiance affiché sur votre profil.</p>
+            <ul style="font-size:12px;color:var(--muted);padding-left:16px;margin:0 0 16px;line-height:1.8;">
+              <li>Accès complet au module de gestion</li>
+              <li>Gestion des adhérents & cotisations</li>
+              <li>Comptabilité & documents</li>
+              <li>Votes électroniques</li>
+            </ul>
+            <button class="btn btn-outline btn-sm" style="border-color:#0891b2;color:#0891b2;" onclick="ouvrirAssoDemandeModal('verifiee')">Faire une demande →</button>
+          </div>
+          <!-- Niveau 2 : Accréditée -->
+          <div style="border:1.5px solid #7c3aed;border-radius:12px;padding:20px;background:linear-gradient(135deg,#faf5ff 0%,#ede9fe 100%);">
+            <div style="font-size:28px;margin-bottom:8px;">🏅</div>
+            <div style="font-weight:700;font-size:15px;margin-bottom:4px;">Association Accréditée <span style="font-size:11px;background:#7c3aed;color:#fff;padding:2px 6px;border-radius:10px;">PREMIUM</span></div>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Association Vérifiée + abonnement actif. Badge officiel Diaspo'Actif, outils IA, API et intégrations.</p>
+            <ul style="font-size:12px;color:var(--muted);padding-left:16px;margin:0 0 16px;line-height:1.8;">
+              <li>Tout le niveau Vérifiée</li>
+              <li>Badge officiel Diaspo'Actif</li>
+              <li>Outils IA & statistiques avancées</li>
+              <li>API et intégrations</li>
+              <li>Abonnement mensuel, trimestriel ou annuel</li>
+            </ul>
+            <button class="btn btn-orange btn-sm" onclick="ouvrirAssoDemandeModal('accreditee')">Souscrire →</button>
+          </div>
+        </div>
+        ${demande && demande.statut === 'refusee' ? `<div style="background:#fee2e2;border:1.5px solid #dc2626;border-radius:10px;padding:14px;margin-top:16px;font-size:13px;">
+          ❌ Votre dernière demande a été refusée.${demande.motif_refus ? ' Motif : '+assoEsc(demande.motif_refus) : ''}
+        </div>` : ''}`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div style="color:#D33;">Erreur : ${assoEsc(e.message||String(e))}</div>`;
+  }
+}
+
+function ouvrirAssoDemandeModal(niveau) {
+  document.getElementById('asso-dem-niveau').value = niveau;
+  document.getElementById('asso-dem-title').textContent = niveau === 'accreditee' ? '🏅 Demande — Association Accréditée' : '✅ Demande — Association Vérifiée';
+  document.getElementById('asso-dem-desc').textContent = niveau === 'accreditee'
+    ? 'Remplissez ce formulaire pour accéder au module premium Gestion des Associations avec badge officiel.'
+    : 'Faites vérifier votre association pour accéder au module de gestion complet.';
+  document.getElementById('asso-demande-modal').style.display = '';
+}
+
+async function submitAssoDemande() {
+  const errEl = document.getElementById('asso-dem-error');
+  errEl.style.display = 'none';
+  const nom_asso = document.getElementById('asso-dem-nom').value.trim();
+  if (!nom_asso) { errEl.textContent = 'Le nom est requis.'; errEl.style.display = ''; return; }
+  try {
+    await api('POST', '/asso/demande', {
+      niveau: document.getElementById('asso-dem-niveau').value,
+      nom_asso,
+      pays: document.getElementById('asso-dem-pays').value.trim()||undefined,
+      ville: document.getElementById('asso-dem-ville').value.trim()||undefined,
+      siret: document.getElementById('asso-dem-siret').value.trim()||undefined,
+      description: document.getElementById('asso-dem-desc-asso').value.trim()||undefined,
+      periodicite: document.getElementById('asso-dem-period').value,
+    });
+    document.getElementById('asso-demande-modal').style.display = 'none';
+    await renderAssoAccreditation();
+  } catch(e) { errEl.textContent = e.error || e.message || 'Erreur'; errEl.style.display = ''; }
+}
+
+/* ── Section : cockpit ── */
+async function renderAssoCockpit() {
+  const el = document.getElementById('asso-cockpit-content');
+  el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);">Chargement…</div>';
+  try {
+    const { accreditation: ac, stats: s } = await api('GET', '/asso/dashboard');
+    const niv = ac.niveau === 'accreditee';
+    el.innerHTML = `
+      ${niv ? `<div style="background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;padding:14px 18px;border-radius:12px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+        <span style="font-size:28px;">🏅</span>
+        <div><div style="font-weight:700;font-size:14px;">Association Accréditée Diaspo'Actif</div><div style="font-size:12px;opacity:.8;">Badge officiel actif · Tous les outils débloqués</div></div>
+      </div>` : `<div style="background:#e0f2fe;padding:12px 16px;border-radius:10px;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:22px;">✅</span><div style="font-size:13px;color:#0369a1;font-weight:600;">Association Vérifiée Diaspo'Actif</div>
+      </div>`}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:20px;">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:var(--orange);">${s.adherents}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Adhérents actifs</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;color:#16a34a;">${assoFmt(s.cotisations)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Cotisations perçues</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:20px;font-weight:800;color:${s.bilan>=0?'#16a34a':'#dc2626'};">${assoFmt(s.bilan)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Solde financier</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:#2563eb;">${s.votes_ouverts}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Votes ouverts</div>
+        </div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:#7c3aed;">${s.documents}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Documents</div>
+        </div>
+        ${s.en_retard > 0 ? `<div style="background:#fee2e2;border:1.5px solid #dc2626;border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:#dc2626;">${s.en_retard}</div>
+          <div style="font-size:11px;color:#991b1b;margin-top:4px;">Cotisations en retard</div>
+        </div>` : ''}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+        <button class="btn btn-outline" onclick="window.initShowSection('asso-adherents')">👥 Gérer les adhérents</button>
+        <button class="btn btn-outline" onclick="window.initShowSection('asso-cotisations')">💰 Cotisations</button>
+        <button class="btn btn-outline" onclick="window.initShowSection('asso-finances')">📊 Finances</button>
+        <button class="btn btn-outline" onclick="window.initShowSection('asso-documents')">📁 Documents</button>
+        <button class="btn btn-outline" onclick="window.initShowSection('asso-votes')">🗳️ Votes</button>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:#D33;">${assoEsc(e.message||String(e))}</div>`;
+  }
+}
+
+/* ── Section : adhérents ── */
+async function renderAssoAdherents() {
+  const el = document.getElementById('asso-adh-list');
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+  try {
+    const q = document.getElementById('asso-adh-q')?.value || '';
+    const statut = document.getElementById('asso-adh-statut')?.value || '';
+    const { adherents, total } = await api('GET', `/asso/adherents?q=${encodeURIComponent(q)}&statut=${statut}`);
+    const badge = document.getElementById('asso-adh-badge');
+    if (badge) { badge.textContent = total; badge.style.display = total>0?'':'none'; }
+    if (!adherents.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Aucun adhérent trouvé.</div>'; return; }
+    el.innerHTML = `
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="border-bottom:2px solid var(--border);">
+            <th style="text-align:left;padding:8px 10px;">Nom</th>
+            <th style="text-align:left;padding:8px 10px;">Email</th>
+            <th style="text-align:left;padding:8px 10px;">Type</th>
+            <th style="text-align:left;padding:8px 10px;">Statut</th>
+            <th style="text-align:left;padding:8px 10px;">Expiration</th>
+            <th style="padding:8px 10px;"></th>
+          </tr></thead>
+          <tbody>
+          ${adherents.map(a => `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 10px;font-weight:600;">${assoEsc(a.prenom)} ${assoEsc(a.nom)}</td>
+            <td style="padding:8px 10px;color:var(--muted);">${assoEsc(a.email||'—')}</td>
+            <td style="padding:8px 10px;font-size:12px;">${assoEsc(a.type_adhesion||'standard')}</td>
+            <td style="padding:8px 10px;">${assoBadge(a.statut)}</td>
+            <td style="padding:8px 10px;font-size:12px;color:var(--muted);">${assoDate(a.date_expiration)}</td>
+            <td style="padding:8px 10px;">
+              <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;" onclick="supprimerAssoAdherent(${a.id})">Supprimer</button>
+            </td>
+          </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:10px;">${total} adhérent(s) au total</div>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:#D33;">${assoEsc(e.message||String(e))}</div>`;
+  }
+}
+
+function openAssoAdherentModal() {
+  ['asso-adh-prenom','asso-adh-nom','asso-adh-email','asso-adh-tel','asso-adh-pays','asso-adh-exp','asso-adh-notes'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('asso-adh-type').value = 'standard';
+  document.getElementById('asso-adh-error').style.display = 'none';
+  document.getElementById('asso-adh-modal').style.display = '';
+}
+
+async function saveAssoAdherent() {
+  const errEl = document.getElementById('asso-adh-error');
+  errEl.style.display = 'none';
+  const prenom = document.getElementById('asso-adh-prenom').value.trim();
+  const nom = document.getElementById('asso-adh-nom').value.trim();
+  if (!prenom || !nom) { errEl.textContent = 'Prénom et nom requis.'; errEl.style.display = ''; return; }
+  try {
+    await api('POST', '/asso/adherents', {
+      prenom, nom,
+      email: document.getElementById('asso-adh-email').value.trim()||undefined,
+      telephone: document.getElementById('asso-adh-tel').value.trim()||undefined,
+      pays: document.getElementById('asso-adh-pays').value.trim()||undefined,
+      type_adhesion: document.getElementById('asso-adh-type').value,
+      date_expiration: document.getElementById('asso-adh-exp').value||undefined,
+      notes: document.getElementById('asso-adh-notes').value.trim()||undefined,
+    });
+    document.getElementById('asso-adh-modal').style.display = 'none';
+    await renderAssoAdherents();
+  } catch(e) { errEl.textContent = e.error || e.message || 'Erreur'; errEl.style.display = ''; }
+}
+
+async function supprimerAssoAdherent(id) {
+  if (!confirm('Supprimer cet adhérent définitivement ?')) return;
+  try { await api('DELETE', `/asso/adherents/${id}`); await renderAssoAdherents(); }
+  catch(e) { alert(e.error || 'Erreur'); }
+}
+
+/* ── Section : cotisations ── */
+async function renderAssoCotisations() {
+  const listEl = document.getElementById('asso-cot-list');
+  const statsEl = document.getElementById('asso-cot-stats');
+  listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+  try {
+    const statut = document.getElementById('asso-cot-statut')?.value || '';
+    const { cotisations, stats } = await api('GET', `/asso/cotisations?statut=${statut}`);
+    statsEl.innerHTML = `
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:#16a34a;">${assoFmt(stats.total_percu)}</div>
+        <div style="font-size:11px;color:var(--muted);">Perçu</div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:#f59e0b;">${assoFmt(stats.total_attendu)}</div>
+        <div style="font-size:11px;color:var(--muted);">En attente</div>
+      </div>
+      ${stats.en_retard > 0 ? `<div style="background:#fee2e2;border:1.5px solid #dc2626;border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:#dc2626;">${stats.en_retard}</div>
+        <div style="font-size:11px;color:#991b1b;">En retard</div>
+      </div>` : ''}`;
+    if (!cotisations.length) { listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Aucune cotisation.</div>'; return; }
+    listEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:2px solid var(--border);">
+        <th style="text-align:left;padding:8px 10px;">Intitulé</th>
+        <th style="text-align:left;padding:8px 10px;">Adhérent</th>
+        <th style="text-align:right;padding:8px 10px;">Montant</th>
+        <th style="text-align:left;padding:8px 10px;">Statut</th>
+        <th style="text-align:left;padding:8px 10px;">Échéance</th>
+        <th style="padding:8px 10px;"></th>
+      </tr></thead>
+      <tbody>${cotisations.map(c => `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 10px;font-weight:600;">${assoEsc(c.intitule)}</td>
+        <td style="padding:8px 10px;color:var(--muted);">${assoEsc(c.adherent_nom||'—')}</td>
+        <td style="padding:8px 10px;text-align:right;font-weight:700;">${assoFmt(c.montant)}</td>
+        <td style="padding:8px 10px;">${assoBadge(c.statut)}</td>
+        <td style="padding:8px 10px;font-size:12px;color:var(--muted);">${assoDate(c.date_echeance)}</td>
+        <td style="padding:8px 10px;">
+          ${c.statut !== 'payee' ? `<button class="btn btn-sm" style="font-size:11px;padding:3px 8px;background:#16a34a;color:#fff;" onclick="marquerCotisationPayee(${c.id})">✓ Payée</button>` : ''}
+        </td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } catch(e) { listEl.innerHTML = `<div style="color:#D33;">${assoEsc(e.message||String(e))}</div>`; }
+}
+
+function openAssoCotisationModal() {
+  ['asso-cot-intitule','asso-cot-montant'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('asso-cot-error').style.display = 'none';
+  document.getElementById('asso-cot-modal').style.display = '';
+}
+
+async function saveAssoCotisation() {
+  const errEl = document.getElementById('asso-cot-error');
+  errEl.style.display = 'none';
+  const intitule = document.getElementById('asso-cot-intitule').value.trim();
+  const montant = parseFloat(document.getElementById('asso-cot-montant').value);
+  if (!intitule || isNaN(montant)) { errEl.textContent = 'Intitulé et montant requis.'; errEl.style.display = ''; return; }
+  try {
+    await api('POST', '/asso/cotisations', {
+      intitule, montant,
+      periodicite: document.getElementById('asso-cot-periodicite').value,
+      statut: document.getElementById('asso-cot-st').value,
+      date_echeance: document.getElementById('asso-cot-echeance').value || undefined,
+    });
+    document.getElementById('asso-cot-modal').style.display = 'none';
+    await renderAssoCotisations();
+  } catch(e) { errEl.textContent = e.error || e.message || 'Erreur'; errEl.style.display = ''; }
+}
+
+async function marquerCotisationPayee(id) {
+  try {
+    await api('PUT', `/asso/cotisations/${id}/statut`, { statut: 'payee', date_paiement: new Date().toISOString().slice(0,10) });
+    await renderAssoCotisations();
+  } catch(e) { alert(e.error || 'Erreur'); }
+}
+
+/* ── Section : finances ── */
+async function renderAssoFinances() {
+  const listEl = document.getElementById('asso-fin-list');
+  const bilanEl = document.getElementById('asso-fin-bilan');
+  listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+  try {
+    const annee = document.getElementById('asso-fin-annee')?.value || '';
+    const { mouvements, bilan } = await api('GET', `/asso/finances?annee=${annee}`);
+    bilanEl.innerHTML = `
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:#16a34a;">${assoFmt(bilan.recettes)}</div>
+        <div style="font-size:11px;color:var(--muted);">Recettes</div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:#dc2626;">${assoFmt(bilan.depenses)}</div>
+        <div style="font-size:11px;color:var(--muted);">Dépenses</div>
+      </div>
+      <div style="background:${(bilan.solde||0)>=0?'#f0fdf4':'#fee2e2'};border:1px solid ${(bilan.solde||0)>=0?'#22c55e':'#dc2626'};border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:${(bilan.solde||0)>=0?'#16a34a':'#dc2626'};">${assoFmt(bilan.solde)}</div>
+        <div style="font-size:11px;color:var(--muted);">Solde</div>
+      </div>`;
+    if (!mouvements.length) { listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Aucun mouvement.</div>'; return; }
+    listEl.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:2px solid var(--border);">
+        <th style="text-align:left;padding:8px 10px;">Date</th>
+        <th style="text-align:left;padding:8px 10px;">Type</th>
+        <th style="text-align:left;padding:8px 10px;">Catégorie</th>
+        <th style="text-align:left;padding:8px 10px;">Intitulé</th>
+        <th style="text-align:right;padding:8px 10px;">Montant</th>
+        <th style="padding:8px 10px;"></th>
+      </tr></thead>
+      <tbody>${mouvements.map(m => `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 10px;font-size:12px;color:var(--muted);">${assoDate(m.date_op)}</td>
+        <td style="padding:8px 10px;">${m.type==='recette'?'<span style="color:#16a34a;font-weight:700;">↑ Recette</span>':'<span style="color:#dc2626;font-weight:700;">↓ Dépense</span>'}</td>
+        <td style="padding:8px 10px;font-size:12px;">${assoEsc(m.categorie||'—')}</td>
+        <td style="padding:8px 10px;font-weight:600;">${assoEsc(m.intitule)}</td>
+        <td style="padding:8px 10px;text-align:right;font-weight:700;color:${m.type==='recette'?'#16a34a':'#dc2626'};">${m.type==='recette'?'+':'−'}${assoFmt(m.montant)}</td>
+        <td style="padding:8px 10px;"><button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;color:#dc2626;border-color:#dc2626;" onclick="supprimerAssoFinance(${m.id})">✕</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } catch(e) { listEl.innerHTML = `<div style="color:#D33;">${assoEsc(e.message||String(e))}</div>`; }
+}
+
+function openAssoFinanceModal() {
+  ['asso-fin-intitule','asso-fin-montant','asso-fin-notes'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('asso-fin-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('asso-fin-error').style.display = 'none';
+  document.getElementById('asso-fin-modal').style.display = '';
+}
+
+async function saveAssoFinance() {
+  const errEl = document.getElementById('asso-fin-error');
+  errEl.style.display = 'none';
+  const intitule = document.getElementById('asso-fin-intitule').value.trim();
+  const montant = parseFloat(document.getElementById('asso-fin-montant').value);
+  if (!intitule || isNaN(montant)) { errEl.textContent = 'Intitulé et montant requis.'; errEl.style.display = ''; return; }
+  try {
+    await api('POST', '/asso/finances', {
+      type: document.getElementById('asso-fin-type').value,
+      categorie: document.getElementById('asso-fin-cat').value,
+      intitule, montant,
+      date_op: document.getElementById('asso-fin-date').value || undefined,
+      notes: document.getElementById('asso-fin-notes').value.trim() || undefined,
+    });
+    document.getElementById('asso-fin-modal').style.display = 'none';
+    await renderAssoFinances();
+  } catch(e) { errEl.textContent = e.error || e.message || 'Erreur'; errEl.style.display = ''; }
+}
+
+async function supprimerAssoFinance(id) {
+  if (!confirm('Supprimer ce mouvement ?')) return;
+  try { await api('DELETE', `/asso/finances/${id}`); await renderAssoFinances(); }
+  catch(e) { alert(e.error || 'Erreur'); }
+}
+
+/* ── Section : documents ── */
+async function renderAssoDocuments() {
+  const el = document.getElementById('asso-doc-list');
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+  try {
+    const { documents } = await api('GET', '/asso/documents');
+    if (!documents.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Aucun document. Cliquez sur "+ Document" pour en ajouter un.</div>'; return; }
+    el.innerHTML = `<div style="display:grid;gap:10px;">${documents.map(d => `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;align-items:center;gap:14px;">
+        <span style="font-size:28px;">${{statuts:'📜',pv:'📋',contrat:'📄',rapport:'📊',convention:'🤝',autre:'📁'}[d.type]||'📁'}</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:14px;">${assoEsc(d.nom)}</div>
+          <div style="font-size:12px;color:var(--muted);">${assoEsc(d.type)} · ${assoEsc(d.acces)} · ${assoDate(d.created_at)}</div>
+          ${d.url ? `<a href="${assoEsc(d.url)}" target="_blank" style="font-size:12px;color:var(--orange);">Ouvrir →</a>` : ''}
+        </div>
+        <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;font-size:11px;" onclick="supprimerAssoDoc(${d.id})">Supprimer</button>
+      </div>`).join('')}</div>`;
+  } catch(e) { el.innerHTML = `<div style="color:#D33;">${assoEsc(e.message||String(e))}</div>`; }
+}
+
+function openAssoDocumentModal() {
+  ['asso-doc-nom','asso-doc-url'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('asso-doc-error').style.display = 'none';
+  document.getElementById('asso-doc-modal').style.display = '';
+}
+
+async function saveAssoDocument() {
+  const errEl = document.getElementById('asso-doc-error');
+  errEl.style.display = 'none';
+  const nom = document.getElementById('asso-doc-nom').value.trim();
+  if (!nom) { errEl.textContent = 'Nom requis.'; errEl.style.display = ''; return; }
+  try {
+    await api('POST', '/asso/documents', {
+      nom,
+      type: document.getElementById('asso-doc-type').value,
+      acces: document.getElementById('asso-doc-acces').value,
+      url: document.getElementById('asso-doc-url').value.trim() || undefined,
+    });
+    document.getElementById('asso-doc-modal').style.display = 'none';
+    await renderAssoDocuments();
+  } catch(e) { errEl.textContent = e.error || e.message || 'Erreur'; errEl.style.display = ''; }
+}
+
+async function supprimerAssoDoc(id) {
+  if (!confirm('Supprimer ce document ?')) return;
+  try { await api('DELETE', `/asso/documents/${id}`); await renderAssoDocuments(); }
+  catch(e) { alert(e.error || 'Erreur'); }
+}
+
+/* ── Section : votes ── */
+async function renderAssoVotes() {
+  const el = document.getElementById('asso-vote-list');
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+  try {
+    const { votes } = await api('GET', '/asso/votes');
+    if (!votes.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Aucun vote créé.</div>'; return; }
+    const VOTE_COLORS = {brouillon:'background:#f1f5f9;color:#64748b;',ouvert:'background:#dcfce7;color:#166534;',clos:'background:#dbeafe;color:#1e40af;',annule:'background:#fee2e2;color:#991b1b;'};
+    el.innerHTML = `<div style="display:grid;gap:12px;">${votes.map(v => {
+      const opts = JSON.parse(v.options_json||'[]');
+      const res = JSON.parse(v.resultat_json||'{}');
+      const total = Object.values(res).reduce((s,n)=>s+n,0);
+      return `<div style="border:1px solid var(--border);border-radius:12px;padding:16px;">
+        <div style="display:flex;align-items:start;justify-content:space-between;gap:10px;margin-bottom:8px;">
+          <div>
+            <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;${VOTE_COLORS[v.statut]||''}">${v.statut}</span>
+            <div style="font-weight:700;font-size:14px;margin-top:6px;">${assoEsc(v.titre)}</div>
+            <div style="font-size:12px;color:var(--muted);">${assoEsc(v.type)}${v.date_fin?' · Jusqu\'au '+assoDate(v.date_fin):''}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${v.statut==='brouillon'?`<button class="btn btn-sm" style="background:#16a34a;color:#fff;font-size:11px;" onclick="ouvrirVote(${v.id})">Ouvrir</button>`:''}
+            ${v.statut==='ouvert'?`<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="clorerVote(${v.id})">Clore</button>`:''}
+          </div>
+        </div>
+        ${v.statut==='clos'&&total>0?`<div style="margin-top:10px;">${opts.map(o=>{const n=res[o]||0;const pct=total>0?Math.round(n/total*100):0;return`<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span>${assoEsc(o)}</span><span>${n} (${pct}%)</span></div><div style="background:var(--border);border-radius:4px;height:6px;"><div style="background:var(--orange);height:6px;border-radius:4px;width:${pct}%"></div></div></div>`}).join('')}</div>`:''}
+        ${v.statut!=='clos'?`<div style="font-size:12px;color:var(--muted);margin-top:8px;">Options : ${opts.map(o=>assoEsc(o)).join(' · ')}</div>`:''}
+      </div>`;
+    }).join('')}</div>`;
+  } catch(e) { el.innerHTML = `<div style="color:#D33;">${assoEsc(e.message||String(e))}</div>`; }
+}
+
+function openAssoVoteModal() {
+  ['asso-vote-titre','asso-vote-desc','asso-vote-options','asso-vote-debut','asso-vote-fin'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('asso-vote-error').style.display = 'none';
+  document.getElementById('asso-vote-modal').style.display = '';
+}
+
+async function saveAssoVote() {
+  const errEl = document.getElementById('asso-vote-error');
+  errEl.style.display = 'none';
+  const titre = document.getElementById('asso-vote-titre').value.trim();
+  const optionsRaw = document.getElementById('asso-vote-options').value;
+  const options = optionsRaw.split('\n').map(s=>s.trim()).filter(Boolean);
+  if (!titre) { errEl.textContent = 'Titre requis.'; errEl.style.display = ''; return; }
+  if (options.length < 2) { errEl.textContent = 'Au moins 2 options requises.'; errEl.style.display = ''; return; }
+  try {
+    await api('POST', '/asso/votes', {
+      titre,
+      description: document.getElementById('asso-vote-desc').value.trim()||undefined,
+      type: document.getElementById('asso-vote-type').value,
+      options,
+      date_debut: document.getElementById('asso-vote-debut').value||undefined,
+      date_fin: document.getElementById('asso-vote-fin').value||undefined,
+    });
+    document.getElementById('asso-vote-modal').style.display = 'none';
+    await renderAssoVotes();
+  } catch(e) { errEl.textContent = e.error || e.message || 'Erreur'; errEl.style.display = ''; }
+}
+
+async function ouvrirVote(id) {
+  try { await api('PUT', `/asso/votes/${id}/ouvrir`); await renderAssoVotes(); }
+  catch(e) { alert(e.error || 'Erreur'); }
+}
+
+async function clorerVote(id) {
+  if (!confirm('Clore ce vote ? Les résultats seront calculés et le vote fermé définitivement.')) return;
+  try { await api('PUT', `/asso/votes/${id}/clore`); await renderAssoVotes(); }
+  catch(e) { alert(e.error || 'Erreur'); }
+}
+
+/* Initialisation au chargement */
+initAssoSidebar();
 </script>
 
   <nav class="mobile-bottom-nav">

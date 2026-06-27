@@ -8786,6 +8786,381 @@ async function handleRequest(req, res) {
   serveStatic(req, res, pathname);
 }
 
+/* ════════════════════════════════════════════════════════════════
+   MODULE GESTION DES ASSOCIATIONS — Art. 30-33
+   Accréditation, abonnement, adhérents, cotisations, finances,
+   documents, votes électroniques, badges
+   ════════════════════════════════════════════════════════════════ */
+
+function getAssoAccred(userId) {
+  return db.prepare(`SELECT * FROM asso_accreditations WHERE user_id=? AND statut='active'`).get(userId);
+}
+
+/* GET /api/asso/accreditation */
+route("GET", "/api/asso/accreditation", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const accred = db.prepare(`SELECT * FROM asso_accreditations WHERE user_id=?`).get(user.id);
+  const demande = db.prepare(`SELECT * FROM asso_demandes WHERE user_id=? ORDER BY created_at DESC LIMIT 1`).get(user.id);
+  sendJSON(res, 200, { accreditation: accred || null, demande: demande || null });
+});
+
+/* POST /api/asso/demande */
+route("POST", "/api/asso/demande", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { niveau = "verifiee", periodicite = "annuel", nom_asso, pays, ville, siret, description } = body;
+  if (!nom_asso) return sendJSON(res, 400, { error: "Le nom de l'association est requis." });
+  if (!["verifiee","accreditee"].includes(niveau)) return sendJSON(res, 400, { error: "Niveau invalide." });
+  const existante = db.prepare(`SELECT id FROM asso_demandes WHERE user_id=? AND statut='en_attente'`).get(user.id);
+  if (existante) return sendJSON(res, 409, { error: "Une demande est déjà en cours de traitement." });
+  const accred = getAssoAccred(user.id);
+  if (accred && accred.niveau === niveau) return sendJSON(res, 409, { error: "Vous possédez déjà ce niveau." });
+  const id = db.prepare(`INSERT INTO asso_demandes (user_id,niveau,periodicite,nom_asso,pays,ville,siret,description) VALUES (?,?,?,?,?,?,?,?)`)
+    .run(user.id, niveau, periodicite, nom_asso, pays||null, ville||null, siret||null, description||null).lastInsertRowid;
+  const admins = db.prepare(`SELECT id FROM users WHERE role IN ('administrateur','super_administrateur')`).all();
+  admins.forEach(a => creerNotif(a.id, "validation", "Demande accréditation association",
+    `${user.nom} demande l'accréditation « Association ${niveau === "accreditee" ? "Accréditée" : "Vérifiée"} »`, { demande_id: Number(id) }));
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* GET /api/asso/demandes */
+route("GET", "/api/asso/demandes", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const demandes = db.prepare(`SELECT * FROM asso_demandes WHERE user_id=? ORDER BY created_at DESC`).all(user.id);
+  sendJSON(res, 200, { demandes });
+});
+
+/* GET /api/asso/adherents */
+route("GET", "/api/asso/adherents", async (req, res, params, body, query) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module Gestion des Associations requis." });
+  const { q, statut, limit: lim = 50, offset: off = 0 } = query;
+  let sql = `SELECT * FROM asso_adherents WHERE asso_user_id=?`;
+  const p = [user.id];
+  if (statut) { sql += ` AND statut=?`; p.push(statut); }
+  if (q) { sql += ` AND (prenom LIKE ? OR nom LIKE ? OR email LIKE ?)`; p.push(`%${q}%`,`%${q}%`,`%${q}%`); }
+  sql += ` ORDER BY nom,prenom LIMIT ? OFFSET ?`;
+  p.push(Number(lim), Number(off));
+  const total = db.prepare(`SELECT COUNT(*) AS n FROM asso_adherents WHERE asso_user_id=?`).get(user.id).n;
+  const adherents = db.prepare(sql).all(...p);
+  sendJSON(res, 200, { adherents, total });
+});
+
+/* POST /api/asso/adherents */
+route("POST", "/api/asso/adherents", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module Gestion des Associations requis." });
+  const { prenom, nom, email, telephone, adresse, pays, date_naissance, nationalite, type_adhesion = "standard", date_expiration, notes } = body;
+  if (!prenom || !nom) return sendJSON(res, 400, { error: "Prénom et nom requis." });
+  const id = db.prepare(`INSERT INTO asso_adherents (asso_user_id,prenom,nom,email,telephone,adresse,pays,date_naissance,nationalite,type_adhesion,date_expiration,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(user.id, prenom, nom, email||null, telephone||null, adresse||null, pays||null, date_naissance||null, nationalite||null, type_adhesion, date_expiration||null, notes||null).lastInsertRowid;
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* PUT /api/asso/adherents/:id */
+route("PUT", "/api/asso/adherents/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const adh = db.prepare(`SELECT * FROM asso_adherents WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
+  if (!adh) return sendJSON(res, 404, { error: "Adhérent introuvable." });
+  const { prenom, nom, email, telephone, adresse, pays, date_naissance, nationalite, statut, type_adhesion, date_expiration, notes } = body;
+  db.prepare(`UPDATE asso_adherents SET prenom=COALESCE(?,prenom),nom=COALESCE(?,nom),email=COALESCE(?,email),telephone=COALESCE(?,telephone),
+    adresse=COALESCE(?,adresse),pays=COALESCE(?,pays),date_naissance=COALESCE(?,date_naissance),nationalite=COALESCE(?,nationalite),
+    statut=COALESCE(?,statut),type_adhesion=COALESCE(?,type_adhesion),date_expiration=COALESCE(?,date_expiration),notes=COALESCE(?,notes),updated_at=datetime('now') WHERE id=?`)
+    .run(prenom||null,nom||null,email||null,telephone||null,adresse||null,pays||null,date_naissance||null,nationalite||null,statut||null,type_adhesion||null,date_expiration||null,notes||null,adh.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/asso/adherents/:id */
+route("DELETE", "/api/asso/adherents/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const adh = db.prepare(`SELECT id FROM asso_adherents WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
+  if (!adh) return sendJSON(res, 404, { error: "Adhérent introuvable." });
+  db.prepare(`DELETE FROM asso_adherents WHERE id=?`).run(adh.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/asso/cotisations */
+route("GET", "/api/asso/cotisations", async (req, res, params, body, query) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const { statut, limit: lim = 50, offset: off = 0 } = query;
+  let sql = `SELECT c.*, a.prenom||' '||a.nom AS adherent_nom FROM asso_cotisations c LEFT JOIN asso_adherents a ON a.id=c.adherent_id WHERE c.asso_user_id=?`;
+  const p = [user.id];
+  if (statut) { sql += ` AND c.statut=?`; p.push(statut); }
+  sql += ` ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
+  p.push(Number(lim), Number(off));
+  const cotisations = db.prepare(sql).all(...p);
+  const stats = db.prepare(`SELECT SUM(CASE WHEN statut='payee' THEN montant ELSE 0 END) AS total_percu, SUM(CASE WHEN statut='en_attente' THEN montant ELSE 0 END) AS total_attendu, COUNT(*) AS total, SUM(CASE WHEN statut='en_retard' THEN 1 ELSE 0 END) AS en_retard FROM asso_cotisations WHERE asso_user_id=?`).get(user.id);
+  sendJSON(res, 200, { cotisations, stats });
+});
+
+/* POST /api/asso/cotisations */
+route("POST", "/api/asso/cotisations", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const { adherent_id, intitule, montant, devise = "EUR", periodicite = "annuel", statut = "en_attente", date_echeance, date_paiement, mode_paiement, reference, notes } = body;
+  if (!intitule || montant == null) return sendJSON(res, 400, { error: "Intitulé et montant requis." });
+  const id = db.prepare(`INSERT INTO asso_cotisations (asso_user_id,adherent_id,intitule,montant,devise,periodicite,statut,date_echeance,date_paiement,mode_paiement,reference,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(user.id, adherent_id||null, intitule, Number(montant), devise, periodicite, statut, date_echeance||null, date_paiement||null, mode_paiement||null, reference||null, notes||null).lastInsertRowid;
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* PUT /api/asso/cotisations/:id/statut */
+route("PUT", "/api/asso/cotisations/:id/statut", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const cot = db.prepare(`SELECT id FROM asso_cotisations WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
+  if (!cot) return sendJSON(res, 404, { error: "Cotisation introuvable." });
+  const { statut, date_paiement, mode_paiement } = body;
+  db.prepare(`UPDATE asso_cotisations SET statut=COALESCE(?,statut),date_paiement=COALESCE(?,date_paiement),mode_paiement=COALESCE(?,mode_paiement) WHERE id=?`)
+    .run(statut||null, date_paiement||null, mode_paiement||null, cot.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/asso/finances */
+route("GET", "/api/asso/finances", async (req, res, params, body, query) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const { annee, limit: lim = 100, offset: off = 0 } = query;
+  let sql = `SELECT * FROM asso_finances WHERE asso_user_id=?`;
+  const p = [user.id];
+  if (annee) { sql += ` AND strftime('%Y',date_op)=?`; p.push(String(annee)); }
+  sql += ` ORDER BY date_op DESC LIMIT ? OFFSET ?`;
+  p.push(Number(lim), Number(off));
+  const mouvements = db.prepare(sql).all(...p);
+  const bilan = db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) AS recettes, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) AS depenses, SUM(CASE WHEN type='recette' THEN montant ELSE -montant END) AS solde FROM asso_finances WHERE asso_user_id=?`).get(user.id);
+  sendJSON(res, 200, { mouvements, bilan });
+});
+
+/* POST /api/asso/finances */
+route("POST", "/api/asso/finances", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const { type, categorie, intitule, montant, devise = "EUR", date_op, mode_paiement, piece_justif, notes } = body;
+  if (!["recette","depense"].includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
+  if (!intitule || montant == null) return sendJSON(res, 400, { error: "Intitulé et montant requis." });
+  const id = db.prepare(`INSERT INTO asso_finances (asso_user_id,type,categorie,intitule,montant,devise,date_op,mode_paiement,piece_justif,notes) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+    .run(user.id, type, categorie||null, intitule, Number(montant), devise, date_op||new Date().toISOString().slice(0,10), mode_paiement||null, piece_justif||null, notes||null).lastInsertRowid;
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* DELETE /api/asso/finances/:id */
+route("DELETE", "/api/asso/finances/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const row = db.prepare(`SELECT id FROM asso_finances WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
+  if (!row) return sendJSON(res, 404, { error: "Mouvement introuvable." });
+  db.prepare(`DELETE FROM asso_finances WHERE id=?`).run(row.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/asso/documents */
+route("GET", "/api/asso/documents", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const docs = db.prepare(`SELECT * FROM asso_documents WHERE asso_user_id=? ORDER BY created_at DESC`).all(user.id);
+  sendJSON(res, 200, { documents: docs });
+});
+
+/* POST /api/asso/documents */
+route("POST", "/api/asso/documents", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const { nom, type = "autre", url, taille, acces = "bureau" } = body;
+  if (!nom) return sendJSON(res, 400, { error: "Nom du document requis." });
+  const id = db.prepare(`INSERT INTO asso_documents (asso_user_id,nom,type,url,taille,acces,created_by) VALUES (?,?,?,?,?,?,?)`)
+    .run(user.id, nom, type, url||null, taille||null, acces, user.id).lastInsertRowid;
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* DELETE /api/asso/documents/:id */
+route("DELETE", "/api/asso/documents/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const doc = db.prepare(`SELECT id FROM asso_documents WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
+  if (!doc) return sendJSON(res, 404, { error: "Document introuvable." });
+  db.prepare(`DELETE FROM asso_documents WHERE id=?`).run(doc.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/asso/votes */
+route("GET", "/api/asso/votes", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const votes = db.prepare(`SELECT * FROM asso_votes WHERE asso_user_id=? ORDER BY created_at DESC`).all(user.id);
+  sendJSON(res, 200, { votes });
+});
+
+/* POST /api/asso/votes */
+route("POST", "/api/asso/votes", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
+  const { titre, description, type = "resolution", options = [], anonyme = true, date_debut, date_fin, quorum = 0 } = body;
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  if (!Array.isArray(options) || options.length < 2) return sendJSON(res, 400, { error: "Au moins 2 options requises." });
+  const id = db.prepare(`INSERT INTO asso_votes (asso_user_id,titre,description,type,options_json,anonyme,date_debut,date_fin,quorum,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+    .run(user.id, titre, description||null, type, JSON.stringify(options), anonyme?1:0, date_debut||null, date_fin||null, Number(quorum), user.id).lastInsertRowid;
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* PUT /api/asso/votes/:id/ouvrir */
+route("PUT", "/api/asso/votes/:id/ouvrir", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const v = db.prepare(`SELECT id FROM asso_votes WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
+  if (!v) return sendJSON(res, 404, { error: "Vote introuvable." });
+  db.prepare(`UPDATE asso_votes SET statut='ouvert' WHERE id=?`).run(v.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PUT /api/asso/votes/:id/clore */
+route("PUT", "/api/asso/votes/:id/clore", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const v = db.prepare(`SELECT * FROM asso_votes WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
+  if (!v) return sendJSON(res, 404, { error: "Vote introuvable." });
+  const reponses = db.prepare(`SELECT choix, COUNT(*) AS n FROM asso_votes_reponses WHERE vote_id=? GROUP BY choix`).all(v.id);
+  const resultat = {};
+  reponses.forEach(r => { resultat[r.choix] = r.n; });
+  db.prepare(`UPDATE asso_votes SET statut='clos', resultat_json=? WHERE id=?`).run(JSON.stringify(resultat), v.id);
+  sendJSON(res, 200, { ok: true, resultat });
+});
+
+/* POST /api/asso/votes/:id/voter */
+route("POST", "/api/asso/votes/:id/voter", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const v = db.prepare(`SELECT * FROM asso_votes WHERE id=? AND statut='ouvert'`).get(Number(params.id));
+  if (!v) return sendJSON(res, 404, { error: "Vote non disponible." });
+  const { adherent_id, choix } = body;
+  if (!choix) return sendJSON(res, 400, { error: "Choix requis." });
+  const options = JSON.parse(v.options_json || "[]");
+  if (!options.includes(choix)) return sendJSON(res, 400, { error: "Option invalide." });
+  try {
+    db.prepare(`INSERT INTO asso_votes_reponses (vote_id,adherent_id,choix) VALUES (?,?,?)`)
+      .run(v.id, adherent_id||null, choix);
+    sendJSON(res, 201, { ok: true });
+  } catch(e) {
+    sendJSON(res, 409, { error: "Vous avez déjà voté." });
+  }
+});
+
+/* GET /api/asso/badge/:userId */
+route("GET", "/api/asso/badge/:userId", async (req, res, params) => {
+  const accred = db.prepare(`SELECT niveau, statut FROM asso_accreditations WHERE user_id=?`).get(Number(params.userId));
+  if (!accred || accred.statut !== "active") return sendJSON(res, 200, { badge: null });
+  sendJSON(res, 200, { badge: accred.niveau });
+});
+
+/* GET /api/asso/dashboard */
+route("GET", "/api/asso/dashboard", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const accred = getAssoAccred(user.id);
+  if (!accred) return sendJSON(res, 403, { error: "Module requis." });
+  const adherents = db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=? AND statut='actif'`).get(user.id).n;
+  const adherentsTotal = db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=?`).get(user.id).n;
+  const cotisations = db.prepare(`SELECT SUM(montant) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(user.id).n || 0;
+  const en_retard = db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='en_retard'`).get(user.id).n;
+  const bilan = db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE -montant END) solde FROM asso_finances WHERE asso_user_id=?`).get(user.id).solde || 0;
+  const votes_ouverts = db.prepare(`SELECT COUNT(*) n FROM asso_votes WHERE asso_user_id=? AND statut='ouvert'`).get(user.id).n;
+  const documents = db.prepare(`SELECT COUNT(*) n FROM asso_documents WHERE asso_user_id=?`).get(user.id).n;
+  sendJSON(res, 200, { accreditation: accred, stats: { adherents, adherentsTotal, cotisations, en_retard, bilan, votes_ouverts, documents } });
+});
+
+/* ADMIN routes */
+route("GET", "/api/admin/asso/demandes", async (req, res, params, body, query) => {
+  const user = getCurrentUser(req);
+  if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
+  const statut = query.statut || "en_attente";
+  const rows = db.prepare(`SELECT d.*, u.nom AS user_nom, u.email AS user_email FROM asso_demandes d JOIN users u ON u.id=d.user_id WHERE d.statut=? ORDER BY d.created_at DESC`).all(statut);
+  sendJSON(res, 200, { demandes: rows });
+});
+
+route("POST", "/api/admin/asso/demandes/:id/approuver", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
+  const dem = db.prepare(`SELECT * FROM asso_demandes WHERE id=?`).get(Number(params.id));
+  if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
+  db.prepare(`UPDATE asso_demandes SET statut='approuvee', updated_at=datetime('now') WHERE id=?`).run(dem.id);
+  const existing = db.prepare(`SELECT id FROM asso_accreditations WHERE user_id=?`).get(dem.user_id);
+  const { date_fin } = body;
+  if (existing) {
+    db.prepare(`UPDATE asso_accreditations SET niveau=?,statut='active',periodicite=?,date_debut=date('now'),date_fin=?,admin_id=?,updated_at=datetime('now') WHERE id=?`)
+      .run(dem.niveau, dem.periodicite, date_fin||null, user.id, existing.id);
+  } else {
+    db.prepare(`INSERT INTO asso_accreditations (user_id,niveau,statut,periodicite,date_debut,date_fin,admin_id) VALUES (?,?,'active',?,date('now'),?,?)`)
+      .run(dem.user_id, dem.niveau, dem.periodicite, date_fin||null, user.id);
+  }
+  db.prepare(`INSERT INTO asso_accred_historique (user_id,action,niveau,admin_id) VALUES (?,?,?,?)`)
+    .run(dem.user_id, "approuvee", dem.niveau, user.id);
+  creerNotif(dem.user_id, "success", "Accréditation accordée",
+    `Votre accréditation « Association ${dem.niveau === "accreditee" ? "Accréditée" : "Vérifiée"} » a été approuvée.`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/asso/demandes/:id/refuser", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
+  const dem = db.prepare(`SELECT * FROM asso_demandes WHERE id=?`).get(Number(params.id));
+  if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
+  const { motif } = body;
+  db.prepare(`UPDATE asso_demandes SET statut='refusee', motif_refus=?, updated_at=datetime('now') WHERE id=?`).run(motif||null, dem.id);
+  db.prepare(`INSERT INTO asso_accred_historique (user_id,action,niveau,admin_id,motif) VALUES (?,?,?,?,?)`)
+    .run(dem.user_id, "refusee", dem.niveau, user.id, motif||null);
+  creerNotif(dem.user_id, "alerte", "Demande refusée",
+    `Votre demande d'accréditation association a été refusée.${motif ? " Motif : " + motif : ""}`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/asso/:userId/suspendre", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
+  const { motif } = body;
+  db.prepare(`UPDATE asso_accreditations SET statut='suspendue',motif=?,updated_at=datetime('now') WHERE user_id=?`).run(motif||null, Number(params.userId));
+  db.prepare(`INSERT INTO asso_accred_historique (user_id,action,admin_id,motif) VALUES (?,?,?,?)`).run(Number(params.userId), "suspendue", user.id, motif||null);
+  creerNotif(Number(params.userId), "alerte", "Accréditation suspendue", `Votre accréditation a été suspendue.${motif ? " Motif : " + motif : ""}`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/asso/:userId/retirer", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
+  const { motif } = body;
+  db.prepare(`UPDATE asso_accreditations SET statut='retiree',motif=?,updated_at=datetime('now') WHERE user_id=?`).run(motif||null, Number(params.userId));
+  db.prepare(`INSERT INTO asso_accred_historique (user_id,action,admin_id,motif) VALUES (?,?,?,?)`).run(Number(params.userId), "retiree", user.id, motif||null);
+  creerNotif(Number(params.userId), "alerte", "Accréditation retirée", `Votre accréditation a été retirée.${motif ? " Motif : " + motif : ""}`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/admin/asso/liste", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
+  const rows = db.prepare(`SELECT a.*, u.nom AS user_nom, u.email AS user_email FROM asso_accreditations a JOIN users u ON u.id=a.user_id ORDER BY a.updated_at DESC`).all();
+  sendJSON(res, 200, { associations: rows });
+});
+
+/* ═══════════════════════════════════════════════════════════════════ */
+
 /* Export pour Vercel serverless */
 module.exports = handleRequest;
 
