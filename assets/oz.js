@@ -22,6 +22,7 @@
     annuaire:        { label: 'Annuaire',        url: '/annuaire.html',                icon: '📋' },
     messagerie:      { label: 'Messagerie',      url: '/messagerie.html',              icon: '💬' },
     formations:      { label: 'Formations',      url: '/formations.html',              icon: '📚' },
+    tutoriels:       { label: 'Centre des tutos', url: '/tutoriels.html',             icon: '🎓' },
     faq:             { label: 'FAQ',             url: '/faq.html',                     icon: '❓' },
     actualites:      { label: 'Actualités',      url: '/fil-actualite.html',           icon: '📰' },
     recherche:       { label: 'Recherche',       url: '/recherche.html',               icon: '🔍' },
@@ -55,6 +56,7 @@
     { re: /au\s*revoir|bye|bonne\s*(soir|nuit|journée)/i, id: 'bye' },
     { re: /que\s+peux[-\s]tu\s+(faire|m[e']?aider)|tes?\s+(fonctions?|capacités?)|quoi\s+(faire|dire)/i, id: 'capabilities' },
     { re: /\baide\b|help|comment\s+(faire|utiliser?|commencer)|d[eé]buter/i, id: 'help' },
+    { re: /centre\s+des?\s+tutos?|centre\s+des?\s+tutoriels?|ouvre\s+(le\s+)?centre|mes?\s+tutos?|espace\s+tutos?/i, id: 'nav_tutoriels' },
     { re: /tutoriel|guide\s+(d[e']?accueil|interactif)/i, id: 'tutorial' },
     { re: /quels?\s+(sont\s+)?mes\s+(droits?|permissions?)|que\s+puis[-\s]je\s+faire/i, id: 'my_permissions' },
     // O-Z
@@ -127,6 +129,10 @@
     // ── Navigation : Formations
     { re: _nav('(les?\s+)?formations?'), id: 'nav_formations' },
     { re: /\bformations?\b/i, id: 'nav_formations' },
+
+    // ── Navigation : Centre des tutos
+    { re: _nav('(le\s+)?centre\s+des?\s+tutos?|(les?\s+)?tutos?\s+interactifs?|(les?\s+)?tutoriels?'), id: 'nav_tutoriels' },
+    { re: /\btutos?\b|\btutoriels?\b/i, id: 'nav_tutoriels' },
 
     // ── Navigation : FAQ
     { re: _nav('(la\s+)?faq|questions?\s+fr[eé]quentes?'), id: 'nav_faq' },
@@ -765,8 +771,8 @@
         addMsg('oz', "Dites-moi simplement ce que vous voulez faire :\n\n• « **Ouvre mes messages** »\n• « **Ouvre les accréditations** »\n• « **Crée un événement** »\n• « **Ajoute une réunion à mon agenda le 15/03 à 14h** »\n• « **Montre-moi mes CV** »\n• « **Va dans l'annuaire** »\n\nJ'exécute directement — pas besoin de cliquer !");
         break;
       case 'tutorial':
-        addMsg('oz', '🎓 Lancement du guide interactif...');
-        setTimeout(() => { if (typeof window.daReplayOnboarding === 'function') window.daReplayOnboarding(); else window.location.href = '/dashboard-utilisateur.html'; }, 500);
+        addMsg('oz', '🎓 J\'ouvre le Centre des tutos...');
+        setTimeout(() => { window.location.href = '/tutoriels.html'; }, 500);
         break;
       case 'oz_settings': addMsg('oz', '⚙️ Voici vos options de personnalisation !'); toggleSettings(); break;
       case 'enable_voice':
@@ -800,6 +806,7 @@
       case 'nav_messagerie':     await navTo('messagerie');     break;
       case 'nav_annuaire':       await navTo('annuaire');       break;
       case 'nav_formations':     await navTo('formations');     break;
+      case 'nav_tutoriels':     await navTo('tutoriels');     break;
       case 'nav_faq':            await navTo('faq');            break;
       case 'nav_actualites':     await navTo('actualites');     break;
       case 'nav_reunions':       await navTo('reunions');       break;
