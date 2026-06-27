@@ -578,7 +578,20 @@ async function doSearch(query) {
     const results = await r.json();
     showSearch(q, results);
     countEl.textContent = results.length ? `${results.length} résultat(s) pour "${q}"` : `Aucun résultat pour "${q}"`;
+    /* Log automatique si aucun résultat */
+    if (!results.length && q.length >= 5) logFaqSansReponse(q);
   } catch(e) { countEl.textContent = 'Erreur lors de la recherche.'; }
+}
+
+function logFaqSansReponse(question) {
+  try {
+    fetch('/api/faq/sans-reponse', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, source: 'faq', compte_type: _currentRole || 'tous', langue: navigator.language?.slice(0,2)||'fr' })
+    }).catch(() => {});
+  } catch(e) {}
 }
 
 function showSearch(query, results) {
@@ -589,8 +602,11 @@ function showSearch(query, results) {
   if (!results.length) {
     list.innerHTML = `<div class="faq-empty">
       <span>🔍</span>
-      Aucune réponse trouvée pour <strong>"${esc(query)}"</strong><br>
-      <small>Essayez d'autres mots-clés ou consultez toutes les questions ci-dessous.</small>
+      Aucune réponse officielle pour <strong>"${esc(query)}"</strong>
+      <div style="margin:12px 0;padding:10px 14px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:0 8px 8px 0;font-size:13px;color:#92400e;text-align:left;">
+        ℹ️ Votre question a été <strong>transmise à l'équipe</strong> afin qu'une réponse officielle soit créée prochainement.
+      </div>
+      <small>Vous pouvez aussi poser votre question au <strong>💬 chatbot</strong> en bas à droite.</small>
       <br><br>
       <button onclick="hideSearch()" class="faq-ans-btn">← Parcourir la FAQ</button>
     </div>`;

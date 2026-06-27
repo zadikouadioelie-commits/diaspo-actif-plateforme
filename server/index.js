@@ -3986,6 +3986,27 @@ async function scrapeSite() {
       } catch(e){ console.error('Onboarding seed error:', e.message); }
     });
   }
+
+  /* ──────── FAQ — QUESTIONS SANS RÉPONSE ──────── */
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_sans_reponse (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question TEXT NOT NULL,
+    question_norm TEXT,
+    count INTEGER DEFAULT 1,
+    compte_type TEXT DEFAULT 'tous',
+    pays TEXT,
+    langue TEXT DEFAULT 'fr',
+    source TEXT DEFAULT 'faq',
+    user_id INTEGER,
+    statut TEXT DEFAULT 'nouveau',
+    priorite TEXT DEFAULT 'faible',
+    admin_id INTEGER,
+    faq_id INTEGER,
+    categorie_suggeree TEXT,
+    reponse_ia TEXT,
+    first_asked_at TEXT DEFAULT (datetime('now')),
+    last_asked_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 })();
 
 /* ── Helpers ── */
@@ -4319,6 +4340,152 @@ route("GET", "/api/faq/search", async (req, res, _p, _b, q) => {
   } catch(e){}
 
   sendJSON(res, 200, scored);
+});
+
+/* ════════════════════════════════════════════════════════════════
+   FAQ — QUESTIONS SANS RÉPONSE (avant /:id pour éviter conflit de route)
+   ════════════════════════════════════════════════════════════════ */
+
+function normSR(s) {
+  return (s || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function similariteSR(a, b) {
+  const wa = new Set(a.split(' ').filter(w => w.length > 3));
+  const wb = new Set(b.split(' ').filter(w => w.length > 3));
+  if (wa.size === 0 || wb.size === 0) return 0;
+  let inter = 0;
+  wa.forEach(w => { if (wb.has(w)) inter++; });
+  return inter / Math.min(wa.size, wb.size);
+}
+
+function calcPriorite(count) {
+  if (count >= 20) return 'critique';
+  if (count > 10)  return 'elevee';
+  if (count >= 3)  return 'moyenne';
+  return 'faible';
+}
+
+route("POST", "/api/faq/sans-reponse", async (req, res, _p, body) => {
+  const { question, source, compte_type, pays, langue } = body;
+  if (!question || question.trim().length < 5) return sendJSON(res, 400, { error: 'Question trop courte' });
+  const user = getCurrentUser(req);
+  const norm = normSR(question);
+  const open = db.prepare(`SELECT id, question_norm, count FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore')`).all();
+  let matched = null;
+  for (const row of open) {
+    if (similariteSR(norm, row.question_norm || '') >= 0.6) { matched = row; break; }
+  }
+  if (matched) {
+    const newCount = matched.count + 1;
+    db.prepare(`UPDATE faq_sans_reponse SET count=?,priorite=?,last_asked_at=datetime('now'),updated_at=datetime('now') WHERE id=?`)
+      .run(newCount, calcPriorite(newCount), matched.id);
+    return sendJSON(res, 200, { id: matched.id, merged: true, count: newCount });
+  }
+  const cats = db.prepare(`SELECT nom FROM faq_categories`).all();
+  let catSugg = null, bestScore = 0;
+  cats.forEach(c => { const s = similariteSR(norm, normSR(c.nom)); if (s > bestScore) { bestScore = s; catSugg = c.nom; } });
+  const r = db.prepare(`INSERT INTO faq_sans_reponse (question,question_norm,source,compte_type,pays,langue,user_id,categorie_suggeree,priorite) VALUES (?,?,?,?,?,?,?,?,?)`)
+    .run(question.trim(), norm, source||'faq', compte_type||'tous', pays||null, langue||'fr', user?.id||null, catSugg, 'faible');
+  sendJSON(res, 201, { id: r.lastInsertRowid, merged: false });
+});
+
+route("GET", "/api/faq/sans-reponse/stats", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const total      = db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='nouveau'`).get()?.n || 0;
+  const en_cours   = db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='en_cours'`).get()?.n || 0;
+  const resolues   = db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='resolu'`).get()?.n || 0;
+  const top5       = db.prepare(`SELECT question, count, priorite FROM faq_sans_reponse WHERE statut='nouveau' ORDER BY count DESC LIMIT 5`).all();
+  const by_priorite= db.prepare(`SELECT priorite, COUNT(*) n FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore') GROUP BY priorite`).all();
+  const avg_temps  = db.prepare(`SELECT AVG((julianday(updated_at)-julianday(first_asked_at))*24) h FROM faq_sans_reponse WHERE statut='resolu'`).get()?.h;
+  sendJSON(res, 200, { total, en_cours, resolues, top5, by_priorite, avg_temps_h: avg_temps });
+});
+
+route("GET", "/api/faq/sans-reponse/similaires", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const open = db.prepare(`SELECT id, question, question_norm, count FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore') ORDER BY count DESC`).all();
+  const groupes = [], used = new Set();
+  for (let i = 0; i < open.length; i++) {
+    if (used.has(open[i].id)) continue;
+    const grp = [open[i]]; used.add(open[i].id);
+    for (let j = i + 1; j < open.length; j++) {
+      if (used.has(open[j].id)) continue;
+      if (similariteSR(open[i].question_norm || '', open[j].question_norm || '') >= 0.5) { grp.push(open[j]); used.add(open[j].id); }
+    }
+    if (grp.length > 1) groupes.push(grp);
+  }
+  sendJSON(res, 200, groupes);
+});
+
+route("GET", "/api/faq/sans-reponse", async (req, res, _p, _b, query) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const statut = query.statut||'', priorite = query.priorite||'', search = query.q||'';
+  const limit = parseInt(query.limit)||50;
+  let where = ['1=1']; const params = [];
+  if (statut)   { where.push(`statut=?`);         params.push(statut); }
+  if (priorite) { where.push(`priorite=?`);       params.push(priorite); }
+  if (search)   { where.push(`question LIKE ?`);  params.push(`%${search}%`); }
+  const rows = db.prepare(
+    `SELECT s.*, u.nom user_nom, a.nom admin_nom FROM faq_sans_reponse s
+     LEFT JOIN users u ON u.id=s.user_id LEFT JOIN users a ON a.id=s.admin_id
+     WHERE ${where.join(' AND ')} ORDER BY s.count DESC, s.last_asked_at DESC LIMIT ?`
+  ).all(...params, limit);
+  sendJSON(res, 200, rows);
+});
+
+route("PUT", "/api/faq/sans-reponse/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const { statut, priorite, admin_id } = body;
+  const sets = [], vals = [];
+  if (statut)   { sets.push(`statut=?`);   vals.push(statut); }
+  if (priorite) { sets.push(`priorite=?`); vals.push(priorite); }
+  if (admin_id !== undefined) { sets.push(`admin_id=?`); vals.push(admin_id||null); }
+  if (!sets.length) return sendJSON(res, 400, { error: 'Rien à modifier' });
+  sets.push(`updated_at=datetime('now')`);
+  db.prepare(`UPDATE faq_sans_reponse SET ${sets.join(',')} WHERE id=?`).run(...vals, parseInt(params.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/faq/sans-reponse/:id/ignorer", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  db.prepare(`UPDATE faq_sans_reponse SET statut='ignore',updated_at=datetime('now') WHERE id=?`).run(parseInt(params.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/faq/sans-reponse/:id/convertir", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const sr = db.prepare(`SELECT * FROM faq_sans_reponse WHERE id=?`).get(parseInt(params.id));
+  if (!sr) return sendJSON(res, 404, { error: 'Question introuvable' });
+  const { category_id, reponse, compte_types, mots_cles, module_lien, module_label } = body;
+  if (!reponse || reponse.trim().length < 10) return sendJSON(res, 400, { error: 'Réponse trop courte' });
+  const r = db.prepare(`INSERT INTO faq_questions (category_id,compte_types,question,reponse,mots_cles,module_lien,module_label,statut,created_by) VALUES (?,?,?,?,?,?,?,'active',?)`)
+    .run(category_id||null, JSON.stringify(compte_types||['tous']), sr.question, reponse.trim(), JSON.stringify(mots_cles||[]), module_lien||null, module_label||null, user.id);
+  db.prepare(`UPDATE faq_sans_reponse SET statut='resolu',faq_id=?,updated_at=datetime('now') WHERE id=?`).run(r.lastInsertRowid, sr.id);
+  sendJSON(res, 201, { faq_id: r.lastInsertRowid, ok: true });
+});
+
+route("POST", "/api/faq/sans-reponse/fusion", async (req, res, _p, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const { ids, question_principale } = body;
+  if (!Array.isArray(ids) || ids.length < 2) return sendJSON(res, 400, { error: '≥2 IDs requis' });
+  const rows = db.prepare(`SELECT * FROM faq_sans_reponse WHERE id IN (${ids.map(()=>'?').join(',')})`).all(...ids.map(Number));
+  const totalCount = rows.reduce((s, r) => s + (r.count||1), 0);
+  const mainId = ids[0];
+  db.prepare(`UPDATE faq_sans_reponse SET question=?,question_norm=?,count=?,priorite=?,updated_at=datetime('now') WHERE id=?`)
+    .run(question_principale, normSR(question_principale), totalCount, calcPriorite(totalCount), mainId);
+  const otherIds = ids.slice(1).map(Number);
+  if (otherIds.length > 0) db.prepare(`UPDATE faq_sans_reponse SET statut='ignore',updated_at=datetime('now') WHERE id IN (${otherIds.map(()=>'?').join(',')})`).run(...otherIds);
+  sendJSON(res, 200, { id: mainId, count: totalCount });
 });
 
 /* GET /api/faq/:id — détail question */

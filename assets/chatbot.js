@@ -1655,8 +1655,11 @@
           { label: '📚 FAQ complète', action: 'faq.html' },
         ];
         _memory.add('bot', 'fallback', 'fallback');
-        appendBotMessage(pageHint ? html + `<div class="cb-proactive-tip">${_esc(pageHint)}</div>` : html, enrichedQR);
-        logUnanswered(text);
+        /* Afficher le message "question transmise" */
+        const noAnswerHtml = (pageHint ? html + `<div class="cb-proactive-tip">${_esc(pageHint)}</div>` : html)
+          + `<div class="cb-no-answer-notice">ℹ️ <strong>Aucune réponse officielle</strong> n'est disponible pour cette question. Elle a été <strong>transmise à l'équipe</strong> afin qu'une réponse soit créée.</div>`;
+        appendBotMessage(noAnswerHtml, enrichedQR);
+        logUnanswered(text, ctx);
       }
     });
   }
@@ -1719,12 +1722,20 @@
     return hints[ctx.page.module] || null;
   }
 
-  function logUnanswered(question) {
+  function logUnanswered(question, ctx) {
     try {
-      fetch('/api/chatbot/questions', {
+      const profile = getProfile();
+      fetch('/api/faq/sans-reponse', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, langue: navigator.language?.slice(0,2) || 'fr' })
+        body: JSON.stringify({
+          question,
+          source: 'chatbot',
+          compte_type: profile || 'tous',
+          langue: navigator.language?.slice(0, 2) || 'fr',
+          pays: null,
+        })
       }).catch(() => {});
     } catch(e) {}
   }
@@ -2145,6 +2156,13 @@
   background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
   border-left: 3px solid #10b981; border-radius: 0 8px 8px 0;
   font-size: 12px; color: #065f46; line-height: 1.5;
+}
+
+/* ── Bandeau "aucune réponse" ──────────────────────────────── */
+.cb-no-answer-notice {
+  margin-top: 8px; padding: 8px 10px;
+  background: #fffbeb; border-left: 3px solid #f59e0b;
+  border-radius: 0 8px 8px 0; font-size: 12px; color: #92400e; line-height: 1.5;
 }
 
 /* ── FAB déplaçable ──────────────────────────────────────────── */

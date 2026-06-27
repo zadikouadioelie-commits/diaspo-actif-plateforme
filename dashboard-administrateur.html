@@ -64,6 +64,7 @@
       <a href="#formations" data-section="formations">📚 Formations</a>
       <a href="#chatbot" data-section="chatbot">🧠 Mémoire Chatbot</a>
       <a href="#faq" data-section="faq">💡 Gestion FAQ</a>
+      <a href="#faq-sr" data-section="faq-sr">❓ Questions sans réponse</a>
       <a href="#onboarding" data-section="onboarding">🎓 Tutoriels d'accueil</a>
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
     </aside>
@@ -964,6 +965,147 @@
           </div>
         </div>
       </div>
+
+      <!-- ══════════ FAQ SANS RÉPONSE ══════════ -->
+      <section id="section-faq-sr" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <h2 style="margin:0;">❓ Questions sans réponse</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Questions posées sans réponse officielle — à traiter pour enrichir la FAQ</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="loadSrFusion()" class="btn-secondary">🔗 Fusions suggérées</button>
+            <button onclick="loadFaqSansReponse()" class="btn-secondary">↻ Actualiser</button>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+          <div class="stat-card"><div class="stat-num" id="sr-k-total" style="color:#ef4444;">—</div><div class="stat-lbl">En attente</div></div>
+          <div class="stat-card"><div class="stat-num" id="sr-k-cours" style="color:#f59e0b;">—</div><div class="stat-lbl">En cours</div></div>
+          <div class="stat-card"><div class="stat-num" id="sr-k-resolues" style="color:#10b981;">—</div><div class="stat-lbl">Résolues</div></div>
+          <div class="stat-card"><div class="stat-num" id="sr-k-temps" style="color:#6366f1;">—</div><div class="stat-lbl">Délai moy. (h)</div></div>
+        </div>
+
+        <!-- Répartition par priorité -->
+        <div style="background:#fff;border-radius:14px;border:1px solid var(--border);padding:20px;margin-bottom:20px;">
+          <h3 style="margin:0 0 14px;font-size:.95rem;">📊 Répartition par niveau de priorité</h3>
+          <div id="sr-chart" style="display:flex;gap:12px;align-items:flex-end;height:100px;"></div>
+          <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;" id="sr-chart-legend"></div>
+        </div>
+
+        <!-- Filtres -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+          <input id="sr-search" type="search" placeholder="🔍 Rechercher une question…"
+            style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;"
+            oninput="filterSrLocal()">
+          <select id="sr-f-statut" onchange="loadFaqSansReponse()"
+            style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;">
+            <option value="">Tous les statuts</option>
+            <option value="nouveau">🆕 Nouveau</option>
+            <option value="en_cours">🔄 En cours</option>
+            <option value="ignore">🚫 Ignoré</option>
+          </select>
+          <select id="sr-f-priorite" onchange="loadFaqSansReponse()"
+            style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;">
+            <option value="">Toutes priorités</option>
+            <option value="critique">🔴 Critique</option>
+            <option value="elevee">🟠 Élevée</option>
+            <option value="moyenne">🟡 Moyenne</option>
+            <option value="faible">🟢 Faible</option>
+          </select>
+        </div>
+
+        <!-- Table questions -->
+        <div style="background:#fff;border-radius:14px;border:1px solid var(--border);overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;" id="sr-table">
+            <thead>
+              <tr style="background:#f8faff;border-bottom:2px solid var(--border);">
+                <th style="padding:10px 14px;text-align:left;font-weight:600;">Question</th>
+                <th style="padding:10px 14px;text-align:center;width:80px;">Demandes</th>
+                <th style="padding:10px 14px;text-align:center;width:90px;">Priorité</th>
+                <th style="padding:10px 14px;text-align:center;width:90px;">Source</th>
+                <th style="padding:10px 14px;text-align:left;width:120px;">Dernière fois</th>
+                <th style="padding:10px 14px;text-align:center;width:180px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sr-tbody"></tbody>
+          </table>
+          <div id="sr-empty" style="display:none;padding:40px;text-align:center;color:var(--muted);">
+            ✅ Aucune question sans réponse — toutes ont été traitées !
+          </div>
+        </div>
+
+        <!-- Modal "Créer une réponse" -->
+        <div id="modal-sr-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+          <div style="background:#fff;border-radius:18px;width:min(680px,96vw);margin:auto;">
+            <div style="padding:22px 26px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+              <h3 style="margin:0;">✍️ Créer une réponse officielle</h3>
+              <button onclick="closeSrModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;">✕</button>
+            </div>
+            <div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px;">
+              <input type="hidden" id="sr-modal-id">
+              <div style="background:#f8faff;border-radius:10px;padding:14px;">
+                <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">QUESTION D'ORIGINE</div>
+                <div id="sr-modal-question" style="font-size:14px;font-weight:600;color:#1a1a2e;"></div>
+                <div id="sr-modal-meta" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+              </div>
+              <!-- Aide IA -->
+              <div id="sr-ia-zone" style="background:#f0f4ff;border-radius:10px;padding:14px;display:none;">
+                <div style="font-size:11px;font-weight:700;color:#2563eb;margin-bottom:6px;">🤖 SUGGESTION IA</div>
+                <div id="sr-ia-text" style="font-size:13px;color:#374151;line-height:1.6;"></div>
+                <button onclick="useSrIa()" style="margin-top:8px;padding:5px 12px;border-radius:7px;border:1.5px solid #2563eb;background:#fff;color:#2563eb;font-size:12px;cursor:pointer;">↳ Utiliser comme base</button>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);">CATÉGORIE</label>
+                <select id="sr-modal-cat" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;">
+                  <option value="">— Aucune catégorie —</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);">TYPES DE COMPTE</label>
+                <div id="sr-modal-types" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);">RÉPONSE OFFICIELLE (HTML autorisé) *</label>
+                <textarea id="sr-modal-reponse" rows="6"
+                  style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;font-family:inherit;resize:vertical;"
+                  placeholder="Rédigez la réponse officielle..."></textarea>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:var(--muted);">LIEN MODULE</label>
+                  <input id="sr-modal-lien" placeholder="dashboard-utilisateur.html"
+                    style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;">
+                </div>
+                <div>
+                  <label style="font-size:11px;font-weight:700;color:var(--muted);">LABEL BOUTON</label>
+                  <input id="sr-modal-lbl" placeholder="Accéder au module"
+                    style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;">
+                </div>
+              </div>
+            </div>
+            <div style="padding:16px 26px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
+              <button onclick="saveSrReponse()" class="btn-primary" style="padding:9px 22px;font-size:13px;">✅ Publier dans la FAQ</button>
+              <button onclick="closeSrModal()" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;">Annuler</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal fusions suggérées -->
+        <div id="modal-fusion-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9001;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+          <div style="background:#fff;border-radius:18px;width:min(700px,96vw);margin:auto;">
+            <div style="padding:22px 26px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+              <h3 style="margin:0;">🔗 Fusions suggérées</h3>
+              <button onclick="document.getElementById('modal-fusion-bg').style.display='none'" style="background:none;border:none;font-size:1.4rem;cursor:pointer;">✕</button>
+            </div>
+            <div style="padding:22px 26px;" id="fusion-body">Chargement…</div>
+            <div style="padding:16px 26px;border-top:1px solid var(--border);">
+              <button onclick="document.getElementById('modal-fusion-bg').style.display='none'" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;">Fermer</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- ══════════ ONBOARDING ══════════ -->
       <section id="section-onboarding" style="display:none;">
@@ -2913,6 +3055,7 @@ async function submitAccordDirect(){
     chatbot:     () => switchCbTab('stats'),
     billetterie: () => loadAdminBilletterie(),
     faq:         () => loadFaqAdmin(),
+    'faq-sr':    () => loadFaqSansReponse(),
     onboarding:  () => loadObAdmin(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
@@ -5346,6 +5489,292 @@ window.closeObStepModal = closeObStepModal;
 window.saveObStep       = saveObStep;
 window.deleteObStep     = deleteObStep;
 window.toggleObActive   = toggleObActive;
+
+/* ═══════════════════════════════════════════
+   FAQ — QUESTIONS SANS RÉPONSE (Admin)
+   ═══════════════════════════════════════════ */
+
+const SR_PRIO = { critique:'🔴 Critique', elevee:'🟠 Élevée', moyenne:'🟡 Moyenne', faible:'🟢 Faible' };
+const SR_STATUT = { nouveau:'🆕 Nouveau', en_cours:'🔄 En cours', resolu:'✅ Résolu', ignore:'🚫 Ignoré' };
+const SR_SOURCE = { faq:'💡 FAQ', chatbot:'🤖 Chatbot', search:'🔍 Recherche' };
+let _srRows = [];
+let _srCats = [];
+let _srModalId = null;
+
+function _srFmt(dt) {
+  if (!dt) return '—';
+  const d = new Date(dt);
+  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+}
+
+async function loadFaqSansReponse() {
+  const statut  = document.getElementById('sr-f-statut')?.value  || '';
+  const priorite= document.getElementById('sr-f-priorite')?.value || '';
+  try {
+    const [rows, stats, cats] = await Promise.all([
+      fetch(`/api/faq/sans-reponse?statut=${statut}&priorite=${priorite}`, {credentials:'include'}).then(r=>r.json()),
+      fetch('/api/faq/sans-reponse/stats', {credentials:'include'}).then(r=>r.json()),
+      fetch('/api/faq/categories', {credentials:'include'}).then(r=>r.json()).catch(()=>[]),
+    ]);
+
+    _srRows = Array.isArray(rows) ? rows : [];
+    _srCats = Array.isArray(cats) ? cats : [];
+
+    /* KPIs */
+    if (stats && !stats.error) {
+      document.getElementById('sr-k-total').textContent    = stats.total ?? '—';
+      document.getElementById('sr-k-cours').textContent    = stats.en_cours ?? '—';
+      document.getElementById('sr-k-resolues').textContent = stats.resolues ?? '—';
+      document.getElementById('sr-k-temps').textContent    = stats.avg_temps_h ? stats.avg_temps_h.toFixed(1) : '—';
+
+      /* Graphique en barres */
+      const chart   = document.getElementById('sr-chart');
+      const legend  = document.getElementById('sr-chart-legend');
+      const colors  = { critique:'#ef4444', elevee:'#f97316', moyenne:'#eab308', faible:'#22c55e' };
+      const labels  = { critique:'Critique', elevee:'Élevée', moyenne:'Moyenne', faible:'Faible' };
+      const byP     = stats.by_priorite || [];
+      const maxN    = Math.max(...byP.map(b=>b.n), 1);
+      if (chart) chart.innerHTML = ['critique','elevee','moyenne','faible'].map(p => {
+        const found = byP.find(b=>b.priorite===p);
+        const n = found?.n || 0;
+        const h = Math.max(4, Math.round((n / maxN) * 80));
+        return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;">
+          <div style="font-size:11px;font-weight:700;color:${colors[p]};">${n}</div>
+          <div style="width:100%;background:${colors[p]};height:${h}px;border-radius:4px 4px 0 0;"></div>
+        </div>`;
+      }).join('');
+      if (legend) legend.innerHTML = ['critique','elevee','moyenne','faible'].map(p =>
+        `<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:${colors[p]};display:inline-block;"></span>${labels[p]}</span>`
+      ).join('');
+    }
+
+    renderSrTable(_srRows);
+  } catch(e) {
+    console.error('loadFaqSansReponse error', e);
+  }
+}
+
+function renderSrTable(rows) {
+  const tbody = document.getElementById('sr-tbody');
+  const empty = document.getElementById('sr-empty');
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    if (empty) empty.style.display = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  tbody.innerHTML = rows.map(r => {
+    const prioColor = { critique:'#ef4444', elevee:'#f97316', moyenne:'#eab308', faible:'#22c55e' };
+    const color = prioColor[r.priorite] || '#6b7280';
+    return `<tr style="border-bottom:1px solid var(--border);" data-id="${r.id}">
+      <td style="padding:10px 14px;max-width:320px;">
+        <div style="font-weight:600;color:#1a1a2e;margin-bottom:2px;white-space:normal;line-height:1.4;">${r.question}</div>
+        <div style="font-size:11px;color:var(--muted);">
+          Première fois : ${_srFmt(r.first_asked_at)} · ${r.compte_type || 'tous'}
+          ${r.categorie_suggeree ? ` · Cat. suggérée : <em>${r.categorie_suggeree}</em>` : ''}
+        </div>
+      </td>
+      <td style="padding:10px 14px;text-align:center;">
+        <span style="font-weight:800;font-size:18px;color:${color};">${r.count}</span>
+      </td>
+      <td style="padding:10px 14px;text-align:center;">
+        <span style="padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;background:${color}20;color:${color};">${SR_PRIO[r.priorite]||r.priorite}</span>
+      </td>
+      <td style="padding:10px 14px;text-align:center;font-size:12px;color:var(--muted);">${SR_SOURCE[r.source]||r.source||'—'}</td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--muted);">${_srFmt(r.last_asked_at)}</td>
+      <td style="padding:10px 14px;text-align:center;">
+        <div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap;">
+          <button onclick="openSrReponse(${r.id})" title="Créer une réponse"
+            style="padding:5px 10px;border-radius:7px;border:1.5px solid #10b981;color:#10b981;background:#fff;cursor:pointer;font-size:11px;white-space:nowrap;">✍️ Répondre</button>
+          <button onclick="setSrEnCours(${r.id})" title="Marquer en cours"
+            style="padding:5px 10px;border-radius:7px;border:1.5px solid #f59e0b;color:#f59e0b;background:#fff;cursor:pointer;font-size:11px;white-space:nowrap;">🔄</button>
+          <button onclick="ignorerSr(${r.id})" title="Ignorer"
+            style="padding:5px 10px;border-radius:7px;border:1.5px solid #e5e7eb;color:#9ca3af;background:#fff;cursor:pointer;font-size:11px;">🚫</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterSrLocal() {
+  const q = (document.getElementById('sr-search')?.value || '').toLowerCase();
+  if (!q) { renderSrTable(_srRows); return; }
+  renderSrTable(_srRows.filter(r => r.question?.toLowerCase().includes(q)));
+}
+
+async function openSrReponse(id) {
+  _srModalId = id;
+  const row = _srRows.find(r => r.id === id);
+  if (!row) return;
+
+  document.getElementById('sr-modal-id').value = id;
+  document.getElementById('sr-modal-question').textContent = row.question;
+  document.getElementById('sr-modal-meta').textContent =
+    `${row.count} demande(s) · Source : ${row.source||'?'} · Compte : ${row.compte_type||'tous'} · Dernière : ${_srFmt(row.last_asked_at)}`;
+
+  /* Remplir les catégories */
+  const catSel = document.getElementById('sr-modal-cat');
+  catSel.innerHTML = '<option value="">— Aucune catégorie —</option>';
+  _srCats.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id; opt.textContent = `${c.icone||'📋'} ${c.nom}`;
+    if (c.nom === row.categorie_suggeree) opt.selected = true;
+    catSel.appendChild(opt);
+  });
+
+  /* Types de compte */
+  const typesDiv = document.getElementById('sr-modal-types');
+  const allTypes = ['tous','utilisateur','initiative','collectivite','institution','officiel','administrateur'];
+  const preselect = row.compte_type && row.compte_type !== 'tous' ? [row.compte_type] : ['tous'];
+  typesDiv.innerHTML = allTypes.map(t =>
+    `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+      <input type="checkbox" value="${t}" ${preselect.includes(t)?'checked':''} style="cursor:pointer;">
+      ${t}
+    </label>`
+  ).join('');
+
+  /* Réinitialiser */
+  document.getElementById('sr-modal-reponse').value = '';
+  document.getElementById('sr-modal-lien').value = '';
+  document.getElementById('sr-modal-lbl').value = '';
+  document.getElementById('sr-ia-zone').style.display = 'none';
+
+  document.getElementById('modal-sr-bg').style.display = 'flex';
+
+  /* Chercher des FAQ similaires existantes pour suggérer */
+  suggestIaReponse(row.question);
+}
+
+async function suggestIaReponse(question) {
+  try {
+    const r = await fetch(`/api/faq/search?q=${encodeURIComponent(question)}&role=tous`, {credentials:'include'});
+    const results = await r.json();
+    if (!results || results.length === 0) return;
+    const top = results[0];
+    const iaZone = document.getElementById('sr-ia-zone');
+    const iaText = document.getElementById('sr-ia-text');
+    if (!iaZone || !iaText) return;
+    iaText.innerHTML = `<strong>Question similaire :</strong> ${top.question}<br><br>${top.reponse}`;
+    iaText.dataset.html = top.reponse;
+    iaZone.style.display = '';
+  } catch(e) {}
+}
+
+function useSrIa() {
+  const html = document.getElementById('sr-ia-text')?.dataset?.html || '';
+  if (html) document.getElementById('sr-modal-reponse').value = html;
+}
+
+function closeSrModal() {
+  document.getElementById('modal-sr-bg').style.display = 'none';
+  _srModalId = null;
+}
+
+async function saveSrReponse() {
+  const id      = parseInt(document.getElementById('sr-modal-id').value);
+  const reponse = document.getElementById('sr-modal-reponse').value.trim();
+  const cat     = document.getElementById('sr-modal-cat').value;
+  const lien    = document.getElementById('sr-modal-lien').value.trim();
+  const lbl     = document.getElementById('sr-modal-lbl').value.trim();
+  const types   = [...document.querySelectorAll('#sr-modal-types input:checked')].map(i=>i.value);
+
+  if (!reponse || reponse.length < 10) { showToast('La réponse est trop courte', 'error'); return; }
+
+  const r = await fetch(`/api/faq/sans-reponse/${id}/convertir`, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      category_id: cat ? parseInt(cat) : null,
+      reponse, compte_types: types.length ? types : ['tous'],
+      module_lien: lien||null, module_label: lbl||null,
+    })
+  }).then(r=>r.json()).catch(()=>null);
+
+  if (r?.ok) {
+    closeSrModal();
+    await loadFaqSansReponse();
+    showToast('✅ Réponse publiée dans la FAQ officielle !');
+  } else {
+    showToast(r?.error || 'Erreur lors de la publication', 'error');
+  }
+}
+
+async function setSrEnCours(id) {
+  await fetch(`/api/faq/sans-reponse/${id}`, {
+    method:'PUT', credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ statut:'en_cours' })
+  });
+  await loadFaqSansReponse();
+  showToast('Marquée "En cours"');
+}
+
+async function ignorerSr(id) {
+  if (!confirm('Ignorer cette question ? Elle sera masquée de la liste principale.')) return;
+  await fetch(`/api/faq/sans-reponse/${id}/ignorer`, { method:'POST', credentials:'include' });
+  await loadFaqSansReponse();
+  showToast('Question ignorée');
+}
+
+async function loadSrFusion() {
+  document.getElementById('modal-fusion-bg').style.display = 'flex';
+  const body = document.getElementById('fusion-body');
+  body.innerHTML = '<p style="color:var(--muted);">Analyse en cours…</p>';
+  try {
+    const groupes = await fetch('/api/faq/sans-reponse/similaires', {credentials:'include'}).then(r=>r.json());
+    if (!groupes || !groupes.length) {
+      body.innerHTML = '<p style="color:var(--muted);">Aucune question similaire détectée pour le moment.</p>';
+      return;
+    }
+    body.innerHTML = groupes.map((grp, gi) => `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">GROUPE ${gi+1} (${grp.length} questions similaires)</div>
+        ${grp.map(r => `<div style="padding:6px 10px;background:#f8faff;border-radius:6px;margin-bottom:6px;font-size:13px;">
+          <span style="font-weight:600;">${r.count}×</span> ${r.question}
+        </div>`).join('')}
+        <div style="margin-top:10px;">
+          <input id="fusion-q-${gi}" value="${grp[0].question.replace(/"/g,'&quot;')}"
+            style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;margin-bottom:8px;"
+            placeholder="Question principale fusionnée">
+          <button onclick="executeFusion([${grp.map(r=>r.id).join(',')}], ${gi})"
+            class="btn-primary" style="padding:6px 16px;font-size:12px;">
+            🔗 Fusionner ces ${grp.length} questions
+          </button>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    body.innerHTML = '<p style="color:#ef4444;">Erreur lors de l\'analyse.</p>';
+  }
+}
+
+async function executeFusion(ids, gi) {
+  const question = document.getElementById(`fusion-q-${gi}`)?.value?.trim();
+  if (!question) { showToast('Question principale requise', 'error'); return; }
+  const r = await fetch('/api/faq/sans-reponse/fusion', {
+    method:'POST', credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ ids, question_principale: question })
+  }).then(r=>r.json()).catch(()=>null);
+  if (r?.id) {
+    showToast(`✅ ${ids.length} questions fusionnées (${r.count} demandes au total)`);
+    document.getElementById('modal-fusion-bg').style.display = 'none';
+    await loadFaqSansReponse();
+  } else {
+    showToast('Erreur lors de la fusion', 'error');
+  }
+}
+
+window.loadFaqSansReponse = loadFaqSansReponse;
+window.filterSrLocal      = filterSrLocal;
+window.openSrReponse      = openSrReponse;
+window.closeSrModal       = closeSrModal;
+window.saveSrReponse      = saveSrReponse;
+window.setSrEnCours       = setSrEnCours;
+window.ignorerSr          = ignorerSr;
+window.loadSrFusion       = loadSrFusion;
+window.executeFusion      = executeFusion;
+window.useSrIa            = useSrIa;
 
 /* ═══ BILLETTERIE ADMIN ═══ */
 async function loadAdminBilletterie() {
