@@ -4120,15 +4120,15 @@ route("GET", "/api/faq", async (req, res, _p, _b, q) => {
   const cat    = q.category_id ? parseInt(q.category_id) : null;
   const statut = q.statut  || 'active';
 
+  const roleClause = (role === 'tous')
+    ? `1=1`
+    : `(fq.compte_types LIKE '%"tous"%' OR fq.compte_types LIKE '%"${role.replace(/'/g,"''")}"%')`;
+
   let sql = `SELECT fq.*, fc.nom AS categorie_nom, fc.icone AS categorie_icone, fc.slug AS categorie_slug
     FROM faq_questions fq
     LEFT JOIN faq_categories fc ON fc.id = fq.category_id
-    WHERE fq.statut = ?
-    AND (
-      fq.compte_types LIKE '%"tous"%'
-      OR fq.compte_types LIKE ?
-    )`;
-  const params = [statut, `%"${role}"%`];
+    WHERE fq.statut = ? AND ${roleClause}`;
+  const params = [statut];
   if (cat) { sql += ` AND fq.category_id = ?`; params.push(cat); }
   sql += ` ORDER BY fq.ordre, fq.vues DESC, fq.id`;
 
@@ -4153,24 +4153,39 @@ route("GET", "/api/faq/search", async (req, res, _p, _b, q) => {
   const nq = normFaq(query);
   const words = nq.split(' ').filter(w => w.length >= 2);
 
+  /* Quand role=tous : chercher dans toutes les questions actives */
+  const roleFilter = (role === 'tous')
+    ? `1=1`
+    : `(fq.compte_types LIKE '%"tous"%' OR fq.compte_types LIKE '%"${role.replace(/'/g,"''")}"%')`;
+
   const all = db.prepare(`SELECT fq.*, fc.nom AS categorie_nom, fc.icone AS categorie_icone, fc.slug AS categorie_slug
     FROM faq_questions fq
     LEFT JOIN faq_categories fc ON fc.id = fq.category_id
-    WHERE fq.statut = 'active'
-    AND (fq.compte_types LIKE '%"tous"%' OR fq.compte_types LIKE ?)
-    ORDER BY fq.vues DESC, fq.id`).all(`%"${role}"%`);
+    WHERE fq.statut = 'active' AND ${roleFilter}
+    ORDER BY fq.vues DESC, fq.id`).all();
 
   const scored = all.map(r => {
     const nq2   = normFaq(r.question);
     const nr    = normFaq(r.reponse.replace(/<[^>]*>/g,''));
     const nsyn  = normFaq((safeParse(r.synonymes||'[]')).join(' '));
     const nkw   = normFaq((safeParse(r.mots_cles||'[]')).join(' '));
+    const netapes = normFaq((safeParse(r.etapes||'[]')).join(' '));
     let score   = 0;
     words.forEach(w => {
+      /* Correspondance exacte */
       if (nq2.includes(w)) score += 10;
       if (nsyn.includes(w)) score += 8;
       if (nkw.includes(w))  score += 6;
       if (nr.includes(w))   score += 3;
+      if (netapes.includes(w)) score += 2;
+      /* Correspondance par tige verbale (ex: "recruter" → "recrute" → "recrutement") */
+      if (w.length >= 5) {
+        const stem = w.slice(0, Math.max(4, w.length - 2));
+        if (!nq2.includes(w) && nq2.includes(stem))   score += 7;
+        if (!nsyn.includes(w) && nsyn.includes(stem)) score += 5;
+        if (!nkw.includes(w)  && nkw.includes(stem))  score += 4;
+        if (!nr.includes(w)   && nr.includes(stem))   score += 2;
+      }
     });
     return { ...r, score,
       compte_types: safeParse(r.compte_types),
