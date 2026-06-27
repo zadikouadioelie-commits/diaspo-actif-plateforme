@@ -993,6 +993,7 @@ const MIGRATIONS = [
   ["users", "last_active TEXT DEFAULT (datetime('now'))"],
   ["users", "signalements_confirmes INTEGER DEFAULT 0"],
   ["users", "is_verified INTEGER DEFAULT 0"],
+  ["users", "is_official INTEGER DEFAULT 0"],
   ["initiatives", "signalements_confirmes INTEGER DEFAULT 0"],
 ];
 
@@ -1557,6 +1558,21 @@ db.exec(`
   ].forEach(([slug, name, icon, url, enabled, sort_order, show_on, cat]) => {
     ins.run(slug, name, icon, url, enabled, sort_order, show_on, cat);
   });
+})();
+
+/* ── Rétrocompatibilité : abonner les comptes existants au compte officiel ── */
+;(function backfillOfficialFollow() {
+  try {
+    const official = db.prepare("SELECT id FROM users WHERE is_official=1 LIMIT 1").get();
+    if (!official) return;
+    const oid = official.id;
+    // Tous les utilisateurs qui ne suivent pas encore le compte officiel
+    const users = db.prepare(
+      "SELECT id FROM users WHERE id != ? AND id NOT IN (SELECT follower_id FROM user_follows WHERE followed_id=?)"
+    ).all(oid, oid);
+    const ins = db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)");
+    users.forEach(u => ins.run(u.id, oid));
+  } catch(e) { /* table pas encore migrée, ignoré */ }
 })();
 
 module.exports = db;

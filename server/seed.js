@@ -163,6 +163,19 @@ function seed() {
     profil_json: "{}"
   }).lastInsertRowid;
 
+  /* ── Compte officiel Diaspo'Actif (canal institutionnel) ── */
+  const officielId = insertUser.run({
+    nom: "Diaspo'Actif", email: "officiel@diaspoactif.com",
+    password_hash: pw.hash, password_salt: pw.salt,
+    role: "administrateur", ville: "Paris", pays: "France",
+    profil_json: JSON.stringify({
+      bio: "Canal officiel Diaspo'Actif — annonces, mises à jour, événements et communications institutionnelles.",
+      titre_pro: "Plateforme officielle",
+      photo_url: null
+    })
+  }).lastInsertRowid;
+  db.prepare("UPDATE users SET is_official=1 WHERE id=?").run(officielId);
+
   insertUser.run({
     nom: "Consulat du Sénégal à Paris", email: "consulat.senegal@diaspoactif.demo",
     password_hash: pw.hash, password_salt: pw.salt,

@@ -83,6 +83,12 @@ function safeParse(s) {
 }
 
 /* ---------- Routes API ---------- */
+/* ── Compte officiel Diaspo'Actif — ID mis en cache au démarrage ── */
+function getOfficialUserId() {
+  const row = db.prepare("SELECT id FROM users WHERE is_official=1 LIMIT 1").get();
+  return row ? row.id : null;
+}
+
 const routes = [];
 function route(method, pattern, handler) {
   const keys = [];
@@ -157,6 +163,12 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
       tel_responsable || telephone || null,
       id
     );
+  }
+
+  // ── Abonnement obligatoire au compte officiel Diaspo'Actif ──
+  const officialId = getOfficialUserId();
+  if (officialId && Number(id) !== officialId) {
+    db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(Number(id), officialId);
   }
 
   const token = createSession(id);
@@ -1034,6 +1046,11 @@ route("POST", "/api/users/:id/suivre", async (req, res, params) => {
 route("DELETE", "/api/users/:id/suivre", async (req, res, params) => {
   const me = getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  // Blocage : impossible de se désabonner du compte officiel Diaspo'Actif
+  const officialId = getOfficialUserId();
+  if (officialId && parseInt(params.id) === officialId) {
+    return sendJSON(res, 403, { error: "L'abonnement au compte officiel Diaspo'Actif est obligatoire et ne peut pas être supprimé." });
+  }
   db.prepare("DELETE FROM user_follows WHERE follower_id=? AND followed_id=?").run(me.id, parseInt(params.id));
   const n = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(parseInt(params.id)).n;
   sendJSON(res, 200, { ok: true, nbAbonnes: n });
