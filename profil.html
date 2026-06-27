@@ -470,6 +470,7 @@
   <img loading="lazy" id="banner-img" alt="Bannière" style="display:none">
   <div class="banner-crop-overlay">
     <button class="banner-btn" onclick="pickBannerFile()">📷 Changer la bannière</button>
+    <button class="banner-btn" id="banner-dl-btn" onclick="downloadBanner()" style="display:none">⬇️ Télécharger</button>
     <button class="banner-btn" onclick="removeBanner()" id="banner-del-btn" style="display:none">🗑️ Supprimer</button>
   </div>
   <div style="position:absolute;bottom:10px;right:12px;">
@@ -716,15 +717,36 @@ function renderBanner() {
   const banner = document.getElementById('p-banner');
   const img = document.getElementById('banner-img');
   const delBtn = document.getElementById('banner-del-btn');
+  const dlBtn  = document.getElementById('banner-dl-btn');
   if (profil.banner_url) {
     img.src = profil.banner_url; img.style.display = 'block';
     banner.style.background = 'none';
     if (delBtn) delBtn.style.display = 'flex';
+    if (dlBtn)  dlBtn.style.display  = 'flex';
   } else {
     img.style.display = 'none';
     const t = THEMES[profil.theme_couleur || 'ocean'];
     banner.style.background = t ? t.banner : '';
     if (delBtn) delBtn.style.display = 'none';
+    if (dlBtn)  dlBtn.style.display  = 'none';
+  }
+}
+
+async function downloadBanner() {
+  if (!profil.banner_url) return;
+  try {
+    const res = await fetch(profil.banner_url, { credentials: 'include' });
+    const blob = await res.blob();
+    const ext = blob.type.includes('png') ? 'png' : blob.type.includes('webp') ? 'webp' : 'jpg';
+    const nom = [profil.prenom, profil.nom].filter(Boolean).join('-') || 'banniere';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `banniere-${nom}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch(e) {
+    /* fallback : ouvre dans un nouvel onglet */
+    window.open(profil.banner_url, '_blank');
   }
 }
 
