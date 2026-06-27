@@ -7271,33 +7271,33 @@ async function handleRequest(req, res) {
     ═══════════════════════════════════════════════════════ */
 
     // GET /api/packages?show_on=home  — public
-    if (method === "GET" && pathname === "/api/packages") {
-      const showOn = query.show_on || null;
+    if (req.method === "GET" && pathname === "/api/packages") {
+      const pq = parsed.query;
+      const showOn = pq.show_on || null;
       let rows = db.prepare(
         "SELECT id,name,slug,icon,url,enabled,sort_order,show_on,category FROM da_packages ORDER BY sort_order ASC"
       ).all();
       if (showOn) rows = rows.filter(r => {
         try { return JSON.parse(r.show_on).includes(showOn); } catch { return false; }
       });
-      if (!query.all) rows = rows.filter(r => r.enabled === 1);
+      if (!pq.all) rows = rows.filter(r => r.enabled === 1);
       return sendJSON(res, 200, { packages: rows });
     }
 
     // GET /api/admin/packages  — admin
-    if (method === "GET" && pathname === "/api/admin/packages") {
+    if (req.method === "GET" && pathname === "/api/admin/packages") {
       const user = getCurrentUser(req);
       if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
-      const rows = db.prepare(
-        "SELECT * FROM da_packages ORDER BY sort_order ASC"
-      ).all();
+      const rows = db.prepare("SELECT * FROM da_packages ORDER BY sort_order ASC").all();
       return sendJSON(res, 200, { packages: rows });
     }
 
     // POST /api/admin/packages  — ajouter
-    if (method === "POST" && pathname === "/api/admin/packages") {
+    if (req.method === "POST" && pathname === "/api/admin/packages") {
       const user = getCurrentUser(req);
       if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
-      const { name, slug, icon, url, enabled, sort_order, show_on, category } = body || {};
+      const body = await readBody(req);
+      const { name, slug, icon, url, enabled, sort_order, show_on, category } = body;
       if (!name || !slug || !icon) return sendJSON(res, 400, { error: "name, slug et icon requis." });
       try {
         const r = db.prepare(
@@ -7305,51 +7305,48 @@ async function handleRequest(req, res) {
         ).run(name, slug, icon, url || "", enabled ? 1 : 0, sort_order || 0,
               JSON.stringify(show_on || ["home","footer"]), category || "social");
         return sendJSON(res, 201, { ok: true, id: Number(r.lastInsertRowid) });
-      } catch (e) {
-        return sendJSON(res, 409, { error: "Slug déjà utilisé." });
-      }
+      } catch (e) { return sendJSON(res, 409, { error: "Slug déjà utilisé." }); }
     }
 
-    // PUT /api/admin/packages/:id  — modifier
-    const pkgPut = pathname.match(/^\/api\/admin\/packages\/(\d+)$/);
-    if (method === "PUT" && pkgPut) {
+    // PUT /api/admin/packages/reorder  — réorganiser (avant /:id pour éviter conflit)
+    if (req.method === "PUT" && pathname === "/api/admin/packages/reorder") {
       const user = getCurrentUser(req);
       if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
-      const id = pkgPut[1];
-      const { name, icon, url, enabled, sort_order, show_on, category } = body || {};
-      db.prepare(`UPDATE da_packages SET
-        name=COALESCE(?,name), icon=COALESCE(?,icon), url=COALESCE(?,url),
-        enabled=COALESCE(?,enabled), sort_order=COALESCE(?,sort_order),
-        show_on=COALESCE(?,show_on), category=COALESCE(?,category),
-        updated_at=datetime('now') WHERE id=?`
-      ).run(
-        name||null, icon||null, url!==undefined?url:null,
-        enabled!==undefined?(enabled?1:0):null,
-        sort_order!==undefined?sort_order:null,
-        show_on?JSON.stringify(show_on):null,
-        category||null, id
-      );
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    // DELETE /api/admin/packages/:id
-    const pkgDel = pathname.match(/^\/api\/admin\/packages\/(\d+)$/);
-    if (method === "DELETE" && pkgDel) {
-      const user = getCurrentUser(req);
-      if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
-      db.prepare("DELETE FROM da_packages WHERE id=?").run(pkgDel[1]);
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    // PUT /api/admin/packages/reorder  — réorganiser
-    if (method === "PUT" && pathname === "/api/admin/packages/reorder") {
-      const user = getCurrentUser(req);
-      if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
-      const { order } = body || {};
+      const body = await readBody(req);
+      const { order } = body;
       if (!Array.isArray(order)) return sendJSON(res, 400, { error: "order[] requis." });
       const stmt = db.prepare("UPDATE da_packages SET sort_order=? WHERE id=?");
       order.forEach((id, i) => stmt.run(i, id));
       return sendJSON(res, 200, { ok: true });
+    }
+
+    // PUT /api/admin/packages/:id  — modifier
+    const pkgMatch = pathname.match(/^\/api\/admin\/packages\/(\d+)$/);
+    if (pkgMatch) {
+      const user = getCurrentUser(req);
+      if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+      const pkgId = pkgMatch[1];
+      if (req.method === "PUT") {
+        const body = await readBody(req);
+        const { name, icon, url, enabled, sort_order, show_on, category } = body;
+        db.prepare(`UPDATE da_packages SET
+          name=COALESCE(?,name), icon=COALESCE(?,icon), url=COALESCE(?,url),
+          enabled=COALESCE(?,enabled), sort_order=COALESCE(?,sort_order),
+          show_on=COALESCE(?,show_on), category=COALESCE(?,category),
+          updated_at=datetime('now') WHERE id=?`
+        ).run(
+          name||null, icon||null, url!==undefined?url:null,
+          enabled!==undefined?(enabled?1:0):null,
+          sort_order!==undefined?sort_order:null,
+          show_on?JSON.stringify(show_on):null,
+          category||null, pkgId
+        );
+        return sendJSON(res, 200, { ok: true });
+      }
+      if (req.method === "DELETE") {
+        db.prepare("DELETE FROM da_packages WHERE id=?").run(pkgId);
+        return sendJSON(res, 200, { ok: true });
+      }
     }
 
     return sendJSON(res, 404, { error: "Route API inconnue." });
