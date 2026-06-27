@@ -39,7 +39,9 @@ function sendJSON(res, status, obj, extraHeaders = {}) {
 }
 
 function readBody(req) {
-  return new Promise((resolve, reject) => {
+  // Idempotent : si le corps a déjà été bufferisé (cold-start Vercel), on le retourne directement
+  if (req._bodyPromise) return req._bodyPromise;
+  req._bodyPromise = new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
@@ -51,6 +53,7 @@ function readBody(req) {
     });
     req.on("error", reject);
   });
+  return req._bodyPromise;
 }
 
 function getCurrentUser(req) {
@@ -4952,6 +4955,12 @@ async function handleRequest(req, res) {
   if (pathname.startsWith("/api/")) {
     // Enregistrer l'activité de l'utilisateur connecté (pour DAU/WAU/MAU)
     if (req.method === "GET") trackActivity(req);
+
+    // Sur Vercel, le body stream peut déjà être terminé avant qu'on ajoute des listeners.
+    // On bufferise le body UNE FOIS ici pour que tous les blocs if tardifs puissent y accéder.
+    if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") {
+      await readBody(req);
+    }
 
     for (const r of routes) {
       if (r.method !== req.method) continue;
