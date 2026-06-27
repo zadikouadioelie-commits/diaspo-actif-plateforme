@@ -23,6 +23,200 @@
     } catch (e) { return 'visiteur'; }
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     CONTEXTE INTELLIGENT — page, module, langue, actions en cours
+     ══════════════════════════════════════════════════════════════ */
+  const PAGE_MAP = {
+    'index.html':               { label: 'Accueil',          module: 'accueil' },
+    'annuaire.html':            { label: 'Annuaire',          module: 'annuaire' },
+    'fil-actualite.html':       { label: 'Fil d\'actualité',  module: 'fil' },
+    'evenements.html':          { label: 'Événements',        module: 'evenements' },
+    'formations.html':          { label: 'Formations',        module: 'formations' },
+    'messagerie.html':          { label: 'Messagerie',        module: 'messagerie' },
+    'recherche.html':           { label: 'Recherche',         module: 'recherche' },
+    'profil.html':              { label: 'Profil',            module: 'profil' },
+    'initiative.html':          { label: 'Fiche initiative',  module: 'initiative' },
+    'login.html':               { label: 'Connexion',         module: 'auth' },
+    'inscription.html':         { label: 'Inscription',       module: 'auth' },
+    'dashboard-utilisateur.html':    { label: 'Mon tableau de bord',        module: 'dashboard_user' },
+    'dashboard-initiative.html':     { label: 'Dashboard initiative',       module: 'dashboard_init' },
+    'dashboard-administrateur.html': { label: 'Dashboard administrateur',   module: 'dashboard_admin' },
+    'dashboard-collectivite.html':   { label: 'Dashboard collectivité',     module: 'dashboard_coll' },
+    'statistiques.html':        { label: 'Observatoire',      module: 'stats' },
+  };
+
+  function detectPage() {
+    const path = window.location.pathname.split('/').pop() || 'index.html';
+    return PAGE_MAP[path] || { label: 'Diaspo\'Actif', module: 'general' };
+  }
+
+  function detectLanguage() {
+    try { return (navigator.language || 'fr').slice(0, 2); } catch(e) { return 'fr'; }
+  }
+
+  function getPageContext() {
+    const page = detectPage();
+    const profile = getProfile();
+    const level   = getLevel(profile);
+    const lang    = detectLanguage();
+    const params  = new URLSearchParams(window.location.search);
+    return { page, profile, level, lang, params };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     MÉMOIRE DE SESSION — conversation courante
+     Ne demande jamais deux fois la même chose
+     ══════════════════════════════════════════════════════════════ */
+  const _memory = {
+    turns: [],           // [{role:'user'|'bot', text, intent, ts}]
+    intentsShown: new Set(),
+    suggestionsShown: new Set(),
+    userObjective: null,
+    infoGiven: {},
+
+    add(role, text, intent) {
+      this.turns.push({ role, text, intent: intent || null, ts: Date.now() });
+      if (intent) this.intentsShown.add(intent);
+      if (this.turns.length > 30) this.turns.shift();
+    },
+
+    hasShown(intent)   { return this.intentsShown.has(intent); },
+    hasSuggested(key)  { return this.suggestionsShown.has(key); },
+    markSuggested(key) { this.suggestionsShown.add(key); },
+
+    lastUserText()  { const u = [...this.turns].reverse().find(t => t.role === 'user');  return u?.text || ''; },
+    lastBotIntent() { const b = [...this.turns].reverse().find(t => t.role === 'bot' && t.intent); return b?.intent; },
+
+    summary() {
+      const topics = [...this.intentsShown].slice(-5).join(', ');
+      return topics ? `Sujets abordés : ${topics}` : '';
+    },
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+     MOTEUR D'ACTIONS — exécute des actions réelles sur la plateforme
+     ══════════════════════════════════════════════════════════════ */
+  const ACTIONS = {
+    navigate(url) {
+      window.location.href = url;
+    },
+
+    async createEvent(data) {
+      try {
+        const r = await fetch('/api/events', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        return r.ok ? await r.json() : null;
+      } catch(e) { return null; }
+    },
+
+    async publishPost(content) {
+      try {
+        const r = await fetch('/api/posts', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contenu: content }),
+        });
+        return r.ok ? await r.json() : null;
+      } catch(e) { return null; }
+    },
+
+    async sendMessage(toId, text) {
+      try {
+        const r = await fetch('/api/conversations/start', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ destinataire_id: toId, premier_message: text }),
+        });
+        return r.ok ? await r.json() : null;
+      } catch(e) { return null; }
+    },
+
+    async generateQR(userId) {
+      if (typeof ProfileQR !== 'undefined') {
+        const container = document.createElement('div');
+        ProfileQR.render(container, { userId });
+        return container.innerHTML;
+      }
+      return null;
+    },
+
+    openMeeting() {
+      window.open('reunions.html', '_blank');
+    },
+
+    async getUserStats() {
+      try {
+        const r = await fetch('/api/dashboard/utilisateur', { credentials: 'include' });
+        return r.ok ? await r.json() : null;
+      } catch(e) { return null; }
+    },
+
+    async initiateVerification() {
+      return { message: 'Pour lancer la vérification de votre compte, rendez-vous dans Mon Profil → Demander la vérification.', action: 'profil.html' };
+    },
+  };
+
+  /* Catalogue des actions disponibles par niveau */
+  const ACTION_CATALOGUE = {
+    0: [],
+    1: [
+      { id: 'complete_profile', label: '📋 Compléter mon profil',   handler: () => ACTIONS.navigate('dashboard-utilisateur.html') },
+      { id: 'send_message',     label: '✉️ Envoyer un message',     handler: () => ACTIONS.navigate('messagerie.html') },
+      { id: 'browse_events',    label: '📅 Voir les événements',    handler: () => ACTIONS.navigate('evenements.html') },
+      { id: 'verify_account',   label: '✅ Vérifier mon compte',    handler: async () => { const r = await ACTIONS.initiateVerification(); return r; } },
+    ],
+    2: [
+      { id: 'publish_post',   label: '📢 Publier une annonce',       handler: () => ACTIONS.navigate('dashboard-initiative.html') },
+      { id: 'create_event',   label: '📅 Créer un événement',        handler: () => ACTIONS.navigate('dashboard-initiative.html#events') },
+      { id: 'open_meeting',   label: '📹 Démarrer une réunion',      handler: () => ACTIONS.openMeeting() },
+      { id: 'generate_qr',    label: '🎴 Générer mon QR code',       handler: () => ACTIONS.navigate('dashboard-initiative.html') },
+      { id: 'my_stats',       label: '📊 Voir mes statistiques',     handler: () => ACTIONS.navigate('dashboard-initiative.html') },
+    ],
+    3: [
+      { id: 'admin_panel',     label: '⚙️ Panneau d\'administration', handler: () => ACTIONS.navigate('dashboard-administrateur.html') },
+      { id: 'global_stats',    label: '📊 Observatoire mondial',     handler: () => ACTIONS.navigate('statistiques.html') },
+      { id: 'moderate',        label: '🚩 Modération',               handler: () => ACTIONS.navigate('dashboard-administrateur.html') },
+    ],
+  };
+
+  function getAvailableActions(level) {
+    return [
+      ...(ACTION_CATALOGUE[0] || []),
+      ...((level >= 1) ? ACTION_CATALOGUE[1] || [] : []),
+      ...((level >= 2) ? ACTION_CATALOGUE[2] || [] : []),
+      ...((level >= 3) ? ACTION_CATALOGUE[3] || [] : []),
+    ];
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     SUGGESTIONS PROACTIVES — analyse le contexte et propose
+     ══════════════════════════════════════════════════════════════ */
+  function getProactiveTip(ctx) {
+    const { page, profile, level } = ctx;
+    const tips = [];
+
+    if (page.module === 'auth' && level === 0) {
+      tips.push({ text: '💡 Astuce : La création de compte est gratuite et dure moins de 2 minutes !', qr: ['Créer mon compte', 'Comment ça marche ?'] });
+    }
+    if (page.module === 'annuaire') {
+      tips.push({ text: '💡 Conseil : Utilisez les filtres "Pays de résidence" et "Domaine" ensemble pour des résultats plus précis.', qr: ['Comment filtrer ?', 'Trouver un expert'] });
+    }
+    if (page.module === 'profil' && level >= 1) {
+      tips.push({ text: '💡 Un profil complet augmente votre score de confiance et votre visibilité dans les recommandations du chatbot.', qr: ['Améliorer mon score', 'Les accréditations'] });
+    }
+    if (page.module === 'dashboard_user' && level === 1) {
+      tips.push({ text: '💡 Pensez à demander une accréditation pour accéder aux opportunités réservées aux membres vérifiés.', qr: ['Les accréditations', 'Demander la vérification'] });
+    }
+    if (page.module === 'messagerie' && level >= 1) {
+      tips.push({ text: '💡 Vous pouvez aussi planifier une réunion vidéo directement depuis la messagerie.', qr: ['Démarrer une réunion', 'Fonctionnalités messagerie'] });
+    }
+
+    return tips.length ? tips[Math.floor(Math.random() * tips.length)] : null;
+  }
+
   /* ─── Mode Intelligent : niveaux d'accès ───────────────────────
      0 = visiteur · 1 = utilisateur · 2 = pro/org · 3 = admin     */
   const LEVEL_CONFIG = {
@@ -895,6 +1089,144 @@
         { label: "🔍 Ouvrir l'annuaire", action: "annuaire.html" },
       ],
     },
+
+    /* ── SCORE DE CONFIANCE ────────────────────────────────────── */
+    trust_score: {
+      text: "🔒 Le Score de Confiance est un indicateur de 0 à 100% qui mesure la fiabilité d'un profil.\n\nIl est calculé automatiquement à partir de :\n• Ancienneté sur la plateforme (+1 pt/mois, max 15)\n• Identité vérifiée (+15 pts)\n• Documents vérifiés (+10 pts)\n• Diplômes vérifiés (+10 pts)\n• Entreprise vérifiée (+8 pts)\n• Accréditations Diaspo'Actif (+10 pts chacune, max 20)\n• Initiative immatriculée (+8 pts)\n• Activité sur la plateforme (max +10 pts)\n• Profil complet (max +6 pts)\n• Absence de signalements (+5 pts)\n\n✅ Score ≥ 90 = Excellent · ≥ 75 = Élevé · ≥ 50 = Moyen",
+      quickReplies: [
+        { label: "Comment améliorer mon score ?", intent: "ameliorer_score" },
+        { label: "Les accréditations", intent: "accreditations" },
+        { label: "Vérification d'identité", intent: "verification" },
+      ],
+    },
+
+    ameliorer_score: {
+      text: "📈 Pour améliorer votre Score de Confiance rapidement :\n\n1. ✅ Faites vérifier votre identité (+15 pts) → Mon Profil → Vérification\n2. 📄 Soumettez vos documents justificatifs (+10 pts)\n3. 🎓 Faites vérifier vos diplômes (+10 pts)\n4. 🏅 Demandez une accréditation DA (+10 pts)\n5. 👤 Complétez votre profil à 100% (photo, bio, compétences)\n6. 📊 Soyez actif : publiez, collaborez, participez aux événements",
+      quickReplies: [
+        { label: "Demander une accréditation", intent: "nav_accred" },
+        { label: "Modifier mon profil", intent: "nav_profil" },
+        { label: "Le score de confiance", intent: "trust_score" },
+      ],
+    },
+
+    /* ── INDICE DE RÉACTIVITÉ ──────────────────────────────────── */
+    reactivite: {
+      text: "⭐ L'Indice de Réactivité est noté de 1 à 5 étoiles. Il mesure la rapidité avec laquelle vous répondez aux messages.\n\n• ⭐⭐⭐⭐⭐ : Répond en moins de 2h\n• ⭐⭐⭐⭐ : Répond sous 24h\n• ⭐⭐⭐ : Répond en 1 à 3 jours\n• ⭐⭐ : Réactivité moyenne\n• ⭐ : Répond rarement\n\nCet indice est calculé automatiquement sur vos 90 derniers jours d'activité messagerie.\n\n💡 Plus vous répondez vite, plus vous êtes visible dans les recommandations.",
+      quickReplies: [
+        { label: "Le score de confiance", intent: "trust_score" },
+        { label: "La messagerie", intent: "messagerie" },
+      ],
+    },
+
+    /* ── MODE ABSENCE ──────────────────────────────────────────── */
+    mode_absence: {
+      text: "🏖️ Le Mode Absence vous permet d'indiquer que vous n'êtes temporairement pas disponible.\n\nTypes d'absence disponibles :\n• 🏖️ Vacances\n• ✈️ Déplacement\n• 💼 Mission\n• 🛌 Congé\n• 🚫 Indisponible\n• Autre\n\nDurant l'absence :\n• Votre profil affiche une bannière d'absence\n• Vous ne pouvez pas être signalé pour inactivité\n• Vos correspondants voient votre statut\n\n📍 Pour activer : Mon Profil → Statut → Mode Absence",
+      quickReplies: [
+        { label: "Les signalements", intent: "signalements" },
+        { label: "Mon profil", intent: "nav_profil" },
+      ],
+    },
+
+    /* ── SIGNALEMENTS ──────────────────────────────────────────── */
+    signalements: {
+      text: "🚩 Le système de Signalement permet de signaler des comportements problématiques.\n\nDeux types de signalement :\n\n1. 📭 Compte inactif : Un compte peut être signalé si aucune réponse en +14 jours (sans mode absence actif)\n\n2. ⚠️ Signalement d'initiative : 12 motifs disponibles (informations incorrectes, comportement abusif, contenu inapproprié…)\n\nProcessus :\n• Signalement reçu → Examiné par les modérateurs → Action si confirmé\n• 3 signalements confirmés = restrictions sur le compte",
+      quickReplies: [
+        { label: "Mode absence", intent: "mode_absence" },
+        { label: "Les règles de la plateforme", intent: "confidentialite" },
+      ],
+    },
+
+    /* ── QR CODE PROFIL ────────────────────────────────────────── */
+    qr_code: {
+      text: "🎴 Chaque profil et initiative dispose d'un QR Code unique et permanent.\n\nFonctionnalités disponibles :\n• 📥 Télécharger en PNG\n• 📥 Télécharger en SVG\n• 🖨️ Imprimer une carte de visite (recto/verso)\n• 🔗 Copier le lien direct\n• ↗️ Partager via l'API Web Share\n• 🌍 Logo Diaspo'Actif centré\n\nLe QR code renvoie vers votre profil public ou votre page initiative.\n\n📍 Accessible depuis votre tableau de bord ou votre profil.",
+      quickReplies: [
+        { label: "Mon tableau de bord", intent: "nav_dashboard" },
+        { label: "Mon profil", intent: "nav_profil" },
+      ],
+    },
+
+    /* ── RÉUNIONS VIDÉO ────────────────────────────────────────── */
+    reunions: {
+      text: "📹 Diaspo'Actif intègre un système de réunions vidéo peer-to-peer.\n\nFonctionnalités :\n• 📅 Planifier une réunion (date, heure, participants)\n• 🎥 Lancer une visioconférence instantanée\n• 📝 Prendre des notes pendant la réunion\n• 📋 Générer un compte-rendu automatique\n• 👥 Multi-participants\n• 🔒 Connexion sécurisée chiffrée\n\n📍 Accessible via : Messagerie → bouton 📹 ou Tableau de bord → Réunions",
+      quickReplies: [
+        { label: "Démarrer une réunion", intent: "nav_dashboard" },
+        { label: "La messagerie", intent: "messagerie" },
+      ],
+    },
+
+    /* ── SCANNER QR / BILLETS ──────────────────────────────────── */
+    scanner: {
+      text: "📷 Le Scanner QR permet de valider les billets d'entrée aux événements.\n\nFonctionnement :\n• L'organisateur accède au scanner depuis son dashboard\n• Il scanne le QR code du billet du participant\n• Le système valide le billet en temps réel (accepté / refusé / déjà utilisé)\n• Un log de toutes les entrées est généré\n\n💡 Idéal pour les événements en présentiel avec billetterie intégrée.",
+      quickReplies: [
+        { label: "Les événements", intent: "evenements" },
+        { label: "Mon dashboard", intent: "nav_dashboard" },
+      ],
+    },
+
+    /* ── WALLET & PAIEMENTS ────────────────────────────────────── */
+    wallet: {
+      text: "💳 Le Wallet Diaspo'Actif est votre porte-monnaie numérique intégré.\n\nFonctionnalités :\n• Recevoir des paiements pour vos événements et billets\n• Vendre des formations\n• Gérer vos transactions et commissions\n• Historique complet des paiements\n• Relevé de compte téléchargeable\n\n💡 La plateforme prélève une commission sur les transactions (détail dans vos conditions d'abonnement).\n\n📍 Accessible depuis : Tableau de bord → Wallet",
+      quickReplies: [
+        { label: "Les abonnements", intent: "abonnements" },
+        { label: "Créer un événement payant", intent: "evenements" },
+      ],
+    },
+
+    /* ── OBSERVATOIRE MONDIAL ──────────────────────────────────── */
+    observatoire: {
+      text: "🌍 L'Observatoire Mondial de Diaspo'Actif est un tableau de bord statistique en temps réel.\n\nDonnées disponibles :\n• 👥 Membres actifs (DAU / WAU / MAU)\n• 🗺️ Répartition géographique par pays, région, ville\n• 🏆 Compétences et domaines les plus représentés\n• 📈 Évolution des inscriptions dans le temps\n• 💼 Statistiques emploi et initiatives\n• 🔒 Scores de confiance agrégés\n• 🤖 Questions les plus posées au chatbot\n\nFiltres disponibles : Période (aujourd'hui/7j/30j/1an/tout) · Pays\nExport : CSV et PDF\nActualisation automatique toutes les 5 minutes\n\n📍 Accessible depuis : statistiques.html",
+      quickReplies: [
+        { label: "Voir l'Observatoire", action: "statistiques.html" },
+        { label: "Les données diaspora", intent: "observatoire" },
+      ],
+    },
+
+    /* ── CV BUILDER ─────────────────────────────────────────────── */
+    cv_builder: {
+      text: "📄 Le CV Builder de Diaspo'Actif permet de créer des CV professionnels directement depuis la plateforme.\n\nFonctionnalités :\n• 📝 Créer jusqu'à 3 CV avec des thèmes différents\n• 🎨 Thèmes disponibles : bleu, vert, rouge, violet, noir, orange\n• 💾 Sauvegarde automatique des versions\n• 📥 Export PDF\n• 🔗 Lien de partage direct\n• ✉️ Intégration avec les candidatures aux offres\n\n📍 Accessible depuis : Mon Compte → CV & Lettres",
+      quickReplies: [
+        { label: "Les offres d'emploi", intent: "offres" },
+        { label: "Mon profil", intent: "nav_profil" },
+      ],
+    },
+
+    /* ── PARTENARIATS ───────────────────────────────────────────── */
+    nav_partenariat: {
+      text: "🤝 Pour chercher des partenariats sur Diaspo'Actif :\n\n1. Utilisez l'Annuaire → filtrez par domaine et pays\n2. Publiez une offre de type \"Partenariat\" depuis votre dashboard\n3. Utilisez la messagerie pour approcher directement les initiatives\n4. Participez aux événements de networking\n5. Activez les collaborations depuis votre profil\n\n💡 Les membres avec une accréditation et un score de confiance élevé sont prioritairement recommandés.",
+      quickReplies: [
+        { label: "Publier une offre", intent: "nav_offre" },
+        { label: "Explorer l'annuaire", action: "annuaire.html" },
+        { label: "Les accréditations", intent: "accreditations" },
+      ],
+    },
+
+    /* ── VÉRIFICATION ───────────────────────────────────────────── */
+    verification: {
+      text: "✅ La vérification de compte garantit l'authenticité de votre présence sur Diaspo'Actif.\n\nNiveaux de vérification :\n• 🪪 Identité vérifiée : pièce d'identité officielle\n• 📄 Documents vérifiés : justificatifs d'activité\n• 🎓 Diplômes vérifiés : attestations académiques\n• 🏢 Entreprise vérifiée : extrait Kbis ou équivalent\n\nBénéfices :\n• Badge \"Compte vérifié\" sur votre profil\n• Score de confiance augmenté\n• Priorité dans les recommandations du chatbot\n• Accès aux fonctionnalités réservées\n\n📍 Pour demander : Mon Profil → Vérification",
+      quickReplies: [
+        { label: "Le score de confiance", intent: "trust_score" },
+        { label: "Les accréditations", intent: "accreditations" },
+      ],
+    },
+
+    /* ── AIDE DÉCISION COMPTE ───────────────────────────────────── */
+    quel_compte: {
+      text: "🤔 Quel type de compte est fait pour vous ?\n\n👤 Compte Utilisateur — si vous êtes :\n• Un membre de la diaspora\n• Un professionnel cherchant des opportunités\n• Un étudiant en recherche de réseau\n\n🏢 Compte Initiative — si vous êtes :\n• Une association ou ONG\n• Une entreprise\n• Un consultant ou freelance actif\n• Un porteur de projet\n\n🏛️ Compte Collectivité — si vous êtes :\n• Une mairie, région, ambassade\n• Une institution publique\n• Un service de l'État\n\nTous les comptes disposent d'un accès gratuit. Les fonctionnalités avancées sont disponibles avec un abonnement.",
+      quickReplies: [
+        { label: "Créer un compte", action: "inscription.html" },
+        { label: "Comparer les abonnements", intent: "abonnements" },
+        { label: "Les accréditations", intent: "accreditations" },
+      ],
+    },
+
+    /* ── AIDE NAVIGATION CONTEXTUELLE ──────────────────────────── */
+    nav_recrutement: {
+      text: "👔 Pour le recrutement sur Diaspo'Actif :\n\n1. Tableau de bord → Offres → Nouvelle offre\n2. Choisissez \"Emploi\" ou \"Stage\" ou \"Mission freelance\"\n3. Décrivez le poste, les compétences requises, la localisation\n4. Définissez la date limite de candidature\n5. Les candidatures arrivent directement dans votre dashboard\n\n💡 Activez les notifications pour être alerté de chaque nouvelle candidature.",
+      quickReplies: [
+        { label: "Gérer les candidatures", intent: "nav_dashboard" },
+        { label: "Publier une offre", intent: "nav_offre" },
+      ],
+    },
   };
 
   /* ═══════════════════════════════════════════════════════════════
@@ -953,6 +1285,25 @@
     { intent: "tarifs",        words: ["tarif","prix","coût","combien","€","euro","gratuit","payant"] },
     { intent: "pourquoi_payer",words: ["pourquoi payer","pourquoi s'abonner","pourquoi prendre","avantage abonnement","bénéfice abonnement"] },
     { intent: "conseil_abonnement", words: ["quel abonnement","quelle formule","que me recommandez","que me conseiller","correspond à mes besoins"] },
+    { intent: "quel_compte",   words: ["quel compte choisir","quel type de compte","je suis une asso","je suis une entreprise","je cherche un réseau","créer mon asso","je suis un professionnel"] },
+
+    // ── Qualité & Réputation
+    { intent: "trust_score",   words: ["score de confiance","trust score","score confiance","indice de fiabilité","ma fiabilité","confiance"] },
+    { intent: "ameliorer_score", words: ["améliorer mon score","augmenter mon score","meilleur score","comment avoir un bon score"] },
+    { intent: "reactivite",    words: ["réactivité","indice de réactivité","étoile","réactivité messagerie","délai de réponse","taux de réponse"] },
+    { intent: "verification",  words: ["vérification","vérifier mon compte","compte vérifié","identité vérifiée","documents vérifiés","diplômes vérifiés"] },
+
+    // ── Fonctionnalités avancées
+    { intent: "qr_code",       words: ["qr code","qr-code","code qr","carte de visite","code barre profil"] },
+    { intent: "scanner",       words: ["scanner","scan billet","valider billet","contrôle entrée","scan qr"] },
+    { intent: "mode_absence",  words: ["mode absence","absence","vacances","indisponible","congé","déplacement"] },
+    { intent: "signalements",  words: ["signalement","signaler","inactivité","compte abusif","comportement problématique","abus"] },
+    { intent: "reunions",      words: ["réunion","visioconférence","visio","videoconférence","meeting","zoom","appel vidéo"] },
+    { intent: "wallet",        words: ["wallet","portefeuille","paiement","payer","recevoir argent","vendre","transaction","billet payant"] },
+    { intent: "observatoire",  words: ["observatoire","statistiques globales","tableau de bord global","chiffres plateforme","données globales"] },
+    { intent: "cv_builder",    words: ["cv","curriculum vitae","cv builder","créer un cv","mon cv","télécharger cv","lettre de motivation"] },
+    { intent: "nav_partenariat", words: ["partenariat","partenaire","trouver un partenaire","chercher un partenaire","collaborer","s'associer"] },
+    { intent: "nav_recrutement", words: ["recruter","recrutement","embaucher","trouver un candidat","poster une offre emploi"] },
 
     // ── Technique
     { intent: "inscription",   words: ["s'inscrire","inscription","créer un compte","créer mon compte","m'inscrire","créer mon profil"] },
@@ -1077,7 +1428,7 @@
     const profile = getProfile();
     const level   = getLevel(profile);
     const lcfg    = LEVEL_CONFIG[level];
-    const levelBadgeHtml = `<span class="cb-level-badge" style="background:${lcfg.color}20;color:${lcfg.color};border:1px solid ${lcfg.color}40;">${lcfg.icon} Niveau ${level} — ${lcfg.label}</span>`;
+    const levelBadgeHtml = `<span class="cb-level-badge" style="background:${lcfg.color}20;color:${lcfg.color};border:1px solid ${lcfg.color}40;">${lcfg.icon} ${lcfg.label} · Mode ${lcfg.tone}</span>`;
 
     panel.innerHTML = `
       <div class="cb-header">
@@ -1106,8 +1457,70 @@
     document.getElementById('cb-send').addEventListener('click', sendMessage);
     document.getElementById('cb-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
 
+    /* ── FAB déplaçable ─────────────────────────────── */
+    initDraggableFab(fab);
+
     setTimeout(() => showWelcome(), 800);
     loadContext();
+  }
+
+  /* Drag & drop du bouton flottant — sauvegarde position dans localStorage */
+  function initDraggableFab(fab) {
+    let dragging = false, startX, startY, origX, origY;
+    const DRAG_THRESHOLD = 5; // px — distingue clic et drag
+
+    const savedPos = (() => {
+      try { return JSON.parse(localStorage.getItem('da_fab_pos') || 'null'); } catch(e) { return null; }
+    })();
+    if (savedPos) {
+      fab.style.bottom = 'auto';
+      fab.style.right  = 'auto';
+      fab.style.left   = Math.max(0, Math.min(savedPos.x, window.innerWidth  - 64)) + 'px';
+      fab.style.top    = Math.max(0, Math.min(savedPos.y, window.innerHeight - 64)) + 'px';
+    }
+
+    fab.addEventListener('mousedown', onDown);
+    fab.addEventListener('touchstart', onDown, { passive: true });
+
+    function onDown(e) {
+      const pt = e.touches ? e.touches[0] : e;
+      startX = pt.clientX;
+      startY = pt.clientY;
+      const rect = fab.getBoundingClientRect();
+      origX = rect.left;
+      origY = rect.top;
+      dragging = false;
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup',   onUp);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend',  onUp);
+    }
+
+    function onMove(e) {
+      const pt = e.touches ? e.touches[0] : e;
+      const dx = pt.clientX - startX;
+      const dy = pt.clientY - startY;
+      if (!dragging && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      dragging = true;
+      if (e.cancelable) e.preventDefault();
+      const nx = Math.max(0, Math.min(origX + dx, window.innerWidth  - fab.offsetWidth));
+      const ny = Math.max(0, Math.min(origY + dy, window.innerHeight - fab.offsetHeight));
+      fab.style.bottom = 'auto';
+      fab.style.right  = 'auto';
+      fab.style.left   = nx + 'px';
+      fab.style.top    = ny + 'px';
+    }
+
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend',  onUp);
+      if (dragging) {
+        const rect = fab.getBoundingClientRect();
+        try { localStorage.setItem('da_fab_pos', JSON.stringify({ x: rect.left, y: rect.top })); } catch(e) {}
+      }
+    }
   }
 
   let _open = false;
@@ -1127,10 +1540,17 @@
     const level   = getLevel(profile);
     const pw      = getProfileWelcome(profile);
     const lcfg    = LEVEL_CONFIG[level];
+    const ctx     = getPageContext();
     const modeTag = level > 0
       ? `<span style="font-size:11px;background:${lcfg.color}15;color:${lcfg.color};padding:2px 8px;border-radius:99px;border:1px solid ${lcfg.color}30;">${lcfg.icon} Mode ${lcfg.tone}</span> `
       : '';
-    const html = `${modeTag}<p>${_esc(pw.text).replace(/\n/g, '<br>')}</p>`;
+    let html = `${modeTag}<p>${_esc(pw.text).replace(/\n/g, '<br>')}</p>`;
+    // Hint contextuel selon page d'arrivée
+    const tip = getProactiveTip(ctx);
+    if (tip) {
+      html += `<div class="cb-proactive-tip">${_esc(tip.text)}</div>`;
+      _memory.markSuggested('tip_' + ctx.page.module);
+    }
     appendBotMessage(html, filterQR(pw.qr, level));
   }
 
@@ -1144,9 +1564,14 @@
 
     const profile = getProfile();
     const level   = getLevel(profile);
+    const ctx     = getPageContext();
+
+    // Mémoriser le message utilisateur
+    _memory.add('user', text, null);
 
     // 1. Détecter les intents FAQ connus
     const intent = detectIntent(text);
+
     if (intent && KB[intent]) {
       // Vérification de permission par niveau
       if (isForbidden(intent, level)) {
@@ -1157,13 +1582,28 @@
             : level === 1
             ? [{ label: '📋 Mon profil', intent: 'nav_profil' }, { label: 'Les abonnements', intent: 'abonnements' }]
             : [{ label: '🏠 Accueil', action: 'index.html' }];
+          _memory.add('bot', refuseMsg, intent);
           setTimeout(() => appendBotMessage(`<p>🔒 ${_esc(refuseMsg)}</p>`, qr), 350);
           return;
         }
       }
+
+      // Réponse adaptée selon si déjà montrée (évite répétition)
+      const alreadyShown = _memory.hasShown(intent);
       setTimeout(() => {
         const { html, quickReplies } = renderResponse(intent, level);
-        appendBotMessage(html, quickReplies);
+        const smartQR = dedupeSuggestions(quickReplies, intent, level);
+        let finalHtml = html;
+        // Suggestion proactive si contexte pertinent
+        if (!alreadyShown) {
+          const tip = getProactiveTip(ctx);
+          if (tip && !_memory.hasSuggested('tip_' + ctx.page.module)) {
+            finalHtml += `<div class="cb-proactive-tip">${_esc(tip.text)}</div>`;
+            _memory.markSuggested('tip_' + ctx.page.module);
+          }
+        }
+        appendBotMessage(finalHtml, smartQR);
+        _memory.add('bot', KB[intent]?.text || '', intent);
       }, 350);
       return;
     }
@@ -1179,18 +1619,45 @@
       const hit = searchContext(text);
       if (hit) {
         const { html, quickReplies } = renderContextHit(hit, text, level);
+        _memory.add('bot', hit.texte?.slice(0, 80) || '', 'ctx_hit');
         appendBotMessage(html, quickReplies);
       } else {
-        // 4. Fallback avec suggestions adaptées au niveau
+        // 4. Fallback avec aide contextuelle à la page actuelle
         const { html, quickReplies } = renderResponse('fallback', level);
+        const pageHint = getPageSpecificFallback(ctx);
         const enrichedQR = [
           ...quickReplies.slice(0, 2),
           { label: '🔍 Chercher un profil / expert', intent: '_search_hint' },
         ];
-        appendBotMessage(html, enrichedQR);
+        _memory.add('bot', 'fallback', 'fallback');
+        appendBotMessage(pageHint ? html + `<div class="cb-proactive-tip">${_esc(pageHint)}</div>` : html, enrichedQR);
         logUnanswered(text);
       }
     }, 350);
+  }
+
+  /* Retire les suggestions déjà montrées ou non pertinentes */
+  function dedupeSuggestions(qrs, currentIntent, level) {
+    if (!qrs) return [];
+    return qrs.filter(qr => {
+      if (!qr.intent) return true;
+      if (qr.intent === currentIntent) return false;
+      if (_memory.intentsShown.size > 5 && _memory.hasShown(qr.intent)) return false;
+      return true;
+    });
+  }
+
+  /* Suggestion contextuelle selon la page courante, en fallback */
+  function getPageSpecificFallback(ctx) {
+    const hints = {
+      annuaire:      'Astuce : essayez de décrire un profil en langage naturel, ex : "Je cherche un médecin à Lyon".',
+      evenements:    'Vous pouvez filtrer les événements par pays, domaine ou date depuis les filtres en haut de page.',
+      messagerie:    'Saviez-vous que vous pouvez planifier une réunion vidéo directement depuis vos messages ?',
+      profil:        'Complétez toutes les sections de votre profil pour améliorer votre score de confiance.',
+      auth:          'La création de compte est gratuite et ne prend que 2 minutes.',
+      dashboard_init: 'Depuis votre dashboard, vous pouvez créer des événements, publier des offres et générer votre QR code.',
+    };
+    return hints[ctx.page.module] || null;
   }
 
   function logUnanswered(question) {
@@ -1612,6 +2079,35 @@
   color: #fff; border-color: transparent;
 }
 .cb-pcard-btn.cb-pcard-btn-main:hover { opacity: .9; }
+
+/* ── Suggestion proactive ────────────────────────────────────── */
+.cb-proactive-tip {
+  margin-top: 8px; padding: 8px 10px;
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+  border-left: 3px solid #10b981; border-radius: 0 8px 8px 0;
+  font-size: 12px; color: #065f46; line-height: 1.5;
+}
+
+/* ── FAB déplaçable ──────────────────────────────────────────── */
+.cb-fab {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.cb-fab:active { cursor: grabbing; }
+
+/* ── Actions moteur ──────────────────────────────────────────── */
+.cb-action-grid {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+}
+.cb-action-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border-radius: 8px; font-size: 12px;
+  font-weight: 600; border: 1.5px solid #e2e8f0; background: #fff;
+  color: #374151; cursor: pointer; transition: all .15s;
+}
+.cb-action-btn:hover { background: #f8fafc; border-color: #0284c7; color: #0284c7; }
     `;
     const style = document.createElement('style');
     style.textContent = css;
