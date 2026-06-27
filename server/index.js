@@ -7,6 +7,7 @@ const path = require("node:path");
 const url = require("node:url");
 const crypto = require("node:crypto");
 const db = require("./db");
+const DAA = require("./daa-lang");
 
 const TICKET_SECRET = process.env.TICKET_SECRET || "diaspoactif-qr-2026-secret";
 function signTicket(ticketId, eventId, ts) {
@@ -9157,6 +9158,441 @@ route("GET", "/api/admin/asso/liste", async (req, res) => {
   if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
   const rows = db.prepare(`SELECT a.*, u.nom AS user_nom, u.email AS user_email FROM asso_accreditations a JOIN users u ON u.id=a.user_id ORDER BY a.updated_at DESC`).all();
   sendJSON(res, 200, { associations: rows });
+});
+
+/* ════════════════════════════════════════════════════════════════════
+   DAA-Lang — Modules complémentaires
+   BANK_INFO · NOTIFICATIONS · FINANCE(budgets) · DOCUMENTS(OCR) ·
+   GENERAL_ASSEMBLY · ANALYTICS · SECURITY(audit) · AI · SUBSCRIPTION
+   Toutes les règles métier et permissions sont dérivées de daa-lang.js
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Rôle DAA-Lang de l'utilisateur courant dans une association.
+   Le titulaire de l'accréditation est PRESIDENT ; sinon on lit
+   asso_membre_roles. */
+function assoRole(assoUserId, daUserId) {
+  if (assoUserId === daUserId) return "PRESIDENT";
+  const r = db.prepare(`SELECT role FROM asso_membre_roles WHERE asso_user_id=? AND da_user_id=?`).get(assoUserId, daUserId);
+  return r ? r.role : "GUEST";
+}
+
+/* Garde de permission unifiée : accréditation active + capacité DSL.
+   Renvoie { user, accred } si OK, sinon écrit la réponse et renvoie null. */
+function assoGuard(req, res, action) {
+  const user = getCurrentUser(req);
+  if (!user) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
+  const accred = getAssoAccred(user.id);
+  if (!accred) { sendJSON(res, 403, { error: "Module Gestion des Associations requis." }); return null; }
+  const role = assoRole(user.id, user.id); // propriétaire = PRESIDENT
+  if (action && !DAA.roleCan(role, action)) {
+    sendJSON(res, 403, { error: `Action « ${action} » non autorisée pour le rôle ${role}.` });
+    return null;
+  }
+  return { user, accred, role };
+}
+
+/* Journalisation d'audit (DSL SECURITY.AUDIT_LOGS / FINANCE.AUDIT_TRAIL) */
+function assoAudit(assoUserId, acteurId, action, entite, entiteId, details) {
+  try {
+    db.prepare(`INSERT INTO asso_audit_log (asso_user_id,acteur_id,action,entite,entite_id,details) VALUES (?,?,?,?,?,?)`)
+      .run(assoUserId, acteurId || null, action, entite || null, entiteId || null, details ? JSON.stringify(details) : null);
+  } catch (e) { /* l'audit ne doit jamais bloquer l'opération métier */ }
+}
+
+/* ── GET /api/asso/spec — expose la spécification DAA-Lang ────────────── */
+route("GET", "/api/asso/spec", async (req, res) => {
+  sendJSON(res, 200, { spec: DAA.SPEC });
+});
+
+/* ════════ MODULE BANK_INFO (DSL CONTRIBUTIONS.BANK_INFO) ════════ */
+
+/* GET /api/asso/bank-info — accès restreint à ACCESS_ROLE du DSL */
+route("GET", "/api/asso/bank-info", async (req, res) => {
+  const g = assoGuard(req, res, "bank_info.read");
+  if (!g) return;
+  const info = db.prepare(`SELECT * FROM asso_bank_info WHERE asso_user_id=?`).get(g.user.id);
+  sendJSON(res, 200, { bank_info: info || null });
+});
+
+/* PUT /api/asso/bank-info */
+route("PUT", "/api/asso/bank-info", async (req, res, params, body) => {
+  const g = assoGuard(req, res, "bank_info.write");
+  if (!g) return;
+  const { holder_name, bank_name, iban, bic, devise = "EUR", reference_modele, display_to_members = 1, instructions } = body;
+  // Validation selon le DSL : IBAN + HOLDER_NAME = REQUIRED
+  if (!holder_name || !iban) return sendJSON(res, 400, { error: "Titulaire (HOLDER_NAME) et IBAN sont requis (DSL)." });
+  if (!DAA.isValid("currency", devise)) return sendJSON(res, 400, { error: "Devise non supportée par le DSL." });
+  const existing = db.prepare(`SELECT id FROM asso_bank_info WHERE asso_user_id=?`).get(g.user.id);
+  if (existing) {
+    db.prepare(`UPDATE asso_bank_info SET holder_name=?,bank_name=?,iban=?,bic=?,devise=?,reference_modele=COALESCE(?,reference_modele),display_to_members=?,instructions=?,updated_at=datetime('now') WHERE asso_user_id=?`)
+      .run(holder_name, bank_name||null, iban, bic||null, devise, reference_modele||null, display_to_members?1:0, instructions||null, g.user.id);
+  } else {
+    db.prepare(`INSERT INTO asso_bank_info (asso_user_id,holder_name,bank_name,iban,bic,devise,reference_modele,display_to_members,instructions) VALUES (?,?,?,?,?,?,COALESCE(?,'COTISATION-{ANNEE}-{PRENOM}-{NOM}'),?,?)`)
+      .run(g.user.id, holder_name, bank_name||null, iban, bic||null, devise, reference_modele||null, display_to_members?1:0, instructions||null);
+  }
+  assoAudit(g.user.id, g.user.id, "bank_info.update", "bank_info", null, { iban: iban.slice(0,8)+"…" });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/asso/bank-info/virement/:cotisationId — instructions de virement
+   générées pour un membre (référence automatique selon le modèle DSL) */
+route("GET", "/api/asso/bank-info/virement/:cotisationId", async (req, res, params) => {
+  const g = assoGuard(req, res, "contributions.read");
+  if (!g) return;
+  const info = db.prepare(`SELECT * FROM asso_bank_info WHERE asso_user_id=?`).get(g.user.id);
+  if (!info) return sendJSON(res, 404, { error: "Coordonnées bancaires non renseignées." });
+  const cot = db.prepare(`SELECT c.*, a.prenom, a.nom FROM asso_cotisations c LEFT JOIN asso_adherents a ON a.id=c.adherent_id WHERE c.id=? AND c.asso_user_id=?`).get(Number(params.cotisationId), g.user.id);
+  if (!cot) return sendJSON(res, 404, { error: "Cotisation introuvable." });
+  const reference = (info.reference_modele || "COTISATION-{ANNEE}-{PRENOM}-{NOM}")
+    .replace("{ANNEE}", new Date().getFullYear())
+    .replace("{PRENOM}", (cot.prenom||"").toUpperCase())
+    .replace("{NOM}", (cot.nom||"").toUpperCase());
+  sendJSON(res, 200, { virement: {
+    holder_name: info.holder_name, bank_name: info.bank_name, iban: info.iban, bic: info.bic,
+    montant: cot.montant, devise: cot.devise, reference, instructions: info.instructions,
+  }});
+});
+
+/* ════════ MODULE NOTIFICATIONS — relances automatiques ════════ */
+
+/* POST /api/asso/relances/run — déclenche le moteur de relances.
+   Parcourt les cotisations impayées, calcule le retard, choisit le niveau
+   de gabarit (DSL TEMPLATE_LEVELS) selon REMINDER_SCHEDULE. */
+route("POST", "/api/asso/relances/run", async (req, res, params, body) => {
+  const g = assoGuard(req, res, "notifications.send");
+  if (!g) return;
+  if (!DAA.NOTIFICATIONS.PAYMENT_REMINDERS) return sendJSON(res, 200, { ok: true, relances: 0 });
+  const canal = (body && body.canal && DAA.isValid("channel", body.canal)) ? String(body.canal).toUpperCase() : "APP";
+  const offsets = DAA.reminderOffsets(); // [0,7,15,30,60]
+  const impayees = db.prepare(`SELECT c.*, a.prenom, a.nom, a.da_user_id FROM asso_cotisations c LEFT JOIN asso_adherents a ON a.id=c.adherent_id
+    WHERE c.asso_user_id=? AND c.statut IN ('en_attente','en_retard') AND c.date_echeance IS NOT NULL`).all(g.user.id);
+  const today = new Date();
+  let count = 0;
+  for (const cot of impayees) {
+    const ech = new Date(cot.date_echeance);
+    const daysLate = Math.floor((today - ech) / 86400000);
+    if (daysLate < 0) continue;
+    // Ne relancer qu'aux jalons définis par le DSL
+    if (!offsets.includes(daysLate)) continue;
+    // Éviter les doublons de relance pour ce jalon
+    const deja = db.prepare(`SELECT id FROM asso_relances WHERE cotisation_id=? AND jours_retard=?`).get(cot.id, daysLate);
+    if (deja) continue;
+    const niveau = DAA.reminderLevelFor(daysLate);
+    const message = `Relance ${niveau} — cotisation « ${cot.intitule} » (${cot.montant} ${cot.devise}) en retard de ${daysLate} jour(s).`;
+    db.prepare(`INSERT INTO asso_relances (asso_user_id,cotisation_id,adherent_id,niveau,canal,jours_retard,message) VALUES (?,?,?,?,?,?,?)`)
+      .run(g.user.id, cot.id, cot.adherent_id, niveau, canal, daysLate, message);
+    // Marque la cotisation en retard
+    if (cot.statut !== "en_retard") db.prepare(`UPDATE asso_cotisations SET statut='en_retard' WHERE id=?`).run(cot.id);
+    // Canal APP → notification plateforme si le membre a un compte lié (confidentialité respectée)
+    if (canal === "APP" && cot.da_user_id) {
+      creerNotif(cot.da_user_id, niveau === "FINAL_NOTICE" ? "alerte" : "info", "Rappel de cotisation", message);
+    }
+    // DSL AUTO_SUSPENSION : suspension après le dernier jalon
+    if (DAA.CONTRIBUTIONS.AUTO_SUSPENSION && daysLate >= Math.max(...offsets) && cot.adherent_id) {
+      db.prepare(`UPDATE asso_adherents SET statut='suspendu' WHERE id=? AND asso_user_id=?`).run(cot.adherent_id, g.user.id);
+    }
+    count++;
+  }
+  assoAudit(g.user.id, g.user.id, "relances.run", "relances", null, { generees: count, canal });
+  sendJSON(res, 200, { ok: true, relances: count });
+});
+
+/* GET /api/asso/relances */
+route("GET", "/api/asso/relances", async (req, res, params, body, query) => {
+  const g = assoGuard(req, res, "contributions.read");
+  if (!g) return;
+  const rows = db.prepare(`SELECT r.*, a.prenom||' '||a.nom AS adherent_nom FROM asso_relances r LEFT JOIN asso_adherents a ON a.id=r.adherent_id WHERE r.asso_user_id=? ORDER BY r.created_at DESC LIMIT 200`).all(g.user.id);
+  sendJSON(res, 200, { relances: rows });
+});
+
+/* ════════ MODULE FINANCE — budgets & validation (DSL FINANCE) ════════ */
+
+/* GET /api/asso/budgets — budget prévu vs réel par catégorie */
+route("GET", "/api/asso/budgets", async (req, res, params, body, query) => {
+  const g = assoGuard(req, res, "finance.read");
+  if (!g) return;
+  const annee = Number(query.annee) || new Date().getFullYear();
+  const budgets = db.prepare(`SELECT * FROM asso_budgets WHERE asso_user_id=? AND annee=? ORDER BY categorie`).all(g.user.id, annee);
+  // DSL AUTO_CALCULATIONS : rapproche chaque budget des dépenses réelles
+  const enriched = budgets.map(b => {
+    const reel = db.prepare(`SELECT COALESCE(SUM(montant),0) n FROM asso_finances WHERE asso_user_id=? AND type='depense' AND categorie=? AND strftime('%Y',date_op)=?`)
+      .get(g.user.id, b.categorie, String(annee)).n;
+    const ecart = b.montant_prevu - reel;
+    return { ...b, montant_reel: reel, ecart, depasse: reel > b.montant_prevu };
+  });
+  sendJSON(res, 200, { budgets: enriched, annee });
+});
+
+/* POST /api/asso/budgets */
+route("POST", "/api/asso/budgets", async (req, res, params, body) => {
+  const g = assoGuard(req, res, "budgets.write");
+  if (!g) return;
+  const { categorie, montant_prevu, devise = "EUR", annee, notes } = body;
+  if (!categorie || montant_prevu == null) return sendJSON(res, 400, { error: "Catégorie et montant prévu requis." });
+  if (!DAA.isValid("currency", devise)) return sendJSON(res, 400, { error: "Devise non supportée par le DSL." });
+  const an = Number(annee) || new Date().getFullYear();
+  const id = db.prepare(`INSERT INTO asso_budgets (asso_user_id,categorie,montant_prevu,devise,annee,notes) VALUES (?,?,?,?,?,?)`)
+    .run(g.user.id, categorie, Number(montant_prevu), devise, an, notes||null).lastInsertRowid;
+  assoAudit(g.user.id, g.user.id, "budget.create", "budget", Number(id), { categorie, montant_prevu });
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* DELETE /api/asso/budgets/:id */
+route("DELETE", "/api/asso/budgets/:id", async (req, res, params) => {
+  const g = assoGuard(req, res, "budgets.write");
+  if (!g) return;
+  const b = db.prepare(`SELECT id FROM asso_budgets WHERE id=? AND asso_user_id=?`).get(Number(params.id), g.user.id);
+  if (!b) return sendJSON(res, 404, { error: "Budget introuvable." });
+  db.prepare(`DELETE FROM asso_budgets WHERE id=?`).run(b.id);
+  assoAudit(g.user.id, g.user.id, "budget.delete", "budget", b.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/asso/finance/rapport — rapports DSL (MONTHLY/QUARTERLY/YEARLY) */
+route("GET", "/api/asso/finance/rapport", async (req, res, params, body, query) => {
+  const g = assoGuard(req, res, "finance.read");
+  if (!g) return;
+  const annee = Number(query.annee) || new Date().getFullYear();
+  // Ventilation mensuelle (AUTO_CALCULATIONS)
+  const parMois = db.prepare(`SELECT strftime('%m',date_op) mois,
+      SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) recettes,
+      SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) depenses
+    FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=? GROUP BY mois ORDER BY mois`).all(g.user.id, String(annee));
+  const parCategorie = db.prepare(`SELECT categorie, type, SUM(montant) total FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=? GROUP BY categorie,type`).all(g.user.id, String(annee));
+  const total = db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) recettes, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) depenses FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=?`).get(g.user.id, String(annee));
+  const resultat = (total.recettes||0) - (total.depenses||0);
+  sendJSON(res, 200, { annee, parMois, parCategorie, total, resultat, devises: DAA.FINANCE.CURRENCIES });
+});
+
+/* GET /api/asso/audit — DSL SECURITY.AUDIT_LOGS */
+route("GET", "/api/asso/audit", async (req, res, params, body, query) => {
+  const g = assoGuard(req, res, "audit.read");
+  if (!g) return;
+  const rows = db.prepare(`SELECT * FROM asso_audit_log WHERE asso_user_id=? ORDER BY created_at DESC LIMIT 300`).all(g.user.id);
+  sendJSON(res, 200, { audit: rows });
+});
+
+/* ════════ MODULE DOCUMENTS — OCR / classification / anti-doublon ════════ */
+
+/* POST /api/asso/documents/:id/ocr — enregistre l'extraction OCR/IA d'une
+   facture et applique classement auto + détection de doublon (DSL DOCUMENTS) */
+route("POST", "/api/asso/documents/:id/ocr", async (req, res, params, body) => {
+  const g = assoGuard(req, res, "documents.write");
+  if (!g) return;
+  const doc = db.prepare(`SELECT * FROM asso_documents WHERE id=? AND asso_user_id=?`).get(Number(params.id), g.user.id);
+  if (!doc) return sendJSON(res, 404, { error: "Document introuvable." });
+  const { type_detecte, ocr_text, fournisseur, montant_ttc, montant_ht, tva, date_facture, num_facture } = body;
+  if (type_detecte && !DAA.isValid("document_type", type_detecte)) return sendJSON(res, 400, { error: "Type de document hors DSL." });
+  // DSL DUPLICATE_DETECTION : hash sur fournisseur+numéro+montant
+  const hash = [fournisseur, num_facture, montant_ttc].filter(Boolean).join("|").toLowerCase();
+  if (hash) {
+    const dup = db.prepare(`SELECT m.id FROM asso_doc_meta m JOIN asso_documents d ON d.id=m.document_id WHERE d.asso_user_id=? AND m.hash_doublon=? AND m.document_id<>?`).get(g.user.id, hash, doc.id);
+    if (dup) return sendJSON(res, 409, { error: "Doublon détecté : cette facture semble déjà enregistrée.", duplicate: true });
+  }
+  // DSL AUTO_CLASSIFICATION : année/trimestre/fournisseur
+  let classement = null;
+  if (date_facture) {
+    const d = new Date(date_facture);
+    const trimestre = Math.floor(d.getMonth() / 3) + 1;
+    classement = `${d.getFullYear()}/T${trimestre}` + (fournisseur ? `/${fournisseur}` : "");
+  }
+  const existing = db.prepare(`SELECT id FROM asso_doc_meta WHERE document_id=?`).get(doc.id);
+  if (existing) {
+    db.prepare(`UPDATE asso_doc_meta SET type_detecte=?,ocr_text=?,fournisseur=?,montant_ttc=?,montant_ht=?,tva=?,date_facture=?,num_facture=?,hash_doublon=?,classement=? WHERE document_id=?`)
+      .run(type_detecte||null, ocr_text||null, fournisseur||null, montant_ttc!=null?Number(montant_ttc):null, montant_ht!=null?Number(montant_ht):null, tva!=null?Number(tva):null, date_facture||null, num_facture||null, hash||null, classement, doc.id);
+  } else {
+    db.prepare(`INSERT INTO asso_doc_meta (document_id,type_detecte,ocr_text,fournisseur,montant_ttc,montant_ht,tva,date_facture,num_facture,hash_doublon,classement) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(doc.id, type_detecte||null, ocr_text||null, fournisseur||null, montant_ttc!=null?Number(montant_ttc):null, montant_ht!=null?Number(montant_ht):null, tva!=null?Number(tva):null, date_facture||null, num_facture||null, hash||null, classement);
+  }
+  assoAudit(g.user.id, g.user.id, "document.ocr", "document", doc.id, { fournisseur, num_facture });
+  sendJSON(res, 200, { ok: true, classement });
+});
+
+/* GET /api/asso/documents/:id/meta */
+route("GET", "/api/asso/documents/:id/meta", async (req, res, params) => {
+  const g = assoGuard(req, res, "documents.read");
+  if (!g) return;
+  const doc = db.prepare(`SELECT id FROM asso_documents WHERE id=? AND asso_user_id=?`).get(Number(params.id), g.user.id);
+  if (!doc) return sendJSON(res, 404, { error: "Document introuvable." });
+  const meta = db.prepare(`SELECT * FROM asso_doc_meta WHERE document_id=?`).get(doc.id);
+  sendJSON(res, 200, { meta: meta || null });
+});
+
+/* ════════ MODULE GENERAL_ASSEMBLY (DSL) ════════ */
+
+/* GET /api/asso/assemblees */
+route("GET", "/api/asso/assemblees", async (req, res) => {
+  const g = assoGuard(req, res, "assembly.manage");
+  if (!g) return;
+  const rows = db.prepare(`SELECT * FROM asso_assemblees WHERE asso_user_id=? ORDER BY date_prevue DESC, created_at DESC`).all(g.user.id);
+  sendJSON(res, 200, { assemblees: rows, features: DAA.GENERAL_ASSEMBLY.FEATURES });
+});
+
+/* POST /api/asso/assemblees — CREATION=ONE_CLICK : active toutes les
+   features du DSL par défaut, génère convocation + ordre du jour */
+route("POST", "/api/asso/assemblees", async (req, res, params, body) => {
+  const g = assoGuard(req, res, "assembly.manage");
+  if (!g) return;
+  const { titre, type = "ordinaire", date_prevue, lieu, lien_visio, ordre_du_jour, quorum_requis } = body;
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  // DSL AUTO_CONVOCATION + AGENDA_GENERATION_AI
+  const odj = ordre_du_jour || "1. Émargement et vérification du quorum\n2. Rapport moral du président\n3. Rapport financier du trésorier\n4. Approbation des comptes\n5. Questions diverses\n6. Clôture";
+  const convocation = `Convocation — ${titre}\n\nVous êtes convoqué(e) à l'assemblée générale ${type} qui se tiendra le ${date_prevue || "(date à définir)"}${lieu ? " à " + lieu : ""}${lien_visio ? " (visio : " + lien_visio + ")" : ""}.\n\nOrdre du jour :\n${odj}`;
+  const id = db.prepare(`INSERT INTO asso_assemblees (asso_user_id,titre,type,date_prevue,lieu,lien_visio,ordre_du_jour,convocation,quorum_requis,features_json,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(g.user.id, titre, type, date_prevue||null, lieu||null, lien_visio||null, odj, convocation, Number(quorum_requis)||0, JSON.stringify(DAA.GENERAL_ASSEMBLY.FEATURES), g.user.id).lastInsertRowid;
+  assoAudit(g.user.id, g.user.id, "assemblee.create", "assemblee", Number(id), { titre });
+  sendJSON(res, 201, { id, ok: true, convocation, ordre_du_jour: odj });
+});
+
+/* PUT /api/asso/assemblees/:id — maj statut/présents/PV + contrôle quorum */
+route("PUT", "/api/asso/assemblees/:id", async (req, res, params, body) => {
+  const g = assoGuard(req, res, "assembly.manage");
+  if (!g) return;
+  const ag = db.prepare(`SELECT * FROM asso_assemblees WHERE id=? AND asso_user_id=?`).get(Number(params.id), g.user.id);
+  if (!ag) return sendJSON(res, 404, { error: "Assemblée introuvable." });
+  const { statut, presents, pv, ordre_du_jour, date_prevue } = body;
+  // DSL QUORUM_CHECK
+  let quorum_atteint = null;
+  if (presents != null && ag.quorum_requis > 0) quorum_atteint = Number(presents) >= ag.quorum_requis;
+  db.prepare(`UPDATE asso_assemblees SET statut=COALESCE(?,statut),presents=COALESCE(?,presents),pv=COALESCE(?,pv),ordre_du_jour=COALESCE(?,ordre_du_jour),date_prevue=COALESCE(?,date_prevue) WHERE id=?`)
+    .run(statut||null, presents!=null?Number(presents):null, pv||null, ordre_du_jour||null, date_prevue||null, ag.id);
+  assoAudit(g.user.id, g.user.id, "assemblee.update", "assemblee", ag.id, { statut, quorum_atteint });
+  sendJSON(res, 200, { ok: true, quorum_atteint });
+});
+
+/* ════════ MODULE ANALYTICS — engagement (DSL ANALYTICS) ════════ */
+
+/* GET /api/asso/analytics — stats membres + indice d'engagement */
+route("GET", "/api/asso/analytics", async (req, res, params, body, query) => {
+  const g = assoGuard(req, res, "analytics.read");
+  if (!g) return;
+  const uid = g.user.id;
+  const membres = db.prepare(`SELECT statut, COUNT(*) n FROM asso_adherents WHERE asso_user_id=? GROUP BY statut`).all(uid);
+  const parPays = db.prepare(`SELECT COALESCE(pays,'—') pays, COUNT(*) n FROM asso_adherents WHERE asso_user_id=? GROUP BY pays ORDER BY n DESC LIMIT 20`).all(uid);
+  const cotisations = db.prepare(`SELECT statut, COUNT(*) n, COALESCE(SUM(montant),0) total FROM asso_cotisations WHERE asso_user_id=? GROUP BY statut`).all(uid);
+  const totalCot = db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=?`).get(uid).n;
+  const payees = db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(uid).n;
+  const tauxRecouvrement = totalCot ? Math.round((payees / totalCot) * 100) : 0;
+  // DSL ENGAGEMENT_SCORE par adhérent (TRACKING : paiements + votes)
+  const engagement = db.prepare(`
+    SELECT a.id, a.prenom||' '||a.nom AS nom,
+      (SELECT COUNT(*) FROM asso_cotisations c WHERE c.adherent_id=a.id AND c.statut='payee') AS paiements,
+      (SELECT COUNT(*) FROM asso_votes_reponses vr WHERE vr.adherent_id=a.id) AS votes
+    FROM asso_adherents a WHERE a.asso_user_id=?`).all(uid)
+    .map(r => ({ ...r, score: Math.min(100, r.paiements * 20 + r.votes * 15) }))
+    .sort((x, y) => y.score - x.score).slice(0, 50);
+  // DSL AUTO_INSIGHTS
+  const insights = [];
+  if (tauxRecouvrement < 60) insights.push("Taux de recouvrement faible : lancez une campagne de relance.");
+  const enRetard = db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='en_retard'`).get(uid).n;
+  if (enRetard > 0) insights.push(`${enRetard} cotisation(s) en retard à traiter.`);
+  if (!engagement.length) insights.push("Aucun adhérent enregistré : commencez par ajouter vos membres.");
+  sendJSON(res, 200, { membres, parPays, cotisations, tauxRecouvrement, engagement, insights });
+});
+
+/* ════════ MODULE AI_ASSISTANT (DSL) ════════ */
+
+/* POST /api/asso/ai — assistant : analyse finance, prédiction, rapports.
+   Implémentation déterministe (sans dépendance externe) basée sur les
+   données réelles ; respecte les capacités déclarées dans le DSL. */
+route("POST", "/api/asso/ai", async (req, res, params, body) => {
+  const g = assoGuard(req, res, "analytics.read");
+  if (!g) return;
+  const uid = g.user.id;
+  const tache = String((body && body.tache) || "").toUpperCase();
+  const out = { tache };
+  if (tache === "FINANCE_ANALYSIS" && DAA.AI_ASSISTANT.FINANCE_ANALYSIS) {
+    const b = db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) r, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) d FROM asso_finances WHERE asso_user_id=?`).get(uid);
+    const solde = (b.r||0) - (b.d||0);
+    out.resume = `Recettes ${b.r||0} / Dépenses ${b.d||0} → solde ${solde}. ${solde < 0 ? "Attention : trésorerie déficitaire." : "Trésorerie positive."}`;
+  } else if (tache === "ENGAGEMENT_PREDICTION" && DAA.AI_ASSISTANT.ENGAGEMENT_PREDICTION) {
+    const risque = db.prepare(`SELECT a.prenom||' '||a.nom nom FROM asso_adherents a WHERE a.asso_user_id=? AND a.statut='actif'
+      AND NOT EXISTS (SELECT 1 FROM asso_cotisations c WHERE c.adherent_id=a.id AND c.statut='payee' AND c.date_paiement >= date('now','-1 year')) LIMIT 20`).all(uid);
+    out.a_risque = risque.map(x => x.nom);
+    out.resume = `${risque.length} membre(s) à risque de non-renouvellement (aucun paiement sur 12 mois).`;
+  } else if (tache === "AUTO_REPORTS" && DAA.AI_ASSISTANT.AUTO_REPORTS) {
+    const nb = db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=? AND statut='actif'`).get(uid).n;
+    const cot = db.prepare(`SELECT COALESCE(SUM(montant),0) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(uid).n;
+    out.rapport = `Rapport d'activité — ${nb} adhérent(s) actif(s), ${cot} encaissés en cotisations.`;
+  } else {
+    return sendJSON(res, 400, { error: "Tâche IA non reconnue ou non activée dans le DSL.", disponibles: Object.keys(DAA.AI_ASSISTANT).filter(k => DAA.AI_ASSISTANT[k] === true) });
+  }
+  assoAudit(uid, uid, "ai.run", "ai", null, { tache });
+  sendJSON(res, 200, out);
+});
+
+/* ════════ MODULE SUBSCRIPTION (DSL) ════════ */
+
+/* GET /api/asso/subscription */
+route("GET", "/api/asso/subscription", async (req, res) => {
+  const g = assoGuard(req, res, null);
+  if (!g) return;
+  let sub = db.prepare(`SELECT * FROM asso_subscription WHERE asso_user_id=?`).get(g.user.id);
+  if (!sub) {
+    db.prepare(`INSERT INTO asso_subscription (asso_user_id,billing,etat) VALUES (?,?, 'TRIAL')`).run(g.user.id, "YEARLY");
+    sub = db.prepare(`SELECT * FROM asso_subscription WHERE asso_user_id=?`).get(g.user.id);
+  }
+  // DSL FREE_MODE / UNPAID_STATE : capacités selon l'état
+  const readOnly = sub.etat === "UNPAID" || sub.etat === "CANCELLED";
+  sendJSON(res, 200, { subscription: sub, mode: readOnly ? DAA.SUBSCRIPTION.UNPAID_STATE : "FULL", read_only: readOnly });
+});
+
+/* POST /api/asso/subscription/pay — enregistre un paiement d'abonnement.
+   DSL BADGE_GRANTED_ON_PAYMENT : active l'accréditation au paiement. */
+route("POST", "/api/asso/subscription/pay", async (req, res, params, body) => {
+  const g = assoGuard(req, res, null);
+  if (!g) return;
+  const { billing = "YEARLY", montant = 0, devise = "EUR" } = body;
+  if (!DAA.isValid("billing", billing)) return sendJSON(res, 400, { error: "Périodicité de facturation hors DSL." });
+  if (!DAA.isValid("currency", devise)) return sendJSON(res, 400, { error: "Devise non supportée." });
+  const echeance = new Date();
+  if (String(billing).toUpperCase() === "MONTHLY") echeance.setMonth(echeance.getMonth() + 1);
+  else echeance.setFullYear(echeance.getFullYear() + 1);
+  const ech = echeance.toISOString().slice(0, 10);
+  const existing = db.prepare(`SELECT id FROM asso_subscription WHERE asso_user_id=?`).get(g.user.id);
+  if (existing) {
+    db.prepare(`UPDATE asso_subscription SET billing=?,etat='ACTIVE',montant=?,devise=?,date_echeance=?,dernier_paiement=date('now'),updated_at=datetime('now') WHERE asso_user_id=?`)
+      .run(billing, Number(montant), devise, ech, g.user.id);
+  } else {
+    db.prepare(`INSERT INTO asso_subscription (asso_user_id,billing,etat,montant,devise,date_echeance,dernier_paiement) VALUES (?,?, 'ACTIVE',?,?,?,date('now'))`)
+      .run(g.user.id, billing, Number(montant), devise, ech);
+  }
+  // BADGE_GRANTED_ON_PAYMENT : (ré)active l'accréditation
+  db.prepare(`UPDATE asso_accreditations SET statut='active',date_fin=?,updated_at=datetime('now') WHERE user_id=?`).run(ech, g.user.id);
+  assoAudit(g.user.id, g.user.id, "subscription.pay", "subscription", null, { billing, montant, devise });
+  sendJSON(res, 200, { ok: true, date_echeance: ech });
+});
+
+/* ════════ MODULE MEMBERS — rôles & rattachement de comptes (DSL) ════════ */
+
+/* GET /api/asso/membre-roles */
+route("GET", "/api/asso/membre-roles", async (req, res) => {
+  const g = assoGuard(req, res, "members.read");
+  if (!g) return;
+  const rows = db.prepare(`SELECT mr.*, u.nom AS user_nom FROM asso_membre_roles mr JOIN users u ON u.id=mr.da_user_id WHERE mr.asso_user_id=? ORDER BY mr.created_at DESC`).all(g.user.id);
+  sendJSON(res, 200, { roles: rows, roles_disponibles: DAA.MEMBERS.ROLES });
+});
+
+/* POST /api/asso/membre-roles — attribue un rôle DSL à un compte plateforme */
+route("POST", "/api/asso/membre-roles", async (req, res, params, body) => {
+  const g = assoGuard(req, res, "members.write");
+  if (!g) return;
+  const { da_user_id, role = "MEMBER", role_custom } = body;
+  if (!da_user_id) return sendJSON(res, 400, { error: "Compte plateforme (da_user_id) requis." });
+  const roleUp = String(role).toUpperCase();
+  // DSL : rôle prédéfini OU rôle personnalisé si CUSTOM_ROLES
+  if (!DAA.MEMBERS.ROLES.includes(roleUp) && !(DAA.MEMBERS.CUSTOM_ROLES && role_custom)) {
+    return sendJSON(res, 400, { error: "Rôle invalide selon le DSL.", roles: DAA.MEMBERS.ROLES });
+  }
+  const finalRole = DAA.MEMBERS.ROLES.includes(roleUp) ? roleUp : "MEMBER";
+  const existing = db.prepare(`SELECT id FROM asso_membre_roles WHERE asso_user_id=? AND da_user_id=?`).get(g.user.id, Number(da_user_id));
+  if (existing) {
+    db.prepare(`UPDATE asso_membre_roles SET role=?,role_custom=? WHERE id=?`).run(finalRole, role_custom||null, existing.id);
+  } else {
+    db.prepare(`INSERT INTO asso_membre_roles (asso_user_id,da_user_id,role,role_custom) VALUES (?,?,?,?)`).run(g.user.id, Number(da_user_id), finalRole, role_custom||null);
+  }
+  assoAudit(g.user.id, g.user.id, "role.assign", "membre_role", Number(da_user_id), { role: finalRole, role_custom });
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ═══════════════════════════════════════════════════════════════════ */

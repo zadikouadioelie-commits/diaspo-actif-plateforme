@@ -2117,6 +2117,140 @@ db.exec(`
     FOREIGN KEY(adherent_id) REFERENCES asso_adherents(id)
   );
 
+  /* ════════════════════════════════════════════════════════════════════
+     DAA-Lang — tables des modules complémentaires
+     ════════════════════════════════════════════════════════════════════ */
+
+  /* ── DSL MEMBERS.ROLES : rattachement compte plateforme ⇄ rôle asso ── */
+  CREATE TABLE IF NOT EXISTS asso_membre_roles (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL,
+    da_user_id    INTEGER NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'MEMBER',
+    role_custom   TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    UNIQUE(asso_user_id, da_user_id),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id),
+    FOREIGN KEY(da_user_id)   REFERENCES users(id)
+  );
+
+  /* ── DSL CONTRIBUTIONS.BANK_INFO ── */
+  CREATE TABLE IF NOT EXISTS asso_bank_info (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id      INTEGER NOT NULL UNIQUE,
+    holder_name       TEXT NOT NULL,
+    bank_name         TEXT,
+    iban              TEXT NOT NULL,
+    bic               TEXT,
+    devise            TEXT DEFAULT 'EUR',
+    reference_modele  TEXT DEFAULT 'COTISATION-{ANNEE}-{PRENOM}-{NOM}',
+    display_to_members INTEGER DEFAULT 1,
+    instructions      TEXT,
+    updated_at        TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id)
+  );
+
+  /* ── DSL NOTIFICATIONS : relances automatiques (log + niveaux) ── */
+  CREATE TABLE IF NOT EXISTS asso_relances (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL,
+    cotisation_id INTEGER,
+    adherent_id   INTEGER,
+    niveau        TEXT NOT NULL DEFAULT 'INFO'
+                  CHECK(niveau IN ('INFO','WARNING','URGENT','FINAL_NOTICE')),
+    canal         TEXT NOT NULL DEFAULT 'APP'
+                  CHECK(canal IN ('APP','EMAIL','PUSH')),
+    jours_retard  INTEGER DEFAULT 0,
+    message       TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id)  REFERENCES users(id),
+    FOREIGN KEY(cotisation_id) REFERENCES asso_cotisations(id)
+  );
+
+  /* ── DSL FINANCE.BUDGETS ── */
+  CREATE TABLE IF NOT EXISTS asso_budgets (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL,
+    categorie     TEXT NOT NULL,
+    montant_prevu REAL NOT NULL DEFAULT 0,
+    devise        TEXT DEFAULT 'EUR',
+    annee         INTEGER NOT NULL,
+    notes         TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id)
+  );
+
+  /* ── DSL SECURITY.AUDIT_LOGS / FINANCE.AUDIT_TRAIL ── */
+  CREATE TABLE IF NOT EXISTS asso_audit_log (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL,
+    acteur_id     INTEGER,
+    action        TEXT NOT NULL,
+    entite        TEXT,
+    entite_id     INTEGER,
+    details       TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id)
+  );
+
+  /* ── DSL DOCUMENTS : métadonnées OCR / classification / anti-doublon ── */
+  CREATE TABLE IF NOT EXISTS asso_doc_meta (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id   INTEGER NOT NULL UNIQUE,
+    type_detecte  TEXT,
+    ocr_text      TEXT,
+    fournisseur   TEXT,
+    montant_ttc   REAL,
+    montant_ht    REAL,
+    tva           REAL,
+    date_facture  TEXT,
+    num_facture   TEXT,
+    hash_doublon  TEXT,
+    classement    TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(document_id) REFERENCES asso_documents(id)
+  );
+
+  /* ── DSL GENERAL_ASSEMBLY ── */
+  CREATE TABLE IF NOT EXISTS asso_assemblees (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL,
+    titre         TEXT NOT NULL,
+    type          TEXT DEFAULT 'ordinaire'
+                  CHECK(type IN ('ordinaire','extraordinaire','constitutive')),
+    date_prevue   TEXT,
+    lieu          TEXT,
+    lien_visio    TEXT,
+    ordre_du_jour TEXT,
+    convocation   TEXT,
+    pv            TEXT,
+    quorum_requis INTEGER DEFAULT 0,
+    presents      INTEGER DEFAULT 0,
+    statut        TEXT DEFAULT 'planifiee'
+                  CHECK(statut IN ('planifiee','en_cours','close','archivee')),
+    features_json TEXT DEFAULT '[]',
+    created_by    INTEGER,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id)
+  );
+
+  /* ── DSL SUBSCRIPTION : état d'abonnement de l'accréditation ── */
+  CREATE TABLE IF NOT EXISTS asso_subscription (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    asso_user_id  INTEGER NOT NULL UNIQUE,
+    billing       TEXT DEFAULT 'YEARLY'
+                  CHECK(billing IN ('MONTHLY','YEARLY')),
+    etat          TEXT DEFAULT 'TRIAL'
+                  CHECK(etat IN ('ACTIVE','TRIAL','UNPAID','CANCELLED')),
+    date_debut    TEXT DEFAULT (date('now')),
+    date_echeance TEXT,
+    montant       REAL DEFAULT 0,
+    devise        TEXT DEFAULT 'EUR',
+    dernier_paiement TEXT,
+    updated_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(asso_user_id) REFERENCES users(id)
+  );
+
 `);
 
 module.exports = db;
