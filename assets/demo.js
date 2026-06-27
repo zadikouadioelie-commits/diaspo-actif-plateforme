@@ -577,6 +577,122 @@
       ]
     },
 
+    /* ── GESTION DES ASSOCIATIONS ── */
+    'f-asso-accreditation': {
+      badge:'🏅 Accréditation Asso', couleur:'#7c3aed',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Accréditation « Gestion des Associations »",
+          voice:"L'accréditation Gestion des Associations est un module premium qui transforme votre compte en véritable outil de gouvernance associative.",
+          desc:"Adhérents, cotisations, trésorerie, comptabilité intelligente, assemblées générales et votes électroniques — tout dans un espace sécurisé." },
+        { el:null, pos:'center',
+          titre:"🎖 Deux niveaux d'accréditation",
+          voice:"Choisissez entre Association Vérifiée, le badge de confiance, et Association Accréditée, qui débloque tous les outils de gestion.",
+          desc:"• Association Vérifiée — badge de confiance affiché sur votre profil\n• Association Accréditée — abonnement premium + tous les modules de gestion" },
+        { el:null, pos:'center',
+          titre:"📝 Faire votre demande",
+          voice:"Depuis votre tableau de bord Initiative, le volet Accréditations affiche désormais la Gestion des Associations. Cliquez sur Découvrir et demander.",
+          desc:"Tableau de bord → Accréditations DA → carte « Gestion des Associations » → Découvrir & demander.",
+          lien:{href:'dashboard-initiative.html#accreditations', label:'Voir mes accréditations'} },
+        { el:null, pos:'center', cta:'initiative',
+          titre:"✅ Validation par l'équipe Diaspo'Actif",
+          voice:"Après vérification de votre association et activation de l'abonnement, le badge est accordé et tous les modules se débloquent.",
+          desc:"Une fois approuvée, la section « Gestion Association » apparaît dans votre menu avec adhérents, cotisations, finances et plus encore." }
+      ]
+    },
+
+    'f-asso-adherents': {
+      badge:'👥 Adhérents', couleur:'#7c3aed',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Gérer les adhérents",
+          voice:"Le registre des adhérents centralise tous vos membres, leur statut et leur historique, en respectant strictement la confidentialité.",
+          desc:"Numéro d'adhérent automatique, ancienneté calculée, statut (actif, suspendu, en attente) et carte de membre numérique." },
+        { el:null, pos:'center',
+          titre:"➕ Ajouter un membre",
+          voice:"Ajoutez un adhérent manuellement ou rattachez un compte Diaspo'Actif existant, sans qu'il ait besoin d'un second compte.",
+          desc:"Section Adhérents → + Nouvel adhérent → identité, statut, type d'adhésion. Les coordonnées personnelles restent masquées aux autres membres.",
+          lien:{href:'dashboard-initiative.html#asso-adherents', label:'Mes adhérents'} },
+        { el:null, pos:'center',
+          titre:"🎫 Rôles & carte de membre",
+          voice:"Attribuez des rôles — président, trésorier, secrétaire — qui déterminent les permissions de chacun. Chaque membre reçoit une carte avec QR Code.",
+          desc:"Le QR Code sert au pointage des présences, au contrôle d'accès aux événements et à la vérification de l'adhésion." },
+        { el:null, pos:'center', cta:'initiative',
+          titre:"✅ Votre registre est prêt !",
+          voice:"Retrouvez à tout moment l'historique des cotisations et participations de chaque adhérent.",
+          desc:"Adhérents → fiche membre → historique complet des cotisations, votes et événements." }
+      ]
+    },
+
+    'f-asso-cotisations': {
+      badge:'💰 Cotisations', couleur:'#7c3aed',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Cotisations & relances automatiques",
+          voice:"Le module de cotisations gère les paiements, leur suivi mois par mois et les relances automatiques des impayés.",
+          desc:"Cotisations annuelles, mensuelles, trimestrielles ou personnalisées, avec suivi visuel par membre." },
+        { el:null, pos:'center',
+          titre:"💳 Encaisser un paiement",
+          voice:"Vos membres paient par carte, PayPal, Mobile Money ou virement bancaire avec une référence générée automatiquement.",
+          desc:"• Carte / PayPal / Stripe\n• Mobile Money (Orange Money, Wave…)\n• Virement bancaire → référence COTISATION-2026-PRENOM-NOM\n• Validation du virement par le trésorier",
+          lien:{href:'dashboard-initiative.html#asso-cotisations', label:'Mes cotisations'} },
+        { el:null, pos:'center',
+          titre:"🔔 Relances automatiques",
+          voice:"Activez le moteur de relances : la plateforme détecte les retards et envoie des rappels gradués à J plus 7, 15, 30 et 60.",
+          desc:"Niveaux INFO → WARNING → URGENT → DERNIER AVIS. Suspension automatique possible au-delà du dernier jalon." },
+        { el:null, pos:'center', cta:'initiative',
+          titre:"✅ Trésorerie maîtrisée !",
+          voice:"Le tableau de bord du trésorier affiche en temps réel les montants encaissés, en attente et en retard.",
+          desc:"Tableau de bord trésorier → cotisations encaissées, en attente, retards et taux de recouvrement." }
+      ]
+    },
+
+    'f-asso-tresorerie': {
+      badge:'📊 Trésorerie', couleur:'#7c3aed',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Trésorerie & comptabilité intelligente",
+          voice:"Tenez la comptabilité de votre association sans effort : recettes, dépenses, budgets et bilans automatiques.",
+          desc:"Multi-comptes, multi-devises (EUR, XOF, XAF, USD…), calculs automatiques et piste d'audit complète." },
+        { el:null, pos:'center',
+          titre:"📷 Numériser une facture (OCR)",
+          voice:"Photographiez ou importez une facture : l'intelligence artificielle extrait le fournisseur, le montant et la TVA automatiquement.",
+          desc:"Facture PDF ou photo → OCR → classement automatique par année et trimestre → détection des doublons → coffre-fort numérique.",
+          lien:{href:'dashboard-initiative.html#asso-finances', label:'Ma trésorerie'} },
+        { el:null, pos:'center',
+          titre:"📈 Budgets & rapports",
+          voice:"Définissez des budgets par catégorie et comparez le prévu au réel. Les rapports financiers se génèrent automatiquement.",
+          desc:"Budget prévu vs réel par catégorie • rapports mensuels, trimestriels et annuels • alertes de dépassement." },
+        { el:null, pos:'center', cta:'initiative',
+          titre:"✅ Comptabilité transparente !",
+          voice:"Chaque opération est tracée et aucune écriture ne peut être supprimée : la transparence est totale.",
+          desc:"Trésorerie → audit → historique horodaté de toutes les opérations et validations." }
+      ]
+    },
+
+    'f-asso-assemblee': {
+      badge:'🗳️ Assemblées & Votes', couleur:'#7c3aed',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Assemblées générales & votes électroniques",
+          voice:"Organisez une assemblée générale en un seul clic, avec convocation, ordre du jour et émargement automatiques.",
+          desc:"Convocation auto, ordre du jour généré, émargement QR Code, visioconférence, vote sécurisé et procès-verbal." },
+        { el:null, pos:'center',
+          titre:"📋 Créer une assemblée",
+          voice:"La création en un clic génère la convocation et l'ordre du jour. Définissez le quorum requis pour valider les décisions.",
+          desc:"Assemblées → Nouvelle AG → date, lieu ou visio, quorum. La convocation et l'ordre du jour sont pré-remplis automatiquement.",
+          lien:{href:'dashboard-initiative.html#asso-votes', label:'Mes assemblées & votes'} },
+        { el:null, pos:'center',
+          titre:"🗳️ Lancer un vote",
+          voice:"Créez des votes de résolution, des élections ou des consultations, en mode public ou secret.",
+          desc:"• Résolution / Élection / Consultation / Budget\n• Vote public ou secret (anonyme)\n• Résultats calculés et archivés automatiquement avec horodatage." },
+        { el:null, pos:'center', cta:'initiative',
+          titre:"✅ Gouvernance simplifiée !",
+          voice:"Le contrôle du quorum, le procès-verbal et l'archivage sont gérés automatiquement par la plateforme.",
+          desc:"Quorum vérifié en temps réel → PV généré → archivage sécurisé de toutes les décisions." }
+      ]
+    },
+
     /* ── AGENDA ── */
     'f-agenda': {
       badge:'📆 Agenda', couleur:'#0f766e',

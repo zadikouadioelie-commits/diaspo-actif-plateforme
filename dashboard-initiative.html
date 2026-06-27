@@ -113,7 +113,11 @@ if (typeof ACCREDITATIONS_DA === 'undefined') {
     { type:'creation_publicite', label:'Création de Publicité', emoji:'📣', couleur:'#dc2626', couleurBg:'#fef2f2', couleurBorder:'#dc2626', couleurText:'#991b1b',
       description:"Autorisation de créer et soumettre des publicités sur la plateforme Diaspo'Actif. Chaque publicité est soumise à validation avant diffusion.",
       droits:["Créer des campagnes publicitaires complètes","Définir le ciblage géographique et démographique","Choisir les emplacements de diffusion","Définir les périodes d'affichage","Suivre les statistiques","Soumettre des publicités à validation"],
-      eligible:['initiative'], prix:{initiative:49} }
+      eligible:['initiative'], prix:{initiative:49} },
+    { type:'gestion_associations', label:'Gestion des Associations', emoji:'🏅', couleur:'#7c3aed', couleurBg:'#f5f3ff', couleurBorder:'#7c3aed', couleurText:'#4c1d95',
+      description:"Accréditation premium pour gérer entièrement votre association depuis un espace sécurisé : adhérents, cotisations, trésorerie, comptabilité intelligente, assemblées générales et votes électroniques.",
+      droits:["Gérer les adhérents et cartes de membre (QR Code)","Encaisser les cotisations (carte, virement, Mobile Money) et relances automatiques","Tenir la trésorerie et la comptabilité (OCR des factures, coffre-fort numérique)","Organiser des assemblées générales et des votes électroniques","Consulter les statistiques avancées et l'indice d'engagement","Assistant IA : analyses financières, prédictions, rapports automatiques"],
+      eligible:['initiative'], prix:{initiative:0}, prixLabel:'Premium — sur abonnement', module:'asso' }
   ];
 }
 if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
@@ -1046,8 +1050,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         const demandeEnCours = demandes.find(d => d.type === def.type && d.statut === 'en_attente');
         const refusee = demandes.find(d => d.type === def.type && d.statut === 'refusee');
         const prix = def.prix?.initiative || 0;
+        const prixTxt = def.prixLabel || (prix > 0 ? prix + ' €/an' : 'Gratuit pour les initiatives');
         let btnHTML;
-        if (active) {
+        if (def.module === 'asso') {
+          // Accréditation pilotée par son propre volet dédié (flux DAA-Lang)
+          btnHTML = `<button class="btn btn-orange btn-block" onclick="window.initShowSection&&window.initShowSection('asso-accreditation')">
+            Découvrir &amp; demander →
+          </button>`;
+        } else if (active) {
           btnHTML = `<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#dcfce7;color:#16a34a;font-weight:700;font-size:13px;">✅ Accréditation active</div>`;
         } else if (demandeEnCours) {
           btnHTML = `<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#fef9c3;color:#a16207;font-weight:700;font-size:13px;">⏳ Demande en cours d'examen</div>`;
@@ -1063,7 +1073,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <span style="font-size:28px;">${def.emoji}</span>
               <div>
                 <div style="font-weight:800;font-size:15px;">${def.label}</div>
-                <div style="font-size:12px;font-weight:700;color:${def.couleurText};">${prix > 0 ? prix + ' €/an' : 'Gratuit pour les initiatives'}</div>
+                <div style="font-size:12px;font-weight:700;color:${def.couleurText};">${prixTxt}</div>
               </div>
             </div>
             <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">${def.description}</p>
