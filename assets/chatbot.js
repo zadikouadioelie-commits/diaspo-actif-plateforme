@@ -1614,26 +1614,85 @@
       return;
     }
 
-    // 3. Chercher dans le contexte enrichi
-    setTimeout(() => {
+    // 3. Recherche dans la FAQ officielle
+    appendTyping();
+    searchFAQ(text, profile).then(faqResults => {
+      removeTyping();
+      if (faqResults && faqResults.length > 0) {
+        const top = faqResults[0];
+        /* Réponse exacte ou proche */
+        if (top.score >= 10) {
+          const html = renderFAQAnswer(top, faqResults.slice(1, 4), level);
+          _memory.add('bot', top.question, 'faq_' + top.id);
+          appendBotMessage(html, [
+            top.module_lien ? { label: `🔗 ${top.module_label || 'Ouvrir'}`, action: top.module_lien } : null,
+            { label: '📚 Voir toute la FAQ', action: 'faq.html' },
+          ].filter(Boolean));
+          return;
+        }
+        /* Plusieurs résultats proches → proposer les questions */
+        if (faqResults.length >= 2) {
+          const html = renderFAQSuggestions(text, faqResults.slice(0, 4));
+          _memory.add('bot', 'faq_suggestions', 'faq');
+          appendBotMessage(html, [{ label: '📚 Parcourir la FAQ', action: 'faq.html' }]);
+          return;
+        }
+      }
+
+      // 4. Chercher dans le contexte enrichi admin
       const hit = searchContext(text);
       if (hit) {
         const { html, quickReplies } = renderContextHit(hit, text, level);
         _memory.add('bot', hit.texte?.slice(0, 80) || '', 'ctx_hit');
         appendBotMessage(html, quickReplies);
       } else {
-        // 4. Fallback avec aide contextuelle à la page actuelle
+        // 5. Fallback avec aide contextuelle à la page actuelle
         const { html, quickReplies } = renderResponse('fallback', level);
         const pageHint = getPageSpecificFallback(ctx);
         const enrichedQR = [
           ...quickReplies.slice(0, 2),
           { label: '🔍 Chercher un profil / expert', intent: '_search_hint' },
+          { label: '📚 FAQ complète', action: 'faq.html' },
         ];
         _memory.add('bot', 'fallback', 'fallback');
         appendBotMessage(pageHint ? html + `<div class="cb-proactive-tip">${_esc(pageHint)}</div>` : html, enrichedQR);
         logUnanswered(text);
       }
-    }, 350);
+    });
+  }
+
+  /* ── Recherche FAQ via API ─────────────────────────────────────── */
+  async function searchFAQ(query, profile) {
+    try {
+      const role = profile || 'tous';
+      const r = await fetch(`/api/faq/search?q=${encodeURIComponent(query)}&role=${encodeURIComponent(role)}`);
+      if (!r.ok) return null;
+      return await r.json();
+    } catch(e) { return null; }
+  }
+
+  /* Rendu d'une réponse FAQ dans le chatbot */
+  function renderFAQAnswer(q, related, level) {
+    const steps = Array.isArray(q.etapes) ? q.etapes : [];
+    const stepsHtml = steps.length
+      ? `<div style="margin:8px 0;padding:10px 12px;background:#f8fafc;border-radius:8px;border-left:3px solid #ff6b00;">
+          <strong style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;">📋 Étapes</strong>
+          <ol style="margin:6px 0 0;padding-left:18px;">${steps.map(s => `<li style="margin-bottom:4px;font-size:13px;">${_esc(s)}</li>`).join('')}</ol>
+        </div>` : '';
+    const relatedHtml = related.length
+      ? `<div style="margin-top:10px;padding:8px 10px;background:#f1f5f9;border-radius:7px;">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:6px;">QUESTIONS SIMILAIRES</div>
+          ${related.map(r => `<a href="faq.html#${r.id}" style="display:block;font-size:12px;color:#ff6b00;text-decoration:none;padding:2px 0;">❯ ${_esc(r.question)}</a>`).join('')}
+        </div>` : '';
+    return `<div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">📚 Depuis la base de connaissances officielle</div>
+      ${q.reponse}${stepsHtml}${relatedHtml}`;
+  }
+
+  /* Rendu de suggestions quand plusieurs questions proches */
+  function renderFAQSuggestions(query, results) {
+    return `<p>🔍 Je trouve plusieurs réponses possibles pour <strong>"${_esc(query)}"</strong>. Vous cherchez peut-être :</p>
+      <ul>${results.map(r => `<li><a href="faq.html#${r.id}" style="color:#ff6b00;">${_esc(r.question)}</a></li>`).join('')}</ul>
+      <p style="font-size:12px;color:#64748b;">Ou consultez <a href="faq.html" style="color:#ff6b00;">toute la FAQ</a> pour une recherche plus complète.</p>`;
   }
 
   /* Retire les suggestions déjà montrées ou non pertinentes */

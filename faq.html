@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — FAQ & Base de connaissances</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<link rel="apple-touch-icon" href="assets/logo.svg">
+<style>
+/* ─── Hero ─────────────────────────────────────────────────────── */
+.faq-hero {
+  background: linear-gradient(135deg, #0F2A50 0%, #1B3A6B 60%, #ff6b00 100%);
+  padding: 60px 20px 40px;
+  text-align: center;
+  color: #fff;
+}
+.faq-hero h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 800; margin: 0 0 10px; }
+.faq-hero p  { opacity: .85; font-size: 1rem; margin: 0 0 28px; }
+.faq-role-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+  padding: 6px 16px; border-radius: 99px; font-size: 13px; margin-bottom: 24px;
+}
+
+/* ─── Barre de recherche ────────────────────────────────────────── */
+.faq-search-wrap {
+  max-width: 640px; margin: 0 auto;
+  position: relative;
+}
+.faq-search-wrap input {
+  width: 100%; box-sizing: border-box;
+  padding: 14px 50px 14px 18px;
+  border-radius: 12px; border: none;
+  font-size: 15px; outline: none;
+  box-shadow: 0 4px 24px rgba(0,0,0,.15);
+}
+.faq-search-wrap button {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 18px;
+}
+.faq-search-results-count {
+  text-align: center; padding: 8px; font-size: 13px; color: #64748b; min-height: 24px;
+}
+
+/* ─── Layout ────────────────────────────────────────────────────── */
+.faq-layout {
+  max-width: 1100px; margin: 0 auto;
+  display: grid; grid-template-columns: 240px 1fr;
+  gap: 32px; padding: 32px 16px 60px;
+}
+@media (max-width: 768px) {
+  .faq-layout { grid-template-columns: 1fr; }
+  .faq-sidebar { display: flex; flex-wrap: wrap; gap: 8px; }
+}
+
+/* ─── Sidebar catégories ────────────────────────────────────────── */
+.faq-sidebar {}
+.faq-sidebar-title { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+.faq-cat-btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 9px 12px; border-radius: 8px;
+  border: none; background: none; cursor: pointer;
+  font-size: 13px; font-weight: 500; color: #475569;
+  text-align: left; transition: all .15s;
+  position: relative;
+}
+.faq-cat-btn:hover { background: #f1f5f9; color: #1e293b; }
+.faq-cat-btn.active { background: #fff7ed; color: var(--orange,#ff6b00); font-weight: 700; }
+.faq-cat-btn .faq-cat-count {
+  margin-left: auto; font-size: 11px; font-weight: 600;
+  background: #e2e8f0; color: #64748b; padding: 1px 7px;
+  border-radius: 99px; min-width: 20px; text-align: center;
+}
+.faq-cat-btn.active .faq-cat-count { background: #fed7aa; color: #c2410c; }
+
+/* ─── Contenu principal ─────────────────────────────────────────── */
+.faq-main {}
+.faq-section-title {
+  font-size: 1.1rem; font-weight: 700; color: #1e293b;
+  margin: 0 0 16px; display: flex; align-items: center; gap: 8px;
+}
+.faq-empty {
+  text-align: center; padding: 60px 20px;
+  color: #94a3b8; font-size: 15px;
+}
+.faq-empty span { display: block; font-size: 40px; margin-bottom: 12px; }
+
+/* ─── Accordéon ─────────────────────────────────────────────────── */
+.faq-item {
+  background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 12px; margin-bottom: 10px;
+  overflow: hidden; transition: box-shadow .15s;
+}
+.faq-item:hover { box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+.faq-item.open  { box-shadow: 0 4px 20px rgba(0,0,0,.08); border-color: var(--orange,#ff6b00); }
+.faq-q {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 16px 18px; cursor: pointer;
+  font-size: 14px; font-weight: 600; color: #1e293b;
+  user-select: none;
+}
+.faq-q-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.faq-q-text { flex: 1; line-height: 1.4; }
+.faq-q-arr {
+  flex-shrink: 0; font-size: 11px; color: #94a3b8;
+  transition: transform .2s; margin-top: 3px;
+}
+.faq-item.open .faq-q-arr { transform: rotate(180deg); }
+.faq-q-views { font-size: 11px; color: #cbd5e1; font-weight: 400; margin-left: 4px; white-space: nowrap; }
+
+.faq-ans {
+  display: none; padding: 0 18px 18px 46px;
+  font-size: 14px; line-height: 1.7; color: #334155;
+  border-top: 1px solid #f1f5f9;
+}
+.faq-item.open .faq-ans { display: block; }
+.faq-ans p { margin: 10px 0; }
+.faq-ans ul, .faq-ans ol { padding-left: 20px; margin: 8px 0; }
+.faq-ans li { margin-bottom: 6px; }
+.faq-ans strong { color: #1e293b; }
+
+/* ─── Étapes ────────────────────────────────────────────────────── */
+.faq-steps {
+  margin: 12px 0;
+  background: #f8fafc; border-radius: 10px; padding: 14px 16px;
+  border-left: 3px solid var(--orange,#ff6b00);
+}
+.faq-steps-title { font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+.faq-step-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-bottom: 8px; font-size: 13px;
+}
+.faq-step-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--orange,#ff6b00); color: #fff;
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+.faq-step-text { flex: 1; color: #374151; }
+
+/* ─── Actions de réponse ────────────────────────────────────────── */
+.faq-ans-actions {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center;
+}
+.faq-ans-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  text-decoration: none; cursor: pointer; border: 1.5px solid #e2e8f0;
+  background: #fff; color: #374151; transition: all .15s;
+}
+.faq-ans-btn:hover { border-color: var(--orange,#ff6b00); color: var(--orange,#ff6b00); }
+.faq-ans-btn.primary {
+  background: var(--orange,#ff6b00); color: #fff; border-color: transparent;
+}
+.faq-ans-btn.primary:hover { opacity: .9; }
+.faq-helpful { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8; }
+.faq-helpful button { background: none; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 9px; cursor: pointer; font-size: 13px; transition: all .15s; }
+.faq-helpful button:hover { background: #f1f5f9; }
+.faq-helpful button.voted { background: #dcfce7; border-color: #86efac; }
+
+/* ─── Questions similaires ──────────────────────────────────────── */
+.faq-similar {
+  margin-top: 12px; padding: 12px 14px;
+  background: #f8fafc; border-radius: 8px;
+}
+.faq-similar-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.faq-similar a {
+  display: block; font-size: 13px; color: var(--orange,#ff6b00);
+  text-decoration: none; padding: 3px 0;
+}
+.faq-similar a:hover { text-decoration: underline; }
+
+/* ─── Résultats de recherche ────────────────────────────────────── */
+.faq-search-results {}
+.faq-search-match mark { background: #fef3c7; border-radius: 3px; padding: 0 2px; }
+
+/* ─── Modal preview ─────────────────────────────────────────────── */
+.faq-no-result {
+  text-align: center; padding: 40px;
+  color: #94a3b8;
+}
+
+/* ─── Sticky search sur scroll ──────────────────────────────────── */
+.faq-sticky-search {
+  position: sticky; top: 64px; z-index: 50;
+  background: #fff; border-bottom: 1px solid #f1f5f9;
+  padding: 10px 20px;
+  display: none;
+}
+.faq-sticky-search.visible { display: block; }
+.faq-sticky-search input {
+  width: 100%; max-width: 500px; box-sizing: border-box;
+  padding: 9px 16px; border-radius: 99px;
+  border: 1.5px solid #e2e8f0; font-size: 14px; outline: none;
+}
+.faq-sticky-search input:focus { border-color: var(--orange,#ff6b00); }
+
+/* ─── Skeleton ──────────────────────────────────────────────────── */
+.faq-skeleton {
+  height: 64px; background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%; animation: skeletonShimmer 1.2s infinite;
+  border-radius: 12px; margin-bottom: 10px;
+}
+@keyframes skeletonShimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* ─── Pastille rôle sidebar ─────────────────────────────────────── */
+.faq-role-filter {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 18px;
+}
+.faq-role-filter label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 8px; }
+.faq-role-select {
+  width: 100%; padding: 8px 10px; border-radius: 7px;
+  border: 1px solid #e2e8f0; font-size: 13px; background: #fff; color: #1e293b;
+}
+</style>
+</head>
+<body>
+<script src="assets/ds.js"></script>
+
+<!-- Nav principale -->
+<div id="app-nav"></div>
+
+<!-- Hero -->
+<section class="faq-hero">
+  <div id="faq-role-display" class="faq-role-badge" style="display:none;">
+    <span id="faq-role-icon">👤</span>
+    <span id="faq-role-label">Connecté</span>
+    <span style="opacity:.6">· FAQ personnalisée</span>
+  </div>
+  <h1>💡 Base de connaissances</h1>
+  <p>Trouvez instantanément des réponses adaptées à votre profil</p>
+  <div class="faq-search-wrap">
+    <input type="text" id="faq-hero-search" placeholder="Rechercher une question… ex : créer un événement" autocomplete="off">
+    <button onclick="triggerSearch()" aria-label="Rechercher">🔍</button>
+  </div>
+</section>
+
+<!-- Sticky search (visible au scroll) -->
+<div class="faq-sticky-search" id="faq-sticky">
+  <input type="text" id="faq-sticky-input" placeholder="Rechercher dans la FAQ…">
+</div>
+
+<!-- Compteur résultats -->
+<div class="faq-search-results-count" id="faq-results-count"></div>
+
+<!-- Layout principal -->
+<div class="faq-layout">
+
+  <!-- Sidebar -->
+  <aside class="faq-sidebar">
+    <!-- Filtre rôle -->
+    <div class="faq-role-filter">
+      <label>Type de compte</label>
+      <select class="faq-role-select" id="faq-role-select" onchange="onRoleChange(this.value)">
+        <option value="tous">Tous les comptes</option>
+        <option value="utilisateur">Utilisateur</option>
+        <option value="initiative">Initiative</option>
+        <option value="entreprise">Entreprise</option>
+        <option value="association">Association</option>
+        <option value="commune">Commune</option>
+        <option value="region">Région</option>
+        <option value="prefecture">Préfecture</option>
+        <option value="ministere">Ministère</option>
+        <option value="organisation">Organisation</option>
+        <option value="etablissement">Établissement scolaire</option>
+        <option value="professionnel">Professionnel</option>
+        <option value="investisseur">Investisseur</option>
+        <option value="equipementier">Équipementier</option>
+        <option value="createur">Créateur</option>
+        <option value="administrateur">Administrateur</option>
+      </select>
+    </div>
+
+    <div class="faq-sidebar-title">Catégories</div>
+    <button class="faq-cat-btn active" data-cat="" onclick="filterCat('')">
+      <span>📚</span> Tout voir
+      <span class="faq-cat-count" id="cat-count-all">—</span>
+    </button>
+    <div id="faq-cat-list"><!-- injecté par JS --></div>
+  </aside>
+
+  <!-- Main -->
+  <main class="faq-main">
+    <div id="faq-search-area" style="display:none;">
+      <h2 class="faq-section-title" id="faq-search-title">🔍 Résultats de recherche</h2>
+      <div id="faq-search-results-list"></div>
+    </div>
+    <div id="faq-browse-area">
+      <h2 class="faq-section-title" id="faq-browse-title">📚 Toutes les questions</h2>
+      <div id="faq-list">
+        <div class="faq-skeleton"></div>
+        <div class="faq-skeleton"></div>
+        <div class="faq-skeleton"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Chatbot -->
+<script src="assets/chatbot.js"></script>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   FAQ — Script principal
+   ════════════════════════════════════════════════════════════════ */
+let _allQuestions = [];
+let _categories   = [];
+let _currentRole  = 'tous';
+let _currentCat   = '';
+let _searchTimer  = null;
+let _openId       = null;
+
+const ROLE_LABELS = {
+  utilisateur: { label: 'Utilisateur', icon: '👤' },
+  initiative:  { label: 'Initiative',  icon: '🚀' },
+  entreprise:  { label: 'Entreprise',  icon: '🏢' },
+  association: { label: 'Association', icon: '🤝' },
+  commune:     { label: 'Commune',     icon: '🏛️' },
+  region:      { label: 'Région',      icon: '🗺️' },
+  prefecture:  { label: 'Préfecture',  icon: '🏴' },
+  ministere:   { label: 'Ministère',   icon: '⚖️' },
+  organisation:{ label: 'Organisation',icon: '🌐' },
+  etablissement:{ label:'Établissement scolaire', icon:'🎓' },
+  professionnel:{ label:'Professionnel', icon:'💼' },
+  investisseur:{ label: 'Investisseur', icon: '💰' },
+  equipementier:{ label:'Équipementier', icon:'🔧' },
+  createur:    { label: 'Créateur',    icon: '🎨' },
+  administrateur:{ label:'Administrateur', icon:'⚙️' },
+  tous:        { label: 'Tous les comptes', icon: '🌍' },
+};
+
+/* ── Init ─────────────────────────────────────────────────────── */
+async function init() {
+  /* Détecter rôle depuis localStorage */
+  try {
+    const role = localStorage.getItem('da_role') || detectRoleFromPath();
+    if (role && role !== 'visiteur') {
+      _currentRole = role;
+      document.getElementById('faq-role-select').value = role;
+      const info = ROLE_LABELS[role];
+      if (info) {
+        document.getElementById('faq-role-icon').textContent  = info.icon;
+        document.getElementById('faq-role-label').textContent = info.label;
+        document.getElementById('faq-role-display').style.display = '';
+      }
+    }
+  } catch(e){}
+
+  await Promise.all([loadCategories(), loadQuestions()]);
+  setupSearch();
+  setupSticky();
+}
+
+function detectRoleFromPath() {
+  const p = window.location.pathname;
+  if (p.includes('administrateur')) return 'administrateur';
+  if (p.includes('initiative'))     return 'initiative';
+  return '';
+}
+
+async function loadCategories() {
+  try {
+    const r  = await fetch('/api/faq/categories');
+    _categories = await r.json();
+    renderCats();
+  } catch(e) {}
+}
+
+async function loadQuestions(catId) {
+  document.getElementById('faq-list').innerHTML =
+    '<div class="faq-skeleton"></div><div class="faq-skeleton"></div><div class="faq-skeleton"></div>';
+  try {
+    const qp = new URLSearchParams({ role: _currentRole });
+    if (catId) qp.set('category_id', catId);
+    const r = await fetch('/api/faq?' + qp);
+    _allQuestions = await r.json();
+    renderQuestions(_allQuestions);
+  } catch(e) {
+    document.getElementById('faq-list').innerHTML = '<div class="faq-empty"><span>😕</span>Impossible de charger les questions.</div>';
+  }
+}
+
+/* ── Catégories sidebar ──────────────────────────────────────── */
+function renderCats() {
+  const list = document.getElementById('faq-cat-list');
+  list.innerHTML = _categories.map(c => `
+    <button class="faq-cat-btn" data-cat="${c.id}" onclick="filterCat(${c.id})">
+      <span>${c.icone}</span> ${esc(c.nom)}
+      <span class="faq-cat-count" id="cat-count-${c.id}">—</span>
+    </button>`).join('');
+}
+
+function updateCatCounts(questions) {
+  const counts = {};
+  questions.forEach(q => {
+    if (q.category_id) counts[q.category_id] = (counts[q.category_id]||0)+1;
+  });
+  document.getElementById('cat-count-all').textContent = questions.length;
+  _categories.forEach(c => {
+    const el = document.getElementById('cat-count-' + c.id);
+    if (el) el.textContent = counts[c.id] || 0;
+  });
+}
+
+function filterCat(catId) {
+  _currentCat = catId;
+  document.querySelectorAll('.faq-cat-btn').forEach(b => b.classList.toggle('active', String(b.dataset.cat) === String(catId)));
+  hideSearch();
+  if (catId) {
+    const q = _allQuestions.filter(item => item.category_id == catId);
+    const cat = _categories.find(c => c.id == catId);
+    document.getElementById('faq-browse-title').textContent = cat ? `${cat.icone} ${cat.nom}` : 'Questions';
+    renderQuestions(q);
+  } else {
+    document.getElementById('faq-browse-title').textContent = '📚 Toutes les questions';
+    renderQuestions(_allQuestions);
+  }
+}
+
+function onRoleChange(role) {
+  _currentRole = role;
+  _currentCat  = '';
+  document.querySelectorAll('.faq-cat-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-cat=""]')?.classList.add('active');
+  loadQuestions();
+}
+
+/* ── Rendu questions ──────────────────────────────────────────── */
+function renderQuestions(questions) {
+  updateCatCounts(_allQuestions);
+  const container = document.getElementById('faq-list');
+  if (!questions.length) {
+    container.innerHTML = '<div class="faq-empty"><span>🤷</span>Aucune question dans cette catégorie pour ce type de compte.<br><small>Essayez "Tous les comptes" ou une autre catégorie.</small></div>';
+    return;
+  }
+  container.innerHTML = questions.map(q => renderItem(q)).join('');
+}
+
+function renderItem(q, highlight) {
+  const catIcon = q.categorie_icone || '📋';
+  const steps   = Array.isArray(q.etapes) ? q.etapes : [];
+  const medias  = Array.isArray(q.medias) ? q.medias : [];
+  const stepsHtml = steps.length
+    ? `<div class="faq-steps">
+        <div class="faq-steps-title">📋 Comment faire</div>
+        ${steps.map((s,i) => `<div class="faq-step-item">
+          <span class="faq-step-num">${i+1}</span>
+          <span class="faq-step-text">${esc(s)}</span>
+        </div>`).join('')}
+      </div>` : '';
+
+  const mediasHtml = medias.map(m => {
+    if (m.type === 'video') return `<a href="${esc(m.url)}" target="_blank" class="faq-ans-btn">🎬 ${esc(m.label||'Voir la vidéo')}</a>`;
+    if (m.type === 'pdf')   return `<a href="${esc(m.url)}" target="_blank" class="faq-ans-btn">📥 ${esc(m.label||'Télécharger le guide')}</a>`;
+    if (m.type === 'image') return `<img src="${esc(m.url)}" alt="${esc(m.label||'')}" style="max-width:100%;border-radius:8px;margin:8px 0;">`;
+    return '';
+  }).join('');
+
+  const moduleBtn = q.module_lien
+    ? `<a href="${esc(q.module_lien)}" class="faq-ans-btn primary">🔗 ${esc(q.module_label||'Ouvrir le module')}</a>` : '';
+
+  const qText = highlight ? highlightText(esc(q.question), highlight) : esc(q.question);
+
+  /* Questions similaires */
+  const similar = getSimilar(q);
+  const similarHtml = similar.length
+    ? `<div class="faq-similar">
+        <div class="faq-similar-title">Vous pourriez aussi consulter</div>
+        ${similar.map(s => `<a href="#" onclick="openItem(${s.id});return false;">❯ ${esc(s.question)}</a>`).join('')}
+      </div>` : '';
+
+  return `<div class="faq-item" id="faq-item-${q.id}" data-id="${q.id}">
+    <div class="faq-q" onclick="toggleItem(${q.id})">
+      <span class="faq-q-icon">${catIcon}</span>
+      <span class="faq-q-text">${qText}<span class="faq-q-views">${q.vues > 0 ? `· ${q.vues} vue${q.vues>1?'s':''}` : ''}</span></span>
+      <span class="faq-q-arr">▼</span>
+    </div>
+    <div class="faq-ans">
+      ${q.reponse}
+      ${stepsHtml}
+      ${mediasHtml}
+      <div class="faq-ans-actions">
+        ${moduleBtn}
+        <div class="faq-helpful">
+          <span>Utile ?</span>
+          <button onclick="rate(${q.id},1,this)" title="Oui, utile">👍</button>
+          <button onclick="rate(${q.id},0,this)" title="Non, pas utile">👎</button>
+        </div>
+      </div>
+      ${similarHtml}
+    </div>
+  </div>`;
+}
+
+function getSimilar(q) {
+  const kw = [...(q.mots_cles||[]), ...(q.synonymes||[])];
+  return _allQuestions
+    .filter(o => o.id !== q.id && o.category_id === q.category_id)
+    .slice(0, 3);
+}
+
+/* ── Accordéon ──────────────────────────────────────────────── */
+function toggleItem(id) {
+  const el = document.getElementById('faq-item-' + id);
+  if (!el) return;
+  const wasOpen = el.classList.contains('open');
+  /* Fermer tous */
+  document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+  if (!wasOpen) {
+    el.classList.add('open');
+    _openId = id;
+    /* Tracker la vue */
+    fetch('/api/faq/' + id + '/view', { method: 'POST', credentials: 'include' }).catch(()=>{});
+    /* Scroll doux */
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+  } else {
+    _openId = null;
+  }
+}
+
+function openItem(id) {
+  /* Ouvrir l'item par ID (depuis "similaires") */
+  const el = document.getElementById('faq-item-' + id);
+  if (el) {
+    toggleItem(id);
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  } else {
+    /* Item pas encore visible → chercher dans toutes les questions */
+    const q = _allQuestions.find(x => x.id === id);
+    if (q) { filterCat(''); setTimeout(() => openItem(id), 300); }
+  }
+}
+
+/* ── Rating ─────────────────────────────────────────────────── */
+function rate(id, helpful, btn) {
+  fetch('/api/faq/' + id + '/rating', {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ helpful }),
+  }).catch(()=>{});
+  btn.classList.add('voted');
+  btn.parentElement.querySelectorAll('button').forEach(b => b.disabled = true);
+  btn.parentElement.innerHTML = `<span style="color:#10b981;font-size:12px;">✅ Merci pour votre retour !</span>`;
+}
+
+/* ── Recherche ──────────────────────────────────────────────── */
+function setupSearch() {
+  const heroInput   = document.getElementById('faq-hero-search');
+  const stickyInput = document.getElementById('faq-sticky-input');
+
+  [heroInput, stickyInput].forEach(input => {
+    input.addEventListener('input', () => {
+      clearTimeout(_searchTimer);
+      const val = input === heroInput ? heroInput.value : stickyInput.value;
+      if (input === heroInput) stickyInput.value = val;
+      else heroInput.value = val;
+      _searchTimer = setTimeout(() => doSearch(val), 280);
+    });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(_searchTimer); doSearch(input.value); } });
+  });
+}
+
+function triggerSearch() {
+  doSearch(document.getElementById('faq-hero-search').value);
+}
+
+async function doSearch(query) {
+  const q = query.trim();
+  const countEl = document.getElementById('faq-results-count');
+  if (!q) { hideSearch(); countEl.textContent = ''; return; }
+  countEl.textContent = 'Recherche en cours…';
+  try {
+    const r = await fetch(`/api/faq/search?q=${encodeURIComponent(q)}&role=${_currentRole}`);
+    const results = await r.json();
+    showSearch(q, results);
+    countEl.textContent = results.length ? `${results.length} résultat(s) pour "${q}"` : `Aucun résultat pour "${q}"`;
+  } catch(e) { countEl.textContent = 'Erreur lors de la recherche.'; }
+}
+
+function showSearch(query, results) {
+  document.getElementById('faq-search-area').style.display  = '';
+  document.getElementById('faq-browse-area').style.display  = 'none';
+  const list = document.getElementById('faq-search-results-list');
+  document.getElementById('faq-search-title').textContent   = `🔍 "${query}"`;
+  if (!results.length) {
+    list.innerHTML = `<div class="faq-empty">
+      <span>🔍</span>
+      Aucune réponse trouvée pour <strong>"${esc(query)}"</strong><br>
+      <small>Essayez d'autres mots-clés ou consultez toutes les questions ci-dessous.</small>
+      <br><br>
+      <button onclick="hideSearch()" class="faq-ans-btn">← Parcourir la FAQ</button>
+    </div>`;
+    return;
+  }
+  list.innerHTML = results.map(q => renderItem(q, query)).join('');
+}
+
+function hideSearch() {
+  document.getElementById('faq-search-area').style.display  = 'none';
+  document.getElementById('faq-browse-area').style.display  = '';
+  document.getElementById('faq-hero-search').value   = '';
+  document.getElementById('faq-sticky-input').value  = '';
+  document.getElementById('faq-results-count').textContent  = '';
+}
+
+function highlightText(html, query) {
+  const words = query.trim().split(/\s+/).filter(w => w.length >= 2);
+  words.forEach(w => {
+    const re = new RegExp(`(${w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+    html = html.replace(re, '<mark>$1</mark>');
+  });
+  return html;
+}
+
+/* ── Sticky ─────────────────────────────────────────────────── */
+function setupSticky() {
+  const hero   = document.querySelector('.faq-hero');
+  const sticky = document.getElementById('faq-sticky');
+  if (!hero || !sticky) return;
+  const obs = new IntersectionObserver(([e]) => sticky.classList.toggle('visible', !e.isIntersecting));
+  obs.observe(hero);
+}
+
+/* ── Helpers ─────────────────────────────────────────────────── */
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── Démarrer ────────────────────────────────────────────────── */
+init();
+
+/* Lien depuis l'URL hash : faq.html#123 ouvre la question 123 */
+if (window.location.hash) {
+  const id = parseInt(window.location.hash.slice(1));
+  if (id) setTimeout(() => openItem(id), 800);
+}
+</script>
+</body>
+</html>

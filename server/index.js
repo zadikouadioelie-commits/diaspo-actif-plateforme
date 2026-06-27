@@ -3582,6 +3582,292 @@ async function scrapeSite() {
     reponse_admin TEXT,
     first_asked_at TEXT DEFAULT (datetime('now')),
     last_asked_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  /* ──────── FAQ ──────── */
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    icone TEXT DEFAULT '📋',
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER REFERENCES faq_categories(id) ON DELETE SET NULL,
+    compte_types TEXT NOT NULL DEFAULT '["tous"]',
+    question TEXT NOT NULL,
+    reponse TEXT NOT NULL,
+    synonymes TEXT DEFAULT '[]',
+    mots_cles TEXT DEFAULT '[]',
+    etapes TEXT DEFAULT '[]',
+    medias TEXT DEFAULT '[]',
+    module_lien TEXT,
+    module_label TEXT,
+    statut TEXT DEFAULT 'active',
+    ordre INTEGER DEFAULT 0,
+    vues INTEGER DEFAULT 0,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_views (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER REFERENCES faq_questions(id) ON DELETE CASCADE,
+    user_id INTEGER,
+    user_role TEXT,
+    created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_searches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    query TEXT NOT NULL,
+    results_count INTEGER DEFAULT 0,
+    user_role TEXT,
+    created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER REFERENCES faq_questions(id) ON DELETE CASCADE,
+    user_id INTEGER,
+    helpful INTEGER NOT NULL,
+    comment TEXT,
+    created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
+
+  /* Seed catégories initiales */
+  const faqCatCount = db.prepare(`SELECT COUNT(*) c FROM faq_categories`).get()?.c || 0;
+  if (faqCatCount === 0) {
+    const cats = [
+      { nom: 'Mon compte',      slug: 'mon-compte',       icone: '👤', ordre: 1 },
+      { nom: 'Publications',    slug: 'publications',      icone: '📝', ordre: 2 },
+      { nom: 'Recrutement',     slug: 'recrutement',       icone: '💼', ordre: 3 },
+      { nom: 'Événements',      slug: 'evenements',        icone: '📅', ordre: 4 },
+      { nom: 'Visioconférence', slug: 'visioconference',   icone: '📹', ordre: 5 },
+      { nom: 'Vérification',    slug: 'verification',      icone: '✅', ordre: 6 },
+      { nom: 'Messagerie',      slug: 'messagerie',        icone: '✉️',  ordre: 7 },
+      { nom: 'Annuaire',        slug: 'annuaire',          icone: '🔍', ordre: 8 },
+      { nom: 'Accréditations',  slug: 'accreditations',    icone: '🏅', ordre: 9 },
+      { nom: 'Statistiques',    slug: 'statistiques',      icone: '📊', ordre: 10 },
+      { nom: 'Financement',     slug: 'financement',       icone: '💰', ordre: 11 },
+      { nom: 'Administration',  slug: 'administration',    icone: '⚙️',  ordre: 12 },
+    ];
+    const insC = db.prepare(`INSERT INTO faq_categories (nom,slug,icone,ordre) VALUES (?,?,?,?)`);
+    cats.forEach(c => { try { insC.run(c.nom, c.slug, c.icone, c.ordre); } catch(e){} });
+
+    /* Seed questions initiales */
+    const getCat = (slug) => db.prepare(`SELECT id FROM faq_categories WHERE slug=?`).get(slug)?.id || null;
+    const insQ = db.prepare(`INSERT INTO faq_questions
+      (category_id,compte_types,question,reponse,synonymes,mots_cles,etapes,module_lien,module_label)
+      VALUES (?,?,?,?,?,?,?,?,?)`);
+
+    const faqSeed = [
+      /* ── MON COMPTE ── */
+      { cat:'mon-compte', types:'["tous"]',
+        q:'Comment modifier mon profil ?',
+        r:'<p>Pour modifier votre profil, accédez à votre <strong>Tableau de bord</strong> puis cliquez sur <strong>Mon Profil</strong>. Vous pouvez y modifier votre photo, votre biographie, vos compétences, vos coordonnées et vos préférences.</p>',
+        syn:'["changer profil","mettre à jour profil","éditer profil","profil"]',
+        kw:'["profil","modifier","mise à jour"]',
+        steps:'["Ouvrir votre tableau de bord","Cliquer sur Mon Profil","Modifier les informations souhaitées","Cliquer sur Enregistrer"]',
+        lien:'dashboard-utilisateur.html', lbl:'Ouvrir mon profil' },
+      { cat:'mon-compte', types:'["tous"]',
+        q:'Comment changer mon mot de passe ?',
+        r:'<p>Allez dans votre tableau de bord → <strong>Paramètres de compte</strong> → <strong>Sécurité</strong> → <strong>Changer le mot de passe</strong>. Saisissez votre mot de passe actuel puis le nouveau deux fois.</p>',
+        syn:'["mot de passe oublié","réinitialiser mot de passe","changer mdp"]',
+        kw:'["mot de passe","sécurité","connexion"]',
+        steps:'["Ouvrir votre tableau de bord","Aller dans Paramètres de compte","Cliquer sur Sécurité","Remplir le formulaire de changement de mot de passe","Valider"]',
+        lien:'dashboard-utilisateur.html', lbl:'Gérer mon compte' },
+      { cat:'mon-compte', types:'["tous"]',
+        q:'Comment supprimer mon compte ?',
+        r:'<p>La suppression de compte est irréversible. Elle est disponible dans <strong>Paramètres → Données personnelles → Supprimer mon compte</strong>. Vos données sont effacées sous 30 jours conformément au RGPD.</p>',
+        syn:'["fermer compte","désactiver compte","quitter plateforme"]',
+        kw:'["supprimer","compte","rgpd","données"]',
+        steps:'[]', lien:null, lbl:null },
+      { cat:'mon-compte', types:'["tous"]',
+        q:'Comment activer le mode absence ?',
+        r:'<p>Le mode absence permet d\'indiquer que vous n\'êtes temporairement pas disponible. Il se trouve dans <strong>Mon Profil → Statut → Mode Absence</strong>. Choisissez le type (vacances, déplacement, mission…) et les dates.</p>',
+        syn:'["absent","vacances","indisponible","congé"]',
+        kw:'["absence","statut","disponibilité"]',
+        steps:'["Ouvrir Mon Profil","Cliquer sur Statut","Activer Mode Absence","Choisir le type et la durée","Valider"]',
+        lien:'dashboard-utilisateur.html', lbl:'Mon profil' },
+
+      /* ── VÉRIFICATION ── */
+      { cat:'verification', types:'["tous"]',
+        q:'Comment vérifier mon identité ?',
+        r:'<p>La vérification d\'identité se fait dans <strong>Mon Profil → Vérification → Identité</strong>. Soumettez une copie de votre pièce d\'identité officielle (passeport ou carte nationale d\'identité). La validation prend 24 à 72h.</p><p>Une fois validée, votre profil affiche le badge <strong>✅ Identité vérifiée</strong> et votre score de confiance augmente de <strong>+15 points</strong>.</p>',
+        syn:'["identité","pièce d\'identité","valider identité","KYC"]',
+        kw:'["vérification","identité","badge","score"]',
+        steps:'["Ouvrir Mon Profil","Cliquer sur Vérification","Choisir Identité","Soumettre votre document","Attendre la validation (24-72h)"]',
+        lien:'profil.html', lbl:'Aller à la vérification' },
+      { cat:'verification', types:'["initiative","entreprise","association","organisation"]',
+        q:'Comment vérifier mon entreprise ou association ?',
+        r:'<p>La vérification d\'entreprise/association nécessite un document officiel (Kbis, récépissé de déclaration en préfecture, statuts…). Accédez à <strong>Mon Profil → Vérification → Entité</strong>. La validation est faite sous 48h par l\'équipe Diaspo\'Actif.</p>',
+        syn:'["vérifier asso","vérifier entreprise","justificatif","immatriculation"]',
+        kw:'["entreprise","association","vérification","kbis","statuts"]',
+        steps:'["Ouvrir Mon Profil","Cliquer sur Vérification","Choisir Entité","Soumettre le document officiel","Attendre la validation (48h)"]',
+        lien:'profil.html', lbl:'Aller à la vérification' },
+
+      /* ── PUBLICATIONS ── */
+      { cat:'publications', types:'["tous"]',
+        q:'Comment créer une publication ?',
+        r:'<p>Depuis votre tableau de bord, cliquez sur <strong>Nouveau post</strong> ou rendez-vous sur le <strong>Fil d\'actualité</strong> puis cliquez sur la zone de saisie en haut. Rédigez votre texte, ajoutez des médias si nécessaire, puis publiez.</p>',
+        syn:'["poster","publier","créer post","écrire une publication"]',
+        kw:'["publication","post","fil","actualité"]',
+        steps:'["Ouvrir le Fil d\'actualité","Cliquer sur la zone de rédaction","Écrire votre publication","Ajouter des médias (optionnel)","Cliquer sur Publier"]',
+        lien:'fil-actualite.html', lbl:'Ouvrir le fil d\'actualité' },
+      { cat:'publications', types:'["initiative","entreprise","association","organisation","commune","region","prefecture","ministere"]',
+        q:'Comment publier une annonce officielle ?',
+        r:'<p>Les comptes organisationnels peuvent publier des annonces officielles depuis leur <strong>Dashboard → Communications → Nouvelle annonce</strong>. Ces annonces sont mises en avant sur le fil d\'actualité des membres concernés (selon le ciblage géographique et thématique).</p>',
+        syn:'["communiqué","annonce","communication officielle","diffuser"]',
+        kw:'["annonce","communication","officielle","ciblage"]',
+        steps:'["Ouvrir votre Dashboard","Aller dans Communications","Cliquer sur Nouvelle annonce","Rédiger et cibler votre annonce","Publier"]',
+        lien:'dashboard-initiative.html', lbl:'Mon dashboard' },
+
+      /* ── RECRUTEMENT ── */
+      { cat:'recrutement', types:'["initiative","entreprise","association","organisation","professionnel","investisseur"]',
+        q:'Comment créer une campagne de recrutement ?',
+        r:'<p>Depuis votre tableau de bord, allez dans <strong>Offres → Nouvelle offre → Emploi / Stage / Bénévolat</strong>. Remplissez les informations du poste, les compétences requises, la localisation et la date limite. Les candidatures arrivent directement dans votre dashboard.</p>',
+        syn:'["recruter","campagne recrutement","embaucher","poster offre emploi"]',
+        kw:'["recrutement","offre","emploi","stage","bénévolat"]',
+        steps:'["Ouvrir votre Dashboard","Cliquer sur Offres","Cliquer sur Nouvelle offre","Choisir le type (emploi/stage/bénévolat)","Remplir le formulaire","Publier"]',
+        lien:'dashboard-initiative.html', lbl:'Gérer mes offres' },
+      { cat:'recrutement', types:'["initiative","association","organisation"]',
+        q:'Comment recruter des bénévoles ?',
+        r:'<p>Créez une offre de type <strong>Bénévolat</strong> depuis <strong>Dashboard → Offres → Nouvelle offre → Bénévolat</strong>. Précisez la nature de la mission, les disponibilités souhaitées et les compétences utiles. Vous pouvez aussi rechercher des profils directement dans l\'Annuaire et les contacter par messagerie.</p>',
+        syn:'["volontaire","bénévole","volontariat","engagement"]',
+        kw:'["bénévolat","volontaire","mission"]',
+        steps:'["Dashboard → Offres → Nouvelle offre","Choisir Bénévolat","Décrire la mission","Définir les disponibilités","Publier","Ou : chercher dans l\'Annuaire → filtrer par domaine → Contacter"]',
+        lien:'annuaire.html', lbl:'Explorer l\'annuaire' },
+      { cat:'recrutement', types:'["tous"]',
+        q:'Comment postuler à une offre ?',
+        r:'<p>Accédez à la section <strong>Offres</strong> depuis le menu principal. Trouvez l\'offre qui vous intéresse, cliquez sur <strong>Postuler</strong>. Votre profil sera transmis à l\'organisation. Vous pouvez suivre vos candidatures dans <strong>Mon Compte → Mes candidatures</strong>.</p>',
+        syn:'["candidater","envoyer candidature","répondre à une offre","postuler"]',
+        kw:'["offre","candidature","postuler","emploi"]',
+        steps:'["Aller dans Offres","Rechercher une offre","Cliquer sur Postuler","Personnaliser votre candidature (optionnel)","Valider"]',
+        lien:'offres.html', lbl:'Voir les offres' },
+
+      /* ── ÉVÉNEMENTS ── */
+      { cat:'evenements', types:'["initiative","entreprise","association","organisation","commune","region","prefecture","ministere","createur"]',
+        q:'Comment créer un événement ?',
+        r:'<p>Depuis votre tableau de bord, cliquez sur <strong>Événements → Nouvel événement</strong>. Remplissez le titre, la description, la date, le lieu (ou indiquez "En ligne"). Vous pouvez définir une billetterie avec des billets gratuits ou payants et générer des QR codes pour valider les entrées.</p>',
+        syn:'["organiser événement","planifier","créer event","conférence","meetup","soirée"]',
+        kw:'["événement","conférence","meetup","billetterie"]',
+        steps:'["Dashboard → Événements → Nouvel événement","Remplir les informations","Choisir le type (présentiel/en ligne)","Configurer la billetterie","Publier l\'événement"]',
+        lien:'dashboard-initiative.html', lbl:'Créer un événement' },
+      { cat:'evenements', types:'["tous"]',
+        q:'Comment participer à un événement ?',
+        r:'<p>Consultez la section <strong>Événements</strong> du menu pour voir tous les événements disponibles. Cliquez sur un événement pour voir les détails et cliquez sur <strong>S\'inscrire</strong> ou <strong>Obtenir un billet</strong>. Votre billet (avec QR code) vous sera envoyé par messagerie et sera disponible dans <strong>Mon Compte → Mes billets</strong>.</p>',
+        syn:'["s\'inscrire événement","participer","assister","s\'inscrire conférence"]',
+        kw:'["événement","inscription","billet","participer"]',
+        steps:'["Aller dans Événements","Trouver un événement","Cliquer sur S\'inscrire ou Obtenir un billet","Valider la commande","Recevoir votre QR code"]',
+        lien:'evenements.html', lbl:'Voir les événements' },
+      { cat:'evenements', types:'["initiative","entreprise","association","commune","region"]',
+        q:'Comment utiliser le scanner de billets ?',
+        r:'<p>Le scanner permet de valider les billets des participants à l\'entrée de votre événement. Depuis votre Dashboard → Événements → sélectionnez l\'événement → <strong>Scanner les entrées</strong>. L\'application utilise la caméra pour lire les QR codes et valide instantanément chaque billet.</p>',
+        syn:'["scanner","valider billet","contrôle entrée","scan qr"]',
+        kw:'["scanner","billet","qr code","entrée","validation"]',
+        steps:'["Dashboard → Événements","Sélectionner votre événement","Cliquer sur Scanner les entrées","Autoriser l\'accès à la caméra","Scanner les QR codes des participants"]',
+        lien:'scanner.html', lbl:'Ouvrir le scanner' },
+
+      /* ── VISIOCONFÉRENCE ── */
+      { cat:'visioconference', types:'["tous"]',
+        q:'Comment démarrer une réunion vidéo ?',
+        r:'<p>Vous pouvez démarrer une réunion depuis :</p><ul><li><strong>Messagerie → bouton 📹</strong> dans une conversation</li><li><strong>Dashboard → Réunions → Nouvelle réunion</strong></li><li><strong>Réunions.html</strong> directement</li></ul><p>La réunion s\'ouvre en peer-to-peer sécurisé. Vous pouvez inviter des participants par lien.</p>',
+        syn:'["visio","videoconférence","appel vidéo","zoom","meeting","réunion en ligne"]',
+        kw:'["réunion","visio","vidéo","conférence"]',
+        steps:'["Ouvrir la Messagerie ou le Dashboard","Cliquer sur l\'icône 📹","Créer la réunion","Partager le lien aux participants","Démarrer la réunion"]',
+        lien:'reunions.html', lbl:'Ouvrir Réunions' },
+      { cat:'visioconference', types:'["initiative","entreprise","association","organisation","commune","region"]',
+        q:'Comment planifier une réunion à l\'avance ?',
+        r:'<p>Depuis <strong>Dashboard → Réunions → Planifier une réunion</strong>, choisissez la date, l\'heure, la durée et les participants. Un lien de réunion est généré et des rappels automatiques sont envoyés aux participants. Vous pouvez ajouter des notes d\'ordre du jour.</p>',
+        syn:'["planifier réunion","programmer","agenda","calendrier visio"]',
+        kw:'["planifier","réunion","agenda","rappel"]',
+        steps:'["Dashboard → Réunions → Planifier","Choisir date et heure","Ajouter les participants","Écrire l\'ordre du jour (optionnel)","Envoyer les invitations"]',
+        lien:'reunions.html', lbl:'Planifier une réunion' },
+
+      /* ── ANNUAIRE ── */
+      { cat:'annuaire', types:'["tous"]',
+        q:'Comment trouver un profil dans l\'annuaire ?',
+        r:'<p>L\'annuaire est accessible depuis le menu principal. Vous pouvez filtrer par :</p><ul><li><strong>Pays de résidence</strong></li><li><strong>Domaine d\'activité</strong></li><li><strong>Type de compte</strong></li><li><strong>Accréditations</strong></li></ul><p>💡 Astuce : décrivez ce que vous cherchez en langage naturel dans le chatbot : "Je cherche un avocat à Paris spécialisé en droit des affaires".</p>',
+        syn:'["chercher profil","trouver quelqu\'un","répertoire","liste membres"]',
+        kw:'["annuaire","recherche","profil","filtre"]',
+        steps:'["Cliquer sur Annuaire dans le menu","Utiliser les filtres (pays, domaine, type)","Cliquer sur un profil pour le voir","Contacter via Messagerie"]',
+        lien:'annuaire.html', lbl:'Ouvrir l\'annuaire' },
+
+      /* ── ACCRÉDITATIONS ── */
+      { cat:'accreditations', types:'["tous"]',
+        q:'À quoi servent les accréditations ?',
+        r:'<p>Les accréditations Diaspo\'Actif sont des badges officiels qui certifient le niveau d\'engagement et de fiabilité d\'un membre. Il en existe plusieurs niveaux :</p><ul><li>🌱 <strong>Engagé Diaspora</strong> — membre actif</li><li>🌟 <strong>Mobilisation Active</strong> — très impliqué</li><li>💎 <strong>Créateur d\'Opportunités</strong> — crée de la valeur pour la communauté</li><li>🏆 <strong>Ambassadeur Diaspora</strong> — niveau maximum</li></ul><p>Chaque accréditation augmente votre <strong>Score de Confiance de +10 points</strong> et vous rend prioritaire dans les recommandations du chatbot.</p>',
+        syn:'["badge","niveau","certification","label","tampon"]',
+        kw:'["accréditation","badge","niveau","score","confiance"]',
+        steps:'[]', lien:'accreditations.html', lbl:'Voir les accréditations' },
+      { cat:'accreditations', types:'["tous"]',
+        q:'Comment obtenir une accréditation ?',
+        r:'<p>Pour demander une accréditation, allez dans <strong>Mon Profil → Accréditations → Demander une accréditation</strong>. Choisissez le niveau souhaité et soumettez les justificatifs requis. L\'équipe Diaspo\'Actif examine votre dossier sous 5 jours ouvrés.</p>',
+        syn:'["demander accréditation","comment accréditer","déposer dossier","obtenir badge"]',
+        kw:'["accréditation","demande","dossier","justificatif"]',
+        steps:'["Mon Profil → Accréditations","Cliquer sur Demander une accréditation","Choisir le niveau","Soumettre les justificatifs","Attendre la validation (5 jours ouvrés)"]',
+        lien:'accreditations.html', lbl:'Demander une accréditation' },
+
+      /* ── STATISTIQUES ── */
+      { cat:'statistiques', types:'["initiative","entreprise","association","organisation","commune","region","prefecture","ministere","administrateur"]',
+        q:'Comment suivre les statistiques de mon compte ?',
+        r:'<p>Votre tableau de bord affiche vos statistiques clés : vues de profil, messages reçus, candidatures, abonnés, engagement sur vos publications. Pour des données plus détaillées, allez dans <strong>Dashboard → Statistiques</strong>. Vous pouvez exporter en CSV ou PDF.</p>',
+        syn:'["stats","chiffres","métriques","analytics","performance"]',
+        kw:'["statistiques","données","performance","export"]',
+        steps:'["Ouvrir votre Dashboard","Cliquer sur Statistiques","Choisir la période","Analyser les données","Exporter si besoin"]',
+        lien:'statistiques.html', lbl:'Voir les statistiques' },
+
+      /* ── MESSAGERIE ── */
+      { cat:'messagerie', types:'["tous"]',
+        q:'Comment envoyer un message à quelqu\'un ?',
+        r:'<p>Depuis l\'Annuaire ou un profil, cliquez sur le bouton <strong>✉️ Contacter</strong>. Ou accédez directement à la <strong>Messagerie</strong> depuis le menu et créez une nouvelle conversation. Vous pouvez envoyer du texte, des fichiers et démarrer une réunion vidéo depuis la messagerie.</p>',
+        syn:'["contacter","écrire","discuter","chat","message privé"]',
+        kw:'["messagerie","message","contact","conversation"]',
+        steps:'["Aller dans Messagerie (menu principal)","Cliquer sur Nouvelle conversation","Chercher la personne","Écrire votre message","Envoyer"]',
+        lien:'messagerie.html', lbl:'Ouvrir la messagerie' },
+
+      /* ── FINANCEMENT ── */
+      { cat:'financement', types:'["initiative","entreprise","association","organisation","investisseur"]',
+        q:'Comment trouver des investisseurs ou financements ?',
+        r:'<p>Publiez une offre de type <strong>Investissement</strong> dans <strong>Dashboard → Offres → Nouvelle offre → Recherche de financement</strong>. Vous pouvez aussi utiliser l\'Annuaire et filtrer par type "Investisseur" pour contacter directement les membres concernés.</p>',
+        syn:'["lever des fonds","financer","investisseur","capital","subvention"]',
+        kw:'["financement","investissement","fonds","capital"]',
+        steps:'["Dashboard → Offres → Nouvelle offre","Choisir Recherche de financement","Décrire votre projet et besoins","Publier","Ou : Annuaire → filtrer par Investisseur → Contacter"]',
+        lien:'offres.html', lbl:'Les offres de financement' },
+
+      /* ── ADMINISTRATION ── */
+      { cat:'administration', types:'["administrateur"]',
+        q:'Comment accéder au panneau d\'administration ?',
+        r:'<p>Le panneau d\'administration est accessible depuis le menu principal (icône ⚙️) ou directement via <strong>dashboard-administrateur.html</strong>. Il donne accès à la gestion des utilisateurs, modération, accréditations, FAQ, statistiques globales et observatoire mondial.</p>',
+        syn:'["admin","back-office","panneau admin","gestion plateforme"]',
+        kw:'["administration","admin","back-office","gestion"]',
+        steps:'["Cliquer sur l\'icône ⚙️ dans le menu","Ou accéder directement à dashboard-administrateur.html","Choisir la section souhaitée"]',
+        lien:'dashboard-administrateur.html', lbl:'Panneau d\'administration' },
+      { cat:'administration', types:'["administrateur"]',
+        q:'Comment gérer les signalements ?',
+        r:'<p>Dans le panneau d\'administration, allez dans <strong>Modération → Signalements</strong>. Vous y trouvez tous les signalements en attente, avec leur motif et les comptes concernés. Vous pouvez approuver (action corrective), rejeter (signalement infondé) ou archiver.</p>',
+        syn:'["modération","abus","plainte","report"]',
+        kw:'["signalement","modération","abus","compte"]',
+        steps:'["Dashboard Admin → Modération","Cliquer sur Signalements","Examiner chaque signalement","Approuver ou Rejeter","Archiver après traitement"]',
+        lien:'dashboard-administrateur.html', lbl:'Modération' },
+    ];
+
+    faqSeed.forEach(item => {
+      try {
+        const catId = getCat(item.cat);
+        insQ.run(
+          catId,
+          item.types,
+          item.q,
+          item.r,
+          item.syn,
+          item.kw,
+          item.steps,
+          item.lien || null,
+          item.lbl || null
+        );
+      } catch(e) { console.error('FAQ seed error:', e.message); }
+    });
+  }
 })();
 
 /* ── Helpers ── */
@@ -3811,6 +4097,271 @@ route("POST", "/api/chatbot/questions/fusionner", async (req, res, params, body)
     db.prepare("UPDATE chatbot_questions SET statut='fusionne' WHERE id=?").run(id)
   );
   sendJSON(res, 200, { ok: true, total_fusionnes: ids.length - 1 });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   FAQ — Routes API
+   ════════════════════════════════════════════════════════════════ */
+
+/* Helper normalisation recherche */
+function normFaq(s) {
+  return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+}
+
+/* GET /api/faq/categories */
+route("GET", "/api/faq/categories", async (req, res) => {
+  const cats = db.prepare(`SELECT * FROM faq_categories ORDER BY ordre, nom`).all();
+  sendJSON(res, 200, cats);
+});
+
+/* GET /api/faq — liste filtrée par rôle et catégorie */
+route("GET", "/api/faq", async (req, res, _p, _b, q) => {
+  const role   = (q.role   || 'tous').toLowerCase();
+  const cat    = q.category_id ? parseInt(q.category_id) : null;
+  const statut = q.statut  || 'active';
+
+  let sql = `SELECT fq.*, fc.nom AS categorie_nom, fc.icone AS categorie_icone, fc.slug AS categorie_slug
+    FROM faq_questions fq
+    LEFT JOIN faq_categories fc ON fc.id = fq.category_id
+    WHERE fq.statut = ?
+    AND (
+      fq.compte_types LIKE '%"tous"%'
+      OR fq.compte_types LIKE ?
+    )`;
+  const params = [statut, `%"${role}"%`];
+  if (cat) { sql += ` AND fq.category_id = ?`; params.push(cat); }
+  sql += ` ORDER BY fq.ordre, fq.vues DESC, fq.id`;
+
+  const rows = db.prepare(sql).all(...params);
+  const parsed = rows.map(r => ({
+    ...r,
+    compte_types: safeParse(r.compte_types),
+    synonymes:    safeParse(r.synonymes || '[]'),
+    mots_cles:    safeParse(r.mots_cles || '[]'),
+    etapes:       safeParse(r.etapes    || '[]'),
+    medias:       safeParse(r.medias    || '[]'),
+  }));
+  sendJSON(res, 200, parsed);
+});
+
+/* GET /api/faq/search — recherche full-text */
+route("GET", "/api/faq/search", async (req, res, _p, _b, q) => {
+  const query  = q.q    || '';
+  const role   = (q.role || 'tous').toLowerCase();
+  if (!query.trim()) return sendJSON(res, 200, []);
+
+  const nq = normFaq(query);
+  const words = nq.split(' ').filter(w => w.length >= 2);
+
+  const all = db.prepare(`SELECT fq.*, fc.nom AS categorie_nom, fc.icone AS categorie_icone, fc.slug AS categorie_slug
+    FROM faq_questions fq
+    LEFT JOIN faq_categories fc ON fc.id = fq.category_id
+    WHERE fq.statut = 'active'
+    AND (fq.compte_types LIKE '%"tous"%' OR fq.compte_types LIKE ?)
+    ORDER BY fq.vues DESC, fq.id`).all(`%"${role}"%`);
+
+  const scored = all.map(r => {
+    const nq2   = normFaq(r.question);
+    const nr    = normFaq(r.reponse.replace(/<[^>]*>/g,''));
+    const nsyn  = normFaq((safeParse(r.synonymes||'[]')).join(' '));
+    const nkw   = normFaq((safeParse(r.mots_cles||'[]')).join(' '));
+    let score   = 0;
+    words.forEach(w => {
+      if (nq2.includes(w)) score += 10;
+      if (nsyn.includes(w)) score += 8;
+      if (nkw.includes(w))  score += 6;
+      if (nr.includes(w))   score += 3;
+    });
+    return { ...r, score,
+      compte_types: safeParse(r.compte_types),
+      etapes:       safeParse(r.etapes    || '[]'),
+      medias:       safeParse(r.medias    || '[]'),
+    };
+  }).filter(r => r.score > 0).sort((a, b) => b.score - a.score).slice(0, 20);
+
+  /* Log la recherche */
+  try {
+    db.prepare(`INSERT INTO faq_searches (query, results_count, user_role) VALUES (?,?,?)`)
+      .run(query.slice(0,200), scored.length, role);
+  } catch(e){}
+
+  sendJSON(res, 200, scored);
+});
+
+/* GET /api/faq/:id — détail question */
+route("GET", "/api/faq/:id", async (req, res, params) => {
+  const row = db.prepare(`SELECT fq.*, fc.nom AS categorie_nom, fc.icone AS categorie_icone
+    FROM faq_questions fq LEFT JOIN faq_categories fc ON fc.id = fq.category_id
+    WHERE fq.id = ?`).get(parseInt(params.id));
+  if (!row) return sendJSON(res, 404, { error: 'Introuvable' });
+  const r = { ...row,
+    compte_types: safeParse(row.compte_types),
+    synonymes:    safeParse(row.synonymes || '[]'),
+    mots_cles:    safeParse(row.mots_cles || '[]'),
+    etapes:       safeParse(row.etapes    || '[]'),
+    medias:       safeParse(row.medias    || '[]'),
+  };
+  sendJSON(res, 200, r);
+});
+
+/* POST /api/faq/:id/view — incrémenter vues */
+route("POST", "/api/faq/:id/view", async (req, res, params, _b) => {
+  const id = parseInt(params.id);
+  db.prepare(`UPDATE faq_questions SET vues = vues + 1 WHERE id = ?`).run(id);
+  const user = getUser(req);
+  try {
+    db.prepare(`INSERT INTO faq_views (question_id, user_id, user_role) VALUES (?,?,?)`)
+      .run(id, user?.id || null, user?.role || null);
+  } catch(e){}
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/faq/:id/rating — noter une réponse */
+route("POST", "/api/faq/:id/rating", async (req, res, params, body) => {
+  const id      = parseInt(params.id);
+  const helpful = body.helpful ? 1 : 0;
+  const user    = getUser(req);
+  db.prepare(`INSERT INTO faq_ratings (question_id, user_id, helpful, comment) VALUES (?,?,?,?)`)
+    .run(id, user?.id || null, helpful, body.comment || null);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── ADMIN CRUD ── */
+
+/* POST /api/faq — créer une question */
+route("POST", "/api/faq", async (req, res, _p, body) => {
+  const user = getUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const { category_id, compte_types, question, reponse, synonymes, mots_cles, etapes, medias, module_lien, module_label, ordre } = body;
+  if (!question?.trim() || !reponse?.trim()) return sendJSON(res, 400, { error: 'Question et réponse requises' });
+  const types = JSON.stringify(Array.isArray(compte_types) ? compte_types : ['tous']);
+  const r = db.prepare(`INSERT INTO faq_questions
+    (category_id,compte_types,question,reponse,synonymes,mots_cles,etapes,medias,module_lien,module_label,ordre,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      category_id || null,
+      types,
+      question.trim(),
+      reponse.trim(),
+      JSON.stringify(synonymes || []),
+      JSON.stringify(mots_cles || []),
+      JSON.stringify(etapes    || []),
+      JSON.stringify(medias    || []),
+      module_lien   || null,
+      module_label  || null,
+      parseInt(ordre) || 0,
+      user.id
+    );
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* PUT /api/faq/:id — modifier */
+route("PUT", "/api/faq/:id", async (req, res, params, body) => {
+  const user = getUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const id = parseInt(params.id);
+  const { category_id, compte_types, question, reponse, synonymes, mots_cles, etapes, medias, module_lien, module_label, ordre, statut } = body;
+  const types = JSON.stringify(Array.isArray(compte_types) ? compte_types : ['tous']);
+  db.prepare(`UPDATE faq_questions SET
+    category_id=?, compte_types=?, question=?, reponse=?, synonymes=?, mots_cles=?, etapes=?,
+    medias=?, module_lien=?, module_label=?, ordre=?, statut=?, updated_at=datetime('now')
+    WHERE id=?`).run(
+      category_id || null, types,
+      (question || '').trim(), (reponse || '').trim(),
+      JSON.stringify(synonymes || []),
+      JSON.stringify(mots_cles || []),
+      JSON.stringify(etapes    || []),
+      JSON.stringify(medias    || []),
+      module_lien || null, module_label || null,
+      parseInt(ordre) || 0, statut || 'active', id
+    );
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/faq/:id/statut — changer statut (active/inactive/archived) */
+route("PATCH", "/api/faq/:id/statut", async (req, res, params, body) => {
+  const user = getUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const id     = parseInt(params.id);
+  const statut = body.statut;
+  if (!['active','inactive','archived'].includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide' });
+  db.prepare(`UPDATE faq_questions SET statut=?, updated_at=datetime('now') WHERE id=?`).run(statut, id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/faq/:id/duplicate — dupliquer */
+route("POST", "/api/faq/:id/duplicate", async (req, res, params) => {
+  const user = getUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const src = db.prepare(`SELECT * FROM faq_questions WHERE id=?`).get(parseInt(params.id));
+  if (!src) return sendJSON(res, 404, { error: 'Introuvable' });
+  const r = db.prepare(`INSERT INTO faq_questions
+    (category_id,compte_types,question,reponse,synonymes,mots_cles,etapes,medias,module_lien,module_label,ordre,statut,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      src.category_id, src.compte_types, `[Copie] ${src.question}`, src.reponse,
+      src.synonymes, src.mots_cles, src.etapes, src.medias,
+      src.module_lien, src.module_label, src.ordre, 'inactive', user.id
+    );
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* DELETE /api/faq/:id — supprimer */
+route("DELETE", "/api/faq/:id", async (req, res, params) => {
+  const user = getUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  db.prepare(`DELETE FROM faq_questions WHERE id=?`).run(parseInt(params.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/faq/categories — créer catégorie */
+route("POST", "/api/faq/categories", async (req, res, _p, body) => {
+  const user = getUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const { nom, icone, ordre } = body;
+  if (!nom?.trim()) return sendJSON(res, 400, { error: 'Nom requis' });
+  const slug = nom.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
+  try {
+    const r = db.prepare(`INSERT INTO faq_categories (nom,slug,icone,ordre) VALUES (?,?,?,?)`).run(nom.trim(), slug, icone||'📋', parseInt(ordre)||0);
+    sendJSON(res, 201, { id: r.lastInsertRowid, slug });
+  } catch(e) { sendJSON(res, 409, { error: 'Ce nom existe déjà' }); }
+});
+
+/* PUT /api/faq/categories/:id — modifier catégorie */
+route("PUT", "/api/faq/categories/:id", async (req, res, params, body) => {
+  const user = getUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  db.prepare(`UPDATE faq_categories SET nom=?, icone=?, ordre=? WHERE id=?`)
+    .run(body.nom||'', body.icone||'📋', parseInt(body.ordre)||0, parseInt(params.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/faq/categories/:id — supprimer catégorie */
+route("DELETE", "/api/faq/categories/:id", async (req, res, params) => {
+  const user = getUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  db.prepare(`DELETE FROM faq_categories WHERE id=?`).run(parseInt(params.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/faq/stats/dashboard — admin stats */
+route("GET", "/api/faq/stats/dashboard", async (req, res) => {
+  const user = getUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
+  const total_questions  = db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE statut='active'`).get()?.n || 0;
+  const total_vues       = db.prepare(`SELECT SUM(vues) n FROM faq_questions`).get()?.n || 0;
+  const zero_vues        = db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE vues=0 AND statut='active'`).get()?.n || 0;
+  const top_questions    = db.prepare(`SELECT id,question,vues,statut FROM faq_questions ORDER BY vues DESC LIMIT 10`).all();
+  const no_results_searches = db.prepare(`SELECT query, COUNT(*) n FROM faq_searches WHERE results_count=0 GROUP BY query ORDER BY n DESC LIMIT 10`).all();
+  const top_searches     = db.prepare(`SELECT query, COUNT(*) n FROM faq_searches GROUP BY query ORDER BY n DESC LIMIT 10`).all();
+  const satisfaction     = db.prepare(`SELECT helpful, COUNT(*) n FROM faq_ratings GROUP BY helpful`).all();
+  const helpful_yes      = satisfaction.find(r=>r.helpful===1)?.n || 0;
+  const helpful_no       = satisfaction.find(r=>r.helpful===0)?.n || 0;
+  const taux_satisfaction = (helpful_yes + helpful_no) > 0
+    ? Math.round((helpful_yes / (helpful_yes + helpful_no)) * 100) : null;
+  sendJSON(res, 200, {
+    total_questions, total_vues, zero_vues,
+    top_questions, no_results_searches, top_searches,
+    satisfaction: { helpful: helpful_yes, not_helpful: helpful_no, taux: taux_satisfaction },
+  });
 });
 
 async function handleRequest(req, res) {
