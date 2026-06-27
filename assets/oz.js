@@ -170,6 +170,14 @@
     { re: /cr[eé][eé]r?\s+(un\s+)?deal|nouveau\s+deal|lancer?\s+(un\s+)?deal|d[eé]marrer?\s+(un\s+)?deal/i, id: 'deal_create' },
     { re: /mes?\s+deals?|ouvrir?\s+(mes?\s+)?deals?|acc[eé]der?\s+(à\s+)?(mes?\s+)?deals?|g[eé]rer?\s+(un\s+)?deal/i, id: 'deal_list' },
 
+    // ── Profil public — onglets
+    { re: /mes?\s+publications?\s*(profil|publiques?)?|affiche?\s+(mes?\s+)?publications?\s*profil/i, id: 'profil_publications' },
+    { re: /mes?\s+publicit[eé]s?\s*(profil)?|affiche?\s+(mes?\s+)?publicit[eé]s?/i, id: 'profil_publicites' },
+    { re: /mon\s+activit[eé]\s*(r[eé]cente|publique)?|affiche?\s+(mon\s+)?activit[eé]|activit[eé]\s+r[eé]cente/i, id: 'profil_activite' },
+    { re: /modifier?\s+(ma\s+)?banni[eè]re|changer?\s+(ma\s+)?banni[eè]re|uploader?\s+(ma\s+)?banni[eè]re/i, id: 'profil_banner' },
+    { re: /confidentialit[eé]\s*(profil)?|privacy\s*(profil)?|param[eè]tres?\s+confidentialit[eé]/i, id: 'profil_privacy' },
+    { re: /mon\s+profil\s+public|voir?\s+mon\s+profil\s+public|affiche?\s+mon\s+profil/i, id: 'profil_public' },
+
     // ── Admin
     { re: /admin|administration|panneau\s+admin/i, id: 'nav_admin' },
   ];
@@ -787,6 +795,26 @@
         await audit('navigate', 'admin');
         setTimeout(() => { window.location.href = '/dashboard-administrateur.html'; }, 500);
         break;
+
+      // ── Profil public — onglets
+      case 'profil_publications':
+        addMsg('oz', '📝 J\'ouvre l\'onglet Publications de votre profil…');
+        setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-publications`; }, 400); break;
+      case 'profil_publicites':
+        addMsg('oz', '📣 J\'ouvre l\'onglet Publicités de votre profil…');
+        setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-publicites`; }, 400); break;
+      case 'profil_activite':
+        addMsg('oz', '⚡ J\'ouvre votre fil d\'activité publique…');
+        setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-activite`; }, 400); break;
+      case 'profil_banner':
+        addMsg('oz', '🖼️ Pour modifier votre bannière, ouvrez votre profil et survolez la bannière pour voir le bouton "Changer la bannière".');
+        setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}`; }, 600); break;
+      case 'profil_privacy':
+        addMsg('oz', '🔒 J\'ouvre les paramètres de confidentialité de votre profil…');
+        setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-confidentialite`; }, 400); break;
+      case 'profil_public':
+        addMsg('oz', '👤 J\'ouvre votre profil public…');
+        setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}`; }, 400); break;
 
       // ── Deals
       case 'deal_create':

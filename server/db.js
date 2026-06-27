@@ -879,6 +879,7 @@ const MIGRATIONS = [
   ["users", "competences TEXT DEFAULT '[]'"],
   ["users", "experiences TEXT DEFAULT '[]'"],
   ["users", "theme_couleur TEXT DEFAULT 'ocean'"],
+  ["users", "privacy_json TEXT DEFAULT '{}'"],
   // Événements enrichis
   ["evenements", "description TEXT"],
   ["evenements", "places_max INTEGER"],

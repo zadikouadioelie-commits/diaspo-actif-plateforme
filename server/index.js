@@ -969,7 +969,7 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
 
 /* ---------- Profil (lecture enrichie) ---------- */
 route("GET", "/api/profil/:id", async (req, res, params) => {
-  const u = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,created_at FROM users WHERE id=?").get(params.id);
+  const u = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at FROM users WHERE id=?").get(params.id);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
   const me = getCurrentUser(req);
   const nbAbonnes    = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(u.id).n;
@@ -995,6 +995,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     experiences: safeParse(u.experiences || "[]"),
     theme_couleur: u.theme_couleur || "ocean",
     situation_pro: u.situation_pro, created_at: u.created_at,
+    privacy: safeParse(u.privacy_json || "{}"),
     nbAbonnes, nbSuivis, isFollowing,
     initiativesSuivies, usersSuivis, publications
   }});
@@ -1026,12 +1027,102 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
     const merged = { ...safeParse(cur.profil_json), ...body.profil };
     fields.push("profil_json=?"); vals.push(JSON.stringify(merged));
   }
+  if (body.privacy !== undefined) {
+    fields.push("privacy_json=?"); vals.push(JSON.stringify(body.privacy));
+  }
   if (fields.length) { vals.push(user.id); db.prepare(`UPDATE users SET ${fields.join(",")} WHERE id=?`).run(...vals); }
-  const up = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,telephone,profil_json FROM users WHERE id=?").get(user.id);
+  const up = db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,telephone,profil_json,privacy_json FROM users WHERE id=?").get(user.id);
   sendJSON(res, 200, { profil: { ...publicUser(up), bio: up.bio, photo_url: up.photo_url, banner_url: up.banner_url,
     prenom: up.prenom, titre_pro: up.titre_pro, theme_couleur: up.theme_couleur,
     competences: safeParse(up.competences||"[]"), experiences: safeParse(up.experiences||"[]"),
-    centres_interet: safeParse(up.centres_interet||"[]"), situation_pro: up.situation_pro, telephone: up.telephone } });
+    centres_interet: safeParse(up.centres_interet||"[]"), situation_pro: up.situation_pro, telephone: up.telephone,
+    privacy: safeParse(up.privacy_json||"{}") } });
+});
+
+/* ---------- Profil — Fil d'activité publique ---------- */
+route("GET", "/api/profil/:id/activite", async (req, res, params) => {
+  const uid = parseInt(params.id);
+  if (!uid) return sendJSON(res, 400, { error: "ID invalide." });
+  const u = db.prepare("SELECT id,privacy_json FROM users WHERE id=?").get(uid);
+  if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
+  const me = getCurrentUser(req);
+  const isOwn = me && me.id === uid;
+  const privacy = safeParse(u.privacy_json || "{}");
+  const query = new URL("http://x" + req.url).searchParams;
+  const page = Math.max(1, parseInt(query.get('page') || '1'));
+  const cat = query.get('categorie') || 'all';
+  const q = (query.get('q') || '').toLowerCase();
+  const LIMIT = 20;
+  const OFFSET = (page - 1) * LIMIT;
+
+  function visOk(section) {
+    const v = privacy[section] || 'public';
+    if (v === 'public') return true;
+    if (v === 'prive') return isOwn;
+    if (v === 'membres') return !!me;
+    if (v === 'relations') return isOwn || (me && !!db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, uid));
+    return true;
+  }
+
+  let items = [];
+
+  if ((cat === 'all' || cat === 'publications') && visOk('publications')) {
+    const rows = db.prepare(`SELECT 'publication' AS type, id, contenu AS titre, categorie, created_at FROM fil_posts WHERE auteur_id=? ORDER BY created_at DESC LIMIT 50`).all(uid);
+    rows.forEach(r => items.push({ type:'publication', id:r.id, titre:r.titre?.substring(0,120), categorie:r.categorie||'Publication', date:r.created_at, url:`/fil-actualite.html` }));
+  }
+  if ((cat === 'all' || cat === 'evenements') && visOk('evenements')) {
+    try {
+      const rows = db.prepare(`SELECT 'evenement' AS type, id, titre, type_evt AS categorie, date_debut AS date FROM evenements WHERE organisateur_id=? ORDER BY date_debut DESC LIMIT 20`).all(uid);
+      rows.forEach(r => items.push({ type:'evenement', id:r.id, titre:r.titre, categorie:r.categorie||'Événement', date:r.date, url:`/evenements.html` }));
+    } catch(e) {}
+  }
+  if ((cat === 'all' || cat === 'accreditations') && visOk('accreditations')) {
+    try {
+      const rows = db.prepare(`SELECT 'accreditation' AS type, id, type AS categorie, created_at AS date FROM accreditations_da WHERE user_id=? AND statut='active' ORDER BY created_at DESC LIMIT 10`).all(uid);
+      rows.forEach(r => items.push({ type:'accreditation', id:r.id, titre:`Accréditation ${r.categorie}`, categorie:'Accréditation', date:r.date, url:`/profil.html?id=${uid}` }));
+    } catch(e) {}
+  }
+  if ((cat === 'all' || cat === 'commentaires') && visOk('commentaires')) {
+    try {
+      const rows = db.prepare(`SELECT 'commentaire' AS type, id, contenu AS titre, created_at AS date FROM fil_commentaires WHERE auteur_id=? ORDER BY created_at DESC LIMIT 20`).all(uid);
+      rows.forEach(r => items.push({ type:'commentaire', id:r.id, titre:r.titre?.substring(0,100), categorie:'Commentaire', date:r.date, url:`/fil-actualite.html` }));
+    } catch(e) {}
+  }
+
+  // Sort chronologically, apply search filter, paginate
+  items.sort((a,b) => new Date(b.date) - new Date(a.date));
+  if (q) items = items.filter(i => (i.titre||'').toLowerCase().includes(q) || (i.categorie||'').toLowerCase().includes(q));
+  const total = items.length;
+  items = items.slice(OFFSET, OFFSET + LIMIT);
+  sendJSON(res, 200, { activite: items, total, page, pages: Math.ceil(total / LIMIT) });
+});
+
+/* ---------- Profil — Publications complètes ---------- */
+route("GET", "/api/profil/:id/publications", async (req, res, params) => {
+  const uid = parseInt(params.id);
+  const query = new URL("http://x" + req.url).searchParams;
+  const page = Math.max(1, parseInt(query.get('page') || '1'));
+  const cat = query.get('categorie') || 'all';
+  const q = (query.get('q') || '').toLowerCase();
+  const LIMIT = 15, OFFSET = (page-1)*LIMIT;
+  let rows;
+  if (cat === 'all') {
+    rows = db.prepare(`SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, COUNT(DISTINCT r.id) AS nb_reactions, COUNT(DISTINCT c.id) AS nb_commentaires FROM fil_posts p LEFT JOIN fil_reactions r ON r.post_id=p.id LEFT JOIN fil_commentaires c ON c.post_id=p.id WHERE p.auteur_id=? GROUP BY p.id ORDER BY p.id DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
+  } else {
+    rows = db.prepare(`SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, COUNT(DISTINCT r.id) AS nb_reactions, COUNT(DISTINCT c.id) AS nb_commentaires FROM fil_posts p LEFT JOIN fil_reactions r ON r.post_id=p.id LEFT JOIN fil_commentaires c ON c.post_id=p.id WHERE p.auteur_id=? AND (p.categorie=? OR p.type=?) GROUP BY p.id ORDER BY p.id DESC LIMIT ? OFFSET ?`).all(uid, cat, cat, LIMIT, OFFSET);
+  }
+  if (q) rows = rows.filter(r => (r.contenu||'').toLowerCase().includes(q));
+  const total = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid).n;
+  sendJSON(res, 200, { publications: rows, total, page, pages: Math.ceil(total/LIMIT) });
+});
+
+/* ---------- Profil — Publicités actives/passées ---------- */
+route("GET", "/api/profil/:id/publicites", async (req, res, params) => {
+  const uid = parseInt(params.id);
+  try {
+    const rows = db.prepare(`SELECT id,nom_campagne,titre,format,statut,date_debut,date_fin,image_url,description,lien_cible FROM publicites WHERE created_by=? AND statut IN ('active','terminee') ORDER BY created_at DESC LIMIT 20`).all(uid);
+    sendJSON(res, 200, { publicites: rows });
+  } catch(e) { sendJSON(res, 200, { publicites: [] }); }
 });
 
 /* ---------- Suivre / ne plus suivre un utilisateur ---------- */

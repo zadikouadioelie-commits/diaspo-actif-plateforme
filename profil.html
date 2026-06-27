@@ -349,6 +349,56 @@
 .btn-sug { background:none; border:1.5px solid var(--tp); color:var(--tp); border-radius:99px; padding:3px 12px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; }
 .btn-sug:hover { background:var(--tp-light); }
 
+/* ===== TABS ===== */
+.p-tabs { display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:16px; background:#fff; border-radius:12px 12px 0 0; padding:0 4px; }
+.p-tab-btn { padding:12px 18px; font-size:13px; font-weight:600; color:var(--muted); cursor:pointer; background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .18s; white-space:nowrap; }
+.p-tab-btn:hover { color:var(--tp); }
+.p-tab-btn.active { color:var(--tp); border-bottom-color:var(--tp); }
+.p-tab-panel { display:none; }
+.p-tab-panel.active { display:block; }
+
+/* ===== ACTIVITÉ FEED ===== */
+.act-feed-filter { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+.act-filter-btn { padding:5px 12px; border-radius:99px; font-size:12px; font-weight:600; border:1.5px solid var(--border); cursor:pointer; background:#fff; color:var(--muted); transition:all .15s; }
+.act-filter-btn.active, .act-filter-btn:hover { background:var(--tp-light); color:var(--tp); border-color:var(--tp); }
+.act-search-row { display:flex; gap:8px; margin-bottom:14px; }
+.act-search-row input { flex:1; height:36px; border:1px solid var(--border); border-radius:8px; padding:0 12px; font-size:13px; font-family:inherit; }
+.act-item { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
+.act-item:last-child { border-bottom:none; }
+.act-icon { width:36px; height:36px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:16px; background:var(--tp-light); }
+.act-body { flex:1; }
+.act-type { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--tp); margin-bottom:2px; }
+.act-titre { font-size:13px; color:#0D1B2A; line-height:1.4; }
+.act-date { font-size:11px; color:var(--muted); margin-top:3px; }
+.act-load-more { width:100%; padding:10px; margin-top:10px; background:#fff; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; color:var(--muted); }
+.act-load-more:hover { border-color:var(--tp); color:var(--tp); }
+
+/* ===== BANNER UPLOAD ===== */
+.p-banner-edit { display:none; }
+.is-own .p-banner-edit { display:flex; align-items:center; gap:6px; }
+.banner-crop-overlay { position:absolute; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; gap:8px; opacity:0; transition:opacity .2s; }
+.p-banner:hover .banner-crop-overlay { opacity:1; }
+.banner-btn { background:rgba(255,255,255,.92); color:#0D1B2A; border:none; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; }
+
+/* ===== PUBLICITÉS PROFIL ===== */
+.pub-ad-card { background:#fff; border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:12px; }
+.pub-ad-img { width:100%; height:180px; object-fit:cover; display:block; }
+.pub-ad-body { padding:14px 16px; }
+.pub-ad-title { font-size:14px; font-weight:800; color:#0D1B2A; margin-bottom:4px; }
+.pub-ad-desc { font-size:13px; color:var(--muted); margin-bottom:10px; line-height:1.5; }
+.pub-ad-meta { font-size:11px; color:var(--muted); margin-bottom:8px; }
+.pub-ad-statut { display:inline-flex; padding:2px 8px; border-radius:99px; font-size:10px; font-weight:800; }
+.pub-ad-statut.active { background:#dcfce7; color:#16a34a; }
+.pub-ad-statut.terminee { background:#f1f5f9; color:#64748b; }
+
+/* ===== PRIVACY ===== */
+.privacy-section { background:#fff; border:1px solid var(--border); border-radius:12px; padding:20px 24px; margin-bottom:14px; }
+.privacy-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); }
+.privacy-row:last-child { border-bottom:none; }
+.privacy-label { font-size:13px; font-weight:600; color:#0D1B2A; }
+.privacy-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+.privacy-select { border:1px solid var(--border); border-radius:6px; padding:5px 10px; font-size:12px; font-family:inherit; color:var(--text); background:#fff; cursor:pointer; }
+
 /* ===== RESPONSIVE ===== */
 @media(max-width:860px){ .p-side { display:none; } }
 @media(max-width:600px){
@@ -385,8 +435,15 @@
 <!-- BANNIÈRE -->
 <div class="p-banner" id="p-banner">
   <img loading="lazy" id="banner-img" alt="Bannière" style="display:none">
-  <button class="p-banner-edit" onclick="pickBannerColor()">📷 Modifier la bannière</button>
+  <div class="banner-crop-overlay">
+    <button class="banner-btn" onclick="pickBannerFile()">📷 Changer la bannière</button>
+    <button class="banner-btn" onclick="removeBanner()" id="banner-del-btn" style="display:none">🗑️ Supprimer</button>
+  </div>
+  <div style="position:absolute;bottom:10px;right:12px;">
+    <button class="p-banner-edit" onclick="pickBannerFile()">📷 Modifier la bannière</button>
+  </div>
 </div>
+<input type="file" id="banner-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handleBannerFile(this)">
 
 <main class="container" style="max-width:820px;padding-top:0;padding-bottom:48px">
 
@@ -510,12 +567,68 @@ function renderThemeSwatches(active) {
 }
 
 /* ---- bannière ---- */
-function pickBannerColor() {
-  const keys = Object.keys(THEMES);
-  const cur  = profil?.theme_couleur || 'ocean';
-  const idx  = keys.indexOf(cur);
-  const next = keys[(idx + 1) % keys.length];
-  setTheme(next);
+function pickBannerFile() {
+  if (!isOwn) return;
+  document.getElementById('banner-file-input').click();
+}
+
+async function handleBannerFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { alert('Image trop volumineuse (max 5 Mo).'); return; }
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    try {
+      // Compress via canvas
+      const compressed = await compressImage(ev.target.result, 1200, 400, 0.82);
+      const up = await api('POST', '/upload', { data: compressed, nom: file.name });
+      await api('PUT', '/profil', { banner_url: up.url });
+      profil.banner_url = up.url;
+      renderBanner();
+    } catch(err) { alert('Erreur lors du chargement de la bannière.'); }
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+async function removeBanner() {
+  if (!isOwn || !confirm('Supprimer la bannière personnalisée ?')) return;
+  await api('PUT', '/profil', { banner_url: null });
+  profil.banner_url = null;
+  renderBanner();
+}
+
+function compressImage(dataUrl, maxW, maxH, quality) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = dataUrl;
+  });
+}
+
+function renderBanner() {
+  const banner = document.getElementById('p-banner');
+  const img = document.getElementById('banner-img');
+  const delBtn = document.getElementById('banner-del-btn');
+  if (profil.banner_url) {
+    img.src = profil.banner_url;
+    img.style.display = 'block';
+    banner.style.background = 'none';
+    if (delBtn) delBtn.style.display = 'flex';
+  } else {
+    img.style.display = 'none';
+    const t = THEMES[profil.theme_couleur || 'ocean'];
+    banner.style.background = t.banner;
+    if (delBtn) delBtn.style.display = 'none';
+  }
 }
 
 /* ---- avatar ---- */
@@ -567,9 +680,19 @@ function render() {
 }
 
 function renderBanner() {
+  const banner = document.getElementById('p-banner');
   const img = document.getElementById('banner-img');
-  if (profil.banner_url) { img.src = profil.banner_url; img.style.display = 'block'; }
-  else img.style.display = 'none';
+  const delBtn = document.getElementById('banner-del-btn');
+  if (profil.banner_url) {
+    img.src = profil.banner_url; img.style.display = 'block';
+    banner.style.background = 'none';
+    if (delBtn) delBtn.style.display = 'flex';
+  } else {
+    img.style.display = 'none';
+    const t = THEMES[profil.theme_couleur || 'ocean'];
+    banner.style.background = t ? t.banner : '';
+    if (delBtn) delBtn.style.display = 'none';
+  }
 }
 
 function renderAvatar() {
@@ -642,17 +765,295 @@ function renderStats() {
 function renderSections() {
   const wrap = document.getElementById('p-sections');
   wrap.innerHTML = '';
-  wrap.appendChild(buildSectionExp());
 
-  // Pub inline entre expériences et compétences
-  wrap.appendChild(buildInlineAd());
+  const tabs = [
+    { id:'resume',        label:'📋 Résumé' },
+    { id:'activite',      label:'⚡ Activité' },
+    { id:'publications',  label:'📝 Publications' },
+    { id:'publicites',    label:'📣 Publicités' },
+  ];
+  if (isOwn) tabs.push({ id:'confidentialite', label:'🔒 Confidentialité' });
 
-  wrap.appendChild(buildSectionSkills());
-  wrap.appendChild(buildSectionPubs());
-  wrap.appendChild(buildSectionInitiatives());
-  wrap.appendChild(buildSectionUsers());
+  const tabsBar = document.createElement('div');
+  tabsBar.className = 'p-tabs';
+  tabsBar.innerHTML = tabs.map(t =>
+    `<button class="p-tab-btn${t.id==='resume'?' active':''}" data-tab="${t.id}" onclick="switchProfileTab('${t.id}')">${t.label}</button>`
+  ).join('');
+  wrap.appendChild(tabsBar);
+
+  // Panel Résumé
+  const resume = document.createElement('div');
+  resume.id = 'ptab-resume';
+  resume.className = 'p-tab-panel active';
+  resume.appendChild(buildSectionExp());
+  resume.appendChild(buildInlineAd());
+  resume.appendChild(buildSectionSkills());
+  resume.appendChild(buildSectionPubs());
+  resume.appendChild(buildSectionInitiatives());
+  resume.appendChild(buildSectionUsers());
+  wrap.appendChild(resume);
+
+  // Panel Activité (lazy-loaded)
+  const activite = document.createElement('div');
+  activite.id = 'ptab-activite';
+  activite.className = 'p-tab-panel';
+  activite.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement de l\'activité…</div>';
+  wrap.appendChild(activite);
+
+  // Panel Publications (lazy-loaded)
+  const publications = document.createElement('div');
+  publications.id = 'ptab-publications';
+  publications.className = 'p-tab-panel';
+  publications.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement des publications…</div>';
+  wrap.appendChild(publications);
+
+  // Panel Publicités (lazy-loaded)
+  const publicites = document.createElement('div');
+  publicites.id = 'ptab-publicites';
+  publicites.className = 'p-tab-panel';
+  publicites.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement des publicités…</div>';
+  wrap.appendChild(publicites);
+
+  // Panel Confidentialité (owner only)
+  if (isOwn) {
+    const conf = document.createElement('div');
+    conf.id = 'ptab-confidentialite';
+    conf.className = 'p-tab-panel';
+    conf.appendChild(buildPrivacyPanel());
+    wrap.appendChild(conf);
+  }
 
   renderSidebar();
+
+  // Vérifier si un onglet est demandé via URL hash
+  const hash = location.hash.replace('#tab-','');
+  if (['activite','publications','publicites','confidentialite'].includes(hash)) {
+    switchProfileTab(hash);
+  }
+}
+
+function switchProfileTab(id) {
+  document.querySelectorAll('.p-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+  document.querySelectorAll('.p-tab-panel').forEach(p => p.classList.toggle('active', p.id === 'ptab-'+id));
+  const panel = document.getElementById('ptab-'+id);
+  if (!panel || panel.dataset.loaded) return;
+  panel.dataset.loaded = '1';
+  if (id === 'activite') loadActiviteTab();
+  if (id === 'publications') loadPublicationsTab();
+  if (id === 'publicites') loadPublicitesTab();
+}
+
+/* ======================================================
+   ONGLET — ACTIVITÉ
+   ====================================================== */
+const ACT_CATS = [
+  { id:'all', label:'Tout' },
+  { id:'publications', label:'Publications' },
+  { id:'commentaires', label:'Commentaires' },
+  { id:'evenements', label:'Événements' },
+  { id:'accreditations', label:'Accréditations' },
+];
+const ACT_ICONS = { publication:'📝', commentaire:'💬', evenement:'📅', accreditation:'🏅', default:'⚡' };
+let _actPage = 1, _actCat = 'all', _actQ = '';
+
+async function loadActiviteTab(reset = true) {
+  const panel = document.getElementById('ptab-activite');
+  if (reset) { _actPage = 1; panel.innerHTML = buildActHeader(); }
+  try {
+    const r = await api('GET', `/profil/${profil.id}/activite?page=${_actPage}&categorie=${_actCat}&q=${encodeURIComponent(_actQ)}`);
+    const list = document.getElementById('act-list') || (() => { const d = document.createElement('div'); d.id='act-list'; panel.appendChild(d); return d; })();
+    if (reset) list.innerHTML = '';
+    if (!r.activite.length && reset) {
+      list.innerHTML = '<div class="empty-p"><div class="ei">⚡</div>Aucune activité publique pour l\'instant.</div>';
+    } else {
+      r.activite.forEach(item => {
+        const d = document.createElement('div');
+        d.className = 'act-item';
+        d.innerHTML = `
+          <div class="act-icon">${ACT_ICONS[item.type] || ACT_ICONS.default}</div>
+          <div class="act-body">
+            <div class="act-type">${esc(item.categorie||item.type)}</div>
+            <div class="act-titre">${esc(item.titre||'—')}</div>
+            <div class="act-date">${fmtDate(item.date)}</div>
+          </div>`;
+        if (item.url) d.style.cursor='pointer', d.onclick=()=>location.href=item.url;
+        list.appendChild(d);
+      });
+      // Bouton "voir plus"
+      const existing = document.getElementById('act-more-btn');
+      if (existing) existing.remove();
+      if (r.page < r.pages) {
+        const btn = document.createElement('button');
+        btn.id = 'act-more-btn';
+        btn.className = 'act-load-more';
+        btn.textContent = `Voir plus (${r.total - _actPage*20 > 0 ? r.total - _actPage*20 : ''} activités restantes)`;
+        btn.onclick = () => { _actPage++; loadActiviteTab(false); };
+        list.after(btn);
+      }
+    }
+  } catch(e) {
+    document.getElementById('ptab-activite').innerHTML += `<div style="color:#dc2626;padding:10px">Erreur : ${e.message}</div>`;
+  }
+}
+
+function buildActHeader() {
+  return `<div class="p-section" style="margin-bottom:0;border-radius:12px 12px 0 0;border-bottom:none;padding-bottom:10px">
+    <div class="act-feed-filter" id="act-filter-row">
+      ${ACT_CATS.map(c=>`<button class="act-filter-btn${c.id===_actCat?' active':''}" onclick="setActCat('${c.id}')">${c.label}</button>`).join('')}
+    </div>
+    <div class="act-search-row">
+      <input type="text" placeholder="🔍 Rechercher dans l'activité…" value="${esc(_actQ)}" oninput="debAct(this.value)">
+    </div>
+  </div><div class="p-section" style="border-radius:0 0 12px 12px;border-top:none;min-height:80px;" id="act-list-wrap">`;
+}
+
+let _actTimer = null;
+function debAct(v) { clearTimeout(_actTimer); _actTimer = setTimeout(()=>{ _actQ=v; loadActiviteTab(true); }, 400); }
+function setActCat(c) { _actCat=c; document.querySelectorAll('.act-filter-btn').forEach(b=>b.classList.toggle('active',b.textContent===ACT_CATS.find(x=>x.id===c)?.label)); loadActiviteTab(true); }
+function fmtDate(d) { if (!d) return ''; try { return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}); } catch(e){return d;} }
+
+/* ======================================================
+   ONGLET — PUBLICATIONS
+   ====================================================== */
+const PUB_CATS = ['all','post','article','annonce','offre','campagne','communique'];
+let _pubPage=1, _pubCat='all', _pubQ='';
+
+async function loadPublicationsTab(reset=true) {
+  const panel = document.getElementById('ptab-publications');
+  if (reset) { _pubPage=1; panel.innerHTML = buildPubHeader(); }
+  try {
+    const r = await api('GET', `/profil/${profil.id}/publications?page=${_pubPage}&categorie=${_pubCat}&q=${encodeURIComponent(_pubQ)}`);
+    let list = document.getElementById('pub-list');
+    if (!list) { list = document.createElement('div'); list.id='pub-list'; panel.querySelector('.pub-list-wrap')?.appendChild(list); }
+    if (reset) list.innerHTML = '';
+    if (!r.publications.length && reset) {
+      list.innerHTML = '<div class="empty-p"><div class="ei">📝</div>Aucune publication pour l\'instant.</div>';
+    } else {
+      const nom = [profil.prenom, profil.nom].filter(Boolean).join(' ') || profil.nom;
+      r.publications.forEach(p => {
+        const d = document.createElement('div');
+        d.className = 'post-card';
+        const avHtml = profil.photo_url ? `<img loading="lazy" src="${esc(profil.photo_url)}" alt="">` : `<span style="font-size:13px;font-weight:800">${initials(nom)}</span>`;
+        d.innerHTML = `
+          <div class="post-header">
+            <div class="post-av">${avHtml}</div>
+            <div class="post-meta">
+              <div class="pm-nom">${esc(nom)}</div>
+              <div class="pm-titre">${esc(profil.titre_pro||'Membre Diaspo\'Actif')}</div>
+              <div class="pm-date">${fmtDate(p.created_at)}</div>
+            </div>
+            <span class="post-cat-pill">${esc(p.categorie||p.type||'Publication')}</span>
+          </div>
+          <div class="post-body"><div class="post-text">${esc(p.contenu||'')}</div></div>
+          <div class="post-stats"><span>❤️ ${p.nb_reactions||0}</span><span>💬 ${p.nb_commentaires||0}</span></div>`;
+        list.appendChild(d);
+      });
+      const existing = document.getElementById('pub-more-btn');
+      if (existing) existing.remove();
+      if (r.page < r.pages) {
+        const btn = document.createElement('button');
+        btn.id='pub-more-btn'; btn.className='act-load-more';
+        btn.textContent=`Voir plus`;
+        btn.onclick=()=>{ _pubPage++; loadPublicationsTab(false); };
+        list.after(btn);
+      }
+    }
+  } catch(e) { document.getElementById('ptab-publications').innerHTML += `<div style="color:#dc2626;padding:10px">Erreur : ${e.message}</div>`; }
+}
+
+function buildPubHeader() {
+  return `<div class="p-section" style="padding-bottom:8px">
+    <div class="act-feed-filter">
+      ${PUB_CATS.map(c=>`<button class="act-filter-btn${c===_pubCat?' active':''}" onclick="setPubCat('${c}')">${c==='all'?'Tout':c}</button>`).join('')}
+    </div>
+    <div class="act-search-row">
+      <input type="text" placeholder="🔍 Rechercher une publication…" value="${esc(_pubQ)}" oninput="debPub(this.value)">
+    </div>
+  </div><div class="pub-list-wrap"><div id="pub-list"></div></div>`;
+}
+let _pubTimer=null;
+function debPub(v){clearTimeout(_pubTimer);_pubTimer=setTimeout(()=>{_pubQ=v;loadPublicationsTab(true);},400);}
+function setPubCat(c){_pubCat=c;document.querySelectorAll('#ptab-publications .act-filter-btn').forEach(b=>b.classList.toggle('active',b.textContent===(c==='all'?'Tout':c)));loadPublicationsTab(true);}
+
+/* ======================================================
+   ONGLET — PUBLICITÉS
+   ====================================================== */
+async function loadPublicitesTab() {
+  const panel = document.getElementById('ptab-publicites');
+  try {
+    const r = await api('GET', `/profil/${profil.id}/publicites`);
+    if (!r.publicites.length) {
+      panel.innerHTML = '<div class="p-section"><div class="empty-p"><div class="ei">📣</div>Aucune publicité publiée pour l\'instant.</div></div>';
+      return;
+    }
+    panel.innerHTML = r.publicites.map(p => `
+      <div class="pub-ad-card">
+        ${p.image_url ? `<img class="pub-ad-img" src="${esc(p.image_url)}" alt="${esc(p.titre||'')}">` : ''}
+        <div class="pub-ad-body">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div class="pub-ad-title">${esc(p.titre||p.nom_campagne||'Campagne')}</div>
+            <span class="pub-ad-statut ${p.statut}">${p.statut==='active'?'Active':'Terminée'}</span>
+          </div>
+          ${p.description ? `<div class="pub-ad-desc">${esc(p.description)}</div>` : ''}
+          <div class="pub-ad-meta">
+            ${p.date_debut?'Du '+fmtDate(p.date_debut):''}${p.date_fin?' au '+fmtDate(p.date_fin):''}
+          </div>
+          ${p.lien_cible ? `<a class="ad-btn" href="${esc(p.lien_cible)}" target="_blank" rel="noopener">En savoir plus →</a>` : ''}
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    panel.innerHTML = '<div class="p-section"><div class="empty-p">Aucune publicité disponible.</div></div>';
+  }
+}
+
+/* ======================================================
+   ONGLET — CONFIDENTIALITÉ
+   ====================================================== */
+function buildPrivacyPanel() {
+  const sections = [
+    { id:'publications',    label:'Publications', sub:'Vos posts, articles, annonces' },
+    { id:'activite',        label:'Fil d\'activité', sub:'Votre activité globale sur la plateforme' },
+    { id:'commentaires',    label:'Commentaires', sub:'Vos commentaires sur les publications' },
+    { id:'evenements',      label:'Événements', sub:'Vos participations et créations d\'événements' },
+    { id:'accreditations',  label:'Accréditations', sub:'Vos accréditations et badges' },
+    { id:'contacts',        label:'Relations', sub:'Vos abonnés et abonnements' },
+  ];
+  const privacy = profil.privacy || {};
+  const div = document.createElement('div');
+  div.className = 'privacy-section';
+  div.innerHTML = `<div class="p-sec-hd"><h3>🔒 Confidentialité du profil</h3></div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Choisissez qui peut voir chaque rubrique de votre profil.</p>
+    ${sections.map(s => `
+      <div class="privacy-row">
+        <div>
+          <div class="privacy-label">${s.label}</div>
+          <div class="privacy-sub">${s.sub}</div>
+        </div>
+        <select class="privacy-select" id="priv-${s.id}" onchange="savePrivacy()">
+          <option value="public"${(privacy[s.id]||'public')==='public'?' selected':''}>🌍 Public</option>
+          <option value="membres"${privacy[s.id]==='membres'?' selected':''}>👤 Membres</option>
+          <option value="relations"${privacy[s.id]==='relations'?' selected':''}>🤝 Relations</option>
+          <option value="prive"${privacy[s.id]==='prive'?' selected':''}>🔒 Privé</option>
+        </select>
+      </div>`).join('')}
+    <div id="priv-msg" style="font-size:12px;color:#16a34a;margin-top:10px;display:none">✅ Paramètres sauvegardés</div>`;
+  return div;
+}
+
+let _privTimer = null;
+async function savePrivacy() {
+  const sections = ['publications','activite','commentaires','evenements','accreditations','contacts'];
+  const privacy = {};
+  sections.forEach(s => {
+    const el = document.getElementById('priv-'+s);
+    if (el) privacy[s] = el.value;
+  });
+  try {
+    await api('PUT', '/profil', { privacy });
+    profil.privacy = privacy;
+    const msg = document.getElementById('priv-msg');
+    if (msg) { msg.style.display='block'; clearTimeout(_privTimer); _privTimer=setTimeout(()=>msg.style.display='none',2500); }
+  } catch(e) {}
 }
 
 /* ======================================================
