@@ -1716,6 +1716,40 @@ db.exec(`
     created_at  TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(deal_id) REFERENCES deals(id)
   );
+
+  /* ───── Partenaires Officiels Diaspo'Actif ───── */
+  CREATE TABLE IF NOT EXISTS partenaires_officiels (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id              INTEGER NOT NULL UNIQUE,
+    statut               TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','suspendue','retiree')),
+    domaines_expertise   TEXT DEFAULT '[]',
+    pays_intervention    TEXT DEFAULT '[]',
+    services             TEXT DEFAULT '[]',
+    description_complete TEXT,
+    site_web             TEXT,
+    liens_utiles         TEXT DEFAULT '[]',
+    categorie            TEXT DEFAULT 'general',
+    niveau_visibilite    TEXT DEFAULT 'public' CHECK(niveau_visibilite IN ('public','membres')),
+    nbr_recommandations  INTEGER DEFAULT 0,
+    admin_id             INTEGER,
+    admin_notes          TEXT,
+    date_attribution     TEXT DEFAULT (datetime('now')),
+    date_expiration      TEXT,
+    created_at           TEXT DEFAULT (datetime('now')),
+    updated_at           TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id)  REFERENCES users(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS partenaires_officiels_historique (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    action     TEXT NOT NULL,
+    admin_id   INTEGER,
+    admin_nom  TEXT,
+    motif      TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 /* backfillOfficialFollow est appelé depuis seed.js après création du compte officiel */

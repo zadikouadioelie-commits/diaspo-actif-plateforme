@@ -69,6 +69,7 @@
       <a href="#onboarding" data-section="onboarding">🎓 Tutoriels d'accueil</a>
       <a href="#packages" data-section="packages">📦 Package Diaspo'Actif</a>
       <a href="#deals-admin" data-section="deals-admin">🤝 Gérer un Deal</a>
+      <a href="#partenaires-admin" data-section="partenaires-admin">🏅 Partenaires Officiels</a>
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
     </aside>
 
@@ -1441,6 +1442,91 @@
               <button class="btn btn-orange" onclick="pkgSave()" style="flex:1;">💾 Enregistrer</button>
               <button class="btn btn-outline" onclick="pkgCloseModal()">Annuler</button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════
+           PARTENAIRES OFFICIELS DIASPO'ACTIF
+      ══════════════════════════════════════════════════════ -->
+      <section id="section-partenaires-admin" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <h2 style="margin:0;">🏅 Partenaires Officiels Diaspo'Actif</h2>
+          <button class="btn btn-orange" onclick="openAttribuerPartenaire()">➕ Attribuer l'accréditation</button>
+          <a href="partenaires.html" target="_blank" class="btn btn-outline" style="font-size:13px;">👁️ Voir l'annuaire public</a>
+        </div>
+
+        <!-- Stats rapides -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;" id="po-stats-grid">
+          <div class="card" style="border-left:4px solid #1e3a8a;">
+            <div style="font-size:22px;font-weight:800;" id="po-stat-actifs">—</div>
+            <div style="font-size:12px;color:var(--muted);">Partenaires actifs</div>
+          </div>
+          <div class="card" style="border-left:4px solid #f59e0b;">
+            <div style="font-size:22px;font-weight:800;" id="po-stat-suspendus">—</div>
+            <div style="font-size:12px;color:var(--muted);">Suspendus</div>
+          </div>
+          <div class="card" style="border-left:4px solid #6b7280;">
+            <div style="font-size:22px;font-weight:800;" id="po-stat-retires">—</div>
+            <div style="font-size:12px;color:var(--muted);">Retirés</div>
+          </div>
+          <div class="card" style="border-left:4px solid #16a34a;">
+            <div style="font-size:22px;font-weight:800;" id="po-stat-recommandations">—</div>
+            <div style="font-size:12px;color:var(--muted);">Recommandations O-Z</div>
+          </div>
+        </div>
+
+        <!-- Filtres -->
+        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+          <input type="text" id="po-admin-search" placeholder="Rechercher…" oninput="filterPoAdmin()" style="flex:1;min-width:180px;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;">
+          <select id="po-admin-statut" onchange="filterPoAdmin()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;">
+            <option value="">Tous les statuts</option>
+            <option value="active">✅ Actifs</option>
+            <option value="suspendue">⏸️ Suspendus</option>
+            <option value="retiree">❌ Retirés</option>
+          </select>
+        </div>
+
+        <div id="po-admin-list" style="display:flex;flex-direction:column;gap:10px;">
+          <div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+        </div>
+
+        <!-- Modal attribuer -->
+        <div id="modal-attribuer-po" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;padding:16px;">
+          <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+              <h3 style="margin:0;font-size:16px;">🏅 Attribuer — Partenaire Officiel</h3>
+              <button onclick="document.getElementById('modal-attribuer-po').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>
+            </div>
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">ID ou nom du compte</label>
+            <input id="po-att-user" type="text" placeholder="Ex : 42 ou Ynouss Diallo" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;">
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Domaines d'expertise (virgule)</label>
+            <input id="po-att-domaines" type="text" placeholder="financement, juridique, formation…" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;">
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Pays / zones d'intervention (virgule)</label>
+            <input id="po-att-pays" type="text" placeholder="France, Sénégal, Côte d'Ivoire…" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;">
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Services proposés (virgule)</label>
+            <input id="po-att-services" type="text" placeholder="Conseil, Accompagnement, Formation…" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;">
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Catégorie</label>
+            <select id="po-att-categorie" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;">
+              <option value="general">Général</option>
+              <option value="financement">Financement</option>
+              <option value="juridique">Juridique</option>
+              <option value="formation">Formation</option>
+              <option value="immobilier">Immobilier</option>
+              <option value="sante">Santé</option>
+              <option value="tech">Technologie</option>
+              <option value="culture">Culture</option>
+              <option value="institution">Institution</option>
+            </select>
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Notes admin (internes)</label>
+            <textarea id="po-att-notes" rows="2" placeholder="Motif de l'attribution…" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Date d'expiration (optionnel)</label>
+            <input id="po-att-expiration" type="date" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;">
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+              <button onclick="document.getElementById('modal-attribuer-po').style.display='none'" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:none;cursor:pointer;">Annuler</button>
+              <button onclick="submitAttribuerPo()" style="padding:9px 18px;background:#1e3a8a;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">🏅 Attribuer</button>
+            </div>
+            <div id="po-att-msg" style="font-size:12px;margin-top:8px;display:none;"></div>
           </div>
         </div>
       </section>
@@ -3283,7 +3369,8 @@ async function submitAccordDirect(){
     promotions:  () => loadPromos(),
     ventes:      () => loadTransactions(),
     packages:    () => loadPackages(),
-    'deals-admin': () => loadAdminDeals(),
+    'deals-admin':       () => loadAdminDeals(),
+    'partenaires-admin': () => loadPartenairesAdmin(),
     parametres:  () => loadParametres(),
     publicites:  () => loadPublicites(),
     chatbot:     () => switchCbTab('stats'),
@@ -6550,6 +6637,110 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === document.getElementById('pkg-modal')) pkgCloseModal();
   });
 });
+
+/* ═══════════════════════════════════════════════════════════
+   PARTENAIRES OFFICIELS — Admin
+═══════════════════════════════════════════════════════════ */
+let _poAdminCache = [];
+
+async function loadPartenairesAdmin() {
+  try {
+    const data = await api('GET', '/admin/partenaires');
+    _poAdminCache = data.partenaires || [];
+    updatePoStats();
+    renderPoAdminList(_poAdminCache);
+  } catch(e) {
+    document.getElementById('po-admin-list').innerHTML = `<div style="color:#dc2626;padding:20px;">Erreur : ${e.message}</div>`;
+  }
+}
+
+function updatePoStats() {
+  const all = _poAdminCache;
+  document.getElementById('po-stat-actifs').textContent   = all.filter(p=>p.statut==='active').length;
+  document.getElementById('po-stat-suspendus').textContent = all.filter(p=>p.statut==='suspendue').length;
+  document.getElementById('po-stat-retires').textContent   = all.filter(p=>p.statut==='retiree').length;
+  document.getElementById('po-stat-recommandations').textContent = all.reduce((s,p)=>s+(p.nbr_recommandations||0),0);
+}
+
+function filterPoAdmin() {
+  const q  = (document.getElementById('po-admin-search')?.value||'').toLowerCase();
+  const st = document.getElementById('po-admin-statut')?.value||'';
+  let list = _poAdminCache;
+  if (q)  list = list.filter(p=>`${p.nom} ${p.prenom||''} ${p.email||''} ${p.titre_pro||''}`.toLowerCase().includes(q));
+  if (st) list = list.filter(p=>p.statut===st);
+  renderPoAdminList(list);
+}
+
+function renderPoAdminList(list) {
+  const el = document.getElementById('po-admin-list');
+  if (!list.length) { el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted);">Aucun partenaire trouvé.</div>'; return; }
+  el.innerHTML = list.map(p => {
+    const nom = [p.prenom,p.nom].filter(Boolean).join(' ')||p.nom||'—';
+    const domaines = (p.domaines_expertise||[]).join(', ') || '—';
+    const pays = (p.pays_intervention||[]).join(', ') || '—';
+    const statutBadge = { active:'✅ Actif', suspendue:'⏸️ Suspendu', retiree:'❌ Retiré' }[p.statut]||p.statut;
+    const statutColor = { active:'#16a34a', suspendue:'#d97706', retiree:'#dc2626' }[p.statut]||'#64748b';
+    return `<div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          ${p.photo_url ? `<img src="${p.photo_url}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="">` : `<div style="width:36px;height:36px;border-radius:50%;background:#1e3a8a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;">${(nom.charAt(0)||'?').toUpperCase()}</div>`}
+          <div>
+            <div style="font-size:14px;font-weight:800;">${nom}</div>
+            <div style="font-size:12px;color:var(--muted);">${p.titre_pro||p.role||''}</div>
+          </div>
+          <span style="margin-left:auto;font-size:11px;font-weight:700;color:${statutColor};">${statutBadge}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;">🎯 Domaines : ${domaines}</div>
+        <div style="font-size:12px;color:var(--muted);">📍 Zones : ${pays}</div>
+        <div style="font-size:11px;color:#2563eb;margin-top:4px;">📊 ${p.nbr_recommandations||0} recommandation(s) O-Z · Attribution : ${(p.date_attribution||'').slice(0,10)}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;">
+        <a href="profil.html?id=${p.user_id}" target="_blank" class="btn btn-sm btn-outline" style="font-size:12px;text-align:center;">👤 Voir le profil</a>
+        ${p.statut==='active'
+          ? `<button class="btn btn-sm" style="background:#d97706;color:#fff;font-size:12px;" onclick="changerStatutPo(${p.id},'suspendue')">⏸️ Suspendre</button>`
+          : `<button class="btn btn-sm" style="background:#16a34a;color:#fff;font-size:12px;" onclick="changerStatutPo(${p.id},'active')">✅ Réactiver</button>`}
+        <button class="btn btn-sm" style="background:#dc2626;color:#fff;font-size:12px;" onclick="changerStatutPo(${p.id},'retiree')">❌ Retirer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openAttribuerPartenaire() {
+  document.getElementById('modal-attribuer-po').style.display = 'flex';
+}
+
+async function submitAttribuerPo() {
+  const split = s => s.split(',').map(x=>x.trim()).filter(Boolean);
+  const userRaw = document.getElementById('po-att-user').value.trim();
+  const user_id = parseInt(userRaw) || null;
+  if (!user_id) { document.getElementById('po-att-msg').style.display='block'; document.getElementById('po-att-msg').textContent='⚠️ Saisissez un ID numérique de compte.'; return; }
+  try {
+    await api('POST', '/admin/partenaires', {
+      user_id,
+      domaines_expertise: split(document.getElementById('po-att-domaines').value),
+      pays_intervention:  split(document.getElementById('po-att-pays').value),
+      services:           split(document.getElementById('po-att-services').value),
+      categorie: document.getElementById('po-att-categorie').value,
+      admin_notes: document.getElementById('po-att-notes').value.trim()||null,
+      date_expiration: document.getElementById('po-att-expiration').value||null,
+    });
+    const msg = document.getElementById('po-att-msg');
+    msg.style.display='block'; msg.style.color='#16a34a'; msg.textContent='✅ Accréditation attribuée avec succès !';
+    setTimeout(()=>{ document.getElementById('modal-attribuer-po').style.display='none'; loadPartenairesAdmin(); }, 1500);
+  } catch(e) {
+    const msg = document.getElementById('po-att-msg');
+    msg.style.display='block'; msg.style.color='#dc2626'; msg.textContent=`Erreur : ${e.message}`;
+  }
+}
+
+async function changerStatutPo(id, statut) {
+  const labels = { suspendue:'Motif de suspension', retiree:'Motif du retrait', active:'Motif de réactivation' };
+  const motif = prompt(labels[statut]+'(optionnel) :') ?? '';
+  try {
+    await api('PUT', `/admin/partenaires/${id}/statut`, { statut, motif });
+    loadPartenairesAdmin();
+  } catch(e) { alert('Erreur : '+e.message); }
+}
 </script>
 </body>
 </html>

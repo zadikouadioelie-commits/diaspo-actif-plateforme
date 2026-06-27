@@ -439,6 +439,9 @@ function renderInitiativeCard(it){
   const membres = it.membres ? `<span class="ann-membres">👥 ${it.membres}</span>` : '';
 
   const certifBadgeHtml = it.certif ? `<div class="ann-certif-wrap">${badgeCertif(it.certif, { small: true })}</div>` : "";
+  const partenaireOfficielBadge = it.partenaire_officiel
+    ? `<div style="margin-bottom:6px;"><a href="partenaires.html" style="display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1e40af;border:1.5px solid #bfdbfe;border-radius:99px;padding:3px 10px;font-size:10.5px;font-weight:800;text-decoration:none;" onclick="event.stopPropagation()">🏅 Partenaire Officiel Diaspo'Actif</a></div>`
+    : '';
   const accredBadges = (it.accreditations||[]).map(a =>
     a === 'mobilisation_active'
       ? '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;">📢 Mobilisation</span>'
@@ -461,6 +464,7 @@ function renderInitiativeCard(it){
       </div>
       ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
+      ${partenaireOfficielBadge}
       ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
       ${accredBadges ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${accredBadges}</div>` : ''}
       <div class="ann-card-foot">

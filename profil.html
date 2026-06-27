@@ -416,6 +416,15 @@
 .pub-ad-statut.active { background:#dcfce7; color:#16a34a; }
 .pub-ad-statut.terminee { background:#f1f5f9; color:#64748b; }
 
+/* ===== BADGE PARTENAIRE OFFICIEL ===== */
+.badge-partenaire-officiel {
+  display:inline-flex; align-items:center; gap:5px;
+  background:#eff6ff; color:#1e40af; border:1.5px solid #bfdbfe;
+  border-radius:99px; padding:4px 13px; font-size:12px; font-weight:800;
+  letter-spacing:.02em; text-decoration:none; transition:background .15s;
+}
+.badge-partenaire-officiel:hover { background:#dbeafe; color:#1e40af; }
+
 /* ===== CONTACTS GRID (Suivis / Abonnés) ===== */
 .contacts-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
 .contact-card { display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--card); border:1.5px solid var(--border); border-radius:12px; text-decoration:none; color:inherit; transition:box-shadow .15s; }
@@ -801,6 +810,17 @@ function renderIdentity() {
   if (profil.titre_pro) html += `<div class="p-titre">${esc(profil.titre_pro)}</div>`;
   else if (profil.situation_pro) html += `<div class="p-titre">${esc(profil.situation_pro.replace('_',' '))}</div>`;
   if (loc) html += `<div class="p-loc">📍 ${esc(loc)}</div>`;
+  if (profil.partenaire_officiel) {
+    const po = profil.partenaire_officiel;
+    html += `<div style="margin:8px 0 12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+      <a href="partenaires.html" class="badge-partenaire-officiel" title="Voir l'annuaire des Partenaires Officiels">🏅 Partenaire Officiel Diaspo'Actif</a>
+      ${po.domaines_expertise.slice(0,2).map(d=>`<span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:600;">${esc(d)}</span>`).join('')}
+    </div>
+    ${isOwn ? `<div class="po-owner-actions" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-secondary" style="font-size:12px;padding:5px 14px;" onclick="openEditFichePartenaire()">✏️ Modifier ma fiche partenaire</button>
+      ${po.site_web ? `<a href="${esc(po.site_web)}" target="_blank" rel="noopener" style="font-size:12px;color:#2563eb;">🌐 ${esc(po.site_web)}</a>` : ''}
+    </div>` : ''}`;
+  }
 
   // ── À propos ──
   html += `<div class="apropos-block" id="apropos-block">
@@ -834,6 +854,57 @@ function renderIdentity() {
   if (isOwn) html += `<button class="btn-ico" style="margin-bottom:4px;" onclick="openEditIdentity()">✏️ Modifier</button>`;
 
   el.innerHTML = html;
+}
+
+/* ── Fiche Partenaire Officiel (owner) ── */
+function openEditFichePartenaire() {
+  const po = profil.partenaire_officiel;
+  if (!po) return;
+  const existing = document.getElementById('modal-fiche-po');
+  if (existing) { existing.remove(); return; }
+  const modal = document.createElement('div');
+  modal.id = 'modal-fiche-po';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML = `<div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <h2 style="font-size:16px;font-weight:800;margin:0;">✏️ Ma fiche Partenaire Officiel</h2>
+      <button onclick="document.getElementById('modal-fiche-po').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">×</button>
+    </div>
+    <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Description complète</label>
+    <textarea id="po-desc" rows="4" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:10px;font-size:13px;background:var(--bg);color:var(--fg);resize:vertical;font-family:inherit;">${esc(po.description_complete||'')}</textarea>
+    <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin:10px 0 4px;">Domaines d'expertise (séparés par des virgules)</label>
+    <input id="po-domaines" type="text" value="${esc((po.domaines_expertise||[]).join(', '))}" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;background:var(--bg);color:var(--fg);">
+    <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin:10px 0 4px;">Pays / zones d'intervention (séparés par des virgules)</label>
+    <input id="po-pays" type="text" value="${esc((po.pays_intervention||[]).join(', '))}" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;background:var(--bg);color:var(--fg);">
+    <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin:10px 0 4px;">Services proposés (séparés par des virgules)</label>
+    <input id="po-services" type="text" value="${esc((po.services||[]).join(', '))}" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;background:var(--bg);color:var(--fg);">
+    <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin:10px 0 4px;">Site web</label>
+    <input id="po-site" type="url" value="${esc(po.site_web||'')}" placeholder="https://…" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;background:var(--bg);color:var(--fg);">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button onclick="document.getElementById('modal-fiche-po').remove()" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:none;cursor:pointer;font-size:13px;">Annuler</button>
+      <button onclick="saveFichePartenaire()" style="padding:9px 18px;background:#1e3a8a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">💾 Enregistrer</button>
+    </div>
+    <div id="po-save-msg" style="font-size:12px;color:#16a34a;margin-top:8px;display:none;">✅ Fiche mise à jour.</div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function saveFichePartenaire() {
+  const split = s => s.split(',').map(x => x.trim()).filter(Boolean);
+  try {
+    await api('PUT', '/partenaires/moi', {
+      description_complete: document.getElementById('po-desc').value.trim() || null,
+      domaines_expertise:   split(document.getElementById('po-domaines').value),
+      pays_intervention:    split(document.getElementById('po-pays').value),
+      services:             split(document.getElementById('po-services').value),
+      site_web:             document.getElementById('po-site').value.trim() || null,
+    });
+    const msg = document.getElementById('po-save-msg');
+    if (msg) { msg.style.display = 'block'; setTimeout(() => document.getElementById('modal-fiche-po')?.remove(), 1500); }
+    // rafraîchir les données du profil
+    const data = await api('GET', `/profil/${profil.id}`);
+    if (data.profil) { Object.assign(profil, data.profil); renderIdentity(); }
+  } catch(e) { alert('Erreur lors de la sauvegarde.'); }
 }
 
 function toggleApropos() {

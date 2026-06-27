@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Partenaires Officiels — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+/* ===== HERO ===== */
+.po-hero {
+  background: linear-gradient(135deg, #1e3a8a 0%, #0D1B2A 100%);
+  color: #fff;
+  padding: 48px 24px 36px;
+  text-align: center;
+  margin-bottom: 28px;
+}
+.po-hero h1 { font-size: 28px; font-weight: 900; margin: 0 0 10px; letter-spacing: -.5px; }
+.po-hero p  { font-size: 15px; opacity: .85; max-width: 560px; margin: 0 auto 20px; line-height: 1.6; }
+.po-badge-hero {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.15); border: 1.5px solid rgba(255,255,255,.35);
+  border-radius: 99px; padding: 6px 18px; font-size: 13px; font-weight: 700;
+  backdrop-filter: blur(6px); margin-bottom: 24px;
+}
+
+/* ===== FILTRES ===== */
+.po-filters {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  max-width: 860px; margin: 0 auto 24px; padding: 0 12px;
+}
+.po-filter-input {
+  flex: 1; min-width: 160px; padding: 10px 14px;
+  border: 1.5px solid var(--border); border-radius: 10px;
+  font-size: 13px; background: var(--card); color: var(--fg);
+}
+.po-filter-input:focus { outline: none; border-color: #1e3a8a; }
+.po-filter-btn {
+  padding: 10px 18px; border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--card); color: var(--fg); font-size: 13px; cursor: pointer; font-weight: 600;
+  transition: background .15s;
+}
+.po-filter-btn.active, .po-filter-btn:hover { background: #1e3a8a; color: #fff; border-color: #1e3a8a; }
+
+/* ===== GRILLE PARTENAIRES ===== */
+.po-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  max-width: 900px; margin: 0 auto; padding: 0 12px 48px;
+}
+.po-card {
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 16px;
+  overflow: hidden; transition: box-shadow .2s, transform .15s;
+  text-decoration: none; color: inherit; display: flex; flex-direction: column;
+}
+.po-card:hover { box-shadow: 0 6px 24px rgba(30,58,138,.13); transform: translateY(-2px); }
+
+.po-card-banner {
+  height: 72px; background: linear-gradient(135deg,#1e3a8a,#3b82f6);
+  position: relative; flex-shrink: 0;
+}
+.po-card-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.po-card-avatar {
+  width: 60px; height: 60px; border-radius: 50%;
+  border: 3px solid #fff; background: #1e3a8a;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 800; color: #fff; overflow: hidden;
+  position: absolute; bottom: -28px; left: 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.18);
+}
+.po-card-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+.po-card-body { padding: 36px 16px 16px; flex: 1; display: flex; flex-direction: column; }
+.po-card-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;
+  border-radius: 99px; padding: 2px 10px; font-size: 11px; font-weight: 800;
+  letter-spacing: .03em; margin-bottom: 8px; width: fit-content;
+}
+.po-card-nom { font-size: 15px; font-weight: 800; color: var(--fg); margin-bottom: 2px; }
+.po-card-titre { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.po-card-desc { font-size: 13px; color: var(--text); line-height: 1.55; flex: 1;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.po-card-domaines { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+.po-card-domaine {
+  background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;
+  border-radius: 99px; padding: 2px 9px; font-size: 11px; font-weight: 600;
+}
+.po-card-pays { font-size: 11px; color: var(--muted); margin-top: 8px; }
+.po-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.po-card-contact {
+  background: #1e3a8a; color: #fff; border: none; border-radius: 8px;
+  padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.po-card-contact:hover { background: #1e40af; color: #fff; }
+.po-card-site { font-size: 11px; color: #2563eb; text-decoration: none; }
+.po-card-site:hover { text-decoration: underline; }
+
+/* ===== BADGE inline (partagé avec profil/annuaire) ===== */
+.badge-partenaire-officiel {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #eff6ff; color: #1e40af; border: 1.5px solid #bfdbfe;
+  border-radius: 99px; padding: 3px 11px; font-size: 12px; font-weight: 800;
+  letter-spacing: .02em;
+}
+
+/* ===== EMPTY STATE ===== */
+.po-empty { text-align: center; padding: 60px 24px; color: var(--muted); max-width: 860px; margin: 0 auto; }
+.po-empty-icon { font-size: 48px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="page" id="root-page">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <nav class="nav">
+      <a href="index.html">Accueil</a>
+      <a href="annuaire.html">Annuaire</a>
+      <a href="fil-actualite.html">Fil d'actualité</a>
+      <a href="partenaires.html" class="active">Partenaires</a>
+    </nav>
+    <div class="topbar-right">
+      <select class="lang-select" id="lang-select"></select>
+      <div id="auth-area" class="auth-area"></div>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="po-hero">
+  <div class="po-badge-hero">🏅 Réseau de Confiance</div>
+  <h1>Partenaires Officiels Diaspo'Actif</h1>
+  <p>Organisations, entreprises, associations et institutions officiellement reconnues par Diaspo'Actif comme partenaires de confiance dans leur domaine d'expertise.</p>
+</div>
+
+<!-- FILTRES -->
+<div class="po-filters">
+  <input class="po-filter-input" id="po-search" type="text" placeholder="🔍 Rechercher un partenaire…" oninput="debSearch(this.value)">
+  <input class="po-filter-input" id="po-domaine" type="text" placeholder="Domaine (financement, juridique…)" oninput="debSearch()">
+  <input class="po-filter-input" id="po-pays" type="text" placeholder="Pays ou zone d'intervention" oninput="debSearch()">
+  <button class="po-filter-btn" onclick="resetFiltres()">✕ Effacer</button>
+</div>
+
+<!-- COMPTEUR -->
+<div style="max-width:860px;margin:0 auto 12px;padding:0 12px;font-size:13px;color:var(--muted)" id="po-count"></div>
+
+<!-- GRILLE -->
+<div class="po-grid" id="po-grid">
+  <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Chargement…</div>
+</div>
+
+<!-- PAGINATION -->
+<div style="text-align:center;padding-bottom:40px" id="po-more"></div>
+
+</div><!-- /page -->
+
+<script src="assets/app.js"></script>
+<script src="assets/ds.js"></script>
+<script src="assets/oz.js" defer></script>
+<script>
+'use strict';
+let _page = 1, _total = 0, _pages = 1, _debTimer = null;
+
+function debSearch(v) {
+  clearTimeout(_debTimer);
+  _debTimer = setTimeout(() => { _page = 1; loadPartenaires(true); }, 300);
+}
+function resetFiltres() {
+  document.getElementById('po-search').value = '';
+  document.getElementById('po-domaine').value = '';
+  document.getElementById('po-pays').value = '';
+  _page = 1; loadPartenaires(true);
+}
+
+async function loadPartenaires(reset) {
+  const q  = encodeURIComponent(document.getElementById('po-search').value.trim());
+  const dom = encodeURIComponent(document.getElementById('po-domaine').value.trim());
+  const pays = encodeURIComponent(document.getElementById('po-pays').value.trim());
+  try {
+    const data = await api('GET', `/partenaires?page=${_page}&q=${q}&domaine=${dom}&pays=${pays}`);
+    _total = data.total || 0;
+    _pages = data.pages || 1;
+    const grid = document.getElementById('po-grid');
+    if (reset) grid.innerHTML = '';
+    document.getElementById('po-count').textContent = `${_total} partenaire${_total > 1 ? 's' : ''} officiel${_total > 1 ? 's' : ''}`;
+    if (!data.partenaires.length && reset) {
+      grid.innerHTML = `<div class="po-empty" style="grid-column:1/-1"><div class="po-empty-icon">🔍</div><p>Aucun partenaire trouvé pour ces critères.</p></div>`;
+    }
+    data.partenaires.forEach(p => grid.appendChild(buildCard(p)));
+    const moreEl = document.getElementById('po-more');
+    moreEl.innerHTML = _page < _pages
+      ? `<button class="btn-secondary" onclick="_page++;loadPartenaires(false)">Voir plus de partenaires</button>` : '';
+  } catch(e) {
+    document.getElementById('po-grid').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">Erreur de chargement.</div>`;
+  }
+}
+
+function buildCard(p) {
+  const nom = [p.prenom, p.nom].filter(Boolean).join(' ') || p.nom || '—';
+  const initiale = nom.charAt(0).toUpperCase();
+  const domaines = (p.domaines_expertise || []).slice(0, 3);
+  const pays = (p.pays_intervention || []).slice(0, 2).join(', ');
+  const desc = p.description_complete || p.bio || '';
+  const card = document.createElement('a');
+  card.href = `/profil.html?id=${p.user_id}`;
+  card.className = 'po-card';
+  card.innerHTML = `
+    <div class="po-card-banner" style="position:relative">
+      ${p.banner_url ? `<img src="${p.banner_url}" alt="">` : ''}
+      <div class="po-card-avatar">
+        ${p.photo_url ? `<img src="${p.photo_url}" alt="${nom}">` : initiale}
+      </div>
+    </div>
+    <div class="po-card-body">
+      <div class="po-card-badge">🏅 Partenaire Officiel Diaspo'Actif</div>
+      <div class="po-card-nom">${esc(nom)}</div>
+      ${p.titre_pro ? `<div class="po-card-titre">${esc(p.titre_pro)}</div>` : ''}
+      ${desc ? `<div class="po-card-desc">${esc(desc)}</div>` : ''}
+      ${domaines.length ? `<div class="po-card-domaines">${domaines.map(d=>`<span class="po-card-domaine">${esc(d)}</span>`).join('')}</div>` : ''}
+      ${pays ? `<div class="po-card-pays">📍 ${esc(pays)}</div>` : ''}
+      <div class="po-card-footer">
+        <a href="messagerie.html?user=${p.user_id}" class="po-card-contact" onclick="event.stopPropagation()">💬 Contacter</a>
+        ${p.site_web ? `<a href="${esc(p.site_web)}" target="_blank" rel="noopener" class="po-card-site" onclick="event.stopPropagation()">🌐 Site web</a>` : ''}
+      </div>
+    </div>`;
+  return card;
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+loadPartenaires(true);
+</script>
+</body>
+</html>

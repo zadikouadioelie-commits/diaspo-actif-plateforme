@@ -170,6 +170,16 @@
     { re: /cr[eé][eé]r?\s+(un\s+)?deal|nouveau\s+deal|lancer?\s+(un\s+)?deal|d[eé]marrer?\s+(un\s+)?deal/i, id: 'deal_create' },
     { re: /mes?\s+deals?|ouvrir?\s+(mes?\s+)?deals?|acc[eé]der?\s+(à\s+)?(mes?\s+)?deals?|g[eé]rer?\s+(un\s+)?deal/i, id: 'deal_list' },
 
+    // ── Partenaires Officiels
+    { re: /partenaires?\s+officiels?|partenaires?\s+diaspo|trouver?\s+un\s+partenaire\s+officiel/i, id: 'partenaires_annuaire' },
+    { re: /financ(er|ement|ier)\s+(mon\s+|un\s+|de\s+)?projet|bailleur|investisseur|subvention/i, id: 'partenaires_financement' },
+    { re: /conseil\s+juridique|avocat|droit|assistance\s+juridique|accompagnement\s+juridique/i, id: 'partenaires_juridique' },
+    { re: /formation\s+professionnelle|organisme\s+de\s+formation|certifi(er|cation)|apprendre/i, id: 'partenaires_formation' },
+    { re: /immobilier|logement|investir?\s+(en\s+)?afrique|bien\s+immobilier/i, id: 'partenaires_immobilier' },
+    { re: /transfert\s+d.argent|envoi\s+d.argent|remittance|virement\s+international/i, id: 'partenaires_transfert' },
+    { re: /sant[eé]|m[eé]decin|clinique|pharmacie|assistance\s+m[eé]dicale/i, id: 'partenaires_sante' },
+    { re: /recommand[ea]?\s+(moi|des?)\s+partenaire|quel\s+partenaire|qui\s+peut\s+m.aider/i, id: 'partenaires_recommander' },
+
     // ── Profil public — réseau & communs
     { re: /affiche?\s+(mes?\s+)?abonn[eé]s?\b|mes?\s+abonn[eé]s?\b|qui\s+(me\s+)?suit/i, id: 'profil_abonnes' },
     { re: /comptes?\s+que\s+je\s+suis|affiche?\s+(mes?\s+)?suivis?|qui\s+est\-ce\s+que\s+je\s+suis/i, id: 'profil_suivis' },
@@ -804,6 +814,50 @@
         break;
 
       // ── Profil public — onglets
+      // ── Partenaires Officiels
+      case 'partenaires_annuaire':
+        addMsg('oz', '🏅 J\'ouvre l\'annuaire des Partenaires Officiels Diaspo\'Actif…');
+        setTimeout(() => { window.location.href = '/partenaires.html'; }, 400); break;
+
+      case 'partenaires_financement':
+      case 'partenaires_juridique':
+      case 'partenaires_formation':
+      case 'partenaires_immobilier':
+      case 'partenaires_transfert':
+      case 'partenaires_sante':
+      case 'partenaires_recommander': {
+        const domMap = {
+          partenaires_financement: 'financement',
+          partenaires_juridique:   'juridique',
+          partenaires_formation:   'formation',
+          partenaires_immobilier:  'immobilier',
+          partenaires_transfert:   'transfert',
+          partenaires_sante:       'santé',
+          partenaires_recommander: '',
+        };
+        const domaine = domMap[intent] || '';
+        addMsg('oz', `⏳ Diaspo'Actif recherche les Partenaires Officiels${domaine ? ` spécialisés en **${domaine}**` : ''}…`);
+        try {
+          const data = await fetch(`/api/partenaires/recommander?domaine=${encodeURIComponent(domaine)}`).then(r => r.json());
+          const partners = data.partenaires || [];
+          if (!partners.length) {
+            addMsg('oz', `Aucun Partenaire Officiel trouvé pour ce domaine. Consultez l'[annuaire complet](/partenaires.html).`);
+          } else {
+            let msg = `🏅 **Diaspo'Actif vous recommande en priorité ses Partenaires Officiels${domaine ? ` spécialisés en ${domaine}` : ''} :**\n\n`;
+            partners.forEach(p => {
+              const nom = [p.prenom, p.nom].filter(Boolean).join(' ') || p.nom;
+              const doms = (p.domaines_expertise||[]).slice(0,2).join(', ');
+              msg += `• **${nom}**${doms ? ` — ${doms}` : ''}${p.user_pays ? ` · ${p.user_pays}` : ''}\n`;
+            });
+            msg += `\n[Voir tous les partenaires →](/partenaires.html)`;
+            addMsg('oz', msg);
+          }
+        } catch(e) {
+          addMsg('oz', `Consultez l'[annuaire des Partenaires Officiels](/partenaires.html) pour trouver des experts de confiance.`);
+        }
+        break;
+      }
+
       case 'profil_abonnes':
         addMsg('oz', '❤️ J\'ouvre la liste de vos abonnés…');
         setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-abonnes`; }, 400); break;

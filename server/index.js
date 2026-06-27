@@ -986,6 +986,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     LEFT JOIN fil_commentaires c ON c.post_id = p.id
     WHERE p.auteur_id = ?
     GROUP BY p.id ORDER BY p.id DESC LIMIT 10`).all(u.id);
+  const po = db.prepare("SELECT statut,domaines_expertise,pays_intervention,services,description_complete,site_web,liens_utiles,date_attribution FROM partenaires_officiels WHERE user_id=?").get(u.id);
   sendJSON(res, 200, { profil: {
     ...publicUser(u),
     bio: u.bio, photo_url: u.photo_url, banner_url: u.banner_url,
@@ -997,7 +998,17 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     situation_pro: u.situation_pro, created_at: u.created_at,
     privacy: safeParse(u.privacy_json || "{}"),
     nbAbonnes, nbSuivis, isFollowing,
-    initiativesSuivies, usersSuivis, publications
+    initiativesSuivies, usersSuivis, publications,
+    partenaire_officiel: po && po.statut === 'active' ? {
+      statut: po.statut,
+      domaines_expertise: safeParse(po.domaines_expertise||'[]'),
+      pays_intervention:  safeParse(po.pays_intervention||'[]'),
+      services:           safeParse(po.services||'[]'),
+      description_complete: po.description_complete,
+      site_web: po.site_web,
+      liens_utiles: safeParse(po.liens_utiles||'[]'),
+      date_attribution: po.date_attribution,
+    } : null,
   }});
 });
 
@@ -8092,6 +8103,176 @@ async function handleRequest(req, res) {
         db.prepare("DELETE FROM deal_jalons WHERE id=? AND deal_id=?").run(jalItem[2],did);
         return sendJSON(res, 200, { ok:true });
       }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       PARTENAIRES OFFICIELS DIASPO'ACTIF
+    ═══════════════════════════════════════════════════════════ */
+
+    /* GET /api/partenaires — annuaire public */
+    if (req.method === "GET" && pathname === "/api/partenaires") {
+      const qs = new URL("http://x" + req.url).searchParams;
+      const domaine = qs.get('domaine') || '';
+      const pays    = qs.get('pays') || '';
+      const q       = (qs.get('q') || '').toLowerCase();
+      const page    = Math.max(1, parseInt(qs.get('page') || '1'));
+      const LIMIT   = 20, OFFSET = (page - 1) * LIMIT;
+      let rows = db.prepare(`
+        SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.titre_pro, u.bio, u.ville, u.pays AS user_pays
+        FROM partenaires_officiels po JOIN users u ON u.id = po.user_id
+        WHERE po.statut = 'active' AND po.niveau_visibilite = 'public'
+        ORDER BY po.nbr_recommandations DESC, po.date_attribution DESC
+        LIMIT ? OFFSET ?`).all(LIMIT, OFFSET);
+      if (domaine) rows = rows.filter(r => (safeParse(r.domaines_expertise||'[]')).some(d => d.toLowerCase().includes(domaine.toLowerCase())));
+      if (pays)    rows = rows.filter(r => (safeParse(r.pays_intervention||'[]')).some(p => p.toLowerCase().includes(pays.toLowerCase())));
+      if (q)       rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.bio||''} ${r.description_complete||''}`.toLowerCase().includes(q));
+      const total = db.prepare("SELECT COUNT(*) AS n FROM partenaires_officiels WHERE statut='active'").get().n;
+      const parsed = rows.map(r => ({
+        ...r,
+        domaines_expertise: safeParse(r.domaines_expertise||'[]'),
+        pays_intervention:  safeParse(r.pays_intervention||'[]'),
+        services:           safeParse(r.services||'[]'),
+        liens_utiles:       safeParse(r.liens_utiles||'[]'),
+      }));
+      return sendJSON(res, 200, { partenaires: parsed, total, page, pages: Math.ceil(total/LIMIT) });
+    }
+
+    /* GET /api/partenaires/:id — fiche détaillée */
+    const partM = pathname.match(/^\/api\/partenaires\/(\d+)$/);
+    if (req.method === "GET" && partM) {
+      const uid = parseInt(partM[1]);
+      const r = db.prepare(`SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.banner_url, u.titre_pro, u.bio, u.ville, u.pays AS user_pays, u.centres_interet, u.competences
+        FROM partenaires_officiels po JOIN users u ON u.id = po.user_id WHERE po.user_id=? AND po.statut='active'`).get(uid);
+      if (!r) return sendJSON(res, 404, { error: "Partenaire introuvable." });
+      return sendJSON(res, 200, {
+        ...r,
+        domaines_expertise: safeParse(r.domaines_expertise||'[]'),
+        pays_intervention:  safeParse(r.pays_intervention||'[]'),
+        services:           safeParse(r.services||'[]'),
+        liens_utiles:       safeParse(r.liens_utiles||'[]'),
+      });
+    }
+
+    /* PUT /api/partenaires/moi — le partenaire met à jour sa fiche */
+    if (req.method === "PUT" && pathname === "/api/partenaires/moi") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const po = db.prepare("SELECT id FROM partenaires_officiels WHERE user_id=? AND statut='active'").get(me.id);
+      if (!po) return sendJSON(res, 403, { error: "Vous n'êtes pas Partenaire Officiel." });
+      const { description_complete, domaines_expertise, pays_intervention, services, site_web, liens_utiles } = body;
+      db.prepare(`UPDATE partenaires_officiels SET
+        description_complete=COALESCE(?,description_complete),
+        domaines_expertise=COALESCE(?,domaines_expertise),
+        pays_intervention=COALESCE(?,pays_intervention),
+        services=COALESCE(?,services),
+        site_web=COALESCE(?,site_web),
+        liens_utiles=COALESCE(?,liens_utiles),
+        updated_at=datetime('now')
+        WHERE user_id=?`).run(
+        description_complete||null,
+        domaines_expertise ? JSON.stringify(domaines_expertise) : null,
+        pays_intervention  ? JSON.stringify(pays_intervention)  : null,
+        services           ? JSON.stringify(services)           : null,
+        site_web||null,
+        liens_utiles       ? JSON.stringify(liens_utiles)       : null,
+        me.id
+      );
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* GET /api/partenaires/moi — vérifie si l'utilisateur connecté est partenaire */
+    if (req.method === "GET" && pathname === "/api/partenaires/moi") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 200, { partenaire: false });
+      const po = db.prepare("SELECT * FROM partenaires_officiels WHERE user_id=?").get(me.id);
+      if (!po) return sendJSON(res, 200, { partenaire: false });
+      return sendJSON(res, 200, { partenaire: true, statut: po.statut, fiche: {
+        ...po,
+        domaines_expertise: safeParse(po.domaines_expertise||'[]'),
+        pays_intervention:  safeParse(po.pays_intervention||'[]'),
+        services:           safeParse(po.services||'[]'),
+        liens_utiles:       safeParse(po.liens_utiles||'[]'),
+      }});
+    }
+
+    /* GET /api/partenaires/recommander?domaine=&q= — recommandation O-Z */
+    if (req.method === "GET" && pathname === "/api/partenaires/recommander") {
+      const qs   = new URL("http://x" + req.url).searchParams;
+      const dom  = (qs.get('domaine') || '').toLowerCase();
+      const q    = (qs.get('q') || '').toLowerCase();
+      let rows   = db.prepare(`SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.titre_pro, u.ville, u.pays AS user_pays
+        FROM partenaires_officiels po JOIN users u ON u.id = po.user_id
+        WHERE po.statut='active' ORDER BY po.nbr_recommandations DESC`).all();
+      if (dom) rows = rows.filter(r => (safeParse(r.domaines_expertise||'[]')).some(d => d.toLowerCase().includes(dom)));
+      if (q)   rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.description_complete||''} ${r.domaines_expertise||''}`.toLowerCase().includes(q));
+      rows = rows.slice(0, 5);
+      // Compter la recommandation
+      rows.forEach(r => db.prepare("UPDATE partenaires_officiels SET nbr_recommandations=nbr_recommandations+1 WHERE id=?").run(r.id));
+      return sendJSON(res, 200, { partenaires: rows.map(r => ({
+        ...r, domaines_expertise: safeParse(r.domaines_expertise||'[]'),
+        pays_intervention: safeParse(r.pays_intervention||'[]'),
+      }))});
+    }
+
+    /* ── Admin : gestion des partenaires ── */
+    if (pathname === "/api/admin/partenaires") {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
+
+      if (req.method === "GET") {
+        const rows = db.prepare(`SELECT po.*, u.nom, u.prenom, u.role, u.email, u.photo_url, u.titre_pro
+          FROM partenaires_officiels po JOIN users u ON u.id = po.user_id
+          ORDER BY po.created_at DESC`).all();
+        return sendJSON(res, 200, { partenaires: rows.map(r => ({
+          ...r,
+          domaines_expertise: safeParse(r.domaines_expertise||'[]'),
+          pays_intervention:  safeParse(r.pays_intervention||'[]'),
+          services:           safeParse(r.services||'[]'),
+        }))});
+      }
+
+      if (req.method === "POST") {
+        // Attribuer l'accréditation
+        const { user_id, domaines_expertise, pays_intervention, services, description_complete, categorie, admin_notes, date_expiration } = body;
+        if (!user_id) return sendJSON(res, 400, { error: "user_id requis." });
+        const u = db.prepare("SELECT id,nom FROM users WHERE id=?").get(user_id);
+        if (!u) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
+        db.prepare(`INSERT INTO partenaires_officiels (user_id,statut,domaines_expertise,pays_intervention,services,description_complete,categorie,admin_id,admin_notes,date_expiration)
+          VALUES (?,?,?,?,?,?,?,?,?,?)
+          ON CONFLICT(user_id) DO UPDATE SET statut='active',domaines_expertise=excluded.domaines_expertise,
+          pays_intervention=excluded.pays_intervention,services=excluded.services,
+          description_complete=excluded.description_complete,categorie=excluded.categorie,
+          admin_id=excluded.admin_id,admin_notes=excluded.admin_notes,date_expiration=excluded.date_expiration,
+          updated_at=datetime('now')`).run(
+          user_id, 'active',
+          JSON.stringify(domaines_expertise||[]),
+          JSON.stringify(pays_intervention||[]),
+          JSON.stringify(services||[]),
+          description_complete||null, categorie||'general', me.id, admin_notes||null, date_expiration||null
+        );
+        db.prepare("INSERT INTO partenaires_officiels_historique (user_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)")
+          .run(user_id, 'attribution', me.id, me.nom, admin_notes||null);
+        creerNotif(user_id, "accreditation", "🏅 Partenaire Officiel Diaspo'Actif",
+          `Félicitations ! Vous êtes désormais Partenaire Officiel Diaspo'Actif.`, {});
+        return sendJSON(res, 200, { ok: true });
+      }
+    }
+
+    const adminPartM = pathname.match(/^\/api\/admin\/partenaires\/(\d+)\/statut$/);
+    if (adminPartM && req.method === "PUT") {
+      const me = getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
+      const pid = parseInt(adminPartM[1]);
+      const { statut, motif } = body;
+      if (!['active','suspendue','retiree'].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+      const po = db.prepare("SELECT user_id FROM partenaires_officiels WHERE id=?").get(pid);
+      if (!po) return sendJSON(res, 404, { error: "Introuvable." });
+      db.prepare("UPDATE partenaires_officiels SET statut=?,updated_at=datetime('now') WHERE id=?").run(statut, pid);
+      db.prepare("INSERT INTO partenaires_officiels_historique (user_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)")
+        .run(po.user_id, statut, me.id, me.nom, motif||null);
+      const msgs = { suspendue:'Votre statut de Partenaire Officiel a été suspendu.', retiree:'Votre statut de Partenaire Officiel a été retiré.', active:'Votre statut de Partenaire Officiel a été réactivé.' };
+      creerNotif(po.user_id, "accreditation", "Partenaire Officiel — Mise à jour", msgs[statut]||'', {});
+      return sendJSON(res, 200, { ok: true });
     }
 
     return sendJSON(res, 404, { error: "Route API inconnue." });
