@@ -2766,4 +2766,5 @@ document.addEventListener("DOMContentLoaded", ()=>{
     ls.color = 'rgba(0,0,0,0.38)'; ls.letterSpacing = '0.5px';
     ls.textTransform = 'uppercase'; ls.fontWeight = '700';
     document.body.appendChild(band);
+  }, 800);
 });
