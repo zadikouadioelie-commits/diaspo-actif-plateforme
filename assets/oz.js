@@ -102,7 +102,7 @@
      ÉTAT
   ══════════════════════════════════════════ */
   let _cfg = {
-    avatar: 'robot', avatarCustom: null, theme: 'auto', size: 'medium',
+    avatar: 'robot', avatarCustom: null, theme: 'auto', size: 'small',
     animations: true, voiceEnabled: false, language: 'fr', posX: null, posY: null,
   };
   let _msgs = [];
@@ -178,12 +178,12 @@
   animation:ozPop .3s ease-out;}
 @keyframes ozPop{from{transform:scale(0)}to{transform:scale(1)}}
 
-#oz-panel{position:absolute;width:370px;max-height:560px;background:var(--oz-bg);
+#oz-panel{position:absolute;width:360px;max-height:520px;background:var(--oz-bg);
   border-radius:var(--oz-r);box-shadow:var(--oz-sh);display:flex;flex-direction:column;
   overflow:hidden;border:1.5px solid var(--oz-border);
-  opacity:0;transform:translateY(16px) scale(.96);pointer-events:none;
-  transition:opacity .22s,transform .22s;bottom:76px;right:0;}
-#oz-panel.open{opacity:1;transform:none;pointer-events:all;}
+  opacity:0;transform:translateY(-10px) scale(.96);pointer-events:none;
+  transition:opacity .22s,transform .22s;top:56px;right:0;}
+#oz-panel.open{opacity:1;transform:translateY(0) scale(1);pointer-events:all;}
 #oz-panel.noanim{transition:none;}
 
 #oz-hd{background:linear-gradient(135deg,#1a1a2e 0%,#2563eb 65%,#10b981 100%);
@@ -257,7 +257,7 @@
 
 #oz-sp{position:absolute;background:var(--oz-bg);border-radius:var(--oz-r);
   box-shadow:var(--oz-sh);border:1.5px solid var(--oz-border);padding:18px;
-  width:300px;bottom:76px;right:0;display:none;z-index:2;}
+  width:300px;top:56px;right:0;display:none;z-index:2;}
 #oz-sp.open{display:block;}
 #oz-sp h3{font-size:14px;font-weight:700;color:var(--oz-text);margin-bottom:14px;}
 .oz-sl{margin-bottom:13px;}
@@ -363,11 +363,11 @@
   <button class="oz-btn oz-btn-s" style="width:100%;margin-top:6px;" onclick="window.__OZ.closeSettings()">Fermer</button>
 </div>`;
 
-    // Position
-    const px = _cfg.posX ?? (window.innerWidth  - 90);
-    const py = _cfg.posY ?? (window.innerHeight - 90);
-    root.style.left = Math.max(0, Math.min(px, window.innerWidth  - 80)) + 'px';
-    root.style.top  = Math.max(0, Math.min(py, window.innerHeight - 80)) + 'px';
+    // Position — défaut : haut droite
+    const px = _cfg.posX ?? (window.innerWidth  - 66);
+    const py = _cfg.posY ?? 16;
+    root.style.left = Math.max(0, Math.min(px, window.innerWidth  - 60)) + 'px';
+    root.style.top  = Math.max(0, Math.min(py, window.innerHeight - 60)) + 'px';
 
     document.body.appendChild(root);
     showQuickChips();
