@@ -563,25 +563,13 @@
   }
 
   function onDrag(cx, cy) {
-    const root = document.getElementById('oz-root');
-    if (!root) return;
+    // OZ est intégré dans la topbar — drag désactivé
     _dragging = true; _dragMoved = true;
-    const x = Math.max(0, Math.min(window.innerWidth  - root.offsetWidth,  cx - _dragOff.x));
-    const y = Math.max(0, Math.min(window.innerHeight - root.offsetHeight, cy - _dragOff.y));
-    root.style.left = x + 'px';
-    root.style.top  = y + 'px';
   }
 
   function endDrag() {
     _dragging = false; _dragActive = false;
     document.getElementById('oz-bubble')?.classList.remove('drag');
-    const root = document.getElementById('oz-root');
-    if (!root) return;
-    _cfg.posX = parseInt(root.style.left);
-    _cfg.posY = parseInt(root.style.top);
-    saveLocal();
-    clearTimeout(window._ozPosSave);
-    window._ozPosSave = setTimeout(saveServerCfg, 1500);
     setTimeout(() => { _dragMoved = false; }, 60);
   }
 
@@ -1087,15 +1075,9 @@
       if (s.animations !== undefined) _cfg.animations  = !!s.animations;
       if (s.voice_enabled !== undefined) _cfg.voiceEnabled = !!s.voice_enabled;
       if (s.language)     _cfg.language     = s.language;
-      if (s.pos_x)        _cfg.posX         = s.pos_x;
-      if (s.pos_y)        _cfg.posY         = s.pos_y;
+      // pos_x / pos_y ignorés — OZ est intégré dans la topbar
       // Re-apply
       applyTheme(); applySize(); updateAvatar();
-      const root = document.getElementById('oz-root');
-      if (root && s.pos_x) {
-        root.style.left = Math.min(s.pos_x, window.innerWidth-80)  + 'px';
-        root.style.top  = Math.min(s.pos_y, window.innerHeight-80) + 'px';
-      }
     } catch(e){}
   }
 
