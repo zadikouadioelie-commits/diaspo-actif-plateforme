@@ -82,6 +82,24 @@
 .p-titre { font-size:14px; color:var(--muted); margin:0 0 5px; }
 .p-loc { font-size:13px; color:var(--muted); margin:0 0 10px; }
 .p-bio { font-size:14px; color:var(--text); line-height:1.65; margin:0 0 14px; white-space:pre-wrap; }
+
+/* À propos */
+.apropos-block { margin:14px 0; background:var(--card); border:1.5px solid var(--border); border-radius:14px; padding:16px 18px; position:relative; }
+.apropos-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.apropos-title { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.apropos-edit-btn { background:none; border:none; cursor:pointer; font-size:13px; color:var(--muted); padding:2px 6px; border-radius:6px; transition:background .15s; }
+.apropos-edit-btn:hover { background:var(--bg); color:var(--accent); }
+.apropos-text { font-size:14px; color:var(--text); line-height:1.7; white-space:pre-wrap; overflow:hidden; transition:max-height .3s ease; }
+.apropos-text.collapsed { max-height:72px; }
+.apropos-more-btn { background:none; border:none; cursor:pointer; font-size:12px; font-weight:700; color:var(--accent); padding:6px 0 0; display:block; }
+.apropos-add-btn { background:none; border:1.5px dashed var(--border); border-radius:14px; width:100%; padding:14px; font-size:13px; color:var(--muted); cursor:pointer; text-align:center; margin:14px 0; transition:border-color .15s, color .15s; }
+.apropos-add-btn:hover { border-color:var(--accent); color:var(--accent); }
+.apropos-editor { margin-top:10px; }
+.apropos-editor textarea { width:100%; box-sizing:border-box; border:1.5px solid var(--border); border-radius:8px; padding:10px 12px; font-size:14px; line-height:1.65; resize:vertical; min-height:100px; background:var(--bg); color:var(--fg); font-family:inherit; }
+.apropos-editor textarea:focus { outline:none; border-color:var(--accent); }
+.apropos-editor-actions { display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
+.apropos-save-btn { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:7px 18px; font-size:13px; font-weight:700; cursor:pointer; }
+.apropos-cancel-btn { background:none; border:1.5px solid var(--border); border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer; color:var(--muted); }
 .p-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
 .p-tag {
   background:var(--tp-light); color:var(--tp); border:1px solid var(--tp);
@@ -776,7 +794,22 @@ function renderIdentity() {
   if (profil.titre_pro) html += `<div class="p-titre">${esc(profil.titre_pro)}</div>`;
   else if (profil.situation_pro) html += `<div class="p-titre">${esc(profil.situation_pro.replace('_',' '))}</div>`;
   if (loc) html += `<div class="p-loc">📍 ${esc(loc)}</div>`;
-  if (profil.bio) html += `<div class="p-bio">${esc(profil.bio)}</div>`;
+
+  // ── À propos ──
+  if (profil.bio) {
+    const long = profil.bio.length > 220;
+    html += `<div class="apropos-block" id="apropos-block">
+      <div class="apropos-header">
+        <span class="apropos-title">À propos</span>
+        ${isOwn ? `<button class="apropos-edit-btn" onclick="openAproposEditor()" title="Modifier">✏️ Modifier</button>` : ''}
+      </div>
+      <div class="apropos-text${long?' collapsed':''}" id="apropos-text">${esc(profil.bio)}</div>
+      ${long ? `<button class="apropos-more-btn" id="apropos-more" onclick="toggleApropos()">Lire la suite ▾</button>` : ''}
+    </div>`;
+  } else if (isOwn) {
+    html += `<button class="apropos-add-btn" onclick="openAproposEditor()">✏️ Ajouter une présentation « À propos »</button>`;
+  }
+
   if (ci.length) html += `<div class="p-tags">${ci.map(c=>`<span class="p-tag">${esc(c)}</span>`).join('')}</div>`;
 
   const accreds = profil._accreditations || [];
@@ -792,6 +825,57 @@ function renderIdentity() {
   if (isOwn) html += `<button class="btn-ico" style="margin-bottom:4px;" onclick="openEditIdentity()">✏️ Modifier</button>`;
 
   el.innerHTML = html;
+}
+
+function toggleApropos() {
+  const txt  = document.getElementById('apropos-text');
+  const btn  = document.getElementById('apropos-more');
+  if (!txt || !btn) return;
+  const collapsed = txt.classList.toggle('collapsed');
+  btn.textContent = collapsed ? 'Lire la suite ▾' : 'Réduire ▴';
+}
+
+function openAproposEditor() {
+  const block = document.getElementById('apropos-block');
+  // supprimer un éditeur déjà ouvert
+  document.getElementById('apropos-editor-wrap')?.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'apropos-editor-wrap';
+  wrap.className = 'apropos-editor';
+  wrap.innerHTML = `
+    <textarea id="apropos-ta" placeholder="Parlez de vous : votre parcours, vos projets, vos valeurs…" maxlength="2000">${esc(profil.bio||'')}</textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+      <span style="font-size:11px;color:var(--muted)" id="apropos-counter">${(profil.bio||'').length}/2000</span>
+      <div class="apropos-editor-actions" style="margin-top:0">
+        <button class="apropos-cancel-btn" onclick="closeAproposEditor()">Annuler</button>
+        <button class="apropos-save-btn" onclick="saveApropos()">💾 Enregistrer</button>
+      </div>
+    </div>`;
+  // Insérer dans le bloc existant ou sous le bouton "Ajouter"
+  const addBtn = document.querySelector('.apropos-add-btn');
+  if (addBtn) { addBtn.insertAdjacentElement('afterend', wrap); }
+  else if (block) { block.appendChild(wrap); }
+  const ta = document.getElementById('apropos-ta');
+  ta.addEventListener('input', () => { document.getElementById('apropos-counter').textContent = ta.value.length + '/2000'; });
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+
+function closeAproposEditor() {
+  document.getElementById('apropos-editor-wrap')?.remove();
+}
+
+async function saveApropos() {
+  const ta = document.getElementById('apropos-ta');
+  if (!ta) return;
+  const bio = ta.value.trim();
+  try {
+    await api('PUT', '/profil', { bio });
+    profil.bio = bio;
+    renderIdentity();
+  } catch(e) {
+    alert('Erreur lors de la sauvegarde.');
+  }
 }
 
 function renderActions() {
