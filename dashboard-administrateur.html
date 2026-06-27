@@ -67,6 +67,7 @@
       <a href="#faq-sr" data-section="faq-sr">❓ Questions sans réponse</a>
       <a href="#oz-admin" data-section="oz-admin">🤖 O-Z Intelligence</a>
       <a href="#onboarding" data-section="onboarding">🎓 Tutoriels d'accueil</a>
+      <a href="#packages" data-section="packages">📦 Package Diaspo'Actif</a>
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
     </aside>
 
@@ -1317,6 +1318,94 @@
       </section>
 
       <!-- PARAMÈTRES -->
+      <!-- PACKAGE DIASPO'ACTIF -->
+      <section id="section-packages" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <h2 style="margin:0;">📦 Package Diaspo'Actif</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Gestionnaire centralisé des liens et services officiels</p>
+          </div>
+          <button class="btn btn-orange" onclick="pkgOpenAdd()">➕ Ajouter un lien</button>
+        </div>
+
+        <!-- Aperçu -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:20px;">
+          <p style="margin:0 0 10px;font-size:13px;color:var(--muted);font-weight:600;">APERÇU — liens actifs (tels qu'affichés sur la page d'accueil)</p>
+          <div id="pkg-preview"></div>
+        </div>
+
+        <!-- Filtres catégorie -->
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;" id="pkg-cat-filters">
+          <button class="btn btn-s btn-outline pkg-cat-btn active" data-cat="">Tous</button>
+          <button class="btn btn-s btn-outline pkg-cat-btn" data-cat="officiel">Officiel</button>
+          <button class="btn btn-s btn-outline pkg-cat-btn" data-cat="social">Réseaux sociaux</button>
+          <button class="btn btn-s btn-outline pkg-cat-btn" data-cat="messagerie">Messagerie</button>
+        </div>
+
+        <!-- Liste -->
+        <div id="pkg-list" style="display:grid;gap:10px;"></div>
+
+        <!-- Modal ajout/édition -->
+        <div id="pkg-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;">
+          <div style="background:#fff;border-radius:18px;padding:28px;width:min(520px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+            <h3 id="pkg-modal-title" style="margin:0 0 20px;">Ajouter un lien</h3>
+            <input type="hidden" id="pkg-modal-id">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div style="grid-column:1/-1;">
+                <label style="font-size:12px;font-weight:600;color:#64748b;">NOM</label>
+                <input id="pkg-f-name" class="form-input" placeholder="Ex: YouTube" style="width:100%;margin-top:4px;">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:#64748b;">SLUG (unique)</label>
+                <input id="pkg-f-slug" class="form-input" placeholder="youtube" style="width:100%;margin-top:4px;">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:#64748b;">ICÔNE (emoji)</label>
+                <input id="pkg-f-icon" class="form-input" placeholder="▶️" style="width:100%;margin-top:4px;">
+              </div>
+              <div style="grid-column:1/-1;">
+                <label style="font-size:12px;font-weight:600;color:#64748b;">URL</label>
+                <input id="pkg-f-url" class="form-input" placeholder="https://..." style="width:100%;margin-top:4px;">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:#64748b;">CATÉGORIE</label>
+                <select id="pkg-f-cat" class="form-input" style="width:100%;margin-top:4px;">
+                  <option value="officiel">Officiel</option>
+                  <option value="social">Réseaux sociaux</option>
+                  <option value="messagerie">Messagerie</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:#64748b;">ORDRE</label>
+                <input id="pkg-f-order" type="number" class="form-input" value="0" style="width:100%;margin-top:4px;">
+              </div>
+              <div style="grid-column:1/-1;">
+                <label style="font-size:12px;font-weight:600;color:#64748b;">EMPLACEMENTS</label>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;" id="pkg-f-show-on">
+                  <label><input type="checkbox" value="home"> Accueil</label>
+                  <label><input type="checkbox" value="footer"> Pied de page</label>
+                  <label><input type="checkbox" value="menu"> Menu</label>
+                  <label><input type="checkbox" value="profil"> Profils</label>
+                  <label><input type="checkbox" value="evenements"> Événements</label>
+                  <label><input type="checkbox" value="initiatives"> Initiatives</label>
+                </div>
+              </div>
+              <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;">
+                <label class="toggle-label">
+                  <input type="checkbox" id="pkg-f-enabled" checked>
+                  <span class="toggle-track"></span>
+                </label>
+                <span style="font-size:14px;">Activé</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:20px;">
+              <button class="btn btn-orange" onclick="pkgSave()" style="flex:1;">💾 Enregistrer</button>
+              <button class="btn btn-outline" onclick="pkgCloseModal()">Annuler</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="section-parametres" style="display:none;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
           <div style="flex:1;"><h2 style="margin:0;">⚙️ Paramètres de la plateforme</h2>
@@ -3154,6 +3243,7 @@ async function submitAccordDirect(){
     plans:       () => loadPlans(),
     promotions:  () => loadPromos(),
     ventes:      () => loadTransactions(),
+    packages:    () => loadPackages(),
     parametres:  () => loadParametres(),
     publicites:  () => loadPublicites(),
     chatbot:     () => switchCbTab('stats'),
@@ -6177,5 +6267,145 @@ window.adminCloseEvent = async function(id) {
 };
 </script>
 <script src="assets/chatbot.js"></script>
+<script src="assets/packages.js"></script>
+<script>
+/* ── Package Diaspo'Actif — Admin ── */
+let _pkgAll = [];
+let _pkgCatFilter = '';
+
+async function loadPackages() {
+  const res = await _obFetch('GET', '/api/admin/packages');
+  _pkgAll = res.packages || [];
+  renderPkgList();
+  // Aperçu
+  if (window.DAPackages) {
+    DAPackages.invalidateCache();
+    DAPackages.render(document.getElementById('pkg-preview'), { show_on: 'home' });
+  }
+}
+
+function renderPkgList() {
+  const list = document.getElementById('pkg-list');
+  if (!list) return;
+  const filtered = _pkgCatFilter ? _pkgAll.filter(p => p.category === _pkgCatFilter) : _pkgAll;
+  if (!filtered.length) { list.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:20px;">Aucun lien dans cette catégorie.</p>'; return; }
+
+  list.innerHTML = filtered.map(p => `
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <span style="font-size:24px;flex-shrink:0;">${p.icon}</span>
+      <div style="flex:1;min-width:160px;">
+        <div style="font-weight:700;font-size:15px;">${p.name}</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${p.url || '<em>URL non définie</em>'}</div>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+          ${JSON.parse(p.show_on||'[]').map(z=>`<span style="font-size:10px;background:#f1f5f9;padding:2px 8px;border-radius:99px;color:#64748b;">${z}</span>`).join('')}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" ${p.enabled?'checked':''} onchange="pkgToggle(${p.id},this.checked)" style="width:16px;height:16px;">
+          <span style="font-size:13px;">${p.enabled?'Activé':'Désactivé'}</span>
+        </label>
+        <button class="btn btn-s btn-outline" onclick="pkgOpenEdit(${p.id})">✏️ Éditer</button>
+        <button class="btn btn-s" style="background:#fee2e2;color:#dc2626;border:none;" onclick="pkgDelete(${p.id},'${p.name.replace(/'/g,"\\'")}')">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+
+  // Drag-to-reorder (simple click arrows)
+  list.querySelectorAll('[data-pkg-up]').forEach(btn => {
+    btn.addEventListener('click', () => pkgMove(Number(btn.dataset.pkgUp), -1));
+  });
+}
+
+function pkgOpenAdd() {
+  document.getElementById('pkg-modal-title').textContent = 'Ajouter un lien';
+  document.getElementById('pkg-modal-id').value = '';
+  document.getElementById('pkg-f-name').value = '';
+  document.getElementById('pkg-f-slug').value = '';
+  document.getElementById('pkg-f-icon').value = '';
+  document.getElementById('pkg-f-url').value = '';
+  document.getElementById('pkg-f-order').value = _pkgAll.length;
+  document.getElementById('pkg-f-cat').value = 'social';
+  document.getElementById('pkg-f-enabled').checked = true;
+  document.querySelectorAll('#pkg-f-show-on input').forEach(cb => { cb.checked = cb.value === 'home' || cb.value === 'footer'; });
+  document.getElementById('pkg-modal').style.display = 'flex';
+}
+
+function pkgOpenEdit(id) {
+  const p = _pkgAll.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('pkg-modal-title').textContent = 'Modifier le lien';
+  document.getElementById('pkg-modal-id').value = p.id;
+  document.getElementById('pkg-f-name').value = p.name;
+  document.getElementById('pkg-f-slug').value = p.slug;
+  document.getElementById('pkg-f-icon').value = p.icon;
+  document.getElementById('pkg-f-url').value = p.url || '';
+  document.getElementById('pkg-f-order').value = p.sort_order;
+  document.getElementById('pkg-f-cat').value = p.category || 'social';
+  document.getElementById('pkg-f-enabled').checked = !!p.enabled;
+  const showOn = JSON.parse(p.show_on || '[]');
+  document.querySelectorAll('#pkg-f-show-on input').forEach(cb => { cb.checked = showOn.includes(cb.value); });
+  document.getElementById('pkg-modal').style.display = 'flex';
+}
+
+function pkgCloseModal() {
+  document.getElementById('pkg-modal').style.display = 'none';
+}
+
+async function pkgSave() {
+  const id = document.getElementById('pkg-modal-id').value;
+  const show_on = Array.from(document.querySelectorAll('#pkg-f-show-on input:checked')).map(cb => cb.value);
+  const payload = {
+    name:       document.getElementById('pkg-f-name').value.trim(),
+    slug:       document.getElementById('pkg-f-slug').value.trim(),
+    icon:       document.getElementById('pkg-f-icon').value.trim(),
+    url:        document.getElementById('pkg-f-url').value.trim(),
+    enabled:    document.getElementById('pkg-f-enabled').checked,
+    sort_order: Number(document.getElementById('pkg-f-order').value),
+    category:   document.getElementById('pkg-f-cat').value,
+    show_on,
+  };
+  if (!payload.name || !payload.icon) return alert('Nom et icône obligatoires.');
+  if (id) {
+    await _obFetch('PUT', `/api/admin/packages/${id}`, payload);
+  } else {
+    await _obFetch('POST', '/api/admin/packages', payload);
+  }
+  pkgCloseModal();
+  await loadPackages();
+}
+
+async function pkgToggle(id, enabled) {
+  await _obFetch('PUT', `/api/admin/packages/${id}`, { enabled });
+  const p = _pkgAll.find(x => x.id === id);
+  if (p) p.enabled = enabled ? 1 : 0;
+  if (window.DAPackages) {
+    DAPackages.invalidateCache();
+    DAPackages.render(document.getElementById('pkg-preview'), { show_on: 'home' });
+  }
+}
+
+async function pkgDelete(id, name) {
+  if (!confirm(`Supprimer "${name}" ?`)) return;
+  await _obFetch('DELETE', `/api/admin/packages/${id}`);
+  await loadPackages();
+}
+
+// Filtres catégorie
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.pkg-cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.pkg-cat-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _pkgCatFilter = btn.dataset.cat;
+      renderPkgList();
+    });
+  });
+  // Fermer modal en cliquant hors
+  document.getElementById('pkg-modal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('pkg-modal')) pkgCloseModal();
+  });
+});
+</script>
 </body>
 </html>
