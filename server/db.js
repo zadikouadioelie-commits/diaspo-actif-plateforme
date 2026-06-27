@@ -1560,6 +1560,139 @@ db.exec(`
   });
 })();
 
+/* ══════════════════════════════════════════════════════
+   MODULE GÉRER UN DEAL
+══════════════════════════════════════════════════════ */
+db.exec(`
+  /* Accréditation "Gérer un Deal" par initiative */
+  CREATE TABLE IF NOT EXISTS deal_accreditations (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL UNIQUE,
+    statut        TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','suspendue','retiree')),
+    admin_id      INTEGER,
+    admin_nom     TEXT,
+    motif         TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
+  /* Deals (espaces de collaboration privés) */
+  CREATE TABLE IF NOT EXISTS deals (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    titre           TEXT NOT NULL,
+    description     TEXT,
+    objectif        TEXT,
+    categorie       TEXT DEFAULT 'partenariat',
+    confidentialite TEXT DEFAULT 'prive' CHECK(confidentialite IN ('prive','confidentiel','ultra_confidentiel')),
+    statut          TEXT DEFAULT 'brouillon' CHECK(statut IN ('brouillon','en_attente','actif','cloture','archive')),
+    createur_id     INTEGER NOT NULL,
+    date_debut      TEXT,
+    date_fin_prev   TEXT,
+    created_at      TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(createur_id) REFERENCES initiatives(id)
+  );
+
+  /* Participants au deal */
+  CREATE TABLE IF NOT EXISTS deal_participants (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id       INTEGER NOT NULL,
+    initiative_id INTEGER NOT NULL,
+    role          TEXT DEFAULT 'participant' CHECK(role IN ('createur','participant','observateur')),
+    statut        TEXT DEFAULT 'invite' CHECK(statut IN ('invite','accepte','refuse','retire')),
+    message_inv   TEXT,
+    repondu_at    TEXT,
+    joined_at     TEXT DEFAULT (datetime('now')),
+    UNIQUE(deal_id, initiative_id),
+    FOREIGN KEY(deal_id) REFERENCES deals(id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
+  /* Tâches du deal */
+  CREATE TABLE IF NOT EXISTS deal_tasks (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id       INTEGER NOT NULL,
+    titre         TEXT NOT NULL,
+    description   TEXT,
+    assignee_id   INTEGER,
+    priorite      TEXT DEFAULT 'normale' CHECK(priorite IN ('basse','normale','haute','urgente')),
+    statut        TEXT DEFAULT 'a_faire' CHECK(statut IN ('a_faire','en_cours','bloquee','terminee','annulee')),
+    date_echeance TEXT,
+    created_by    INTEGER,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+  );
+
+  /* Documents du deal */
+  CREATE TABLE IF NOT EXISTS deal_documents (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id     INTEGER NOT NULL,
+    dossier     TEXT DEFAULT '/',
+    nom         TEXT NOT NULL,
+    type_mime   TEXT,
+    taille      INTEGER DEFAULT 0,
+    contenu_b64 TEXT,
+    version     INTEGER DEFAULT 1,
+    uploaded_by INTEGER,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+  );
+
+  /* Messages internes du deal */
+  CREATE TABLE IF NOT EXISTS deal_messages (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id       INTEGER NOT NULL,
+    auteur_id     INTEGER NOT NULL,
+    auteur_nom    TEXT,
+    contenu       TEXT NOT NULL,
+    type          TEXT DEFAULT 'message' CHECK(type IN ('message','annonce','decision')),
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+  );
+
+  /* Notes collaboratives du deal */
+  CREATE TABLE IF NOT EXISTS deal_notes (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id       INTEGER NOT NULL,
+    titre         TEXT NOT NULL,
+    contenu       TEXT,
+    type          TEXT DEFAULT 'note' CHECK(type IN ('note','compte_rendu','proposition','contrat','autre')),
+    auteur_id     INTEGER,
+    auteur_nom    TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+  );
+
+  /* Événements calendrier du deal */
+  CREATE TABLE IF NOT EXISTS deal_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id     INTEGER NOT NULL,
+    titre       TEXT NOT NULL,
+    description TEXT,
+    type        TEXT DEFAULT 'reunion' CHECK(type IN ('reunion','echeance','rappel','appel','autre')),
+    date_debut  TEXT NOT NULL,
+    date_fin    TEXT,
+    created_by  INTEGER,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+  );
+
+  /* Journal d'activité du deal (immuable) */
+  CREATE TABLE IF NOT EXISTS deal_history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    deal_id    INTEGER NOT NULL,
+    acteur_id  INTEGER,
+    acteur_nom TEXT,
+    action     TEXT NOT NULL,
+    detail     TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(deal_id) REFERENCES deals(id)
+  );
+`);
+
 /* backfillOfficialFollow est appelé depuis seed.js après création du compte officiel */
 function backfillOfficialFollow() {
   try {

@@ -62,7 +62,10 @@
       <a href="reseau.html">🌐 Mon Réseau Pro <span class="pill" id="reseau-badge" style="display:none;"></span></a>
       <a href="reunions.html">📹 Visioconférence</a>
 
-      <div class="sb-group-lbl">06 — OUTILS</div>
+      <div class="sb-group-lbl">06 — COLLABORATION</div>
+      <a href="#deals" data-section="deals">🤝 Mes Deals <span class="pill" id="deals-badge" style="display:none;"></span></a>
+
+      <div class="sb-group-lbl">07 — OUTILS</div>
       <a href="#paiement" data-section="paiement">💳 Module paiement</a>
       <a href="#accreditations" data-section="accreditations">🎖 Accréditations DA</a>
       <a href="#publicites-init" data-section="publicites-init">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
@@ -393,6 +396,68 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
         <div id="init-pub-list">
           <div style="color:var(--muted);font-size:13px;">Chargement…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION DEALS ── -->
+    <div class="card" style="margin-bottom:20px;display:none;" id="deals">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">🤝 Mes Deals</h3>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Espaces de collaboration privés entre initiatives. Négociations, partenariats, projets communs.</p>
+      <div id="deals-gate" style="display:none;background:#fef2f2;border:1.5px solid #dc2626;border-radius:12px;padding:20px;text-align:center;margin-bottom:14px;">
+        <div style="font-size:36px;margin-bottom:8px;">🔒</div>
+        <div style="font-weight:700;color:#1e293b;margin-bottom:4px;">Accréditation requise</div>
+        <p style="font-size:13px;color:#64748b;margin:0 0 12px;">Le module « Gérer un Deal » est une accréditation officielle Diaspo'Actif. Contactez l'administration pour l'obtenir.</p>
+        <a href="#accreditations" class="btn btn-orange" onclick="window.initShowSection&&window.initShowSection('accreditations')">Voir mes accréditations →</a>
+      </div>
+      <div id="deals-content" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <button class="btn btn-sm" style="background:#2563eb;color:#fff;" onclick="openDealModal()">➕ Nouveau Deal</button>
+          <button class="btn btn-sm btn-outline" onclick="renderDealsSection()">↺ Actualiser</button>
+        </div>
+        <div id="deals-invites-list" style="margin-bottom:16px;"></div>
+        <div id="deals-list"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
+      </div>
+    </div>
+
+    <!-- Modal Nouveau Deal -->
+    <div id="deal-create-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
+      <div style="max-width:560px;margin:40px auto;background:#1e293b;border-radius:14px;padding:24px;color:#e2e8f0;">
+        <h3 style="margin:0 0 16px;">🤝 Créer un nouveau Deal</h3>
+        <div style="margin-bottom:12px;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Titre *</label><input id="deal-titre" class="form-control" placeholder="Titre du deal" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;box-sizing:border-box;"/></div>
+        <div style="margin-bottom:12px;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Objectif</label><textarea id="deal-objectif" class="form-control" rows="2" placeholder="Objectif principal de ce deal" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;resize:none;box-sizing:border-box;"></textarea></div>
+        <div style="margin-bottom:12px;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Description</label><textarea id="deal-desc" class="form-control" rows="2" placeholder="Description" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;resize:none;box-sizing:border-box;"></textarea></div>
+        <div style="display:flex;gap:10px;margin-bottom:12px;">
+          <div style="flex:1;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Catégorie</label>
+            <select id="deal-cat" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;">
+              <option value="partenariat">Partenariat</option>
+              <option value="investissement">Investissement</option>
+              <option value="negociation">Négociation</option>
+              <option value="projet_commun">Projet commun</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div style="flex:1;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Confidentialité</label>
+            <select id="deal-conf" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;">
+              <option value="prive">Privé</option>
+              <option value="confidentiel">Confidentiel</option>
+              <option value="ultra_confidentiel">Ultra confidentiel</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:12px;">
+          <div style="flex:1;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Date de début</label><input type="date" id="deal-debut" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;box-sizing:border-box;"/></div>
+          <div style="flex:1;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Date de fin prévue</label><input type="date" id="deal-fin" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;box-sizing:border-box;"/></div>
+        </div>
+        <div style="margin-bottom:16px;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Initiatives à inviter (optionnel)</label>
+          <select id="deal-invites" multiple style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;height:100px;box-sizing:border-box;"><option disabled>Chargement…</option></select>
+          <div style="font-size:11px;color:#64748b;margin-top:4px;">Ctrl+clic pour sélectionner plusieurs</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm" style="background:#2563eb;color:#fff;" onclick="createDeal()">Créer le Deal</button>
+          <button class="btn btn-sm btn-outline" onclick="document.getElementById('deal-create-modal').style.display='none'">Annuler</button>
         </div>
       </div>
     </div>
@@ -1537,7 +1602,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement'];
+  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -1547,6 +1612,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       a.classList.toggle('active', a.dataset.section===name);
     });
     if (name === 'billetterie-init') renderInitBilletterie();
+    if (name === 'deals') renderDealsSection();
     window.scrollTo(0,0);
   };
 
@@ -1772,6 +1838,129 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
 })();
+
+/* ══════════════════════════════════════════════
+   MODULE GÉRER UN DEAL — Dashboard Initiative
+══════════════════════════════════════════════ */
+async function renderDealsSection() {
+  const gate = document.getElementById('deals-gate');
+  const content = document.getElementById('deals-content');
+  // Vérifier accréditation (on tentera de charger les deals, 403 = pas accréditée)
+  try {
+    const data = await api('GET', '/deals');
+    gate.style.display = 'none';
+    content.style.display = '';
+    renderDealsList(data.deals || []);
+  } catch(e) {
+    if (e && (e.status === 403 || (typeof e === 'string' && e.includes('403')))) {
+      gate.style.display = '';
+      content.style.display = 'none';
+    } else {
+      gate.style.display = 'none';
+      content.style.display = '';
+      document.getElementById('deals-list').innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun deal pour l\'instant.</p>';
+    }
+  }
+}
+
+function renderDealsList(deals) {
+  const listEl = document.getElementById('deals-list');
+  const invites = deals.filter(d => d.ma_participation === 'invite');
+  const actifs = deals.filter(d => d.ma_participation === 'accepte');
+
+  // Bannière invitations en attente
+  const invEl = document.getElementById('deals-invites-list');
+  if (invites.length) {
+    invEl.innerHTML = invites.map(d => `
+      <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:700;font-size:14px;color:#92400e;">🤝 Invitation : ${escDeal(d.titre)}</div>
+          <div style="font-size:12px;color:#78350f;">Par ${escDeal(d.createur_nom)} · ${fmtDealDate(d.created_at)}</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" style="background:#16a34a;color:#fff;" onclick="repondreDeal(${d.id},'accepter')">✅ Accepter</button>
+          <button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="repondreDeal(${d.id},'refuser')">✗ Décliner</button>
+          <a class="btn btn-sm btn-outline" href="deal.html?id=${d.id}">Voir →</a>
+        </div>
+      </div>`).join('');
+  } else { invEl.innerHTML = ''; }
+
+  if (!actifs.length && !invites.length) {
+    listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun deal actif. Créez votre premier Deal collaboratif !</p>';
+    return;
+  }
+  if (!actifs.length) { listEl.innerHTML = ''; return; }
+
+  const statutLabel = { brouillon:'Brouillon', en_attente:'En attente', actif:'Actif', cloture:'Clôturé', archive:'Archivé' };
+  const statutColor = { brouillon:'#64748b', en_attente:'#d97706', actif:'#16a34a', cloture:'#dc2626', archive:'#6b7280' };
+  listEl.innerHTML = actifs.map(d => `
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="font-weight:700;font-size:14px;color:#1e293b;margin-bottom:4px;">${escDeal(d.titre)}</div>
+        <div style="font-size:12px;color:#64748b;">Par ${escDeal(d.createur_nom)} · ${d.nb_participants} participant(s) · ${fmtDealDate(d.updated_at)}</div>
+        ${d.objectif ? `<div style="font-size:12px;color:#475569;margin-top:4px;">${escDeal(d.objectif.substring(0,80))}${d.objectif.length>80?'…':''}</div>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:8px;background:${statutColor[d.statut]||'#64748b'}22;color:${statutColor[d.statut]||'#64748b'};">${statutLabel[d.statut]||d.statut}</span>
+        <a class="btn btn-sm" style="background:#2563eb;color:#fff;text-decoration:none;" href="deal.html?id=${d.id}">Ouvrir →</a>
+      </div>
+    </div>`).join('');
+
+  // Badge sidebar
+  const badge = document.getElementById('deals-badge');
+  if (badge) {
+    const pending = invites.length;
+    if (pending > 0) { badge.textContent = pending; badge.style.display = ''; }
+    else badge.style.display = 'none';
+  }
+}
+
+async function openDealModal() {
+  document.getElementById('deal-create-modal').style.display = '';
+  // Charger les initiatives disponibles
+  try {
+    const { initiatives } = await api('GET', '/initiatives?limit=100');
+    const sel = document.getElementById('deal-invites');
+    sel.innerHTML = initiatives.map(i => `<option value="${i.id}">${escDeal(i.nom)} (${i.pays||'—'})</option>`).join('');
+  } catch(e) {
+    document.getElementById('deal-invites').innerHTML = '<option disabled>Erreur chargement</option>';
+  }
+}
+
+async function createDeal() {
+  const titre = document.getElementById('deal-titre').value.trim();
+  if (!titre) { alert('Titre requis'); return; }
+  const sel = document.getElementById('deal-invites');
+  const invites = Array.from(sel.selectedOptions).map(o => Number(o.value));
+  try {
+    await api('POST', '/deals', {
+      titre,
+      objectif: document.getElementById('deal-objectif').value.trim()||undefined,
+      description: document.getElementById('deal-desc').value.trim()||undefined,
+      categorie: document.getElementById('deal-cat').value,
+      confidentialite: document.getElementById('deal-conf').value,
+      date_debut: document.getElementById('deal-debut').value||undefined,
+      date_fin_prev: document.getElementById('deal-fin').value||undefined,
+      invites
+    });
+    document.getElementById('deal-create-modal').style.display = 'none';
+    await renderDealsSection();
+  } catch(e) { alert((e && e.error) || e.message || 'Erreur'); }
+}
+
+async function repondreDeal(dealId, reponse) {
+  try {
+    await api('POST', `/deals/${dealId}/repondre`, { reponse });
+    await renderDealsSection();
+    if (reponse === 'accepter') location.href = `deal.html?id=${dealId}`;
+  } catch(e) { alert((e && e.error) || 'Erreur'); }
+}
+
+function escDeal(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDealDate(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}); } catch(e) { return s; }
+}
 </script>
 
   <nav class="mobile-bottom-nav">

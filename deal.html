@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Deal — Diaspo'Actif</title>
+<link rel="stylesheet" href="assets/styles.css"/>
+<link rel="stylesheet" href="assets/responsive.css"/>
+<link rel="icon" href="assets/logo.svg"/>
+<meta name="robots" content="noindex,nofollow"/>
+<style>
+/* ── Layout ── */
+.deal-wrapper{display:flex;min-height:calc(100vh - 64px);background:var(--bg,#f1f5f9);}
+.deal-sidebar{width:260px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:sticky;top:64px;height:calc(100vh - 64px);overflow-y:auto;}
+.deal-main{flex:1;min-width:0;padding:24px;}
+/* ── Sidebar ── */
+.deal-sid-head{padding:20px 16px 12px;border-bottom:1px solid #f1f5f9;}
+.deal-sid-title{font-size:14px;font-weight:700;color:#1e293b;line-height:1.3;margin-bottom:4px;}
+.deal-sid-meta{font-size:11px;color:#94a3b8;}
+.deal-sid-status{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;margin-top:6px;}
+.deal-sid-status.brouillon{background:#f1f5f9;color:#64748b;}
+.deal-sid-status.en_attente{background:#fef3c7;color:#d97706;}
+.deal-sid-status.actif{background:#dcfce7;color:#16a34a;}
+.deal-sid-status.cloture{background:#fee2e2;color:#dc2626;}
+.deal-sid-status.archive{background:#e5e7eb;color:#6b7280;}
+.deal-nav{padding:8px 0;}
+.deal-nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:13px;color:#475569;cursor:pointer;transition:background .15s;border-left:3px solid transparent;}
+.deal-nav-item:hover{background:#f8fafc;color:#1e293b;}
+.deal-nav-item.active{background:#eff6ff;color:#2563eb;border-left-color:#2563eb;font-weight:600;}
+.deal-nav-item svg{flex-shrink:0;}
+.deal-sid-actions{margin-top:auto;padding:12px 16px;border-top:1px solid #f1f5f9;display:flex;flex-direction:column;gap:6px;}
+/* ── Tabs content ── */
+.deal-tab{display:none;}
+.deal-tab.active{display:block;}
+/* ── Common ── */
+.deal-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:16px;}
+.deal-card-title{font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+.deal-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:700px){.deal-grid2{grid-template-columns:1fr;}}
+/* ── Stats bar ── */
+.deal-stats{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
+.deal-stat{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;flex:1;min-width:100px;}
+.deal-stat-num{font-size:22px;font-weight:800;color:#1e293b;}
+.deal-stat-label{font-size:11px;color:#94a3b8;margin-top:2px;}
+/* ── Messages ── */
+.msg-list{max-height:380px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px;}
+.msg-bubble{background:#f8fafc;border-radius:10px;padding:10px 14px;border:1px solid #e2e8f0;}
+.msg-bubble.mine{background:#eff6ff;border-color:#bfdbfe;}
+.msg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+.msg-author{font-size:12px;font-weight:700;color:#1e293b;}
+.msg-time{font-size:11px;color:#94a3b8;}
+.msg-text{font-size:13px;color:#334155;line-height:1.5;}
+.msg-input-row{display:flex;gap:8px;margin-top:12px;}
+.msg-input-row textarea{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;resize:none;min-height:64px;font-family:inherit;}
+/* ── Tasks ── */
+.task-item{display:flex;align-items:flex-start;gap:10px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:8px;}
+.task-check{width:18px;height:18px;border-radius:4px;border:2px solid #cbd5e1;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.task-check.done{background:#16a34a;border-color:#16a34a;color:#fff;}
+.task-body{flex:1;}
+.task-title{font-size:13px;font-weight:600;color:#1e293b;}
+.task-title.done{text-decoration:line-through;color:#94a3b8;}
+.task-meta{font-size:11px;color:#94a3b8;margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;}
+.task-prio{padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;}
+.task-prio.basse{background:#f1f5f9;color:#64748b;}
+.task-prio.normale{background:#dbeafe;color:#1d4ed8;}
+.task-prio.haute{background:#fef3c7;color:#d97706;}
+.task-prio.urgente{background:#fee2e2;color:#dc2626;}
+/* ── Documents ── */
+.doc-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;}
+.doc-icon{width:36px;height:36px;background:#e0e7ff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.doc-info{flex:1;}
+.doc-name{font-size:13px;font-weight:600;color:#1e293b;}
+.doc-meta{font-size:11px;color:#94a3b8;}
+/* ── Notes ── */
+.note-item{padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:8px;cursor:pointer;}
+.note-item:hover{background:#fef9c3;}
+.note-title{font-size:13px;font-weight:700;color:#1e293b;}
+.note-meta{font-size:11px;color:#94a3b8;margin-top:2px;}
+.note-preview{font-size:12px;color:#64748b;margin-top:6px;line-height:1.4;white-space:pre-wrap;}
+/* ── Participants ── */
+.part-item{display:flex;align-items:center;gap:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:8px;}
+.part-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0;}
+.part-info{flex:1;}
+.part-nom{font-size:13px;font-weight:700;color:#1e293b;}
+.part-role{font-size:11px;color:#94a3b8;}
+.part-statut{font-size:11px;font-weight:600;padding:2px 8px;border-radius:8px;}
+.part-statut.accepte{background:#dcfce7;color:#16a34a;}
+.part-statut.invite{background:#fef3c7;color:#d97706;}
+.part-statut.refuse{background:#fee2e2;color:#dc2626;}
+/* ── Historique ── */
+.histo-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9;}
+.histo-dot{width:8px;height:8px;background:#2563eb;border-radius:50%;margin-top:5px;flex-shrink:0;}
+.histo-body{flex:1;}
+.histo-action{font-size:13px;font-weight:600;color:#1e293b;}
+.histo-detail{font-size:12px;color:#64748b;}
+.histo-meta{font-size:11px;color:#94a3b8;margin-top:2px;}
+/* ── Calendar ── */
+.cal-event{padding:10px 12px;background:#eff6ff;border-left:3px solid #2563eb;border-radius:0 8px 8px 0;margin-bottom:8px;}
+.cal-event.echeance{background:#fff7ed;border-left-color:#ea580c;}
+.cal-event.appel{background:#f0fdf4;border-left-color:#16a34a;}
+.cal-event-title{font-size:13px;font-weight:700;color:#1e293b;}
+.cal-event-meta{font-size:11px;color:#64748b;margin-top:2px;}
+/* ── Modals ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;}
+.modal-box{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);}
+.modal-title{font-size:17px;font-weight:700;color:#1e293b;margin-bottom:16px;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:5px;}
+.form-input{width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;box-sizing:border-box;}
+.form-input:focus{outline:none;border-color:#2563eb;}
+.form-select{width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;}
+.form-row{display:flex;gap:10px;}
+.form-row .form-group{flex:1;}
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;}
+.btn-primary{background:#2563eb;color:#fff;}
+.btn-primary:hover{background:#1d4ed8;}
+.btn-secondary{background:#f1f5f9;color:#475569;}
+.btn-secondary:hover{background:#e2e8f0;}
+.btn-danger{background:#fee2e2;color:#dc2626;}
+.btn-danger:hover{background:#fecaca;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.btn-full{width:100%;justify-content:center;}
+.mt-8{margin-top:8px;}
+.mt-12{margin-top:12px;}
+/* ── Invite invitation banner ── */
+.invite-banner{background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:16px;margin-bottom:20px;}
+.invite-banner h3{font-size:14px;font-weight:700;color:#92400e;margin-bottom:6px;}
+.invite-banner p{font-size:13px;color:#78350f;margin-bottom:10px;}
+.invite-banner-btns{display:flex;gap:8px;}
+/* ── Note editor ── */
+#note-editor-area{width:100%;min-height:300px;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.7;box-sizing:border-box;}
+/* ── Upload zone ── */
+.upload-zone{border:2px dashed #cbd5e1;border-radius:10px;padding:28px;text-align:center;cursor:pointer;color:#94a3b8;font-size:13px;transition:border-color .2s;}
+.upload-zone:hover{border-color:#2563eb;color:#2563eb;}
+.upload-zone input{display:none;}
+/* ── Accès refusé ── */
+#deal-denied{display:none;flex:1;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:40px;}
+#deal-denied .icon{font-size:48px;}
+#deal-denied h2{font-size:20px;font-weight:700;color:#1e293b;}
+#deal-denied p{font-size:14px;color:#64748b;text-align:center;}
+</style>
+</head>
+<body>
+<div id="app-root"></div>
+<script src="assets/app.js"></script>
+<script src="assets/ds.js"></script>
+
+<script>
+const DEAL_ID = new URLSearchParams(location.search).get('id');
+let DEAL = null, PARTICIPANTS = [], MY_INIT = null, MY_PART = null, ME = null;
+let currentTab = 'dashboard';
+
+/* ══════════════════════════════════════════
+   INIT
+══════════════════════════════════════════ */
+async function initDeal() {
+  try { ME = await _obFetch('GET', '/api/auth/me'); } catch(e) { location.href = '/login.html?next=' + encodeURIComponent(location.href); return; }
+  if (!DEAL_ID) { showDenied('Aucun deal spécifié.'); return; }
+  try {
+    const r = await _obFetch('GET', `/api/deals/${DEAL_ID}`);
+    DEAL = r.deal; PARTICIPANTS = r.participants;
+    MY_INIT = PARTICIPANTS.find(p => {
+      // on cherche notre initiative dans les participants
+      return true; // sera filtré après
+    });
+  } catch(e) {
+    if (e.status === 403 || e.status === 401) { showDenied('Vous n\'avez pas accès à ce Deal.'); return; }
+    showDenied('Deal introuvable.'); return;
+  }
+  // Récupérer mon initiative
+  try {
+    const moi = await _obFetch('GET', '/api/initiatives/mes');
+    if (moi && moi.length) {
+      MY_INIT = moi[0];
+      MY_PART = PARTICIPANTS.find(p => p.initiative_id == MY_INIT.id);
+    }
+  } catch(e) {}
+
+  buildPage();
+}
+
+function showDenied(msg) {
+  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:12px;background:#f1f5f9;">
+    <div style="font-size:48px">🔒</div>
+    <h2 style="font-size:20px;font-weight:700;color:#1e293b;">${msg}</h2>
+    <a href="dashboard-initiative.html" style="color:#2563eb;font-size:14px;">Retour au tableau de bord</a>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════
+   BUILD PAGE
+══════════════════════════════════════════ */
+function buildPage() {
+  const isCreateur = MY_PART?.role === 'createur';
+  const isInvite = MY_PART?.statut === 'invite';
+  const isMembre = MY_PART?.statut === 'accepte';
+
+  document.title = `${DEAL.titre} — Deal Diaspo'Actif`;
+
+  const statusLabel = { brouillon:'Brouillon', en_attente:'En attente', actif:'Actif', cloture:'Clôturé', archive:'Archivé' }[DEAL.statut] || DEAL.statut;
+
+  const sidebar = `
+    <div class="deal-sidebar">
+      <div class="deal-sid-head">
+        <div class="deal-sid-title">${esc(DEAL.titre)}</div>
+        <div class="deal-sid-meta">Par ${esc(DEAL.createur_nom)}</div>
+        <span class="deal-sid-status ${DEAL.statut}">${statusLabel}</span>
+      </div>
+      <nav class="deal-nav" id="deal-nav">
+        ${navItem('dashboard','🏠','Tableau de bord')}
+        ${navItem('messages','💬','Messages')}
+        ${navItem('taches','✅','Tâches')}
+        ${navItem('documents','📁','Documents')}
+        ${navItem('notes','📝','Notes')}
+        ${navItem('calendrier','📅','Calendrier')}
+        ${navItem('participants','👥','Participants')}
+        ${navItem('historique','📋','Historique')}
+      </nav>
+      <div class="deal-sid-actions">
+        ${isCreateur && DEAL.statut === 'actif' ? `<button class="btn btn-secondary btn-sm btn-full" onclick="doCloturer()">🔒 Clôturer</button>` : ''}
+        ${isCreateur && DEAL.statut === 'cloture' ? `<button class="btn btn-secondary btn-sm btn-full" onclick="doArchiver()">📦 Archiver</button>` : ''}
+        ${isCreateur && DEAL.statut === 'archive' ? `<button class="btn btn-primary btn-sm btn-full" onclick="doReactiver()">♻️ Réactiver</button>` : ''}
+        <a href="dashboard-initiative.html" class="btn btn-secondary btn-sm btn-full">← Retour</a>
+      </div>
+    </div>`;
+
+  const main = `
+    <div class="deal-main">
+      ${isInvite ? invitationBanner() : ''}
+      <div id="tab-dashboard" class="deal-tab active">${buildDashboard()}</div>
+      <div id="tab-messages" class="deal-tab"></div>
+      <div id="tab-taches" class="deal-tab"></div>
+      <div id="tab-documents" class="deal-tab"></div>
+      <div id="tab-notes" class="deal-tab"></div>
+      <div id="tab-calendrier" class="deal-tab"></div>
+      <div id="tab-participants" class="deal-tab"></div>
+      <div id="tab-historique" class="deal-tab"></div>
+    </div>`;
+
+  document.getElementById('app-root').innerHTML =
+    `<div class="deal-wrapper">${sidebar}${main}</div>` + modals();
+
+  document.querySelectorAll('.deal-nav-item').forEach(el => {
+    el.addEventListener('click', () => switchTab(el.dataset.tab));
+  });
+}
+
+function navItem(tab, icon, label) {
+  return `<div class="deal-nav-item${tab==='dashboard'?' active':''}" data-tab="${tab}">${icon} ${label}</div>`;
+}
+
+function invitationBanner() {
+  return `<div class="invite-banner">
+    <h3>🤝 Vous avez été invité à rejoindre ce Deal</h3>
+    <p>Acceptez l'invitation pour accéder à l'espace de travail complet.</p>
+    <div class="invite-banner-btns">
+      <button class="btn btn-primary" onclick="repondreInvitation('accepter')">✅ Accepter</button>
+      <button class="btn btn-danger" onclick="repondreInvitation('refuser')">✗ Décliner</button>
+    </div>
+  </div>`;
+}
+
+function buildDashboard() {
+  const nbPart = PARTICIPANTS.filter(p => p.statut === 'accepte').length;
+  const cat = DEAL.categorie || 'partenariat';
+  return `
+    <div class="deal-stats">
+      <div class="deal-stat"><div class="deal-stat-num">${nbPart}</div><div class="deal-stat-label">Participants actifs</div></div>
+      <div class="deal-stat"><div class="deal-stat-num" id="stat-taches">—</div><div class="deal-stat-label">Tâches</div></div>
+      <div class="deal-stat"><div class="deal-stat-num" id="stat-docs">—</div><div class="deal-stat-label">Documents</div></div>
+      <div class="deal-stat"><div class="deal-stat-num" id="stat-msgs">—</div><div class="deal-stat-label">Messages</div></div>
+    </div>
+    <div class="deal-grid2">
+      <div class="deal-card">
+        <div class="deal-card-title">ℹ️ Informations</div>
+        ${fieldRow('Catégorie', cat)}
+        ${fieldRow('Confidentialité', DEAL.confidentialite)}
+        ${fieldRow('Début', DEAL.date_debut || '—')}
+        ${fieldRow('Fin prévue', DEAL.date_fin_prev || '—')}
+        ${DEAL.objectif ? `<div style="margin-top:10px;font-size:13px;color:#475569"><strong>Objectif :</strong><br>${esc(DEAL.objectif)}</div>` : ''}
+        ${DEAL.description ? `<div style="margin-top:8px;font-size:13px;color:#475569">${esc(DEAL.description)}</div>` : ''}
+      </div>
+      <div class="deal-card">
+        <div class="deal-card-title">👥 Participants</div>
+        ${PARTICIPANTS.slice(0,4).map(p => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div class="part-avatar" style="width:32px;height:32px;font-size:12px;">${p.nom.charAt(0)}</div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#1e293b;">${esc(p.nom)}</div>
+          <div style="font-size:11px;color:#94a3b8;">${p.role === 'createur' ? 'Créateur' : 'Participant'}</div></div>
+          <span class="part-statut ${p.statut}">${p.statut}</span>
+        </div>`).join('')}
+        ${PARTICIPANTS.length > 4 ? `<div style="font-size:12px;color:#64748b;margin-top:4px;">+${PARTICIPANTS.length-4} autres</div>` : ''}
+      </div>
+    </div>
+    <div class="deal-card" id="recent-activity">
+      <div class="deal-card-title">⚡ Activité récente</div>
+      <div id="recent-histo"><span style="font-size:13px;color:#94a3b8;">Chargement…</span></div>
+    </div>`;
+}
+
+function fieldRow(label, val) {
+  return `<div style="display:flex;gap:8px;margin-bottom:6px;font-size:13px;">
+    <span style="color:#94a3b8;min-width:100px;">${label}</span>
+    <span style="font-weight:600;color:#1e293b;">${esc(String(val))}</span>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════
+   TAB SWITCHING
+══════════════════════════════════════════ */
+function switchTab(tab) {
+  document.querySelectorAll('.deal-nav-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  document.querySelectorAll('.deal-tab').forEach(el => el.classList.toggle('active', el.id === `tab-${tab}`));
+  currentTab = tab;
+  const el = document.getElementById(`tab-${tab}`);
+  if (el && !el.dataset.loaded) { loadTab(tab); el.dataset.loaded = '1'; }
+}
+
+async function loadTab(tab) {
+  const el = document.getElementById(`tab-${tab}`);
+  el.innerHTML = `<div style="padding:40px;text-align:center;color:#94a3b8;font-size:14px;">Chargement…</div>`;
+  try {
+    if (tab === 'messages') await loadMessages();
+    else if (tab === 'taches') await loadTaches();
+    else if (tab === 'documents') await loadDocuments();
+    else if (tab === 'notes') await loadNotes();
+    else if (tab === 'calendrier') await loadCalendrier();
+    else if (tab === 'participants') await loadParticipants();
+    else if (tab === 'historique') await loadHistorique();
+  } catch(e) {
+    el.innerHTML = `<div style="padding:20px;color:#dc2626;">Erreur : ${e.message||'Inaccessible'}</div>`;
+  }
+}
+
+/* load recent activity in dashboard */
+async function loadDashboardStats() {
+  try {
+    const [t,d,m,h] = await Promise.all([
+      _obFetch('GET', `/api/deals/${DEAL_ID}/taches`),
+      _obFetch('GET', `/api/deals/${DEAL_ID}/documents`),
+      _obFetch('GET', `/api/deals/${DEAL_ID}/messages`),
+      _obFetch('GET', `/api/deals/${DEAL_ID}/historique`)
+    ]);
+    document.getElementById('stat-taches').textContent = t.taches?.length||0;
+    document.getElementById('stat-docs').textContent = d.documents?.length||0;
+    document.getElementById('stat-msgs').textContent = m.messages?.length||0;
+    const rh = document.getElementById('recent-histo');
+    if (!h.historique?.length) { rh.innerHTML = '<span style="font-size:13px;color:#94a3b8;">Aucune activité enregistrée.</span>'; return; }
+    rh.innerHTML = h.historique.slice(0,5).map(e => `
+      <div class="histo-item">
+        <div class="histo-dot"></div>
+        <div class="histo-body">
+          <div class="histo-action">${esc(e.action)}</div>
+          ${e.detail ? `<div class="histo-detail">${esc(e.detail)}</div>` : ''}
+          <div class="histo-meta">${e.acteur_nom||'—'} · ${fmtDate(e.created_at)}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+/* ══════════════════════════════════════════
+   MESSAGES
+══════════════════════════════════════════ */
+async function loadMessages() {
+  const el = document.getElementById('tab-messages');
+  const { messages } = await _obFetch('GET', `/api/deals/${DEAL_ID}/messages`);
+  el.innerHTML = `
+    <div class="deal-card">
+      <div class="deal-card-title">💬 Messages
+        <span style="font-size:12px;font-weight:400;color:#94a3b8;">${messages.length} message(s)</span>
+      </div>
+      <div class="msg-list" id="msg-list">
+        ${messages.length ? messages.map(renderMsg).join('') : '<span style="font-size:13px;color:#94a3b8;">Aucun message pour l\'instant.</span>'}
+      </div>
+      <div class="msg-input-row">
+        <textarea id="msg-input" placeholder="Écrire un message…"></textarea>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <button class="btn btn-primary" onclick="sendMsg()">Envoyer</button>
+          <select id="msg-type" class="form-select" style="font-size:12px;padding:5px 8px;">
+            <option value="message">Message</option>
+            <option value="annonce">Annonce</option>
+            <option value="decision">Décision</option>
+          </select>
+        </div>
+      </div>
+    </div>`;
+  const ml = document.getElementById('msg-list');
+  ml.scrollTop = ml.scrollHeight;
+}
+
+function renderMsg(m) {
+  const isMine = MY_INIT && m.auteur_nom === MY_INIT.nom;
+  const typeLabel = m.type === 'annonce' ? '📢 ' : m.type === 'decision' ? '⚖️ ' : '';
+  return `<div class="msg-bubble${isMine?' mine':''}">
+    <div class="msg-head">
+      <span class="msg-author">${typeLabel}${esc(m.auteur_nom||'—')}</span>
+      <span class="msg-time">${fmtDate(m.created_at)}</span>
+    </div>
+    <div class="msg-text">${esc(m.contenu)}</div>
+  </div>`;
+}
+
+async function sendMsg() {
+  const inp = document.getElementById('msg-input');
+  const type = document.getElementById('msg-type').value;
+  const contenu = inp.value.trim();
+  if (!contenu) return;
+  try {
+    await _obFetch('POST', `/api/deals/${DEAL_ID}/messages`, { contenu, type });
+    inp.value = '';
+    document.getElementById('tab-messages').dataset.loaded = '';
+    await loadMessages();
+  } catch(e) { alert(e.message || 'Erreur'); }
+}
+
+/* ══════════════════════════════════════════
+   TÂCHES
+══════════════════════════════════════════ */
+async function loadTaches() {
+  const el = document.getElementById('tab-taches');
+  const { taches } = await _obFetch('GET', `/api/deals/${DEAL_ID}/taches`);
+  const byStatus = { a_faire:[], en_cours:[], bloquee:[], terminee:[], annulee:[] };
+  taches.forEach(t => (byStatus[t.statut]||byStatus.a_faire).push(t));
+  el.innerHTML = `
+    <div class="deal-card">
+      <div class="deal-card-title">✅ Tâches
+        <button class="btn btn-primary btn-sm" onclick="openTaskModal()">+ Nouvelle tâche</button>
+      </div>
+      ${['a_faire','en_cours','bloquee','terminee'].map(s => renderTaskGroup(s, byStatus[s])).join('')}
+      ${!taches.length ? '<p style="font-size:13px;color:#94a3b8;">Aucune tâche. Créez la première !</p>' : ''}
+    </div>`;
+}
+
+function renderTaskGroup(statut, taches) {
+  if (!taches.length) return '';
+  const labels = { a_faire:'À faire', en_cours:'En cours', bloquee:'Bloquée', terminee:'Terminée', annulee:'Annulée' };
+  return `<div style="margin-bottom:16px;">
+    <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">${labels[statut]} (${taches.length})</div>
+    ${taches.map(t => `
+      <div class="task-item">
+        <div class="task-check${statut==='terminee'?' done':''}" onclick="toggleTask(${t.id},'${statut==='terminee'?'a_faire':'terminee'}')">${statut==='terminee'?'✓':''}</div>
+        <div class="task-body">
+          <div class="task-title${statut==='terminee'?' done':''}">${esc(t.titre)}</div>
+          <div class="task-meta">
+            <span class="task-prio ${t.priorite}">${t.priorite}</span>
+            ${t.date_echeance ? `<span>📅 ${t.date_echeance}</span>` : ''}
+          </div>
+          ${t.description ? `<div style="font-size:12px;color:#64748b;margin-top:4px;">${esc(t.description)}</div>` : ''}
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="deleteTask(${t.id})" title="Supprimer">✕</button>
+      </div>`).join('')}
+  </div>`;
+}
+
+async function toggleTask(id, newStatut) {
+  try {
+    await _obFetch('PUT', `/api/deals/${DEAL_ID}/taches/${id}`, { statut: newStatut });
+    document.getElementById('tab-taches').dataset.loaded = '';
+    await loadTaches();
+  } catch(e) { alert(e.message || 'Erreur'); }
+}
+
+async function deleteTask(id) {
+  if (!confirm('Supprimer cette tâche ?')) return;
+  try {
+    await _obFetch('DELETE', `/api/deals/${DEAL_ID}/taches/${id}`);
+    document.getElementById('tab-taches').dataset.loaded = '';
+    await loadTaches();
+  } catch(e) { alert(e.message || 'Erreur'); }
+}
+
+function openTaskModal() {
+  document.getElementById('modal-task').style.display = 'flex';
+}
+
+async function saveTask() {
+  const titre = document.getElementById('task-titre').value.trim();
+  if (!titre) { alert('Titre requis'); return; }
+  const body = {
+    titre,
+    description: document.getElementById('task-desc').value.trim()||undefined,
+    priorite: document.getElementById('task-prio').value,
+    date_echeance: document.getElementById('task-date').value||undefined
+  };
+  try {
+    await _obFetch('POST', `/api/deals/${DEAL_ID}/taches`, body);
+    closeModal('modal-task');
+    document.getElementById('tab-taches').dataset.loaded = '';
+    await loadTaches();
+  } catch(e) { alert(e.message || 'Erreur'); }
+}
+
+/* ══════════════════════════════════════════
+   DOCUMENTS
+══════════════════════════════════════════ */
+async function loadDocuments() {
+  const el = document.getElementById('tab-documents');
+  const { documents } = await _obFetch('GET', `/api/deals/${DEAL_ID}/documents`);
+  const byFolder = {};
+  documents.forEach(d => { (byFolder[d.dossier] = byFolder[d.dossier]||[]).push(d); });
+  el.innerHTML = `
+    <div class="deal-card">
+      <div class="deal-card-title">📁 Documents
+        <button class="btn btn-primary btn-sm" onclick="openDocModal()">+ Ajouter</button>
+      </div>
+      ${!documents.length ? '<p style="font-size:13px;color:#94a3b8;">Aucun document partagé.</p>' : ''}
+      ${Object.entries(byFolder).map(([folder, docs]) => `
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px;">📂 ${esc(folder)}</div>
+          ${docs.map(d => `
+            <div class="doc-item">
+              <div class="doc-icon">${docIcon(d.type_mime)}</div>
+              <div class="doc-info">
+                <div class="doc-name">${esc(d.nom)}</div>
+                <div class="doc-meta">${fmtSize(d.taille)} · ${fmtDate(d.created_at)}</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="downloadDoc(${d.id})">⬇ Télécharger</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteDoc(${d.id})">✕</button>
+            </div>`).join('')}
+        </div>`).join('')}
+    </div>`;
+}
+
+function docIcon(mime) {
+  if (!mime) return '📄';
+  if (mime.startsWith('image/')) return '🖼️';
+  if (mime.startsWith('video/')) return '🎬';
+  if (mime.includes('pdf')) return '📕';
+  if (mime.includes('spreadsheet') || mime.includes('excel')) return '📊';
+  if (mime.includes('presentation') || mime.includes('powerpoint')) return '📊';
+  if (mime.includes('word') || mime.includes('document')) return '📝';
+  return '📄';
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '—';
+  if (bytes < 1024) return bytes + ' o';
+  if (bytes < 1024*1024) return Math.round(bytes/1024) + ' Ko';
+  return (bytes/1024/1024).toFixed(1) + ' Mo';
+}
+
+function openDocModal() {
+  document.getElementById('modal-doc').style.display = 'flex';
+}
+
+async function uploadDoc() {
+  const fileInput = document.getElementById('doc-file');
+  const dossier = document.getElementById('doc-dossier').value.trim() || '/';
+  if (!fileInput.files.length) { alert('Veuillez sélectionner un fichier.'); return; }
+  const file = fileInput.files[0];
+  if (file.size > 5 * 1024 * 1024) { alert('Fichier trop volumineux (max 5 Mo).'); return; }
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const b64 = e.target.result.split(',')[1];
+    try {
+      await _obFetch('POST', `/api/deals/${DEAL_ID}/documents`, {
+        nom: file.name, type_mime: file.type, taille: file.size,
+        contenu_b64: b64, dossier
+      });
+      closeModal('modal-doc');
+      document.getElementById('tab-documents').dataset.loaded = '';
+      await loadDocuments();
+    } catch(err) { alert(err.message || 'Erreur upload'); }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function downloadDoc(docId) {
+  try {
+    const { document: doc } = await _obFetch('GET', `/api/deals/${DEAL_ID}/documents/${docId}`);
+    const a = document.createElement('a');
+    a.href = `data:${doc.type_mime||'application/octet-stream'};base64,${doc.contenu_b64}`;
+    a.download = doc.nom;
+    a.click();
+  } catch(e) { alert('Erreur téléchargement'); }
+}
+
+async function deleteDoc(docId) {
+  if (!confirm('Supprimer ce document ?')) return;
+  try {
+    await _obFetch('DELETE', `/api/deals/${DEAL_ID}/documents/${docId}`);
+    document.getElementById('tab-documents').dataset.loaded = '';
+    await loadDocuments();
+  } catch(e) { alert(e.message || 'Erreur'); }
+}
+
+/* ══════════════════════════════════════════
+   NOTES
+══════════════════════════════════════════ */
+let editingNoteId = null;
+async function loadNotes() {
+  const el = document.getElementById('tab-notes');
+  const { notes } = await _obFetch('GET', `/api/deals/${DEAL_ID}/notes`);
+  el.innerHTML = `
+    <div class="deal-grid2">
+      <div class="deal-card">
+        <div class="deal-card-title">📝 Notes
+          <button class="btn btn-primary btn-sm" onclick="newNote()">+ Nouvelle</button>
+        </div>
+        ${!notes.length ? '<p style="font-size:13px;color:#94a3b8;">Aucune note. Créez la première !</p>' : ''}
+        ${notes.map(n => `
+          <div class="note-item" onclick="openNote(${n.id})">
+            <div class="note-title">${esc(n.titre)}</div>
+            <div class="note-meta">${n.type} · ${n.auteur_nom||'—'} · ${fmtDate(n.updated_at)}</div>
+            ${n.contenu ? `<div class="note-preview">${esc(n.contenu.substring(0,80))}${n.contenu.length>80?'…':''}</div>` : ''}
+          </div>`).join('')}
+      </div>
+      <div class="deal-card" id="note-editor-panel">
+        <div style="font-size:13px;color:#94a3b8;text-align:center;padding:40px 0;">
+          Sélectionnez une note ou créez-en une nouvelle.
+        </div>
+      </div>
+    </div>`;
+  window._dealNotes = notes;
+}
+
+function newNote() {
+  editingNoteId = null;
+  document.getElementById('note-editor-panel').innerHTML = `
+    <div class="deal-card-title">Nouvelle note</div>
+    <div class="form-group"><input class="form-input" id="note-titre" placeholder="Titre" value="Sans titre"/></div>
+    <div class="form-group">
+      <select class="form-select" id="note-type">
+        <option value="note">Note</option>
+        <option value="compte_rendu">Compte rendu</option>
+        <option value="proposition">Proposition</option>
+        <option value="contrat">Contrat</option>
+        <option value="autre">Autre</option>
+      </select>
+    </div>
+    <textarea id="note-editor-area" placeholder="Rédigez votre note ici…"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="btn btn-primary" onclick="saveNote()">Enregistrer</button>
+      <button class="btn btn-secondary" onclick="loadNotes()">Annuler</button>
+    </div>`;
+}
+
+function openNote(id) {
+  const n = window._dealNotes?.find(x => x.id == id);
+  if (!n) return;
+  editingNoteId = id;
+  document.getElementById('note-editor-panel').innerHTML = `
+    <div class="deal-card-title">Modifier la note</div>
+    <div class="form-group"><input class="form-input" id="note-titre" value="${esc(n.titre)}"/></div>
+    <div class="form-group">
+      <select class="form-select" id="note-type">
+        ${['note','compte_rendu','proposition','contrat','autre'].map(v => `<option value="${v}"${n.type===v?' selected':''}>${v}</option>`).join('')}
+      </select>
+    </div>
+    <textarea id="note-editor-area">${esc(n.contenu||'')}</textarea>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="btn btn-primary" onclick="saveNote()">Enregistrer</button>
+      <button class="btn btn-secondary" onclick="loadNotes()">Annuler</button>
+    </div>`;
+}
+
+async function saveNote() {
+  const titre = document.getElementById('note-titre').value.trim();
+  const contenu = document.getElementById('note-editor-area').value;
+  const type = document.getElementById('note-type').value;
+  try {
+    if (editingNoteId) {
+      await _obFetch('PUT', `/api/deals/${DEAL_ID}/notes/${editingNoteId}`, { titre, contenu });
+    } else {
+      await _obFetch('POST', `/api/deals/${DEAL_ID}/notes`, { titre, contenu, type });
+    }
+    document.getElementById('tab-notes').dataset.loaded = '';
+    await loadNotes();
+  } catch(e) { alert(e.message || 'Erreur'); }
+}
+
+/* ══════════════════════════════════════════
+   CALENDRIER
+══════════════════════════════════════════ */
+async function loadCalendrier() {
+  const el = document.getElementById('tab-calendrier');
+  const { evenements } = await _obFetch('GET', `/api/deals/${DEAL_ID}/evenements`);
+  const now = new Date();
+  const futurs = evenements.filter(e => new Date(e.date_debut) >= now).sort((a,b) => new Date(a.date_debut)-new Date(b.date_debut));
+  const passes = evenements.filter(e => new Date(e.date_debut) < now).sort((a,b) => new Date(b.date_debut)-new Date(a.date_debut));
+  el.innerHTML = `
+    <div class="deal-card">
+      <div class="deal-card-title">📅 Calendrier
+        <button class="btn btn-primary btn-sm" onclick="openEventModal()">+ Ajouter</button>
+      </div>
+      ${futurs.length ? `<div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px;">À venir</div>${futurs.map(renderEvent).join('')}</div>` : ''}
+      ${passes.length ? `<div><div style="font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:8px;">Passés</div>${passes.map(renderEvent).join('')}</div>` : ''}
+      ${!evenements.length ? '<p style="font-size:13px;color:#94a3b8;">Aucun événement programmé.</p>' : ''}
+    </div>`;
+}
+
+function renderEvent(e) {
+  return `<div class="cal-event ${e.type}" style="display:flex;align-items:flex-start;justify-content:space-between;">
+    <div>
+      <div class="cal-event-title">${typeEventIcon(e.type)} ${esc(e.titre)}</div>
+      <div class="cal-event-meta">${fmtDate(e.date_debut)}${e.date_fin?' → '+fmtDate(e.date_fin):''}${e.description?` · ${esc(e.description)}`:''}</div>
+    </div>
+    <button class="btn btn-danger btn-sm" onclick="deleteEvent(${e.id})" title="Supprimer">✕</button>
+  </div>`;
+}
+
+function typeEventIcon(type) {
+  return { reunion:'🤝', echeance:'⏰', rappel:'🔔', appel:'📞', autre:'📌' }[type]||'📌';
+}
+
+function openEventModal() { document.getElementById('modal-event').style.display = 'flex'; }
+
+async function saveEvent() {
+  const titre = document.getElementById('event-titre').value.trim();
+  const date_debut = document.getElementById('event-date').value;
+  if (!titre || !date_debut) { alert('Titre et date requis'); return; }
+  try {
+    await _obFetch('POST', `/api/deals/${DEAL_ID}/evenements`, {
+      titre, date_debut,
+      date_fin: document.getElementById('event-date-fin').value||undefined,
+      type: document.getElementById('event-type').value,
+      description: document.getElementById('event-desc').value.trim()||undefined
+    });
+    closeModal('modal-event');
+    document.getElementById('tab-calendrier').dataset.loaded = '';
+    await loadCalendrier();
+  } catch(e) { alert(e.message||'Erreur'); }
+}
+
+async function deleteEvent(id) {
+  if (!confirm('Supprimer cet événement ?')) return;
+  try {
+    await _obFetch('DELETE', `/api/deals/${DEAL_ID}/evenements/${id}`);
+    document.getElementById('tab-calendrier').dataset.loaded = '';
+    await loadCalendrier();
+  } catch(e) { alert(e.message||'Erreur'); }
+}
+
+/* ══════════════════════════════════════════
+   PARTICIPANTS
+══════════════════════════════════════════ */
+async function loadParticipants() {
+  const el = document.getElementById('tab-participants');
+  const { deal, participants } = await _obFetch('GET', `/api/deals/${DEAL_ID}`);
+  PARTICIPANTS = participants;
+  const isCreateur = MY_PART?.role === 'createur';
+  el.innerHTML = `
+    <div class="deal-card">
+      <div class="deal-card-title">👥 Participants (${participants.length})
+        ${isCreateur ? `<button class="btn btn-primary btn-sm" onclick="openInviteModal()">+ Inviter</button>` : ''}
+      </div>
+      ${participants.map(p => `
+        <div class="part-item">
+          <div class="part-avatar">${p.nom.charAt(0)}</div>
+          <div class="part-info">
+            <div class="part-nom">${esc(p.nom)}</div>
+            <div class="part-role">${p.role === 'createur' ? '👑 Créateur' : '🤝 Participant'}${p.pays?' · '+p.pays:''}</div>
+          </div>
+          <span class="part-statut ${p.statut}">${p.statut === 'accepte' ? 'Actif' : p.statut === 'invite' ? 'Invité' : p.statut}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function openInviteModal() {
+  document.getElementById('modal-invite').style.display = 'flex';
+  try {
+    const { initiatives } = await _obFetch('GET', '/api/initiatives?limit=50');
+    const myIds = new Set(PARTICIPANTS.map(p => p.initiative_id));
+    const filtred = initiatives.filter(i => !myIds.has(i.id));
+    const sel = document.getElementById('invite-select');
+    sel.innerHTML = '<option value="">-- Sélectionner une initiative --</option>' +
+      filtred.map(i => `<option value="${i.id}">${esc(i.nom)} (${i.pays||'—'})</option>`).join('');
+  } catch(e) {}
+}
+
+async function sendInvite() {
+  const initiative_id = document.getElementById('invite-select').value;
+  const message = document.getElementById('invite-msg').value.trim();
+  if (!initiative_id) { alert('Sélectionnez une initiative'); return; }
+  try {
+    await _obFetch('POST', `/api/deals/${DEAL_ID}/inviter`, { initiative_id: Number(initiative_id), message });
+    closeModal('modal-invite');
+    document.getElementById('tab-participants').dataset.loaded = '';
+    await loadParticipants();
+  } catch(e) { alert(e.message||'Erreur'); }
+}
+
+/* ══════════════════════════════════════════
+   HISTORIQUE
+══════════════════════════════════════════ */
+async function loadHistorique() {
+  const el = document.getElementById('tab-historique');
+  const { historique } = await _obFetch('GET', `/api/deals/${DEAL_ID}/historique`);
+  el.innerHTML = `
+    <div class="deal-card">
+      <div class="deal-card-title">📋 Historique complet (${historique.length})</div>
+      ${!historique.length ? '<p style="font-size:13px;color:#94a3b8;">Aucune entrée.</p>' : ''}
+      ${historique.map(e => `
+        <div class="histo-item">
+          <div class="histo-dot"></div>
+          <div class="histo-body">
+            <div class="histo-action">${esc(e.action)}</div>
+            ${e.detail ? `<div class="histo-detail">${esc(e.detail)}</div>` : ''}
+            <div class="histo-meta">${e.acteur_nom||'Système'} · ${fmtDate(e.created_at)}</div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+/* ══════════════════════════════════════════
+   ACTIONS DEAL
+══════════════════════════════════════════ */
+async function repondreInvitation(reponse) {
+  try {
+    await _obFetch('POST', `/api/deals/${DEAL_ID}/repondre`, { reponse });
+    location.reload();
+  } catch(e) { alert(e.message||'Erreur'); }
+}
+
+async function doCloturer() {
+  if (!confirm('Clôturer définitivement ce Deal ?')) return;
+  try { await _obFetch('PUT', `/api/deals/${DEAL_ID}/cloturer`); location.reload(); } catch(e) { alert(e.message); }
+}
+async function doArchiver() {
+  if (!confirm('Archiver ce Deal ?')) return;
+  try { await _obFetch('PUT', `/api/deals/${DEAL_ID}/archiver`); location.reload(); } catch(e) { alert(e.message); }
+}
+async function doReactiver() {
+  try { await _obFetch('PUT', `/api/deals/${DEAL_ID}/reactiver`); location.reload(); } catch(e) { alert(e.message); }
+}
+
+/* ══════════════════════════════════════════
+   MODALS
+══════════════════════════════════════════ */
+function modals() {
+  return `
+  <!-- Modal Tâche -->
+  <div class="modal-overlay" id="modal-task" style="display:none;" onclick="if(event.target===this)closeModal('modal-task')">
+    <div class="modal-box">
+      <div class="modal-title">✅ Nouvelle tâche</div>
+      <div class="form-group"><label class="form-label">Titre *</label><input class="form-input" id="task-titre" placeholder="Titre de la tâche"/></div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="task-desc" rows="2" style="resize:none;"></textarea></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Priorité</label>
+          <select class="form-select" id="task-prio">
+            <option value="basse">Basse</option>
+            <option value="normale" selected>Normale</option>
+            <option value="haute">Haute</option>
+            <option value="urgente">Urgente</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Échéance</label><input type="date" class="form-input" id="task-date"/></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-primary" onclick="saveTask()">Créer</button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-task')">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Document -->
+  <div class="modal-overlay" id="modal-doc" style="display:none;" onclick="if(event.target===this)closeModal('modal-doc')">
+    <div class="modal-box">
+      <div class="modal-title">📁 Ajouter un document</div>
+      <div class="form-group">
+        <label class="form-label">Dossier</label>
+        <input class="form-input" id="doc-dossier" placeholder="/ (racine)" value="/"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fichier * (max 5 Mo)</label>
+        <div class="upload-zone" onclick="document.getElementById('doc-file').click()">
+          <input type="file" id="doc-file" accept="*/*" onchange="updateDocLabel(this)"/>
+          <div id="doc-file-label">Cliquez pour sélectionner un fichier</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-primary" onclick="uploadDoc()">Téléverser</button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-doc')">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Événement -->
+  <div class="modal-overlay" id="modal-event" style="display:none;" onclick="if(event.target===this)closeModal('modal-event')">
+    <div class="modal-box">
+      <div class="modal-title">📅 Nouvel événement</div>
+      <div class="form-group"><label class="form-label">Titre *</label><input class="form-input" id="event-titre" placeholder="Titre"/></div>
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <select class="form-select" id="event-type">
+          <option value="reunion">Réunion</option>
+          <option value="echeance">Échéance</option>
+          <option value="rappel">Rappel</option>
+          <option value="appel">Appel</option>
+          <option value="autre">Autre</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Début *</label><input type="datetime-local" class="form-input" id="event-date"/></div>
+        <div class="form-group"><label class="form-label">Fin</label><input type="datetime-local" class="form-input" id="event-date-fin"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="event-desc" placeholder="Description optionnelle"/></div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-primary" onclick="saveEvent()">Ajouter</button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-event')">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Inviter -->
+  <div class="modal-overlay" id="modal-invite" style="display:none;" onclick="if(event.target===this)closeModal('modal-invite')">
+    <div class="modal-box">
+      <div class="modal-title">🤝 Inviter une initiative</div>
+      <div class="form-group">
+        <label class="form-label">Initiative</label>
+        <select class="form-select" id="invite-select"><option>Chargement…</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Message d'invitation</label><textarea class="form-input" id="invite-msg" rows="3" placeholder="Message optionnel…" style="resize:none;"></textarea></div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-primary" onclick="sendInvite()">Envoyer l'invitation</button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-invite')">Annuler</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function updateDocLabel(input) {
+  document.getElementById('doc-file-label').textContent = input.files[0]?.name || 'Aucun fichier sélectionné';
+}
+
+/* ══════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════ */
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); } catch(e) { return s; }
+}
+
+/* ══════════════════════════════════════════
+   BOOTSTRAP
+══════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', async () => {
+  await initDeal();
+  // Load dashboard stats after page built
+  setTimeout(async () => {
+    if (MY_PART?.statut === 'accepte' || ME?.role === 'administrateur') {
+      await loadDashboardStats();
+    }
+  }, 200);
+});
+</script>
+</body>
+</html>

@@ -7366,6 +7366,401 @@ async function handleRequest(req, res) {
       }
     }
 
+    /* ══════════════════════════════════════════════════════
+       MODULE GÉRER UN DEAL
+    ══════════════════════════════════════════════════════ */
+
+    // Helper : vérifier accréditation deal d'une initiative
+    function hasDealAccred(initiative_id) {
+      return !!db.prepare("SELECT 1 FROM deal_accreditations WHERE initiative_id=? AND statut='active'").get(initiative_id);
+    }
+    // Helper : vérifier qu'un user est membre actif d'un deal
+    function isDealMember(deal_id, user) {
+      const init = db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+      if (!init) return false;
+      return !!db.prepare("SELECT 1 FROM deal_participants WHERE deal_id=? AND initiative_id=? AND statut='accepte'").get(deal_id, init.id);
+    }
+    // Helper : logguer une action dans le journal du deal
+    function dealLog(deal_id, acteur_id, acteur_nom, action, detail) {
+      db.prepare("INSERT INTO deal_history (deal_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)").run(deal_id, acteur_id, acteur_nom, action, detail||null);
+    }
+
+    /* ── ADMIN : accréditation Gérer un Deal ── */
+    const adminDealAccredM = pathname.match(/^\/api\/admin\/deals\/accreditations\/(\d+)\/(attribuer|suspendre|retirer)$/);
+    if (req.method === "POST" && adminDealAccredM) {
+      const admin = getCurrentUser(req);
+      if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+      const body = await readBody(req);
+      const [, init_id, action] = adminDealAccredM;
+      const init = db.prepare("SELECT id,nom FROM initiatives WHERE id=?").get(init_id);
+      if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+      const statut = action === "attribuer" ? "active" : action === "suspendre" ? "suspendue" : "retiree";
+      const existing = db.prepare("SELECT id FROM deal_accreditations WHERE initiative_id=?").get(init_id);
+      if (existing) {
+        db.prepare("UPDATE deal_accreditations SET statut=?,admin_id=?,admin_nom=?,motif=?,updated_at=datetime('now') WHERE initiative_id=?")
+          .run(statut, admin.id, admin.nom, body.motif||null, init_id);
+      } else {
+        db.prepare("INSERT INTO deal_accreditations (initiative_id,statut,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)")
+          .run(init_id, statut, admin.id, admin.nom, body.motif||null);
+      }
+      const owner = db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(init_id);
+      if (owner?.owner_user_id && action === "attribuer") {
+        creerNotif(owner.owner_user_id, "accreditation", "🤝 Accréditation « Gérer un Deal » obtenue !",
+          `Votre initiative « ${init.nom} » peut désormais créer et gérer des Deals collaboratifs sur Diaspo'Actif.`, { initiative_id: init.id });
+      }
+      return sendJSON(res, 200, { ok: true, statut });
+    }
+
+    /* ── ADMIN : liste de tous les deals ── */
+    if (req.method === "GET" && pathname === "/api/admin/deals") {
+      const admin = getCurrentUser(req);
+      if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+      const deals = db.prepare(`SELECT d.*,i.nom as createur_nom,
+        (SELECT COUNT(*) FROM deal_participants dp WHERE dp.deal_id=d.id AND dp.statut='accepte') as nb_participants
+        FROM deals d JOIN initiatives i ON i.id=d.createur_id ORDER BY d.created_at DESC`).all();
+      return sendJSON(res, 200, { deals });
+    }
+
+    /* ── ADMIN : liste des accreditations deal ── */
+    if (req.method === "GET" && pathname === "/api/admin/deals/accreditations") {
+      const admin = getCurrentUser(req);
+      if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+      const rows = db.prepare(`SELECT da.*,i.nom as initiative_nom,i.slug FROM deal_accreditations da
+        JOIN initiatives i ON i.id=da.initiative_id ORDER BY da.created_at DESC`).all();
+      return sendJSON(res, 200, { accreditations: rows });
+    }
+
+    /* ── GET mes deals (initiative connectée) ── */
+    if (req.method === "GET" && pathname === "/api/deals") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const myInit = db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(me.id);
+      if (!myInit) return sendJSON(res, 403, { error: "Compte initiative requis." });
+      const deals = db.prepare(`SELECT d.*,i.nom as createur_nom,
+        dp.statut as ma_participation,
+        (SELECT COUNT(*) FROM deal_participants p WHERE p.deal_id=d.id AND p.statut='accepte') as nb_participants
+        FROM deals d
+        JOIN deal_participants dp ON dp.deal_id=d.id AND dp.initiative_id=?
+        JOIN initiatives i ON i.id=d.createur_id
+        ORDER BY d.updated_at DESC`).all(myInit.id);
+      return sendJSON(res, 200, { deals });
+    }
+
+    /* ── POST créer un deal ── */
+    if (req.method === "POST" && pathname === "/api/deals") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+      if (!myInit) return sendJSON(res, 403, { error: "Compte initiative requis." });
+      if (!hasDealAccred(myInit.id)) return sendJSON(res, 403, { error: "Accréditation 'Gérer un Deal' requise." });
+      const body = await readBody(req);
+      const { titre, description, objectif, categorie, confidentialite, date_debut, date_fin_prev, invites } = body;
+      if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+      const r = db.prepare(`INSERT INTO deals (titre,description,objectif,categorie,confidentialite,createur_id,date_debut,date_fin_prev,statut)
+        VALUES (?,?,?,?,?,?,?,?,'brouillon')`).run(titre, description||null, objectif||null,
+        categorie||'partenariat', confidentialite||'prive', myInit.id, date_debut||null, date_fin_prev||null);
+      const dealId = Number(r.lastInsertRowid);
+      // Ajouter le créateur comme participant accepté
+      db.prepare("INSERT INTO deal_participants (deal_id,initiative_id,role,statut) VALUES (?,?,'createur','accepte')").run(dealId, myInit.id);
+      dealLog(dealId, me.id, myInit.nom, "creation", `Deal créé par ${myInit.nom}`);
+      // Envoyer les invitations
+      if (Array.isArray(invites)) {
+        invites.forEach(invId => {
+          const inv = db.prepare("SELECT id,nom,owner_user_id FROM initiatives WHERE id=?").get(invId);
+          if (!inv || inv.id === myInit.id) return;
+          db.prepare("INSERT OR IGNORE INTO deal_participants (deal_id,initiative_id,role,statut) VALUES (?,?,'participant','invite')").run(dealId, inv.id);
+          dealLog(dealId, me.id, myInit.nom, "invitation", `${inv.nom} invitée`);
+          if (inv.owner_user_id) {
+            creerNotif(inv.owner_user_id, "deal", `🤝 Invitation au Deal « ${titre} »`,
+              `${myInit.nom} vous invite à rejoindre le Deal « ${titre} ». Répondez depuis votre tableau de bord.`,
+              { deal_id: dealId });
+          }
+        });
+      }
+      // Si aucune invitation, passer direct en actif
+      const pendingCount = db.prepare("SELECT COUNT(*) as n FROM deal_participants WHERE deal_id=? AND statut='invite'").get(dealId).n;
+      if (pendingCount === 0) db.prepare("UPDATE deals SET statut='actif' WHERE id=?").run(dealId);
+      else db.prepare("UPDATE deals SET statut='en_attente' WHERE id=?").run(dealId);
+      return sendJSON(res, 201, { ok: true, deal_id: dealId });
+    }
+
+    /* ── GET deal/:id ── */
+    const dealBase = pathname.match(/^\/api\/deals\/(\d+)$/);
+    if (req.method === "GET" && dealBase) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = dealBase[1];
+      const deal = db.prepare("SELECT d.*,i.nom as createur_nom FROM deals d JOIN initiatives i ON i.id=d.createur_id WHERE d.id=?").get(did);
+      if (!deal) return sendJSON(res, 404, { error: "Deal introuvable." });
+      // Vérif accès : admin, ou participant (même invité)
+      const myInit = db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(me.id);
+      if (me.role !== "administrateur") {
+        if (!myInit) return sendJSON(res, 403, { error: "Accès refusé." });
+        const part = db.prepare("SELECT statut FROM deal_participants WHERE deal_id=? AND initiative_id=?").get(did, myInit.id);
+        if (!part) return sendJSON(res, 403, { error: "Accès refusé." });
+      }
+      const participants = db.prepare(`SELECT dp.*,i.nom,i.slug,i.domaine,i.pays FROM deal_participants dp
+        JOIN initiatives i ON i.id=dp.initiative_id WHERE dp.deal_id=? ORDER BY dp.joined_at`).all(did);
+      return sendJSON(res, 200, { deal, participants });
+    }
+
+    /* ── PUT mettre à jour un deal ── */
+    if (req.method === "PUT" && dealBase) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = dealBase[1];
+      const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+      if (!myInit) return sendJSON(res, 403, { error: "Compte initiative requis." });
+      const part = db.prepare("SELECT role FROM deal_participants WHERE deal_id=? AND initiative_id=? AND statut='accepte'").get(did, myInit.id);
+      if (!part || (part.role !== 'createur' && me.role !== 'administrateur')) return sendJSON(res, 403, { error: "Seul le créateur peut modifier ce deal." });
+      const body = await readBody(req);
+      db.prepare(`UPDATE deals SET titre=COALESCE(?,titre),description=COALESCE(?,description),
+        objectif=COALESCE(?,objectif),categorie=COALESCE(?,categorie),
+        date_debut=COALESCE(?,date_debut),date_fin_prev=COALESCE(?,date_fin_prev),updated_at=datetime('now') WHERE id=?`)
+        .run(body.titre||null,body.description||null,body.objectif||null,body.categorie||null,body.date_debut||null,body.date_fin_prev||null,did);
+      dealLog(did, me.id, myInit.nom, "modification", "Informations du deal mises à jour");
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST répondre à une invitation ── */
+    const dealRepondre = pathname.match(/^\/api\/deals\/(\d+)\/repondre$/);
+    if (req.method === "POST" && dealRepondre) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = dealRepondre[1];
+      const body = await readBody(req);
+      const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+      if (!myInit) return sendJSON(res, 403, { error: "Compte initiative requis." });
+      const part = db.prepare("SELECT id,statut FROM deal_participants WHERE deal_id=? AND initiative_id=?").get(did, myInit.id);
+      if (!part) return sendJSON(res, 404, { error: "Invitation introuvable." });
+      if (part.statut !== "invite") return sendJSON(res, 400, { error: "Invitation déjà traitée." });
+      const accepte = body.reponse === "accepter";
+      const nouveauStatut = accepte ? "accepte" : "refuse";
+      db.prepare("UPDATE deal_participants SET statut=?,repondu_at=datetime('now') WHERE deal_id=? AND initiative_id=?").run(nouveauStatut, did, myInit.id);
+      dealLog(did, me.id, myInit.nom, accepte ? "acceptation" : "refus", `${myInit.nom} ${accepte ? "a rejoint" : "a décliné"} le deal`);
+      // Si tout le monde a répondu → passer en actif
+      const pending = db.prepare("SELECT COUNT(*) as n FROM deal_participants WHERE deal_id=? AND statut='invite'").get(did).n;
+      if (pending === 0 && accepte) db.prepare("UPDATE deals SET statut='actif',updated_at=datetime('now') WHERE id=? AND statut='en_attente'").run(did);
+      return sendJSON(res, 200, { ok: true, statut: nouveauStatut });
+    }
+
+    /* ── POST inviter une initiative supplémentaire ── */
+    const dealInviter = pathname.match(/^\/api\/deals\/(\d+)\/inviter$/);
+    if (req.method === "POST" && dealInviter) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = dealInviter[1];
+      const body = await readBody(req);
+      const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+      if (!myInit) return sendJSON(res, 403, { error: "Compte initiative requis." });
+      if (!isDealMember(did, me)) return sendJSON(res, 403, { error: "Accès refusé." });
+      const invId = body.initiative_id;
+      const inv = db.prepare("SELECT id,nom,owner_user_id FROM initiatives WHERE id=?").get(invId);
+      if (!inv) return sendJSON(res, 404, { error: "Initiative introuvable." });
+      db.prepare("INSERT OR IGNORE INTO deal_participants (deal_id,initiative_id,role,statut,message_inv) VALUES (?,?,'participant','invite',?)").run(did, inv.id, body.message||null);
+      dealLog(did, me.id, myInit.nom, "invitation", `${inv.nom} invitée`);
+      const deal = db.prepare("SELECT titre FROM deals WHERE id=?").get(did);
+      if (inv.owner_user_id) creerNotif(inv.owner_user_id, "deal", `🤝 Invitation au Deal « ${deal.titre} »`,
+        `${myInit.nom} vous invite à rejoindre le Deal « ${deal.titre} ».`, { deal_id: Number(did) });
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── MESSAGES ── */
+    const dealMessages = pathname.match(/^\/api\/deals\/(\d+)\/messages$/);
+    if (dealMessages) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = dealMessages[1];
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      if (req.method === "GET") {
+        const msgs = db.prepare("SELECT * FROM deal_messages WHERE deal_id=? ORDER BY created_at ASC").all(did);
+        return sendJSON(res, 200, { messages: msgs });
+      }
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        if (!body.contenu) return sendJSON(res, 400, { error: "Contenu requis." });
+        const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+        db.prepare("INSERT INTO deal_messages (deal_id,auteur_id,auteur_nom,contenu,type) VALUES (?,?,?,?,?)")
+          .run(did, me.id, myInit?.nom||me.nom, body.contenu, body.type||'message');
+        db.prepare("UPDATE deals SET updated_at=datetime('now') WHERE id=?").run(did);
+        dealLog(did, me.id, myInit?.nom||me.nom, "message", null);
+        return sendJSON(res, 201, { ok: true });
+      }
+    }
+
+    /* ── TÂCHES ── */
+    const dealTaches = pathname.match(/^\/api\/deals\/(\d+)\/taches$/);
+    if (dealTaches) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = dealTaches[1];
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      if (req.method === "GET") {
+        return sendJSON(res, 200, { taches: db.prepare("SELECT * FROM deal_tasks WHERE deal_id=? ORDER BY created_at DESC").all(did) });
+      }
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+        const r = db.prepare("INSERT INTO deal_tasks (deal_id,titre,description,assignee_id,priorite,date_echeance,created_by) VALUES (?,?,?,?,?,?,?)")
+          .run(did, body.titre, body.description||null, body.assignee_id||null, body.priorite||'normale', body.date_echeance||null, me.id);
+        dealLog(did, me.id, myInit?.nom||me.nom, "tache_creee", `Tâche : ${body.titre}`);
+        return sendJSON(res, 201, { ok: true, id: Number(r.lastInsertRowid) });
+      }
+    }
+
+    const dealTacheItem = pathname.match(/^\/api\/deals\/(\d+)\/taches\/(\d+)$/);
+    if (dealTacheItem) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const [, did, tid] = dealTacheItem;
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+      if (req.method === "PUT") {
+        const body = await readBody(req);
+        db.prepare(`UPDATE deal_tasks SET titre=COALESCE(?,titre),description=COALESCE(?,description),
+          statut=COALESCE(?,statut),priorite=COALESCE(?,priorite),assignee_id=COALESCE(?,assignee_id),
+          date_echeance=COALESCE(?,date_echeance),updated_at=datetime('now') WHERE id=? AND deal_id=?`)
+          .run(body.titre||null,body.description||null,body.statut||null,body.priorite||null,body.assignee_id||null,body.date_echeance||null,tid,did);
+        if (body.statut) dealLog(did, me.id, myInit?.nom||me.nom, "tache_mise_a_jour", `Statut → ${body.statut}`);
+        return sendJSON(res, 200, { ok: true });
+      }
+      if (req.method === "DELETE") {
+        db.prepare("DELETE FROM deal_tasks WHERE id=? AND deal_id=?").run(tid, did);
+        return sendJSON(res, 200, { ok: true });
+      }
+    }
+
+    /* ── DOCUMENTS ── */
+    const dealDocs = pathname.match(/^\/api\/deals\/(\d+)\/documents$/);
+    if (dealDocs) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = dealDocs[1];
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      if (req.method === "GET") {
+        const docs = db.prepare("SELECT id,deal_id,dossier,nom,type_mime,taille,version,uploaded_by,created_at FROM deal_documents WHERE deal_id=? ORDER BY dossier,created_at DESC").all(did);
+        return sendJSON(res, 200, { documents: docs });
+      }
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        if (!body.nom || !body.contenu_b64) return sendJSON(res, 400, { error: "Nom et contenu requis." });
+        const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+        db.prepare("INSERT INTO deal_documents (deal_id,dossier,nom,type_mime,taille,contenu_b64,uploaded_by) VALUES (?,?,?,?,?,?,?)")
+          .run(did, body.dossier||'/', body.nom, body.type_mime||null, body.taille||0, body.contenu_b64, me.id);
+        dealLog(did, me.id, myInit?.nom||me.nom, "document_ajoute", `Document : ${body.nom}`);
+        return sendJSON(res, 201, { ok: true });
+      }
+    }
+
+    const dealDocItem = pathname.match(/^\/api\/deals\/(\d+)\/documents\/(\d+)$/);
+    if (dealDocItem) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const [, did, docId] = dealDocItem;
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      if (req.method === "GET") {
+        const doc = db.prepare("SELECT * FROM deal_documents WHERE id=? AND deal_id=?").get(docId, did);
+        if (!doc) return sendJSON(res, 404, { error: "Document introuvable." });
+        return sendJSON(res, 200, { document: doc });
+      }
+      if (req.method === "DELETE") {
+        const doc = db.prepare("SELECT nom FROM deal_documents WHERE id=? AND deal_id=?").get(docId, did);
+        if (!doc) return sendJSON(res, 404, { error: "Document introuvable." });
+        const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+        db.prepare("DELETE FROM deal_documents WHERE id=? AND deal_id=?").run(docId, did);
+        dealLog(did, me.id, myInit?.nom||me.nom, "document_supprime", `Document : ${doc.nom}`);
+        return sendJSON(res, 200, { ok: true });
+      }
+    }
+
+    /* ── NOTES ── */
+    const dealNotes = pathname.match(/^\/api\/deals\/(\d+)\/notes$/);
+    if (dealNotes) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = dealNotes[1];
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      if (req.method === "GET") {
+        return sendJSON(res, 200, { notes: db.prepare("SELECT * FROM deal_notes WHERE deal_id=? ORDER BY updated_at DESC").all(did) });
+      }
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+        const r = db.prepare("INSERT INTO deal_notes (deal_id,titre,contenu,type,auteur_id,auteur_nom) VALUES (?,?,?,?,?,?)")
+          .run(did, body.titre||'Sans titre', body.contenu||'', body.type||'note', me.id, myInit?.nom||me.nom);
+        dealLog(did, me.id, myInit?.nom||me.nom, "note_creee", `Note : ${body.titre||'Sans titre'}`);
+        return sendJSON(res, 201, { ok: true, id: Number(r.lastInsertRowid) });
+      }
+    }
+
+    const dealNoteItem = pathname.match(/^\/api\/deals\/(\d+)\/notes\/(\d+)$/);
+    if (dealNoteItem && req.method === "PUT") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const [, did, nid] = dealNoteItem;
+      if (!isDealMember(did, me)) return sendJSON(res, 403, { error: "Accès refusé." });
+      const body = await readBody(req);
+      db.prepare("UPDATE deal_notes SET titre=COALESCE(?,titre),contenu=COALESCE(?,contenu),updated_at=datetime('now') WHERE id=? AND deal_id=?")
+        .run(body.titre||null, body.contenu!==undefined?body.contenu:null, nid, did);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── CALENDRIER ── */
+    const dealEvents = pathname.match(/^\/api\/deals\/(\d+)\/evenements$/);
+    if (dealEvents) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = dealEvents[1];
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      if (req.method === "GET") {
+        return sendJSON(res, 200, { evenements: db.prepare("SELECT * FROM deal_events WHERE deal_id=? ORDER BY date_debut").all(did) });
+      }
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+        if (!body.titre || !body.date_debut) return sendJSON(res, 400, { error: "Titre et date_debut requis." });
+        const r = db.prepare("INSERT INTO deal_events (deal_id,titre,description,type,date_debut,date_fin,created_by) VALUES (?,?,?,?,?,?,?)")
+          .run(did, body.titre, body.description||null, body.type||'reunion', body.date_debut, body.date_fin||null, me.id);
+        dealLog(did, me.id, myInit?.nom||me.nom, "evenement_ajoute", `${body.type||'reunion'} : ${body.titre}`);
+        return sendJSON(res, 201, { ok: true, id: Number(r.lastInsertRowid) });
+      }
+    }
+
+    const dealEventItem = pathname.match(/^\/api\/deals\/(\d+)\/evenements\/(\d+)$/);
+    if (dealEventItem && req.method === "DELETE") {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const [, did, eid] = dealEventItem;
+      if (!isDealMember(did, me)) return sendJSON(res, 403, { error: "Accès refusé." });
+      db.prepare("DELETE FROM deal_events WHERE id=? AND deal_id=?").run(eid, did);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── HISTORIQUE ── */
+    const dealHistorique = pathname.match(/^\/api\/deals\/(\d+)\/historique$/);
+    if (req.method === "GET" && dealHistorique) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const did = dealHistorique[1];
+      if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
+      return sendJSON(res, 200, { historique: db.prepare("SELECT * FROM deal_history WHERE deal_id=? ORDER BY created_at DESC LIMIT 200").all(did) });
+    }
+
+    /* ── CLÔTURER / ARCHIVER / RÉACTIVER ── */
+    const dealAction = pathname.match(/^\/api\/deals\/(\d+)\/(cloturer|archiver|reactiver)$/);
+    if (req.method === "PUT" && dealAction) {
+      const me = getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const [, did, action] = dealAction;
+      const myInit = db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
+      const part = db.prepare("SELECT role FROM deal_participants WHERE deal_id=? AND initiative_id=? AND statut='accepte'").get(did, myInit?.id);
+      if ((!part || part.role !== 'createur') && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Seul le créateur peut effectuer cette action." });
+      const newStatut = action === 'cloturer' ? 'cloture' : action === 'archiver' ? 'archive' : 'actif';
+      db.prepare("UPDATE deals SET statut=?,updated_at=datetime('now') WHERE id=?").run(newStatut, did);
+      dealLog(did, me.id, myInit?.nom||me.nom, action, `Deal ${action === 'cloturer' ? 'clôturé' : action === 'archiver' ? 'archivé' : 'réactivé'}`);
+      return sendJSON(res, 200, { ok: true, statut: newStatut });
+    }
+
     return sendJSON(res, 404, { error: "Route API inconnue." });
   }
 

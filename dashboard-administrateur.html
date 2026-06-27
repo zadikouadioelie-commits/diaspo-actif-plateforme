@@ -68,6 +68,7 @@
       <a href="#oz-admin" data-section="oz-admin">🤖 O-Z Intelligence</a>
       <a href="#onboarding" data-section="onboarding">🎓 Tutoriels d'accueil</a>
       <a href="#packages" data-section="packages">📦 Package Diaspo'Actif</a>
+      <a href="#deals-admin" data-section="deals-admin">🤝 Gérer un Deal</a>
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
     </aside>
 
@@ -1318,6 +1319,44 @@
       </section>
 
       <!-- PARAMÈTRES -->
+      <!-- GÉRER UN DEAL — ADMIN -->
+      <section id="section-deals-admin" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <h2 style="margin:0;">🤝 Gérer un Deal</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Accréditations et supervision des Deals collaboratifs entre initiatives</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="loadAdminDeals()">↺ Actualiser</button>
+        </div>
+
+        <!-- Onglets admin deals -->
+        <div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:8px;">
+          <button class="btn btn-sm" id="tab-deals-accred-btn" style="background:#2563eb;color:#fff;" onclick="showDealAdminTab('accred')">🎖 Accréditations</button>
+          <button class="btn btn-sm btn-outline" id="tab-deals-list-btn" onclick="showDealAdminTab('list')">📋 Liste des Deals</button>
+        </div>
+
+        <div id="deals-admin-accred">
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;color:#1d4ed8;">
+            💡 Attribuez l'accréditation <strong>Gérer un Deal</strong> aux initiatives autorisées. Sans cette accréditation, une initiative ne peut pas créer ni rejoindre un Deal.
+          </div>
+          <div id="deals-accred-list"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
+          <div style="margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:14px;">Attribuer l'accréditation à une initiative</h4>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <select id="deal-accred-init-sel" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;">
+                <option value="">-- Sélectionner une initiative --</option>
+              </select>
+              <input id="deal-accred-motif" placeholder="Motif (optionnel)" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;"/>
+              <button class="btn btn-sm" style="background:#2563eb;color:#fff;" onclick="attribuerDealAccred()">Attribuer</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="deals-admin-list" style="display:none;">
+          <div id="deals-admin-all"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
+        </div>
+      </section>
+
       <!-- PACKAGE DIASPO'ACTIF -->
       <section id="section-packages" style="display:none;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
@@ -3244,6 +3283,7 @@ async function submitAccordDirect(){
     promotions:  () => loadPromos(),
     ventes:      () => loadTransactions(),
     packages:    () => loadPackages(),
+    'deals-admin': () => loadAdminDeals(),
     parametres:  () => loadParametres(),
     publicites:  () => loadPublicites(),
     chatbot:     () => switchCbTab('stats'),
@@ -6271,6 +6311,110 @@ window.adminCloseEvent = async function(id) {
 <script>
 /* ── Package Diaspo'Actif — Admin ── */
 let _pkgAll = [];
+/* ══════════════════════════════════════════════
+   MODULE ADMIN — GÉRER UN DEAL
+══════════════════════════════════════════════ */
+function showDealAdminTab(tab) {
+  document.getElementById('deals-admin-accred').style.display = tab==='accred' ? '' : 'none';
+  document.getElementById('deals-admin-list').style.display  = tab==='list'   ? '' : 'none';
+  document.getElementById('tab-deals-accred-btn').style.background = tab==='accred' ? '#2563eb' : '';
+  document.getElementById('tab-deals-accred-btn').style.color = tab==='accred' ? '#fff' : '';
+  document.getElementById('tab-deals-list-btn').style.background = tab==='list' ? '#2563eb' : '';
+  document.getElementById('tab-deals-list-btn').style.color = tab==='list' ? '#fff' : '';
+  if (tab === 'list') loadAdminDealsList();
+}
+
+async function loadAdminDeals() {
+  await Promise.all([loadDealAccredList(), loadDealInitSelect()]);
+}
+
+async function loadDealAccredList() {
+  const el = document.getElementById('deals-accred-list');
+  try {
+    const { accreditations } = await _obFetch('GET', '/api/admin/deals/accreditations');
+    if (!accreditations.length) { el.innerHTML = '<p style="font-size:13px;color:var(--muted);">Aucune accréditation Deal attribuée.</p>'; return; }
+    const sColor = { active:'#16a34a', suspendue:'#d97706', retiree:'#dc2626' };
+    const sLabel = { active:'Active', suspendue:'Suspendue', retiree:'Retirée' };
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:2px solid var(--border);text-align:left;">
+        <th style="padding:8px 10px;">Initiative</th>
+        <th style="padding:8px 10px;">Statut</th>
+        <th style="padding:8px 10px;">Attribuée le</th>
+        <th style="padding:8px 10px;">Admin</th>
+        <th style="padding:8px 10px;">Actions</th>
+      </tr></thead>
+      <tbody>${accreditations.map(a => `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 10px;font-weight:600;">${escAdm(a.initiative_nom)}</td>
+        <td style="padding:8px 10px;"><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:${sColor[a.statut]}22;color:${sColor[a.statut]};">${sLabel[a.statut]||a.statut}</span></td>
+        <td style="padding:8px 10px;color:var(--muted);">${fmtAdmDate(a.created_at)}</td>
+        <td style="padding:8px 10px;color:var(--muted);">${escAdm(a.admin_nom||'—')}</td>
+        <td style="padding:8px 10px;display:flex;gap:4px;flex-wrap:wrap;">
+          ${a.statut==='active' ? `<button class="btn btn-sm" style="background:#fef3c7;color:#d97706;font-size:11px;" onclick="actionDealAccred(${a.initiative_id},'suspendre')">Suspendre</button>` : ''}
+          ${a.statut!=='retiree' ? `<button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;font-size:11px;" onclick="actionDealAccred(${a.initiative_id},'retirer')">Retirer</button>` : ''}
+          ${a.statut!=='active' ? `<button class="btn btn-sm" style="background:#dcfce7;color:#16a34a;font-size:11px;" onclick="actionDealAccred(${a.initiative_id},'attribuer')">Réactiver</button>` : ''}
+        </td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch(e) { el.innerHTML = '<p style="color:#dc2626;font-size:13px;">Erreur chargement.</p>'; }
+}
+
+async function loadDealInitSelect() {
+  try {
+    const { initiatives } = await _obFetch('GET', '/api/initiatives?limit=200');
+    const sel = document.getElementById('deal-accred-init-sel');
+    sel.innerHTML = '<option value="">-- Sélectionner une initiative --</option>' +
+      initiatives.map(i => `<option value="${i.id}">${escAdm(i.nom)} (${i.pays||'—'})</option>`).join('');
+  } catch(e) {}
+}
+
+async function attribuerDealAccred() {
+  const init_id = document.getElementById('deal-accred-init-sel').value;
+  const motif = document.getElementById('deal-accred-motif').value.trim();
+  if (!init_id) { alert('Sélectionnez une initiative'); return; }
+  try {
+    await _obFetch('POST', `/api/admin/deals/accreditations/${init_id}/attribuer`, { motif: motif||undefined });
+    await loadAdminDeals();
+  } catch(e) { alert((e && e.error) || e.message || 'Erreur'); }
+}
+
+async function actionDealAccred(init_id, action) {
+  if (action === 'retirer' && !confirm('Retirer l\'accréditation Deal de cette initiative ?')) return;
+  try {
+    await _obFetch('POST', `/api/admin/deals/accreditations/${init_id}/${action}`);
+    await loadAdminDeals();
+  } catch(e) { alert((e && e.error) || e.message || 'Erreur'); }
+}
+
+async function loadAdminDealsList() {
+  const el = document.getElementById('deals-admin-all');
+  try {
+    const { deals } = await _obFetch('GET', '/api/admin/deals');
+    if (!deals.length) { el.innerHTML = '<p style="font-size:13px;color:var(--muted);">Aucun Deal créé sur la plateforme.</p>'; return; }
+    const sColor = { brouillon:'#64748b', en_attente:'#d97706', actif:'#16a34a', cloture:'#dc2626', archive:'#6b7280' };
+    const sLabel = { brouillon:'Brouillon', en_attente:'En attente', actif:'Actif', cloture:'Clôturé', archive:'Archivé' };
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:2px solid var(--border);text-align:left;">
+        <th style="padding:8px 10px;">Titre</th>
+        <th style="padding:8px 10px;">Créateur</th>
+        <th style="padding:8px 10px;">Participants</th>
+        <th style="padding:8px 10px;">Statut</th>
+        <th style="padding:8px 10px;">Créé le</th>
+      </tr></thead>
+      <tbody>${deals.map(d => `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 10px;font-weight:600;">${escAdm(d.titre)}</td>
+        <td style="padding:8px 10px;">${escAdm(d.createur_nom)}</td>
+        <td style="padding:8px 10px;text-align:center;">${d.nb_participants}</td>
+        <td style="padding:8px 10px;"><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:${sColor[d.statut]||'#64748b'}22;color:${sColor[d.statut]||'#64748b'};">${sLabel[d.statut]||d.statut}</span></td>
+        <td style="padding:8px 10px;color:var(--muted);">${fmtAdmDate(d.created_at)}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch(e) { el.innerHTML = '<p style="color:#dc2626;font-size:13px;">Erreur chargement.</p>'; }
+}
+
+function escAdm(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtAdmDate(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}); } catch(e) { return s; }
+}
+
 let _pkgCatFilter = '';
 
 async function loadPackages() {
