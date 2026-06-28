@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -8,110 +8,140 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f7;color:#1a2b4a;}
-:root{--primary:#1a3a5c;--accent:#4a90d9;--green:#27ae60;--red:#e74c3c;--orange:#e67e22;}
+:root{--primary:#1a3a5c;--accent:#4a90d9;--green:#27ae60;--red:#e74c3c;--orange:#e67e22;--purple:#9b59b6;}
 
 /* HEADER */
-#ag-header{background:var(--primary);color:#fff;padding:0 20px;height:56px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.3);}
-.ag-back{color:#fff;text-decoration:none;font-size:.8rem;opacity:.8;}
-#ag-title{font-size:1.1rem;font-weight:800;flex:1;}
-.ag-nav-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 12px;border-radius:6px;font-size:.8rem;cursor:pointer;}
+#ag-header{background:var(--primary);color:#fff;padding:0 20px;height:56px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.3);}
+.ag-back{color:#fff;text-decoration:none;font-size:.78rem;opacity:.8;white-space:nowrap;}
+#ag-title{font-size:1rem;font-weight:800;flex:1;white-space:nowrap;}
+.ag-nav-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 11px;border-radius:6px;font-size:.78rem;cursor:pointer;white-space:nowrap;}
 .ag-nav-btn:hover{background:rgba(255,255,255,.22);}
-.ag-nav-btn.primary{background:var(--accent);border-color:var(--accent);}
-#ag-period{font-size:.85rem;font-weight:700;min-width:200px;text-align:center;}
+.ag-nav-btn.accent{background:var(--accent);border-color:var(--accent);}
+.ag-nav-btn.green{background:var(--green);border-color:var(--green);}
+.ag-nav-btn.orange{background:var(--orange);border-color:var(--orange);}
+#ag-period{font-size:.82rem;font-weight:700;min-width:180px;text-align:center;}
+
+/* IDENTITY BANNER */
+#agenda-identity{background:linear-gradient(135deg,#1a3a5c 0%,#234e72 100%);color:#fff;padding:10px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.identity-pill{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:4px 12px;font-size:.75rem;font-weight:700;display:inline-flex;align-items:center;gap:5px;}
+.identity-sep{color:rgba(255,255,255,.3);}
+.identity-link{color:#7dd3fc;text-decoration:none;font-size:.75rem;font-weight:700;}
+.identity-link:hover{text-decoration:underline;}
 
 /* TABS VUE */
 #ag-view-tabs{display:flex;border-bottom:2px solid #e0e8f0;background:#fff;padding:0 20px;gap:4px;}
-.view-tab{padding:10px 16px;font-size:.82rem;font-weight:700;border:none;background:none;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;transition:all .2s;}
+.view-tab{padding:10px 15px;font-size:.8rem;font-weight:700;border:none;background:none;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;transition:all .2s;}
 .view-tab.active{color:var(--primary);border-bottom-color:var(--accent);}
 
 /* MAIN */
 #ag-main{max-width:1200px;margin:0 auto;padding:16px;}
 
 /* VUE MOIS */
-#view-month{}
 .month-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#e0e8f0;border-radius:8px;overflow:hidden;}
-.month-header{background:#f8f9ff;padding:8px;text-align:center;font-size:.75rem;font-weight:800;color:#888;text-transform:uppercase;}
+.month-header{background:#f8f9ff;padding:8px;text-align:center;font-size:.73rem;font-weight:800;color:#888;text-transform:uppercase;}
 .month-day{background:#fff;min-height:90px;padding:4px;cursor:pointer;transition:background .1s;position:relative;}
 .month-day:hover{background:#f0f7ff;}
 .month-day.other-month{background:#fafafa;opacity:.5;}
 .month-day.today{background:#eff6ff;}
-.month-day.today .day-num{background:var(--accent);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;}
-.day-num{font-size:.78rem;font-weight:700;color:#888;margin-bottom:3px;}
-.month-event{font-size:.7rem;padding:2px 5px;border-radius:3px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;font-weight:600;}
-.month-more{font-size:.65rem;color:var(--accent);cursor:pointer;margin-top:2px;}
+.day-num{font-size:.76rem;font-weight:700;color:#888;margin-bottom:3px;}
+.day-num.today-num{background:var(--accent);color:#fff;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;}
+.month-event{font-size:.68rem;padding:2px 5px;border-radius:3px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;font-weight:600;}
+.month-more{font-size:.63rem;color:var(--accent);cursor:pointer;margin-top:2px;}
 
 /* VUE SEMAINE */
 .week-grid{display:grid;grid-template-columns:60px repeat(7,1fr);border:1px solid #e0e8f0;border-radius:8px;overflow:hidden;background:#fff;}
-.week-header-empty{background:#f8f9ff;border-right:1px solid #e0e8f0;border-bottom:2px solid #e0e8f0;}
-.week-day-header{background:#f8f9ff;padding:8px 4px;text-align:center;font-size:.75rem;border-right:1px solid #e0e8f0;border-bottom:2px solid #e0e8f0;}
+.week-header-empty,.week-day-header{background:#f8f9ff;border-right:1px solid #e0e8f0;border-bottom:2px solid #e0e8f0;}
+.week-day-header{padding:8px 4px;text-align:center;font-size:.73rem;}
 .week-day-header .dname{font-weight:800;text-transform:uppercase;color:#888;}
-.week-day-header .dnum{font-size:1.2rem;font-weight:900;color:var(--primary);}
-.week-day-header.today .dnum{background:var(--accent);color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin:0 auto;}
-.week-hours{display:contents;}
-.week-time-col{padding:0;}
-.week-hour-label{height:48px;border-bottom:1px solid #f0f0f0;border-right:1px solid #e0e8f0;padding:0 4px;display:flex;align-items:flex-start;font-size:.65rem;color:#bbb;padding-top:2px;}
+.week-day-header .dnum{font-size:1.15rem;font-weight:900;color:var(--primary);}
+.week-day-header.today .dnum-wrap{background:var(--accent);color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin:0 auto;}
+.week-hour-label{height:48px;border-bottom:1px solid #f0f0f0;border-right:1px solid #e0e8f0;padding:0 4px;display:flex;align-items:flex-start;font-size:.63rem;color:#bbb;padding-top:2px;}
 .week-day-col{position:relative;border-right:1px solid #e8edf5;}
-.week-day-slots{position:relative;height:1152px;/* 24h x 48px */}
-.week-slot{position:absolute;left:1px;right:1px;border-radius:4px;padding:2px 4px;font-size:.7rem;color:#fff;font-weight:600;cursor:pointer;overflow:hidden;z-index:1;}
+.week-day-slots{position:relative;height:1152px;}
+.week-slot{position:absolute;left:1px;right:1px;border-radius:4px;padding:2px 4px;font-size:.68rem;color:#fff;font-weight:600;cursor:pointer;overflow:hidden;z-index:1;}
 .week-hour-line{position:absolute;left:0;right:0;height:1px;background:#f0f0f0;}
 .week-now-line{position:absolute;left:0;right:0;height:2px;background:#e74c3c;z-index:5;}
 
 /* VUE JOUR */
 .day-timeline{display:grid;grid-template-columns:60px 1fr;border:1px solid #e0e8f0;border-radius:8px;overflow:hidden;background:#fff;}
 .day-slots{position:relative;height:1152px;}
-.day-slot{position:absolute;left:2px;right:2px;border-radius:6px;padding:4px 8px;font-size:.78rem;color:#fff;font-weight:600;cursor:pointer;overflow:hidden;}
+.day-slot{position:absolute;left:2px;right:2px;border-radius:6px;padding:4px 8px;font-size:.76rem;color:#fff;font-weight:600;cursor:pointer;overflow:hidden;}
 
 /* VUE LISTE */
 .list-group{margin-bottom:20px;}
-.list-date-header{font-size:.8rem;font-weight:800;color:#888;text-transform:uppercase;padding:8px 0;border-bottom:2px solid #e0e8f0;margin-bottom:8px;}
-.list-event{display:flex;gap:12px;align-items:flex-start;padding:10px 14px;background:#fff;border-radius:8px;margin-bottom:8px;border-left:4px solid #4a90d9;cursor:pointer;transition:box-shadow .15s;}
+.list-date-header{font-size:.78rem;font-weight:800;color:#888;text-transform:uppercase;padding:8px 0;border-bottom:2px solid #e0e8f0;margin-bottom:8px;}
+.list-event{display:flex;gap:12px;align-items:flex-start;padding:10px 14px;background:#fff;border-radius:8px;margin-bottom:8px;border-left:4px solid var(--accent);cursor:pointer;transition:box-shadow .15s;}
 .list-event:hover{box-shadow:0 2px 12px rgba(0,0,0,.08);}
-.list-event-time{font-size:.78rem;font-weight:700;color:#888;min-width:90px;}
-.list-event-info{flex:1;}
-.list-event-title{font-size:.9rem;font-weight:700;}
-.list-event-desc{font-size:.78rem;color:#888;margin-top:2px;}
+.list-event-time{font-size:.76rem;font-weight:700;color:#888;min-width:80px;}
+.list-event-title{font-size:.88rem;font-weight:700;}
+.list-event-desc{font-size:.76rem;color:#888;margin-top:2px;}
 
 /* MODAL */
-.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px;}
-.modal-box{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;position:relative;}
-.modal-title{font-size:1rem;font-weight:800;margin-bottom:16px;color:var(--primary);}
-.modal-close{position:absolute;top:16px;right:16px;background:#f0f0f0;border:none;border-radius:50%;width:28px;height:28px;font-size:1rem;cursor:pointer;}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px;}
+.modal-box{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;position:relative;}
+.modal-title{font-size:1rem;font-weight:800;margin-bottom:16px;color:var(--primary);display:flex;align-items:center;gap:8px;}
+.modal-close{position:absolute;top:14px;right:14px;background:#f0f0f0;border:none;border-radius:50%;width:28px;height:28px;font-size:1rem;cursor:pointer;line-height:28px;text-align:center;}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
 .form-field{margin-bottom:10px;}
-label{font-size:.78rem;font-weight:600;color:#555;display:block;margin-bottom:3px;}
-input,select,textarea{width:100%;padding:7px 10px;border:1px solid #d0d8e4;border-radius:7px;font-family:inherit;font-size:.85rem;}
+label{font-size:.76rem;font-weight:700;color:#555;display:block;margin-bottom:3px;}
+input[type=text],input[type=date],input[type=time],input[type=url],select,textarea{width:100%;padding:7px 10px;border:1.5px solid #d0d8e4;border-radius:7px;font-family:inherit;font-size:.84rem;}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px #4a90d920;}
-.modal-actions{display:flex;gap:8px;margin-top:16px;}
-.btn{padding:9px 18px;border-radius:8px;font-size:.85rem;font-weight:700;border:none;cursor:pointer;}
+.modal-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
+.btn{padding:8px 16px;border-radius:8px;font-size:.83rem;font-weight:700;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
 .btn-primary{background:var(--primary);color:#fff;}
 .btn-green{background:var(--green);color:#fff;}
 .btn-red{background:var(--red);color:#fff;}
-.btn-outline{background:#f0f4ff;color:var(--primary);border:1px solid #d0d8e4;}
+.btn-outline{background:#f0f4ff;color:var(--primary);border:1.5px solid #d0d8e4;}
 .btn-orange{background:var(--orange);color:#fff;}
+.btn-purple{background:var(--purple);color:#fff;}
 
-/* PANNEAU RDV */
-#rdv-panel{background:#fff;border-radius:12px;padding:16px;margin-bottom:16px;}
-#rdv-panel h3{font-size:.9rem;margin-bottom:12px;color:var(--primary);}
-.rdv-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;background:#f8f9ff;margin-bottom:8px;border-left:4px solid #e0e8f0;}
+/* PARTICIPANTS */
+.participants-section{background:#f8f9ff;border-radius:10px;padding:14px;margin-bottom:12px;border:1.5px solid #e0e8f0;}
+.part-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.part-counter{font-size:.78rem;font-weight:800;}
+.part-counter.ok{color:var(--green);}
+.part-counter.warn{color:var(--orange);}
+.part-counter.max{color:var(--red);}
+.part-gauge{height:5px;background:#e0e8f0;border-radius:99px;overflow:hidden;margin-bottom:10px;}
+.part-gauge-fill{height:100%;border-radius:99px;transition:width .3s,background .3s;}
+.part-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+.part-item{display:flex;align-items:center;gap:8px;background:#fff;border-radius:7px;padding:7px 10px;border:1px solid #e8edf5;}
+.part-avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;flex-shrink:0;}
+.part-name{flex:1;font-size:.82rem;font-weight:600;}
+.part-role{font-size:.68rem;color:#888;}
+.part-remove{background:none;border:none;color:#ccc;cursor:pointer;font-size:.9rem;padding:0 4px;}
+.part-remove:hover{color:var(--red);}
+.part-search-wrap{position:relative;}
+.part-search-results{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #e0e8f0;border-radius:8px;z-index:10;max-height:160px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.1);margin-top:2px;}
+.part-search-item{padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;}
+.part-search-item:hover{background:#f0f7ff;}
+.part-search-item:last-child{border-bottom:none;}
+
+/* RDV PANEL */
+.rdv-item{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:8px;background:#f8f9ff;margin-bottom:8px;border-left:4px solid #e0e8f0;cursor:pointer;transition:box-shadow .15s;}
+.rdv-item:hover{box-shadow:0 2px 10px rgba(0,0,0,.07);}
 .rdv-item.en_attente{border-color:var(--orange);}
 .rdv-item.accepte{border-color:var(--green);}
 .rdv-item.refuse{border-color:var(--red);}
+.rdv-item.peut_etre{border-color:var(--purple);}
 .rdv-item.contre_proposition{border-color:#9b59b6;}
-.rdv-badge{font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:10px;background:#e0e8f0;color:#555;text-transform:uppercase;}
+.rdv-badge{font-size:.63rem;font-weight:800;padding:2px 8px;border-radius:10px;color:#fff;text-transform:uppercase;white-space:nowrap;}
 
 /* COULEURS */
 .color-swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s;}
 .color-swatch.selected{border-color:#fff;box-shadow:0 0 0 2px var(--primary);transform:scale(1.15);}
+
 
 /* RESPONSIVE */
 @media(max-width:768px){
   .month-event{display:none;}
   .month-day{min-height:50px;}
   .form-row{grid-template-columns:1fr;}
-  #ag-period{font-size:.75rem;min-width:120px;}
+  #ag-period{min-width:100px;font-size:.75rem;}
+  #ag-header{flex-wrap:nowrap;overflow-x:auto;}
 }
 </style>
-  <link rel="stylesheet" href="/assets/responsive.css">
+<link rel="stylesheet" href="/assets/responsive.css">
 </head>
 <body>
 
@@ -122,10 +152,21 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   <span id="ag-period">—</span>
   <button class="ag-nav-btn" onclick="navNext()">›</button>
   <button class="ag-nav-btn" onclick="goToday()">Aujourd'hui</button>
-  <button class="ag-nav-btn primary" onclick="openNewEvent()">+ Événement</button>
-  <button class="ag-nav-btn" onclick="openRdvModal()" style="background:#27ae60;border-color:#27ae60;">🤝 RDV</button>
-  <button class="ag-nav-btn" onclick="location.href='/meeting.html'" style="background:#e67e22;border-color:#e67e22;">📹 Réunion</button>
+  <button class="ag-nav-btn accent" onclick="openNewRdv()">+ Rendez-vous</button>
+  <button class="ag-nav-btn orange" onclick="location.href='/meeting.html'">📹 Réunion</button>
 </header>
+
+<!-- IDENTITY BANNER -->
+<div id="agenda-identity">
+  <span class="identity-pill">🔒 Rendez-vous privés</span>
+  <span class="identity-sep">·</span>
+  <span class="identity-pill">👥 Max 10 participants</span>
+  <span class="identity-sep">·</span>
+  <span class="identity-pill">🚫 Aucune diffusion publique</span>
+  <span style="flex:1"></span>
+  <span style="font-size:.75rem;opacity:.7;">Pour organiser un événement ou une manifestation :</span>
+  <a class="identity-link" href="/evenements.html">📢 Mobiliser la diaspora →</a>
+</div>
 
 <div id="ag-view-tabs">
   <button class="view-tab active" data-view="month" onclick="switchView('month',this)">Mois</button>
@@ -143,23 +184,25 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   <div id="view-rdv" style="display:none;"></div>
 </div>
 
-<!-- MODAL ÉVÉNEMENT -->
+<!-- ═══════════════════════════════════════════
+     MODAL BLOC PERSONNEL (agenda privé)
+═══════════════════════════════════════════ -->
 <div class="modal-backdrop" id="modal-event">
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal('modal-event')">×</button>
-    <div class="modal-title" id="event-modal-title">Nouvel événement</div>
+    <div class="modal-title">📌 <span id="event-modal-title">Bloc personnel</span></div>
+    <div style="background:#f0f7ff;border-radius:8px;padding:8px 12px;font-size:.76rem;color:#555;margin-bottom:14px;">
+      ℹ️ Bloc personnel visible uniquement par vous. Pour inviter d'autres personnes, utilisez <strong>+ Rendez-vous</strong>.
+    </div>
     <input type="hidden" id="ev-id">
-    <div class="form-field"><label>Titre *</label><input id="ev-titre" type="text" placeholder="Titre de l'événement"></div>
+    <div class="form-field"><label>Titre *</label><input id="ev-titre" type="text" placeholder="Ex. : Préparation réunion, Formation…"></div>
     <div class="form-row">
-      <div><label>Date début *</label><input id="ev-date-debut" type="datetime-local"></div>
-      <div><label>Date fin *</label><input id="ev-date-fin" type="datetime-local"></div>
+      <div><label>Début *</label><input id="ev-date-debut" type="datetime-local"></div>
+      <div><label>Fin *</label><input id="ev-date-fin" type="datetime-local"></div>
     </div>
-    <div class="form-row">
-      <div><label>Lieu</label><input id="ev-lieu" type="text" placeholder="Paris, Zoom, Téléphone…"></div>
-      <div><label>Type</label><select id="ev-lieu-type"><option value="physique">Physique</option><option value="virtuel">Virtuel</option><option value="telephone">Téléphone</option></select></div>
-    </div>
+    <div class="form-field"><label>Lieu</label><input id="ev-lieu" type="text" placeholder="Paris, Zoom, Téléphone…"></div>
     <div class="form-field"><label>Description</label><textarea id="ev-desc" rows="2" placeholder="Description…"></textarea></div>
-    <div class="form-field"><label>Notes privées</label><textarea id="ev-notes" rows="2" placeholder="Notes privées (visibles uniquement par vous)…"></textarea></div>
+    <div class="form-field"><label>Notes privées</label><textarea id="ev-notes" rows="2" placeholder="Notes visibles uniquement par vous…"></textarea></div>
     <div class="form-field">
       <label>Couleur</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;" id="color-picker">
@@ -181,66 +224,111 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   </div>
 </div>
 
-<!-- MODAL PROPOSER RDV -->
+<!-- ═══════════════════════════════════════════
+     MODAL RENDEZ-VOUS (multi-participants)
+═══════════════════════════════════════════ -->
 <div class="modal-backdrop" id="modal-rdv">
-  <div class="modal-box">
+  <div class="modal-box" style="max-width:600px;">
     <button class="modal-close" onclick="closeModal('modal-rdv')">×</button>
-    <div class="modal-title">🤝 Proposer un rendez-vous</div>
-    <div class="form-field"><label>Avec qui ? (ID ou recherche)</label>
-      <input id="rdv-dest-search" type="text" placeholder="Rechercher un utilisateur…" oninput="searchUsers(this.value)">
-      <div id="rdv-user-results" style="border:1px solid #e0e8f0;border-radius:6px;margin-top:4px;display:none;max-height:150px;overflow-y:auto;background:#fff;position:relative;z-index:10;"></div>
-      <input type="hidden" id="rdv-dest-id">
-      <div id="rdv-dest-name" style="font-size:.8rem;color:var(--green);margin-top:4px;font-weight:700;"></div>
+    <div class="modal-title">🤝 Créer un rendez-vous</div>
+
+    <!-- Participants -->
+    <div class="participants-section">
+      <div class="part-header">
+        <label style="margin:0;">👥 Participants (vous + invités)</label>
+        <span id="part-counter" class="part-counter ok">1 / 10</span>
+      </div>
+      <div class="part-gauge"><div id="part-gauge-fill" class="part-gauge-fill" style="width:10%;background:var(--green);"></div></div>
+      <div id="part-list" class="part-list">
+        <!-- Organisateur (vous) — toujours présent -->
+        <div class="part-item" id="part-self">
+          <div class="part-avatar" id="part-self-avatar">?</div>
+          <div style="flex:1;"><div class="part-name" id="part-self-name">Vous (organisateur)</div></div>
+          <span class="part-role">Organisateur</span>
+        </div>
+      </div>
+      <!-- Recherche participants -->
+      <div class="part-search-wrap">
+        <input type="text" id="part-search" placeholder="🔍 Ajouter un participant (nom, email…)" oninput="partSearch(this.value)" autocomplete="off">
+        <div id="part-results" class="part-search-results" style="display:none;"></div>
+      </div>
+      <div id="part-limit-msg" style="font-size:.74rem;color:var(--orange);margin-top:6px;display:none;">
+        ⚠️ Maximum 10 participants atteint.
+      </div>
     </div>
+
+    <!-- Détails RDV -->
     <div class="form-field"><label>Sujet *</label><input id="rdv-titre" type="text" placeholder="Objet du rendez-vous"></div>
-    <div class="form-field"><label>Description</label><textarea id="rdv-desc" rows="2" placeholder="Description…"></textarea></div>
+    <div class="form-field"><label>Description</label><textarea id="rdv-desc" rows="2" placeholder="Ordre du jour, notes…"></textarea></div>
     <div class="form-row">
       <div><label>Date *</label><input id="rdv-date" type="date"></div>
       <div><label>Durée</label>
-        <select id="rdv-duree">
+        <select id="rdv-duree" onchange="updateRdvFin()">
           <option value="15">15 min</option>
           <option value="30" selected>30 min</option>
           <option value="45">45 min</option>
           <option value="60">1 heure</option>
           <option value="90">1h30</option>
           <option value="120">2 heures</option>
+          <option value="180">3 heures</option>
         </select>
       </div>
     </div>
     <div class="form-row">
-      <div><label>Heure début *</label><input id="rdv-heure-debut" type="time" value="09:00"></div>
+      <div><label>Heure début *</label><input id="rdv-heure-debut" type="time" value="09:00" onchange="updateRdvFin()"></div>
       <div><label>Heure fin</label><input id="rdv-heure-fin" type="time" value="09:30" readonly style="background:#f8f9ff;"></div>
     </div>
     <div class="form-row">
-      <div><label>Lieu</label><input id="rdv-lieu" type="text" placeholder="Lieu ou lien visio…"></div>
-      <div><label>Type</label><select id="rdv-lieu-type"><option value="virtuel">Virtuel</option><option value="physique">Physique</option><option value="telephone">Téléphone</option></select></div>
+      <div><label>Lieu</label><input id="rdv-lieu" type="text" placeholder="Salle, adresse…"></div>
+      <div><label>Type</label>
+        <select id="rdv-lieu-type">
+          <option value="virtuel">Virtuel</option>
+          <option value="physique">Physique</option>
+          <option value="telephone">Téléphone</option>
+          <option value="hybride">Hybride</option>
+        </select>
+      </div>
     </div>
-    <div id="rdv-dispo-result" style="font-size:.8rem;margin-top:4px;"></div>
+    <div class="form-field"><label>🔗 Lien de visioconférence</label><input id="rdv-visio" type="url" placeholder="https://meet.google.com/… ou https://zoom.us/…"></div>
+    <div class="form-field" style="background:#f8f9ff;border-radius:8px;padding:10px;border:1.5px dashed #d0d8e4;">
+      <label>📎 Pièces jointes</label>
+      <div id="docs-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+      <input type="text" id="doc-url" placeholder="Coller un lien (Google Drive, Dropbox…)" style="margin-top:6px;">
+      <button class="btn btn-outline" onclick="addDoc()" style="margin-top:6px;font-size:.75rem;padding:5px 10px;">+ Ajouter le lien</button>
+    </div>
+    <div id="rdv-dispo-result" style="font-size:.78rem;margin-top:4px;"></div>
     <div class="modal-actions">
-      <button class="btn btn-green" onclick="proposerRdv()">📨 Envoyer la proposition</button>
+      <button class="btn btn-green" onclick="proposerRdv()">📨 Envoyer les invitations</button>
       <button class="btn btn-outline" onclick="closeModal('modal-rdv')">Annuler</button>
+    </div>
+    <div style="font-size:.72rem;color:#aaa;margin-top:10px;text-align:center;">
+      🔒 Ce rendez-vous est <strong>privé</strong>. Il ne sera jamais publié ni diffusé publiquement.
     </div>
   </div>
 </div>
 
-<!-- MODAL RÉPONDRE RDV -->
+
+<!-- ═══════════════════════════════════════════
+     MODAL RÉPONDRE RDV
+═══════════════════════════════════════════ -->
 <div class="modal-backdrop" id="modal-rdv-respond">
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal('modal-rdv-respond')">×</button>
     <div class="modal-title" id="rdv-respond-title">Répondre au rendez-vous</div>
     <input type="hidden" id="rdv-respond-id">
-    <div id="rdv-respond-info" style="background:#f8f9ff;border-radius:8px;padding:12px;margin-bottom:14px;font-size:.85rem;"></div>
+    <div id="rdv-respond-info" style="background:#f8f9ff;border-radius:8px;padding:12px;margin-bottom:14px;font-size:.84rem;"></div>
     <div class="form-field"><label>Message (optionnel)</label><textarea id="rdv-respond-msg" rows="2" placeholder="Votre message…"></textarea></div>
     <div id="contre-prop-fields" style="display:none;">
-      <div style="font-size:.82rem;font-weight:700;color:#9b59b6;margin-bottom:8px;">Proposer une autre date :</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--purple);margin-bottom:8px;">Proposer une autre date :</div>
       <div class="form-row">
         <div><label>Nouvelle date</label><input id="contre-date" type="date"></div>
         <div><label>Heure début</label><input id="contre-heure-debut" type="time"></div>
       </div>
       <div><label>Heure fin</label><input id="contre-heure-fin" type="time"></div>
     </div>
-    <div class="modal-actions">
+    <div class="modal-actions" style="flex-wrap:wrap;">
       <button class="btn btn-green" onclick="respondRdv('accepte')">✅ Accepter</button>
+      <button class="btn" style="background:#8b5cf6;color:#fff;" onclick="respondRdv('peut_etre')">🤔 Peut-être</button>
       <button class="btn btn-orange" onclick="showContreProp()">🔄 Autre date</button>
       <button class="btn btn-red" onclick="respondRdv('refuse')">❌ Refuser</button>
       <button class="btn btn-outline" onclick="closeModal('modal-rdv-respond')">Annuler</button>
@@ -248,7 +336,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   </div>
 </div>
 
-<!-- MODAL DÉTAIL ÉVÉNEMENT -->
+<!-- ═══════════════════════════════════════════
+     MODAL DÉTAIL ÉVÉNEMENT/RDV
+═══════════════════════════════════════════ -->
 <div class="modal-backdrop" id="modal-event-detail">
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal('modal-event-detail')">×</button>
@@ -263,15 +353,30 @@ let currentDate = new Date();
 let events = [];
 let rdvList = [];
 let selectedColor = '#4a90d9';
+let rdvParticipants = []; /* [{id, prenom, nom}] — les invités (hors organisateur) */
+let docsLinks = [];
 
 /* ═══════════ INIT ═══════════ */
 (async () => {
   await loadEvents();
   await loadRdv();
   render();
+  loadSelfUser();
   checkReminders();
   setInterval(checkReminders, 5 * 60 * 1000);
 })();
+
+async function loadSelfUser() {
+  try {
+    const r = await fetch('/api/me', { credentials:'include' });
+    if (!r.ok) return;
+    const me = await r.json();
+    if (me && me.prenom) {
+      document.getElementById('part-self-name').textContent = `${me.prenom} ${me.nom} (vous)`;
+      document.getElementById('part-self-avatar').textContent = (me.prenom[0]||'?').toUpperCase();
+    }
+  } catch(e) {}
+}
 
 async function loadEvents() {
   try {
@@ -280,7 +385,6 @@ async function loadEvents() {
     const r = await fetch(`/api/agenda/events?from=${from}&to=${to}`, { credentials:'include' });
     if (r.ok) events = await r.json();
   } catch(e) {}
-  // Fusionner les événements billetterie (initiatives uniquement)
   try {
     const me = await fetchCurrentUser();
     if (me && (me.role === 'initiative' || me.role === 'administrateur')) {
@@ -288,32 +392,26 @@ async function loadEvents() {
       if (rb.ok) {
         const data = await rb.json();
         const billEvents = (data.events || []).map(e => ({
-          id: -(e.id),
-          titre: '🎟️ ' + e.titre,
-          description: e.description || null,
-          date_debut: e.date_debut,
-          date_fin: e.date_fin || e.date_debut,
-          lieu: [e.ville, e.pays].filter(Boolean).join(', ') || null,
-          couleur: '#ff6b00',
-          _isBilletterie: true,
-          _billId: e.id,
-          _billStatut: e.statut,
-          _billVendus: e.billets_vendus || 0,
-          _billNbTypes: e.nb_types || 0
+          id: -(e.id), titre: '🎟️ ' + e.titre, description: e.description||null,
+          date_debut: e.date_debut, date_fin: e.date_fin||e.date_debut,
+          lieu: [e.ville, e.pays].filter(Boolean).join(', ')||null,
+          couleur: '#ff6b00', _isBilletterie: true, _billId: e.id,
+          _billStatut: e.statut, _billVendus: e.billets_vendus||0, _billNbTypes: e.nb_types||0
         }));
-        // Éviter les doublons si déjà présents
         const existing = new Set(events.map(e => String(e.id)));
         billEvents.forEach(be => { if (!existing.has(String(be.id))) events.push(be); });
       }
     }
   } catch(e) {}
 }
+
 async function loadRdv() {
   try {
     const r = await fetch('/api/rdv', { credentials:'include' });
     if (r.ok) rdvList = await r.json();
   } catch(e) {}
 }
+
 async function checkReminders() {
   try { await fetch('/api/agenda/reminders', { credentials:'include' }); } catch(e) {}
 }
@@ -329,14 +427,14 @@ function navPrev() {
   if (currentView==='month') currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()-1, 1);
   else if (currentView==='week') currentDate = new Date(currentDate.getTime() - 7*86400000);
   else if (currentView==='day') currentDate = new Date(currentDate.getTime() - 86400000);
-  else if (currentView==='list') currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()-1, 1);
+  else currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()-1, 1);
   loadAndRender();
 }
 function navNext() {
   if (currentView==='month') currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 1);
   else if (currentView==='week') currentDate = new Date(currentDate.getTime() + 7*86400000);
   else if (currentView==='day') currentDate = new Date(currentDate.getTime() + 86400000);
-  else if (currentView==='list') currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 1);
+  else currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 1);
   loadAndRender();
 }
 function goToday() { currentDate = new Date(); loadAndRender(); }
@@ -344,11 +442,9 @@ async function loadAndRender() { await loadEvents(); render(); }
 
 /* ═══════════ RENDER ═══════════ */
 function render() {
-  document.getElementById('view-month').style.display = currentView==='month'?'':'none';
-  document.getElementById('view-week').style.display  = currentView==='week'?'':'none';
-  document.getElementById('view-day').style.display   = currentView==='day'?'':'none';
-  document.getElementById('view-list').style.display  = currentView==='list'?'':'none';
-  document.getElementById('view-rdv').style.display   = currentView==='rdv'?'':'none';
+  ['month','week','day','list','rdv'].forEach(v => {
+    document.getElementById('view-'+v).style.display = currentView===v ? '' : 'none';
+  });
   if (currentView==='month') renderMonth();
   if (currentView==='week')  renderWeek();
   if (currentView==='day')   renderDay();
@@ -356,28 +452,25 @@ function render() {
   if (currentView==='rdv')   renderRdvPanel();
 }
 
-const MOIS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-const JOURS = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
-const JOURS_L = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const MOIS   = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const JOURS  = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+const JOURS_L= ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
 
 function renderMonth() {
-  const y = currentDate.getFullYear(), m = currentDate.getMonth();
+  const y=currentDate.getFullYear(), m=currentDate.getMonth();
   document.getElementById('ag-period').textContent = `${MOIS[m]} ${y}`;
-  const first = new Date(y, m, 1), last = new Date(y, m+1, 0);
-  const startDow = first.getDay();
-  const today = new Date(); today.setHours(0,0,0,0);
-
+  const first=new Date(y,m,1), startDow=first.getDay();
+  const today=new Date(); today.setHours(0,0,0,0);
   let html = '<div class="month-grid">';
   for (const j of JOURS) html += `<div class="month-header">${j}</div>`;
-
-  let day = new Date(y, m, 1 - startDow);
+  let day = new Date(y, m, 1-startDow);
   for (let i=0; i<42; i++) {
     const isToday = day.getTime()===today.getTime();
     const isOther = day.getMonth()!==m;
     const ds = day.toISOString().slice(0,10);
-    const dayEvts = events.filter(e => e.date_debut.startsWith(ds));
+    const dayEvts = events.filter(e => e.date_debut && e.date_debut.startsWith(ds));
     html += `<div class="month-day${isOther?' other-month':''}${isToday?' today':''}" onclick="dayClick('${ds}')">`;
-    html += `<div class="day-num">${isToday?`<span style="background:var(--accent);color:#fff;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;">${day.getDate()}</span>`:day.getDate()}</div>`;
+    html += `<div class="day-num">${isToday?`<span class="today-num">${day.getDate()}</span>`:day.getDate()}</div>`;
     dayEvts.slice(0,3).forEach(ev => {
       html += `<div class="month-event" style="background:${ev.couleur||'#4a90d9'}" onclick="event.stopPropagation();openEventDetail(${ev.id})">${_esc(ev.titre)}</div>`;
     });
@@ -390,411 +483,480 @@ function renderMonth() {
 }
 
 function renderWeek() {
-  const dow = currentDate.getDay();
-  const monday = new Date(currentDate.getTime() - (dow===0?6:dow-1)*86400000);
-  const days = Array.from({length:7}, (_,i) => new Date(monday.getTime()+i*86400000));
-  const today = new Date(); today.setHours(0,0,0,0);
-  document.getElementById('ag-period').textContent = `Sem. du ${days[0].getDate()} ${MOIS[days[0].getMonth()].slice(0,3)} au ${days[6].getDate()} ${MOIS[days[6].getMonth()].slice(0,3)} ${days[6].getFullYear()}`;
-
-  let html = '<div class="week-grid">';
-  html += '<div class="week-header-empty" style="background:#f8f9ff;border-right:1px solid #e0e8f0;border-bottom:2px solid #e0e8f0;"></div>';
+  const dow=currentDate.getDay();
+  const monday=new Date(currentDate.getTime()-(dow===0?6:dow-1)*86400000);
+  const days=Array.from({length:7},(_,i)=>new Date(monday.getTime()+i*86400000));
+  const today=new Date(); today.setHours(0,0,0,0);
+  document.getElementById('ag-period').textContent=`Sem. du ${days[0].getDate()} ${MOIS[days[0].getMonth()].slice(0,3)} au ${days[6].getDate()} ${MOIS[days[6].getMonth()].slice(0,3)} ${days[6].getFullYear()}`;
+  let html='<div class="week-grid"><div class="week-header-empty"></div>';
   days.forEach(d => {
-    const isToday = d.getTime()===today.getTime();
-    html += `<div class="week-day-header${isToday?' today':''}"><div class="dname">${JOURS[d.getDay()]}</div><div class="dnum" style="${isToday?'background:var(--accent);color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin:0 auto;':''}">${d.getDate()}</div></div>`;
+    const isTd=d.getTime()===today.getTime();
+    html+=`<div class="week-day-header${isTd?' today':''}"><div class="dname">${JOURS[d.getDay()]}</div><div class="${isTd?'dnum-wrap':'dnum'}">${d.getDate()}</div></div>`;
   });
-  // Grille heures
   for (let h=0; h<24; h++) {
-    html += `<div class="week-hour-label">${String(h).padStart(2,'0')}:00</div>`;
+    html+=`<div class="week-hour-label">${String(h).padStart(2,'0')}:00</div>`;
     days.forEach(d => {
-      const ds = d.toISOString().slice(0,10);
-      const dayEvts = events.filter(e => e.date_debut.startsWith(ds));
-      html += `<div class="week-day-col" style="border-right:1px solid #e8edf5;height:48px;border-bottom:1px solid #f0f0f0;position:relative;" onclick="dayHourClick('${ds}','${String(h).padStart(2,'0')}:00')">`;
+      const ds=d.toISOString().slice(0,10);
+      const dayEvts=events.filter(e=>e.date_debut&&e.date_debut.startsWith(ds));
+      html+=`<div class="week-day-col" style="height:48px;border-bottom:1px solid #f0f0f0;" onclick="dayHourClick('${ds}','${String(h).padStart(2,'0')}:00')">`;
       if (h===0) {
-        // Render events for this day (positioned absolutely relative to column)
-        dayEvts.forEach(ev => {
-          const s = ev.date_debut.slice(11,16)||'00:00'; const e = ev.date_fin.slice(11,16)||'01:00';
-          const [sh,sm] = s.split(':').map(Number); const [eh,em] = e.split(':').map(Number);
-          const top = (sh*60+sm)*48/60; const height = Math.max(16,(eh*60+em-sh*60-sm)*48/60);
-          html += `<div class="week-slot" style="background:${ev.couleur||'#4a90d9'};top:${top}px;height:${height}px;" onclick="event.stopPropagation();openEventDetail(${ev.id})">${_esc(ev.titre)}</div>`;
+        dayEvts.forEach(ev=>{
+          const s=(ev.date_debut||'').slice(11,16)||'00:00';
+          const e2=(ev.date_fin||'').slice(11,16)||'01:00';
+          const [sh,sm]=s.split(':').map(Number);const[eh,em]=e2.split(':').map(Number);
+          const top=(sh*60+sm)*48/60;const height=Math.max(16,(eh*60+em-sh*60-sm)*48/60);
+          html+=`<div class="week-slot" style="background:${ev.couleur||'#4a90d9'};top:${top}px;height:${height}px;" onclick="event.stopPropagation();openEventDetail(${ev.id})">${_esc(ev.titre)}</div>`;
         });
       }
-      html += '</div>';
+      html+='</div>';
     });
   }
-  html += '</div>';
-  document.getElementById('view-week').innerHTML = html;
+  html+='</div>';
+  document.getElementById('view-week').innerHTML=html;
 }
 
 function renderDay() {
-  const ds = currentDate.toISOString().slice(0,10);
-  document.getElementById('ag-period').textContent = `${JOURS_L[currentDate.getDay()]} ${currentDate.getDate()} ${MOIS[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
-  const dayEvts = events.filter(e => e.date_debut.startsWith(ds));
-  let html = '<div class="day-timeline">';
-  html += '<div>';
-  for (let h=0; h<24; h++) html += `<div class="week-hour-label">${String(h).padStart(2,'0')}:00</div>`;
-  html += '</div>';
-  html += '<div class="day-slots" onclick="dayHourClickFromEvt(event)">';
-  // Lignes
-  for (let h=0; h<24; h++) html += `<div class="week-hour-line" style="top:${h*48}px;"></div>`;
-  // Heure courante
-  const now = new Date(); const nowMin = now.getHours()*60+now.getMinutes();
-  if (ds === now.toISOString().slice(0,10)) html += `<div class="week-now-line" style="top:${nowMin*48/60}px;"></div>`;
-  // Événements
-  dayEvts.forEach(ev => {
-    const s = ev.date_debut.slice(11,16)||'00:00'; const e = ev.date_fin.slice(11,16)||'01:00';
-    const [sh,sm] = s.split(':').map(Number); const [eh,em] = e.split(':').map(Number);
-    const top = (sh*60+sm)*48/60; const height = Math.max(24,(eh*60+em-sh*60-sm)*48/60);
-    html += `<div class="day-slot" style="background:${ev.couleur||'#4a90d9'};top:${top}px;height:${height}px;" onclick="event.stopPropagation();openEventDetail(${ev.id})"><strong>${_esc(ev.titre)}</strong><br>${s} – ${e}${ev.lieu?'<br>📍 '+_esc(ev.lieu):''}</div>`;
+  const ds=currentDate.toISOString().slice(0,10);
+  document.getElementById('ag-period').textContent=`${JOURS_L[currentDate.getDay()]} ${currentDate.getDate()} ${MOIS[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+  const dayEvts=events.filter(e=>e.date_debut&&e.date_debut.startsWith(ds));
+  let html='<div class="day-timeline"><div>';
+  for(let h=0;h<24;h++) html+=`<div class="week-hour-label">${String(h).padStart(2,'0')}:00</div>`;
+  html+='</div><div class="day-slots" onclick="dayHourClickFromEvt(event)">';
+  for(let h=0;h<24;h++) html+=`<div class="week-hour-line" style="top:${h*48}px;"></div>`;
+  const now=new Date(); const nowMin=now.getHours()*60+now.getMinutes();
+  if(ds===now.toISOString().slice(0,10)) html+=`<div class="week-now-line" style="top:${nowMin*48/60}px;"></div>`;
+  dayEvts.forEach(ev=>{
+    const s=(ev.date_debut||'').slice(11,16)||'00:00';
+    const e2=(ev.date_fin||'').slice(11,16)||'01:00';
+    const[sh,sm]=s.split(':').map(Number);const[eh,em]=e2.split(':').map(Number);
+    const top=(sh*60+sm)*48/60;const height=Math.max(24,(eh*60+em-sh*60-sm)*48/60);
+    html+=`<div class="day-slot" style="background:${ev.couleur||'#4a90d9'};top:${top}px;height:${height}px;" onclick="event.stopPropagation();openEventDetail(${ev.id})"><strong>${_esc(ev.titre)}</strong><br>${s}–${e2}${ev.lieu?'<br>📍 '+_esc(ev.lieu):''}</div>`;
   });
-  html += '</div></div>';
-  document.getElementById('view-day').innerHTML = html;
+  html+='</div></div>';
+  document.getElementById('view-day').innerHTML=html;
 }
 
 function renderList() {
-  const from = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const to   = new Date(currentDate.getFullYear(), currentDate.getMonth()+3, 0);
-  document.getElementById('ag-period').textContent = `${MOIS[from.getMonth()]} – ${MOIS[to.getMonth()]} ${to.getFullYear()}`;
-  const upcoming = events.filter(e => new Date(e.date_debut) >= from).sort((a,b) => new Date(a.date_debut)-new Date(b.date_debut));
-  if (!upcoming.length) { document.getElementById('view-list').innerHTML = '<div style="padding:40px;text-align:center;color:#aaa;">Aucun événement à venir</div>'; return; }
-  const groups = {};
-  upcoming.forEach(ev => {
-    const k = ev.date_debut.slice(0,10);
-    if (!groups[k]) groups[k] = [];
-    groups[k].push(ev);
-  });
-  let html = '';
-  for (const [date, evts] of Object.entries(groups)) {
-    const d = new Date(date+'T12:00:00');
-    html += `<div class="list-group"><div class="list-date-header">${JOURS_L[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}</div>`;
-    evts.forEach(ev => {
-      html += `<div class="list-event" style="border-left-color:${ev.couleur||'#4a90d9'}" onclick="openEventDetail(${ev.id})">
-        <div class="list-event-time">${(ev.date_debut.slice(11,16)||'')}<br><span style="font-weight:400;color:#bbb;">${(ev.date_fin.slice(11,16)||'')}</span></div>
-        <div class="list-event-info"><div class="list-event-title">${_esc(ev.titre)}</div>${ev.lieu?`<div class="list-event-desc">📍 ${_esc(ev.lieu)}</div>`:''}${ev.description?`<div class="list-event-desc">${_esc(ev.description.slice(0,80))}</div>`:''}</div>
-        ${ev.meeting_id?`<button class="btn btn-orange" style="font-size:.7rem;padding:4px 8px;" onclick="event.stopPropagation();joinMeeting(${ev.meeting_id})">📹</button>`:''}
+  const from=new Date(currentDate.getFullYear(),currentDate.getMonth(),1);
+  const to=new Date(currentDate.getFullYear(),currentDate.getMonth()+3,0);
+  document.getElementById('ag-period').textContent=`${MOIS[from.getMonth()]} – ${MOIS[to.getMonth()]} ${to.getFullYear()}`;
+  const upcoming=events.filter(e=>new Date(e.date_debut)>=from).sort((a,b)=>new Date(a.date_debut)-new Date(b.date_debut));
+  if(!upcoming.length){document.getElementById('view-list').innerHTML='<div style="padding:40px;text-align:center;color:#aaa;">Aucun rendez-vous à venir</div>';return;}
+  const groups={};
+  upcoming.forEach(ev=>{const k=ev.date_debut.slice(0,10);if(!groups[k])groups[k]=[];groups[k].push(ev);});
+  let html='';
+  for(const[date,evts] of Object.entries(groups)){
+    const d=new Date(date+'T12:00:00');
+    html+=`<div class="list-group"><div class="list-date-header">${JOURS_L[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}</div>`;
+    evts.forEach(ev=>{
+      html+=`<div class="list-event" style="border-left-color:${ev.couleur||'#4a90d9'}" onclick="openEventDetail(${ev.id})">
+        <div class="list-event-time">${ev.date_debut.slice(11,16)||''}<br><span style="font-weight:400;color:#bbb;">${ev.date_fin.slice(11,16)||''}</span></div>
+        <div><div class="list-event-title">${_esc(ev.titre)}</div>${ev.lieu?`<div class="list-event-desc">📍 ${_esc(ev.lieu)}</div>`:''}${ev.description?`<div class="list-event-desc">${_esc(ev.description.slice(0,80))}</div>`:''}</div>
       </div>`;
     });
-    html += '</div>';
+    html+='</div>';
   }
-  document.getElementById('view-list').innerHTML = html;
+  document.getElementById('view-list').innerHTML=html;
 }
 
 function renderRdvPanel() {
-  document.getElementById('ag-period').textContent = 'Mes Rendez-vous';
-  const LABELS = { en_attente:'En attente',accepte:'Accepté',refuse:'Refusé',contre_proposition:'Contre-prop.',annule:'Annulé',expire:'Expiré' };
-  const COLORS = { en_attente:'#e67e22',accepte:'#27ae60',refuse:'#e74c3c',contre_proposition:'#9b59b6',annule:'#95a5a6',expire:'#95a5a6' };
-  let html = '<div style="background:#fff;border-radius:12px;padding:16px;">';
-  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h3 style="font-size:.95rem;color:var(--primary);">Mes rendez-vous (${rdvList.length})</h3><button class="btn btn-green" onclick="openRdvModal()" style="font-size:.78rem;padding:6px 12px;">+ Proposer un RDV</button></div>`;
-  if (!rdvList.length) { html += '<div style="padding:24px;text-align:center;color:#aaa;">Aucun rendez-vous</div>'; }
-  rdvList.forEach(rdv => {
-    const isProposeur = rdv.proposeur_id !== undefined; // simplified
-    const other = rdv.proposeur_nom ? `${rdv.proposeur_prenom} ${rdv.proposeur_nom}` : `${rdv.dest_prenom} ${rdv.dest_nom}`;
-    html += `<div class="rdv-item ${rdv.statut}" style="cursor:pointer;" onclick="openRdvDetail(${rdv.id})">
+  document.getElementById('ag-period').textContent='Mes Rendez-vous';
+  const LABELS={en_attente:'En attente',accepte:'Accepté',refuse:'Refusé',peut_etre:'Peut-être',contre_proposition:'Contre-prop.',annule:'Annulé',expire:'Expiré'};
+  const COLORS={en_attente:'#e67e22',accepte:'#27ae60',refuse:'#e74c3c',peut_etre:'#8b5cf6',contre_proposition:'#9b59b6',annule:'#95a5a6',expire:'#95a5a6'};
+  let html=`<div style="background:#fff;border-radius:12px;padding:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="font-size:.95rem;color:var(--primary);">Mes rendez-vous (${rdvList.length})</h3>
+      <button class="btn btn-green" onclick="openNewRdv()" style="font-size:.77rem;padding:6px 12px;">+ Nouveau RDV</button>
+    </div>
+    <div style="background:#f0f7ff;border-radius:8px;padding:10px 14px;font-size:.76rem;color:#555;margin-bottom:14px;">
+      🔒 <strong>Rendez-vous privés uniquement.</strong> Max 10 participants.
+      Pour des rassemblements communautaires, utilisez <a href="/evenements.html" style="color:var(--accent);">les Événements</a>.
+    </div>`;
+  if(!rdvList.length) html+='<div style="padding:24px;text-align:center;color:#aaa;">Aucun rendez-vous. <button class="btn btn-outline" onclick="openNewRdv()" style="font-size:.78rem;margin-left:8px;">+ Créer</button></div>';
+  rdvList.forEach(rdv=>{
+    const other=rdv.proposeur_nom?`${rdv.proposeur_prenom} ${rdv.proposeur_nom}`:`${rdv.dest_prenom} ${rdv.dest_nom}`;
+    let nbPart=2;
+    try{nbPart=(JSON.parse(rdv.participants_json||'[]').length)||2;}catch(e){}
+    html+=`<div class="rdv-item ${rdv.statut}" onclick="openRdvDetail(${rdv.id})">
       <div style="flex:1;">
-        <div style="font-weight:700;font-size:.88rem;">${_esc(rdv.titre)}</div>
-        <div style="font-size:.75rem;color:#888;">👤 ${_esc(other)} · 📅 ${rdv.date_proposee} ${rdv.heure_debut}–${rdv.heure_fin}</div>
-        ${rdv.lieu?`<div style="font-size:.72rem;color:#aaa;">📍 ${_esc(rdv.lieu)}</div>`:''}
-        ${rdv.statut==='contre_proposition'?`<div style="font-size:.72rem;color:#9b59b6;">Nouvelle proposition : ${rdv.contre_date} ${rdv.contre_heure_debut}</div>`:''}
+        <div style="font-weight:700;font-size:.87rem;">${_esc(rdv.titre)}</div>
+        <div style="font-size:.73rem;color:#888;">👤 ${_esc(other)} · 📅 ${rdv.date_proposee} ${rdv.heure_debut}–${rdv.heure_fin}</div>
+        ${nbPart>2?`<div style="font-size:.7rem;color:var(--accent);margin-top:2px;">👥 ${nbPart} participants</div>`:''}
+        ${rdv.lieu?`<div style="font-size:.7rem;color:#aaa;">📍 ${_esc(rdv.lieu)}</div>`:''}
+        ${rdv.lien_visio?`<div style="font-size:.7rem;color:var(--accent);">🔗 Lien visio disponible</div>`:''}
+        ${rdv.statut==='contre_proposition'?`<div style="font-size:.7rem;color:var(--purple);">Contre-prop. : ${rdv.contre_date} ${rdv.contre_heure_debut}</div>`:''}
       </div>
-      <span class="rdv-badge" style="background:${COLORS[rdv.statut]||'#e0e8f0'};color:#fff;">${LABELS[rdv.statut]||rdv.statut}</span>
-      ${rdv.meeting_id?`<button class="btn" style="background:#e67e22;color:#fff;font-size:.72rem;padding:4px 8px;" onclick="event.stopPropagation();joinMeetingByRdv(${rdv.meeting_id})">📹</button>`:''}
+      <span class="rdv-badge" style="background:${COLORS[rdv.statut]||'#e0e8f0'};">${LABELS[rdv.statut]||rdv.statut}</span>
+      ${rdv.meeting_id?`<button class="btn btn-orange" style="font-size:.7rem;padding:4px 8px;" onclick="event.stopPropagation();joinMeetingByRdv(${rdv.meeting_id})">📹</button>`:''}
     </div>`;
   });
-  html += '</div>';
-  document.getElementById('view-rdv').innerHTML = html;
+  html+='</div>';
+  document.getElementById('view-rdv').innerHTML=html;
 }
 
-/* ═══════════ ÉVÉNEMENTS ═══════════ */
-function dayClick(ds) { currentView='day'; currentDate = new Date(ds+'T12:00:00'); render(); }
-function dayHourClick(ds, h) { openNewEvent(ds, h); }
+/* ═══════════ EVENTS AGENDA (blocs personnels) ═══════════ */
+function dayClick(ds) { currentView='day'; currentDate=new Date(ds+'T12:00:00'); render(); }
+function dayHourClick(ds,h) { openNewBloc(ds,h); }
 function dayHourClickFromEvt(e) {
-  const rect = e.currentTarget.getBoundingClientRect();
-  const y = e.clientY - rect.top;
-  const totalMin = (y / 48) * 60;
-  const h = Math.floor(totalMin/60), m = Math.floor((totalMin%60)/15)*15;
-  const ds = currentDate.toISOString().slice(0,10);
-  openNewEvent(ds, `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+  const rect=e.currentTarget.getBoundingClientRect();
+  const y=e.clientY-rect.top;
+  const totalMin=(y/48)*60;
+  const h=Math.floor(totalMin/60), m=Math.floor((totalMin%60)/15)*15;
+  openNewBloc(currentDate.toISOString().slice(0,10), `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
 }
 
-function openNewEvent(dateStr, timeStr) {
-  document.getElementById('event-modal-title').textContent = 'Nouvel événement';
-  document.getElementById('ev-id').value = '';
-  document.getElementById('ev-titre').value = '';
-  document.getElementById('ev-desc').value = '';
-  document.getElementById('ev-notes').value = '';
-  document.getElementById('ev-lieu').value = '';
-  document.getElementById('ev-lieu-type').value = 'physique';
-  document.getElementById('btn-delete-ev').style.display = 'none';
-  const ds = dateStr || currentDate.toISOString().slice(0,10);
-  const ts = timeStr || '09:00';
-  const [h,m] = ts.split(':').map(Number);
-  const endH = h+1>23?23:h+1;
-  document.getElementById('ev-date-debut').value = `${ds}T${ts}`;
-  document.getElementById('ev-date-fin').value   = `${ds}T${String(endH).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-  selectedColor = '#4a90d9';
-  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s.dataset.color==='#4a90d9'));
+function openNewBloc(dateStr, timeStr) {
+  document.getElementById('event-modal-title').textContent='Bloc personnel';
+  document.getElementById('ev-id').value='';
+  document.getElementById('ev-titre').value='';
+  document.getElementById('ev-desc').value='';
+  document.getElementById('ev-notes').value='';
+  document.getElementById('ev-lieu').value='';
+  document.getElementById('btn-delete-ev').style.display='none';
+  const ds=dateStr||currentDate.toISOString().slice(0,10);
+  const ts=timeStr||'09:00';
+  const[h,m]=ts.split(':').map(Number);
+  const endH=h+1>23?23:h+1;
+  document.getElementById('ev-date-debut').value=`${ds}T${ts}`;
+  document.getElementById('ev-date-fin').value=`${ds}T${String(endH).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  selectedColor='#4a90d9';
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('selected',s.dataset.color==='#4a90d9'));
   openModal('modal-event');
 }
 
 function openEventDetail(id) {
-  const ev = events.find(e => e.id===id);
-  if (!ev) return;
-  if (ev._isBilletterie) {
-    const STATUT_LBL = {brouillon:'📝 Brouillon', publie:'🟢 Publié', ferme:'🔒 Fermé', archive:'📁 Archivé'};
-    const sd = new Date(ev.date_debut);
-    const fmtB = d => isNaN(d)?'—':d.toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    let html = `<div style="border-left:5px solid #ff6b00;padding-left:12px;margin-bottom:16px;">
+  const ev=events.find(e=>e.id===id);
+  if(!ev) return;
+  if(ev._isBilletterie){
+    const STATUT_LBL={brouillon:'📝 Brouillon',publie:'🟢 Publié',ferme:'🔒 Fermé',archive:'📁 Archivé'};
+    const sd=new Date(ev.date_debut);
+    const fmtB=d=>isNaN(d)?'—':d.toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    let html=`<div style="border-left:5px solid #ff6b00;padding-left:12px;margin-bottom:16px;">
       <div style="font-size:1.1rem;font-weight:800;margin-bottom:4px;">${_esc(ev.titre)}</div>
       <div style="font-size:.82rem;color:#888;">📅 ${fmtB(sd)}</div>
       ${ev.lieu?`<div style="font-size:.82rem;color:#888;margin-top:2px;">📍 ${_esc(ev.lieu)}</div>`:''}
       <div style="margin-top:8px;"><span style="font-size:.78rem;padding:3px 10px;background:#fff3e0;color:#e65100;border-radius:12px;font-weight:700;">${STATUT_LBL[ev._billStatut]||ev._billStatut}</span></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;">
-      <div style="background:#fff3e0;border-radius:10px;padding:12px;text-align:center;">
-        <div style="font-size:22px;font-weight:800;color:#ff6b00;">${ev._billVendus}</div>
-        <div style="font-size:11px;color:#888;margin-top:2px;">Billets vendus</div>
-      </div>
-      <div style="background:#f8fafc;border-radius:10px;padding:12px;text-align:center;">
-        <div style="font-size:22px;font-weight:800;">${ev._billNbTypes}</div>
-        <div style="font-size:11px;color:#888;margin-top:2px;">Types de billets</div>
-      </div>
+      <div style="background:#fff3e0;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:#ff6b00;">${ev._billVendus}</div><div style="font-size:11px;color:#888;margin-top:2px;">Billets vendus</div></div>
+      <div style="background:#f8fafc;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:800;">${ev._billNbTypes}</div><div style="font-size:11px;color:#888;margin-top:2px;">Types de billets</div></div>
     </div>
-    ${ev.description?`<div style="font-size:.85rem;color:#555;line-height:1.6;margin-bottom:10px;">${_esc(ev.description)}</div>`:''}
-    <div style="background:#fff8f0;border:1px solid #ffe0b2;border-radius:8px;padding:10px;font-size:.78rem;color:#bf360c;">
-      ℹ️ Cet événement est géré depuis la billetterie. Pour modifier les billets, publier ou scanner les QR codes, ouvrez la billetterie.
-    </div>`;
-    document.getElementById('event-detail-content').innerHTML = html;
-    const actions = document.createElement('div');
-    actions.className = 'modal-actions';
-    actions.innerHTML = `<a href="billetterie.html" target="_blank" class="btn btn-orange" style="text-decoration:none;">🎟️ Ouvrir la billetterie</a><button class="btn btn-outline" onclick="closeModal('modal-event-detail')">Fermer</button>`;
+    ${ev.description?`<div style="font-size:.85rem;color:#555;line-height:1.6;margin-bottom:10px;">${_esc(ev.description)}</div>`:''}`;
+    document.getElementById('event-detail-content').innerHTML=html;
+    const actions=document.createElement('div');
+    actions.className='modal-actions';
+    actions.innerHTML=`<a href="billetterie.html" target="_blank" class="btn btn-orange" style="text-decoration:none;">🎟️ Ouvrir la billetterie</a><button class="btn btn-outline" onclick="closeModal('modal-event-detail')">Fermer</button>`;
     document.getElementById('event-detail-content').appendChild(actions);
     openModal('modal-event-detail');
     return;
   }
-  const sd = new Date(ev.date_debut), ed = new Date(ev.date_fin);
-  const fmt = d => d.toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  let html = `<div style="border-left:5px solid ${ev.couleur||'#4a90d9'};padding-left:12px;margin-bottom:16px;">
+  const sd=new Date(ev.date_debut), ed=new Date(ev.date_fin);
+  const fmt=d=>d.toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  let html=`<div style="border-left:5px solid ${ev.couleur||'#4a90d9'};padding-left:12px;margin-bottom:16px;">
     <div style="font-size:1.1rem;font-weight:800;margin-bottom:4px;">${_esc(ev.titre)}</div>
     <div style="font-size:.82rem;color:#888;">📅 ${fmt(sd)} → ${fmt(ed)}</div>
     ${ev.lieu?`<div style="font-size:.82rem;color:#888;">📍 ${_esc(ev.lieu)}</div>`:''}
   </div>`;
-  if (ev.description) html += `<div style="font-size:.85rem;color:#333;margin-bottom:10px;line-height:1.6;">${_esc(ev.description)}</div>`;
-  if (ev.notes_privees) html += `<div style="background:#fffbe6;border-radius:6px;padding:8px;font-size:.8rem;margin-bottom:10px;">🔒 ${_esc(ev.notes_privees)}</div>`;
-  document.getElementById('event-detail-content').innerHTML = html;
-  // Actions
-  const actions = document.createElement('div');
-  actions.className = 'modal-actions';
-  actions.innerHTML = `<button class="btn btn-outline" onclick="editEvent(${id})">✏️ Modifier</button>`;
-  if (ev.meeting_id) actions.innerHTML += `<button class="btn btn-orange" onclick="joinMeeting(${ev.meeting_id})">📹 Rejoindre la réunion</button>`;
-  actions.innerHTML += `<button class="btn btn-outline" onclick="closeModal('modal-event-detail')">Fermer</button>`;
+  if(ev.description) html+=`<div style="font-size:.85rem;color:#333;margin-bottom:10px;line-height:1.6;">${_esc(ev.description)}</div>`;
+  if(ev.notes_privees) html+=`<div style="background:#fffbe6;border-radius:6px;padding:8px;font-size:.8rem;margin-bottom:10px;">🔒 ${_esc(ev.notes_privees)}</div>`;
+  document.getElementById('event-detail-content').innerHTML=html;
+  const actions=document.createElement('div');
+  actions.className='modal-actions';
+  actions.innerHTML=`<button class="btn btn-outline" onclick="editBloc(${id})">✏️ Modifier</button>`;
+  if(ev.meeting_id) actions.innerHTML+=`<button class="btn btn-orange" onclick="joinMeeting(${ev.meeting_id})">📹 Réunion</button>`;
+  actions.innerHTML+=`<button class="btn btn-outline" onclick="closeModal('modal-event-detail')">Fermer</button>`;
   document.getElementById('event-detail-content').appendChild(actions);
   openModal('modal-event-detail');
 }
 
-function editEvent(id) {
-  const ev = events.find(e => e.id===id);
-  if (!ev) return;
+function editBloc(id) {
+  const ev=events.find(e=>e.id===id);
+  if(!ev) return;
   closeModal('modal-event-detail');
-  document.getElementById('event-modal-title').textContent = 'Modifier l\'événement';
-  document.getElementById('ev-id').value = id;
-  document.getElementById('ev-titre').value = ev.titre||'';
-  document.getElementById('ev-desc').value = ev.description||'';
-  document.getElementById('ev-notes').value = ev.notes_privees||'';
-  document.getElementById('ev-lieu').value = ev.lieu||'';
-  document.getElementById('ev-lieu-type').value = ev.lieu_type||'physique';
-  document.getElementById('ev-date-debut').value = ev.date_debut?.slice(0,16)||'';
-  document.getElementById('ev-date-fin').value = ev.date_fin?.slice(0,16)||'';
-  selectedColor = ev.couleur||'#4a90d9';
-  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('selected', s.dataset.color===selectedColor));
-  document.getElementById('btn-delete-ev').style.display = '';
+  document.getElementById('event-modal-title').textContent='Modifier le bloc';
+  document.getElementById('ev-id').value=id;
+  document.getElementById('ev-titre').value=ev.titre||'';
+  document.getElementById('ev-desc').value=ev.description||'';
+  document.getElementById('ev-notes').value=ev.notes_privees||'';
+  document.getElementById('ev-lieu').value=ev.lieu||'';
+  document.getElementById('ev-date-debut').value=ev.date_debut?.slice(0,16)||'';
+  document.getElementById('ev-date-fin').value=ev.date_fin?.slice(0,16)||'';
+  selectedColor=ev.couleur||'#4a90d9';
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('selected',s.dataset.color===selectedColor));
+  document.getElementById('btn-delete-ev').style.display='';
   openModal('modal-event');
 }
 
 async function saveEvent() {
-  const id = document.getElementById('ev-id').value;
-  const data = {
-    titre: document.getElementById('ev-titre').value.trim(),
-    description: document.getElementById('ev-desc').value.trim(),
-    notes_privees: document.getElementById('ev-notes').value.trim(),
-    lieu: document.getElementById('ev-lieu').value.trim(),
-    lieu_type: document.getElementById('ev-lieu-type').value,
-    date_debut: document.getElementById('ev-date-debut').value.replace('T',' ').slice(0,16)+':00',
-    date_fin: document.getElementById('ev-date-fin').value.replace('T',' ').slice(0,16)+':00',
-    couleur: selectedColor
+  const id=document.getElementById('ev-id').value;
+  const data={
+    titre:document.getElementById('ev-titre').value.trim(),
+    description:document.getElementById('ev-desc').value.trim(),
+    notes_privees:document.getElementById('ev-notes').value.trim(),
+    lieu:document.getElementById('ev-lieu').value.trim(),
+    lieu_type:'physique',
+    date_debut:document.getElementById('ev-date-debut').value.replace('T',' ').slice(0,16)+':00',
+    date_fin:document.getElementById('ev-date-fin').value.replace('T',' ').slice(0,16)+':00',
+    couleur:selectedColor
   };
-  if (!data.titre) { showMsg('Le titre est requis', 'warning'); return; }
-  const url = id ? `/api/agenda/events/${id}` : '/api/agenda/events';
-  const method = id ? 'PUT' : 'POST';
-  const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(data) });
-  if (r.ok) { closeModal('modal-event'); await loadAndRender(); }
-  else { const j = await r.json(); showMsg('Erreur : ' + j.error, 'danger'); }
+  if(!data.titre){showMsg('Le titre est requis','warning');return;}
+  const url=id?`/api/agenda/events/${id}`:'/api/agenda/events';
+  const method=id?'PUT':'POST';
+  const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(data)});
+  if(r.ok){closeModal('modal-event');await loadAndRender();}
+  else{const j=await r.json();showMsg('Erreur : '+j.error,'danger');}
 }
 
 async function deleteEvent() {
-  const id = document.getElementById('ev-id').value;
-  if (!id || !confirm('Supprimer cet événement ?')) return;
-  const r = await fetch(`/api/agenda/events/${id}`, { method:'DELETE', credentials:'include' });
-  if (r.ok) { closeModal('modal-event'); await loadAndRender(); }
+  const id=document.getElementById('ev-id').value;
+  if(!id||!confirm('Supprimer ce bloc ?')) return;
+  const r=await fetch(`/api/agenda/events/${id}`,{method:'DELETE',credentials:'include'});
+  if(r.ok){closeModal('modal-event');await loadAndRender();}
 }
 
 function selectColor(el) {
-  selectedColor = el.dataset.color;
-  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+  selectedColor=el.dataset.color;
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('selected'));
   el.classList.add('selected');
 }
 
-/* ═══════════ RDV ═══════════ */
-function openRdvModal(destId, destName) {
-  document.getElementById('rdv-dest-id').value = destId||'';
-  document.getElementById('rdv-dest-name').textContent = destName ? `✅ ${destName}` : '';
-  document.getElementById('rdv-dest-search').value = destName||'';
-  document.getElementById('rdv-titre').value = '';
-  document.getElementById('rdv-desc').value = '';
-  document.getElementById('rdv-dispo-result').textContent = '';
-  const today = new Date().toISOString().slice(0,10);
-  document.getElementById('rdv-date').value = today;
+/* ═══════════ RDV MULTI-PARTICIPANTS ═══════════ */
+function openNewRdv(destId, destName) {
+  rdvParticipants=[];
+  docsLinks=[];
+  document.getElementById('docs-list').innerHTML='';
+  document.getElementById('doc-url').value='';
+  document.getElementById('rdv-titre').value='';
+  document.getElementById('rdv-desc').value='';
+  document.getElementById('rdv-visio').value='';
+  document.getElementById('rdv-lieu').value='';
+  document.getElementById('rdv-lieu-type').value='virtuel';
+  document.getElementById('rdv-dispo-result').textContent='';
+  document.getElementById('rdv-date').value=new Date().toISOString().slice(0,10);
   updateRdvFin();
+  if(destId) setTimeout(()=>addParticipantById(destId, destName||'Participant'), 100);
+  renderParticipants();
+  document.getElementById('part-search').value='';
+  document.getElementById('part-results').style.display='none';
   openModal('modal-rdv');
 }
 
-document.getElementById('rdv-heure-debut')?.addEventListener('change', updateRdvFin);
-document.getElementById('rdv-duree')?.addEventListener('change', updateRdvFin);
-function updateRdvFin() {
-  const h = document.getElementById('rdv-heure-debut').value;
-  const dur = parseInt(document.getElementById('rdv-duree').value)||30;
-  if (!h) return;
-  const [hh,mm] = h.split(':').map(Number);
-  const total = hh*60+mm+dur;
-  document.getElementById('rdv-heure-fin').value = `${String(Math.floor(total/60)%24).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+function renderParticipants() {
+  const total = rdvParticipants.length + 1; // +1 = organisateur
+  const counter = document.getElementById('part-counter');
+  const fill    = document.getElementById('part-gauge-fill');
+  const limitMsg = document.getElementById('part-limit-msg');
+  counter.textContent = `${total} / 10`;
+  counter.className = `part-counter ${total >= 10 ? 'max' : total >= 7 ? 'warn' : 'ok'}`;
+  fill.style.width = (total/10*100)+'%';
+  fill.style.background = total >= 10 ? 'var(--red)' : total >= 7 ? 'var(--orange)' : 'var(--green)';
+  limitMsg.style.display = total >= 10 ? '' : 'none';
+
+  // Refresh participant list (keep self)
+  const list = document.getElementById('part-list');
+  const selfEl = document.getElementById('part-self');
+  list.innerHTML = '';
+  list.appendChild(selfEl);
+  rdvParticipants.forEach((p, idx) => {
+    const div=document.createElement('div');
+    div.className='part-item';
+    div.innerHTML=`
+      <div class="part-avatar" style="background:var(--purple);">${(p.prenom||'?')[0].toUpperCase()}</div>
+      <div style="flex:1;"><div class="part-name">${_esc(p.prenom+' '+p.nom)}</div></div>
+      <button class="part-remove" onclick="removeParticipant(${idx})" title="Retirer">✕</button>`;
+    list.appendChild(div);
+  });
 }
 
-let userSearchTimer;
-async function searchUsers(q) {
-  clearTimeout(userSearchTimer);
-  const res = document.getElementById('rdv-user-results');
-  if (!q || q.length < 2) { res.style.display='none'; return; }
-  userSearchTimer = setTimeout(async () => {
-    try {
-      const r = await fetch(`/api/users/search?q=${encodeURIComponent(q)}&limit=8`, { credentials:'include' });
-      if (!r.ok) return;
-      const users = await r.json();
-      if (!users.length) { res.style.display='none'; return; }
-      res.innerHTML = users.map(u => `<div style="padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid #f0f0f0;" onmousedown="selectRdvUser(${u.id},'${_esc(u.prenom)} ${_esc(u.nom)}')">${_esc(u.prenom)} ${_esc(u.nom)}<span style="color:#aaa;margin-left:6px;">${_esc(u.email||u.ville||'')}</span></div>`).join('');
-      res.style.display = 'block';
-    } catch(e) {}
-  }, 300);
+function removeParticipant(idx) {
+  rdvParticipants.splice(idx,1);
+  renderParticipants();
 }
-function selectRdvUser(id, name) {
-  document.getElementById('rdv-dest-id').value = id;
-  document.getElementById('rdv-dest-name').textContent = `✅ ${name}`;
-  document.getElementById('rdv-dest-search').value = name;
-  document.getElementById('rdv-user-results').style.display = 'none';
+
+let partSearchTimer;
+async function partSearch(q) {
+  clearTimeout(partSearchTimer);
+  const res=document.getElementById('part-results');
+  if(!q||q.length<2){res.style.display='none';return;}
+  partSearchTimer=setTimeout(async()=>{
+    try {
+      const r=await fetch(`/api/users/search?q=${encodeURIComponent(q)}&limit=8`,{credentials:'include'});
+      if(!r.ok) return;
+      const users=await r.json();
+      if(!users.length){res.style.display='none';return;}
+      res.innerHTML=users.map(u=>{
+        const alreadyIn=rdvParticipants.some(p=>p.id===u.id);
+        return `<div class="part-search-item${alreadyIn?' style="opacity:.5;pointer-events:none;"':''}" onmousedown="addParticipantFromSearch(${u.id},'${_esc(u.prenom)}','${_esc(u.nom)}')">
+          <div class="part-avatar" style="width:24px;height:24px;font-size:.65rem;background:var(--accent);">${(u.prenom||'?')[0].toUpperCase()}</div>
+          ${_esc(u.prenom)} ${_esc(u.nom)}${alreadyIn?' ✓':''}
+          <span style="color:#aaa;margin-left:auto;font-size:.72rem;">${_esc(u.ville||u.pays||'')}</span>
+        </div>`;
+      }).join('');
+      res.style.display='block';
+    } catch(e){}
+  },280);
+}
+
+function addParticipantFromSearch(id, prenom, nom) {
+  document.getElementById('part-results').style.display='none';
+  document.getElementById('part-search').value='';
+  addParticipantById(id, null, prenom, nom);
+}
+
+function addParticipantById(id, fullName, prenom, nom) {
+  const total=rdvParticipants.length+1; // +1 pour organisateur
+  if(rdvParticipants.some(p=>p.id===id)) return;
+  if(total >= 10) {
+    // L'Agenda est limité à 10 participants — pour plus, utiliser "Mobiliser la diaspora"
+    document.getElementById('part-limit-msg').style.display='';
+    document.getElementById('part-limit-msg').innerHTML=
+      '⛔ Maximum 10 participants atteint. L\'Agenda est réservé aux rendez-vous privés. ' +
+      'Pour un événement communautaire (plus de 10 personnes, billetterie, invitations de masse) : ' +
+      '<a href="/evenements.html" style="color:var(--orange);font-weight:700;">→ Mobiliser la diaspora</a>';
+    return;
+  }
+  if(fullName && !prenom) {
+    const parts=fullName.split(' ');
+    prenom=parts[0]; nom=parts.slice(1).join(' ')||'';
+  }
+  rdvParticipants.push({id, prenom:prenom||'?', nom:nom||''});
+  renderParticipants();
+}
+
+function addDoc() {
+  const url=document.getElementById('doc-url').value.trim();
+  if(!url) return;
+  docsLinks.push(url);
+  document.getElementById('doc-url').value='';
+  const dl=document.getElementById('docs-list');
+  const chip=document.createElement('span');
+  chip.style.cssText='background:#e8f4ff;border:1px solid #bde0ff;border-radius:99px;padding:3px 10px;font-size:.72rem;display:inline-flex;align-items:center;gap:5px;';
+  chip.innerHTML=`📎 <a href="${_esc(url)}" target="_blank" style="color:#2563eb;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(url.replace(/^https?:\/\//,'').slice(0,30))}</a>`;
+  dl.appendChild(chip);
+}
+
+function updateRdvFin() {
+  const h=document.getElementById('rdv-heure-debut').value;
+  const dur=parseInt(document.getElementById('rdv-duree').value)||30;
+  if(!h) return;
+  const[hh,mm]=h.split(':').map(Number);
+  const total=hh*60+mm+dur;
+  document.getElementById('rdv-heure-fin').value=`${String(Math.floor(total/60)%24).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
 }
 
 async function proposerRdv() {
-  const destId = document.getElementById('rdv-dest-id').value;
-  const titre = document.getElementById('rdv-titre').value.trim();
-  const date = document.getElementById('rdv-date').value;
-  const heureDebut = document.getElementById('rdv-heure-debut').value;
-  const heureFin = document.getElementById('rdv-heure-fin').value;
-  if (!destId||!titre||!date||!heureDebut) { showMsg('Veuillez remplir tous les champs obligatoires', 'warning'); return; }
-  const dispo = document.getElementById('rdv-dispo-result');
-  dispo.textContent = '⏳ Vérification des disponibilités…';
-  // Vérif dispo
-  const debut = `${date}T${heureDebut}:00`;
-  const fin   = `${date}T${heureFin}:00`;
-  try {
-    const r1 = await fetch(`/api/agenda/availability?debut=${encodeURIComponent(debut)}&fin=${encodeURIComponent(fin)}`, { credentials:'include' });
-    const a1 = await r1.json();
-    const r2 = await fetch(`/api/agenda/availability?user_id=${destId}&debut=${encodeURIComponent(debut)}&fin=${encodeURIComponent(fin)}`, { credentials:'include' });
-    const a2 = await r2.json();
-    if (!a1.libre) { dispo.innerHTML = `<span style="color:var(--red);">❌ Vous n'êtes pas disponible sur ce créneau.${a1.suggestions.length?` Suggestions : ${a1.suggestions.map(s=>s.debut.slice(11,16)).join(', ')}.`:''}</span>`; return; }
-    if (!a2.libre) { dispo.innerHTML = `<span style="color:var(--orange);">⚠️ Le destinataire n'est peut-être pas disponible sur ce créneau.${a2.suggestions.length?` Créneaux libres : ${a2.suggestions.map(s=>s.debut.slice(11,16)).join(', ')}.`:''}</span>`; }
-    else dispo.innerHTML = '<span style="color:var(--green);">✅ Les deux utilisateurs sont disponibles.</span>';
-  } catch(e) {}
+  const titre=document.getElementById('rdv-titre').value.trim();
+  const date=document.getElementById('rdv-date').value;
+  const heureDebut=document.getElementById('rdv-heure-debut').value;
+  const heureFin=document.getElementById('rdv-heure-fin').value;
+  if(!titre||!date||!heureDebut){showMsg('Titre, date et heure requis','warning');return;}
+  if(rdvParticipants.length===0){showMsg('Ajoutez au moins un participant','warning');return;}
 
-  const body = {
-    destinataire_id: parseInt(destId),
+  const dispo=document.getElementById('rdv-dispo-result');
+  dispo.textContent='⏳ Envoi des invitations…';
+
+  const body={
+    destinataire_id: rdvParticipants[0].id,
+    participants_json: JSON.stringify(rdvParticipants.map(p=>p.id)),
     titre,
     description: document.getElementById('rdv-desc').value.trim(),
     date_proposee: date, heure_debut: heureDebut, heure_fin: heureFin,
     duree_minutes: parseInt(document.getElementById('rdv-duree').value)||30,
     lieu: document.getElementById('rdv-lieu').value.trim(),
-    lieu_type: document.getElementById('rdv-lieu-type').value
+    lieu_type: document.getElementById('rdv-lieu-type').value,
+    lien_visio: document.getElementById('rdv-visio').value.trim()
   };
-  const r = await fetch('/api/rdv', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(body) });
-  const j = await r.json();
-  if (r.ok) { closeModal('modal-rdv'); await loadRdv(); if (currentView==='rdv') renderRdvPanel(); showMsg('Proposition de RDV envoyée !', 'success'); }
-  else dispo.innerHTML = `<span style="color:var(--red);">❌ ${j.error}</span>`;
+
+  const r=await fetch('/api/rdv',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+  const j=await r.json();
+  if(r.ok){
+    closeModal('modal-rdv');
+    await loadRdv();
+    if(currentView==='rdv') renderRdvPanel();
+    showMsg(`✅ Invitations envoyées à ${rdvParticipants.length} participant${rdvParticipants.length>1?'s':''}!`,'success');
+  } else {
+    if(j.code==='MAX_PARTICIPANTS') {
+      dispo.innerHTML='<span style="color:var(--red);">❌ Maximum 10 participants. Pour un événement communautaire : <a href="/evenements.html" style="color:var(--orange);">→ Mobiliser la diaspora</a></span>';
+    } else {
+      dispo.innerHTML=`<span style="color:var(--red);">❌ ${j.error}</span>`;
+    }
+  }
 }
 
+/* ═══════════ RÉPONDRE RDV ═══════════ */
 function openRdvDetail(id) {
-  const rdv = rdvList.find(r => r.id===id);
-  if (!rdv) return;
-  document.getElementById('rdv-respond-id').value = id;
-  document.getElementById('rdv-respond-title').textContent = `RDV : ${rdv.titre}`;
-  document.getElementById('rdv-respond-info').innerHTML = `
+  const rdv=rdvList.find(r=>r.id===id);
+  if(!rdv) return;
+  document.getElementById('rdv-respond-id').value=id;
+  document.getElementById('rdv-respond-title').textContent=`RDV : ${rdv.titre}`;
+  let nbInfo='';
+  try{const ids=JSON.parse(rdv.participants_json||'[]');if(ids.length>2)nbInfo=`<div style="margin-top:4px;font-size:.78rem;color:var(--accent);">👥 ${ids.length} participants</div>`;}catch(e){}
+  document.getElementById('rdv-respond-info').innerHTML=`
     <strong>${_esc(rdv.titre)}</strong><br>
     📅 ${rdv.date_proposee} · ${rdv.heure_debut} – ${rdv.heure_fin}<br>
     ${rdv.lieu?`📍 ${_esc(rdv.lieu)}<br>`:''}
+    ${rdv.lien_visio?`🔗 <a href="${_esc(rdv.lien_visio)}" target="_blank" style="color:var(--accent);">Lien visio</a><br>`:''}
     ${rdv.description?`📝 ${_esc(rdv.description)}<br>`:''}
     Statut : <strong>${rdv.statut}</strong>
-    ${rdv.statut==='contre_proposition'?`<br>Nouvelle proposition : ${rdv.contre_date} ${rdv.contre_heure_debut} – ${rdv.contre_heure_fin}`:''}
+    ${nbInfo}
+    ${rdv.statut==='contre_proposition'?`<br>Contre-prop. : ${rdv.contre_date} ${rdv.contre_heure_debut} – ${rdv.contre_heure_fin}`:''}
   `;
-  document.getElementById('contre-prop-fields').style.display = 'none';
-  document.getElementById('rdv-respond-msg').value = '';
+  document.getElementById('contre-prop-fields').style.display='none';
+  document.getElementById('rdv-respond-msg').value='';
   openModal('modal-rdv-respond');
 }
 
-function showContreProp() {
-  document.getElementById('contre-prop-fields').style.display = '';
-}
+function showContreProp() { document.getElementById('contre-prop-fields').style.display=''; }
 
 async function respondRdv(action) {
-  const id = document.getElementById('rdv-respond-id').value;
-  const body = {
+  const id=document.getElementById('rdv-respond-id').value;
+  const body={
     action,
     message_reponse: document.getElementById('rdv-respond-msg').value.trim(),
     contre_date: document.getElementById('contre-date')?.value,
     contre_heure_debut: document.getElementById('contre-heure-debut')?.value,
     contre_heure_fin: document.getElementById('contre-heure-fin')?.value
   };
-  const r = await fetch(`/api/rdv/${id}/respond`, { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify(body) });
-  const j = await r.json();
-  if (r.ok) {
+  const r=await fetch(`/api/rdv/${id}/respond`,{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)});
+  const j=await r.json();
+  if(r.ok){
     closeModal('modal-rdv-respond');
-    await loadRdv(); await loadAndRender();
-    if (action==='accepte' && j.meeting) {
-      if (confirm(`✅ RDV accepté ! Une salle de réunion a été créée.\nRejoindre maintenant ?`)) joinMeetingByRoomId(j.meeting.room_id, j.meeting.token_host || j.meeting.token_guest);
-    } else showMsg(action==='accepte'?'RDV accepté !':action==='refuse'?'RDV refusé':action==='contre_proposition'?'Contre-proposition envoyée':'Action effectuée', action==='refuse'?'warning':'success');
-  } else showMsg('Erreur : ' + j.error, 'danger');
+    await loadRdv();await loadAndRender();
+    if(action==='accepte'&&j.meeting){
+      if(confirm(`✅ RDV accepté ! Une salle de réunion a été créée.\nRejoindre maintenant ?`))
+        joinMeetingByRoomId(j.meeting.room_id,j.meeting.token_host||j.meeting.token_guest);
+    } else {
+      const msgs={accepte:'✅ RDV accepté — ajouté à votre agenda !',peut_etre:'🤔 Réponse "Peut-être" envoyée.',refuse:'RDV refusé.',contre_proposition:'Contre-proposition envoyée.'};
+      showMsg(msgs[action]||'Action effectuée', action==='refuse'?'warning':'success');
+    }
+  } else showMsg('Erreur : '+(j.error||'inconnue'),'danger');
 }
 
 async function joinMeeting(meetingId) {
-  try {
-    const r = await fetch(`/api/meetings/${meetingId}`, { credentials:'include' });
-    const m = await r.json();
-    if (m.room_id) location.href = `/meeting.html?room=${m.room_id}&token=${m.token_host||m.token_guest}`;
-  } catch(e) {}
+  try{const r=await fetch(`/api/meetings/${meetingId}`,{credentials:'include'});const m=await r.json();if(m.room_id)location.href=`/meeting.html?room=${m.room_id}&token=${m.token_host||m.token_guest}`;}catch(e){}
 }
-function joinMeetingByRoomId(roomId, token) {
-  location.href = `/meeting.html?room=${roomId}&token=${token}`;
-}
+function joinMeetingByRdv(meetingId){joinMeeting(meetingId);}
+function joinMeetingByRoomId(roomId,token){location.href=`/meeting.html?room=${roomId}&token=${token}`;}
 
 /* ═══════════ UTILS ═══════════ */
-function _esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function openModal(id) { document.getElementById(id).style.display='flex'; }
-function closeModal(id) { document.getElementById(id).style.display='none'; }
-document.querySelectorAll('.modal-backdrop').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.style.display='none'; }));
+function _esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function openModal(id){document.getElementById(id).style.display='flex';}
+function closeModal(id){document.getElementById(id).style.display='none';}
+document.querySelectorAll('.modal-backdrop').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.style.display='none';}));
 
-/* ═══ Toast helper ═══ */
-function showMsg(msg, type='info') {
-  if (typeof DA !== 'undefined') { DA.toast(msg, {type}); return; }
-  const el = document.createElement('div');
-  el.style.cssText = `position:fixed;bottom:20px;right:20px;z-index:9999;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;color:#fff;background:${type==='success'?'#10b981':type==='warning'?'#f59e0b':'#ef4444'};box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:340px;`;
-  el.textContent = msg;
+function showMsg(msg,type='info'){
+  if(typeof DA!=='undefined'){DA.toast(msg,{type});return;}
+  const el=document.createElement('div');
+  el.style.cssText=`position:fixed;bottom:20px;right:20px;z-index:9999;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;color:#fff;background:${type==='success'?'#10b981':type==='warning'?'#f59e0b':'#ef4444'};box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:340px;`;
+  el.textContent=msg;
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 4000);
+  setTimeout(()=>el.remove(),4000);
 }
+
+// Fermer dropdown participants quand on clique ailleurs
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.part-search-wrap')) document.getElementById('part-results').style.display='none';
+});
 </script>
 <script src="assets/ds.js"></script>
 <script src="assets/chatbot.js"></script>

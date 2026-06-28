@@ -6042,6 +6042,12 @@ async function handleRequest(req, res) {
     const crypto = require("node:crypto");
     const genId = (n=16) => crypto.randomBytes(n).toString("hex");
 
+    /* Migrations lazy — colonnes multi-participants & conversion */
+    try { db.prepare("ALTER TABLE rdv_proposals ADD COLUMN participants_json TEXT").run(); } catch(e) {}
+    try { db.prepare("ALTER TABLE rdv_proposals ADD COLUMN reponses_json TEXT DEFAULT '{}'").run(); } catch(e) {}
+    try { db.prepare("ALTER TABLE rdv_proposals ADD COLUMN lien_visio TEXT").run(); } catch(e) {}
+    try { db.prepare("ALTER TABLE rdv_proposals ADD COLUMN converted_event_id INTEGER").run(); } catch(e) {}
+
     /* GET /api/agenda/events — événements de l'utilisateur (avec range dates) */
     if (req.method === "GET" && pathname === "/api/agenda/events") {
       const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
@@ -6154,32 +6160,48 @@ async function handleRequest(req, res) {
       return sendJSON(res, 200, rdvs);
     }
 
-    /* POST /api/rdv — proposer un RDV */
+    /* POST /api/rdv — proposer un RDV (multi-participants, max 10 au total) */
     if (req.method === "POST" && pathname === "/api/rdv") {
       const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const { destinataire_id, titre, description, date_proposee, heure_debut, heure_fin, duree_minutes, lieu, lieu_type } = body;
-      if (!destinataire_id || !titre || !date_proposee || !heure_debut || !heure_fin)
+      const { destinataire_id, titre, description, date_proposee, heure_debut, heure_fin, duree_minutes,
+              lieu, lieu_type, lien_visio, participants_json } = body;
+      if (!titre || !date_proposee || !heure_debut || !heure_fin)
         return sendJSON(res, 400, { error: "Champs requis manquants" });
-      // Vérif dispo des deux
+
+      // Collecter tous les participants (destinataire principal + extras)
+      let extraIds = [];
+      try { extraIds = JSON.parse(participants_json || '[]').map(Number).filter(Boolean); } catch(e) {}
+      const allDests = destinataire_id ? [Number(destinataire_id), ...extraIds.filter(id => id !== Number(destinataire_id))] : extraIds;
+      const uniqueDests = [...new Set(allDests)].filter(id => id !== me.id);
+
+      // Limite 10 participants (organisateur inclus)
+      if (uniqueDests.length > 9) return sendJSON(res, 400, { error: "Maximum 9 invités (10 participants incluant l'organisateur)", code: 'MAX_PARTICIPANTS' });
+      if (uniqueDests.length === 0) return sendJSON(res, 400, { error: "Au moins un destinataire requis" });
+
       const debut = `${date_proposee}T${heure_debut}:00`;
       const fin   = `${date_proposee}T${heure_fin}:00`;
-      const conflitProposeur = db.prepare(`SELECT id FROM agenda_events WHERE user_id=? AND NOT (date_fin <= ? OR date_debut >= ?)`).all(me.id, debut, fin);
-      const conflitDest = db.prepare(`SELECT id FROM agenda_events WHERE user_id=? AND NOT (date_fin <= ? OR date_debut >= ?)`).all(destinataire_id, debut, fin);
-      if (conflitProposeur.length > 0) return sendJSON(res, 409, { error: "Vous avez déjà un événement sur ce créneau", who: 'proposeur' });
-      if (conflitDest.length > 0) return sendJSON(res, 409, { error: "Le destinataire a déjà un événement sur ce créneau", who: 'destinataire' });
-      const r = db.prepare(`INSERT INTO rdv_proposals(proposeur_id,destinataire_id,titre,description,date_proposee,heure_debut,heure_fin,duree_minutes,lieu,lieu_type)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(me.id, destinataire_id, titre, description||null, date_proposee, heure_debut, heure_fin, duree_minutes||30, lieu||null, lieu_type||'virtuel');
-      // Notif destinataire
-      const moi = db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
-      try {
-        db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
-          destinataire_id, 'rdv_proposition',
-          `Nouveau rendez-vous proposé`,
-          `${moi.prenom} ${moi.nom} vous propose un RDV : "${titre}" le ${date_proposee} à ${heure_debut}`,
-          JSON.stringify({ rdv_id: r.lastInsertRowid })
+
+      const r = db.prepare(`INSERT INTO rdv_proposals(proposeur_id,destinataire_id,titre,description,date_proposee,heure_debut,heure_fin,duree_minutes,lieu,lieu_type,lien_visio,participants_json)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+          me.id, uniqueDests[0], titre, description||null, date_proposee, heure_debut, heure_fin,
+          duree_minutes||30, lieu||null, lieu_type||'virtuel', lien_visio||null,
+          JSON.stringify(uniqueDests)
         );
-      } catch(e) {}
-      return sendJSON(res, 201, { id: r.lastInsertRowid });
+      const rdvId = r.lastInsertRowid;
+
+      // Notif à tous les destinataires
+      const moi = db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+      for (const destId of uniqueDests) {
+        try {
+          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+            destId, 'rdv_proposition',
+            `Nouveau rendez-vous proposé`,
+            `${moi.prenom} ${moi.nom} vous propose un RDV : "${titre}" le ${date_proposee} à ${heure_debut}`,
+            JSON.stringify({ rdv_id: rdvId })
+          );
+        } catch(e) {}
+      }
+      return sendJSON(res, 201, { id: rdvId, nb_participants: uniqueDests.length + 1 });
     }
 
     /* PATCH /api/rdv/:id/respond — accepter/refuser/contre-proposer */
@@ -6192,11 +6214,10 @@ async function handleRequest(req, res) {
       const { action, contre_date, contre_heure_debut, contre_heure_fin, message_reponse } = body;
 
       if (action === 'accepte') {
-        // Créer les événements dans les deux agendas
         const debut = `${rdv.date_proposee}T${rdv.heure_debut}:00`;
         const fin   = `${rdv.date_proposee}T${rdv.heure_fin}:00`;
         let meetingId = null;
-        // Créer salle de réunion si virtuel
+        // Salle de réunion si virtuel
         if (rdv.lieu_type === 'virtuel' || !rdv.lieu) {
           const roomId = genId(12);
           const tokenHost  = genId(16);
@@ -6207,13 +6228,24 @@ async function handleRequest(req, res) {
           db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, rdv.proposeur_id, 'host');
           try { db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, rdv.destinataire_id, 'guest'); } catch(e) {}
         }
+        // Créer agenda_events pour l'organisateur
         const evP = db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
           .run(rdv.proposeur_id, rdv.titre, rdv.description||null, debut, fin, rdv.lieu||null, rdv.lieu_type||'physique', '#27ae60', rdvId, meetingId);
+        // Créer agenda_events pour le destinataire principal
         const evD = db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
           .run(rdv.destinataire_id, rdv.titre, rdv.description||null, debut, fin, rdv.lieu||null, rdv.lieu_type||'physique', '#27ae60', rdvId, meetingId);
+        // Créer agenda_events pour les participants additionnels
+        let extraIds = [];
+        try { extraIds = JSON.parse(rdv.participants_json || '[]').map(Number).filter(id => id !== rdv.proposeur_id && id !== rdv.destinataire_id); } catch(e) {}
+        for (const pid of extraIds) {
+          try {
+            db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+              .run(pid, rdv.titre, rdv.description||null, debut, fin, rdv.lieu||null, rdv.lieu_type||'physique', '#27ae60', rdvId, meetingId);
+            if (meetingId) try { db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, pid, 'guest'); } catch(e) {}
+          } catch(e) {}
+        }
         db.prepare(`UPDATE rdv_proposals SET statut='accepte',event_proposeur_id=?,event_destinataire_id=?,meeting_id=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
           .run(evP.lastInsertRowid, evD.lastInsertRowid, meetingId, message_reponse||null, rdvId);
-        // Notif proposeur
         try {
           const dest = db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
           db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
@@ -6270,6 +6302,54 @@ async function handleRequest(req, res) {
         return sendJSON(res, 200, { statut: 'annule' });
       }
       return sendJSON(res, 400, { error: "Action inconnue" });
+    }
+
+    /* GET /api/rdv/:id — détail d'un RDV */
+    if (req.method === "GET" && /^\/api\/rdv\/\d+$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rdvId = parseInt(pathname.split('/')[3]);
+      const rdv = db.prepare(`SELECT r.*,
+        up.prenom AS proposeur_prenom, up.nom AS proposeur_nom,
+        ud.prenom AS dest_prenom, ud.nom AS dest_nom
+        FROM rdv_proposals r
+        LEFT JOIN users up ON r.proposeur_id = up.id
+        LEFT JOIN users ud ON r.destinataire_id = ud.id
+        WHERE r.id=?`).get(rdvId);
+      if (!rdv) return sendJSON(res, 404, { error: "RDV introuvable" });
+      // Enrichir avec les noms des participants additionnels
+      let participantsInfo = [];
+      try {
+        const ids = JSON.parse(rdv.participants_json || '[]');
+        participantsInfo = ids.map(id => {
+          const u = db.prepare(`SELECT id, prenom, nom, photo_url FROM users WHERE id=?`).get(id);
+          return u || { id };
+        });
+      } catch(e) {}
+      return sendJSON(res, 200, { ...rdv, participants_info: participantsInfo });
+    }
+
+    /* POST /api/rdv/:id/convert-to-event — convertir un RDV en Événement */
+    if (req.method === "POST" && /^\/api\/rdv\/\d+\/convert-to-event$/.test(pathname)) {
+      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const rdvId = parseInt(pathname.split('/')[3]);
+      const rdv = db.prepare(`SELECT * FROM rdv_proposals WHERE id=?`).get(rdvId);
+      if (!rdv) return sendJSON(res, 404, { error: "RDV introuvable" });
+      if (rdv.proposeur_id !== me.id) return sendJSON(res, 403, { error: "Seul l'organisateur peut convertir" });
+      // Créer l'événement communautaire
+      const { titre_evt, description_evt, heure_debut, ville, pays, visibilite } = body;
+      const dateEvt = rdv.date_proposee;
+      const titreF  = titre_evt || rdv.titre;
+      const descF   = description_evt || rdv.description || '';
+      const lieuF   = body.lieu || rdv.lieu || '';
+      const r = db.prepare(`INSERT INTO evenements(titre, description, date_evt, heure_debut, lieu, ville, pays, createur_id, visibilite, statut)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+          titreF, descF, dateEvt, rdv.heure_debut, lieuF,
+          ville || '', pays || '', me.id,
+          visibilite || 'public', 'publie'
+        );
+      // Marquer le RDV comme converti
+      try { db.prepare(`UPDATE rdv_proposals SET converted_event_id=?,statut='annule',updated_at=datetime('now') WHERE id=?`).run(r.lastInsertRowid, rdvId); } catch(e) {}
+      return sendJSON(res, 201, { event_id: r.lastInsertRowid, titre: titreF });
     }
 
     /* ================================================================
