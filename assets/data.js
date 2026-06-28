@@ -361,6 +361,28 @@ const ACCREDITATIONS_DA = [
     ],
     eligible: ['initiative'],
     prix: { initiative: 49 }
+  },
+  {
+    type: 'gestion_associations',
+    label: 'Gestion des Associations',
+    emoji: '🏅',
+    couleur: '#7c3aed',
+    couleurBg: '#f5f3ff',
+    couleurBorder: '#7c3aed',
+    couleurText: '#4c1d95',
+    description: 'Accréditation premium pour gérer entièrement votre association depuis un espace sécurisé : adhérents, cotisations, trésorerie, comptabilité intelligente, assemblées générales et votes électroniques.',
+    droits: [
+      'Gérer les adhérents et cartes de membre (QR Code)',
+      'Encaisser les cotisations (carte, virement, Mobile Money) et relances automatiques',
+      'Tenir la trésorerie et la comptabilité (OCR des factures, coffre-fort numérique)',
+      'Organiser des assemblées générales et des votes électroniques',
+      'Consulter les statistiques avancées et l\'indice d\'engagement',
+      'Assistant IA : analyses financières, prédictions, rapports automatiques'
+    ],
+    eligible: ['initiative'],
+    prix: { initiative: 0 },
+    prixLabel: 'Premium — sur abonnement',
+    module: 'asso'
   }
 ];
 
