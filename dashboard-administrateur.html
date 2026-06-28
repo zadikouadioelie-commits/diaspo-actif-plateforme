@@ -2012,103 +2012,17 @@
               <input id="adp-module" class="input-field" style="width:100%;" placeholder="ex: asso">
             </div>
 
-            <!-- Règles par type de compte -->
+            <!-- Règles par type de compte — dynamique -->
             <h4 style="margin:16px 0 10px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">Éligibilité &amp; Tarification par type de compte</h4>
-
-            <!-- Utilisateur -->
-            <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
-              <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Utilisateur</div>
-              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-utilisateur" value="automatique"> Accès automatique</label>
-                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-utilisateur" value="sur_demande" checked> Sur demande</label>
-                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-utilisateur" value="non_concerne"> Non concerné</label>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-                <div>
-                  <label class="form-label" style="font-size:11px;">Tarification</label>
-                  <select id="tarif-type-utilisateur" class="input-field" style="width:100%;font-size:13px;">
-                    <option value="gratuit">Gratuit</option>
-                    <option value="paiement_unique">Paiement unique</option>
-                    <option value="mensuel">Abonnement mensuel</option>
-                    <option value="annuel">Abonnement annuel</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" style="font-size:11px;">Montant (€)</label>
-                  <input id="tarif-montant-utilisateur" class="input-field" style="width:100%;font-size:13px;" type="number" min="0" step="0.01" value="0">
-                </div>
-                <div>
-                  <label class="form-label" style="font-size:11px;">Validation admin</label>
-                  <select id="tarif-validation-utilisateur" class="input-field" style="width:100%;font-size:13px;">
-                    <option value="1">Requise</option>
-                    <option value="0">Non requise (accès immédiat)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <!-- Initiative -->
-            <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
-              <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Initiative</div>
-              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-initiative" value="automatique"> Accès automatique</label>
-                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-initiative" value="sur_demande" checked> Sur demande</label>
-                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-initiative" value="non_concerne"> Non concerné</label>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-                <div>
-                  <label class="form-label" style="font-size:11px;">Tarification</label>
-                  <select id="tarif-type-initiative" class="input-field" style="width:100%;font-size:13px;">
-                    <option value="gratuit">Gratuit</option>
-                    <option value="paiement_unique">Paiement unique</option>
-                    <option value="mensuel">Abonnement mensuel</option>
-                    <option value="annuel">Abonnement annuel</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" style="font-size:11px;">Montant (€)</label>
-                  <input id="tarif-montant-initiative" class="input-field" style="width:100%;font-size:13px;" type="number" min="0" step="0.01" value="0">
-                </div>
-                <div>
-                  <label class="form-label" style="font-size:11px;">Validation admin</label>
-                  <select id="tarif-validation-initiative" class="input-field" style="width:100%;font-size:13px;">
-                    <option value="1">Requise</option>
-                    <option value="0">Non requise (accès immédiat)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <!-- Institution (collectivite) -->
-            <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
-              <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Institution</div>
-              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-collectivite" value="automatique"> Accès automatique</label>
-                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-collectivite" value="sur_demande" checked> Sur demande</label>
-                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-collectivite" value="non_concerne"> Non concerné</label>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-                <div>
-                  <label class="form-label" style="font-size:11px;">Tarification</label>
-                  <select id="tarif-type-collectivite" class="input-field" style="width:100%;font-size:13px;">
-                    <option value="gratuit">Gratuit</option>
-                    <option value="paiement_unique">Paiement unique</option>
-                    <option value="mensuel">Abonnement mensuel</option>
-                    <option value="annuel">Abonnement annuel</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label" style="font-size:11px;">Montant (€)</label>
-                  <input id="tarif-montant-collectivite" class="input-field" style="width:100%;font-size:13px;" type="number" min="0" step="0.01" value="0">
-                </div>
-                <div>
-                  <label class="form-label" style="font-size:11px;">Validation admin</label>
-                  <select id="tarif-validation-collectivite" class="input-field" style="width:100%;font-size:13px;">
-                    <option value="1">Requise</option>
-                    <option value="0">Non requise (accès immédiat)</option>
-                  </select>
-                </div>
-              </div>
+            <div id="adp-roles-container"></div>
+            <div style="margin-bottom:14px;">
+              <select id="adp-add-role-select" class="input-field" style="width:auto;font-size:13px;cursor:pointer;" onchange="adpAddRoleFromSelect(this)">
+                <option value="">＋ Ajouter un type de compte…</option>
+                <option value="utilisateur">Utilisateur</option>
+                <option value="initiative">Initiative</option>
+                <option value="collectivite">Institution</option>
+                <option value="officiel">Officiel</option>
+              </select>
             </div>
 
             <div style="display:flex;gap:8px;margin-top:6px;">
@@ -3998,7 +3912,89 @@ document.querySelector('[data-section="formations"]')?.addEventListener('click',
 
 /* ===== MOTEUR D'ACCRÉDITATIONS DYNAMIQUE ===== */
 let _accredDefEditId = null;
-const ROLES_LBL = {utilisateur:'Utilisateur', initiative:'Initiative', collectivite:'Institution'};
+const ROLES_LBL = {utilisateur:'Utilisateur', initiative:'Initiative', collectivite:'Institution', officiel:'Officiel'};
+const ROLES_ALL = [
+  {value:'utilisateur', label:'Utilisateur'},
+  {value:'initiative',  label:'Initiative'},
+  {value:'collectivite',label:'Institution'},
+  {value:'officiel',    label:'Officiel'},
+];
+
+/* ── Blocs éligibilité dynamiques ── */
+function adpRenderRoleBlock(role, regle, tarif) {
+  const mode  = regle?.mode      || 'sur_demande';
+  const ttype = tarif?.type_tarif || 'gratuit';
+  const mnt   = tarif?.montant   ?? 0;
+  const val   = tarif?.validation_admin ?? 1;
+  const label = ROLES_LBL[role] || role;
+  const sel   = (v, cmp) => v == cmp ? ' selected' : '';
+  const chk   = (v, cmp) => v === cmp ? ' checked' : '';
+  const div   = document.createElement('div');
+  div.id      = `adp-role-block-${role}`;
+  div.dataset.role = role;
+  div.style.cssText = 'border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;';
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-weight:700;font-size:13px;">${label}</div>
+      <button type="button" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;font-size:11px;padding:3px 10px;cursor:pointer;" onclick="adpRemoveRole('${role}')">✕ Retirer</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-${role}" value="automatique"${chk(mode,'automatique')}> Accès automatique</label>
+      <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-${role}" value="sur_demande"${chk(mode,'sur_demande')}> Sur demande</label>
+      <label style="font-size:13px;cursor:pointer;"><input type="radio" name="mode-${role}" value="non_concerne"${chk(mode,'non_concerne')}> Non concerné</label>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <div>
+        <label class="form-label" style="font-size:11px;">Tarification</label>
+        <select id="tarif-type-${role}" class="input-field" style="width:100%;font-size:13px;">
+          <option value="gratuit"${sel(ttype,'gratuit')}>Gratuit</option>
+          <option value="paiement_unique"${sel(ttype,'paiement_unique')}>Paiement unique</option>
+          <option value="mensuel"${sel(ttype,'mensuel')}>Abonnement mensuel</option>
+          <option value="annuel"${sel(ttype,'annuel')}>Abonnement annuel</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:11px;">Montant (€)</label>
+        <input id="tarif-montant-${role}" class="input-field" style="width:100%;font-size:13px;" type="number" min="0" step="0.01" value="${mnt}">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:11px;">Validation admin</label>
+        <select id="tarif-validation-${role}" class="input-field" style="width:100%;font-size:13px;">
+          <option value="1"${sel(val,1)}>Requise</option>
+          <option value="0"${sel(val,0)}>Non requise (accès immédiat)</option>
+        </select>
+      </div>
+    </div>`;
+  return div;
+}
+
+function adpAddRole(role, regle, tarif) {
+  const c = document.getElementById('adp-roles-container');
+  if (!c || !role || c.querySelector(`[data-role="${role}"]`)) return;
+  c.appendChild(adpRenderRoleBlock(role, regle, tarif));
+  adpRefreshSelect();
+}
+
+function adpRemoveRole(role) {
+  document.getElementById(`adp-role-block-${role}`)?.remove();
+  adpRefreshSelect();
+}
+
+function adpAddRoleFromSelect(sel) {
+  const role = sel.value;
+  if (role) adpAddRole(role);
+  sel.value = '';
+}
+
+function adpRefreshSelect() {
+  const sel = document.getElementById('adp-add-role-select');
+  if (!sel) return;
+  const present = [...document.querySelectorAll('#adp-roles-container [data-role]')].map(e => e.dataset.role);
+  const available = ROLES_ALL.filter(r => !present.includes(r.value));
+  sel.innerHTML = '<option value="">＋ Ajouter un type de compte…</option>' +
+    available.map(r => `<option value="${r.value}">${r.label}</option>`).join('');
+  sel.parentElement.style.display = available.length ? '' : 'none';
+}
 
 async function loadAccredDefinitions() {
   const el = document.getElementById('accred-def-list');
@@ -4171,19 +4167,21 @@ async function openAccredDefModal(def) {
     toggleWrap.style.display = '';
     extFields.style.display = 'none';
   }
-  ['utilisateur','initiative','collectivite'].forEach(role => {
-    const regle = (def?.regles||[]).find(r=>r.role===role);
-    const tarif = (def?.tarifs||[]).find(t=>t.role===role);
-    const mode = regle?.mode || 'non_concerne';
-    const radio = document.querySelector(`input[name="mode-${role}"][value="${mode}"]`);
-    if (radio) radio.checked = true;
-    const selT = document.getElementById(`tarif-type-${role}`);
-    const inpM = document.getElementById(`tarif-montant-${role}`);
-    const selV = document.getElementById(`tarif-validation-${role}`);
-    if (selT) selT.value = tarif?.type_tarif || 'gratuit';
-    if (inpM) inpM.value = tarif?.montant ?? 0;
-    if (selV) selV.value = tarif?.validation_admin ?? 1;
-  });
+  /* Blocs rôles dynamiques */
+  const _rolesC = document.getElementById('adp-roles-container');
+  if (_rolesC) {
+    _rolesC.innerHTML = '';
+    const _rolesPresents = def?.regles?.length
+      ? def.regles.map(r => r.role)
+      : ['utilisateur','initiative','collectivite'];
+    _rolesPresents.forEach(role => {
+      adpAddRole(role,
+        (def?.regles||[]).find(r=>r.role===role),
+        (def?.tarifs||[]).find(t=>t.role===role)
+      );
+    });
+    adpRefreshSelect();
+  }
   document.getElementById('accred-def-panel').style.display = '';
   document.getElementById('accred-def-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -4229,7 +4227,8 @@ async function saveAccredDef() {
   const couleur = document.getElementById('adp-couleur').value;
   const couleur_bg = couleur + '20';
   const regles = [], tarifs = [];
-  ['utilisateur','initiative','collectivite'].forEach(role => {
+  [...document.querySelectorAll('#adp-roles-container [data-role]')].forEach(block => {
+    const role = block.dataset.role;
     const mode = document.querySelector(`input[name="mode-${role}"]:checked`)?.value || 'non_concerne';
     regles.push({ role, mode });
     if (mode !== 'non_concerne') {
