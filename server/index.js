@@ -10009,24 +10009,82 @@ route("POST", "/api/admin/accred/definitions", async (req, res, params, body) =>
   sendJSON(res, 201, { id, ok: true });
 });
 
-/* PUT /api/admin/accred/definitions/:id — modifier une définition */
+/* GET /api/admin/accred/definitions/:id/impact — aperçu avant modification */
+route("GET", "/api/admin/accred/definitions/:id/impact", async (req, res, params) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const def = db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(params.id);
+  if (!def) return sendJSON(res, 404, { error: "Définition introuvable." });
+  const nb_titulaires = db.prepare("SELECT COUNT(*) AS n FROM user_accreditations WHERE accred_id=? AND statut='active'").get(params.id).n;
+  const nb_demandes_attente = db.prepare("SELECT COUNT(*) AS n FROM accred_demandes WHERE accred_id=? AND statut='en_attente'").get(params.id).n;
+  const titulaires = db.prepare(`
+    SELECT ua.statut, u.nom, u.email, u.role
+    FROM user_accreditations ua JOIN users u ON u.id=ua.user_id
+    WHERE ua.accred_id=? AND ua.statut='active' LIMIT 10
+  `).all(params.id);
+  const repartition = db.prepare(`
+    SELECT u.role, COUNT(*) AS n FROM user_accreditations ua JOIN users u ON u.id=ua.user_id
+    WHERE ua.accred_id=? AND ua.statut='active' GROUP BY u.role
+  `).all(params.id);
+  sendJSON(res, 200, { nb_titulaires, nb_demandes_attente, titulaires, repartition });
+});
+
+/* GET /api/admin/accred/definitions/:id/audit — journal des modifications */
+route("GET", "/api/admin/accred/definitions/:id/audit", async (req, res, params) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const logs = db.prepare("SELECT * FROM accred_audit_log WHERE accred_id=? ORDER BY created_at DESC LIMIT 100").all(params.id);
+  sendJSON(res, 200, { logs });
+});
+
+/* PUT /api/admin/accred/definitions/:id — modifier une définition (v2 avec audit + modes) */
 route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body) => {
   const admin = getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  const { label, emoji, description, droits, couleur, couleur_bg, couleur_border, couleur_text,
-          module: mod, fonctionnalite, ordre, actif, regles, tarifs } = body;
   const def = db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(params.id);
   if (!def) return sendJSON(res, 404, { error: "Définition introuvable." });
 
+  const n = v => v === undefined ? null : v;
+  const {
+    label, emoji, description, droits, couleur, couleur_bg, couleur_border, couleur_text,
+    module: mod, fonctionnalite, ordre, actif, regles, tarifs,
+    duree_validite_jours, conditions_obtention, documents_requis,
+    renouvellement_auto, double_validation, controle_documentaire,
+    /* Options modification */
+    motif, mode_application, date_application, notifier_titulaires
+  } = body;
+
+  /* Snapshot avant pour audit */
+  const snap_avant = JSON.stringify({
+    label: def.label, emoji: def.emoji, description: def.description,
+    droits: def.droits, couleur: def.couleur, module: def.module,
+    fonctionnalite: def.fonctionnalite, actif: def.actif,
+    duree_validite_jours: def.duree_validite_jours
+  });
+
   db.prepare(`UPDATE accred_definitions SET
-    label=?,emoji=?,description=?,droits=?,couleur=?,couleur_bg=?,couleur_border=?,couleur_text=?,
-    module=?,fonctionnalite=?,ordre=?,actif=?,updated_at=datetime('now') WHERE id=?`)
-    .run(label||def.label, emoji||def.emoji, description||def.description,
-         droits ? JSON.stringify(droits) : def.droits,
-         couleur||def.couleur, couleur_bg||def.couleur_bg, couleur_border||def.couleur_border,
-         couleur_text||def.couleur_text, mod!==undefined?mod:def.module,
-         fonctionnalite!==undefined?fonctionnalite:def.fonctionnalite,
-         ordre!==undefined?ordre:def.ordre, actif!==undefined?actif:def.actif, params.id);
+    label=COALESCE(?,label), emoji=COALESCE(?,emoji), description=COALESCE(?,description),
+    droits=COALESCE(?,droits), couleur=COALESCE(?,couleur), couleur_bg=COALESCE(?,couleur_bg),
+    couleur_border=COALESCE(?,couleur_border), couleur_text=COALESCE(?,couleur_text),
+    module=COALESCE(?,module), fonctionnalite=COALESCE(?,fonctionnalite),
+    ordre=COALESCE(?,ordre), actif=COALESCE(?,actif),
+    duree_validite_jours=COALESCE(?,duree_validite_jours),
+    conditions_obtention=COALESCE(?,conditions_obtention),
+    documents_requis=COALESCE(?,documents_requis),
+    renouvellement_auto=COALESCE(?,renouvellement_auto),
+    double_validation=COALESCE(?,double_validation),
+    controle_documentaire=COALESCE(?,controle_documentaire),
+    updated_at=datetime('now') WHERE id=?`)
+    .run(
+      n(label), n(emoji), n(description),
+      droits ? JSON.stringify(droits) : null,
+      n(couleur), n(couleur_bg), n(couleur_border), n(couleur_text),
+      n(mod), n(fonctionnalite), n(ordre), n(actif),
+      n(duree_validite_jours), n(conditions_obtention),
+      documents_requis ? JSON.stringify(documents_requis) : null,
+      n(renouvellement_auto), n(double_validation), n(controle_documentaire),
+      params.id
+    );
 
   if (Array.isArray(regles)) {
     db.prepare("DELETE FROM accred_regles WHERE accred_id=?").run(params.id);
@@ -10038,7 +10096,45 @@ route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body)
     const insT = db.prepare("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,renouvellement_auto,periode_grace_jours,validation_admin) VALUES (?,?,?,?,?,?,?,?)");
     for (const t of tarifs) if (t.role) insT.run(params.id, t.role, t.type_tarif||'gratuit', t.montant||0, t.devise||'EUR', t.renouvellement_auto||0, t.periode_grace_jours||7, t.validation_admin||1);
   }
-  sendJSON(res, 200, { ok: true });
+
+  /* Snapshot après pour audit */
+  const def_apres = db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(params.id);
+  const snap_apres = JSON.stringify({
+    label: def_apres.label, emoji: def_apres.emoji, description: def_apres.description,
+    droits: def_apres.droits, couleur: def_apres.couleur, module: def_apres.module,
+    fonctionnalite: def_apres.fonctionnalite, actif: def_apres.actif,
+    duree_validite_jours: def_apres.duree_validite_jours
+  });
+
+  /* Journal d'audit */
+  const nb_titulaires = db.prepare("SELECT COUNT(*) AS n FROM user_accreditations WHERE accred_id=? AND statut='active'").get(params.id).n;
+  db.prepare(`INSERT INTO accred_audit_log
+    (accred_id,admin_id,admin_nom,champ,ancienne_valeur,nouvelle_valeur,motif,mode_application,date_application,nb_comptes_impactes)
+    VALUES (?,?,?,'definition_complete',?,?,?,?,?,?)`)
+    .run(params.id, admin.id, admin.nom, snap_avant, snap_apres, motif||null,
+         mode_application||'nouvelles_demandes', date_application||null, nb_titulaires);
+
+  /* Application aux titulaires existants si mode=tous */
+  if (mode_application === 'tous' && actif !== undefined) {
+    /* Si désactivation : retirer l'accred à tous */
+    if (!actif) {
+      db.prepare("UPDATE user_accreditations SET statut='retiree',updated_at=datetime('now') WHERE accred_id=?").run(params.id);
+    }
+  }
+
+  /* Notification des titulaires si demandé */
+  if (notifier_titulaires && mode_application !== 'nouvelles_demandes') {
+    const titulaires = db.prepare("SELECT user_id FROM user_accreditations WHERE accred_id=? AND statut='active'").all(params.id);
+    const accredLabel = def_apres.label;
+    const msg = mode_application === 'differe' && date_application
+      ? `L'accréditation « ${accredLabel} » sera modifiée le ${date_application}. ${motif||''}`
+      : `L'accréditation « ${accredLabel} » a été mise à jour. ${motif||''}`;
+    for (const t of titulaires) {
+      creerNotif(t.user_id, 'accreditation', `Mise à jour : ${accredLabel}`, msg, { accred_id: params.id });
+    }
+  }
+
+  sendJSON(res, 200, { ok: true, nb_comptes_impactes: nb_titulaires });
 });
 
 /* DELETE /api/admin/accred/definitions/:id — désactiver */
@@ -10129,6 +10225,227 @@ route("PATCH", "/api/admin/accred/users/:userId/:accredId/retirer", async (req, 
     .run(params.userId, params.accredId);
   db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
     .run(params.userId, params.accredId, 'retire', admin.id, admin.nom, body.motif||null);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ─── PACKS D'ACCRÉDITATIONS ─── */
+
+/* Helper : attribue toutes les accréditations d'un pack à un utilisateur */
+function _attribuerPackItems(user, packId) {
+  const items = db.prepare("SELECT accred_id FROM accred_pack_items WHERE pack_id=?").all(packId);
+  const ins = db.prepare("INSERT OR IGNORE INTO user_accreditations (user_id,accred_id,statut) VALUES (?,?,'active')");
+  for (const it of items) ins.run(user.id, it.accred_id);
+}
+
+/* GET /api/accreditations/packs — liste publique des packs actifs */
+route("GET", "/api/accreditations/packs", async (req, res) => {
+  const me = getCurrentUser(req);
+  const packs = db.prepare("SELECT * FROM accred_packs WHERE actif=1 ORDER BY ordre, nom").all();
+  const result = packs.map(p => {
+    const items = db.prepare(`
+      SELECT d.id, d.type, d.label, d.emoji, d.couleur
+      FROM accred_pack_items pi JOIN accred_definitions d ON d.id=pi.accred_id WHERE pi.pack_id=?
+    `).all(p.id);
+    const regles = db.prepare("SELECT * FROM accred_pack_regles WHERE pack_id=?").all(p.id);
+    const tarifs = db.prepare("SELECT * FROM accred_pack_tarifs WHERE pack_id=?").all(p.id);
+    let ma_demande = null;
+    let mon_pack = null;
+    if (me) {
+      ma_demande = db.prepare("SELECT * FROM accred_pack_demandes WHERE user_id=? AND pack_id=?").get(me.id, p.id);
+      mon_pack = db.prepare("SELECT * FROM user_packs WHERE user_id=? AND pack_id=? AND statut='active'").get(me.id, p.id);
+    }
+    return { ...p, accreditations: items, regles, tarifs, ma_demande, actif_pour_moi: !!mon_pack };
+  });
+  sendJSON(res, 200, { packs: result });
+});
+
+/* POST /api/accreditations/packs/:id/demande — demander un pack */
+route("POST", "/api/accreditations/packs/:id/demande", async (req, res, params, body) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const pack = db.prepare("SELECT * FROM accred_packs WHERE id=? AND actif=1").get(params.id);
+  if (!pack) return sendJSON(res, 404, { error: "Pack introuvable." });
+  const regle = db.prepare("SELECT * FROM accred_pack_regles WHERE pack_id=? AND role=?").get(params.id, me.role);
+  if (!regle || regle.mode === 'non_concerne') return sendJSON(res, 403, { error: "Ce pack n'est pas disponible pour votre type de compte." });
+  const existe = db.prepare("SELECT id FROM accred_pack_demandes WHERE user_id=? AND pack_id=?").get(me.id, params.id);
+  if (existe) return sendJSON(res, 409, { error: "Demande déjà soumise pour ce pack." });
+  const actifDeja = db.prepare("SELECT id FROM user_packs WHERE user_id=? AND pack_id=? AND statut='active'").get(me.id, params.id);
+  if (actifDeja) return sendJSON(res, 409, { error: "Vous possédez déjà ce pack." });
+  if (regle.mode === 'automatique') {
+    db.prepare("INSERT OR IGNORE INTO user_packs (user_id,pack_id,statut) VALUES (?,?,'active')").run(me.id, params.id);
+    _attribuerPackItems(me, params.id);
+    creerNotif(me.id, 'pack', `Pack attribué : ${pack.nom}`,
+      `Le pack « ${pack.nom} » vous a été attribué automatiquement.`, { pack_id: params.id });
+    return sendJSON(res, 200, { ok: true, statut: 'active' });
+  }
+  db.prepare("INSERT INTO accred_pack_demandes (user_id,pack_id,message) VALUES (?,?,?)").run(me.id, params.id, body.message||null);
+  const admins = db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+  admins.forEach(a => creerNotif(a.id, 'pack_demande', `Demande pack : ${pack.nom}`,
+    `${me.nom} demande le pack « ${pack.nom} ».`, { pack_id: params.id, user_id: me.id }));
+  sendJSON(res, 201, { ok: true, statut: 'en_attente' });
+});
+
+/* GET /api/admin/accred/packs — liste admin des packs */
+route("GET", "/api/admin/accred/packs", async (req, res) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const packs = db.prepare("SELECT * FROM accred_packs ORDER BY ordre, nom").all();
+  const result = packs.map(p => {
+    const items = db.prepare(`
+      SELECT d.id, d.type, d.label, d.emoji FROM accred_pack_items pi
+      JOIN accred_definitions d ON d.id=pi.accred_id WHERE pi.pack_id=?
+    `).all(p.id);
+    const regles = db.prepare("SELECT * FROM accred_pack_regles WHERE pack_id=?").all(p.id);
+    const tarifs = db.prepare("SELECT * FROM accred_pack_tarifs WHERE pack_id=?").all(p.id);
+    const nb_titulaires = db.prepare("SELECT COUNT(*) AS n FROM user_packs WHERE pack_id=? AND statut='active'").get(p.id).n;
+    const nb_demandes = db.prepare("SELECT COUNT(*) AS n FROM accred_pack_demandes WHERE pack_id=? AND statut='en_attente'").get(p.id).n;
+    return { ...p, accreditations: items, regles, tarifs, nb_titulaires, nb_demandes };
+  });
+  sendJSON(res, 200, { packs: result });
+});
+
+/* POST /api/admin/accred/packs — créer un pack */
+route("POST", "/api/admin/accred/packs", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { nom, description, emoji, couleur, couleur_bg, slug, ordre, date_debut, date_fin, accred_ids, regles, tarifs } = body;
+  if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
+  const packSlug = slug || nom.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+  const { lastInsertRowid: id } = db.prepare(`
+    INSERT INTO accred_packs (nom,description,emoji,couleur,couleur_bg,slug,ordre,date_debut,date_fin,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?)
+  `).run(nom, description||null, emoji||'📦', couleur||'#6366f1', couleur_bg||'#f5f3ff',
+         packSlug, ordre||0, date_debut||null, date_fin||null, admin.id);
+  if (Array.isArray(accred_ids)) {
+    const insI = db.prepare("INSERT OR IGNORE INTO accred_pack_items (pack_id,accred_id) VALUES (?,?)");
+    accred_ids.forEach(aid => insI.run(id, aid));
+  }
+  if (Array.isArray(regles)) {
+    const insR = db.prepare("INSERT OR REPLACE INTO accred_pack_regles (pack_id,role,mode) VALUES (?,?,?)");
+    regles.forEach(r => { if (r.role && r.mode) insR.run(id, r.role, r.mode); });
+    const autoRoles = regles.filter(r => r.mode === 'automatique').map(r => r.role);
+    for (const role of autoRoles) {
+      const users = db.prepare("SELECT id,nom,email,role FROM users WHERE role=?").all(role);
+      users.forEach(u => {
+        db.prepare("INSERT OR IGNORE INTO user_packs (user_id,pack_id,statut,admin_id) VALUES (?,?,'active',?)").run(u.id, id, admin.id);
+        _attribuerPackItems(u, id);
+      });
+    }
+  }
+  if (Array.isArray(tarifs)) {
+    const insT = db.prepare("INSERT OR REPLACE INTO accred_pack_tarifs (pack_id,role,type_tarif,montant,devise,validation_admin) VALUES (?,?,?,?,?,?)");
+    tarifs.forEach(t => { if (t.role) insT.run(id, t.role, t.type_tarif||'gratuit', t.montant||0, t.devise||'EUR', t.validation_admin!==undefined?t.validation_admin:1); });
+  }
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* PUT /api/admin/accred/packs/:id — modifier un pack */
+route("PUT", "/api/admin/accred/packs/:id", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const pack = db.prepare("SELECT * FROM accred_packs WHERE id=?").get(params.id);
+  if (!pack) return sendJSON(res, 404, { error: "Pack introuvable." });
+  const n = v => v === undefined ? null : v;
+  const { nom, description, emoji, couleur, couleur_bg, slug, ordre, date_debut, date_fin, actif,
+          accred_ids, regles, tarifs, notifier_titulaires } = body;
+  db.prepare(`UPDATE accred_packs SET
+    nom=COALESCE(?,nom), description=COALESCE(?,description), emoji=COALESCE(?,emoji),
+    couleur=COALESCE(?,couleur), couleur_bg=COALESCE(?,couleur_bg), slug=COALESCE(?,slug),
+    ordre=COALESCE(?,ordre), date_debut=COALESCE(?,date_debut), date_fin=COALESCE(?,date_fin),
+    actif=COALESCE(?,actif), updated_at=datetime('now') WHERE id=?`)
+    .run(n(nom),n(description),n(emoji),n(couleur),n(couleur_bg),n(slug),
+         n(ordre),n(date_debut),n(date_fin),n(actif),params.id);
+  if (Array.isArray(accred_ids)) {
+    db.prepare("DELETE FROM accred_pack_items WHERE pack_id=?").run(params.id);
+    const insI = db.prepare("INSERT OR IGNORE INTO accred_pack_items (pack_id,accred_id) VALUES (?,?)");
+    accred_ids.forEach(aid => insI.run(params.id, aid));
+  }
+  if (Array.isArray(regles)) {
+    db.prepare("DELETE FROM accred_pack_regles WHERE pack_id=?").run(params.id);
+    const insR = db.prepare("INSERT INTO accred_pack_regles (pack_id,role,mode) VALUES (?,?,?)");
+    regles.forEach(r => { if (r.role && r.mode) insR.run(params.id, r.role, r.mode); });
+  }
+  if (Array.isArray(tarifs)) {
+    db.prepare("DELETE FROM accred_pack_tarifs WHERE pack_id=?").run(params.id);
+    const insT = db.prepare("INSERT INTO accred_pack_tarifs (pack_id,role,type_tarif,montant,devise,validation_admin) VALUES (?,?,?,?,?,?)");
+    tarifs.forEach(t => { if (t.role) insT.run(params.id, t.role, t.type_tarif||'gratuit', t.montant||0, t.devise||'EUR', t.validation_admin!==undefined?t.validation_admin:1); });
+  }
+  if (notifier_titulaires) {
+    const packNom = nom || pack.nom;
+    db.prepare("SELECT user_id FROM user_packs WHERE pack_id=? AND statut='active'").all(params.id)
+      .forEach(t => creerNotif(t.user_id, 'pack', `Mise à jour : ${packNom}`,
+        `Le pack « ${packNom} » a été mis à jour.`, { pack_id: params.id }));
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/admin/accred/packs/:id — désactiver un pack */
+route("DELETE", "/api/admin/accred/packs/:id", async (req, res, params) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE accred_packs SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/admin/accred/packs/demandes — demandes de packs en attente */
+route("GET", "/api/admin/accred/packs/demandes", async (req, res) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = db.prepare(`
+    SELECT pd.*, u.nom AS user_nom, u.email AS user_email, u.role AS user_role,
+           p.nom AS pack_nom, p.emoji AS pack_emoji
+    FROM accred_pack_demandes pd JOIN users u ON u.id=pd.user_id JOIN accred_packs p ON p.id=pd.pack_id
+    WHERE pd.statut='en_attente' ORDER BY pd.created_at DESC
+  `).all();
+  sendJSON(res, 200, { demandes: rows });
+});
+
+/* PATCH /api/admin/accred/packs/demandes/:id/approuver */
+route("PATCH", "/api/admin/accred/packs/demandes/:id/approuver", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const dem = db.prepare("SELECT * FROM accred_pack_demandes WHERE id=?").get(params.id);
+  if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
+  db.prepare("UPDATE accred_pack_demandes SET statut='approuvee' WHERE id=?").run(params.id);
+  db.prepare("INSERT OR IGNORE INTO user_packs (user_id,pack_id,statut,admin_id,notes) VALUES (?,?,'active',?,?)")
+    .run(dem.user_id, dem.pack_id, admin.id, body.notes||null);
+  const user = db.prepare("SELECT id,nom,email,role FROM users WHERE id=?").get(dem.user_id);
+  _attribuerPackItems(user, dem.pack_id);
+  const pack = db.prepare("SELECT * FROM accred_packs WHERE id=?").get(dem.pack_id);
+  creerNotif(dem.user_id, 'pack', `Pack accordé : ${pack.nom}`,
+    `Votre demande pour le pack « ${pack.nom} » a été approuvée. Toutes les accréditations incluses sont maintenant actives.`,
+    { pack_id: dem.pack_id });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accred/packs/demandes/:id/refuser */
+route("PATCH", "/api/admin/accred/packs/demandes/:id/refuser", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const dem = db.prepare("SELECT * FROM accred_pack_demandes WHERE id=?").get(params.id);
+  if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
+  db.prepare("UPDATE accred_pack_demandes SET statut='refusee',motif_refus=? WHERE id=?").run(body.motif||null, params.id);
+  const pack = db.prepare("SELECT * FROM accred_packs WHERE id=?").get(dem.pack_id);
+  creerNotif(dem.user_id, 'pack', `Pack refusé : ${pack.nom}`,
+    `Votre demande pour le pack « ${pack.nom} » a été refusée.${body.motif ? ' Motif : '+body.motif : ''}`,
+    { pack_id: dem.pack_id });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accred/packs/:id/attribuer — attribution manuelle directe */
+route("PATCH", "/api/admin/accred/packs/:id/attribuer", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { user_id } = body;
+  if (!user_id) return sendJSON(res, 400, { error: "user_id requis." });
+  const pack = db.prepare("SELECT * FROM accred_packs WHERE id=?").get(params.id);
+  if (!pack) return sendJSON(res, 404, { error: "Pack introuvable." });
+  const user = db.prepare("SELECT id,nom,email,role FROM users WHERE id=?").get(user_id);
+  if (!user) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
+  db.prepare("INSERT OR REPLACE INTO user_packs (user_id,pack_id,statut,admin_id) VALUES (?,?,'active',?)").run(user_id, params.id, admin.id);
+  _attribuerPackItems(user, params.id);
+  creerNotif(user_id, 'pack', `Pack attribué : ${pack.nom}`,
+    `Le pack « ${pack.nom} » vous a été attribué par l'administration.`, { pack_id: params.id });
   sendJSON(res, 200, { ok: true });
 });
 

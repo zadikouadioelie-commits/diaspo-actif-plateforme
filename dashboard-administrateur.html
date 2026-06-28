@@ -2052,6 +2052,84 @@
             </div>
           </div>
 
+          <!-- Champs étendus pour l'édition -->
+          <div id="adp-extended-fields" style="display:none;margin-top:16px;padding-top:16px;border-top:1px dashed var(--border);">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">Paramètres avancés</h4>
+            <div class="grid grid-2" style="gap:12px;margin-bottom:12px;">
+              <div>
+                <label class="form-label">Durée de validité (jours, vide = illimitée)</label>
+                <input id="adp-duree-validite" class="input-field" style="width:100%;" type="number" min="0" placeholder="ex: 365">
+              </div>
+              <div>
+                <label class="form-label">Renouvellement automatique</label>
+                <select id="adp-renouvellement-auto" class="input-field" style="width:100%;">
+                  <option value="0">Non</option>
+                  <option value="1">Oui</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Double validation requise</label>
+                <select id="adp-double-validation" class="input-field" style="width:100%;">
+                  <option value="0">Non</option>
+                  <option value="1">Oui</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Contrôle documentaire</label>
+                <select id="adp-controle-docs" class="input-field" style="width:100%;">
+                  <option value="0">Non</option>
+                  <option value="1">Oui</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-bottom:12px;">
+              <label class="form-label">Conditions d'obtention</label>
+              <textarea id="adp-conditions" class="input-field" style="width:100%;min-height:60px;" placeholder="Ex: Être une initiative enregistrée depuis plus de 6 mois…"></textarea>
+            </div>
+            <div style="margin-bottom:12px;">
+              <label class="form-label">Documents justificatifs demandés (un par ligne)</label>
+              <textarea id="adp-documents" class="input-field" style="width:100%;min-height:60px;" placeholder="Statuts de l'association&#10;Récépissé de déclaration&#10;RIB"></textarea>
+            </div>
+
+            <!-- Mode d'application (édition seulement) -->
+            <div id="adp-mode-application-block" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:14px;margin-bottom:12px;">
+              <h4 style="margin:0 0 10px;font-size:13px;font-weight:700;">⚠️ Application aux titulaires existants</h4>
+              <div id="adp-impact-info" style="font-size:13px;color:var(--muted);margin-bottom:10px;"></div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <label style="font-size:13px;cursor:pointer;display:flex;align-items:flex-start;gap:8px;">
+                  <input type="radio" name="mode-application" value="nouvelles_demandes" checked style="margin-top:2px;">
+                  <span><strong>Nouvelles demandes seulement</strong> — les titulaires actuels conservent leurs conditions</span>
+                </label>
+                <label style="font-size:13px;cursor:pointer;display:flex;align-items:flex-start;gap:8px;">
+                  <input type="radio" name="mode-application" value="tous" style="margin-top:2px;">
+                  <span><strong>Appliquer à tous les titulaires</strong> — les nouvelles règles s'appliquent immédiatement</span>
+                </label>
+                <label style="font-size:13px;cursor:pointer;display:flex;align-items:flex-start;gap:8px;">
+                  <input type="radio" name="mode-application" value="differe" style="margin-top:2px;">
+                  <span><strong>Application différée</strong> — choisir une date d'entrée en vigueur</span>
+                </label>
+              </div>
+              <div id="adp-date-application-block" style="display:none;margin-top:10px;">
+                <label class="form-label">Date d'entrée en vigueur</label>
+                <input id="adp-date-application" class="input-field" type="date" style="width:200px;">
+              </div>
+              <div style="margin-top:10px;">
+                <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                  <input type="checkbox" id="adp-notifier-titulaires">
+                  <span>Notifier les titulaires concernés</span>
+                </label>
+              </div>
+              <div style="margin-top:10px;">
+                <label class="form-label">Motif de la modification (visible dans l'audit)</label>
+                <input id="adp-motif" class="input-field" style="width:100%;" placeholder="Ex: Mise à jour des conditions de tarification 2026">
+              </div>
+            </div>
+          </div>
+
+          <div style="margin:8px 0 0;display:none;" id="adp-toggle-advanced-wrap">
+            <button class="btn btn-sm btn-outline" onclick="toggleAdpAdvanced()">⚙️ Paramètres avancés</button>
+          </div>
+
           <!-- Demandes du nouveau système -->
           <div id="accred-def-demandes" style="margin-top:24px;">
             <div class="flex-between" style="margin-bottom:10px;">
@@ -2059,6 +2137,130 @@
             </div>
             <div id="accred-def-demandes-list" class="card" style="padding:0;overflow:hidden;">
               <div style="padding:16px;color:var(--muted);">Chargement…</div>
+            </div>
+          </div>
+
+          <!-- Journal d'audit -->
+          <div id="accred-audit-block" style="display:none;margin-top:24px;border-top:1px dashed var(--border);padding-top:20px;">
+            <div class="flex-between" style="margin-bottom:10px;">
+              <h3 style="margin:0;font-size:15px;">📋 Journal d'audit</h3>
+              <button class="btn btn-sm btn-outline" onclick="document.getElementById('accred-audit-block').style.display='none'">✕</button>
+            </div>
+            <div id="accred-audit-list" class="card" style="padding:0;overflow:hidden;">
+              <div style="padding:16px;color:var(--muted);">Sélectionnez une accréditation pour voir son historique.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PACKS D'ACCRÉDITATIONS -->
+        <div id="section-accred-packs" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
+          <div class="flex-between" style="margin-bottom:6px;">
+            <h2 style="margin:0;">📦 Packs d'accréditations</h2>
+            <button class="btn btn-orange" onclick="openPackModal()">+ Créer un pack</button>
+          </div>
+          <p style="color:var(--muted);font-size:13px;margin:0 0 16px;">Regroupez plusieurs accréditations dans un pack. Un pack accordé active automatiquement toutes les accréditations incluses.</p>
+
+          <!-- Onglets packs -->
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+            <button class="btn btn-orange" id="pack-tab-packs" onclick="switchPackTab('packs')">📦 Packs</button>
+            <button class="btn btn-outline" id="pack-tab-demandes" onclick="switchPackTab('demandes')">⏳ Demandes <span id="pack-demandes-badge" style="display:none;background:rgba(255,90,0,.15);color:var(--orange);padding:1px 6px;border-radius:99px;font-size:11px;margin-left:4px;"></span></button>
+          </div>
+
+          <div id="pack-panel-packs">
+            <div id="packs-list" class="card" style="padding:0;overflow:hidden;">
+              <div style="padding:16px;color:var(--muted);">Chargement…</div>
+            </div>
+          </div>
+          <div id="pack-panel-demandes" style="display:none;">
+            <div id="packs-demandes-list" class="card" style="padding:0;overflow:hidden;">
+              <div style="padding:16px;color:var(--muted);">Chargement…</div>
+            </div>
+          </div>
+
+          <!-- Modal création/édition pack -->
+          <div id="pack-modal" class="card" style="display:none;margin-top:20px;border:2px solid var(--orange);">
+            <div class="flex-between" style="margin-bottom:16px;">
+              <h3 style="margin:0;" id="pack-modal-title">Nouveau pack</h3>
+              <button class="btn btn-sm btn-outline" onclick="closePackModal()">✕</button>
+            </div>
+            <div class="grid grid-2" style="gap:12px;margin-bottom:12px;">
+              <div>
+                <label class="form-label">Nom du pack *</label>
+                <input id="pack-nom" class="input-field" style="width:100%;" placeholder="ex: Pack Communication">
+              </div>
+              <div>
+                <label class="form-label">Emoji</label>
+                <input id="pack-emoji" class="input-field" style="width:100%;" placeholder="📦">
+              </div>
+              <div>
+                <label class="form-label">Couleur</label>
+                <input id="pack-couleur" class="input-field" type="color" style="width:100%;height:38px;" value="#6366f1">
+              </div>
+              <div>
+                <label class="form-label">Ordre d'affichage</label>
+                <input id="pack-ordre" class="input-field" style="width:100%;" type="number" value="0">
+              </div>
+            </div>
+            <div style="margin-bottom:12px;">
+              <label class="form-label">Description</label>
+              <textarea id="pack-description" class="input-field" style="width:100%;min-height:60px;"></textarea>
+            </div>
+
+            <h4 style="margin:16px 0 10px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">Accréditations incluses</h4>
+            <div id="pack-accreds-selector" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+              <div style="color:var(--muted);font-size:13px;">Chargement des accréditations…</div>
+            </div>
+
+            <h4 style="margin:16px 0 10px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">Accès et tarification par type de compte</h4>
+            ${['utilisateur','initiative','collectivite'].map(role => `
+            <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:8px;">${role === 'collectivite' ? 'Institution' : role.charAt(0).toUpperCase() + role.slice(1)}</div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="pack-mode-${role}" value="automatique"> Accès automatique</label>
+                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="pack-mode-${role}" value="sur_demande" checked> Sur demande</label>
+                <label style="font-size:13px;cursor:pointer;"><input type="radio" name="pack-mode-${role}" value="non_concerne"> Non concerné</label>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                <div>
+                  <label class="form-label" style="font-size:11px;">Tarification</label>
+                  <select id="pack-tarif-type-${role}" class="input-field" style="width:100%;font-size:13px;">
+                    <option value="gratuit">Gratuit</option>
+                    <option value="paiement_unique">Paiement unique</option>
+                    <option value="mensuel">Mensuel</option>
+                    <option value="annuel">Annuel</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:11px;">Montant (€)</label>
+                  <input id="pack-tarif-montant-${role}" class="input-field" style="width:100%;font-size:13px;" type="number" min="0" step="0.01" value="0">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:11px;">Validation admin</label>
+                  <select id="pack-tarif-validation-${role}" class="input-field" style="width:100%;font-size:13px;">
+                    <option value="1">Requise</option>
+                    <option value="0">Automatique</option>
+                  </select>
+                </div>
+              </div>
+            </div>`).join('')}
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+              <div>
+                <label class="form-label">Date de début (optionnel)</label>
+                <input id="pack-date-debut" class="input-field" style="width:100%;" type="date">
+              </div>
+              <div>
+                <label class="form-label">Date de fin (optionnel)</label>
+                <input id="pack-date-fin" class="input-field" style="width:100%;" type="date">
+              </div>
+            </div>
+
+            <div style="display:flex;gap:8px;align-items:center;margin-top:16px;">
+              <button class="btn btn-orange" onclick="savePack()">💾 Enregistrer le pack</button>
+              <button class="btn btn-outline" onclick="closePackModal()">Annuler</button>
+              <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;margin-left:auto;">
+                <input type="checkbox" id="pack-notifier"> Notifier les titulaires des modifications
+              </label>
             </div>
           </div>
         </div>
@@ -3620,7 +3822,12 @@ async function deleteAccredDef(id) {
   loadAccredDefinitions();
 }
 
-function openAccredDefModal(def) {
+function toggleAdpAdvanced() {
+  const el = document.getElementById('adp-extended-fields');
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+async function openAccredDefModal(def) {
   _accredDefEditId = def ? def.id : null;
   document.getElementById('adp-title').textContent = def ? `Modifier — ${def.emoji||''} ${def.label}` : 'Nouvelle accréditation';
   document.getElementById('adp-type').value = def?.type || '';
@@ -3629,9 +3836,66 @@ function openAccredDefModal(def) {
   document.getElementById('adp-emoji').value = def?.emoji || '';
   document.getElementById('adp-couleur').value = def?.couleur || '#6366f1';
   document.getElementById('adp-description').value = def?.description || '';
-  document.getElementById('adp-droits').value = (Array.isArray(def?.droits) ? def.droits : []).join('\n');
+  const droitsArr = Array.isArray(def?.droits) ? def.droits : (typeof def?.droits === 'string' ? JSON.parse(def.droits||'[]') : []);
+  document.getElementById('adp-droits').value = droitsArr.join('\n');
   document.getElementById('adp-fonctionnalite').value = def?.fonctionnalite || '';
   document.getElementById('adp-module').value = def?.module || '';
+  /* Champs avancés */
+  document.getElementById('adp-duree-validite').value = def?.duree_validite_jours || '';
+  document.getElementById('adp-renouvellement-auto').value = def?.renouvellement_auto ? '1' : '0';
+  document.getElementById('adp-double-validation').value = def?.double_validation ? '1' : '0';
+  document.getElementById('adp-controle-docs').value = def?.controle_documentaire ? '1' : '0';
+  document.getElementById('adp-conditions').value = def?.conditions_obtention || '';
+  const docsArr = Array.isArray(def?.documents_requis) ? def.documents_requis : (typeof def?.documents_requis === 'string' ? JSON.parse(def.documents_requis||'[]') : []);
+  document.getElementById('adp-documents').value = docsArr.join('\n');
+  /* Mode d'application visible uniquement en édition */
+  const modeBlock = document.getElementById('adp-mode-application-block');
+  const toggleWrap = document.getElementById('adp-toggle-advanced-wrap');
+  const extFields = document.getElementById('adp-extended-fields');
+  if (def) {
+    modeBlock.style.display = '';
+    toggleWrap.style.display = '';
+    extFields.style.display = '';
+    /* Charger l'impact */
+    try {
+      const { nb_titulaires, nb_demandes_attente, repartition } = await api('GET', `/admin/accred/definitions/${def.id}/impact`);
+      document.getElementById('adp-impact-info').innerHTML =
+        `<strong>${nb_titulaires}</strong> compte(s) titulaire(s) actuellement actif(s)` +
+        (nb_demandes_attente ? ` · <strong>${nb_demandes_attente}</strong> demande(s) en attente` : '') +
+        (repartition.length ? `<br>${repartition.map(r=>`${ROLES_LBL[r.role]||r.role} : ${r.n}`).join(' · ')}` : '');
+    } catch(_) {}
+    document.querySelector('input[name="mode-application"][value="nouvelles_demandes"]').checked = true;
+    document.getElementById('adp-date-application-block').style.display = 'none';
+    document.getElementById('adp-notifier-titulaires').checked = false;
+    document.getElementById('adp-motif').value = '';
+    /* Écouter le changement de mode */
+    document.querySelectorAll('input[name="mode-application"]').forEach(r => {
+      r.onchange = () => {
+        document.getElementById('adp-date-application-block').style.display =
+          r.value === 'differe' && r.checked ? '' : 'none';
+      };
+    });
+    /* Bouton audit */
+    const auditBtn = document.getElementById('adp-audit-btn');
+    if (!auditBtn) {
+      const saveRow = document.querySelector('#accred-def-panel > div:last-of-type');
+      if (saveRow) {
+        const btn = document.createElement('button');
+        btn.id = 'adp-audit-btn';
+        btn.className = 'btn btn-sm btn-outline';
+        btn.style.marginLeft = 'auto';
+        btn.textContent = '📋 Journal d\'audit';
+        btn.onclick = () => loadAccredAudit(def.id);
+        saveRow.appendChild(btn);
+      }
+    } else {
+      auditBtn.onclick = () => loadAccredAudit(def.id);
+    }
+  } else {
+    modeBlock.style.display = 'none';
+    toggleWrap.style.display = '';
+    extFields.style.display = 'none';
+  }
   ['utilisateur','initiative','collectivite'].forEach(role => {
     const regle = (def?.regles||[]).find(r=>r.role===role);
     const tarif = (def?.tarifs||[]).find(t=>t.role===role);
@@ -3654,19 +3918,41 @@ function closeAccredDefPanel() {
   _accredDefEditId = null;
 }
 
+async function loadAccredAudit(accredId) {
+  const block = document.getElementById('accred-audit-block');
+  const list = document.getElementById('accred-audit-list');
+  block.style.display = '';
+  block.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  try {
+    const { logs } = await api('GET', `/admin/accred/definitions/${accredId}/audit`);
+    if (!logs.length) { list.innerHTML = '<div style="padding:16px;color:var(--muted);">Aucune modification enregistrée.</div>'; return; }
+    list.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+        <th style="padding:8px 12px;text-align:left;">Date</th>
+        <th style="padding:8px 12px;text-align:left;">Admin</th>
+        <th style="padding:8px 12px;text-align:left;">Mode</th>
+        <th style="padding:8px 12px;text-align:left;">Comptes</th>
+        <th style="padding:8px 12px;text-align:left;">Motif</th>
+      </tr></thead><tbody>
+      ${logs.map(l=>`<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 12px;white-space:nowrap;">${(l.created_at||'').slice(0,16).replace('T',' ')}</td>
+        <td style="padding:8px 12px;">${l.admin_nom||'—'}</td>
+        <td style="padding:8px 12px;">${l.mode_application||'nouvelles_demandes'}</td>
+        <td style="padding:8px 12px;">${l.nb_comptes_impactes||0}</td>
+        <td style="padding:8px 12px;color:var(--muted);">${l.motif||'—'}</td>
+      </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) { list.innerHTML = `<div style="padding:16px;color:red;">${e.message}</div>`; }
+}
+
 async function saveAccredDef() {
   const type = document.getElementById('adp-type').value.trim().replace(/\s+/g,'_');
   const label = document.getElementById('adp-label').value.trim();
   if (!type || !label) return alert('Identifiant et nom requis.');
-  const droitsRaw = document.getElementById('adp-droits').value;
-  const droits = droitsRaw.split('\n').map(s=>s.trim()).filter(Boolean);
+  const droits = document.getElementById('adp-droits').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const documents_requis = document.getElementById('adp-documents').value.split('\n').map(s=>s.trim()).filter(Boolean);
   const couleur = document.getElementById('adp-couleur').value;
-
-  /* couleur → variantes bg/border/text */
-  const couleur_bg = couleur + '20'; /* Approximation — sera affinée en prod */
-  const couleur_border = couleur;
-  const couleur_text = couleur;
-
+  const couleur_bg = couleur + '20';
   const regles = [], tarifs = [];
   ['utilisateur','initiative','collectivite'].forEach(role => {
     const mode = document.querySelector(`input[name="mode-${role}"]:checked`)?.value || 'non_concerne';
@@ -3681,35 +3967,227 @@ async function saveAccredDef() {
       });
     }
   });
-
-  const body = { type, label,
+  const modeApp = _accredDefEditId ? (document.querySelector('input[name="mode-application"]:checked')?.value || 'nouvelles_demandes') : null;
+  const body = {
+    type, label,
     emoji: document.getElementById('adp-emoji').value.trim(),
     description: document.getElementById('adp-description').value.trim(),
-    droits, couleur, couleur_bg, couleur_border, couleur_text,
+    droits, couleur, couleur_bg, couleur_border: couleur, couleur_text: couleur,
     module: document.getElementById('adp-module').value.trim() || null,
     fonctionnalite: document.getElementById('adp-fonctionnalite').value.trim() || null,
-    regles, tarifs
+    duree_validite_jours: parseInt(document.getElementById('adp-duree-validite').value) || null,
+    renouvellement_auto: parseInt(document.getElementById('adp-renouvellement-auto').value),
+    double_validation: parseInt(document.getElementById('adp-double-validation').value),
+    controle_documentaire: parseInt(document.getElementById('adp-controle-docs').value),
+    conditions_obtention: document.getElementById('adp-conditions').value.trim() || null,
+    documents_requis,
+    regles, tarifs,
+    mode_application: modeApp,
+    date_application: modeApp === 'differe' ? (document.getElementById('adp-date-application')?.value || null) : null,
+    notifier_titulaires: _accredDefEditId ? document.getElementById('adp-notifier-titulaires')?.checked : false,
+    motif: _accredDefEditId ? (document.getElementById('adp-motif')?.value?.trim() || null) : null
   };
-
   try {
-    if (_accredDefEditId) {
-      await api('PUT', `/admin/accred/definitions/${_accredDefEditId}`, body);
-    } else {
-      await api('POST', `/admin/accred/definitions`, body);
-    }
+    const r = _accredDefEditId
+      ? await api('PUT', `/admin/accred/definitions/${_accredDefEditId}`, body)
+      : await api('POST', `/admin/accred/definitions`, body);
     closeAccredDefPanel();
     loadAccredDefinitions();
     loadAccredDefDemandes();
-  } catch(e) {
-    alert('Erreur : ' + e.message);
-  }
+    if (r?.nb_comptes_impactes > 0 && modeApp !== 'nouvelles_demandes') {
+      alert(`✅ Enregistré. ${r.nb_comptes_impactes} compte(s) impacté(s).`);
+    }
+  } catch(e) { alert('Erreur : ' + e.message); }
 }
 
 /* Chargement initial quand la section accreditations est ouverte */
-const _origLoadAccredSection = window.loadAccredSection;
 function loadMoteurAccred() {
   loadAccredDefinitions();
   loadAccredDefDemandes();
+}
+
+/* ===== PACKS D'ACCRÉDITATIONS ===== */
+let _packEditId = null;
+let _allAccredDefs = [];
+
+function switchPackTab(tab) {
+  ['packs','demandes'].forEach(t => {
+    document.getElementById(`pack-panel-${t}`).style.display = t === tab ? '' : 'none';
+    const btn = document.getElementById(`pack-tab-${t}`);
+    if (btn) { btn.className = t === tab ? 'btn btn-orange' : 'btn btn-outline'; }
+  });
+  if (tab === 'packs') loadAdminPacks();
+  if (tab === 'demandes') loadPacksDemandes();
+}
+
+async function loadAdminPacks() {
+  const el = document.getElementById('packs-list');
+  if (!el) return;
+  try {
+    const { packs } = await api('GET', '/admin/accred/packs');
+    if (!packs.length) {
+      el.innerHTML = '<div style="padding:16px;color:var(--muted);">Aucun pack. Créez-en un avec le bouton ci-dessus.</div>';
+      return;
+    }
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+        <th style="padding:10px 14px;text-align:left;">Pack</th>
+        <th style="padding:10px 14px;text-align:left;">Accréditations</th>
+        <th style="padding:10px 14px;text-align:left;">Éligibles</th>
+        <th style="padding:10px 14px;text-align:center;">Titulaires</th>
+        <th style="padding:10px 14px;text-align:center;">Demandes</th>
+        <th style="padding:10px 14px;text-align:center;">Statut</th>
+        <th style="padding:10px 14px;"></th>
+      </tr></thead><tbody>
+      ${packs.map(p => {
+        const roles = (p.regles||[]).filter(r=>r.mode!=='non_concerne').map(r=>ROLES_LBL[r.role]||r.role).join(', ');
+        const accredTags = (p.accreditations||[]).map(a=>`<span style="background:${a.couleur||'#e5e7eb'}22;border:1px solid ${a.couleur||'#e5e7eb'};border-radius:6px;padding:1px 6px;font-size:11px;white-space:nowrap;">${a.emoji||'🎖'} ${a.label}</span>`).join(' ');
+        return `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:12px 14px;font-weight:700;">${p.emoji||'📦'} ${p.nom}
+            <div style="font-size:11px;color:var(--muted);font-weight:400;">${p.slug}</div></td>
+          <td style="padding:12px 14px;max-width:200px;">${accredTags||'—'}</td>
+          <td style="padding:12px 14px;font-size:12px;">${roles||'Aucun'}</td>
+          <td style="padding:12px 14px;text-align:center;font-weight:700;">${p.nb_titulaires}</td>
+          <td style="padding:12px 14px;text-align:center;">${p.nb_demandes > 0 ? `<span style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:99px;font-weight:700;font-size:11px;">${p.nb_demandes}</span>` : '0'}</td>
+          <td style="padding:12px 14px;text-align:center;">
+            <span style="padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;background:${p.actif?'#dcfce7':'#fee2e2'};color:${p.actif?'#16a34a':'#dc2626'};">${p.actif?'Actif':'Inactif'}</span>
+          </td>
+          <td style="padding:12px 14px;display:flex;gap:6px;">
+            <button class="btn btn-sm btn-outline" onclick="editPack(${JSON.stringify(p).replace(/"/g,'&quot;')})">✏️</button>
+            ${p.actif ? `<button class="btn btn-sm btn-outline" style="color:#B91C1C;" onclick="desactiverPack(${p.id})">Suspendre</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody></table>`;
+  } catch(e) {
+    el.innerHTML = `<div style="padding:16px;color:red;">${e.message}</div>`;
+  }
+}
+
+async function loadPacksDemandes() {
+  const el = document.getElementById('packs-demandes-list');
+  if (!el) return;
+  try {
+    const { demandes } = await api('GET', '/admin/accred/packs/demandes');
+    const badge = document.getElementById('pack-demandes-badge');
+    if (badge) { badge.textContent = demandes.length; badge.style.display = demandes.length ? '' : 'none'; }
+    if (!demandes.length) { el.innerHTML = '<div style="padding:16px;color:var(--muted);">Aucune demande en attente.</div>'; return; }
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+        <th style="padding:10px 14px;text-align:left;">Compte</th>
+        <th style="padding:10px 14px;text-align:left;">Pack</th>
+        <th style="padding:10px 14px;text-align:left;">Message</th>
+        <th style="padding:10px 14px;text-align:left;">Date</th>
+        <th style="padding:10px 14px;"></th>
+      </tr></thead><tbody>
+      ${demandes.map(d=>`<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:10px 14px;font-weight:600;">${d.user_nom}<div style="font-size:11px;color:var(--muted);">${d.user_email} · ${d.user_role}</div></td>
+        <td style="padding:10px 14px;">${d.pack_emoji||'📦'} ${d.pack_nom}</td>
+        <td style="padding:10px 14px;font-size:12px;color:var(--muted);">${d.message||'—'}</td>
+        <td style="padding:10px 14px;color:var(--muted);font-size:12px;">${(d.created_at||'').slice(0,10)}</td>
+        <td style="padding:10px 14px;display:flex;gap:6px;">
+          <button class="btn btn-sm btn-orange" onclick="approuverPackDem(${d.id})">✅ Approuver</button>
+          <button class="btn btn-sm btn-outline" style="color:#B91C1C;" onclick="refuserPackDem(${d.id})">❌ Refuser</button>
+        </td>
+      </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) { el.innerHTML = `<div style="padding:16px;color:red;">${e.message}</div>`; }
+}
+
+async function approuverPackDem(id) {
+  if (!confirm('Approuver cette demande de pack ?')) return;
+  await api('PATCH', `/admin/accred/packs/demandes/${id}/approuver`, {});
+  loadPacksDemandes(); loadAdminPacks();
+}
+async function refuserPackDem(id) {
+  const motif = prompt('Motif du refus (optionnel) :');
+  if (motif === null) return;
+  await api('PATCH', `/admin/accred/packs/demandes/${id}/refuser`, { motif });
+  loadPacksDemandes();
+}
+async function desactiverPack(id) {
+  if (!confirm('Suspendre ce pack ?')) return;
+  await api('DELETE', `/admin/accred/packs/${id}`);
+  loadAdminPacks();
+}
+
+async function openPackModal(pack) {
+  _packEditId = pack ? pack.id : null;
+  document.getElementById('pack-modal-title').textContent = pack ? `Modifier — ${pack.emoji||'📦'} ${pack.nom}` : 'Nouveau pack';
+  document.getElementById('pack-nom').value = pack?.nom || '';
+  document.getElementById('pack-emoji').value = pack?.emoji || '📦';
+  document.getElementById('pack-couleur').value = pack?.couleur || '#6366f1';
+  document.getElementById('pack-ordre').value = pack?.ordre ?? 0;
+  document.getElementById('pack-description').value = pack?.description || '';
+  document.getElementById('pack-date-debut').value = pack?.date_debut || '';
+  document.getElementById('pack-date-fin').value = pack?.date_fin || '';
+  document.getElementById('pack-notifier').checked = false;
+  /* Charger les définitions disponibles */
+  try {
+    const { definitions } = await api('GET', '/admin/accred/definitions');
+    _allAccredDefs = definitions;
+    const selectedIds = new Set((pack?.accreditations||[]).map(a=>a.id));
+    document.getElementById('pack-accreds-selector').innerHTML = definitions.map(d =>
+      `<label style="display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;">
+        <input type="checkbox" data-accred-id="${d.id}" ${selectedIds.has(d.id)?'checked':''}> ${d.emoji||'🎖'} ${d.label}
+      </label>`
+    ).join('');
+  } catch(e) {
+    document.getElementById('pack-accreds-selector').innerHTML = `<div style="color:red;">${e.message}</div>`;
+  }
+  /* Règles */
+  ['utilisateur','initiative','collectivite'].forEach(role => {
+    const regle = (pack?.regles||[]).find(r=>r.role===role);
+    const tarif = (pack?.tarifs||[]).find(t=>t.role===role);
+    const mode = regle?.mode || 'non_concerne';
+    const radio = document.querySelector(`input[name="pack-mode-${role}"][value="${mode}"]`);
+    if (radio) radio.checked = true;
+    const selT = document.getElementById(`pack-tarif-type-${role}`);
+    const inpM = document.getElementById(`pack-tarif-montant-${role}`);
+    const selV = document.getElementById(`pack-tarif-validation-${role}`);
+    if (selT) selT.value = tarif?.type_tarif || 'gratuit';
+    if (inpM) inpM.value = tarif?.montant ?? 0;
+    if (selV) selV.value = tarif?.validation_admin ?? 1;
+  });
+  document.getElementById('pack-modal').style.display = '';
+  document.getElementById('pack-modal').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function editPack(pack) { openPackModal(pack); }
+function closePackModal() { document.getElementById('pack-modal').style.display = 'none'; _packEditId = null; }
+
+async function savePack() {
+  const nom = document.getElementById('pack-nom').value.trim();
+  if (!nom) return alert('Nom du pack requis.');
+  const accred_ids = Array.from(document.querySelectorAll('#pack-accreds-selector input[type="checkbox"]:checked'))
+    .map(cb => parseInt(cb.dataset.accredId));
+  const regles = [], tarifs = [];
+  ['utilisateur','initiative','collectivite'].forEach(role => {
+    const mode = document.querySelector(`input[name="pack-mode-${role}"]:checked`)?.value || 'non_concerne';
+    regles.push({ role, mode });
+    tarifs.push({
+      role,
+      type_tarif: document.getElementById(`pack-tarif-type-${role}`)?.value || 'gratuit',
+      montant: parseFloat(document.getElementById(`pack-tarif-montant-${role}`)?.value) || 0,
+      devise: 'EUR',
+      validation_admin: parseInt(document.getElementById(`pack-tarif-validation-${role}`)?.value) ?? 1
+    });
+  });
+  const body = {
+    nom, emoji: document.getElementById('pack-emoji').value.trim() || '📦',
+    couleur: document.getElementById('pack-couleur').value,
+    ordre: parseInt(document.getElementById('pack-ordre').value) || 0,
+    description: document.getElementById('pack-description').value.trim() || null,
+    date_debut: document.getElementById('pack-date-debut').value || null,
+    date_fin: document.getElementById('pack-date-fin').value || null,
+    accred_ids, regles, tarifs,
+    notifier_titulaires: document.getElementById('pack-notifier').checked
+  };
+  try {
+    if (_packEditId) { await api('PUT', `/admin/accred/packs/${_packEditId}`, body); }
+    else { await api('POST', `/admin/accred/packs`, body); }
+    closePackModal();
+    loadAdminPacks();
+  } catch(e) { alert('Erreur : ' + e.message); }
 }
 
 /* ===== ACCRÉDITATIONS DIASPO'ACTIF ===== */
@@ -3851,7 +4329,7 @@ async function retirerDA(userId, type){
 
 // Charger quand la section accreditations s'ouvre
 document.querySelector('[data-section="accreditations"]')?.addEventListener('click',()=>{
-  setTimeout(()=>{ loadDADemandes(); loadMoteurAccred(); }, 150);
+  setTimeout(()=>{ loadDADemandes(); loadMoteurAccred(); loadAdminPacks(); loadPacksDemandes(); }, 150);
 });
 
 /* ── Navigation helper ── */

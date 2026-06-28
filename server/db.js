@@ -2511,5 +2511,117 @@ db.exec(`
   insT.run(id,'collectivite','gratuit',0,'EUR',1);
 })();
 
+/* ===== MOTEUR ACCRÉDITATIONS v2 : audit + champs étendus + packs ===== */
+
+/* Extension de accred_definitions */
+;[
+  "duree_validite_jours INTEGER",
+  "conditions_obtention TEXT",
+  "documents_requis TEXT DEFAULT '[]'",
+  "renouvellement_auto INTEGER DEFAULT 0",
+  "double_validation INTEGER DEFAULT 0",
+  "controle_documentaire INTEGER DEFAULT 0",
+  "date_application TEXT"
+].forEach(col => { try { db.exec(`ALTER TABLE accred_definitions ADD COLUMN ${col}`); } catch(_) {} });
+
+db.exec(`
+  /* Journal d'audit des modifications d'accréditations */
+  CREATE TABLE IF NOT EXISTS accred_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    accred_id INTEGER NOT NULL,
+    admin_id INTEGER NOT NULL,
+    admin_nom TEXT,
+    champ TEXT NOT NULL,
+    ancienne_valeur TEXT,
+    nouvelle_valeur TEXT,
+    motif TEXT,
+    mode_application TEXT DEFAULT 'nouvelles_demandes',
+    date_application TEXT,
+    nb_comptes_impactes INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id)
+  );
+
+  /* Packs d'accréditations */
+  CREATE TABLE IF NOT EXISTS accred_packs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    nom TEXT NOT NULL,
+    description TEXT,
+    emoji TEXT DEFAULT '📦',
+    couleur TEXT DEFAULT '#6366f1',
+    couleur_bg TEXT DEFAULT '#f5f3ff',
+    actif INTEGER DEFAULT 1,
+    date_debut TEXT,
+    date_fin TEXT,
+    ordre INTEGER DEFAULT 0,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS accred_pack_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pack_id INTEGER NOT NULL,
+    accred_id INTEGER NOT NULL,
+    UNIQUE(pack_id, accred_id),
+    FOREIGN KEY(pack_id) REFERENCES accred_packs(id) ON DELETE CASCADE,
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS accred_pack_regles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pack_id INTEGER NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('utilisateur','initiative','collectivite')),
+    mode TEXT NOT NULL DEFAULT 'non_concerne'
+          CHECK(mode IN ('automatique','sur_demande','non_concerne')),
+    UNIQUE(pack_id, role),
+    FOREIGN KEY(pack_id) REFERENCES accred_packs(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS accred_pack_tarifs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pack_id INTEGER NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('utilisateur','initiative','collectivite')),
+    type_tarif TEXT NOT NULL DEFAULT 'gratuit'
+                CHECK(type_tarif IN ('gratuit','paiement_unique','mensuel','annuel')),
+    montant REAL DEFAULT 0,
+    devise TEXT DEFAULT 'EUR',
+    validation_admin INTEGER DEFAULT 1,
+    UNIQUE(pack_id, role),
+    FOREIGN KEY(pack_id) REFERENCES accred_packs(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS user_packs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    pack_id INTEGER NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'active'
+             CHECK(statut IN ('active','suspendue','expiree')),
+    date_attribution TEXT DEFAULT (datetime('now')),
+    date_expiration TEXT,
+    admin_id INTEGER,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, pack_id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(pack_id) REFERENCES accred_packs(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS accred_pack_demandes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    pack_id INTEGER NOT NULL,
+    message TEXT,
+    statut TEXT DEFAULT 'en_attente'
+            CHECK(statut IN ('en_attente','approuvee','refusee')),
+    motif_refus TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, pack_id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(pack_id) REFERENCES accred_packs(id)
+  );
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
