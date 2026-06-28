@@ -2265,6 +2265,148 @@
           </div>
         </div>
 
+        <!-- FEATURE ENGINE — Registry des fonctionnalités -->
+        <div id="section-feature-engine" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
+          <div class="flex-between" style="margin-bottom:6px;">
+            <h2 style="margin:0;">⚙️ Feature Engine</h2>
+            <button class="btn btn-orange" onclick="openFeatureModal()">+ Nouvelle fonctionnalité</button>
+          </div>
+          <p style="color:var(--muted);font-size:13px;margin:0 0 16px;">Registre central de toutes les fonctionnalités de la plateforme. Chaque feature définit ses règles d'accès, d'accréditation et de visibilité.</p>
+
+          <!-- Onglets -->
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+            <button class="btn btn-orange" id="fe-tab-registry" onclick="switchFeTab('registry')">📋 Registry</button>
+            <button class="btn btn-outline" id="fe-tab-stats" onclick="switchFeTab('stats')">📊 Usage & Stats</button>
+          </div>
+
+          <!-- Panel registry -->
+          <div id="fe-panel-registry">
+            <!-- Filtres par catégorie -->
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+              ${['Toutes','communication','formation','evenements','collaboration','publication','observatoire'].map((c,i) =>
+                `<button class="btn btn-sm ${i===0?'btn-orange':'btn-outline'}" id="fe-cat-${c.replace(/ /g,'_')}"
+                  onclick="filterFeCategory('${c}')">${c==='Toutes'?'Toutes':c.charAt(0).toUpperCase()+c.slice(1)}</button>`
+              ).join('')}
+            </div>
+            <div id="features-list" class="card" style="padding:0;overflow:hidden;">
+              <div style="padding:16px;color:var(--muted);">Chargement…</div>
+            </div>
+          </div>
+
+          <!-- Panel stats -->
+          <div id="fe-panel-stats" style="display:none;">
+            <div class="grid grid-3" style="gap:12px;margin-bottom:20px;">
+              <div class="card" style="text-align:center;padding:16px;">
+                <div style="font-size:24px;font-weight:800;color:var(--orange);" id="fe-stat-total">—</div>
+                <div style="font-size:12px;color:var(--muted);">Features actives</div>
+              </div>
+              <div class="card" style="text-align:center;padding:16px;">
+                <div style="font-size:24px;font-weight:800;color:#3b82f6;" id="fe-stat-suggestions">—</div>
+                <div style="font-size:12px;color:var(--muted);">Suggestions de gel en attente</div>
+              </div>
+              <div class="card" style="text-align:center;padding:16px;">
+                <div style="font-size:24px;font-weight:800;color:#10b981;" id="fe-stat-top-usage">—</div>
+                <div style="font-size:12px;color:var(--muted);">Feature la plus utilisée</div>
+              </div>
+            </div>
+            <div id="fe-stats-detail" class="card" style="padding:0;overflow:hidden;">
+              <div style="padding:16px;color:var(--muted);">Chargement…</div>
+            </div>
+          </div>
+
+          <!-- Modal création/édition feature -->
+          <div id="feature-modal" class="card" style="display:none;margin-top:20px;border:2px solid var(--orange);">
+            <div class="flex-between" style="margin-bottom:16px;">
+              <h3 style="margin:0;" id="feature-modal-title">Nouvelle fonctionnalité</h3>
+              <button class="btn btn-sm btn-outline" onclick="closeFeatureModal()">✕</button>
+            </div>
+            <div class="grid grid-2" style="gap:12px;margin-bottom:12px;">
+              <div>
+                <label class="form-label">Slug unique *</label>
+                <input id="fe-slug" class="input-field" style="width:100%;" placeholder="ex: appels_video">
+              </div>
+              <div>
+                <label class="form-label">Nom affiché *</label>
+                <input id="fe-nom" class="input-field" style="width:100%;" placeholder="ex: Appels vidéo">
+              </div>
+              <div>
+                <label class="form-label">Emoji</label>
+                <input id="fe-emoji" class="input-field" style="width:100%;" placeholder="⚙️">
+              </div>
+              <div>
+                <label class="form-label">Couleur</label>
+                <input id="fe-couleur" class="input-field" type="color" style="width:100%;height:38px;" value="#6366f1">
+              </div>
+              <div>
+                <label class="form-label">Catégorie</label>
+                <select id="fe-categorie" class="input-field" style="width:100%;">
+                  ${['communication','formation','evenements','collaboration','publication','observatoire','administration','general'].map(c =>
+                    `<option value="${c}">${c}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Visibilité par défaut</label>
+                <select id="fe-visibilite" class="input-field" style="width:100%;">
+                  <option value="hidden">Cachée (nécessite accès)</option>
+                  <option value="visible">Visible</option>
+                  <option value="locked">Verrouillée (affiché mais inaccessible)</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Ordre d'affichage</label>
+                <input id="fe-ordre" class="input-field" style="width:100%;" type="number" value="0">
+              </div>
+              <div>
+                <label class="form-label">Statut</label>
+                <select id="fe-statut" class="input-field" style="width:100%;">
+                  <option value="active">Active</option>
+                  <option value="beta">Bêta</option>
+                  <option value="deprecated">Dépréciée</option>
+                  <option value="disabled">Désactivée</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-bottom:12px;">
+              <label class="form-label">Description</label>
+              <textarea id="fe-description" class="input-field" style="width:100%;min-height:60px;"></textarea>
+            </div>
+            <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;">Accès et accréditation</h4>
+              <div class="grid grid-2" style="gap:10px;">
+                <div>
+                  <label class="form-label">Accréditation requise</label>
+                  <select id="fe-require-accred" class="input-field" style="width:100%;" onchange="toggleAccredType()">
+                    <option value="0">Non — libre ou par rôle</option>
+                    <option value="1">Oui — accréditation requise</option>
+                  </select>
+                </div>
+                <div id="fe-accred-type-wrap">
+                  <label class="form-label">Type d'accréditation requis</label>
+                  <input id="fe-accred-type" class="input-field" style="width:100%;" placeholder="ex: createur_formations">
+                </div>
+              </div>
+              <div style="margin-top:10px;">
+                <label class="form-label">Accès automatique pour les rôles (sans accréditation)</label>
+                <div style="display:flex;gap:12px;margin-top:6px;">
+                  <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    <input type="checkbox" id="fe-role-utilisateur" value="utilisateur"> Utilisateur
+                  </label>
+                  <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    <input type="checkbox" id="fe-role-initiative" value="initiative"> Initiative
+                  </label>
+                  <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    <input type="checkbox" id="fe-role-collectivite" value="collectivite"> Institution
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <button class="btn btn-orange" onclick="saveFeature()">💾 Enregistrer</button>
+              <button class="btn btn-outline" onclick="closeFeatureModal()">Annuler</button>
+            </div>
+          </div>
+        </div>
+
         <!-- ACCRÉDITATIONS DA : Mobilisation Active / Créateur d'Opportunités -->
         <div id="section-accred-da" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
           <h2 style="margin:0 0 6px;">Accréditations Diaspo'Actif</h2>
@@ -4006,6 +4148,213 @@ function loadMoteurAccred() {
   loadAccredDefDemandes();
 }
 
+/* ===== FEATURE ENGINE ===== */
+let _featureEditId = null;
+let _feCatFilter = 'Toutes';
+
+const FE_CAT_LABELS = {
+  communication: '💬 Communication', formation: '🎓 Formation', evenements: '🗓️ Événements',
+  collaboration: '🤲 Collaboration', publication: '📰 Publication',
+  observatoire: '🔭 Observatoire', administration: '⚙️ Administration', general: '📦 Général'
+};
+const FE_STATUT_COLORS = {
+  active: { bg: '#dcfce7', color: '#16a34a' },
+  frozen: { bg: '#dbeafe', color: '#1d4ed8' },
+  locked: { bg: '#fee2e2', color: '#dc2626' },
+  beta: { bg: '#fef3c7', color: '#b45309' },
+  disabled: { bg: '#f3f4f6', color: '#6b7280' }
+};
+
+function switchFeTab(tab) {
+  ['registry','stats'].forEach(t => {
+    document.getElementById(`fe-panel-${t}`).style.display = t === tab ? '' : 'none';
+    document.getElementById(`fe-tab-${t}`).className = t === tab ? 'btn btn-orange' : 'btn btn-outline';
+  });
+  if (tab === 'stats') loadFeStats();
+  else loadAdminFeatures();
+}
+
+function filterFeCategory(cat) {
+  _feCatFilter = cat;
+  document.querySelectorAll('[id^="fe-cat-"]').forEach(btn => {
+    btn.className = btn.id === `fe-cat-${cat.replace(/ /g,'_')}` ? 'btn btn-sm btn-orange' : 'btn btn-sm btn-outline';
+  });
+  loadAdminFeatures();
+}
+
+async function loadAdminFeatures() {
+  const el = document.getElementById('features-list');
+  if (!el) return;
+  try {
+    const { features } = await api('GET', '/admin/features');
+    const filtered = _feCatFilter === 'Toutes' ? features : features.filter(f => f.categorie === _feCatFilter);
+    if (!filtered.length) { el.innerHTML = '<div style="padding:16px;color:var(--muted);">Aucune feature dans cette catégorie.</div>'; return; }
+
+    /* Grouper par catégorie */
+    const bycat = {};
+    filtered.forEach(f => { (bycat[f.categorie] = bycat[f.categorie] || []).push(f); });
+
+    el.innerHTML = Object.entries(bycat).map(([cat, feats]) => `
+      <div style="padding:12px 16px 0;background:#f8fafc;border-bottom:1px solid var(--border);">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);">${FE_CAT_LABELS[cat] || cat}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tbody>
+          ${feats.map(f => {
+            const rolesArr = (() => { try { return JSON.parse(f.roles_acces||'[]'); } catch(_){return [];} })();
+            const s = FE_STATUT_COLORS[f.statut] || FE_STATUT_COLORS.disabled;
+            return `<tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 16px;font-weight:700;width:240px;">
+                ${f.emoji||'⚙️'} ${f.nom}
+                <div style="font-size:11px;color:var(--muted);font-weight:400;font-family:monospace;">${f.slug}</div>
+              </td>
+              <td style="padding:10px 12px;">
+                <span style="background:${s.bg};color:${s.color};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;">${f.statut}</span>
+                <span style="background:#f3f4f6;color:#374151;padding:2px 8px;border-radius:99px;font-size:11px;margin-left:4px;">${f.visibilite_defaut}</span>
+              </td>
+              <td style="padding:10px 12px;font-size:12px;color:var(--muted);">
+                ${f.require_accreditation ? `🔒 Accréd. <code>${f.accred_type||'?'}</code>` : rolesArr.length ? `✅ Auto: ${rolesArr.join(', ')}` : '⛔ Aucun accès auto'}
+              </td>
+              <td style="padding:10px 12px;text-align:center;">
+                <span title="Actifs" style="font-size:12px;margin-right:8px;">▶ ${f.nb_actifs||0}</span>
+                <span title="Gelés" style="font-size:12px;color:#1d4ed8;">❄ ${f.nb_geles||0}</span>
+              </td>
+              <td style="padding:10px 12px;text-align:right;white-space:nowrap;">
+                <button class="btn btn-sm btn-outline" onclick="editFeature(${JSON.stringify(f).replace(/"/g,'&quot;')})">✏️</button>
+                <button class="btn btn-sm btn-outline" style="margin-left:4px;" onclick="viewFeatureUsers(${f.id},'${f.nom.replace(/'/g,"\\'")}')">👥</button>
+                ${f.actif ? `<button class="btn btn-sm btn-outline" style="color:#B91C1C;margin-left:4px;" onclick="desactiverFeature(${f.id})">🗑</button>` : ''}
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    `).join('');
+  } catch(e) { el.innerHTML = `<div style="padding:16px;color:red;">${e.message}</div>`; }
+}
+
+async function loadFeStats() {
+  const el = document.getElementById('fe-stats-detail');
+  if (!el) return;
+  try {
+    const { top_usages, top_frozen, nb_suggestions_actives } = await api('GET', '/admin/features/stats');
+    const { features } = await api('GET', '/admin/features');
+    const nbActifs = features.filter(f=>f.actif).length;
+
+    document.getElementById('fe-stat-total').textContent = nbActifs;
+    document.getElementById('fe-stat-suggestions').textContent = nb_suggestions_actives;
+    document.getElementById('fe-stat-top-usage').textContent = top_usages[0] ? `${top_usages[0].emoji} ${top_usages[0].nom}` : '—';
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
+        <div style="border-right:1px solid var(--border);padding:16px;">
+          <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;">Top features utilisées</h4>
+          ${top_usages.map((f,i) => `
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f3f4f6;">
+              <span style="font-size:18px;width:28px;text-align:center;">${f.emoji||'⚙️'}</span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:13px;">${f.nom}</div>
+                <div style="font-size:11px;color:var(--muted);">${f.categorie}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-weight:700;font-size:14px;">${f.total.toLocaleString('fr-FR')}</div>
+                <div style="font-size:11px;color:var(--muted);">${f.nb_users} utilisateurs</div>
+              </div>
+            </div>
+          `).join('') || '<div style="color:var(--muted);font-size:13px;">Aucun usage enregistré.</div>'}
+        </div>
+        <div style="padding:16px;">
+          <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;">Features les plus gelées</h4>
+          ${top_frozen.map(f => `
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f3f4f6;">
+              <span style="font-size:18px;">❄️</span>
+              <span style="flex:1;font-size:13px;font-weight:600;">${f.emoji||'⚙️'} ${f.nom}</span>
+              <span style="font-weight:700;color:#1d4ed8;">${f.nb_gels} gels</span>
+            </div>
+          `).join('') || '<div style="color:var(--muted);font-size:13px;">Aucun gel enregistré.</div>'}
+        </div>
+      </div>
+    `;
+  } catch(e) { el.innerHTML = `<div style="padding:16px;color:red;">${e.message}</div>`; }
+}
+
+async function viewFeatureUsers(featureId, nom) {
+  const panel = document.getElementById('features-list');
+  try {
+    const { users } = await api('GET', `/admin/features/${featureId}/users`);
+    const groups = { active: [], frozen: [], locked: [], pending_accreditation: [] };
+    users.forEach(u => (groups[u.statut] = groups[u.statut] || []).push(u));
+    alert(`« ${nom} » — ${users.length} utilisateurs\n\n` +
+      `✅ Actifs: ${(groups.active||[]).length}\n` +
+      `❄️ Gelés: ${(groups.frozen||[]).length}\n` +
+      `🔒 Verrouillés: ${(groups.locked||[]).length}\n\n` +
+      `Usages totaux: ${users.reduce((s,u)=>s+(u.nb_utilisations||0),0)}`);
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+function toggleAccredType() {
+  const req = document.getElementById('fe-require-accred').value;
+  document.getElementById('fe-accred-type-wrap').style.opacity = req === '1' ? '1' : '0.4';
+}
+
+function openFeatureModal(f) {
+  _featureEditId = f ? f.id : null;
+  document.getElementById('feature-modal-title').textContent = f ? `Modifier — ${f.emoji||''} ${f.nom}` : 'Nouvelle fonctionnalité';
+  document.getElementById('fe-slug').value = f?.slug || '';
+  document.getElementById('fe-slug').disabled = !!f;
+  document.getElementById('fe-nom').value = f?.nom || '';
+  document.getElementById('fe-emoji').value = f?.emoji || '⚙️';
+  document.getElementById('fe-couleur').value = f?.couleur || '#6366f1';
+  document.getElementById('fe-categorie').value = f?.categorie || 'general';
+  document.getElementById('fe-visibilite').value = f?.visibilite_defaut || 'hidden';
+  document.getElementById('fe-ordre').value = f?.ordre ?? 0;
+  document.getElementById('fe-statut').value = f?.statut || 'active';
+  document.getElementById('fe-description').value = f?.description || '';
+  document.getElementById('fe-require-accred').value = f?.require_accreditation ? '1' : '0';
+  document.getElementById('fe-accred-type').value = f?.accred_type || '';
+  const rolesArr = (() => { try { return JSON.parse(f?.roles_acces||'[]'); } catch(_){return [];} })();
+  ['utilisateur','initiative','collectivite'].forEach(r => {
+    document.getElementById(`fe-role-${r}`).checked = rolesArr.includes(r);
+  });
+  toggleAccredType();
+  document.getElementById('feature-modal').style.display = '';
+  document.getElementById('feature-modal').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function editFeature(f) { openFeatureModal(f); }
+function closeFeatureModal() { document.getElementById('feature-modal').style.display = 'none'; _featureEditId = null; }
+
+async function saveFeature() {
+  const slug = document.getElementById('fe-slug').value.trim();
+  const nom = document.getElementById('fe-nom').value.trim();
+  if (!slug || !nom) return alert('Slug et nom requis.');
+  const roles_acces = ['utilisateur','initiative','collectivite']
+    .filter(r => document.getElementById(`fe-role-${r}`).checked);
+  const body = {
+    slug, nom,
+    description: document.getElementById('fe-description').value.trim() || null,
+    categorie: document.getElementById('fe-categorie').value,
+    visibilite_defaut: document.getElementById('fe-visibilite').value,
+    statut: document.getElementById('fe-statut').value,
+    emoji: document.getElementById('fe-emoji').value.trim() || '⚙️',
+    couleur: document.getElementById('fe-couleur').value,
+    ordre: parseInt(document.getElementById('fe-ordre').value) || 0,
+    require_accreditation: document.getElementById('fe-require-accred').value === '1' ? 1 : 0,
+    accred_type: document.getElementById('fe-accred-type').value.trim() || null,
+    roles_acces
+  };
+  try {
+    if (_featureEditId) { await api('PUT', `/admin/features/${_featureEditId}`, body); }
+    else { await api('POST', `/admin/features`, body); }
+    closeFeatureModal();
+    loadAdminFeatures();
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function desactiverFeature(id) {
+  if (!confirm('Désactiver cette fonctionnalité ?')) return;
+  await api('DELETE', `/admin/features/${id}`);
+  loadAdminFeatures();
+}
+
 /* ===== PACKS D'ACCRÉDITATIONS ===== */
 let _packEditId = null;
 let _allAccredDefs = [];
@@ -4329,7 +4678,7 @@ async function retirerDA(userId, type){
 
 // Charger quand la section accreditations s'ouvre
 document.querySelector('[data-section="accreditations"]')?.addEventListener('click',()=>{
-  setTimeout(()=>{ loadDADemandes(); loadMoteurAccred(); loadAdminPacks(); loadPacksDemandes(); }, 150);
+  setTimeout(()=>{ loadDADemandes(); loadMoteurAccred(); loadAdminPacks(); loadPacksDemandes(); loadAdminFeatures(); }, 150);
 });
 
 /* ── Navigation helper ── */

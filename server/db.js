@@ -2623,5 +2623,172 @@ db.exec(`
   );
 `);
 
+/* ===== FEATURE ENGINE — OS applicatif Diaspo'Actif ===== */
+
+db.exec(`
+  /* A. Feature Registry — catalogue de toutes les fonctionnalités */
+  CREATE TABLE IF NOT EXISTS features (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    nom TEXT NOT NULL,
+    description TEXT,
+    categorie TEXT DEFAULT 'general'
+              CHECK(categorie IN ('communication','formation','evenements','collaboration',
+                                  'publication','observatoire','administration','general')),
+    statut TEXT DEFAULT 'active' CHECK(statut IN ('active','beta','deprecated','disabled')),
+    visibilite_defaut TEXT DEFAULT 'hidden'
+                      CHECK(visibilite_defaut IN ('visible','hidden','locked')),
+    require_accreditation INTEGER DEFAULT 0,
+    accred_type TEXT,           -- slug de l'accréditation requise (si require_accreditation=1)
+    require_pack INTEGER DEFAULT 0,
+    roles_acces TEXT DEFAULT '[]', -- JSON ["initiative","collectivite"] = accès par défaut sans accred
+    emoji TEXT DEFAULT '⚙️',
+    couleur TEXT DEFAULT '#6366f1',
+    ordre INTEGER DEFAULT 0,
+    actif INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  /* B. User Feature State — état de chaque fonction pour chaque utilisateur */
+  CREATE TABLE IF NOT EXISTS user_features (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    feature_id INTEGER NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'locked'
+             CHECK(statut IN ('active','frozen','locked','pending_accreditation')),
+    source TEXT DEFAULT 'manuel'
+             CHECK(source IN ('automatique','accreditation','pack','manuel','demande')),
+    frozen_at TEXT,
+    activated_at TEXT DEFAULT (datetime('now')),
+    notes TEXT,
+    UNIQUE(user_id, feature_id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(feature_id) REFERENCES features(id)
+  );
+
+  /* C. Usage Tracker — journal d'utilisation par fonction */
+  CREATE TABLE IF NOT EXISTS feature_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    feature_id INTEGER NOT NULL,
+    nb_utilisations INTEGER DEFAULT 0,
+    derniere_utilisation TEXT,
+    premiere_utilisation TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, feature_id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(feature_id) REFERENCES features(id)
+  );
+
+  /* D. Freeze Suggestions — candidats au gel (inactivité > N jours) */
+  CREATE TABLE IF NOT EXISTS freeze_suggestions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    feature_id INTEGER NOT NULL,
+    inactive_days INTEGER DEFAULT 0,
+    niveau TEXT DEFAULT 'low' CHECK(niveau IN ('low','medium','high')),
+    dismissed INTEGER DEFAULT 0,
+    dismissed_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, feature_id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(feature_id) REFERENCES features(id)
+  );
+
+  /* E. Feature Recommendations */
+  CREATE TABLE IF NOT EXISTS feature_recommendations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    feature_id INTEGER NOT NULL,
+    raison TEXT,
+    action TEXT DEFAULT 'unlock' CHECK(action IN ('unlock','activate','upgrade','explore')),
+    score REAL DEFAULT 0,
+    vu INTEGER DEFAULT 0,
+    dismissed INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(feature_id) REFERENCES features(id)
+  );
+
+  /* F. Notification Logs — 1 message / semaine / fonction max */
+  CREATE TABLE IF NOT EXISTS feature_notification_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    feature_id INTEGER NOT NULL,
+    type TEXT DEFAULT 'freeze_suggestion'
+          CHECK(type IN ('freeze_suggestion','recommendation','inactivity','reactivation')),
+    message TEXT,
+    semaine_iso TEXT, -- ex: "2026-W26" pour dédoublonnage
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(feature_id) REFERENCES features(id)
+  );
+`);
+
+/* Extension user_accreditations : lier à la feature si accred donne accès à une feature */
+try { db.exec("ALTER TABLE user_accreditations ADD COLUMN feature_slug TEXT"); } catch(_) {}
+
+/* Seed initial du Feature Registry */
+;(function seedFeatureRegistry() {
+  const exists = db.prepare("SELECT id FROM features WHERE slug='messagerie'").get();
+  if (exists) return;
+
+  const ins = db.prepare(`INSERT OR IGNORE INTO features
+    (slug,nom,description,categorie,visibilite_defaut,require_accreditation,accred_type,
+     roles_acces,emoji,couleur,ordre,actif)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,1)`);
+
+  const FEATURES = [
+    /* Communication */
+    ['messagerie','Messagerie','Envoi et réception de messages privés','communication','visible',0,null,
+     '["utilisateur","initiative","collectivite"]','💬','#3b82f6',10],
+    ['appels_video','Appels vidéo','Appels vidéo en temps réel','communication','hidden',1,'appels_video',
+     '[]','📹','#8b5cf6',11],
+    ['agenda_partage','Agenda partagé','Agenda collaboratif et planification','communication','hidden',1,null,
+     '["initiative","collectivite"]','📅','#06b6d4',12],
+    ['reunions','Réunions en ligne','Organisation et tenue de réunions virtuelles','communication','hidden',1,null,
+     '["initiative","collectivite"]','🤝','#10b981',13],
+    ['signature_electronique','Signature électronique','Signature de documents en ligne','communication','hidden',1,null,
+     '["collectivite"]','✍️','#f59e0b',14],
+
+    /* Formation */
+    ['createur_formations','Créateur de formations','Créer et publier des formations Diaspo Formation',
+     'formation','hidden',1,'createur_formations','[]','🎓','#f59e0b',20],
+    ['catalogue_formations','Catalogue formations','Accéder au catalogue de formations',
+     'formation','visible',0,null,'["utilisateur","initiative","collectivite"]','📚','#f59e0b',21],
+
+    /* Événements */
+    ['evenements','Événements','Créer et gérer des événements','evenements','visible',0,null,
+     '["utilisateur","initiative","collectivite"]','🗓️','#ec4899',30],
+    ['billetterie','Billetterie','Vente de billets pour événements payants','evenements','hidden',1,null,
+     '["initiative","collectivite"]','🎟️','#ec4899',31],
+
+    /* Collaboration */
+    ['collaborations','Collaborations','Appels à contributions et candidatures','collaboration','visible',0,null,
+     '["utilisateur","initiative","collectivite"]','🤲','#10b981',40],
+    ['offres_emploi','Offres & opportunités','Publier des offres d\'emploi et missions',
+     'collaboration','hidden',1,'createur_opportunites','["initiative","collectivite"]','💼','#10b981',41],
+    ['sondages','Sondages & consultations','Créer des sondages et mobiliser la communauté',
+     'collaboration','hidden',1,'mobilisation_active','[]','📊','#6366f1',42],
+    ['gestion_documentaire','Gestion documentaire','Bibliothèque de documents partagée',
+     'collaboration','hidden',1,null,'["initiative","collectivite"]','📁','#6366f1',43],
+
+    /* Publication */
+    ['fil_actualite','Fil d\'actualité','Publication sur le fil de la communauté',
+     'publication','visible',0,null,'["utilisateur","initiative","collectivite"]','📰','#f97316',50],
+    ['publicites','Publicités','Créer et diffuser des publicités ciblées',
+     'publication','hidden',1,'creation_publicite','["initiative","collectivite"]','📣','#f97316',51],
+    ['cv_builder','CV Builder','Création et partage de CV professionnel',
+     'publication','hidden',1,null,'["utilisateur"]','📄','#64748b',52],
+
+    /* Observatoire */
+    ['observatoire','Observatoire Diaspora','Données statistiques agrégées de la diaspora',
+     'observatoire','hidden',1,'observatoire_diaspora','["collectivite"]','🔭','#0284c7',60],
+  ];
+
+  for (const f of FEATURES) ins.run(...f);
+})();
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;

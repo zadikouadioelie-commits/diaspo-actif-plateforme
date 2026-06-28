@@ -10228,6 +10228,428 @@ route("PATCH", "/api/admin/accred/users/:userId/:accredId/retirer", async (req, 
   sendJSON(res, 200, { ok: true });
 });
 
+/* ═══════════════════════════════════════════════════════════════════
+   FEATURE ENGINE — OS applicatif Diaspo'Actif
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Moteur de décision central ──
+   Calcule l'état de chaque feature pour un utilisateur donné.
+   Retourne Map<slug, {statut, source, feature}>
+
+   Règle de priorité :
+   1. frozen (user a gelé → caché)
+   2. active via user_features (pack, accred, auto)
+   3. roles_acces contient le rôle → active automatiquement
+   4. require_accreditation → vérifie accred → locked si absente
+   5. sinon locked
+*/
+function computeFeatureStates(userId, userRole) {
+  const features = db.prepare("SELECT * FROM features WHERE actif=1 ORDER BY ordre").all();
+  const userFeats = db.prepare("SELECT * FROM user_features WHERE user_id=?").all(userId);
+  const ufMap = new Map(userFeats.map(uf => [uf.feature_id, uf]));
+
+  return features.map(f => {
+    const uf = ufMap.get(f.id);
+
+    // 1. Gelé explicitement par l'utilisateur
+    if (uf?.statut === 'frozen') return { ...f, statut: 'frozen', source: 'user', uf };
+
+    // 2. Active via user_features (accred, pack, manuel)
+    if (uf?.statut === 'active') return { ...f, statut: 'active', source: uf.source, uf };
+
+    // 3. Accès par rôle par défaut
+    let rolesAcces = [];
+    try { rolesAcces = JSON.parse(f.roles_acces || '[]'); } catch(_) {}
+    if (rolesAcces.includes(userRole)) {
+      // Activer automatiquement si pas encore dans user_features
+      if (!uf) {
+        try {
+          db.prepare("INSERT OR IGNORE INTO user_features (user_id,feature_id,statut,source) VALUES (?,?,'active','automatique')")
+            .run(userId, f.id);
+        } catch(_) {}
+      }
+      return { ...f, statut: 'active', source: 'automatique', uf };
+    }
+
+    // 4. Accred requise
+    if (f.require_accreditation && f.accred_type) {
+      if (hasAccreditation(userId, f.accred_type)) {
+        if (!uf) {
+          try {
+            db.prepare("INSERT OR IGNORE INTO user_features (user_id,feature_id,statut,source) VALUES (?,?,'active','accreditation')")
+              .run(userId, f.id);
+          } catch(_) {}
+        }
+        return { ...f, statut: 'active', source: 'accreditation', uf };
+      }
+      return { ...f, statut: 'locked', source: 'accreditation_manquante', uf };
+    }
+
+    // 5. pending ou locked
+    if (uf?.statut === 'pending_accreditation') return { ...f, statut: 'pending_accreditation', source: 'demande', uf };
+    return { ...f, statut: 'locked', source: null, uf };
+  });
+}
+
+/* ── Tracker d'usage ── */
+function trackFeatureUsage(userId, featureSlug) {
+  try {
+    const f = db.prepare("SELECT id FROM features WHERE slug=? AND actif=1").get(featureSlug);
+    if (!f) return;
+    db.prepare(`INSERT INTO feature_usage (user_id,feature_id,nb_utilisations,derniere_utilisation)
+      VALUES (?,?,1,datetime('now'))
+      ON CONFLICT(user_id,feature_id) DO UPDATE SET
+        nb_utilisations=nb_utilisations+1,
+        derniere_utilisation=datetime('now'),
+        updated_at=datetime('now')`)
+      .run(userId, f.id);
+  } catch(_) {}
+}
+
+/* ── Analyse d'inactivité et génération de suggestions de gel ──
+   Appelé lors du chargement du dashboard, pas en cron (Vercel serverless).
+   Crée des freeze_suggestions et envoie max 1 notif/semaine/feature.
+*/
+function runFreezeSuggestionEngine(userId) {
+  try {
+    const usages = db.prepare(`
+      SELECT fu.*, f.slug, f.nom, f.emoji,
+             CAST(julianday('now') - julianday(fu.derniere_utilisation) AS INTEGER) AS inactive_days
+      FROM feature_usage fu JOIN features f ON f.id=fu.feature_id
+      WHERE fu.user_id=? AND fu.derniere_utilisation IS NOT NULL
+    `).all(userId);
+
+    for (const u of usages) {
+      if (u.inactive_days < 20) continue;
+      const uf = db.prepare("SELECT statut FROM user_features WHERE user_id=? AND feature_id=?")
+        .get(userId, db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug)?.id);
+      if (!uf || uf.statut !== 'active') continue;
+
+      const niveau = u.inactive_days >= 60 ? 'high' : u.inactive_days >= 40 ? 'medium' : 'low';
+      db.prepare(`INSERT INTO freeze_suggestions (user_id,feature_id,inactive_days,niveau)
+        VALUES (?,?,?,?)
+        ON CONFLICT(user_id,feature_id) DO UPDATE SET
+          inactive_days=excluded.inactive_days, niveau=excluded.niveau`)
+        .run(userId, db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug)?.id, u.inactive_days, niveau);
+
+      // 1 notif max par semaine par feature
+      const now = new Date();
+      const weekIso = `${now.getFullYear()}-W${String(Math.ceil((now - new Date(now.getFullYear(),0,1)) / 604800000 + 1)).padStart(2,'0')}`;
+      const alreadySent = db.prepare(
+        "SELECT id FROM feature_notification_logs WHERE user_id=? AND feature_id=? AND semaine_iso=?"
+      ).get(userId, db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug)?.id, weekIso);
+      if (alreadySent) continue;
+
+      const semaines = Math.floor(u.inactive_days / 7);
+      const messages = [
+        `${u.emoji} « ${u.nom} » n'est plus utilisée récemment. Vous pouvez la garder ou la ranger pour simplifier votre espace.`,
+        `Rappel : vous pouvez organiser votre tableau de bord en gelant « ${u.nom} » si elle ne vous est plus utile.`,
+        `Astuce : un espace plus léger améliore votre navigation. « ${u.nom} » est inactive depuis ${u.inactive_days} jours.`
+      ];
+      const msg = messages[Math.min(semaines - 3, messages.length - 1)] || messages[0];
+      const featId = db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug)?.id;
+      if (!featId) continue;
+      creerNotif(userId, 'freeze_suggestion', `💡 Simplifiez votre espace`, msg, { feature_slug: u.slug, action: 'freeze_suggestion' });
+      db.prepare("INSERT INTO feature_notification_logs (user_id,feature_id,type,message,semaine_iso) VALUES (?,?,'freeze_suggestion',?,?)")
+        .run(userId, featId, msg, weekIso);
+    }
+  } catch(_) {}
+}
+
+/* ── Routes Feature Engine ── */
+
+/* GET /api/features — catalogue public */
+route("GET", "/api/features", async (req, res, params, body, query) => {
+  const me = getCurrentUser(req);
+  const categorie = query.categorie || null;
+  const features = db.prepare(
+    categorie
+      ? "SELECT * FROM features WHERE actif=1 AND categorie=? ORDER BY ordre"
+      : "SELECT * FROM features WHERE actif=1 ORDER BY categorie, ordre"
+  ).all(...(categorie ? [categorie] : []));
+  if (!me) return sendJSON(res, 200, { features: features.map(f => ({ ...f, statut: 'locked', source: null })) });
+
+  const states = computeFeatureStates(me.id, me.role);
+  const stateMap = new Map(states.map(s => [s.id, s]));
+  sendJSON(res, 200, { features: features.map(f => {
+    const s = stateMap.get(f.id);
+    return { ...f, statut: s?.statut || 'locked', source: s?.source || null };
+  })});
+});
+
+/* GET /api/me/features — état complet de toutes les features pour l'utilisateur connecté */
+route("GET", "/api/me/features", async (req, res) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  runFreezeSuggestionEngine(me.id);
+  const states = computeFeatureStates(me.id, me.role);
+  const usages = db.prepare("SELECT feature_id, nb_utilisations, derniere_utilisation FROM feature_usage WHERE user_id=?").all(me.id);
+  const usageMap = new Map(usages.map(u => [u.feature_id, u]));
+  sendJSON(res, 200, {
+    features: states.map(s => ({
+      id: s.id, slug: s.slug, nom: s.nom, description: s.description,
+      categorie: s.categorie, emoji: s.emoji, couleur: s.couleur,
+      visibilite_defaut: s.visibilite_defaut, ordre: s.ordre,
+      statut: s.statut, source: s.source,
+      usage: usageMap.get(s.id) || { nb_utilisations: 0, derniere_utilisation: null }
+    }))
+  });
+});
+
+/* GET /api/features/check/:slug — vérification rapide (gateway check) */
+route("GET", "/api/features/check/:slug", async (req, res, params) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = db.prepare("SELECT * FROM features WHERE slug=? AND actif=1").get(params.slug);
+  if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
+  const states = computeFeatureStates(me.id, me.role);
+  const state = states.find(s => s.slug === params.slug);
+  const statut = state?.statut || 'locked';
+  sendJSON(res, statut === 'active' ? 200 : 403, { slug: params.slug, statut, access: statut === 'active' });
+});
+
+/* POST /api/features/:slug/freeze — geler une feature */
+route("POST", "/api/features/:slug/freeze", async (req, res, params) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = db.prepare("SELECT * FROM features WHERE slug=? AND actif=1").get(params.slug);
+  if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
+  db.prepare(`INSERT INTO user_features (user_id,feature_id,statut,source,frozen_at) VALUES (?,?,'frozen','manuel',datetime('now'))
+    ON CONFLICT(user_id,feature_id) DO UPDATE SET statut='frozen', frozen_at=datetime('now')`)
+    .run(me.id, f.id);
+  // Dismiss la suggestion de gel si elle existait
+  db.prepare("UPDATE freeze_suggestions SET dismissed=1,dismissed_at=datetime('now') WHERE user_id=? AND feature_id=?")
+    .run(me.id, f.id);
+  sendJSON(res, 200, { ok: true, statut: 'frozen', message: `« ${f.nom} » a été gelée. Vous pouvez la réactiver à tout moment.` });
+});
+
+/* POST /api/features/:slug/unfreeze — dégeler une feature */
+route("POST", "/api/features/:slug/unfreeze", async (req, res, params) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = db.prepare("SELECT * FROM features WHERE slug=? AND actif=1").get(params.slug);
+  if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
+  db.prepare(`INSERT INTO user_features (user_id,feature_id,statut,source,activated_at) VALUES (?,?,'active','manuel',datetime('now'))
+    ON CONFLICT(user_id,feature_id) DO UPDATE SET statut='active', activated_at=datetime('now')`)
+    .run(me.id, f.id);
+  sendJSON(res, 200, { ok: true, statut: 'active', message: `« ${f.nom} » est de nouveau active.` });
+});
+
+/* POST /api/usage/log — tracker l'usage d'une feature */
+route("POST", "/api/usage/log", async (req, res, params, body) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { slug } = body;
+  if (!slug) return sendJSON(res, 400, { error: "slug requis." });
+  trackFeatureUsage(me.id, slug);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/me/freeze-suggestions — suggestions de gel en attente */
+route("GET", "/api/me/freeze-suggestions", async (req, res) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = db.prepare(`
+    SELECT fs.*, f.slug, f.nom, f.emoji, f.categorie,
+           fu.nb_utilisations, fu.derniere_utilisation
+    FROM freeze_suggestions fs
+    JOIN features f ON f.id=fs.feature_id
+    LEFT JOIN feature_usage fu ON fu.user_id=fs.user_id AND fu.feature_id=fs.feature_id
+    WHERE fs.user_id=? AND fs.dismissed=0
+    ORDER BY fs.inactive_days DESC
+  `).all(me.id);
+  sendJSON(res, 200, { suggestions: rows });
+});
+
+/* POST /api/me/freeze-suggestions/:featureSlug/dismiss */
+route("POST", "/api/me/freeze-suggestions/:featureSlug/dismiss", async (req, res, params) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = db.prepare("SELECT id FROM features WHERE slug=?").get(params.featureSlug);
+  if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
+  db.prepare("UPDATE freeze_suggestions SET dismissed=1,dismissed_at=datetime('now') WHERE user_id=? AND feature_id=?")
+    .run(me.id, f.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/me/recommendations — recommandations personnalisées */
+route("GET", "/api/me/recommendations", async (req, res) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  // Générer des recommandations basées sur le profil et les usages
+  _generateRecommendations(me.id, me.role);
+  const rows = db.prepare(`
+    SELECT fr.*, f.slug, f.nom, f.emoji, f.categorie, f.description
+    FROM feature_recommendations fr
+    JOIN features f ON f.id=fr.feature_id
+    WHERE fr.user_id=? AND fr.dismissed=0
+    ORDER BY fr.score DESC LIMIT 5
+  `).all(me.id);
+  sendJSON(res, 200, { recommendations: rows });
+});
+
+/* POST /api/me/recommendations/:featureSlug/dismiss */
+route("POST", "/api/me/recommendations/:featureSlug/dismiss", async (req, res, params) => {
+  const me = getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = db.prepare("SELECT id FROM features WHERE slug=?").get(params.featureSlug);
+  if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
+  db.prepare("UPDATE feature_recommendations SET dismissed=1 WHERE user_id=? AND feature_id=?")
+    .run(me.id, f.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Moteur de recommandations */
+function _generateRecommendations(userId, userRole) {
+  try {
+    const allFeatures = db.prepare("SELECT * FROM features WHERE actif=1").all();
+    const states = computeFeatureStates(userId, userRole);
+    const stateMap = new Map(states.map(s => [s.slug, s]));
+    const usages = db.prepare("SELECT feature_id, nb_utilisations FROM feature_usage WHERE user_id=?").all(userId);
+    const usageMap = new Map(usages.map(u => [u.feature_id, u.nb_utilisations]));
+
+    for (const f of allFeatures) {
+      const state = stateMap.get(f.slug);
+      if (!state || state.statut !== 'locked') continue; // recommander seulement les locked
+
+      let raison = null;
+      let score = 0;
+      let action = 'unlock';
+
+      // Logique de pertinence par rôle
+      if (userRole === 'initiative') {
+        if (f.slug === 'createur_formations') { raison = 'Partagez votre expertise en créant des formations pour la diaspora'; score = 0.9; }
+        else if (f.slug === 'billetterie') { raison = 'Vous organisez des événements — la billetterie vous permettra de les monétiser'; score = 0.8; }
+        else if (f.slug === 'publicites') { raison = 'Augmentez votre visibilité avec des publicités ciblées'; score = 0.7; }
+        else if (f.slug === 'reunions') { raison = 'Organisez vos réunions directement sur la plateforme'; score = 0.75; }
+      } else if (userRole === 'collectivite') {
+        if (f.slug === 'observatoire') { raison = 'Accédez aux données statistiques de la diaspora'; score = 0.95; }
+        if (f.slug === 'signature_electronique') { raison = 'Simplifiez la signature de vos documents officiels'; score = 0.85; }
+      } else if (userRole === 'utilisateur') {
+        if (f.slug === 'cv_builder') { raison = 'Créez et partagez votre profil professionnel'; score = 0.8; }
+        if (f.slug === 'sondages') { raison = 'Participez à la vie de la communauté via des sondages'; score = 0.6; }
+      }
+
+      // Bonus si l'utilisateur utilise intensément des features de la même catégorie
+      const sameCategory = allFeatures.filter(ff => ff.categorie === f.categorie && ff.id !== f.id);
+      const categoryUsage = sameCategory.reduce((acc, ff) => acc + (usageMap.get(ff.id) || 0), 0);
+      if (categoryUsage > 10) score = Math.min(score + 0.1, 1.0);
+
+      if (!raison || score < 0.5) continue;
+
+      db.prepare(`INSERT INTO feature_recommendations (user_id,feature_id,raison,action,score)
+        VALUES (?,?,?,?,?)
+        ON CONFLICT(user_id,feature_id) DO UPDATE SET raison=excluded.raison, score=excluded.score`)
+        .run(userId, f.id, raison, action, score);
+    }
+  } catch(_) {}
+}
+
+/* ── Admin Feature Registry ── */
+
+/* GET /api/admin/features — liste toutes les features */
+route("GET", "/api/admin/features", async (req, res, params, body, query) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const features = db.prepare("SELECT * FROM features ORDER BY categorie, ordre").all();
+  const stats = features.map(f => {
+    const nb_actifs = db.prepare("SELECT COUNT(*) AS n FROM user_features WHERE feature_id=? AND statut='active'").get(f.id).n;
+    const nb_geles = db.prepare("SELECT COUNT(*) AS n FROM user_features WHERE feature_id=? AND statut='frozen'").get(f.id).n;
+    const total_usages = db.prepare("SELECT COALESCE(SUM(nb_utilisations),0) AS n FROM feature_usage WHERE feature_id=?").get(f.id).n;
+    return { ...f, nb_actifs, nb_geles, total_usages };
+  });
+  sendJSON(res, 200, { features: stats });
+});
+
+/* POST /api/admin/features — créer une feature */
+route("POST", "/api/admin/features", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { slug, nom, description, categorie, visibilite_defaut, require_accreditation, accred_type,
+          roles_acces, emoji, couleur, ordre } = body;
+  if (!slug || !nom) return sendJSON(res, 400, { error: "slug et nom requis." });
+  const { lastInsertRowid: id } = db.prepare(`
+    INSERT INTO features (slug,nom,description,categorie,visibilite_defaut,require_accreditation,
+      accred_type,roles_acces,emoji,couleur,ordre)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+  `).run(slug, nom, description||null, categorie||'general',
+         visibilite_defaut||'hidden', require_accreditation?1:0,
+         accred_type||null,
+         Array.isArray(roles_acces) ? JSON.stringify(roles_acces) : (roles_acces||'[]'),
+         emoji||'⚙️', couleur||'#6366f1', ordre||0);
+  // Attribution automatique aux rôles par défaut
+  const rolesArr = Array.isArray(roles_acces) ? roles_acces : JSON.parse(roles_acces||'[]');
+  for (const role of rolesArr) {
+    const users = db.prepare("SELECT id FROM users WHERE role=?").all(role);
+    const ins = db.prepare("INSERT OR IGNORE INTO user_features (user_id,feature_id,statut,source) VALUES (?,?,'active','automatique')");
+    users.forEach(u => ins.run(u.id, id));
+  }
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* PUT /api/admin/features/:id — modifier une feature */
+route("PUT", "/api/admin/features/:id", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const n = v => v === undefined ? null : v;
+  const { slug, nom, description, categorie, visibilite_defaut, require_accreditation, accred_type,
+          roles_acces, emoji, couleur, ordre, actif } = body;
+  db.prepare(`UPDATE features SET
+    slug=COALESCE(?,slug), nom=COALESCE(?,nom), description=COALESCE(?,description),
+    categorie=COALESCE(?,categorie), visibilite_defaut=COALESCE(?,visibilite_defaut),
+    require_accreditation=COALESCE(?,require_accreditation), accred_type=COALESCE(?,accred_type),
+    roles_acces=COALESCE(?,roles_acces), emoji=COALESCE(?,emoji), couleur=COALESCE(?,couleur),
+    ordre=COALESCE(?,ordre), actif=COALESCE(?,actif), updated_at=datetime('now')
+    WHERE id=?`)
+    .run(n(slug), n(nom), n(description), n(categorie), n(visibilite_defaut),
+         n(require_accreditation), n(accred_type),
+         roles_acces ? JSON.stringify(Array.isArray(roles_acces) ? roles_acces : JSON.parse(roles_acces)) : null,
+         n(emoji), n(couleur), n(ordre), n(actif), params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/admin/features/:id — désactiver une feature */
+route("DELETE", "/api/admin/features/:id", async (req, res, params) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE features SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/admin/features/stats — tableau de bord usage global */
+route("GET", "/api/admin/features/stats", async (req, res) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const top_usages = db.prepare(`
+    SELECT f.slug, f.nom, f.emoji, f.categorie,
+           SUM(fu.nb_utilisations) AS total, COUNT(DISTINCT fu.user_id) AS nb_users
+    FROM feature_usage fu JOIN features f ON f.id=fu.feature_id
+    GROUP BY fu.feature_id ORDER BY total DESC LIMIT 10
+  `).all();
+  const top_frozen = db.prepare(`
+    SELECT f.slug, f.nom, f.emoji, COUNT(*) AS nb_gels
+    FROM user_features uf JOIN features f ON f.id=uf.feature_id
+    WHERE uf.statut='frozen' GROUP BY uf.feature_id ORDER BY nb_gels DESC LIMIT 5
+  `).all();
+  const nb_suggestions_actives = db.prepare("SELECT COUNT(*) AS n FROM freeze_suggestions WHERE dismissed=0").get().n;
+  sendJSON(res, 200, { top_usages, top_frozen, nb_suggestions_actives });
+});
+
+/* GET /api/admin/features/:id/users — utilisateurs par état pour une feature */
+route("GET", "/api/admin/features/:id/users", async (req, res, params) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = db.prepare(`
+    SELECT uf.statut, uf.source, uf.activated_at, uf.frozen_at,
+           u.nom, u.email, u.role,
+           fu.nb_utilisations, fu.derniere_utilisation
+    FROM user_features uf JOIN users u ON u.id=uf.user_id
+    LEFT JOIN feature_usage fu ON fu.user_id=uf.user_id AND fu.feature_id=uf.feature_id
+    WHERE uf.feature_id=? ORDER BY uf.statut, u.nom
+  `).all(params.id);
+  sendJSON(res, 200, { users: rows });
+});
+
 /* ─── PACKS D'ACCRÉDITATIONS ─── */
 
 /* Helper : attribue toutes les accréditations d'un pack à un utilisateur */
