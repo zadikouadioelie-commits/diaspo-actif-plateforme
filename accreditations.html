@@ -118,30 +118,43 @@ function switchTab(t){
 const STAT_LBL={active:'✅ Active',suspendue:'⚠️ Suspendue',retiree:'❌ Retirée'};
 const STAT_CLS={active:'status-active',suspendue:'status-suspendue',retiree:'status-retiree'};
 
-/* Retourne les accréditations éligibles pour un rôle donné */
-function accredsEligibles(role){
-  const DA = typeof ACCREDITATIONS_DA !== 'undefined' ? ACCREDITATIONS_DA : [];
-  return DA.filter(d => (d.eligible||[]).includes(role));
+/* Cache du catalogue dynamique (chargé depuis l'API) */
+let _catalogue = null;
+async function getCatalogue(){
+  if(_catalogue) return _catalogue;
+  try {
+    const r = await api('GET', '/accreditations/catalogue');
+    _catalogue = r.catalogue || [];
+  } catch(e) {
+    /* Fallback sur ACCREDITATIONS_DA statique si API indisponible */
+    _catalogue = (typeof ACCREDITATIONS_DA !== 'undefined' ? ACCREDITATIONS_DA : []).map(d => ({
+      ...d, couleur_bg: d.couleurBg, couleur_border: d.couleurBorder, couleur_text: d.couleurText
+    }));
+  }
+  return _catalogue;
 }
 
 /* Rendu de la fiche info (onglet "Comment ça marche ?") */
-function renderInfoTab(role){
+function renderInfoTab(catalogue){
   const el = document.getElementById('tab-info-content');
-  const list = accredsEligibles(role);
-  if(!list.length){ el.innerHTML='<p style="color:var(--muted);">Aucune accréditation disponible pour votre type de compte.</p>'; return; }
-  el.innerHTML = list.map(def => `
-    <div class="accred-card" style="border-color:${def.couleurBorder||'var(--border)'};">
-      <div class="accred-badge" style="background:${def.couleurBg};color:${def.couleurText};border:1.5px solid ${def.couleurBorder};">${def.emoji} ${def.label}</div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">${def.description}</p>
-      <ul class="features-list">${(def.droits||[]).map(d=>`<li>${d}</li>`).join('')}</ul>
+  if(!catalogue.length){ el.innerHTML='<p style="color:var(--muted);">Aucune accréditation disponible pour votre type de compte.</p>'; return; }
+  el.innerHTML = catalogue.map(def => {
+    const bg = def.couleur_bg || def.couleurBg || '#f5f3ff';
+    const border = def.couleur_border || def.couleurBorder || '#6366f1';
+    const text = def.couleur_text || def.couleurText || '#3730a3';
+    const droits = Array.isArray(def.droits) ? def.droits : [];
+    return `<div class="accred-card" style="border-color:${border};">
+      <div class="accred-badge" style="background:${bg};color:${text};border:1.5px solid ${border};">${def.emoji} ${def.label}</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">${def.description||''}</p>
+      <ul class="features-list">${droits.map(d=>`<li>${d}</li>`).join('')}</ul>
       ${def.prixLabel ? `<p style="font-size:12px;color:var(--muted);margin-top:8px;font-weight:600;">${def.prixLabel}</p>` : ''}
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 let pendingType=null;
 function openModalDemande(type){
-  const DA = typeof ACCREDITATIONS_DA !== 'undefined' ? ACCREDITATIONS_DA : [];
-  const def = DA.find(d=>d.type===type)||{};
+  const def = (_catalogue||[]).find(d=>d.type===type)||{};
   pendingType=type;
   document.getElementById('modal-title').textContent='Demande — '+(def.emoji||'')+' '+(def.label||type);
   document.getElementById('modal-desc').textContent=def.description||'';
@@ -169,8 +182,8 @@ async function loadMesAccreds(){
     document.getElementById('tab-info-content').innerHTML='';
     return;
   }
-  const role = me.role || 'utilisateur';
-  renderInfoTab(role);
+  const catalogue = await getCatalogue();
+  renderInfoTab(catalogue);
 
   try{
     const [r1,r2]=await Promise.all([
@@ -179,20 +192,19 @@ async function loadMesAccreds(){
     ]);
     const accreds=r1.accreditations||[];
     const demandes=r2.demandes||[];
-    const eligibles = accredsEligibles(role);
-
-    if(!eligibles.length){
+    if(!catalogue.length){
       el.innerHTML='<p style="color:var(--muted);">Aucune accréditation disponible pour votre type de compte.</p>';
       return;
     }
 
     let html='<div class="accred-grid">';
-    for(const def of eligibles){
+    for(const def of catalogue){
       const type=def.type;
       const acc=accreds.find(a=>a.type===type);
       const dem=demandes.find(d=>d.type===type&&d.statut==='en_attente');
-      html+=`<div class="accred-card ${acc?acc.statut:''}" style="border-color:${acc&&acc.statut==='active'?'#22c55e':def.couleurBorder||'var(--border)'};">
-        <div class="accred-badge" style="background:${def.couleurBg};color:${def.couleurText};border:1.5px solid ${def.couleurBorder};">${def.emoji} ${def.label}</div>
+      const _bg=def.couleur_bg||def.couleurBg||'#f5f3ff', _border=def.couleur_border||def.couleurBorder||'#6366f1', _text=def.couleur_text||def.couleurText||'#3730a3';
+      html+=`<div class="accred-card ${acc?acc.statut:''}" style="border-color:${acc&&acc.statut==='active'?'#22c55e':_border};">
+        <div class="accred-badge" style="background:${_bg};color:${_text};border:1.5px solid ${_border};">${def.emoji} ${def.label}</div>
         ${acc?`<span class="status-pill ${STAT_CLS[acc.statut]||''}">${STAT_LBL[acc.statut]||acc.statut}</span>`:''}
         <p style="font-size:13px;color:var(--muted);margin:8px 0 12px;">${def.description}</p>`;
 
@@ -219,11 +231,11 @@ async function loadMesAccreds(){
     }
     html+='</div>';
 
-    const refusees=demandes.filter(d=>d.statut==='refusee' && eligibles.find(e=>e.type===d.type));
+    const refusees=demandes.filter(d=>d.statut==='refusee' && catalogue.find(e=>e.type===d.type));
     if(refusees.length){
       html+='<div class="card" style="margin-top:20px;border-left:4px solid #ef4444;"><h4 style="margin-top:0;color:#dc2626;">Demandes non retenues</h4>';
       html+=refusees.map(d=>{
-        const def=(typeof ACCREDITATIONS_DA!=='undefined'?ACCREDITATIONS_DA:[]).find(x=>x.type===d.type)||{};
+        const def=catalogue.find(x=>x.type===d.type)||{};
         return `<div style="font-size:13px;padding:6px 0;border-bottom:1px solid var(--border);">
           <strong>${def.emoji||''} ${def.label||d.type}</strong> — ${fmtDate(d.created_at)}
           ${d.motif_refus?`<br><span style="color:var(--muted);">${esc(d.motif_refus)}</span>`:''}

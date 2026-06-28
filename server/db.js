@@ -2253,5 +2253,179 @@ db.exec(`
 
 `);
 
+/* ═══════════════════════════════════════════════════════════════════
+   MOTEUR D'ACCRÉDITATIONS DYNAMIQUE
+   Remplace le tableau statique ACCREDITATIONS_DA de data.js
+   ═══════════════════════════════════════════════════════════════════ */
+db.exec(`
+  /* Catalogue des accréditations */
+  CREATE TABLE IF NOT EXISTS accred_definitions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    type           TEXT NOT NULL UNIQUE,
+    label          TEXT NOT NULL,
+    emoji          TEXT DEFAULT '',
+    description    TEXT,
+    droits         TEXT DEFAULT '[]',
+    couleur        TEXT DEFAULT '#6366f1',
+    couleur_bg     TEXT DEFAULT '#f5f3ff',
+    couleur_border TEXT DEFAULT '#6366f1',
+    couleur_text   TEXT DEFAULT '#3730a3',
+    module         TEXT,
+    fonctionnalite TEXT,
+    actif          INTEGER DEFAULT 1,
+    ordre          INTEGER DEFAULT 0,
+    created_by     INTEGER,
+    created_at     TEXT DEFAULT (datetime('now')),
+    updated_at     TEXT DEFAULT (datetime('now'))
+  );
+
+  /* Règles d'accès par type de compte */
+  CREATE TABLE IF NOT EXISTS accred_regles (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    accred_id INTEGER NOT NULL,
+    role      TEXT NOT NULL CHECK(role IN ('utilisateur','initiative','collectivite')),
+    mode      TEXT NOT NULL DEFAULT 'non_concerne'
+              CHECK(mode IN ('automatique','sur_demande','non_concerne')),
+    UNIQUE(accred_id, role),
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id) ON DELETE CASCADE
+  );
+
+  /* Tarification par type de compte */
+  CREATE TABLE IF NOT EXISTS accred_tarifs (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    accred_id           INTEGER NOT NULL,
+    role                TEXT NOT NULL CHECK(role IN ('utilisateur','initiative','collectivite')),
+    type_tarif          TEXT NOT NULL DEFAULT 'gratuit'
+                        CHECK(type_tarif IN ('gratuit','paiement_unique','mensuel','annuel')),
+    montant             REAL DEFAULT 0,
+    devise              TEXT DEFAULT 'EUR',
+    renouvellement_auto INTEGER DEFAULT 0,
+    periode_grace_jours INTEGER DEFAULT 7,
+    validation_admin    INTEGER DEFAULT 1,
+    UNIQUE(accred_id, role),
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id) ON DELETE CASCADE
+  );
+
+  /* Accréditations attribuées (nouveau système dynamique) */
+  CREATE TABLE IF NOT EXISTS user_accreditations (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id          INTEGER NOT NULL,
+    accred_id        INTEGER NOT NULL,
+    statut           TEXT NOT NULL DEFAULT 'active'
+                     CHECK(statut IN ('active','suspendue','retiree','expiree')),
+    date_attribution TEXT DEFAULT (datetime('now')),
+    date_expiration  TEXT,
+    type_tarif       TEXT DEFAULT 'gratuit',
+    montant_paye     REAL DEFAULT 0,
+    admin_id         INTEGER,
+    notes            TEXT,
+    created_at       TEXT DEFAULT (datetime('now')),
+    updated_at       TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, accred_id),
+    FOREIGN KEY(user_id)   REFERENCES users(id),
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id)
+  );
+
+  /* Demandes d'accréditation (nouveau système dynamique) */
+  CREATE TABLE IF NOT EXISTS accred_demandes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    accred_id   INTEGER NOT NULL,
+    message     TEXT,
+    statut      TEXT DEFAULT 'en_attente'
+                CHECK(statut IN ('en_attente','approuvee','refusee')),
+    motif_refus TEXT,
+    created_at  TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, accred_id),
+    FOREIGN KEY(user_id)   REFERENCES users(id),
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id)
+  );
+
+  /* Historique du moteur dynamique */
+  CREATE TABLE IF NOT EXISTS accred_historique_v2 (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER,
+    accred_id  INTEGER,
+    action     TEXT NOT NULL,
+    admin_id   INTEGER,
+    admin_nom  TEXT,
+    motif      TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`);
+
+/* Seed des accréditations existantes dans le nouveau système */
+;(function seedAccredDefinitions() {
+  const count = db.prepare("SELECT COUNT(*) AS n FROM accred_definitions").get().n;
+  if (count > 0) return;
+
+  const insD = db.prepare(`INSERT OR IGNORE INTO accred_definitions
+    (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+  const insR = db.prepare(`INSERT OR IGNORE INTO accred_regles (accred_id,role,mode) VALUES (?,?,?)`);
+  const insT = db.prepare(`INSERT OR IGNORE INTO accred_tarifs
+    (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES (?,?,?,?,?,?)`);
+  const getD = db.prepare("SELECT id FROM accred_definitions WHERE type=?");
+
+  const SEED = [
+    {
+      type:'mobilisation_active', label:'Mobilisation Active', emoji:'📢',
+      description:"Autorisation d'exercer des fonctions de mobilisation au sein de Diaspo'Actif.",
+      droits:JSON.stringify(['Participer à des missions rémunérées','Répondre à des appels de mobilisation','Réaliser des enquêtes de terrain','Participer à des campagnes de sensibilisation']),
+      couleur:'#f59e0b',bg:'#fffbeb',border:'#f59e0b',text:'#92400e', module:null, ordre:1,
+      regles:[{role:'utilisateur',mode:'sur_demande'},{role:'initiative',mode:'sur_demande'}],
+      tarifs:[{role:'utilisateur',type:'paiement_unique',montant:19},{role:'initiative',type:'paiement_unique',montant:29}]
+    },
+    {
+      type:'createur_opportunites', label:"Créateur d'Opportunités", emoji:'💼',
+      description:"Autorisation de publier des offres et de créer des opportunités professionnelles.",
+      droits:JSON.stringify(['Publier des offres (emplois, stages, marchés)','Mettre en relation des acteurs','Participer à des programmes de recrutement']),
+      couleur:'#3b82f6',bg:'#eff6ff',border:'#3b82f6',text:'#1e40af', module:null, ordre:2,
+      regles:[{role:'initiative',mode:'sur_demande'},{role:'collectivite',mode:'sur_demande'}],
+      tarifs:[{role:'initiative',type:'paiement_unique',montant:39},{role:'collectivite',type:'gratuit',montant:0}]
+    },
+    {
+      type:'observatoire_diaspora', label:'Observatoire Diaspora', emoji:'📊',
+      description:"Autorisation d'accéder aux données statistiques et outils d'analyse de la plateforme.",
+      droits:JSON.stringify(['Accéder aux statistiques autorisées','Consulter les tableaux de bord','Réaliser des consultations publiques','Obtenir des rapports périodiques']),
+      couleur:'#059669',bg:'#f0fdf4',border:'#059669',text:'#065f46', module:null, ordre:3,
+      regles:[{role:'collectivite',mode:'sur_demande'}],
+      tarifs:[{role:'collectivite',type:'gratuit',montant:0}]
+    },
+    {
+      type:'institutionnelle', label:'Institutionnelle', emoji:'🏛️',
+      description:"Autorisation d'exercer des fonctions institutionnelles sur la plateforme.",
+      droits:JSON.stringify(['Diffuser des communications officielles','Organiser des consultations publiques','Interagir avec un territoire donné','Publier des avis et informations officiels']),
+      couleur:'#7c3aed',bg:'#f5f3ff',border:'#7c3aed',text:'#4c1d95', module:null, ordre:4,
+      regles:[{role:'collectivite',mode:'sur_demande'}],
+      tarifs:[{role:'collectivite',type:'gratuit',montant:0}]
+    },
+    {
+      type:'creation_publicite', label:'Création de Publicité', emoji:'📣',
+      description:"Autorisation de créer et soumettre des publicités sur la plateforme Diaspo'Actif.",
+      droits:JSON.stringify(['Créer des campagnes publicitaires complètes (6 paramètres)','Définir le ciblage géographique et démographique','Suivre les statistiques d\'impressions et de clics']),
+      couleur:'#dc2626',bg:'#fef2f2',border:'#dc2626',text:'#991b1b', module:null, ordre:5,
+      regles:[{role:'initiative',mode:'sur_demande'}],
+      tarifs:[{role:'initiative',type:'paiement_unique',montant:49}]
+    },
+    {
+      type:'gestion_associations', label:'Gestion des Associations', emoji:'🏅',
+      description:"Accréditation premium pour gérer entièrement votre association : adhérents, cotisations, trésorerie, comptabilité intelligente, assemblées générales et votes électroniques.",
+      droits:JSON.stringify(['Gérer les adhérents et cartes de membre (QR Code)','Encaisser les cotisations et relances automatiques','Tenir la trésorerie et la comptabilité (OCR des factures)','Organiser des assemblées générales et des votes électroniques','Consulter les statistiques avancées','Assistant IA : analyses financières, prédictions, rapports']),
+      couleur:'#7c3aed',bg:'#f5f3ff',border:'#7c3aed',text:'#4c1d95', module:'asso', ordre:6,
+      regles:[{role:'initiative',mode:'sur_demande'}],
+      tarifs:[{role:'initiative',type:'annuel',montant:0,validation_admin:1}]
+    }
+  ];
+
+  for (const d of SEED) {
+    insD.run(d.type, d.label, d.emoji, d.description, d.droits,
+             d.couleur, d.bg, d.border, d.text, d.module||null, d.ordre);
+    const { id } = getD.get(d.type);
+    for (const r of d.regles) insR.run(id, r.role, r.mode);
+    for (const t of d.tarifs) insT.run(id, t.role, t.type||'gratuit', t.montant||0, 'EUR', t.validation_admin===0?0:1);
+  }
+})();
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;

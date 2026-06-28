@@ -3293,20 +3293,32 @@ function hasAccred(userId, type) {
   return !!r;
 }
 
-/* GET /api/accreditations/mes — mes accréditations */
+/* GET /api/accreditations/mes — mes accréditations (ancien + nouveau système) */
 route("GET", "/api/accreditations/mes", async (req, res) => {
   const user = getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const rows = db.prepare("SELECT * FROM compte_accreditations WHERE user_id=? ORDER BY created_at DESC").all(user.id);
-  sendJSON(res, 200, { accreditations: rows });
+  const anciens = db.prepare("SELECT * FROM compte_accreditations WHERE user_id=? ORDER BY created_at DESC").all(user.id);
+  const nouveaux = db.prepare(`
+    SELECT ua.*, d.type AS type, d.label, d.emoji, d.couleur, d.couleur_bg, d.couleur_border, d.couleur_text, d.module
+    FROM user_accreditations ua JOIN accred_definitions d ON d.id=ua.accred_id
+    WHERE ua.user_id=? ORDER BY ua.created_at DESC
+  `).all(user.id);
+  const types = new Set(anciens.map(a => a.type));
+  sendJSON(res, 200, { accreditations: [...anciens, ...nouveaux.filter(n => !types.has(n.type))] });
 });
 
-/* GET /api/accreditations/demandes — mes propres demandes */
+/* GET /api/accreditations/demandes — mes propres demandes (ancien + nouveau système) */
 route("GET", "/api/accreditations/demandes", async (req, res) => {
   const user = getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const rows = db.prepare("SELECT * FROM demandes_accreditation WHERE user_id=? ORDER BY created_at DESC").all(user.id);
-  sendJSON(res, 200, { demandes: rows });
+  const anciens = db.prepare("SELECT * FROM demandes_accreditation WHERE user_id=? ORDER BY created_at DESC").all(user.id);
+  const nouveaux = db.prepare(`
+    SELECT ad.*, d.type AS type, d.label, d.emoji
+    FROM accred_demandes ad JOIN accred_definitions d ON d.id=ad.accred_id
+    WHERE ad.user_id=? ORDER BY ad.created_at DESC
+  `).all(user.id);
+  const types = new Set(anciens.map(a => a.type));
+  sendJSON(res, 200, { demandes: [...anciens, ...nouveaux.filter(n => !types.has(n.type))] });
 });
 
 /* GET /api/accreditations/user/:id — accréditations publiques d'un compte */
@@ -3315,13 +3327,43 @@ route("GET", "/api/accreditations/user/:id", async (req, res, params) => {
   sendJSON(res, 200, { accreditations: rows });
 });
 
-/* POST /api/accreditations/demande — demander une accréditation */
+/* POST /api/accreditations/demande — demander une accréditation (nouveau + ancien système) */
 route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
   const user = getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const { type, message } = body;
+  if (!type) return sendJSON(res, 400, { error: "Type requis." });
+
+  /* Chercher dans le nouveau catalogue dynamique */
+  const def = db.prepare("SELECT * FROM accred_definitions WHERE type=? AND actif=1").get(type);
+  if (def) {
+    const regle = db.prepare("SELECT mode FROM accred_regles WHERE accred_id=? AND role=?").get(def.id, user.role);
+    if (!regle || regle.mode === 'non_concerne')
+      return sendJSON(res, 403, { error: "Votre type de compte n'est pas éligible à cette accréditation." });
+    if (regle.mode === 'automatique')
+      return sendJSON(res, 400, { error: "Cette accréditation est accordée automatiquement à votre type de compte." });
+    const existingDem = db.prepare("SELECT id,statut FROM accred_demandes WHERE user_id=? AND accred_id=? ORDER BY created_at DESC LIMIT 1").get(user.id, def.id);
+    if (existingDem && existingDem.statut === 'en_attente')
+      return sendJSON(res, 409, { error: "Une demande est déjà en cours pour cette accréditation." });
+    if (db.prepare("SELECT id FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(user.id, def.id))
+      return sendJSON(res, 409, { error: "Vous possédez déjà cette accréditation." });
+    const tarif = db.prepare("SELECT validation_admin FROM accred_tarifs WHERE accred_id=? AND role=?").get(def.id, user.role);
+    const id = db.prepare("INSERT OR IGNORE INTO accred_demandes (user_id,accred_id,message) VALUES (?,?,?)").run(user.id, def.id, message||null).lastInsertRowid;
+    if (!tarif || tarif.validation_admin !== 0) {
+      const admins = db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+      admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation",
+        `${user.nom} demande « ${def.emoji} ${def.label} »`, { demande_id: Number(id) }));
+    } else {
+      /* Accès immédiat sans validation */
+      db.prepare("UPDATE accred_demandes SET statut='approuvee' WHERE id=?").run(id);
+      db.prepare("INSERT OR IGNORE INTO user_accreditations (user_id,accred_id,statut) VALUES (?,?,'active')").run(user.id, def.id);
+    }
+    return sendJSON(res, 201, { id, ok: true });
+  }
+
+  /* Fallback : ancien système pour les types hardcodés */
   const TYPES_ACCRED_VALIDES = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle","creation_publicite"];
-  if (!TYPES_ACCRED_VALIDES.includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
+  if (!TYPES_ACCRED_VALIDES.includes(type)) return sendJSON(res, 400, { error: "Type ou accréditation invalide." });
   const existing = db.prepare("SELECT id,statut FROM demandes_accreditation WHERE user_id=? AND type=? ORDER BY created_at DESC LIMIT 1").get(user.id, type);
   if (existing && existing.statut === "en_attente") return sendJSON(res, 409, { error: "Une demande est déjà en cours pour ce type." });
   if (hasAccred(user.id, type)) return sendJSON(res, 409, { error: "Vous possédez déjà cette accréditation." });
@@ -9592,6 +9634,214 @@ route("POST", "/api/asso/membre-roles", async (req, res, params, body) => {
     db.prepare(`INSERT INTO asso_membre_roles (asso_user_id,da_user_id,role,role_custom) VALUES (?,?,?,?)`).run(g.user.id, Number(da_user_id), finalRole, role_custom||null);
   }
   assoAudit(g.user.id, g.user.id, "role.assign", "membre_role", Number(da_user_id), { role: finalRole, role_custom });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOTEUR D'ACCRÉDITATIONS DYNAMIQUE
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Helper : récupère la définition complète (def + regles + tarifs) */
+function getAccredDef(idOrType) {
+  const def = typeof idOrType === 'number'
+    ? db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(idOrType)
+    : db.prepare("SELECT * FROM accred_definitions WHERE type=?").get(idOrType);
+  if (!def) return null;
+  def.droits  = safeParse(def.droits);
+  def.regles  = db.prepare("SELECT role,mode FROM accred_regles WHERE accred_id=?").all(def.id);
+  def.tarifs  = db.prepare("SELECT role,type_tarif,montant,devise,renouvellement_auto,periode_grace_jours,validation_admin FROM accred_tarifs WHERE accred_id=?").all(def.id);
+  /* eligible = liste des rôles dont le mode n'est pas 'non_concerne' */
+  def.eligible = def.regles.filter(r => r.mode !== 'non_concerne').map(r => r.role);
+  /* prix pour compat ACCREDITATIONS_DA statique */
+  def.prix = {};
+  for (const t of def.tarifs) def.prix[t.role] = t.montant;
+  if (def.module === 'asso') def.prixLabel = def.tarifs[0]?.type_tarif === 'gratuit' ? 'Gratuit' : 'Premium — sur abonnement';
+  return def;
+}
+
+/* GET /api/accreditations/catalogue — liste filtrée par rôle */
+route("GET", "/api/accreditations/catalogue", async (req, res) => {
+  const user = getCurrentUser(req);
+  const role = user ? user.role : null;
+  const defs = db.prepare("SELECT * FROM accred_definitions WHERE actif=1 ORDER BY ordre,id").all();
+  const result = defs.map(d => {
+    const def = getAccredDef(d.id);
+    if (!def) return null;
+    if (role && !def.eligible.includes(role)) return null; // filtrer par rôle si connecté
+    return def;
+  }).filter(Boolean);
+  sendJSON(res, 200, { catalogue: result });
+});
+
+/* ──── Routes Admin : gestion des définitions ──── */
+
+/* GET /api/admin/accred/definitions */
+route("GET", "/api/admin/accred/definitions", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const defs = db.prepare("SELECT * FROM accred_definitions ORDER BY ordre,id").all();
+  sendJSON(res, 200, { definitions: defs.map(d => getAccredDef(d.id)) });
+});
+
+/* POST /api/admin/accred/definitions — créer une définition */
+route("POST", "/api/admin/accred/definitions", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { type, label, emoji, description, droits, couleur, couleur_bg, couleur_border, couleur_text,
+          module: mod, fonctionnalite, ordre, regles, tarifs } = body;
+  if (!type || !label) return sendJSON(res, 400, { error: "type et label requis." });
+  if (db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type))
+    return sendJSON(res, 409, { error: "Ce type existe déjà." });
+
+  const id = db.prepare(`INSERT INTO accred_definitions
+    (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,fonctionnalite,ordre,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(type, label, emoji||'', description||'', JSON.stringify(droits||[]),
+         couleur||'#6366f1', couleur_bg||'#f5f3ff', couleur_border||'#6366f1', couleur_text||'#3730a3',
+         mod||null, fonctionnalite||null, ordre||0, admin.id).lastInsertRowid;
+
+  if (Array.isArray(regles)) {
+    const insR = db.prepare("INSERT OR REPLACE INTO accred_regles (accred_id,role,mode) VALUES (?,?,?)");
+    for (const r of regles) if (r.role && r.mode) insR.run(id, r.role, r.mode);
+  }
+  if (Array.isArray(tarifs)) {
+    const insT = db.prepare("INSERT OR REPLACE INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,renouvellement_auto,periode_grace_jours,validation_admin) VALUES (?,?,?,?,?,?,?,?)");
+    for (const t of tarifs) if (t.role) insT.run(id, t.role, t.type_tarif||'gratuit', t.montant||0, t.devise||'EUR', t.renouvellement_auto||0, t.periode_grace_jours||7, t.validation_admin||1);
+  }
+
+  /* Appliquer accès automatique aux comptes éligibles */
+  if (Array.isArray(regles)) {
+    const autoRoles = regles.filter(r => r.mode === 'automatique').map(r => r.role);
+    for (const role of autoRoles) {
+      const users = db.prepare("SELECT id FROM users WHERE role=?").all(role);
+      const ins = db.prepare("INSERT OR IGNORE INTO user_accreditations (user_id,accred_id,statut) VALUES (?,?,'active')");
+      users.forEach(u => ins.run(u.id, id));
+    }
+  }
+
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* PUT /api/admin/accred/definitions/:id — modifier une définition */
+route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { label, emoji, description, droits, couleur, couleur_bg, couleur_border, couleur_text,
+          module: mod, fonctionnalite, ordre, actif, regles, tarifs } = body;
+  const def = db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(params.id);
+  if (!def) return sendJSON(res, 404, { error: "Définition introuvable." });
+
+  db.prepare(`UPDATE accred_definitions SET
+    label=?,emoji=?,description=?,droits=?,couleur=?,couleur_bg=?,couleur_border=?,couleur_text=?,
+    module=?,fonctionnalite=?,ordre=?,actif=?,updated_at=datetime('now') WHERE id=?`)
+    .run(label||def.label, emoji||def.emoji, description||def.description,
+         droits ? JSON.stringify(droits) : def.droits,
+         couleur||def.couleur, couleur_bg||def.couleur_bg, couleur_border||def.couleur_border,
+         couleur_text||def.couleur_text, mod!==undefined?mod:def.module,
+         fonctionnalite!==undefined?fonctionnalite:def.fonctionnalite,
+         ordre!==undefined?ordre:def.ordre, actif!==undefined?actif:def.actif, params.id);
+
+  if (Array.isArray(regles)) {
+    db.prepare("DELETE FROM accred_regles WHERE accred_id=?").run(params.id);
+    const insR = db.prepare("INSERT INTO accred_regles (accred_id,role,mode) VALUES (?,?,?)");
+    for (const r of regles) if (r.role && r.mode) insR.run(params.id, r.role, r.mode);
+  }
+  if (Array.isArray(tarifs)) {
+    db.prepare("DELETE FROM accred_tarifs WHERE accred_id=?").run(params.id);
+    const insT = db.prepare("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,renouvellement_auto,periode_grace_jours,validation_admin) VALUES (?,?,?,?,?,?,?,?)");
+    for (const t of tarifs) if (t.role) insT.run(params.id, t.role, t.type_tarif||'gratuit', t.montant||0, t.devise||'EUR', t.renouvellement_auto||0, t.periode_grace_jours||7, t.validation_admin||1);
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/admin/accred/definitions/:id — désactiver */
+route("DELETE", "/api/admin/accred/definitions/:id", async (req, res, params) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE accred_definitions SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/admin/accred/demandes — toutes les demandes (nouveau système) */
+route("GET", "/api/admin/accred/demandes", async (req, res, params, body, query) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const statut = query.statut || "en_attente";
+  const rows = db.prepare(`
+    SELECT ad.*, u.nom AS user_nom, u.email AS user_email, u.role AS user_role,
+           d.label AS accred_label, d.emoji AS accred_emoji, d.type AS accred_type
+    FROM accred_demandes ad
+    JOIN users u ON u.id=ad.user_id
+    JOIN accred_definitions d ON d.id=ad.accred_id
+    WHERE ad.statut=? ORDER BY ad.created_at DESC
+  `).all(statut);
+  sendJSON(res, 200, { demandes: rows });
+});
+
+/* PATCH /api/admin/accred/demandes/:id/approuver */
+route("PATCH", "/api/admin/accred/demandes/:id/approuver", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const dem = db.prepare("SELECT * FROM accred_demandes WHERE id=?").get(params.id);
+  if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
+  const def = getAccredDef(dem.accred_id);
+  const tarif = def?.tarifs?.find(t => {
+    const user = db.prepare("SELECT role FROM users WHERE id=?").get(dem.user_id);
+    return user && t.role === user.role;
+  });
+  db.prepare("UPDATE accred_demandes SET statut='approuvee' WHERE id=?").run(params.id);
+  db.prepare(`INSERT INTO user_accreditations (user_id,accred_id,statut,admin_id,type_tarif,date_expiration,notes)
+    VALUES (?,?,'active',?,?,?,?)
+    ON CONFLICT(user_id,accred_id) DO UPDATE SET statut='active',admin_id=?,date_expiration=?,updated_at=datetime('now')`)
+    .run(dem.user_id, dem.accred_id, admin.id, tarif?.type_tarif||'gratuit', body.date_expiration||null, body.notes||null,
+         admin.id, body.date_expiration||null);
+  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+    .run(dem.user_id, dem.accred_id, 'accorde', admin.id, admin.nom, body.motif||null);
+  creerNotif(dem.user_id, "validation", "Accréditation accordée !",
+    `Félicitations ! Votre accréditation « ${def?.emoji||''} ${def?.label||''} » vient d'être validée.`,
+    { accred_type: def?.type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accred/demandes/:id/refuser */
+route("PATCH", "/api/admin/accred/demandes/:id/refuser", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const dem = db.prepare("SELECT * FROM accred_demandes WHERE id=?").get(params.id);
+  if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
+  db.prepare("UPDATE accred_demandes SET statut='refusee',motif_refus=? WHERE id=?").run(body.motif||null, params.id);
+  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+    .run(dem.user_id, dem.accred_id, 'refuse', admin.id, admin.nom, body.motif||null);
+  const def = getAccredDef(dem.accred_id);
+  creerNotif(dem.user_id, "validation", "Demande d'accréditation non retenue",
+    `Votre demande pour « ${def?.label||''} » n'a pas été retenue${body.motif ? ` : ${body.motif}` : '.'}.`,
+    { accred_type: def?.type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/admin/accred/users — liste des accréditations attribuées */
+route("GET", "/api/admin/accred/users", async (req, res) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = db.prepare(`
+    SELECT ua.*, u.nom AS user_nom, u.email AS user_email, u.role AS user_role,
+           d.label AS accred_label, d.emoji AS accred_emoji, d.type AS accred_type
+    FROM user_accreditations ua
+    JOIN users u ON u.id=ua.user_id
+    JOIN accred_definitions d ON d.id=ua.accred_id
+    ORDER BY ua.updated_at DESC
+  `).all();
+  sendJSON(res, 200, { accreditations: rows });
+});
+
+/* PATCH /api/admin/accred/users/:userId/:accredId/retirer */
+route("PATCH", "/api/admin/accred/users/:userId/:accredId/retirer", async (req, res, params, body) => {
+  const admin = getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE user_accreditations SET statut='retiree',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
+    .run(params.userId, params.accredId);
+  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+    .run(params.userId, params.accredId, 'retire', admin.id, admin.nom, body.motif||null);
   sendJSON(res, 200, { ok: true });
 });
 
