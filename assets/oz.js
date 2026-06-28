@@ -222,13 +222,13 @@
 
   const R = {
     fr: {
-      greet_day: ["Bonjour ! Je suis **O-Z**, votre assistant intelligent Diaspo'Actif. Comment puis-je vous aider aujourd'hui ?",
-                  "Bonjour ! En quoi puis-je vous être utile aujourd'hui ?"],
-      greet_eve: ["Bonsoir ! Je suis **O-Z**. Que puis-je faire pour vous ce soir ?"],
-      thanks:    ["Avec plaisir ! N'hésitez pas si vous avez d'autres questions.", "Je suis là pour vous aider ! 😊"],
-      bye:       ["À bientôt ! N'hésitez pas à faire appel à moi."],
-      confused:  ["Je ne suis pas certain de comprendre. Pouvez-vous reformuler ?",
-                  "Hmm, je n'ai pas bien saisi. Essayez de préciser votre demande."],
+      greet_day: ["Bonjour ! Je suis **O-Z**, votre agent d'exécution Diaspo'Actif. Donnez-moi une commande et j'agis.",
+                  "Bonjour ! Dites-moi quoi ouvrir ou faire, j'exécute immédiatement."],
+      greet_eve: ["Bonsoir ! Je suis **O-Z**. Donnez-moi une commande, j'exécute."],
+      thanks:    ["Commande reçue ! Autre chose à ouvrir ou faire ?", "À votre service !"],
+      bye:       ["À bientôt !"],
+      confused:  ["Je suis un agent d'action, pas de réponses. Pour les questions, utilisez le **chatbot**.",
+                  "Je n'exécute que des commandes. Pour une réponse, ouvrez le **chatbot**."],
       capabilities: "Je suis **O-Z**, votre assistant d'action Diaspo'Actif. Je **fais** — je ne réponds pas aux questions (le chatbot est là pour ça).\n\n• « **Ouvre les accréditations** » → j'ouvre\n• « **Ouvre les habilitations** » → j'ouvre\n• « **Ouvre les publicités** » → j'ouvre\n• « **Ouvre la messagerie** » → j'ouvre\n• « **Crée un événement** » → je lance le formulaire\n• « **Va dans l'annuaire** » → j'y vais\n• « **Ouvre mon agenda** » → j'ouvre\n\nDites une commande, j'exécute immédiatement.",
     },
     en: {
@@ -1078,18 +1078,15 @@
         break;
       }
 
-      // ── Fallback : tenter une action sur la page, puis KB, puis confusion
+      // ── Fallback : tenter une action sur la page, sinon renvoyer au chatbot
       default: {
-        // 1. Tenter d'agir directement sur un élément de la page courante
+        // 1. Tenter de cliquer un élément de la page si la commande ressemble à une action
         if (/ouvr[ei]r?|acc[eé]der?|activer?|afficher?|montrer?|aller|voir/i.test(text)) {
           const acted = tryPageAction(text);
           if (acted) { await audit('action', 'page_action', { text }); break; }
         }
-        // 2. Chercher dans la KB / FAQ
-        const kb = await queryKB(text);
-        if (kb) { addMsg('oz', kb); break; }
-        // 3. Message de confusion — court, sans longues listes
-        addMsg('oz', 'Je n\'ai pas trouvé cette commande. Essayez : « **Ouvre les accréditations** », « **Ouvre mes messages** », « **Crée un événement** ».');
+        // 2. O-Z ne répond pas aux questions — renvoyer vers le chatbot
+        addMsg('oz', '❌ Je suis un agent d\'**action**, pas de réponses.\n\nPour poser une question, utilisez le **chatbot** 💬\n\nMoi j\'exécute des commandes :\n• « **Ouvre les accréditations** »\n• « **Ouvre mes messages** »\n• « **Crée un événement** »');
         logUnanswered(text);
       }
     }
