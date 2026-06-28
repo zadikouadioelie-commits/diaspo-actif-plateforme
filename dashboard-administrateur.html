@@ -2283,10 +2283,13 @@
           <div id="fe-panel-registry">
             <!-- Filtres par catégorie -->
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
-              ${['Toutes','communication','formation','evenements','collaboration','publication','observatoire'].map((c,i) =>
-                `<button class="btn btn-sm ${i===0?'btn-orange':'btn-outline'}" id="fe-cat-${c.replace(/ /g,'_')}"
-                  onclick="filterFeCategory('${c}')">${c==='Toutes'?'Toutes':c.charAt(0).toUpperCase()+c.slice(1)}</button>`
-              ).join('')}
+              <button class="btn btn-sm btn-orange" id="fe-cat-Toutes" onclick="filterFeCategory('Toutes')">Toutes</button>
+              <button class="btn btn-sm btn-outline" id="fe-cat-communication" onclick="filterFeCategory('communication')">Communication</button>
+              <button class="btn btn-sm btn-outline" id="fe-cat-formation" onclick="filterFeCategory('formation')">Formation</button>
+              <button class="btn btn-sm btn-outline" id="fe-cat-evenements" onclick="filterFeCategory('evenements')">Événements</button>
+              <button class="btn btn-sm btn-outline" id="fe-cat-collaboration" onclick="filterFeCategory('collaboration')">Collaboration</button>
+              <button class="btn btn-sm btn-outline" id="fe-cat-publication" onclick="filterFeCategory('publication')">Publication</button>
+              <button class="btn btn-sm btn-outline" id="fe-cat-observatoire" onclick="filterFeCategory('observatoire')">Observatoire</button>
             </div>
             <div id="features-list" class="card" style="padding:0;overflow:hidden;">
               <div style="padding:16px;color:var(--muted);">Chargement…</div>
