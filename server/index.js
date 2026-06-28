@@ -736,39 +736,324 @@ route("GET", "/api/mes-suivis", async (req, res) => {
 });
 
 /* ---------- Formations ---------- */
+/* ──────────────────────────────────────────────────────────
+   DIASPO FORMATION — Routes publiques & créateur
+   ────────────────────────────────────────────────────────── */
+
+function hasAccreditation(userId, type) {
+  const ancien = db.prepare("SELECT id FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type);
+  if (ancien) return true;
+  const def = db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
+  if (!def) return false;
+  const nouv = db.prepare("SELECT id FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id);
+  return !!nouv;
+}
+
 route("GET", "/api/formations", async (req, res, params, body, query) => {
-  let rows = db.prepare("SELECT * FROM formations ORDER BY created_at DESC").all();
+  let rows = db.prepare(`
+    SELECT f.*, u.nom AS auteur_nom
+    FROM formations f
+    LEFT JOIN users u ON u.id = f.owner_user_id
+    WHERE COALESCE(f.statut,'publiee') = 'publiee'
+    ORDER BY f.created_at DESC
+  `).all();
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
+  if (query.categorie) rows = rows.filter(r => r.categorie === query.categorie);
   if (query.type) rows = rows.filter(r => r.type_formation === query.type);
   if (query.niveau) rows = rows.filter(r => r.niveau === query.niveau);
   if (query.langue) rows = rows.filter(r => r.langue === query.langue);
-  if (query.gratuit === "1") rows = rows.filter(r => r.gratuit === 1);
+  if (query.gratuit === "1") rows = rows.filter(r => r.mode_acces === 'gratuit' || r.gratuit === 1);
   if (query.q) {
     const q = query.q.toLowerCase();
-    rows = rows.filter(r => (r.titre + r.description + r.organisme).toLowerCase().includes(q));
+    rows = rows.filter(r => ((r.titre||'') + (r.description||'') + (r.organisme||'')).toLowerCase().includes(q));
   }
   sendJSON(res, 200, { formations: rows });
 });
 
 route("GET", "/api/formations/:id", async (req, res, params) => {
-  const row = db.prepare("SELECT * FROM formations WHERE id = ?").get(params.id);
+  const row = db.prepare(`
+    SELECT f.*, u.nom AS auteur_nom
+    FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id
+    WHERE f.id=?
+  `).get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Formation introuvable." });
-  sendJSON(res, 200, { formation: row });
+  const avis = db.prepare("SELECT a.*, u.nom AS auteur FROM formation_avis a JOIN users u ON u.id=a.user_id WHERE a.formation_id=? ORDER BY a.created_at DESC").all(params.id);
+  const nb_inscrits = db.prepare("SELECT COUNT(*) AS n FROM formation_inscriptions WHERE formation_id=? AND statut='active'").get(params.id).n;
+  sendJSON(res, 200, { formation: { ...row, avis, nb_inscrits } });
 });
 
+/* Mes formations (créateur) */
+route("GET", "/api/mes-formations", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const formations = db.prepare(`
+    SELECT f.*,
+      (SELECT COUNT(*) FROM formation_inscriptions i WHERE i.formation_id=f.id AND i.statut='active') AS nb_inscrits,
+      (SELECT COALESCE(SUM(montant_paye),0) FROM formation_inscriptions i WHERE i.formation_id=f.id AND i.statut='active') AS revenu_brut
+    FROM formations f
+    WHERE f.owner_user_id=?
+    ORDER BY f.created_at DESC
+  `).all(user.id);
+  sendJSON(res, 200, { formations });
+});
+
+/* Mes inscriptions (apprenant) */
+route("GET", "/api/mes-inscriptions", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const inscriptions = db.prepare(`
+    SELECT i.*, f.titre, f.description, f.image_url, f.mode_acces, f.niveau
+    FROM formation_inscriptions i JOIN formations f ON f.id=i.formation_id
+    WHERE i.user_id=? ORDER BY i.date_inscription DESC
+  `).all(user.id);
+  sendJSON(res, 200, { inscriptions });
+});
+
+/* Créer une formation */
 route("POST", "/api/formations", async (req, res, params, body) => {
   const user = getCurrentUser(req);
-  if (!user || !["initiative", "administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Administrateur." });
-  const { titre, type_formation, organisme, domaine, nationalite, langue, niveau, description, prix, gratuit, duree, places } = body;
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (user.role === 'utilisateur') return sendJSON(res, 403, { error: "Accréditation Créateur de formations requise." });
+  if (!['initiative','collectivite','administrateur'].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Institution." });
+  if (user.role !== 'administrateur' && !hasAccreditation(user.id, 'createur_formations')) {
+    return sendJSON(res, 403, { error: "Accréditation Créateur de formations requise. Faites une demande dans la section Accréditations." });
+  }
+  const { titre, type_formation, organisme, domaine, nationalite, langue, niveau, description,
+          prix, duree, duree_heures, places, mode_acces, telecharge_autorise,
+          objectifs, prerequis, categorie, video_intro } = body;
   if (!titre) return sendJSON(res, 400, { error: "Le titre est requis." });
+  const modeAcces = mode_acces || 'gratuit';
+  const commission = modeAcces === 'gratuit' ? 0 : modeAcces === 'payant_sauf_membres' ? 2 : 5;
+  const gratuit = modeAcces === 'gratuit' ? 1 : 0;
   const init = db.prepare("SELECT id FROM initiatives WHERE owner_user_id = ?").get(user.id);
   const id = db.prepare(`
-    INSERT INTO formations (titre, type_formation, organisme, domaine, nationalite, langue, niveau, description, prix, gratuit, duree, places, initiative_id, owner_user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(titre, type_formation || null, organisme || null, domaine || null, nationalite || null, langue || "Français",
-    niveau || null, description || null, prix || 0, gratuit ? 1 : 0, duree || null, places || null,
-    init ? init.id : null, user.id).lastInsertRowid;
+    INSERT INTO formations (titre, type_formation, organisme, domaine, nationalite, langue, niveau, description,
+      prix, gratuit, duree, duree_heures, places, initiative_id, owner_user_id,
+      statut, mode_acces, commission_pct, telecharge_autorise, objectifs, prerequis, categorie, video_intro)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'brouillon',?,?,?,?,?,?,?)
+  `).run(
+    titre, type_formation||null, organisme||null, domaine||null, nationalite||null, langue||'Français',
+    niveau||null, description||null, prix||0, gratuit, duree||null, duree_heures||null, places||null,
+    init?.id||null, user.id,
+    modeAcces, commission, telecharge_autorise?1:0,
+    objectifs||null, prerequis||null, categorie||null, video_intro||null
+  ).lastInsertRowid;
   sendJSON(res, 201, { id });
+});
+
+/* Modifier une formation (brouillon ou refusée) */
+route("PUT", "/api/formations/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if (!['brouillon','refusee'].includes(f.statut||'brouillon') && user.role !== 'administrateur') {
+    return sendJSON(res, 400, { error: "Seules les formations en brouillon ou refusées peuvent être modifiées." });
+  }
+  const { titre, description, objectifs, prerequis, niveau, langue, duree, duree_heures,
+          places, categorie, mode_acces, prix, telecharge_autorise, video_intro, image_url } = body;
+  const modeAcces = mode_acces || f.mode_acces || 'gratuit';
+  const commission = modeAcces === 'gratuit' ? 0 : modeAcces === 'payant_sauf_membres' ? 2 : 5;
+  db.prepare(`UPDATE formations SET
+    titre=COALESCE(?,titre), description=COALESCE(?,description), objectifs=COALESCE(?,objectifs),
+    prerequis=COALESCE(?,prerequis), niveau=COALESCE(?,niveau), langue=COALESCE(?,langue),
+    duree=COALESCE(?,duree), duree_heures=COALESCE(?,duree_heures), places=COALESCE(?,places),
+    categorie=COALESCE(?,categorie), mode_acces=?, prix=COALESCE(?,prix),
+    commission_pct=?, telecharge_autorise=COALESCE(?,telecharge_autorise),
+    video_intro=COALESCE(?,video_intro), image_url=COALESCE(?,image_url),
+    statut=CASE WHEN statut='refusee' THEN 'brouillon' ELSE statut END,
+    motif_refus=CASE WHEN statut='refusee' THEN NULL ELSE motif_refus END
+    WHERE id=?`
+  ).run(titre,description,objectifs,prerequis,niveau,langue,duree,duree_heures,places,
+    categorie,modeAcces,prix,commission,telecharge_autorise!=null?(telecharge_autorise?1:0):null,
+    video_intro,image_url, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Supprimer une formation (brouillon seulement) */
+route("DELETE", "/api/formations/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if ((f.statut||'brouillon') !== 'brouillon' && user.role !== 'administrateur') return sendJSON(res, 400, { error: "Seule une formation en brouillon peut être supprimée." });
+  db.prepare("DELETE FROM formations WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Soumettre à validation */
+route("POST", "/api/formations/:id/publier", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (f.owner_user_id !== user.id) return sendJSON(res, 403, { error: "Interdit." });
+  if (!['brouillon','refusee'].includes(f.statut||'brouillon')) return sendJSON(res, 400, { error: `Statut actuel : ${f.statut}` });
+  db.prepare("UPDATE formations SET statut='en_attente', motif_refus=NULL WHERE id=?").run(params.id);
+  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom) VALUES (?,'soumise',?,?)").run(params.id, user.id, user.nom);
+  /* Notif aux admins */
+  const admins = db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+  for (const a of admins) {
+    creerNotif(a.id, 'formation', 'Nouvelle formation à valider', `« ${f.titre} » est en attente de validation.`, { formation_id: params.id });
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* S'inscrire à une formation */
+route("POST", "/api/formations/:id/inscrire", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f || f.statut !== 'publiee') return sendJSON(res, 404, { error: "Formation introuvable ou non publiée." });
+  const deja = db.prepare("SELECT id FROM formation_inscriptions WHERE formation_id=? AND user_id=?").get(params.id, user.id);
+  if (deja) return sendJSON(res, 409, { error: "Déjà inscrit." });
+  let montant = 0, acces_gratuit = 0, code_valide = null;
+  if (f.mode_acces === 'payant_sauf_membres') {
+    const code = (body.code||'').trim().toUpperCase();
+    const codeRow = code ? db.prepare("SELECT * FROM formation_codes_acces WHERE code=? AND actif=1").get(code) : null;
+    if (codeRow && (!codeRow.date_expiration || codeRow.date_expiration > new Date().toISOString())
+        && (!codeRow.limite_utilisations || codeRow.nb_utilisations < codeRow.limite_utilisations)) {
+      acces_gratuit = 1;
+      code_valide = code;
+      db.prepare("UPDATE formation_codes_acces SET nb_utilisations=nb_utilisations+1 WHERE id=?").run(codeRow.id);
+    } else {
+      montant = f.prix || 0;
+    }
+  } else if (f.mode_acces === 'payant') {
+    montant = f.prix || 0;
+  }
+  db.prepare(`INSERT INTO formation_inscriptions
+    (formation_id,user_id,montant_paye,acces_gratuit_membre,code_acces)
+    VALUES (?,?,?,?,?)`).run(params.id, user.id, montant, acces_gratuit, code_valide);
+  creerNotif(user.id, 'formation', 'Inscription confirmée', `Vous êtes inscrit à la formation « ${f.titre} ».`, { formation_id: params.id });
+  sendJSON(res, 201, { ok: true, acces_gratuit });
+});
+
+/* Ajouter un avis */
+route("POST", "/api/formations/:id/avis", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const inscrit = db.prepare("SELECT id FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active'").get(params.id, user.id);
+  if (!inscrit) return sendJSON(res, 403, { error: "Vous devez être inscrit pour laisser un avis." });
+  const { note, commentaire } = body;
+  if (!note || note < 1 || note > 5) return sendJSON(res, 400, { error: "Note entre 1 et 5 requise." });
+  db.prepare("INSERT OR REPLACE INTO formation_avis (formation_id,user_id,note,commentaire) VALUES (?,?,?,?)").run(params.id, user.id, note, commentaire||null);
+  sendJSON(res, 201, { ok: true });
+});
+
+/* Répondre à un avis (créateur) */
+route("PATCH", "/api/formations/avis/:avisId/repondre", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const avis = db.prepare("SELECT a.*, f.owner_user_id FROM formation_avis a JOIN formations f ON f.id=a.formation_id WHERE a.id=?").get(params.avisId);
+  if (!avis) return sendJSON(res, 404, { error: "Avis introuvable." });
+  if (avis.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  db.prepare("UPDATE formation_avis SET reponse_createur=? WHERE id=?").run(body.reponse||null, params.avisId);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ──────────────────────────────────────────────────────────
+   DIASPO FORMATION — Routes admin (validation, codes)
+   ────────────────────────────────────────────────────────── */
+
+route("GET", "/api/admin/formations/en-attente", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const formations = db.prepare(`
+    SELECT f.*, u.nom AS auteur_nom, u.email AS auteur_email
+    FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id
+    WHERE f.statut='en_attente'
+    ORDER BY f.created_at ASC
+  `).all();
+  sendJSON(res, 200, { formations });
+});
+
+route("GET", "/api/admin/formations", async (req, res, params, body, query) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const statut = query.statut || null;
+  const formations = statut
+    ? db.prepare("SELECT f.*, u.nom AS auteur_nom FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id WHERE f.statut=? ORDER BY f.created_at DESC").all(statut)
+    : db.prepare("SELECT f.*, u.nom AS auteur_nom FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id ORDER BY f.created_at DESC LIMIT 100").all();
+  sendJSON(res, 200, { formations });
+});
+
+route("PATCH", "/api/admin/formations/:id/valider", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const f = db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  db.prepare("UPDATE formations SET statut='publiee', validateur_id=?, valide_at=datetime('now') WHERE id=?").run(user.id, params.id);
+  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'validee',?,?,?)").run(params.id, user.id, user.nom, body.motif||null);
+  creerNotif(f.owner_user_id, 'formation', 'Formation publiée ! 🎉', `Votre formation « ${f.titre} » a été validée et publiée sur Diaspo Formation.`, { formation_id: params.id });
+  sendJSON(res, 200, { ok: true });
+});
+
+route("PATCH", "/api/admin/formations/:id/refuser", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const f = db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  const motif = body.motif || 'Contenu non conforme.';
+  db.prepare("UPDATE formations SET statut='refusee', motif_refus=? WHERE id=?").run(motif, params.id);
+  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'refusee',?,?,?)").run(params.id, user.id, user.nom, motif);
+  creerNotif(f.owner_user_id, 'formation', 'Formation refusée', `Votre formation « ${f.titre} » n'a pas été validée. Motif : ${motif}`, { formation_id: params.id });
+  sendJSON(res, 200, { ok: true });
+});
+
+route("PATCH", "/api/admin/formations/:id/suspendre", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const f = db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  const motif = body.motif || '';
+  const newStatut = f.statut === 'suspendue' ? 'publiee' : 'suspendue';
+  db.prepare("UPDATE formations SET statut=? WHERE id=?").run(newStatut, params.id);
+  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)").run(params.id, newStatut, user.id, user.nom, motif);
+  creerNotif(f.owner_user_id, 'formation', newStatut==='suspendue'?'Formation suspendue':'Formation réactivée',
+    newStatut==='suspendue' ? `Votre formation « ${f.titre} » a été suspendue.${motif?' Motif : '+motif:''}` : `Votre formation « ${f.titre} » est de nouveau publiée.`,
+    { formation_id: params.id });
+  sendJSON(res, 200, { ok: true, statut: newStatut });
+});
+
+/* Codes d'accès gratuit (membres Diaspo'Actif) */
+route("GET", "/api/admin/codes-acces", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  sendJSON(res, 200, { codes: db.prepare("SELECT * FROM formation_codes_acces ORDER BY created_at DESC").all() });
+});
+
+route("POST", "/api/admin/codes-acces", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const { code, description, limite_utilisations, date_expiration } = body;
+  if (!code) return sendJSON(res, 400, { error: "Code requis." });
+  const id = db.prepare(`INSERT INTO formation_codes_acces (code,description,limite_utilisations,date_expiration,created_by) VALUES (?,?,?,?,?)`)
+    .run(code.toUpperCase().trim(), description||null, limite_utilisations||null, date_expiration||null, user.id).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PATCH", "/api/admin/codes-acces/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const c = db.prepare("SELECT * FROM formation_codes_acces WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Code introuvable." });
+  if (body.toggle_actif !== undefined) {
+    db.prepare("UPDATE formation_codes_acces SET actif=? WHERE id=?").run(c.actif?0:1, params.id);
+  } else {
+    db.prepare("UPDATE formation_codes_acces SET description=COALESCE(?,description), limite_utilisations=COALESCE(?,limite_utilisations), date_expiration=COALESCE(?,date_expiration) WHERE id=?")
+      .run(body.description, body.limite_utilisations||null, body.date_expiration||null, params.id);
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/admin/codes-acces/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  db.prepare("DELETE FROM formation_codes_acces WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ---------- Dashboard Initiative (données réelles de l'initiative de l'utilisateur connecté) ---------- */

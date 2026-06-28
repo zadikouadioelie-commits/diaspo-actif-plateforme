@@ -2427,5 +2427,89 @@ db.exec(`
   }
 })();
 
+/* ===== MODULE DIASPO FORMATION ===== */
+
+/* Extension de la table formations (colonnes optionnelles ajoutées si absentes) */
+;['statut TEXT DEFAULT \'brouillon\'','mode_acces TEXT DEFAULT \'gratuit\'','commission_pct REAL DEFAULT 0',
+  'telecharge_autorise INTEGER DEFAULT 0','image_url TEXT','duree_heures REAL',
+  'prerequis TEXT','objectifs TEXT','video_intro TEXT','categorie TEXT',
+  'motif_refus TEXT','validateur_id INTEGER','valide_at TEXT',
+  'nb_inscrits INTEGER DEFAULT 0','revenu_total REAL DEFAULT 0'
+].forEach(col => {
+  try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {}
+});
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_inscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    statut TEXT DEFAULT 'active' CHECK(statut IN ('active','annulee','expiree')),
+    code_acces TEXT,
+    montant_paye REAL DEFAULT 0,
+    acces_gratuit_membre INTEGER DEFAULT 0,
+    avancement_pct INTEGER DEFAULT 0,
+    date_inscription TEXT DEFAULT (datetime('now')),
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(formation_id, user_id),
+    FOREIGN KEY(formation_id) REFERENCES formations(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE TABLE IF NOT EXISTS formation_avis (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    note INTEGER NOT NULL CHECK(note BETWEEN 1 AND 5),
+    commentaire TEXT,
+    reponse_createur TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(formation_id, user_id),
+    FOREIGN KEY(formation_id) REFERENCES formations(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE TABLE IF NOT EXISTS formation_codes_acces (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    description TEXT,
+    actif INTEGER DEFAULT 1,
+    nb_utilisations INTEGER DEFAULT 0,
+    limite_utilisations INTEGER,
+    date_expiration TEXT,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(created_by) REFERENCES users(id)
+  );
+  CREATE TABLE IF NOT EXISTS formation_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    admin_id INTEGER,
+    admin_nom TEXT,
+    motif TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+`);
+
+/* Ajouter l'accréditation createur_formations si elle n'existe pas encore */
+;(function seedCreateurFormations() {
+  const exists = db.prepare("SELECT id FROM accred_definitions WHERE type='createur_formations'").get();
+  if (exists) return;
+  const insD = db.prepare(`INSERT OR IGNORE INTO accred_definitions
+    (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+  const insR = db.prepare(`INSERT OR IGNORE INTO accred_regles (accred_id,role,mode) VALUES (?,?,?)`);
+  const insT = db.prepare(`INSERT OR IGNORE INTO accred_tarifs
+    (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES (?,?,?,?,?,?)`);
+  insD.run('createur_formations','Créateur de formations','🎓',
+    "Autorisation de proposer des formations dans l'espace Diaspo Formation. Permet de créer, publier et gérer des formations avec suivi des inscriptions et des revenus.",
+    JSON.stringify(['Créer et publier des formations','Suivre les inscriptions et les revenus','Choisir le mode d\'accès (gratuit, payant, payant sauf membres)','Consulter les avis des apprenants','Émettre des attestations de formation']),
+    '#f59e0b','#fffbeb','#f59e0b','#92400e','diaspo_formation', 7);
+  const { id } = db.prepare("SELECT id FROM accred_definitions WHERE type='createur_formations'").get();
+  insR.run(id,'initiative','sur_demande');
+  insR.run(id,'collectivite','sur_demande');
+  insT.run(id,'initiative','gratuit',0,'EUR',1);
+  insT.run(id,'collectivite','gratuit',0,'EUR',1);
+})();
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;

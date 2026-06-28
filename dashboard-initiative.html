@@ -75,6 +75,7 @@
 
       <div class="sb-group-lbl">07 — OUTILS</div>
       <a href="#paiement" data-section="paiement">💳 Module paiement</a>
+      <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" style="display:none;">🎓 Diaspo Formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
       <a href="#accreditations" data-section="accreditations">🎖 Accréditations DA</a>
       <a href="#asso-accreditation" data-section="asso-accreditation">🏅 Accréditation Asso</a>
       <a href="#publicites-init" data-section="publicites-init">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
@@ -362,6 +363,141 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Consultez et gérez les candidatures reçues sur vos offres publiées.</p>
       <div id="recrutement-content"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
     </div>
+
+    <!-- ════ DIASPO FORMATION — GESTION DES FORMATIONS ════ -->
+    <div class="card" style="margin-bottom:20px;display:none;" id="formations-gestion">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">🎓 Gestion des formations</h3>
+        <button class="btn btn-orange" onclick="openFormationForm()">+ Nouvelle formation</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Créez, gérez et suivez vos formations sur Diaspo Formation.</p>
+
+      <!-- Widgets stats -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;" id="form-stats-row">
+        <div class="card" style="padding:14px;text-align:center;background:#f0fdf4;">
+          <div style="font-size:22px;font-weight:800;color:#16a34a;" id="form-stat-total">—</div>
+          <div style="font-size:11px;color:var(--muted);">Formations</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;background:#eff6ff;">
+          <div style="font-size:22px;font-weight:800;color:#2563eb;" id="form-stat-inscrits">—</div>
+          <div style="font-size:11px;color:var(--muted);">Inscrits</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;background:#fffbeb;">
+          <div style="font-size:22px;font-weight:800;color:#d97706;" id="form-stat-revenu">—</div>
+          <div style="font-size:11px;color:var(--muted);">Revenus bruts</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;background:#fef2f2;">
+          <div style="font-size:22px;font-weight:800;color:#dc2626;" id="form-stat-attente">—</div>
+          <div style="font-size:11px;color:var(--muted);">En validation</div>
+        </div>
+      </div>
+
+      <!-- Onglets statut -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-orange" id="ftab-all" onclick="filterFormations('all')">Toutes</button>
+        <button class="btn btn-sm btn-outline" id="ftab-brouillon" onclick="filterFormations('brouillon')">Brouillons</button>
+        <button class="btn btn-sm btn-outline" id="ftab-en_attente" onclick="filterFormations('en_attente')">En attente</button>
+        <button class="btn btn-sm btn-outline" id="ftab-publiee" onclick="filterFormations('publiee')">Publiées</button>
+        <button class="btn btn-sm btn-outline" id="ftab-refusee" onclick="filterFormations('refusee')">Refusées</button>
+      </div>
+
+      <!-- Liste -->
+      <div id="formations-list">
+        <div style="text-align:center;padding:24px;color:var(--muted);">Chargement…</div>
+      </div>
+
+      <!-- Formulaire création / édition -->
+      <div id="formation-form-panel" style="display:none;margin-top:24px;border-top:2px solid var(--border);padding-top:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <h4 style="margin:0;" id="form-panel-title">Nouvelle formation</h4>
+          <button class="btn btn-sm btn-outline" onclick="closeFormationForm()">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div style="grid-column:1/-1;">
+            <label class="form-label">Titre *</label>
+            <input id="fp-titre" class="input-field" style="width:100%;" placeholder="Titre de la formation">
+          </div>
+          <div>
+            <label class="form-label">Catégorie</label>
+            <select id="fp-categorie" class="input-field" style="width:100%;">
+              <option value="">— Choisir —</option>
+              <option value="entrepreneuriat">Entrepreneuriat</option>
+              <option value="numerique">Numérique & Tech</option>
+              <option value="finance">Finance & Investissement</option>
+              <option value="leadership">Leadership & Gestion</option>
+              <option value="culture">Culture & Langues</option>
+              <option value="sante">Santé & Bien-être</option>
+              <option value="juridique">Juridique & Administratif</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Niveau</label>
+            <select id="fp-niveau" class="input-field" style="width:100%;">
+              <option value="">— Choisir —</option>
+              <option value="Débutant">Débutant</option>
+              <option value="Intermédiaire">Intermédiaire</option>
+              <option value="Avancé">Avancé</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Langue</label>
+            <select id="fp-langue" class="input-field" style="width:100%;">
+              <option value="Français">Français</option>
+              <option value="Anglais">Anglais</option>
+              <option value="Arabe">Arabe</option>
+              <option value="Espagnol">Espagnol</option>
+              <option value="Portugais">Portugais</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Durée (texte, ex : 6h30)</label>
+            <input id="fp-duree" class="input-field" style="width:100%;" placeholder="ex : 6h30">
+          </div>
+          <div>
+            <label class="form-label">Places max (vide = illimité)</label>
+            <input id="fp-places" class="input-field" type="number" min="1" style="width:100%;" placeholder="ex : 50">
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label class="form-label">Description *</label>
+          <textarea id="fp-description" class="input-field" style="width:100%;min-height:80px;" placeholder="Présentez votre formation…"></textarea>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label class="form-label">Objectifs (un par ligne)</label>
+          <textarea id="fp-objectifs" class="input-field" style="width:100%;min-height:70px;" placeholder="À l'issue de cette formation, l'apprenant saura…"></textarea>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label class="form-label">Prérequis</label>
+          <textarea id="fp-prerequis" class="input-field" style="width:100%;min-height:55px;" placeholder="Aucun prérequis / Notions de base…"></textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label class="form-label">Mode d'accès</label>
+            <select id="fp-mode" class="input-field" style="width:100%;" onchange="onModeAccesChange()">
+              <option value="gratuit">Gratuit (commission 0 %)</option>
+              <option value="payant">Payant (commission 5 %)</option>
+              <option value="payant_sauf_membres">Payant sauf membres DA (commission 2 %)</option>
+            </select>
+          </div>
+          <div id="fp-prix-wrap">
+            <label class="form-label">Tarif (€)</label>
+            <input id="fp-prix" class="input-field" type="number" min="0" step="0.01" style="width:100%;" value="0">
+          </div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="fp-telecharge">
+            Autoriser le téléchargement des contenus
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-orange" onclick="saveFormation()">💾 Enregistrer</button>
+          <button class="btn btn-outline" onclick="closeFormationForm()">Annuler</button>
+        </div>
+      </div>
+    </div>
+    <!-- FIN DIASPO FORMATION -->
 
     <div class="card" style="margin-bottom:20px;" id="accreditations">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -2827,8 +2963,185 @@ async function clorerVote(id) {
   catch(e) { alert(e.error || 'Erreur'); }
 }
 
+/* ===== DIASPO FORMATION ===== */
+let _mesFormations = [];
+let _formEditId = null;
+let _formFilter = 'all';
+
+const FORM_STATUT = {
+  brouillon:  { label:'Brouillon',      color:'#6b7280', bg:'#f3f4f6' },
+  en_attente: { label:'En validation',  color:'#d97706', bg:'#fffbeb' },
+  publiee:    { label:'Publiée ✅',     color:'#16a34a', bg:'#f0fdf4' },
+  refusee:    { label:'Refusée',        color:'#dc2626', bg:'#fef2f2' },
+  suspendue:  { label:'Suspendue',      color:'#9333ea', bg:'#faf5ff' },
+};
+const MODE_LBL = { gratuit:'Gratuit (0%)', payant:'Payant (5%)', payant_sauf_membres:'Payant sauf membres DA (2%)' };
+
+async function initFormationsSidebar() {
+  try {
+    const { accreditations } = await api('GET', '/accreditations/mes');
+    const has = (accreditations||[]).some(a => a.type === 'createur_formations' && a.statut === 'active');
+    const sb = document.getElementById('sb-formations-gestion');
+    if (sb) sb.style.display = has ? '' : 'none';
+    if (has) loadMesFormations();
+  } catch(_) {}
+}
+
+async function loadMesFormations() {
+  try {
+    const { formations } = await api('GET', '/mes-formations');
+    _mesFormations = formations || [];
+    updateFormationStats();
+    renderFormationsList();
+  } catch(e) {
+    document.getElementById('formations-list').innerHTML = `<p style="color:red;">Erreur : ${e.message}</p>`;
+  }
+}
+
+function updateFormationStats() {
+  const total = _mesFormations.length;
+  const inscrits = _mesFormations.reduce((s,f) => s + (f.nb_inscrits||0), 0);
+  const revenu = _mesFormations.reduce((s,f) => s + (f.revenu_brut||0), 0);
+  const attente = _mesFormations.filter(f => f.statut === 'en_attente').length;
+  document.getElementById('form-stat-total').textContent = total;
+  document.getElementById('form-stat-inscrits').textContent = inscrits;
+  document.getElementById('form-stat-revenu').textContent = revenu.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0});
+  document.getElementById('form-stat-attente').textContent = attente;
+  const badge = document.getElementById('formations-badge');
+  if (attente > 0) { badge.textContent = attente; badge.style.display = ''; }
+  else badge.style.display = 'none';
+}
+
+function filterFormations(statut) {
+  _formFilter = statut;
+  document.querySelectorAll('[id^="ftab-"]').forEach(b => {
+    b.className = b.id === `ftab-${statut}` ? 'btn btn-sm btn-orange' : 'btn btn-sm btn-outline';
+  });
+  renderFormationsList();
+}
+
+function renderFormationsList() {
+  const list = document.getElementById('formations-list');
+  const rows = _formFilter === 'all' ? _mesFormations : _mesFormations.filter(f => (f.statut||'brouillon') === _formFilter);
+  if (!rows.length) {
+    list.innerHTML = `<div style="text-align:center;padding:24px;color:var(--muted);">
+      ${_mesFormations.length ? 'Aucune formation dans ce statut.' : 'Aucune formation. Cliquez sur « + Nouvelle formation » pour commencer.'}
+    </div>`;
+    return;
+  }
+  list.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px;">
+    ${rows.map(f => {
+      const st = FORM_STATUT[f.statut||'brouillon'] || FORM_STATUT.brouillon;
+      const peutModifier = ['brouillon','refusee'].includes(f.statut||'brouillon');
+      const peutPublier = ['brouillon','refusee'].includes(f.statut||'brouillon');
+      return `<div style="border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${f.titre}</div>
+            <div style="font-size:12px;color:var(--muted);">${f.categorie||'—'} · ${f.niveau||'—'} · ${MODE_LBL[f.mode_acces]||'Gratuit'} ${f.prix>0?'· '+f.prix+'€':''}</div>
+          </div>
+          <span style="padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap;background:${st.bg};color:${st.color};">${st.label}</span>
+        </div>
+        ${f.motif_refus ? `<div style="margin-top:8px;padding:8px 12px;background:#fef2f2;border-radius:8px;font-size:12px;color:#dc2626;">⚠️ ${f.motif_refus}</div>` : ''}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;flex-wrap:wrap;gap:6px;">
+          <div style="font-size:12px;color:var(--muted);">👥 ${f.nb_inscrits||0} inscrit(s) · 💶 ${(f.revenu_brut||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0})}</div>
+          <div style="display:flex;gap:6px;">
+            ${peutModifier ? `<button class="btn btn-sm btn-outline" onclick="openFormationForm(${f.id})">✏️ Modifier</button>` : ''}
+            ${peutPublier ? `<button class="btn btn-sm btn-orange" onclick="soumettreFormation(${f.id},'${f.titre.replace(/'/g,"\\'")}')" >📤 Soumettre</button>` : ''}
+            ${f.statut === 'brouillon' ? `<button class="btn btn-sm btn-outline" style="color:#dc2626;" onclick="supprimerFormation(${f.id},'${f.titre.replace(/'/g,"\\'")}')" >🗑</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function openFormationForm(id) {
+  _formEditId = id || null;
+  const f = id ? _mesFormations.find(x => x.id === id) : null;
+  document.getElementById('form-panel-title').textContent = f ? `Modifier — ${f.titre}` : 'Nouvelle formation';
+  document.getElementById('fp-titre').value = f?.titre || '';
+  document.getElementById('fp-categorie').value = f?.categorie || '';
+  document.getElementById('fp-niveau').value = f?.niveau || '';
+  document.getElementById('fp-langue').value = f?.langue || 'Français';
+  document.getElementById('fp-duree').value = f?.duree || '';
+  document.getElementById('fp-places').value = f?.places || '';
+  document.getElementById('fp-description').value = f?.description || '';
+  document.getElementById('fp-objectifs').value = Array.isArray(f?.objectifs) ? f.objectifs.join('\n') : (f?.objectifs || '');
+  document.getElementById('fp-prerequis').value = f?.prerequis || '';
+  document.getElementById('fp-mode').value = f?.mode_acces || 'gratuit';
+  document.getElementById('fp-prix').value = f?.prix || 0;
+  document.getElementById('fp-telecharge').checked = !!(f?.telecharge_autorise);
+  onModeAccesChange();
+  document.getElementById('formation-form-panel').style.display = '';
+  document.getElementById('formation-form-panel').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function closeFormationForm() {
+  document.getElementById('formation-form-panel').style.display = 'none';
+  _formEditId = null;
+}
+
+function onModeAccesChange() {
+  const mode = document.getElementById('fp-mode').value;
+  document.getElementById('fp-prix-wrap').style.display = mode === 'gratuit' ? 'none' : '';
+}
+
+async function saveFormation() {
+  const titre = document.getElementById('fp-titre').value.trim();
+  const description = document.getElementById('fp-description').value.trim();
+  if (!titre || !description) return alert('Titre et description obligatoires.');
+  const body = {
+    titre,
+    description,
+    categorie: document.getElementById('fp-categorie').value || null,
+    niveau: document.getElementById('fp-niveau').value || null,
+    langue: document.getElementById('fp-langue').value || 'Français',
+    duree: document.getElementById('fp-duree').value.trim() || null,
+    places: parseInt(document.getElementById('fp-places').value) || null,
+    objectifs: document.getElementById('fp-objectifs').value.trim() || null,
+    prerequis: document.getElementById('fp-prerequis').value.trim() || null,
+    mode_acces: document.getElementById('fp-mode').value,
+    prix: parseFloat(document.getElementById('fp-prix').value) || 0,
+    telecharge_autorise: document.getElementById('fp-telecharge').checked,
+  };
+  try {
+    if (_formEditId) {
+      await api('PUT', `/formations/${_formEditId}`, body);
+    } else {
+      await api('POST', '/formations', body);
+    }
+    closeFormationForm();
+    loadMesFormations();
+  } catch(e) {
+    alert('Erreur : ' + (e.error || e.message));
+  }
+}
+
+async function soumettreFormation(id, titre) {
+  if (!confirm(`Soumettre « ${titre} » à la validation Diaspo'Actif ?\n\nL'équipe de modération vérifiera votre formation avant publication.`)) return;
+  try {
+    await api('POST', `/formations/${id}/publier`);
+    loadMesFormations();
+  } catch(e) { alert('Erreur : ' + (e.error || e.message)); }
+}
+
+async function supprimerFormation(id, titre) {
+  if (!confirm(`Supprimer « ${titre} » ? Cette action est irréversible.`)) return;
+  try {
+    await api('DELETE', `/formations/${id}`);
+    loadMesFormations();
+  } catch(e) { alert('Erreur : ' + (e.error || e.message)); }
+}
+
+/* Navigation formations */
+document.querySelector('[data-section="formations-gestion"]')?.addEventListener('click', () => {
+  setTimeout(loadMesFormations, 150);
+});
+
 /* Initialisation au chargement */
 initAssoSidebar();
+initFormationsSidebar();
 </script>
 
   <nav class="mobile-bottom-nav">

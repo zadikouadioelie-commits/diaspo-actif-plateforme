@@ -1695,8 +1695,62 @@
 
       <!-- FORMATIONS -->
       <section id="section-formations" style="display:none;">
-        <h2>Formations publiées</h2>
-        <div id="formations-admin-list" style="margin-top:16px;"><div class="notice">Chargement…</div></div>
+        <h2>🎓 Diaspo Formation</h2>
+        <p style="color:var(--muted);font-size:13px;margin:0 0 20px;">Validation des formations, gestion des codes d'accès membres et suivi global.</p>
+
+        <!-- Onglets admin -->
+        <div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">
+          <button class="btn btn-orange" id="adm-ftab-en_attente" onclick="admFormTab('en_attente')">⏳ En attente de validation</button>
+          <button class="btn btn-outline" id="adm-ftab-publiee" onclick="admFormTab('publiee')">✅ Publiées</button>
+          <button class="btn btn-outline" id="adm-ftab-codes" onclick="admFormTab('codes')">🔑 Codes d'accès</button>
+          <button class="btn btn-outline" id="adm-ftab-all" onclick="admFormTab('all')">Toutes</button>
+        </div>
+
+        <!-- Panel en attente -->
+        <div id="adm-fpanel-en_attente">
+          <div id="adm-flist-en_attente" class="card" style="padding:0;overflow:hidden;">
+            <div style="padding:16px;color:var(--muted);">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- Panel publiées / all -->
+        <div id="adm-fpanel-publiee" style="display:none;">
+          <div id="adm-flist-publiee" class="card" style="padding:0;overflow:hidden;">
+            <div style="padding:16px;color:var(--muted);">Chargement…</div>
+          </div>
+        </div>
+        <div id="adm-fpanel-all" style="display:none;">
+          <div id="adm-flist-all" class="card" style="padding:0;overflow:hidden;">
+            <div style="padding:16px;color:var(--muted);">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- Panel codes d'accès -->
+        <div id="adm-fpanel-codes" style="display:none;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <h3 style="margin:0;font-size:15px;">Codes d'accès gratuit (membres Diaspo'Actif)</h3>
+            <button class="btn btn-orange btn-sm" onclick="openCodeAccesForm()">+ Nouveau code</button>
+          </div>
+          <div id="adm-codes-form" style="display:none;background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div><label class="form-label" style="font-size:11px;">Code *</label>
+                <input id="caf-code" class="input-field" style="width:100%;text-transform:uppercase;" placeholder="DIASPO2025"></div>
+              <div><label class="form-label" style="font-size:11px;">Description</label>
+                <input id="caf-desc" class="input-field" style="width:100%;" placeholder="Carte membre 2025"></div>
+              <div><label class="form-label" style="font-size:11px;">Limite utilisations (vide=∞)</label>
+                <input id="caf-limite" class="input-field" type="number" min="1" style="width:100%;"></div>
+              <div><label class="form-label" style="font-size:11px;">Expiration (vide=illimité)</label>
+                <input id="caf-expiration" class="input-field" type="date" style="width:100%;"></div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-orange btn-sm" onclick="saveCodeAcces()">Enregistrer</button>
+              <button class="btn btn-outline btn-sm" onclick="closeCodeAccesForm()">Annuler</button>
+            </div>
+          </div>
+          <div id="adm-codes-list" class="card" style="padding:0;overflow:hidden;">
+            <div style="padding:16px;color:var(--muted);">Chargement…</div>
+          </div>
+        </div>
       </section>
 
       <!-- PUBLICATIONS -->
@@ -3322,6 +3376,148 @@ document.querySelectorAll(".sidebar a[data-section='moderation']").forEach(a => 
   a.addEventListener("click", () => setTimeout(() => loadModerationComptes('en_attente'), 50));
 });
 /* ===== Fin modération ===== */
+
+/* ===== DIASPO FORMATION — ADMIN ===== */
+let _admFormTab = 'en_attente';
+
+function admFormTab(tab) {
+  _admFormTab = tab;
+  ['en_attente','publiee','codes','all'].forEach(t => {
+    const btn = document.getElementById(`adm-ftab-${t}`);
+    const panel = document.getElementById(`adm-fpanel-${t}`);
+    if (btn) btn.className = t === tab ? 'btn btn-orange' : 'btn btn-outline';
+    if (panel) panel.style.display = t === tab ? '' : 'none';
+  });
+  if (tab === 'codes') loadAdmCodes();
+  else loadAdmFormations(tab);
+}
+
+async function loadAdmFormations(statut) {
+  const el = document.getElementById(`adm-flist-${statut}`);
+  if (!el) return;
+  el.innerHTML = '<div style="padding:16px;color:var(--muted);">Chargement…</div>';
+  try {
+    const url = statut === 'en_attente' ? '/admin/formations/en-attente' : `/admin/formations${statut !== 'all' ? `?statut=${statut}` : ''}`;
+    const { formations } = await api('GET', url);
+    if (!formations.length) { el.innerHTML = '<div style="padding:16px;color:var(--muted);">Aucune formation.</div>'; return; }
+    const STATUT_LBL = { brouillon:'Brouillon', en_attente:'En attente', publiee:'Publiée', refusee:'Refusée', suspendue:'Suspendue' };
+    const STATUT_CLR = { en_attente:'#d97706', publiee:'#16a34a', refusee:'#dc2626', suspendue:'#9333ea', brouillon:'#6b7280' };
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:2px solid var(--border);background:#f8fafc;">
+        <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Formation</th>
+        <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Créateur</th>
+        <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Mode</th>
+        <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Statut</th>
+        <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Actions</th>
+      </tr></thead><tbody>
+      ${formations.map(f => {
+        const st = f.statut || 'brouillon';
+        return `<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:12px 14px;">
+            <div style="font-weight:700;">${f.titre}</div>
+            <div style="font-size:11px;color:var(--muted);">${f.categorie||'—'} · ${f.niveau||'—'} · Soumise le ${(f.created_at||'').slice(0,10)}</div>
+            ${f.description ? `<div style="font-size:12px;margin-top:4px;color:var(--muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.description}</div>` : ''}
+          </td>
+          <td style="padding:12px 14px;font-size:12px;">${f.auteur_nom||'—'}<br><span style="color:var(--muted);font-size:11px;">${f.auteur_email||''}</span></td>
+          <td style="padding:12px 14px;font-size:12px;">${f.mode_acces||'gratuit'}${f.prix>0?' · '+f.prix+'€':''}</td>
+          <td style="padding:12px 14px;">
+            <span style="padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;background:${(STATUT_CLR[st]||'#6b7280')}20;color:${STATUT_CLR[st]||'#6b7280'};">
+              ${STATUT_LBL[st]||st}
+            </span>
+          </td>
+          <td style="padding:12px 14px;">
+            ${st === 'en_attente' ? `
+              <button class="btn btn-sm btn-orange" onclick="admValiderFormation(${f.id},'${f.titre.replace(/'/g,"\\'")}')">✅ Valider</button>
+              <button class="btn btn-sm btn-outline" style="color:#dc2626;margin-left:4px;" onclick="admRefuserFormation(${f.id},'${f.titre.replace(/'/g,"\\'")}')">❌ Refuser</button>
+            ` : ''}
+            ${st === 'publiee' ? `<button class="btn btn-sm btn-outline" style="color:#9333ea;" onclick="admSuspendreFormation(${f.id},'${f.titre.replace(/'/g,"\\'")}')">Suspendre</button>` : ''}
+            ${st === 'suspendue' ? `<button class="btn btn-sm btn-outline" onclick="admSuspendreFormation(${f.id},'${f.titre.replace(/'/g,"\\'")}')">Réactiver</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody></table>`;
+  } catch(e) {
+    el.innerHTML = `<div style="padding:16px;color:red;">Erreur : ${e.message}</div>`;
+  }
+}
+
+async function admValiderFormation(id, titre) {
+  if (!confirm(`Valider et publier « ${titre} » ?`)) return;
+  await api('PATCH', `/admin/formations/${id}/valider`, {});
+  loadAdmFormations(_admFormTab);
+}
+async function admRefuserFormation(id, titre) {
+  const motif = prompt(`Motif du refus pour « ${titre} » :`, '');
+  if (motif === null) return;
+  await api('PATCH', `/admin/formations/${id}/refuser`, { motif });
+  loadAdmFormations(_admFormTab);
+}
+async function admSuspendreFormation(id, titre) {
+  const motif = prompt(`Motif (optionnel) pour « ${titre} » :`, '');
+  if (motif === null) return;
+  await api('PATCH', `/admin/formations/${id}/suspendre`, { motif });
+  loadAdmFormations(_admFormTab);
+}
+
+/* Codes d'accès */
+async function loadAdmCodes() {
+  const el = document.getElementById('adm-codes-list');
+  el.innerHTML = '<div style="padding:16px;color:var(--muted);">Chargement…</div>';
+  try {
+    const { codes } = await api('GET', '/admin/codes-acces');
+    if (!codes.length) { el.innerHTML = '<div style="padding:16px;color:var(--muted);">Aucun code enregistré.</div>'; return; }
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:2px solid var(--border);background:#f8fafc;">
+        <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Code</th>
+        <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Description</th>
+        <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Utilisations</th>
+        <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Expiration</th>
+        <th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);">Statut</th>
+        <th style="padding:10px 14px;"></th>
+      </tr></thead><tbody>
+      ${codes.map(c => `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:10px 14px;font-weight:700;font-family:monospace;font-size:14px;">${c.code}</td>
+        <td style="padding:10px 14px;font-size:12px;color:var(--muted);">${c.description||'—'}</td>
+        <td style="padding:10px 14px;font-size:12px;">${c.nb_utilisations}${c.limite_utilisations?'/'+c.limite_utilisations:' (∞)'}</td>
+        <td style="padding:10px 14px;font-size:12px;color:var(--muted);">${c.date_expiration?c.date_expiration.slice(0,10):'Illimité'}</td>
+        <td style="padding:10px 14px;">
+          <span style="padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;background:${c.actif?'#dcfce7':'#fee2e2'};color:${c.actif?'#16a34a':'#dc2626'};">
+            ${c.actif?'Actif':'Désactivé'}
+          </span>
+        </td>
+        <td style="padding:10px 14px;display:flex;gap:6px;">
+          <button class="btn btn-sm btn-outline" onclick="toggleCode(${c.id})">${c.actif?'Désactiver':'Activer'}</button>
+          <button class="btn btn-sm btn-outline" style="color:#dc2626;" onclick="deleteCode(${c.id})">🗑</button>
+        </td>
+      </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) { el.innerHTML = `<div style="padding:16px;color:red;">Erreur : ${e.message}</div>`; }
+}
+function openCodeAccesForm() { document.getElementById('adm-codes-form').style.display = ''; }
+function closeCodeAccesForm() { document.getElementById('adm-codes-form').style.display = 'none'; }
+async function saveCodeAcces() {
+  const code = document.getElementById('caf-code').value.trim().toUpperCase();
+  if (!code) return alert('Code requis.');
+  await api('POST', '/admin/codes-acces', {
+    code,
+    description: document.getElementById('caf-desc').value.trim() || null,
+    limite_utilisations: parseInt(document.getElementById('caf-limite').value) || null,
+    date_expiration: document.getElementById('caf-expiration').value || null,
+  });
+  closeCodeAccesForm();
+  loadAdmCodes();
+}
+async function toggleCode(id) { await api('PATCH', `/admin/codes-acces/${id}`, { toggle_actif: true }); loadAdmCodes(); }
+async function deleteCode(id) {
+  if (!confirm('Supprimer ce code ?')) return;
+  await api('DELETE', `/admin/codes-acces/${id}`);
+  loadAdmCodes();
+}
+
+/* Chargement quand la section formations s'ouvre */
+document.querySelector('[data-section="formations"]')?.addEventListener('click', () => {
+  setTimeout(() => { admFormTab('en_attente'); }, 150);
+});
 
 /* ===== MOTEUR D'ACCRÉDITATIONS DYNAMIQUE ===== */
 let _accredDefEditId = null;
