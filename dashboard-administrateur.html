@@ -47,6 +47,7 @@
       <span class="sb-group-lbl">🟨 Territoires</span>
       <a href="#membres" data-section="membres">👥 Membres</a>
       <a href="#reseau-pro" data-section="reseau-pro">💼 Réseau Professionnel</a>
+      <a href="#diaspora-stats" data-section="diaspora-stats">📊 Diaspora Données</a>
       <a href="#contenu" data-section="contenu">📄 Contenu diaspora</a>
 
       <span class="sb-group-lbl">🟪 Intelligence</span>
@@ -328,6 +329,231 @@
           <div class="card"><h3 style="margin:0 0 14px;font-size:14px;">🌱 Origine</h3><div id="res-orig"></div></div>
         </div>
         <div class="card"><h3 style="margin:0 0 14px;font-size:14px;">🏙️ Top villes</h3><div id="res-villes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;"></div></div>
+      </section>
+
+      <!-- DIASPORA DONNÉES STATISTIQUES -->
+      <section id="section-diaspora-stats" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="margin:0;">📊 Diaspora Données Statistiques</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Observatoire numérique mondial des diasporas — analyse, tendances, prédictions</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="ds-tabs-bar">
+            <button class="btn btn-sm" id="ds-tab-global"    onclick="dsTab('global')"    style="background:var(--orange);color:#fff;">🌐 Vue Globale</button>
+            <button class="btn btn-sm btn-outline" id="ds-tab-pays"     onclick="dsTab('pays')">🗺️ Pays</button>
+            <button class="btn btn-sm btn-outline" id="ds-tab-villes"   onclick="dsTab('villes')">📍 Villes</button>
+            <button class="btn btn-sm btn-outline" id="ds-tab-domaines" onclick="dsTab('domaines')">💼 Domaines</button>
+            <button class="btn btn-sm btn-outline" id="ds-tab-scores"   onclick="dsTab('scores')">⭐ Scores</button>
+            <button class="btn btn-sm btn-outline" id="ds-tab-insights" onclick="dsTab('insights')">🤖 Insights IA</button>
+            <button class="btn btn-sm btn-outline" id="ds-tab-compare"  onclick="dsTab('compare')">⚖️ Comparateur</button>
+          </div>
+        </div>
+
+        <!-- Bannière RGPD -->
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:13px;color:#14532d;">
+          🔐 <strong>Données 100% agrégées et anonymisées.</strong> Aucune donnée personnelle individuelle n'est exposée. Conformité RGPD stricte.
+        </div>
+
+        <!-- ── VUE GLOBALE ── -->
+        <div id="ds-view-global">
+          <!-- KPI row -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px;">
+            <div class="card" style="text-align:center;padding:16px;">
+              <div style="font-size:26px;font-weight:800;color:var(--orange);" id="ds-kpi-init">—</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Initiatives actives</div>
+            </div>
+            <div class="card" style="text-align:center;padding:16px;">
+              <div style="font-size:26px;font-weight:800;color:#6366f1;" id="ds-kpi-events">—</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Événements ouverts</div>
+            </div>
+            <div class="card" style="text-align:center;padding:16px;">
+              <div style="font-size:26px;font-weight:800;color:#10b981;" id="ds-kpi-formations">—</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Formations</div>
+            </div>
+            <div class="card" style="text-align:center;padding:16px;">
+              <div style="font-size:26px;font-weight:800;color:#f59e0b;" id="ds-kpi-pays">—</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Pays représentés</div>
+            </div>
+            <div class="card" style="text-align:center;padding:16px;">
+              <div style="font-size:26px;font-weight:800;color:#ec4899;" id="ds-kpi-villes">—</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Villes couvertes</div>
+            </div>
+            <div class="card" style="text-align:center;padding:16px;">
+              <div style="font-size:26px;font-weight:800;color:#14b8a6;" id="ds-kpi-abos">—</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Abonnements</div>
+            </div>
+          </div>
+
+          <!-- Carte visuelle des villes (hotspots) -->
+          <div class="card" style="padding:18px;margin-bottom:16px;">
+            <h4 style="margin:0 0 6px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">🗺️ Diaspora Map — Hotspots par ville</h4>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;">Taille = nombre d'initiatives · Couleur = intensité d'activité</p>
+            <div id="ds-carte" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;min-height:80px;"></div>
+            <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--muted);">
+              <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fde68a;"></span> Faible</span>
+              <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fb923c;"></span> Moyen</span>
+              <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;"></span> Fort</span>
+              <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#7f1d1d;"></span> Très fort</span>
+            </div>
+          </div>
+
+          <!-- Évolution -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">📈 Évolution initiatives (12 mois)</h4>
+              <div id="ds-evo-init" style="display:flex;align-items:flex-end;gap:6px;height:80px;"></div>
+            </div>
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">📅 Évolution événements (12 mois)</h4>
+              <div id="ds-evo-events" style="display:flex;align-items:flex-end;gap:6px;height:80px;"></div>
+            </div>
+          </div>
+
+          <!-- Top 3 domaines résumé -->
+          <div class="card" style="padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">🏆 Top 3 Domaines dominants</h4>
+            <div id="ds-top3-domaines" style="display:flex;gap:12px;flex-wrap:wrap;"></div>
+          </div>
+        </div>
+
+        <!-- ── PAYS ── -->
+        <div id="ds-view-pays" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">🌍 Pays d'origine des diasporas</h4>
+              <div id="ds-bar-origine"></div>
+            </div>
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">🏠 Pays de résidence</h4>
+              <div id="ds-bar-residence"></div>
+            </div>
+          </div>
+          <!-- Tableau origines -->
+          <div class="card" style="padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">📋 Tableau — Origines des diasporas</h4>
+            <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;" id="ds-table-origines">
+              <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                <th style="padding:8px 12px;text-align:left;">Pays d'origine</th>
+                <th style="padding:8px 12px;text-align:right;">Initiatives</th>
+                <th style="padding:8px 12px;text-align:left;min-width:120px;">Poids</th>
+              </tr></thead>
+              <tbody id="ds-tbody-origines"></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <!-- ── VILLES ── -->
+        <div id="ds-view-villes" style="display:none;">
+          <div class="card" style="padding:16px;margin-bottom:16px;">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">📍 Top villes les plus actives</h4>
+            <div id="ds-bar-villes"></div>
+          </div>
+          <div class="card" style="padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">📋 Détail par ville</h4>
+            <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                <th style="padding:8px 12px;text-align:left;">Ville</th>
+                <th style="padding:8px 12px;text-align:left;">Pays</th>
+                <th style="padding:8px 12px;text-align:right;">Initiatives</th>
+                <th style="padding:8px 12px;text-align:right;">Vues totales</th>
+                <th style="padding:8px 12px;text-align:right;">Événements</th>
+                <th style="padding:8px 12px;text-align:left;min-width:100px;">Intensité</th>
+              </tr></thead>
+              <tbody id="ds-tbody-villes"></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <!-- ── DOMAINES ── -->
+        <div id="ds-view-domaines" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">📊 Domaines — Initiatives</h4>
+              <div id="ds-bar-dom-init"></div>
+            </div>
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">📅 Domaines — Événements</h4>
+              <div id="ds-bar-dom-evt"></div>
+            </div>
+          </div>
+          <div class="card" style="padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">🎓 Domaines — Formations</h4>
+            <div id="ds-bar-dom-form"></div>
+          </div>
+        </div>
+
+        <!-- ── SCORES ── -->
+        <div id="ds-view-scores" style="display:none;">
+          <div class="card" style="padding:16px;margin-bottom:16px;">
+            <h4 style="margin:0 0 4px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">⭐ Classement des initiatives par score d'activité</h4>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px;">Score 0–100 calculé sur : vues · abonnés · événements · formations</p>
+            <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                <th style="padding:8px 12px;text-align:left;">#</th>
+                <th style="padding:8px 12px;text-align:left;">Initiative</th>
+                <th style="padding:8px 12px;text-align:left;">Ville</th>
+                <th style="padding:8px 12px;text-align:left;">Domaine</th>
+                <th style="padding:8px 12px;text-align:right;">Abonnés</th>
+                <th style="padding:8px 12px;text-align:right;">Événements</th>
+                <th style="padding:8px 12px;text-align:right;">Score</th>
+              </tr></thead>
+              <tbody id="ds-tbody-scores"></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <!-- ── INSIGHTS IA ── -->
+        <div id="ds-view-insights" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 14px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">🤖 Insights automatiques</h4>
+              <div id="ds-insights-list"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
+            </div>
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 14px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">⚠️ Alertes intelligentes</h4>
+              <div id="ds-alertes-list"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
+            </div>
+          </div>
+          <!-- Tendances -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">📈 Tendances domaines ce mois</h4>
+              <div id="ds-tend-dom"></div>
+            </div>
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">🏙️ Tendances villes ce mois</h4>
+              <div id="ds-tend-ville"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── COMPARATEUR ── -->
+        <div id="ds-view-compare" style="display:none;">
+          <div class="card" style="padding:18px;margin-bottom:16px;">
+            <h4 style="margin:0 0 14px;">⚖️ Comparer deux villes ou deux domaines</h4>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+              <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Type de comparaison</label>
+                <select id="ds-cmp-type" class="input-field" style="width:160px;font-size:13px;" onchange="dsCmpTypeChange()">
+                  <option value="ville">Ville vs Ville</option>
+                  <option value="domaine">Domaine vs Domaine</option>
+                  <option value="pays">Pays vs Pays</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Élément A</label>
+                <input id="ds-cmp-a" class="input-field" style="width:180px;font-size:13px;" placeholder="Ex: Paris">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Élément B</label>
+                <input id="ds-cmp-b" class="input-field" style="width:180px;font-size:13px;" placeholder="Ex: Toulouse">
+              </div>
+              <button class="btn" onclick="dsRunCompare()" style="background:var(--orange);color:#fff;">Comparer</button>
+            </div>
+          </div>
+          <div id="ds-cmp-result"></div>
+        </div>
+
       </section>
 
       <!-- CONTENU -->
@@ -4948,6 +5174,309 @@ function goSection(name){
 /* ── Réseau Professionnel — chargement à l'ouverture ── */
 document.querySelectorAll(".sidebar a[data-section='reseau-pro']").forEach(a => {
   a.addEventListener('click', () => setTimeout(() => loadReseauPro(), 80));
+});
+
+/* ── Diaspora Données Statistiques ── */
+let _dsData = null;
+
+async function loadDiasporaStats() {
+  if (_dsData) { dsRender(_dsData); return; }
+  const r = await fetch('/api/admin/diaspora-stats', { credentials: 'include' })
+    .then(x => x.json()).catch(() => null);
+  if (!r) return;
+  _dsData = r;
+  dsRender(r);
+}
+
+function dsRender(r) {
+  // KPIs
+  const k = r.kpi || {};
+  const $  = id => document.getElementById(id);
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = (v||0).toLocaleString('fr'); };
+  set('ds-kpi-init',      k.totalInit);
+  set('ds-kpi-events',    k.totalEvents);
+  set('ds-kpi-formations',k.totalForm);
+  set('ds-kpi-pays',      k.totalPays);
+  set('ds-kpi-villes',    k.totalVilles);
+  set('ds-kpi-abos',      k.totalAbos);
+
+  // Carte hotspots
+  const carte = $('ds-carte');
+  if (carte && r.par_ville?.length) {
+    const maxN = r.par_ville[0].n || 1;
+    carte.innerHTML = r.par_ville.slice(0,18).map(v => {
+      const pct = v.n / maxN;
+      const size = Math.round(28 + pct * 56); // 28px à 84px
+      const color = pct > .75 ? '#7f1d1d' : pct > .5 ? '#ef4444' : pct > .25 ? '#fb923c' : '#fde68a';
+      const textColor = pct > .5 ? '#fff' : '#1a1a1a';
+      return `<div title="${v.ville} (${v.pays||'?'}) — ${v.n} initiatives" style="
+        width:${size}px;height:${size}px;border-radius:50%;background:${color};
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        font-size:${Math.max(9,Math.round(size/6))}px;font-weight:700;color:${textColor};
+        cursor:default;transition:transform .15s;text-align:center;line-height:1.2;
+        " onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform=''">
+        <span style="overflow:hidden;max-width:90%;text-overflow:ellipsis;white-space:nowrap;font-size:${Math.max(8,Math.round(size/7))}px;">${v.ville}</span>
+        <span style="opacity:.85;">${v.n}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Évolutions
+  dsRenderEvo('ds-evo-init',   r.evolution,        'var(--orange)');
+  dsRenderEvo('ds-evo-events', r.evolution_events, '#6366f1');
+
+  // Top 3 domaines
+  const t3 = $('ds-top3-domaines');
+  if (t3 && r.par_domaine?.length) {
+    const colors = ['#f59e0b','#6366f1','#10b981'];
+    const total  = r.par_domaine.reduce((s, d) => s + d.n, 0) || 1;
+    t3.innerHTML = r.par_domaine.slice(0, 3).map((d, i) => `
+      <div style="flex:1;min-width:160px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:${colors[i]};">${d.n}</div>
+        <div style="font-weight:700;margin:4px 0 2px;">${d.domaine}</div>
+        <div style="font-size:11px;color:var(--muted);">${Math.round(d.n/total*100)}% du total</div>
+      </div>`).join('');
+  }
+
+  // Pays
+  dsRenderBars('ds-bar-origine',   r.par_origine,       'pays_origine', 'n', '#6366f1');
+  dsRenderBars('ds-bar-residence', r.par_pays_residence,'pays',         'n', '#10b981');
+
+  // Tableau origines
+  const tbody = $('ds-tbody-origines');
+  if (tbody && r.par_origine?.length) {
+    const tot = r.par_origine.reduce((s,d)=>s+d.n,0)||1;
+    tbody.innerHTML = r.par_origine.map(d => {
+      const pct = Math.round(d.n/tot*100);
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 12px;font-weight:600;">${d.pays_origine||'—'}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;">${d.n}</td>
+        <td style="padding:8px 12px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="background:var(--border);border-radius:99px;height:6px;flex:1;">
+              <div style="width:${pct}%;background:#6366f1;height:6px;border-radius:99px;"></div>
+            </div>
+            <span style="font-size:11px;color:var(--muted);min-width:28px;">${pct}%</span>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Villes barres
+  dsRenderBars('ds-bar-villes', r.par_ville, 'ville', 'n', 'var(--orange)');
+
+  // Tableau villes
+  const tvilles = $('ds-tbody-villes');
+  if (tvilles && r.par_ville?.length) {
+    const maxN = r.par_ville[0].n || 1;
+    tvilles.innerHTML = r.par_ville.map(v => {
+      const pct = Math.round(v.n/maxN*100);
+      const badge = pct > 75 ? '#7f1d1d' : pct > 50 ? '#ef4444' : pct > 25 ? '#fb923c' : '#f59e0b';
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 12px;font-weight:600;">${v.ville}</td>
+        <td style="padding:8px 12px;color:var(--muted);">${v.pays||'—'}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;">${v.n}</td>
+        <td style="padding:8px 12px;text-align:right;color:var(--muted);">${(v.total_vues||0).toLocaleString('fr')}</td>
+        <td style="padding:8px 12px;text-align:right;color:var(--muted);">${v.nb_events||0}</td>
+        <td style="padding:8px 12px;">
+          <div style="background:var(--border);border-radius:99px;height:6px;width:100%;">
+            <div style="width:${pct}%;background:${badge};height:6px;border-radius:99px;"></div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Domaines
+  dsRenderBars('ds-bar-dom-init',  r.par_domaine,             'domaine',    'n', 'var(--orange)');
+  dsRenderBars('ds-bar-dom-evt',   r.events_par_domaine,      'domaine',    'n', '#6366f1');
+  dsRenderBars('ds-bar-dom-form',  r.formations_par_domaine,  'domaine',    'n', '#10b981');
+
+  // Scores
+  const tscores = $('ds-tbody-scores');
+  if (tscores && r.top_initiatives?.length) {
+    tscores.innerHTML = r.top_initiatives.map((init, i) => {
+      const score = init.score || 0;
+      const pct   = score;
+      const color = score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#6b7280';
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}`;
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px 12px;text-align:center;">${medal}</td>
+        <td style="padding:8px 12px;font-weight:600;">${init.nom}</td>
+        <td style="padding:8px 12px;color:var(--muted);">${init.ville||'—'}</td>
+        <td style="padding:8px 12px;color:var(--muted);">${init.domaine||'—'}</td>
+        <td style="padding:8px 12px;text-align:right;">${init.nb_abonnes||0}</td>
+        <td style="padding:8px 12px;text-align:right;">${init.nb_events||0}</td>
+        <td style="padding:8px 12px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="background:var(--border);border-radius:99px;height:6px;flex:1;">
+              <div style="width:${pct}%;background:${color};height:6px;border-radius:99px;"></div>
+            </div>
+            <span style="font-size:12px;font-weight:800;color:${color};min-width:30px;">${score}</span>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Tendances
+  dsTendances(r.tendance_domaine, 'ds-tend-dom', 'domaine');
+  dsTendances(r.tendance_ville,   'ds-tend-ville', 'ville');
+}
+
+function dsRenderBars(containerId, data, keyL, keyV, color) {
+  const el = document.getElementById(containerId);
+  if (!el || !data?.length) { if (el) el.innerHTML = '<div style="color:var(--muted);font-size:13px;">Aucune donnée</div>'; return; }
+  const max = data[0][keyV] || 1;
+  el.innerHTML = data.slice(0,10).map(d => {
+    const pct = Math.round((d[keyV] / max) * 100);
+    return `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+        <span style="font-weight:600;max-width:75%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d[keyL]||'—'}</span>
+        <span style="color:var(--muted);">${d[keyV]}</span>
+      </div>
+      <div style="background:var(--border);border-radius:99px;height:6px;">
+        <div style="width:${pct}%;background:${color};height:6px;border-radius:99px;"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function dsRenderEvo(id, data, color) {
+  const el = document.getElementById(id);
+  if (!el || !data?.length) return;
+  const maxV = Math.max(...data.map(d => d.n), 1);
+  el.innerHTML = data.map(d => {
+    const h = Math.max(6, Math.round((d.n / maxV) * 74));
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;">${d.n}</div>
+      <div style="width:100%;background:${color};border-radius:4px 4px 0 0;height:${h}px;opacity:.85;"></div>
+      <div style="font-size:9px;color:var(--muted);">${(d.mois||'').slice(5)}</div>
+    </div>`;
+  }).join('');
+}
+
+function dsTendances(data, containerId, key) {
+  const el = document.getElementById(containerId);
+  if (!el || !data?.length) { if (el) el.innerHTML = '<div style="color:var(--muted);font-size:13px;">Aucune donnée</div>'; return; }
+  el.innerHTML = data.map(d => {
+    const delta = (d.ce_mois || 0) - (d.mois_prec || 0);
+    const pct   = d.mois_prec > 0 ? Math.round((delta / d.mois_prec) * 100) : null;
+    const color = delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : '#6b7280';
+    const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '→';
+    const pctTxt = pct !== null ? `${pct > 0 ? '+' : ''}${pct}%` : 'nouveau';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      <span style="font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d[key]||'—'}</span>
+      <span style="color:${color};font-weight:800;font-size:12px;">${arrow} ${pctTxt}</span>
+    </div>`;
+  }).join('');
+}
+
+async function dsLoadInsights() {
+  const r = await fetch('/api/admin/diaspora-stats/insights', { credentials: 'include' })
+    .then(x => x.json()).catch(() => ({ insights: [], alertes: [] }));
+  const il = document.getElementById('ds-insights-list');
+  const al = document.getElementById('ds-alertes-list');
+  if (il) il.innerHTML = (r.insights||[]).map(i => `
+    <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:20px;flex-shrink:0;">${i.icone}</span>
+      <div style="font-size:13px;line-height:1.5;">${i.texte}</div>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:13px;">Aucun insight disponible.</div>';
+  if (al) al.innerHTML = (r.alertes||[]).map(a => `
+    <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #fde68a;background:#fffbeb;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+      <span style="font-size:20px;flex-shrink:0;">${a.icone}</span>
+      <div style="font-size:13px;line-height:1.5;">${a.texte}</div>
+    </div>`).join('') || '<div style="color:var(--muted);font-size:13px;">Aucune alerte détectée. 🟢</div>';
+}
+
+function dsTab(tab) {
+  ['global','pays','villes','domaines','scores','insights','compare'].forEach(t => {
+    const view = document.getElementById('ds-view-' + t);
+    const btn  = document.getElementById('ds-tab-' + t);
+    if (view) view.style.display = t === tab ? '' : 'none';
+    if (btn) {
+      btn.className = t === tab ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+      btn.style.background = t === tab ? 'var(--orange)' : '';
+      btn.style.color      = t === tab ? '#fff' : '';
+    }
+  });
+  if (tab === 'insights') dsLoadInsights();
+  if (tab === 'scores' && !_dsData) loadDiasporaStats();
+}
+
+async function dsRunCompare() {
+  const type = document.getElementById('ds-cmp-type').value;
+  const a    = document.getElementById('ds-cmp-a').value.trim();
+  const b    = document.getElementById('ds-cmp-b').value.trim();
+  if (!a || !b) { alert('Saisissez les deux éléments à comparer.'); return; }
+  const res = document.getElementById('ds-cmp-result');
+  res.innerHTML = '<div style="color:var(--muted);font-size:13px;">Calcul en cours…</div>';
+
+  // Compare depuis les données déjà chargées
+  const d = _dsData;
+  if (!d) { res.innerHTML = '<div class="notice">Données non chargées.</div>'; return; }
+
+  let rowsA, rowsB, keyName, keyVal;
+  if (type === 'ville') {
+    rowsA = d.par_ville?.find(v => v.ville?.toLowerCase().includes(a.toLowerCase()));
+    rowsB = d.par_ville?.find(v => v.ville?.toLowerCase().includes(b.toLowerCase()));
+    keyName = 'ville';
+  } else if (type === 'domaine') {
+    rowsA = d.par_domaine?.find(v => v.domaine?.toLowerCase().includes(a.toLowerCase()));
+    rowsB = d.par_domaine?.find(v => v.domaine?.toLowerCase().includes(b.toLowerCase()));
+    keyName = 'domaine';
+  } else {
+    rowsA = d.par_pays_residence?.find(v => v.pays?.toLowerCase().includes(a.toLowerCase()));
+    rowsB = d.par_pays_residence?.find(v => v.pays?.toLowerCase().includes(b.toLowerCase()));
+    keyName = 'pays';
+  }
+
+  if (!rowsA && !rowsB) { res.innerHTML = '<div class="notice">Aucune donnée trouvée pour ces critères.</div>'; return; }
+
+  const nA = rowsA?.n || 0, nB = rowsB?.n || 0;
+  const maxN = Math.max(nA, nB, 1);
+  const pA = Math.round(nA/maxN*100), pB = Math.round(nB/maxN*100);
+  const lblA = rowsA?.[keyName] || a;
+  const lblB = rowsB?.[keyName] || b;
+  const winner = nA > nB ? lblA : nB > nA ? lblB : '=';
+
+  res.innerHTML = `
+  <div class="card" style="padding:20px;">
+    <h4 style="margin:0 0 16px;text-align:center;">${lblA} vs ${lblB}</h4>
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;">
+      <div style="text-align:center;">
+        <div style="font-size:32px;font-weight:800;color:var(--orange);">${nA}</div>
+        <div style="font-weight:700;margin:4px 0;">${lblA}</div>
+        <div style="background:var(--border);border-radius:99px;height:8px;margin-top:8px;">
+          <div style="width:${pA}%;background:var(--orange);height:8px;border-radius:99px;"></div>
+        </div>
+      </div>
+      <div style="font-size:24px;font-weight:900;color:var(--muted);">VS</div>
+      <div style="text-align:center;">
+        <div style="font-size:32px;font-weight:800;color:#6366f1;">${nB}</div>
+        <div style="font-weight:700;margin:4px 0;">${lblB}</div>
+        <div style="background:var(--border);border-radius:99px;height:8px;margin-top:8px;">
+          <div style="width:${pB}%;background:#6366f1;height:8px;border-radius:99px;"></div>
+        </div>
+      </div>
+    </div>
+    ${winner !== '=' ? `<div style="margin-top:16px;text-align:center;font-size:13px;color:var(--muted);">
+      🏆 <strong>${winner}</strong> a la plus forte concentration d'initiatives diaspora (${type}).
+    </div>` : '<div style="margin-top:12px;text-align:center;color:var(--muted);">Résultats équivalents.</div>'}
+  </div>`;
+}
+
+function dsCmpTypeChange() {
+  const type = document.getElementById('ds-cmp-type').value;
+  const ph = { ville: ['Paris', 'Toulouse'], domaine: ['économie', 'culture'], pays: ['France', 'Belgique'] }[type] || ['A','B'];
+  document.getElementById('ds-cmp-a').placeholder = `Ex: ${ph[0]}`;
+  document.getElementById('ds-cmp-b').placeholder = `Ex: ${ph[1]}`;
+}
+
+/* Hook d'ouverture */
+document.querySelectorAll(".sidebar a[data-section='diaspora-stats']").forEach(a => {
+  a.addEventListener('click', () => setTimeout(() => loadDiasporaStats(), 80));
 });
 
 /* ── Widget stats accréditations DA (vue d'ensemble) ── */

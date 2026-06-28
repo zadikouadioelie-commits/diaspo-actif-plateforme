@@ -2304,6 +2304,181 @@ route("GET", "/api/admin/reseau-pro/stats", async (req, res) => {
   });
 });
 
+/* ===== DIASPORA DONNÉES STATISTIQUES ===== */
+
+route("GET", "/api/admin/diaspora-stats", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  // KPIs globaux
+  const totalInit    = db.prepare("SELECT COUNT(*) n FROM initiatives").get().n;
+  const totalEvents  = db.prepare("SELECT COUNT(*) n FROM evenements WHERE statut='ouvert'").get().n;
+  const totalForm    = db.prepare("SELECT COUNT(*) n FROM formations").get().n;
+  const totalAbos    = db.prepare("SELECT COUNT(*) n FROM abonnements").get().n;
+  const totalPays    = db.prepare("SELECT COUNT(DISTINCT pays) n FROM initiatives WHERE pays IS NOT NULL").get().n;
+  const totalVilles  = db.prepare("SELECT COUNT(DISTINCT ville) n FROM initiatives WHERE ville IS NOT NULL").get().n;
+  const actifs30j    = db.prepare("SELECT COUNT(DISTINCT i.id) n FROM initiatives i JOIN abonnements a ON a.initiative_id=i.id JOIN user_activity ua ON ua.user_id=a.user_id WHERE ua.date>=date('now','-30 days')").get().n;
+
+  // Par domaine avec events + formations
+  const parDomaine = db.prepare(`
+    SELECT domaine, COUNT(*) n,
+      ROUND(AVG(COALESCE(nb_vues,0)),0) AS moy_vues
+    FROM initiatives WHERE domaine IS NOT NULL
+    GROUP BY domaine ORDER BY n DESC LIMIT 12
+  `).all();
+  const eventsParDomaine = db.prepare(`SELECT domaine, COUNT(*) n FROM evenements WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 10`).all();
+  const formParDomaine   = db.prepare(`SELECT domaine, COUNT(*) n FROM formations WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 10`).all();
+
+  // Par pays d'origine
+  const parOrigine = db.prepare(`
+    SELECT nationalite1 AS pays_origine, COUNT(*) n
+    FROM initiatives WHERE nationalite1 IS NOT NULL
+    GROUP BY nationalite1 ORDER BY n DESC LIMIT 20
+  `).all();
+
+  // Par pays de résidence
+  const parPaysResidence = db.prepare(`
+    SELECT pays, COUNT(*) n FROM initiatives WHERE pays IS NOT NULL
+    GROUP BY pays ORDER BY n DESC LIMIT 20
+  `).all();
+
+  // Par ville (top 20)
+  const parVille = db.prepare(`
+    SELECT ville, pays, COUNT(*) n,
+      SUM(COALESCE(nb_vues,0)) AS total_vues,
+      (SELECT COUNT(*) FROM evenements e WHERE e.ville=i.ville) AS nb_events
+    FROM initiatives i WHERE ville IS NOT NULL
+    GROUP BY ville ORDER BY n DESC LIMIT 20
+  `).all();
+
+  // Score d'activité par initiative (top 15)
+  const topInitiatives = db.prepare(`
+    SELECT i.id, i.nom, i.slug, i.ville, i.pays, i.domaine,
+      COALESCE(i.nb_vues,0) AS nb_vues,
+      (SELECT COUNT(*) FROM abonnements a WHERE a.initiative_id=i.id) AS nb_abonnes,
+      (SELECT COUNT(*) FROM evenements e WHERE e.owner_user_id=i.owner_user_id) AS nb_events,
+      (SELECT COUNT(*) FROM formations f WHERE f.owner_user_id=i.owner_user_id) AS nb_formations,
+      MIN(100, ROUND(
+        COALESCE(i.nb_vues,0)*0.05 +
+        (SELECT COUNT(*) FROM abonnements a WHERE a.initiative_id=i.id)*8.0 +
+        (SELECT COUNT(*) FROM evenements e WHERE e.owner_user_id=i.owner_user_id)*12.0 +
+        (SELECT COUNT(*) FROM formations f WHERE f.owner_user_id=i.owner_user_id)*10.0
+      ,0)) AS score
+    FROM initiatives i ORDER BY score DESC, nb_abonnes DESC LIMIT 15
+  `).all();
+
+  // Évolution mensuelle inscriptions initiatives (12 mois)
+  const evolution = db.prepare(`
+    SELECT substr(created_at,1,7) AS mois, COUNT(*) n
+    FROM initiatives GROUP BY mois ORDER BY mois DESC LIMIT 12
+  `).all().reverse();
+
+  // Évolution événements (12 mois)
+  const evolutionEvents = db.prepare(`
+    SELECT substr(created_at,1,7) AS mois, COUNT(*) n
+    FROM evenements GROUP BY mois ORDER BY mois DESC LIMIT 12
+  `).all().reverse();
+
+  // Tendances: comparer mois courant vs précédent par domaine
+  const tendanceDomaine = db.prepare(`
+    SELECT domaine,
+      SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS ce_mois,
+      SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END) AS mois_prec
+    FROM initiatives WHERE domaine IS NOT NULL
+    GROUP BY domaine HAVING ce_mois>0 OR mois_prec>0
+    ORDER BY (ce_mois - mois_prec) DESC LIMIT 8
+  `).all();
+
+  // Tendances villes
+  const tendanceVille = db.prepare(`
+    SELECT ville,
+      SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS ce_mois,
+      SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END) AS mois_prec
+    FROM initiatives WHERE ville IS NOT NULL
+    GROUP BY ville HAVING ce_mois>0 OR mois_prec>0
+    ORDER BY (ce_mois - mois_prec) DESC LIMIT 8
+  `).all();
+
+  sendJSON(res, 200, {
+    kpi: { totalInit, totalEvents, totalForm, totalAbos, totalPays, totalVilles, actifs30j },
+    par_domaine: parDomaine, events_par_domaine: eventsParDomaine, formations_par_domaine: formParDomaine,
+    par_origine: parOrigine, par_pays_residence: parPaysResidence,
+    par_ville: parVille, top_initiatives: topInitiatives,
+    evolution, evolution_events: evolutionEvents,
+    tendance_domaine: tendanceDomaine, tendance_ville: tendanceVille
+  });
+});
+
+// Insights IA algorithmiques
+route("GET", "/api/admin/diaspora-stats/insights", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  const insights = [];
+  const alertes  = [];
+
+  // Top domaine
+  const topDom = db.prepare(`SELECT domaine, COUNT(*) n FROM initiatives WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 1`).get();
+  if (topDom) insights.push({ type:'analyse', icone:'📊', texte:`Le domaine <strong>${topDom.domaine}</strong> domine avec ${topDom.n} initiatives enregistrées.` });
+
+  // Top ville
+  const topVille = db.prepare(`SELECT ville, pays, COUNT(*) n FROM initiatives WHERE ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 1`).get();
+  if (topVille) insights.push({ type:'analyse', icone:'📍', texte:`<strong>${topVille.ville}</strong> (${topVille.pays||'—'}) est la ville avec la plus forte concentration d'initiatives diaspora (${topVille.n}).` });
+
+  // Top pays d'origine
+  const topOrigine = db.prepare(`SELECT nationalite1 AS o, COUNT(*) n FROM initiatives WHERE nationalite1 IS NOT NULL GROUP BY nationalite1 ORDER BY n DESC LIMIT 1`).get();
+  if (topOrigine) insights.push({ type:'analyse', icone:'🌍', texte:`La diaspora <strong>${topOrigine.o}</strong> est la plus représentée avec ${topOrigine.n} initiatives actives.` });
+
+  // Croissance domaine ce mois
+  const croissanceDom = db.prepare(`
+    SELECT domaine,
+      SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS cm,
+      SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END) AS pm
+    FROM initiatives WHERE domaine IS NOT NULL GROUP BY domaine HAVING pm>0
+    ORDER BY (CAST(cm AS REAL)/pm) DESC LIMIT 1
+  `).get();
+  if (croissanceDom && croissanceDom.pm > 0) {
+    const pct = Math.round(((croissanceDom.cm - croissanceDom.pm) / croissanceDom.pm) * 100);
+    if (pct > 0) insights.push({ type:'tendance', icone:'📈', texte:`Les activités <strong>${croissanceDom.domaine}</strong> augmentent de <strong>+${pct}%</strong> ce mois par rapport au précédent.` });
+    else if (pct < -10) alertes.push({ type:'alerte', icone:'⚠️', texte:`Baisse de ${Math.abs(pct)}% des nouvelles initiatives <strong>${croissanceDom.domaine}</strong> ce mois.` });
+  }
+
+  // Ville en croissance
+  const croissanceVille = db.prepare(`
+    SELECT ville,
+      SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS cm,
+      SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END) AS pm
+    FROM initiatives WHERE ville IS NOT NULL GROUP BY ville HAVING pm>0
+    ORDER BY (CAST(cm AS REAL)/pm) DESC LIMIT 1
+  `).get();
+  if (croissanceVille && croissanceVille.pm > 0 && croissanceVille.cm > croissanceVille.pm) {
+    const pct = Math.round(((croissanceVille.cm - croissanceVille.pm) / croissanceVille.pm) * 100);
+    if (pct >= 15) insights.push({ type:'tendance', icone:'🚀', texte:`<strong>${croissanceVille.ville}</strong> devient un hub émergent diaspora avec une croissance de <strong>+${pct}%</strong> ce mois.` });
+  }
+
+  // Score moyen
+  const scoreMoy = db.prepare(`
+    SELECT ROUND(AVG(
+      MIN(100, COALESCE(nb_vues,0)*0.05 +
+        (SELECT COUNT(*) FROM abonnements a WHERE a.initiative_id=i.id)*8.0 +
+        (SELECT COUNT(*) FROM evenements e WHERE e.owner_user_id=i.owner_user_id)*12.0 +
+        (SELECT COUNT(*) FROM formations f WHERE f.owner_user_id=i.owner_user_id)*10.0
+      )
+    ),1) AS s FROM initiatives i
+  `).get()?.s || 0;
+  insights.push({ type:'analyse', icone:'⚡', texte:`Score d'activité moyen des initiatives : <strong>${scoreMoy}/100</strong>.` });
+
+  // Ratio événements/initiatives
+  const nbInit = db.prepare("SELECT COUNT(*) n FROM initiatives").get().n;
+  const nbEvt  = db.prepare("SELECT COUNT(*) n FROM evenements").get().n;
+  if (nbInit > 0) {
+    const ratio = (nbEvt / nbInit).toFixed(1);
+    insights.push({ type:'analyse', icone:'📅', texte:`En moyenne, chaque initiative génère <strong>${ratio} événements</strong> enregistrés sur la plateforme.` });
+  }
+
+  sendJSON(res, 200, { insights, alertes });
+});
+
 /* ===== MODULE CONTENU ===== */
 
 route("GET", "/api/admin/contenu", async (req, res) => {
