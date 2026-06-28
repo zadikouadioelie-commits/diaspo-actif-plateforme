@@ -8337,6 +8337,56 @@ async function handleRequest(req, res) {
       return sendJSON(res, 200, { accreditations: rows });
     }
 
+    /* ── ADMIN : Deals Diaspo'Actif — liste et création ── */
+    if (pathname === "/api/admin/diaspoactif/deals") {
+      const admin = getCurrentUser(req);
+      if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+      const daInit = db.prepare("SELECT id FROM initiatives WHERE slug='diaspoactif-platform'").get();
+      if (!daInit) return sendJSON(res, 500, { error: "Initiative Diaspo'Actif introuvable. Redémarrez le serveur." });
+
+      if (req.method === "GET") {
+        const deals = db.prepare(`SELECT d.*, i.nom as createur_nom,
+          dp.statut as ma_participation,
+          (SELECT COUNT(*) FROM deal_participants p WHERE p.deal_id=d.id AND p.statut='accepte') as nb_participants
+          FROM deals d
+          JOIN deal_participants dp ON dp.deal_id=d.id AND dp.initiative_id=?
+          JOIN initiatives i ON i.id=d.createur_id
+          ORDER BY d.updated_at DESC`).all(daInit.id);
+        return sendJSON(res, 200, { deals, initiative_id: daInit.id });
+      }
+
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        const { titre, description, objectif, categorie, confidentialite, date_debut, date_fin_prev, invites } = body;
+        if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+        const r = db.prepare(`INSERT INTO deals (titre,description,objectif,categorie,confidentialite,createur_id,date_debut,date_fin_prev,statut)
+          VALUES (?,?,?,?,?,?,?,?,'brouillon')`).run(
+          titre, description||null, objectif||null,
+          categorie||'partenariat', confidentialite||'prive',
+          daInit.id, date_debut||null, date_fin_prev||null
+        );
+        const dealId = Number(r.lastInsertRowid);
+        db.prepare("INSERT INTO deal_participants (deal_id,initiative_id,role,statut) VALUES (?,?,'createur','accepte')").run(dealId, daInit.id);
+        const inviteList = Array.isArray(invites) ? invites.filter(Boolean) : [];
+        for (const iid of inviteList) {
+          const inv = db.prepare("SELECT id FROM initiatives WHERE id=?").get(iid);
+          if (inv) {
+            db.prepare("INSERT OR IGNORE INTO deal_participants (deal_id,initiative_id,role,statut,message_inv) VALUES (?,?,'participant','invite',?)")
+              .run(dealId, iid, body.message_inv||null);
+            const owner = db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(iid);
+            if (owner?.owner_user_id) {
+              creerNotif(owner.owner_user_id, "deal", "🤝 Invitation Deal — Diaspo'Actif",
+                `Diaspo'Actif vous invite à rejoindre le Deal : « ${titre} ».`, { deal_id: dealId });
+            }
+          }
+        }
+        if (inviteList.length === 0) db.prepare("UPDATE deals SET statut='actif' WHERE id=?").run(dealId);
+        else db.prepare("UPDATE deals SET statut='en_attente' WHERE id=?").run(dealId);
+        dealLog(dealId, admin.id, "Diaspo'Actif", "creation", "Deal créé par Diaspo'Actif");
+        return sendJSON(res, 201, { ok: true, deal_id: dealId });
+      }
+    }
+
     /* ── GET mes deals (initiative connectée) ── */
     if (req.method === "GET" && pathname === "/api/deals") {
       const me = getCurrentUser(req);

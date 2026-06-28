@@ -2790,5 +2790,30 @@ try { db.exec("ALTER TABLE user_accreditations ADD COLUMN feature_slug TEXT"); }
   for (const f of FEATURES) ins.run(...f);
 })();
 
+/* ── Initiative virtuelle Diaspo'Actif (pour les Deals de la plateforme) ── */
+;(function seedDiaspoActifInitiative() {
+  const adminUser = db.prepare("SELECT id FROM users WHERE email='admin@diaspoactif.demo'").get();
+  if (!adminUser) return;
+  // Créer l'initiative si elle n'existe pas encore
+  const existing = db.prepare("SELECT id FROM initiatives WHERE slug='diaspoactif-platform'").get();
+  if (!existing) {
+    db.prepare(`INSERT INTO initiatives
+      (nom, slug, domaine, type, pays, ville, description, mission, statut, owner_user_id, is_verified, abonnement_actif)
+      VALUES (?,?,?,?,?,?,?,?,?,?,1,1)`).run(
+      "Diaspo'Actif", "diaspoactif-platform", "diaspora",
+      "Organisation", "International", "Paris",
+      "Canal officiel des Deals collaboratifs initiés par la plateforme Diaspo'Actif.",
+      "Connecter les initiatives de la diaspora mondiale à travers des partenariats stratégiques.",
+      "active", adminUser.id
+    );
+  }
+  // Donner l'accréditation deal si pas encore accordée
+  const init = db.prepare("SELECT id FROM initiatives WHERE slug='diaspoactif-platform'").get();
+  if (init) {
+    db.prepare(`INSERT OR IGNORE INTO deal_accreditations (initiative_id, statut, admin_nom, motif)
+      VALUES (?, 'active', 'Système', 'Initiative officielle Diaspo''Actif — accès permanent')`).run(init.id);
+  }
+})();
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
