@@ -218,7 +218,122 @@
 
     // ── Admin
     { re: /admin|administration|panneau\s+admin/i, id: 'nav_admin' },
+
+    // ── OZ Command Routing Engine (CRE) — commandes centralisées
+    { re: /^indique[-\s]?moi\s+\S/i,                                                       id: 'cre_indique' },
+    { re: /list[ez]{1,2}?\s+(les?\s+)?(commandes?|sections?|modules?|pages?|outils?|onglets?)|voir?\s+toutes?\s+(les?\s+)?(sections?|commandes?|pages?)|qu[e']?est[-\s]ce\s+que\s+(?:je\s+peux|tu\s+peux)\s+ouvrir/i, id: 'cre_list' },
   ];
+
+  /* ══════════════════════════════════════════
+     OZ COMMAND ROUTING ENGINE (CRE)
+     Moteur central de routage par commande textuelle
+  ══════════════════════════════════════════ */
+  const OZ_CRE = (() => {
+    let _routes = [];
+    let _nextId  = 1;
+
+    // Table de synonymes globaux (accent-free keys)
+    const SYNO = {
+      agenda:          ['calendrier','planning','calandrier','planing','calender','rendez-vous','rdv'],
+      messagerie:      ['messages','chat','discussions','inbox','courrier','boite','mail','envoyer'],
+      evenements:      ['evenement','event','events','activites','sorties','manifestation'],
+      annuaire:        ['membres','repertoire','bottin','contacts','community','personnes'],
+      formations:      ['cours','apprentissage','apprendre','training','education','enseigne'],
+      statistiques:    ['stats','analytics','analyse','donnees','observatoire','tableau','data','chiffres'],
+      profil:          ['compte','fiche','identite','mon compte','ma page'],
+      accreditations:  ['habilitations','badges','autorisations','certifs','certifications','permissions'],
+      parametres:      ['configuration','reglages','settings','options','preferences'],
+      actualites:      ['fil','news','nouvelles','actu','journal','publications'],
+      reseau:          ['connexions','contacts','network','liens','relations'],
+      recherche:       ['chercher','trouver','search','explorer','lookup'],
+      admin:           ['administration','backoffice','panneau','manage','gestion'],
+      diaspora:        ['diaspora donnees','diaspora stats','observatoire','intelligence'],
+    };
+
+    function norm(s) {
+      return (s || '').toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/\b(le|la|les|l|de|des|du|un|une|mes|mon|ma|aux|au|vers|dans|sur|les|a)\b/g, ' ')
+        .replace(/['''`]/g, ' ').replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ').trim();
+    }
+
+    function scoreKw(kw, query) {
+      const nk = norm(kw), nq = norm(query);
+      if (!nk || !nq) return 0;
+      if (nk === nq) return 1;
+      if (nk.startsWith(nq) || nq.startsWith(nk)) return 0.92;
+      if (nk.includes(nq) || nq.includes(nk)) return 0.85;
+      const tq = nq.split(' ').filter(t => t.length > 1);
+      const tk = nk.split(' ').filter(t => t.length > 1);
+      if (!tq.length || !tk.length) return 0;
+      const matched = tq.filter(t => tk.some(k => k.startsWith(t) || t.startsWith(k) || (t.length > 3 && k.includes(t)))).length;
+      return matched / Math.max(tq.length, tk.length) * 0.75;
+    }
+
+    function scoreRoute(r, query) {
+      let best = 0;
+      for (const kw of r.keywords) { const s = scoreKw(kw, query); if (s > best) best = s; if (best >= 1) break; }
+      return best;
+    }
+
+    function expandSynonyms(kws) {
+      const out = [...kws];
+      kws.forEach(kw => {
+        const nk = norm(kw);
+        Object.entries(SYNO).forEach(([base, syns]) => {
+          if (norm(base).includes(nk) || nk.includes(norm(base))) out.push(...syns);
+        });
+      });
+      return [...new Set(out)];
+    }
+
+    return {
+      get routes() { return _routes; },
+
+      register(items) {
+        items.forEach(item => {
+          const id  = item.id != null ? item.id : _nextId++;
+          const kws = expandSynonyms([item.label || '', ...(item.keywords || [])]);
+          _routes.push({ id, label: item.label, icon: item.icon || '📌', keywords: kws, action: item.action, description: item.description || '' });
+        });
+      },
+
+      find(query, byId = false) {
+        const q = String(query || '').trim();
+        if (!q) return null;
+        if (byId) {
+          const num = parseInt(q);
+          if (!isNaN(num)) { const r = _routes.find(r => r.id === num); if (r) return r; }
+          const exact = _routes.find(r => norm(r.label) === norm(q));
+          if (exact) return exact;
+        }
+        let best = null, bestS = 0;
+        for (const r of _routes) { const s = scoreRoute(r, q); if (s > bestS) { bestS = s; best = r; } }
+        return bestS >= 0.32 ? best : null;
+      },
+
+      suggest(query, max = 5) {
+        return _routes
+          .map(r => ({ r, s: scoreRoute(r, query) }))
+          .filter(x => x.s > 0.08)
+          .sort((a, b) => b.s - a.s)
+          .slice(0, max)
+          .map(x => x.r);
+      },
+
+      route(query, byId = false) {
+        const match = this.find(query, byId);
+        if (match && typeof match.action === 'function') { match.action(); return match; }
+        return null;
+      },
+
+      list(role) {
+        if (!role) return _routes.slice();
+        return _routes.filter(r => !r.roles || r.roles.includes(role));
+      },
+    };
+  })();
 
   const R = {
     fr: {
@@ -273,11 +388,98 @@
     bindEvents();
     applyTheme();
     applySize();
+    initCRE();
     await Promise.all([loadServerCfg(), loadKB()]);
     scheduleProactive();
     if (!sessionStorage.getItem('oz:done')) {
       setTimeout(() => { showBadge(); sessionStorage.setItem('oz:done', '1'); }, 3500);
     }
+  }
+
+  /* ── Initialisation du CRE — enregistrement de toutes les routes ── */
+  function initCRE() {
+    // Routes globales depuis MODULES (pages complètes)
+    let idx = 1;
+    Object.entries(MODULES).forEach(([key, m]) => {
+      OZ_CRE.register([{
+        id: idx++,
+        label: m.label,
+        icon: m.icon,
+        keywords: [key, m.label],
+        action: () => { addMsg('oz', `${m.icon} Ouverture de **${m.label}**…`); setTimeout(() => { window.location.href = m.url; }, 500); },
+      }]);
+    });
+
+    // Routes dashboard Administrateur (sections internes)
+    const adminSections = [
+      { label: 'Vue d\'ensemble',        icon: '🏠', keywords: ['vue ensemble','accueil','home','overview','resume'],    section: 'dashboard' },
+      { label: 'Membres',                icon: '👥', keywords: ['membres','users','utilisateurs','inscrits'],            section: 'membres' },
+      { label: 'Réseau Professionnel',   icon: '💼', keywords: ['reseau professionnel','professionnels','competences'],  section: 'reseau-pro' },
+      { label: 'Diaspora Données',       icon: '📊', keywords: ['diaspora donnees','observatoire','diaspora stats'],     section: 'diaspora-stats' },
+      { label: 'Accréditations Admin',   icon: '🏛️', keywords: ['accreditations admin','habilitations admin'],          section: 'accreditations' },
+      { label: 'Formations Admin',       icon: '🎓', keywords: ['formations admin','gestion formations'],                section: 'formations' },
+      { label: 'Événements Admin',       icon: '🎪', keywords: ['evenements admin','gestion evenements'],               section: 'evenements' },
+      { label: 'Modération',             icon: '🛡️', keywords: ['moderation','signalements','abus','rapports'],         section: 'moderation' },
+      { label: 'Finances Admin',         icon: '💰', keywords: ['finances','transactions','paiements','revenus'],        section: 'finances' },
+      { label: 'Certifications Admin',   icon: '🛡️', keywords: ['certifications','certification'],                     section: 'certifications' },
+      { label: 'Paramètres Plateforme',  icon: '⚙️', keywords: ['parametres plateforme','configuration','settings'],   section: 'parametres' },
+      { label: 'O-Z Admin',              icon: '🤖', keywords: ['oz admin','assistant admin','chatbot admin'],          section: 'oz' },
+      { label: 'Publicités Admin',       icon: '📣', keywords: ['publicites admin','ads','annonces'],                   section: 'publicites' },
+      { label: 'Contenu Diaspora',       icon: '📄', keywords: ['contenu diaspora','articles','publications admin'],    section: 'contenu' },
+    ];
+    adminSections.forEach((s, i) => {
+      OZ_CRE.register([{
+        id: 100 + i,
+        label: s.label,
+        icon: s.icon,
+        keywords: s.keywords,
+        roles: ['administrateur'],
+        action: () => goSectionOZ(s.section, s.label, s.icon),
+      }]);
+    });
+
+    // Routes dashboard Utilisateur
+    const userSections = [
+      { label: 'Mon Profil',        icon: '👤', keywords: ['profil','mon profil','ma fiche'],               hash: '#profil' },
+      { label: 'Mon Agenda',        icon: '📅', keywords: ['agenda','calendrier','planning','rdv'],          hash: '#agenda' },
+      { label: 'Mes Messages',      icon: '💬', keywords: ['messages','messagerie','discussions'],           hash: '#messagerie' },
+      { label: 'Mes Abonnements',   icon: '❤️', keywords: ['abonnements','suivis','initiatives suivies'],   hash: '#abonnements' },
+      { label: 'Mes Événements',    icon: '🎪', keywords: ['evenements','mes evenements'],                   hash: '#evenements' },
+      { label: 'Mes Formations',    icon: '📚', keywords: ['formations','mes formations','mes cours'],       hash: '#formations' },
+      { label: 'Mon Réseau',        icon: '🌐', keywords: ['reseau','contacts','connexions','liens'],        hash: '#reseau' },
+    ];
+    userSections.forEach((s, i) => {
+      OZ_CRE.register([{
+        id: 200 + i,
+        label: s.label,
+        icon: s.icon,
+        keywords: s.keywords,
+        action: () => goHashOZ(s.hash, s.label, s.icon),
+      }]);
+    });
+  }
+
+  function goSectionOZ(section, label, icon) {
+    const onAdmin = window.location.pathname.includes('dashboard-administrateur');
+    if (onAdmin) {
+      if (typeof window.goSection === 'function') { window.goSection(section); }
+      else {
+        const link = document.querySelector(`[data-section="${section}"]`);
+        if (link) link.click();
+        else window.location.hash = '#' + section;
+      }
+      closePanel();
+    } else {
+      addMsg('oz', `${icon || '🔗'} Ouverture de **${label || section}**…`);
+      setTimeout(() => { window.location.href = '/dashboard-administrateur.html#' + section; }, 500);
+    }
+  }
+
+  function goHashOZ(hash, label, icon) {
+    addMsg('oz', `${icon || '🔗'} Ouverture de **${label || hash}**…`);
+    const el = document.querySelector(`[data-section="${hash.replace('#','')}"]`) || document.querySelector(hash);
+    if (el) { el.click(); closePanel(); }
+    else window.location.hash = hash;
   }
 
   function detectRole() {
@@ -1078,15 +1280,76 @@
         break;
       }
 
-      // ── Fallback : tenter une action sur la page, sinon renvoyer au chatbot
+      // ── CRE : "indique moi [id ou nom]"
+      case 'cre_indique': {
+        const raw = text.replace(/^indique[-\s]?moi\s+/i, '').trim();
+        const match = OZ_CRE.route(raw, true);
+        if (!match) {
+          const sug = OZ_CRE.suggest(raw, 5);
+          if (sug.length) {
+            addMsg('oz',
+              `🔍 Aucun élément **#${raw}** trouvé. Voulez-vous :\n\n` +
+              sug.map(s => `• **[${s.id}]** ${s.icon} ${s.label}`).join('\n') +
+              '\n\nDites « **indique moi [numéro]** » pour ouvrir directement.'
+            );
+          } else {
+            addMsg('oz',
+              `❌ Je n'ai pas trouvé **"${raw}"**.\n\nTapez « **liste les sections** » pour voir tous les numéros disponibles.`
+            );
+          }
+        } else {
+          addMsg('oz', `${match.icon} Ouverture de **${match.label}** [#${match.id}]…`);
+          await audit('navigate', 'cre:' + match.label);
+        }
+        break;
+      }
+
+      // ── CRE : liste toutes les routes numérotées
+      case 'cre_list': {
+        const routes = OZ_CRE.list(_role);
+        const show = routes.slice(0, 18);
+        let msg = `📋 **Sections & modules disponibles** — dites « **indique moi [numéro]** » pour ouvrir :\n\n`;
+        msg += show.map(r => `**[${r.id}]** ${r.icon} ${r.label}`).join('\n');
+        if (routes.length > 18) msg += `\n\n…et ${routes.length - 18} autres.`;
+        msg += '\n\nExemple : « **indique moi 3** » ou « **ouvre messagerie** »';
+        addMsg('oz', msg);
+        break;
+      }
+
+      // ── Fallback : OZ_CRE fuzzy → tryPageAction → chatbot redirect
       default: {
-        // 1. Tenter de cliquer un élément de la page si la commande ressemble à une action
-        if (/ouvr[ei]r?|acc[eé]der?|activer?|afficher?|montrer?|aller|voir/i.test(text)) {
+        // 1. Si la commande ressemble à "ouvre X" → essayer OZ_CRE d'abord
+        const ouvrePat = /^(?:ouvr[ei]r?|acc[eé]der?\s*(?:[àa]\s+)?|afficher?|montrer?|aller\s+(?:sur|dans|[àa])\s+|va\s+(?:sur|dans|[àa])\s+|voir?\s+(?:le?|la?|les?\s+)?)\s*/i;
+        if (ouvrePat.test(text)) {
+          const query = text.replace(ouvrePat, '').trim();
+          if (query) {
+            const match = OZ_CRE.route(query);
+            if (match) {
+              addMsg('oz', `${match.icon} Ouverture de **${match.label}**…`);
+              await audit('navigate', 'cre:' + match.label);
+              break;
+            }
+            // Suggestion si proche
+            const sug = OZ_CRE.suggest(query, 4);
+            if (sug.length) {
+              addMsg('oz',
+                `🔍 Je n'ai pas trouvé **"${query}"**.\n\nVoulez-vous dire :\n` +
+                sug.map(s => `• ${s.icon} **${s.label}** (dites « ouvre ${s.label} »)`).join('\n') +
+                '\n\nOu tapez « **liste les sections** » pour voir toutes les options.'
+              );
+              break;
+            }
+          }
+          // Dernier recours : cliquer un élément visible sur la page
           const acted = tryPageAction(text);
           if (acted) { await audit('action', 'page_action', { text }); break; }
+          addMsg('oz',
+            `🔍 Je n'ai pas trouvé la section correspondante.\n\nVoulez-vous voir les options proches ?\nTapez « **liste les sections** » pour tout afficher.\n\nOu essayez :\n• « **ouvre messagerie** »\n• « **ouvre agenda** »\n• « **ouvre accréditations** »`
+          );
+          break;
         }
-        // 2. O-Z ne répond pas aux questions — renvoyer vers le chatbot
-        addMsg('oz', '❌ Je suis un agent d\'**action**, pas de réponses.\n\nPour poser une question, utilisez le **chatbot** 💬\n\nMoi j\'exécute des commandes :\n• « **Ouvre les accréditations** »\n• « **Ouvre mes messages** »\n• « **Crée un événement** »');
+        // 2. Autres textes — O-Z est un agent d'action, pas de Q&R
+        addMsg('oz', '❌ Je suis un agent d\'**action**, pas de réponses.\n\nPour poser une question, utilisez le **chatbot** 💬\n\nCommandes disponibles :\n• « **Ouvre [section]** » — navigation directe\n• « **Indique moi [numéro]** » — ouverture par ID\n• « **Liste les sections** » — voir tout\n• « **Crée un événement** »');
         logUnanswered(text);
       }
     }
@@ -1486,6 +1749,7 @@
      API PUBLIQUE
   ══════════════════════════════════════════ */
   window.__OZ = {
+    // Panneau
     open:          openPanel,
     close:         closePanel,
     say:           (msg) => { openPanel(); addMsg('oz', msg); },
@@ -1494,6 +1758,12 @@
     closeSettings,
     getRole:       () => _role,
     setRole:       (r) => { _role = r; showQuickChips(); },
+    // Command Routing Engine — API publique pour les pages
+    registerRoutes: (routes) => OZ_CRE.register(routes),
+    listRoutes:     (role)   => OZ_CRE.list(role),
+    route:          (query, byId) => OZ_CRE.route(query, byId),
+    findRoute:      (query, byId) => OZ_CRE.find(query, byId),
+    suggestRoutes:  (query, max)  => OZ_CRE.suggest(query, max),
   };
 
   // Démarrage
