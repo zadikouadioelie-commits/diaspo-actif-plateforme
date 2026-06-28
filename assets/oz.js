@@ -80,9 +80,10 @@
     { re: /envoyer?\s+(un\s+)?message|[eé]crire?\s+[aà]\s+\w/i, id: 'send_message' },
     { re: /newsletter/i, id: 'create_newsletter' },
 
-    // ── Navigation : accréditations
+    // ── Navigation : accréditations / habilitations
     { re: _nav('(les?\s+)?accr[eé]ditations?|(mon\s+)?badge|ma\s+carte\s+d[e\']accr[eé]ditation'), id: 'nav_accreditations' },
     { re: /accr[eé]ditations?|accréditation/i, id: 'nav_accreditations' },
+    { re: /habilitations?|autorisations?\s+(plateforme|compte|profil)?/i, id: 'nav_accreditations' },
 
     // ── Navigation : CV & Lettres
     { re: _nav('(mes?\s+)?cvs?|(mes?\s+)?(lettres?|curriculum)'), id: 'nav_cv' },
@@ -208,6 +209,8 @@
     // ── Profil public — onglets
     { re: /mes?\s+publications?\s*(profil|publiques?)?|affiche?\s+(mes?\s+)?publications?\s*profil/i, id: 'profil_publications' },
     { re: /mes?\s+publicit[eé]s?\s*(profil)?|affiche?\s+(mes?\s+)?publicit[eé]s?/i, id: 'profil_publicites' },
+    { re: /(ouvr[ei]r?|acc[eé]der?|activer?|lancer?)\s+(les?\s+|aux?\s+)?publicit[eé]s?/i, id: 'open_publicites' },
+    { re: /\bpublicit[eé]s?\b/i, id: 'open_publicites' },
     { re: /mon\s+activit[eé]\s*(r[eé]cente|publique)?|affiche?\s+(mon\s+)?activit[eé]|activit[eé]\s+r[eé]cente/i, id: 'profil_activite' },
     { re: /modifier?\s+(ma\s+)?banni[eè]re|changer?\s+(ma\s+)?banni[eè]re|uploader?\s+(ma\s+)?banni[eè]re/i, id: 'profil_banner' },
     { re: /confidentialit[eé]\s*(profil)?|privacy\s*(profil)?|param[eè]tres?\s+confidentialit[eé]/i, id: 'profil_privacy' },
@@ -226,7 +229,7 @@
       bye:       ["À bientôt ! N'hésitez pas à faire appel à moi."],
       confused:  ["Je ne suis pas certain de comprendre. Pouvez-vous reformuler ?",
                   "Hmm, je n'ai pas bien saisi. Essayez de préciser votre demande."],
-      capabilities: "Voici ce que je sais faire :\n\n• 🗺️ **Naviguer** entre tous les modules\n• 🎪 **Créer** des événements, initiatives, articles\n• 🔍 **Trouver** des partenaires et membres\n• 📄 **Générer** des contrats\n• 🎟️ **Créer** des billetteries\n• 📖 **Répondre** à vos questions sur la plateforme\n• 🎓 **Lancer** les tutoriels interactifs\n• 🔔 **Vous alerter** des opportunités pertinentes\n\nDites-moi simplement ce que vous voulez faire !",
+      capabilities: "Je suis **O-Z**, votre assistant d'action Diaspo'Actif. Je **fais** — je ne réponds pas aux questions (le chatbot est là pour ça).\n\n• « **Ouvre les accréditations** » → j'ouvre\n• « **Ouvre les habilitations** » → j'ouvre\n• « **Ouvre les publicités** » → j'ouvre\n• « **Ouvre la messagerie** » → j'ouvre\n• « **Crée un événement** » → je lance le formulaire\n• « **Va dans l'annuaire** » → j'y vais\n• « **Ouvre mon agenda** » → j'ouvre\n\nDites une commande, j'exécute immédiatement.",
     },
     en: {
       greet_day: ["Hello! I'm **O-Z**, your intelligent Diaspo'Actif assistant. How can I help you today?"],
@@ -768,7 +771,7 @@
       case 'capabilities':  addMsg('oz', L.capabilities); break;
       case 'my_permissions':addMsg('oz', getPermsText()); break;
       case 'help':
-        addMsg('oz', "Dites-moi simplement ce que vous voulez faire :\n\n• « **Ouvre mes messages** »\n• « **Ouvre les accréditations** »\n• « **Crée un événement** »\n• « **Ajoute une réunion à mon agenda le 15/03 à 14h** »\n• « **Montre-moi mes CV** »\n• « **Va dans l'annuaire** »\n\nJ'exécute directement — pas besoin de cliquer !");
+        addMsg('oz', "Je suis **O-Z** — j'exécute vos commandes, je n'réponds pas aux questions.\n\n• « **Ouvre les accréditations** »\n• « **Ouvre les habilitations** »\n• « **Ouvre les publicités** »\n• « **Ouvre mes messages** »\n• « **Crée un événement** »\n• « **Va dans l'annuaire** »\n\nPour des questions, utilisez le **chatbot**. Moi j'agis !");
         break;
       case 'tutorial':
         addMsg('oz', '🎓 J\'ouvre le Centre des tutos...');
@@ -1016,9 +1019,23 @@
       case 'profil_publications':
         addMsg('oz', '📝 J\'ouvre l\'onglet Publications de votre profil…');
         setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-publications`; }, 400); break;
-      case 'profil_publicites':
-        addMsg('oz', '📣 J\'ouvre l\'onglet Publicités de votre profil…');
-        setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-publicites`; }, 400); break;
+      case 'open_publicites':
+      case 'profil_publicites': {
+        // Tenter d'abord d'ouvrir/activer la section publicités sur la page courante
+        const pubOpened = tryOpenPageSection(['publicite','pub-section','onglet-publicites','tab-publicites','btn-publicites','section-publicites']);
+        if (!pubOpened) {
+          addMsg('oz', '📣 J\'ouvre les publicités…');
+          await audit('navigate', 'publicites');
+          const u = window._CU;
+          const path = window.location.pathname;
+          if (path.includes('dashboard-initiative')) {
+            setTimeout(() => { if (window.initShowSection) window.initShowSection('publicites'); else window.location.hash = '#publicites'; }, 300);
+          } else {
+            setTimeout(() => { window.location.href = `/profil.html?id=${u?.id||''}#tab-publicites`; }, 400);
+          }
+        }
+        break;
+      }
       case 'profil_activite':
         addMsg('oz', '⚡ J\'ouvre votre fil d\'activité publique…');
         setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-activite`; }, 400); break;
@@ -1061,17 +1078,53 @@
         break;
       }
 
-      // ── Fallback : KB puis confusion
+      // ── Fallback : tenter une action sur la page, puis KB, puis confusion
       default: {
-        const kb = await queryKB(text);
-        if (kb) { addMsg('oz', kb); }
-        else {
-          addMsg('oz', L.confused[Math.floor(Math.random()*L.confused.length)] +
-            '\n\nExemples de commandes :\n• « **Ouvre les accréditations** »\n• « **Ouvre mes messages** »\n• « **Montre-moi mon agenda** »\n• « **Crée un événement** »');
-          logUnanswered(text);
+        // 1. Tenter d'agir directement sur un élément de la page courante
+        if (/ouvr[ei]r?|acc[eé]der?|activer?|afficher?|montrer?|aller|voir/i.test(text)) {
+          const acted = tryPageAction(text);
+          if (acted) { await audit('action', 'page_action', { text }); break; }
         }
+        // 2. Chercher dans la KB / FAQ
+        const kb = await queryKB(text);
+        if (kb) { addMsg('oz', kb); break; }
+        // 3. Message de confusion — court, sans longues listes
+        addMsg('oz', 'Je n\'ai pas trouvé cette commande. Essayez : « **Ouvre les accréditations** », « **Ouvre mes messages** », « **Crée un événement** ».');
+        logUnanswered(text);
       }
     }
+  }
+
+  /* ══════════════════════════════════════════
+     ACTIONS SUR LA PAGE COURANTE
+     Cherche et clique un élément correspondant aux mots-clés
+  ══════════════════════════════════════════ */
+  function tryOpenPageSection(ids) {
+    for (const id of ids) {
+      const el = document.getElementById(id) || document.querySelector(`[data-section="${id}"]`) || document.querySelector(`[href="#${id}"]`);
+      if (el) {
+        el.click();
+        addMsg('oz', `✅ Ouvert !`);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function tryPageAction(text) {
+    // Cherche un bouton ou lien dont le texte correspond aux mots-clés de la commande
+    const words = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split(/\s+/).filter(w => w.length > 3);
+    const candidates = [...document.querySelectorAll('button, [role="tab"], a[data-section], .nav-item, .sidebar-link')];
+    for (const el of candidates) {
+      const label = (el.textContent || el.title || el.dataset.section || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+      const matches = words.filter(w => label.includes(w)).length;
+      if (matches >= 1 && label.length < 80) {
+        el.click();
+        addMsg('oz', `✅ ${el.textContent.trim().slice(0, 40)} ouvert !`);
+        return true;
+      }
+    }
+    return false;
   }
 
   /* Navigation IMMÉDIATE — pas de bouton intermédiaire */
