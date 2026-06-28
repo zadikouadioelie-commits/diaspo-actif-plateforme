@@ -1,5 +1,6 @@
 /* ===========================================================
    DIASPO'ACTIF — Serveur (HTTP natif Node, sans dépendance externe)
+   Build: 2026-06-28-b
    =========================================================== */
 const http = require("node:http");
 const fs = require("node:fs");
