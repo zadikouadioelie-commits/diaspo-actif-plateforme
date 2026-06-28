@@ -61,7 +61,7 @@
 
 <div style="max-width:960px;margin:0 auto;padding:30px 16px;">
   <h1 style="margin-bottom:4px;">Accréditations Diaspo'Actif</h1>
-  <p style="color:var(--muted);margin-bottom:24px;">Deux accréditations permettent d'accéder à des fonctionnalités avancées de mobilisation et de création d'opportunités.</p>
+  <p style="color:var(--muted);margin-bottom:24px;" id="accred-subtitle">Les accréditations DA sont des autorisations opérationnelles — pas des récompenses. Chaque accréditation vous donne le droit d'exercer une fonction spécifique sur la plateforme.</p>
 
   <div class="tab-row">
     <button class="tab-btn on" onclick="switchTab('mes')">Mes accréditations</button>
@@ -73,32 +73,7 @@
   </div>
 
   <div id="tab-info" class="tab-panel">
-    <div class="accred-grid">
-      <div class="accred-card">
-        <div class="accred-badge badge-ma">📢 Mobilisation Active</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Consultez, mobilisez et interrogez vos communautés.</p>
-        <ul class="features-list">
-          <li>📊 Sondages &amp; consultations</li>
-          <li>📋 Appels à projets</li>
-          <li>🙋 Recherche bénévoles</li>
-          <li>📅 Mobilisation territoriale</li>
-          <li>📈 Statistiques participation</li>
-        </ul>
-        <p style="font-size:12px;color:var(--muted);">Pour : ambassades, consulats, mairies, ONG, associations, initiatives certifiées…</p>
-      </div>
-      <div class="accred-card">
-        <div class="accred-badge badge-co">💼 Créateur d'Opportunités</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Créez des opportunités économiques, professionnelles et entrepreneuriales.</p>
-        <ul class="features-list">
-          <li>💼 Offres emploi/stages/missions</li>
-          <li>🔍 Recherche de profils experts</li>
-          <li>🤝 Appels à partenaires</li>
-          <li>🚀 Programmes incubation</li>
-          <li>📊 Statistiques recrutement</li>
-        </ul>
-        <p style="font-size:12px;color:var(--muted);">Pour : entreprises, startups, coopératives, chambres de commerce, investisseurs…</p>
-      </div>
-    </div>
+    <div id="tab-info-content" class="accred-grid"><div style="color:var(--muted)">Chargement…</div></div>
     <div class="card" style="margin-top:24px;">
       <h3 style="margin-top:0;">Processus de demande</h3>
       <ol style="padding-left:18px;font-size:14px;line-height:2.2;">
@@ -140,14 +115,36 @@ function switchTab(t){
   document.getElementById('tab-info').classList.toggle('show',t==='info');
 }
 
+const STAT_LBL={active:'✅ Active',suspendue:'⚠️ Suspendue',retiree:'❌ Retirée'};
+const STAT_CLS={active:'status-active',suspendue:'status-suspendue',retiree:'status-retiree'};
+
+/* Retourne les accréditations éligibles pour un rôle donné */
+function accredsEligibles(role){
+  const DA = typeof ACCREDITATIONS_DA !== 'undefined' ? ACCREDITATIONS_DA : [];
+  return DA.filter(d => (d.eligible||[]).includes(role));
+}
+
+/* Rendu de la fiche info (onglet "Comment ça marche ?") */
+function renderInfoTab(role){
+  const el = document.getElementById('tab-info-content');
+  const list = accredsEligibles(role);
+  if(!list.length){ el.innerHTML='<p style="color:var(--muted);">Aucune accréditation disponible pour votre type de compte.</p>'; return; }
+  el.innerHTML = list.map(def => `
+    <div class="accred-card" style="border-color:${def.couleurBorder||'var(--border)'};">
+      <div class="accred-badge" style="background:${def.couleurBg};color:${def.couleurText};border:1.5px solid ${def.couleurBorder};">${def.emoji} ${def.label}</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">${def.description}</p>
+      <ul class="features-list">${(def.droits||[]).map(d=>`<li>${d}</li>`).join('')}</ul>
+      ${def.prixLabel ? `<p style="font-size:12px;color:var(--muted);margin-top:8px;font-weight:600;">${def.prixLabel}</p>` : ''}
+    </div>`).join('');
+}
+
 let pendingType=null;
 function openModalDemande(type){
+  const DA = typeof ACCREDITATIONS_DA !== 'undefined' ? ACCREDITATIONS_DA : [];
+  const def = DA.find(d=>d.type===type)||{};
   pendingType=type;
-  const labels={mobilisation_active:'📢 Mobilisation Active',createur_opportunites:'💼 Créateur d\'Opportunités'};
-  document.getElementById('modal-title').textContent='Demande — '+labels[type];
-  document.getElementById('modal-desc').textContent=type==='mobilisation_active'
-    ?'Accès aux sondages, consultations, appels à projets et mobilisation communautaire.'
-    :'Accès aux offres d\'emploi/stage, recherche de compétences, opportunités économiques et programmes d\'accompagnement.';
+  document.getElementById('modal-title').textContent='Demande — '+(def.emoji||'')+' '+(def.label||type);
+  document.getElementById('modal-desc').textContent=def.description||'';
   document.getElementById('demande-message').value='';
   document.getElementById('modal-demande').style.display='flex';
 }
@@ -164,18 +161,17 @@ async function submitDemande(){
   }catch(e){showMsg(e.message||'Erreur lors de la demande.', 'danger');}
 }
 
-const STAT_LBL={active:'✅ Active',suspendue:'⚠️ Suspendue',retiree:'❌ Retirée'};
-const STAT_CLS={active:'status-active',suspendue:'status-suspendue',retiree:'status-retiree'};
-const TYPE_LBL={mobilisation_active:'📢 Mobilisation Active',createur_opportunites:'💼 Créateur d\'Opportunités'};
-const TYPE_CLS={mobilisation_active:'badge-ma',createur_opportunites:'badge-co'};
-
 async function loadMesAccreds(){
   const el=document.getElementById('mes-accreds-container');
   const me=await fetchCurrentUser().catch(()=>null);
   if(!me){
     el.innerHTML='<p style="color:var(--muted);">Connectez-vous pour voir vos accréditations. <a href="login.html" class="btn btn-orange btn-sm" style="margin-left:8px;">Se connecter</a></p>';
+    document.getElementById('tab-info-content').innerHTML='';
     return;
   }
+  const role = me.role || 'utilisateur';
+  renderInfoTab(role);
+
   try{
     const [r1,r2]=await Promise.all([
       api('GET','/accreditations/mes'),
@@ -183,21 +179,36 @@ async function loadMesAccreds(){
     ]);
     const accreds=r1.accreditations||[];
     const demandes=r2.demandes||[];
-    const types=['mobilisation_active','createur_opportunites'];
+    const eligibles = accredsEligibles(role);
+
+    if(!eligibles.length){
+      el.innerHTML='<p style="color:var(--muted);">Aucune accréditation disponible pour votre type de compte.</p>';
+      return;
+    }
+
     let html='<div class="accred-grid">';
-    for(const type of types){
+    for(const def of eligibles){
+      const type=def.type;
       const acc=accreds.find(a=>a.type===type);
       const dem=demandes.find(d=>d.type===type&&d.statut==='en_attente');
-      html+=`<div class="accred-card ${acc?acc.statut:''}">
-        <div class="accred-badge ${TYPE_CLS[type]}">${TYPE_LBL[type]}</div>
-        ${acc?`<span class="status-pill ${STAT_CLS[acc.statut]||''}">${STAT_LBL[acc.statut]||acc.statut}</span>`:''}`;
-      if(acc){
+      html+=`<div class="accred-card ${acc?acc.statut:''}" style="border-color:${acc&&acc.statut==='active'?'#22c55e':def.couleurBorder||'var(--border)'};">
+        <div class="accred-badge" style="background:${def.couleurBg};color:${def.couleurText};border:1.5px solid ${def.couleurBorder};">${def.emoji} ${def.label}</div>
+        ${acc?`<span class="status-pill ${STAT_CLS[acc.statut]||''}">${STAT_LBL[acc.statut]||acc.statut}</span>`:''}
+        <p style="font-size:13px;color:var(--muted);margin:8px 0 12px;">${def.description}</p>`;
+
+      if(def.module==='asso'){
+        /* Accréditation Gestion des Associations → volet dédié du dashboard */
+        if(acc && acc.statut==='active'){
+          html+=`<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#dcfce7;color:#16a34a;font-weight:700;font-size:13px;">✅ Accréditation active</div>
+            <a href="dashboard-initiative.html#asso-cockpit" class="btn btn-orange btn-sm btn-demande" style="margin-top:8px;">Ouvrir mon espace association →</a>`;
+        } else if(dem){
+          html+=`<p style="font-size:13px;color:var(--muted);padding:8px 0;"><span class="status-pill status-attente" style="position:static;display:inline-block;margin-right:6px;">⏳ En attente</span>Votre demande est en cours d'examen.</p>`;
+        } else {
+          html+=`<a href="dashboard-initiative.html#asso-accreditation" class="btn btn-orange btn-demande">Découvrir &amp; demander →</a>`;
+        }
+      } else if(acc){
         html+=`<p style="font-size:13px;margin:6px 0;">Accordée le ${fmtDate(acc.date_attribution)}</p>`;
         if(acc.date_expiration) html+=`<p style="font-size:12px;color:var(--muted);">Expire le ${fmtDate(acc.date_expiration)}</p>`;
-        if(acc.statut==='active'){
-          if(type==='mobilisation_active') html+=`<a href="sondages.html?action=creer" class="btn btn-orange btn-sm btn-demande">+ Créer un sondage</a>`;
-          if(type==='createur_opportunites') html+=`<a href="offres.html?action=creer" class="btn btn-orange btn-sm btn-demande">+ Publier une offre</a>`;
-        }
       } else if(dem){
         html+=`<p style="font-size:13px;color:var(--muted);padding:8px 0;"><span class="status-pill status-attente" style="position:static;display:inline-block;margin-right:6px;">⏳ En attente</span>Votre demande est en cours d'examen.</p>`;
       } else {
@@ -207,14 +218,18 @@ async function loadMesAccreds(){
       html+='</div>';
     }
     html+='</div>';
-    const refusees=demandes.filter(d=>d.statut==='refusee');
+
+    const refusees=demandes.filter(d=>d.statut==='refusee' && eligibles.find(e=>e.type===d.type));
     if(refusees.length){
       html+='<div class="card" style="margin-top:20px;border-left:4px solid #ef4444;"><h4 style="margin-top:0;color:#dc2626;">Demandes non retenues</h4>';
-      html+=refusees.map(d=>`<div style="font-size:13px;padding:6px 0;border-bottom:1px solid var(--border);">
-        <strong>${TYPE_LBL[d.type]||d.type}</strong> — ${fmtDate(d.created_at)}
-        ${d.motif_refus?`<br><span style="color:var(--muted);">${esc(d.motif_refus)}</span>`:''}
-        <button class="btn btn-outline btn-sm" style="margin-left:8px;" onclick="openModalDemande('${d.type}')">Redemander</button>
-      </div>`).join('');
+      html+=refusees.map(d=>{
+        const def=(typeof ACCREDITATIONS_DA!=='undefined'?ACCREDITATIONS_DA:[]).find(x=>x.type===d.type)||{};
+        return `<div style="font-size:13px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <strong>${def.emoji||''} ${def.label||d.type}</strong> — ${fmtDate(d.created_at)}
+          ${d.motif_refus?`<br><span style="color:var(--muted);">${esc(d.motif_refus)}</span>`:''}
+          ${def.module!=='asso'?`<button class="btn btn-outline btn-sm" style="margin-left:8px;" onclick="openModalDemande('${d.type}')">Redemander</button>`:''}
+        </div>`;
+      }).join('');
       html+='</div>';
     }
     el.innerHTML=html;
