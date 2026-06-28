@@ -5526,7 +5526,7 @@ async function handleRequest(req, res) {
       const params = {};
       r.keys.forEach((k, i) => params[k] = m[i + 1]);
       try {
-        const body = (req.method === "POST" || req.method === "PUT") ? await readBody(req) : {};
+        const body = (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") ? await readBody(req) : {};
         await r.handler(req, res, params, body, parsed.query);
       } catch (e) {
         console.error(e);
