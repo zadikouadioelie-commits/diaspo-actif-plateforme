@@ -2218,6 +2218,92 @@ route("GET", "/api/admin/reseau", async (req, res) => {
     pays_nouveaux_mois: paysNouveaux });
 });
 
+/* ===== MODULE RÉSEAU PROFESSIONNEL ===== */
+
+// Liste paginée des professionnels avec filtres
+route("GET", "/api/admin/reseau-pro", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  const q = req.query || {};
+  const page  = Math.max(1, parseInt(q.page) || 1);
+  const limit = Math.min(100, parseInt(q.limit) || 30);
+  const offset = (page - 1) * limit;
+
+  let where = ["u.role IN ('utilisateur','initiative','collectivite','officiel')"];
+  const params = [];
+
+  if (q.pays)     { where.push("u.pays = ?");         params.push(q.pays); }
+  if (q.ville)    { where.push("u.ville LIKE ?");      params.push('%' + q.ville + '%'); }
+  if (q.origine)  { where.push("(u.origine1 = ? OR u.origine2 = ?)"); params.push(q.origine, q.origine); }
+  if (q.nationalite) { where.push("(u.nationalite1 = ? OR u.nationalite2 = ?)"); params.push(q.nationalite, q.nationalite); }
+  if (q.domaine)  { where.push("u.situation_pro LIKE ?"); params.push('%' + q.domaine + '%'); }
+  if (q.role)     { where.push("u.role = ?");          params.push(q.role); }
+  if (q.actif === '1') {
+    where.push("EXISTS (SELECT 1 FROM user_activity a WHERE a.user_id=u.id AND a.date >= date('now','-30 days'))");
+  }
+
+  const whereStr = where.join(' AND ');
+
+  const total = db.prepare(`SELECT COUNT(*) n FROM users u WHERE ${whereStr}`).get(...params).n;
+  const rows  = db.prepare(`
+    SELECT u.id, u.nom, u.prenom, u.titre_pro, u.situation_pro,
+           u.ville, u.pays, u.origine1 AS pays_origine, u.nationalite1 AS nationalite,
+           u.role, substr(u.created_at,1,10) AS date_inscription,
+           CASE WHEN a.user_id IS NOT NULL THEN 1 ELSE 0 END AS actif_30j
+    FROM users u
+    LEFT JOIN (
+      SELECT DISTINCT user_id FROM user_activity WHERE date >= date('now','-30 days')
+    ) a ON a.user_id = u.id
+    WHERE ${whereStr}
+    ORDER BY u.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, limit, offset);
+
+  sendJSON(res, 200, { total, page, limit, professionnels: rows });
+});
+
+// Statistiques agrégées du réseau pro
+route("GET", "/api/admin/reseau-pro/stats", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  const roleFilter = "role IN ('utilisateur','initiative','collectivite','officiel')";
+
+  const total        = db.prepare(`SELECT COUNT(*) n FROM users WHERE ${roleFilter}`).get().n;
+  const actifs30j    = db.prepare(`SELECT COUNT(DISTINCT u.id) n FROM users u JOIN user_activity a ON a.user_id=u.id WHERE a.date >= date('now','-30 days') AND u.${roleFilter}`).get().n;
+  const nouveaux30j  = db.prepare(`SELECT COUNT(*) n FROM users WHERE ${roleFilter} AND created_at >= datetime('now','-30 days')`).get().n;
+
+  const parVille     = db.prepare(`SELECT ville, pays, COUNT(*) n FROM users WHERE ${roleFilter} AND ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 15`).all();
+  const parPays      = db.prepare(`SELECT pays, COUNT(*) n FROM users WHERE ${roleFilter} AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 12`).all();
+  const parOrigine   = db.prepare(`SELECT origine1 AS origine, COUNT(*) n FROM users WHERE ${roleFilter} AND origine1 IS NOT NULL GROUP BY origine ORDER BY n DESC LIMIT 12`).all();
+  const parNat       = db.prepare(`SELECT nationalite1 AS nationalite, COUNT(*) n FROM users WHERE ${roleFilter} AND nationalite1 IS NOT NULL GROUP BY nationalite ORDER BY n DESC LIMIT 10`).all();
+  const parRole      = db.prepare(`SELECT role, COUNT(*) n FROM users WHERE ${roleFilter} GROUP BY role ORDER BY n DESC`).all();
+  const parSitPro    = db.prepare(`SELECT situation_pro, COUNT(*) n FROM users WHERE ${roleFilter} AND situation_pro IS NOT NULL GROUP BY situation_pro ORDER BY n DESC LIMIT 10`).all();
+
+  // Top villes actives (activité 30j)
+  const villesActives = db.prepare(`
+    SELECT u.ville, u.pays, COUNT(DISTINCT a.user_id) n
+    FROM user_activity a JOIN users u ON u.id=a.user_id
+    WHERE a.date >= date('now','-30 days') AND u.${roleFilter} AND u.ville IS NOT NULL
+    GROUP BY u.ville ORDER BY n DESC LIMIT 10
+  `).all();
+
+  // Évolution inscriptions 6 derniers mois
+  const evolution = db.prepare(`
+    SELECT substr(created_at,1,7) AS mois, COUNT(*) n
+    FROM users WHERE ${roleFilter}
+    GROUP BY mois ORDER BY mois DESC LIMIT 6
+  `).all().reverse();
+
+  sendJSON(res, 200, {
+    totaux: { total, actifs_30j: actifs30j, nouveaux_30j: nouveaux30j },
+    par_ville: parVille, par_pays: parPays, par_origine: parOrigine,
+    par_nationalite: parNat, par_role: parRole, par_situation_pro: parSitPro,
+    villes_actives: villesActives, evolution
+  });
+});
+
 /* ===== MODULE CONTENU ===== */
 
 route("GET", "/api/admin/contenu", async (req, res) => {

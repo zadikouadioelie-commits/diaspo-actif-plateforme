@@ -46,6 +46,7 @@
 
       <span class="sb-group-lbl">🟨 Territoires</span>
       <a href="#membres" data-section="membres">👥 Membres</a>
+      <a href="#reseau-pro" data-section="reseau-pro">💼 Réseau Professionnel</a>
       <a href="#contenu" data-section="contenu">📄 Contenu diaspora</a>
 
       <span class="sb-group-lbl">🟪 Intelligence</span>
@@ -1685,6 +1686,127 @@
         <h2>Gestion des membres</h2>
         <div class="notice">Cette section affiche les membres inscrits sur la plateforme. Les données personnelles sont affichées en lecture seule pour l'administrateur. Seul l'utilisateur peut modifier son profil.</div>
         <div id="membres-list" style="margin-top:16px;"><div class="notice">Chargement…</div></div>
+      </section>
+
+      <!-- RÉSEAU PROFESSIONNEL -->
+      <section id="section-reseau-pro" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="margin:0;">💼 Réseau Professionnel</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Observatoire des compétences et dynamiques économiques de la diaspora</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-sm" id="rp-tab-stats" onclick="rpShowTab('stats')" style="background:var(--orange);color:#fff;">📊 Statistiques</button>
+            <button class="btn btn-sm btn-outline" id="rp-tab-liste" onclick="rpShowTab('liste')">🗂️ Liste</button>
+          </div>
+        </div>
+
+        <!-- Avertissement RGPD -->
+        <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:13px;color:#92400e;">
+          🔐 <strong>Données professionnelles uniquement.</strong> Emails, téléphones et adresses précises ne sont jamais exposés. Conformité RGPD.
+        </div>
+
+        <!-- Filtres -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:18px;">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;">Filtres</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <input id="rp-f-ville" class="input-field" style="width:140px;font-size:13px;" placeholder="Ville…" oninput="rpApplyFilters()">
+            <input id="rp-f-pays" class="input-field" style="width:140px;font-size:13px;" placeholder="Pays résidence…" oninput="rpApplyFilters()">
+            <input id="rp-f-origine" class="input-field" style="width:160px;font-size:13px;" placeholder="Pays d'origine…" oninput="rpApplyFilters()">
+            <input id="rp-f-domaine" class="input-field" style="width:160px;font-size:13px;" placeholder="Domaine / situation…" oninput="rpApplyFilters()">
+            <select id="rp-f-role" class="input-field" style="width:150px;font-size:13px;" onchange="rpApplyFilters()">
+              <option value="">Tous les types</option>
+              <option value="utilisateur">Utilisateur</option>
+              <option value="initiative">Initiative</option>
+              <option value="collectivite">Institution</option>
+              <option value="officiel">Officiel</option>
+            </select>
+            <select id="rp-f-actif" class="input-field" style="width:140px;font-size:13px;" onchange="rpApplyFilters()">
+              <option value="">Toute activité</option>
+              <option value="1">Actifs (30j)</option>
+            </select>
+            <button class="btn btn-sm btn-outline" onclick="rpResetFilters()">✕ Réinitialiser</button>
+          </div>
+        </div>
+
+        <!-- VUE STATISTIQUES -->
+        <div id="rp-view-stats">
+          <!-- KPI cards -->
+          <div class="grid grid-3" style="gap:14px;margin-bottom:20px;">
+            <div class="card" style="text-align:center;padding:18px;">
+              <div style="font-size:28px;font-weight:800;color:var(--orange);" id="rp-stat-total">—</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px;">Professionnels total</div>
+            </div>
+            <div class="card" style="text-align:center;padding:18px;">
+              <div style="font-size:28px;font-weight:800;color:#10b981;" id="rp-stat-actifs">—</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px;">Actifs ces 30 jours</div>
+            </div>
+            <div class="card" style="text-align:center;padding:18px;">
+              <div style="font-size:28px;font-weight:800;color:#6366f1;" id="rp-stat-nouveaux">—</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px;">Nouveaux ce mois</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <!-- Top villes -->
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">📍 Top villes</h4>
+              <div id="rp-chart-villes"></div>
+            </div>
+            <!-- Top origines -->
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">🌍 Pays d'origine</h4>
+              <div id="rp-chart-origines"></div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <!-- Pays résidence -->
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">🏠 Pays de résidence</h4>
+              <div id="rp-chart-pays"></div>
+            </div>
+            <!-- Situation pro -->
+            <div class="card" style="padding:16px;">
+              <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">💼 Situation professionnelle</h4>
+              <div id="rp-chart-sitpro"></div>
+            </div>
+          </div>
+
+          <!-- Évolution -->
+          <div class="card" style="padding:16px;margin-bottom:16px;">
+            <h4 style="margin:0 0 14px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">📈 Évolution des inscriptions (6 mois)</h4>
+            <div id="rp-chart-evolution" style="display:flex;align-items:flex-end;gap:8px;height:80px;"></div>
+          </div>
+
+          <!-- Villes actives -->
+          <div class="card" style="padding:16px;">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);">🔥 Villes les plus actives (30j)</h4>
+            <div id="rp-chart-villes-actives"></div>
+          </div>
+        </div>
+
+        <!-- VUE LISTE -->
+        <div id="rp-view-liste" style="display:none;">
+          <div id="rp-liste-info" style="font-size:13px;color:var(--muted);margin-bottom:10px;"></div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead>
+                <tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                  <th style="padding:10px 12px;text-align:left;font-weight:700;">Nom</th>
+                  <th style="padding:10px 12px;text-align:left;font-weight:700;">Titre / Situation</th>
+                  <th style="padding:10px 12px;text-align:left;font-weight:700;">Ville</th>
+                  <th style="padding:10px 12px;text-align:left;font-weight:700;">Pays résidence</th>
+                  <th style="padding:10px 12px;text-align:left;font-weight:700;">Pays d'origine</th>
+                  <th style="padding:10px 12px;text-align:left;font-weight:700;">Type</th>
+                  <th style="padding:10px 12px;text-align:center;font-weight:700;">Actif 30j</th>
+                </tr>
+              </thead>
+              <tbody id="rp-tbody"></tbody>
+            </table>
+          </div>
+          <div id="rp-pagination" style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap;"></div>
+        </div>
       </section>
 
       <!-- INITIATIVES -->
@@ -4823,6 +4945,11 @@ function goSection(name){
   if(lnk) lnk.classList.add('active');
 }
 
+/* ── Réseau Professionnel — chargement à l'ouverture ── */
+document.querySelectorAll(".sidebar a[data-section='reseau-pro']").forEach(a => {
+  a.addEventListener('click', () => setTimeout(() => loadReseauPro(), 80));
+});
+
 /* ── Widget stats accréditations DA (vue d'ensemble) ── */
 async function loadDAWidgetStats(){
   try{
@@ -5337,6 +5464,151 @@ async function submitAccordDirect(){
         <div style="font-weight:700;">${v.ville}</div>
         <div style="font-size:11px;color:var(--muted);">${v.pays || ""} · ${v.n} membre${v.n>1?"s":""}</div>
       </div>`).join("") || "<div class='notice'>Aucune donnée.</div>";
+  }
+
+  // ══ RÉSEAU PROFESSIONNEL ════════════════════════════════════
+  let _rpPage = 1;
+  let _rpStats = null;
+
+  async function loadReseauPro() {
+    if (!_rpStats) await rpLoadStats();
+    rpShowTab('stats');
+  }
+
+  async function rpLoadStats() {
+    const r = await api("GET", "/admin/reseau-pro/stats").catch(() => null);
+    if (!r) return;
+    _rpStats = r;
+
+    // KPIs
+    document.getElementById('rp-stat-total').textContent    = (r.totaux?.total || 0).toLocaleString('fr');
+    document.getElementById('rp-stat-actifs').textContent   = (r.totaux?.actifs_30j || 0).toLocaleString('fr');
+    document.getElementById('rp-stat-nouveaux').textContent = (r.totaux?.nouveaux_30j || 0).toLocaleString('fr');
+
+    // Fonction helper pour barres horizontales
+    function renderBars(containerId, data, keyLabel, keyVal, color) {
+      const el = document.getElementById(containerId);
+      if (!el || !data?.length) { if (el) el.innerHTML = '<div style="color:var(--muted);font-size:13px;">Aucune donnée</div>'; return; }
+      const max = data[0][keyVal] || 1;
+      el.innerHTML = data.slice(0,8).map(d => {
+        const pct = Math.round((d[keyVal] / max) * 100);
+        const lbl = d[keyLabel] || '—';
+        return `<div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+            <span style="font-weight:600;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lbl}</span>
+            <span style="color:var(--muted);">${d[keyVal]}</span>
+          </div>
+          <div style="background:var(--border);border-radius:99px;height:6px;">
+            <div style="width:${pct}%;background:${color};height:6px;border-radius:99px;"></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    renderBars('rp-chart-villes',         r.par_ville,        'ville',        'n', 'var(--orange)');
+    renderBars('rp-chart-origines',        r.par_origine,      'origine',      'n', '#6366f1');
+    renderBars('rp-chart-pays',            r.par_pays,         'pays',         'n', '#10b981');
+    renderBars('rp-chart-sitpro',          r.par_situation_pro,'situation_pro','n', '#f59e0b');
+    renderBars('rp-chart-villes-actives',  r.villes_actives,   'ville',        'n', '#ef4444');
+
+    // Évolution
+    const evo = document.getElementById('rp-chart-evolution');
+    if (evo && r.evolution?.length) {
+      const maxEvo = Math.max(...r.evolution.map(e => e.n), 1);
+      evo.innerHTML = r.evolution.map(e => {
+        const h = Math.max(8, Math.round((e.n / maxEvo) * 76));
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div style="font-size:11px;color:var(--muted);font-weight:600;">${e.n}</div>
+          <div style="width:100%;background:var(--orange);border-radius:4px 4px 0 0;height:${h}px;"></div>
+          <div style="font-size:10px;color:var(--muted);">${(e.mois||'').slice(5)}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  async function rpLoadListe(page = 1) {
+    _rpPage = page;
+    const tbody = document.getElementById('rp-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:16px;text-align:center;color:var(--muted);">Chargement…</td></tr>';
+
+    const params = new URLSearchParams({ page, limit: 30 });
+    const ville  = document.getElementById('rp-f-ville')?.value.trim();
+    const pays   = document.getElementById('rp-f-pays')?.value.trim();
+    const orig   = document.getElementById('rp-f-origine')?.value.trim();
+    const dom    = document.getElementById('rp-f-domaine')?.value.trim();
+    const role   = document.getElementById('rp-f-role')?.value;
+    const actif  = document.getElementById('rp-f-actif')?.value;
+    if (ville)  params.set('ville', ville);
+    if (pays)   params.set('pays', pays);
+    if (orig)   params.set('origine', orig);
+    if (dom)    params.set('domaine', dom);
+    if (role)   params.set('role', role);
+    if (actif)  params.set('actif', actif);
+
+    const r = await fetch(`/api/admin/reseau-pro?${params}`, { credentials: 'include' })
+      .then(x => x.json()).catch(() => ({ professionnels: [], total: 0 }));
+
+    const ROLE_LBL = { utilisateur:'Utilisateur', initiative:'Initiative', collectivite:'Institution', officiel:'Officiel' };
+
+    if (tbody) {
+      tbody.innerHTML = (r.professionnels || []).map(p => `
+        <tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background=''">
+          <td style="padding:9px 12px;font-weight:600;">${p.nom||''} ${p.prenom||''}</td>
+          <td style="padding:9px 12px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.titre_pro||p.situation_pro||'—'}</td>
+          <td style="padding:9px 12px;">${p.ville||'—'}</td>
+          <td style="padding:9px 12px;">${p.pays||'—'}</td>
+          <td style="padding:9px 12px;">${p.pays_origine||'—'}</td>
+          <td style="padding:9px 12px;"><span style="background:var(--border);border-radius:6px;padding:2px 8px;font-size:11px;">${ROLE_LBL[p.role]||p.role}</span></td>
+          <td style="padding:9px 12px;text-align:center;">${p.actif_30j ? '<span style="color:#10b981;font-weight:700;">●</span>' : '<span style="color:var(--border);">○</span>'}</td>
+        </tr>`).join('') || '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--muted);">Aucun résultat</td></tr>';
+    }
+
+    const info = document.getElementById('rp-liste-info');
+    if (info) info.textContent = `${(r.total||0).toLocaleString('fr')} professionnel(s) trouvé(s)`;
+
+    // Pagination
+    const totalPages = Math.ceil((r.total||0) / 30);
+    const pag = document.getElementById('rp-pagination');
+    if (pag) {
+      pag.innerHTML = '';
+      if (page > 1) {
+        const b = document.createElement('button');
+        b.className = 'btn btn-sm btn-outline'; b.textContent = '← Préc.';
+        b.onclick = () => rpLoadListe(page - 1); pag.appendChild(b);
+      }
+      const sp = document.createElement('span');
+      sp.style.cssText = 'font-size:13px;color:var(--muted);padding:0 6px;';
+      sp.textContent = `Page ${page} / ${totalPages || 1}`; pag.appendChild(sp);
+      if (page < totalPages) {
+        const b = document.createElement('button');
+        b.className = 'btn btn-sm btn-outline'; b.textContent = 'Suiv. →';
+        b.onclick = () => rpLoadListe(page + 1); pag.appendChild(b);
+      }
+    }
+  }
+
+  function rpShowTab(tab) {
+    document.getElementById('rp-view-stats').style.display = tab === 'stats' ? '' : 'none';
+    document.getElementById('rp-view-liste').style.display = tab === 'liste' ? '' : 'none';
+    document.getElementById('rp-tab-stats').style.background = tab === 'stats' ? 'var(--orange)' : '';
+    document.getElementById('rp-tab-stats').style.color      = tab === 'stats' ? '#fff' : '';
+    document.getElementById('rp-tab-stats').className = tab === 'stats' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+    document.getElementById('rp-tab-liste').className = tab === 'liste' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+    if (tab === 'stats' && !_rpStats) rpLoadStats();
+    if (tab === 'liste') rpLoadListe(1);
+  }
+
+  function rpApplyFilters() {
+    clearTimeout(window._rpFilterTimer);
+    window._rpFilterTimer = setTimeout(() => {
+      if (document.getElementById('rp-view-liste').style.display !== 'none') rpLoadListe(1);
+    }, 400);
+  }
+
+  function rpResetFilters() {
+    ['rp-f-ville','rp-f-pays','rp-f-origine','rp-f-domaine'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['rp-f-role','rp-f-actif'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    if (document.getElementById('rp-view-liste').style.display !== 'none') rpLoadListe(1);
   }
 
   // ══ CONTENU ════════════════════════════════════════════════
