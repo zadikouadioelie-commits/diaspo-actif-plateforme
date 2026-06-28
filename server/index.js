@@ -8347,12 +8347,12 @@ async function handleRequest(req, res) {
         const adminUser = db.prepare("SELECT id FROM users WHERE email='admin@diaspoactif.demo'").get();
         if (!adminUser) return sendJSON(res, 500, { error: "Compte admin introuvable." });
         const r2 = db.prepare(`INSERT INTO initiatives
-          (nom,slug,domaine,type,pays,ville,description,mission,statut,owner_user_id,is_verified,abonnement_actif)
-          VALUES (?,?,?,?,?,?,?,?,?,?,1,1)`).run(
+          (nom,slug,domaine,type,pays,ville,description,mission,owner_user_id,abonnement_actif)
+          VALUES (?,?,?,?,?,?,?,?,?,1)`).run(
           "Diaspo'Actif","diaspoactif-platform","diaspora","Organisation","International","Paris",
           "Canal officiel des Deals collaboratifs initiés par la plateforme Diaspo'Actif.",
           "Connecter les initiatives de la diaspora mondiale à travers des partenariats stratégiques.",
-          "active", adminUser.id
+          adminUser.id
         );
         daInit = { id: Number(r2.lastInsertRowid) };
         db.prepare("INSERT OR IGNORE INTO deal_accreditations (initiative_id,statut,admin_nom,motif) VALUES (?,'active','Système','Initiative officielle Diaspo''Actif')").run(daInit.id);
