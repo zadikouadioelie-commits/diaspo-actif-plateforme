@@ -851,10 +851,12 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
   if (!['brouillon','refusee'].includes(f.statut||'brouillon') && user.role !== 'administrateur') {
     return sendJSON(res, 400, { error: "Seules les formations en brouillon ou refusées peuvent être modifiées." });
   }
-  const { titre, description, objectifs, prerequis, niveau, langue, duree, duree_heures,
-          places, categorie, mode_acces, prix, telecharge_autorise, video_intro, image_url } = body;
-  const modeAcces = mode_acces || f.mode_acces || 'gratuit';
+  const n = v => (v === undefined ? null : v);
+  const modeAcces = body.mode_acces || f.mode_acces || 'gratuit';
   const commission = modeAcces === 'gratuit' ? 0 : modeAcces === 'payant_sauf_membres' ? 2 : 5;
+  const newTelecharge = body.telecharge_autorise != null ? (body.telecharge_autorise ? 1 : 0) : null;
+  const newStatut = (f.statut === 'refusee') ? 'brouillon' : f.statut;
+  const newMotif = (f.statut === 'refusee') ? null : f.motif_refus;
   db.prepare(`UPDATE formations SET
     titre=COALESCE(?,titre), description=COALESCE(?,description), objectifs=COALESCE(?,objectifs),
     prerequis=COALESCE(?,prerequis), niveau=COALESCE(?,niveau), langue=COALESCE(?,langue),
@@ -862,12 +864,12 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
     categorie=COALESCE(?,categorie), mode_acces=?, prix=COALESCE(?,prix),
     commission_pct=?, telecharge_autorise=COALESCE(?,telecharge_autorise),
     video_intro=COALESCE(?,video_intro), image_url=COALESCE(?,image_url),
-    statut=CASE WHEN statut='refusee' THEN 'brouillon' ELSE statut END,
-    motif_refus=CASE WHEN statut='refusee' THEN NULL ELSE motif_refus END
+    statut=?, motif_refus=?
     WHERE id=?`
-  ).run(titre,description,objectifs,prerequis,niveau,langue,duree,duree_heures,places,
-    categorie,modeAcces,prix,commission,telecharge_autorise!=null?(telecharge_autorise?1:0):null,
-    video_intro,image_url, params.id);
+  ).run(n(body.titre),n(body.description),n(body.objectifs),n(body.prerequis),
+    n(body.niveau),n(body.langue),n(body.duree),n(body.duree_heures),n(body.places),
+    n(body.categorie),modeAcces,n(body.prix),commission,newTelecharge,
+    n(body.video_intro),n(body.image_url),newStatut,newMotif,params.id);
   sendJSON(res, 200, { ok: true });
 });
 
