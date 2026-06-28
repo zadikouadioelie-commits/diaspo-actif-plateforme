@@ -2778,7 +2778,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   // ── O-Z : chargement automatique sur toutes les pages
   if (!window.__OZ_LOADED && !document.getElementById('oz-root')) {
     const _ozS = document.createElement('script');
-    _ozS.src = '/assets/oz.js?v=62';
+    _ozS.src = '/assets/oz.js?v=63';
     _ozS.defer = true;
     document.head.appendChild(_ozS);
   }

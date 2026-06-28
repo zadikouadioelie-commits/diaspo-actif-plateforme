@@ -817,9 +817,16 @@
       case 'nav_recherche':      await navTo('recherche');      break;
       case 'nav_dashboard':      await navTo('dashboard');      break;
       case 'nav_accreditations': {
+        // Déterminer le rôle réel : le cookie d'auth est HttpOnly (illisible côté
+        // client), donc _role retombe souvent sur « utilisateur ». On interroge l'API.
+        let role = _role;
+        try {
+          const me = await fetch('/api/auth/me', {credentials:'include'}).then(r=>r.json());
+          if (me && me.user && me.user.role) { role = me.user.role; _role = role; }
+        } catch(e) {}
         // Initiative : les accréditations (dont « Gestion des Associations ») sont
         // gérées dans son tableau de bord, pas sur la page générique.
-        if (_role === 'initiative') {
+        if (role === 'initiative') {
           addMsg('oz', '🏅 J\'ouvre vos accréditations...');
           await audit('navigate', 'accreditations');
           setTimeout(() => {
