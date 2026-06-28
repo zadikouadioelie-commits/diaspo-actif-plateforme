@@ -8341,8 +8341,24 @@ async function handleRequest(req, res) {
     if (pathname === "/api/admin/diaspoactif/deals") {
       const admin = getCurrentUser(req);
       if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
-      const daInit = db.prepare("SELECT id FROM initiatives WHERE slug='diaspoactif-platform'").get();
-      if (!daInit) return sendJSON(res, 500, { error: "Initiative Diaspo'Actif introuvable. Redémarrez le serveur." });
+      let daInit = db.prepare("SELECT id FROM initiatives WHERE slug='diaspoactif-platform'").get();
+      if (!daInit) {
+        // Création lazy si le seed ne l'a pas encore créée
+        const adminUser = db.prepare("SELECT id FROM users WHERE email='admin@diaspoactif.demo'").get();
+        if (!adminUser) return sendJSON(res, 500, { error: "Compte admin introuvable." });
+        const r2 = db.prepare(`INSERT INTO initiatives
+          (nom,slug,domaine,type,pays,ville,description,mission,statut,owner_user_id,is_verified,abonnement_actif)
+          VALUES (?,?,?,?,?,?,?,?,?,?,1,1)`).run(
+          "Diaspo'Actif","diaspoactif-platform","diaspora","Organisation","International","Paris",
+          "Canal officiel des Deals collaboratifs initiés par la plateforme Diaspo'Actif.",
+          "Connecter les initiatives de la diaspora mondiale à travers des partenariats stratégiques.",
+          "active", adminUser.id
+        );
+        daInit = { id: Number(r2.lastInsertRowid) };
+        db.prepare("INSERT OR IGNORE INTO deal_accreditations (initiative_id,statut,admin_nom,motif) VALUES (?,'active','Système','Initiative officielle Diaspo''Actif')").run(daInit.id);
+      }
+      // S'assurer que l'accréditation deal existe toujours
+      db.prepare("INSERT OR IGNORE INTO deal_accreditations (initiative_id,statut,admin_nom,motif) VALUES (?,'active','Système','Initiative officielle Diaspo''Actif')").run(daInit.id);
 
       if (req.method === "GET") {
         const deals = db.prepare(`SELECT d.*, i.nom as createur_nom,

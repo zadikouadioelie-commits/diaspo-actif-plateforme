@@ -704,6 +704,30 @@ function seed() {
     "organisation", "A.I.T.O Toulouse", "France", "initiative", 9.5
   );
 
+  /* ── Initiative virtuelle Diaspo'Actif pour les Deals de la plateforme ── */
+  const daInitExisting = db.prepare("SELECT id FROM initiatives WHERE slug='diaspoactif-platform'").get();
+  if (!daInitExisting) {
+    const daInitId = insertInitiative.run({
+      slug: 'diaspoactif-platform', nom: "Diaspo'Actif", sigle: 'DA',
+      pays: 'International', region: null, ville: 'Paris', zone: null,
+      nationalite1: null, nationalite2: null, domaine: 'diaspora',
+      type: 'Organisation', statut: 'active', description:
+        "Canal officiel des Deals collaboratifs initiés par la plateforme Diaspo'Actif.",
+      mission: "Connecter les initiatives de la diaspora mondiale à travers des partenariats stratégiques.",
+      site_web: null, email_public: 'contact@diaspoactif.com',
+      telephone: null, adresse: null, lat: 48.8566, lon: 2.3522,
+      membres: null, annee_creation: 2020, vues: 0, abonnes: 0,
+      is_verified: 1, abonnement_actif: 1, historique: null,
+      reseaux_sociaux: null, galerie: null, services: null,
+      profil_json: '{}'
+    }).lastInsertRowid;
+    db.prepare("UPDATE initiatives SET owner_user_id=? WHERE id=?").run(adminId, daInitId);
+    db.prepare("INSERT OR IGNORE INTO deal_accreditations (initiative_id,statut,admin_nom,motif) VALUES (?,'active','Système','Initiative officielle Diaspo''Actif — accès permanent')").run(daInitId);
+  } else {
+    // S'assurer que l'accréditation deal existe
+    db.prepare("INSERT OR IGNORE INTO deal_accreditations (initiative_id,statut,admin_nom,motif) VALUES (?,'active','Système','Initiative officielle Diaspo''Actif — accès permanent')").run(daInitExisting.id);
+  }
+
   // Abonner tous les comptes demo au compte officiel
   const { backfillOfficialFollow } = db;
   if (typeof backfillOfficialFollow === 'function') backfillOfficialFollow();
