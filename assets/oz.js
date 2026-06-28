@@ -816,7 +816,25 @@
       case 'nav_statistiques':   await navTo('statistiques');   break;
       case 'nav_recherche':      await navTo('recherche');      break;
       case 'nav_dashboard':      await navTo('dashboard');      break;
-      case 'nav_accreditations': await navTo('accreditations'); break;
+      case 'nav_accreditations': {
+        // Initiative : les accréditations (dont « Gestion des Associations ») sont
+        // gérées dans son tableau de bord, pas sur la page générique.
+        if (_role === 'initiative') {
+          addMsg('oz', '🏅 J\'ouvre vos accréditations...');
+          await audit('navigate', 'accreditations');
+          setTimeout(() => {
+            if (location.pathname.includes('/dashboard-initiative.html')) {
+              location.hash = '#accreditations';
+              if (window.initShowSection) window.initShowSection('accreditations');
+            } else {
+              location.href = '/dashboard-initiative.html#accreditations';
+            }
+          }, 500);
+        } else {
+          await navTo('accreditations');
+        }
+        break;
+      }
       case 'nav_cv':             await navTo('cv');             break;
       case 'nav_agenda':         await navTo('agenda');         break;
       case 'nav_profil':         await navTo('profil');         break;

@@ -2129,8 +2129,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       initShowSection(a.dataset.section);
     });
   });
-  /* Afficher cockpit par défaut */
-  initShowSection('cockpit');
+  /* Section initiale : depuis le hash d'URL si valide (ex. O-Z, liens directs), sinon cockpit */
+  function openFromHash() {
+    const h = (location.hash || '').replace('#','');
+    if (h && INIT_SECTIONS.includes(h)) initShowSection(h);
+    else initShowSection('cockpit');
+  }
+  openFromHash();
+  window.addEventListener('hashchange', openFromHash);
 
   /* Style commun projets */
   if(!document.getElementById('init-proj-style')){
