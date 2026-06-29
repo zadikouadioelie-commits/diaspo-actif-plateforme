@@ -1076,12 +1076,21 @@ function renderSections() {
     wrap.appendChild(communs);
   }
 
-  // Panel Confidentialité (owner only)
+  // Panel Confidentialité (owner only) — avec sous-onglets
   if (isOwn) {
     const conf = document.createElement('div');
     conf.id = 'ptab-confidentialite';
     conf.className = 'p-tab-panel';
-    conf.appendChild(buildPrivacyPanel());
+    conf.innerHTML = `
+      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;">
+        <button id="conf-sub-privacy" onclick="switchConfTab('privacy')" style="padding:10px 20px;font-size:13px;font-weight:700;background:none;border:none;border-bottom:2.5px solid var(--orange);color:var(--orange);cursor:pointer;margin-bottom:-2px;">🔒 Confidentialité</button>
+        <button id="conf-sub-codes" onclick="switchConfTab('codes')" style="padding:10px 20px;font-size:13px;font-weight:700;background:none;border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;margin-bottom:-2px;">🔑 Codes</button>
+      </div>
+      <div id="conf-panel-privacy"></div>
+      <div id="conf-panel-codes" style="display:none;"></div>
+    `;
+    const privacyContainer = conf.querySelector('#conf-panel-privacy');
+    privacyContainer.appendChild(buildPrivacyPanel());
     wrap.appendChild(conf);
   }
 
@@ -1189,39 +1198,39 @@ let _pubPage=1, _pubCat='all', _pubQ='';
 async function loadPublicationsTab(reset=true) {
   const panel = document.getElementById('ptab-publications');
   if (reset) { _pubPage=1; panel.innerHTML = buildPubHeader(); }
+  // Bouton "Créer un post" si propriétaire
+  if (isOwn && reset) {
+    const createBtn = document.createElement('div');
+    createBtn.style.cssText = 'margin-bottom:14px;';
+    createBtn.innerHTML = `<button class="btn btn-outline" onclick="if(window.Posts){Posts.openModal();}else{location.href='fil-actualite.html';}" style="border-color:#4338CA;color:#4338CA;font-weight:700;">✍️ Créer un post</button>`;
+    panel.prepend(createBtn);
+  }
   try {
     const r = await api('GET', `/profil/${profil.id}/publications?page=${_pubPage}&categorie=${_pubCat}&q=${encodeURIComponent(_pubQ)}`);
     let list = document.getElementById('pub-list');
     if (!list) { list = document.createElement('div'); list.id='pub-list'; panel.querySelector('.pub-list-wrap')?.appendChild(list); }
     if (reset) list.innerHTML = '';
     if (!r.publications.length && reset) {
-      list.innerHTML = '<div class="empty-p"><div class="ei">📝</div>Aucune publication pour l\'instant.</div>';
+      list.innerHTML = `<div class="empty-p"><div class="ei">📝</div>${isOwn ? 'Aucune publication. <button class="btn btn-sm" onclick="if(window.Posts){Posts.openModal();}else{location.href=\'fil-actualite.html\';}" style="background:#4338CA;color:#fff;border:none;border-radius:6px;padding:5px 12px;margin-left:8px;cursor:pointer;">Créer mon premier post</button>' : 'Aucune publication pour l\'instant.'}</div>`;
     } else {
-      const nom = [profil.prenom, profil.nom].filter(Boolean).join(' ') || profil.nom;
-      r.publications.forEach(p => {
-        const d = document.createElement('div');
-        d.className = 'post-card';
-        const avHtml = profil.photo_url ? `<img loading="lazy" src="${esc(profil.photo_url)}" alt="">` : `<span style="font-size:13px;font-weight:800">${initials(nom)}</span>`;
-        d.innerHTML = `
-          <div class="post-header">
-            <div class="post-av">${avHtml}</div>
-            <div class="post-meta">
-              <div class="pm-nom">${esc(nom)}</div>
-              <div class="pm-titre">${esc(profil.titre_pro||'Membre Diaspo\'Actif')}</div>
-              <div class="pm-date">${fmtDate(p.created_at)}</div>
-            </div>
-            <span class="post-cat-pill">${esc(p.categorie||p.type||'Publication')}</span>
-          </div>
-          <div class="post-body"><div class="post-text">${esc(p.contenu||'')}</div></div>
-          <div class="post-stats"><span>❤️ ${p.nb_reactions||0}</span><span>💬 ${p.nb_commentaires||0}</span></div>`;
-        list.appendChild(d);
-      });
+      if (window.Posts) {
+        Posts.renderFeed(r.publications, list.id || 'pub-list', { currentUserId: CU?.id });
+      } else {
+        r.publications.forEach(p => {
+          const d = document.createElement('div');
+          d.className = 'post-card';
+          const nom = [profil.prenom, profil.nom].filter(Boolean).join(' ') || profil.nom;
+          const avHtml = profil.photo_url ? `<img loading="lazy" src="${esc(profil.photo_url)}" alt="">` : `<span style="font-size:13px;font-weight:800">${initials(nom)}</span>`;
+          d.innerHTML = `<div class="post-header"><div class="post-av">${avHtml}</div><div class="post-meta"><div class="pm-nom">${esc(nom)}</div><div class="pm-date">${fmtDate(p.created_at)}</div></div></div><div class="post-body"><div class="post-text">${esc(p.contenu||'')}</div></div><div class="post-stats"><span>❤️ ${p.nb_reactions||0}</span><span>💬 ${p.nb_commentaires||0}</span></div>`;
+          list.appendChild(d);
+        });
+      }
       const existing = document.getElementById('pub-more-btn');
       if (existing) existing.remove();
       if (r.page < r.pages) {
         const btn = document.createElement('button');
         btn.id='pub-more-btn'; btn.className='act-load-more';
-        btn.textContent=`Voir plus`;
+        btn.textContent='Voir plus';
         btn.onclick=()=>{ _pubPage++; loadPublicationsTab(false); };
         list.after(btn);
       }
@@ -1322,6 +1331,196 @@ async function savePrivacy() {
     const msg = document.getElementById('priv-msg');
     if (msg) { msg.style.display='block'; clearTimeout(_privTimer); _privTimer=setTimeout(()=>msg.style.display='none',2500); }
   } catch(e) {}
+}
+
+/* ======================================================
+   SOUS-ONGLETS — CONFIDENTIALITÉ (privacy / codes)
+   ====================================================== */
+window.switchConfTab = function(tab) {
+  document.getElementById('conf-panel-privacy').style.display = tab === 'privacy' ? '' : 'none';
+  document.getElementById('conf-panel-codes').style.display = tab === 'codes' ? '' : 'none';
+  document.getElementById('conf-sub-privacy').style.borderBottomColor = tab === 'privacy' ? 'var(--orange)' : 'transparent';
+  document.getElementById('conf-sub-privacy').style.color = tab === 'privacy' ? 'var(--orange)' : 'var(--muted)';
+  document.getElementById('conf-sub-codes').style.borderBottomColor = tab === 'codes' ? 'var(--orange)' : 'transparent';
+  document.getElementById('conf-sub-codes').style.color = tab === 'codes' ? 'var(--orange)' : 'var(--muted)';
+  if (tab === 'codes') renderCodesPanel();
+};
+
+let _codesLoaded = false;
+async function renderCodesPanel() {
+  if (_codesLoaded) return;
+  _codesLoaded = true;
+  const panel = document.getElementById('conf-panel-codes');
+  if (!panel) return;
+
+  // Charger da_id du profil
+  const daId = profil.da_id || '—';
+  const profileUrl = `${location.origin}/profil.html?id=${profil.id}`;
+
+  panel.innerHTML = `
+    <style>
+      .codes-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;}
+      .codes-card h4{margin:0 0 6px;font-size:14px;font-weight:800;}
+      .codes-card .codes-sub{font-size:12px;color:var(--muted);margin:0 0 14px;}
+      .da-badge{font-family:monospace;font-size:18px;font-weight:900;letter-spacing:3px;color:var(--orange);background:rgba(255,107,0,0.07);border:1.5px solid var(--orange);border-radius:8px;padding:8px 18px;display:inline-block;margin-bottom:12px;}
+      .ds-masked{font-size:20px;letter-spacing:4px;color:var(--muted);margin-bottom:12px;font-family:monospace;}
+      .ds-revealed{font-family:monospace;font-size:16px;font-weight:800;letter-spacing:3px;color:#1e293b;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:8px;padding:8px 16px;margin-bottom:12px;word-break:break-all;}
+      .codes-btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+      .codes-btn{font-size:12px;padding:6px 14px;border-radius:7px;cursor:pointer;font-weight:700;border:1.5px solid;background:transparent;}
+      .codes-btn.orange{color:var(--orange);border-color:var(--orange);}
+      .codes-btn.purple{color:#7c3aed;border-color:#7c3aed;}
+      .codes-btn.red{color:#dc2626;border-color:#dc2626;}
+      .codes-btn.green{color:#16a34a;border-color:#16a34a;}
+      .ds-pwd-form{margin-top:14px;display:none;}
+      .ds-pwd-form input{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);margin-bottom:8px;}
+      .ds-err{color:#dc2626;font-size:12px;margin-top:4px;display:none;}
+      .history-list{margin-top:12px;}
+      .history-row{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+      .history-action{font-weight:700;color:var(--text);}
+      .history-meta{color:var(--muted);text-align:right;font-size:11px;}
+    </style>
+
+    <!-- Carte 1 : Identifiant DA -->
+    <div class="codes-card">
+      <h4>🪪 Identifiant Diaspo'Actif (ID DA)</h4>
+      <p class="codes-sub">Identifiant public · visible sur votre profil et sous votre QR Code · utilisable pour vous retrouver, vous inviter ou créer un partenariat</p>
+      <div id="codes-da-qr" style="margin-bottom:12px;"></div>
+      <div class="da-badge" id="codes-da-badge">${daId}</div>
+      <div class="codes-btn-row">
+        <button class="codes-btn orange" onclick="navigator.clipboard.writeText('${daId}').then(()=>showToast?.('✅ ID copié !'))">📋 Copier l'ID</button>
+        <button class="codes-btn orange" onclick="(async()=>{const r=await fetch('/api/profil/ds-id/log-copy',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:'{}'});})();" style="display:none">log</button>
+        <button class="codes-btn purple" onclick="window._dlQRCode()">⬇️ Télécharger le QR Code</button>
+        <button class="codes-btn purple" onclick="navigator.share?navigator.share({title:'Mon profil Diaspo\\'Actif',text:'Retrouvez-moi : ${daId}',url:'${profileUrl}'}).catch(()=>{}):navigator.clipboard.writeText('${profileUrl}').then(()=>showToast?.('🔗 Lien copié !'))">🔗 Partager</button>
+      </div>
+    </div>
+
+    <!-- Carte 2 : Code de Sécurité DS-ID -->
+    <div class="codes-card">
+      <h4>🔐 Code de Sécurité Diaspo'Actif (DS-ID)</h4>
+      <p class="codes-sub">Votre signature numérique personnelle · strictement confidentielle · jamais visible publiquement · utilisée pour signer des deals, partenariats et votes</p>
+      <div id="ds-masked-view">
+        <div class="ds-masked">••••••••••••••••••••</div>
+        <div class="codes-btn-row">
+          <button class="codes-btn green" onclick="window._showDsIdForm('reveal')">👁 Afficher</button>
+        </div>
+      </div>
+      <div id="ds-revealed-view" style="display:none;">
+        <div class="ds-revealed" id="ds-value"></div>
+        <div class="codes-btn-row">
+          <button class="codes-btn green" onclick="window._copyDsId()">📋 Copier</button>
+          <button class="codes-btn red" onclick="window._showDsIdForm('regen')">🔄 Régénérer</button>
+          <button class="codes-btn orange" onclick="window._hideDsId()">🙈 Masquer</button>
+        </div>
+      </div>
+      <!-- Formulaire mot de passe -->
+      <div class="ds-pwd-form" id="ds-pwd-form">
+        <div id="ds-pwd-title" style="font-size:13px;font-weight:700;margin-bottom:8px;">🔑 Entrez votre mot de passe pour continuer</div>
+        <input type="password" id="ds-pwd-input" placeholder="Votre mot de passe" autocomplete="current-password">
+        <div id="ds-pwd-err" class="ds-err"></div>
+        <div class="codes-btn-row" style="margin-top:4px;">
+          <button class="codes-btn green" onclick="window._submitDsId()" style="background:var(--orange);color:#fff;border-color:var(--orange);">Valider</button>
+          <button class="codes-btn orange" onclick="window._cancelDsId()">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Historique -->
+    <div class="codes-card">
+      <h4>📋 Historique de sécurité</h4>
+      <div id="ds-history-list"><p style="font-size:13px;color:var(--muted);">Chargement…</p></div>
+    </div>
+  `;
+
+  // Rendre le QR code
+  if (window.ProfileQR) {
+    ProfileQR.render(document.getElementById('codes-da-qr'), {
+      userId: profil.id, userNom: profil.nom || '', userRole: profil.role || '', size: 120
+    });
+  }
+
+  window._dlQRCode = function() {
+    const canvas = document.querySelector('#codes-da-qr canvas');
+    if (!canvas) return;
+    const a = document.createElement('a');
+    a.download = `qr-diaspoactif-${daId}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  };
+
+  let _dsAction = 'reveal';
+  window._showDsIdForm = function(action) {
+    _dsAction = action;
+    document.getElementById('ds-pwd-form').style.display = '';
+    document.getElementById('ds-pwd-title').textContent = action === 'regen'
+      ? '⚠️ Régénérer le DS-ID — entrez votre mot de passe (l\'ancien code sera invalidé)'
+      : '🔑 Entrez votre mot de passe pour afficher votre DS-ID';
+    document.getElementById('ds-pwd-input').value = '';
+    document.getElementById('ds-pwd-err').style.display = 'none';
+    document.getElementById('ds-pwd-input').focus();
+  };
+  window._cancelDsId = function() {
+    document.getElementById('ds-pwd-form').style.display = 'none';
+  };
+  window._hideDsId = function() {
+    document.getElementById('ds-revealed-view').style.display = 'none';
+    document.getElementById('ds-masked-view').style.display = '';
+    document.getElementById('ds-value').textContent = '';
+  };
+  window._copyDsId = async function() {
+    const val = document.getElementById('ds-value').textContent;
+    if (!val) return;
+    await navigator.clipboard.writeText(val);
+    await api('POST', '/profil/ds-id/log-copy', {});
+    showToast?.('📋 DS-ID copié !');
+  };
+  window._submitDsId = async function() {
+    const pwd = document.getElementById('ds-pwd-input').value;
+    const err = document.getElementById('ds-pwd-err');
+    err.style.display = 'none';
+    if (!pwd) { err.textContent = 'Mot de passe requis.'; err.style.display = 'block'; return; }
+    try {
+      if (_dsAction === 'regen') {
+        const r = await api('POST', '/profil/ds-id/regenerate', { password: pwd });
+        document.getElementById('ds-value').textContent = r.ds_id;
+        document.getElementById('ds-pwd-form').style.display = 'none';
+        document.getElementById('ds-masked-view').style.display = 'none';
+        document.getElementById('ds-revealed-view').style.display = '';
+        showToast?.('✅ DS-ID régénéré avec succès.');
+      } else {
+        const r = await api('POST', '/profil/ds-id/reveal', { password: pwd });
+        document.getElementById('ds-value').textContent = r.ds_id;
+        document.getElementById('ds-pwd-form').style.display = 'none';
+        document.getElementById('ds-masked-view').style.display = 'none';
+        document.getElementById('ds-revealed-view').style.display = '';
+      }
+      loadDsHistory();
+    } catch(e) {
+      err.textContent = e.message || 'Erreur de validation.';
+      err.style.display = 'block';
+    }
+  };
+
+  // Touche Entrée dans le champ mot de passe
+  document.getElementById('ds-pwd-input').addEventListener('keydown', e => { if (e.key === 'Enter') window._submitDsId(); });
+
+  async function loadDsHistory() {
+    const el = document.getElementById('ds-history-list');
+    try {
+      const r = await api('GET', '/profil/ds-id/history');
+      if (!r.history.length) { el.innerHTML = '<p style="font-size:13px;color:var(--muted);">Aucune activité enregistrée.</p>'; return; }
+      const labels = { creation:'Création', consultation:'Consultation', copie:'Copie', regeneration:'Régénération', signature:'Signature numérique', echec_validation:'Tentative échouée' };
+      const colors = { creation:'#16a34a', consultation:'#2563eb', copie:'#7c3aed', regeneration:'#d97706', signature:'#0891b2', echec_validation:'#dc2626' };
+      el.innerHTML = '<div class="history-list">' + r.history.map(h => `
+        <div class="history-row">
+          <span class="history-action" style="color:${colors[h.action]||'var(--text)'}">${labels[h.action]||h.action}</span>
+          <div class="history-meta">
+            <div>${new Date(h.created_at).toLocaleString('fr-FR')}</div>
+            ${h.ip ? `<div>IP : ${h.ip}</div>` : ''}
+          </div>
+        </div>`).join('') + '</div>';
+    } catch(e) { el.innerHTML = '<p style="font-size:13px;color:var(--muted);">Historique indisponible.</p>'; }
+  }
+  loadDsHistory();
 }
 
 /* ======================================================
@@ -2043,6 +2242,7 @@ init();
 </script>
 <script src="assets/trust-score.js"></script>
 <script src="assets/profile-qr.js"></script>
+<script src="assets/posts.js"></script>
 <script src="assets/chatbot.js"></script>
 </body>
 </html>

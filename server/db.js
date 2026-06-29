@@ -816,6 +816,40 @@ db.exec(`
   );
 `);
 
+/* ══ LISTES DE DIFFUSION ══ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS listes_diffusion (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    proprietaire_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    description TEXT,
+    couleur TEXT DEFAULT '#1B3A6B',
+    icone TEXT DEFAULT '📋',
+    notes TEXT,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(proprietaire_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS listes_diffusion_contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    liste_id INTEGER NOT NULL,
+    user_id INTEGER,
+    email TEXT,
+    nom TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(liste_id) REFERENCES listes_diffusion(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+`);
+// Migrations listes_diffusion v2
+const _ldCols = db.prepare("PRAGMA table_info(listes_diffusion)").all().map(c=>c.name);
+[["couleur TEXT DEFAULT '#1B3A6B'","couleur"],["icone TEXT DEFAULT '📋'","icone"],["notes TEXT","notes"],["ordre INTEGER DEFAULT 0","ordre"]]
+  .forEach(([def,col])=>{ if(!_ldCols.includes(col)) try{db.prepare(`ALTER TABLE listes_diffusion ADD COLUMN ${def}`).run();}catch(e){} });
+const _ldcCols = db.prepare("PRAGMA table_info(listes_diffusion_contacts)").all().map(c=>c.name);
+if(!_ldcCols.includes('user_id')) try{db.prepare("ALTER TABLE listes_diffusion_contacts ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL").run();}catch(e){}
+if(!_ldcCols.includes('email') && _ldcCols.includes('email')) {} // email already exists
+
 /* ══ WALLET SYSTÈME ══ */
 db.exec(`
   /* ── WALLET LEDGER (IMMUABLE — INSERT ONLY) ── */
@@ -906,6 +940,68 @@ const MIGRATIONS = [
   ["evenements", "ville TEXT"],
   ["evenements", "inscription_ouverte INTEGER DEFAULT 1"],
   ["evenements", "lien_inscription TEXT"],
+  // Événements v2 — champs complémentaires
+  ["evenements", "heure_debut TEXT"],
+  ["evenements", "heure_fin TEXT"],
+  ["evenements", "date_fin TEXT"],
+  ["evenements", "lien_visio TEXT"],
+  ["evenements", "visibilite TEXT DEFAULT 'public'"],
+  // Événements v3 — multimédia
+  ["evenements", "image_couverture TEXT"],
+  ["evenements", "galerie_photos TEXT DEFAULT '[]'"],
+  ["evenements", "video1_url TEXT"],
+  ["evenements", "video1_titre TEXT"],
+  ["evenements", "video2_url TEXT"],
+  ["evenements", "video2_titre TEXT"],
+  ["evenements", "pdf_url TEXT"],
+  ["evenements", "pdf_nom TEXT"],
+  ["evenements", "pdf_acces TEXT DEFAULT 'public'"],
+  // Billetterie events v2 — multimédia
+  ["events", "image_couverture TEXT"],
+  ["events", "galerie_photos TEXT DEFAULT '[]'"],
+  ["events", "video1_url TEXT"],
+  ["events", "video1_titre TEXT"],
+  ["events", "video2_url TEXT"],
+  ["events", "video2_titre TEXT"],
+  ["events", "pdf_url TEXT"],
+  ["events", "pdf_nom TEXT"],
+  ["events", "pdf_acces TEXT DEFAULT 'public'"],
+  // Billetterie events v3 — cible
+  ["events", "cible_type TEXT DEFAULT 'tous'"],
+  ["events", "cible_liste_ids TEXT DEFAULT '[]'"],
+  // Billetterie events v4 — fiche conceptuelle
+  ["events", "fc_resume TEXT"],
+  ["events", "fc_objectifs TEXT"],
+  ["events", "fc_public TEXT"],
+  ["events", "fc_programme TEXT"],
+  ["events", "fc_partenaires TEXT"],
+  ["events", "fc_contact TEXT"],
+  ["events", "fc_notes TEXT"],
+  // Billetterie events v5 — partenaires structurés, vidéos fichiers, planification
+  ["events", "fc_partenaires_ids TEXT DEFAULT '[]'"],
+  ["events", "video1_thumb TEXT"],
+  ["events", "video2_thumb TEXT"],
+  ["events", "programmed_at TEXT"],
+  ["events", "timezone TEXT DEFAULT 'Europe/Paris'"],
+  // Billetterie events v6 — gestion inscriptions sécurisées
+  ["events", "inscription_mode TEXT DEFAULT 'libre'"],
+  ["events", "nb_places INTEGER"],
+  ["events", "liste_attente INTEGER DEFAULT 0"],
+  // Billetterie events v7 — rayon de publication + métriques + exposition
+  ["events", "rayon_publication TEXT DEFAULT 'international'"],
+  ["events", "vues_total INTEGER DEFAULT 0"],
+  ["events", "vues_uniques INTEGER DEFAULT 0"],
+  ["events", "nb_partages INTEGER DEFAULT 0"],
+  ["events", "nb_sauvegardes INTEGER DEFAULT 0"],
+  ["events", "publie_at TEXT"],
+  ["events", "duree_exposition_jours INTEGER DEFAULT 20"],
+  // Dossier QR Code Participants — cycle de vie
+  ["events", "qr_folder_notified_at TEXT"],
+  ["events", "qr_folder_purged_at TEXT"],
+  // Agenda events — lien source
+  ["agenda_events", "source_type TEXT DEFAULT 'manuel'"],
+  ["agenda_events", "source_id INTEGER"],
+  ["agenda_events", "event_id INTEGER"],
   // Collaborations enrichies
   ["collaborations", "titre TEXT"],
   ["collaborations", "description TEXT"],
@@ -1018,6 +1114,17 @@ const MIGRATIONS = [
   ["users", "temoignage_derniere_demande TEXT"],
   ["users", "demo_vue INTEGER DEFAULT 0"],
   ["initiatives", "signalements_confirmes INTEGER DEFAULT 0"],
+  ["initiatives", "commune TEXT"],
+  ["initiatives", "departement TEXT"],
+  ["initiatives", "comment_entendu TEXT"],
+  ["initiatives", "attentes TEXT"],
+  ["initiatives", "autorisation_temoignage INTEGER DEFAULT 0"],
+  ["initiatives", "nb_salaries INTEGER DEFAULT 0"],
+  ["initiatives", "linkedin TEXT"],
+  ["initiatives", "twitter TEXT"],
+  ["initiatives", "youtube TEXT"],
+  ["initiatives", "forme_autre TEXT"],
+  ["initiatives", "pays_origine TEXT"],
   // Partenaires Officiels — champs de configuration visibilité
   ["partenaires_officiels", "priorite INTEGER DEFAULT 0"],
   ["partenaires_officiels", "mise_en_avant INTEGER DEFAULT 0"],
@@ -1025,7 +1132,182 @@ const MIGRATIONS = [
   ["partenaires_officiels", "periode_fin TEXT"],
   ["partenaires_officiels", "slogan TEXT"],
   ["partenaires_officiels", "cles_matching TEXT DEFAULT '[]'"],
+  // ── Comptes Étatiques ──
+  ["users", "type_organisme TEXT"],
+  ["users", "sigle_institution TEXT"],
+  ["users", "description_institution TEXT"],
+  ["users", "tel_secondaire TEXT"],
+  ["users", "email_officiel TEXT"],
+  ["users", "email_secondaire TEXT"],
+  ["users", "site_officiel TEXT"],
+  ["users", "facebook_officiel TEXT"],
+  ["users", "twitter_officiel TEXT"],
+  ["users", "linkedin_officiel TEXT"],
+  ["users", "youtube_officiel TEXT"],
+  ["users", "instagram_officiel TEXT"],
+  ["users", "tiktok_officiel TEXT"],
+  ["users", "whatsapp_officiel TEXT"],
+  ["users", "telegram_officiel TEXT"],
+  ["users", "nom_responsable_etatique TEXT"],
+  ["users", "prenom_responsable_etatique TEXT"],
+  ["users", "fonction_responsable_etatique TEXT"],
+  ["users", "date_prise_fonction TEXT"],
+  ["users", "date_fin_mandat TEXT"],
+  ["users", "photo_responsable TEXT"],
+  ["users", "email_responsable_etatique TEXT"],
+  ["users", "tel_responsable_etatique TEXT"],
+  ["users", "declaration_officielle INTEGER DEFAULT 0"],
+  ["users", "statut_etatique TEXT DEFAULT 'declare'"],
+  ["users", "domaine_utilisateur TEXT"],
+  // ── Comptes Étatiques v2 : 4 sections ──
+  // Section 1 – Institution
+  ["users", "date_creation_institution TEXT"],
+  ["users", "devise_institution TEXT"],
+  ["users", "logo_url TEXT"],
+  // Section 2 – Pays d'origine / autorité de rattachement
+  ["users", "pays_origine_institution TEXT"],
+  ["users", "ministere_tutelle TEXT"],
+  ["users", "administration_rattachement TEXT"],
+  ["users", "region_origine TEXT"],
+  // Section 3 – Pays d'exercice
+  ["users", "pays_exercice TEXT"],
+  ["users", "region_exercice TEXT"],
+  ["users", "departement_exercice TEXT"],
+  ["users", "ville_exercice TEXT"],
+  ["users", "adresse_exercice TEXT"],
+  ["users", "code_postal_exercice TEXT"],
+  ["users", "coordonnees_gps TEXT"],
+  ["users", "horaires_ouverture TEXT"],
+  ["users", "site_local TEXT"],
+  // Section 4 – Responsable
+  ["users", "signature_responsable TEXT"],
+  // Hiérarchie institutionnelle
+  ["users", "parent_institution_id INTEGER"],
+  // ── Badge disponibilité emploi ──
+  ["users", "disponible_pour_travailler INTEGER DEFAULT 0"],
+  // ── Recrutement campagnes enrichies ──
+  ["recrutement_campagnes", "titre_poste TEXT"],
+  ["recrutement_campagnes", "secteur_activite TEXT"],
+  ["recrutement_campagnes", "region TEXT"],
+  ["recrutement_campagnes", "departement TEXT"],
+  ["recrutement_campagnes", "teletravail TEXT DEFAULT 'non'"],
+  ["recrutement_campagnes", "niveau_etudes TEXT"],
+  ["recrutement_campagnes", "experience_annees TEXT"],
+  ["recrutement_campagnes", "competences TEXT DEFAULT '[]'"],
+  ["recrutement_campagnes", "langues TEXT DEFAULT '[]'"],
+  ["recrutement_campagnes", "certifications TEXT DEFAULT '[]'"],
+  ["recrutement_campagnes", "qualites TEXT DEFAULT '[]'"],
+  ["recrutement_campagnes", "date_debut TEXT"],
+  ["recrutement_campagnes", "duree_mission TEXT"],
+  ["recrutement_campagnes", "remuneration TEXT"],
+  ["recrutement_campagnes", "devise TEXT DEFAULT 'EUR'"],
+  ["recrutement_campagnes", "nb_postes INTEGER DEFAULT 1"],
+  ["recrutement_campagnes", "photos_json TEXT DEFAULT '[]'"],
+  ["recrutement_campagnes", "pdf_b64 TEXT"],
+  ["recrutement_campagnes", "pdf_nom TEXT"],
+  ["recrutement_campagnes", "date_limite_candidature TEXT"],
+  ["recrutement_campagnes", "nb_commentaires INTEGER DEFAULT 0"],
+  ["recrutement_campagnes", "nb_favoris INTEGER DEFAULT 0"],
+  ["recrutement_campagnes", "nb_republications INTEGER DEFAULT 0"],
+  ["recrutement_campagnes", "fil_post_id INTEGER"],
+  // ── Recrutement candidatures enrichies ──
+  ["recrutement_candidatures", "cv_snapshot TEXT"],
+  ["recrutement_candidatures", "lettre_snapshot TEXT"],
+  ["recrutement_candidatures", "documents_json TEXT DEFAULT '[]'"],
+  // ── Sondages enrichis ──
+  ["sondages", "rayon_publication TEXT DEFAULT 'national'"],
+  ["sondages", "nb_vues INTEGER DEFAULT 0"],
+  ["sondages", "nb_reactions INTEGER DEFAULT 0"],
+  ["sondages", "nb_commentaires INTEGER DEFAULT 0"],
+  ["sondages", "nb_republications INTEGER DEFAULT 0"],
+  ["sondages", "nb_favoris INTEGER DEFAULT 0"],
+  ["sondages", "photos_json TEXT DEFAULT '[]'"],
+  ["sondages", "pdf_b64 TEXT"],
+  ["sondages", "pdf_nom TEXT"],
+  ["sondages", "video_url TEXT"],
+  ["sondages", "objectif TEXT"],
+  ["sondages", "categorie TEXT DEFAULT 'autre'"],
+  ["sondages", "ville TEXT"],
+  ["sondages", "pays TEXT"],
+  ["sondages", "region TEXT"],
+  ["sondages", "departement TEXT"],
+  ["sondages", "confidentialite TEXT DEFAULT 'anonyme'"],
+  ["sondages", "resultats_visibles TEXT DEFAULT 'apres_cloture'"],
+  ["sondages", "date_debut TEXT"],
+  ["sondages", "une_reponse_par_compte INTEGER DEFAULT 1"],
+  ["sondages", "modification_autorisee INTEGER DEFAULT 0"],
+  ["sondages", "fil_post_id INTEGER"],
+  // ── Questions sondage enrichies ──
+  ["sondage_questions", "description TEXT"],
+  ["sondage_questions", "min_label TEXT"],
+  ["sondage_questions", "max_label TEXT"],
+  ["sondage_questions", "min_val INTEGER DEFAULT 1"],
+  ["sondage_questions", "max_val INTEGER DEFAULT 5"],
 ];
+
+/* ===== COMPTES ÉTATIQUES : tables spécifiques ===== */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS partenaires_institutionnels (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    institution_id   INTEGER NOT NULL,
+    partenaire_id    INTEGER NOT NULL,
+    statut           TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','accepte','refuse')),
+    comment_connu    TEXT,
+    invited_by       INTEGER,
+    created_at       TEXT DEFAULT (datetime('now')),
+    updated_at       TEXT DEFAULT (datetime('now')),
+    UNIQUE(institution_id, partenaire_id),
+    FOREIGN KEY(institution_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(partenaire_id)  REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(invited_by)     REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS historique_responsables (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    nom          TEXT NOT NULL,
+    prenom       TEXT,
+    fonction     TEXT,
+    date_debut   TEXT,
+    date_fin     TEXT,
+    created_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS representations_institutionnelles (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    institution_id      INTEGER NOT NULL,
+    nom                 TEXT NOT NULL,
+    pays_exercice       TEXT NOT NULL,
+    region              TEXT,
+    departement         TEXT,
+    ville               TEXT,
+    adresse             TEXT,
+    code_postal         TEXT,
+    coordonnees_gps     TEXT,
+    telephone           TEXT,
+    tel_secondaire      TEXT,
+    email_officiel      TEXT,
+    site_local          TEXT,
+    horaires_ouverture  TEXT,
+    facebook_officiel   TEXT,
+    twitter_officiel    TEXT,
+    linkedin_officiel   TEXT,
+    youtube_officiel    TEXT,
+    instagram_officiel  TEXT,
+    nom_responsable     TEXT,
+    prenom_responsable  TEXT,
+    fonction_responsable TEXT,
+    email_responsable   TEXT,
+    tel_responsable     TEXT,
+    date_prise_fonction TEXT,
+    date_fin_mandat     TEXT,
+    statut              TEXT DEFAULT 'active' CHECK(statut IN ('active','inactive','fermee')),
+    created_at          TEXT DEFAULT (datetime('now')),
+    updated_at          TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(institution_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
 
 /* ===== SYSTÈME D'ACCRÉDITATIONS DIASPO'ACTIF ===== */
 db.exec(`
@@ -2121,6 +2403,20 @@ db.exec(`
      DAA-Lang — tables des modules complémentaires
      ════════════════════════════════════════════════════════════════════ */
 
+  /* ── INITIATIVE MEMBRES : affiliations avec validation ── */
+  CREATE TABLE IF NOT EXISTS initiative_membres (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id   INTEGER NOT NULL,
+    user_id         INTEGER NOT NULL,
+    fonction        TEXT,
+    statut          TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','accepte','refuse')),
+    created_at      TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now')),
+    UNIQUE(initiative_id, user_id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
   /* ── DSL MEMBERS.ROLES : rattachement compte plateforme ⇄ rôle asso ── */
   CREATE TABLE IF NOT EXISTS asso_membre_roles (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2792,5 +3088,395 @@ try { db.exec("ALTER TABLE user_accreditations ADD COLUMN feature_slug TEXT"); }
 
 /* Note : l'initiative virtuelle diaspoactif-platform est créée par seed.js après les users */
 
+/* ===== EXTENSION SYSTÈME DE POSTS (2026-06-29) ===== */
+
+/* Nouvelles colonnes fil_posts */
+const postsAlters = [
+  "ALTER TABLE fil_posts ADD COLUMN pub_type TEXT",
+  "ALTER TABLE fil_posts ADD COLUMN media_url TEXT",
+  "ALTER TABLE fil_posts ADD COLUMN media_type TEXT",
+  "ALTER TABLE fil_posts ADD COLUMN article_titre TEXT",
+  "ALTER TABLE fil_posts ADD COLUMN article_contenu TEXT",
+  "ALTER TABLE fil_posts ADD COLUMN video_duree INTEGER",
+  "ALTER TABLE fil_posts ADD COLUMN original_post_id INTEGER",
+  "ALTER TABLE fil_posts ADD COLUMN repost_commentaire TEXT",
+  "ALTER TABLE fil_posts ADD COLUMN visibilite TEXT DEFAULT 'public'",
+  "ALTER TABLE fil_posts ADD COLUMN medias TEXT DEFAULT '[]'",
+  "ALTER TABLE fil_posts ADD COLUMN hashtags TEXT DEFAULT '[]'",
+  "ALTER TABLE fil_posts ADD COLUMN statut TEXT DEFAULT 'publie'",
+  "ALTER TABLE fil_posts ADD COLUMN programmed_at TEXT",
+  "ALTER TABLE fil_posts ADD COLUMN localisation_pays TEXT",
+  "ALTER TABLE fil_posts ADD COLUMN localisation_ville TEXT",
+  "ALTER TABLE fil_posts ADD COLUMN vues INTEGER DEFAULT 0",
+];
+for (const sql of postsAlters) { try { db.prepare(sql).run(); } catch(e) { /* colonne déjà existante */ } }
+
+/* Nouvelles tables Posts system */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS fil_bookmarks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    post_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, post_id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(post_id) REFERENCES fil_posts(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS fil_contributions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    user_nom TEXT,
+    user_email TEXT,
+    type_contribution TEXT NOT NULL,
+    message TEXT,
+    statut TEXT DEFAULT 'en_attente',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(post_id) REFERENCES fil_posts(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS fil_post_views (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(post_id, user_id)
+  );
+`);
+
+/* =====================================================================
+   INSCRIPTIONS SÉCURISÉES (ID DA + DS-ID)
+   ===================================================================== */
+db.exec(`
+  /* Inscriptions sécurisées aux événements */
+  CREATE TABLE IF NOT EXISTS event_inscriptions_securisees (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id         INTEGER NOT NULL,
+    user_id          INTEGER,
+    da_id_utilise    TEXT,
+    nom              TEXT NOT NULL,
+    prenom           TEXT,
+    type_compte      TEXT,
+    organisation     TEXT,
+    ds_id_signe      INTEGER DEFAULT 0,
+    ds_id_signe_at   TEXT,
+    statut           TEXT DEFAULT 'identifie' CHECK(statut IN ('identifie','signe','paiement_attente','confirme','annule','liste_attente')),
+    billet_qr        TEXT,
+    agenda_event_id  INTEGER,
+    ip               TEXT,
+    user_agent       TEXT,
+    created_at       TEXT DEFAULT (datetime('now')),
+    updated_at       TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(event_id) REFERENCES events(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Journal d'audit DS-ID — toutes les signatures numériques */
+  CREATE TABLE IF NOT EXISTS ds_id_validations (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    action_type  TEXT NOT NULL,
+    action_ref   TEXT,
+    action_id    INTEGER,
+    da_id        TEXT,
+    succes       INTEGER DEFAULT 1,
+    ip           TEXT,
+    user_agent   TEXT,
+    created_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* ── Module Recrutement ── */
+  CREATE TABLE IF NOT EXISTS recrutement_campagnes (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    recruteur_id         INTEGER NOT NULL,
+    nom                  TEXT NOT NULL,
+    description          TEXT,
+    type_recrutement     TEXT DEFAULT 'emploi',
+    organisme            TEXT,
+    pays                 TEXT,
+    ville                TEXT,
+    adresse              TEXT,
+    rayon_publication    TEXT DEFAULT 'national',
+    statut               TEXT DEFAULT 'brouillon' CHECK(statut IN ('brouillon','active','expiree','archivee')),
+    publie_at            TEXT,
+    promotion_fin        TEXT,
+    expire_at            TEXT,
+    vues_total           INTEGER DEFAULT 0,
+    nb_partages          INTEGER DEFAULT 0,
+    nb_reactions         INTEGER DEFAULT 0,
+    notif_promo_7j       INTEGER DEFAULT 0,
+    notif_promo_fin      INTEGER DEFAULT 0,
+    notif_expir_7j       INTEGER DEFAULT 0,
+    notif_cloture        INTEGER DEFAULT 0,
+    image_b64            TEXT,
+    created_at           TEXT DEFAULT (datetime('now')),
+    updated_at           TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(recruteur_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS recrutement_candidatures (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    campagne_id  INTEGER NOT NULL,
+    candidat_id  INTEGER NOT NULL,
+    message      TEXT,
+    cv_b64       TEXT,
+    statut       TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','vue','acceptee','refusee','archivee')),
+    created_at   TEXT DEFAULT (datetime('now')),
+    updated_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(campagne_id) REFERENCES recrutement_campagnes(id),
+    FOREIGN KEY(candidat_id) REFERENCES users(id),
+    UNIQUE(campagne_id, candidat_id)
+  );
+
+  /* ── Interactions recrutement ── */
+  CREATE TABLE IF NOT EXISTS recrutement_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campagne_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    type TEXT DEFAULT 'jaime' CHECK(type IN ('jaime','interesse','bravo','soutien','informatif')),
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(campagne_id, user_id),
+    FOREIGN KEY(campagne_id) REFERENCES recrutement_campagnes(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS recrutement_commentaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campagne_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    contenu TEXT NOT NULL,
+    parent_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(campagne_id) REFERENCES recrutement_campagnes(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS recrutement_favoris (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campagne_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(campagne_id, user_id),
+    FOREIGN KEY(campagne_id) REFERENCES recrutement_campagnes(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* ── Profil Emploi / Espace Candidat ── */
+  CREATE TABLE IF NOT EXISTS profil_emploi (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    situation TEXT DEFAULT 'en_recherche',
+    types_opportunites TEXT DEFAULT '[]',
+    secteurs TEXT DEFAULT '[]',
+    metier TEXT,
+    competences TEXT DEFAULT '[]',
+    experience TEXT DEFAULT 'debutant',
+    niveau_etudes TEXT,
+    langues TEXT DEFAULT '[]',
+    mobilite TEXT DEFAULT 'national',
+    teletravail TEXT DEFAULT 'non',
+    salaire_min REAL,
+    salaire_max REAL,
+    devise TEXT DEFAULT 'EUR',
+    date_disponibilite TEXT,
+    cv_pdf TEXT,
+    lettre_pdf TEXT,
+    portfolio_pdf TEXT,
+    disponible_pour_travailler INTEGER DEFAULT 0,
+    suspendre_offres INTEGER DEFAULT 0,
+    lettre_contenu TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS profil_emploi_experiences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    poste TEXT NOT NULL,
+    entreprise TEXT,
+    ville TEXT,
+    pays TEXT,
+    date_debut TEXT,
+    date_fin TEXT,
+    en_cours INTEGER DEFAULT 0,
+    description TEXT,
+    realisations TEXT,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS profil_emploi_formations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    diplome TEXT NOT NULL,
+    etablissement TEXT,
+    ville TEXT,
+    pays TEXT,
+    date_obtention TEXT,
+    description TEXT,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Interactions sondages ── */
+  CREATE TABLE IF NOT EXISTS sondage_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sondage_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    type TEXT DEFAULT 'jaime',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(sondage_id, user_id),
+    FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS sondage_commentaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sondage_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    contenu TEXT NOT NULL,
+    parent_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS sondage_favoris (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sondage_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(sondage_id, user_id),
+    FOREIGN KEY(sondage_id) REFERENCES sondages(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`);
+
+/* =====================================================================
+   IDENTIFIANT UNIQUE DIASPO'ACTIF (DA-XXXXXXXX)
+   ===================================================================== */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS da_id_counter (
+    id         INTEGER PRIMARY KEY CHECK(id=1),
+    last_value INTEGER DEFAULT 0
+  );
+  INSERT OR IGNORE INTO da_id_counter VALUES (1, 0);
+`);
+
+// Ajouter la colonne da_id sur users et initiatives (sans UNIQUE inline — SQLite interdit ça en ALTER)
+{
+  const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+  if (!userCols.includes('da_id')) {
+    db.exec('ALTER TABLE users ADD COLUMN da_id TEXT');
+    try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_da_id ON users(da_id) WHERE da_id IS NOT NULL'); } catch(_) {}
+  }
+  const initCols = db.prepare('PRAGMA table_info(initiatives)').all().map(c => c.name);
+  if (!initCols.includes('da_id')) {
+    db.exec('ALTER TABLE initiatives ADD COLUMN da_id TEXT');
+    try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_initiatives_da_id ON initiatives(da_id) WHERE da_id IS NOT NULL'); } catch(_) {}
+  }
+}
+
+// Génère un DA-ID atomique
+function generateDaId() {
+  db.prepare('UPDATE da_id_counter SET last_value = last_value + 1 WHERE id = 1').run();
+  const { last_value } = db.prepare('SELECT last_value FROM da_id_counter WHERE id=1').get();
+  return 'DA-' + String(last_value).padStart(8, '0');
+}
+
+// Migration : attribuer un DA-ID aux comptes existants qui n'en ont pas
+;(function backfillDaIds() {
+  const usersWithout = db.prepare('SELECT id FROM users WHERE da_id IS NULL ORDER BY id').all();
+  const initsWithout = db.prepare('SELECT id FROM initiatives WHERE da_id IS NULL ORDER BY id').all();
+  const setUser = db.prepare('UPDATE users SET da_id=? WHERE id=?');
+  const setInit = db.prepare('UPDATE initiatives SET da_id=? WHERE id=?');
+  for (const u of usersWithout) {
+    try { setUser.run(generateDaId(), u.id); } catch (_) {}
+  }
+  for (const i of initsWithout) {
+    try { setInit.run(generateDaId(), i.id); } catch (_) {}
+  }
+})();
+
+/* =====================================================================
+   CODE DE SÉCURITÉ DIASPO'ACTIF (DS-ID)
+   Format : DAS-XXXX-XXXX-XXXX (alphanumérique uppercase sans ambiguïtés)
+   Stocké en clair (seul le propriétaire peut le révéler après auth)
+   Jamais transmis via API publique
+   ===================================================================== */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ds_id_history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    action     TEXT NOT NULL CHECK(action IN ('creation','consultation','copie','regeneration','signature','echec_validation')),
+    ip         TEXT,
+    user_agent TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`);
+
+{
+  const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+  if (!userCols.includes('ds_id')) {
+    db.exec('ALTER TABLE users ADD COLUMN ds_id TEXT');
+  }
+}
+
+function generateDsId() {
+  const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans 0OI1 pour lisibilité
+  const seg = () => Array.from({length:4}, () => CHARS[Math.floor(Math.random()*CHARS.length)]).join('');
+  return `DAS-${seg()}-${seg()}-${seg()}`;
+}
+
+// Backfill DS-ID pour les comptes existants sans DS-ID
+;(function backfillDsIds() {
+  const without = db.prepare('SELECT id FROM users WHERE ds_id IS NULL ORDER BY id').all();
+  const set = db.prepare('UPDATE users SET ds_id=? WHERE id=?');
+  for (const u of without) {
+    try { set.run(generateDsId(), u.id); } catch(_) {}
+  }
+})();
+
+/* =====================================================================
+   MODULE OBSERVATIONS — Tables de suivi
+   ===================================================================== */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS profil_visites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profil_user_id INTEGER NOT NULL,
+    visiteur_id INTEGER,
+    visiteur_pays TEXT,
+    visiteur_ville TEXT,
+    visiteur_role TEXT,
+    visiteur_secteur TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(profil_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(visiteur_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    cible_type TEXT,
+    cible_id INTEGER,
+    detail TEXT,
+    ip TEXT,
+    user_agent TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
+module.exports.generateDaId = generateDaId;
+module.exports.generateDsId = generateDsId;

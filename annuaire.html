@@ -46,20 +46,41 @@
   display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
 
 /* Filters bar */
-.ann-filters{background:#fff;border-bottom:1px solid var(--border);padding:16px 0;}
+.ann-filters{background:#fff;border-bottom:1px solid var(--border);padding:18px 0;}
 .ann-filters-inner{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
-.ann-filters-inner select,.ann-filters-inner input{
-  height:42px;padding:0 14px;border:1px solid var(--border);border-radius:6px;
-  font-size:13.5px;background:#fff;color:var(--text);min-width:160px;flex:1;
+.ann-filter-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px;}
+.ann-filter-group label{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.04em;}
+.ann-filter-group select,
+.ann-filter-group input[type=text]{
+  height:42px;padding:0 14px;border:1px solid var(--border);border-radius:8px;
+  font-size:13.5px;background:#fff;color:var(--text);width:100%;
+  transition:border-color .15s;
 }
+.ann-filter-group select:focus,
+.ann-filter-group input[type=text]:focus{border-color:var(--orange);outline:none;}
+.ann-filter-geo{height:42px;}
+.ann-btn-reset{
+  height:42px;padding:0 18px;background:#f3f4f6;color:#374151;
+  border:1px solid #e5e7eb;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;
+  white-space:nowrap;flex-shrink:0;transition:background .15s;
+}
+.ann-btn-reset:hover{background:#e5e7eb;}
+/* Chips filtres actifs */
+.ann-active-chips{display:none;flex-wrap:wrap;gap:6px;align-items:center;max-width:1180px;margin:0 auto;padding:0 24px 12px;}
+.ann-chip{display:inline-flex;align-items:center;gap:6px;background:#EEF2FF;color:#3730A3;
+  border-radius:99px;padding:4px 12px;font-size:12.5px;font-weight:600;}
+.ann-chip-remove{background:none;border:none;cursor:pointer;color:#3730A3;font-size:14px;
+  width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+  border-radius:50%;padding:0;line-height:1;}
+.ann-chip-remove:hover{background:#c7d2fe;}
+.ann-filter-label{font-size:12px;font-weight:700;color:var(--navy);white-space:nowrap;}
+.ann-unique-chk{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap;}
 .ann-search-btn{
   height:42px;padding:0 22px;background:var(--orange);color:#fff;
-  border:none;border-radius:6px;font-weight:700;font-size:13.5px;cursor:pointer;
+  border:none;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer;
   display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0;
 }
 .ann-search-btn:hover{background:#0D47A1;}
-.ann-unique-chk{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap;}
-.ann-filter-label{font-size:12px;font-weight:700;color:var(--navy);white-space:nowrap;min-width:90px;}
 
 /* Section heading */
 .ann-section-head{max-width:1180px;margin:0 auto;padding:32px 24px 18px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;}
@@ -196,55 +217,51 @@
 
   <!-- ===== FILTRES ===== -->
   <div class="ann-filters">
-    <div class="ann-filters-inner" style="flex-direction:column;gap:10px;">
+    <div class="ann-filters-inner">
 
-      <!-- Ligne 1 : Nationalités + Origines -->
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%;">
-        <span class="ann-filter-label">🏛 Nationalités</span>
-        <div id="f-pays"    style="flex:1;min-width:140px;"></div>
-        <div id="f-nat2"    style="flex:1;min-width:140px;"></div>
-        <span class="ann-filter-label" style="margin-left:8px;">🌍 Origines</span>
-        <div id="f-orig1"   style="flex:1;min-width:140px;"></div>
-        <div id="f-orig2"   style="flex:1;min-width:140px;"></div>
-        <label class="ann-unique-chk"><input type="checkbox" id="f-unique"> Nationalité unique</label>
-      </div>
-
-      <!-- Ligne 2 : Localisation + Rayonnement + Domaine + Recherche -->
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%;">
-        <span class="ann-filter-label">📍 Localisation</span>
-        <div id="f-pays-res" style="flex:1;min-width:130px;"></div>
-        <div id="f-region"   style="flex:1;min-width:130px;"></div>
-        <div id="f-ville"    style="flex:1;min-width:130px;"></div>
-        <span class="ann-filter-label" style="margin-left:8px;">🌐 Portée</span>
-        <select id="f-ray" style="flex:1;min-width:120px;">
-          <option value="">Tout rayonnement</option>
-          <option value="locale">Locale</option>
-          <option value="régionale">Régionale</option>
-          <option value="nationale">Nationale</option>
-          <option value="internationale">Internationale</option>
+      <!-- Type d'organisme -->
+      <div class="ann-filter-group">
+        <label>🏛 Type d'organisme</label>
+        <select id="f-type-org">
+          <option value="">Tous les types</option>
+          <option value="Association">Association</option>
+          <option value="Entreprise">Entreprise</option>
+          <option value="Institution">Institution</option>
+          <option value="Collectivité">Collectivité</option>
+          <option value="ONG">ONG</option>
+          <option value="Coopérative">Coopérative</option>
+          <option value="Média">Média</option>
+          <option value="Fondation">Fondation</option>
+          <option value="Particulier">Particulier</option>
+          <option value="Autre">Autre</option>
         </select>
-        <select id="f-domaine"  style="flex:1;min-width:120px;"><option value="">Domaine</option></select>
-        <select id="f-type"     style="flex:1;min-width:110px;"><option value="">Type</option></select>
-        <input type="text" id="f-q" placeholder="Nom ou mot-clé..." style="flex:2;min-width:160px;">
-        <button class="ann-search-btn" id="btn-search">🔍 Rechercher</button>
       </div>
 
-      <!-- Ligne 3 : Accréditations DA -->
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%;">
-        <span class="ann-filter-label">🎖 Accréditations</span>
-        <select id="f-accred" style="flex:1;min-width:200px;">
-          <option value="">Toutes les initiatives</option>
-          <option value="mobilisation_active">📢 Mobilisation Active</option>
-          <option value="createur_opportunites">💼 Créateur d'Opportunités</option>
-        </select>
-        <label class="ann-unique-chk" style="white-space:nowrap;">
-          <input type="checkbox" id="f-verified">
-          <span>✅ Initiatives vérifiées uniquement</span>
-        </label>
-        <span style="font-size:12px;color:var(--muted);">Filtrer par accréditation Diaspo'Actif</span>
+      <!-- Pays de résidence -->
+      <div class="ann-filter-group">
+        <label>📍 Pays de résidence</label>
+        <div id="f-pays-res" class="ann-filter-geo"></div>
       </div>
+
+      <!-- Pays d'origine -->
+      <div class="ann-filter-group">
+        <label>🌍 Pays d'origine</label>
+        <div id="f-pays-orig" class="ann-filter-geo"></div>
+      </div>
+
+      <!-- Ville -->
+      <div class="ann-filter-group">
+        <label>🏙 Ville</label>
+        <input type="text" id="f-ville-simple" placeholder="Ex : Abidjan, Paris…">
+      </div>
+
+      <!-- Reset -->
+      <button class="ann-btn-reset" id="btn-reset-filters">✕ Réinitialiser</button>
 
     </div>
+
+    <!-- Chips filtres actifs -->
+    <div class="ann-active-chips" id="active-filters-bar"></div>
   </div>
 
   <!-- ===== NOS INITIATIVES ===== -->

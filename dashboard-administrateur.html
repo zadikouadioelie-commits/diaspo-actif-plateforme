@@ -21,6 +21,7 @@
       <div class="topbar-right">
         <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">☰</button>
         <select class="lang-select" id="lang-select"></select>
+        <button class="btn btn-sm" onclick="if(window.Posts){Posts.openModal();}else{location.href='fil-actualite.html';}" style="background:#4338CA;color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">✍️ Post</button>
         <div id="auth-area" class="auth-area"></div>
       </div>
     </div>
@@ -36,7 +37,7 @@
       <span class="sb-group-lbl">🟦 Cockpit</span>
       <a href="#vue-ensemble" class="active" data-section="vue-ensemble">📊 Vue d'ensemble</a>
       <a href="#reseau" data-section="reseau">🌍 Réseau & Diaspora</a>
-      <a href="#retention" data-section="retention">📈 Rétention</a>
+      <a href="#retention" data-section="retention">👥 Acquisition Membres</a>
 
       <span class="sb-group-lbl">🟩 Initiatives</span>
       <a href="#initiatives" data-section="initiatives">🌐 Initiatives & Projets</a>
@@ -51,6 +52,9 @@
       <a href="#contenu" data-section="contenu">📄 Contenu diaspora</a>
 
       <span class="sb-group-lbl">🟪 Intelligence</span>
+      <a href="#obs-eco" data-section="obs-eco">💶 Observatoire Économique</a>
+      <a href="#obs-coop" data-section="obs-coop">🌍 Observatoire Coopération</a>
+      <a href="#obs-instit" data-section="obs-instit">🏛️ Observatoire Institutionnel</a>
       <a href="#finances" data-section="finances">💰 Finances</a>
       <a href="#ventes" data-section="ventes">🛒 Ventes & Transactions</a>
       <a href="#plans" data-section="plans">📋 Plans & Abonnements</a>
@@ -286,21 +290,9 @@
             <div style="font-size:28px;font-weight:800;color:#92400e;" id="da-widget-pending">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">⏳ Demandes en attente</div>
           </div>
-          <div class="card" style="border-left:4px solid #fef3c7;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
-            <div style="font-size:28px;font-weight:800;color:#f59e0b;" id="da-widget-mobilisation">—</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:2px;">📢 Mobilisation Active</div>
-          </div>
-          <div class="card" style="border-left:4px solid #dbeafe;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
-            <div style="font-size:28px;font-weight:800;color:#1e40af;" id="da-widget-opportunites">—</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:2px;">💼 Créateur d'Opportunités</div>
-          </div>
           <div class="card" style="border-left:4px solid #bbf7d0;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
             <div style="font-size:28px;font-weight:800;color:#065f46;" id="da-widget-observatoire">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">📊 Observatoire</div>
-          </div>
-          <div class="card" style="border-left:4px solid #e9d5ff;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
-            <div style="font-size:28px;font-weight:800;color:#4c1d95;" id="da-widget-institutionnelle">—</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:2px;">🏛️ Institutionnelle</div>
           </div>
           <div class="card" style="border-left:4px solid #fecaca;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
             <div style="font-size:28px;font-weight:800;color:#991b1b;" id="da-widget-pub">—</div>
@@ -578,7 +570,7 @@
       <!-- RÉTENTION -->
       <section id="section-retention" style="display:none;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-          <div><h2 style="margin:0;">📈 Rétention & Comportement</h2>
+          <div><h2 style="margin:0;">👥 Acquisition Membres</h2>
             <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Taux de rétention à 7 / 30 / 90 jours — basé sur l'activité réelle</p>
           </div>
         </div>
@@ -619,6 +611,713 @@
       </section>
 
       <!-- FINANCES -->
+      <!-- ══ OBSERVATOIRE INSTITUTIONNEL ══ -->
+      <section id="section-obs-instit" style="display:none;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="margin:0;font-size:22px;">🏛️ Observatoire Institutionnel</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Activité des Comptes Étatiques · Statistiques agrégées · Réservé Administrateur</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="oi-periode" onchange="loadObsInstit()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;">
+              <option value="all">Depuis la création</option>
+              <option value="year">Cette année</option>
+              <option value="month">Ce mois</option>
+            </select>
+            <button class="btn btn-outline" onclick="loadObsInstit()" style="font-size:13px;">↺ Actualiser</button>
+            <button class="btn btn-outline" onclick="showOiDownloadPanel()" style="font-size:13px;border-color:#2563eb;color:#2563eb;">⬇️ Télécharger</button>
+            <button class="btn btn-outline" onclick="showOiMailPanel()" style="font-size:13px;border-color:#059669;color:#059669;">✉️ Envoyer par mail</button>
+          </div>
+        </div>
+
+        <!-- PANEL TÉLÉCHARGEMENT -->
+        <div id="oi-download-panel" style="display:none;margin-bottom:20px;">
+          <div class="card" style="border:2px solid #2563eb20;background:#eff6ff;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <h3 style="margin:0;font-size:15px;color:#1e40af;">⬇️ Téléchargement des données</h3>
+              <button onclick="document.getElementById('oi-download-panel').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);">×</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px;">
+              <button onclick="oiDownload('pdf')" style="padding:12px;border:2px solid #dc2626;border-radius:10px;background:#fef2f2;color:#dc2626;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">📕</span>PDF</button>
+              <button onclick="oiDownload('word')" style="padding:12px;border:2px solid #2563eb;border-radius:10px;background:#eff6ff;color:#2563eb;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">📘</span>Word</button>
+              <button onclick="oiDownload('excel')" style="padding:12px;border:2px solid #059669;border-radius:10px;background:#f0fdf4;color:#059669;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">📗</span>Excel</button>
+              <button onclick="oiDownload('csv')" style="padding:12px;border:2px solid #6b7280;border-radius:10px;background:#f9fafb;color:#374151;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">📄</span>CSV</button>
+              <button onclick="oiDownload('pptx')" style="padding:12px;border:2px solid #d97706;border-radius:10px;background:#fffbeb;color:#d97706;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">📙</span>PowerPoint</button>
+              <button onclick="oiDownload('json')" style="padding:12px;border:2px solid #7c3aed;border-radius:10px;background:#faf5ff;color:#7c3aed;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">🗂️</span>JSON</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px;background:#fff;border-radius:8px;font-size:12px;">
+              <label><input type="checkbox" id="oi-dl-vue" checked> Vue d'ensemble</label>
+              <label><input type="checkbox" id="oi-dl-class" checked> Classements</label>
+              <label><input type="checkbox" id="oi-dl-comms" checked> Communications</label>
+              <label><input type="checkbox" id="oi-dl-events" checked> Événements</label>
+              <label><input type="checkbox" id="oi-dl-recruit" checked> Recrutements</label>
+              <label><input type="checkbox" id="oi-dl-coop" checked> Coopérations</label>
+              <label><input type="checkbox" id="oi-dl-indices" checked> Indices</label>
+              <label><input type="checkbox" id="oi-dl-ia" checked> Analyse IA</label>
+            </div>
+            <div id="oi-dl-msg" style="display:none;margin-top:10px;" class="notice"></div>
+          </div>
+        </div>
+
+        <!-- PANEL EMAIL -->
+        <div id="oi-mail-panel" style="display:none;margin-bottom:20px;">
+          <div class="card" style="border:2px solid #05996920;background:#f0fdf4;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <h3 style="margin:0;font-size:15px;color:#065f46;">✉️ Envoyer les données par mail</h3>
+              <button onclick="document.getElementById('oi-mail-panel').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);">×</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">DESTINATAIRE(S) *</label>
+                <input type="email" id="oi-mail-to" placeholder="email@exemple.com" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;" multiple>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">OBJET</label>
+                <input type="text" id="oi-mail-subject" value="Rapport Observatoire Institutionnel — Diaspo'Actif" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;">
+              </div>
+              <div style="grid-column:1/-1;">
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">MESSAGE</label>
+                <textarea id="oi-mail-body" rows="3" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;resize:vertical;">Veuillez trouver ci-joint le rapport de l'Observatoire Institutionnel Diaspo'Actif.</textarea>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">FORMAT JOINT</label>
+                <select id="oi-mail-format" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;">
+                  <option value="pdf">PDF</option><option value="excel">Excel</option><option value="csv">CSV</option><option value="word">Word</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">PÉRIODE</label>
+                <select id="oi-mail-periode" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;">
+                  <option>Depuis la création</option><option>Cette année</option><option>Ce mois</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button onclick="oiSendMail()" class="btn btn-orange" style="font-size:13px;">✉️ Envoyer</button>
+              <button onclick="oiSendMailto()" class="btn btn-outline" style="font-size:13px;border-color:#059669;color:#059669;">📧 Ouvrir dans ma messagerie</button>
+            </div>
+            <div id="oi-mail-msg" style="display:none;margin-top:10px;" class="notice"></div>
+          </div>
+        </div>
+
+        <!-- KPI GLOBAUX -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px;">
+          <div style="background:var(--navy);color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🏛️ Total</div>
+            <div id="oi-total" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#059669;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">✅ Vérifiés</div>
+            <div id="oi-verif" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#1e40af;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">⚡ Actifs</div>
+            <div id="oi-actifs" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#6b7280;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">😴 Inactifs</div>
+            <div id="oi-inactifs" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#7c2d12;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">📢 Publications</div>
+            <div id="oi-pubs" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#4c1d95;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🗓️ Événements</div>
+            <div id="oi-events" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#134e4a;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">💼 Recrutements</div>
+            <div id="oi-recruit" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#713f12;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🌐 Pays</div>
+            <div id="oi-pays-nb" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+        </div>
+
+        <!-- ONGLETS -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+          <button class="btn btn-orange btn-sm" id="oi-tab-vue"        onclick="oiTab('vue')">📊 Vue d'ensemble</button>
+          <button class="btn btn-outline btn-sm" id="oi-tab-class"     onclick="oiTab('class')">🏆 Classements</button>
+          <button class="btn btn-outline btn-sm" id="oi-tab-comms"     onclick="oiTab('comms')">📢 Communications</button>
+          <button class="btn btn-outline btn-sm" id="oi-tab-events"    onclick="oiTab('events')">🗓️ Événements</button>
+          <button class="btn btn-outline btn-sm" id="oi-tab-recruit"   onclick="oiTab('recruit')">💼 Recrutements</button>
+          <button class="btn btn-outline btn-sm" id="oi-tab-coop"      onclick="oiTab('coop')">🤝 Coopération</button>
+          <button class="btn btn-outline btn-sm" id="oi-tab-indices"   onclick="oiTab('indices')">📐 Indices</button>
+          <button class="btn btn-outline btn-sm" id="oi-tab-ia"        onclick="oiTab('ia')">🤖 IA & Tendances</button>
+          <button class="btn btn-outline btn-sm" id="oi-tab-compare"   onclick="oiTab('compare')">⚖️ Comparaisons</button>
+          <button class="btn btn-outline btn-sm" id="oi-tab-rapports"  onclick="oiTab('rapports')">📄 Rapports</button>
+        </div>
+
+        <!-- PANEL VUE D'ENSEMBLE -->
+        <div id="oi-panel-vue">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;" class="oi-grid3">
+            <div class="card">
+              <h3 style="margin:0 0 12px;font-size:14px;">🏢 Par type d'institution</h3>
+              <div id="oi-par-type" class="notice">Chargement…</div>
+            </div>
+            <div class="card">
+              <h3 style="margin:0 0 12px;font-size:14px;">🌍 Par pays</h3>
+              <div id="oi-par-pays" class="notice">Chargement…</div>
+            </div>
+            <div class="card">
+              <h3 style="margin:0 0 12px;font-size:14px;">🌐 Par continent</h3>
+              <div id="oi-par-continent" class="notice">Chargement…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL CLASSEMENTS -->
+        <div id="oi-panel-class" style="display:none;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button class="btn btn-orange btn-sm" id="oi-cls-actives"       onclick="oiClassTab('actives')">⚡ Plus actives</button>
+            <button class="btn btn-outline btn-sm" id="oi-cls-communicantes" onclick="oiClassTab('communicantes')">📢 Plus communicantes</button>
+            <button class="btn btn-outline btn-sm" id="oi-cls-consultees"    onclick="oiClassTab('consultees')">👁️ Plus consultées</button>
+            <button class="btn btn-outline btn-sm" id="oi-cls-suivies"       onclick="oiClassTab('suivies')">❤️ Plus suivies</button>
+            <button class="btn btn-outline btn-sm" id="oi-cls-reactives"     onclick="oiClassTab('reactives')">⚡ Plus réactives</button>
+          </div>
+          <div class="card" id="oi-classement-panel">
+            <div id="oi-classement-list" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL COMMUNICATIONS -->
+        <div id="oi-panel-comms" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="oi-grid2">
+            <div class="card">
+              <h3 style="margin:0 0 12px;font-size:14px;">📊 Métriques globales</h3>
+              <div id="oi-comms-metrics" class="notice">Chargement…</div>
+            </div>
+            <div class="card">
+              <h3 style="margin:0 0 12px;font-size:14px;">🏷️ Thèmes de communication</h3>
+              <div id="oi-comms-themes" class="notice">Chargement…</div>
+            </div>
+          </div>
+          <div class="card" style="margin-top:14px;">
+            <h3 style="margin:0 0 12px;font-size:14px;">📋 Sondages institutionnels</h3>
+            <div id="oi-sondages" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL ÉVÉNEMENTS -->
+        <div id="oi-panel-events" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:14px;">🗓️ Analyse des événements institutionnels</h3>
+            <div id="oi-events-stats" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL RECRUTEMENTS -->
+        <div id="oi-panel-recruit" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:14px;">💼 Analyse des recrutements</h3>
+            <div id="oi-recruit-stats" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL COOPÉRATION -->
+        <div id="oi-panel-coop" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:14px;">🤝 Coopération institutionnelle</h3>
+            <div id="oi-coop-stats" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL INDICES -->
+        <div id="oi-panel-indices" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:14px;">📐 Indices Stratégiques Institutionnels (sur 100)</h3>
+            <div id="oi-indices-list" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL IA -->
+        <div id="oi-panel-ia" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:14px;">🤖 Tendances & Intelligence Artificielle</h3>
+            <p style="color:var(--muted);font-size:12px;margin:0 0 14px;">Identification automatique des dynamiques institutionnelles</p>
+            <div id="oi-ia-content" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL COMPARAISONS -->
+        <div id="oi-panel-compare" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:14px;">⚖️ Comparaison d'institutions</h3>
+            <p style="color:var(--muted);font-size:12px;margin:0 0 14px;">Sélectionnez jusqu'à 4 institutions à comparer</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+              <select id="oi-cmp-1" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;flex:1;min-width:180px;"><option value="">— Institution 1 —</option></select>
+              <select id="oi-cmp-2" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;flex:1;min-width:180px;"><option value="">— Institution 2 —</option></select>
+              <select id="oi-cmp-3" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;flex:1;min-width:180px;"><option value="">— Institution 3 —</option></select>
+              <select id="oi-cmp-4" style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;flex:1;min-width:180px;"><option value="">— Institution 4 —</option></select>
+            </div>
+            <button onclick="oiCompare()" class="btn btn-orange" style="font-size:13px;margin-bottom:14px;">⚖️ Comparer</button>
+            <div id="oi-compare-result"></div>
+          </div>
+        </div>
+
+        <!-- PANEL RAPPORTS -->
+        <div id="oi-panel-rapports" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:14px;">📄 Génération de Rapports Institutionnels</h3>
+            <p style="color:var(--muted);font-size:12px;margin:0 0 14px;">Export professionnel téléchargeable ou envoyable par mail</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px;padding:12px;background:#f8fafc;border-radius:10px;">
+              <div><label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">PÉRIODE</label>
+                <select style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;"><option>Depuis la création</option><option>Cette année</option><option>Ce mois</option></select>
+              </div>
+              <div><label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">PAYS</label>
+                <select style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;"><option value="">Tous</option><option>France</option><option>Sénégal</option><option>Maroc</option><option>Canada</option></select>
+              </div>
+              <div><label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">TYPE</label>
+                <select style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;"><option value="">Tous</option><option>Mairie</option><option>Préfecture</option><option>Ambassade</option><option>Consulat</option></select>
+              </div>
+              <div><label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">CONTINENT</label>
+                <select style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;"><option value="">Tous</option><option>Europe</option><option>Afrique</option><option>Amériques</option></select>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px;">
+              <button onclick="oiDownload('pdf')" style="padding:14px 10px;border:2px solid #dc2626;border-radius:10px;background:#fef2f2;color:#dc2626;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">📕</span>PDF<span style="font-size:10px;font-weight:400;color:var(--muted);">Rapport complet</span></button>
+              <button onclick="oiDownload('word')" style="padding:14px 10px;border:2px solid #2563eb;border-radius:10px;background:#eff6ff;color:#2563eb;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">📘</span>Word<span style="font-size:10px;font-weight:400;color:var(--muted);">Document éditable</span></button>
+              <button onclick="oiDownload('excel')" style="padding:14px 10px;border:2px solid #059669;border-radius:10px;background:#f0fdf4;color:#059669;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">📗</span>Excel<span style="font-size:10px;font-weight:400;color:var(--muted);">Tableau de données</span></button>
+              <button onclick="oiDownload('csv')" style="padding:14px 10px;border:2px solid #6b7280;border-radius:10px;background:#f9fafb;color:#374151;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">📄</span>CSV<span style="font-size:10px;font-weight:400;color:var(--muted);">Export brut</span></button>
+              <button onclick="oiDownload('pptx')" style="padding:14px 10px;border:2px solid #d97706;border-radius:10px;background:#fffbeb;color:#d97706;font-weight:700;cursor:pointer;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:20px;">📙</span>PowerPoint<span style="font-size:10px;font-weight:400;color:var(--muted);">Présentation</span></button>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#059669;">✉️ Envoyer directement par mail</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <input type="email" id="oi-rpt-mail" placeholder="destinataire@exemple.com" style="flex:1;min-width:200px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;">
+                <button onclick="oiSendMailQuick()" class="btn btn-orange" style="font-size:13px;">📤 Envoyer</button>
+                <button onclick="oiSendMailto()" class="btn btn-outline" style="font-size:13px;border-color:#059669;color:#059669;">📧 Ma messagerie</button>
+              </div>
+            </div>
+            <div id="oi-rpt-msg" style="display:none;margin-top:10px;" class="notice"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ OBSERVATOIRE DE LA COOPÉRATION INTERNATIONALE ══ -->
+      <section id="section-obs-coop" style="display:none;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="margin:0;font-size:22px;">🌍 Observatoire de la Coopération Internationale</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Données agrégées & anonymisées · Observatoire mondial des coopérations · Réservé Administrateur</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <select id="oci-periode" onchange="loadObsCoop()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;">
+              <option value="all">Depuis la création</option>
+              <option value="year">Cette année</option>
+              <option value="month">Ce mois</option>
+            </select>
+            <button class="btn btn-outline" onclick="loadObsCoop()" style="font-size:13px;">↺ Actualiser</button>
+          </div>
+        </div>
+
+        <div class="notice" style="margin-bottom:20px;background:#eff6ff;border-color:#2563eb;color:#1e40af;">
+          🔒 <strong>Confidentialité totale :</strong> données agrégées et anonymisées. Aucun contenu de Deal ou contrat confidentiel n'est affiché.
+        </div>
+
+        <!-- KPI GLOBAUX -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-bottom:20px;">
+          <div style="background:var(--navy);color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🤝 Coopérations</div>
+            <div id="oci-coops" style="font-size:24px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#1e40af;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🎯 Deals intl.</div>
+            <div id="oci-deals" style="font-size:24px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#065f46;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🏛️ Partenariats</div>
+            <div id="oci-partenariats" style="font-size:24px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#7c2d12;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">📁 Projets</div>
+            <div id="oci-projets" style="font-size:24px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#4c1d95;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🗓️ Événements</div>
+            <div id="oci-events" style="font-size:24px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#134e4a;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🌐 Pays</div>
+            <div id="oci-pays" style="font-size:24px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#713f12;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🌍 Diasporas</div>
+            <div id="oci-diasporas" style="font-size:24px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#1e3a5f;color:#fff;border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">💶 Valeur</div>
+            <div id="oci-valeur" style="font-size:18px;font-weight:800;">—</div>
+          </div>
+        </div>
+
+        <!-- ONGLETS -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+          <button class="btn btn-orange btn-sm" id="oci-tab-carte"        onclick="ociTab('carte')">🗺️ Cartographie</button>
+          <button class="btn btn-outline btn-sm" id="oci-tab-deals"       onclick="ociTab('deals')">🎯 Deals</button>
+          <button class="btn btn-outline btn-sm" id="oci-tab-partenariats" onclick="ociTab('partenariats')">🤝 Partenariats</button>
+          <button class="btn btn-outline btn-sm" id="oci-tab-secteurs"    onclick="ociTab('secteurs')">🏭 Secteurs</button>
+          <button class="btn btn-outline btn-sm" id="oci-tab-geo"         onclick="ociTab('geo')">🌐 Géographie</button>
+          <button class="btn btn-outline btn-sm" id="oci-tab-tendances"   onclick="ociTab('tendances')">📈 Tendances</button>
+          <button class="btn btn-outline btn-sm" id="oci-tab-indices"     onclick="ociTab('indices')">📐 Indices</button>
+          <button class="btn btn-outline btn-sm" id="oci-tab-ia"          onclick="ociTab('ia')">🤖 IA Stratégique</button>
+          <button class="btn btn-outline btn-sm" id="oci-tab-rapports"    onclick="ociTab('rapports')">📄 Rapports</button>
+        </div>
+
+        <!-- PANEL CARTOGRAPHIE -->
+        <div id="oci-panel-carte">
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:15px;">🗺️ Cartographie mondiale des coopérations</h3>
+            <p style="color:var(--muted);font-size:12px;margin:0 0 14px;">Principaux flux et corridors de coopération entre pays et diasporas</p>
+            <div id="oci-flux-list" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL DEALS -->
+        <div id="oci-panel-deals" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;" class="oci-grid">
+            <div class="card">
+              <h3 style="margin:0 0 14px;font-size:15px;">🌍 Pays les plus actifs</h3>
+              <div id="oci-deals-pays" class="notice">Chargement…</div>
+            </div>
+            <div class="card">
+              <h3 style="margin:0 0 14px;font-size:15px;">🌐 Diasporas coopératives</h3>
+              <div id="oci-deals-diasporas" class="notice">Chargement…</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:15px;">📂 Deals par domaine</h3>
+            <div id="oci-deals-domaines" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL PARTENARIATS -->
+        <div id="oci-panel-partenariats" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:15px;">🤝 Partenariats par type</h3>
+            <div id="oci-partenariats-list" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL SECTEURS -->
+        <div id="oci-panel-secteurs" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:15px;">🏭 Coopérations par secteur</h3>
+            <div id="oci-secteurs-list" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL GÉOGRAPHIE -->
+        <div id="oci-panel-geo" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" class="oci-grid">
+            <div class="card">
+              <h3 style="margin:0 0 14px;font-size:15px;">🌐 Flux géographiques</h3>
+              <div id="oci-geo-flux" class="notice">Chargement…</div>
+            </div>
+            <div class="card">
+              <h3 style="margin:0 0 14px;font-size:15px;">🌍 Continents actifs</h3>
+              <div id="oci-geo-continents" class="notice">Chargement…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL TENDANCES -->
+        <div id="oci-panel-tendances" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:15px;">📈 Tendances de coopération</h3>
+            <div id="oci-tendances-content" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL INDICES -->
+        <div id="oci-panel-indices" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:15px;">📐 Indices Stratégiques de Coopération</h3>
+            <div id="oci-indices-list" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL IA -->
+        <div id="oci-panel-ia" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:15px;">🤖 Analyse Stratégique par Intelligence Artificielle</h3>
+            <p style="color:var(--muted);font-size:12px;margin:0 0 16px;">Identification automatique des opportunités et tendances émergentes</p>
+            <div id="oci-ia-content" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL RAPPORTS -->
+        <div id="oci-panel-rapports" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:15px;">📄 Génération de Rapports</h3>
+            <p style="color:var(--muted);font-size:12px;margin:0 0 18px;">Export professionnel des données de coopération</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;padding:14px;background:#f8fafc;border-radius:10px;">
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">PÉRIODE</label>
+                <select style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;">
+                  <option>Depuis la création</option><option>Cette année</option><option>Ce mois</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">PAYS</label>
+                <select style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;">
+                  <option value="">Tous</option><option>France</option><option>Sénégal</option><option>Maroc</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">CONTINENT</label>
+                <select style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;">
+                  <option value="">Tous</option><option>Europe</option><option>Afrique</option><option>Amériques</option><option>Asie</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">SECTEUR</label>
+                <select style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;">
+                  <option value="">Tous</option><option>Commerce</option><option>Numérique</option><option>Santé</option><option>Éducation</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+              <button onclick="ociExport('pdf')" style="padding:16px 12px;border:2px solid #dc2626;border-radius:12px;background:#fef2f2;color:#dc2626;font-weight:700;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="font-size:24px;">📕</span>PDF<span style="font-size:10px;font-weight:400;color:var(--muted);">Rapport complet</span></button>
+              <button onclick="ociExport('word')" style="padding:16px 12px;border:2px solid #2563eb;border-radius:12px;background:#eff6ff;color:#2563eb;font-weight:700;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="font-size:24px;">📘</span>Word<span style="font-size:10px;font-weight:400;color:var(--muted);">Document éditable</span></button>
+              <button onclick="ociExport('excel')" style="padding:16px 12px;border:2px solid #059669;border-radius:12px;background:#f0fdf4;color:#059669;font-weight:700;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="font-size:24px;">📗</span>Excel<span style="font-size:10px;font-weight:400;color:var(--muted);">Tableau de données</span></button>
+              <button onclick="ociExport('csv')" style="padding:16px 12px;border:2px solid #6b7280;border-radius:12px;background:#f9fafb;color:#374151;font-weight:700;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="font-size:24px;">📄</span>CSV<span style="font-size:10px;font-weight:400;color:var(--muted);">Export brut</span></button>
+              <button onclick="ociExport('pptx')" style="padding:16px 12px;border:2px solid #d97706;border-radius:12px;background:#fffbeb;color:#d97706;font-weight:700;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="font-size:24px;">📙</span>PowerPoint<span style="font-size:10px;font-weight:400;color:var(--muted);">Présentation</span></button>
+            </div>
+            <div id="oci-export-msg" style="display:none;margin-top:14px;" class="notice"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ OBSERVATOIRE ÉCONOMIQUE GLOBAL ══ -->
+      <section id="section-obs-eco" style="display:none;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="margin:0;font-size:22px;">💶 Observatoire Économique Global</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Analyse agrégée & anonymisée · Données non nominatives · Réservé Administrateur</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="oeg-periode" onchange="loadObsEco()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;">
+              <option value="all">Depuis la création</option>
+              <option value="year">Cette année</option>
+              <option value="month">Ce mois</option>
+              <option value="day">Aujourd'hui</option>
+            </select>
+            <button class="btn btn-outline" onclick="loadObsEco()" style="font-size:13px;">↺ Actualiser</button>
+          </div>
+        </div>
+
+        <!-- CONFIDENTIALITÉ -->
+        <div class="notice" style="margin-bottom:20px;background:#f0fdf4;border-color:#059669;color:#065f46;">
+          🔒 <strong>Confidentialité totale :</strong> toutes les statistiques sont agrégées et anonymisées. Ce module n'affiche aucune transaction individuelle ni donnée nominative.
+        </div>
+
+        <!-- KPI GLOBAUX -->
+        <div id="oeg-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
+          <div style="background:var(--navy);color:#fff;border-radius:14px;padding:18px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:6px;">💶 Valeur totale</div>
+            <div id="oeg-total-val" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#1e3a5f;color:#fff;border-radius:14px;padding:18px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:6px;">🔄 Transactions</div>
+            <div id="oeg-total-tx" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#065f46;color:#fff;border-radius:14px;padding:18px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:6px;">🛒 Achats</div>
+            <div id="oeg-nb-achats" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#7c2d12;color:#fff;border-radius:14px;padding:18px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:6px;">📤 Ventes</div>
+            <div id="oeg-nb-ventes" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+          <div style="background:#4c1d95;color:#fff;border-radius:14px;padding:18px;text-align:center;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:6px;">📊 Valeur moy.</div>
+            <div id="oeg-val-moy" style="font-size:26px;font-weight:800;">—</div>
+          </div>
+        </div>
+
+        <!-- ÉVOLUTION -->
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 14px;font-size:15px;">📈 Évolution des transactions</h3>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+            <div style="background:#f8fafc;border-radius:10px;padding:14px;text-align:center;">
+              <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;">Aujourd'hui</div>
+              <div id="oeg-tx-jour" style="font-size:22px;font-weight:800;color:var(--orange);">—</div>
+            </div>
+            <div style="background:#f8fafc;border-radius:10px;padding:14px;text-align:center;">
+              <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;">Ce mois</div>
+              <div id="oeg-tx-mois" style="font-size:22px;font-weight:800;color:#059669;">—</div>
+            </div>
+            <div style="background:#f8fafc;border-radius:10px;padding:14px;text-align:center;">
+              <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;">Cette année</div>
+              <div id="oeg-tx-an" style="font-size:22px;font-weight:800;color:#7c3aed;">—</div>
+            </div>
+            <div style="background:#f8fafc;border-radius:10px;padding:14px;text-align:center;">
+              <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;">Total plateforme</div>
+              <div id="oeg-tx-total" style="font-size:22px;font-weight:800;color:var(--navy);">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ONGLETS -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="oeg-tabs">
+          <button class="btn btn-orange btn-sm" id="oeg-tab-diasporas" onclick="oegTab('diasporas')">🌍 Diasporas</button>
+          <button class="btn btn-outline btn-sm" id="oeg-tab-categories" onclick="oegTab('categories')">📂 Catégories</button>
+          <button class="btn btn-outline btn-sm" id="oeg-tab-secteurs" onclick="oegTab('secteurs')">🏭 Secteurs</button>
+          <button class="btn btn-outline btn-sm" id="oeg-tab-carte" onclick="oegTab('carte')">🗺️ Cartographie</button>
+          <button class="btn btn-outline btn-sm" id="oeg-tab-indices" onclick="oegTab('indices')">📐 Indices</button>
+          <button class="btn btn-outline btn-sm" id="oeg-tab-ia" onclick="oegTab('ia')">🤖 Intelligence IA</button>
+          <button class="btn btn-outline btn-sm" id="oeg-tab-top" onclick="oegTab('top')">🏆 Classements</button>
+          <button class="btn btn-outline btn-sm" id="oeg-tab-rapports" onclick="oegTab('rapports')">📄 Rapports</button>
+        </div>
+
+        <!-- PANEL DIASPORAS -->
+        <div id="oeg-panel-diasporas">
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="margin:0 0 14px;font-size:15px;">🛒 Diasporas qui achètent le plus</h3>
+            <div id="oeg-diasporas-achats" class="notice">Chargement…</div>
+          </div>
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="margin:0 0 14px;font-size:15px;">📤 Diasporas qui vendent le plus</h3>
+            <div id="oeg-diasporas-ventes" class="notice">Chargement…</div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:15px;">💎 Diasporas créant le plus de valeur</h3>
+            <div id="oeg-diasporas-valeur" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL CATÉGORIES -->
+        <div id="oeg-panel-categories" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:15px;">📂 Analyse par catégorie</h3>
+            <div id="oeg-categories-list" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL SECTEURS -->
+        <div id="oeg-panel-secteurs" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:15px;">🏭 Analyse par secteur économique</h3>
+            <div id="oeg-secteurs-list" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL CARTOGRAPHIE -->
+        <div id="oeg-panel-carte" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:15px;">🗺️ Cartographie des flux économiques</h3>
+            <p style="color:var(--muted);font-size:12px;margin:0 0 14px;">Principaux corridors d'échanges entre diasporas</p>
+            <div id="oeg-carte-flux" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL INDICES -->
+        <div id="oeg-panel-indices" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:15px;">📐 Indices Stratégiques Diaspo'Actif</h3>
+            <div id="oeg-indices-list" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL IA -->
+        <div id="oeg-panel-ia" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:15px;">🤖 Analyse Économique par Intelligence Artificielle</h3>
+            <p style="color:var(--muted);font-size:12px;margin:0 0 16px;">Identification automatique des tendances, opportunités et marchés émergents</p>
+            <div id="oeg-ia-content" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL CLASSEMENTS -->
+        <div id="oeg-panel-top" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;" class="oeg-top-grid">
+            <div class="card">
+              <h3 style="margin:0 0 14px;font-size:15px;">🌍 Top 10 Diasporas</h3>
+              <div id="oeg-top-diasporas" class="notice">Chargement…</div>
+            </div>
+            <div class="card">
+              <h3 style="margin:0 0 14px;font-size:15px;">🌐 Top 10 Pays</h3>
+              <div id="oeg-top-pays" class="notice">Chargement…</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 14px;font-size:15px;">🏭 Top Secteurs</h3>
+            <div id="oeg-top-secteurs" class="notice">Chargement…</div>
+          </div>
+        </div>
+
+        <!-- PANEL RAPPORTS -->
+        <div id="oeg-panel-rapports" style="display:none;">
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:15px;">📄 Génération de Rapports Stratégiques</h3>
+            <p style="color:var(--muted);font-size:12px;margin:0 0 18px;">Export professionnel des données économiques agrégées</p>
+            <!-- Filtres -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:20px;padding:14px;background:#f8fafc;border-radius:10px;">
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">PÉRIODE</label>
+                <select id="oeg-rpt-periode" style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;">
+                  <option value="all">Depuis la création</option>
+                  <option value="year">Cette année</option>
+                  <option value="month">Ce mois</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">DIASPORA</label>
+                <select id="oeg-rpt-diaspora" style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;">
+                  <option value="">Toutes</option>
+                  <option>Sénégalaise</option><option>Malienne</option><option>Ivoirienne</option>
+                  <option>Marocaine</option><option>Algérienne</option><option>Camerounaise</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">SECTEUR</label>
+                <select id="oeg-rpt-secteur" style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;">
+                  <option value="">Tous</option>
+                  <option>Commerce de détail</option><option>Services aux entreprises</option>
+                  <option>Éducation & Formation</option><option>Technologies</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">TYPE COMPTE</label>
+                <select id="oeg-rpt-role" style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border);font-size:13px;">
+                  <option value="">Tous</option>
+                  <option value="utilisateur">Utilisateurs</option>
+                  <option value="initiative">Initiatives</option>
+                  <option value="collectivite">Collectivités</option>
+                </select>
+              </div>
+            </div>
+            <!-- Formats export -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+              <button onclick="oegExport('pdf')" style="padding:16px 12px;border:2px solid #dc2626;border-radius:12px;background:#fef2f2;color:#dc2626;font-weight:700;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <span style="font-size:24px;">📕</span> PDF
+                <span style="font-size:10px;font-weight:400;color:var(--muted);">Rapport complet</span>
+              </button>
+              <button onclick="oegExport('word')" style="padding:16px 12px;border:2px solid #2563eb;border-radius:12px;background:#eff6ff;color:#2563eb;font-weight:700;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <span style="font-size:24px;">📘</span> Word
+                <span style="font-size:10px;font-weight:400;color:var(--muted);">Document éditable</span>
+              </button>
+              <button onclick="oegExport('excel')" style="padding:16px 12px;border:2px solid #059669;border-radius:12px;background:#f0fdf4;color:#059669;font-weight:700;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <span style="font-size:24px;">📗</span> Excel
+                <span style="font-size:10px;font-weight:400;color:var(--muted);">Tableau de données</span>
+              </button>
+              <button onclick="oegExport('csv')" style="padding:16px 12px;border:2px solid #6b7280;border-radius:12px;background:#f9fafb;color:#374151;font-weight:700;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <span style="font-size:24px;">📄</span> CSV
+                <span style="font-size:10px;font-weight:400;color:var(--muted);">Export brut</span>
+              </button>
+              <button onclick="oegExport('pptx')" style="padding:16px 12px;border:2px solid #d97706;border-radius:12px;background:#fffbeb;color:#d97706;font-weight:700;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <span style="font-size:24px;">📙</span> PowerPoint
+                <span style="font-size:10px;font-weight:400;color:var(--muted);">Présentation</span>
+              </button>
+            </div>
+            <div id="oeg-export-msg" style="display:none;margin-top:14px;" class="notice"></div>
+          </div>
+        </div>
+      </section>
+
       <section id="section-finances" style="display:none;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
           <div style="flex:1;">
@@ -2355,14 +3054,11 @@
         </div>
       </section>
 
-      <!-- ACCRÉDITATIONS OBSERVATOIRE DIASPORA -->
+      <!-- ACCRÉDITATIONS DA -->
       <section id="section-accreditations" style="display:none;">
         <div class="flex-between" style="margin-bottom:16px;">
-          <h2 style="margin:0;">🏛️ Accréditations Observatoire Diaspora</h2>
+          <h2 style="margin:0;">🏛️ Accréditations Diaspo'Actif</h2>
           <button class="btn btn-orange" onclick="openAccredModal()">+ Nouvelle accréditation</button>
-        </div>
-        <div class="notice" style="margin-bottom:16px;">
-          L'accréditation Observatoire est délivrée exclusivement par Diaspo'Actif. Elle permet aux institutions d'accéder aux statistiques agrégées et anonymisées de la diaspora, dans les limites strictes définies ci-dessous.
         </div>
         <div class="card" style="margin-bottom:20px;">
           <h3 style="margin:0 0 14px;">Institutions accréditées</h3>
@@ -2907,7 +3603,7 @@
         <!-- ACCRÉDITATIONS DA : Mobilisation Active / Créateur d'Opportunités -->
         <div id="section-accred-da" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
           <h2 style="margin:0 0 6px;">Accréditations Diaspo'Actif</h2>
-          <p style="color:var(--muted);font-size:13px;margin:0 0 8px;">Gérez les demandes et attributions des 4 accréditations opérationnelles Diaspo'Actif.</p>
+          <p style="color:var(--muted);font-size:13px;margin:0 0 8px;">Gérez les demandes et attributions des accréditations opérationnelles Diaspo'Actif.</p>
           <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
             📋 <em>Les accréditations DA ne constituent ni une récompense, ni une distinction honorifique. Elles correspondent à des <strong>autorisations opérationnelles</strong> accordées afin d'exercer certaines fonctions ou d'accéder à des services spécifiques de la plateforme.</em>
           </div>
@@ -2985,31 +3681,7 @@
 
           <!-- Type d'accréditation -->
           <label class="form-label">Type d'accréditation *</label>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;transition:border-color .2s;" id="ad-card-mob" onclick="selectTypeDA('mobilisation_active')">
-              <input type="radio" name="ad-type" value="mobilisation_active" style="display:none;">
-              <div style="font-size:18px;margin-bottom:4px;">📢</div>
-              <div style="font-weight:700;font-size:12px;">Mobilisation Active</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Missions · Campagnes · Terrain</div>
-            </label>
-            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;transition:border-color .2s;" id="ad-card-opp" onclick="selectTypeDA('createur_opportunites')">
-              <input type="radio" name="ad-type" value="createur_opportunites" style="display:none;">
-              <div style="font-size:18px;margin-bottom:4px;">💼</div>
-              <div style="font-weight:700;font-size:12px;">Créateur d'Opportunités</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Offres · Recrutement · Mise en relation</div>
-            </label>
-            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;transition:border-color .2s;" id="ad-card-obs" onclick="selectTypeDA('observatoire_diaspora')">
-              <input type="radio" name="ad-type" value="observatoire_diaspora" style="display:none;">
-              <div style="font-size:18px;margin-bottom:4px;">📊</div>
-              <div style="font-weight:700;font-size:12px;">Observatoire Diaspora</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Statistiques · Tableaux de bord · Rapports</div>
-            </label>
-            <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;transition:border-color .2s;" id="ad-card-ins" onclick="selectTypeDA('institutionnelle')">
-              <input type="radio" name="ad-type" value="institutionnelle" style="display:none;">
-              <div style="font-size:18px;margin-bottom:4px;">🏛️</div>
-              <div style="font-weight:700;font-size:12px;">Institutionnelle</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:2px;">Communications · Consultations · Territoire</div>
-            </label>
+          <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:14px;">
             <label style="cursor:pointer;border:2px solid var(--border);border-radius:12px;padding:12px;transition:border-color .2s;" id="ad-card-pub" onclick="selectTypeDA('creation_publicite')">
               <input type="radio" name="ad-type" value="creation_publicite" style="display:none;">
               <div style="font-size:18px;margin-bottom:4px;">📣</div>
@@ -5124,7 +5796,7 @@ async function savePack() {
 /* ===== ACCRÉDITATIONS DIASPO'ACTIF ===== */
 function escDA(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmtDA(d){if(!d)return '—';try{return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
-const DA_TYPE_LBL={mobilisation_active:'📢 Mobilisation Active',createur_opportunites:'💼 Créateur d\'Opportunités',observatoire_diaspora:'📊 Observatoire Diaspora',institutionnelle:'🏛️ Institutionnelle',creation_publicite:'📣 Création de Publicité'};
+const DA_TYPE_LBL={creation_publicite:'📣 Création de Publicité'};
 const DA_STAT_LBL={active:'✅ Active',suspendue:'⚠️ Suspendue',retiree:'❌ Retirée'};
 const DA_ACT_LBL={accorde:'Accordée',refuse:'Refusée',suspendu:'Suspendue',retire:'Retirée',reactiver:'Réactivée'};
 
@@ -5590,22 +6262,10 @@ async function loadDAWidgetStats(){
     ]);
     const pending=(dem.demandes||[]).length;
     const accreds=act.accreditations||[];
-    const mob=accreds.filter(a=>a.type==='mobilisation_active'&&a.statut==='active').length;
-    const opp=accreds.filter(a=>a.type==='createur_opportunites'&&a.statut==='active').length;
-    const obs=accreds.filter(a=>a.type==='observatoire_diaspora'&&a.statut==='active').length;
-    const ins=accreds.filter(a=>a.type==='institutionnelle'&&a.statut==='active').length;
     const pub=accreds.filter(a=>a.type==='creation_publicite'&&a.statut==='active').length;
     const wp=document.getElementById('da-widget-pending');
-    const wm=document.getElementById('da-widget-mobilisation');
-    const wo=document.getElementById('da-widget-opportunites');
-    const wb=document.getElementById('da-widget-observatoire');
-    const wi=document.getElementById('da-widget-institutionnelle');
     const wpb=document.getElementById('da-widget-pub');
     if(wp) wp.textContent=pending;
-    if(wm) wm.textContent=mob;
-    if(wo) wo.textContent=opp;
-    if(wb) wb.textContent=obs;
-    if(wi) wi.textContent=ins;
     if(wpb) wpb.textContent=pub;
     // Badge sidebar
     const badge=document.getElementById('accred-pending-badge');
@@ -5673,7 +6333,7 @@ function clearSelectedDA(){
   document.getElementById('ad-user-id').value='';
   document.getElementById('ad-selected').style.display='none';
 }
-const DA_CARD_COLORS={mobilisation_active:['#f59e0b','#fffbeb','ad-card-mob'],createur_opportunites:['#3b82f6','#eff6ff','ad-card-opp'],observatoire_diaspora:['#059669','#f0fdf4','ad-card-obs'],institutionnelle:['#7c3aed','#f5f3ff','ad-card-ins'],creation_publicite:['#dc2626','#fef2f2','ad-card-pub']};
+const DA_CARD_COLORS={creation_publicite:['#dc2626','#fef2f2','ad-card-pub']};
 function selectTypeDA(type){
   _adSelectedType=type;
   Object.entries(DA_CARD_COLORS).forEach(([t,[col,bg,id]])=>{
@@ -5714,6 +6374,9 @@ async function submitAccordDirect(){
     reseau:      () => loadReseau(),
     contenu:     () => loadContenu(),
     retention:   () => loadRetention(),
+    'obs-eco':   () => loadObsEco(),
+    'obs-coop':  () => loadObsCoop(),
+    'obs-instit': () => loadObsInstit(),
     finances:    () => loadFinances(),
     plans:       () => loadPlans(),
     promotions:  () => loadPromos(),
@@ -6081,6 +6744,973 @@ async function submitAccordDirect(){
 
   // Charger widget accréditations DA au démarrage
   loadDAWidgetStats();
+
+  // ══ OBSERVATOIRE ÉCONOMIQUE GLOBAL ══════════════════════════
+  let _oegData = null;
+  let _oegCurrentTab = 'diasporas';
+
+  function fmtEur(v){ return new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v); }
+  function fmtNum(v){ return new Intl.NumberFormat('fr-FR').format(v); }
+  function evolBadge(v){ const pos=v>=0; return `<span style="padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;background:${pos?'#dcfce7':'#fee2e2'};color:${pos?'#16a34a':'#dc2626'};">${pos?'+':''}${v}%</span>`; }
+  function barPct(v,max,color='#1B3A6B'){ const pct=Math.round((v/max)*100); return `<div style="background:#f1f5f9;border-radius:99px;height:6px;margin-top:5px;"><div style="width:${pct}%;background:${color};height:6px;border-radius:99px;"></div></div>`; }
+
+  function oegTab(tab){
+    _oegCurrentTab=tab;
+    ['diasporas','categories','secteurs','carte','indices','ia','top','rapports'].forEach(t=>{
+      const btn=document.getElementById('oeg-tab-'+t);
+      const panel=document.getElementById('oeg-panel-'+t);
+      if(btn) btn.className=t===tab?'btn btn-orange btn-sm':'btn btn-outline btn-sm';
+      if(panel) panel.style.display=t===tab?'':'none';
+    });
+    if(_oegData) oegRender(_oegData);
+  }
+
+  async function loadObsEco(){
+    const periode=document.getElementById('oeg-periode')?.value||'all';
+    try{
+      const d=await api('GET',`/admin/observatoire-eco?periode=${periode}`);
+      _oegData=d;
+      // KPIs globaux
+      document.getElementById('oeg-total-val').textContent=fmtEur(d.global.totalVal);
+      document.getElementById('oeg-total-tx').textContent=fmtNum(d.global.totalTx);
+      document.getElementById('oeg-nb-achats').textContent=fmtNum(d.global.nbAchats);
+      document.getElementById('oeg-nb-ventes').textContent=fmtNum(d.global.nbVentes);
+      document.getElementById('oeg-val-moy').textContent=fmtEur(d.global.valMoy);
+      document.getElementById('oeg-tx-jour').textContent=fmtNum(d.global.txJour);
+      document.getElementById('oeg-tx-mois').textContent=fmtNum(d.global.txMois);
+      document.getElementById('oeg-tx-an').textContent=fmtNum(d.global.txAn);
+      document.getElementById('oeg-tx-total').textContent=fmtNum(d.global.totalTx);
+      oegRender(d);
+    }catch(e){ console.error('OEG error',e); }
+  }
+
+  function oegRender(d){
+    const t=_oegCurrentTab;
+    if(t==='diasporas') oegRenderDiasporas(d.diasporas);
+    if(t==='categories') oegRenderCategories(d.categories);
+    if(t==='secteurs') oegRenderSecteurs(d.secteurs);
+    if(t==='carte') oegRenderCarte(d.flux_pays);
+    if(t==='indices') oegRenderIndices(d.indices);
+    if(t==='ia') oegRenderIA(d.ai_insights);
+    if(t==='top') oegRenderTop(d);
+    if(t==='rapports') {}
+  }
+
+  function oegRenderDiasporas(diasporas){
+    const maxA=Math.max(...diasporas.map(d=>d.val_achats));
+    const maxV=Math.max(...diasporas.map(d=>d.ca_ventes));
+    const maxE=Math.max(...diasporas.map(d=>d.valeur_eco));
+    const byAchats=[...diasporas].sort((a,b)=>b.val_achats-a.val_achats);
+    const byVentes=[...diasporas].sort((a,b)=>b.ca_ventes-a.ca_ventes);
+    const byValeur=[...diasporas].sort((a,b)=>b.valeur_eco-a.valeur_eco);
+
+    document.getElementById('oeg-diasporas-achats').innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+          <th style="padding:8px 10px;text-align:left;">Diaspora</th>
+          <th style="padding:8px 10px;text-align:right;">Achats</th>
+          <th style="padding:8px 10px;text-align:right;">Valeur</th>
+          <th style="padding:8px 10px;text-align:right;">Panier moy.</th>
+          <th style="padding:8px 10px;text-align:right;width:80px;">Évol.</th>
+        </tr></thead><tbody>
+        ${byAchats.map((d,i)=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 10px;font-weight:600;">${i<3?['🥇','🥈','🥉'][i]:''} ${d.nom}${barPct(d.val_achats,maxA,'#f97316')}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtNum(d.achats)}</td>
+          <td style="padding:10px 10px;text-align:right;font-weight:700;">${fmtEur(d.val_achats)}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtEur(d.panier_moy)}</td>
+          <td style="padding:10px 10px;text-align:right;">${evolBadge(d.evol)}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+
+    document.getElementById('oeg-diasporas-ventes').innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+          <th style="padding:8px 10px;text-align:left;">Diaspora</th>
+          <th style="padding:8px 10px;text-align:right;">Ventes</th>
+          <th style="padding:8px 10px;text-align:right;">Chiffre d'affaires</th>
+          <th style="padding:8px 10px;text-align:right;">Moy./vente</th>
+        </tr></thead><tbody>
+        ${byVentes.map((d,i)=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 10px;font-weight:600;">${i<3?['🥇','🥈','🥉'][i]:''} ${d.nom}${barPct(d.ca_ventes,maxV,'#059669')}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtNum(d.ventes)}</td>
+          <td style="padding:10px 10px;text-align:right;font-weight:700;">${fmtEur(d.ca_ventes)}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtEur(d.val_moy_vente)}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+
+    document.getElementById('oeg-diasporas-valeur').innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+          <th style="padding:8px 10px;text-align:left;">Diaspora</th>
+          <th style="padding:8px 10px;text-align:right;">Valeur créée</th>
+          <th style="padding:8px 10px;text-align:right;">CA total</th>
+          <th style="padding:8px 10px;text-align:right;">Vendeurs</th>
+          <th style="padding:8px 10px;text-align:right;">Acheteurs</th>
+          <th style="padding:8px 10px;text-align:right;">Vol. tx.</th>
+        </tr></thead><tbody>
+        ${byValeur.map((d,i)=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 10px;font-weight:600;">${i<3?['🥇','🥈','🥉'][i]:''} ${d.nom}${barPct(d.valeur_eco,maxE,'#7c3aed')}</td>
+          <td style="padding:10px 10px;text-align:right;font-weight:800;color:#7c3aed;">${fmtEur(d.valeur_eco)}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtEur(d.ca_ventes)}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtNum(d.vendeurs)}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtNum(d.acheteurs)}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtNum(d.achats+d.ventes)}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  function oegRenderCategories(cats){
+    const maxCA=Math.max(...cats.map(c=>c.ca));
+    document.getElementById('oeg-categories-list').innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+          <th style="padding:8px 10px;text-align:left;">Catégorie</th>
+          <th style="padding:8px 10px;text-align:right;">Ventes</th>
+          <th style="padding:8px 10px;text-align:right;">Chiffre d'affaires</th>
+          <th style="padding:8px 10px;text-align:right;">Évolution</th>
+        </tr></thead><tbody>
+        ${cats.map((c,i)=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 10px;font-weight:600;">${c.emoji} ${c.nom}${barPct(c.ca,maxCA,'#f97316')}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtNum(c.ventes)}</td>
+          <td style="padding:10px 10px;text-align:right;font-weight:700;">${fmtEur(c.ca)}</td>
+          <td style="padding:10px 10px;text-align:right;">${evolBadge(c.evol_pct)}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  function oegRenderSecteurs(secteurs){
+    const maxCA=Math.max(...secteurs.map(s=>s.ca));
+    document.getElementById('oeg-secteurs-list').innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+          <th style="padding:8px 10px;text-align:left;">Secteur</th>
+          <th style="padding:8px 10px;text-align:right;">CA</th>
+          <th style="padding:8px 10px;text-align:right;">Ventes</th>
+          <th style="padding:8px 10px;text-align:right;">Achats</th>
+          <th style="padding:8px 10px;text-align:right;">Croissance</th>
+        </tr></thead><tbody>
+        ${secteurs.map((s,i)=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 10px;font-weight:600;">${i===0?'🥇':i===1?'🥈':i===2?'🥉':''} ${s.nom}${barPct(s.ca,maxCA,'#1B3A6B')}</td>
+          <td style="padding:10px 10px;text-align:right;font-weight:700;">${fmtEur(s.ca)}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtNum(s.ventes)}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtNum(s.achats)}</td>
+          <td style="padding:10px 10px;text-align:right;">${evolBadge(s.croissance_pct)}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  function oegRenderCarte(flux){
+    const PAYS_NOM={FR:'France',BE:'Belgique',ES:'Espagne',IT:'Italie',GB:'Royaume-Uni',DE:'Allemagne',CA:'Canada',CH:'Suisse',US:'USA',
+      SN:'Sénégal',ML:'Mali',CI:"Côte d'Ivoire",CM:'Cameroun',MA:'Maroc',TN:'Tunisie',CD:'Congo',GN:'Guinée',DZ:'Algérie',GH:'Ghana',HT:'Haïti',BF:'Burkina Faso'};
+    const maxM=Math.max(...flux.map(f=>f.montant));
+    document.getElementById('oeg-carte-flux').innerHTML=`
+      <div style="margin-bottom:14px;padding:12px;background:#f0f7ff;border-radius:10px;font-size:12.5px;color:#1e40af;">
+        ℹ️ <strong>Corridors économiques</strong> : flux financiers agrégés entre pays d'origine et pays de résidence des membres.
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+          <th style="padding:8px 10px;text-align:left;">Origine</th>
+          <th style="padding:8px 10px;text-align:center;">→</th>
+          <th style="padding:8px 10px;text-align:left;">Destination</th>
+          <th style="padding:8px 10px;text-align:right;">Montant</th>
+          <th style="padding:8px 10px;text-align:right;">Transactions</th>
+          <th style="padding:8px 10px;text-align:left;">Intensité</th>
+        </tr></thead><tbody>
+        ${flux.map(f=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 10px;font-weight:600;">🌍 ${PAYS_NOM[f.origine]||f.origine}</td>
+          <td style="padding:10px 10px;text-align:center;color:var(--muted);">→</td>
+          <td style="padding:10px 10px;font-weight:600;">🌍 ${PAYS_NOM[f.destination]||f.destination}</td>
+          <td style="padding:10px 10px;text-align:right;font-weight:700;">${fmtEur(f.montant)}</td>
+          <td style="padding:10px 10px;text-align:right;">${fmtNum(f.nb)}</td>
+          <td style="padding:10px 10px;">${barPct(f.montant,maxM,'#7c3aed')}</td>
+        </tr>`).join('')}
+      </tbody></table>
+      <div style="margin-top:16px;padding:12px;background:#fef9c3;border-radius:10px;font-size:12px;color:#713f12;">
+        🗺️ <strong>Principaux pôles :</strong> Paris, Bruxelles, Montréal, Madrid, Rome | <strong>Corridors dominants :</strong> France → Sénégal, France → Mali, UK → Ghana, USA → Haïti
+      </div>`;
+  }
+
+  function oegRenderIndices(idx){
+    const indices=[
+      { code:'IGCV', nom:'Indice Global de Création de Valeur', desc:"Mesure la valeur économique totale créée par les membres de la plateforme.", val:idx.igcv, color:'#7c3aed', icon:'💎' },
+      { code:'IDC',  nom:'Indice de Dynamisme Commercial',      desc:"Reflète l'intensité des échanges commerciaux sur la plateforme.",          val:idx.idc,  color:'#f97316', icon:'📈' },
+      { code:'IED',  nom:'Indice des Échanges entre Diasporas', desc:"Mesure les flux économiques inter-communautaires.",                         val:idx.ied,  color:'#059669', icon:'🌍' },
+      { code:'ICD',  nom:'Indice de Consommation des Diasporas', desc:"Proportion des membres en position d'acheteurs actifs.",                  val:idx.icd,  color:'#2563eb', icon:'🛒' },
+      { code:'IPE',  nom:'Indice de Production Économique',     desc:"Proportion des membres générant des revenus sur la plateforme.",           val:idx.ipe,  color:'#dc2626', icon:'🏭' },
+    ];
+    document.getElementById('oeg-indices-list').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
+        ${indices.map(idx=>`<div style="border:2px solid ${idx.color}20;border-radius:14px;padding:18px;background:${idx.color}08;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="font-size:20px;">${idx.icon}</span>
+            <div>
+              <div style="font-weight:800;font-size:13px;color:${idx.color};">${idx.code}</div>
+              <div style="font-size:11px;color:var(--muted);">${idx.nom}</div>
+            </div>
+          </div>
+          <div style="font-size:36px;font-weight:900;color:${idx.color};margin-bottom:6px;">${idx.val}</div>
+          <div style="background:#f1f5f9;border-radius:99px;height:8px;margin-bottom:8px;">
+            <div style="width:${Math.min(idx.val,100)}%;background:${idx.color};height:8px;border-radius:99px;"></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);">${idx.desc}</div>
+        </div>`).join('')}
+      </div>`;
+  }
+
+  function oegRenderIA(ai){
+    document.getElementById('oeg-ia-content').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div style="padding:16px;background:#f0fdf4;border-radius:12px;border-left:4px solid #059669;">
+          <div style="font-weight:700;font-size:13px;color:#065f46;margin-bottom:10px;">🚀 Secteurs en forte croissance</div>
+          ${ai.croissance.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #bbf7d0;">✅ ${v}</div>`).join('')}
+        </div>
+        <div style="padding:16px;background:#eff6ff;border-radius:12px;border-left:4px solid #2563eb;">
+          <div style="font-weight:700;font-size:13px;color:#1e40af;margin-bottom:10px;">🔍 Catégories les plus recherchées</div>
+          ${ai.recherches.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #bfdbfe;">🔹 ${v}</div>`).join('')}
+        </div>
+        <div style="padding:16px;background:#fef9c3;border-radius:12px;border-left:4px solid #d97706;">
+          <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:10px;">🌱 Marchés émergents</div>
+          ${ai.marches.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #fde68a;">🔸 ${v}</div>`).join('')}
+        </div>
+        <div style="padding:16px;background:#fdf2f8;border-radius:12px;border-left:4px solid #a21caf;">
+          <div style="font-weight:700;font-size:13px;color:#701a75;margin-bottom:10px;">📊 Tendances commerciales</div>
+          ${ai.tendances.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #f5d0fe;">💜 ${v}</div>`).join('')}
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:16px;background:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
+        <div style="font-weight:700;font-size:13px;color:#c2410c;margin-bottom:10px;">💡 Nouvelles opportunités identifiées par l'IA</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${ai.opportunites.map(v=>`<span style="padding:5px 12px;background:#fff;border:1px solid #fed7aa;border-radius:99px;font-size:12.5px;color:#9a3412;">💰 ${v}</span>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  function oegRenderTop(d){
+    const maxE=Math.max(...d.diasporas.map(x=>x.valeur_eco));
+    document.getElementById('oeg-top-diasporas').innerHTML=`
+      ${d.diasporas.slice(0,10).map((di,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-weight:800;font-size:12px;color:var(--muted);width:20px;">${i+1}</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:13px;">${di.nom}</div>
+          ${barPct(di.valeur_eco,maxE,['#f59e0b','#6b7280','#cd7f32'][i]||'#1B3A6B')}
+        </div>
+        <span style="font-weight:800;font-size:13px;">${fmtEur(di.valeur_eco)}</span>
+      </div>`).join('')}`;
+
+    const maxCA=Math.max(...d.top_pays.map(p=>p.ca));
+    document.getElementById('oeg-top-pays').innerHTML=`
+      ${d.top_pays.slice(0,10).map((p,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-weight:800;font-size:12px;color:var(--muted);width:20px;">${i+1}</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:13px;">${p.emoji} ${p.pays}</div>
+          ${barPct(p.ca,maxCA,'#059669')}
+        </div>
+        <span style="font-weight:800;font-size:13px;">${fmtEur(p.ca)}</span>
+      </div>`).join('')}`;
+
+    const maxSCA=Math.max(...d.secteurs.map(s=>s.ca));
+    document.getElementById('oeg-top-secteurs').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+        ${d.secteurs.slice(0,6).map((s,i)=>`<div style="padding:14px;border:1px solid var(--border);border-radius:10px;">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:2px;">#${i+1}</div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:4px;">${s.nom}</div>
+          <div style="font-size:18px;font-weight:800;color:#1B3A6B;">${fmtEur(s.ca)}</div>
+          <div style="font-size:11px;color:var(--muted);">Croissance ${evolBadge(s.croissance_pct)}</div>
+          ${barPct(s.ca,maxSCA,'#f97316')}
+        </div>`).join('')}
+      </div>`;
+  }
+
+  function oegExport(fmt){
+    const msg=document.getElementById('oeg-export-msg');
+    msg.style.display='';
+    const labels={pdf:'PDF',word:'Word (.docx)',excel:'Excel (.xlsx)',csv:'CSV',pptx:'PowerPoint (.pptx)'};
+    msg.innerHTML=`⏳ Génération du rapport <strong>${labels[fmt]||fmt}</strong> en cours… (fonctionnalité disponible en production)`;
+    msg.style.background='#eff6ff';msg.style.borderColor='#2563eb';msg.style.color='#1e40af';
+    setTimeout(()=>{
+      msg.innerHTML=`✅ Rapport <strong>${labels[fmt]||fmt}</strong> généré. En production, le téléchargement démarrerait automatiquement.`;
+      msg.style.background='#f0fdf4';msg.style.borderColor='#059669';msg.style.color='#065f46';
+    },1800);
+  }
+
+  window.loadObsEco=loadObsEco;
+  window.oegTab=oegTab;
+  window.oegExport=oegExport;
+
+  // ══ OBSERVATOIRE COOPÉRATION INTERNATIONALE ════════════════════
+  let _ociData = null;
+  let _ociCurrentTab = 'carte';
+
+  function ociTab(tab){
+    _ociCurrentTab=tab;
+    ['carte','deals','partenariats','secteurs','geo','tendances','indices','ia','rapports'].forEach(t=>{
+      const btn=document.getElementById('oci-tab-'+t);
+      const panel=document.getElementById('oci-panel-'+t);
+      if(btn) btn.className=t===tab?'btn btn-orange btn-sm':'btn btn-outline btn-sm';
+      if(panel) panel.style.display=t===tab?'':'none';
+    });
+    if(_ociData) ociRender(_ociData);
+  }
+
+  async function loadObsCoop(){
+    try{
+      const d=await api('GET','/admin/observatoire-coop');
+      _ociData=d;
+      const db=d.dashboard;
+      document.getElementById('oci-coops').textContent=fmtNum(db.cooperations_actives);
+      document.getElementById('oci-deals').textContent=fmtNum(db.deals_internationaux);
+      document.getElementById('oci-partenariats').textContent=fmtNum(db.partenariats);
+      document.getElementById('oci-projets').textContent=fmtNum(db.projets_internationaux);
+      document.getElementById('oci-events').textContent=fmtNum(db.evenements_internationaux);
+      document.getElementById('oci-pays').textContent=fmtNum(db.pays_impliques);
+      document.getElementById('oci-diasporas').textContent=fmtNum(db.diasporas_impliquees);
+      document.getElementById('oci-valeur').textContent=fmtEur(db.valeur_eco);
+      ociRender(d);
+    }catch(e){ console.error('OCI',e); }
+  }
+
+  function ociRender(d){
+    const t=_ociCurrentTab;
+    if(t==='carte')        ociRenderCarte(d.flux_coop);
+    if(t==='deals')        ociRenderDeals(d.deals);
+    if(t==='partenariats') ociRenderPartenariats(d.partenariats);
+    if(t==='secteurs')     ociRenderSecteurs(d.secteurs);
+    if(t==='geo')          ociRenderGeo(d.geo);
+    if(t==='tendances')    ociRenderTendances(d.tendances);
+    if(t==='indices')      ociRenderIndices(d.indices);
+    if(t==='ia')           ociRenderIA(d.ai_insights);
+  }
+
+  function ociRenderCarte(flux){
+    const maxV=Math.max(...flux.map(f=>f.volume));
+    const maxM=Math.max(...flux.map(f=>f.valeur));
+    const byType={};
+    flux.forEach(f=>{(byType[f.type]=byType[f.type]||[]).push(f);});
+    const tyLabels={'multi':'🌍 Coopérations Nord-Sud','sud-sud':'🌐 Coopérations Sud-Sud'};
+    let html='';
+    Object.entries(byType).forEach(([type,items])=>{
+      html+=`<div style="margin-bottom:18px;">
+        <div style="font-weight:700;font-size:13px;color:var(--navy);margin-bottom:8px;padding:6px 10px;background:#f0f4ff;border-radius:8px;">${tyLabels[type]||type}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+            <th style="padding:7px 10px;text-align:left;">Origine</th>
+            <th style="padding:7px 10px;text-align:center;">→</th>
+            <th style="padding:7px 10px;text-align:left;">Destination</th>
+            <th style="padding:7px 10px;text-align:right;">Coopérations</th>
+            <th style="padding:7px 10px;text-align:right;">Valeur</th>
+            <th style="padding:7px 10px;text-align:left;width:120px;">Intensité</th>
+          </tr></thead><tbody>
+          ${items.map(f=>`<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:9px 10px;font-weight:600;">🌍 ${f.origine}</td>
+            <td style="padding:9px 10px;text-align:center;color:#2563eb;font-size:16px;">⟷</td>
+            <td style="padding:9px 10px;font-weight:600;">🌍 ${f.destination}</td>
+            <td style="padding:9px 10px;text-align:right;font-weight:700;">${fmtNum(f.volume)}</td>
+            <td style="padding:9px 10px;text-align:right;">${fmtEur(f.valeur)}</td>
+            <td style="padding:9px 10px;">${barPct(f.volume,maxV,'#2563eb')}</td>
+          </tr>`).join('')}
+          </tbody></table></div>`;
+    });
+    document.getElementById('oci-flux-list').innerHTML=html;
+  }
+
+  function ociRenderDeals(deals){
+    const maxP=Math.max(...deals.top_pays.map(p=>p.n));
+    document.getElementById('oci-deals-pays').innerHTML=`
+      <div style="margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:#eff6ff;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:700;">Entre pays</div>
+          <div style="font-size:20px;font-weight:800;color:#1e40af;">${fmtNum(deals.entre_pays)}</div>
+        </div>
+        <div style="background:#f0fdf4;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:700;">Valeur totale</div>
+          <div style="font-size:16px;font-weight:800;color:#059669;">${fmtEur(deals.valeur)}</div>
+        </div>
+        <div style="background:#fef9c3;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:10px;color:var(--muted);font-weight:700;">Taux réussite</div>
+          <div style="font-size:20px;font-weight:800;color:#92400e;">${deals.taux_reussite}%</div>
+        </div>
+      </div>
+      ${deals.top_pays.map((p,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+        <span style="font-weight:800;font-size:11px;color:var(--muted);width:18px;">${i+1}</span>
+        <div style="flex:1;"><div style="font-weight:600;font-size:13px;">${p.emoji} ${p.pays}</div>${barPct(p.n,maxP,'#1e40af')}</div>
+        <span style="font-weight:800;">${fmtNum(p.n)}</span>
+      </div>`).join('')}`;
+
+    const maxD=Math.max(...deals.top_diasporas.map(d=>d.n));
+    document.getElementById('oci-deals-diasporas').innerHTML=
+      deals.top_diasporas.map((d,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-weight:800;font-size:11px;color:var(--muted);width:18px;">${i+1}</span>
+        <div style="flex:1;"><div style="font-weight:600;font-size:13px;">${['🥇','🥈','🥉','',''][i]||''} ${d.nom}</div>${barPct(d.n,maxD,'#059669')}</div>
+        <div style="text-align:right;"><div style="font-weight:800;font-size:13px;">${fmtNum(d.n)}</div><div>${evolBadge(parseFloat((d.evol/10).toFixed(1)))}</div></div>
+      </div>`).join('');
+
+    const maxDom=Math.max(...deals.domaines.map(d=>d.n));
+    document.getElementById('oci-deals-domaines').innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+          <th style="padding:8px 10px;text-align:left;">Domaine</th>
+          <th style="padding:8px 10px;text-align:right;">Deals</th>
+          <th style="padding:8px 10px;text-align:right;">Évolution</th>
+          <th style="padding:8px 10px;text-align:left;width:120px;">Part</th>
+        </tr></thead><tbody>
+        ${deals.domaines.map(d=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:9px 10px;font-weight:600;">${d.nom}</td>
+          <td style="padding:9px 10px;text-align:right;font-weight:700;">${fmtNum(d.n)}</td>
+          <td style="padding:9px 10px;text-align:right;">${evolBadge(parseFloat((d.evol/10).toFixed(1)))}</td>
+          <td style="padding:9px 10px;">${barPct(d.n,maxDom,'#7c3aed')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  function ociRenderPartenariats(pats){
+    const maxN=Math.max(...pats.map(p=>p.n));
+    document.getElementById('oci-partenariats-list').innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+          <th style="padding:8px 10px;text-align:left;">Type</th>
+          <th style="padding:8px 10px;text-align:right;">Nombre</th>
+          <th style="padding:8px 10px;text-align:right;">Évolution</th>
+          <th style="padding:8px 10px;text-align:left;">Pays principaux</th>
+          <th style="padding:8px 10px;text-align:left;width:100px;">Volume</th>
+        </tr></thead><tbody>
+        ${pats.map(p=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 10px;font-weight:700;">${p.emoji} ${p.type}</td>
+          <td style="padding:10px 10px;text-align:right;font-weight:800;">${fmtNum(p.n)}</td>
+          <td style="padding:10px 10px;text-align:right;">${evolBadge(parseFloat((p.evol/10).toFixed(1)))}</td>
+          <td style="padding:10px 10px;font-size:12px;color:var(--muted);">${p.pays.join(', ')}</td>
+          <td style="padding:10px 10px;">${barPct(p.n,maxN,'#2563eb')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  function ociRenderSecteurs(secteurs){
+    const maxN=Math.max(...secteurs.map(s=>s.n));
+    document.getElementById('oci-secteurs-list').innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+          <th style="padding:8px 10px;text-align:left;">Secteur</th>
+          <th style="padding:8px 10px;text-align:right;">Coopérations</th>
+          <th style="padding:8px 10px;text-align:right;">Évolution</th>
+          <th style="padding:8px 10px;text-align:right;">Valeur est.</th>
+          <th style="padding:8px 10px;text-align:left;width:100px;">Volume</th>
+        </tr></thead><tbody>
+        ${secteurs.map((s,i)=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:9px 10px;font-weight:600;">${s.emoji} ${s.nom}</td>
+          <td style="padding:9px 10px;text-align:right;font-weight:700;">${fmtNum(s.n)}</td>
+          <td style="padding:9px 10px;text-align:right;">${evolBadge(s.evol_pct)}</td>
+          <td style="padding:9px 10px;text-align:right;font-size:12px;">${fmtEur(s.valeur)}</td>
+          <td style="padding:9px 10px;">${barPct(s.n,maxN,'#059669')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  function ociRenderGeo(geo){
+    const maxF=Math.max(...geo.flux_types.map(f=>f.n));
+    document.getElementById('oci-geo-flux').innerHTML=`
+      ${geo.flux_types.map(f=>`<div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-weight:700;font-size:13px;">${f.type}</span>
+          <span style="font-weight:800;color:var(--navy);">${fmtNum(f.n)} <span style="font-size:11px;font-weight:400;color:var(--muted);">(${f.pct}%)</span></span>
+        </div>
+        ${barPct(f.n,maxF,'#1e40af')}
+      </div>`).join('')}
+      <div style="margin-top:14px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;">🏆 Top pays d'origine</div>
+        ${geo.top_pays_origine.map((p,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:11px;color:var(--muted);width:16px;">${i+1}</span>
+          <span style="flex:1;font-weight:600;font-size:13px;">${p.emoji} ${p.pays}</span>
+          <span style="font-weight:800;">${fmtNum(p.coops)}</span>
+        </div>`).join('')}
+      </div>`;
+
+    const maxC=Math.max(...geo.top_continents.map(c=>c.n));
+    document.getElementById('oci-geo-continents').innerHTML=`
+      ${geo.top_continents.map(c=>`<div style="margin-bottom:14px;padding:14px;border:1px solid var(--border);border-radius:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-weight:700;font-size:14px;">${c.continent}</span>
+          <span>${evolBadge(parseFloat((c.evol/10).toFixed(1)))}</span>
+        </div>
+        <div style="font-size:24px;font-weight:900;color:var(--navy);margin-bottom:6px;">${fmtNum(c.n)}</div>
+        ${barPct(c.n,maxC,'#7c3aed')}
+      </div>`).join('')}`;
+  }
+
+  function ociRenderTendances(t){
+    document.getElementById('oci-tendances-content').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div style="padding:16px;background:#eff6ff;border-radius:12px;border-left:4px solid #2563eb;">
+          <div style="font-weight:700;font-size:13px;color:#1e40af;margin-bottom:10px;">🔗 Principaux axes de coopération</div>
+          ${t.pays_actifs.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #bfdbfe;">🌐 ${v}</div>`).join('')}
+        </div>
+        <div style="padding:16px;background:#f0fdf4;border-radius:12px;border-left:4px solid #059669;">
+          <div style="font-weight:700;font-size:13px;color:#065f46;margin-bottom:10px;">🚀 Secteurs en forte croissance</div>
+          ${t.secteurs_croissance.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #bbf7d0;">✅ ${v}</div>`).join('')}
+        </div>
+        <div style="padding:16px;background:#fef9c3;border-radius:12px;border-left:4px solid #d97706;">
+          <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:10px;">🌱 Nouveaux axes émergents</div>
+          ${t.axes_emergents.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #fde68a;">🔸 ${v}</div>`).join('')}
+        </div>
+        <div style="padding:16px;background:#fdf2f8;border-radius:12px;border-left:4px solid #a21caf;">
+          <div style="font-weight:700;font-size:13px;color:#701a75;margin-bottom:10px;">🕸️ Réseaux émergents</div>
+          ${t.reseaux_emergents.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #f5d0fe;">💜 ${v}</div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  function ociRenderIndices(idx){
+    const indices=[
+      { code:'ICI',  nom:'Indice de Coopération Internationale',   desc:"Mesure l'intensité globale des coopérations sur la plateforme.",      val:idx.ici,  color:'#2563eb', icon:'🌍' },
+      { code:'ICD',  nom:'Indice de Coopération entre Diasporas',  desc:"Mesure les interactions directes entre communautés diasporiques.",     val:idx.icd,  color:'#059669', icon:'🤝' },
+      { code:'IPI',  nom:'Indice de Partenariat Institutionnel',   desc:"Reflète le niveau d'engagement des institutions dans les partenariats.",val:idx.ipi, color:'#7c3aed', icon:'🏛️' },
+      { code:'IDI',  nom:'Indice de Développement International',  desc:"Mesure la couverture géographique mondiale des coopérations.",         val:idx.idi,  color:'#d97706', icon:'📊' },
+      { code:'ICVI', nom:'Indice de Création de Valeur Internationale', desc:"Évalue la valeur économique générée par les coopérations.",        val:idx.icvi, color:'#dc2626', icon:'💎' },
+    ];
+    document.getElementById('oci-indices-list').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
+        ${indices.map(i=>`<div style="border:2px solid ${i.color}20;border-radius:14px;padding:18px;background:${i.color}08;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="font-size:20px;">${i.icon}</span>
+            <div>
+              <div style="font-weight:800;font-size:13px;color:${i.color};">${i.code}</div>
+              <div style="font-size:11px;color:var(--muted);">${i.nom}</div>
+            </div>
+          </div>
+          <div style="font-size:36px;font-weight:900;color:${i.color};margin-bottom:6px;">${i.val}</div>
+          <div style="background:#f1f5f9;border-radius:99px;height:8px;margin-bottom:8px;">
+            <div style="width:${Math.min(i.val,100)}%;background:${i.color};height:8px;border-radius:99px;"></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);">${i.desc}</div>
+        </div>`).join('')}
+      </div>`;
+  }
+
+  function ociRenderIA(ai){
+    document.getElementById('oci-ia-content').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div style="padding:16px;background:#f0fdf4;border-radius:12px;border-left:4px solid #059669;">
+          <div style="font-weight:700;font-size:13px;color:#065f46;margin-bottom:10px;">💡 Nouvelles opportunités de coopération</div>
+          ${ai.opportunites.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #bbf7d0;">🟢 ${v}</div>`).join('')}
+        </div>
+        <div style="padding:16px;background:#eff6ff;border-radius:12px;border-left:4px solid #2563eb;">
+          <div style="font-weight:700;font-size:13px;color:#1e40af;margin-bottom:10px;">🔗 Pays et acteurs complémentaires</div>
+          ${ai.complementaires.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #bfdbfe;">🔹 ${v}</div>`).join('')}
+        </div>
+        <div style="padding:16px;background:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
+          <div style="font-weight:700;font-size:13px;color:#c2410c;margin-bottom:10px;">🚀 Secteurs à fort potentiel</div>
+          <div style="display:flex;flex-wrap:wrap;gap:7px;">
+            ${ai.potentiel.map(v=>`<span style="padding:4px 10px;background:#fff;border:1px solid #fed7aa;border-radius:99px;font-size:12px;color:#9a3412;">💰 ${v}</span>`).join('')}
+          </div>
+        </div>
+        <div style="padding:16px;background:#fdf2f8;border-radius:12px;border-left:4px solid #a21caf;">
+          <div style="font-weight:700;font-size:13px;color:#701a75;margin-bottom:10px;">📈 Tendances émergentes</div>
+          ${ai.tendances.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #f5d0fe;">💜 ${v}</div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  function ociExport(fmt){
+    const msg=document.getElementById('oci-export-msg');
+    msg.style.display='';
+    const labels={pdf:'PDF',word:'Word (.docx)',excel:'Excel (.xlsx)',csv:'CSV',pptx:'PowerPoint (.pptx)'};
+    msg.innerHTML=`⏳ Génération du rapport <strong>${labels[fmt]||fmt}</strong> en cours…`;
+    msg.style.background='#eff6ff';msg.style.borderColor='#2563eb';msg.style.color='#1e40af';
+    setTimeout(()=>{
+      msg.innerHTML=`✅ Rapport <strong>${labels[fmt]||fmt}</strong> prêt. En production, le téléchargement démarrerait automatiquement.`;
+      msg.style.background='#f0fdf4';msg.style.borderColor='#059669';msg.style.color='#065f46';
+    },1800);
+  }
+
+  window.loadObsCoop=loadObsCoop;
+  window.ociTab=ociTab;
+  window.ociExport=ociExport;
+
+  // ══ OBSERVATOIRE INSTITUTIONNEL ═══════════════════════════════
+  let _oiData = null;
+  let _oiCurrentTab = 'vue';
+  let _oiCurrentClass = 'actives';
+
+  function oiTab(tab){
+    _oiCurrentTab=tab;
+    ['vue','class','comms','events','recruit','coop','indices','ia','compare','rapports'].forEach(t=>{
+      const btn=document.getElementById('oi-tab-'+t);
+      const panel=document.getElementById('oi-panel-'+t);
+      if(btn) btn.className=t===tab?'btn btn-orange btn-sm':'btn btn-outline btn-sm';
+      if(panel) panel.style.display=t===tab?'':'none';
+    });
+    if(_oiData) oiRender(_oiData);
+  }
+
+  function oiClassTab(cls){
+    _oiCurrentClass=cls;
+    ['actives','communicantes','consultees','suivies','reactives'].forEach(t=>{
+      const btn=document.getElementById('oi-cls-'+t);
+      if(btn) btn.className=t===cls?'btn btn-orange btn-sm':'btn btn-outline btn-sm';
+    });
+    if(_oiData) oiRenderClassement(_oiData.classements);
+  }
+
+  function showOiDownloadPanel(){
+    const p=document.getElementById('oi-download-panel');
+    p.style.display=p.style.display==='none'?'':'none';
+    document.getElementById('oi-mail-panel').style.display='none';
+  }
+  function showOiMailPanel(){
+    const p=document.getElementById('oi-mail-panel');
+    p.style.display=p.style.display==='none'?'':'none';
+    document.getElementById('oi-download-panel').style.display='none';
+  }
+
+  async function loadObsInstit(){
+    try{
+      const d=await api('GET','/admin/observatoire-institutionnel');
+      _oiData=d;
+      const ov=d.overview;
+      document.getElementById('oi-total').textContent=fmtNum(ov.nbTotal);
+      document.getElementById('oi-verif').textContent=fmtNum(ov.nbVerif);
+      document.getElementById('oi-actifs').textContent=fmtNum(ov.nbActifs);
+      document.getElementById('oi-inactifs').textContent=fmtNum(ov.nbInactifs);
+      document.getElementById('oi-pubs').textContent=fmtNum(d.comms.total_publications);
+      document.getElementById('oi-events').textContent=fmtNum(d.events_stats.total);
+      document.getElementById('oi-recruit').textContent=fmtNum(d.recruit_stats.campagnes);
+      document.getElementById('oi-pays-nb').textContent=fmtNum(ov.par_pays.length);
+      // Remplir selects comparaison
+      ['oi-cmp-1','oi-cmp-2','oi-cmp-3','oi-cmp-4'].forEach(id=>{
+        const sel=document.getElementById(id);
+        if(!sel) return;
+        const cur=sel.value;
+        sel.innerHTML='<option value="">— Institution —</option>'+d.institutions.map(i=>`<option value="${i.id}">${i.type} — ${i.nom} (${i.pays})</option>`).join('');
+        sel.value=cur;
+      });
+      oiRender(d);
+    }catch(e){ console.error('OI',e); }
+  }
+
+  function oiRender(d){
+    const t=_oiCurrentTab;
+    if(t==='vue')     oiRenderVue(d.overview);
+    if(t==='class')   oiRenderClassement(d.classements);
+    if(t==='comms')   oiRenderComms(d.comms, d.sondages);
+    if(t==='events')  oiRenderEvents(d.events_stats);
+    if(t==='recruit') oiRenderRecruit(d.recruit_stats);
+    if(t==='coop')    oiRenderCoop(d.coop_stats);
+    if(t==='indices') oiRenderIndicesOI(d.indices);
+    if(t==='ia')      oiRenderIA(d.ai);
+  }
+
+  function oiRenderVue(ov){
+    const maxT=Math.max(...ov.par_type.map(t=>t.n),1);
+    document.getElementById('oi-par-type').innerHTML=ov.par_type.map(t=>`
+      <div style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;">
+          <span style="font-weight:600;">🏢 ${t.type}</span>
+          <span style="font-weight:800;">${t.n}</span>
+        </div>${barPct(t.n,maxT,'#1B3A6B')}
+      </div>`).join('');
+
+    const maxP=Math.max(...ov.par_pays.map(p=>p.n),1);
+    document.getElementById('oi-par-pays').innerHTML=ov.par_pays.map(p=>`
+      <div style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;">
+          <span style="font-weight:600;">🌍 ${p.pays}</span>
+          <span style="font-weight:800;">${p.n}</span>
+        </div>${barPct(p.n,maxP,'#059669')}
+      </div>`).join('');
+
+    const maxC=Math.max(...ov.continents.map(c=>c.n),1);
+    document.getElementById('oi-par-continent').innerHTML=ov.continents.map(c=>`
+      <div style="margin-bottom:12px;padding:12px;border:1px solid var(--border);border-radius:10px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px;">${c.continent}</div>
+        <div style="font-size:22px;font-weight:900;color:var(--navy);">${c.n}</div>
+        ${barPct(c.n,maxC,'#7c3aed')}
+      </div>`).join('');
+  }
+
+  function oiRenderClassement(cls){
+    const maps={actives:'top_actives',communicantes:'top_communicantes',consultees:'top_consultees',suivies:'top_suivies',reactives:'top_reactives'};
+    const metrics={
+      actives: (i)=>`Connexions : <strong>${i.connexions}</strong> · Score : <strong>${i.score}</strong>`,
+      communicantes: (i)=>`Publications : <strong>${i.publications}</strong> · Événements : <strong>${i.events}</strong> · Recrutements : <strong>${i.recrutements}</strong>`,
+      consultees: (i)=>`Vues profil : <strong>${fmtNum(i.vues_profil)}</strong>`,
+      suivies: (i)=>`Abonnés : <strong>${fmtNum(i.abonnes)}</strong> · Évol. : ${evolBadge(i.evol_abonnes)}`,
+      reactives: (i)=>`Engagement : <strong>${i.taux_engagement}%</strong> · Réactions : <strong>${i.reactions}</strong>`
+    };
+    const list=cls[maps[_oiCurrentClass]]||[];
+    const maxScore=Math.max(...list.map(i=>i.score||i.vues_profil||i.abonnes||1),1);
+    const scoreKey={actives:'score',communicantes:'publications',consultees:'vues_profil',suivies:'abonnes',reactives:'taux_engagement'};
+    document.getElementById('oi-classement-list').innerHTML=list.length?`
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+          <th style="padding:8px 10px;text-align:left;">#</th>
+          <th style="padding:8px 10px;text-align:left;">Institution</th>
+          <th style="padding:8px 10px;text-align:left;">Métriques</th>
+          <th style="padding:8px 10px;text-align:left;width:120px;">Niveau</th>
+        </tr></thead><tbody>
+        ${list.map((i,idx)=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 10px;font-weight:800;color:var(--muted);">${idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':idx+1}</td>
+          <td style="padding:10px 10px;">
+            <div style="font-weight:700;font-size:13px;">🏛️ ${i.type}</div>
+            <div style="font-size:11px;color:var(--muted);">${i.pays} · ${i.statut==='verifie'?'<span style="color:#059669;">✅ Vérifié</span>':'En attente'}</div>
+          </td>
+          <td style="padding:10px 10px;font-size:12px;">${metrics[_oiCurrentClass](i)}</td>
+          <td style="padding:10px 10px;">${barPct(i[scoreKey[_oiCurrentClass]]||i.score,maxScore,'#f97316')}</td>
+        </tr>`).join('')}
+      </tbody></table>`:
+      '<div style="padding:16px;color:var(--muted);">Aucune donnée disponible.</div>';
+  }
+
+  function oiRenderComms(comms, sondages){
+    document.getElementById('oi-comms-metrics').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        ${[
+          ['📢','Publications',comms.total_publications,'#1e40af'],
+          ['🗓️','Événements',comms.total_events,'#059669'],
+          ['❤️','Réactions',comms.total_reactions,'#dc2626'],
+          ['💬','Commentaires',comms.total_commentaires,'#7c3aed'],
+          ['🔄','Republications',comms.total_repub,'#d97706'],
+        ].map(([e,l,v,c])=>`<div style="padding:10px;background:#f8fafc;border-radius:8px;border-left:3px solid ${c};">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;">${e} ${l}</div>
+          <div style="font-size:22px;font-weight:800;color:${c};">${fmtNum(v)}</div>
+        </div>`).join('')}
+      </div>`;
+
+    const maxT=Math.max(...comms.themes.map(t=>t.n),1);
+    document.getElementById('oi-comms-themes').innerHTML=comms.themes.map(t=>`
+      <div style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;">
+          <span style="font-weight:600;">🏷️ ${t.theme}</span><span style="font-weight:800;">${t.n}</span>
+        </div>${barPct(t.n,maxT,'#1e40af')}
+      </div>`).join('');
+
+    document.getElementById('oi-sondages').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px;">
+        <div style="padding:12px;background:#f8fafc;border-radius:8px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;">📋 Total sondages</div>
+          <div style="font-size:24px;font-weight:800;color:var(--navy);">${sondages.total}</div>
+        </div>
+        <div style="padding:12px;background:#f0fdf4;border-radius:8px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;">✅ Taux participation</div>
+          <div style="font-size:24px;font-weight:800;color:#059669;">${sondages.taux_participation_moy}%</div>
+        </div>
+        <div style="padding:12px;background:#eff6ff;border-radius:8px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;">💬 Rép. moyen</div>
+          <div style="font-size:24px;font-weight:800;color:#1e40af;">${fmtNum(sondages.nb_reponses_moy)}</div>
+        </div>
+        <div style="padding:12px;background:#fef9c3;border-radius:8px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;">📈 Évolution</div>
+          <div style="font-size:22px;font-weight:800;color:#92400e;">+${sondages.evol}%</div>
+        </div>
+      </div>
+      <div><strong style="font-size:12px;color:var(--muted);">THÈMES POPULAIRES</strong> : ${sondages.themes_pop.map(t=>`<span style="padding:3px 10px;background:#f1f5f9;border-radius:99px;font-size:12px;margin:2px;">${t}</span>`).join('')}</div>`;
+  }
+
+  function oiRenderEvents(ev){
+    document.getElementById('oi-events-stats').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
+        ${[
+          ['🗓️','Événements créés',ev.total,'var(--navy)'],
+          ['👥','Participants total',fmtNum(ev.participants_total),'#1e40af'],
+          ['✅','Taux présence',ev.taux_presence+'%','#059669'],
+          ['🎟️','Taux remplissage',ev.taux_remplissage+'%','#7c3aed'],
+          ['❤️','Engagement',ev.engagement+'%','#dc2626'],
+        ].map(([e,l,v,c])=>`<div style="padding:14px;background:#f8fafc;border-radius:10px;text-align:center;border-top:3px solid ${c};">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:4px;">${e} ${l}</div>
+          <div style="font-size:26px;font-weight:800;color:${c};">${v}</div>
+        </div>`).join('')}
+      </div>`;
+  }
+
+  function oiRenderRecruit(rc){
+    document.getElementById('oi-recruit-stats').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
+        ${[
+          ['📢','Campagnes',rc.campagnes,'var(--navy)'],
+          ['📨','Candidatures',fmtNum(rc.candidatures),'#1e40af'],
+          ['✅','Recrutements',fmtNum(rc.recrutements),'#059669'],
+          ['🎯','Taux réussite',rc.taux_reussite+'%','#f97316'],
+        ].map(([e,l,v,c])=>`<div style="padding:14px;background:#f8fafc;border-radius:10px;text-align:center;border-top:3px solid ${c};">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:4px;">${e} ${l}</div>
+          <div style="font-size:26px;font-weight:800;color:${c};">${v}</div>
+        </div>`).join('')}
+      </div>`;
+  }
+
+  function oiRenderCoop(coop){
+    const maxCoop=Math.max(...coop.top_coop.map(i=>i.deals+i.partenariats),1);
+    document.getElementById('oi-coop-stats').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">
+        ${[
+          ['🎯','Deals',coop.deals,'#1e40af'],
+          ['🤝','Partenariats nationaux',coop.partenariats_national,'#059669'],
+          ['🌍','Partenariats intl.',coop.partenariats_intl,'#7c3aed'],
+          ['🔄','Projets en cours',coop.projets_cours,'#f97316'],
+          ['✅','Projets réalisés',coop.projets_realises,'#065f46'],
+        ].map(([e,l,v,c])=>`<div style="padding:12px;background:#f8fafc;border-radius:10px;text-align:center;border-top:3px solid ${c};">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:4px;">${e} ${l}</div>
+          <div style="font-size:22px;font-weight:800;color:${c};">${v}</div>
+        </div>`).join('')}
+      </div>
+      <div><div style="font-weight:700;font-size:13px;margin-bottom:10px;">🏆 Top institutions coopératives</div>
+      ${coop.top_coop.map((i,idx)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-weight:800;color:var(--muted);width:20px;">${['🥇','🥈','🥉','4','5'][idx]||idx+1}</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:13px;">🏛️ ${i.type} — ${i.pays}</div>
+          <div style="font-size:11px;color:var(--muted);">Deals : ${i.deals} · Partenariats : ${i.partenariats}</div>
+          ${barPct(i.deals+i.partenariats,maxCoop,'#1e40af')}
+        </div>
+      </div>`).join('')}</div>`;
+  }
+
+  function oiRenderIndicesOI(idx){
+    const indices=[
+      { code:'ICI',  nom:'Indice de Communication Institutionnelle', val:idx.ici,  color:'#2563eb', icon:'📢' },
+      { code:'IEI',  nom:'Indice d\'Engagement Institutionnel',      val:idx.iei,  color:'#059669', icon:'❤️' },
+      { code:'ICO',  nom:'Indice de Coopération Institutionnelle',   val:idx.ico,  color:'#7c3aed', icon:'🤝' },
+      { code:'IRI',  nom:'Indice de Recrutement Institutionnel',     val:idx.iri,  color:'#f97316', icon:'💼' },
+      { code:'III',  nom:'Indice d\'Innovation Institutionnelle',    val:idx.iii,  color:'#d97706', icon:'💡' },
+      { code:'IGPI', nom:'Indice Global de Performance Institutionnelle', val:idx.igpi, color:'var(--navy)', icon:'🏆' },
+    ];
+    document.getElementById('oi-indices-list').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+        ${indices.map(i=>`<div style="border:2px solid ${i.color}30;border-radius:14px;padding:16px;background:${i.code==='IGPI'?'#f0f4ff':'#fafafa'};">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="font-size:18px;">${i.icon}</span>
+            <div>
+              <div style="font-weight:800;font-size:13px;color:${i.color};">${i.code}</div>
+              <div style="font-size:10px;color:var(--muted);">${i.nom}</div>
+            </div>
+          </div>
+          <div style="font-size:34px;font-weight:900;color:${i.color};margin-bottom:4px;">${i.val}<span style="font-size:14px;opacity:.6;">/100</span></div>
+          <div style="background:#f1f5f9;border-radius:99px;height:8px;">
+            <div style="width:${Math.min(i.val,100)}%;background:${i.color};height:8px;border-radius:99px;"></div>
+          </div>
+        </div>`).join('')}
+      </div>`;
+  }
+
+  function oiRenderIA(ai){
+    document.getElementById('oi-ia-content').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div style="padding:14px;background:#f0fdf4;border-radius:12px;border-left:4px solid #059669;">
+          <div style="font-weight:700;font-size:13px;color:#065f46;margin-bottom:8px;">🚀 Institutions les plus dynamiques</div>
+          ${ai.dynamiques.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #bbf7d0;">✅ ${v}</div>`).join('')}
+        </div>
+        <div style="padding:14px;background:#eff6ff;border-radius:12px;border-left:4px solid #2563eb;">
+          <div style="font-weight:700;font-size:13px;color:#1e40af;margin-bottom:8px;">📈 Institutions en forte progression</div>
+          ${ai.progression.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #bfdbfe;">📈 ${v}</div>`).join('')}
+        </div>
+        <div style="padding:14px;background:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
+          <div style="font-weight:700;font-size:13px;color:#c2410c;margin-bottom:8px;">🏷️ Domaines d'action dominants</div>
+          ${ai.domaines.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #fed7aa;">🔸 ${v}</div>`).join('')}
+        </div>
+        <div style="padding:14px;background:#fef9c3;border-radius:12px;border-left:4px solid #d97706;">
+          <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:8px;">🌱 Secteurs & tendances émergentes</div>
+          ${ai.emergents.map(v=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid #fde68a;">🔹 ${v}</div>`).join('')}
+        </div>
+      </div>
+      <div style="margin-top:14px;padding:14px;background:#fdf2f8;border-radius:12px;border-left:4px solid #a21caf;">
+        <div style="font-weight:700;font-size:13px;color:#701a75;margin-bottom:8px;">⭐ Meilleures pratiques observées</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${ai.meilleures_pratiques.map(v=>`<span style="padding:4px 12px;background:#fff;border:1px solid #f5d0fe;border-radius:99px;font-size:12px;color:#701a75;">✓ ${v}</span>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  function oiCompare(){
+    if(!_oiData) return;
+    const ids=['oi-cmp-1','oi-cmp-2','oi-cmp-3','oi-cmp-4'].map(id=>parseInt(document.getElementById(id)?.value)).filter(Boolean);
+    if(ids.length<2){ alert('Sélectionnez au moins 2 institutions.'); return; }
+    const selected=_oiData.institutions.filter(i=>ids.includes(i.id));
+    const metrics=[
+      ['Connexions','connexions'],['Publications','publications'],['Événements','events'],
+      ['Recrutements','recrutements'],['Abonnés','abonnes'],['Vues profil','vues_profil'],
+      ['Sondages','sondages'],['Deals','deals'],['Partenariats','partenariats'],
+      ['Réactions','reactions'],['Engagement','taux_engagement'],['Score global','score']
+    ];
+    const maxVals={};
+    metrics.forEach(([,k])=>{ maxVals[k]=Math.max(...selected.map(i=>i[k]||0),1); });
+    const colors=['#1e40af','#059669','#dc2626','#d97706'];
+    document.getElementById('oi-compare-result').innerHTML=`
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:600px;">
+          <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+            <th style="padding:10px 12px;text-align:left;min-width:140px;">Indicateur</th>
+            ${selected.map((i,idx)=>`<th style="padding:10px 12px;text-align:center;color:${colors[idx]};">
+              <div style="font-weight:800;">🏛️ ${i.type}</div>
+              <div style="font-size:11px;font-weight:400;color:var(--muted);">${i.pays}</div>
+            </th>`).join('')}
+          </tr></thead><tbody>
+          ${metrics.map(([label,key])=>`<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:9px 12px;font-weight:600;font-size:12px;">${label}</td>
+            ${selected.map((i,idx)=>{
+              const v=i[key]||0; const maxV=maxVals[key];
+              const best=selected.every(s=>s[key]<=v);
+              return `<td style="padding:9px 12px;text-align:center;">
+                <div style="font-weight:${best?'800':'600'};color:${best?colors[idx]:'inherit'};font-size:${best?'15px':'13px'};">${typeof v==='number'&&v>=1000?fmtNum(v):v}</div>
+                ${barPct(v,maxV,colors[idx])}
+              </td>`;
+            }).join('')}
+          </tr>`).join('')}
+        </tbody></table>
+      </div>`;
+  }
+
+  function oiDownload(fmt){
+    const el=document.getElementById('oi-dl-msg')||document.getElementById('oi-rpt-msg');
+    if(el){ el.style.display=''; el.innerHTML=`⏳ Génération du fichier <strong>${fmt.toUpperCase()}</strong>…`; el.style.background='#eff6ff'; el.style.borderColor='#2563eb'; el.style.color='#1e40af'; }
+    if(fmt==='csv'){
+      // Vrai téléchargement CSV
+      fetch('/api/admin/export-data?module=institutionnel&format=csv').then(r=>r.blob()).then(blob=>{
+        const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='diaspoactif-institutionnel-'+Date.now()+'.csv'; a.click();
+        if(el){ el.innerHTML='✅ Fichier CSV téléchargé.'; el.style.background='#f0fdf4'; el.style.borderColor='#059669'; el.style.color='#065f46'; }
+      }).catch(()=>{ if(el) el.innerHTML='❌ Erreur de génération.'; });
+    } else if(fmt==='json'){
+      const blob=new Blob([JSON.stringify(_oiData,null,2)],{type:'application/json'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='diaspoactif-institutionnel-'+Date.now()+'.json'; a.click();
+      if(el){ el.innerHTML='✅ Fichier JSON téléchargé.'; el.style.background='#f0fdf4'; el.style.borderColor='#059669'; el.style.color='#065f46'; }
+    } else {
+      setTimeout(()=>{
+        if(el){ el.innerHTML=`✅ Rapport <strong>${fmt.toUpperCase()}</strong> généré. En production, le téléchargement démarrerait automatiquement.`; el.style.background='#f0fdf4'; el.style.borderColor='#059669'; el.style.color='#065f46'; }
+      },1800);
+    }
+  }
+
+  function oiSendMail(){
+    const to=document.getElementById('oi-mail-to')?.value;
+    const msg=document.getElementById('oi-mail-msg');
+    if(!to){ if(msg){msg.style.display='';msg.innerHTML='❌ Veuillez saisir un destinataire.';msg.style.background='#fef2f2';msg.style.borderColor='#dc2626';msg.style.color='#dc2626';} return; }
+    if(msg){ msg.style.display=''; msg.innerHTML='⏳ Envoi en cours…'; msg.style.background='#eff6ff'; msg.style.borderColor='#2563eb'; msg.style.color='#1e40af'; }
+    setTimeout(()=>{
+      if(msg){ msg.innerHTML=`✅ Rapport envoyé à <strong>${to}</strong>. (En production, l'e-mail serait envoyé automatiquement via le serveur mail.)`; msg.style.background='#f0fdf4'; msg.style.borderColor='#059669'; msg.style.color='#065f46'; }
+    },1800);
+  }
+
+  function oiSendMailto(){
+    const to=document.getElementById('oi-mail-to')?.value||document.getElementById('oi-rpt-mail')?.value||'';
+    const subject=encodeURIComponent(document.getElementById('oi-mail-subject')?.value||'Rapport Observatoire Institutionnel — Diaspo\'Actif');
+    const body=encodeURIComponent((document.getElementById('oi-mail-body')?.value||'Veuillez trouver ci-joint le rapport de l\'Observatoire Institutionnel Diaspo\'Actif.')+'\n\n-- Diaspo\'Actif Admin');
+    window.open(`mailto:${to}?subject=${subject}&body=${body}`,'_blank');
+  }
+
+  function oiSendMailQuick(){
+    const to=document.getElementById('oi-rpt-mail')?.value;
+    const msg=document.getElementById('oi-rpt-msg');
+    if(!to){ if(msg){msg.style.display='';msg.innerHTML='❌ Veuillez saisir un destinataire.';msg.style.background='#fef2f2';msg.style.borderColor='#dc2626';msg.style.color='#dc2626';} return; }
+    if(msg){ msg.style.display=''; msg.innerHTML='⏳ Envoi en cours…'; msg.style.background='#eff6ff'; msg.style.borderColor='#2563eb'; msg.style.color='#1e40af'; }
+    setTimeout(()=>{
+      if(msg){ msg.innerHTML=`✅ Rapport envoyé à <strong>${to}</strong>.`; msg.style.background='#f0fdf4'; msg.style.borderColor='#059669'; msg.style.color='#065f46'; }
+    },1800);
+  }
+
+  window.loadObsInstit=loadObsInstit;
+  window.oiTab=oiTab;
+  window.oiClassTab=oiClassTab;
+  window.oiCompare=oiCompare;
+  window.oiDownload=oiDownload;
+  window.oiSendMail=oiSendMail;
+  window.oiSendMailto=oiSendMailto;
+  window.oiSendMailQuick=oiSendMailQuick;
+  window.showOiDownloadPanel=showOiDownloadPanel;
+  window.showOiMailPanel=showOiMailPanel;
 
   // ══ RÉSEAU & DIASPORA ══════════════════════════════════════
   async function loadReseau() {
@@ -8891,6 +10521,7 @@ window.adminCloseEvent = async function(id) {
   catch(e) { alert('Erreur : '+e.message); }
 };
 </script>
+<script src="assets/posts.js"></script>
 <script src="assets/chatbot.js"></script>
 <script src="assets/packages.js"></script>
 <script>

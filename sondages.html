@@ -1,491 +1,521 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Diaspo'Actif — Sondages &amp; Consultations</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diaspo'Actif — Sondages</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
-  <link rel="stylesheet" href="/assets/responsive.css">
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ff6b00">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="apple-touch-icon" href="assets/logo.svg">
+<link rel="stylesheet" href="assets/responsive.css">
 <style>
-.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center;}
-.filters select,.filters input{padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);}
-.sondage-card{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:18px;margin-bottom:12px;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
-.sondage-card:hover{border-color:var(--orange);box-shadow:0 2px 8px rgba(0,0,0,.06);}
-.type-badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;margin-bottom:8px;}
-.type-sondage{background:#f0fdf4;color:#16a34a;border:1px solid #86efac;}
-.type-consultation{background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;}
-.type-appel{background:#fef3c7;color:#b45309;border:1px solid #fcd34d;}
-.type-mobilisation{background:#fdf4ff;color:#7c3aed;border:1px solid #d8b4fe;}
-.statut-cloture{opacity:.6;}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;}
-.modal-box{background:#fff;border-radius:12px;padding:28px;max-width:640px;width:100%;max-height:90vh;overflow-y:auto;position:relative;}
-.question-block{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:16px;margin-bottom:14px;}
-.question-block label{display:block;font-weight:600;margin-bottom:10px;font-size:14px;}
-.opt-radio,.opt-check{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px;cursor:pointer;}
-.opt-radio input,.opt-check input{width:16px;height:16px;cursor:pointer;}
-.echelle-row{display:flex;gap:6px;flex-wrap:wrap;}
-.echelle-row button{width:36px;height:36px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;font-weight:700;font-size:13px;transition:all .1s;}
-.echelle-row button.sel{background:var(--orange);color:#fff;border-color:var(--orange);}
-.form-section{margin-bottom:18px;}
-.form-section h4{margin:0 0 10px;font-size:14px;}
-.create-question{background:var(--bg);border:1.5px dashed var(--border);border-radius:8px;padding:14px;margin-bottom:10px;}
-.create-question input,.create-question select,.create-question textarea{width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;margin-bottom:6px;}
-.opt-input-row{display:flex;gap:6px;margin-bottom:4px;}
-.opt-input-row input{flex:1;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;}
-.resultats-bar{display:flex;align-items:center;gap:10px;margin:6px 0;}
-.resultats-bar .bar-bg{flex:1;height:14px;background:var(--border);border-radius:99px;overflow:hidden;}
-.resultats-bar .bar-fill{height:100%;background:var(--orange);border-radius:99px;transition:width .4s;}
+.sond-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
+.sond-tab{padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
+.sond-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.sond-section{display:none;}.sond-section.active{display:block;}
+.sond-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:box-shadow .2s;}
+.sond-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.08);}
+.sond-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+.cat-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:#f3f4f6;color:#374151;}
+.prog-bar{height:8px;border-radius:4px;background:#f3f4f6;overflow:hidden;margin-top:4px;}
+.prog-fill{height:100%;border-radius:4px;background:var(--orange);transition:width .4s;}
+.q-card{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;position:relative;}
+.q-delete{position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;color:#ef4444;font-size:18px;}
+.interact-bar{display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border);margin-top:12px;}
+.ibtn{display:flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;cursor:pointer;font-size:12px;font-weight:700;transition:all .15s;color:#374151;}
+.ibtn:hover,.ibtn.active{border-color:var(--orange);color:var(--orange);background:#fff7f0;}
 </style>
 </head>
 <body>
-<div class="page">
-
-<header class="topbar">
-  <div class="topbar-inner">
-    <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
-    <nav class="nav">
-      <a href="index.html">Accueil</a>
-      <a href="annuaire.html">Annuaire</a>
-      <a href="sondages.html" class="active">Sondages</a>
-      <a href="offres.html">Offres</a>
-    </nav>
-    <div class="topbar-right">
-      <select class="lang-select" id="lang-select"></select>
-      <div id="auth-area" class="auth-area"></div>
+<div class="page" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt=""> DIASPO'ACTIF</a></div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="recrutement.html">Recrutement</a>
+        <a href="sondages.html" style="color:var(--orange);font-weight:700;">Sondages</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
     </div>
-  </div>
-</header>
+  </header>
 
-<div style="max-width:860px;margin:0 auto;padding:30px 16px;">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
-    <div>
-      <h1 style="margin:0 0 4px;">📢 Sondages &amp; Consultations</h1>
-      <p style="margin:0;color:var(--muted);font-size:13px;">Participez aux sondages ouverts par la communauté Diaspo'Actif.</p>
+  <main class="container" style="padding-top:24px;padding-bottom:60px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1 style="margin:0 0 4px;font-size:26px;">📊 Sondages &amp; Consultations</h1>
+        <p style="margin:0;color:var(--muted);font-size:14px;">Participez aux sondages de la diaspora et publiez vos propres consultations</p>
+      </div>
+      <button class="btn btn-orange" id="btn-creer-sond" style="display:none;" onclick="openCreateSond()">+ Créer un sondage</button>
     </div>
-    <button id="btn-creer" class="btn btn-orange" style="display:none;" onclick="openCreateModal()">+ Créer un sondage</button>
-  </div>
 
-  <div class="filters">
-    <input id="search-q" type="search" placeholder="Rechercher…" oninput="filterSondages()" style="width:200px;">
-    <select id="filter-type" onchange="filterSondages()">
-      <option value="">Tous les types</option>
-      <option value="sondage">Sondage</option>
-      <option value="consultation_citoyenne">Consultation citoyenne</option>
-      <option value="consultation_diaspora">Consultation diaspora</option>
-      <option value="consultation_associative">Consultation associative</option>
-      <option value="consultation_sectorielle">Consultation sectorielle</option>
-      <option value="appel_projets">Appel à projets</option>
-      <option value="mobilisation">Mobilisation</option>
-    </select>
-    <select id="filter-statut" onchange="filterSondages()">
-      <option value="">Tous</option>
-      <option value="ouvert">Ouverts</option>
-      <option value="cloture">Clôturés</option>
-    </select>
-  </div>
+    <div class="sond-nav">
+      <button class="sond-tab active" onclick="switchSond('offres')">🔍 Sondages ouverts</button>
+      <button class="sond-tab" onclick="switchSond('mes-sondages')" id="tab-mes-sond" style="display:none;">📋 Mes sondages</button>
+    </div>
 
-  <div id="sondages-list"><div style="color:var(--muted);">Chargement…</div></div>
-</div>
-</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+      <input type="text" id="sf-q" placeholder="🔍 Rechercher…" style="flex:1;min-width:160px;height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" oninput="filterSonds()">
+      <select id="sf-cat" onchange="filterSonds()" style="height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;">
+        <option value="">Toutes catégories</option>
+        <option value="consultation_citoyenne">Consultation citoyenne</option>
+        <option value="projet">Projet</option>
+        <option value="emploi">Emploi</option>
+        <option value="formation">Formation</option>
+        <option value="culture">Culture</option>
+        <option value="investissement">Investissement</option>
+        <option value="sante">Santé</option>
+        <option value="numerique">Numérique</option>
+        <option value="education">Éducation</option>
+        <option value="environnement">Environnement</option>
+        <option value="autre">Autre</option>
+      </select>
+    </div>
 
-<!-- Modal : Voir/Répondre à un sondage -->
-<div id="modal-sondage" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('modal-sondage')">
-  <div class="modal-box">
-    <button onclick="closeModal('modal-sondage')" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">✕</button>
-    <div id="modal-sondage-content"></div>
-  </div>
-</div>
-
-<!-- Modal : Créer un sondage -->
-<div id="modal-create" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('modal-create')">
-  <div class="modal-box" style="max-width:680px;">
-    <button onclick="closeModal('modal-create')" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">✕</button>
-    <h2 style="margin-top:0;">Créer un sondage / consultation</h2>
-
-    <div class="form-section">
-      <h4>Informations générales</h4>
-      <div style="display:grid;gap:8px;">
-        <input id="c-titre" placeholder="Titre *" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;width:100%;box-sizing:border-box;">
-        <textarea id="c-desc" rows="3" placeholder="Description (optionnel)" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box;resize:vertical;"></textarea>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <select id="c-type" style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;">
-            <option value="sondage">Sondage</option>
-            <option value="consultation_citoyenne">Consultation citoyenne</option>
-            <option value="consultation_diaspora">Consultation diaspora</option>
-            <option value="consultation_associative">Consultation associative</option>
-            <option value="consultation_sectorielle">Consultation sectorielle</option>
-            <option value="appel_projets">Appel à projets</option>
-            <option value="mobilisation">Mobilisation</option>
-          </select>
-          <input id="c-date-cloture" type="date" style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;" placeholder="Date de clôture">
-        </div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-          <input type="checkbox" id="c-anonyme"> Réponses anonymes
-        </label>
+    <div class="sond-section active" id="sec-offres">
+      <div id="sonds-grid" class="sond-grid">
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
       </div>
     </div>
 
-    <div class="form-section">
-      <h4>Questions <span id="q-count" style="color:var(--muted);font-weight:400;">(0)</span></h4>
-      <div id="questions-container"></div>
-      <button class="btn btn-outline btn-sm" onclick="addQuestion()">+ Ajouter une question</button>
+    <div class="sond-section" id="sec-mes-sondages">
+      <div id="mes-sonds-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
     </div>
+  </main>
+</div>
 
-    <div style="display:flex;gap:10px;margin-top:8px;">
-      <button class="btn btn-orange" onclick="submitCreate()">Publier le sondage</button>
-      <button class="btn btn-outline" onclick="closeModal('modal-create')">Annuler</button>
+<!-- MODAL DÉTAIL / PARTICIPATION -->
+<div class="modal-bg" id="modal-sond-bg" onclick="if(event.target===this)closeMod('modal-sond-bg')">
+  <div class="modal" id="modal-sond-content" style="max-width:700px;max-height:90vh;overflow-y:auto;"></div>
+</div>
+
+<!-- MODAL CRÉER SONDAGE -->
+<div class="modal-bg" id="modal-create-sond-bg" onclick="if(event.target===this)closeMod('modal-create-sond-bg')">
+  <div class="modal" style="max-width:680px;max-height:92vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;">📊 Créer un sondage</h3>
+      <button onclick="closeMod('modal-create-sond-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Informations générales</div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;">
+      <div class="form-row"><label>Titre *</label><input type="text" id="cs-titre" placeholder="Ex : Votre avis sur le projet…"></div>
+      <div class="form-row"><label>Description</label><textarea id="cs-desc" rows="3" style="resize:vertical;" placeholder="Contexte et objectif…"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-row">
+          <label>Catégorie</label>
+          <select id="cs-cat">
+            <option value="autre">Autre</option>
+            <option value="consultation_citoyenne">Consultation citoyenne</option>
+            <option value="projet">Projet</option>
+            <option value="emploi">Emploi</option>
+            <option value="formation">Formation</option>
+            <option value="culture">Culture</option>
+            <option value="investissement">Investissement</option>
+            <option value="sante">Santé</option>
+            <option value="numerique">Numérique</option>
+            <option value="education">Éducation</option>
+            <option value="environnement">Environnement</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Rayon de publication</label>
+          <select id="cs-rayon">
+            <option value="national">National</option>
+            <option value="international">International</option>
+            <option value="region">Région</option>
+            <option value="departement">Département</option>
+            <option value="ville">Ville</option>
+          </select>
+        </div>
+        <div class="form-row"><label>Date de début</label><input type="date" id="cs-debut"></div>
+        <div class="form-row"><label>Date de clôture (max 30 jours)</label><input type="date" id="cs-cloture"></div>
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;border-top:1px solid var(--border);padding-top:12px;">Confidentialité</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div class="form-row">
+        <label>Votes</label>
+        <select id="cs-conf">
+          <option value="anonyme">Anonymes</option>
+          <option value="nominatif">Nominatifs</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Résultats</label>
+        <select id="cs-res-vis">
+          <option value="apres_cloture">Après clôture</option>
+          <option value="temps_reel">En temps réel</option>
+          <option value="createur">Créateur uniquement</option>
+          <option value="public">Publics</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;border-top:1px solid var(--border);padding-top:12px;">Questions</div>
+    <div id="qs-builder"></div>
+    <button class="btn btn-sm btn-outline" onclick="addQuestion()" style="margin-bottom:16px;">+ Ajouter une question</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:10px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
+        <input type="checkbox" id="cs-publier" style="accent-color:var(--orange);"> Publier immédiatement
+      </label>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" onclick="closeMod('modal-create-sond-bg')">Annuler</button>
+        <button class="btn btn-orange" id="btn-save-sond" onclick="saveSond()">Créer le sondage</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Modal : Résultats -->
-<div id="modal-resultats" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('modal-resultats')">
-  <div class="modal-box">
-    <button onclick="closeModal('modal-resultats')" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">✕</button>
-    <div id="modal-resultats-content"></div>
-  </div>
+<!-- MODAL STATS -->
+<div class="modal-bg" id="modal-stats-sond-bg" onclick="if(event.target===this)closeMod('modal-stats-sond-bg')">
+  <div class="modal" id="modal-stats-sond-content" style="max-width:640px;max-height:90vh;overflow-y:auto;"></div>
 </div>
 
 <script src="assets/data.js"></script>
-<script src="assets/demo.js"></script>`n  <script src="assets/app.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/chatbot.js"></script>
 <script>
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});}catch(e){return d;}}
-function closeModal(id){document.getElementById(id).style.display='none';}
+let ALL_SONDS = [];
+let ME_SOND = null;
+let QS_BUILDER = [];
+let QS_IDX = 0;
 
-const TYPE_LABELS={sondage:'Sondage',consultation_citoyenne:'Consultation citoyenne',consultation_diaspora:'Consultation diaspora',consultation_associative:'Consultation associative',consultation_sectorielle:'Consultation sectorielle',appel_projets:'Appel à projets',mobilisation:'Mobilisation'};
-const TYPE_CSS={sondage:'type-sondage',consultation_citoyenne:'type-consultation',consultation_diaspora:'type-consultation',consultation_associative:'type-consultation',consultation_sectorielle:'type-consultation',appel_projets:'type-appel',mobilisation:'type-mobilisation'};
-const QTYPE_LABELS={choix_unique:'Choix unique',choix_multiple:'Choix multiple',texte_libre:'Texte libre',echelle:'Échelle',classement:'Classement'};
+function closeMod(id){ document.getElementById(id).style.display='none'; }
+function fmtDate(s){ if(!s)return '—'; return new Date(s).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}); }
+function daysLeft(d){ if(!d)return null; return Math.ceil((new Date(d)-new Date())/86400000); }
 
-let allSondages=[];
-let currentMe=null;
-let questionIdx=0;
+const CAT_LABELS = {consultation_citoyenne:'Consultation citoyenne',projet:'Projet',emploi:'Emploi',formation:'Formation',culture:'Culture',tourisme:'Tourisme',investissement:'Investissement',sante:'Santé',numerique:'Numérique',education:'Éducation',environnement:'Environnement',autre:'Sondage'};
 
-async function init(){
-  await applyAuthState();
-  currentMe=await fetchCurrentUser().catch(()=>null);
-  const params=new URLSearchParams(location.search);
-  // Check accred for create button
-  if(currentMe){
-    try{
-      const r=await api('GET','/accreditations/mes');
-      const hasMA=(r.accreditations||[]).some(a=>a.type==='mobilisation_active'&&a.statut==='active');
-      document.getElementById('btn-creer').style.display=hasMA?'inline-flex':'none';
-    }catch(e){}
+document.addEventListener('DOMContentLoaded', async()=>{
+  await new Promise(r=>setTimeout(r,400));
+  try{ const r=await api('GET','/auth/me'); ME_SOND=r.user; }catch(_){}
+  if(ME_SOND && ['initiative','collectivite','administrateur'].includes(ME_SOND.role)){
+    document.getElementById('btn-creer-sond').style.display='';
+    document.getElementById('tab-mes-sond').style.display='';
   }
-  await loadSondages();
-  if(params.get('action')==='creer') openCreateModal();
-  if(params.get('id')) openSondage(params.get('id'));
+  loadSonds();
+});
+
+function switchSond(name){
+  document.querySelectorAll('.sond-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.sond-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('sec-'+name)?.classList.add('active');
+  document.querySelectorAll('.sond-tab').forEach(t=>{ if(t.getAttribute('onclick')?.includes(name)) t.classList.add('active'); });
+  if(name==='mes-sondages') loadMesSonds();
 }
 
-async function loadSondages(){
+async function loadSonds(){
   try{
     const r=await api('GET','/sondages');
-    allSondages=r.sondages||[];
-    renderSondages(allSondages);
-  }catch(e){document.getElementById('sondages-list').innerHTML='<p style="color:var(--muted);">Erreur lors du chargement.</p>';}
+    ALL_SONDS=r.sondages||[];
+    renderSonds(ALL_SONDS);
+  }catch(e){ document.getElementById('sonds-grid').innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Erreur de chargement.</div>'; }
 }
 
-function filterSondages(){
-  const q=document.getElementById('search-q').value.toLowerCase();
-  const type=document.getElementById('filter-type').value;
-  const statut=document.getElementById('filter-statut').value;
-  let list=allSondages;
-  if(q) list=list.filter(s=>(s.titre+(s.description||'')).toLowerCase().includes(q));
-  if(type) list=list.filter(s=>s.type===type);
-  if(statut) list=list.filter(s=>s.statut===statut);
-  renderSondages(list);
+function filterSonds(){
+  const q=document.getElementById('sf-q').value.toLowerCase();
+  const cat=document.getElementById('sf-cat').value;
+  renderSonds(ALL_SONDS.filter(s=>(!q||s.titre.toLowerCase().includes(q)||(s.description||'').toLowerCase().includes(q))&&(!cat||s.categorie===cat)));
 }
 
-function renderSondages(list){
-  const el=document.getElementById('sondages-list');
-  if(!list.length){el.innerHTML='<p style="color:var(--muted);">Aucun sondage trouvé.</p>';return;}
-  el.innerHTML=list.map(s=>`
-    <div class="sondage-card ${s.statut==='cloture'?'statut-cloture':''}" onclick="openSondage(${s.id})">
-      <div class="type-badge ${TYPE_CSS[s.type]||'type-sondage'}">${TYPE_LABELS[s.type]||s.type}</div>
-      ${s.statut==='cloture'?'<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:#f3f4f6;color:#6b7280;margin-left:6px;">Clôturé</span>':''}
-      <div style="font-weight:700;font-size:15px;margin-bottom:4px;">${esc(s.titre)}</div>
-      ${s.description?`<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">${esc(s.description.slice(0,120))}${s.description.length>120?'…':''}</div>`:''}
-      <div style="display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap;">
-        <span>👤 ${esc(s.createur_nom)}</span>
-        <span>💬 ${s.nb_reponses} réponse${s.nb_reponses!==1?'s':''}</span>
-        ${s.date_cloture?`<span>📅 Clôture : ${fmtDate(s.date_cloture)}</span>`:''}
-        ${s.anonyme?'<span>🔒 Anonyme</span>':''}
+function renderSonds(sonds){
+  const grid=document.getElementById('sonds-grid');
+  if(!sonds.length){grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucun sondage disponible.</div>';return;}
+  grid.innerHTML=sonds.map(s=>{
+    const jours=daysLeft(s.date_cloture);
+    return `<div class="sond-card" onclick="openSond(${s.id})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px;">
+        <span class="cat-badge">📊 ${escH(CAT_LABELS[s.categorie]||s.categorie||'Sondage')}</span>
+        ${jours!==null?`<span style="font-size:11px;font-weight:700;color:${jours<=3&&jours>0?'#ef4444':jours<=0?'#6b7280':'var(--muted)'};">${jours>0?jours+' j restants':'Clôturé'}</span>`:''}
       </div>
-    </div>
-  `).join('');
-}
-
-async function openSondage(id){
-  const el=document.getElementById('modal-sondage-content');
-  el.innerHTML='<div style="color:var(--muted);">Chargement…</div>';
-  document.getElementById('modal-sondage').style.display='flex';
-  try{
-    const r=await api('GET','/sondages/'+id);
-    const {sondage:s,questions,dejaRepondu}=r;
-    const isCreateur=currentMe&&currentMe.id===s.createur_id;
-    let html=`<div class="type-badge ${TYPE_CSS[s.type]||'type-sondage'}" style="margin-bottom:10px;">${TYPE_LABELS[s.type]||s.type}</div>
-      <h2 style="margin:0 0 6px;">${esc(s.titre)}</h2>
-      ${s.description?`<p style="font-size:13px;color:var(--muted);margin-bottom:14px;">${esc(s.description)}</p>`:''}
-      <div style="font-size:12px;color:var(--muted);margin-bottom:18px;display:flex;gap:12px;flex-wrap:wrap;">
-        <span>👤 ${esc(s.createur_nom)}</span>
-        <span>💬 ${s.nb_reponses} réponse${s.nb_reponses!==1?'s':''}</span>
-        ${s.date_cloture?`<span>📅 Clôture : ${fmtDate(s.date_cloture)}</span>`:''}
-        ${s.anonyme?'<span>🔒 Réponses anonymes</span>':''}
-      </div>`;
-
-    if(isCreateur){
-      html+=`<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;">
-        <button class="btn btn-outline btn-sm" onclick="voirResultats(${s.id})">📊 Voir les résultats</button>
-        ${s.statut==='ouvert'?`<button class="btn btn-outline btn-sm" onclick="cloturerSondage(${s.id})">🔒 Clôturer</button>`:''}
-      </div>`;
-    }
-
-    if(dejaRepondu){
-      html+=`<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#16a34a;">✅ Vous avez déjà répondu à ce sondage.</div>`;
-    } else if(s.statut==='cloture'){
-      html+=`<div style="background:#f3f4f6;border-radius:8px;padding:12px;font-size:13px;color:var(--muted);margin-bottom:16px;">🔒 Ce sondage est clôturé.</div>`;
-    } else if(!currentMe){
-      html+=`<div style="background:#fef9c3;border:1.5px solid #fde047;border-radius:8px;padding:12px;font-size:13px;margin-bottom:16px;">
-        Connectez-vous pour participer. <a href="login.html">Se connecter</a></div>`;
-    } else {
-      html+=`<form id="form-reponse" onsubmit="submitReponse(event,${s.id})">`;
-      html+=questions.map(q=>{
-        let input='';
-        const opts=q.options||[];
-        if(q.type==='choix_unique'){
-          input=opts.map((o,i)=>`<label class="opt-radio"><input type="radio" name="q${q.id}" value="${esc(o)}" ${q.obligatoire?'required':''}> ${esc(o)}</label>`).join('');
-        } else if(q.type==='choix_multiple'){
-          input=opts.map((o,i)=>`<label class="opt-check"><input type="checkbox" name="q${q.id}" value="${esc(o)}"> ${esc(o)}</label>`).join('');
-        } else if(q.type==='texte_libre'){
-          input=`<textarea name="q${q.id}" rows="3" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;" ${q.obligatoire?'required':''}></textarea>`;
-        } else if(q.type==='echelle'){
-          input=`<div class="echelle-row">${[1,2,3,4,5].map(n=>`<button type="button" class="echelle-btn" data-qid="${q.id}" data-val="${n}" onclick="selectEchelle(this)">${n}</button>`).join('')}</div>
-            <input type="hidden" name="q${q.id}" id="echelle-val-${q.id}" ${q.obligatoire?'required':''}="">`;
-        } else if(q.type==='classement'){
-          input=`<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Classez du plus important au moins important</div>`
-            +opts.map((o,i)=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-              <select name="q${q.id}_${i}" style="width:50px;padding:4px;border:1px solid var(--border);border-radius:4px;">
-                ${opts.map((_,j)=>`<option value="${j+1}" ${j===i?'selected':''}>${j+1}</option>`).join('')}
-              </select>
-              <span style="font-size:13px;">${esc(o)}</span>
-            </div>`).join('');
-        }
-        return `<div class="question-block"><label>${esc(q.texte)}${q.obligatoire?' <span style="color:red;">*</span>':''}</label>${input}</div>`;
-      }).join('');
-      html+=`<button type="submit" class="btn btn-orange">Envoyer mes réponses</button></form>`;
-    }
-    el.innerHTML=html;
-  }catch(e){el.innerHTML='<p style="color:red;">Erreur : '+esc(e.message)+'</p>';}
-}
-
-function selectEchelle(btn){
-  const qid=btn.dataset.qid;
-  document.querySelectorAll(`.echelle-btn[data-qid="${qid}"]`).forEach(b=>b.classList.remove('sel'));
-  btn.classList.add('sel');
-  document.getElementById('echelle-val-'+qid).value=btn.dataset.val;
-}
-
-async function submitReponse(e,sondageId){
-  e.preventDefault();
-  const form=document.getElementById('form-reponse');
-  const formData=new FormData(form);
-  const reponses={};
-  // Collect all question responses
-  const r=await api('GET','/sondages/'+sondageId);
-  for(const q of r.questions){
-    if(q.type==='choix_multiple'){
-      reponses[q.id]=formData.getAll('q'+q.id);
-    } else {
-      reponses[q.id]=formData.get('q'+q.id)||null;
-    }
-  }
-  try{
-    await api('POST','/sondages/'+sondageId+'/repondre',{reponses});
-    closeModal('modal-sondage');
-    alert('Merci pour votre participation !');
-    loadSondages();
-  }catch(e){alert(e.message||'Erreur lors de l\'envoi.');}
-}
-
-async function voirResultats(id){
-  const el=document.getElementById('modal-resultats-content');
-  el.innerHTML='<div style="color:var(--muted);">Chargement…</div>';
-  closeModal('modal-sondage');
-  document.getElementById('modal-resultats').style.display='flex';
-  try{
-    const r=await api('GET','/sondages/'+id+'/resultats');
-    let html=`<h2 style="margin-top:0;">📊 Résultats — ${esc(r.sondage.titre)}</h2>`;
-
-    /* ── Stats globales ── */
-    html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-      <div style="flex:1;min-width:120px;background:var(--bg);border-radius:10px;padding:12px;text-align:center;">
-        <div style="font-size:22px;font-weight:800;color:var(--orange);">${r.nb_reponses}</div>
-        <div style="font-size:11px;color:var(--muted);">Réponses</div>
+      <h3 style="margin:0 0 6px;font-size:15px;line-height:1.3;">${escH(s.titre)}</h3>
+      ${s.description?`<p style="font-size:12px;color:#555;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(s.description)}</p>`:''}
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">🏛️ ${escH(s.createur_nom||'—')} · ${s.nb_questions||0} question(s)</div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);">
+        <span>👥 ${s.nb_reponses||0} participants</span><span>👁️ ${s.nb_vues||0} · ❤️ ${s.nb_reactions||0}</span>
       </div>
-      <div style="flex:1;min-width:120px;background:var(--bg);border-radius:10px;padding:12px;text-align:center;">
-        <div style="font-size:22px;font-weight:800;color:var(--navy);">${r.nb_repondants||0}</div>
-        <div style="font-size:11px;color:var(--muted);">Participants</div>
-      </div>
-      <div style="flex:1;min-width:120px;background:var(--bg);border-radius:10px;padding:12px;text-align:center;">
-        <div style="font-size:22px;font-weight:800;color:#059669;">${r.taux_participation||0}%</div>
-        <div style="font-size:11px;color:var(--muted);">Taux participation</div>
+      <div class="interact-bar" onclick="event.stopPropagation()">
+        <button class="ibtn" onclick="toggleRxnSond(${s.id},this)">❤️ ${s.nb_reactions||0}</button>
+        <button class="ibtn" onclick="toggleFavSond(${s.id},this)">⭐</button>
+        <button class="ibtn" onclick="openSond(${s.id})">💬 ${s.nb_commentaires||0}</button>
+        <button class="ibtn" style="border-color:var(--orange);color:var(--orange);" onclick="openSond(${s.id})">📋 Participer</button>
       </div>
     </div>`;
-
-    /* ── Répartition géographique ── */
-    if((r.repartition_pays||[]).length){
-      const maxN=Math.max(...r.repartition_pays.map(p=>p.n),1);
-      html+=`<div class="question-block"><div style="font-weight:700;margin-bottom:10px;">🌍 Répartition géographique des participants</div>`;
-      html+=r.repartition_pays.map(row=>{
-        const pct=Math.round((row.n/maxN)*100);
-        return `<div class="resultats-bar">
-          <span style="width:140px;font-size:13px;flex-shrink:0;">${esc(row.pays)}</span>
-          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#3b82f6;"></div></div>
-          <span style="font-size:12px;color:var(--muted);width:60px;text-align:right;">${row.n} pers.</span>
-        </div>`;
-      }).join('');
-      html+=`</div>`;
-    }
-
-    /* ── Questions ── */
-    for(const res of r.resultats){
-      html+=`<div class="question-block"><div style="font-weight:700;margin-bottom:10px;">${esc(res.question)}</div>`;
-      if(res.type==='texte_libre'){
-        const textes=res.reponses.filter(r=>r.reponse).map(r=>`<div style="padding:6px 10px;background:var(--bg);border-radius:6px;font-size:13px;margin-bottom:4px;">"${esc(r.reponse)}"</div>`).join('');
-        html+=textes||'<span style="color:var(--muted);font-size:13px;">Aucune réponse</span>';
-      } else {
-        const total=res.reponses.reduce((s,r)=>s+r.n,0)||1;
-        html+=res.reponses.map(row=>{
-          const pct=Math.round((row.n/total)*100);
-          return `<div class="resultats-bar">
-            <span style="width:160px;font-size:13px;flex-shrink:0;">${esc(row.reponse||'—')}</span>
-            <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
-            <span style="font-size:12px;color:var(--muted);width:60px;text-align:right;">${pct}% (${row.n})</span>
-          </div>`;
-        }).join('');
-      }
-      html+='</div>';
-    }
-    el.innerHTML=html;
-  }catch(e){el.innerHTML='<p style="color:red;">Erreur : '+esc(e.message)+'</p>';}
+  }).join('');
 }
 
-async function cloturerSondage(id){
-  if(!confirm('Clôturer ce sondage ? Les participants ne pourront plus répondre.'))return;
+async function openSond(sid){
+  api('POST','/sondages/'+sid+'/view').catch(()=>{});
+  const el=document.getElementById('modal-sond-content');
+  el.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);">Chargement…</div>';
+  document.getElementById('modal-sond-bg').style.display='flex';
   try{
-    await api('PATCH','/sondages/'+id+'/cloturer');
-    closeModal('modal-sondage');
-    loadSondages();
-  }catch(e){alert(e.message||'Erreur.');}
+    const r=await api('GET','/sondages/'+sid);
+    const s=r.sondage; const qs=r.questions||[]; const maP=r.ma_participation;
+    const estCreateur=ME_SOND&&(ME_SOND.id===s.createur_id||ME_SOND.role==='administrateur');
+    const ferme=s.statut!=='ouvert';
+    const dejaRepondu=!!maP;
+    const peutParticiper=ME_SOND&&!ferme&&!dejaRepondu;
+    el.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <span class="cat-badge" style="margin-bottom:6px;display:inline-block;">📊 ${escH(CAT_LABELS[s.categorie]||'Sondage')}</span>
+          <h2 style="margin:0;font-size:20px;">${escH(s.titre)}</h2>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Par ${escH(s.createur_nom||'—')} · Clôture le ${fmtDate(s.date_cloture)}</div>
+        </div>
+        <button onclick="closeMod('modal-sond-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+      </div>
+      ${s.description?`<div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.6;">${escH(s.description)}</div>`:''}
+      <div style="display:flex;gap:14px;font-size:13px;color:var(--muted);margin-bottom:16px;flex-wrap:wrap;">
+        <span>👥 ${s.nb_reponses||0}</span><span>👁️ ${s.nb_vues||0}</span><span>❤️ ${s.nb_reactions||0}</span>
+      </div>
+      ${ferme?'<div style="padding:12px;background:#fef3c7;border-radius:10px;margin-bottom:16px;text-align:center;font-size:13px;">⏰ Ce sondage est clôturé.</div>':''}
+      ${dejaRepondu&&!ferme?'<div style="padding:12px;background:#d1fae5;border-radius:10px;margin-bottom:16px;text-align:center;font-size:13px;font-weight:700;color:#065f46;">✅ Vous avez déjà répondu.</div>':''}
+      ${peutParticiper?`<div id="sond-form-${sid}">${qs.map((q2,i)=>renderQ(q2,i)).join('')}<button class="btn btn-orange" style="width:100%;margin-top:12px;" onclick="submitSond(${sid},[${qs.map(q2=>q2.id).join(',')}])">✅ Soumettre</button></div>`:''}
+      ${(ferme||dejaRepondu)?`<button class="btn btn-sm btn-outline" onclick="loadResMini(${sid})">📊 Voir les résultats</button><div id="res-mini-${sid}"></div>`:''}
+      ${!ME_SOND&&!ferme?'<div style="padding:12px;background:#fef3c7;border-radius:10px;text-align:center;font-size:13px;">🔑 <a href="login.html" style="color:var(--orange);font-weight:700;">Connectez-vous</a> pour participer.</div>':''}
+      <div class="interact-bar" style="margin-top:16px;">
+        <button class="ibtn ${s.ma_reaction?'active':''}" onclick="toggleRxnSond(${sid},this)">❤️ ${s.nb_reactions||0}</button>
+        <button class="ibtn ${s.est_favori?'active':''}" onclick="toggleFavSond(${sid},this)">⭐ ${s.est_favori?'Sauvegardé':'Favoris'}</button>
+        <button class="ibtn" onclick="navigator.clipboard.writeText(location.origin+'/sondages.html?id=${sid}');DA.toast('Lien copié !',{type:'success'})">📤 Copier</button>
+        ${estCreateur?`<button class="btn btn-sm" style="border-color:var(--orange);color:var(--orange);" onclick="closeMod('modal-sond-bg');openStatsSond(${sid})">📊 Stats</button>`:''}
+        ${estCreateur&&!ferme?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${sid})">🔒 Clôturer</button>`:''}
+        ${estCreateur?`<button class="btn btn-sm" onclick="window.location.href='/api/sondages/${sid}/export'">⬇️ CSV</button>`:''}
+      </div>
+      <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
+        <strong style="font-size:14px;">💬 Commentaires</strong>
+        <div id="sond-coms-${sid}" style="margin-top:10px;"></div>
+        ${ME_SOND?`<div style="display:flex;gap:8px;margin-top:10px;"><input type="text" id="sond-com-${sid}" placeholder="Votre commentaire…" style="flex:1;height:36px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;"><button class="btn btn-sm btn-orange" onclick="postComSond(${sid})">Envoyer</button></div>`:''}
+      </div>`;
+    loadComsSond(sid);
+  }catch(e){el.innerHTML=`<div style="padding:20px;color:#ef4444;">Erreur : ${escH(e.message)}</div>`;}
 }
 
-/* ──── Création de sondage ──── */
-let questions=[];
+function renderQ(q,i){
+  const opts=JSON.parse(q.options_json||'[]');
+  let html=`<div style="margin-bottom:14px;padding:12px;background:#f8fafc;border-radius:10px;">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;">${i+1}. ${escH(q.texte)} ${q.obligatoire?'<span style="color:#ef4444;">*</span>':''}</div>`;
+  if(q.type==='oui_non'){
+    html+=`<label style="margin-right:12px;cursor:pointer;"><input type="radio" name="q_${q.id}" value="oui"> Oui</label><label style="cursor:pointer;"><input type="radio" name="q_${q.id}" value="non"> Non</label>`;
+  } else if(q.type==='choix_unique'){
+    html+=opts.map(o=>`<label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;font-size:13px;"><input type="radio" name="q_${q.id}" value="${escH(o)}"> ${escH(o)}</label>`).join('');
+  } else if(q.type==='choix_multiple'){
+    html+=opts.map(o=>`<label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;font-size:13px;"><input type="checkbox" name="q_${q.id}" value="${escH(o)}"> ${escH(o)}</label>`).join('');
+  } else if(['echelle_5','echelle_10','etoiles'].includes(q.type)){
+    const max=q.type==='echelle_10'?10:5;
+    html+=`<div style="display:flex;gap:10px;flex-wrap:wrap;">`;
+    for(let v=1;v<=max;v++) html+=`<label style="text-align:center;cursor:pointer;"><input type="radio" name="q_${q.id}" value="${v}" style="display:block;margin:auto;"><span style="font-size:12px;">${v}</span></label>`;
+    html+=`</div>`;
+  } else if(q.type==='texte_long'){
+    html+=`<textarea name="q_${q.id}" rows="3" placeholder="Votre réponse…" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>`;
+  } else {
+    html+=`<input type="${q.type==='date'?'date':q.type==='nombre'?'number':'text'}" name="q_${q.id}" placeholder="Votre réponse…" style="width:100%;height:36px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;">`;
+  }
+  html+=`</div>`;
+  return html;
+}
 
-function openCreateModal(){
-  questions=[];
-  questionIdx=0;
-  document.getElementById('c-titre').value='';
-  document.getElementById('c-desc').value='';
-  document.getElementById('c-type').value='sondage';
-  document.getElementById('c-date-cloture').value='';
-  document.getElementById('c-anonyme').checked=false;
-  document.getElementById('questions-container').innerHTML='';
-  document.getElementById('q-count').textContent='(0)';
-  document.getElementById('modal-create').style.display='flex';
+async function submitSond(sid,qids){
+  const reponses=[];
+  for(const qid of qids){
+    const radios=[...document.querySelectorAll(`[name="q_${qid}"]:checked`)];
+    const checks=[...document.querySelectorAll(`input[name="q_${qid}"][type=checkbox]:checked`)];
+    const textEl=document.querySelector(`[name="q_${qid}"]:not([type=radio]):not([type=checkbox])`);
+    let valeur=null;
+    if(radios.length) valeur=radios.length===1?radios[0].value:radios.map(r=>r.value);
+    else if(checks.length) valeur=checks.map(c=>c.value);
+    else if(textEl?.value?.trim()) valeur=textEl.value.trim();
+    if(valeur!==null) reponses.push({question_id:qid,valeur});
+  }
+  try{
+    await api('POST','/sondages/'+sid+'/participer',{reponses});
+    DA.toast('Réponses enregistrées !',{type:'success'});
+    closeMod('modal-sond-bg'); loadSonds();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+async function loadResMini(sid){
+  const el=document.getElementById('res-mini-'+sid);
+  if(!el)return;
+  try{
+    const r=await api('GET','/sondages/'+sid+'/resultats');
+    el.innerHTML='<div style="margin-top:12px;">'+r.resultats.map(({question:q,reponses})=>`
+      <div style="margin-bottom:14px;">
+        <strong style="font-size:13px;">${escH(q.texte)}</strong>
+        ${reponses.slice(0,6).map(rep=>{const total=reponses.reduce((s,r2)=>s+r2.n,0)||1;const pct=Math.round(rep.n/total*100);return `<div style="margin-top:4px;font-size:12px;"><div style="display:flex;justify-content:space-between;"><span>${escH(String(rep.reponse||'').replace(/^"|"$/g,''))}</span><span style="font-weight:700;">${pct}% (${rep.n})</span></div><div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div></div>`;}).join('')}
+      </div>`).join('')+'</div>';
+  }catch(e){el.innerHTML='<div style="color:#ef4444;font-size:12px;margin-top:6px;">Résultats non disponibles.</div>';}
+}
+
+async function toggleRxnSond(sid,btn){
+  if(!ME_SOND){DA.toast('Connexion requise.',{type:'warning'});return;}
+  try{const r=await api('POST','/sondages/'+sid+'/reaction',{type:'jaime'});btn.textContent='❤️ '+r.nb_reactions;btn.classList.toggle('active',r.action!=='removed');}catch(_){}
+}
+async function toggleFavSond(sid,btn){
+  if(!ME_SOND){DA.toast('Connexion requise.',{type:'warning'});return;}
+  try{const r=await api('POST','/sondages/'+sid+'/favori');btn.textContent='⭐ '+(r.est_favori?'Sauvegardé':'Favoris');btn.classList.toggle('active',r.est_favori);}catch(_){}
+}
+async function loadComsSond(sid){
+  const el=document.getElementById('sond-coms-'+sid);if(!el)return;
+  try{
+    const r=await api('GET','/sondages/'+sid+'/commentaires');
+    const coms=r.commentaires||[];
+    el.innerHTML=coms.length?coms.map(c=>`<div style="display:flex;gap:10px;margin-bottom:8px;">${c.photo_url?`<img src="${escH(c.photo_url)}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;">`:'<div style="width:30px;height:30px;border-radius:50%;background:#e2e8f0;text-align:center;line-height:30px;">👤</div>'}<div style="flex:1;background:#f8fafc;border-radius:10px;padding:8px 12px;"><div style="font-size:12px;font-weight:700;">${escH(c.prenom||'')} ${escH(c.nom||'')}</div><div style="font-size:13px;">${escH(c.contenu)}</div></div></div>`).join(''):'<div style="color:var(--muted);font-size:12px;">Aucun commentaire.</div>';
+  }catch(_){}
+}
+async function postComSond(sid){
+  const inp=document.getElementById('sond-com-'+sid);
+  if(!inp?.value?.trim())return;
+  try{await api('POST','/sondages/'+sid+'/commentaires',{contenu:inp.value.trim()});inp.value='';loadComsSond(sid);}
+  catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+/* ── Mes sondages ── */
+async function loadMesSonds(){
+  if(!ME_SOND)return;
+  const el=document.getElementById('mes-sonds-list');
+  try{
+    const r=await api('GET','/sondages?mine=1');
+    const sonds=r.sondages||[];
+    if(!sonds.length){el.innerHTML='<div class="notice">Vous n\'avez pas encore créé de sondage.</div>';return;}
+    el.innerHTML=sonds.map(s=>`
+      <div class="card" style="margin-bottom:12px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+          <div>
+            <span class="cat-badge">📊 ${escH(CAT_LABELS[s.categorie]||'Sondage')}</span>
+            <strong style="font-size:15px;display:block;margin-top:4px;">${escH(s.titre)}</strong>
+            <div style="font-size:12px;color:var(--muted);">Clôture ${fmtDate(s.date_cloture)} · ${s.nb_reponses||0} réponses</div>
+          </div>
+          <span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:${s.statut==='ouvert'?'#d1fae5':'#f3f4f6'};color:${s.statut==='ouvert'?'#065f46':'#6b7280'};">${s.statut}</span>
+        </div>
+        <div style="display:flex;gap:10px;font-size:12px;color:var(--muted);margin-bottom:10px;">
+          <span>👁️ ${s.nb_vues||0}</span><span>❤️ ${s.nb_reactions||0}</span><span>💬 ${s.nb_commentaires||0}</span><span>👥 ${s.nb_reponses||0}</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" onclick="openSond(${s.id})">👁️ Voir</button>
+          <button class="btn btn-sm btn-outline" onclick="openStatsSond(${s.id})">📊 Stats</button>
+          ${s.statut==='ouvert'?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${s.id})">🔒 Clôturer</button>`:''}
+          <button class="btn btn-sm" onclick="window.location.href='/api/sondages/${s.id}/export'">⬇️ CSV</button>
+          <button class="btn btn-sm" style="border-color:#6b7280;color:#6b7280;" onclick="archiverSond(${s.id})">🗄️ Archiver</button>
+        </div>
+      </div>`).join('');
+  }catch(e){el.innerHTML=`<div style="color:#ef4444;">${escH(e.message)}</div>`;}
+}
+
+/* ── Créer sondage ── */
+function openCreateSond(){
+  QS_BUILDER=[];QS_IDX=0;
+  document.getElementById('qs-builder').innerHTML='';
+  ['cs-titre','cs-desc'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('cs-cat').value='autre';
+  document.getElementById('cs-rayon').value='national';
+  document.getElementById('cs-conf').value='anonyme';
+  document.getElementById('cs-res-vis').value='apres_cloture';
+  document.getElementById('cs-debut').value=new Date().toISOString().slice(0,10);
+  document.getElementById('cs-cloture').value=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+  document.getElementById('cs-publier').checked=false;
+  addQuestion();
+  document.getElementById('modal-create-sond-bg').style.display='flex';
 }
 
 function addQuestion(){
-  const idx=questionIdx++;
-  questions.push({id:idx,texte:'',type:'choix_unique',options:['',''],obligatoire:true});
-  renderQuestions();
-}
-
-function removeQuestion(idx){
-  questions=questions.filter(q=>q.id!==idx);
-  renderQuestions();
-}
-
-function renderQuestions(){
-  document.getElementById('q-count').textContent='('+questions.length+')';
-  document.getElementById('questions-container').innerHTML=questions.map((q,i)=>`
-    <div class="create-question">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <strong style="font-size:13px;">Question ${i+1}</strong>
-        <button type="button" onclick="removeQuestion(${q.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;">✕</button>
+  QS_IDX++;
+  const idx=QS_IDX;
+  QS_BUILDER.push({idx,texte:'',type:'choix_unique',options:[]});
+  const div=document.createElement('div');
+  div.className='q-card'; div.id='qb-'+idx;
+  div.innerHTML=`
+    <button type="button" class="q-delete" onclick="removeQ(${idx})">×</button>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:8px;">
+      <div class="form-row" style="margin:0;"><label style="font-size:11px;">Question ${idx}</label><input type="text" id="qt-${idx}" placeholder="Texte de la question" oninput="QS_BUILDER.find(q=>q.idx===${idx}).texte=this.value"></div>
+      <div class="form-row" style="margin:0;"><label style="font-size:11px;">Type</label>
+        <select id="qtype-${idx}" onchange="changeQType(${idx},this.value)">
+          <option value="choix_unique">Choix unique</option>
+          <option value="choix_multiple">Choix multiples</option>
+          <option value="oui_non">Oui / Non</option>
+          <option value="texte_libre">Réponse libre</option>
+          <option value="texte_long">Texte long</option>
+          <option value="echelle_5">Échelle 1-5</option>
+          <option value="echelle_10">Échelle 1-10</option>
+          <option value="etoiles">Étoiles</option>
+          <option value="nombre">Nombre</option>
+          <option value="date">Date</option>
+        </select>
       </div>
-      <input placeholder="Texte de la question *" value="${esc(q.texte)}" oninput="questions[${i}].texte=this.value">
-      <select onchange="questions[${i}].type=this.value;renderQuestions()">
-        ${Object.entries(QTYPE_LABELS).map(([v,l])=>`<option value="${v}" ${q.type===v?'selected':''}>${l}</option>`).join('')}
-      </select>
-      ${(q.type==='choix_unique'||q.type==='choix_multiple'||q.type==='classement')?`
-        <div id="opts-${q.id}">
-          ${(q.options||[]).map((o,oi)=>`<div class="opt-input-row">
-            <input placeholder="Option ${oi+1}" value="${esc(o)}" oninput="questions[${i}].options[${oi}]=this.value">
-            <button type="button" onclick="removeOpt(${i},${oi})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
-          </div>`).join('')}
-        </div>
-        <button type="button" onclick="addOpt(${i})" style="font-size:12px;color:var(--orange);background:none;border:none;cursor:pointer;">+ Ajouter une option</button>
-      `:''}
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-top:6px;">
-        <input type="checkbox" ${q.obligatoire?'checked':''} onchange="questions[${i}].obligatoire=this.checked"> Obligatoire
-      </label>
     </div>
-  `).join('');
+    <div id="qopts-${idx}">
+      <div id="qopts-list-${idx}"></div>
+      <button type="button" class="btn btn-sm btn-outline" onclick="addOpt(${idx})" style="margin-top:4px;">+ Option</button>
+    </div>`;
+  document.getElementById('qs-builder').appendChild(div);
 }
 
-function addOpt(qi){
-  questions[qi].options=questions[qi].options||[];
-  questions[qi].options.push('');
-  renderQuestions();
+function removeQ(idx){ QS_BUILDER=QS_BUILDER.filter(q=>q.idx!==idx); document.getElementById('qb-'+idx)?.remove(); }
+function changeQType(idx,type){
+  const q=QS_BUILDER.find(q=>q.idx===idx); if(q) q.type=type;
+  const d=document.getElementById('qopts-'+idx);
+  if(d) d.style.display=['choix_unique','choix_multiple'].includes(type)?'':'none';
 }
-function removeOpt(qi,oi){
-  questions[qi].options.splice(oi,1);
-  renderQuestions();
+function addOpt(idx){
+  const q=QS_BUILDER.find(q=>q.idx===idx); if(!q)return;
+  const oi=q.options.length; q.options.push('');
+  const list=document.getElementById('qopts-list-'+idx);
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;gap:6px;margin-bottom:4px;';
+  row.innerHTML=`<input type="text" placeholder="Option ${oi+1}" style="flex:1;height:32px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;" oninput="QS_BUILDER.find(q=>q.idx===${idx}).options[${oi}]=this.value"><button type="button" onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:#ef4444;">×</button>`;
+  list.appendChild(row);
 }
 
-async function submitCreate(){
-  const titre=document.getElementById('c-titre').value.trim();
-  if(!titre){alert('Titre requis.');return;}
-  if(!questions.length){alert('Ajoutez au moins une question.');return;}
-  const qs=questions.map(q=>({
-    texte:q.texte.trim(),type:q.type,
-    options:(q.options||[]).filter(o=>o.trim()),
-    obligatoire:q.obligatoire
-  }));
-  if(qs.some(q=>!q.texte)){alert('Toutes les questions doivent avoir un texte.');return;}
+async function saveSond(){
+  const titre=document.getElementById('cs-titre').value.trim();
+  if(!titre){DA.toast('Titre requis.',{type:'warning'});return;}
+  const debut=document.getElementById('cs-debut').value;
+  const cloture=document.getElementById('cs-cloture').value;
+  if(debut&&cloture&&(new Date(cloture)-new Date(debut))/86400000>30){DA.toast('Max 30 jours.',{type:'warning'});return;}
+  const questions=QS_BUILDER.map(q=>({texte:q.texte,type:q.type,options:q.options.filter(Boolean),obligatoire:true})).filter(q=>q.texte.trim());
+  if(!questions.length){DA.toast('Ajoutez au moins une question.',{type:'warning'});return;}
+  const btn=document.getElementById('btn-save-sond');btn.disabled=true;btn.textContent='…';
   try{
-    const r=await api('POST','/sondages',{
-      titre,
-      description:document.getElementById('c-desc').value.trim()||null,
-      type:document.getElementById('c-type').value,
-      date_cloture:document.getElementById('c-date-cloture').value||null,
-      anonyme:document.getElementById('c-anonyme').checked,
-      questions:qs
-    });
-    closeModal('modal-create');
-    await loadSondages();
-    openSondage(r.id);
-  }catch(e){alert(e.message||'Erreur lors de la création.');}
+    await api('POST','/sondages',{titre,description:document.getElementById('cs-desc').value||null,categorie:document.getElementById('cs-cat').value,rayon_publication:document.getElementById('cs-rayon').value,date_debut:debut||null,date_cloture:cloture||null,confidentialite:document.getElementById('cs-conf').value,resultats_visibles:document.getElementById('cs-res-vis').value,statut:document.getElementById('cs-publier').checked?'ouvert':'brouillon',questions});
+    DA.toast('Sondage créé !',{type:'success'});closeMod('modal-create-sond-bg');loadSonds();
+    if(ME_SOND&&['initiative','collectivite','administrateur'].includes(ME_SOND.role)) loadMesSonds();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+  finally{btn.disabled=false;btn.textContent='Créer le sondage';}
 }
 
-init();
-</script>
+async function cloturerSond(sid){
+  if(!confirm('Clôturer ce sondage ?'))return;
+  try{await api('PUT','/sondages/'+sid,{statut:'cloture'});DA.toast('Sondage clôturé.',{type:'success'});closeMod('modal-sond-bg');loadSonds();loadMesSonds();}catch(e){DA.toast(e.message,{type:'danger'});}
+}
+async function archiverSond(sid){
+  if(!confirm('Archiver ce sondage ?'))return;
+  try{await api('DELETE','/sondages/'+sid);DA.toast('Archivé.',{type:'success'});loadMesSonds();}catch(e){DA.toast(e.message,{type:'danger'});}
+}
 
-  <!-- ─── Mobile Bottom Navigation ─── -->
-  <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
-    <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
-    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
-    <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
-    <a class="mobile-bottom-nav__item" href="evenements.html"><span class="nav-icon">📅</span><span>Événements</span></a>
-    <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
-  </nav>
-<script src="assets/chatbot.js"></script>
+async function openStatsSond(sid){
+  const el=document.getElementById('modal-stats-sond-content');
+  el.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);">Chargement…</div>';
+  document.getElementById('modal-stats-sond-bg').style.display='flex';
+  try{
+    const r=await api('GET','/sondages/'+sid+'/stats');
+    const s=r.sondage;
+    el.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;">📊 ${escH(s.titre)}</h3>
+        <button onclick="closeMod('modal-stats-sond-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:20px;">
+        ${[['👁️','Vues',s.nb_vues||0],['👥','Répondants',s.nb_reponses||0],['🔄','Taux',r.taux_participation+'%'],['❤️','Réactions',s.nb_reactions||0],['💬','Commentaires',s.nb_commentaires||0],['⭐','Favoris',s.nb_favoris||0]].map(([ic,lb,v])=>`<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;"><div>${ic}</div><div style="font-size:22px;font-weight:800;color:var(--orange);">${v}</div><div style="font-size:10px;color:var(--muted);">${lb}</div></div>`).join('')}
+      </div>
+      ${r.par_pays.length?`<div style="margin-bottom:16px;"><strong style="font-size:13px;">🌍 Par pays</strong><div style="margin-top:8px;">${r.par_pays.map(p=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;"><span>${escH(p.pays||'—')}</span><span style="font-weight:700;">${p.n}</span></div>`).join('')}</div></div>`:''}
+      ${r.par_type.length?`<div style="margin-bottom:16px;"><strong style="font-size:13px;">👤 Par type de compte</strong><div style="margin-top:8px;">${r.par_type.map(t=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;"><span>${escH(t.type_compte||'—')}</span><span style="font-weight:700;">${t.n}</span></div>`).join('')}</div></div>`:''}
+      ${r.evolution.length?`<div style="margin-bottom:16px;"><strong style="font-size:13px;">📈 Évolution</strong><div style="margin-top:8px;">${r.evolution.map(e=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:var(--muted);"><span>${e.jour}</span><strong>${e.n}</strong></div>`).join('')}</div></div>`:''}
+      <button class="btn btn-outline" style="width:100%;" onclick="window.location.href='/api/sondages/${sid}/export'">⬇️ Exporter CSV</button>`;
+  }catch(e){el.innerHTML=`<div style="padding:20px;color:#ef4444;">Erreur : ${escH(e.message)}</div>`;}
+}
+</script>
 </body>
 </html>

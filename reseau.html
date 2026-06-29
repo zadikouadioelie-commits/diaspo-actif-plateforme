@@ -118,6 +118,36 @@
 .star-btn{background:none;border:none;font-size:1.2rem;cursor:pointer;opacity:.4;transition:opacity .15s;}
 .star-btn.on{opacity:1;}
 
+/* ── LISTES DE DIFFUSION ── */
+.ld-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+.ld-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.ld-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;cursor:pointer;transition:box-shadow .15s,transform .1s;position:relative;}
+.ld-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.1);transform:translateY(-1px);}
+.ld-card-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.ld-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;}
+.ld-card-nom{font-size:.95rem;font-weight:800;margin:0 0 2px;}
+.ld-card-desc{font-size:.78rem;color:var(--muted);margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.ld-card-meta{font-size:.75rem;color:var(--muted);display:flex;align-items:center;gap:12px;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;}
+.ld-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.ld-btn{padding:5px 12px;font-size:.75rem;font-weight:700;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:#fff;color:var(--text);transition:background .15s;}
+.ld-btn:hover{background:var(--bg);}
+.ld-btn.danger{color:#dc2626;border-color:#fca5a5;}
+.ld-btn.danger:hover{background:#fef2f2;}
+.ld-contact-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.ld-contact-avatar{width:36px;height:36px;border-radius:50%;background:#eff6ff;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:800;color:#1d4ed8;flex-shrink:0;overflow:hidden;}
+.ld-contact-avatar img{width:100%;height:100%;object-fit:cover;}
+.ld-contact-info{flex:1;min-width:0;}
+.ld-contact-nom{font-size:.87rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ld-contact-sub{font-size:.74rem;color:var(--muted);}
+.ld-empty{text-align:center;padding:40px 20px;color:var(--muted);}
+.ld-detail-header{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap;}
+.icone-picker{display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--bg);border-radius:8px;max-height:120px;overflow-y:auto;}
+.icone-picker span{font-size:1.3rem;cursor:pointer;padding:4px;border-radius:6px;transition:background .1s;}
+.icone-picker span:hover,.icone-picker span.sel{background:#eff6ff;}
+.couleur-picker{display:flex;flex-wrap:wrap;gap:8px;padding:6px 0;}
+.couleur-picker span{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .1s;}
+.couleur-picker span.sel{border-color:#fff;box-shadow:0 0 0 2px #1B3A6B;}
+
 @media(max-width:640px){
   .search-bar-inner{flex-direction:column;}
   .search-bar select{width:100%;}
@@ -179,6 +209,7 @@
       <button class="rtab active" data-tab="annuaire">🔍 Annuaire</button>
       <button class="rtab" data-tab="mon-reseau" id="tab-mon-reseau">🏢 Mon Réseau</button>
       <button class="rtab" data-tab="demandes" id="tab-demandes">📬 Demandes <span class="rtab-badge" id="badge-demandes" style="display:none;"></span></button>
+      <button class="rtab" data-tab="listes" id="tab-listes">📋 Mes Listes</button>
       <button class="rtab" data-tab="stats">📊 Statistiques</button>
       <button class="rtab" data-tab="profil-reseau">⚙️ Mon profil réseau</button>
     </div>
@@ -196,6 +227,11 @@
     <!-- TAB: DEMANDES -->
     <div class="rtab-pane" id="tab-demandes">
       <div id="demandes-content"><div class="notice">Chargement…</div></div>
+    </div>
+
+    <!-- TAB: MES LISTES -->
+    <div class="rtab-pane" id="tab-listes">
+      <div id="listes-content"></div>
     </div>
 
     <!-- TAB: STATS -->
@@ -254,6 +290,99 @@
   </div>
 </div>
 
+<!-- MODAL: Créer / Modifier liste -->
+<div class="modal-back" id="modal-liste-form">
+  <div class="modal-box" style="max-width:500px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="margin:0;font-size:1.05rem;" id="modal-liste-titre">📋 Nouvelle liste</h2>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-liste-form').classList.remove('open')">✕</button>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:5px;">Nom *</label>
+      <input type="text" id="lf-nom" placeholder="Ex : Investisseurs prioritaires" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:.9rem;font-family:inherit;">
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:5px;">Description</label>
+      <textarea id="lf-desc" rows="2" placeholder="À quoi sert cette liste ?" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:.87rem;font-family:inherit;resize:vertical;"></textarea>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Icône</label>
+      <div class="icone-picker" id="lf-icone-picker">
+        <span data-v="📋">📋</span><span data-v="⭐">⭐</span><span data-v="🏆">🏆</span><span data-v="💼">💼</span><span data-v="🌍">🌍</span>
+        <span data-v="🤝">🤝</span><span data-v="💎">💎</span><span data-v="🎯">🎯</span><span data-v="📢">📢</span><span data-v="🏛">🏛</span>
+        <span data-v="✈️">✈️</span><span data-v="🌱">🌱</span><span data-v="💡">💡</span><span data-v="🔑">🔑</span><span data-v="📰">📰</span>
+        <span data-v="👥">👥</span><span data-v="🎓">🎓</span><span data-v="🏥">🏥</span><span data-v="🌐">🌐</span><span data-v="❤️">❤️</span>
+      </div>
+      <input type="hidden" id="lf-icone" value="📋">
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Couleur</label>
+      <div class="couleur-picker" id="lf-couleur-picker">
+        <span data-v="#1B3A6B" style="background:#1B3A6B;" title="Bleu marine"></span>
+        <span data-v="#e0760a" style="background:#e0760a;" title="Orange"></span>
+        <span data-v="#10b981" style="background:#10b981;" title="Vert"></span>
+        <span data-v="#ef4444" style="background:#ef4444;" title="Rouge"></span>
+        <span data-v="#8b5cf6" style="background:#8b5cf6;" title="Violet"></span>
+        <span data-v="#f59e0b" style="background:#f59e0b;" title="Jaune"></span>
+        <span data-v="#06b6d4" style="background:#06b6d4;" title="Cyan"></span>
+        <span data-v="#64748b" style="background:#64748b;" title="Gris"></span>
+        <span data-v="#ec4899" style="background:#ec4899;" title="Rose"></span>
+        <span data-v="#84cc16" style="background:#84cc16;" title="Lime"></span>
+      </div>
+      <input type="hidden" id="lf-couleur" value="#1B3A6B">
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:5px;">Notes personnelles</label>
+      <textarea id="lf-notes" rows="2" placeholder="Notes privées sur cette liste…" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:.87rem;font-family:inherit;resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-liste-form').classList.remove('open')">Annuler</button>
+      <button class="btn btn-primary" style="background:#1B3A6B;border-color:#1B3A6B;" onclick="saveListe()" id="btn-save-liste-r">Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Ajouter à une liste -->
+<div class="modal-back" id="modal-ajouter-liste">
+  <div class="modal-box" style="max-width:420px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;font-size:1rem;">📋 Ajouter à une liste</h2>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-ajouter-liste').classList.remove('open')">✕</button>
+    </div>
+    <div id="modal-ajouter-target" style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:.87rem;font-weight:600;"></div>
+    <div id="modal-ajouter-listes" style="display:flex;flex-direction:column;gap:7px;max-height:300px;overflow-y:auto;"></div>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+      <button class="btn btn-sm btn-outline" style="width:100%;" onclick="ouvrirCreerListe()">＋ Créer une nouvelle liste</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Détail d'une liste -->
+<div class="modal-back" id="modal-detail-liste">
+  <div class="modal-box" style="max-width:640px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div class="ld-detail-header" style="margin:0;">
+        <div id="mdl-icon" style="width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;"></div>
+        <div>
+          <div style="font-size:1rem;font-weight:800;" id="mdl-nom"></div>
+          <div style="font-size:.78rem;color:var(--muted);" id="mdl-meta"></div>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-detail-liste').classList.remove('open')">✕</button>
+    </div>
+    <div id="mdl-desc" style="font-size:.85rem;color:var(--muted);margin-bottom:14px;"></div>
+    <div id="mdl-notes" style="font-size:.82rem;background:#fef9c3;border-radius:8px;padding:10px 12px;margin-bottom:14px;display:none;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <strong style="font-size:.87rem;" id="mdl-contacts-titre">Contacts</strong>
+      <div style="display:flex;gap:6px;">
+        <button class="ld-btn" onclick="exporterListe(currentListeId)">⬇️ Export CSV</button>
+        <button class="ld-btn" onclick="editerListe(currentListeId)">✏️ Modifier</button>
+      </div>
+    </div>
+    <div id="mdl-contacts-list" style="max-height:320px;overflow-y:auto;"></div>
+  </div>
+</div>
+
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>`n  <script src="assets/app.js"></script>
 <script src="assets/ds.js"></script>
@@ -268,6 +397,8 @@ const apiCall=(m,p,b)=>fetch('/api'+p,{method:m,credentials:'include',headers:b?
 /* ── ÉTAT ── */
 let ME=null, MY_INIT=null, MY_AFFIL_IDS=new Set(), MY_SENT_IDS=new Set();
 let currentAffilId=null, currentTargetId=null;
+let currentListeId=null, editingListeId=null;
+let mesListes=[], pendingAddUserId=null, pendingAddUserNom=null;
 
 const TYPES_ORG=['Association','Entreprise','Fédération','ONG','Institution','Coopérative','Entrepreneur individuel','Fondation','Collectif','Réseau'];
 const SECTEURS=['Action Sociale','Agriculture','Santé','Éducation','Technologie','Culture','Économie','Finance','Droit','Environnement','Commerce','Immobilier','Transport','Tourisme','Médias','Sport','Énergie','Mode','Alimentation','Sécurité'];
@@ -382,6 +513,7 @@ function initCardHTML(i){
         <button class="btn-contact" onclick="voirFiche(${i.id})">Voir</button>
         ${ME&&!isMe?`<button class="btn-affil${isMembre?' membre':hasSent?' sent':''}" onclick="${!isMembre&&!hasSent?`demanderAffil(${i.id},'${escH(i.nom||'')}')`:''}">
           ${isMembre?'✓ Membre':hasSent?'⏳ Envoyé':'+ Rejoindre'}</button>`:''}
+        ${ME&&!isMe&&i.owner_user_id?`<button class="btn-affil" style="border-color:#8b5cf6;color:#8b5cf6;" onclick="ajouterAListe(${i.owner_user_id},'${escH(i.nom||'')}')">📋</button>`:''}
       </div>
     </div>
   </div>`;
@@ -433,6 +565,7 @@ async function voirFiche(id){
         ${ME&&!isMe?`<button class="btn-contact" onclick="contacter(${i.owner_user_id||0},'${escH(i.nom||'')}',document.getElementById('modal-fiche'))">💬 Contacter</button>`:''}
         ${ME&&!isMe&&MY_INIT?.numero_immatriculation&&!MY_AFFIL_IDS.has(i.id)&&!MY_SENT_IDS.has(i.id)?`<button class="btn-affil" onclick="demanderAffil(${i.id},'${escH(i.nom||'')}')">+ Rejoindre le réseau</button>`:''}
         ${ME&&!isMe&&MY_INIT?.numero_immatriculation?`<button class="btn-affil" style="border-color:#f97316;color:#f97316;" onclick="recommander(${i.id},'${escH(i.nom||'')}')">👍 Recommander</button>`:''}
+        ${ME&&!isMe&&i.owner_user_id?`<button class="btn-affil" style="border-color:#8b5cf6;color:#8b5cf6;" onclick="ajouterAListe(${i.owner_user_id},'${escH(i.nom||'')}')">📋 Ajouter à une liste</button>`:''}
       </div>`;
   }catch(e){content.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
 }
@@ -760,13 +893,241 @@ document.querySelectorAll('.rtab').forEach(btn=>{
     else if(tab==='demandes') loadDemandesTab();
     else if(tab==='stats') loadStatsTab();
     else if(tab==='profil-reseau') loadProfilReseauTab();
+    else if(tab==='listes') loadListesTab();
   });
 });
 
 /* Fermer modals au clic extérieur */
-['modal-affil','modal-fiche','modal-reponse'].forEach(id=>{
-  document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+['modal-affil','modal-fiche','modal-reponse','modal-liste-form','modal-ajouter-liste','modal-detail-liste'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
 });
+
+/* ══ MODULE LISTES DE DIFFUSION ══ */
+const ICONES_LISTE=['📋','⭐','🏆','💼','🌍','🤝','💎','🎯','📢','🏛','✈️','🌱','💡','🔑','📰','👥','🎓','🏥','🌐','❤️'];
+const COULEURS_LISTE=['#1B3A6B','#e0760a','#10b981','#ef4444','#8b5cf6','#f59e0b','#06b6d4','#64748b','#ec4899','#84cc16'];
+
+async function loadListesTab(){
+  if(!ME){
+    document.getElementById('listes-content').innerHTML=`<div class="rnet-empty"><div class="e-icon">🔒</div><div class="e-title">Connexion requise</div><div class="e-sub">Connectez-vous pour gérer vos listes de diffusion.</div></div>`;
+    return;
+  }
+  try{
+    const{listes}=await apiCall('GET','/listes-diffusion');
+    mesListes=listes||[];
+    renderListesTab();
+  }catch(e){
+    document.getElementById('listes-content').innerHTML=`<div class="notice" style="color:#D33;">Erreur : ${escH(e.message)}</div>`;
+  }
+}
+
+function renderListesTab(){
+  const el=document.getElementById('listes-content');
+  if(!el) return;
+  if(!mesListes.length){
+    el.innerHTML=`
+      <div class="ld-header">
+        <div><h2 style="margin:0;font-size:1.1rem;">📋 Mes listes de diffusion</h2><p style="margin:4px 0 0;font-size:.83rem;color:var(--muted);">Organisez vos contacts en groupes personnalisés et réutilisez-les partout.</p></div>
+        <button class="btn btn-primary" style="background:#1B3A6B;border-color:#1B3A6B;" onclick="ouvrirCreerListe()">＋ Nouvelle liste</button>
+      </div>
+      <div class="rnet-empty"><div class="e-icon">📋</div><div class="e-title">Aucune liste</div><div class="e-sub">Créez votre première liste pour organiser vos contacts.</div></div>`;
+    return;
+  }
+  el.innerHTML=`
+    <div class="ld-header">
+      <div><h2 style="margin:0;font-size:1.1rem;">📋 Mes listes de diffusion</h2><p style="margin:4px 0 0;font-size:.83rem;color:var(--muted);">${mesListes.length} liste(s) · ${mesListes.reduce((s,l)=>s+(l.nb_contacts||0),0)} contact(s) au total</p></div>
+      <button class="btn btn-primary" style="background:#1B3A6B;border-color:#1B3A6B;" onclick="ouvrirCreerListe()">＋ Nouvelle liste</button>
+    </div>
+    <div class="ld-grid">
+      ${mesListes.map(l=>`
+        <div class="ld-card" onclick="voirDetailListe(${l.id})">
+          <div class="ld-card-top">
+            <div class="ld-icon" style="background:${l.couleur||'#1B3A6B'}22;color:${l.couleur||'#1B3A6B'}">${l.icone||'📋'}</div>
+            <div style="flex:1;min-width:0;">
+              <div class="ld-card-nom">${escH(l.nom)}</div>
+              ${l.description?`<p class="ld-card-desc">${escH(l.description)}</p>`:''}
+            </div>
+          </div>
+          ${l.notes?`<div style="font-size:.76rem;color:#92400e;background:#fef9c3;padding:5px 8px;border-radius:6px;margin-bottom:6px;">📝 ${escH(l.notes)}</div>`:''}
+          <div class="ld-card-meta">
+            <span>👥 ${l.nb_contacts||0} contact(s)</span>
+            <span>Mise à jour ${new Date(l.updated_at).toLocaleDateString('fr-FR')}</span>
+          </div>
+          <div class="ld-card-actions" onclick="event.stopPropagation()">
+            <button class="ld-btn" onclick="editerListe(${l.id})">✏️ Modifier</button>
+            <button class="ld-btn" onclick="dupliquerListe(${l.id})">📑 Dupliquer</button>
+            <button class="ld-btn" onclick="exporterListe(${l.id})">⬇️ CSV</button>
+            <button class="ld-btn danger" onclick="supprimerListe(${l.id},'${escH(l.nom)}')">🗑️</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function ouvrirCreerListe(callback){
+  editingListeId=null;
+  document.getElementById('modal-liste-titre').textContent='📋 Nouvelle liste';
+  document.getElementById('btn-save-liste-r').textContent='Créer';
+  ['lf-nom','lf-desc','lf-notes'].forEach(id=>document.getElementById(id).value='');
+  selectIcone('📋'); selectCouleur('#1B3A6B');
+  window._listeCallback=callback||null;
+  document.getElementById('modal-liste-form').classList.add('open');
+}
+
+function editerListe(id){
+  const l=mesListes.find(x=>x.id===id); if(!l) return;
+  editingListeId=id;
+  document.getElementById('modal-liste-titre').textContent='✏️ Modifier la liste';
+  document.getElementById('btn-save-liste-r').textContent='Enregistrer';
+  document.getElementById('lf-nom').value=l.nom||'';
+  document.getElementById('lf-desc').value=l.description||'';
+  document.getElementById('lf-notes').value=l.notes||'';
+  selectIcone(l.icone||'📋'); selectCouleur(l.couleur||'#1B3A6B');
+  document.getElementById('modal-liste-form').classList.add('open');
+}
+
+function selectIcone(v){
+  document.getElementById('lf-icone').value=v;
+  document.querySelectorAll('#lf-icone-picker span').forEach(s=>s.classList.toggle('sel',s.dataset.v===v));
+}
+function selectCouleur(v){
+  document.getElementById('lf-couleur').value=v;
+  document.querySelectorAll('#lf-couleur-picker span').forEach(s=>s.classList.toggle('sel',s.dataset.v===v));
+}
+document.querySelectorAll('#lf-icone-picker span').forEach(s=>s.addEventListener('click',()=>selectIcone(s.dataset.v)));
+document.querySelectorAll('#lf-couleur-picker span').forEach(s=>s.addEventListener('click',()=>selectCouleur(s.dataset.v)));
+
+async function saveListe(){
+  const nom=document.getElementById('lf-nom').value.trim();
+  if(!nom){DA.toast('Nom requis.',{type:'warning'});return;}
+  const data={nom, description:document.getElementById('lf-desc').value||null, icone:document.getElementById('lf-icone').value||'📋', couleur:document.getElementById('lf-couleur').value||'#1B3A6B', notes:document.getElementById('lf-notes').value||null};
+  const btn=document.getElementById('btn-save-liste-r');
+  btn.disabled=true; btn.textContent='⏳';
+  try{
+    let newId;
+    if(editingListeId){
+      await apiCall('PUT',`/listes-diffusion/${editingListeId}`,data);
+      DA.toast('Liste modifiée.',{type:'success'});
+    } else {
+      const r=await apiCall('POST','/listes-diffusion',data);
+      newId=r.id;
+      DA.toast('Liste créée !',{type:'success'});
+    }
+    document.getElementById('modal-liste-form').classList.remove('open');
+    await loadListesTab();
+    if(window._listeCallback && newId) window._listeCallback(newId);
+    window._listeCallback=null;
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+  finally{btn.disabled=false; btn.textContent=editingListeId?'Enregistrer':'Créer';}
+}
+
+async function dupliquerListe(id){
+  try{
+    await apiCall('POST',`/listes-diffusion/${id}/duplicate`);
+    DA.toast('Liste dupliquée.',{type:'success'});
+    await loadListesTab();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+async function supprimerListe(id,nom){
+  if(!confirm(`Supprimer la liste "${nom}" et tous ses contacts ?`)) return;
+  try{
+    await apiCall('DELETE',`/listes-diffusion/${id}`);
+    DA.toast('Liste supprimée.',{type:'success'});
+    await loadListesTab();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+function exporterListe(id){
+  window.open(`/api/listes-diffusion/${id}/export`,'_blank');
+}
+
+async function voirDetailListe(id){
+  currentListeId=id;
+  const l=mesListes.find(x=>x.id===id); if(!l) return;
+  const modal=document.getElementById('modal-detail-liste');
+  document.getElementById('mdl-icon').textContent=l.icone||'📋';
+  document.getElementById('mdl-icon').style.background=(l.couleur||'#1B3A6B')+'22';
+  document.getElementById('mdl-icon').style.color=l.couleur||'#1B3A6B';
+  document.getElementById('mdl-nom').textContent=l.nom;
+  document.getElementById('mdl-meta').textContent=`${l.nb_contacts||0} contact(s) · Mise à jour ${new Date(l.updated_at).toLocaleDateString('fr-FR')}`;
+  const desc=document.getElementById('mdl-desc'); desc.textContent=l.description||'';
+  const notes=document.getElementById('mdl-notes');
+  if(l.notes){notes.style.display=''; notes.textContent='📝 '+l.notes;}else{notes.style.display='none';}
+  document.getElementById('mdl-contacts-list').innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);">Chargement…</div>';
+  modal.classList.add('open');
+  try{
+    const{contacts}=await apiCall('GET',`/listes-diffusion/${id}/contacts`);
+    document.getElementById('mdl-contacts-titre').textContent=`${contacts.length} contact(s)`;
+    if(!contacts.length){
+      document.getElementById('mdl-contacts-list').innerHTML='<div class="ld-empty">Aucun contact dans cette liste.<br><span style="font-size:.8rem;">Ajoutez des contacts depuis l\'annuaire ou les fiches du réseau.</span></div>';
+      return;
+    }
+    document.getElementById('mdl-contacts-list').innerHTML=contacts.map(c=>{
+      const nom=c.nom_plateforme||c.nom||'Contact';
+      const email=c.email_plateforme||c.email||'';
+      const initiales=nom.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+      return `<div class="ld-contact-row">
+        <div class="ld-contact-avatar">${c.photo_url?`<img src="${escH(c.photo_url)}" alt="">`:(initiales||'?')}</div>
+        <div class="ld-contact-info">
+          <div class="ld-contact-nom">${escH(nom)}</div>
+          <div class="ld-contact-sub">${escH(email)}${c.pays?` · ${escH(c.pays)}`:''}${c.role?` · ${escH(c.role)}`:''}</div>
+        </div>
+        <button class="ld-btn danger" style="flex-shrink:0;" onclick="retirerContact(${id},${c.id},'${escH(nom)}')">✕</button>
+      </div>`;
+    }).join('');
+  }catch(e){document.getElementById('mdl-contacts-list').innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+async function retirerContact(listeId,contactId,nom){
+  if(!confirm(`Retirer ${nom} de la liste ?`)) return;
+  try{
+    await apiCall('DELETE',`/listes-diffusion/${listeId}/contacts/${contactId}`);
+    DA.toast('Contact retiré.',{type:'success'});
+    await voirDetailListe(listeId);
+    await loadListesTab();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+/* ── Ajouter un utilisateur plateforme à une liste ── */
+async function ajouterAListe(userId,nomUser){
+  if(!ME){DA.toast('Connectez-vous pour gérer vos listes.',{type:'warning'});return;}
+  pendingAddUserId=userId; pendingAddUserNom=nomUser;
+  document.getElementById('modal-ajouter-target').textContent=`👤 ${nomUser}`;
+  const listesEl=document.getElementById('modal-ajouter-listes');
+  listesEl.innerHTML='<div style="padding:10px;color:var(--muted);">Chargement…</div>';
+  document.getElementById('modal-ajouter-liste').classList.add('open');
+  try{
+    const[{listes},{liste_ids}]=await Promise.all([
+      apiCall('GET','/listes-diffusion'),
+      apiCall('POST','/listes-diffusion/check-user',{user_id:userId})
+    ]);
+    mesListes=listes||[];
+    const dansListes=new Set(liste_ids||[]);
+    if(!listes.length){
+      listesEl.innerHTML='<div class="ld-empty">Aucune liste — créez-en une ci-dessous.</div>';
+      return;
+    }
+    listesEl.innerHTML=listes.map(l=>`
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:${dansListes.has(l.id)?'#f0fdf4':'#fff'};">
+        <span style="font-size:1.1rem;">${l.icone||'📋'}</span>
+        <div style="flex:1;">
+          <div style="font-size:.87rem;font-weight:700;">${escH(l.nom)}</div>
+          <div style="font-size:.74rem;color:var(--muted);">${l.nb_contacts||0} contact(s)</div>
+        </div>
+        ${dansListes.has(l.id)?'<span style="color:#10b981;font-weight:800;font-size:.8rem;">✓ Présent</span>':`<button class="btn btn-sm btn-primary" style="background:#1B3A6B;border-color:#1B3A6B;font-size:.75rem;padding:4px 12px;" onclick="confirmerAjoutListe(${l.id})">Ajouter</button>`}
+      </label>`).join('');
+  }catch(e){listesEl.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+async function confirmerAjoutListe(listeId){
+  if(!pendingAddUserId) return;
+  try{
+    await apiCall('POST',`/listes-diffusion/${listeId}/contacts`,{user_id:pendingAddUserId});
+    DA.toast(`${pendingAddUserNom} ajouté à la liste !`,{type:'success'});
+    document.getElementById('modal-ajouter-liste').classList.remove('open');
+    await loadListesTab();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
 
 /* Sidebar toggle */
 (function(){

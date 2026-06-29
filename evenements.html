@@ -43,6 +43,30 @@
 .feature-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
 .fchip{background:#fff3e0;color:#c45000;border:1px solid #ffd0a0;border-radius:99px;padding:3px 10px;font-size:.72rem;font-weight:700;}
 .section-divider{font-size:.73rem;font-weight:800;text-transform:uppercase;color:#aaa;letter-spacing:.05em;padding:8px 0 4px;border-bottom:1px solid #f0f0f0;margin:12px 0 8px;}
+
+/* ── Carrousel ── */
+.carousel-wrap{position:relative;overflow:hidden;border-radius:0;background:#111;max-height:300px;}
+.carousel-track{display:flex;transition:transform .4s ease;}
+.carousel-slide{min-width:100%;position:relative;}
+.carousel-slide img{width:100%;height:260px;object-fit:cover;display:block;}
+.carousel-btn{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.45);color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;z-index:5;display:flex;align-items:center;justify-content:center;}
+.carousel-btn.prev{left:10px;}
+.carousel-btn.next{right:10px;}
+.carousel-dots{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;}
+.carousel-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.5);cursor:pointer;transition:background .2s;}
+.carousel-dot.active{background:#fff;}
+
+/* ── Détail événement ── */
+.evt-detail-header{padding:20px 24px 16px;}
+.evt-detail-meta{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0;font-size:13px;color:var(--muted);}
+.evt-detail-meta span{display:flex;align-items:center;gap:5px;}
+.video-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:10px;}
+.video-player{border-radius:10px;overflow:hidden;background:#111;aspect-ratio:16/9;position:relative;}
+.video-player iframe,.video-player video{width:100%;height:100%;border:none;display:block;}
+.pdf-preview-bar{display:flex;align-items:center;gap:12px;background:#F8F9FA;border:1px solid var(--border);border-radius:10px;padding:14px 18px;}
+.gallery-thumb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;}
+.gallery-thumb-grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:pointer;transition:opacity .15s;}
+.gallery-thumb-grid img:hover{opacity:.85;}
 </style>
 </head>
 <body>
@@ -124,6 +148,84 @@
     </div>
     <div style="margin-bottom:10px;"><label>🔗 Lien visioconférence (si en ligne)</label><input type="url" id="e-visio-evt" placeholder="https://zoom.us/… ou https://meet.google.com/…"></div>
 
+    <!-- ── MULTIMÉDIA ── -->
+    <div class="section-divider">📎 Contenus multimédias</div>
+
+    <!-- Image de couverture -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🖼️ Image de couverture</label>
+      <div id="cover-drop" style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;background:#FAFAFA;" onclick="document.getElementById('cover-file').click()">
+        <div id="cover-preview" style="display:none;margin-bottom:8px;"><img id="cover-img" style="max-height:120px;border-radius:8px;max-width:100%;object-fit:cover;"></div>
+        <div id="cover-placeholder"><span style="font-size:28px;">📷</span><br><span style="font-size:13px;color:var(--muted);">Cliquer pour choisir une image de couverture</span><br><span style="font-size:11px;color:#aaa;">JPG, PNG, WebP · max 2 Mo</span></div>
+      </div>
+      <input type="file" id="cover-file" accept="image/jpeg,image/png,image/webp" style="display:none">
+    </div>
+
+    <!-- Galerie photos (4 max) -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🖼️ Galerie photos <span style="font-weight:400;text-transform:none;color:#aaa;">(4 max · JPG, PNG, WebP)</span></label>
+      <div style="display:flex;flex-wrap:nowrap;gap:8px;" id="gallery-slots">
+        <div id="gslot-0" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('gfile-0').click()">
+          <span style="font-size:20px;color:#ccc;" id="gph-0">＋</span>
+          <img id="gimg-0" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt="">
+          <button id="gdel-0" onclick="event.stopPropagation();clearPhoto(0)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;z-index:2;">×</button>
+          <input type="file" id="gfile-0" accept="image/jpeg,image/png,image/webp" style="display:none">
+        </div>
+        <div id="gslot-1" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('gfile-1').click()">
+          <span style="font-size:20px;color:#ccc;" id="gph-1">＋</span>
+          <img id="gimg-1" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt="">
+          <button id="gdel-1" onclick="event.stopPropagation();clearPhoto(1)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;z-index:2;">×</button>
+          <input type="file" id="gfile-1" accept="image/jpeg,image/png,image/webp" style="display:none">
+        </div>
+        <div id="gslot-2" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('gfile-2').click()">
+          <span style="font-size:20px;color:#ccc;" id="gph-2">＋</span>
+          <img id="gimg-2" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt="">
+          <button id="gdel-2" onclick="event.stopPropagation();clearPhoto(2)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;z-index:2;">×</button>
+          <input type="file" id="gfile-2" accept="image/jpeg,image/png,image/webp" style="display:none">
+        </div>
+        <div id="gslot-3" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('gfile-3').click()">
+          <span style="font-size:20px;color:#ccc;" id="gph-3">＋</span>
+          <img id="gimg-3" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt="">
+          <button id="gdel-3" onclick="event.stopPropagation();clearPhoto(3)" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1;z-index:2;">×</button>
+          <input type="file" id="gfile-3" accept="image/jpeg,image/png,image/webp" style="display:none">
+        </div>
+      </div>
+      <div id="gallery-progress" style="display:none;margin-top:6px;"><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden;"><div id="gallery-bar" style="height:100%;background:var(--orange);width:0%;transition:width .3s;"></div></div></div>
+    </div>
+
+    <!-- Vidéos (2 max) -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">🎬 Vidéos <span style="font-weight:400;text-transform:none;color:#aaa;">(2 max · YouTube, Vimeo ou lien direct MP4)</span></label>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="url" id="e-video1" placeholder="https://youtube.com/watch?v=… ou lien MP4" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+          <input type="text" id="e-video1-titre" placeholder="Titre (facultatif)" style="width:140px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="url" id="e-video2" placeholder="Deuxième vidéo (facultatif)" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+          <input type="text" id="e-video2-titre" placeholder="Titre (facultatif)" style="width:140px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+        </div>
+      </div>
+      <p style="font-size:11px;color:#aaa;margin:4px 0 0;">Durée max recommandée : 2 minutes par vidéo.</p>
+    </div>
+
+    <!-- PDF -->
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">📄 Document PDF <span style="font-weight:400;text-transform:none;color:#aaa;">(1 max · programme, invitation, brochure…)</span></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <div id="pdf-drop" style="flex:1;min-width:200px;border:2px dashed var(--border);border-radius:8px;padding:12px 16px;cursor:pointer;background:#FAFAFA;display:flex;align-items:center;gap:10px;" onclick="document.getElementById('pdf-file').click()">
+          <span style="font-size:22px;" id="pdf-icon">📄</span>
+          <span style="font-size:13px;color:var(--muted);" id="pdf-label">Choisir un PDF (max 5 Mo)</span>
+        </div>
+        <input type="file" id="pdf-file" accept="application/pdf" style="display:none">
+        <select id="e-pdf-acces" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;">
+          <option value="public">🌍 PDF public</option>
+          <option value="inscrits">🎟️ Inscrits seulement</option>
+        </select>
+      </div>
+      <div id="pdf-progress" style="display:none;margin-top:6px;"><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden;"><div id="pdf-bar" style="height:100%;background:var(--orange);width:0%;transition:width .3s;"></div></div></div>
+    </div>
+
     <div class="section-divider">Fonctionnalités activées</div>
     <div class="feature-chips">
       <label class="fchip" style="cursor:pointer;"><input type="checkbox" id="f-billetterie" style="width:auto;display:inline;margin-right:4px;">🎟️ Billetterie</label>
@@ -131,17 +233,35 @@
       <label class="fchip" style="cursor:pointer;"><input type="checkbox" id="f-rappels" checked style="width:auto;display:inline;margin-right:4px;">🔔 Rappels auto</label>
       <label class="fchip" style="cursor:pointer;"><input type="checkbox" id="f-stats" checked style="width:auto;display:inline;margin-right:4px;">📊 Statistiques</label>
     </div>
-    <p style="font-size:.72rem;color:#aaa;margin-top:8px;">Les fonctionnalités avancées (galerie photos, affiches, contrôle des entrées, listes de diffusion) seront disponibles depuis le tableau de bord de votre événement après création.</p>
 
     <div class="auth-error" id="e-error" style="display:none;margin-top:12px"></div>
     <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;flex-wrap:wrap;">
       <button class="btn" id="btn-cancel">Annuler</button>
+      <button class="btn btn-outline" id="btn-preview-evt" onclick="previewEvent()">👁 Prévisualiser</button>
       <button class="btn btn-orange" id="btn-save">📢 Publier l'événement</button>
     </div>
     <div style="font-size:.72rem;color:#aaa;text-align:center;margin-top:10px;">
       Cet événement sera visible sur Diaspo'Actif selon la visibilité choisie.
       Pour un rendez-vous privé (max 10 personnes), <a href="/agenda.html" style="color:var(--orange);">utilisez l'Agenda</a>.
     </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL DÉTAIL ÉVÉNEMENT ═══ -->
+<div class="modal-bg" id="modal-detail-bg" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:700px;padding:0;overflow:hidden;">
+    <div id="evt-detail-content"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL PRÉVISUALISATION ═══ -->
+<div class="modal-bg" id="modal-preview-bg" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:700px;padding:0;overflow:hidden;">
+    <div style="background:var(--orange);color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;">
+      <strong>👁 Prévisualisation — tel que vu par les participants</strong>
+      <button onclick="document.getElementById('modal-preview-bg').classList.remove('open')" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+    </div>
+    <div id="evt-preview-content" style="max-height:80vh;overflow-y:auto;"></div>
   </div>
 </div>
 
@@ -217,6 +337,7 @@ function renderEvts() {
         </div>
         ${evt.description ? '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.5">'+esc(evt.description.slice(0,120))+(evt.description.length>120?'…':'')+'</p>' : ''}
         <div class="evt-actions">
+          <button class="btn btn-outline" style="font-size:12px" onclick="openDetail(${evt.id})">Voir</button>
           ${inscrit
             ? '<button class="btn" style="font-size:12px" onclick="quitter('+evt.id+',this)">Se désinscrire</button>'
             : (plein
@@ -266,6 +387,92 @@ document.getElementById('btn-creer').addEventListener('click', () => {
 });
 document.getElementById('btn-cancel').addEventListener('click', () => document.getElementById('modal-bg').classList.remove('open'));
 
+/* ══════════════════════════════════════════
+   MULTIMÉDIA — gestion photos, PDF, vidéos
+══════════════════════════════════════════ */
+const galleryData = [null,null,null,null]; // base64 ou null
+let coverData = null;
+let pdfData = null; let pdfNom = null;
+
+// Compression image via Canvas
+function compressImage(file, maxW, maxH, quality) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = url;
+  });
+}
+
+// Cover
+document.getElementById('cover-file').addEventListener('change', async function() {
+  const file = this.files[0]; if (!file) return;
+  if (file.size > 2*1024*1024) { alert('Image trop lourde (max 2 Mo).'); return; }
+  coverData = await compressImage(file, 1200, 600, 0.82);
+  document.getElementById('cover-img').src = coverData;
+  document.getElementById('cover-preview').style.display = '';
+  document.getElementById('cover-placeholder').style.display = 'none';
+  document.getElementById('cover-drop').style.borderColor = 'var(--orange)';
+});
+
+// Galerie photos
+[0,1,2,3].forEach(i => {
+  document.getElementById('gfile-'+i).addEventListener('change', async function() {
+    const file = this.files[0]; if (!file) return;
+    if (file.size > 2*1024*1024) { alert('Image trop lourde (max 2 Mo).'); return; }
+    const bar = document.getElementById('gallery-bar');
+    document.getElementById('gallery-progress').style.display = '';
+    bar.style.width = '30%';
+    const b64 = await compressImage(file, 800, 800, 0.78);
+    galleryData[i] = b64;
+    bar.style.width = '100%';
+    setTimeout(() => document.getElementById('gallery-progress').style.display = 'none', 600);
+    document.getElementById('gimg-'+i).src = b64;
+    document.getElementById('gimg-'+i).style.display = '';
+    document.getElementById('gph-'+i).style.display = 'none';
+    document.getElementById('gdel-'+i).style.display = '';
+    document.getElementById('gslot-'+i).style.borderColor = 'var(--orange)';
+  });
+});
+window.clearPhoto = function(i) {
+  galleryData[i] = null;
+  document.getElementById('gimg-'+i).style.display = 'none';
+  document.getElementById('gph-'+i).style.display = '';
+  document.getElementById('gdel-'+i).style.display = 'none';
+  document.getElementById('gfile-'+i).value = '';
+  document.getElementById('gslot-'+i).style.borderColor = '';
+};
+
+// PDF
+document.getElementById('pdf-file').addEventListener('change', function() {
+  const file = this.files[0]; if (!file) return;
+  if (file.size > 5*1024*1024) { alert('PDF trop lourd (max 5 Mo).'); return; }
+  const bar = document.getElementById('pdf-bar');
+  document.getElementById('pdf-progress').style.display = '';
+  bar.style.width = '20%';
+  const reader = new FileReader();
+  reader.onprogress = e => { if (e.lengthComputable) bar.style.width = Math.round(e.loaded/e.total*80)+'%'; };
+  reader.onload = e => {
+    pdfData = e.target.result;
+    pdfNom = file.name;
+    bar.style.width = '100%';
+    setTimeout(() => document.getElementById('pdf-progress').style.display = 'none', 600);
+    document.getElementById('pdf-label').textContent = '📄 ' + file.name;
+    document.getElementById('pdf-drop').style.borderColor = 'var(--orange)';
+  };
+  reader.readAsDataURL(file);
+});
+
+/* ══ Sauvegarde événement ══ */
 document.getElementById('btn-save').addEventListener('click', async () => {
   const titre = document.getElementById('e-titre').value.trim();
   const date  = document.getElementById('e-date').value;
@@ -273,23 +480,207 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   errBox.style.display = 'none';
   if (!titre || !date) { errBox.textContent='Titre et date requis.'; errBox.style.display='block'; return; }
   try {
+    const galerie = galleryData.filter(Boolean);
     await api('POST', '/evenements', {
       titre,
-      date_evt:    date,
-      heure_debut: document.getElementById('e-heure').value || null,
-      type_evt:    document.getElementById('e-type').value,
-      domaine:     document.getElementById('e-domaine').value,
-      pays:        document.getElementById('e-pays').value,
-      lieu:        document.getElementById('e-lieu').value,
-      description: document.getElementById('e-desc').value,
-      places_max:  document.getElementById('e-places').value || null,
-      visibilite:  document.getElementById('e-visibilite').value,
-      lien_visio:  document.getElementById('e-visio-evt').value || null
+      date_evt:      date,
+      heure_debut:   document.getElementById('e-heure').value || null,
+      type_evt:      document.getElementById('e-type').value,
+      domaine:       document.getElementById('e-domaine').value,
+      pays:          document.getElementById('e-pays').value,
+      lieu:          document.getElementById('e-lieu').value,
+      description:   document.getElementById('e-desc').value,
+      places_max:    document.getElementById('e-places').value || null,
+      visibilite:    document.getElementById('e-visibilite').value,
+      lien_visio:    document.getElementById('e-visio-evt').value || null,
+      image_couverture: coverData,
+      galerie_photos:   galerie,
+      video1_url:    document.getElementById('e-video1').value || null,
+      video1_titre:  document.getElementById('e-video1-titre').value || null,
+      video2_url:    document.getElementById('e-video2').value || null,
+      video2_titre:  document.getElementById('e-video2-titre').value || null,
+      pdf_url:       pdfData,
+      pdf_nom:       pdfNom,
+      pdf_acces:     document.getElementById('e-pdf-acces').value,
     });
     document.getElementById('modal-bg').classList.remove('open');
     loadEvts();
   } catch(e) { errBox.textContent=e.message||'Erreur.'; errBox.style.display='block'; }
 });
+
+/* ══ Prévisualisation ══ */
+window.previewEvent = function() {
+  const galerie = galleryData.filter(Boolean);
+  const cover = coverData || (galerie.length ? galerie[0] : null);
+  const fake = {
+    titre:       document.getElementById('e-titre').value || 'Titre de l\'événement',
+    date_evt:    document.getElementById('e-date').value,
+    heure_debut: document.getElementById('e-heure').value,
+    lieu:        document.getElementById('e-lieu').value,
+    pays:        document.getElementById('e-pays').value,
+    description: document.getElementById('e-desc').value,
+    type_evt:    document.getElementById('e-type').value,
+    domaine:     document.getElementById('e-domaine').value,
+    image_couverture: cover,
+    galerie_photos: galerie,
+    video1_url:   document.getElementById('e-video1').value,
+    video1_titre: document.getElementById('e-video1-titre').value,
+    video2_url:   document.getElementById('e-video2').value,
+    video2_titre: document.getElementById('e-video2-titre').value,
+    pdf_url:      pdfData,
+    pdf_nom:      pdfNom,
+  };
+  document.getElementById('evt-preview-content').innerHTML = renderEventDetail(fake, true);
+  document.getElementById('modal-preview-bg').classList.add('open');
+  initCarousel('preview-carousel');
+};
+
+/* ══ Détail événement ══ */
+window.openDetail = async function(id) {
+  document.getElementById('evt-detail-content').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement…</div>';
+  document.getElementById('modal-detail-bg').classList.add('open');
+  try {
+    const r = await api('GET', '/evenements/'+id);
+    const evt = r.evenement;
+    // Tenter de parser galerie_photos
+    if (typeof evt.galerie_photos === 'string') {
+      try { evt.galerie_photos = JSON.parse(evt.galerie_photos); } catch(e) { evt.galerie_photos = []; }
+    }
+    document.getElementById('evt-detail-content').innerHTML = renderEventDetail(evt, false);
+    initCarousel('detail-carousel');
+  } catch(e) {
+    document.getElementById('evt-detail-content').innerHTML = '<div style="padding:40px;text-align:center;color:red;">Erreur de chargement.</div>';
+  }
+};
+
+function embedUrl(url) {
+  if (!url) return null;
+  // YouTube
+  const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+  if (yt) return 'https://www.youtube.com/embed/' + yt[1];
+  // Vimeo
+  const vi = url.match(/vimeo\.com\/(\d+)/);
+  if (vi) return 'https://player.vimeo.com/video/' + vi[1];
+  return null; // direct
+}
+
+function renderEventDetail(evt, isPreview) {
+  const prefix = isPreview ? 'preview' : 'detail';
+  const galerie = Array.isArray(evt.galerie_photos) ? evt.galerie_photos.filter(Boolean) : [];
+  const cover = evt.image_couverture || (galerie.length ? galerie[0] : null);
+  const allSlides = cover ? [cover, ...galerie.filter(s => s !== cover)] : galerie;
+  const uniqueSlides = [...new Set(allSlides)];
+
+  const carouselHTML = uniqueSlides.length ? `
+    <div class="carousel-wrap" id="${prefix}-carousel-wrap">
+      <div class="carousel-track" id="${prefix}-carousel">
+        ${uniqueSlides.map(src => `<div class="carousel-slide"><img src="${esc(src)}" alt=""></div>`).join('')}
+      </div>
+      ${uniqueSlides.length > 1 ? `
+        <button class="carousel-btn prev" onclick="carouselMove('${prefix}-carousel',-1)">‹</button>
+        <button class="carousel-btn next" onclick="carouselMove('${prefix}-carousel',1)">›</button>
+        <div class="carousel-dots">${uniqueSlides.map((_,i)=>`<div class="carousel-dot${i===0?' active':''}" onclick="carouselGo('${prefix}-carousel',${i})"></div>`).join('')}</div>
+      ` : ''}
+    </div>
+  ` : `<div style="height:200px;background:linear-gradient(135deg,#ff6b00,#ff9f43);display:flex;align-items:center;justify-content:center;font-size:60px;">📢</div>`;
+
+  const thumbsHTML = galerie.length > 1 ? `
+    <div style="padding:0 20px 10px;">
+      <div class="section-divider">🖼️ Galerie</div>
+      <div class="gallery-thumb-grid">
+        ${galerie.map((src,i)=>`<img src="${esc(src)}" alt="Photo ${i+1}" onclick="carouselGo('${prefix}-carousel',${uniqueSlides.indexOf(src)})">`).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  const v1embed = embedUrl(evt.video1_url);
+  const v2embed = embedUrl(evt.video2_url);
+  const videosHTML = (evt.video1_url || evt.video2_url) ? `
+    <div style="padding:0 20px 14px;">
+      <div class="section-divider">🎬 Vidéos</div>
+      <div class="video-grid">
+        ${evt.video1_url ? `<div>
+          ${evt.video1_titre ? `<p style="font-size:12px;font-weight:700;margin:0 0 6px;">${esc(evt.video1_titre)}</p>` : ''}
+          <div class="video-player">${v1embed
+            ? `<iframe src="${v1embed}" allowfullscreen allow="autoplay;encrypted-media"></iframe>`
+            : `<video src="${esc(evt.video1_url)}" controls></video>`
+          }</div>
+        </div>` : ''}
+        ${evt.video2_url ? `<div>
+          ${evt.video2_titre ? `<p style="font-size:12px;font-weight:700;margin:0 0 6px;">${esc(evt.video2_titre)}</p>` : ''}
+          <div class="video-player">${v2embed
+            ? `<iframe src="${v2embed}" allowfullscreen allow="autoplay;encrypted-media"></iframe>`
+            : `<video src="${esc(evt.video2_url)}" controls></video>`
+          }</div>
+        </div>` : ''}
+      </div>
+    </div>
+  ` : '';
+
+  const pdfHTML = evt.pdf_url ? `
+    <div style="padding:0 20px 14px;">
+      <div class="section-divider">📄 Document</div>
+      <div class="pdf-preview-bar">
+        <span style="font-size:32px;">📄</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:14px;">${esc(evt.pdf_nom || 'Document PDF')}</div>
+          <div style="font-size:12px;color:var(--muted);">Programme · Brochure · Invitation</div>
+        </div>
+        <a href="${esc(evt.pdf_url)}" target="_blank" download="${esc(evt.pdf_nom||'document.pdf')}" class="btn btn-orange" style="font-size:12px;">⬇ Télécharger</a>
+        <a href="${esc(evt.pdf_url)}" target="_blank" class="btn btn-outline" style="font-size:12px;">👁 Voir</a>
+      </div>
+    </div>
+  ` : '';
+
+  return `
+    ${carouselHTML}
+    <div class="evt-detail-header">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:11px;color:var(--orange);font-weight:700;text-transform:uppercase;margin-bottom:4px;">${esc(evt.type_evt||'Événement')}</div>
+          <h2 style="margin:0 0 10px;font-size:20px;line-height:1.3;">${esc(evt.titre)}</h2>
+        </div>
+        ${!isPreview ? `<button onclick="document.getElementById('modal-detail-bg').classList.remove('open')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);flex-shrink:0;">×</button>` : ''}
+      </div>
+      <div class="evt-detail-meta">
+        ${evt.date_evt ? `<span>📅 ${fmtDate(evt.date_evt)}${evt.heure_debut ? ' · '+evt.heure_debut : ''}</span>` : ''}
+        ${evt.lieu ? `<span>📍 ${esc(evt.lieu)}</span>` : ''}
+        ${evt.ville ? `<span>🏙️ ${esc(evt.ville)}</span>` : ''}
+        ${evt.pays ? `<span>🌍 ${esc(evt.pays)}</span>` : ''}
+        ${evt.domaine ? `<span class="evt-tag">🏷️ ${esc(evt.domaine)}</span>` : ''}
+      </div>
+      ${evt.description ? `<p style="font-size:14px;line-height:1.65;color:#444;margin:0 0 12px;">${esc(evt.description)}</p>` : ''}
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+        ${!isPreview ? `<button class="btn btn-orange" onclick="rejoindre(${evt.id},this)" style="font-size:13px;">✅ S'inscrire à l'événement</button>` : '<button class="btn btn-orange" style="font-size:13px;">✅ S\'inscrire à l\'événement</button>'}
+        <button class="btn btn-outline" style="font-size:13px;" onclick="navigator.share ? navigator.share({title:'${esc(evt.titre)}',url:location.href}) : navigator.clipboard.writeText(location.href).then(()=>alert('Lien copié !'))">📤 Partager</button>
+      </div>
+    </div>
+    ${thumbsHTML}
+    ${videosHTML}
+    ${pdfHTML}
+  `;
+}
+
+/* ══ Carrousel ══ */
+const carouselState = {};
+window.initCarousel = function(id) {
+  carouselState[id] = 0;
+};
+window.carouselMove = function(id, dir) {
+  const track = document.getElementById(id);
+  if (!track) return;
+  const count = track.children.length;
+  carouselState[id] = (carouselState[id] + dir + count) % count;
+  carouselGo(id, carouselState[id]);
+};
+window.carouselGo = function(id, idx) {
+  const track = document.getElementById(id);
+  if (!track) return;
+  carouselState[id] = idx;
+  track.style.transform = `translateX(-${idx * 100}%)`;
+  const wrap = track.closest('[id$="-carousel-wrap"]') || track.parentElement;
+  wrap.querySelectorAll('.carousel-dot').forEach((d,i) => d.classList.toggle('active', i===idx));
+};
 
 /* ─── Init ─── */
 (async () => {

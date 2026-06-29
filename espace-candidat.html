@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Espace Candidat</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<style>
+.ec-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
+.ec-tab{padding:11px 18px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
+.ec-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.ec-section{display:none;}.ec-section.active{display:block;}
+/* KPI cards */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:24px;}
+.kpi-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
+.kpi-val{font-size:28px;font-weight:800;color:var(--orange);}
+.kpi-lbl{font-size:11px;color:var(--muted);margin-top:2px;}
+/* Badge dispo */
+.badge-dispo{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#d1fae5;border:1.5px solid #6ee7b7;border-radius:20px;font-size:13px;font-weight:700;color:#065f46;cursor:pointer;}
+.badge-dispo.off{background:#f3f4f6;border-color:#d1d5db;color:#6b7280;}
+/* Expérience / formation cards */
+.exp-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;position:relative;}
+.exp-actions{position:absolute;top:12px;right:12px;display:flex;gap:6px;}
+/* Offres match */
+.match-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:box-shadow .2s;}
+.match-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.08);}
+.score-bar{height:4px;border-radius:2px;background:#f3f4f6;margin-top:6px;}
+.score-fill{height:100%;border-radius:2px;background:var(--orange);}
+/* Candidatures historique */
+.cand-hist{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
+.statut-pill{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;}
+.s-attente{background:#fef9c3;color:#854d0e;}
+.s-vue{background:#dbeafe;color:#1e40af;}
+.s-accept{background:#d1fae5;color:#065f46;}
+.s-refuse{background:#fee2e2;color:#991b1b;}
+/* Rayon grid */
+.rayon-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.rayon-opt{cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 6px;text-align:center;transition:all .15s;background:#fff;}
+.rayon-opt.sel{border-color:var(--orange);background:#fff7f0;}
+/* Lettre */
+#lettre-editor{min-height:300px;border:1px solid var(--border);border-radius:10px;padding:14px;font-size:14px;line-height:1.7;outline:none;background:#fff;}
+.editor-toolbar{display:flex;gap:4px;flex-wrap:wrap;padding:8px;background:#f8fafc;border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;}
+.editor-toolbar button{padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;}
+.editor-toolbar button:hover{background:var(--orange);color:#fff;border-color:var(--orange);}
+</style>
+</head>
+<body>
+<div class="page" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt=""> DIASPO'ACTIF</a></div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="recrutement.html">Recrutement</a>
+        <a href="espace-candidat.html" style="color:var(--orange);font-weight:700;">Espace Candidat</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:24px;padding-bottom:60px;" id="main-content">
+    <div id="not-logged" style="display:none;text-align:center;padding:60px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">🔒</div>
+      <h2>Connectez-vous pour accéder à votre Espace Candidat</h2>
+      <p style="color:var(--muted);margin-bottom:20px;">Gérez votre profil professionnel, votre CV et recevez des offres correspondant à votre profil.</p>
+      <a href="login.html" class="btn btn-orange">Se connecter</a>
+    </div>
+
+    <div id="logged-content" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h1 style="margin:0 0 4px;font-size:26px;">💼 Espace Candidat</h1>
+          <p style="margin:0;color:var(--muted);font-size:14px;">Gérez votre dossier professionnel et trouvez des opportunités correspondant à votre profil</p>
+        </div>
+        <div id="badge-dispo-wrap" onclick="toggleDispo()"></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="ec-nav">
+        <button class="ec-tab active" onclick="switchTab('dashboard')">📊 Tableau de bord</button>
+        <button class="ec-tab" onclick="switchTab('profil')">🔍 Recherche d'emploi</button>
+        <button class="ec-tab" onclick="switchTab('cv')">📄 Mon CV</button>
+        <button class="ec-tab" onclick="switchTab('lettre')">✉️ Ma lettre</button>
+        <button class="ec-tab" onclick="switchTab('offres')">🎯 Offres pour moi</button>
+        <button class="ec-tab" onclick="switchTab('candidatures')">📋 Mes candidatures</button>
+      </div>
+
+      <!-- ── DASHBOARD ── -->
+      <div class="ec-section active" id="sec-dashboard">
+        <div class="kpi-grid" id="kpi-grid">
+          <div class="kpi-card"><div class="kpi-val" id="k-offres">—</div><div class="kpi-lbl">Offres pour moi</div></div>
+          <div class="kpi-card"><div class="kpi-val" id="k-total">—</div><div class="kpi-lbl">Candidatures envoyées</div></div>
+          <div class="kpi-card"><div class="kpi-val" id="k-attente">—</div><div class="kpi-lbl">En attente</div></div>
+          <div class="kpi-card"><div class="kpi-val" id="k-vue">—</div><div class="kpi-lbl">Vues par recruteur</div></div>
+          <div class="kpi-card"><div class="kpi-val" id="k-accept">—</div><div class="kpi-lbl">Acceptées</div></div>
+          <div class="kpi-card"><div class="kpi-val" id="k-refuse">—</div><div class="kpi-lbl">Refusées</div></div>
+        </div>
+        <!-- Raccourcis -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+          <div class="card" style="cursor:pointer;padding:16px;" onclick="switchTab('profil')">
+            <div style="font-size:24px;margin-bottom:6px;">🔍</div>
+            <strong>Recherche d'emploi</strong>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Définissez vos critères et activez le badge disponible</div>
+          </div>
+          <div class="card" style="cursor:pointer;padding:16px;" onclick="switchTab('cv')">
+            <div style="font-size:24px;margin-bottom:6px;">📄</div>
+            <strong>Mon CV numérique</strong>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Expériences, formations, compétences</div>
+          </div>
+          <div class="card" style="cursor:pointer;padding:16px;" onclick="switchTab('offres')">
+            <div style="font-size:24px;margin-bottom:6px;">🎯</div>
+            <strong>Offres pour moi</strong>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Campagnes correspondant à votre profil</div>
+          </div>
+          <div class="card" style="cursor:pointer;padding:16px;" onclick="switchTab('candidatures')">
+            <div style="font-size:24px;margin-bottom:6px;">📋</div>
+            <strong>Mes candidatures</strong>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Suivi de toutes vos candidatures</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PROFIL EMPLOI ── -->
+      <div class="ec-section" id="sec-profil">
+        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;margin-bottom:20px;font-size:13px;">
+          🔒 <strong>Informations privées</strong> — Ces données ne sont jamais partagées publiquement. Elles servent uniquement à personnaliser vos recommandations d'offres.
+        </div>
+        <form onsubmit="saveProfil(event)" style="display:flex;flex-direction:column;gap:16px;">
+          <div class="form-row">
+            <label>Situation professionnelle</label>
+            <select id="p-situation">
+              <option value="en_recherche">En recherche d'emploi</option>
+              <option value="en_veille">En veille</option>
+              <option value="disponible_immediat">Disponible immédiatement</option>
+              <option value="disponible_preavis">Disponible sous préavis</option>
+              <option value="en_poste_ouvert">En poste mais ouvert aux opportunités</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Types d'opportunités recherchées <span style="color:var(--muted)">(plusieurs choix)</span></label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;" id="types-opp-grid">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;" id="lbl-cdi"><input type="checkbox" value="CDI" onchange="toggleType(this)"> CDI</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" value="CDD" onchange="toggleType(this)"> CDD</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" value="Stage" onchange="toggleType(this)"> Stage</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" value="Alternance" onchange="toggleType(this)"> Alternance</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" value="Mission" onchange="toggleType(this)"> Mission</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" value="Consultant" onchange="toggleType(this)"> Consultant</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" value="Freelance" onchange="toggleType(this)"> Freelance</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" value="Benevolat" onchange="toggleType(this)"> Bénévolat</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" value="Volontariat" onchange="toggleType(this)"> Volontariat</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" value="Temps plein" onchange="toggleType(this)"> Temps plein</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" value="Temps partiel" onchange="toggleType(this)"> Temps partiel</label>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="form-row">
+              <label>Métier recherché</label>
+              <input type="text" id="p-metier" placeholder="Ex : Développeur web, Infirmier…">
+            </div>
+            <div class="form-row">
+              <label>Secteur d'activité</label>
+              <input type="text" id="p-secteur" placeholder="Ex : Santé, Tech, Finance…">
+            </div>
+            <div class="form-row">
+              <label>Expérience</label>
+              <select id="p-experience">
+                <option value="debutant">Débutant (0 an)</option>
+                <option value="1-3">1 à 3 ans</option>
+                <option value="3-5">3 à 5 ans</option>
+                <option value="5-10">5 à 10 ans</option>
+                <option value="10+">Plus de 10 ans</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Niveau d'études</label>
+              <select id="p-etudes">
+                <option value="">— Non précisé —</option>
+                <option value="bac">Baccalauréat</option>
+                <option value="bac+2">Bac+2 (BTS, DUT)</option>
+                <option value="bac+3">Bac+3 (Licence, Bachelor)</option>
+                <option value="bac+4">Bac+4 (Master 1)</option>
+                <option value="bac+5">Bac+5 (Master, Ingénieur)</option>
+                <option value="bac+8">Bac+8 (Doctorat)</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Mobilité géographique</label>
+              <select id="p-mobilite">
+                <option value="ville">Ma ville</option>
+                <option value="departement">Mon département</option>
+                <option value="region">Ma région</option>
+                <option value="national">National</option>
+                <option value="international">International</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Télétravail</label>
+              <select id="p-teletravail">
+                <option value="non">Non</option>
+                <option value="oui">Oui</option>
+                <option value="hybride">Hybride</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Salaire souhaité minimum (facultatif)</label>
+              <input type="number" id="p-sal-min" placeholder="Ex : 2000">
+            </div>
+            <div class="form-row">
+              <label>Salaire souhaité maximum</label>
+              <input type="number" id="p-sal-max" placeholder="Ex : 3500">
+            </div>
+          </div>
+          <div class="form-row">
+            <label>Devise</label>
+            <select id="p-devise" style="max-width:140px;">
+              <option value="EUR">EUR €</option>
+              <option value="USD">USD $</option>
+              <option value="GBP">GBP £</option>
+              <option value="XOF">FCFA</option>
+              <option value="MAD">MAD</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Date de disponibilité</label>
+            <input type="date" id="p-dispo-date" style="max-width:200px;">
+          </div>
+          <!-- Badge dispo for travailler -->
+          <div style="border-top:1px solid var(--border);padding-top:16px;">
+            <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;">
+              <input type="checkbox" id="p-badge-dispo" style="width:18px;height:18px;accent-color:var(--orange);margin-top:2px;" onchange="updateBadgePreview()">
+              <div>
+                <div style="font-weight:700;font-size:14px;">⭐ Disponible pour travailler</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px;">Une étoile verte s'affichera discrètement sur votre profil. Aucune autre information n'est rendue publique.</div>
+              </div>
+            </label>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button type="submit" class="btn btn-orange">💾 Enregistrer mes préférences</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ── CV NUMÉRIQUE ── -->
+      <div class="ec-section" id="sec-cv">
+        <!-- Expériences -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;">💼 Expériences professionnelles</h3>
+          <button class="btn btn-sm btn-orange" onclick="openExpForm()">＋ Ajouter</button>
+        </div>
+        <div id="exps-list"><div style="color:var(--muted);font-size:13px;padding:12px 0;">Aucune expérience renseignée.</div></div>
+
+        <!-- Formations -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:24px 0 12px;">
+          <h3 style="margin:0;">🎓 Formations</h3>
+          <button class="btn btn-sm btn-orange" onclick="openFormForm()">＋ Ajouter</button>
+        </div>
+        <div id="forms-list"><div style="color:var(--muted);font-size:13px;padding:12px 0;">Aucune formation renseignée.</div></div>
+
+        <!-- Documents PDF -->
+        <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px;">
+          <h3 style="margin:0 0 12px;">📎 Documents (CV PDF, Diplômes)</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;flex-wrap:wrap;">
+            <div>
+              <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">CV (PDF)</label>
+              <input type="file" id="cv-pdf-input" accept=".pdf" onchange="uploadDoc('cv')" style="font-size:12px;">
+              <div id="cv-pdf-status" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">Lettre de motivation (PDF)</label>
+              <input type="file" id="lettre-pdf-input" accept=".pdf" onchange="uploadDoc('lettre')" style="font-size:12px;">
+              <div id="lettre-pdf-status" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">Portfolio (PDF)</label>
+              <input type="file" id="portfolio-pdf-input" accept=".pdf" onchange="uploadDoc('portfolio')" style="font-size:12px;">
+              <div id="portfolio-pdf-status" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── LETTRE DE MOTIVATION ── -->
+      <div class="ec-section" id="sec-lettre">
+        <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <h3 style="margin:0;">✉️ Ma lettre de motivation</h3>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Rédigez et sauvegardez votre lettre. Elle sera jointe automatiquement à vos candidatures.</div>
+          </div>
+          <button class="btn btn-orange" onclick="saveLettre()">💾 Enregistrer</button>
+        </div>
+        <div class="editor-toolbar">
+          <button type="button" onclick="fmtDoc('bold')"><b>G</b></button>
+          <button type="button" onclick="fmtDoc('italic')"><i>I</i></button>
+          <button type="button" onclick="fmtDoc('underline')"><u>S</u></button>
+          <button type="button" onclick="fmtDoc('insertUnorderedList')">• Liste</button>
+          <button type="button" onclick="fmtDoc('insertOrderedList')">1. Liste</button>
+          <button type="button" onclick="fmtDoc('removeFormat')">✕ Effacer</button>
+        </div>
+        <div id="lettre-editor" contenteditable="true" style="border-radius:0 0 10px 10px;"></div>
+      </div>
+
+      <!-- ── OFFRES POUR MOI ── -->
+      <div class="ec-section" id="sec-offres">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px;margin-bottom:16px;font-size:13px;">
+          🎯 Les offres sont classées selon votre <strong>score de correspondance</strong> avec votre profil (secteur, métier, localisation, télétravail).
+        </div>
+        <div id="offres-match-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+          <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);">Chargement…</div>
+        </div>
+      </div>
+
+      <!-- ── MES CANDIDATURES ── -->
+      <div class="ec-section" id="sec-candidatures">
+        <div id="cands-hist-list">
+          <div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ── MODAL EXPÉRIENCE ── -->
+<div class="modal-bg" id="modal-exp-bg" onclick="if(event.target===this)closeMod('modal-exp-bg')">
+  <div class="modal" style="max-width:540px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;" id="exp-modal-title">＋ Ajouter une expérience</h3>
+      <button onclick="closeMod('modal-exp-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-row"><label>Poste occupé *</label><input type="text" id="exp-poste" placeholder="Ex : Chef de projet"></div>
+        <div class="form-row"><label>Entreprise / Organisme</label><input type="text" id="exp-entreprise"></div>
+        <div class="form-row"><label>Ville</label><input type="text" id="exp-ville"></div>
+        <div class="form-row"><label>Pays</label><input type="text" id="exp-pays"></div>
+        <div class="form-row"><label>Date de début</label><input type="month" id="exp-debut"></div>
+        <div class="form-row">
+          <label>Date de fin</label>
+          <input type="month" id="exp-fin">
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px;margin-top:4px;"><input type="checkbox" id="exp-en-cours" onchange="toggleEnCours()"> En cours</label>
+        </div>
+      </div>
+      <div class="form-row"><label>Description des missions</label><textarea id="exp-desc" rows="3" style="resize:vertical;"></textarea></div>
+      <div class="form-row"><label>Principales réalisations</label><textarea id="exp-real" rows="2" style="resize:vertical;" placeholder="Ex : Hausse de 20% du CA, lancement de 3 produits…"></textarea></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeMod('modal-exp-bg')">Annuler</button>
+      <button class="btn btn-orange" onclick="saveExp()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL FORMATION ── -->
+<div class="modal-bg" id="modal-form-bg" onclick="if(event.target===this)closeMod('modal-form-bg')">
+  <div class="modal" style="max-width:500px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;" id="form-modal-title">＋ Ajouter une formation</h3>
+      <button onclick="closeMod('modal-form-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-row"><label>Diplôme *</label><input type="text" id="form-diplome" placeholder="Ex : Master Informatique"></div>
+        <div class="form-row"><label>Établissement</label><input type="text" id="form-etab"></div>
+        <div class="form-row"><label>Ville</label><input type="text" id="form-ville"></div>
+        <div class="form-row"><label>Pays</label><input type="text" id="form-pays"></div>
+        <div class="form-row"><label>Date d'obtention</label><input type="month" id="form-date"></div>
+      </div>
+      <div class="form-row"><label>Description (facultatif)</label><textarea id="form-desc" rows="2" style="resize:vertical;"></textarea></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeMod('modal-form-bg')">Annuler</button>
+      <button class="btn btn-orange" onclick="saveFormation()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/chatbot.js"></script>
+<script>
+/* ════════════════════════
+   ESPACE CANDIDAT
+   ════════════════════════ */
+
+let ME_EC = null;
+let PROFIL_EC = null;
+let EXPS = [], FORMS = [];
+let EDIT_EXP_ID = null, EDIT_FORM_ID = null;
+let TYPES_OPP = [];
+let DOC_PDFS = {}; // {cv: base64, lettre: base64, portfolio: base64}
+
+function closeMod(id){ document.getElementById(id).style.display='none'; }
+function fmtDate(s){ if(!s)return '—'; return new Date(s).toLocaleDateString('fr-FR',{month:'short',year:'numeric'}); }
+
+document.addEventListener('DOMContentLoaded', async()=>{
+  await new Promise(r=>setTimeout(r,400));
+  try{
+    const r = await api('GET','/auth/me');
+    ME_EC = r.user;
+  }catch(_){}
+  if(!ME_EC){
+    document.getElementById('not-logged').style.display='';
+    return;
+  }
+  document.getElementById('logged-content').style.display='';
+  loadAll();
+});
+
+async function loadAll(){
+  try{
+    const r = await api('GET','/profil-emploi');
+    PROFIL_EC = r.profil; EXPS = r.experiences||[]; FORMS = r.formations||[];
+    const stats = r.cands_statuts||[];
+    const total = r.nb_candidatures||0;
+    document.getElementById('k-total').textContent = total;
+    document.getElementById('k-attente').textContent = stats.find(s=>s.statut==='en_attente')?.n||0;
+    document.getElementById('k-vue').textContent = stats.find(s=>s.statut==='vue')?.n||0;
+    document.getElementById('k-accept').textContent = stats.find(s=>s.statut==='acceptee')?.n||0;
+    document.getElementById('k-refuse').textContent = stats.find(s=>s.statut==='refusee')?.n||0;
+    fillProfilForm();
+    renderExps(); renderForms();
+    // Lettre
+    if(r.profil?.lettre_contenu) document.getElementById('lettre-editor').innerHTML = r.profil.lettre_contenu;
+    // Badge dispo
+    renderBadgeDispo(r.profil?.disponible_pour_travailler);
+  }catch(e){console.error(e);}
+}
+
+/* ── Tabs ── */
+function switchTab(name){
+  document.querySelectorAll('.ec-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.ec-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('sec-'+name)?.classList.add('active');
+  document.querySelectorAll('.ec-tab').forEach(t=>{ if(t.getAttribute('onclick')?.includes(name)) t.classList.add('active'); });
+  if(name==='offres') loadOffresMatch();
+  if(name==='candidatures') loadCandidatures();
+}
+
+/* ── Badge disponible ── */
+function renderBadgeDispo(actif){
+  const el = document.getElementById('badge-dispo-wrap');
+  el.innerHTML = actif
+    ? `<div class="badge-dispo">⭐ Disponible pour travailler</div>`
+    : `<div class="badge-dispo off">⭐ Désactivé</div>`;
+}
+function toggleDispo(){
+  const current = PROFIL_EC?.disponible_pour_travailler;
+  api('PUT','/profil-emploi',{...getProfilData(), disponible_pour_travailler: !current}).then(()=>{
+    if(PROFIL_EC) PROFIL_EC.disponible_pour_travailler = !current;
+    renderBadgeDispo(!current);
+    DA.toast(!current?'⭐ Badge activé — Vous recevrez des offres ciblées.':'Badge désactivé.', {type:!current?'success':'info'});
+  });
+}
+function updateBadgePreview(){ /* live update si besoin */ }
+
+/* ── Profil emploi ── */
+function fillProfilForm(){
+  if(!PROFIL_EC) return;
+  const p = PROFIL_EC;
+  document.getElementById('p-situation').value = p.situation||'en_recherche';
+  document.getElementById('p-metier').value = p.metier||'';
+  document.getElementById('p-experience').value = p.experience||'debutant';
+  document.getElementById('p-etudes').value = p.niveau_etudes||'';
+  document.getElementById('p-mobilite').value = p.mobilite||'national';
+  document.getElementById('p-teletravail').value = p.teletravail||'non';
+  document.getElementById('p-sal-min').value = p.salaire_min||'';
+  document.getElementById('p-sal-max').value = p.salaire_max||'';
+  document.getElementById('p-devise').value = p.devise||'EUR';
+  document.getElementById('p-dispo-date').value = p.date_disponibilite?.slice(0,10)||'';
+  document.getElementById('p-badge-dispo').checked = !!p.disponible_pour_travailler;
+  // Types opportunités
+  TYPES_OPP = JSON.parse(p.types_opportunites||'[]');
+  document.querySelectorAll('#types-opp-grid input[type=checkbox]').forEach(cb=>{
+    cb.checked = TYPES_OPP.includes(cb.value);
+  });
+  // Secteurs comme string
+  try{ const s=JSON.parse(p.secteurs||'[]'); document.getElementById('p-secteur').value=s[0]||''; }catch(_){ document.getElementById('p-secteur').value=p.secteurs||''; }
+}
+function toggleType(cb){ if(cb.checked){ if(!TYPES_OPP.includes(cb.value)) TYPES_OPP.push(cb.value); } else { TYPES_OPP=TYPES_OPP.filter(t=>t!==cb.value); } }
+function getProfilData(){
+  return {
+    situation: document.getElementById('p-situation').value,
+    types_opportunites: TYPES_OPP,
+    secteurs: [document.getElementById('p-secteur').value].filter(Boolean),
+    metier: document.getElementById('p-metier').value||null,
+    experience: document.getElementById('p-experience').value,
+    niveau_etudes: document.getElementById('p-etudes').value||null,
+    mobilite: document.getElementById('p-mobilite').value,
+    teletravail: document.getElementById('p-teletravail').value,
+    salaire_min: parseFloat(document.getElementById('p-sal-min').value)||null,
+    salaire_max: parseFloat(document.getElementById('p-sal-max').value)||null,
+    devise: document.getElementById('p-devise').value,
+    date_disponibilite: document.getElementById('p-dispo-date').value||null,
+    disponible_pour_travailler: document.getElementById('p-badge-dispo').checked,
+    ...DOC_PDFS
+  };
+}
+async function saveProfil(e){
+  e.preventDefault();
+  try{
+    await api('PUT','/profil-emploi', getProfilData());
+    DA.toast('✅ Profil emploi enregistré !', {type:'success'});
+    loadAll();
+  }catch(err){ DA.toast('Erreur : '+err.message, {type:'danger'}); }
+}
+
+/* ── Upload PDF (base64) ── */
+function uploadDoc(type){
+  const inputs = {cv:'cv-pdf-input', lettre:'lettre-pdf-input', portfolio:'portfolio-pdf-input'};
+  const statuses = {cv:'cv-pdf-status', lettre:'lettre-pdf-status', portfolio:'portfolio-pdf-status'};
+  const keys = {cv:'cv_pdf', lettre:'lettre_pdf', portfolio:'portfolio_pdf'};
+  const file = document.getElementById(inputs[type]).files[0];
+  if(!file) return;
+  if(file.size > 5*1024*1024){ DA.toast('Fichier trop volumineux (max 5 Mo)', {type:'warning'}); return; }
+  const reader = new FileReader();
+  reader.onload = async e=>{
+    DOC_PDFS[keys[type]] = e.target.result;
+    document.getElementById(statuses[type]).textContent = '✅ ' + file.name + ' prêt';
+    await api('PUT','/profil-emploi',{[keys[type]]: e.target.result});
+    DA.toast('Document enregistré.', {type:'success'});
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── Expériences ── */
+function renderExps(){
+  const el = document.getElementById('exps-list');
+  if(!EXPS.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:12px 0;">Aucune expérience renseignée.</div>'; return; }
+  el.innerHTML = EXPS.map(exp=>`
+    <div class="exp-card">
+      <div class="exp-actions">
+        <button class="btn btn-sm" style="padding:3px 8px;border-color:var(--orange);color:var(--orange);" onclick="editExp(${exp.id})">✏️</button>
+        <button class="btn btn-sm" style="padding:3px 8px;border-color:#ef4444;color:#ef4444;" onclick="deleteExp(${exp.id})">🗑️</button>
+      </div>
+      <div style="padding-right:80px;">
+        <strong style="font-size:14px;">${escH(exp.poste)}</strong>
+        ${exp.entreprise?`<span style="color:var(--muted);font-size:13px;"> @ ${escH(exp.entreprise)}</span>`:''}
+        ${exp.en_cours?'<span style="margin-left:8px;font-size:11px;background:#d1fae5;color:#065f46;padding:2px 7px;border-radius:8px;">En cours</span>':''}
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+          ${[exp.ville,exp.pays].filter(Boolean).map(escH).join(', ')||''}
+          ${exp.date_debut?` · ${fmtDate(exp.date_debut)} → ${exp.en_cours?'Présent':fmtDate(exp.date_fin)}`:''}
+        </div>
+        ${exp.description?`<div style="font-size:13px;margin-top:6px;color:#555;">${escH(exp.description)}</div>`:''}
+        ${exp.realisations?`<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic;">${escH(exp.realisations)}</div>`:''}
+      </div>
+    </div>`).join('');
+}
+
+function openExpForm(){ EDIT_EXP_ID=null; document.getElementById('exp-modal-title').textContent='＋ Ajouter une expérience'; ['exp-poste','exp-entreprise','exp-ville','exp-pays','exp-desc','exp-real'].forEach(i=>document.getElementById(i).value=''); ['exp-debut','exp-fin'].forEach(i=>document.getElementById(i).value=''); document.getElementById('exp-en-cours').checked=false; document.getElementById('modal-exp-bg').style.display='flex'; }
+function toggleEnCours(){ document.getElementById('exp-fin').disabled = document.getElementById('exp-en-cours').checked; }
+function editExp(id){
+  EDIT_EXP_ID=id;
+  const exp = EXPS.find(e=>e.id===id); if(!exp)return;
+  document.getElementById('exp-modal-title').textContent='✏️ Modifier l\'expérience';
+  document.getElementById('exp-poste').value=exp.poste||'';
+  document.getElementById('exp-entreprise').value=exp.entreprise||'';
+  document.getElementById('exp-ville').value=exp.ville||'';
+  document.getElementById('exp-pays').value=exp.pays||'';
+  document.getElementById('exp-debut').value=exp.date_debut?.slice(0,7)||'';
+  document.getElementById('exp-fin').value=exp.date_fin?.slice(0,7)||'';
+  document.getElementById('exp-en-cours').checked=!!exp.en_cours;
+  document.getElementById('exp-desc').value=exp.description||'';
+  document.getElementById('exp-real').value=exp.realisations||'';
+  document.getElementById('modal-exp-bg').style.display='flex';
+}
+async function saveExp(){
+  const poste=document.getElementById('exp-poste').value.trim();
+  if(!poste){DA.toast('Poste requis.',{type:'warning'});return;}
+  const data={poste,entreprise:document.getElementById('exp-entreprise').value||null,ville:document.getElementById('exp-ville').value||null,pays:document.getElementById('exp-pays').value||null,date_debut:document.getElementById('exp-debut').value||null,date_fin:document.getElementById('exp-fin').value||null,en_cours:document.getElementById('exp-en-cours').checked,description:document.getElementById('exp-desc').value||null,realisations:document.getElementById('exp-real').value||null};
+  try{
+    if(EDIT_EXP_ID) await api('PUT','/profil-emploi/experiences/'+EDIT_EXP_ID,data);
+    else await api('POST','/profil-emploi/experiences',data);
+    DA.toast('Expérience enregistrée.',{type:'success'}); closeMod('modal-exp-bg'); loadAll();
+  }catch(e){DA.toast('Erreur : '+e.message,{type:'danger'});}
+}
+async function deleteExp(id){ if(!confirm('Supprimer cette expérience ?'))return; await api('DELETE','/profil-emploi/experiences/'+id); loadAll(); }
+
+/* ── Formations ── */
+function renderForms(){
+  const el=document.getElementById('forms-list');
+  if(!FORMS.length){el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:12px 0;">Aucune formation renseignée.</div>';return;}
+  el.innerHTML=FORMS.map(f=>`
+    <div class="exp-card">
+      <div class="exp-actions">
+        <button class="btn btn-sm" style="padding:3px 8px;border-color:var(--orange);color:var(--orange);" onclick="editForm(${f.id})">✏️</button>
+        <button class="btn btn-sm" style="padding:3px 8px;border-color:#ef4444;color:#ef4444;" onclick="deleteForm(${f.id})">🗑️</button>
+      </div>
+      <div style="padding-right:80px;">
+        <strong style="font-size:14px;">${escH(f.diplome)}</strong>
+        ${f.etablissement?`<span style="color:var(--muted);font-size:13px;"> — ${escH(f.etablissement)}</span>`:''}
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+          ${[f.ville,f.pays].filter(Boolean).map(escH).join(', ')||''}
+          ${f.date_obtention?` · Obtenu en ${fmtDate(f.date_obtention)}`:''}
+        </div>
+        ${f.description?`<div style="font-size:12px;color:#555;margin-top:4px;">${escH(f.description)}</div>`:''}
+      </div>
+    </div>`).join('');
+}
+function openFormForm(){EDIT_FORM_ID=null;document.getElementById('form-modal-title').textContent='＋ Ajouter une formation';['form-diplome','form-etab','form-ville','form-pays','form-desc'].forEach(i=>document.getElementById(i).value='');document.getElementById('form-date').value='';document.getElementById('modal-form-bg').style.display='flex';}
+function editForm(id){
+  EDIT_FORM_ID=id; const f=FORMS.find(x=>x.id===id); if(!f)return;
+  document.getElementById('form-modal-title').textContent='✏️ Modifier la formation';
+  document.getElementById('form-diplome').value=f.diplome||'';document.getElementById('form-etab').value=f.etablissement||'';document.getElementById('form-ville').value=f.ville||'';document.getElementById('form-pays').value=f.pays||'';document.getElementById('form-date').value=f.date_obtention?.slice(0,7)||'';document.getElementById('form-desc').value=f.description||'';
+  document.getElementById('modal-form-bg').style.display='flex';
+}
+async function saveFormation(){
+  const diplome=document.getElementById('form-diplome').value.trim();
+  if(!diplome){DA.toast('Diplôme requis.',{type:'warning'});return;}
+  const data={diplome,etablissement:document.getElementById('form-etab').value||null,ville:document.getElementById('form-ville').value||null,pays:document.getElementById('form-pays').value||null,date_obtention:document.getElementById('form-date').value||null,description:document.getElementById('form-desc').value||null};
+  try{
+    if(EDIT_FORM_ID) await api('PUT','/profil-emploi/formations/'+EDIT_FORM_ID,data);
+    else await api('POST','/profil-emploi/formations',data);
+    DA.toast('Formation enregistrée.',{type:'success'});closeMod('modal-form-bg');loadAll();
+  }catch(e){DA.toast('Erreur : '+e.message,{type:'danger'});}
+}
+async function deleteForm(id){if(!confirm('Supprimer cette formation ?'))return;await api('DELETE','/profil-emploi/formations/'+id);loadAll();}
+
+/* ── Lettre ── */
+function fmtDoc(cmd){ document.execCommand(cmd,false,null); document.getElementById('lettre-editor').focus(); }
+async function saveLettre(){
+  const contenu = document.getElementById('lettre-editor').innerHTML;
+  try{ await api('PUT','/profil-emploi',{lettre_contenu:contenu}); DA.toast('Lettre enregistrée.',{type:'success'}); }
+  catch(e){ DA.toast('Erreur.',{type:'danger'}); }
+}
+
+/* ── Offres matchées ── */
+async function loadOffresMatch(){
+  const grid=document.getElementById('offres-match-grid');
+  grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+  try{
+    const r=await api('GET','/profil-emploi/offres-matchees');
+    const camps=r.campagnes||[];
+    document.getElementById('k-offres').textContent=camps.length;
+    if(!camps.length){grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);">Aucune offre correspondante. Complétez votre profil pour recevoir des recommandations.</div>';return;}
+    const TYPE_LABELS={emploi:'💼 Emploi',benevolat:'🤝 Bénévolat',stage:'🎓 Stage',mission:'🎯 Mission',appel_candidature:'📣 Appel à candidatures'};
+    grid.innerHTML=camps.map(c=>`
+      <div class="match-card" onclick="ouvrirOffre(${c.id})">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:#dbeafe;color:#1e40af;">${TYPE_LABELS[c.type_recrutement]||c.type_recrutement}</span>
+          ${c.deja_postule?'<span style="font-size:11px;font-weight:700;color:#10b981;">✅ Postulé</span>':''}
+        </div>
+        <strong style="font-size:14px;display:block;margin-bottom:4px;">${escH(c.nom)}</strong>
+        ${c.titre_poste?`<div style="font-size:12px;color:#555;margin-bottom:4px;">${escH(c.titre_poste)}</div>`:''}
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+          ${c.organisme?escH(c.organisme)+' · ':''}${[c.ville,c.pays].filter(Boolean).map(escH).join(', ')}
+        </div>
+        ${c.score_matching>0?`
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);">
+            <span>Correspondance</span>
+            <div class="score-bar" style="flex:1;"><div class="score-fill" style="width:${Math.min(c.score_matching,100)}%"></div></div>
+            <span style="font-weight:700;color:var(--orange);">${Math.min(c.score_matching,100)}%</span>
+          </div>`:''}
+        ${!c.deja_postule?`<button class="btn btn-sm btn-orange" style="width:100%;margin-top:10px;" onclick="event.stopPropagation();postulerDirect(${c.id})">📩 Postuler</button>`:''}
+      </div>`).join('');
+  }catch(e){grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:30px;color:#ef4444;">Erreur : ${escH(e.message)}</div>`;}
+}
+
+function ouvrirOffre(id){ window.location.href='recrutement.html'; }
+
+async function postulerDirect(cid){
+  if(!confirm('Envoyer votre candidature pour cette offre ?'))return;
+  try{
+    await api('POST','/recrutement/'+cid+'/candidature',{message:'Candidature envoyée depuis mon Espace Candidat.'});
+    DA.toast('✅ Candidature envoyée !',{type:'success'});
+    loadOffresMatch();
+  }catch(e){DA.toast('Erreur : '+e.message,{type:'danger'});}
+}
+
+/* ── Historique candidatures ── */
+async function loadCandidatures(){
+  const el=document.getElementById('cands-hist-list');
+  try{
+    const r=await api('GET','/profil-emploi');
+    const cands=r.nb_candidatures;
+    // On va requêter les candidatures directement via recrutement
+    const r2=await api('GET','/recrutement?mine=1');
+    el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;">Utilisez la page <a href="recrutement.html" style="color:var(--orange);">Recrutement</a> pour voir le détail de vos candidatures.</div>';
+  }catch(e){el.innerHTML=`<div style="color:#ef4444;">${escH(e.message)}</div>`;}
+}
+</script>
+</body>
+</html>

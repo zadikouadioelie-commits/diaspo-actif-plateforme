@@ -1,15 +1,14 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <title>Diaspo'Actif — Fil d'actualité</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
-  <link rel="stylesheet" href="/assets/responsive.css">
+<link rel="stylesheet" href="/assets/responsive.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="assets/logo.svg">
 </head>
 <body>
@@ -26,50 +25,223 @@
         <a href="evenements.html">Événements</a>
       </nav>
       <div class="topbar-right">
-        
         <select class="lang-select" id="lang-select"></select>
         <div id="auth-area" class="auth-area"></div>
       </div>
     </div>
   </header>
 
-  <main class="container" style="max-width:760px;padding-top:30px;padding-bottom:40px;">
-    <h2 style="margin:0 0 4px;">Fil d'actualité global</h2>
-    <p class="sub">Publications des utilisateurs, associations, entreprises et institutions : opportunités, appels à projets, formations et actualités des diasporas.</p>
+  <main class="container" style="max-width:700px;padding-top:24px;padding-bottom:60px;">
 
-    <div class="notice">À mesure de votre utilisation (nationalités déclarées, centres d'intérêt, groupes rejoints, interactions, événements consultés, initiatives suivies), ce fil deviendra progressivement personnalisé pour prioriser les contenus les plus pertinents pour vous. Pour l'instant, vous voyez l'ensemble des publications publiques.</div>
-
-    <div class="card" id="fil-publish" style="margin-bottom:16px;"></div>
-
-    <div class="feed-filter-bar" id="feed-filter-bar">
-      <button class="active" data-type="Tous">🌐 Tous</button>
-      <button data-type="Suivis">👥 Suivis</button>
-      <button data-type="Populaires">🔥 Populaires</button>
-      <button data-type="Articles">📰 À la une</button>
-      <button data-type="Texte">📝 Texte</button>
-      <button data-type="Photos">📷 Photos</button>
-      <button data-type="Vidéos">🎥 Vidéos</button>
+    <!-- En-tête -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h2 style="margin:0 0 2px;">Fil d'actualité</h2>
+        <p style="margin:0;color:var(--text-secondary,#6b7280);font-size:.88rem;">Publications de la communauté Diaspo'Actif</p>
+      </div>
+      <button class="btn-primary" id="btn-create-post" onclick="Posts.openModal()" style="display:none;">
+        ✍️ Créer un post
+      </button>
     </div>
 
+    <!-- Bouton créer un post (trigger inline) -->
+    <div id="feed-create-trigger"></div>
+
+    <!-- Filtres du fil -->
+    <div class="posts-feed-filters" id="feed-filters">
+      <button class="posts-feed-filter active" data-mode="tous">🌐 Tous</button>
+      <button class="posts-feed-filter" data-mode="suivis">👥 Mes abonnements</button>
+      <button class="posts-feed-filter" data-mode="populaires">🔥 Populaires</button>
+      <button class="posts-feed-filter" data-mode="articles">📰 Articles</button>
+    </div>
+
+    <!-- Filtres par catégorie -->
+    <div class="posts-feed-filters" id="cat-filters" style="margin-bottom:20px;">
+      <button class="posts-feed-filter active" data-cat="">Toutes catégories</button>
+      <button class="posts-feed-filter" data-cat="Projet">Projets</button>
+      <button class="posts-feed-filter" data-cat="Opportunité">Opportunités</button>
+      <button class="posts-feed-filter" data-cat="Investissement">Investissements</button>
+      <button class="posts-feed-filter" data-cat="Emploi">Emploi</button>
+      <button class="posts-feed-filter" data-cat="Formation">Formation</button>
+      <button class="posts-feed-filter" data-cat="Événement">Événements</button>
+      <button class="posts-feed-filter" data-cat="Culture">Culture</button>
+    </div>
+
+    <!-- Publicité -->
     <div id="ad-fil" data-pub-format="banniere" style="margin-bottom:16px;"></div>
 
-    <div id="feed-list"></div>
+    <!-- Liste des posts -->
+    <div id="feed-list">
+      <div style="text-align:center;padding:40px;color:#9ca3af;">
+        <div style="font-size:2rem;margin-bottom:8px;">⏳</div>
+        <p>Chargement du fil…</p>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div id="feed-pagination" style="text-align:center;margin-top:20px;"></div>
+
   </main>
 
-  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord — Prototype interactif (données fictives) · 2026</span> · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a></footer>
+  <footer class="footer">
+    <span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> ·
+    <a href="confidentialite.html" class="footer-link">Confidentialité</a>
+  </footer>
 </div>
 
-<script src="assets/data.js"></script>
-<script src="assets/demo.js"></script>`n  <script src="assets/app.js"></script>
+<!-- Navigation mobile -->
+<nav class="mobile-bottom-nav" aria-label="Navigation mobile">
+  <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+  <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+  <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
+  <a class="mobile-bottom-nav__item" href="evenements.html"><span class="nav-icon">📅</span><span>Événements</span></a>
+  <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
+</nav>
 
-  <!-- ─── Mobile Bottom Navigation ─── -->
-  <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
-    <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
-    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
-    <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
-    <a class="mobile-bottom-nav__item" href="evenements.html"><span class="nav-icon">📅</span><span>Événements</span></a>
-    <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
-  </nav>
+<!-- Bouton flottant créer post (mobile) -->
+<button class="posts-fab" id="posts-fab" onclick="Posts.openModal()" title="Créer un post" style="display:none;">✍️</button>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/posts.js"></script>
+
+<script>
+/* ── État du fil ── */
+let feedMode = 'tous';
+let feedCat  = '';
+let feedPage = 1;
+let currentUser = null;
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', async () => {
+  // Récupérer l'utilisateur courant
+  try {
+    const r = await fetch('/api/auth/me', { credentials: 'include' }).then(r => r.json());
+    if (r.user) {
+      currentUser = r.user;
+      Posts.init(currentUser.id);
+      // Afficher bouton créer
+      document.getElementById('btn-create-post').style.display = 'inline-flex';
+      document.getElementById('posts-fab').style.display = 'flex';
+      // Afficher le déclencheur inline
+      Posts.renderTrigger('feed-create-trigger');
+    } else {
+      Posts.init(null);
+    }
+  } catch(e) {
+    Posts.init(null);
+  }
+
+  // Filtres mode
+  document.querySelectorAll('#feed-filters .posts-feed-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      feedMode = btn.dataset.mode;
+      feedPage = 1;
+      document.querySelectorAll('#feed-filters .posts-feed-filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadFeed();
+    });
+  });
+
+  // Filtres catégorie
+  document.querySelectorAll('#cat-filters .posts-feed-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      feedCat = btn.dataset.cat;
+      feedPage = 1;
+      document.querySelectorAll('#cat-filters .posts-feed-filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadFeed();
+    });
+  });
+
+  // Hashtag depuis URL
+  const urlParams = new URLSearchParams(location.search);
+  const hashtag = urlParams.get('hashtag');
+  if (hashtag) {
+    document.querySelector('h2').textContent = `#${hashtag}`;
+    document.querySelector('h2').nextElementSibling.textContent = `Publications avec le hashtag #${hashtag}`;
+  }
+
+  // Post unique depuis URL
+  const postId = urlParams.get('post');
+  if (postId) {
+    loadSinglePost(postId);
+  } else {
+    loadFeed();
+  }
+});
+
+/* ── Charger le fil ── */
+async function loadFeed() {
+  const container = document.getElementById('feed-list');
+  container.innerHTML = `<div style="text-align:center;padding:30px;color:#9ca3af;"><div style="font-size:1.8rem;margin-bottom:8px;">⏳</div><p>Chargement…</p></div>`;
+
+  try {
+    const params = new URLSearchParams({ mode: feedMode, page: feedPage, limit: 15 });
+    if (feedCat) params.set('categorie', feedCat);
+
+    const urlParams = new URLSearchParams(location.search);
+    const hashtag = urlParams.get('hashtag');
+    if (hashtag) params.set('hashtag', hashtag);
+
+    const r = await fetch(`/api/fil?${params}`, { credentials: 'include' }).then(r => r.json());
+    const posts = r.posts || [];
+
+    if (!posts.length) {
+      container.innerHTML = `<div style="text-align:center;padding:40px;color:#9ca3af;">
+        <div style="font-size:2.5rem;margin-bottom:12px;">📭</div>
+        <p style="font-size:1rem;font-weight:600;margin-bottom:4px;">Aucune publication</p>
+        <p style="font-size:.88rem;">${feedMode === 'suivis' ? 'Suivez des personnes et des initiatives pour voir leurs publications.' : 'Soyez le premier à partager quelque chose !'}</p>
+        ${currentUser ? '<button class="btn-primary" onclick="Posts.openModal()" style="margin-top:12px;">✍️ Créer un post</button>' : ''}
+      </div>`;
+      document.getElementById('feed-pagination').innerHTML = '';
+      return;
+    }
+
+    Posts.renderFeed(posts, 'feed-list', { currentUserId: currentUser?.id });
+    renderPagination(r.page, r.pages, r.total);
+  } catch(e) {
+    container.innerHTML = `<div style="text-align:center;padding:30px;color:#dc2626;"><p>Erreur de chargement. <button onclick="loadFeed()" class="btn-secondary" style="margin-left:8px;">Réessayer</button></p></div>`;
+  }
+}
+
+/* ── Post unique ── */
+async function loadSinglePost(postId) {
+  try {
+    const r = await fetch(`/api/fil/${postId}`, { credentials: 'include' }).then(r => r.json());
+    if (r.post) {
+      document.getElementById('feed-list').innerHTML = Posts.renderPostCard(r.post, { currentUserId: currentUser?.id });
+      document.getElementById('feed-filters').style.display = 'none';
+      document.getElementById('cat-filters').style.display = 'none';
+      document.getElementById('feed-pagination').innerHTML = `<button class="btn-secondary" onclick="history.back()">← Retour au fil</button>`;
+    }
+  } catch(e) { loadFeed(); }
+}
+
+/* ── Pagination ── */
+function renderPagination(page, pages, total) {
+  const el = document.getElementById('feed-pagination');
+  if (pages <= 1) { el.innerHTML = ''; return; }
+  let html = `<div style="display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;">`;
+  if (page > 1) html += `<button class="btn-secondary btn-sm" onclick="changePage(${page-1})">← Précédent</button>`;
+  html += `<span style="color:#6b7280;font-size:.88rem;">Page ${page} / ${pages}</span>`;
+  if (page < pages) html += `<button class="btn-secondary btn-sm" onclick="changePage(${page+1})">Suivant →</button>`;
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function changePage(p) {
+  feedPage = p;
+  loadFeed();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ── Exposer loadFeed pour Posts.js ── */
+window.loadFeed = loadFeed;
+window.PostsFeed = { refresh: loadFeed };
+</script>
+
 <script src="assets/chatbot.js"></script>
 </body>
 </html>

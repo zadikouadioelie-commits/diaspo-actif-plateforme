@@ -74,6 +74,7 @@
       <a href="#asso-votes" data-section="asso-votes" id="sb-asso-votes" style="display:none;">🗳️ Votes</a>
 
       <div class="sb-group-lbl">07 — OUTILS</div>
+      <a href="profil.html">👤 Mon profil public</a>
       <a href="#paiement" data-section="paiement">💳 Module paiement</a>
       <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" style="display:none;">🎓 Diaspo Formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
       <a href="#accreditations" data-section="accreditations">🎖 Accréditations DA</a>
@@ -95,22 +96,6 @@
 /* Catalogue accréditations DA — défini ici pour éviter les problèmes de cache data.js */
 if (typeof ACCREDITATIONS_DA === 'undefined') {
   window.ACCREDITATIONS_DA = [
-    { type:'mobilisation_active', label:'Mobilisation Active', emoji:'📢', couleur:'#f59e0b', couleurBg:'#fffbeb', couleurBorder:'#f59e0b', couleurText:'#92400e',
-      description:"Autorisation d'exercer des fonctions de mobilisation au sein de Diaspo'Actif. Permet de participer activement aux missions, campagnes et appels de terrain.",
-      droits:["Participer à des missions rémunérées","Répondre à des appels de mobilisation","Réaliser des enquêtes de terrain","Participer à des campagnes de sensibilisation","Être sollicité par des partenaires"],
-      eligible:['initiative','utilisateur'], prix:{initiative:29,collectivite:0,utilisateur:19} },
-    { type:'createur_opportunites', label:"Créateur d'Opportunités", emoji:'💼', couleur:'#3b82f6', couleurBg:'#eff6ff', couleurBorder:'#3b82f6', couleurText:'#1e40af',
-      description:"Autorisation de publier des offres et de créer des opportunités professionnelles ou économiques pour la diaspora sur la plateforme.",
-      droits:["Publier certaines offres (emplois, stages, marchés)","Mettre en relation des acteurs","Participer à des programmes de recrutement","Créer des opportunités professionnelles","Accéder au module offres prioritaires"],
-      eligible:['initiative','collectivite'], prix:{initiative:39,collectivite:0} },
-    { type:'observatoire_diaspora', label:'Observatoire Diaspora', emoji:'📊', couleur:'#059669', couleurBg:'#f0fdf4', couleurBorder:'#059669', couleurText:'#065f46',
-      description:"Autorisation d'accéder aux données statistiques et outils d'analyse.",
-      droits:["Accéder aux statistiques autorisées","Consulter les tableaux de bord","Réaliser des consultations","Obtenir des rapports","Analyser les tendances"],
-      eligible:['collectivite'], prix:{collectivite:0} },
-    { type:'institutionnelle', label:'Institutionnelle', emoji:'🏛️', couleur:'#7c3aed', couleurBg:'#f5f3ff', couleurBorder:'#7c3aed', couleurText:'#4c1d95',
-      description:"Autorisation d'exercer des fonctions institutionnelles sur la plateforme.",
-      droits:["Diffuser des communications officielles","Organiser des consultations publiques","Interagir avec un territoire donné","Accéder à certains outils institutionnels"],
-      eligible:['collectivite'], prix:{collectivite:0} },
     { type:'creation_publicite', label:'Création de Publicité', emoji:'📣', couleur:'#dc2626', couleurBg:'#fef2f2', couleurBorder:'#dc2626', couleurText:'#991b1b',
       description:"Autorisation de créer et soumettre des publicités sur la plateforme Diaspo'Actif. Chaque publicité est soumise à validation avant diffusion.",
       droits:["Créer des campagnes publicitaires complètes","Définir le ciblage géographique et démographique","Choisir les emplacements de diffusion","Définir les périodes d'affichage","Suivre les statistiques","Soumettre des publicités à validation"],
@@ -160,69 +145,327 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   const msgPill = document.getElementById("msg-count");
   if (msgPill) msgPill.textContent = messages_non_lus || 0;
 
-  /* Pas encore d'initiative liée → formulaire de création */
+  /* Pas encore d'initiative liée → formulaire de création multi-étapes */
   if (!init) {
     document.getElementById("sidebar-brand").textContent = "Nouvelle initiative";
-    content.innerHTML = `
-      <div class="flex-between" style="margin-bottom:16px;">
-        <h1 style="margin:0;">Créer votre fiche initiative</h1>
-        <span class="badge badge-asso">Compte Initiative</span>
-      </div>
-      <div class="notice">Votre compte est prêt. Complétez votre fiche pour apparaître dans l'annuaire et accéder à toutes les fonctionnalités.</div>
-      <div class="card" style="margin-top:20px;">
-        <h3>Informations de base</h3>
-        <div class="grid grid-2" style="margin-top:14px;gap:14px;">
-          <div><label style="font-size:13px;font-weight:700;">Nom de l'initiative *</label><input id="cr-nom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Association des…"></div>
-          <div><label style="font-size:13px;font-weight:700;">Sigle</label><input id="cr-sigle" class="input-field" style="width:100%;margin-top:4px;" placeholder="A.I.T.O"></div>
-          <div><label style="font-size:13px;font-weight:700;">Pays d'origine *</label><input id="cr-pays" class="input-field" style="width:100%;margin-top:4px;" placeholder="Côte d'Ivoire"></div>
-          <div><label style="font-size:13px;font-weight:700;">Région de résidence</label><input id="cr-region" class="input-field" style="width:100%;margin-top:4px;" placeholder="Occitanie"></div>
-          <div><label style="font-size:13px;font-weight:700;">Ville</label><input id="cr-ville" class="input-field" style="width:100%;margin-top:4px;" placeholder="Toulouse"></div>
-          <div><label style="font-size:13px;font-weight:700;">Domaine d'activité</label>
-            <select id="cr-domaine" class="input-field" style="width:100%;margin-top:4px;">
-              <option value="">— Choisir —</option>
-              ${["Action Sociale","Agriculture","Santé","Éducation","Technologie","Culture","Économie","Environnement"].map(d=>`<option>${d}</option>`).join("")}
-            </select>
-          </div>
-          <div><label style="font-size:13px;font-weight:700;">Type d'organisation</label>
-            <select id="cr-type" class="input-field" style="width:100%;margin-top:4px;">
-              <option value="">— Choisir —</option>
-              ${["Association","ONG","Entreprise","Fondation","Coopérative"].map(t=>`<option>${t}</option>`).join("")}
-            </select>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:20px;">
-            <input type="checkbox" id="cr-nat-unique"> <label for="cr-nat-unique" style="font-size:13px;">Réservée à une nationalité unique</label>
-          </div>
-        </div>
-        <div style="margin-top:14px;"><label style="font-size:13px;font-weight:700;">Description</label>
-          <textarea id="cr-desc" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Présentez votre initiative, ses objectifs et ses activités…"></textarea>
-        </div>
-        <div id="cr-error" style="color:#D33;font-size:13px;margin-top:8px;display:none;"></div>
-        <button class="btn btn-orange btn-block" style="margin-top:16px;" id="cr-submit">Créer ma fiche initiative</button>
-      </div>`;
 
-    document.getElementById("cr-submit").addEventListener("click", async () => {
-      const nom = document.getElementById("cr-nom").value.trim();
-      const pays = document.getElementById("cr-pays").value.trim();
-      const errEl = document.getElementById("cr-error");
-      if (!nom || !pays) { errEl.textContent = "Le nom et le pays sont obligatoires."; errEl.style.display = "block"; return; }
-      errEl.style.display = "none";
-      try {
-        await api("POST", "/initiatives", {
-          nom, pays,
-          sigle: document.getElementById("cr-sigle").value.trim(),
-          region: document.getElementById("cr-region").value.trim(),
-          ville: document.getElementById("cr-ville").value.trim(),
-          domaine: document.getElementById("cr-domaine").value,
-          type: document.getElementById("cr-type").value,
-          description: document.getElementById("cr-desc").value.trim(),
-          nationalite_unique: document.getElementById("cr-nat-unique").checked
-        });
-        window.location.reload();
-      } catch (e) {
-        errEl.textContent = e.message || "Erreur lors de la création.";
-        errEl.style.display = "block";
+    const STEPS = [
+      { num: 1, label: "Responsable",    icon: "👤" },
+      { num: 2, label: "Initiative",     icon: "🏛" },
+      { num: 3, label: "Localisation",   icon: "📍" },
+      { num: 4, label: "Présentation",   icon: "📝" },
+      { num: 5, label: "En ligne",       icon: "🌐" },
+      { num: 6, label: "Membres",        icon: "👥" },
+      { num: 7, label: "Finalisation",   icon: "🤝" },
+    ];
+    const NB_STEPS = 7;
+    const DOMAINES = ["Action Sociale","Agriculture","Santé","Éducation","Technologie","Culture","Économie","Environnement","Sport","Autre"];
+    const FORMES = [
+      { val: "Entreprise",              icon: "🏢" },
+      { val: "Association",             icon: "🤝" },
+      { val: "ONG",                     icon: "🌍" },
+      { val: "Coopérative",             icon: "💡" },
+      { val: "Fondation",               icon: "🏛" },
+      { val: "Média",                   icon: "📺" },
+      { val: "Initiative individuelle", icon: "👤" },
+      { val: "Autre",                   icon: "✍️" },
+    ];
+    const FONCTIONS_MEMBRE = ["Président(e)","Vice-président(e)","Directeur / Directrice","Responsable communication","Secrétaire","Trésorier / Trésorière","Développeur / Développeuse","Chef(fe) de projet","Bénévole","Consultant(e)","Autre"];
+    const SOURCES = ["Réseaux sociaux","Recommandation d'un ami / collègue","Moteur de recherche (Google…)","Presse / Média","Événement","Association partenaire","Institution","Partenaire","Autre"];
+    const PAYS_LIST = ["Afghanistan","Afrique du Sud","Algérie","Allemagne","Angola","Argentine","Australie","Autriche","Belgique","Bénin","Bolivie","Brésil","Bulgarie","Burkina Faso","Burundi","Cameroun","Canada","Cap-Vert","Centrafrique","Chili","Chine","Colombie","Comores","Congo","Corée du Sud","Côte d'Ivoire","Croatie","Cuba","Danemark","Djibouti","Egypte","Émirats arabes unis","Espagne","États-Unis","Éthiopie","Finlande","France","Gabon","Gambie","Ghana","Grèce","Guinée","Guinée-Bissau","Haïti","Inde","Indonésie","Irak","Iran","Irlande","Israël","Italie","Jamaïque","Japon","Jordanie","Kenya","Kosovo","Laos","Liban","Libéria","Libye","Luxembourg","Madagascar","Mali","Maroc","Mauritanie","Mexique","Mozambique","Myanmar","Namibie","Népal","Niger","Nigeria","Norvège","Nouvelle-Zélande","Pakistan","Palestine","Pays-Bas","Pérou","Philippines","Pologne","Portugal","Qatar","RD Congo","Roumanie","Royaume-Uni","Russie","Rwanda","Sénégal","Serbie","Sierra Leone","Singapour","Slovaquie","Somalie","Soudan","Soudan du Sud","Sri Lanka","Suède","Suisse","Syrie","Tanzanie","Tchad","Thaïlande","Togo","Tunisie","Turquie","Ukraine","Uruguay","Venezuela","Vietnam","Yémen","Zambie","Zimbabwe"];
+
+    let currentStep = 1;
+    const membresEnAttente = [];
+
+    function renderProgress() {
+      const steps = STEPS.slice(0, NB_STEPS);
+      return `<div style="display:flex;gap:0;margin-bottom:24px;border-radius:10px;overflow:hidden;border:1px solid var(--border);">`
+        + steps.map(s => `<div style="flex:1;text-align:center;padding:8px 2px;font-size:10px;font-weight:700;background:${s.num===currentStep?'var(--orange)':s.num<currentStep?'#F0FDF4':'#F9FAFB'};color:${s.num===currentStep?'#fff':s.num<currentStep?'#15803D':'var(--muted)'};border-right:${s.num<NB_STEPS?'1px solid var(--border)':'none'};transition:background .2s;"><div style="font-size:15px;">${s.num<currentStep?'✅':s.icon}</div><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px;">${s.label}</div></div>`).join('')
+        + `<div style="font-size:11px;color:var(--muted);padding:8px 6px;display:flex;align-items:center;white-space:nowrap;border-left:1px solid var(--border);background:#F9FAFB;">${currentStep}/${NB_STEPS}</div></div>`;
+    }
+
+    function renderStep() {
+      const isLast = currentStep === NB_STEPS;
+      let body = '';
+
+      if (currentStep === 1) {
+        body = `
+          <h3 style="margin:0 0 6px;">👤 Informations du responsable</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 20px;">Renseignez vos coordonnées en tant que porteur de l'initiative.</p>
+          <div class="grid grid-2" style="gap:14px;">
+            <div><label class="cr-label">Nom *</label><input id="cr-nom-resp" class="input-field" style="width:100%;margin-top:4px;" placeholder="Koné"></div>
+            <div><label class="cr-label">Prénom *</label><input id="cr-prenom-resp" class="input-field" style="width:100%;margin-top:4px;" placeholder="Aminata"></div>
+            <div style="grid-column:1/-1;"><label class="cr-label">Fonction <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label><input id="cr-fonction-resp" class="input-field" style="width:100%;margin-top:4px;" placeholder="Présidente, Directrice, Fondatrice…"></div>
+          </div>`;
+
+      } else if (currentStep === 2) {
+        body = `
+          <h3 style="margin:0 0 6px;">🏛 Votre initiative</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Seul le nom et le pays d'origine sont obligatoires.</p>
+          <div class="grid grid-2" style="gap:14px;">
+            <div><label class="cr-label">Nom de l'initiative *</label><input id="cr-nom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Association des…"></div>
+            <div><label class="cr-label">Sigle <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label><input id="cr-sigle" class="input-field" style="width:100%;margin-top:4px;" placeholder="A.D.A"></div>
+            <div style="grid-column:1/-1;">
+              <label class="cr-label">Forme de l'initiative</label>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:8px;">
+                ${FORMES.map(f=>`<label class="forme-opt" style="display:flex;align-items:center;gap:7px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;"><input type="radio" name="cr-forme" value="${f.val}" style="accent-color:var(--orange);"> ${f.icon} ${f.val}</label>`).join('')}
+              </div>
+              <div id="forme-autre-wrap" style="display:none;margin-top:10px;">
+                <label class="cr-label">Précisez *</label>
+                <input id="cr-forme-autre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ex : Groupement d'intérêt économique…">
+              </div>
+            </div>
+            <div><label class="cr-label">Domaine d'activité</label>
+              <select id="cr-domaine" class="input-field" style="width:100%;margin-top:4px;"><option value="">— Choisir —</option>${DOMAINES.map(d=>`<option>${d}</option>`).join('')}</select>
+            </div>
+            <div><label class="cr-label">Pays d'origine de l'initiative *</label>
+              <input id="cr-pays-origine" class="input-field" style="width:100%;margin-top:4px;" list="pays-dl" placeholder="Côte d'Ivoire, Sénégal…">
+              <datalist id="pays-dl">${PAYS_LIST.map(p=>`<option value="${p}">`).join('')}</datalist>
+              <p style="font-size:11px;color:var(--muted);margin:3px 0 0;">Le pays de la diaspora ou de la communauté représentée.</p>
+            </div>
+            <div><label class="cr-label">Nombre de salariés</label><input id="cr-nb-salaries" type="number" min="0" class="input-field" style="width:100%;margin-top:4px;" placeholder="0"></div>
+            <div><label class="cr-label">N° SIRET / Immatriculation <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label><input id="cr-siret" class="input-field" style="width:100%;margin-top:4px;" placeholder="123 456 789 00010"></div>
+          </div>`;
+
+      } else if (currentStep === 3) {
+        body = `
+          <h3 style="margin:0 0 6px;">📍 Localisation</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Où est basée votre initiative ou votre siège social ?</p>
+          <div class="grid grid-2" style="gap:14px;">
+            <div style="grid-column:1/-1;"><label class="cr-label">Adresse <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label><input id="cr-adresse" class="input-field" style="width:100%;margin-top:4px;" placeholder="12 rue des Lilas"></div>
+            <div><label class="cr-label">Pays de résidence</label><input id="cr-pays-res" class="input-field" style="width:100%;margin-top:4px;" list="pays-dl2" placeholder="France"><datalist id="pays-dl2">${PAYS_LIST.map(p=>`<option value="${p}">`).join('')}</datalist></div>
+            <div><label class="cr-label">Ville</label><input id="cr-ville" class="input-field" style="width:100%;margin-top:4px;" placeholder="Lyon"></div>
+            <div><label class="cr-label">Commune <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label><input id="cr-commune" class="input-field" style="width:100%;margin-top:4px;" placeholder="…"></div>
+            <div><label class="cr-label">Région <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label><input id="cr-region" class="input-field" style="width:100%;margin-top:4px;" placeholder="Occitanie"></div>
+            <div><label class="cr-label">Département <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label><input id="cr-departement" class="input-field" style="width:100%;margin-top:4px;" placeholder="Haute-Garonne"></div>
+            <div><label class="cr-label">Code postal <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label><input id="cr-cp" class="input-field" style="width:100%;margin-top:4px;" placeholder="69001"></div>
+          </div>`;
+
+      } else if (currentStep === 4) {
+        body = `
+          <h3 style="margin:0 0 6px;">📝 Présentation de l'activité</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Décrivez votre initiative pour que la communauté la comprenne.</p>
+          <div>
+            <label class="cr-label">Description détaillée *</label>
+            <textarea id="cr-desc" style="width:100%;min-height:160px;border-radius:10px;border:1px solid var(--border);padding:14px;font-family:inherit;font-size:14px;margin-top:6px;resize:vertical;line-height:1.6;" placeholder="Présentez votre initiative : ses objectifs, ses actions, ses valeurs, le public qu'elle sert et son impact attendu…"></textarea>
+          </div>`;
+
+      } else if (currentStep === 5) {
+        body = `
+          <h3 style="margin:0 0 6px;">🌐 Présence en ligne</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Tous ces champs sont <strong>facultatifs</strong>. Ils afficheront des icônes cliquables sur votre fiche publique.</p>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div><label class="cr-label">🌐 Site Internet</label><input id="cr-site-web" class="input-field" style="width:100%;margin-top:4px;" type="url" placeholder="https://www.moninitiative.org"></div>
+            <div><label class="cr-label">💼 LinkedIn</label><input id="cr-linkedin" class="input-field" style="width:100%;margin-top:4px;" type="url" placeholder="https://linkedin.com/company/…"></div>
+            <div><label class="cr-label">🐦 X (Twitter)</label><input id="cr-twitter" class="input-field" style="width:100%;margin-top:4px;" type="url" placeholder="https://x.com/…"></div>
+            <div><label class="cr-label">▶️ YouTube</label><input id="cr-youtube" class="input-field" style="width:100%;margin-top:4px;" type="url" placeholder="https://youtube.com/@…"></div>
+            <p style="font-size:11.5px;color:var(--muted);margin:0;">Si un lien n'est pas renseigné, son icône n'apparaîtra pas sur votre fiche publique.</p>
+          </div>`;
+
+      } else if (currentStep === 6) {
+        const chips = membresEnAttente.map((m, i) => `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#F9FAFB;border:1px solid var(--border);border-radius:8px;margin-top:6px;"><div style="width:34px;height:34px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">${(m.prenom||m.nom||'?')[0].toUpperCase()}</div><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13px;">${m.prenom||''} ${m.nom||''}</div><div style="font-size:12px;color:var(--muted);">${m.email||''}</div></div><select style="border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:12px;" onchange="membresEnAttente[${i}].fonction=this.value"><option value="">— Fonction (facultatif) —</option>${FONCTIONS_MEMBRE.map(f=>`<option value="${f}" ${m.fonction===f?'selected':''}>${f}</option>`).join('')}</select><button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:4px;" onclick="membresEnAttente.splice(${i},1);mountStep()">✕</button></div>`).join('');
+        body = `
+          <h3 style="margin:0 0 6px;">👥 Membres <span style="font-size:12px;font-weight:400;color:var(--muted);">(facultatif)</span></h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Invitez des membres inscrits. Chacun recevra une demande d'affiliation à accepter ou refuser.</p>
+          <div style="position:relative;margin-bottom:12px;">
+            <input id="cr-membre-search" class="input-field" style="width:100%;" placeholder="Nom, prénom, e-mail ou identifiant Diaspo'Actif…" autocomplete="off">
+            <div id="cr-membre-results" style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:50;display:none;max-height:200px;overflow-y:auto;"></div>
+          </div>
+          <div id="membres-list">${chips||'<p style="color:var(--muted);font-size:13px;margin:0;">Aucun membre ajouté. Vous pourrez en inviter depuis votre tableau de bord après création.</p>'}</div>`;
+
+      } else if (currentStep === 7) {
+        body = `
+          <h3 style="margin:0 0 6px;">🤝 Finalisation</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Dernière étape avant la création de votre fiche.</p>
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div>
+              <label class="cr-label">Comment avez-vous entendu parler de Diaspo'Actif ?</label>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:7px;margin-top:10px;">
+                ${SOURCES.map(s=>`<label class="source-opt" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;"><input type="radio" name="cr-source" value="${s}" style="accent-color:var(--orange);"> ${s}</label>`).join('')}
+              </div>
+            </div>
+            <div id="source-autre-wrap" style="display:none;"><label class="cr-label">Précisez</label><input id="cr-source-autre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Comment avez-vous entendu parler de nous ?"></div>
+            <div><label class="cr-label">Vos attentes <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label><textarea id="cr-attentes" style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;font-size:14px;margin-top:6px;resize:vertical;line-height:1.6;" placeholder="Pourquoi rejoignez-vous Diaspo'Actif ? Collaborations recherchées, ressources souhaitées…"></textarea></div>
+            <label style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;cursor:pointer;">
+              <input type="checkbox" id="cr-autorisation-temoignage" style="margin-top:2px;accent-color:var(--orange);flex-shrink:0;">
+              <span style="font-size:13px;line-height:1.55;color:#0369A1;"><strong>J'autorise Diaspo'Actif à publier tout ou partie de mon témoignage</strong> sur ses supports de communication.<br><span style="font-size:11.5px;color:var(--muted);display:block;margin-top:3px;">Facultatif — modifiable à tout moment depuis votre espace membre.</span></span>
+            </label>
+          </div>`;
       }
-    });
+
+      return `${renderProgress()}<div class="card" style="margin-top:0;" id="cr-step-card">${body}<div id="cr-error" style="color:#D33;font-size:13px;margin-top:12px;padding:10px;background:#FEF2F2;border-radius:8px;display:none;"></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:24px;gap:10px;flex-wrap:wrap;">${currentStep>1?`<button class="btn btn-outline" id="cr-prev" style="min-width:110px;">← Précédent</button>`:`<div></div>`}<div style="display:flex;gap:8px;">${currentStep===6?`<button class="btn btn-outline" id="cr-skip-members">Passer</button>`:''}${!isLast?`<button class="btn btn-orange" id="cr-next" style="min-width:130px;">Suivant →</button>`:`<button class="btn btn-orange" id="cr-submit" style="min-width:170px;">✅ Créer ma fiche</button>`}</div></div></div>`;
+    }
+
+    const formData = {};
+
+    function collectStep() {
+      if (currentStep===1) {
+        formData.nom_responsable      = (document.getElementById('cr-nom-resp')?.value||'').trim();
+        formData.prenom_responsable   = (document.getElementById('cr-prenom-resp')?.value||'').trim();
+        formData.fonction_responsable = (document.getElementById('cr-fonction-resp')?.value||'').trim();
+      } else if (currentStep===2) {
+        formData.nom    = (document.getElementById('cr-nom')?.value||'').trim();
+        formData.sigle  = (document.getElementById('cr-sigle')?.value||'').trim();
+        const fc = document.querySelector('input[name="cr-forme"]:checked');
+        formData.type   = fc?.value||'';
+        formData.forme_autre = formData.type==='Autre'?(document.getElementById('cr-forme-autre')?.value||'').trim():'';
+        formData.domaine      = document.getElementById('cr-domaine')?.value||'';
+        formData.pays_origine = (document.getElementById('cr-pays-origine')?.value||'').trim();
+        formData.nb_salaries  = parseInt(document.getElementById('cr-nb-salaries')?.value||'0')||0;
+        formData.numero_immatriculation = (document.getElementById('cr-siret')?.value||'').trim();
+      } else if (currentStep===3) {
+        formData.adresse     = (document.getElementById('cr-adresse')?.value||'').trim();
+        formData.pays        = (document.getElementById('cr-pays-res')?.value||'').trim();
+        formData.ville       = (document.getElementById('cr-ville')?.value||'').trim();
+        formData.commune     = (document.getElementById('cr-commune')?.value||'').trim();
+        formData.region      = (document.getElementById('cr-region')?.value||'').trim();
+        formData.departement = (document.getElementById('cr-departement')?.value||'').trim();
+        formData.code_postal = (document.getElementById('cr-cp')?.value||'').trim();
+      } else if (currentStep===4) {
+        formData.description = (document.getElementById('cr-desc')?.value||'').trim();
+      } else if (currentStep===5) {
+        const chkUrl = v => { try{if(v)new URL(v);return v;}catch(_){return '';} };
+        formData.site_web = chkUrl((document.getElementById('cr-site-web')?.value||'').trim());
+        formData.linkedin = chkUrl((document.getElementById('cr-linkedin')?.value||'').trim());
+        formData.twitter  = chkUrl((document.getElementById('cr-twitter')?.value||'').trim());
+        formData.youtube  = chkUrl((document.getElementById('cr-youtube')?.value||'').trim());
+      } else if (currentStep===6) {
+        formData.membres = membresEnAttente.map(m=>({userId:m.id,fonction:m.fonction||''}));
+      } else if (currentStep===7) {
+        const chk = document.querySelector('input[name="cr-source"]:checked');
+        let src = chk?.value||'';
+        if(src==='Autre') src=(document.getElementById('cr-source-autre')?.value||'').trim()||'Autre';
+        formData.comment_entendu = src;
+        formData.attentes = (document.getElementById('cr-attentes')?.value||'').trim();
+        formData.autorisation_temoignage = document.getElementById('cr-autorisation-temoignage')?.checked||false;
+      }
+    }
+
+    function validateStep() {
+      const e = document.getElementById('cr-error');
+      if(e) e.style.display='none';
+      const err = msg => { if(e){e.textContent=msg;e.style.display='block';} return false; };
+      if (currentStep===1) {
+        if(!formData.nom_responsable||!formData.prenom_responsable) return err('Le nom et le prénom du responsable sont obligatoires.');
+      } else if (currentStep===2) {
+        if(!formData.nom) return err("Le nom de l'initiative est obligatoire.");
+        if(formData.type==='Autre'&&!formData.forme_autre) return err("Veuillez préciser la forme de l'initiative.");
+        if(!formData.pays_origine) return err("Le pays d'origine est obligatoire.");
+      } else if (currentStep===4) {
+        if(!formData.description) return err('La description est obligatoire.');
+      } else if (currentStep===5) {
+        const fields=[['cr-site-web','Site Internet'],['cr-linkedin','LinkedIn'],['cr-twitter','X (Twitter)'],['cr-youtube','YouTube']];
+        for(const[id,lbl]of fields){const v=(document.getElementById(id)?.value||'').trim();if(v&&!v.startsWith('http'))return err(lbl+' : URL invalide (doit commencer par https://)');}
+      }
+      return true;
+    }
+
+    function mountStep() {
+      content.innerHTML = `<div class="flex-between" style="margin-bottom:16px;"><h1 style="margin:0;">${STEPS[currentStep-1].icon} ${STEPS[currentStep-1].label}</h1><span class="badge badge-asso">Compte Initiative</span></div><div class="notice" style="margin-bottom:16px;">Votre compte est prêt. Complétez votre fiche pour apparaître dans l'annuaire.</div>${renderStep()}`;
+
+      document.getElementById('cr-prev')?.addEventListener('click',()=>{collectStep();currentStep--;mountStep();restoreStep();});
+      document.getElementById('cr-next')?.addEventListener('click',()=>{collectStep();if(!validateStep())return;currentStep++;mountStep();restoreStep();});
+      document.getElementById('cr-skip-members')?.addEventListener('click',()=>{formData.membres=[];currentStep++;mountStep();restoreStep();});
+      document.getElementById('cr-submit')?.addEventListener('click',async()=>{
+        collectStep();if(!validateStep())return;
+        const e=document.getElementById('cr-error');const btn=document.getElementById('cr-submit');
+        btn.disabled=true;btn.textContent='Création en cours…';
+        try{await api('POST','/initiatives',formData);window.location.href='bienvenue.html';}
+        catch(ex){if(e){e.textContent=ex.message||'Erreur.';e.style.display='block';}btn.disabled=false;btn.textContent='✅ Créer ma fiche';}
+      });
+
+      document.querySelectorAll('.forme-opt').forEach(lbl=>{
+        lbl.querySelector('input')?.addEventListener('change',()=>{
+          document.querySelectorAll('.forme-opt').forEach(l=>{l.style.borderColor='';l.style.background='';});
+          lbl.style.borderColor='var(--orange)';lbl.style.background='#FFF7ED';
+          const w=document.getElementById('forme-autre-wrap');if(w)w.style.display=lbl.querySelector('input').value==='Autre'?'block':'none';
+        });
+      });
+      document.querySelectorAll('.source-opt').forEach(lbl=>{
+        lbl.querySelector('input')?.addEventListener('change',()=>{
+          document.querySelectorAll('.source-opt').forEach(l=>{l.style.borderColor='';l.style.background='';});
+          lbl.style.borderColor='var(--orange)';lbl.style.background='#FFF7ED';
+          const w=document.getElementById('source-autre-wrap');if(w)w.style.display=lbl.querySelector('input').value==='Autre'?'block':'none';
+        });
+      });
+
+      const si=document.getElementById('cr-membre-search');
+      if(si){
+        let t;
+        si.addEventListener('input',()=>{
+          clearTimeout(t);
+          const q=si.value.trim();const res=document.getElementById('cr-membre-results');
+          if(q.length<2){res.style.display='none';return;}
+          t=setTimeout(async()=>{
+            try{
+              const data=await api('GET','/users/search?q='+encodeURIComponent(q));
+              const ids=membresEnAttente.map(m=>m.id);
+              const users=(data.users||[]).filter(u=>!ids.includes(u.id));
+              if(!users.length){res.innerHTML='<div style="padding:12px;color:var(--muted);font-size:13px;">Aucun résultat</div>';res.style.display='block';return;}
+              res.innerHTML=users.map(u=>`<div class="mr-item" data-id="${u.id}" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);"><div style="width:32px;height:32px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">${(u.prenom||u.nom||'?')[0].toUpperCase()}</div><div><div style="font-weight:700;font-size:13px;">${u.prenom||''} ${u.nom||''}</div><div style="font-size:12px;color:var(--muted);">${u.email||''}</div></div></div>`).join('');
+              res.style.display='block';
+              res.querySelectorAll('.mr-item').forEach(el=>{
+                el.addEventListener('click',()=>{const u=users.find(x=>x.id===parseInt(el.dataset.id));if(u&&!membresEnAttente.find(m=>m.id===u.id)){membresEnAttente.push({...u,fonction:''});si.value='';res.style.display='none';mountStep();}});
+                el.addEventListener('mouseover',()=>el.style.background='#F9FAFB');
+                el.addEventListener('mouseout',()=>el.style.background='');
+              });
+            }catch(_){}
+          },350);
+        });
+        document.addEventListener('click',e=>{if(!si.contains(e.target)){const r=document.getElementById('cr-membre-results');if(r)r.style.display='none';}});
+      }
+    }
+
+    function restoreStep() {
+      if(currentStep===1){
+        if(formData.nom_responsable)      {const el=document.getElementById('cr-nom-resp');if(el)el.value=formData.nom_responsable;}
+        if(formData.prenom_responsable)   {const el=document.getElementById('cr-prenom-resp');if(el)el.value=formData.prenom_responsable;}
+        if(formData.fonction_responsable) {const el=document.getElementById('cr-fonction-resp');if(el)el.value=formData.fonction_responsable;}
+      } else if(currentStep===2){
+        if(formData.nom)   {const el=document.getElementById('cr-nom');if(el)el.value=formData.nom;}
+        if(formData.sigle) {const el=document.getElementById('cr-sigle');if(el)el.value=formData.sigle;}
+        if(formData.type){
+          const r=document.querySelector('input[name="cr-forme"][value="'+formData.type+'"]');
+          if(r){r.checked=true;const l=r.closest('.forme-opt');if(l){l.style.borderColor='var(--orange)';l.style.background='#FFF7ED';}}
+          if(formData.type==='Autre'){const w=document.getElementById('forme-autre-wrap');if(w)w.style.display='block';}
+        }
+        if(formData.forme_autre){const el=document.getElementById('cr-forme-autre');if(el)el.value=formData.forme_autre;}
+        if(formData.domaine){const el=document.getElementById('cr-domaine');if(el)el.value=formData.domaine;}
+        if(formData.pays_origine){const el=document.getElementById('cr-pays-origine');if(el)el.value=formData.pays_origine;}
+        if(formData.nb_salaries!=null){const el=document.getElementById('cr-nb-salaries');if(el)el.value=formData.nb_salaries;}
+        if(formData.numero_immatriculation){const el=document.getElementById('cr-siret');if(el)el.value=formData.numero_immatriculation;}
+      } else if(currentStep===3){
+        if(formData.pays)        {const el=document.getElementById('cr-pays-res');if(el)el.value=formData.pays;}
+        if(formData.adresse)     {const el=document.getElementById('cr-adresse');if(el)el.value=formData.adresse;}
+        if(formData.ville)       {const el=document.getElementById('cr-ville');if(el)el.value=formData.ville;}
+        if(formData.commune)     {const el=document.getElementById('cr-commune');if(el)el.value=formData.commune;}
+        if(formData.region)      {const el=document.getElementById('cr-region');if(el)el.value=formData.region;}
+        if(formData.departement) {const el=document.getElementById('cr-departement');if(el)el.value=formData.departement;}
+        if(formData.code_postal) {const el=document.getElementById('cr-cp');if(el)el.value=formData.code_postal;}
+      } else if(currentStep===4){
+        if(formData.description){const el=document.getElementById('cr-desc');if(el)el.value=formData.description;}
+      } else if(currentStep===5){
+        if(formData.site_web){const el=document.getElementById('cr-site-web');if(el)el.value=formData.site_web;}
+        if(formData.linkedin) {const el=document.getElementById('cr-linkedin'); if(el)el.value=formData.linkedin;}
+        if(formData.twitter)  {const el=document.getElementById('cr-twitter');  if(el)el.value=formData.twitter;}
+        if(formData.youtube)  {const el=document.getElementById('cr-youtube');  if(el)el.value=formData.youtube;}
+      } else if(currentStep===7){
+        if(formData.attentes){const el=document.getElementById('cr-attentes');if(el)el.value=formData.attentes;}
+        if(formData.autorisation_temoignage){const el=document.getElementById('cr-autorisation-temoignage');if(el)el.checked=true;}
+        if(formData.comment_entendu){
+          const r=document.querySelector('input[name="cr-source"][value="'+formData.comment_entendu+'"]');
+          if(r){r.checked=true;const l=r.closest('.source-opt');if(l){l.style.borderColor='var(--orange)';l.style.background='#FFF7ED';}}
+        }
+      }
+    }
+
+    if(!document.getElementById('cr-style')){
+      const st=document.createElement('style');st.id='cr-style';
+      st.textContent='.cr-label{font-size:13px;font-weight:700;display:block;} .mr-item:last-child{border-bottom:none!important;}';
+      document.head.appendChild(st);
+    }
+
+    mountStep();
     return;
   }
 
@@ -283,59 +526,100 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     </div>
 
     <div class="card" style="margin-bottom:20px;" id="publications">
-      <h3>Nouvelle publication</h3>
-      <p style="font-size:13px;color:var(--muted);">Format court recommandé pour les vidéos : max 3 minutes. Vos publications apparaissent dans le <a href="fil-actualite.html" style="color:var(--orange);font-weight:700;">Fil d'actualité global</a>.</p>
-      <div id="pub-form" style="margin-top:12px;">
-        <select id="pub-categorie" class="input-field" style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <h3 style="margin:0;">📣 Nouvelle publication</h3>
+        <a href="fil-actualite.html" style="font-size:12px;color:var(--orange);">Voir le fil →</a>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:4px 0 14px;">Vos publications apparaissent dans le <strong>Fil d'actualité global</strong>. Format vidéo : max 3 min recommandé.</p>
+
+      <div id="pub-form">
+        <!-- Catégorie -->
+        <select id="pub-categorie" class="input-field" style="margin-bottom:10px;width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;">
           <option value="Actualité">📰 Actualité</option>
           <option value="Appel à projets">🤝 Appel à projets</option>
           <option value="Événement">📅 Événement</option>
           <option value="Témoignage">💬 Témoignage</option>
           <option value="Vidéo">🎬 Vidéo (&lt;3 min)</option>
+          <option value="Offre">💼 Offre d'emploi</option>
+          <option value="Annonce">📢 Annonce</option>
         </select>
-        <textarea id="pub-contenu" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;" placeholder="Partager une actualité, une opportunité, un appel à projets…"></textarea>
-        <button class="btn btn-orange" id="pub-btn" style="margin-top:8px;" ${abonneActif ? "" : "disabled"}>Publier</button>
-        ${!abonneActif ? `<p style="color:var(--muted);font-size:12px;margin-top:6px;">Abonnez-vous pour débloquer la publication.</p>` : ""}
-      </div>
-      ${publications_recentes.length ? `
-      <h4 style="margin-top:20px;font-size:13px;text-transform:uppercase;color:var(--muted);">Mes publications récentes</h4>
-      ${publications_recentes.map(p => `
-        <div class="feed-post" style="margin-top:10px;">
-          <div class="flex-between">
-            <span class="feed-cat">${p.categorie || ""}</span>
-            <span style="color:var(--muted);font-size:12px;">${new Date(p.created_at.replace(" ","T")+"Z").toLocaleString("fr-FR")}</span>
-          </div>
-          <div class="feed-body" style="margin-top:6px;">${p.contenu}</div>
-        </div>`).join("")}` : ""}
-    </div>
 
-    <div class="card" style="margin-bottom:20px;" id="evenements">
-      <h3>Mobiliser la diaspora</h3>
-      <div class="timeline-item" style="margin-top:14px;">
-        <div class="date-chip">15<span>NOV</span></div>
-        <div style="flex:1;">
-          <div class="flex-between">
-            <div><strong>Forum des entrepreneurs</strong><p style="margin:2px 0 0;color:var(--muted);font-size:13px;">120 participants confirmés</p></div>
-            <button class="btn btn-sm btn-orange">Gérer les inscriptions</button>
+        <!-- Contenu -->
+        <textarea id="pub-contenu" style="width:100%;min-height:100px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;font-size:13px;resize:vertical;" placeholder="Partager une actualité, une opportunité, un appel à projets…"></textarea>
+
+        <!-- Visibilité -->
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <label style="font-size:12px;font-weight:700;color:#555;">Visibilité :</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="radio" name="pub-visibilite" value="public" checked style="accent-color:var(--orange);"> 🌍 Public</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="radio" name="pub-visibilite" value="abonnes" style="accent-color:var(--orange);"> 👥 Abonnés</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="radio" name="pub-visibilite" value="prive" style="accent-color:var(--orange);"> 🔒 Privé</label>
+        </div>
+
+        <!-- Mode publication -->
+        <div style="margin-top:14px;padding:14px;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;">
+          <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px;">📅 Quand publier ?</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <label id="pub-mode-lbl-now" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:2px solid var(--orange);border-radius:8px;background:#fff;">
+              <input type="radio" name="pub-mode" value="maintenant" checked style="accent-color:var(--orange);">
+              <div>
+                <strong style="font-size:13px;">🚀 Publier maintenant</strong>
+                <div style="font-size:11px;color:var(--muted);">La publication sera visible immédiatement sur le fil d'actualité</div>
+              </div>
+            </label>
+            <label id="pub-mode-lbl-prog" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
+              <input type="radio" name="pub-mode" value="programme" style="accent-color:var(--orange);">
+              <div>
+                <strong style="font-size:13px;">⏰ Programmer la publication</strong>
+                <div style="font-size:11px;color:var(--muted);">Choisissez une date et une heure de diffusion</div>
+              </div>
+            </label>
+            <div id="pub-prog-panel" style="display:none;padding:10px 12px;border:1px solid #C7D7F5;border-radius:8px;background:#EFF6FF;margin-top:2px;">
+              <label style="font-size:12px;font-weight:700;color:#1d4ed8;display:block;margin-bottom:6px;">📅 Date et heure de publication :</label>
+              <input type="datetime-local" id="pub-programmed-at" style="width:100%;padding:8px 12px;border:1px solid #93C5FD;border-radius:7px;font-family:inherit;font-size:13px;background:#fff;">
+              <p style="font-size:11px;color:#3b82f6;margin:6px 0 0;">La publication sera envoyée automatiquement à la date et l'heure choisies.</p>
+            </div>
+            <label id="pub-mode-lbl-draft" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
+              <input type="radio" name="pub-mode" value="brouillon" style="accent-color:var(--orange);">
+              <div>
+                <strong style="font-size:13px;">💾 Enregistrer comme brouillon</strong>
+                <div style="font-size:11px;color:var(--muted);">Sauvegarder sans publier — accessible depuis "Mes brouillons"</div>
+              </div>
+            </label>
           </div>
         </div>
-      </div>
-      <div class="timeline-item">
-        <div class="date-chip">02<span>DÉC</span></div>
-        <div style="flex:1;">
-          <div class="flex-between">
-            <div><strong>Gala de solidarité de fin d'année</strong><p style="margin:2px 0 0;color:var(--muted);font-size:13px;">Ouvert à tous</p></div>
-            <button class="btn btn-sm btn-outline">Éditer l'événement</button>
-          </div>
+
+        <!-- Actions -->
+        <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-orange" id="pub-btn" ${abonneActif ? "" : "disabled"} style="min-width:160px;">🚀 Publier maintenant</button>
+          <button class="btn btn-outline" id="pub-preview-btn" ${abonneActif ? "" : "disabled"}>👁️ Aperçu</button>
+          ${!abonneActif ? `<span style="color:var(--muted);font-size:12px;">Abonnez-vous pour débloquer la publication.</span>` : ""}
         </div>
       </div>
-      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
-        <button class="btn btn-orange" onclick="initShowSection('billetterie-init')">🎟️ Gérer la billetterie</button>
-        <button class="btn btn-outline" onclick="initShowSection('billetterie-init')">+ Créer un événement</button>
+
+      <!-- Mes publications récentes -->
+      <div id="pub-recentes-wrap" style="margin-top:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <h4 style="margin:0;font-size:13px;text-transform:uppercase;color:var(--muted);">Mes publications récentes</h4>
+          <button class="btn btn-sm btn-outline" onclick="loadPubRecentes()" style="font-size:11px;">↺ Actualiser</button>
+        </div>
+        <div id="pub-recentes-list">
+          ${publications_recentes.length ? publications_recentes.map(p => `
+            <div class="feed-post" style="margin-top:8px;border:1px solid var(--border);border-radius:10px;padding:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <span class="feed-cat" style="font-size:11px;padding:2px 8px;background:#f1f5f9;border-radius:20px;">${p.categorie || ""}</span>
+                  <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${p.statut==='publie'?'#dcfce7':p.statut==='brouillon'?'#fef9c3':'#f1f5f9'};color:${p.statut==='publie'?'#166534':p.statut==='brouillon'?'#92400e':'#64748b'};">${p.statut==='publie'?'🟢 Publié':p.statut==='brouillon'?'🟡 Brouillon':'⬛ Archivé'}</span>
+                </div>
+                <span style="color:var(--muted);font-size:11px;">${new Date((p.created_at||'').replace(' ','T')+'Z').toLocaleString('fr-FR')}</span>
+              </div>
+              <div class="feed-body" style="margin-top:8px;font-size:13px;">${p.contenu||''}</div>
+            </div>`).join("") : `<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px;">Aucune publication pour l'instant.</p>`}
+        </div>
       </div>
     </div>
 
-    <!-- ═══ SECTION BILLETTERIE INITIATIVE ═══ -->
+    <!-- ═══ SECTION ÉVÉNEMENTS & BILLETTERIE ═══ -->
+    <div id="evenements" style="display:none;"></div>
     <div id="billetterie-init" style="display:none;"></div>
 
     <div class="card" style="margin-bottom:20px;" id="paiement">
@@ -1126,23 +1410,116 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     } catch (e) { console.error(e); }
   });
 
-  /* Publication sur le fil */
+  /* ══ MODULE PUBLICATION ══ */
+  // Radio mode → UI
+  document.querySelectorAll('input[name="pub-mode"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const mode = document.querySelector('input[name="pub-mode"]:checked')?.value || 'maintenant';
+      const panel = document.getElementById('pub-prog-panel');
+      const btn   = document.getElementById('pub-btn');
+      // Panel programmation
+      panel.style.display = mode === 'programme' ? '' : 'none';
+      // Texte bouton
+      if (mode === 'maintenant') btn.textContent = '🚀 Publier maintenant';
+      else if (mode === 'programme') btn.textContent = '⏰ Programmer';
+      else btn.textContent = '💾 Enregistrer le brouillon';
+      // Bordures actives
+      document.getElementById('pub-mode-lbl-now').style.borderColor  = mode==='maintenant' ? 'var(--orange)' : 'var(--border)';
+      document.getElementById('pub-mode-lbl-prog').style.borderColor = mode==='programme'  ? 'var(--orange)' : 'var(--border)';
+      document.getElementById('pub-mode-lbl-draft').style.borderColor= mode==='brouillon'  ? 'var(--orange)' : 'var(--border)';
+    });
+  });
+
+  // Publier / Programmer / Brouillon
   const pubBtn = document.getElementById("pub-btn");
   if (pubBtn) pubBtn.addEventListener("click", async () => {
-    const contenu = document.getElementById("pub-contenu").value.trim();
+    const contenu   = document.getElementById("pub-contenu").value.trim();
     const categorie = document.getElementById("pub-categorie").value;
-    if (!contenu) return;
+    const visibilite = document.querySelector('input[name="pub-visibilite"]:checked')?.value || 'public';
+    const mode      = document.querySelector('input[name="pub-mode"]:checked')?.value || 'maintenant';
+
+    if (!contenu) { DA.toast?.('Le contenu ne peut pas être vide.', {type:'warning'}) || alert('Le contenu ne peut pas être vide.'); return; }
+
+    if (mode === 'programme') {
+      const dateVal = document.getElementById('pub-programmed-at').value;
+      if (!dateVal) { DA.toast?.('Choisissez une date de publication.', {type:'warning'}) || alert('Choisissez une date de publication.'); return; }
+      const prog = new Date(dateVal);
+      if (prog <= new Date()) { DA.toast?.('La date programmée doit être dans le futur.', {type:'warning'}) || alert('La date programmée doit être dans le futur.'); return; }
+    }
+
     pubBtn.disabled = true;
+    const origText = pubBtn.textContent;
+    pubBtn.textContent = '⏳ En cours…';
+
     try {
-      await api("POST", "/fil", { contenu, categorie });
+      const payload = {
+        contenu, categorie, visibilite,
+        statut: mode === 'brouillon' ? 'brouillon' : 'publie',
+        programmed_at: mode === 'programme' ? document.getElementById('pub-programmed-at').value : null
+      };
+      await api("POST", "/fil", payload);
       document.getElementById("pub-contenu").value = "";
-      alert("Publication envoyée ! Elle apparaît maintenant dans le fil d'actualité.");
+      // Reset mode → maintenant
+      document.querySelector('input[name="pub-mode"][value="maintenant"]').checked = true;
+      document.querySelector('input[name="pub-mode"]').dispatchEvent(new Event('change'));
+
+      if (mode === 'brouillon') {
+        DA.toast?.('Brouillon enregistré.', {type:'success'}) || alert('Brouillon enregistré.');
+      } else if (mode === 'programme') {
+        const d = new Date(document.getElementById('pub-programmed-at').value || '');
+        DA.toast?.('Publication programmée pour le ' + d.toLocaleString('fr-FR') + '.', {type:'success'}) || alert('Publication programmée !');
+        document.getElementById('pub-programmed-at').value = '';
+      } else {
+        DA.toast?.('Publication envoyée ! Elle est visible sur le fil d\'actualité.', {type:'success'}) || alert('Publication envoyée !');
+      }
+      loadPubRecentes();
     } catch (e) {
-      alert("Erreur : " + (e.message || "Impossible de publier."));
+      DA.toast?.('Erreur : ' + (e.message || 'Impossible de publier.'), {type:'danger'}) || alert('Erreur : ' + e.message);
     } finally {
       pubBtn.disabled = false;
+      pubBtn.textContent = origText;
     }
   });
+
+  // Aperçu rapide
+  const pubPreviewBtn = document.getElementById('pub-preview-btn');
+  if (pubPreviewBtn) pubPreviewBtn.addEventListener('click', () => {
+    const contenu = document.getElementById('pub-contenu').value.trim();
+    if (!contenu) return;
+    const cat = document.getElementById('pub-categorie').value;
+    const now = new Date().toLocaleString('fr-FR');
+    const w = window.open('', '_blank', 'width=480,height=400');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Aperçu</title>
+    <style>body{font-family:sans-serif;padding:20px;background:#f8fafc;} .post{background:#fff;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
+    .cat{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:#f1f5f9;margin-bottom:8px;}
+    .contenu{font-size:14px;line-height:1.6;} .meta{font-size:11px;color:#94a3b8;margin-top:10px;}</style></head>
+    <body><p style="font-size:12px;color:#64748b;margin-bottom:12px;">📋 Aperçu avant publication</p>
+    <div class="post"><span class="cat">${cat}</span><div class="contenu">${contenu.replace(/\n/g,'<br>')}</div>
+    <div class="meta">Publié par vous · ${now}</div></div></body></html>`);
+  });
+
+  // Charger les publications récentes
+  window.loadPubRecentes = async function() {
+    const el = document.getElementById('pub-recentes-list');
+    if (!el) return;
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px;text-align:center;padding:12px;">Chargement…</p>';
+    try {
+      const { posts = [] } = await api('GET', '/fil?auteur_id=me&limit=5');
+      if (!posts.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px;">Aucune publication pour l\'instant.</p>'; return; }
+      el.innerHTML = posts.map(p => `
+        <div style="margin-top:8px;border:1px solid var(--border);border-radius:10px;padding:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span style="font-size:11px;padding:2px 8px;background:#f1f5f9;border-radius:20px;">${p.categorie||'Publication'}</span>
+              <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${p.statut==='publie'?'#dcfce7':p.statut==='brouillon'?'#fef9c3':'#f1f5f9'};color:${p.statut==='publie'?'#166534':p.statut==='brouillon'?'#92400e':'#64748b'};">${p.statut==='publie'?'🟢 Publié':p.statut==='brouillon'?'🟡 Brouillon':'⬛ Archivé'}</span>
+              ${p.programmed_at&&p.statut!=='publie'?`<span style="font-size:11px;color:#3b82f6;">⏰ ${new Date(p.programmed_at.replace(' ','T')).toLocaleString('fr-FR')}</span>`:''}
+            </div>
+            <span style="color:var(--muted);font-size:11px;">${new Date((p.created_at||'').replace(' ','T')+'Z').toLocaleString('fr-FR')}</span>
+          </div>
+          <div style="margin-top:8px;font-size:13px;line-height:1.5;">${(p.contenu||'').substring(0,200)}${(p.contenu||'').length>200?'…':''}</div>
+        </div>`).join('');
+    } catch(e) { el.innerHTML = '<p style="color:#ef4444;font-size:13px;">Erreur de chargement.</p>'; }
+  };
 
   renderAllAds();
 
@@ -1824,6 +2201,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-orange" onclick="initShowSection('mes-projets')">+ Nouveau projet</button>
+          <button class="btn btn-outline" onclick="if(window.Posts){Posts.openModal();}else{location.href='fil-actualite.html';}" style="border-color:#4338CA;color:#4338CA;">✍️ Créer un post</button>
           <a href="initiative.html?id=${init.slug||init.id}" class="btn btn-outline" target="_blank">Voir ma fiche →</a>
         </div>
       </div>
@@ -2033,7 +2411,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             Voir ma fiche publique →
           </a>
         </div>
-        <div id="init-qr-dash" style="flex-shrink:0;"></div>
+        <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:10px;">
+          <div id="init-qr-dash"></div>
+          ${init.da_id ? `
+          <div style="text-align:center;">
+            <div id="init-da-id-badge" style="font-family:monospace;font-size:15px;font-weight:800;letter-spacing:2px;color:var(--orange);background:rgba(255,107,0,0.08);border:1.5px solid var(--orange);border-radius:8px;padding:6px 14px;margin-bottom:8px;">${init.da_id}</div>
+            <div style="display:flex;gap:8px;justify-content:center;">
+              <button onclick="navigator.clipboard.writeText('${init.da_id}').then(()=>showToast('✅ Identifiant copié !'))" style="font-size:12px;padding:5px 12px;border:1.5px solid var(--orange);background:transparent;color:var(--orange);border-radius:6px;cursor:pointer;font-weight:600;">📋 Copier</button>
+              <button onclick="navigator.share ? navigator.share({title:'Mon identifiant Diaspo\\'Actif',text:'Retrouvez-moi sur Diaspo\\'Actif avec l\\'identifiant ${init.da_id}',url:window.location.origin+'/initiative.html?id=${init.id}'}).catch(()=>{}) : navigator.clipboard.writeText('${init.da_id}').then(()=>showToast('✅ Identifiant copié !'))" style="font-size:12px;padding:5px 12px;border:1.5px solid #6366f1;background:transparent;color:#6366f1;border-radius:6px;cursor:pointer;font-weight:600;">🔗 Partager</button>
+            </div>
+          </div>` : ''}
+        </div>
       </div>`;
     const cockpit = document.getElementById('cockpit');
     if (cockpit) cockpit.after(qrCard);
@@ -2056,6 +2444,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
       a.classList.toggle('active', a.dataset.section===name);
     });
+    if (name === 'evenements') window.renderInitEvenements?.();
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'deals') renderDealsSection();
     if (name === 'asso-accreditation') renderAssoAccreditation();
@@ -2072,6 +2461,688 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   const BILLET_STATUTS = {brouillon:'📝 Brouillon',publie:'🟢 Publié',ferme:'🔒 Fermé',archive:'📁 Archivé'};
   const BILLET_TYPE_COLOR = {standard:'',vip:'background:#f3e5f5;color:#6a1b9a;',early:'background:#e8f5e9;color:#1b5e20;',sponsor:'background:#e3f2fd;color:#0d47a1;'};
+
+  /* ══ MODULE ÉVÉNEMENTS INLINE ══ */
+  const EVT_STATUTS = {brouillon:'🟡 Brouillon', publie:'🟢 Publié', ferme:'🔴 Fermé', archive:'⬛ Archivé'};
+  let initEvtEditingId = null;
+  let initEvtCoverB64 = null, initEvtGallery = [null,null,null,null], initEvtPdfB64 = null, initEvtPdfNom = null;
+
+  window.renderInitEvenements = async function renderInitEvenements() {
+    const el = document.getElementById('evenements');
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+    try {
+      const { events = [] } = await api('GET', '/events?organisateur_id='+me.id+'&all=1');
+      const pubCount = events.filter(e=>e.statut==='publie').length;
+      const badge = document.getElementById('init-billets-badge');
+      if (badge && pubCount > 0) { badge.textContent = pubCount; badge.style.display = ''; }
+      el.innerHTML = `
+        <div class="card" style="margin-bottom:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:4px;">
+            <div>
+              <h2 style="margin:0;font-size:1.1rem;">📅 Mes événements</h2>
+              <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">${events.length} événement(s) · ${pubCount} publié(s)</p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-outline" onclick="initShowSection('billetterie-init')">🎟️ Billetterie & Wallet</button>
+              <button class="btn btn-orange" onclick="openInitEvtModal()">＋ Créer un événement</button>
+            </div>
+          </div>
+        </div>
+        ${!events.length ? `
+          <div class="card" style="text-align:center;padding:48px 24px;">
+            <div style="font-size:3rem;margin-bottom:12px;">📅</div>
+            <h3 style="margin:0 0 8px;">Aucun événement</h3>
+            <p style="color:var(--muted);font-size:14px;margin:0 0 20px;">Créez votre premier événement pour mobiliser votre communauté.</p>
+            <button class="btn btn-orange" onclick="openInitEvtModal()">＋ Créer mon premier événement</button>
+          </div>` :
+          events.map(e => `
+          <div class="card" style="margin-bottom:12px;padding:16px;">
+            <div style="display:flex;gap:14px;align-items:flex-start;">
+              ${e.image_couverture||e.image_b64 ? `<img src="${e.image_couverture||e.image_b64}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0;" alt="">` : `<div style="width:72px;height:72px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;">📅</div>`}
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+                  <strong style="font-size:14px;">${escH(e.titre)}</strong>
+                  <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${e.statut==='publie'?'#dcfce7':e.statut==='brouillon'?'#fef9c3':'#f1f5f9'};color:${e.statut==='publie'?'#166534':e.statut==='brouillon'?'#92400e':'#64748b'};">${EVT_STATUTS[e.statut]||e.statut}</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+                  📅 ${fmtDateInit(e.date_debut)}${e.date_fin?' → '+fmtDateInit(e.date_fin):''} &nbsp;·&nbsp; 📍 ${escH([e.ville,e.pays].filter(Boolean).join(', ')||'—')}
+                  ${e.categorie ? ` &nbsp;·&nbsp; 🏷️ ${escH(e.categorie)}`:''}
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                  <span style="font-size:12px;background:var(--bg);padding:4px 10px;border-radius:6px;">🎟️ ${e.billets_vendus||0} billet(s) vendu(s)</span>
+                  <span style="font-size:12px;background:var(--bg);padding:4px 10px;border-radius:6px;">📋 ${e.nb_types||0} type(s)</span>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+              <button class="btn btn-sm btn-outline" onclick="openInitEvtModal(${e.id})">✏️ Modifier</button>
+              ${e.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="initPublishEvent(${e.id})">🟢 Publier</button>`:''}
+              ${e.statut==='publie'?`<button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="initCloseEvent(${e.id})">🔒 Fermer</button>`:''}
+              <button class="btn btn-sm btn-outline" onclick="initShowEventFinancier(${e.id})">📊 Stats</button>
+              <button class="btn btn-sm btn-outline" onclick="initGererBillets(${e.id})" style="margin-left:auto;">🎟️ Gérer les billets</button>
+            </div>
+            <div id="fin-panel-${e.id}" style="display:none;margin-top:12px;"></div>
+          </div>`).join('')}`;
+    } catch(e) { document.getElementById('evenements').innerHTML = '<div class="notice">Erreur chargement.</div>'; }
+  }
+
+  window.openInitEvtModal = async function(id) {
+    initEvtEditingId = id || null;
+    initEvtCoverB64 = null; initEvtGallery = [null,null,null,null]; initEvtPdfB64 = null; initEvtPdfNom = null;
+    const modal = document.getElementById('init-evt-modal-bg');
+    const form = document.getElementById('init-evt-form-content');
+    modal.style.display = 'flex';
+    if (id) {
+      form.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+      try {
+        const { event: e } = await api('GET', '/events/'+id);
+        initEvtCoverB64 = e.image_couverture || e.image_b64 || null;
+        renderInitEvtForm(e);
+      } catch(err) { form.innerHTML = '<div style="color:#ef4444;">Erreur : '+err.message+'</div>'; }
+    } else {
+      renderInitEvtForm(null);
+    }
+  };
+  window.closeInitEvtModal = function() {
+    document.getElementById('init-evt-modal-bg').style.display = 'none';
+  };
+
+  function renderInitEvtForm(e) {
+    const f = document.getElementById('init-evt-form-content');
+    const v = s => escH(String(s||''));
+    f.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="form-row" style="grid-column:1/-1;">
+          <label>Titre *</label>
+          <input type="text" id="iev-titre" value="${v(e?.titre)}" placeholder="Ex : Gala de la Diaspora 2026" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;">
+        </div>
+        <div class="form-row" style="grid-column:1/-1;">
+          <label>Description</label>
+          <textarea id="iev-desc" rows="3" placeholder="Présentation de l'événement…" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;">${v(e?.description)}</textarea>
+        </div>
+        <div class="form-row">
+          <label>Date de début *</label>
+          <input type="datetime-local" id="iev-debut" value="${v(e?.date_debut?.slice(0,16))}" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+        </div>
+        <div class="form-row">
+          <label>Date de fin</label>
+          <input type="datetime-local" id="iev-fin" value="${v(e?.date_fin?.slice(0,16))}" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+        </div>
+        <div class="form-row">
+          <label>Pays</label>
+          <input type="text" id="iev-pays" value="${v(e?.pays)}" placeholder="France" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+        </div>
+        <div class="form-row">
+          <label>Ville</label>
+          <input type="text" id="iev-ville" value="${v(e?.ville)}" placeholder="Paris" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+        </div>
+        <div class="form-row" style="grid-column:1/-1;">
+          <label>Adresse</label>
+          <input type="text" id="iev-adresse" value="${v(e?.adresse)}" placeholder="123 rue de la Paix…" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+        </div>
+        <div class="form-row">
+          <label>Catégorie</label>
+          <select id="iev-cat" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+            ${['Culture','Business','Formation','Sport','Diaspora','Gastronomie','Networking','Conférence','Gala','Autre'].map(c=>`<option${e?.categorie===c?' selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Capacité</label>
+          <input type="number" id="iev-capacite" value="${v(e?.capacite||0)}" min="0" placeholder="0 = illimité" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+        </div>
+      </div>
+
+      <!-- IMAGE DE COUVERTURE -->
+      <div style="margin:16px 0 6px;font-size:13px;font-weight:700;color:#555;border-top:1px solid var(--border);padding-top:14px;">🖼️ Image de couverture</div>
+      <div id="iev-cover-drop" style="border:2px dashed var(--border);border-radius:8px;padding:14px;text-align:center;cursor:pointer;background:#FAFAFA;" onclick="document.getElementById('iev-cover-file').click()">
+        ${initEvtCoverB64 ? `<img src="${initEvtCoverB64}" style="max-height:100px;max-width:100%;border-radius:6px;object-fit:cover;" id="iev-cover-img" alt="">` : `<div id="iev-cover-img-wrap"><span id="iev-cover-ph" style="font-size:13px;color:var(--muted);">📷 Cliquer pour choisir · JPG PNG WebP · max 2 Mo</span></div>`}
+      </div>
+      <input type="file" id="iev-cover-file" accept="image/jpeg,image/png,image/webp" style="display:none">
+
+      <!-- GALERIE 4 PHOTOS -->
+      <div style="margin:16px 0 6px;font-size:13px;font-weight:700;color:#555;">🖼️ Galerie photos <span style="font-weight:400;color:var(--muted);">(4 max)</span></div>
+      <div style="display:flex;gap:6px;">
+        ${[0,1,2,3].map(i=>`<div id="iev-gs-${i}" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('iev-gf-${i}').click()"><span id="iev-gph-${i}" style="font-size:18px;color:#ccc;">＋</span><img id="iev-gi-${i}" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt=""><button id="iev-gd-${i}" onclick="event.stopPropagation();ievClearPhoto(${i})" style="display:none;position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;z-index:2;">×</button><input type="file" id="iev-gf-${i}" accept="image/jpeg,image/png,image/webp" style="display:none"></div>`).join('')}
+      </div>
+
+      <!-- VIDÉOS MP4 -->
+      <div style="margin:16px 0 8px;font-size:13px;font-weight:700;color:#555;">🎬 Vidéos <span style="font-weight:400;color:var(--muted);">(2 max · MP4 · max 1 min)</span></div>
+      ${[1,2].map(n=>`
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:#FAFAFA;" id="iev-vid${n}-wrap">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div id="iev-vid${n}-thumb-wrap" style="width:72px;height:52px;border-radius:6px;overflow:hidden;background:#e2e8f0;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+            ${e?.[`video${n}_thumb`] ? `<img src="${escH(e[`video${n}_thumb`])}" style="width:100%;height:100%;object-fit:cover;" alt="">` : `<span style="font-size:20px;color:#94a3b8;">🎬</span>`}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <input type="text" id="iev-video${n}-titre" value="${v(e?.[`video${n}_titre`])}" placeholder="Titre de la vidéo (facultatif)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;margin-bottom:6px;">
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button type="button" onclick="document.getElementById('iev-vf${n}').click()" style="padding:6px 12px;border:1px solid var(--orange);border-radius:6px;background:#fff;color:var(--orange);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">${e?.[`video${n}_url`]?'🔄 Remplacer':'📁 Choisir un MP4'}</button>
+              ${e?.[`video${n}_url`]?`<span style="font-size:11px;color:#22c55e;font-weight:700;">✅ Vidéo enregistrée</span>`:'<span id="iev-vid'+n+'-name" style="font-size:11px;color:var(--muted);">Aucun fichier · max 1 min · MP4</span>'}
+            </div>
+            <div id="iev-vid${n}-progress-wrap" style="display:none;margin-top:6px;">
+              <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+                <div id="iev-vid${n}-bar" style="height:6px;background:var(--orange);width:0%;transition:width .2s;border-radius:4px;"></div>
+              </div>
+              <span id="iev-vid${n}-pct" style="font-size:11px;color:var(--orange);">0%</span>
+            </div>
+          </div>
+        </div>
+        <input type="file" id="iev-vf${n}" accept="video/mp4" style="display:none">
+        <input type="hidden" id="iev-video${n}-url" value="${v(e?.[`video${n}_url`])}">
+        <input type="hidden" id="iev-video${n}-thumb" value="${v(e?.[`video${n}_thumb`])}">
+      </div>`).join('')}
+
+      <!-- FICHE CONCEPTUELLE / PDF -->
+      <div style="margin:16px 0 10px;border-top:1px solid var(--border);padding-top:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <span style="font-size:13px;font-weight:700;color:#555;">📋 Fiche conceptuelle</span>
+          <select id="iev-pdf-acces" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;">
+            <option value="public"${e?.pdf_acces==='public'?' selected':''}>🌍 Public</option>
+            <option value="inscrits"${e?.pdf_acces==='inscrits'?' selected':''}>🎟️ Inscrits seulement</option>
+          </select>
+        </div>
+
+        <!-- Onglets PDF / Fiche structurée -->
+        <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:12px;">
+          <button type="button" id="iev-fc-tab-pdf" onclick="ievSwitchFcTab('pdf')" style="flex:1;padding:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:var(--orange);color:#fff;">📎 Importer un PDF</button>
+          <button type="button" id="iev-fc-tab-fiche" onclick="ievSwitchFcTab('fiche')" style="flex:1;padding:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:#f1f5f9;color:#64748b;">📝 Créer la fiche ici</button>
+        </div>
+
+        <!-- Panel PDF -->
+        <div id="iev-fc-panel-pdf">
+          <div id="iev-pdf-drop" style="border:2px dashed var(--border);border-radius:8px;padding:14px;cursor:pointer;background:#FAFAFA;display:flex;align-items:center;gap:10px;" onclick="document.getElementById('iev-pdf-file').click()">
+            <span style="font-size:24px;">📄</span>
+            <div>
+              <div id="iev-pdf-label" style="font-size:13px;font-weight:600;color:#334155;">${e?.pdf_nom ? '✅ '+escH(e.pdf_nom) : 'Glisser ou cliquer pour choisir un PDF'}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">Max 5 Mo — visible par les participants selon l'accès choisi</div>
+            </div>
+          </div>
+          <input type="file" id="iev-pdf-file" accept="application/pdf" style="display:none">
+        </div>
+
+        <!-- Panel Fiche structurée -->
+        <div id="iev-fc-panel-fiche" style="display:none;">
+          <div style="display:flex;flex-direction:column;gap:10px;">
+
+            <div>
+              <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">Résumé / Présentation</label>
+              <textarea id="iev-fc-resume" rows="3" placeholder="Présentation générale de l'événement, contexte, motivation…" style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;">${v(e?.fc_resume)}</textarea>
+            </div>
+
+            <div>
+              <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">🎯 Objectifs</label>
+              <textarea id="iev-fc-objectifs" rows="3" placeholder="Objectifs principaux (un par ligne ou en liste)…" style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;">${v(e?.fc_objectifs)}</textarea>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">👥 Public cible</label>
+                <textarea id="iev-fc-public" rows="2" placeholder="Diaspora, investisseurs, jeunes…" style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;">${v(e?.fc_public)}</textarea>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">💶 Budget prévisionnel</label>
+                <input type="text" id="iev-fc-budget" value="${v(e?.fc_budget)}" placeholder="Ex : 5 000 € — subventionné à 50 %" style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+              </div>
+            </div>
+
+            <div>
+              <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">📅 Programme / Déroulé</label>
+              <textarea id="iev-fc-programme" rows="4" placeholder="9h00 — Accueil&#10;10h00 — Conférence plénière&#10;12h30 — Déjeuner networking&#10;14h00 — Ateliers…" style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;">${v(e?.fc_programme)}</textarea>
+            </div>
+
+            <div>
+              <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">🤝 Partenaires Diaspo'Actif</label>
+              <div style="margin-top:4px;position:relative;">
+                <input type="text" id="iev-part-search" placeholder="Rechercher un compte (ambassade, association, entreprise…)" autocomplete="off"
+                  style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+                <div id="iev-part-dropdown" style="display:none;position:absolute;z-index:100;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;margin-top:2px;"></div>
+              </div>
+              <div id="iev-part-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:0;">
+                ${(()=>{try{const ps=JSON.parse(e?.fc_partenaires_ids||'[]');return ps.map(p=>`<span class="iev-part-chip" data-id="${p.id}" data-source="${p.source}" data-nom="${escH(p.nom)}" style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:20px;font-size:12px;"><strong>${escH(p.nom)}</strong><span style="font-size:10px;color:#64748b;">${escH(p.role||'')}</span><button onclick="ievRemovePartenaire(this)" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:14px;padding:0 0 0 2px;line-height:1;">×</button></span>`).join('');}catch{return '';}})()}
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">📞 Contact organisateur</label>
+              <textarea id="iev-fc-contact" rows="2" placeholder="Nom, email, téléphone…" style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;">${v(e?.fc_contact)}</textarea>
+            </div>
+
+            <div>
+              <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">📝 Notes complémentaires</label>
+              <textarea id="iev-fc-notes" rows="2" placeholder="Informations pratiques, accès, parking, dress code…" style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;">${v(e?.fc_notes)}</textarea>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- CIBLE -->
+      <div style="margin:16px 0 8px;font-size:13px;font-weight:700;color:#555;border-top:1px solid var(--border);padding-top:14px;">🎯 Cible</div>
+      <div style="display:flex;flex-direction:column;gap:7px;" id="iev-cible-radios">
+        ${[['tous','🌍 Tout le monde','Visible par tous les utilisateurs'],['abonnes','👥 Abonnés','Personnes qui vous suivent'],['liste','📋 Liste de diffusion','Envoyer à une liste de contacts']].map(([v,l,d])=>`
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;" id="iev-cible-lbl-${v}">
+          <input type="radio" name="iev-cible" value="${v}" ${(e?.cible_type||'tous')===v?'checked':''} style="accent-color:var(--orange);">
+          <div><strong style="font-size:13px;">${l}</strong><div style="font-size:12px;color:var(--muted);">${d}</div></div>
+        </label>`).join('')}
+      </div>
+      <div id="iev-listes-panel" style="display:none;margin-top:8px;background:#FAFAFA;border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <strong style="font-size:12px;">Choisir les listes :</strong>
+        </div>
+        <div id="iev-listes-cbs" style="font-size:12px;color:var(--muted);">Chargement…</div>
+      </div>
+
+      <!-- RAYON DE PUBLICATION -->
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="font-size:13px;font-weight:700;color:#555;margin-bottom:10px;">📡 Rayon de publication</div>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5;">Définit la portée géographique de diffusion de votre événement — visibilité, recommandations et notifications.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;">
+          ${[['ville','🏙️ Ville','Diffusion locale — ville uniquement'],
+             ['commune','🏘️ Commune','Commune d\'organisation'],
+             ['departement','🗺️ Département','Département entier'],
+             ['region','🌐 Région','Toute la région'],
+             ['national','🇫🇷 National','Tout le pays'],
+             ['international','🌍 International','Diffusion mondiale']
+            ].map(([val,lbl,desc])=>`
+          <label style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;cursor:pointer;padding:10px 8px;border:1.5px solid var(--border);border-radius:10px;background:#fff;transition:border-color .15s;" id="iev-rayon-lbl-${val}" onclick="ievSelectRayon('${val}')">
+            <input type="radio" name="iev-rayon" value="${val}" ${(e?.rayon_publication||'international')===val?'checked':''} style="display:none;">
+            <span style="font-size:15px;">${lbl.split(' ')[0]}</span>
+            <strong style="font-size:11px;">${lbl.split(' ').slice(1).join(' ')}</strong>
+            <span style="font-size:10px;color:var(--muted);line-height:1.3;">${desc}</span>
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <!-- GESTION DES INSCRIPTIONS -->
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="font-size:13px;font-weight:700;color:#555;margin-bottom:10px;">📋 Gestion des inscriptions</div>
+        <div style="display:flex;flex-direction:column;gap:7px;" id="iev-inscription-radios">
+          ${[
+            ['libre','📭 Événement sans inscription','Participation libre, aucun suivi'],
+            ['facultative','📝 Pré-inscription facultative','Facultative — les participants peuvent s\'inscrire en avance'],
+            ['obligatoire','✅ Pré-inscription obligatoire','Requiert une inscription avec ID DA + DS-ID'],
+            ['validation','🔍 Inscription avec validation','L\'organisateur valide chaque demande'],
+          ].map(([val,lbl,desc])=>`
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
+            <input type="radio" name="iev-insc-mode" value="${val}" ${(e?.inscription_mode||'libre')===val?'checked':''} style="accent-color:var(--orange);" onchange="ievTogglePlaces()">
+            <div><strong style="font-size:13px;">${lbl}</strong><div style="font-size:11px;color:var(--muted);">${desc}</div></div>
+          </label>`).join('')}
+        </div>
+        <div id="iev-places-panel" style="display:${e?.inscription_mode && e.inscription_mode!=='libre'?'':'none'};margin-top:10px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+              <label style="font-size:12px;font-weight:700;color:#166534;">👥 Nombre de places</label>
+              <input type="number" id="iev-nb-places" min="0" value="${e?.nb_places||''}" placeholder="0 = illimité" style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid #86EFAC;border-radius:6px;font-size:13px;font-family:inherit;">
+            </div>
+            <div style="display:flex;align-items:flex-end;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid #86EFAC;border-radius:6px;background:#fff;width:100%;">
+                <input type="checkbox" id="iev-liste-attente" ${e?.liste_attente?'checked':''} style="accent-color:var(--orange);">
+                <div><strong style="font-size:12px;color:#166534;">📋 Liste d'attente</strong><div style="font-size:10px;color:var(--muted);">Automatique si complet</div></div>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:10px;background:rgba(255,107,0,0.05);border:1px solid rgba(255,107,0,0.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.5;">
+          💡 Avec l'inscription obligatoire, les participants s'identifient avec leur <strong>Identifiant Diaspo'Actif (ID DA)</strong> et signent avec leur <strong>Code de Sécurité (DS-ID)</strong>. Chaque inscription est tracée et sécurisée.
+        </div>
+      </div>
+
+      <!-- PLANIFICATION -->
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px;">📅 Publication</div>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+          <label id="iev-mode-lbl-now" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:2px solid var(--orange);border-radius:8px;background:#fff;">
+            <input type="radio" name="iev-mode-pub" value="publie" ${(e?.statut==='publie'||!e)?'checked':''} style="accent-color:var(--orange);">
+            <div><strong style="font-size:13px;">🚀 Publier immédiatement</strong><div style="font-size:11px;color:var(--muted);">L'événement sera visible dès la validation</div></div>
+          </label>
+          <label id="iev-mode-lbl-prog" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
+            <input type="radio" name="iev-mode-pub" value="programme" ${e?.statut==='brouillon_programme'?'checked':''} style="accent-color:var(--orange);">
+            <div><strong style="font-size:13px;">⏰ Programmer la publication</strong><div style="font-size:11px;color:var(--muted);">Diffusion automatique à la date choisie</div></div>
+          </label>
+          <div id="iev-prog-panel" style="display:${e?.statut==='brouillon_programme'?'':'none'};padding:12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;margin-top:-2px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <div>
+                <label style="font-size:11px;font-weight:700;color:#1d4ed8;">📅 Date</label>
+                <input type="date" id="iev-prog-date" value="${e?.programmed_at?.slice(0,10)||''}" style="width:100%;margin-top:3px;padding:7px 10px;border:1px solid #93C5FD;border-radius:6px;font-size:12px;font-family:inherit;">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:#1d4ed8;">🕐 Heure</label>
+                <input type="time" id="iev-prog-heure" value="${e?.programmed_at?.slice(11,16)||'09:00'}" style="width:100%;margin-top:3px;padding:7px 10px;border:1px solid #93C5FD;border-radius:6px;font-size:12px;font-family:inherit;">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:#1d4ed8;">🌍 Fuseau</label>
+                <select id="iev-prog-tz" style="width:100%;margin-top:3px;padding:7px 8px;border:1px solid #93C5FD;border-radius:6px;font-size:11px;font-family:inherit;">
+                  ${['Europe/Paris','Africa/Abidjan','Africa/Dakar','Africa/Douala','Africa/Libreville','America/Montreal','America/New_York','America/Los_Angeles','Europe/London','Europe/Brussels'].map(tz=>`<option value="${tz}"${(e?.timezone||'Europe/Paris')===tz?' selected':''}>${tz}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+          </div>
+          <label id="iev-mode-lbl-draft" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
+            <input type="radio" name="iev-mode-pub" value="brouillon" ${e?.statut==='brouillon'?'checked':''} style="accent-color:var(--orange);">
+            <div><strong style="font-size:13px;">💾 Enregistrer comme brouillon</strong><div style="font-size:11px;color:var(--muted);">Reprendre plus tard avant publication</div></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- BOUTONS -->
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-outline" onclick="closeInitEvtModal()">Annuler</button>
+        <button class="btn btn-orange" onclick="saveInitEvt()" id="iev-btn-save" style="min-width:180px;">${initEvtEditingId?'💾 Enregistrer les modifications':'✅ Créer l\'événement'}</button>
+      </div>`;
+
+    // Listeners image couverture
+    document.getElementById('iev-cover-file').addEventListener('change', async ev => {
+      const file = ev.target.files[0]; if(!file) return;
+      initEvtCoverB64 = await ievCompressImage(file, 1280, 720, 0.8);
+      const drop = document.getElementById('iev-cover-drop');
+      drop.innerHTML = `<img src="${initEvtCoverB64}" style="max-height:100px;max-width:100%;border-radius:6px;object-fit:cover;" alt="">`;
+    });
+    // Galerie
+    for(let i=0;i<4;i++){
+      document.getElementById('iev-gf-'+i).addEventListener('change', async ev => {
+        const file = ev.target.files[0]; if(!file) return;
+        const b64 = await ievCompressImage(file,800,800,0.75);
+        initEvtGallery[i]=b64;
+        document.getElementById('iev-gi-'+i).src=b64; document.getElementById('iev-gi-'+i).style.display='';
+        document.getElementById('iev-gph-'+i).style.display='none'; document.getElementById('iev-gd-'+i).style.display='';
+      });
+    }
+    // PDF
+    const pdfFile = document.getElementById('iev-pdf-file');
+    if (pdfFile) pdfFile.addEventListener('change', ev => {
+      const file = ev.target.files[0]; if(!file) return;
+      if(file.size>5*1024*1024){DA.toast('PDF trop lourd (max 5 Mo).',{type:'warning'});return;}
+      initEvtPdfNom=file.name;
+      const reader=new FileReader();
+      reader.onload=rv=>{initEvtPdfB64=rv.target.result;document.getElementById('iev-pdf-label').textContent='✅ '+file.name;};
+      reader.readAsDataURL(file);
+    });
+    // Cible radio
+    document.querySelectorAll('input[name="iev-cible"]').forEach(r=>{
+      r.addEventListener('change',()=>{
+        const panel=document.getElementById('iev-listes-panel');
+        panel.style.display=r.value==='liste'&&r.checked?'':'none';
+        if(r.value==='liste'&&r.checked) ievChargerListes();
+      });
+    });
+    if((e?.cible_type||'tous')==='liste') { document.getElementById('iev-listes-panel').style.display=''; ievChargerListes(e?.cible_liste_ids); }
+
+    // ── Mode publication radios
+    document.querySelectorAll('input[name="iev-mode-pub"]').forEach(r=>{
+      r.addEventListener('change',()=>{
+        const v=r.value; if(!r.checked) return;
+        const panel=document.getElementById('iev-prog-panel');
+        if(panel) panel.style.display = v==='programme' ? '' : 'none';
+        ['now','prog','draft'].forEach(k=>{
+          const el=document.getElementById('iev-mode-lbl-'+k);
+          if(el) el.style.borderColor = (k==='now'&&v==='publie')||(k==='prog'&&v==='programme')||(k==='draft'&&v==='brouillon') ? 'var(--orange)' : 'var(--border)';
+          if(el) el.style.borderWidth = (k==='now'&&v==='publie')||(k==='prog'&&v==='programme')||(k==='draft'&&v==='brouillon') ? '2px' : '1px';
+        });
+        const btn=document.getElementById('iev-btn-save');
+        if(btn) btn.textContent = v==='publie' ? (initEvtEditingId?'💾 Enregistrer':'🚀 Publier maintenant') : v==='programme' ? (initEvtEditingId?'💾 Enregistrer':'⏰ Programmer') : (initEvtEditingId?'💾 Enregistrer':'💾 Enregistrer en brouillon');
+      });
+    });
+
+    // ── Vidéos MP4 upload
+    for(const n of [1,2]){
+      document.getElementById(`iev-vf${n}`).addEventListener('change', ev => {
+        const file = ev.target.files[0]; if(!file) return;
+        if(!file.type.includes('mp4') && !file.name.endsWith('.mp4')){DA.toast('Format MP4 uniquement.',{type:'warning'});return;}
+        // Vérifier durée via HTMLVideoElement
+        const blobUrl = URL.createObjectURL(file);
+        const tmpVid = document.createElement('video');
+        tmpVid.src = blobUrl;
+        tmpVid.onloadedmetadata = async () => {
+          if(tmpVid.duration > 62){
+            URL.revokeObjectURL(blobUrl);
+            DA.toast(`Vidéo ${n} trop longue (max 1 minute, durée : ${Math.round(tmpVid.duration)}s).`,{type:'warning'});
+            return;
+          }
+          // Générer thumbnail à la 1ère seconde
+          tmpVid.currentTime = Math.min(1, tmpVid.duration * 0.1);
+          tmpVid.onseeked = () => {
+            try {
+              const c = document.createElement('canvas'); c.width=160; c.height=90;
+              c.getContext('2d').drawImage(tmpVid, 0, 0, 160, 90);
+              const thumbB64 = c.toDataURL('image/jpeg', 0.7);
+              document.getElementById(`iev-video${n}-thumb`).value = thumbB64;
+              const tw = document.getElementById(`iev-vid${n}-thumb-wrap`);
+              if(tw) tw.innerHTML = `<img src="${thumbB64}" style="width:100%;height:100%;object-fit:cover;" alt="">`;
+            } catch(_){}
+            URL.revokeObjectURL(blobUrl);
+          };
+          // Upload XHR avec progress
+          const pw = document.getElementById(`iev-vid${n}-progress-wrap`);
+          const bar = document.getElementById(`iev-vid${n}-bar`);
+          const pct = document.getElementById(`iev-vid${n}-pct`);
+          const nameEl = document.getElementById(`iev-vid${n}-name`);
+          if(pw) pw.style.display='';
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/upload/video');
+          xhr.upload.onprogress = ev2 => {
+            if(ev2.lengthComputable){const p=Math.round(ev2.loaded/ev2.total*100);if(bar)bar.style.width=p+'%';if(pct)pct.textContent=p+'%';}
+          };
+          xhr.onload = () => {
+            if(pw) pw.style.display='none';
+            if(xhr.status===200){
+              const r=JSON.parse(xhr.responseText);
+              document.getElementById(`iev-video${n}-url`).value = r.url;
+              if(nameEl) nameEl.textContent = '✅ '+file.name;
+              DA.toast(`Vidéo ${n} téléversée.`,{type:'success'});
+            } else {
+              const err=JSON.parse(xhr.responseText||'{}');
+              DA.toast(err.error||'Erreur upload vidéo.',{type:'danger'});
+            }
+          };
+          xhr.onerror = () => { if(pw)pw.style.display='none'; DA.toast('Erreur réseau upload vidéo.',{type:'danger'}); };
+          xhr.send(file);
+        };
+        tmpVid.onerror = () => { URL.revokeObjectURL(blobUrl); DA.toast('Fichier vidéo invalide.',{type:'warning'}); };
+      });
+    }
+
+    // ── Autocomplete partenaires
+    let ievPartTimer = null;
+    const partSearch = document.getElementById('iev-part-search');
+    const partDrop = document.getElementById('iev-part-dropdown');
+    if(partSearch) partSearch.addEventListener('input', () => {
+      clearTimeout(ievPartTimer);
+      const q = partSearch.value.trim();
+      if(q.length < 2){ if(partDrop) partDrop.style.display='none'; return; }
+      ievPartTimer = setTimeout(async () => {
+        try {
+          const {comptes=[]} = await api('GET', '/search/comptes?q='+encodeURIComponent(q));
+          if(!comptes.length){ partDrop.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--muted);">Aucun résultat</div>'; partDrop.style.display=''; return; }
+          partDrop.innerHTML = comptes.map(c=>`
+            <div onclick="ievAddPartenaire(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+              <div style="width:28px;height:28px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">${c.avatar_url?`<img src="${c.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`:c.nom.charAt(0)}</div>
+              <div><div style="font-size:13px;font-weight:600;">${escH(c.nom)}</div><div style="font-size:11px;color:var(--muted);">${escH(c.role||'')} · ${c.source==='initiative'?'Initiative':'Utilisateur'}</div></div>
+            </div>`).join('');
+          partDrop.style.display='';
+        } catch(_){ partDrop.style.display='none'; }
+      }, 280);
+    });
+    document.addEventListener('click', ev => { if(partDrop&&!partDrop.contains(ev.target)&&ev.target!==partSearch) partDrop.style.display='none'; }, {capture:true});
+  }
+
+  // Partenaires autocomplete helpers
+  window.ievAddPartenaire = function(compte) {
+    const drop = document.getElementById('iev-part-dropdown');
+    const chips = document.getElementById('iev-part-chips');
+    const search = document.getElementById('iev-part-search');
+    if(!chips) return;
+    // Éviter doublons
+    if(chips.querySelector(`[data-id="${compte.id}"][data-source="${compte.source}"]`)) {
+      if(drop) drop.style.display='none'; if(search) search.value=''; return;
+    }
+    const chip = document.createElement('span');
+    chip.className='iev-part-chip';
+    chip.dataset.id=compte.id; chip.dataset.source=compte.source; chip.dataset.nom=compte.nom;
+    chip.dataset.role=compte.role||'';
+    chip.style.cssText='display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:20px;font-size:12px;';
+    chip.innerHTML=`<strong>${escH(compte.nom)}</strong><span style="font-size:10px;color:#64748b;">${escH(compte.role||'')}</span><button onclick="ievRemovePartenaire(this)" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:14px;padding:0 0 0 2px;line-height:1;">×</button>`;
+    chips.appendChild(chip);
+    if(drop) drop.style.display='none'; if(search) search.value='';
+  };
+  window.ievRemovePartenaire = function(btn) { btn.closest('.iev-part-chip').remove(); };
+  window.ievGetPartenaires = function ievGetPartenaires() {
+    return [...document.querySelectorAll('.iev-part-chip')].map(c=>({id:parseInt(c.dataset.id)||c.dataset.id, source:c.dataset.source, nom:c.dataset.nom, role:c.dataset.role}));
+  };
+
+  window.ievSwitchFcTab = function(tab) {
+    const isPdf = tab === 'pdf';
+    document.getElementById('iev-fc-panel-pdf').style.display   = isPdf ? '' : 'none';
+    document.getElementById('iev-fc-panel-fiche').style.display = isPdf ? 'none' : '';
+    document.getElementById('iev-fc-tab-pdf').style.background   = isPdf ? 'var(--orange)' : '#f1f5f9';
+    document.getElementById('iev-fc-tab-pdf').style.color        = isPdf ? '#fff' : '#64748b';
+    document.getElementById('iev-fc-tab-fiche').style.background = isPdf ? '#f1f5f9' : 'var(--orange)';
+    document.getElementById('iev-fc-tab-fiche').style.color      = isPdf ? '#64748b' : '#fff';
+  };
+
+  // Initialiser les styles rayon au rendu du formulaire
+  (function initRayonStyles() {
+    const checked = document.querySelector('input[name="iev-rayon"]:checked');
+    if (checked) ievSelectRayon(checked.value);
+  })();
+
+  window.ievClearPhoto = function(i){
+    initEvtGallery[i]=null;
+    document.getElementById('iev-gi-'+i).style.display='none';
+    document.getElementById('iev-gph-'+i).style.display='';
+    document.getElementById('iev-gd-'+i).style.display='none';
+    document.getElementById('iev-gf-'+i).value='';
+  };
+
+  window.ievCompressImage = function ievCompressImage(file,maxW,maxH,quality){
+    return new Promise(res=>{
+      const img=new Image(); const url=URL.createObjectURL(file);
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        if(w>maxW||h>maxH){const r=Math.min(maxW/w,maxH/h);w=Math.round(w*r);h=Math.round(h*r);}
+        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h); URL.revokeObjectURL(url);
+        res(c.toDataURL('image/jpeg',quality||0.75));
+      }; img.src=url;
+    });
+  }
+
+  window.ievChargerListes = async function ievChargerListes(selectedIds) {
+    const el = document.getElementById('iev-listes-cbs'); if(!el) return;
+    try {
+      const { listes=[] } = await api('GET', '/listes-diffusion');
+      const selSet = new Set(Array.isArray(selectedIds) ? selectedIds : (selectedIds ? JSON.parse(selectedIds||'[]') : []));
+      if(!listes.length){
+        el.innerHTML='<span style="color:var(--muted);">Aucune liste — créez-en depuis le module Réseau Professionnel.</span>';
+        return;
+      }
+      el.innerHTML=listes.map(l=>`
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:#fff;margin-bottom:5px;">
+          <input type="checkbox" value="${l.id}" class="iev-liste-cb" ${selSet.has(l.id)?'checked':''} style="accent-color:var(--orange);">
+          <span style="font-size:1rem;">${l.icone||'📋'}</span>
+          <div><strong>${escH(l.nom)}</strong><span style="color:var(--muted);font-size:11px;margin-left:6px;">${l.nb_contacts||0} contact(s)</span></div>
+        </label>`).join('');
+    } catch(e){ el.innerHTML='<span style="color:#ef4444;">Erreur chargement listes.</span>'; }
+  }
+
+  window.ievSelectRayon = function(val) {
+    document.querySelectorAll('input[name="iev-rayon"]').forEach(r => {
+      r.checked = r.value === val;
+      const lbl = document.getElementById('iev-rayon-lbl-'+r.value);
+      if (lbl) { lbl.style.borderColor = r.value===val?'var(--orange)':'var(--border)'; lbl.style.background = r.value===val?'rgba(255,107,0,0.06)':'#fff'; }
+    });
+  };
+
+  window.ievTogglePlaces = function() {
+    const mode = document.querySelector('input[name="iev-insc-mode"]:checked')?.value||'libre';
+    const panel = document.getElementById('iev-places-panel');
+    if(panel) panel.style.display = mode !== 'libre' ? '' : 'none';
+  };
+
+  window.saveInitEvt = async function() {
+    const titre = document.getElementById('iev-titre').value.trim();
+    const debut = document.getElementById('iev-debut').value;
+    if(!titre||!debut){DA.toast('Titre et date de début requis.',{type:'warning'});return;}
+
+    // Mode publication
+    const modePub = document.querySelector('input[name="iev-mode-pub"]:checked')?.value||'publie';
+    let programmed_at = null;
+    if(modePub==='programme'){
+      const d=document.getElementById('iev-prog-date').value;
+      const h=document.getElementById('iev-prog-heure').value||'09:00';
+      if(!d){DA.toast('Choisissez une date de programmation.',{type:'warning'});return;}
+      programmed_at = `${d}T${h}:00`;
+      if(new Date(programmed_at)<=new Date()){DA.toast('La date programmée doit être dans le futur.',{type:'warning'});return;}
+    }
+
+    const cibleType = document.querySelector('input[name="iev-cible"]:checked')?.value||'tous';
+    const cibleListes = cibleType==='liste' ? [...document.querySelectorAll('.iev-liste-cb:checked')].map(cb=>parseInt(cb.value)) : [];
+    const galerie = initEvtGallery.filter(Boolean);
+    const partenaires = ievGetPartenaires();
+
+    const data = {
+      titre,
+      description: document.getElementById('iev-desc').value||null,
+      date_debut: debut,
+      date_fin: document.getElementById('iev-fin').value||null,
+      pays: document.getElementById('iev-pays').value||null,
+      ville: document.getElementById('iev-ville').value||null,
+      adresse: document.getElementById('iev-adresse').value||null,
+      categorie: document.getElementById('iev-cat').value||'Général',
+      capacite: parseInt(document.getElementById('iev-capacite').value)||0,
+      statut: modePub==='publie' ? 'publie' : modePub==='programme' ? 'brouillon_programme' : 'brouillon',
+      image_couverture: initEvtCoverB64||null,
+      galerie_photos: galerie,
+      video1_url: document.getElementById('iev-video1-url')?.value||null,
+      video1_titre: document.getElementById('iev-video1-titre')?.value||null,
+      video1_thumb: document.getElementById('iev-video1-thumb')?.value||null,
+      video2_url: document.getElementById('iev-video2-url')?.value||null,
+      video2_titre: document.getElementById('iev-video2-titre')?.value||null,
+      video2_thumb: document.getElementById('iev-video2-thumb')?.value||null,
+      pdf_url: initEvtPdfB64||null,
+      pdf_nom: initEvtPdfNom||null,
+      pdf_acces: document.getElementById('iev-pdf-acces')?.value||'public',
+      fc_resume: document.getElementById('iev-fc-resume')?.value||null,
+      fc_objectifs: document.getElementById('iev-fc-objectifs')?.value||null,
+      fc_public: document.getElementById('iev-fc-public')?.value||null,
+      fc_programme: document.getElementById('iev-fc-programme')?.value||null,
+      fc_partenaires: partenaires.map(p=>p.nom).join(', ')||null,
+      fc_partenaires_ids: partenaires,
+      fc_contact: document.getElementById('iev-fc-contact')?.value||null,
+      fc_notes: document.getElementById('iev-fc-notes')?.value||null,
+      cible_type: cibleType,
+      cible_liste_ids: cibleListes,
+      programmed_at,
+      timezone: document.getElementById('iev-prog-tz')?.value||'Europe/Paris',
+      inscription_mode: document.querySelector('input[name="iev-insc-mode"]:checked')?.value||'libre',
+      nb_places: parseInt(document.getElementById('iev-nb-places')?.value)||null,
+      liste_attente: document.getElementById('iev-liste-attente')?.checked ? 1 : 0,
+      rayon_publication: document.querySelector('input[name="iev-rayon"]:checked')?.value||'international'
+    };
+
+    const btn = document.getElementById('iev-btn-save');
+    const origLabel = btn.textContent;
+    btn.disabled=true; btn.textContent='⏳ Enregistrement…';
+    try {
+      if(initEvtEditingId) {
+        await api('PUT','/events/'+initEvtEditingId, data);
+        DA.toast('Événement mis à jour !',{type:'success'});
+      } else {
+        await api('POST','/events', data);
+        const msgs = {publie:'🚀 Événement publié avec succès !', brouillon_programme:'⏰ Publication programmée !', brouillon:'💾 Brouillon enregistré.'};
+        DA.toast(msgs[data.statut]||'Événement créé !',{type:'success'});
+      }
+      closeInitEvtModal();
+      renderInitEvenements();
+    } catch(err){DA.toast('Erreur : '+err.message,{type:'danger'});}
+    finally{btn.disabled=false; btn.textContent=origLabel;}
+  };
+
+  window.initGererBillets = function(id) {
+    initShowSection('billetterie-init');
+    renderInitBilletterie().then(()=>{
+      const el = document.getElementById('fin-panel-'+id);
+      if(el) initShowEventFinancier(id);
+    });
+  };
 
   async function renderInitBilletterie() {
     const el = document.getElementById('billetterie-init');
@@ -2098,7 +3169,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <h2 style="margin:0;">🎟️ Billetterie</h2>
             <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Créez et gérez vos événements, vendez des billets, scannez les QR codes</p>
           </div>
-          <button class="btn btn-orange" onclick="window.open('billetterie.html','_blank')">🔗 Ouvrir la billetterie</button>
+          <button class="btn btn-orange" onclick="openInitEvtModal()">＋ Créer un événement</button>
         </div>
 
         <!-- WALLET INITIATIVE -->
@@ -2163,7 +3234,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <!-- Tableau des événements avec stats -->
         <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
           <strong style="font-size:14px;">Vos événements</strong>
-          <button class="btn btn-sm btn-orange" onclick="window.open('billetterie.html','_blank')">+ Créer</button>
+          <button class="btn btn-sm btn-orange" onclick="openInitEvtModal()">＋ Créer</button>
         </div>
         ${events.length ? events.map(e=>`
           <div class="card" style="margin-bottom:10px;padding:14px;">
@@ -3152,6 +4223,18 @@ initFormationsSidebar();
     <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Réseau</span></a>
   </nav>
 <script src="assets/profile-qr.js"></script>
+<script src="assets/posts.js"></script>
 <script src="assets/chatbot.js"></script>
+
+<!-- ══ MODAL CRÉATION / MODIFICATION ÉVÉNEMENT (dashboard initiative) ══ -->
+<div id="init-evt-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;overflow-y:auto;padding:20px;align-items:flex-start;justify-content:center;">
+  <div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:700px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h3 style="margin:0;font-size:1.1rem;" id="init-evt-modal-titre">📅 Créer un événement</h3>
+      <button onclick="closeInitEvtModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b;line-height:1;">×</button>
+    </div>
+    <div id="init-evt-form-content"></div>
+  </div>
+</div>
 </body>
 </html>

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Observatoire Global</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<style>
+.obs-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
+.obs-tab{padding:11px 16px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
+.obs-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.obs-section{display:none;}.obs-section.active{display:block;}
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
+.kpi-val{font-size:26px;font-weight:900;color:var(--orange);line-height:1.1;margin-bottom:3px;}
+.kpi-lbl{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.kpi-sub{font-size:11px;color:#555;margin-top:2px;}
+/* Bar chart */
+.bar-chart{display:flex;align-items:flex-end;gap:3px;height:70px;margin-top:10px;}
+.bar-chart-bar{flex:1;border-radius:3px 3px 0 0;background:var(--orange);opacity:.75;min-height:2px;}
+/* Liste stat */
+.stat-list{list-style:none;padding:0;margin:8px 0 0;}
+.stat-list li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:13px;}
+.stat-list li:last-child{border-bottom:none;}
+/* Carte diaspora */
+.diaspora-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px;}
+.diaspora-row:last-child{border-bottom:none;}
+/* Indice */
+.indice-bar{height:12px;border-radius:6px;background:#f3f4f6;overflow:hidden;margin-top:6px;}
+.indice-fill{height:100%;border-radius:6px;}
+/* Alerte */
+.alerte-card{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;margin-bottom:8px;}
+.a-success{background:#d1fae5;border:1px solid #a7f3d0;}
+.a-info{background:#dbeafe;border:1px solid #bfdbfe;}
+.a-warning{background:#fef3c7;border:1px solid #fde68a;}
+/* Audit log */
+.audit-row{font-size:12px;padding:6px 0;border-bottom:1px solid #f3f4f6;display:flex;gap:12px;align-items:center;}
+.audit-row:last-child{border-bottom:none;}
+/* Prog bar */
+.prog-bar{height:8px;border-radius:4px;background:#f3f4f6;overflow:hidden;margin-top:3px;}
+.prog-fill{height:100%;border-radius:4px;background:var(--orange);}
+</style>
+</head>
+<body>
+<div class="page" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt=""> DIASPO'ACTIF</a></div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="admin.html">Admin</a>
+        <a href="observations.html">Observations</a>
+        <a href="observatoire.html" style="color:var(--orange);font-weight:700;">Observatoire</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:24px;padding-bottom:60px;">
+
+    <div id="auth-guard" style="display:none;text-align:center;padding:60px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">🌍</div>
+      <h2>Observatoire Global Diaspo'Actif</h2>
+      <p style="color:var(--muted);">Accès réservé au Compte Administrateur.</p>
+    </div>
+
+    <div id="obs-content" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+            <span style="font-size:22px;">🌍</span>
+            <h1 style="margin:0;font-size:22px;">Observatoire Global Diaspo'Actif</h1>
+          </div>
+          <p style="margin:0;font-size:12px;color:var(--muted);">Centre de pilotage stratégique — données en temps réel · <span id="last-update"></span></p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" onclick="loadAll()">🔄 Actualiser</button>
+          <button class="btn btn-sm btn-outline" onclick="exportGlobal('csv')">⬇️ CSV</button>
+          <button class="btn btn-sm btn-orange" onclick="switchObs('rapports')">📄 Rapports</button>
+        </div>
+      </div>
+
+      <!-- Niveaux d'observation -->
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+        <button class="btn btn-sm" id="btn-level-global" style="background:var(--orange);color:#fff;border-color:var(--orange);" onclick="setLevel('global')">🌍 Global</button>
+        <button class="btn btn-sm btn-outline" id="btn-level-mad" onclick="setLevel('mad')">🌐 MAD — Analyse Diasporas</button>
+        <button class="btn btn-sm btn-outline" id="btn-level-obs" onclick="setLevel('obs')">📊 Observations Personnelles</button>
+        <button class="btn btn-sm btn-outline" id="btn-level-audit" onclick="setLevel('audit')">📜 Journal d'audit</button>
+      </div>
+
+      <!-- NIVEAU GLOBAL -->
+      <div id="level-global">
+        <div class="obs-nav">
+          <button class="obs-tab active" onclick="switchObs('tableau-bord')">📊 Tableau de bord</button>
+          <button class="obs-tab" onclick="switchObs('diasporas')">🌍 Diasporas</button>
+          <button class="obs-tab" onclick="switchObs('activite-glob')">⚡ Activité</button>
+          <button class="obs-tab" onclick="switchObs('economique')">💰 Économique</button>
+          <button class="obs-tab" onclick="switchObs('classements')">🏆 Classements</button>
+          <button class="obs-tab" onclick="switchObs('indices')">📈 Indices stratégiques</button>
+          <button class="obs-tab" onclick="switchObs('alertes-glob')">🔔 Alertes</button>
+          <button class="obs-tab" onclick="switchObs('rapports')">📄 Rapports</button>
+        </div>
+
+        <!-- Tableau de bord général -->
+        <div class="obs-section active" id="sec-tableau-bord">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div class="card" style="padding:16px;">
+              <strong style="font-size:13px;display:block;margin-bottom:10px;">👥 Comptes</strong>
+              <div class="kpi-grid" style="margin-bottom:0;" id="kpi-comptes-mini"></div>
+            </div>
+            <div class="card" style="padding:16px;">
+              <strong style="font-size:13px;display:block;margin-bottom:10px;">⚡ Activité en temps réel</strong>
+              <div class="kpi-grid" style="margin-bottom:0;" id="kpi-activite-mini"></div>
+            </div>
+          </div>
+          <div class="card" style="padding:16px;margin-bottom:16px;">
+            <strong style="font-size:13px;display:block;margin-bottom:10px;">📈 Évolution mensuelle des inscriptions</strong>
+            <div class="bar-chart" id="chart-comptes"></div>
+            <div id="chart-comptes-labels" style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;"></div>
+          </div>
+          <div class="card" style="padding:16px;">
+            <strong style="font-size:13px;display:block;margin-bottom:10px;">📝 Publications (30 jours)</strong>
+            <div class="bar-chart" id="chart-pubs-glob"></div>
+          </div>
+        </div>
+
+        <!-- Diasporas -->
+        <div class="obs-section" id="sec-diasporas">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="card" style="padding:16px;">
+              <strong style="font-size:13px;display:block;margin-bottom:10px;">🌍 Répartition par pays</strong>
+              <div id="diasporas-list"></div>
+            </div>
+            <div class="card" style="padding:16px;">
+              <strong style="font-size:13px;display:block;margin-bottom:10px;">👤 Répartition par type de compte</strong>
+              <div id="par-role-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activité globale -->
+        <div class="obs-section" id="sec-activite-glob">
+          <div class="kpi-grid" id="kpi-activite-glob"></div>
+        </div>
+
+        <!-- Économique -->
+        <div class="obs-section" id="sec-economique">
+          <div class="kpi-grid" id="kpi-eco"></div>
+        </div>
+
+        <!-- Classements -->
+        <div class="obs-section" id="sec-classements">
+          <div class="card" style="padding:16px;">
+            <strong style="font-size:14px;display:block;margin-bottom:12px;">🚀 Top Comptes Initiatives les plus actifs</strong>
+            <div id="classement-init-list"></div>
+          </div>
+        </div>
+
+        <!-- Indices stratégiques -->
+        <div class="obs-section" id="sec-indices">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;" id="indices-grid"></div>
+        </div>
+
+        <!-- Alertes -->
+        <div class="obs-section" id="sec-alertes-glob">
+          <div id="alertes-glob-list"></div>
+        </div>
+
+        <!-- Rapports -->
+        <div class="obs-section" id="sec-rapports">
+          <div class="card" style="padding:24px;max-width:600px;">
+            <h3 style="margin:0 0 16px;font-size:16px;">📄 Générateur de rapports</h3>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div class="form-row">
+                <label>Période</label>
+                <select id="rpt-periode">
+                  <option value="7">7 derniers jours</option>
+                  <option value="30" selected>30 derniers jours</option>
+                  <option value="90">3 mois</option>
+                  <option value="180">6 mois</option>
+                  <option value="365">1 an</option>
+                  <option value="all">Depuis le lancement</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label>Contenu</label>
+                <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+                  ${['Comptes &amp; utilisateurs','Activité &amp; publications','Diasporas','Campagnes recrutement','Événements','Deals &amp; projets','Indices stratégiques','Alertes intelligentes'].map((l,i)=>`<label style="font-size:13px;cursor:pointer;font-weight:normal;"><input type="checkbox" checked style="accent-color:var(--orange);"> ${l}</label>`).join('')}
+                </div>
+              </div>
+              <div class="form-row">
+                <label>Format d'export</label>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
+                  <button class="btn btn-sm btn-outline" onclick="exportGlobal('csv')">CSV</button>
+                  <button class="btn btn-sm btn-outline" onclick="DA.toast('Export PDF en développement.',{type:'info'})">PDF</button>
+                  <button class="btn btn-sm btn-outline" onclick="exportGlobal('json')">JSON</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NIVEAU MAD -->
+      <div id="level-mad" style="display:none;">
+        <div class="obs-nav">
+          <button class="obs-tab active" onclick="switchObsMAD('vue-generale')">🌍 Vue générale</button>
+          <button class="obs-tab" onclick="switchObsMAD('emploi-mad')">💼 Emploi</button>
+          <button class="obs-tab" onclick="switchObsMAD('entrepreneuriat')">🏗️ Entrepreneuriat</button>
+          <button class="obs-tab" onclick="switchObsMAD('classements-mad')">🏆 Classements</button>
+          <button class="obs-tab" onclick="switchObsMAD('indices-mad')">📈 Indices MAD</button>
+        </div>
+        <div class="obs-section active" id="sec-vue-generale">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;" id="mad-grid"></div>
+        </div>
+        <div class="obs-section" id="sec-emploi-mad">
+          <div class="kpi-grid" id="kpi-emploi-mad"></div>
+        </div>
+        <div class="obs-section" id="sec-entrepreneuriat">
+          <div class="kpi-grid" id="kpi-entrepr"></div>
+        </div>
+        <div class="obs-section" id="sec-classements-mad">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" id="classements-mad-grid"></div>
+        </div>
+        <div class="obs-section" id="sec-indices-mad">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;" id="indices-mad-grid"></div>
+        </div>
+      </div>
+
+      <!-- NIVEAU OBS personnelles (accès admin à n'importe quel compte) -->
+      <div id="level-obs" style="display:none;">
+        <div style="padding:20px;background:#f8fafc;border-radius:12px;text-align:center;">
+          <p style="color:var(--muted);font-size:13px;">🔍 Consultez les observations personnelles depuis <a href="observations.html" style="color:var(--orange);">la page Observations</a>.</p>
+          <p style="color:var(--muted);font-size:13px;">En tant qu'administrateur, vous avez accès à tous les niveaux d'observation.</p>
+        </div>
+      </div>
+
+      <!-- AUDIT LOG -->
+      <div id="level-audit" style="display:none;">
+        <div class="card" style="padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <strong style="font-size:14px;">📜 Journal d'audit</strong>
+            <button class="btn btn-sm btn-outline" onclick="loadAudit()">🔄 Actualiser</button>
+          </div>
+          <div id="audit-list">
+            <div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/chatbot.js"></script>
+<script>
+let GLOB_DATA = null;
+let MAD_DATA = null;
+let ME_OBS = null;
+let CURRENT_LEVEL = 'global';
+
+document.addEventListener('DOMContentLoaded', async()=>{
+  await new Promise(r=>setTimeout(r,400));
+  try{ const r=await api('GET','/auth/me'); ME_OBS=r.user; }catch(_){}
+  if(!ME_OBS||ME_OBS.role!=='administrateur'){
+    document.getElementById('auth-guard').style.display='';
+    return;
+  }
+  document.getElementById('obs-content').style.display='';
+  document.getElementById('last-update').textContent = 'Dernière mise à jour : '+new Date().toLocaleTimeString('fr-FR');
+  loadAll();
+});
+
+function setLevel(level){
+  CURRENT_LEVEL=level;
+  ['global','mad','obs','audit'].forEach(l=>{
+    const el=document.getElementById('level-'+l);
+    if(el) el.style.display=l===level?'':'none';
+    const btn=document.getElementById('btn-level-'+l);
+    if(btn){ btn.style.background=l===level?'var(--orange)':''; btn.style.color=l===level?'#fff':''; btn.style.borderColor=l===level?'var(--orange)':'var(--border)'; }
+  });
+  if(level==='mad'&&!MAD_DATA) loadMAD();
+  if(level==='audit') loadAudit();
+}
+
+function switchObs(name){
+  document.querySelectorAll('#level-global .obs-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('#level-global .obs-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('sec-'+name)?.classList.add('active');
+  document.querySelectorAll('#level-global .obs-tab').forEach(t=>{ if(t.getAttribute('onclick')?.includes(name)) t.classList.add('active'); });
+}
+function switchObsMAD(name){
+  document.querySelectorAll('#level-mad .obs-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('#level-mad .obs-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('sec-'+name)?.classList.add('active');
+  document.querySelectorAll('#level-mad .obs-tab').forEach(t=>{ if(t.getAttribute('onclick')?.includes(name)) t.classList.add('active'); });
+}
+
+function kpi(val,lbl,sub='',color='var(--orange)'){
+  return `<div class="kpi"><div class="kpi-val" style="color:${color};">${escH(String(val))}</div><div class="kpi-lbl">${lbl}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
+}
+function barChart(data,id){
+  const el=document.getElementById(id);if(!el)return;
+  if(!data||!data.length){el.innerHTML='<div style="color:var(--muted);font-size:11px;">Pas de données.</div>';return;}
+  const max=Math.max(...data.map(d=>d.n),1);
+  el.innerHTML=data.map(d=>`<div class="bar-chart-bar" style="height:${Math.max(d.n/max*100,2)}%;" title="${d.mois||d.jour||''} : ${d.n}"></div>`).join('');
+}
+function indiceBlock(label,val,color,desc){
+  return `<div class="card" style="padding:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+      <span style="font-size:13px;font-weight:700;">${label}</span>
+      <span style="font-size:22px;font-weight:900;color:${color};">${val}</span>
+    </div>
+    <div class="indice-bar"><div class="indice-fill" style="width:${val}%;background:${color};"></div></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;">${desc}</div>
+  </div>`;
+}
+
+async function loadAll(){
+  try{
+    GLOB_DATA=await api('GET','/observatoire/global');
+    renderGlobal(GLOB_DATA);
+    document.getElementById('last-update').textContent='Dernière mise à jour : '+new Date().toLocaleTimeString('fr-FR');
+  }catch(e){ DA.toast('Erreur : '+e.message,{type:'danger'}); }
+}
+
+function renderGlobal(d){
+  /* KPI mini */
+  document.getElementById('kpi-comptes-mini').innerHTML=
+    kpi(d.comptes.total,'Total comptes')+
+    kpi(d.comptes.actifs_semaine,'Actifs /semaine','','#10b981')+
+    kpi(d.comptes.nouveaux_mois,'Nouveaux /mois','','#3b82f6')+
+    kpi(d.comptes.verifies,'Vérifiés','','#f59e0b');
+  document.getElementById('kpi-activite-mini').innerHTML=
+    kpi(d.activite.pubs_aujourd,'Pubs aujourd\'hui','','#ef4444')+
+    kpi(d.activite.evts_actifs,'Évts actifs','','#8b5cf6')+
+    kpi(d.activite.camps_actives,'Campagnes actives','','#f59e0b')+
+    kpi(d.activite.sonds_ouverts,'Sondages ouverts','','#3b82f6');
+  /* Charts */
+  barChart(d.evolution.comptes,'chart-comptes');
+  const cl=document.getElementById('chart-comptes-labels');
+  if(cl&&d.evolution.comptes.length) cl.innerHTML=d.evolution.comptes.map(e=>`<span>${(e.mois||'').slice(5)}</span>`).join('');
+  barChart(d.evolution.publications,'chart-pubs-glob');
+
+  /* Activité globale */
+  document.getElementById('kpi-activite-glob').innerHTML=
+    kpi(d.activite.publications,'Publications totales')+
+    kpi(d.activite.evenements,'Événements','','#3b82f6')+
+    kpi(d.activite.evts_actifs,'Évts actifs','','#10b981')+
+    kpi(d.activite.campagnes,'Campagnes recrutement','','#8b5cf6')+
+    kpi(d.activite.camps_actives,'Campagnes actives','','#f59e0b')+
+    kpi(d.activite.sondages,'Sondages','','#ef4444')+
+    kpi(d.activite.deals,'Deals','','#3b82f6')+
+    kpi(d.activite.deals_actifs,'Deals actifs','','#10b981')+
+    kpi(d.activite.deals_clotures,'Deals clôturés','','#6b7280')+
+    kpi(d.activite.projets,'Projets','','#f59e0b');
+
+  /* Économique */
+  const fmtE=n=>n>=1000000?Math.round(n/100000)/10+'M€':n>=1000?Math.round(n/100)/10+'k€':n+'€';
+  document.getElementById('kpi-eco').innerHTML=
+    kpi(d.economique.candidatures,'Candidatures reçues','','#3b82f6')+
+    kpi(fmtE(d.economique.revenus_total),'Revenus plateforme','','#10b981')+
+    kpi(fmtE(d.economique.revenus_annee),'Revenus cette année','','#f59e0b');
+
+  /* Diasporas */
+  const dl=document.getElementById('diasporas-list');
+  const maxD=Math.max(...(d.par_pays.map(p=>p.n)||[1]));
+  dl.innerHTML=d.par_pays.slice(0,15).map(p=>`
+    <div class="diaspora-row">
+      <span>📍 ${escH(p.pays)}</span>
+      <div style="flex:1;margin:0 10px;">
+        <div class="prog-bar"><div class="prog-fill" style="width:${Math.round(p.n/maxD*100)}%;"></div></div>
+      </div>
+      <strong>${p.n}</strong>
+    </div>`).join('');
+  const rl=document.getElementById('par-role-list');
+  const roleLabels={utilisateur:'👤 Utilisateurs',initiative:'🚀 Initiatives',collectivite:'🏛️ Étatiques',administrateur:'⚙️ Admins'};
+  rl.innerHTML=d.par_role.map(r=>`
+    <div class="diaspora-row">
+      <span>${escH(roleLabels[r.role]||r.role)}</span>
+      <strong>${r.n}</strong>
+    </div>`).join('');
+
+  /* Classement initiatives */
+  const cl2=document.getElementById('classement-init-list');
+  cl2.innerHTML=d.classements.initiatives.map((u,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6;">
+      <span style="font-size:16px;font-weight:900;color:${i<3?'var(--orange)':'var(--muted)'};min-width:24px;">#${i+1}</span>
+      ${u.photo_url?`<img src="${escH(u.photo_url)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">`:'<div style="width:32px;height:32px;border-radius:50%;background:#e2e8f0;text-align:center;line-height:32px;font-size:14px;">🏛️</div>'}
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;">${escH(u.prenom||'')} ${escH(u.nom||'')}</div>
+        <div style="font-size:11px;color:var(--muted);">📍 ${escH(u.pays||'—')}</div>
+      </div>
+      <div style="text-align:right;font-size:11px;color:var(--muted);">
+        <div>📝 ${u.nb_pubs}</div><div>📅 ${u.nb_evts}</div><div>💼 ${u.nb_camps}</div>
+      </div>
+    </div>`).join('');
+
+  /* Indices stratégiques */
+  const idx=d.indices;
+  document.getElementById('indices-grid').innerHTML=
+    indiceBlock('IED — Indice d\'Engagement des Diasporas',idx.IED,'#3b82f6','Mesure : publications, événements, commentaires, réactions, sondages.')+
+    indiceBlock('IE — Indice d\'Entrepreneuriat',idx.IE,'#8b5cf6','Mesure : Deals, projets, partenariats, entreprises créées.')+
+    indiceBlock('IEMP — Indice d\'Employabilité',idx.IEMP,'#10b981','Mesure : recrutements, offres, candidatures, taux d\'embauche.')+
+    indiceBlock('ICI — Indice de Coopération Internationale',idx.ICI,'#f59e0b','Mesure : partenariats institutionnels, collaborations, Deals multi-acteurs.');
+
+  /* Alertes */
+  const al=document.getElementById('alertes-glob-list');
+  if(d.alertes&&d.alertes.length){
+    al.innerHTML=d.alertes.map(a=>`
+      <div class="alerte-card a-${a.severity}">
+        <span style="font-size:20px;">${a.severity==='success'?'🎉':a.severity==='warning'?'⚠️':'ℹ️'}</span>
+        <div><strong style="font-size:13px;">${escH(a.titre)}</strong><div style="font-size:12px;color:#374151;margin-top:2px;">${escH(a.desc)}</div></div>
+      </div>`).join('');
+  } else {
+    al.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted);">✅ Aucune alerte active. La plateforme fonctionne normalement.</div>';
+  }
+}
+
+async function loadMAD(){
+  try{
+    MAD_DATA=await api('GET','/observatoire/mad');
+    renderMAD(MAD_DATA);
+  }catch(e){ DA.toast('MAD : '+e.message,{type:'danger'}); }
+}
+
+function renderMAD(d){
+  /* Vue générale — diaspora table */
+  const grid=document.getElementById('mad-grid');
+  grid.innerHTML=`
+    <div class="card" style="padding:16px;">
+      <strong style="font-size:13px;display:block;margin-bottom:10px;">🌍 Taille des diasporas par pays de résidence</strong>
+      <div>
+        ${d.diaspora.slice(0,15).map(p=>{
+          const maxN=d.diaspora[0]?.nb_membres||1;
+          return `<div style="padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:12px;">
+            <div style="display:flex;justify-content:space-between;"><span>📍 ${escH(p.pays)}</span><strong>${p.nb_membres}</strong></div>
+            <div class="prog-bar"><div class="prog-fill" style="width:${Math.round(p.nb_membres/maxN*100)}%;"></div></div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">🚀 ${p.nb_initiatives} initiatives · ✅ ${p.nb_verifies} vérifiés</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="card" style="padding:16px;">
+      <strong style="font-size:13px;display:block;margin-bottom:10px;">🏭 Secteurs d'activité</strong>
+      <ul class="stat-list">
+        ${d.secteurs.slice(0,10).map(s=>`<li><span>${escH(s.secteur||'—')}</span><strong>${s.n}</strong></li>`).join('')||'<li style="color:var(--muted);">Aucune donnée.</li>'}
+      </ul>
+    </div>`;
+
+  /* Emploi */
+  document.getElementById('kpi-emploi-mad').innerHTML=
+    kpi(d.emploi.offres,'Offres publiées')+
+    kpi(d.emploi.candidatures,'Candidatures','','#3b82f6')+
+    kpi(d.emploi.en_recherche,'En recherche d\'emploi','','#f59e0b');
+
+  /* Entrepreneuriat */
+  document.getElementById('kpi-entrepr').innerHTML=
+    kpi(d.deals?.total||0,'Deals')+
+    kpi(d.deals?.clotures||0,'Deals clôturés','','#10b981')+
+    kpi(d.projets?.total||0,'Projets','','#8b5cf6')+
+    kpi(d.evenements?.nb_evts||0,'Événements organisés','','#3b82f6');
+
+  /* Classements MAD */
+  const cmg=document.getElementById('classements-mad-grid');
+  cmg.innerHTML=`
+    <div class="card" style="padding:16px;">
+      <strong style="font-size:13px;display:block;margin-bottom:10px;">📝 Diasporas les plus actives</strong>
+      <ul class="stat-list">
+        ${d.classements.activite.map((p,i)=>`<li><span>#${i+1} 📍 ${escH(p.pays)}</span><strong>${p.nb_pubs} pubs</strong></li>`).join('')}
+      </ul>
+    </div>
+    <div class="card" style="padding:16px;">
+      <strong style="font-size:13px;display:block;margin-bottom:10px;">💼 Diasporas les plus recruteuses</strong>
+      <ul class="stat-list">
+        ${d.classements.emploi.map((p,i)=>`<li><span>#${i+1} 📍 ${escH(p.pays)}</span><strong>${p.offres} offres</strong></li>`).join('')}
+      </ul>
+    </div>`;
+
+  /* Indices MAD */
+  const img=document.getElementById('indices-mad-grid');
+  img.innerHTML=
+    indiceBlock('IED — Engagement Diaspora',d.indices.IED,'#3b82f6','Publications + événements par membre.')+
+    indiceBlock('IE — Entrepreneuriat',d.indices.IE,'#8b5cf6','Deals conclus par membre.')+
+    indiceBlock('IEMP — Employabilité',d.indices.IEMP,'#10b981','Candidatures / offres publiées.');
+}
+
+async function loadAudit(){
+  const el=document.getElementById('audit-list');
+  try{
+    const r=await api('GET','/audit-log');
+    const logs=r.logs||[];
+    el.innerHTML=logs.length?logs.map(l=>`
+      <div class="audit-row">
+        <span style="color:var(--muted);white-space:nowrap;">${new Date(l.created_at).toLocaleString('fr-FR')}</span>
+        <strong>${escH(l.prenom||'')} ${escH(l.nom||'')}</strong>
+        <span style="flex:1;">${escH(l.action)}</span>
+        ${l.cible_type?`<span style="color:var(--muted);">${escH(l.cible_type)} #${l.cible_id||'—'}</span>`:''}
+      </div>`).join(''):'<div style="text-align:center;padding:20px;color:var(--muted);">Aucune action enregistrée.</div>';
+  }catch(e){ el.innerHTML=`<div style="color:#ef4444;font-size:12px;">Erreur : ${escH(e.message)}</div>`; }
+}
+
+function exportGlobal(fmt){
+  if(!GLOB_DATA){ DA.toast('Chargez d\'abord les données.',{type:'warning'}); return; }
+  const d=GLOB_DATA;
+  if(fmt==='json'){
+    const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='observatoire_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+    return;
+  }
+  const rows=[
+    ['Métrique','Valeur'],
+    ['Total comptes',d.comptes.total],['Utilisateurs',d.comptes.utilisateurs],['Initiatives',d.comptes.initiatives],['Étatiques',d.comptes.etatiques],['Vérifiés',d.comptes.verifies],['Nouveaux ce mois',d.comptes.nouveaux_mois],['Actifs cette semaine',d.comptes.actifs_semaine],
+    ['Publications totales',d.activite.publications],['Événements',d.activite.evenements],['Campagnes recrutement',d.activite.campagnes],['Sondages',d.activite.sondages],['Deals',d.activite.deals],['Deals clôturés',d.activite.deals_clotures],['Projets',d.activite.projets],
+    ['Candidatures',d.economique.candidatures],['Revenus plateforme',d.economique.revenus_total],
+    ['IED',d.indices.IED],['IE',d.indices.IE],['IEMP',d.indices.IEMP],['ICI',d.indices.ICI]
+  ];
+  const csv=rows.map(r=>r.map(v=>'"'+String(v||0).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='observatoire_global_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>

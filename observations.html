@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Observations</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<style>
+.obs-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
+.obs-tab{padding:11px 18px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
+.obs-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.obs-section{display:none;}.obs-section.active{display:block;}
+/* KPI cards */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:24px;}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;}
+.kpi-val{font-size:28px;font-weight:900;color:var(--orange);line-height:1.1;margin-bottom:4px;}
+.kpi-lbl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+/* Indice activité */
+.indice-bar{height:20px;border-radius:10px;background:#f3f4f6;overflow:hidden;margin:8px 0;}
+.indice-fill{height:100%;border-radius:10px;transition:width 1s ease;}
+/* Mini bar chart */
+.bar-chart{display:flex;align-items:flex-end;gap:3px;height:60px;}
+.bar-chart-bar{flex:1;border-radius:3px 3px 0 0;background:var(--orange);opacity:.7;min-height:2px;transition:height .3s;}
+/* List */
+.stat-list li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:13px;}
+.stat-list li:last-child{border-bottom:none;}
+/* Recommandations */
+.reco-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;}
+.reco-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.reco-haute{background:#fef3c7;}
+.reco-moyenne{background:#dbeafe;}
+.reco-basse{background:#f0fdf4;}
+.prog-bar{height:8px;border-radius:4px;background:#f3f4f6;overflow:hidden;margin-top:4px;}
+.prog-fill{height:100%;border-radius:4px;background:var(--orange);}
+</style>
+</head>
+<body>
+<div class="page" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt=""> DIASPO'ACTIF</a></div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="recrutement.html">Recrutement</a>
+        <a href="sondages.html">Sondages</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:24px;padding-bottom:60px;">
+
+    <!-- Auth guard -->
+    <div id="auth-guard" style="display:none;text-align:center;padding:60px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">📊</div>
+      <h2>Observations</h2>
+      <p style="color:var(--muted);">Connectez-vous pour accéder à vos statistiques personnelles.</p>
+      <a href="login.html" class="btn btn-orange" style="margin-top:12px;">Se connecter</a>
+    </div>
+
+    <div id="obs-content" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h1 style="margin:0 0 4px;font-size:24px;">📊 Observations</h1>
+          <p id="obs-subtitle" style="margin:0;font-size:13px;color:var(--muted);"></p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select id="periode-select" onchange="loadObs()" style="height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;">
+            <option value="7">7 derniers jours</option>
+            <option value="30" selected>30 derniers jours</option>
+            <option value="90">3 mois</option>
+            <option value="365">1 an</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="exportObs('csv')">⬇️ CSV</button>
+        </div>
+      </div>
+
+      <div class="obs-nav" id="obs-nav">
+        <button class="obs-tab active" onclick="switchObs('frequentation')">👁️ Fréquentation</button>
+        <button class="obs-tab" onclick="switchObs('reseau')">🔗 Réseau</button>
+        <button class="obs-tab" onclick="switchObs('publications')">📝 Publications</button>
+        <button class="obs-tab" onclick="switchObs('profil')">👤 Profil &amp; Emploi</button>
+        <button class="obs-tab" onclick="switchObs('activite')">⚡ Activité</button>
+        <button class="obs-tab" onclick="switchObs('analyse')">🌍 Analyse réseau</button>
+        <button class="obs-tab" onclick="switchObs('ia')">🤖 Recommandations IA</button>
+        <!-- Onglets approfondis (initiative/collectivite) -->
+        <button class="obs-tab init-only" onclick="switchObs('campagnes')" style="display:none;">💼 Campagnes</button>
+        <button class="obs-tab init-only" onclick="switchObs('evenements')" style="display:none;">📅 Événements</button>
+        <button class="obs-tab init-only" onclick="switchObs('deals')" style="display:none;">🤝 Deals</button>
+        <button class="obs-tab init-only" onclick="switchObs('financier')" style="display:none;">💰 Financier</button>
+      </div>
+
+      <!-- ─── Fréquentation ─── -->
+      <div class="obs-section active" id="sec-frequentation">
+        <div class="kpi-grid" id="kpi-freq"></div>
+        <div class="card" style="padding:20px;">
+          <strong style="font-size:14px;">📈 Évolution des visites (7 jours)</strong>
+          <div class="bar-chart" id="chart-vues" style="margin-top:12px;"></div>
+          <div id="chart-vues-labels" style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;"></div>
+        </div>
+      </div>
+
+      <!-- ─── Réseau ─── -->
+      <div class="obs-section" id="sec-reseau">
+        <div class="kpi-grid" id="kpi-reseau"></div>
+        <div class="card" style="padding:20px;margin-top:16px;">
+          <strong style="font-size:14px;">📈 Évolution des abonnés (30 jours)</strong>
+          <div class="bar-chart" id="chart-abonnes" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
+      <!-- ─── Publications ─── -->
+      <div class="obs-section" id="sec-publications">
+        <div class="kpi-grid" id="kpi-pubs"></div>
+        <div class="card" style="padding:20px;margin-top:16px;">
+          <strong style="font-size:14px;">❤️ Évolution de l'engagement (30 jours)</strong>
+          <div class="bar-chart" id="chart-engagement" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
+      <!-- ─── Profil & Emploi ─── -->
+      <div class="obs-section" id="sec-profil">
+        <div class="kpi-grid" id="kpi-profil"></div>
+        <div id="profil-emploi-detail" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- ─── Indice d'activité ─── -->
+      <div class="obs-section" id="sec-activite">
+        <div id="indice-activite-section"></div>
+      </div>
+
+      <!-- ─── Analyse réseau ─── -->
+      <div class="obs-section" id="sec-analyse">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;" id="analyse-grid"></div>
+      </div>
+
+      <!-- ─── Recommandations IA ─── -->
+      <div class="obs-section" id="sec-ia">
+        <div style="margin-bottom:16px;padding:14px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;">
+          <strong style="font-size:13px;color:#065f46;">🤖 Intelligence artificielle Diaspo'Actif</strong>
+          <p style="font-size:12px;color:#065f46;margin:4px 0 0;">Ces recommandations sont générées automatiquement à partir de l'analyse de votre activité et des tendances de la plateforme.</p>
+        </div>
+        <div id="recos-list"></div>
+      </div>
+
+      <!-- ─── Campagnes recrutement (init) ─── -->
+      <div class="obs-section" id="sec-campagnes">
+        <div class="kpi-grid" id="kpi-camps"></div>
+        <div class="card" style="padding:20px;margin-top:16px;">
+          <strong style="font-size:14px;">🏆 Performance par campagne</strong>
+          <div id="perf-camps-list" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
+      <!-- ─── Événements ─── -->
+      <div class="obs-section" id="sec-evenements">
+        <div class="kpi-grid" id="kpi-evts"></div>
+      </div>
+
+      <!-- ─── Deals ─── -->
+      <div class="obs-section" id="sec-deals">
+        <div class="kpi-grid" id="kpi-deals"></div>
+      </div>
+
+      <!-- ─── Financier ─── -->
+      <div class="obs-section" id="sec-financier">
+        <div class="kpi-grid" id="kpi-financier"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/chatbot.js"></script>
+<script>
+let OBS_DATA = null;
+let OBS_APP_DATA = null;
+let ME_OBS = null;
+
+function switchObs(name){
+  document.querySelectorAll('.obs-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.obs-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('sec-'+name)?.classList.add('active');
+  document.querySelectorAll('.obs-tab').forEach(t=>{ if(t.getAttribute('onclick')?.includes(name)) t.classList.add('active'); });
+}
+
+function kpi(val, lbl, sub='', color='var(--orange)'){
+  return `<div class="kpi"><div class="kpi-val" style="color:${color};">${escH(String(val))}</div><div class="kpi-lbl">${lbl}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
+}
+
+function barChart(data, containerId, colorFn){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  if(!data||!data.length){el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:10px 0;">Pas de données.</div>';return;}
+  const max=Math.max(...data.map(d=>d.n),1);
+  el.innerHTML=data.map(d=>`<div class="bar-chart-bar" style="height:${Math.max(d.n/max*100,2)}%;background:${colorFn?colorFn(d):'var(--orange)'};" title="${d.jour||d.mois||''} : ${d.n}"></div>`).join('');
+}
+
+document.addEventListener('DOMContentLoaded', async()=>{
+  await new Promise(r=>setTimeout(r,400));
+  try{ const r=await api('GET','/auth/me'); ME_OBS=r.user; }catch(_){}
+  if(!ME_OBS){ document.getElementById('auth-guard').style.display=''; return; }
+  document.getElementById('obs-content').style.display='';
+  const subtitle = {
+    utilisateur: 'Tableau de bord — Observations personnelles',
+    initiative: 'Tableau de bord — Observations Approfondies',
+    collectivite: 'Tableau de bord — Observations Approfondies',
+    administrateur: 'Tableau de bord — Toutes observations'
+  };
+  document.getElementById('obs-subtitle').textContent = subtitle[ME_OBS.role] || '';
+
+  // Afficher les onglets approfondis
+  if(['initiative','collectivite','administrateur'].includes(ME_OBS.role)){
+    document.querySelectorAll('.init-only').forEach(el=>el.style.display='');
+  }
+
+  loadObs();
+});
+
+async function loadObs(){
+  if(!ME_OBS) return;
+  try{
+    OBS_DATA = (await api('GET','/observations/me')).valueOf ? await api('GET','/observations/me') : OBS_DATA;
+    OBS_DATA = await api('GET','/observations/me');
+    renderFreq(OBS_DATA);
+    renderReseau(OBS_DATA);
+    renderPubs(OBS_DATA);
+    renderProfil(OBS_DATA);
+    renderActivite(OBS_DATA);
+    renderAnalyse(OBS_DATA);
+    renderIA(OBS_DATA);
+
+    if(['initiative','collectivite','administrateur'].includes(ME_OBS.role)){
+      OBS_APP_DATA = await api('GET','/observations/approfondies');
+      renderCampagnes(OBS_APP_DATA);
+      renderEvenements(OBS_APP_DATA);
+      renderDeals(OBS_APP_DATA);
+      renderFinancier(OBS_APP_DATA);
+    }
+  }catch(e){ console.error('Obs error:', e); DA.toast('Erreur chargement statistiques : '+e.message,{type:'danger'}); }
+}
+
+function renderFreq(d){
+  const f=d.frequentation;
+  document.getElementById('kpi-freq').innerHTML=
+    kpi(f.total,'Visites totales')+
+    kpi(f.uniques,'Visiteurs uniques')+
+    kpi(f.aujourd,'Vues aujourd\'hui','','#3b82f6')+
+    kpi(f.semaine,'Vues cette semaine','','#8b5cf6')+
+    kpi(f.mois,'Vues ce mois','','#f59e0b');
+  barChart(f.evolution,'chart-vues');
+  const labels=document.getElementById('chart-vues-labels');
+  if(labels&&f.evolution.length){labels.innerHTML=f.evolution.map(e=>`<span>${(e.jour||'').slice(5)}</span>`).join('');}
+}
+
+function renderReseau(d){
+  const r=d.reseau;
+  document.getElementById('kpi-reseau').innerHTML=
+    kpi(r.abonnes,'Abonnés')+
+    kpi(r.abonnements,'Abonnements','','#3b82f6');
+  barChart(r.evolution,'chart-abonnes');
+}
+
+function renderPubs(d){
+  const p=d.publications;
+  document.getElementById('kpi-pubs').innerHTML=
+    kpi(p.nb,'Publications')+
+    kpi(p.vues,'Vues','','#3b82f6')+
+    kpi(p.reactions,'Réactions','','#ef4444')+
+    kpi(p.commentaires,'Commentaires','','#8b5cf6')+
+    kpi(p.republications,'Republications','','#f59e0b')+
+    kpi(p.taux_engagement+'%','Taux d\'engagement','','#10b981');
+  barChart(p.evolution,'chart-engagement',d=>`hsl(${Math.round(d.n/10*120)},70%,50%)`);
+}
+
+function renderProfil(d){
+  const p=d.profil;
+  document.getElementById('kpi-profil').innerHTML=
+    kpi(p.candidatures,'Candidatures envoyées')+
+    kpi(p.offres_disponibles,'Offres disponibles','','#3b82f6')+
+    kpi(p.profil_emploi_actif?'✅':'—','Profil emploi actif','','#10b981');
+  document.getElementById('profil-emploi-detail').innerHTML=`
+    <div class="card" style="padding:16px;">
+      <strong style="font-size:14px;">📋 Statut du profil emploi</strong>
+      <div style="margin-top:10px;font-size:13px;color:var(--muted);">
+        ${p.profil_emploi_actif ? '<span style="color:#065f46;font-weight:700;">✅ Profil emploi actif — vous recevez des offres ciblées.</span>' : '<span>❌ Profil emploi inactif. <a href="espace-candidat.html" style="color:var(--orange);">Activez-le ici</a> pour recevoir des offres.</span>'}
+      </div>
+    </div>`;
+}
+
+function renderActivite(d){
+  const a=d.indice_activite;
+  const pct=a.score;
+  document.getElementById('indice-activite-section').innerHTML=`
+    <div class="card" style="padding:24px;max-width:600px;margin:0 auto;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:60px;font-weight:900;color:${a.color};">${pct}</div>
+        <div style="font-size:22px;font-weight:800;color:${a.color};margin-bottom:4px;">${escH(a.niveau)}</div>
+        <div style="font-size:13px;color:var(--muted);">Indice d'activité Diaspo'Actif</div>
+      </div>
+      <div class="indice-bar"><div class="indice-fill" style="width:${pct}%;background:${a.color};"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:20px;"><span>0</span><span>50</span><span>100</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+        ${a.niveaux.map(n=>`<div style="padding:8px 12px;border-radius:8px;border:1px solid ${pct>=n.min?n.color:' var(--border)'};background:${pct>=n.min?n.color+'20':'#f9f9f9'};">
+          <span style="font-size:12px;font-weight:700;color:${pct>=n.min?n.color:'var(--muted)'};">${escH(n.label)}</span>
+          <span style="font-size:10px;color:var(--muted);display:block;">à partir de ${n.min} pts</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderAnalyse(d){
+  const a=d.analyse_reseau;
+  const grid=document.getElementById('analyse-grid');
+  grid.innerHTML=`
+    <div class="card" style="padding:16px;">
+      <strong style="font-size:14px;">🌍 Pays des visiteurs</strong>
+      <ul class="stat-list" style="margin-top:10px;">
+        ${a.pays.length ? a.pays.map(p=>`<li><span>📍 ${escH(p.pays||'—')}</span><strong>${p.n}</strong></li>`).join('') : '<li style="color:var(--muted);">Pas encore de données.</li>'}
+      </ul>
+    </div>
+    <div class="card" style="padding:16px;">
+      <strong style="font-size:14px;">🏙️ Villes des visiteurs</strong>
+      <ul class="stat-list" style="margin-top:10px;">
+        ${a.villes.length ? a.villes.map(v=>`<li><span>${escH(v.ville||'—')}</span><strong>${v.n}</strong></li>`).join('') : '<li style="color:var(--muted);">Pas encore de données.</li>'}
+      </ul>
+    </div>
+    <div class="card" style="padding:16px;">
+      <strong style="font-size:14px;">👤 Types de comptes visiteurs</strong>
+      <ul class="stat-list" style="margin-top:10px;">
+        ${a.types.length ? a.types.map(t=>`<li><span>${escH(t.type_compte||'—')}</span><strong>${t.n}</strong></li>`).join('') : '<li style="color:var(--muted);">Pas encore de données.</li>'}
+      </ul>
+    </div>`;
+}
+
+function renderIA(d){
+  const recos=d.recommandations||[];
+  const icons={publication:'📝',reseau:'🔗',profil:'👤',emploi:'💼',engagement:'❤️',conversion:'🔄',recrutement:'💼',evenements:'📅',deals:'🤝',sondages:'📊',campagnes:'📣'};
+  document.getElementById('recos-list').innerHTML=recos.length ? recos.map(r=>`
+    <div class="reco-card">
+      <div class="reco-icon reco-${r.priorite||'basse'}">${icons[r.type]||'💡'}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;">${escH(r.titre)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${escH(r.desc)}</div>
+        <div style="margin-top:6px;">
+          <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${r.priorite==='haute'?'#fef3c7':r.priorite==='moyenne'?'#dbeafe':'#f0fdf4'};color:${r.priorite==='haute'?'#92400e':r.priorite==='moyenne'?'#1e40af':'#065f46'};">${r.priorite==='haute'?'⚡ Priorité haute':r.priorite==='moyenne'?'📌 Priorité moyenne':'💡 Suggestion'}</span>
+        </div>
+      </div>
+    </div>`).join('') : '<div style="text-align:center;padding:30px;color:var(--muted);">🎉 Aucune recommandation pour le moment. Continuez comme ça !</div>';
+}
+
+function renderCampagnes(d){
+  const c=d.campagnes;
+  document.getElementById('kpi-camps').innerHTML=
+    kpi(c.total,'Campagnes totales')+
+    kpi(c.actives,'Actives','','#10b981')+
+    kpi(c.clotures,'Clôturées','','#6b7280')+
+    kpi(c.vues,'Vues totales','','#3b82f6')+
+    kpi(c.candidatures,'Candidatures','','#8b5cf6')+
+    kpi(c.taux_conversion+'%','Taux de conversion','','#f59e0b');
+  const el=document.getElementById('perf-camps-list');
+  if(c.performances&&c.performances.length){
+    el.innerHTML=c.performances.map(p=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6;">
+        <div><div style="font-size:13px;font-weight:700;">${escH(p.nom)}</div><div style="font-size:11px;color:var(--muted);">${p.statut} · expire ${p.expire_at?p.expire_at.slice(0,10):'—'}</div></div>
+        <div style="text-align:right;font-size:12px;"><div>👁️ ${p.vues_total||0} vues</div><div>👤 ${p.nb_candidatures||0} candidatures</div></div>
+      </div>`).join('');
+  } else { el.innerHTML='<div style="color:var(--muted);font-size:12px;">Aucune campagne.</div>'; }
+}
+
+function renderEvenements(d){
+  const e=d.evenements;
+  document.getElementById('kpi-evts').innerHTML=
+    kpi(e.total,'Événements organisés')+
+    kpi(e.inscrits,'Inscrits','','#3b82f6')+
+    kpi(e.presents,'Présents','','#10b981')+
+    kpi(e.total>0?Math.round(e.presents/Math.max(e.inscrits,1)*100)+'%':'—','Taux de participation','','#f59e0b');
+}
+
+function renderDeals(d){
+  const dl=d.deals;
+  document.getElementById('kpi-deals').innerHTML=
+    kpi(dl.total,'Deals créés')+
+    kpi(dl.actifs,'En cours','','#3b82f6')+
+    kpi(dl.clotures,'Clôturés','','#10b981')+
+    kpi(dl.taux_reussite+'%','Taux de réussite','','#f59e0b');
+}
+
+function renderFinancier(d){
+  const f=d.financier;
+  const fmt=n=>n>=1000?Math.round(n/100)/10+'k':n;
+  document.getElementById('kpi-financier').innerHTML=
+    kpi(fmt(f.revenus_total)+' €','Revenus totaux')+
+    kpi(fmt(f.revenus_mois)+' €','Ce mois','','#3b82f6')+
+    kpi(fmt(f.revenus_annee)+' €','Cette année','','#10b981');
+}
+
+function exportObs(fmt){
+  if(!OBS_DATA){ DA.toast('Chargez les données d\'abord.',{type:'warning'}); return; }
+  const rows=[['Indicateur','Valeur']];
+  const d=OBS_DATA;
+  rows.push(['Visites totales profil',d.frequentation.total],['Visiteurs uniques',d.frequentation.uniques],['Vues aujourd\'hui',d.frequentation.aujourd],['Abonnés',d.reseau.abonnes],['Abonnements',d.reseau.abonnements],['Publications',d.publications.nb],['Vues publications',d.publications.vues],['Réactions',d.publications.reactions],['Commentaires',d.publications.commentaires],['Taux engagement',d.publications.taux_engagement+'%'],['Score activité',d.indice_activite.score],['Niveau',d.indice_activite.niveau]);
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='observations_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Diaspo'Actif — Dashboard Collectivité</title>
+<title>Diaspo'Actif — Dashboard Compte Étatique</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/styles.css">
   <link rel="stylesheet" href="/assets/responsive.css">
@@ -87,7 +87,7 @@
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar">
       <button class="sidebar-close" id="sidebar-close">×</button>
-      <div class="brand" id="coll-brand">Collectivité</div>
+      <div class="brand" id="coll-brand">Compte Étatique</div>
 
       <div class="sb-group-lbl">01 — COCKPIT</div>
       <a href="#" class="active" data-section="cockpit">🟦 Tableau de bord</a>
@@ -125,7 +125,7 @@
             <h1 style="margin:0;" id="cockpit-nom">Chargement…</h1>
             <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Cockpit collectivité — pilotage, initiatives et intelligence territoriale</p>
           </div>
-          <span class="badge badge-inst">Collectivité</span>
+          <span class="badge badge-inst">Compte Étatique</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
           <div class="card stat-card"><div class="stat-number" id="ck-membres">—</div><div class="stat-label">Membres territoire</div></div>
@@ -182,7 +182,7 @@
             <h1 style="margin:0;" id="inst-nom">Chargement…</h1>
             <p id="inst-infos" style="margin:4px 0 0;color:var(--muted);font-size:13.5px;"></p>
           </div>
-          <span class="badge badge-inst">Collectivité</span>
+          <span class="badge badge-inst">Compte Étatique</span>
         </div>
         <div id="accred-banner" style="display:none;" class="obs-badge">
           <span class="obs-icon">🏛️</span>
@@ -592,22 +592,6 @@
 <script>
 if (typeof ACCREDITATIONS_DA === 'undefined') {
   window.ACCREDITATIONS_DA = [
-    { type:'mobilisation_active', label:'Mobilisation Active', emoji:'📢', couleur:'#f59e0b', couleurBg:'#fffbeb', couleurBorder:'#f59e0b', couleurText:'#92400e',
-      description:"Autorisation d'exercer des fonctions de mobilisation au sein de Diaspo'Actif.",
-      droits:["Participer à des missions rémunérées","Répondre à des appels de mobilisation","Réaliser des enquêtes de terrain","Participer à des campagnes de sensibilisation","Être sollicité par des partenaires"],
-      eligible:['initiative','utilisateur'], prix:{initiative:29,collectivite:0,utilisateur:19} },
-    { type:'createur_opportunites', label:"Créateur d'Opportunités", emoji:'💼', couleur:'#3b82f6', couleurBg:'#eff6ff', couleurBorder:'#3b82f6', couleurText:'#1e40af',
-      description:"Autorisation de publier des offres et de créer des opportunités professionnelles pour la diaspora.",
-      droits:["Publier certaines offres (emplois, stages, marchés)","Mettre en relation des acteurs","Participer à des programmes de recrutement","Créer des opportunités professionnelles","Accéder au module offres prioritaires"],
-      eligible:['initiative','collectivite'], prix:{initiative:39,collectivite:0} },
-    { type:'observatoire_diaspora', label:'Observatoire Diaspora', emoji:'📊', couleur:'#059669', couleurBg:'#f0fdf4', couleurBorder:'#059669', couleurText:'#065f46',
-      description:"Autorisation d'accéder aux données statistiques et outils d'analyse de la plateforme pour des usages institutionnels ou de recherche.",
-      droits:["Accéder aux statistiques autorisées","Consulter les tableaux de bord","Réaliser des consultations publiques","Obtenir des rapports périodiques","Analyser les tendances diasporiques"],
-      eligible:['collectivite'], prix:{collectivite:0} },
-    { type:'institutionnelle', label:'Institutionnelle', emoji:'🏛️', couleur:'#7c3aed', couleurBg:'#f5f3ff', couleurBorder:'#7c3aed', couleurText:'#4c1d95',
-      description:"Autorisation d'exercer des fonctions institutionnelles sur la plateforme : communications officielles, consultations et interaction territoriale.",
-      droits:["Diffuser des communications officielles","Organiser des consultations publiques","Interagir avec un territoire donné","Accéder à certains outils institutionnels","Publier des avis et informations officiels"],
-      eligible:['collectivite'], prix:{collectivite:0} }
   ];
 }
 if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
@@ -680,7 +664,7 @@ async function loadCockpit() {
     if(per) { per.innerHTML = el('perimetre-content') ? el('perimetre-content').innerHTML : '<p style="color:var(--muted);font-size:13px;">Aucun périmètre défini.</p>'; }
     /* Nom */
     const nomEl = document.getElementById('cockpit-nom');
-    if(nomEl) { const n = document.getElementById('inst-nom'); nomEl.textContent = n ? n.textContent : 'Collectivité'; }
+    if(nomEl) { const n = document.getElementById('inst-nom'); nomEl.textContent = n ? n.textContent : 'Compte Étatique'; }
   } catch(e) { console.error('cockpit', e); }
 }
 
@@ -1201,7 +1185,7 @@ async function loadPartenariats() {
   if (ME.role !== "collectivite") { window.location.href = ROLE_DASHBOARD[ME.role] || "index.html"; return; }
 
   document.getElementById("inst-nom").textContent = ME.nom;
-  document.getElementById("inst-infos").textContent = [ME.ville, ME.pays].filter(Boolean).join(", ") + " · Collectivité";
+  document.getElementById("inst-infos").textContent = [ME.ville, ME.pays].filter(Boolean).join(", ") + " · Compte Étatique";
 
   // Vérifier l'accréditation
   try {

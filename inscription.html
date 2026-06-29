@@ -99,11 +99,11 @@
         <div class="type-card" data-role="initiative">
           <div class="tc-icon">&#127970;</div><h3>Initiative</h3>
           <p>Association, ONG, entreprise, cooperative, startup, projet collectif</p>
-          <span class="badge">50 €/an (simule)</span>
+          <span class="badge">Gratuit</span>
         </div>
         <div class="type-card" data-role="collectivite">
-          <div class="tc-icon">&#127963;</div><h3>Compte Officiel</h3>
-          <p>Ambassade, consulat, ministere, region, mairie, organisme public</p>
+          <div class="tc-icon">🏛</div><h3>Compte Étatique</h3>
+          <p>Ambassade, consulat, mairie, préfecture, ministère, région, agence publique…</p>
           <span class="badge">Validation requise</span>
         </div>
       </div>
@@ -299,75 +299,154 @@
           <div><label>Confirmer <span style="color:var(--orange)">*</span></label><input type="password" id="i-pwd2" minlength="8" placeholder="Repeter" autocomplete="new-password"></div>
         </div>
       </div>
-      <div class="notice" style="margin-top:16px">&#9888; Abonnement 50 €/an et verification des documents simules.</div>
+      <div class="notice" style="margin-top:16px">&#9888; La création de compte est gratuite. La vérification des documents est simulée en mode démo.</div>
       <div class="auth-error" id="i-error"></div>
       <div style="margin-top:20px"><button class="btn btn-orange btn-block" id="i-submit">Creer mon compte initiative</button></div>
     </div>
   </div>
-  <!-- ETAPE 2c : Collectivite -->
+  <!-- ETAPE 2c : Compte Étatique — 4 sections -->
+  <datalist id="ce-pays-dl"><option value="Afghanistan"><option value="Afrique du Sud"><option value="Algérie"><option value="Allemagne"><option value="Angola"><option value="Argentine"><option value="Australie"><option value="Autriche"><option value="Belgique"><option value="Bénin"><option value="Bolivie"><option value="Brésil"><option value="Bulgarie"><option value="Burkina Faso"><option value="Burundi"><option value="Cameroun"><option value="Canada"><option value="Cap-Vert"><option value="Centrafrique"><option value="Chili"><option value="Chine"><option value="Colombie"><option value="Comores"><option value="Congo"><option value="Corée du Sud"><option value="Côte d'Ivoire"><option value="Croatie"><option value="Cuba"><option value="Danemark"><option value="Djibouti"><option value="Egypte"><option value="Émirats arabes unis"><option value="Espagne"><option value="États-Unis"><option value="Éthiopie"><option value="Finlande"><option value="France"><option value="Gabon"><option value="Gambie"><option value="Ghana"><option value="Grèce"><option value="Guinée"><option value="Guinée-Bissau"><option value="Haïti"><option value="Inde"><option value="Indonésie"><option value="Irak"><option value="Iran"><option value="Irlande"><option value="Israël"><option value="Italie"><option value="Jamaïque"><option value="Japon"><option value="Jordanie"><option value="Kenya"><option value="Kosovo"><option value="Laos"><option value="Liban"><option value="Libéria"><option value="Libye"><option value="Luxembourg"><option value="Madagascar"><option value="Mali"><option value="Maroc"><option value="Mauritanie"><option value="Mexique"><option value="Mozambique"><option value="Myanmar"><option value="Namibie"><option value="Népal"><option value="Niger"><option value="Nigeria"><option value="Norvège"><option value="Nouvelle-Zélande"><option value="Pakistan"><option value="Palestine"><option value="Pays-Bas"><option value="Pérou"><option value="Philippines"><option value="Pologne"><option value="Portugal"><option value="Qatar"><option value="RD Congo"><option value="Roumanie"><option value="Royaume-Uni"><option value="Russie"><option value="Rwanda"><option value="Sénégal"><option value="Serbie"><option value="Sierra Leone"><option value="Singapour"><option value="Slovaquie"><option value="Somalie"><option value="Soudan"><option value="Soudan du Sud"><option value="Sri Lanka"><option value="Suède"><option value="Suisse"><option value="Syrie"><option value="Tanzanie"><option value="Tchad"><option value="Thaïlande"><option value="Togo"><option value="Tunisie"><option value="Turquie"><option value="Ukraine"><option value="Uruguay"><option value="Venezuela"><option value="Vietnam"><option value="Yémen"><option value="Zambie"><option value="Zimbabwe"></datalist>
+
   <div class="insc-pane" id="pane-collectivite">
-    <div class="card" style="padding:28px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
-        <button class="btn" id="back-collectivite" style="padding:6px 12px;font-size:13px">&larr; Retour</button>
-        <div><strong>Compte Officiel</strong><br><span style="font-size:12px;color:var(--muted)">Institution publique ou parapublique</span></div>
-      </div>
-      <div class="form-section"><h4>Institution</h4>
-        <div class="grid-2">
-          <div><label>Type <span style="color:var(--orange)">*</span></label>
-            <select id="c-type">
-              <option value="">— Selectionner —</option>
-              <option>Ambassade</option><option>Consulat</option><option>Ministere</option>
-              <option>Prefecture</option><option>Region</option><option>Mairie</option>
-              <option>Chambre de commerce</option><option>Organisme public</option>
-              <option>Agence gouvernementale</option>
-            </select>
+    <!-- Barre de progression interne -->
+    <div id="ce-progress" style="display:flex;gap:0;border-radius:10px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:18px;">
+      <div class="ce-tab" data-tab="1" style="flex:1;text-align:center;padding:9px 4px;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s;"><div style="font-size:16px;">🏛</div>Institution</div><div class="ce-tab" data-tab="2" style="flex:1;text-align:center;padding:9px 4px;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s;"><div style="font-size:16px;">🌍</div>Pays d'origine</div><div class="ce-tab" data-tab="3" style="flex:1;text-align:center;padding:9px 4px;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s;"><div style="font-size:16px;">📍</div>Pays d'exercice</div><div class="ce-tab" data-tab="4" style="flex:1;text-align:center;padding:9px 4px;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s;"><div style="font-size:16px;">👤</div>Responsable</div>
+    </div>
+
+    <!-- ══ SECTION 1 : Institution ══ -->
+    <div class="ce-section" id="ce-s1">
+      <div class="card" style="padding:22px 26px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+          <button class="btn" id="back-collectivite" style="padding:5px 12px;font-size:13px;">← Retour</button>
+          <div><strong>🏛 Compte Étatique</strong> — Section 1/4<br><span style="font-size:12px;color:var(--muted);">Informations sur l'institution</span></div>
+        </div>
+        <div class="grid-2" style="gap:14px;">
+          <div><label>Nom officiel <span style="color:var(--orange)">*</span></label><input id="ce-nom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ambassade de Côte d'Ivoire en France"></div>
+          <div><label>Sigle <span style="font-size:11px;color:var(--muted);">(facultatif)</span></label><input id="ce-sigle" class="input-field" style="width:100%;margin-top:4px;" placeholder="ACF, CGCI…"></div>
+          <div><label>Type d'organisme <span style="color:var(--orange)">*</span></label>
+            <select id="ce-type" class="input-field" style="width:100%;margin-top:4px;"><option value="">— Sélectionner —</option><option>Ambassade</option><option>Consulat</option><option>Mairie</option><option>Préfecture</option><option>Sous-Préfecture</option><option>Région</option><option>Département</option><option>Province</option><option>Ministère</option><option>Gouvernorat</option><option>Agence publique</option><option>Administration</option><option>Collectivité territoriale</option><option>Chambre consulaire</option><option>Autorité administrative</option><option>Communauté de communes</option><option>Métropole</option><option>Organisation publique</option><option>Autre</option></select>
           </div>
-          <div><label>Nom officiel <span style="color:var(--orange)">*</span></label><input type="text" id="c-nom" placeholder="Ambassade du Senegal en France"></div>
-        </div>
-        <div class="grid-2" style="margin-top:12px">
-          <div><label>Pays concerne <span style="color:var(--orange)">*</span></label><input type="text" id="c-pays" placeholder="Senegal"></div>
-          <div><label>Ville <span style="color:var(--orange)">*</span></label><input type="text" id="c-ville" placeholder="Paris"></div>
-        </div>
-        <div style="margin-top:12px"><label>Adresse</label><input type="text" id="c-adresse" placeholder="14 avenue Robert Schuman…"></div>
-      </div>
-      <div class="form-section"><h4>Responsable du compte</h4>
-        <div class="grid-3">
-          <div><label>Nom <span style="color:var(--orange)">*</span></label><input type="text" id="c-rnom" placeholder="Sow"></div>
-          <div><label>Prenom <span style="color:var(--orange)">*</span></label><input type="text" id="c-rprenom" placeholder="Ibrahim"></div>
-          <div><label>Fonction <span style="color:var(--orange)">*</span></label><input type="text" id="c-rfct" placeholder="Consul General"></div>
-        </div>
-        <div class="grid-3" style="margin-top:12px">
-          <div><label>Email professionnel <span style="color:var(--orange)">*</span></label><input type="email" id="c-email" placeholder="contact@ambassade.fr"></div>
-          <div><label>Telephone</label><input type="tel" id="c-tel" placeholder="+33 1 00 00 00 00"></div>
-          <div><label>Site officiel</label><input type="url" id="c-site" placeholder="https://ambassade.fr"></div>
-        </div>
-      </div>
-      <div class="validation-notice">
-        <strong>&#128274; Validation obligatoire avant activation</strong>
-        Documents : lettre officielle, arrete de nomination, courrier administratif ou email d'un domaine institutionnel. Les fonctionnalites s'activent apres verification.
-      </div>
-      <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:16px">
-        <strong style="font-size:13px">&#128683; Restrictions permanentes</strong>
-        <ul style="font-size:12px;color:var(--muted);margin:8px 0 0;padding-left:18px;line-height:1.7">
-          <li>Ne peuvent pas initier un contact avec un utilisateur (personne physique)</li>
-          <li>Aucun acces aux nationalites ou identites individuelles</li>
-          <li>Statistiques uniquement agregees (seuil minimum : 10 membres)</li>
-          <li>Aucun acces aux pieces d'identite ni coordonnees privees</li>
-        </ul>
-      </div>
-      <div class="form-section"><h4>Securite</h4>
-        <div class="grid-2">
-          <div>
-            <label>Mot de passe <span style="color:var(--orange)">*</span></label>
-            <input type="password" id="c-pwd" minlength="8" placeholder="8 caracteres min" autocomplete="new-password" oninput="updateStrength(this,'c-sbar','c-shint')">
-            <div class="pwd-strength"><div class="pwd-strength-bar" id="c-sbar"></div></div>
-            <div class="pwd-hint" id="c-shint"></div>
+          <div><label>Date de création <span style="font-size:11px;color:var(--muted);">(facultatif)</span></label><input id="ce-date-creation" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div style="grid-column:1/-1;"><label>Description <span style="font-size:11px;color:var(--muted);">(facultatif)</span></label>
+            <textarea id="ce-desc" style="width:100%;min-height:90px;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;margin-top:4px;resize:vertical;line-height:1.6;" placeholder="Missions, territoire, public concerné…"></textarea>
           </div>
-          <div><label>Confirmer <span style="color:var(--orange)">*</span></label><input type="password" id="c-pwd2" minlength="8" placeholder="Repeter" autocomplete="new-password"></div>
+          <div><label>Site internet officiel</label><input id="ce-site" type="url" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://www.ambassade-ci.fr"></div>
+          <div><label>Devise / Slogan <span style="font-size:11px;color:var(--muted);">(facultatif)</span></label><input id="ce-devise" class="input-field" style="width:100%;margin-top:4px;" placeholder="Union — Discipline — Travail"></div>
+          <div style="grid-column:1/-1;"><label>Logo <span style="font-size:11px;color:var(--muted);">(URL ou laisser vide)</span></label><input id="ce-logo" type="url" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://…/logo.png"></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:20px;">
+          <button class="btn btn-orange" id="ce-next-1" style="min-width:160px;">Section suivante →</button>
         </div>
       </div>
-      <div class="auth-error" id="c-error"></div>
-      <div style="margin-top:20px"><button class="btn btn-orange btn-block" id="c-submit">Soumettre ma demande d'acces</button></div>
+    </div>
+
+    <!-- ══ SECTION 2 : Pays d'origine ══ -->
+    <div class="ce-section" id="ce-s2" style="display:none;">
+      <div class="card" style="padding:22px 26px;">
+        <div style="margin-bottom:18px;"><strong>🌍 Pays d'origine</strong> — Section 2/4<br>
+          <span style="font-size:12px;color:var(--muted);">Autorité de rattachement — le pays <em>auquel</em> appartient l'institution.</span>
+        </div>
+        <div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12.5px;color:#0369A1;">
+          <strong>Exemples :</strong> Ambassade de Côte d'Ivoire à Paris → Pays d'origine : <strong>Côte d'Ivoire</strong> | Consulat du Sénégal à Lyon → Pays d'origine : <strong>Sénégal</strong>
+        </div>
+        <div class="grid-2" style="gap:14px;">
+          <div><label>Pays d'origine <span style="color:var(--orange)">*</span></label><input id="ce-pays-origine" class="input-field" list="ce-pays-dl" style="width:100%;margin-top:4px;" placeholder="Côte d'Ivoire, Sénégal…"></div>
+          <div><label>Ministère / Autorité de tutelle</label><input id="ce-ministere" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ministère des Affaires Étrangères"></div>
+          <div><label>Administration de rattachement</label><input id="ce-admin-rattachement" class="input-field" style="width:100%;margin-top:4px;" placeholder="Direction des Affaires Consulaires"></div>
+          <div><label>Région / Collectivité d'origine <span style="font-size:11px;color:var(--muted);">(si applicable)</span></label><input id="ce-region-origine" class="input-field" style="width:100%;margin-top:4px;" placeholder="Région des Lagunes…"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:20px;">
+          <button class="btn btn-outline" id="ce-prev-2">← Précédent</button>
+          <button class="btn btn-orange" id="ce-next-2" style="min-width:160px;">Section suivante →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION 3 : Pays d'exercice ══ -->
+    <div class="ce-section" id="ce-s3" style="display:none;">
+      <div class="card" style="padding:22px 26px;">
+        <div style="margin-bottom:18px;"><strong>📍 Pays d'exercice</strong> — Section 3/4<br>
+          <span style="font-size:12px;color:var(--muted);">Où l'institution exerce réellement ses activités.</span>
+        </div>
+        <div class="grid-2" style="gap:14px;">
+          <div><label>Pays d'exercice <span style="color:var(--orange)">*</span></label><input id="ce-pays-exercice" class="input-field" list="ce-pays-dl" style="width:100%;margin-top:4px;" placeholder="France, Belgique…"></div>
+          <div><label>Région</label><input id="ce-region-exercice" class="input-field" style="width:100%;margin-top:4px;" placeholder="Île-de-France"></div>
+          <div><label>Département / Province</label><input id="ce-dept-exercice" class="input-field" style="width:100%;margin-top:4px;" placeholder="Paris"></div>
+          <div><label>Ville <span style="color:var(--orange)">*</span></label><input id="ce-ville" class="input-field" style="width:100%;margin-top:4px;" placeholder="Paris"></div>
+          <div style="grid-column:1/-1;"><label>Adresse complète</label><input id="ce-adresse" class="input-field" style="width:100%;margin-top:4px;" placeholder="1 avenue Blaise Pascal…"></div>
+          <div><label>Code postal</label><input id="ce-cp" class="input-field" style="width:100%;margin-top:4px;" placeholder="75016"></div>
+          <div><label>Coordonnées GPS <span style="font-size:11px;color:var(--muted);">(optionnel)</span></label><input id="ce-gps" class="input-field" style="width:100%;margin-top:4px;" placeholder="48.8566, 2.3522"></div>
+          <div><label>Téléphone principal</label><input id="ce-tel" type="tel" class="input-field" style="width:100%;margin-top:4px;" placeholder="+33 1 00 00 00 00"></div>
+          <div><label>Téléphone secondaire</label><input id="ce-tel2" type="tel" class="input-field" style="width:100%;margin-top:4px;" placeholder="+33 1 00 00 00 01"></div>
+          <div><label>E-mail officiel</label><input id="ce-email-off" type="email" class="input-field" style="width:100%;margin-top:4px;" placeholder="contact@ambassade.fr"></div>
+          <div><label>Site local <span style="font-size:11px;color:var(--muted);">(si différent)</span></label><input id="ce-site-local" type="url" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://ambassade-france.ci"></div>
+          <div style="grid-column:1/-1;"><label>Horaires d'ouverture <span style="font-size:11px;color:var(--muted);">(facultatif)</span></label>
+            <textarea id="ce-horaires" style="width:100%;min-height:70px;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;margin-top:4px;resize:vertical;" placeholder="Lun-Ven 9h-17h | Fermé jours fériés"></textarea>
+          </div>
+        </div>
+        <details style="margin-top:14px;">
+          <summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--orange);">📱 Réseaux sociaux officiels (facultatif)</summary>
+          <div class="grid-2" style="margin-top:10px;gap:10px;">
+            <div><label style="font-size:12px;">Facebook</label><input id="ce-fb" type="url" class="input-field" style="width:100%;margin-top:3px;" placeholder="https://facebook.com/…"></div>
+            <div><label style="font-size:12px;">X (Twitter)</label><input id="ce-tw" type="url" class="input-field" style="width:100%;margin-top:3px;" placeholder="https://x.com/…"></div>
+            <div><label style="font-size:12px;">LinkedIn</label><input id="ce-li" type="url" class="input-field" style="width:100%;margin-top:3px;" placeholder="https://linkedin.com/…"></div>
+            <div><label style="font-size:12px;">YouTube</label><input id="ce-yt" type="url" class="input-field" style="width:100%;margin-top:3px;" placeholder="https://youtube.com/@…"></div>
+            <div><label style="font-size:12px;">Instagram</label><input id="ce-ig" type="url" class="input-field" style="width:100%;margin-top:3px;" placeholder="https://instagram.com/…"></div>
+          </div>
+        </details>
+        <div style="display:flex;justify-content:space-between;margin-top:20px;">
+          <button class="btn btn-outline" id="ce-prev-3">← Précédent</button>
+          <button class="btn btn-orange" id="ce-next-3" style="min-width:160px;">Section suivante →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION 4 : Responsable officiel ══ -->
+    <div class="ce-section" id="ce-s4" style="display:none;">
+      <div class="card" style="padding:22px 26px;">
+        <div style="margin-bottom:18px;"><strong>👤 Responsable officiel</strong> — Section 4/4<br>
+          <span style="font-size:12px;color:var(--muted);">Ces informations sont indépendantes de l'institution et modifiables lors des changements de mandat.</span>
+        </div>
+        <div class="grid-2" style="gap:14px;">
+          <div><label>Nom <span style="color:var(--orange)">*</span></label><input id="ce-rnom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Kouassi"></div>
+          <div><label>Prénom <span style="color:var(--orange)">*</span></label><input id="ce-rprenom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Jean-Baptiste"></div>
+          <div style="grid-column:1/-1;"><label>Fonction <span style="color:var(--orange)">*</span></label><input id="ce-rfct" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ambassadeur, Consul Général, Maire, Préfet, Président du Conseil Régional…"></div>
+          <div><label>Date de prise de fonction</label><input id="ce-date-prise" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label>Fin de mandat <span style="font-size:11px;color:var(--muted);">(si connue)</span></label><input id="ce-date-fin" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
+          <div><label>E-mail professionnel <span style="color:var(--orange)">*</span></label><input id="ce-email-resp" type="email" class="input-field" style="width:100%;margin-top:4px;" placeholder="j.kouassi@ambassade.fr"></div>
+          <div><label>Téléphone professionnel</label><input id="ce-tel-resp" type="tel" class="input-field" style="width:100%;margin-top:4px;" placeholder="+33 1 00 00 00 03"></div>
+        </div>
+
+        <!-- Déclaration officielle -->
+        <div style="background:#FFF7ED;border:1.5px solid #FB923C;border-radius:10px;padding:16px;margin-top:18px;">
+          <strong style="font-size:13px;color:#C2410C;">📜 Déclaration officielle obligatoire</strong>
+          <p style="font-size:12px;color:#78350F;margin:8px 0 12px;line-height:1.6;">En soumettant cette demande, je certifie que ce compte est créé avec l'accord du responsable légal de cette institution ainsi que des personnes habilitées à représenter officiellement cette administration.</p>
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+            <input type="checkbox" id="ce-declaration" style="margin-top:2px;accent-color:var(--orange);flex-shrink:0;">
+            <span style="font-size:12.5px;color:#78350F;line-height:1.55;"><strong>J'accepte et je certifie</strong> que cette demande est faite avec l'autorisation du responsable légal de l'institution.</span>
+          </label>
+        </div>
+
+        <!-- Sécurité -->
+        <div style="margin-top:18px;">
+          <h4 style="margin:0 0 12px;font-size:14px;">🔑 Sécurité du compte</h4>
+          <div class="grid-2" style="gap:14px;">
+            <div>
+              <label>Mot de passe <span style="color:var(--orange)">*</span></label>
+              <input type="password" id="c-pwd" minlength="8" placeholder="8 caractères min" autocomplete="new-password" oninput="updateStrength(this,'c-sbar','c-shint')" class="input-field" style="width:100%;margin-top:4px;">
+              <div class="pwd-strength"><div class="pwd-strength-bar" id="c-sbar"></div></div>
+              <div class="pwd-hint" id="c-shint"></div>
+            </div>
+            <div><label>Confirmer <span style="color:var(--orange)">*</span></label><input type="password" id="c-pwd2" minlength="8" placeholder="Répéter" autocomplete="new-password" class="input-field" style="width:100%;margin-top:4px;"></div>
+          </div>
+        </div>
+
+        <div class="auth-error" id="c-error"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:20px;">
+          <button class="btn btn-outline" id="ce-prev-4">← Précédent</button>
+          <button class="btn btn-orange" id="c-submit" style="min-width:200px;">🏛 Soumettre ma demande d'accès</button>
+        </div>
+      </div>
     </div>
   </div>
   <!-- SUCCES -->
@@ -567,34 +646,161 @@ function collecterTerritoires(){
   }).filter(Boolean);
 }
 
-document.getElementById("c-submit").addEventListener("click",async()=>{
-  try{
-    const typeInst=document.getElementById("c-type").value;
-    const nom=document.getElementById("c-nom").value.trim();
-    const pays=document.getElementById("c-pays").value.trim();
-    const ville=document.getElementById("c-ville").value.trim();
-    const rnom=document.getElementById("c-rnom").value.trim();
-    const rprenom=document.getElementById("c-rprenom").value.trim();
-    const rfct=document.getElementById("c-rfct").value.trim();
-    const email=document.getElementById("c-email").value.trim();
-    const pwd=document.getElementById("c-pwd").value;
-    const pwd2=document.getElementById("c-pwd2").value;
-    req(typeInst,"Type institution");req(nom,"Nom officiel");req(pays,"Pays");
-    req(ville,"Ville");req(rnom,"Nom");req(rprenom,"Prenom");
-    req(rfct,"Fonction");req(email,"Email professionnel");req(pwd,"Mot de passe");
-    if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
-    if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
-    await submitForm("c-submit","c-error",{
-      role:"collectivite",nom:rnom,prenom:rprenom,email,password:pwd,
-      type_institution:typeInst,nom_institution:nom,
-      pays_concerne:pays,ville,
-      adresse:document.getElementById("c-adresse").value.trim()||null,
-      nom_responsable:rnom,prenom_responsable:rprenom,fonction_responsable:rfct,
-      telephone_pro:document.getElementById("c-tel").value.trim()||null,
-      site_officiel:document.getElementById("c-site").value.trim()||null
+/* ===== Compte Étatique — Navigation 4 sections ===== */
+(function(){
+  const g = id => document.getElementById(id);
+  const v = id => g(id)?.value?.trim()||null;
+  const chkUrl = u => { try{if(u)new URL(u);return u;}catch(_){return null;} };
+
+  let ceStep = 1;
+
+  function ceShow(n) {
+    ceStep = n;
+    [1,2,3,4].forEach(i => {
+      const s = g('ce-s'+i);
+      if(s) s.style.display = i===n ? '' : 'none';
     });
-  }catch(e){const eb=document.getElementById("c-error");eb.textContent=e.message;eb.style.display="block";}
-});
+    // Mettre à jour la barre de progression
+    document.querySelectorAll('.ce-tab').forEach(tab => {
+      const t = parseInt(tab.dataset.tab);
+      tab.style.background = t===n ? 'var(--orange)' : t<n ? '#F0FDF4' : '#F9FAFB';
+      tab.style.color = t===n ? '#fff' : t<n ? '#15803D' : 'var(--muted)';
+    });
+  }
+
+  // Tabs cliquables
+  document.querySelectorAll('.ce-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const n = parseInt(tab.dataset.tab);
+      if(n < ceStep || n === ceStep) ceShow(n); // on peut revenir en arrière librement
+    });
+  });
+
+  // Validation section 1
+  g('ce-next-1')?.addEventListener('click', () => {
+    const nom = v('ce-nom'), type = v('ce-type');
+    const err = g('c-error');
+    if(!nom){if(err){err.textContent='Le nom officiel est obligatoire.';err.style.display='block';}return;}
+    if(!type){if(err){err.textContent="Le type d'organisme est obligatoire.";err.style.display='block';}return;}
+    if(err) err.style.display='none';
+    ceShow(2);
+    window.scrollTo({top: g('pane-collectivite').offsetTop - 20, behavior:'smooth'});
+  });
+
+  // Navigation section 2
+  g('ce-prev-2')?.addEventListener('click', () => ceShow(1));
+  g('ce-next-2')?.addEventListener('click', () => {
+    const orig = v('ce-pays-origine');
+    const err = g('c-error');
+    if(!orig){if(err){err.textContent="Le pays d'origine est obligatoire.";err.style.display='block';}return;}
+    if(err) err.style.display='none';
+    ceShow(3);
+    window.scrollTo({top: g('pane-collectivite').offsetTop - 20, behavior:'smooth'});
+  });
+
+  // Navigation section 3
+  g('ce-prev-3')?.addEventListener('click', () => ceShow(2));
+  g('ce-next-3')?.addEventListener('click', () => {
+    const pays = v('ce-pays-exercice'), ville = v('ce-ville');
+    const err = g('c-error');
+    if(!pays){if(err){err.textContent="Le pays d'exercice est obligatoire.";err.style.display='block';}return;}
+    if(!ville){if(err){err.textContent='La ville est obligatoire.';err.style.display='block';}return;}
+    if(err) err.style.display='none';
+    ceShow(4);
+    window.scrollTo({top: g('pane-collectivite').offsetTop - 20, behavior:'smooth'});
+  });
+
+  // Précédent section 4
+  g('ce-prev-4')?.addEventListener('click', () => ceShow(3));
+
+  // Soumission finale
+  g('c-submit')?.addEventListener('click', async () => {
+    const err = g('c-error');
+    try {
+      const rnom   = v('ce-rnom')||'';
+      const rprenom= v('ce-rprenom')||'';
+      const rfct   = v('ce-rfct')||'';
+      const email  = v('ce-email-resp')||'';
+      const pwd    = g('c-pwd')?.value||'';
+      const pwd2   = g('c-pwd2')?.value||'';
+      const decl   = g('ce-declaration')?.checked;
+
+      if(!rnom)   throw new Error('Le nom du responsable est obligatoire.');
+      if(!rprenom)throw new Error('Le prénom du responsable est obligatoire.');
+      if(!rfct)   throw new Error('La fonction du responsable est obligatoire.');
+      if(!email)  throw new Error("L'e-mail professionnel est obligatoire.");
+      if(!decl)   throw new Error('Vous devez accepter la déclaration officielle.');
+      if(!pwd)    throw new Error('Le mot de passe est obligatoire.');
+      if(pwd !== pwd2) throw new Error('Les mots de passe ne correspondent pas.');
+      if(pwd.length < 8) throw new Error('Le mot de passe doit comporter au moins 8 caractères.');
+      if(err) err.style.display = 'none';
+
+      await submitForm('c-submit','c-error', {
+        role:'collectivite',
+        nom: rnom, prenom: rprenom, email, password: pwd,
+        /* Section 1 — Institution */
+        nom_institution:       v('ce-nom'),
+        type_institution:      v('ce-type'),
+        type_organisme:        v('ce-type'),
+        sigle_institution:     v('ce-sigle'),
+        description_institution: v('ce-desc'),
+        date_creation_institution: v('ce-date-creation'),
+        site_officiel:         chkUrl(v('ce-site')),
+        logo_url:              chkUrl(v('ce-logo')),
+        devise_institution:    v('ce-devise'),
+        /* Section 2 — Pays d'origine */
+        pays_origine_institution: v('ce-pays-origine'),
+        ministere_tutelle:     v('ce-ministere'),
+        administration_rattachement: v('ce-admin-rattachement'),
+        region_origine:        v('ce-region-origine'),
+        /* Section 3 — Pays d'exercice */
+        pays:                  v('ce-pays-exercice'),
+        pays_exercice:         v('ce-pays-exercice'),
+        region:                v('ce-region-exercice'),
+        region_exercice:       v('ce-region-exercice'),
+        departement:           v('ce-dept-exercice'),
+        departement_exercice:  v('ce-dept-exercice'),
+        ville:                 v('ce-ville'),
+        ville_exercice:        v('ce-ville'),
+        adresse:               v('ce-adresse'),
+        adresse_exercice:      v('ce-adresse'),
+        code_postal:           v('ce-cp'),
+        code_postal_exercice:  v('ce-cp'),
+        coordonnees_gps:       v('ce-gps'),
+        telephone:             v('ce-tel'),
+        tel_secondaire:        v('ce-tel2'),
+        email_officiel:        v('ce-email-off'),
+        site_local:            chkUrl(v('ce-site-local')),
+        horaires_ouverture:    v('ce-horaires'),
+        facebook_officiel:     chkUrl(v('ce-fb')),
+        twitter_officiel:      chkUrl(v('ce-tw')),
+        linkedin_officiel:     chkUrl(v('ce-li')),
+        youtube_officiel:      chkUrl(v('ce-yt')),
+        instagram_officiel:    chkUrl(v('ce-ig')),
+        /* Section 4 — Responsable */
+        nom_responsable_etatique:     rnom,
+        prenom_responsable_etatique:  rprenom,
+        fonction_responsable_etatique:rfct,
+        email_responsable_etatique:   email,
+        tel_responsable_etatique:     v('ce-tel-resp'),
+        date_prise_fonction:          v('ce-date-prise'),
+        date_fin_mandat:              v('ce-date-fin'),
+        declaration_officielle: 1,
+        statut_etatique: 'declare',
+      });
+    } catch(e) {
+      if(err){ err.textContent=e.message; err.style.display='block'; }
+    }
+  });
+
+  // Style initial des tabs
+  document.querySelectorAll('.ce-tab').forEach(tab => {
+    tab.style.borderRight = '1px solid #E5E7EB';
+    tab.style.background = '#F9FAFB';
+    tab.style.color = 'var(--muted)';
+  });
+  ceShow(1);
+})();
 </script>
 
   <!-- ─── Mobile Bottom Navigation ─── -->

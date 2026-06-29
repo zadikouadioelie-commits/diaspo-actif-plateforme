@@ -232,6 +232,131 @@
           </select>
         </div>
       </div>
+      <!-- ── MULTIMÉDIA ── -->
+      <div style="margin:18px 0 6px;font-size:13px;font-weight:700;color:#555;border-top:1px solid var(--border);padding-top:14px;">📎 Contenus multimédias <span style="font-weight:400;color:var(--muted);font-size:12px;">(facultatif)</span></div>
+
+      <!-- Image de couverture -->
+      <div class="form-row">
+        <label>🖼️ Image de couverture</label>
+        <div id="blt-cover-drop" style="border:2px dashed var(--border);border-radius:8px;padding:14px;text-align:center;cursor:pointer;background:#FAFAFA;" onclick="document.getElementById('blt-cover-file').click()">
+          <div id="blt-cover-preview" style="display:none;margin-bottom:6px;"><img id="blt-cover-img" style="max-height:100px;border-radius:6px;max-width:100%;object-fit:cover;" alt=""></div>
+          <span id="blt-cover-ph" style="font-size:13px;color:var(--muted);">📷 Cliquer pour choisir · JPG, PNG, WebP · max 2 Mo</span>
+        </div>
+        <input type="file" id="blt-cover-file" accept="image/jpeg,image/png,image/webp" style="display:none">
+      </div>
+
+      <!-- Galerie 4 photos -->
+      <div class="form-row">
+        <label>🖼️ Galerie photos <span style="font-weight:400;color:var(--muted);">(4 max)</span></label>
+        <div style="display:flex;gap:6px;" id="blt-gallery-slots">
+          <div id="blt-gs-0" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('blt-gf-0').click()"><span id="blt-gph-0" style="font-size:18px;color:#ccc;">＋</span><img id="blt-gi-0" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt=""><button id="blt-gd-0" onclick="event.stopPropagation();bltClearPhoto(0)" style="display:none;position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;z-index:2;">×</button><input type="file" id="blt-gf-0" accept="image/jpeg,image/png,image/webp" style="display:none"></div>
+          <div id="blt-gs-1" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('blt-gf-1').click()"><span id="blt-gph-1" style="font-size:18px;color:#ccc;">＋</span><img id="blt-gi-1" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt=""><button id="blt-gd-1" onclick="event.stopPropagation();bltClearPhoto(1)" style="display:none;position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;z-index:2;">×</button><input type="file" id="blt-gf-1" accept="image/jpeg,image/png,image/webp" style="display:none"></div>
+          <div id="blt-gs-2" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('blt-gf-2').click()"><span id="blt-gph-2" style="font-size:18px;color:#ccc;">＋</span><img id="blt-gi-2" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt=""><button id="blt-gd-2" onclick="event.stopPropagation();bltClearPhoto(2)" style="display:none;position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;z-index:2;">×</button><input type="file" id="blt-gf-2" accept="image/jpeg,image/png,image/webp" style="display:none"></div>
+          <div id="blt-gs-3" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('blt-gf-3').click()"><span id="blt-gph-3" style="font-size:18px;color:#ccc;">＋</span><img id="blt-gi-3" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt=""><button id="blt-gd-3" onclick="event.stopPropagation();bltClearPhoto(3)" style="display:none;position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;z-index:2;">×</button><input type="file" id="blt-gf-3" accept="image/jpeg,image/png,image/webp" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- Vidéos -->
+      <div class="form-row">
+        <label>🎬 Vidéos <span style="font-weight:400;color:var(--muted);">(2 max · YouTube, Vimeo ou lien MP4 · max 2 min)</span></label>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <input type="url" id="blt-video1" placeholder="https://youtube.com/watch?v=… ou lien MP4" style="flex:1;">
+          <input type="text" id="blt-video1-titre" placeholder="Titre (facultatif)" style="width:130px;">
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input type="url" id="blt-video2" placeholder="Deuxième vidéo (facultatif)" style="flex:1;">
+          <input type="text" id="blt-video2-titre" placeholder="Titre (facultatif)" style="width:130px;">
+        </div>
+      </div>
+
+      <!-- PDF -->
+      <div class="form-row">
+        <label>📄 Document PDF <span style="font-weight:400;color:var(--muted);">(1 max · programme, invitation · max 5 Mo)</span></label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div id="blt-pdf-drop" style="flex:1;border:2px dashed var(--border);border-radius:6px;padding:10px 14px;cursor:pointer;background:#FAFAFA;display:flex;align-items:center;gap:8px;" onclick="document.getElementById('blt-pdf-file').click()">
+            <span style="font-size:18px;">📄</span><span id="blt-pdf-label" style="font-size:13px;color:var(--muted);">Choisir un PDF (max 5 Mo)</span>
+          </div>
+          <select id="blt-pdf-acces" style="padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+            <option value="public">🌍 Public</option>
+            <option value="inscrits">🎟️ Inscrits</option>
+          </select>
+          <input type="file" id="blt-pdf-file" accept="application/pdf" style="display:none">
+        </div>
+        <div id="blt-pdf-progress" style="display:none;margin-top:4px;"><div style="height:3px;background:#f0f0f0;border-radius:2px;"><div id="blt-pdf-bar" style="height:100%;background:var(--orange);width:0%;transition:width .3s;border-radius:2px;"></div></div></div>
+      </div>
+
+      <!-- ── RAYON DE PUBLICATION ── -->
+      <div style="margin:18px 0 10px;font-size:13px;font-weight:700;color:#555;border-top:1px solid var(--border);padding-top:14px;">📡 Rayon de publication</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px;" id="blt-rayon-grid">
+        <label onclick="bltSelectRayon('ville')" style="cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;transition:all .15s;background:#fff;">
+          <input type="radio" name="blt-rayon" value="ville" style="display:none;">
+          <div style="font-size:20px;">🏙️</div>
+          <div style="font-size:12px;font-weight:700;margin-top:2px;">Ville</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1px;">Ma ville uniquement</div>
+        </label>
+        <label onclick="bltSelectRayon('commune')" style="cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;transition:all .15s;background:#fff;">
+          <input type="radio" name="blt-rayon" value="commune" style="display:none;">
+          <div style="font-size:20px;">🏘️</div>
+          <div style="font-size:12px;font-weight:700;margin-top:2px;">Commune</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1px;">Commune d'organisation</div>
+        </label>
+        <label onclick="bltSelectRayon('departement')" style="cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;transition:all .15s;background:#fff;">
+          <input type="radio" name="blt-rayon" value="departement" style="display:none;">
+          <div style="font-size:20px;">🗺️</div>
+          <div style="font-size:12px;font-weight:700;margin-top:2px;">Département</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1px;">Tout le département</div>
+        </label>
+        <label onclick="bltSelectRayon('region')" style="cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;transition:all .15s;background:#fff;">
+          <input type="radio" name="blt-rayon" value="region" style="display:none;">
+          <div style="font-size:20px;">🌐</div>
+          <div style="font-size:12px;font-weight:700;margin-top:2px;">Région</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1px;">Toute la région</div>
+        </label>
+        <label onclick="bltSelectRayon('national')" style="cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;transition:all .15s;background:#fff;">
+          <input type="radio" name="blt-rayon" value="national" style="display:none;">
+          <div style="font-size:20px;">🇫🇷</div>
+          <div style="font-size:12px;font-weight:700;margin-top:2px;">National</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1px;">Tout le pays</div>
+        </label>
+        <label onclick="bltSelectRayon('international')" style="cursor:pointer;border:2px solid var(--orange);border-radius:10px;padding:10px 8px;text-align:center;transition:all .15s;background:#fff7f0;">
+          <input type="radio" name="blt-rayon" value="international" checked style="display:none;">
+          <div style="font-size:20px;">🌍</div>
+          <div style="font-size:12px;font-weight:700;margin-top:2px;">International</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1px;">Diffusion mondiale</div>
+        </label>
+      </div>
+
+      <!-- ── CIBLE ── -->
+      <div style="margin:18px 0 6px;font-size:13px;font-weight:700;color:#555;border-top:1px solid var(--border);padding-top:14px;">🎯 Cible de l'événement</div>
+      <div class="form-row">
+        <label style="margin-bottom:8px;display:block;">À qui s'adresse cet événement ?</label>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;transition:border-color .2s;" id="cible-label-tous">
+            <input type="radio" name="ev-cible" value="tous" id="cible-tous" checked style="accent-color:var(--orange);">
+            <div><strong style="font-size:13px;">🌍 Tout le monde</strong><br><span style="font-size:12px;color:var(--muted);">Visible par tous les utilisateurs de la plateforme</span></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;transition:border-color .2s;" id="cible-label-abonnes">
+            <input type="radio" name="ev-cible" value="abonnes" id="cible-abonnes" style="accent-color:var(--orange);">
+            <div><strong style="font-size:13px;">👥 Abonnés au compte</strong><br><span style="font-size:12px;color:var(--muted);">Envoyé uniquement aux personnes qui vous suivent</span></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;transition:border-color .2s;" id="cible-label-liste">
+            <input type="radio" name="ev-cible" value="liste" id="cible-liste" style="accent-color:var(--orange);">
+            <div><strong style="font-size:13px;">📋 Liste de diffusion</strong><br><span style="font-size:12px;color:var(--muted);">Envoyer à une ou plusieurs listes de contacts</span></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Sélection des listes (visible seulement si "liste" sélectionné) -->
+      <div id="cible-listes-panel" style="display:none;margin-top:10px;background:#FAFAFA;border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <strong style="font-size:13px;">Choisir les listes :</strong>
+          <button type="button" onclick="openCreerListe()" class="btn btn-sm btn-outline" style="font-size:11px;">＋ Nouvelle liste</button>
+        </div>
+        <div id="cible-listes-checkboxes" style="display:flex;flex-direction:column;gap:6px;">
+          <span style="font-size:12px;color:var(--muted);">Chargement…</span>
+        </div>
+      </div>
+
       <!-- Types de billets -->
       <div style="margin:18px 0 10px;"><strong style="font-size:14px;">🎟️ Types de billets</strong> <button onclick="addTicketTypeRow()" class="btn btn-sm btn-outline" style="margin-left:10px;font-size:12px;">＋ Ajouter</button></div>
       <div class="tt-list" id="tt-rows">
@@ -258,9 +383,50 @@
   </div>
 </div>
 
+<!-- ══ MODAL CRÉER LISTE DE DIFFUSION ══ -->
+<div class="modal-bg" id="modal-creer-liste-bg" onclick="if(event.target===this)closeMod('modal-creer-liste-bg')">
+  <div class="modal" style="max-width:440px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <h3 style="margin:0;">📋 Nouvelle liste de diffusion</h3>
+      <button onclick="closeMod('modal-creer-liste-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
+    </div>
+    <div class="form-row">
+      <label>Nom de la liste *</label>
+      <input type="text" id="nl-nom" placeholder="Ex : Membres VIP, Partenaires Afrique…">
+    </div>
+    <div class="form-row">
+      <label>Description <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>
+      <textarea id="nl-desc" placeholder="À quoi sert cette liste ?" rows="2"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Contacts <span style="font-weight:400;color:var(--muted);">(facultatif — un par ligne, format : email ou email;nom)</span></label>
+      <textarea id="nl-contacts" rows="4" placeholder="jean@example.com;Jean Dupont&#10;marie@example.com&#10;…"></textarea>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="btn btn-outline" onclick="closeMod('modal-creer-liste-bg')">Annuler</button>
+      <button class="btn btn-orange" onclick="saveNouvelListe()" id="btn-save-liste">Créer la liste</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL DASHBOARD ÉVÉNEMENT ══ -->
 <div class="modal-bg" id="modal-org-detail-bg" onclick="if(event.target===this)closeMod('modal-org-detail-bg')">
   <div class="modal" id="modal-org-detail-content" style="max-width:720px;"></div>
+</div>
+
+<!-- ══ MODAL INSCRIPTION SÉCURISÉE (ID DA + DS-ID) ══ -->
+<div class="modal-bg" id="modal-inscription-bg" onclick="if(event.target===this)closeMod('modal-inscription-bg')">
+  <div class="modal" id="modal-inscription-content" style="max-width:520px;"></div>
+</div>
+
+<!-- ══ MODAL OBSERVATIONS ══ -->
+<div class="modal-bg" id="modal-obs-bg" onclick="if(event.target===this)closeMod('modal-obs-bg')">
+  <div class="modal" id="modal-obs-content" style="max-width:780px;max-height:90vh;overflow-y:auto;"></div>
+</div>
+
+<!-- ══ MODAL DOSSIER QR CODE PARTICIPANTS ══ -->
+<div class="modal-bg" id="modal-qr-folder-bg" onclick="if(event.target===this)closeMod('modal-qr-folder-bg')">
+  <div class="modal" id="modal-qr-folder-content" style="max-width:860px;max-height:90vh;overflow-y:auto;"></div>
 </div>
 </div><!-- /app -->
 
@@ -342,6 +508,7 @@ function renderEvents(events) {
           <span>🏷️ ${escH(e.categorie||'Général')}</span>
           ${e.nb_billets>0 ? `<span>🎫 ${e.nb_billets} billets vendus</span>` : ''}
         </div>
+        ${e.rayon_publication && e.rayon_publication !== 'international' ? `<div style="font-size:10px;color:var(--muted);margin-bottom:4px;">📡 ${{ville:'Ville',commune:'Commune',departement:'Département',region:'Région',national:'National'}[e.rayon_publication]||''}</div>` : ''}
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:12px;color:var(--muted);">${e.nb_types||0} type(s) de billets</span>
           <button class="btn btn-sm btn-orange">Voir & Acheter</button>
@@ -352,6 +519,8 @@ function renderEvents(events) {
 
 /* ══ MODAL DÉTAIL ÉVÉNEMENT ══ */
 async function openEvent(eid) {
+  // Tracker la vue
+  try { api('POST', '/events/'+eid+'/view'); } catch(_) {}
   try {
     const r = await api('GET', '/events/'+eid);
     const e = r.event; const types = r.ticket_types || []; const stats = r.stats || {};
@@ -370,6 +539,16 @@ async function openEvent(eid) {
         ${e.adresse ? `<div style="grid-column:1/-1">📍 ${escH(e.adresse)}</div>` : ''}
         ${e.capacite ? `<div>👥 Capacité : ${e.capacite}</div>` : ''}
         <div>🎫 Billets vendus : ${stats.nb||0}</div>
+        ${e.rayon_publication ? `<div style="grid-column:1/-1">📡 <strong>Rayon :</strong> ${{ville:'🏙️ Ville',commune:'🏘️ Commune',departement:'🗺️ Département',region:'🌐 Région',national:'🇫🇷 National',international:'🌍 International'}[e.rayon_publication]||e.rayon_publication}${e.ville&&e.rayon_publication==='ville'?' ('+escH(e.ville)+')':''}</div>` : ''}
+        ${e.publie_at ? (()=>{
+          const joursPublie = Math.floor((Date.now()-new Date(e.publie_at+'Z').getTime())/86400000);
+          const duree = e.duree_exposition_jours||20;
+          const restant = duree - joursPublie;
+          const expo = e.statut_exposition || (restant>0?'actif':'expire');
+          if(expo==='actif') return `<div style="grid-column:1/-1"><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:#dcfce7;border:1px solid #86efac;border-radius:20px;font-size:11px;font-weight:700;color:#166534;">🟢 Actif · Exposition J+${joursPublie}/${duree} (${Math.max(0,restant)} jours restants)</span></div>`;
+          if(expo==='termine') return `<div style="grid-column:1/-1"><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:20px;font-size:11px;font-weight:700;color:#6b7280;">⚫ Terminé</span></div>`;
+          return `<div style="grid-column:1/-1"><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:#fef9c3;border:1px solid #fde047;border-radius:20px;font-size:11px;font-weight:700;color:#713f12;">⚠️ Exposition expirée (${joursPublie} jours — hors recommandations)</span></div>`;
+        })() : ''}
       </div>
       ${e.description ? `<p style="font-size:13.5px;line-height:1.6;color:var(--text);margin-bottom:16px;">${escH(e.description)}</p>` : ''}
       <h4 style="margin:0 0 12px;">🎟️ Types de billets</h4>
@@ -387,7 +566,15 @@ async function openEvent(eid) {
           </div>
         </div>`).join('') : '<p style="color:var(--muted);font-size:13px;">Aucun billet disponible pour cet événement.</p>'}
       ${!ME ? '<div class="notice" style="margin-top:16px;">🔐 <a href="login.html">Connectez-vous</a> pour acheter des billets.</div>' : ''}
-      ${ME && ME.role !== 'utilisateur' ? '<div class="notice" style="margin-top:16px;">ℹ️ Seuls les membres Diaspora peuvent acheter des billets.</div>' : ''}`;
+      ${ME && ME.role !== 'utilisateur' ? '<div class="notice" style="margin-top:16px;">ℹ️ Seuls les membres Diaspora peuvent acheter des billets.</div>' : ''}
+      ${e.inscription_mode && e.inscription_mode !== 'libre' ? await renderInscriptionSecuriseeSection(e) : ''}
+      <div style="margin-top:18px;background:var(--surface-2,#f8f9fa);border-radius:12px;padding:14px 16px;border:1px solid var(--border);">
+        <div style="font-weight:700;font-size:13px;color:var(--orange);margin-bottom:10px;">💡 Vos deux codes Diaspo'Actif</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;line-height:1.5;">
+          <div><strong>🆔 Identifiant DA (ID DA)</strong><br>Votre identifiant public. Permet de vous identifier et relier votre compte à vos actions. Peut être communiqué sans risque.</div>
+          <div><strong>🔑 Code de Sécurité (DS-ID)</strong><br>Votre signature numérique privée. Confirme que vous approuvez personnellement une action engageante. Ne jamais le communiquer.</div>
+        </div>
+      </div>`;
     document.getElementById('modal-event-bg').classList.add('open');
   } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
 }
@@ -402,6 +589,454 @@ async function buyTicket(eid, ttid, nom, prix) {
     loadEvents();
     switchTab('mes-billets');
   } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
+}
+
+/* ══ INSCRIPTION SÉCURISÉE (ID DA + DS-ID) ══ */
+async function renderInscriptionSecuriseeSection(e) {
+  // Vérifier statut si connecté
+  if (ME) {
+    try {
+      const r = await api('GET', '/events/'+e.id+'/inscription/status');
+      if (r.inscrit) {
+        const badgeColor = r.statut === 'confirme' ? '#22c55e' : r.statut === 'liste_attente' ? '#f59e0b' : '#94a3b8';
+        return `<div style="margin-top:16px;padding:14px 16px;background:${badgeColor}15;border:1.5px solid ${badgeColor};border-radius:12px;">
+          <div style="font-weight:700;color:${badgeColor};">✅ ${r.statut==='confirme'?'Inscription confirmée':r.statut==='liste_attente'?'En liste d\'attente':'Inscription enregistrée'}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Votre inscription à cet événement est enregistrée avec votre ID DA.</div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="/api/events/${e.id}/inscription/export-ics" class="btn btn-sm btn-outline" style="font-size:11px;">📅 Exporter (.ics)</a>
+          </div>
+        </div>`;
+      }
+    } catch(_) {}
+  }
+  const modeLabel = { 'obligatoire': 'Inscription obligatoire', 'facultative': 'Pré-inscription', 'validation': 'Inscription avec validation', 'libre': '' }[e.inscription_mode] || e.inscription_mode;
+  const placesTxt = e.nb_places ? ` · ${e.nb_places} places${e.liste_attente?' (liste d\'attente activée)':''}` : '';
+  return `<div style="margin-top:16px;padding:14px 16px;background:rgba(255,107,0,0.06);border:1.5px solid var(--orange);border-radius:12px;">
+    <div style="font-weight:700;color:var(--orange);margin-bottom:8px;">📋 ${modeLabel}${placesTxt}</div>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5;">Pour vous inscrire, vous aurez besoin de votre <strong>Identifiant Diaspo'Actif (ID DA)</strong> et de votre <strong>Code de Sécurité (DS-ID)</strong>.</p>
+    <button class="btn btn-orange" style="font-size:13px;" onclick="ouvrirInscriptionSecurisee(${e.id},'${escH(e.titre)}','${escH(e.date_debut||'')}','${escH(e.ville||'')}')">🔐 S'inscrire avec mon ID DA</button>
+  </div>`;
+}
+
+let _inscriptionCtx = {};
+async function ouvrirInscriptionSecurisee(eid, titre, date, ville) {
+  _inscriptionCtx = { eid, titre, date, ville, step: 1 };
+  renderInscriptionModal();
+  document.getElementById('modal-inscription-bg').classList.add('open');
+}
+
+function renderInscriptionModal() {
+  const ctx = _inscriptionCtx;
+  const autoId = ME?.da_id || '';
+  document.getElementById('modal-inscription-content').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;font-size:16px;">🎟️ Inscription sécurisée</h3>
+      <button onclick="closeMod('modal-inscription-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
+    </div>
+    <div style="background:var(--surface-2,#f8f9fa);border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:16px;">
+      <strong>${escH(ctx.titre)}</strong> · ${fmtDate(ctx.date)} · ${escH(ctx.ville||'')}
+    </div>
+    <!-- Stepper -->
+    <div style="display:flex;gap:0;margin-bottom:20px;">
+      <div style="flex:1;padding:8px 12px;border-radius:8px 0 0 8px;text-align:center;font-size:12px;font-weight:700;background:${ctx.step===1?'var(--orange)':'#e5e7eb'};color:${ctx.step===1?'#fff':'var(--muted)'};">
+        Étape 1<br><span style="font-weight:400;">Identification (ID DA)</span>
+      </div>
+      <div style="flex:1;padding:8px 12px;border-radius:0 8px 8px 0;text-align:center;font-size:12px;font-weight:700;background:${ctx.step===2?'var(--orange)':'#e5e7eb'};color:${ctx.step===2?'#fff':'var(--muted)'};">
+        Étape 2<br><span style="font-weight:400;">Signature (DS-ID)</span>
+      </div>
+    </div>
+    ${ctx.step === 1 ? renderStep1(autoId) : renderStep2()}
+  `;
+}
+
+function renderStep1(autoId) {
+  return `
+    <div id="insc-step1">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5;">
+        Votre <strong>Identifiant Diaspo'Actif (ID DA)</strong> permet d'identifier votre compte et de relier votre inscription à votre profil. Il peut être communiqué sans risque.
+      </p>
+      <label style="font-size:13px;font-weight:600;">Identifiant Diaspo'Actif (ID DA)</label>
+      <input id="insc-da-id" type="text" class="input" style="margin:6px 0 14px;font-family:monospace;font-size:15px;letter-spacing:2px;text-transform:uppercase;" placeholder="DA-00000000" value="${autoId}" autocomplete="off">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:16px;">Trouvez votre ID DA dans votre profil → Confidentialité → 🔑 Codes, ou sous votre QR Code.</div>
+      <div id="insc-step1-error" style="color:#ef4444;font-size:12px;margin-bottom:8px;display:none;"></div>
+      <button class="btn btn-orange" style="width:100%;" onclick="submitStep1()">🔍 Identifier mon compte →</button>
+    </div>`;
+}
+
+function renderStep2() {
+  const ctx = _inscriptionCtx;
+  return `
+    <div id="insc-step2">
+      <div style="background:#f0fdf4;border:1.5px solid #22c55e;border-radius:10px;padding:12px 16px;margin-bottom:16px;">
+        <div style="font-weight:700;font-size:13px;color:#166534;margin-bottom:6px;">✅ Compte identifié</div>
+        <div style="font-size:13px;"><strong>${escH(ctx.compte?.nom||'')}</strong></div>
+        <div style="font-size:12px;color:var(--muted);">${escH(ctx.compte?.type_compte||'')} · ID DA : ${escH(ctx.compte?.da_id||'')}</div>
+      </div>
+      <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;line-height:1.5;color:#92400e;">
+        <strong>Pour confirmer définitivement votre inscription</strong>, veuillez saisir votre Code de Sécurité Diaspo'Actif (DS-ID). Ce code constitue votre signature numérique personnelle et confirme que cette action est réalisée par le propriétaire du compte.
+      </div>
+      <label style="font-size:13px;font-weight:600;">Code de Sécurité Diaspo'Actif (DS-ID)</label>
+      <input id="insc-ds-id" type="password" class="input" style="margin:6px 0 4px;font-family:monospace;font-size:15px;letter-spacing:3px;text-transform:uppercase;" placeholder="DAS-XXXX-XXXX-XXXX" autocomplete="off">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Ne communiquez jamais votre DS-ID à une autre personne. Diaspo'Actif ne vous le demandera jamais par e-mail ou téléphone.</div>
+      <div id="insc-step2-error" style="color:#ef4444;font-size:12px;margin:8px 0;display:none;"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="_inscriptionCtx.step=1;renderInscriptionModal()">← Retour</button>
+        <button class="btn btn-orange" style="flex:2;" id="insc-sign-btn" onclick="submitStep2()">🔐 Signer et confirmer l'inscription</button>
+      </div>
+    </div>`;
+}
+
+async function submitStep1() {
+  const daId = document.getElementById('insc-da-id').value.trim().toUpperCase();
+  const errDiv = document.getElementById('insc-step1-error');
+  errDiv.style.display = 'none';
+  if (!daId || !/^DA-\d{1,8}$/.test(daId)) { errDiv.textContent = 'Format invalide. Exemple : DA-00012345'; errDiv.style.display='block'; return; }
+  const btn = document.querySelector('#insc-step1 button.btn-orange');
+  btn.disabled = true; btn.textContent = '⏳ Vérification…';
+  try {
+    const r = await api('POST', '/events/'+_inscriptionCtx.eid+'/inscription/identify', { da_id: daId });
+    _inscriptionCtx.inscription_id = r.inscription_id;
+    _inscriptionCtx.compte = r.compte;
+    _inscriptionCtx.step = 2;
+    renderInscriptionModal();
+  } catch(e) {
+    errDiv.textContent = e.message || 'Erreur de vérification.';
+    errDiv.style.display = 'block';
+    btn.disabled = false; btn.textContent = '🔍 Identifier mon compte →';
+  }
+}
+
+async function submitStep2() {
+  const dsId = document.getElementById('insc-ds-id').value.trim().toUpperCase();
+  const errDiv = document.getElementById('insc-step2-error');
+  errDiv.style.display = 'none';
+  if (!dsId) { errDiv.textContent = 'Veuillez saisir votre Code de Sécurité (DS-ID).'; errDiv.style.display='block'; return; }
+  const btn = document.getElementById('insc-sign-btn');
+  btn.disabled = true; btn.textContent = '⏳ Signature…';
+  try {
+    const r = await api('POST', '/events/'+_inscriptionCtx.eid+'/inscription/sign', {
+      inscription_id: _inscriptionCtx.inscription_id,
+      ds_id_saisi: dsId
+    });
+    closeMod('modal-inscription-bg');
+    const msg = r.statut === 'liste_attente'
+      ? '📋 Vous avez été ajouté en liste d\'attente. Vous serez notifié si une place se libère.'
+      : '🎉 Inscription confirmée et ajoutée à votre agenda Diaspo\'Actif !';
+    DA.toast(msg, { type: r.statut === 'liste_attente' ? 'info' : 'success', duration: 7000 });
+    loadEvents();
+    // Re-open event detail to show updated status
+    setTimeout(() => openEvent(_inscriptionCtx.eid), 500);
+  } catch(e) {
+    errDiv.textContent = e.message || 'Code incorrect. Vérifiez votre DS-ID.';
+    errDiv.style.display = 'block';
+    btn.disabled = false; btn.textContent = '🔐 Signer et confirmer l\'inscription';
+  }
+}
+
+/* ══ DOSSIER QR CODE PARTICIPANTS ══ */
+async function openDossierQR(eid) {
+  const el = document.getElementById('modal-qr-folder-content');
+  el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement du dossier QR…</div>';
+  document.getElementById('modal-qr-folder-bg').style.display = 'flex';
+  try {
+    const r = await api('GET', '/events/'+eid+'/qr-participants');
+    const { evenement: ev, inscriptions, tickets_payants, stats } = r;
+    const purgePrevue = stats.date_purge_prevue ? new Date(stats.date_purge_prevue).toLocaleDateString('fr-FR') : '—';
+    const tous = [
+      ...inscriptions.map(i => ({
+        source: 'da',
+        id: i.id,
+        nom: `${i.prenom||''} ${i.nom}`.trim(),
+        da_id: i.da_id_utilise,
+        type_compte: i.type_compte||'—',
+        organisation: i.organisation||'',
+        statut: i.statut,
+        ds_id_signe: i.ds_id_signe,
+        billet_qr: i.billet_qr,
+        nb_scans: i.nb_scans||0,
+        premier_scan: i.premier_scan,
+        created_at: i.created_at,
+        photo_url: i.photo_url,
+        type_billet: 'Inscription DA',
+        prix: null
+      })),
+      ...tickets_payants.map(t => ({
+        source: 'ticket',
+        id: t.ticket_id,
+        nom: t.nom_display || t.nom || '—',
+        da_id: t.da_id||null,
+        type_compte: t.type_compte||'—',
+        statut: t.statut,
+        ds_id_signe: null,
+        billet_qr: null,
+        nb_scans: t.nb_scans||0,
+        premier_scan: t.premier_scan,
+        created_at: t.created_at,
+        photo_url: t.photo_url,
+        type_billet: t.type_billet,
+        prix: t.prix_paye
+      }))
+    ];
+    const statutColor = {confirme:'#10b981',signe:'#6366f1',identifie:'#f59e0b',liste_attente:'#f97316',annule:'#ef4444',archive:'#9ca3af',valid:'#10b981',used:'#6366f1',cancelled:'#ef4444'};
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h3 style="margin:0;font-size:17px;">📁 Dossier QR Code Participants</h3>
+          <div style="font-size:13px;color:var(--muted);margin-top:2px;">🎪 ${escH(ev.titre)}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-sm" style="border-color:#0369a1;color:#0369a1;" onclick="exportDossierQRCsv(${eid})">⬇️ Exporter CSV</button>
+          <button onclick="closeMod('modal-qr-folder-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:16px;">
+        ${[
+          ['📋','Total inscrits',stats.total_inscrits+stats.total_billets],
+          ['✅','Confirmés',stats.total_confirmes],
+          ['🎫','Billets payants',stats.total_billets],
+          ['🚶','Présents (scannés)',stats.total_presents]
+        ].map(([ic,lb,v])=>`<div class="card" style="padding:10px;text-align:center;"><div style="font-size:20px;">${ic}</div><div style="font-size:22px;font-weight:800;color:var(--orange);">${v}</div><div style="font-size:10px;color:var(--muted);">${lb}</div></div>`).join('')}
+      </div>
+
+      <!-- Alerte suppression -->
+      <div style="padding:10px 14px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;font-size:12px;margin-bottom:16px;">
+        🗓️ <strong>Suppression automatique prévue :</strong> ${purgePrevue} (J+5 après la fin de l'événement)
+        — <em>Les journaux de scan, QR codes et billets seront supprimés. Les paiements et statistiques globales sont conservés.</em>
+      </div>
+
+      <!-- Table participants -->
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+              <th style="padding:8px;text-align:left;width:36px;"></th>
+              <th style="padding:8px;text-align:left;">Participant</th>
+              <th style="padding:8px;text-align:left;">ID DA</th>
+              <th style="padding:8px;text-align:left;">Type de billet</th>
+              <th style="padding:8px;text-align:center;">Statut</th>
+              <th style="padding:8px;text-align:center;">DS-ID ✅</th>
+              <th style="padding:8px;text-align:center;">Scans</th>
+              <th style="padding:8px;text-align:left;">1er scan</th>
+              <th style="padding:8px;text-align:center;">QR</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tous.length ? tous.map(p=>`
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px;">
+                  ${p.photo_url ? `<img src="${escH(p.photo_url)}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;">` : `<div style="width:30px;height:30px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:14px;">👤</div>`}
+                </td>
+                <td style="padding:8px;"><strong>${escH(p.nom)}</strong>${p.organisation?`<div style="font-size:10px;color:var(--muted);">${escH(p.organisation)}</div>`:''}</td>
+                <td style="padding:8px;font-family:monospace;font-size:11px;">${p.da_id?`<span style="background:#f0f9ff;padding:2px 6px;border-radius:4px;">${escH(p.da_id)}</span>`:'—'}</td>
+                <td style="padding:8px;">${escH(p.type_billet)}${p.prix!=null?` <span style="color:var(--muted);">(${p.prix}€)</span>`:''}</td>
+                <td style="padding:8px;text-align:center;"><span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:${(statutColor[p.statut]||'#6b7280')+'22'};color:${statutColor[p.statut]||'#6b7280'};">${p.statut}</span></td>
+                <td style="padding:8px;text-align:center;">${p.ds_id_signe===1?'✅':p.ds_id_signe===0?'⏳':'—'}</td>
+                <td style="padding:8px;text-align:center;font-weight:700;color:${p.nb_scans>0?'#10b981':p.nb_scans>1?'#f59e0b':'var(--muted)'};">${p.nb_scans>0?p.nb_scans:'—'}</td>
+                <td style="padding:8px;font-size:11px;color:var(--muted);">${p.premier_scan ? new Date(p.premier_scan).toLocaleString('fr-FR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) : '—'}</td>
+                <td style="padding:8px;text-align:center;">
+                  ${p.billet_qr ? `<button class="btn btn-sm" style="padding:2px 8px;font-size:11px;" onclick="afficherQRParticipant('${p.billet_qr}','${escH(p.nom)}','${p.da_id||''}')">🔍 QR</button>` : '—'}
+                </td>
+              </tr>`).join('') : '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--muted);">Aucun participant enregistré.</td></tr>'}
+          </tbody>
+        </table>
+      </div>`;
+  } catch(err) {
+    el.innerHTML = `<div style="padding:30px;text-align:center;color:#ef4444;">Erreur : ${escH(err.message)}</div>`;
+  }
+}
+
+let _qrInstances = {};
+function afficherQRParticipant(billet_qr, nom, da_id) {
+  // Mini popup QR
+  const existing = document.getElementById('mini-qr-popup');
+  if (existing) existing.remove();
+  const popup = document.createElement('div');
+  popup.id = 'mini-qr-popup';
+  popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:#fff;padding:24px;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center;min-width:260px;';
+  popup.innerHTML = `
+    <div style="font-weight:800;font-size:15px;margin-bottom:4px;">${escH(nom)}</div>
+    ${da_id?`<div style="font-size:11px;color:var(--muted);margin-bottom:12px;">🪪 ${escH(da_id)}</div>`:''}
+    <div id="mini-qr-canvas" style="display:flex;justify-content:center;"></div>
+    <button onclick="this.closest('#mini-qr-popup').remove()" style="margin-top:16px;padding:6px 20px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:#f8fafc;">✕ Fermer</button>`;
+  document.body.appendChild(popup);
+  // Overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998;';
+  overlay.onclick = () => { popup.remove(); overlay.remove(); };
+  document.body.appendChild(overlay);
+  // Rendu QR
+  if (typeof QRCode !== 'undefined') {
+    new QRCode(document.getElementById('mini-qr-canvas'), {
+      text: billet_qr, width: 180, height: 180,
+      colorDark: '#1a1a1a', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  }
+}
+
+async function exportDossierQRCsv(eid) {
+  try {
+    const r = await api('GET', '/events/'+eid+'/qr-participants');
+    const { evenement: ev, inscriptions, tickets_payants } = r;
+    const lignes = [['Type','Nom','Prenom','ID DA','Type compte','Type billet','Statut','DS-ID signe','Nb scans','Premier scan','Date inscription']];
+    for (const i of inscriptions) {
+      lignes.push(['DA',i.nom,i.prenom||'',i.da_id_utilise||'',i.type_compte||'','Inscription DA',i.statut,i.ds_id_signe?'Oui':'Non',i.nb_scans||0,i.premier_scan||'',i.created_at]);
+    }
+    for (const t of tickets_payants) {
+      lignes.push(['Ticket',t.nom||t.nom_display||'','',t.da_id||'',t.type_compte||'',t.type_billet||'',t.statut,'—',t.nb_scans||0,t.premier_scan||'',t.created_at]);
+    }
+    const csv = lignes.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
+    a.download = `QR-Participants-${ev.titre.replace(/\s+/g,'-')}.csv`;
+    a.click();
+  } catch(e) { DA.toast('Erreur export : '+e.message, {type:'danger'}); }
+}
+
+/* ══ OBSERVATIONS (tableau de bord analytique) ══ */
+async function openObservations(eid) {
+  const el = document.getElementById('modal-obs-content');
+  el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement des données…</div>';
+  document.getElementById('modal-obs-bg').classList.add('open');
+  try {
+    const r = await api('GET', '/events/'+eid+'/observations');
+    const ev = r.event; const p = r.participation; const prof = r.profil;
+    const timeline = r.timeline || [];
+    const parts = r.participants || [];
+
+    // Helpers
+    const pct = (n,t) => t>0 ? Math.round(n/t*100) : 0;
+    const bar = (n,max,color='var(--orange)') => `<div style="height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;"><div style="height:8px;background:${color};border-radius:4px;width:${max>0?Math.round(n/max*100):0}%;transition:width .4s;"></div></div>`;
+    const statCard = (icon,label,val,sub='',color='var(--orange)') =>
+      `<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:22px;margin-bottom:4px;">${icon}</div>
+        <div style="font-size:26px;font-weight:800;color:${color};">${val}</div>
+        <div style="font-size:12px;font-weight:600;">${label}</div>
+        ${sub?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">${sub}</div>`:''}
+      </div>`;
+
+    // Graphique timeline (barres CSS)
+    const maxTl = Math.max(1,...timeline.map(t=>t.n));
+    const tlHTML = timeline.length ? `
+      <div style="display:flex;align-items:flex-end;gap:4px;height:60px;padding:0 4px;">
+        ${timeline.map(t=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;">
+          <div style="flex:1;display:flex;align-items:flex-end;width:100%;">
+            <div style="width:100%;background:var(--orange);border-radius:3px 3px 0 0;height:${Math.round(t.n/maxTl*100)}%;min-height:4px;" title="${t.n} inscription(s) le ${t.jour}"></div>
+          </div>
+          <div style="font-size:9px;color:var(--muted);transform:rotate(-30deg);white-space:nowrap;">${t.jour?.slice(5)||''}</div>
+        </div>`).join('')}
+      </div>` : '<div style="color:var(--muted);font-size:13px;text-align:center;padding:10px;">Aucune donnée d\'inscription encore.</div>';
+
+    // Diagramme barres horizontal pour les profils
+    const profileBars = (arr,total) => arr.map(x=>`
+      <div style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+          <span>${escH(x.label)}</span><strong>${x.n} <span style="color:var(--muted)">(${pct(x.n,total)}%)</span></strong>
+        </div>
+        ${bar(x.n,Math.max(...arr.map(a=>a.n)))}
+      </div>`).join('');
+
+    const RAYON_LABELS = {ville:'🏙️ Ville',commune:'🏘️ Commune',departement:'🗺️ Département',region:'🌐 Région',national:'🇫🇷 National',international:'🌍 International'};
+
+    el.innerHTML = `
+      <div style="padding:20px 24px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
+          <div>
+            <h3 style="margin:0;font-size:17px;">🔭 Observations</h3>
+            <div style="font-size:13px;color:var(--muted);margin-top:3px;">${escH(ev.titre)} · ${fmtDate(ev.date_debut)}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button onclick="exportObsCsv()" class="btn btn-sm btn-outline" style="font-size:12px;">⬇ CSV</button>
+            <button onclick="closeMod('modal-obs-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
+          </div>
+        </div>
+
+        <!-- PARTICIPATION STATS -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;">
+          ${statCard('👥','Total inscrits',p.total)}
+          ${statCard('✅','Confirmés',p.confirmes,'#22c55e','#22c55e')}
+          ${statCard('🎯','Présents',p.presents,'Scan validé','#3b82f6')}
+          ${statCard('❌','Désistements',p.annules,'','#ef4444')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
+          ${statCard('👁️','Vues totales',ev.vues_total||0)}
+          ${statCard('🔄','Taux conversion',pct(p.total,ev.vues_total||1)+'%','Vues → Inscriptions')}
+          ${statCard('📋','Liste d\'attente',p.liste_attente||0,'','#f59e0b')}
+        </div>
+
+        <!-- TIMELINE -->
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:12px;">📈 Progression des inscriptions</div>
+          ${tlHTML}
+        </div>
+
+        <!-- PROFIL PARTICIPANTS -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+          <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:12px;">🏷️ Types de comptes</div>
+            ${prof.types.length ? profileBars(prof.types,p.total) : '<div style="color:var(--muted);font-size:12px;">Aucune donnée</div>'}
+          </div>
+          <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:12px;">🌍 Pays représentés</div>
+            ${prof.pays.length ? profileBars(prof.pays,p.total) : '<div style="color:var(--muted);font-size:12px;">Aucune donnée</div>'}
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:12px;">🏙️ Villes principales</div>
+          ${prof.villes.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">${prof.villes.map(v=>`<span style="padding:4px 10px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:20px;font-size:12px;"><strong>${escH(v.label)}</strong> <span style="color:var(--muted);">${v.n}</span></span>`).join('')}</div>` : '<div style="color:var(--muted);font-size:12px;">Aucune donnée</div>'}
+        </div>
+
+        <!-- LISTE INSCRITS -->
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:12px;">📋 Liste des participants (${parts.length})</div>
+          ${parts.length ? `
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead><tr style="border-bottom:2px solid var(--border);">
+                <th style="text-align:left;padding:6px 8px;font-weight:700;">Nom</th>
+                <th style="text-align:left;padding:6px 8px;font-weight:700;">ID DA</th>
+                <th style="text-align:left;padding:6px 8px;font-weight:700;">Type</th>
+                <th style="text-align:left;padding:6px 8px;font-weight:700;">Statut</th>
+                <th style="text-align:left;padding:6px 8px;font-weight:700;">Date</th>
+                <th style="text-align:left;padding:6px 8px;font-weight:700;">Méthode</th>
+                <th style="padding:6px 8px;font-weight:700;">Signé DS-ID</th>
+              </tr></thead>
+              <tbody>${parts.map((p,i)=>`
+                <tr style="border-bottom:1px solid var(--border);background:${i%2?'#fafafa':'#fff'};">
+                  <td style="padding:6px 8px;font-weight:600;">${escH(p.nom||'—')}</td>
+                  <td style="padding:6px 8px;font-family:monospace;color:var(--orange);">${escH(p.da_id||'—')}</td>
+                  <td style="padding:6px 8px;">${escH(p.type_compte||'—')}</td>
+                  <td style="padding:6px 8px;"><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${{confirme:'#dcfce7',signe:'#dbeafe',liste_attente:'#fef3c7',annule:'#fee2e2',identifie:'#f3f4f6'}[p.statut]||'#f3f4f6'};color:${{confirme:'#166534',signe:'#1d4ed8',liste_attente:'#92400e',annule:'#991b1b',identifie:'#374151'}[p.statut]||'#374151'};">${p.statut?.toUpperCase()||'—'}</span></td>
+                  <td style="padding:6px 8px;color:var(--muted);">${p.created_at?.slice(0,10)||'—'}</td>
+                  <td style="padding:6px 8px;">${escH(p.methode||'—')}</td>
+                  <td style="padding:6px 8px;text-align:center;">${p.ds_id_signe?'✅':'—'}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : '<div style="color:var(--muted);text-align:center;padding:20px;">Aucun participant pour le moment.</div>'}
+        </div>
+      </div>`;
+
+    // Stocker pour export CSV
+    window._obsParticipants = parts;
+    window._obsEvenement = ev.titre;
+  } catch(e) {
+    el.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444;">Erreur : ${escH(e.message||'Impossible de charger les observations.')}</div>`;
+  }
+}
+
+function exportObsCsv() {
+  const parts = window._obsParticipants || [];
+  if (!parts.length) { DA.toast('Aucun participant à exporter.', {type:'info'}); return; }
+  const headers = ['Nom','ID DA','Type de compte','Statut','Date inscription','Méthode','DS-ID signé'];
+  const rows = parts.map(p=>[p.nom||'',p.da_id||'',p.type_compte||'',p.statut||'',p.created_at?.slice(0,10)||'',p.methode||'',p.ds_id_signe?'Oui':'Non'].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+  const csv = [headers.join(','),...rows].join('\n');
+  const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download = `participants-${(window._obsEvenement||'event').replace(/[^a-z0-9]/gi,'-').toLowerCase()}.csv`;
+  a.click();
 }
 
 /* ══ MES BILLETS ══ */
@@ -534,11 +1169,29 @@ async function validateQR(payload) {
 function showScanResult(r) {
   const el = document.getElementById('scan-result');
   if (r.valid) {
-    el.innerHTML = `<div class="scan-result scan-ok"><div style="font-size:32px;margin-bottom:8px;">✅</div><strong style="font-size:18px;">ACCÈS AUTORISÉ</strong><div style="margin-top:8px;font-size:15px;">Bienvenue, <strong>${escH(r.nom||'Participant')}</strong></div><div style="font-size:12px;opacity:.7;margin-top:4px;">Billet #${r.ticket_id} — check-in enregistré</div></div>`;
+    const alerteDoublon = r.deja_scanne ? `<div style="margin-top:8px;padding:6px 12px;background:rgba(251,191,36,.25);border-radius:8px;font-size:12px;font-weight:700;color:#78350f;">⚠️ ATTENTION — Déjà scanné ${r.nb_scans_total-1} fois</div>` : '';
+    const photo = r.photo_url ? `<img src="${escH(r.photo_url)}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:3px solid #10b981;margin-bottom:8px;">` : `<div style="width:60px;height:60px;border-radius:50%;background:#d1fae5;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 8px;">👤</div>`;
+    el.innerHTML = `<div class="scan-result scan-ok">
+      <div style="font-size:26px;margin-bottom:4px;">${r.deja_scanne?'⚠️':'✅'}</div>
+      <strong style="font-size:16px;">${r.deja_scanne?'DOUBLON DÉTECTÉ':'ACCÈS AUTORISÉ'}</strong>
+      ${alerteDoublon}
+      <div style="margin-top:12px;display:flex;flex-direction:column;align-items:center;">
+        ${photo}
+        <div style="font-size:17px;font-weight:800;">${escH(r.nom||'Participant')}</div>
+        ${r.da_id?`<div style="font-size:11px;background:#064e3b;color:#fff;padding:2px 8px;border-radius:10px;margin-top:3px;">🪪 ${escH(r.da_id)}</div>`:''}
+        ${r.organisation?`<div style="font-size:12px;color:#065f46;margin-top:2px;">🏛️ ${escH(r.organisation)}</div>`:''}
+      </div>
+      <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;text-align:left;">
+        <div><span style="color:#065f46;">📋 Billet</span><br><strong>${escH(r.type_billet||'Entrée')}</strong></div>
+        <div><span style="color:#065f46;">👤 Compte</span><br><strong>${escH(r.type_compte||'—')}</strong></div>
+        <div style="grid-column:1/-1;"><span style="color:#065f46;">🎪 Événement</span><br><strong>${escH(r.event_titre||'—')}</strong></div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;opacity:.65;">Check-in #${r.nb_scans_total||1} enregistré · ${new Date().toLocaleTimeString('fr-FR')}</div>
+    </div>`;
   } else {
     el.innerHTML = `<div class="scan-result scan-err"><div style="font-size:32px;margin-bottom:8px;">❌</div><strong style="font-size:18px;">ACCÈS REFUSÉ</strong><div style="margin-top:8px;font-size:14px;">${escH(r.motif||'QR code invalide')}</div></div>`;
   }
-  setTimeout(() => { el.innerHTML = ''; }, 5000);
+  setTimeout(() => { el.innerHTML = ''; }, 7000);
 }
 
 async function loadScanHistory() {
@@ -581,13 +1234,26 @@ async function loadOrgEvents() {
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline" onclick="openOrgDetail(${e.id})">📊 Tableau de bord</button>
+            <button class="btn btn-sm" style="border-color:var(--orange);color:var(--orange);" onclick="openObservations(${e.id})">🔭 Observations</button>
+            ${e.qr_folder_purged_at ? `<button class="btn btn-sm" style="border-color:#6b7280;color:#6b7280;" disabled title="Dossier archivé ${new Date(e.qr_folder_purged_at).toLocaleDateString('fr-FR')}">🗄️ QR Archivé</button>` : `<button class="btn btn-sm" style="border-color:#0369a1;color:#0369a1;" onclick="openDossierQR(${e.id})">📁 Dossier QR</button>`}
             ${e.statut==='brouillon' ? `<button class="btn btn-sm btn-orange" onclick="publishEvent(${e.id})">🟢 Publier</button>` : ''}
             ${e.statut==='publie' ? `<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="closeEvent(${e.id})">🔒 Fermer</button>` : ''}
           </div>
         </div>
-        <div style="display:flex;gap:16px;font-size:13px;color:var(--muted);">
+        <div style="display:flex;gap:16px;font-size:13px;color:var(--muted);flex-wrap:wrap;">
           <span>🎫 ${e.billets_vendus||0} billets vendus</span>
           <span>🏷️ ${e.nb_types||0} type(s)</span>
+          ${(()=>{
+            const expo = e.statut_exposition;
+            if(!expo||expo==='hors_ligne') return '';
+            if(expo==='actif') {
+              const jours = e.publie_at ? Math.floor((Date.now()-new Date(e.publie_at+'Z').getTime())/86400000) : 0;
+              const duree = e.duree_exposition_jours||20;
+              return `<span style="color:#166534;">🟢 Actif · J+${jours}/${duree} (${Math.max(0,duree-jours)} j restants)</span>`;
+            }
+            if(expo==='termine') return `<span style="color:#6b7280;">⚫ Terminé</span>`;
+            return `<span style="color:#92400e;">⚠️ Exposition expirée — hors recommandations</span>`;
+          })()}
         </div>
       </div>`).join('');
   } catch(e) { console.error(e); }
@@ -653,6 +1319,178 @@ function openCreateEvent(eid) {
   document.getElementById('create-modal-title').textContent = eid ? '✏️ Modifier l\'événement' : '＋ Créer un événement';
   document.getElementById('modal-create-bg').classList.add('open');
 }
+/* ── MULTIMÉDIA billetterie ── */
+let bltCoverB64 = null;
+let bltGallery = [null, null, null, null];
+let bltPdfB64 = null, bltPdfNom = null;
+
+function bltCompressImage(file, maxW, maxH, quality) {
+  return new Promise(res => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxW || h > maxH) { const r = Math.min(maxW/w, maxH/h); w = Math.round(w*r); h = Math.round(h*r); }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', quality||0.75));
+    };
+    img.src = url;
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('blt-cover-file').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    bltCoverB64 = await bltCompressImage(f, 1280, 720, 0.8);
+    document.getElementById('blt-cover-img').src = bltCoverB64;
+    document.getElementById('blt-cover-preview').style.display = '';
+    document.getElementById('blt-cover-ph').style.display = 'none';
+  });
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('blt-gf-'+i).addEventListener('change', async e => {
+      const f = e.target.files[0]; if (!f) return;
+      const b64 = await bltCompressImage(f, 800, 800, 0.75);
+      bltGallery[i] = b64;
+      document.getElementById('blt-gi-'+i).src = b64;
+      document.getElementById('blt-gi-'+i).style.display = '';
+      document.getElementById('blt-gph-'+i).style.display = 'none';
+      document.getElementById('blt-gd-'+i).style.display = '';
+    });
+  }
+  document.getElementById('blt-pdf-file').addEventListener('change', e => {
+    const f = e.target.files[0]; if (!f) return;
+    if (f.size > 5*1024*1024) { DA.toast('PDF trop lourd (max 5 Mo).', {type:'warning'}); return; }
+    bltPdfNom = f.name;
+    const prog = document.getElementById('blt-pdf-progress');
+    prog.style.display = '';
+    const bar = document.getElementById('blt-pdf-bar');
+    const reader = new FileReader();
+    reader.onprogress = ev => { if (ev.lengthComputable) bar.style.width = Math.round(ev.loaded/ev.total*100)+'%'; };
+    reader.onload = ev => {
+      bltPdfB64 = ev.target.result;
+      document.getElementById('blt-pdf-label').textContent = '✅ '+f.name;
+      bar.style.width = '100%';
+      setTimeout(() => prog.style.display = 'none', 600);
+    };
+    reader.readAsDataURL(f);
+  });
+});
+
+window.bltClearPhoto = function(i) {
+  bltGallery[i] = null;
+  document.getElementById('blt-gi-'+i).style.display = 'none';
+  document.getElementById('blt-gph-'+i).style.display = '';
+  document.getElementById('blt-gd-'+i).style.display = 'none';
+  document.getElementById('blt-gf-'+i).value = '';
+};
+
+function bltResetMedia() {
+  bltCoverB64 = null; bltGallery = [null,null,null,null]; bltPdfB64 = null; bltPdfNom = null;
+  resetCible();
+  const cp = document.getElementById('blt-cover-preview'); if(cp) cp.style.display='none';
+  const pp = document.getElementById('blt-pdf-progress'); if(pp) pp.style.display='none';
+  const cph = document.getElementById('blt-cover-ph'); if(cph) cph.style.display='';
+  const pl = document.getElementById('blt-pdf-label'); if(pl) pl.textContent='Choisir un PDF (max 5 Mo)';
+  for(let i=0;i<4;i++) bltClearPhoto(i);
+  ['blt-video1','blt-video2','blt-video1-titre','blt-video2-titre'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+}
+
+/* ── CIBLE ── */
+let mesListesDiffusion = [];
+
+async function chargerListesDiffusion() {
+  try {
+    const r = await api('GET', '/listes-diffusion');
+    mesListesDiffusion = r.listes || [];
+    renderListesCheckboxes();
+  } catch(e) {
+    document.getElementById('cible-listes-checkboxes').innerHTML = '<span style="font-size:12px;color:#e74c3c;">Erreur chargement listes.</span>';
+  }
+}
+
+function renderListesCheckboxes() {
+  const el = document.getElementById('cible-listes-checkboxes');
+  if (!el) return;
+  if (!mesListesDiffusion.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Aucune liste — créez-en une avec le bouton ci-dessus.</div>';
+    return;
+  }
+  el.innerHTML = mesListesDiffusion.map(l => `
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:#fff;font-size:13px;">
+      <input type="checkbox" value="${l.id}" class="cible-liste-cb" style="accent-color:var(--orange);">
+      <div>
+        <strong>${escH(l.nom)}</strong>
+        <span style="color:var(--muted);font-size:11px;margin-left:6px;">${l.nb_contacts} contact(s)</span>
+        ${l.description ? `<div style="font-size:11px;color:var(--muted);">${escH(l.description)}</div>` : ''}
+      </div>
+    </label>`).join('');
+}
+
+// Afficher/masquer le panel listes selon le choix radio
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('input[name="ev-cible"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const panel = document.getElementById('cible-listes-panel');
+      const isListe = radio.value === 'liste' && radio.checked;
+      panel.style.display = isListe ? '' : 'none';
+      if (isListe && !mesListesDiffusion.length) chargerListesDiffusion();
+      // Highlight sélectionné
+      ['tous','abonnes','liste'].forEach(v => {
+        const lbl = document.getElementById('cible-label-'+v);
+        if (lbl) lbl.style.borderColor = (radio.value === v && radio.checked) ? 'var(--orange)' : 'var(--border)';
+      });
+    });
+  });
+});
+
+window.openCreerListe = function() {
+  ['nl-nom','nl-desc','nl-contacts'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('modal-creer-liste-bg').classList.add('open');
+};
+
+window.saveNouvelListe = async function() {
+  const nom = document.getElementById('nl-nom').value.trim();
+  if (!nom) { DA.toast('Nom de liste requis.', {type:'warning'}); return; }
+  const btn = document.getElementById('btn-save-liste');
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const r = await api('POST', '/listes-diffusion', { nom, description: document.getElementById('nl-desc').value||null });
+    const lid = r.id;
+    // Importer les contacts si renseignés
+    const lignes = document.getElementById('nl-contacts').value.trim().split('\n').filter(Boolean);
+    if (lignes.length) {
+      const contacts = lignes.map(l => { const [email,nom] = l.split(';'); return {email:email.trim(),nom:(nom||'').trim()||null}; }).filter(c=>c.email.includes('@'));
+      if (contacts.length) await api('POST', '/listes-diffusion/'+lid+'/contacts', {contacts});
+    }
+    closeMod('modal-creer-liste-bg');
+    DA.toast('Liste créée !', {type:'success'});
+    await chargerListesDiffusion();
+    // Cocher la nouvelle liste automatiquement
+    setTimeout(() => {
+      const cb = document.querySelector(`.cible-liste-cb[value="${lid}"]`);
+      if (cb) cb.checked = true;
+    }, 100);
+  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
+  finally { btn.disabled=false; btn.textContent='Créer la liste'; }
+};
+
+function getCibleData() {
+  const type = document.querySelector('input[name="ev-cible"]:checked')?.value || 'tous';
+  const listeIds = type === 'liste'
+    ? [...document.querySelectorAll('.cible-liste-cb:checked')].map(cb => parseInt(cb.value))
+    : [];
+  return { cible_type: type, cible_liste_ids: listeIds };
+}
+
+function resetCible() {
+  const tous = document.getElementById('cible-tous');
+  if (tous) { tous.checked = true; tous.dispatchEvent(new Event('change')); }
+  document.querySelectorAll('.cible-liste-cb').forEach(cb => cb.checked = false);
+}
+
 function addTicketTypeRow() {
   const container = document.getElementById('tt-rows');
   const idx = ttIdx++;
@@ -668,6 +1506,16 @@ function addTicketTypeRow() {
     <button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#ef4444;">×</button>`;
   container.appendChild(row);
 }
+function bltSelectRayon(val) {
+  document.querySelectorAll('#blt-rayon-grid label').forEach(l => {
+    const v = l.querySelector('input[name="blt-rayon"]').value;
+    const sel = v === val;
+    l.style.borderColor = sel ? 'var(--orange)' : 'var(--border)';
+    l.style.background = sel ? '#fff7f0' : '#fff';
+    if (sel) l.querySelector('input').checked = true;
+  });
+}
+
 async function saveEvent() {
   const titre = document.getElementById('ev-titre').value.trim();
   const date_debut = document.getElementById('ev-debut').value;
@@ -681,6 +1529,7 @@ async function saveEvent() {
     const type = document.getElementById('tt-type-'+i)?.value||'standard';
     if (nom) ticket_types.push({ nom, prix, quantite, type });
   });
+  const galerieFiltree = bltGallery.filter(Boolean);
   const data = {
     titre, description: document.getElementById('ev-desc').value||null,
     pays: document.getElementById('ev-pays').value||null,
@@ -690,13 +1539,25 @@ async function saveEvent() {
     capacite: parseInt(document.getElementById('ev-capacite').value)||0,
     categorie: document.getElementById('ev-cat').value||'Général',
     ticket_types,
-    statut: document.getElementById('ev-publier').checked ? 'publie' : 'brouillon'
+    statut: document.getElementById('ev-publier').checked ? 'publie' : 'brouillon',
+    image_couverture: bltCoverB64||null,
+    galerie_photos: galerieFiltree,
+    video1_url: document.getElementById('blt-video1').value||null,
+    video1_titre: document.getElementById('blt-video1-titre').value||null,
+    video2_url: document.getElementById('blt-video2').value||null,
+    video2_titre: document.getElementById('blt-video2-titre').value||null,
+    pdf_url: bltPdfB64||null,
+    pdf_nom: bltPdfNom||null,
+    pdf_acces: document.getElementById('blt-pdf-acces').value||'public',
+    rayon_publication: document.querySelector('#blt-rayon-grid input[name="blt-rayon"]:checked')?.value || 'international',
+    ...getCibleData()
   };
   const btn = document.getElementById('btn-save-event');
   btn.disabled = true; btn.textContent = '⏳ Création…';
   try {
     await api('POST', '/events', data);
     closeMod('modal-create-bg');
+    bltResetMedia();
     DA.toast('Événement créé avec succès !', {type:'success'});
     loadOrgEvents(); loadEvents();
   } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }

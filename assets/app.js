@@ -497,115 +497,134 @@ async function initAnnuaire(){
     const r = await api("GET", "/initiatives");
     ALL = r.initiatives;
   } catch (e) {
-    list.innerHTML = `<div class="empty">Impossible de contacter le serveur Diaspo'Actif. Vérifiez qu'il est démarré (voir README du dossier server/).</div>`;
+    list.innerHTML = `<div class="empty">Impossible de contacter le serveur Diaspo'Actif.</div>`;
     return;
   }
 
-  /* Domaine + Type (restent des selects classiques) */
-  populateSelect("f-domaine", [...new Set(ALL.map(i=>i.domaine).filter(Boolean))].sort());
-  populateSelect("f-type",    [...new Set(ALL.map(i=>i.type).filter(Boolean))].sort());
+  /* État des filtres */
+  const state = { typeOrg: "", paysRes: "", paysOrig: "", ville: "" };
 
-  function sel(id){ return (document.getElementById(id)||{}).value || ""; }
+  /* Normalisation */
+  const norm = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g,"");
 
-  function apply(){
-    const q          = (document.getElementById("f-q")||{}).value?.toLowerCase() || "";
-    const nat1       = sel("f-pays");
-    const nat2       = sel("f-nat2");
-    const orig1      = sel("f-orig1");
-    const orig2      = sel("f-orig2");
-    const paysRes    = sel("f-pays-res");
-    const region     = sel("f-region");
-    const ville      = sel("f-ville");
-    const ray        = sel("f-ray");
-    const dom        = sel("f-domaine");
-    const type       = sel("f-type");
-    const uniqueOnly   = document.getElementById("f-unique")?.checked   || false;
-    const verifiedOnly = document.getElementById("f-verified")?.checked  || false;
-    const accred       = sel("f-accred");
+  /* ── Rendu des chips filtres actifs ── */
+  function renderChips() {
+    const bar = document.getElementById("active-filters-bar");
+    if (!bar) return;
+    const labels = {
+      typeOrg:  "Type",
+      paysRes:  "Résidence",
+      paysOrig: "Origine",
+      ville:    "Ville",
+    };
+    const active = Object.entries(state).filter(([,v]) => v);
+    bar.style.display = active.length ? "flex" : "none";
+    bar.innerHTML = active.length
+      ? active.map(([k, v]) =>
+          `<span class="ann-chip">${labels[k]} : ${v}
+            <button class="ann-chip-remove" onclick="annRemoveFilter('${k}')" title="Retirer ce filtre">✕</button>
+          </span>`
+        ).join("") +
+        `<span style="font-size:12px;color:var(--muted);margin-left:4px;">${filtered_count} résultat${filtered_count!==1?"s":""}</span>`
+      : "";
+  }
 
-    /* Normalisation : minuscules + trim + suppression accents */
-    const norm = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  let filtered_count = ALL.length;
 
-    const filtered = ALL.filter(it=>{
-      /* Extraction pays et ville de résidence depuis it.ville ("Toulouse, France") */
-      const villeParts  = (it.ville||"").split(",");
-      const itVille     = norm(villeParts[0]);
-      const itPaysVille = norm(villeParts.length > 1 ? villeParts[villeParts.length-1] : "");
-      /* it.pays = pays d'origine de la diaspora */
-      const itPaysOrig  = norm(it.pays);
+  /* ── Appliquer les filtres ── */
+  function apply() {
+    const filtered = ALL.filter(it => {
+      const villeParts = (it.ville||"").split(",");
+      const itVille    = norm(villeParts[0]);
+      const itPaysRes  = norm(villeParts.length > 1 ? villeParts[villeParts.length-1] : "");
+      const itPaysOrig = norm(it.pays||"") || norm(it.nationalite1||"");
 
-      if(q && !norm(it.nom).includes(norm(q)) && !norm(it.description||"").includes(norm(q))) return false;
-      /* Nationalité / origine : correspondance partielle */
-      const nat1n = norm(nat1);
-      if(nat1n && !norm(it.nationalite1||"").includes(nat1n) && !norm(it.nationalite2||"").includes(nat1n)) return false;
-      const nat2n = norm(nat2);
-      if(nat2n && !norm(it.nationalite1||"").includes(nat2n) && !norm(it.nationalite2||"").includes(nat2n)) return false;
-      const or1n = norm(orig1);
-      if(or1n && !norm(it.origine1||"").includes(or1n) && !norm(it.origine2||"").includes(or1n)) return false;
-      const or2n = norm(orig2);
-      if(or2n && !norm(it.origine1||"").includes(or2n) && !norm(it.origine2||"").includes(or2n)) return false;
-      /* Pays de résidence : cherche dans le pays extrait de it.ville ET dans it.pays */
-      if(paysRes){
-        const pr = norm(paysRes);
-        if(!itPaysVille.includes(pr) && !itPaysOrig.includes(pr)) return false;
-      }
-      /* Région : correspondance partielle */
-      if(region && !norm(it.region||"").includes(norm(region))) return false;
-      /* Ville : cherche dans la partie ville de it.ville */
-      if(ville && !itVille.includes(norm(ville))) return false;
-      if(ray && it.rayonnement !== ray) return false;
-      if(dom  && it.domaine !== dom) return false;
-      if(type && it.type !== type) return false;
-      if(uniqueOnly   && !it.nationalite_unique) return false;
-      if(verifiedOnly && !(it.accreditations||[]).length) return false;
-      if(accred && !(it.accreditations||[]).includes(accred)) return false;
+      if (state.typeOrg && norm(it.type||"") !== norm(state.typeOrg)) return false;
+      if (state.paysRes && !itPaysRes.includes(norm(state.paysRes))) return false;
+      if (state.paysOrig && !itPaysOrig.includes(norm(state.paysOrig))
+          && !norm(it.nationalite2||"").includes(norm(state.paysOrig))
+          && !norm(it.origine1||"").includes(norm(state.paysOrig))
+          && !norm(it.origine2||"").includes(norm(state.paysOrig))) return false;
+      if (state.ville && !itVille.includes(norm(state.ville))) return false;
       return true;
     });
 
+    filtered_count = filtered.length;
     document.getElementById("result-count").textContent = filtered.length;
     list.innerHTML = filtered.length
       ? filtered.map(renderInitiativeCard).join("")
-      : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">Aucune initiative ne correspond à ces critères.</div>`;
+      : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
+          <div style="font-size:2rem;margin-bottom:12px;">🔍</div>
+          <p style="font-weight:700;margin-bottom:6px;">Aucune initiative trouvée</p>
+          <p style="font-size:.88rem;">Essayez avec d'autres filtres ou <button onclick="annResetFilters()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:700;text-decoration:underline;">réinitialisez la recherche</button>.</p>
+        </div>`;
+    renderChips();
   }
 
-  /* ── GeoAutocomplete pour nationalités et origines (pays seuls) ── */
-  if(typeof GeoAutocomplete !== "undefined"){
-    ["f-pays","f-nat2","f-orig1","f-orig2"].forEach(id => {
-      const anchor = document.getElementById(id);
-      if(!anchor) return;
-      new GeoAutocomplete(anchor, {
-        id,
-        placeholder: id.startsWith("f-orig") ? "Origine…" : "Nationalité…",
-        getList: () => geoGetCountries(),
-        onSelect: apply,
-      });
+  /* ── Exposer reset et removeFilter globalement ── */
+  window.annResetFilters = function() {
+    state.typeOrg = state.paysRes = state.paysOrig = state.ville = "";
+    const typeEl = document.getElementById("f-type-org");
+    if (typeEl) typeEl.value = "";
+    const villeEl = document.getElementById("f-ville-simple");
+    if (villeEl) villeEl.value = "";
+    // Reset GeoAutocomplete (vider le champ input visible)
+    ["f-pays-res","f-pays-orig"].forEach(id => {
+      const wrap = document.getElementById(id);
+      if (wrap) { const inp = wrap.querySelector("input"); if (inp) inp.value = ""; }
+    });
+    apply();
+  };
+
+  window.annRemoveFilter = function(key) {
+    state[key] = "";
+    if (key === "typeOrg") { const el = document.getElementById("f-type-org"); if(el) el.value = ""; }
+    if (key === "ville")   { const el = document.getElementById("f-ville-simple"); if(el) el.value = ""; }
+    if (key === "paysRes") {
+      const wrap = document.getElementById("f-pays-res");
+      if (wrap) { const inp = wrap.querySelector("input"); if(inp) inp.value = ""; }
+    }
+    if (key === "paysOrig") {
+      const wrap = document.getElementById("f-pays-orig");
+      if (wrap) { const inp = wrap.querySelector("input"); if(inp) inp.value = ""; }
+    }
+    apply();
+  };
+
+  /* ── Type d'organisme ── */
+  const typeEl = document.getElementById("f-type-org");
+  if (typeEl) typeEl.addEventListener("change", () => { state.typeOrg = typeEl.value; apply(); });
+
+  /* ── Ville (texte libre, debounce) ── */
+  let _villeTimer;
+  const villeEl = document.getElementById("f-ville-simple");
+  if (villeEl) villeEl.addEventListener("input", () => {
+    clearTimeout(_villeTimer);
+    _villeTimer = setTimeout(() => { state.ville = villeEl.value.trim(); apply(); }, 300);
+  });
+
+  /* ── Bouton reset ── */
+  document.getElementById("btn-reset-filters")?.addEventListener("click", window.annResetFilters);
+
+  /* ── GeoAutocomplete (pays résidence + pays origine) ── */
+  if (typeof GeoAutocomplete !== "undefined") {
+    const prAnchor = document.getElementById("f-pays-res");
+    if (prAnchor) new GeoAutocomplete(prAnchor, {
+      id: "f-pays-res",
+      placeholder: "Ex : France, Sénégal…",
+      getList: () => geoGetCountries(),
+      onSelect: v => { state.paysRes = v; apply(); },
     });
 
-    /* ── Triplet hiérarchique Pays résidence → Région → Ville ── */
-    const prAnchor = document.getElementById("f-pays-res");
-    const rgAnchor = document.getElementById("f-region");
-    const vlAnchor = document.getElementById("f-ville");
-    if(prAnchor && rgAnchor && vlAnchor){
-      GeoTriple({
-        countryAnchor: prAnchor, stateAnchor: rgAnchor, cityAnchor: vlAnchor,
-        countryId: "f-pays-res", stateId: "f-region", cityId: "f-ville",
-        countryPlaceholder: "Pays de résidence…",
-        statePlaceholder:   "Région / État…",
-        cityPlaceholder:    "Ville…",
-        onCountrySelect: apply,
-        onStateSelect:   apply,
-        onCitySelect:    apply,
-      });
-    }
+    const poAnchor = document.getElementById("f-pays-orig");
+    if (poAnchor) new GeoAutocomplete(poAnchor, {
+      id: "f-pays-orig",
+      placeholder: "Ex : Côte d'Ivoire…",
+      getList: () => geoGetCountries(),
+      onSelect: v => { state.paysOrig = v; apply(); },
+    });
   }
 
-  /* ── Selects et inputs classiques ── */
-  ["f-q","f-ray","f-domaine","f-type","f-accred"].forEach(id=>{
-    const el = document.getElementById(id);
-    if(el){ el.addEventListener("input", apply); el.addEventListener("change", apply); }
-  });
-  document.getElementById("f-unique")?.addEventListener("change", apply);
-  document.getElementById("btn-search")?.addEventListener("click", apply);
   apply();
 }
 
@@ -1255,6 +1274,8 @@ window.submitRepost = async function(postId){
 async function initFilActualite(){
   const el = document.getElementById("feed-list");
   if(!el) return;
+  // Si posts.js est chargé, il gère le fil — on cède la place
+  if(window.Posts) return;
 
   const CATS = ["Diaspora","Entrepreneuriat","Investissement","Culture","Initiatives citoyennes","Formation","Santé","Technologie","Agriculture","Autre"];
   const TYPE_ICONS = { texte:"📝", article:"📰", photo:"📷", video:"🎥" };

@@ -183,6 +183,83 @@ function seed() {
     profil_json: "{}"
   });
 
+  /* ── 10 Comptes Étatiques de démonstration ── */
+  const ETATS_DEMO = [
+    { nom: "Mairie de Paris", email: "mairie.paris@diaspoactif.demo", ville: "Paris", pays: "France",
+      type_organisme: "Mairie", type_institution: "Mairie", bio: "La Ville de Paris est la collectivité territoriale chargée de l'administration de la capitale française. Elle gère les services municipaux, le développement urbain et les politiques de solidarité pour ses 2,2 millions d'habitants.",
+      domaine_utilisateur: "Administration publique",
+      nom_responsable_etatique: "Hidalgo", prenom_responsable_etatique: "Anne", fonction_responsable_etatique: "Maire de Paris",
+      statut_etatique: "verifie", is_official: 1 },
+    { nom: "Préfecture de Police de Paris", email: "prefecture.police.paris@diaspoactif.demo", ville: "Paris", pays: "France",
+      type_organisme: "Préfecture", type_institution: "Préfecture", bio: "La Préfecture de Police de Paris assure la sécurité publique, la gestion des étrangers et la délivrance des titres officiels pour la région Île-de-France.",
+      domaine_utilisateur: "Administration publique",
+      nom_responsable_etatique: "Nuñez", prenom_responsable_etatique: "Laurent", fonction_responsable_etatique: "Préfet de Police",
+      statut_etatique: "certifie", is_official: 1 },
+    { nom: "Mairie d'Abidjan (Plateau)", email: "mairie.abidjan@diaspoactif.demo", ville: "Abidjan", pays: "Côte d'Ivoire",
+      type_organisme: "Mairie", type_institution: "Mairie", bio: "La commune du Plateau est le centre administratif et économique d'Abidjan, accueillant les principales institutions de la capitale économique ivoirienne.",
+      domaine_utilisateur: "Administration publique",
+      nom_responsable_etatique: "Cissé", prenom_responsable_etatique: "Jacques Olivier", fonction_responsable_etatique: "Maire du Plateau",
+      statut_etatique: "verifie" },
+    { nom: "Préfecture d'Abidjan", email: "prefecture.abidjan@diaspoactif.demo", ville: "Abidjan", pays: "Côte d'Ivoire",
+      type_organisme: "Préfecture", type_institution: "Préfecture", bio: "La Préfecture d'Abidjan coordonne l'action de l'État dans le district d'Abidjan, supervise les communes et assure le lien entre le gouvernement central et les collectivités locales.",
+      domaine_utilisateur: "Administration publique",
+      nom_responsable_etatique: "Coulibaly", prenom_responsable_etatique: "Dramane", fonction_responsable_etatique: "Préfet d'Abidjan",
+      statut_etatique: "declare" },
+    { nom: "Mairie de Montréal", email: "mairie.montreal@diaspoactif.demo", ville: "Montréal", pays: "Canada",
+      type_organisme: "Mairie", type_institution: "Mairie", bio: "Montréal est la métropole québécoise, ville multiculturelle par excellence. Sa mairie pilote le développement durable, l'inclusion et les relations avec les communautés diasporiques qui représentent plus de 35% de sa population.",
+      domaine_utilisateur: "Administration publique",
+      nom_responsable_etatique: "Plante", prenom_responsable_etatique: "Valérie", fonction_responsable_etatique: "Mairesse de Montréal",
+      statut_etatique: "certifie", is_official: 1 },
+    { nom: "Mairie de Bruxelles", email: "mairie.bruxelles@diaspoactif.demo", ville: "Bruxelles", pays: "Belgique",
+      type_organisme: "Mairie", type_institution: "Mairie", bio: "La Ville de Bruxelles est la capitale de la Belgique et siège des institutions européennes. Elle mène des politiques actives d'inclusion des communautés diasporiques et de coopération internationale.",
+      domaine_utilisateur: "Administration publique",
+      nom_responsable_etatique: "Close", prenom_responsable_etatique: "Philippe", fonction_responsable_etatique: "Bourgmestre de Bruxelles",
+      statut_etatique: "verifie" },
+    { nom: "Mairie de Dakar", email: "mairie.dakar@diaspoactif.demo", ville: "Dakar", pays: "Sénégal",
+      type_organisme: "Mairie", type_institution: "Mairie", bio: "La Mairie de Dakar administre la capitale sénégalaise, centre névralgique de l'Afrique de l'Ouest. Elle accompagne les initiatives diasporiques et œuvre pour le développement économique local.",
+      domaine_utilisateur: "Administration publique",
+      nom_responsable_etatique: "Diagne", prenom_responsable_etatique: "Barthélémy", fonction_responsable_etatique: "Maire de Dakar",
+      statut_etatique: "verifie" },
+    { nom: "Mairie de Yaoundé", email: "mairie.yaounde@diaspoactif.demo", ville: "Yaoundé", pays: "Cameroun",
+      type_organisme: "Mairie", type_institution: "Mairie", bio: "Capitale du Cameroun, Yaoundé est le siège des institutions nationales et des représentations diplomatiques. La mairie développe des partenariats avec la diaspora camerounaise pour soutenir les projets de développement local.",
+      domaine_utilisateur: "Administration publique",
+      nom_responsable_etatique: "Nkou Mvondo", prenom_responsable_etatique: "Luc", fonction_responsable_etatique: "Délégué du Gouvernement",
+      statut_etatique: "declare" },
+    { nom: "Mairie de Genève", email: "mairie.geneve@diaspoactif.demo", ville: "Genève", pays: "Suisse",
+      type_organisme: "Mairie", type_institution: "Mairie", bio: "Genève est une ville internationale accueillant les organisations mondiales (ONU, OMS, UNHCR). Sa mairie promeut le dialogue interculturel et soutient les initiatives des communautés diasporiques établies dans le canton.",
+      domaine_utilisateur: "Administration publique",
+      nom_responsable_etatique: "Pagani", prenom_responsable_etatique: "Alfonso", fonction_responsable_etatique: "Maire de Genève",
+      statut_etatique: "verifie" },
+    { nom: "Préfecture de la Gironde", email: "prefecture.gironde@diaspoactif.demo", ville: "Bordeaux", pays: "France",
+      type_organisme: "Préfecture", type_institution: "Préfecture", bio: "La Préfecture de la Gironde représente l'État dans le département. Elle coordonne les politiques d'intégration, de lutte contre les discriminations et d'accueil des populations issues de la diaspora.",
+      domaine_utilisateur: "Administration publique",
+      nom_responsable_etatique: "Coirier", prenom_responsable_etatique: "Fabienne", fonction_responsable_etatique: "Préfète de la Gironde",
+      statut_etatique: "verifie" },
+  ];
+
+  for (const e of ETATS_DEMO) {
+    try {
+      const uid = insertUser.run({
+        nom: e.nom, email: e.email,
+        password_hash: pw.hash, password_salt: pw.salt,
+        role: "collectivite",
+        ville: e.ville, pays: e.pays,
+        bio: e.bio,
+        profil_json: "{}"
+      }).lastInsertRowid;
+      /* Mise à jour des champs étatiques */
+      db.prepare(`UPDATE users SET
+        type_institution=?, type_organisme=?, domaine_utilisateur=?,
+        nom_responsable_etatique=?, prenom_responsable_etatique=?, fonction_responsable_etatique=?,
+        statut_etatique=?, is_official=?, declaration_officielle=1
+        WHERE id=?`).run(
+        e.type_institution, e.type_organisme, e.domaine_utilisateur||null,
+        e.nom_responsable_etatique||null, e.prenom_responsable_etatique||null, e.fonction_responsable_etatique||null,
+        e.statut_etatique||'declare', e.is_official||0, uid
+      );
+    } catch(_) {}
+  }
+
   /* ── Compte ANADER — Partenaire Officiel ── */
   const anaderUserId = insertUser.run({
     nom: "ANADER", email: "contact@anader.diaspoactif.demo",

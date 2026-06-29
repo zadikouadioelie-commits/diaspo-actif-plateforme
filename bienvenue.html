@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Bienvenue !</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<meta name="theme-color" content="#ff6b00">
+<style>
+  .bv-hero { background: linear-gradient(135deg, #FF6B00 0%, #FF8C42 100%); color: #fff; text-align: center; padding: 48px 20px 36px; }
+  .bv-hero h1 { font-size: 2rem; margin: 0 0 10px; }
+  .bv-hero p  { font-size: 1rem; margin: 0; opacity: .9; }
+  .bv-grid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 24px; }
+  .bv-card   { background: #fff; border: 1.5px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px; transition: border-color .2s, box-shadow .2s; }
+  .bv-card:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(255,107,0,.12); }
+  .bv-avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--orange); color: #fff; font-size: 22px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .bv-name   { font-weight: 700; font-size: 15px; }
+  .bv-meta   { font-size: 12px; color: var(--muted); }
+  .bv-desc   { font-size: 13px; color: #444; line-height: 1.5; flex: 1; }
+  .bv-follow { border: 1.5px solid var(--orange); color: var(--orange); background: #fff; border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s; }
+  .bv-follow:hover, .bv-follow.followed { background: var(--orange); color: #fff; }
+  .bv-follow.followed::before { content: "✓ "; }
+  .bv-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 28px; }
+  .bv-skip   { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; text-decoration: underline; margin-top: 16px; display: block; text-align: center; }
+  .bv-empty  { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+  .bv-badge  { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: #FFF3E0; color: var(--orange); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width:900px;margin:0 auto;padding:0 20px 60px;">
+
+    <div class="bv-hero" style="border-radius:0 0 16px 16px;margin-bottom:32px;">
+      <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+      <h1>Bienvenue sur Diaspo'Actif !</h1>
+      <p>Votre fiche a été créée avec succès.<br>Voici quelques profils susceptibles de vous intéresser.</p>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <h2 style="margin:0;font-size:18px;">Profils recommandés pour vous</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" id="selection-btns">
+        <button class="btn btn-orange" id="btn-follow-all">Suivre la sélection</button>
+        <button class="btn btn-outline" id="btn-ignore-all">Tout ignorer</button>
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 20px;">Ces recommandations sont basées sur votre profil. Vous pouvez les ignorer à tout moment.</p>
+
+    <div class="bv-grid" id="reco-grid">
+      <div class="bv-empty">Chargement des recommandations…</div>
+    </div>
+
+    <button class="bv-skip" id="btn-skip">Passer cette étape et accéder à mon tableau de bord →</button>
+  </main>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(async () => {
+  /* Vérifier si l'utilisateur est connecté */
+  let me = null;
+  try { me = await fetch('/api/auth/me', { credentials: 'include' }).then(r => r.json()); } catch(_) {}
+  const user = me?.user;
+
+  /* Déterminer le tableau de bord cible */
+  function dashboardUrl() {
+    if (!user) return 'index.html';
+    const map = { initiative: 'dashboard-initiative.html', administrateur: 'dashboard-administrateur.html', collectivite: 'dashboard-collectivite.html' };
+    return map[user.role] || 'dashboard-utilisateur.html';
+  }
+
+  /* Bouton Passer */
+  document.getElementById('btn-skip').addEventListener('click', () => window.location.href = dashboardUrl());
+  document.getElementById('btn-ignore-all').addEventListener('click', () => window.location.href = dashboardUrl());
+
+  /* Charger recommandations */
+  let recos = [];
+  const followedIds = new Set();
+
+  try {
+    const data = await fetch('/api/recommendations', { credentials: 'include' }).then(r => r.json());
+    recos = data.recommendations || [];
+  } catch(_) {}
+
+  const grid = document.getElementById('reco-grid');
+
+  function renderReco(r, i) {
+    const initials = ((r.prenom||r.display_nom||'?')[0] || '?').toUpperCase();
+    const name = r.display_nom || ((r.prenom||'') + ' ' + (r.nom||'')).trim() || 'Profil';
+    const isFollowed = followedIds.has(r.id);
+
+    const ROLE_INFO = {
+      initiative:     { label: 'Initiative',       color: '#FF6B00', bg: '#FFF7ED', icon: '🏛' },
+      utilisateur:    { label: 'Membre',            color: '#0369A1', bg: '#F0F9FF', icon: '👤' },
+      administrateur: { label: 'Compte Étatique',  color: '#7C3AED', bg: '#F5F3FF', icon: '🏛' },
+      collectivite:   { label: 'Compte Étatique',  color: '#7C3AED', bg: '#F5F3FF', icon: '🏛' },
+    };
+    const ri = ROLE_INFO[r.role] || { label: r.role||'', color: '#64748b', bg: '#F8FAFC', icon: '👤' };
+
+    const pays  = (r.pays_init || r.pays_origine || '').trim();
+    const ville = (r.ville || '').trim();
+    const lieu  = [ville, pays].filter(Boolean).join(', ');
+    const domaine = (r.domaine || r.compte_type || '').trim();
+    const desc  = (r.description || '').trim();
+
+    return `
+      <div class="bv-card" data-idx="${i}" style="position:relative;">
+        <!-- En-tête : avatar + identité -->
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          ${r.avatar_url
+            ? `<img src="${r.avatar_url}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid ${ri.color}22;">`
+            : `<div class="bv-avatar" style="background:${ri.color};width:56px;height:56px;font-size:20px;">${initials}</div>`}
+          <div style="flex:1;min-width:0;">
+            <div class="bv-name" style="font-size:14px;line-height:1.3;">${name}</div>
+            <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+              <span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${ri.bg};color:${ri.color};">${ri.icon} ${ri.label}</span>
+              ${domaine ? `<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#F1F5F9;color:#475569;">${domaine}</span>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Localisation -->
+        ${lieu ? `<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#64748b;margin-top:8px;"><span>📍</span><span>${lieu}</span></div>` : ''}
+
+        <!-- Description / objet social -->
+        ${desc ? `<div style="font-size:13px;color:#374151;line-height:1.55;margin-top:8px;padding:10px 12px;background:#F9FAFB;border-radius:8px;border-left:3px solid ${ri.color};">${desc.length > 150 ? desc.slice(0,150)+'…' : desc}</div>` : ''}
+
+        <!-- Bouton Suivre -->
+        <button class="bv-follow ${isFollowed ? 'followed' : ''}" data-id="${r.id}" data-idx="${i}" style="width:100%;margin-top:10px;padding:9px;border-radius:8px;">
+          ${isFollowed ? '✓ Suivi(e)' : `+ Suivre ${ri.label}`}
+        </button>
+      </div>`;
+  }
+
+  function renderGrid() {
+    if (!recos.length) {
+      grid.innerHTML = `<div class="bv-empty">Aucune recommandation disponible pour l'instant.<br>Explorez l'<a href="annuaire.html" style="color:var(--orange);">annuaire</a> pour découvrir la communauté.</div>`;
+      return;
+    }
+    grid.innerHTML = recos.map((r, i) => renderReco(r, i)).join('');
+    grid.querySelectorAll('.bv-follow').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt(btn.dataset.id);
+        if (followedIds.has(id)) return;
+        try {
+          await fetch(`/api/follow/${id}`, { method: 'POST', credentials: 'include' });
+          followedIds.add(id);
+          btn.className = 'bv-follow followed';
+          btn.textContent = '✓ Suivi(e)';
+        } catch(_) {
+          followedIds.add(id); /* mode démo */
+          btn.className = 'bv-follow followed';
+          btn.textContent = '✓ Suivi(e)';
+        }
+      });
+    });
+  }
+
+  renderGrid();
+
+  /* Suivre toute la sélection */
+  document.getElementById('btn-follow-all').addEventListener('click', async () => {
+    for (const r of recos) {
+      if (!followedIds.has(r.id)) {
+        try { await fetch(`/api/follow/${r.id}`, { method: 'POST', credentials: 'include' }); } catch(_) {}
+        followedIds.add(r.id);
+      }
+    }
+    renderGrid();
+    setTimeout(() => window.location.href = dashboardUrl(), 800);
+  });
+})();
+</script>
+</body>
+</html>
