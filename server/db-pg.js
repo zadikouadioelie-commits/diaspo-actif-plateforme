@@ -22,19 +22,33 @@ function toPg(sql) {
     .replace(/date\('now'\)/gi, "CURRENT_DATE")
     .replace(/\bINTEGER PRIMARY KEY AUTOINCREMENT\b/gi, "BIGSERIAL PRIMARY KEY")
     .replace(/\bBLOB\b/gi, "BYTEA")
-    .replace(/INSERT OR IGNORE INTO/gi, "INSERT INTO")
-    .replace(/INSERT OR REPLACE INTO/gi, "INSERT INTO")
+    // INSERT OR IGNORE → INSERT avec ON CONFLICT DO NOTHING (si pas déjà présent)
+    .replace(/\bINSERT OR IGNORE INTO\b/gi, "INSERT INTO")
+    .replace(/\bINSERT OR REPLACE INTO\b/gi, "INSERT INTO")
     .replace(/ON CONFLICT\b/gi, "ON CONFLICT");
 }
 
-/* Retourne un résultat INSERT avec lastInsertRowid */
-function addReturning(sql) {
-  const s = sql.trim().toUpperCase();
-  if (s.startsWith("INSERT") && !s.includes("RETURNING")) {
-    return sql.trimEnd() + " RETURNING id";
-  }
-  return sql;
+/* Ajoute ON CONFLICT DO NOTHING aux INSERT qui venaient de INSERT OR IGNORE */
+function wasIgnoreInsert(rawSql) {
+  return /\bINSERT OR IGNORE INTO\b/i.test(rawSql);
 }
+
+/* Ajoute RETURNING id pour récupérer l'ID inséré, sauf si déjà présent */
+function addReturningIfNeeded(sql, raw) {
+  const s = sql.trim().toUpperCase();
+  if (!s.startsWith("INSERT")) return sql;
+  let out = sql;
+  // Ajouter ON CONFLICT DO NOTHING pour les INSERT OR IGNORE d'origine
+  if (wasIgnoreInsert(raw) && !s.includes("ON CONFLICT")) {
+    out = out.trimEnd() + " ON CONFLICT DO NOTHING";
+  }
+  // Ajouter RETURNING id si pas déjà là
+  if (!out.trim().toUpperCase().includes("RETURNING")) {
+    out = out.trimEnd() + " RETURNING id";
+  }
+  return out;
+}
+
 
 /* Convertit PRAGMA table_info(x) en requête pg */
 function isPragmaInfo(sql) {
@@ -85,12 +99,19 @@ class PgStatement {
   /* Exécute (INSERT/UPDATE/DELETE) — retourne { changes, lastInsertRowid } */
   async run(...args) {
     const params = args.flat();
-    const sql = addReturning(this._sql);
-    const r = await pool.query(sql, params);
-    return {
-      changes: r.rowCount || 0,
-      lastInsertRowid: r.rows[0]?.id || null,
-    };
+    const sql = addReturningIfNeeded(this._sql, this._raw);
+    try {
+      const r = await pool.query(sql, params);
+      return { changes: r.rowCount || 0, lastInsertRowid: r.rows[0]?.id || null };
+    } catch (e) {
+      // La table n'a pas de colonne "id" — réessai sans RETURNING
+      if (e.code === '42703' && e.message.includes('"id"')) {
+        const sqlNoRet = sql.replace(/\s+RETURNING id\s*$/i, '');
+        const r = await pool.query(sqlNoRet, params);
+        return { changes: r.rowCount || 0, lastInsertRowid: null };
+      }
+      throw e;
+    }
   }
 }
 
