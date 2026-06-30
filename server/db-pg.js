@@ -124,5 +124,7 @@ function prepare(sql) {
 pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT").catch(() => {});
 pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires BIGINT").catch(() => {});
 pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url TEXT").catch(() => {});
+pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT FALSE").catch(() => {});
+pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS nom_institution TEXT").catch(() => {});
 
 module.exports = { prepare, exec, pool };

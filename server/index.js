@@ -789,7 +789,7 @@ route("GET", "/api/recommendations", async (req, res, params, body, query) => {
              ville, pays AS pays_init, NULL AS pays_origine,
              photo_url AS avatar_url, titre_pro AS compte_type,
              situation_pro AS domaine
-      FROM users WHERE id NOT IN (${placeholders}) AND (nationalite1 = ? OR nationalite2 = ?) LIMIT 6
+      FROM users WHERE id NOT IN (${placeholders}) AND (nationalite1 = ? OR nationalite2 = ?) AND (is_demo IS NULL OR is_demo = FALSE) LIMIT 6
     `).all(...excluded, origine, origine);
     candidates.push(...usrs.map(r => ({ ...r, score: 1 })));
   }
@@ -803,7 +803,7 @@ route("GET", "/api/recommendations", async (req, res, params, body, query) => {
              ville, pays AS pays_init, NULL AS pays_origine,
              photo_url AS avatar_url, titre_pro AS compte_type,
              situation_pro AS domaine
-      FROM users WHERE id NOT IN (${ph2}) ORDER BY last_active DESC LIMIT ?
+      FROM users WHERE id NOT IN (${ph2}) AND (is_demo IS NULL OR is_demo = FALSE) ORDER BY last_active DESC LIMIT ?
     `).all(...existIds, limit);
     candidates.push(...active.map(r => ({ ...r, score: 0 })));
   }

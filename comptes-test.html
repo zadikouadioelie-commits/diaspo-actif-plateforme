@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Comptes de test — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #060e1a 0%, #0D1B2A 60%, #0F2A50 100%);
+  font-family: Inter, Arial, sans-serif;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.wrap { width: 100%; max-width: 520px; }
+.logo { text-align: center; margin-bottom: 32px; }
+.logo-text { font-size: 20px; font-weight: 900; color: #fff; letter-spacing: -.02em; }
+.logo-sub { font-size: 11px; color: #64748B; margin-top: 2px; }
+
+/* Gate */
+#gate { background: rgba(255,255,255,.05); border: 1.5px solid rgba(255,255,255,.1); border-radius: 16px; padding: 32px; text-align: center; }
+#gate h2 { color: #fff; font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+#gate p { color: #94A3B8; font-size: 13px; margin-bottom: 20px; }
+#gate input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1.5px solid rgba(255,255,255,.15); background: rgba(255,255,255,.07); color: #fff; font-size: 15px; text-align: center; letter-spacing: 4px; outline: none; }
+#gate input:focus { border-color: #2563EB; }
+#gate .btn { width: 100%; margin-top: 14px; background: linear-gradient(135deg,#2563EB,#1d4ed8); color: #fff; border: none; border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 800; cursor: pointer; }
+#gate .err { color: #EF4444; font-size: 12px; margin-top: 8px; display: none; }
+
+/* Panel */
+#panel { display: none; }
+h1 { color: #fff; font-size: 20px; font-weight: 900; margin-bottom: 6px; }
+.subtitle { color: #64748B; font-size: 13px; margin-bottom: 24px; }
+
+.card {
+  background: rgba(255,255,255,.06);
+  border: 1.5px solid rgba(255,255,255,.1);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 14px;
+  transition: border-color .2s;
+}
+.card:hover { border-color: rgba(37,99,235,.5); }
+.card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.badge {
+  font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.badge-utilisateur { background: rgba(37,99,235,.2); color: #60A5FA; }
+.badge-initiative  { background: rgba(232,124,62,.2); color: #FB923C; }
+.badge-collectivite{ background: rgba(124,58,237,.2); color: #C084FC; }
+.badge-admin       { background: rgba(239,68,68,.2); color: #FCA5A5; }
+.card-nom { color: #fff; font-weight: 700; font-size: 15px; }
+
+.creds { background: rgba(0,0,0,.3); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+.cred-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.cred-row:last-child { margin-bottom: 0; }
+.cred-label { color: #64748B; font-size: 12px; }
+.cred-val { color: #CBD5E1; font-size: 12px; font-family: monospace; }
+.copy-btn { background: none; border: none; color: #64748B; cursor: pointer; font-size: 14px; padding: 2px; }
+.copy-btn:hover { color: #94A3B8; }
+
+.btn-login {
+  width: 100%; background: linear-gradient(135deg,#2563EB,#1d4ed8);
+  color: #fff; border: none; border-radius: 10px; padding: 11px;
+  font-size: 13px; font-weight: 800; cursor: pointer;
+  transition: opacity .2s;
+}
+.btn-login:hover { opacity: .88; }
+.btn-login.loading { opacity: .6; cursor: not-allowed; }
+
+.admin-card { border-color: rgba(239,68,68,.3) !important; }
+
+.note { background: rgba(37,99,235,.08); border: 1px solid rgba(37,99,235,.2); border-radius: 10px; padding: 12px 14px; margin-top: 8px; }
+.note p { color: #94A3B8; font-size: 12px; line-height: 1.6; }
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: #10B981; color: #fff; padding: 10px 20px; border-radius: 10px;
+  font-size: 13px; font-weight: 700; transition: transform .3s;
+  pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <div class="logo-text">DIASPO'ACTIF</div>
+    <div class="logo-sub">Espace de test — accès restreint</div>
+  </div>
+
+  <!-- Gate de sécurité -->
+  <div id="gate">
+    <h2>🔒 Accès restreint</h2>
+    <p>Entrez le code d'accès pour voir les comptes de test.</p>
+    <input type="password" id="code-input" placeholder="••••••••" maxlength="20" onkeydown="if(event.key==='Enter')checkCode()">
+    <button class="btn" onclick="checkCode()">Accéder →</button>
+    <p class="err" id="code-err">Code incorrect.</p>
+  </div>
+
+  <!-- Panel principal -->
+  <div id="panel">
+    <h1>Comptes de test</h1>
+    <p class="subtitle">Invisibles du public — pour vérifier chaque expérience utilisateur.</p>
+
+    <!-- Utilisateur -->
+    <div class="card">
+      <div class="card-head">
+        <span class="badge badge-utilisateur">Utilisateur</span>
+        <span class="card-nom">Jean Utilisateur Test</span>
+      </div>
+      <div class="creds">
+        <div class="cred-row">
+          <span class="cred-label">Email</span>
+          <span class="cred-val" id="e-user">test-utilisateur@diaspoactif.com</span>
+          <button class="copy-btn" onclick="copy('e-user')">📋</button>
+        </div>
+        <div class="cred-row">
+          <span class="cred-label">Mot de passe</span>
+          <span class="cred-val" id="p-user">TestUser2024!</span>
+          <button class="copy-btn" onclick="copy('p-user')">📋</button>
+        </div>
+      </div>
+      <button class="btn-login" onclick="login('test-utilisateur@diaspoactif.com','TestUser2024!',this)">
+        Se connecter en tant qu'Utilisateur →
+      </button>
+    </div>
+
+    <!-- Initiative -->
+    <div class="card">
+      <div class="card-head">
+        <span class="badge badge-initiative">Initiative</span>
+        <span class="card-nom">Marie Initiative Test</span>
+      </div>
+      <div class="creds">
+        <div class="cred-row">
+          <span class="cred-label">Email</span>
+          <span class="cred-val" id="e-init">test-initiative@diaspoactif.com</span>
+          <button class="copy-btn" onclick="copy('e-init')">📋</button>
+        </div>
+        <div class="cred-row">
+          <span class="cred-label">Mot de passe</span>
+          <span class="cred-val" id="p-init">TestInit2024!</span>
+          <button class="copy-btn" onclick="copy('p-init')">📋</button>
+        </div>
+      </div>
+      <button class="btn-login" onclick="login('test-initiative@diaspoactif.com','TestInit2024!',this)">
+        Se connecter en tant qu'Initiative →
+      </button>
+    </div>
+
+    <!-- Collectivité -->
+    <div class="card">
+      <div class="card-head">
+        <span class="badge badge-collectivite">Collectivité</span>
+        <span class="card-nom">Mairie de Test</span>
+      </div>
+      <div class="creds">
+        <div class="cred-row">
+          <span class="cred-label">Email</span>
+          <span class="cred-val" id="e-coll">test-collectivite@diaspoactif.com</span>
+          <button class="copy-btn" onclick="copy('e-coll')">📋</button>
+        </div>
+        <div class="cred-row">
+          <span class="cred-label">Mot de passe</span>
+          <span class="cred-val" id="p-coll">TestColl2024!</span>
+          <button class="copy-btn" onclick="copy('p-coll')">📋</button>
+        </div>
+      </div>
+      <button class="btn-login" onclick="login('test-collectivite@diaspoactif.com','TestColl2024!',this)">
+        Se connecter en tant que Collectivité →
+      </button>
+    </div>
+
+    <!-- Admin -->
+    <div class="card admin-card">
+      <div class="card-head">
+        <span class="badge badge-admin">Administrateur</span>
+        <span class="card-nom">Admin Diaspo'Actif</span>
+      </div>
+      <div class="creds">
+        <div class="cred-row">
+          <span class="cred-label">Email</span>
+          <span class="cred-val" id="e-admin">admin@diaspoactif.com</span>
+          <button class="copy-btn" onclick="copy('e-admin')">📋</button>
+        </div>
+        <div class="cred-row">
+          <span class="cred-label">Mot de passe</span>
+          <span class="cred-val" id="p-admin">AdminDA@2024!Secure</span>
+          <button class="copy-btn" onclick="copy('p-admin')">📋</button>
+        </div>
+      </div>
+      <button class="btn-login" onclick="login('admin@diaspoactif.com','AdminDA@2024!Secure',this)">
+        Se connecter en tant qu'Administrateur →
+      </button>
+    </div>
+
+    <div class="note">
+      <p>🔒 Ces comptes sont <strong>invisibles du public</strong> (fil, recherche, annuaire). Seul toi peux y accéder depuis cette page.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Copié !</div>
+
+<script>
+/* Code d'accès — modifiable ici */
+const ACCESS_CODE = "DiaspoAdmin2024";
+
+function checkCode() {
+  const val = document.getElementById('code-input').value.trim();
+  const err = document.getElementById('code-err');
+  if (val === ACCESS_CODE) {
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('panel').style.display = 'block';
+    sessionStorage.setItem('da_test_ok', '1');
+  } else {
+    err.style.display = 'block';
+    document.getElementById('code-input').value = '';
+  }
+}
+
+if (sessionStorage.getItem('da_test_ok')) {
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('panel').style.display = 'block';
+}
+
+function copy(id) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => showToast('Copié !'));
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+async function login(email, password, btn) {
+  btn.classList.add('loading');
+  btn.textContent = 'Connexion...';
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erreur');
+    const role = data.user?.role;
+    const dest = {
+      utilisateur:    'dashboard-utilisateur.html',
+      initiative:     'dashboard-initiative.html',
+      collectivite:   'dashboard-collectivite.html',
+      administrateur: 'dashboard-administrateur.html'
+    }[role] || 'index.html';
+    window.location.href = dest;
+  } catch(e) {
+    btn.classList.remove('loading');
+    btn.textContent = `Erreur : ${e.message}`;
+    setTimeout(() => { btn.textContent = 'Se connecter →'; }, 3000);
+  }
+}
+</script>
+</body>
+</html>
