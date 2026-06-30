@@ -109,14 +109,14 @@
       <section id="section-vue-ensemble">
         <div class="flex-between" style="margin-bottom:24px;">
           <div>
-            <h1 style="margin:0;">Tableau de bord Administrateur</h1>
+            <h1 style="margin:0;">Tableau de bord Super Administrateur</h1>
             <p style="margin:4px 0 0;color:var(--muted);font-size:13.5px;">Diaspo'Actif — activité et gestion de la plateforme</p>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
             <span id="last-refresh" style="font-size:12px;color:var(--muted);"></span>
             <a href="reunions.html" class="btn btn-outline" style="font-size:13px;padding:6px 14px;text-decoration:none;border-color:#7c3aed;color:#7c3aed;display:inline-flex;align-items:center;gap:6px;">📹 Visioconférence</a>
             <button class="btn" style="font-size:13px;padding:6px 14px;" onclick="reloadDashboard()">↺ Actualiser</button>
-            <span class="badge badge-asso">Administrateur</span>
+            <span class="badge badge-asso">👑 Super Administrateur</span>
           </div>
         </div>
 
@@ -617,7 +617,7 @@
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
           <div>
             <h2 style="margin:0;font-size:22px;">🏛️ Observatoire Institutionnel</h2>
-            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Activité des Comptes Étatiques · Statistiques agrégées · Réservé Administrateur</p>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Activité des Comptes Étatiques · Statistiques agrégées · Réservé Super Administrateur</p>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <select id="oi-periode" onchange="loadObsInstit()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;">
@@ -902,7 +902,7 @@
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
           <div>
             <h2 style="margin:0;font-size:22px;">🌍 Observatoire de la Coopération Internationale</h2>
-            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Données agrégées & anonymisées · Observatoire mondial des coopérations · Réservé Administrateur</p>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Données agrégées & anonymisées · Observatoire mondial des coopérations · Réservé Super Administrateur</p>
           </div>
           <div style="display:flex;gap:8px;">
             <select id="oci-periode" onchange="loadObsCoop()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;">
@@ -1097,7 +1097,7 @@
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
           <div>
             <h2 style="margin:0;font-size:22px;">💶 Observatoire Économique Global</h2>
-            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Analyse agrégée & anonymisée · Données non nominatives · Réservé Administrateur</p>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Analyse agrégée & anonymisée · Données non nominatives · Réservé Super Administrateur</p>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <select id="oeg-periode" onchange="loadObsEco()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;">
@@ -1761,7 +1761,7 @@
             <option value="professionnel">Professionnel</option>
             <option value="investisseur">Investisseur</option>
             <option value="createur">Créateur</option>
-            <option value="administrateur">Administrateur</option>
+            <option value="administrateur">Super Administrateur</option>
           </select>
           <select id="faq-filter-cat" style="padding:7px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;flex:1;min-width:160px;" onchange="loadFaqAdmin()">
             <option value="">Toutes les catégories</option>
@@ -1835,7 +1835,7 @@
                   <option value="professionnel">Professionnel</option>
                   <option value="investisseur">Investisseur</option>
                   <option value="createur">Créateur</option>
-                  <option value="administrateur">Administrateur</option>
+                  <option value="administrateur">Super Administrateur</option>
                 </select>
                 <div style="font-size:11px;color:var(--muted);margin-top:4px;">Ctrl+clic pour sélection multiple</div>
               </div>
