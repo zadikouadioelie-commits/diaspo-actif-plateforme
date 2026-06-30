@@ -269,6 +269,13 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   const token = createSession(id);
   const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, statut_verification FROM users WHERE id = ?").get(id);
   const authTok = signAuthToken({ uid: id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+
+  // Email de bienvenue (non bloquant)
+  try {
+    const { emailBienvenue } = require("./mailer");
+    emailBienvenue({ prenom: user.prenom || user.nom, email: user.email, role: user.role });
+  } catch (_) {}
+
   sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
 });
 
