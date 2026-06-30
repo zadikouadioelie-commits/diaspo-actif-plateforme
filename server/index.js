@@ -480,7 +480,7 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
   row.abonnement_actif = !!row.abonnement_actif;
   row.certif = getCertif(row.id);
   row.accreditations = row.owner_user_id
-    ? await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(row.owner_user_id).map(a => a.type)
+    ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(row.owner_user_id)).map(a => a.type)
     : [];
   sendJSON(res, 200, { initiative: row });
 });
@@ -763,7 +763,7 @@ route("GET", "/api/recommendations", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const userFull = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
-  const followed = await db.prepare("SELECT followed_id FROM user_follows WHERE follower_id = ?").all(user.id).map(r => r.followed_id);
+  const followed = (await db.prepare("SELECT followed_id FROM user_follows WHERE follower_id = ?").all(user.id)).map(r => r.followed_id);
   const excluded = [user.id, ...followed];
   const placeholders = excluded.map(() => "?").join(",");
   /* Critères de matching : pays résidence, pays origine, domaine */
@@ -2826,7 +2826,7 @@ async function enrichPost(p, cu) {
     }
   }
   const auteur_accreditations = p.auteur_id
-    ? await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(p.auteur_id).map(a => a.type)
+    ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(p.auteur_id)).map(a => a.type)
     : [];
   return { ...p, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post };
 }
@@ -2842,9 +2842,9 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   // ─── MODE SUIVIS ───────────────────────────────────────────────────────────
   if (mode === "suivis" && cu) {
     // IDs des utilisateurs suivis
-    const followedUsers = await db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(cu.id).map(r => r.followed_id);
+    const followedUsers = (await db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(cu.id)).map(r => r.followed_id);
     // IDs des initiatives suivies → propriétaires (owner_user_id)
-    const followedInits = await db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id).map(r => r.initiative_id);
+    const followedInits = (await db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id)).map(r => r.initiative_id);
     const initAuthorIds = followedInits.length
       ? db.prepare(`SELECT owner_user_id AS id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")}) AND owner_user_id IS NOT NULL`).all(...followedInits).map(r => r.id)
       : [];
@@ -2896,8 +2896,8 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
 
   if (cu) {
     // 1) Posts des profils/initiatives suivis (récents d'abord)
-    const followedUsers = await db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(cu.id).map(r => r.followed_id);
-    const followedInits = await db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id).map(r => r.initiative_id);
+    const followedUsers = (await db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(cu.id)).map(r => r.followed_id);
+    const followedInits = (await db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id)).map(r => r.initiative_id);
     const initOwners = followedInits.length
       ? db.prepare(`SELECT owner_user_id AS id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")}) AND owner_user_id IS NOT NULL`).all(...followedInits).map(r => r.id)
       : [];
@@ -2960,8 +2960,8 @@ route("DELETE", "/api/follow/:id", async (req, res, params) => {
 route("GET", "/api/fil/meta", async (req, res) => {
   const cu = await getCurrentUser(req);
   if (!cu) return sendJSON(res, 200, { suivis_users: [], suivis_initiatives: [] });
-  const suivis_users = await db.prepare("SELECT followed_id AS id FROM user_follows WHERE follower_id=?").all(cu.id).map(r => r.id);
-  const suivis_initiatives = await db.prepare("SELECT initiative_id AS id FROM abonnements WHERE user_id=?").all(cu.id).map(r => r.id);
+  const suivis_users = (await db.prepare("SELECT followed_id AS id FROM user_follows WHERE follower_id=?").all(cu.id)).map(r => r.id);
+  const suivis_initiatives = (await db.prepare("SELECT initiative_id AS id FROM abonnements WHERE user_id=?").all(cu.id)).map(r => r.id);
   sendJSON(res, 200, { suivis_users, suivis_initiatives });
 });
 
@@ -4354,7 +4354,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     // Toutes communications qui ne sont pas bloquées par l'utilisateur
-    const desabo = await db.prepare("SELECT institution_id FROM comm_desabonnements WHERE user_id=?").all(user.id).map(r=>r.institution_id);
+    const desabo = (await db.prepare("SELECT institution_id FROM comm_desabonnements WHERE user_id=?").all(user.id)).map(r=>r.institution_id);
     let rows = await db.prepare("SELECT ci.*, u.nom AS emetteur_nom FROM communications_institutionnelles ci JOIN users u ON u.id=ci.emetteur_id ORDER BY ci.created_at DESC LIMIT 30").all();
     if (desabo.length) rows = rows.filter(r => !desabo.includes(null) && !desabo.includes(r.emetteur_id));
     sendJSON(res, 200, { communications: rows });
@@ -7774,7 +7774,7 @@ async function handleRequest(req, res) {
     if (req.method === 'POST' && pathname === '/api/listes-diffusion/check-user') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { user_id } = body;
-      const ids = await db.prepare(`SELECT c.liste_id FROM listes_diffusion_contacts c JOIN listes_diffusion l ON l.id=c.liste_id WHERE l.proprietaire_id=? AND c.user_id=?`).all(me.id, user_id).map(r=>r.liste_id);
+      const ids = (await db.prepare(`SELECT c.liste_id FROM listes_diffusion_contacts c JOIN listes_diffusion l ON l.id=c.liste_id WHERE l.proprietaire_id=? AND c.user_id=?`).all(me.id, user_id)).map(r=>r.liste_id);
       return sendJSON(res, 200, { liste_ids: ids });
     }
 
@@ -9867,7 +9867,7 @@ async function handleRequest(req, res) {
     async function initAccreds(initId) {
       const row = await db.prepare(`SELECT owner_user_id FROM initiatives WHERE id=?`).get(initId);
       if (!row?.owner_user_id) return [];
-      return await db.prepare(`SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'`).all(row.owner_user_id).map(a => a.type);
+      return (await db.prepare(`SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'`).all(row.owner_user_id)).map(a => a.type);
     }
     /* Helper — nb recommandations */
     async function countRecos(initId) {
@@ -14220,7 +14220,7 @@ route("GET", "/api/admin/observatoire-coop", async (req, res) => {
   const nbProjets= db.prepare("SELECT COUNT(*) as n FROM projets").get().n || 0;
   const nbUsers  = db.prepare("SELECT COUNT(*) as n FROM users").get().n || 0;
   const nbCampagnes = db.prepare("SELECT COUNT(*) as n FROM recrutement_campagnes").get().n || 0;
-  const paysList = await db.prepare("SELECT DISTINCT pays FROM initiatives WHERE pays IS NOT NULL").all().map(r=>r.pays);
+  const paysList = (await db.prepare("SELECT DISTINCT pays FROM initiatives WHERE pays IS NOT NULL").all()).map(r=>r.pays);
   const nbPays   = new Set([...paysList, "France", "Belgique", "Canada", "Maroc", "Espagne"]).size;
 
   const seed = nbInit * 41 + nbEvents * 13 + nbDeals * 7 + nbUsers * 3;
