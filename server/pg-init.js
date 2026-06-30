@@ -19,8 +19,10 @@ async function pgInit() {
     "SELECT COUNT(*)::int AS cnt FROM information_schema.tables WHERE table_schema = 'public'"
   );
   if (rows[0].cnt > 3) {
+    /* Schéma déjà en place — mais toujours corriger les comptes démo */
+    await seedPg(pool);
     _initialized = true;
-    return; // Schéma déjà en place
+    return;
   }
 
   console.log('[pg-init] Création du schéma Postgres...');
