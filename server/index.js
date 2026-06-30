@@ -15530,6 +15530,287 @@ app.get('/api/bp-simulations/:id/rapport', requireAuth, (req, res) => {
   sendJSON(res, 200, { rapport: sim.rapport_json ? safeJSON(sim.rapport_json, {}) : null, score: sim.score, statut: sim.statut });
 });
 
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE AUDIOVISUEL
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Helpers ── */
+function genResumeIA(titre, description, type) {
+  const types = { conference:'conférence', ag:'assemblée générale', formation:'formation', evenement:'événement', podcast:'podcast', interview:'interview' };
+  const t = types[type] || type;
+  return `Résumé de la ${t} "${titre}" : ${description ? description.slice(0,200) : 'Contenu audiovisuel produit par l\'initiative.'} Points abordés : vision stratégique, actualités de l'initiative, échanges avec les participants. Ce contenu est disponible en replay dans la bibliothèque audiovisuelle.`;
+}
+function genMomentsClés(titre) {
+  return [
+    { time:'00:00', label:'Introduction et accueil' },
+    { time:'05:30', label:'Présentation du sujet' },
+    { time:'20:00', label:'Développement et analyses' },
+    { time:'45:00', label:'Questions du public' },
+    { time:'55:00', label:'Synthèse et conclusions' },
+  ];
+}
+
+/* ── LIVES ── */
+
+/* Lister les lives d'une initiative */
+app.get('/api/audiovisuel/lives', requireAuth, (req, res) => {
+  const initiativeId = req.query.initiative_id || req.user.id;
+  const statut = req.query.statut;
+  let q = 'SELECT l.*, u.nom as initiative_nom FROM av_lives l JOIN users u ON u.id=l.initiative_id WHERE l.initiative_id=?';
+  const params = [initiativeId];
+  if (statut) { q += ' AND l.statut=?'; params.push(statut); }
+  q += ' ORDER BY l.date_debut DESC LIMIT 50';
+  sendJSON(res, 200, db.prepare(q).all(...params));
+});
+
+/* Créer un live */
+app.post('/api/audiovisuel/lives', requireAuth, async (req, res) => {
+  if (req.user.role !== 'initiative' && req.user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé aux initiatives' });
+  const body = await parseBody(req);
+  const { titre, description='', type='conference', acces='public', prix=0, code_acces='', url_stream='', vignette_url='', date_debut, date_fin, tags=[] } = body;
+  if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
+  const r = db.prepare('INSERT INTO av_lives (initiative_id,titre,description,type,acces,prix,code_acces,url_stream,vignette_url,date_debut,date_fin,tags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(req.user.id, titre, description, type, acces, prix, code_acces, url_stream, vignette_url, date_debut||null, date_fin||null, JSON.stringify(tags));
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* Obtenir un live */
+app.get('/api/audiovisuel/lives/:id', (req, res) => {
+  const live = db.prepare('SELECT l.*, u.nom as initiative_nom, u.avatar as initiative_avatar FROM av_lives l JOIN users u ON u.id=l.initiative_id WHERE l.id=?').get(req.params.id);
+  if (!live) return sendJSON(res, 404, { error: 'Live introuvable' });
+  sendJSON(res, 200, { ...live, tags: safeJSON(live.tags, []), moments_cles: safeJSON(live.moments_cles, []), decisions: safeJSON(live.decisions, []), actions: safeJSON(live.actions, []) });
+});
+
+/* Modifier un live */
+app.put('/api/audiovisuel/lives/:id', requireAuth, async (req, res) => {
+  const live = db.prepare('SELECT * FROM av_lives WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
+  if (!live) return sendJSON(res, 404, { error: 'Introuvable' });
+  const body = await parseBody(req);
+  const fields = ['titre','description','type','acces','prix','code_acces','url_stream','url_replay','vignette_url','date_debut','date_fin','statut','enregistrement_url','transcription','resume_ia','tags','moments_cles','decisions','actions'];
+  const sets = []; const vals = [];
+  fields.forEach(f => { if (body[f] !== undefined) { sets.push(`${f}=?`); vals.push(typeof body[f]==='object'?JSON.stringify(body[f]):body[f]); } });
+  sets.push("updated_at=datetime('now')");
+  db.prepare(`UPDATE av_lives SET ${sets.join(',')} WHERE id=?`).run(...vals, req.params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Supprimer un live */
+app.delete('/api/audiovisuel/lives/:id', requireAuth, (req, res) => {
+  const live = db.prepare('SELECT * FROM av_lives WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
+  if (!live) return sendJSON(res, 404, { error: 'Introuvable' });
+  db.prepare('DELETE FROM av_lives WHERE id=?').run(req.params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Démarrer / terminer un live */
+app.post('/api/audiovisuel/lives/:id/statut', requireAuth, async (req, res) => {
+  const live = db.prepare('SELECT * FROM av_lives WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
+  if (!live) return sendJSON(res, 404, { error: 'Introuvable' });
+  const body = await parseBody(req);
+  const { statut } = body;
+  if (!['programme','en_cours','termine','annule'].includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide' });
+  // Si on termine, générer le résumé IA
+  let extra = {};
+  if (statut === 'termine') {
+    extra.resume_ia = genResumeIA(live.titre, live.description, live.type);
+    extra.moments_cles = JSON.stringify(genMomentsClés(live.titre));
+  }
+  const extraSets = Object.keys(extra).map(k=>`${k}=?`).join(',');
+  const q = `UPDATE av_lives SET statut=?${extraSets?','+extraSets:''} WHERE id=?`;
+  db.prepare(q).run(statut, ...Object.values(extra), req.params.id);
+  sendJSON(res, 200, { ok: true, statut, resume_ia: extra.resume_ia });
+});
+
+/* Incrémenter vues */
+app.post('/api/audiovisuel/lives/:id/vue', (req, res) => {
+  db.prepare('UPDATE av_lives SET nb_vues=nb_vues+1 WHERE id=?').run(req.params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── CHAT LIVE ── */
+
+app.get('/api/audiovisuel/lives/:id/chat', (req, res) => {
+  const since = req.query.since || '1970-01-01';
+  const msgs = db.prepare("SELECT c.*, u.nom as user_nom, u.avatar as user_avatar FROM av_live_chat c LEFT JOIN users u ON u.id=c.user_id WHERE c.live_id=? AND c.created_at>? ORDER BY c.created_at ASC LIMIT 100").all(req.params.id, since);
+  sendJSON(res, 200, msgs);
+});
+
+app.post('/api/audiovisuel/lives/:id/chat', async (req, res) => {
+  const body = await parseBody(req);
+  const { message, pseudo='Anonyme', user_id=null } = body;
+  if (!message?.trim()) return sendJSON(res, 400, { error: 'Message vide' });
+  const r = db.prepare('INSERT INTO av_live_chat (live_id, user_id, pseudo, message) VALUES (?,?,?,?)').run(req.params.id, user_id||null, pseudo, message.trim().slice(0,500));
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+app.delete('/api/audiovisuel/lives/:id/chat/:msgId', requireAuth, (req, res) => {
+  db.prepare('UPDATE av_live_chat SET type=? WHERE id=? AND live_id=?').run('modere', req.params.msgId, req.params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── SONDAGES ── */
+
+app.get('/api/audiovisuel/lives/:id/sondages', (req, res) => {
+  const sondages = db.prepare('SELECT * FROM av_sondages WHERE live_id=? AND actif=1').all(req.params.id);
+  const result = sondages.map(s => {
+    const options = safeJSON(s.options_json, []);
+    const votes = db.prepare('SELECT option_index, COUNT(*) as cnt FROM av_votes WHERE sondage_id=? GROUP BY option_index').all(s.id);
+    const totaux = {}; votes.forEach(v => totaux[v.option_index] = v.cnt);
+    const total = votes.reduce((a,v)=>a+v.cnt,0);
+    return { ...s, options: options.map((o,i)=>({ label:o, votes:totaux[i]||0, pct:total?(((totaux[i]||0)/total)*100).toFixed(1):0 })), total };
+  });
+  sendJSON(res, 200, result);
+});
+
+app.post('/api/audiovisuel/lives/:id/sondages', requireAuth, async (req, res) => {
+  const live = db.prepare('SELECT * FROM av_lives WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
+  if (!live) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const body = await parseBody(req);
+  const { question, options=[] } = body;
+  if (!question || options.length < 2) return sendJSON(res, 400, { error: 'Question et min 2 options requises' });
+  const r = db.prepare('INSERT INTO av_sondages (live_id, question, options_json) VALUES (?,?,?)').run(req.params.id, question, JSON.stringify(options));
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+app.post('/api/audiovisuel/sondages/:id/voter', async (req, res) => {
+  const body = await parseBody(req);
+  const { option_index, user_id=null } = body;
+  try {
+    db.prepare('INSERT INTO av_votes (sondage_id, user_id, option_index) VALUES (?,?,?)').run(req.params.id, user_id||null, option_index);
+    sendJSON(res, 201, { ok: true });
+  } catch(e) { sendJSON(res, 409, { error: 'Déjà voté' }); }
+});
+
+/* ── RÉACTIONS ── */
+
+app.post('/api/audiovisuel/lives/:id/reactions', async (req, res) => {
+  const body = await parseBody(req);
+  const { emoji='❤️', user_id=null } = body;
+  db.prepare('INSERT INTO av_reactions (live_id, user_id, emoji) VALUES (?,?,?)').run(req.params.id, user_id||null, emoji);
+  const total = db.prepare('SELECT emoji, COUNT(*) as cnt FROM av_reactions WHERE live_id=? GROUP BY emoji').all(req.params.id);
+  sendJSON(res, 200, { ok: true, reactions: total });
+});
+
+app.get('/api/audiovisuel/lives/:id/reactions', (req, res) => {
+  const total = db.prepare('SELECT emoji, COUNT(*) as cnt FROM av_reactions WHERE live_id=? GROUP BY emoji ORDER BY cnt DESC').all(req.params.id);
+  sendJSON(res, 200, total);
+});
+
+/* ── PODCASTS / SÉRIES ── */
+
+app.get('/api/audiovisuel/series', (req, res) => {
+  const initiativeId = req.query.initiative_id;
+  let q = 'SELECT s.*, u.nom as initiative_nom, (SELECT COUNT(*) FROM av_episodes e WHERE e.serie_id=s.id) as nb_episodes FROM av_series s JOIN users u ON u.id=s.initiative_id';
+  const params = [];
+  if (initiativeId) { q += ' WHERE s.initiative_id=?'; params.push(initiativeId); }
+  q += ' ORDER BY s.created_at DESC LIMIT 50';
+  sendJSON(res, 200, db.prepare(q).all(...params));
+});
+
+app.post('/api/audiovisuel/series', requireAuth, async (req, res) => {
+  if (req.user.role !== 'initiative' && req.user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé aux initiatives' });
+  const body = await parseBody(req);
+  const { titre, description='', categorie='general', image_url='' } = body;
+  if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
+  const r = db.prepare('INSERT INTO av_series (initiative_id, titre, description, categorie, image_url) VALUES (?,?,?,?,?)').run(req.user.id, titre, description, categorie, image_url);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* ── ÉPISODES ── */
+
+app.get('/api/audiovisuel/episodes', (req, res) => {
+  const initiativeId = req.query.initiative_id;
+  const serieId = req.query.serie_id;
+  let q = 'SELECT e.*, u.nom as initiative_nom, s.titre as serie_titre FROM av_episodes e JOIN users u ON u.id=e.initiative_id LEFT JOIN av_series s ON s.id=e.serie_id WHERE e.is_public=1';
+  const params = [];
+  if (initiativeId) { q += ' AND e.initiative_id=?'; params.push(initiativeId); }
+  if (serieId) { q += ' AND e.serie_id=?'; params.push(serieId); }
+  q += ' ORDER BY e.published_at DESC LIMIT 50';
+  sendJSON(res, 200, db.prepare(q).all(...params));
+});
+
+app.get('/api/audiovisuel/episodes/:id', (req, res) => {
+  const ep = db.prepare('SELECT e.*, u.nom as initiative_nom, s.titre as serie_titre FROM av_episodes e JOIN users u ON u.id=e.initiative_id LEFT JOIN av_series s ON s.id=e.serie_id WHERE e.id=?').get(req.params.id);
+  if (!ep) return sendJSON(res, 404, { error: 'Épisode introuvable' });
+  db.prepare('UPDATE av_episodes SET nb_ecoutes=nb_ecoutes+1 WHERE id=?').run(req.params.id);
+  sendJSON(res, 200, { ...ep, intervenants: safeJSON(ep.intervenants, []), chapitres: safeJSON(ep.chapitres, []), mots_cles: safeJSON(ep.mots_cles, []) });
+});
+
+app.post('/api/audiovisuel/episodes', requireAuth, async (req, res) => {
+  if (req.user.role !== 'initiative' && req.user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé aux initiatives' });
+  const body = await parseBody(req);
+  const { titre, description='', url_audio, serie_id=null, duree_secondes=0, intervenants=[], categorie='general', image_url='', is_public=1, published_at=null, tags=[], mots_cles=[] } = body;
+  if (!titre || !url_audio) return sendJSON(res, 400, { error: 'Titre et URL audio requis' });
+  const resume = genResumeIA(titre, description, categorie);
+  const chapitres = duree_secondes > 600 ? [{ time:'0:00', titre:'Introduction' }, { time:`${Math.floor(duree_secondes/3/60)}:${String(Math.floor((duree_secondes/3)%60)).padStart(2,'0')}`, titre:'Développement' }, { time:`${Math.floor(duree_secondes*2/3/60)}:${String(Math.floor((duree_secondes*2/3)%60)).padStart(2,'0')}`, titre:'Conclusion' }] : [];
+  const r = db.prepare('INSERT INTO av_episodes (initiative_id, serie_id, titre, description, url_audio, duree_secondes, intervenants, categorie, image_url, is_public, published_at, resume_ia, chapitres, mots_cles) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(req.user.id, serie_id||null, titre, description, url_audio, duree_secondes, JSON.stringify(intervenants), categorie, image_url, is_public?1:0, published_at||new Date().toISOString().slice(0,10), resume, JSON.stringify(chapitres), JSON.stringify(mots_cles));
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+app.put('/api/audiovisuel/episodes/:id', requireAuth, async (req, res) => {
+  const ep = db.prepare('SELECT * FROM av_episodes WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
+  if (!ep) return sendJSON(res, 404, { error: 'Introuvable' });
+  const body = await parseBody(req);
+  const fields = ['titre','description','url_audio','serie_id','duree_secondes','intervenants','categorie','image_url','is_public','published_at','transcription','resume_ia','chapitres','mots_cles'];
+  const sets=[]; const vals=[];
+  fields.forEach(f => { if (body[f]!==undefined) { sets.push(`${f}=?`); vals.push(typeof body[f]==='object'?JSON.stringify(body[f]):body[f]); } });
+  db.prepare(`UPDATE av_episodes SET ${sets.join(',')} WHERE id=?`).run(...vals, req.params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+app.delete('/api/audiovisuel/episodes/:id', requireAuth, (req, res) => {
+  const ep = db.prepare('SELECT * FROM av_episodes WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
+  if (!ep) return sendJSON(res, 404, { error: 'Introuvable' });
+  db.prepare('DELETE FROM av_episodes WHERE id=?').run(req.params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Commenter un épisode */
+app.get('/api/audiovisuel/episodes/:id/commentaires', (req, res) => {
+  const coms = db.prepare('SELECT c.*, u.nom as user_nom, u.avatar as user_avatar FROM av_commentaires c JOIN users u ON u.id=c.user_id WHERE c.episode_id=? ORDER BY c.created_at DESC LIMIT 50').all(req.params.id);
+  sendJSON(res, 200, coms);
+});
+app.post('/api/audiovisuel/episodes/:id/commentaires', requireAuth, async (req, res) => {
+  const body = await parseBody(req);
+  const { contenu, note=null } = body;
+  if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis' });
+  const r = db.prepare('INSERT INTO av_commentaires (episode_id, user_id, contenu, note) VALUES (?,?,?,?)').run(req.params.id, req.user.id, contenu.trim(), note||null);
+  if (note) db.prepare('UPDATE av_episodes SET note=ROUND((note*nb_notes+?)/(nb_notes+1),1), nb_notes=nb_notes+1 WHERE id=?').run(note, req.params.id);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* ── BIBLIOTHÈQUE (mixte lives + épisodes) ── */
+app.get('/api/audiovisuel/bibliotheque', (req, res) => {
+  const initiativeId = req.query.initiative_id;
+  const type = req.query.type; // 'live' | 'episode' | null (tous)
+  let lives = [], episodes = [];
+  if (!type || type === 'live') {
+    let q = "SELECT 'live' as content_type, l.id, l.titre, l.description, l.vignette_url, l.nb_vues as nb_vues, l.date_debut as date_ref, l.statut, l.type, u.nom as initiative_nom FROM av_lives l JOIN users u ON u.id=l.initiative_id WHERE l.statut='termine'";
+    const p = [];
+    if (initiativeId) { q += ' AND l.initiative_id=?'; p.push(initiativeId); }
+    lives = db.prepare(q + ' ORDER BY l.date_debut DESC LIMIT 30').all(...p);
+  }
+  if (!type || type === 'episode') {
+    let q = "SELECT 'episode' as content_type, e.id, e.titre, e.description, e.image_url as vignette_url, e.nb_ecoutes as nb_vues, e.published_at as date_ref, 'publie' as statut, e.categorie as type, u.nom as initiative_nom FROM av_episodes e JOIN users u ON u.id=e.initiative_id WHERE e.is_public=1";
+    const p = [];
+    if (initiativeId) { q += ' AND e.initiative_id=?'; p.push(initiativeId); }
+    episodes = db.prepare(q + ' ORDER BY e.published_at DESC LIMIT 30').all(...p);
+  }
+  const all = [...lives, ...episodes].sort((a,b) => new Date(b.date_ref) - new Date(a.date_ref));
+  sendJSON(res, 200, all);
+});
+
+/* ── STATS AUDIOVISUEL ── */
+app.get('/api/audiovisuel/stats', requireAuth, (req, res) => {
+  const id = req.user.id;
+  const totalLives = db.prepare('SELECT COUNT(*) as n FROM av_lives WHERE initiative_id=?').get(id).n;
+  const totalVuesLive = db.prepare('SELECT COALESCE(SUM(nb_vues),0) as n FROM av_lives WHERE initiative_id=?').get(id).n;
+  const livesEnCours = db.prepare("SELECT COUNT(*) as n FROM av_lives WHERE initiative_id=? AND statut='en_cours'").get(id).n;
+  const totalEpisodes = db.prepare('SELECT COUNT(*) as n FROM av_episodes WHERE initiative_id=?').get(id).n;
+  const totalEcoutes = db.prepare('SELECT COALESCE(SUM(nb_ecoutes),0) as n FROM av_episodes WHERE initiative_id=?').get(id).n;
+  const totalSeries = db.prepare('SELECT COUNT(*) as n FROM av_series WHERE initiative_id=?').get(id).n;
+  sendJSON(res, 200, { totalLives, totalVuesLive, livesEnCours, totalEpisodes, totalEcoutes, totalSeries });
+});
+
 /* ═══════════════════════════════════════════════════════════════════ */
 
 /* Export pour Vercel serverless */

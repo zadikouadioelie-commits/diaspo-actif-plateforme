@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Audiovisuel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+/* ===== LAYOUT ===== */
+.av-shell{max-width:1100px;margin:0 auto;padding:24px 20px 80px;}
+.av-hero{background:linear-gradient(135deg,#1e1b4b,#312e81,#4c1d95);border-radius:20px;padding:40px;color:#fff;margin-bottom:28px;position:relative;overflow:hidden;}
+.av-hero::before{content:'';position:absolute;right:-40px;top:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.05);}
+.av-hero h1{margin:0 0 8px;font-size:28px;}
+.av-hero p{margin:0 0 20px;opacity:.85;font-size:15px;}
+.av-hero-stats{display:flex;gap:24px;flex-wrap:wrap;}
+.av-stat{text-align:center;}
+.av-stat .sn{font-size:28px;font-weight:900;}
+.av-stat .sl{font-size:11.5px;opacity:.8;margin-top:2px;}
+
+/* Tabs */
+.av-tabs{display:flex;gap:4px;background:var(--bg);border-radius:12px;padding:4px;margin-bottom:20px;border:1px solid var(--border);}
+.av-tab{flex:1;padding:9px;text-align:center;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:700;color:var(--muted);border:none;background:none;transition:all .15s;}
+.av-tab.active{background:#fff;color:var(--orange);box-shadow:0 1px 6px rgba(0,0,0,.1);}
+
+/* Live cards */
+.live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px;}
+.live-card{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;transition:all .18s;cursor:pointer;}
+.live-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1);transform:translateY(-2px);}
+.live-thumb{position:relative;width:100%;height:170px;background:linear-gradient(135deg,#1e1b4b,#4c1d95);display:flex;align-items:center;justify-content:center;}
+.live-thumb img{width:100%;height:100%;object-fit:cover;}
+.live-thumb .live-badge{position:absolute;top:10px;left:10px;background:#dc2626;color:#fff;border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:800;letter-spacing:.5px;}
+.live-thumb .live-badge.prog{background:#f59e0b;}
+.live-thumb .live-badge.fin{background:#6b7280;}
+.live-thumb .play-ico{font-size:48px;opacity:.9;}
+.live-info{padding:14px;}
+.live-title{font-weight:800;font-size:14.5px;margin:0 0 4px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.live-meta{font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;}
+.live-meta span{display:flex;align-items:center;gap:3px;}
+.live-actions{display:flex;gap:8px;margin-top:12px;}
+
+/* Badge de type */
+.type-badge{display:inline-block;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700;}
+.type-conference{background:#dbeafe;color:#1d4ed8;}
+.type-formation{background:#dcfce7;color:#15803d;}
+.type-ag{background:#fef9c3;color:#92400e;}
+.type-evenement{background:#fce7f3;color:#be185d;}
+.type-interview{background:#f3e8ff;color:#7c3aed;}
+.type-podcast{background:#ffedd5;color:#c2410c;}
+
+/* Podcast cards */
+.pod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.pod-card{border:1px solid var(--border);border-radius:14px;padding:14px;background:#fff;display:flex;gap:12px;cursor:pointer;transition:all .15s;}
+.pod-card:hover{box-shadow:0 3px 15px rgba(0,0,0,.09);transform:translateY(-1px);}
+.pod-thumb{width:70px;height:70px;border-radius:10px;object-fit:cover;flex-shrink:0;background:linear-gradient(135deg,#ff6b00,#ffb27a);display:flex;align-items:center;justify-content:center;font-size:28px;}
+.pod-body{flex:1;min-width:0;}
+.pod-title{font-weight:800;font-size:13.5px;margin:0 0 3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pod-meta{font-size:11.5px;color:var(--muted);}
+.pod-progress{height:3px;border-radius:99px;background:var(--border);overflow:hidden;margin-top:6px;}
+.pod-progress .fill{height:100%;border-radius:99px;background:var(--orange);}
+
+/* Bibliothèque */
+.bib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;}
+.bib-card{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff;cursor:pointer;transition:all .15s;}
+.bib-card:hover{box-shadow:0 3px 14px rgba(0,0,0,.1);transform:translateY(-1px);}
+.bib-thumb{height:130px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);position:relative;display:flex;align-items:center;justify-content:center;font-size:36px;}
+.bib-thumb img{width:100%;height:100%;object-fit:cover;}
+.bib-info{padding:10px 12px;}
+.bib-title{font-weight:700;font-size:13px;margin:0 0 3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.bib-sub{font-size:11px;color:var(--muted);}
+
+/* Modals */
+.av-modal-body{display:flex;flex-direction:column;gap:14px;}
+
+/* Accès live */
+.acces-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.acces-opt{border:2px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;text-align:center;transition:all .15s;}
+.acces-opt:hover,.acces-opt.selected{border-color:var(--orange);background:var(--orange-light);}
+.acces-opt .ai{font-size:22px;margin-bottom:4px;}
+.acces-opt .an{font-size:12.5px;font-weight:700;}
+
+/* Banner live en cours */
+.live-now-banner{background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;margin-bottom:20px;cursor:pointer;}
+.live-now-banner .pulse{width:12px;height:12px;border-radius:50%;background:#fff;animation:pulse 1.2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(.85);}}
+
+@media(max-width:640px){
+  .live-grid,.pod-grid,.bib-grid{grid-template-columns:1fr;}
+  .av-hero{padding:24px;}
+  .av-tabs{overflow-x:auto;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="dashboard-initiative.html" style="color:var(--muted);text-decoration:none;font-size:13px;font-weight:700;">← Dashboard</a>
+      <div class="logo" style="margin-left:16px;"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="av-shell">
+
+    <!-- Live en cours (si applicable) -->
+    <div id="live-now-banner" style="display:none;" onclick="document.getElementById('tab-lives').click()"></div>
+
+    <!-- Hero + stats -->
+    <div class="av-hero">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+        <div>
+          <h1>📺 Audiovisuel</h1>
+          <p>Votre espace média : diffusez en direct, publiez des podcasts, gérez votre bibliothèque.</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3);" onclick="openModalLive()">+ Nouveau Live</button>
+          <button class="btn" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3);" onclick="openModalPodcast()">+ Podcast</button>
+        </div>
+      </div>
+      <div class="av-hero-stats" id="av-stats">
+        <div class="av-stat"><div class="sn">—</div><div class="sl">Lives</div></div>
+        <div class="av-stat"><div class="sn">—</div><div class="sl">Vues live</div></div>
+        <div class="av-stat"><div class="sn">—</div><div class="sl">Épisodes</div></div>
+        <div class="av-stat"><div class="sn">—</div><div class="sl">Écoutes</div></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="av-tabs">
+      <button class="av-tab active" id="tab-lives" onclick="switchTab('lives')">📺 Lives</button>
+      <button class="av-tab" id="tab-podcasts" onclick="switchTab('podcasts')">🎙 Podcasts</button>
+      <button class="av-tab" id="tab-bib" onclick="switchTab('bib')">📚 Bibliothèque</button>
+    </div>
+
+    <!-- Contenu -->
+    <div id="panel-lives"><div style="color:var(--muted);text-align:center;padding:40px;">Chargement…</div></div>
+    <div id="panel-podcasts" style="display:none;"><div style="color:var(--muted);text-align:center;padding:40px;">Chargement…</div></div>
+    <div id="panel-bib" style="display:none;"><div style="color:var(--muted);text-align:center;padding:40px;">Chargement…</div></div>
+
+  </div>
+</div>
+
+<!-- MODAL NOUVEAU LIVE -->
+<div class="modal-bg" id="modal-live" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;">
+  <div class="modal" style="max-width:560px;width:95%;max-height:90vh;overflow-y:auto;">
+    <div class="modal-head">
+      <strong>📺 Nouveau Live</strong>
+      <button onclick="closeModal('modal-live')" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);">✕</button>
+    </div>
+    <div class="modal-body av-modal-body">
+      <div>
+        <label class="form-label">Titre *</label>
+        <input id="live-titre" class="form-input" placeholder="Ex : Assemblée Générale 2026">
+      </div>
+      <div>
+        <label class="form-label">Description</label>
+        <textarea id="live-desc" class="form-input" rows="3" placeholder="Présentation, objectifs…"></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label class="form-label">Type</label>
+          <select id="live-type" class="form-input">
+            <option value="conference">📢 Conférence</option>
+            <option value="ag">🏛 Assemblée Générale</option>
+            <option value="formation">🎓 Formation</option>
+            <option value="evenement">📅 Événement</option>
+            <option value="lancement">🚀 Lancement produit</option>
+            <option value="visite">🌍 Visite de terrain</option>
+            <option value="reunion">🧑‍💼 Réunion publique</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Date/heure de début</label>
+          <input id="live-date" type="datetime-local" class="form-input">
+        </div>
+      </div>
+      <div>
+        <label class="form-label">URL de diffusion (YouTube Live, Zoom, Meet…)</label>
+        <input id="live-url" class="form-input" placeholder="https://youtube.com/live/xxx">
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Entrez le lien de votre diffusion YouTube / Zoom / Jitsi. Les spectateurs pourront le rejoindre depuis la plateforme.</div>
+      </div>
+      <div>
+        <label class="form-label">Vignette (URL image)</label>
+        <input id="live-vignette" class="form-input" placeholder="https://…/image.jpg">
+      </div>
+      <div>
+        <label class="form-label">Accès</label>
+        <div class="acces-opts" id="acces-opts">
+          <div class="acces-opt selected" data-acces="public" onclick="selectAcces('public')"><div class="ai">🌍</div><div class="an">Public</div></div>
+          <div class="acces-opt" data-acces="membres" onclick="selectAcces('membres')"><div class="ai">👥</div><div class="an">Membres</div></div>
+          <div class="acces-opt" data-acces="prive" onclick="selectAcces('prive')"><div class="ai">🔒</div><div class="an">Privé</div></div>
+          <div class="acces-opt" data-acces="payant" onclick="selectAcces('payant')"><div class="ai">🎟</div><div class="an">Payant</div></div>
+        </div>
+      </div>
+      <div id="live-prix-row" style="display:none;">
+        <label class="form-label">Prix (€)</label>
+        <input id="live-prix" type="number" min="0" step="0.5" class="form-input" placeholder="9.99">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-live')">Annuler</button>
+      <button class="btn btn-orange" onclick="createLive()">Créer le Live</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOUVEAU PODCAST -->
+<div class="modal-bg" id="modal-podcast" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;">
+  <div class="modal" style="max-width:540px;width:95%;max-height:90vh;overflow-y:auto;">
+    <div class="modal-head">
+      <strong>🎙 Nouvel épisode podcast</strong>
+      <button onclick="closeModal('modal-podcast')" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);">✕</button>
+    </div>
+    <div class="modal-body av-modal-body">
+      <div>
+        <label class="form-label">Titre *</label>
+        <input id="pod-titre" class="form-input" placeholder="Titre de l'épisode">
+      </div>
+      <div>
+        <label class="form-label">Description</label>
+        <textarea id="pod-desc" class="form-input" rows="3" placeholder="Résumé de l'épisode…"></textarea>
+      </div>
+      <div>
+        <label class="form-label">URL audio * (SoundCloud, Spotify, lien direct MP3…)</label>
+        <input id="pod-url" class="form-input" placeholder="https://…/episode.mp3">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label class="form-label">Catégorie</label>
+          <select id="pod-cat" class="form-input">
+            <option value="general">Général</option>
+            <option value="interview">🎤 Interview</option>
+            <option value="formation">📚 Formation</option>
+            <option value="actualite">📰 Actualités</option>
+            <option value="conseil">💡 Conseils</option>
+            <option value="temoignage">🗣 Témoignage</option>
+            <option value="annonce">📢 Annonce</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Durée (min)</label>
+          <input id="pod-duree" type="number" min="1" class="form-input" placeholder="30">
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Image de couverture (URL)</label>
+        <input id="pod-image" class="form-input" placeholder="https://…/cover.jpg">
+      </div>
+      <div>
+        <label class="form-label">Intervenants (séparés par des virgules)</label>
+        <input id="pod-interv" class="form-input" placeholder="Jean Dupont, Marie Martin">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-podcast')">Annuler</button>
+      <button class="btn btn-orange" onclick="createPodcast()">Publier l'épisode</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+/* =====================================================
+   MODULE AUDIOVISUEL — Page principale
+   ===================================================== */
+let me = null;
+let livesData = [];
+let episodesData = [];
+let currentTab = 'lives';
+let selectedAcces = 'public';
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(d){ if(!d)return'—'; const dt=new Date(d); return dt.toLocaleDateString('fr',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function fmtDuree(s){ if(!s)return''; const m=Math.floor(s/60); const h=Math.floor(m/60); return h?`${h}h${String(m%60).padStart(2,'0')}`:`${m} min`; }
+function fmtNum(n){ return n>=1000?(n/1000).toFixed(1)+'k':String(n||0); }
+
+const TYPE_LABELS = { conference:'Conférence', ag:'AG', formation:'Formation', evenement:'Événement', lancement:'Lancement', visite:'Visite', reunion:'Réunion', interview:'Interview', podcast:'Podcast', actualite:'Actualités', conseil:'Conseils', temoignage:'Témoignage', annonce:'Annonce', general:'Général' };
+const TYPE_ICONS = { conference:'📢', ag:'🏛', formation:'🎓', evenement:'📅', lancement:'🚀', visite:'🌍', reunion:'🧑‍💼', interview:'🎤', podcast:'🎙', actualite:'📰', conseil:'💡', temoignage:'🗣', annonce:'📢', general:'🎵' };
+const STATUT_BADGE = { en_cours:'<span class="live-badge">🔴 EN DIRECT</span>', programme:'<span class="live-badge prog">📅 Programmé</span>', termine:'<span class="live-badge fin">✅ Terminé</span>', annule:'<span class="live-badge fin">❌ Annulé</span>' };
+
+function closeModal(id){ document.getElementById(id).style.display='none'; }
+
+function switchTab(tab) {
+  currentTab = tab;
+  ['lives','podcasts','bib'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t===tab);
+    document.getElementById(`panel-${t}`).style.display = t===tab?'block':'none';
+  });
+  if (tab==='lives' && !livesData.length) loadLives();
+  if (tab==='podcasts' && !episodesData.length) loadEpisodes();
+  if (tab==='bib') loadBib();
+}
+
+/* ── Stats ── */
+async function loadStats() {
+  try {
+    const s = await api('GET', '/audiovisuel/stats');
+    document.getElementById('av-stats').innerHTML = `
+      <div class="av-stat"><div class="sn">${s.totalLives}</div><div class="sl">Lives</div></div>
+      <div class="av-stat"><div class="sn">${fmtNum(s.totalVuesLive)}</div><div class="sl">Vues live</div></div>
+      <div class="av-stat"><div class="sn">${s.totalEpisodes}</div><div class="sl">Épisodes</div></div>
+      <div class="av-stat"><div class="sn">${fmtNum(s.totalEcoutes)}</div><div class="sl">Écoutes</div></div>`;
+    if (s.livesEnCours > 0) {
+      const b = document.getElementById('live-now-banner');
+      b.style.display = 'flex';
+      b.innerHTML = `<div class="pulse"></div><div><strong>${s.livesEnCours} live en cours !</strong> Cliquez pour gérer la diffusion</div>`;
+    }
+  } catch(e) {}
+}
+
+/* ── Lives ── */
+async function loadLives() {
+  const el = document.getElementById('panel-lives');
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;">Chargement…</div>';
+  try {
+    livesData = await api('GET', `/audiovisuel/lives?initiative_id=${me.id}`);
+    renderLives();
+  } catch(e) { el.innerHTML = `<div style="color:#D33;padding:20px;">${e.message}</div>`; }
+}
+
+function renderLives() {
+  const el = document.getElementById('panel-lives');
+  if (!livesData.length) {
+    el.innerHTML = `<div style="text-align:center;padding:60px;color:var(--muted);">
+      <div style="font-size:48px;margin-bottom:12px;">📺</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Aucun live créé</div>
+      <p style="margin:0 0 20px;">Organisez votre première diffusion en direct.</p>
+      <button class="btn btn-orange" onclick="openModalLive()">+ Créer un live</button>
+    </div>`;
+    return;
+  }
+  const isInit = me?.role === 'initiative';
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-outline" onclick="filterLives('')" id="f-all" style="font-weight:700;">Tous (${livesData.length})</button>
+        <button class="btn btn-sm btn-outline" onclick="filterLives('en_cours')" id="f-en_cours">🔴 En direct</button>
+        <button class="btn btn-sm btn-outline" onclick="filterLives('programme')" id="f-programme">📅 Programmés</button>
+        <button class="btn btn-sm btn-outline" onclick="filterLives('termine')" id="f-termine">✅ Terminés</button>
+      </div>
+      ${isInit ? `<button class="btn btn-orange btn-sm" onclick="openModalLive()">+ Nouveau Live</button>` : ''}
+    </div>
+    <div class="live-grid" id="lives-grid">${livesData.map(renderLiveCard).join('')}</div>`;
+}
+
+function renderLiveCard(l) {
+  const badge = STATUT_BADGE[l.statut] || '';
+  const icon = TYPE_ICONS[l.type] || '📺';
+  const isInit = me?.role === 'initiative';
+  return `<div class="live-card">
+    <div class="live-thumb" onclick="openLive(${l.id})">
+      ${l.vignette_url ? `<img src="${esc(l.vignette_url)}" alt="">` : `<span class="play-ico">${icon}</span>`}
+      ${badge}
+    </div>
+    <div class="live-info">
+      <div style="margin-bottom:6px;"><span class="type-badge type-${l.type}">${icon} ${TYPE_LABELS[l.type]||l.type}</span></div>
+      <div class="live-title">${esc(l.titre)}</div>
+      <div class="live-meta">
+        <span>📅 ${fmtDate(l.date_debut)}</span>
+        <span>👁 ${fmtNum(l.nb_vues)}</span>
+        ${l.acces!=='public'?`<span>🔒 ${l.acces}</span>`:''}
+      </div>
+      <div class="live-actions">
+        <button class="btn btn-sm btn-orange" onclick="openLive(${l.id})">${l.statut==='en_cours'?'🔴 Rejoindre':'▶ Voir'}</button>
+        ${isInit&&l.statut==='programme'?`<button class="btn btn-sm" style="background:#dc2626;color:#fff;border-color:#dc2626;" onclick="demarrerLive(${l.id})">🚀 Démarrer</button>`:''}
+        ${isInit&&l.statut==='en_cours'?`<button class="btn btn-sm btn-outline" onclick="terminerLive(${l.id})">⏹ Terminer</button>`:''}
+        ${isInit?`<button class="btn btn-sm btn-outline" onclick="deleteLive(${l.id},'${esc(l.titre)}')">🗑</button>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function filterLives(statut) {
+  const filtered = statut ? livesData.filter(l=>l.statut===statut) : livesData;
+  document.getElementById('lives-grid').innerHTML = filtered.map(renderLiveCard).join('');
+}
+
+/* ── Podcasts ── */
+async function loadEpisodes() {
+  const el = document.getElementById('panel-podcasts');
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;">Chargement…</div>';
+  try {
+    episodesData = await api('GET', `/audiovisuel/episodes?initiative_id=${me.id}`);
+    renderEpisodes();
+  } catch(e) { el.innerHTML = `<div style="color:#D33;padding:20px;">${e.message}</div>`; }
+}
+
+function renderEpisodes() {
+  const el = document.getElementById('panel-podcasts');
+  const isInit = me?.role === 'initiative';
+  if (!episodesData.length) {
+    el.innerHTML = `<div style="text-align:center;padding:60px;color:var(--muted);">
+      <div style="font-size:48px;margin-bottom:12px;">🎙</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Aucun épisode publié</div>
+      <p style="margin:0 0 20px;">Commencez votre podcast avec votre premier épisode.</p>
+      ${isInit?`<button class="btn btn-orange" onclick="openModalPodcast()">+ Publier un épisode</button>`:''}
+    </div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div style="font-size:13px;font-weight:700;color:var(--muted);">${episodesData.length} épisode${episodesData.length>1?'s':''}</div>
+      ${isInit?`<button class="btn btn-orange btn-sm" onclick="openModalPodcast()">+ Nouvel épisode</button>`:''}
+    </div>
+    <div class="pod-grid">${episodesData.map(renderEpisodeCard).join('')}</div>`;
+}
+
+function renderEpisodeCard(ep) {
+  const icon = TYPE_ICONS[ep.categorie] || '🎵';
+  return `<div class="pod-card" onclick="openEpisode(${ep.id})">
+    <div class="pod-thumb">${ep.image_url?`<img src="${esc(ep.image_url)}" alt="" style="width:70px;height:70px;object-fit:cover;border-radius:10px;">`:icon}</div>
+    <div class="pod-body">
+      <div class="pod-title">${esc(ep.titre)}</div>
+      <div class="pod-meta">${TYPE_LABELS[ep.categorie]||ep.categorie} · ${fmtDuree(ep.duree_secondes||0)}</div>
+      <div class="pod-meta" style="margin-top:2px;">🎧 ${fmtNum(ep.nb_ecoutes)} · ⭐ ${ep.note?ep.note.toFixed(1):'—'}</div>
+      <div class="pod-progress"><div class="fill" style="width:0%"></div></div>
+    </div>
+  </div>`;
+}
+
+/* ── Bibliothèque ── */
+async function loadBib() {
+  const el = document.getElementById('panel-bib');
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;">Chargement…</div>';
+  try {
+    const data = await api('GET', `/audiovisuel/bibliotheque?initiative_id=${me.id}`);
+    if (!data.length) { el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--muted);">📂 Bibliothèque vide — terminez un live ou publiez un épisode pour l\'alimenter.</div>'; return; }
+    el.innerHTML = `
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-outline" onclick="loadBibFilter('')">Tout</button>
+        <button class="btn btn-sm btn-outline" onclick="loadBibFilter('live')">📺 Lives</button>
+        <button class="btn btn-sm btn-outline" onclick="loadBibFilter('episode')">🎙 Podcasts</button>
+      </div>
+      <div class="bib-grid" id="bib-grid">${data.map(renderBibCard).join('')}</div>`;
+    window._bibAll = data;
+  } catch(e) { el.innerHTML = `<div style="color:#D33;padding:20px;">${e.message}</div>`; }
+}
+
+function loadBibFilter(type) {
+  const data = type ? (window._bibAll||[]).filter(x=>x.content_type===type) : (window._bibAll||[]);
+  document.getElementById('bib-grid').innerHTML = data.map(renderBibCard).join('');
+}
+
+function renderBibCard(c) {
+  const icon = c.content_type==='live'?'📺':'🎙';
+  const onclick = c.content_type==='live'?`openLive(${c.id})`:`openEpisode(${c.id})`;
+  return `<div class="bib-card" onclick="${onclick}">
+    <div class="bib-thumb">${c.vignette_url?`<img src="${esc(c.vignette_url)}" alt="">`:icon}</div>
+    <div class="bib-info">
+      <div style="font-size:10.5px;color:var(--orange);font-weight:700;margin-bottom:3px;">${icon} ${c.content_type==='live'?'Live':'Podcast'}</div>
+      <div class="bib-title">${esc(c.titre)}</div>
+      <div class="bib-sub">👁 ${fmtNum(c.nb_vues)} · ${new Date(c.date_ref||Date.now()).toLocaleDateString('fr')}</div>
+    </div>
+  </div>`;
+}
+
+/* ── Créer un Live ── */
+function openModalLive() { document.getElementById('modal-live').style.display='flex'; }
+function selectAcces(a) {
+  selectedAcces = a;
+  document.querySelectorAll('.acces-opt').forEach(el=>el.classList.toggle('selected', el.dataset.acces===a));
+  document.getElementById('live-prix-row').style.display = a==='payant'?'block':'none';
+}
+async function createLive() {
+  const titre = document.getElementById('live-titre').value.trim();
+  if (!titre) { alert('Titre requis'); return; }
+  await api('POST', '/audiovisuel/lives', {
+    titre,
+    description: document.getElementById('live-desc').value.trim(),
+    type: document.getElementById('live-type').value,
+    acces: selectedAcces,
+    prix: parseFloat(document.getElementById('live-prix').value)||0,
+    url_stream: document.getElementById('live-url').value.trim(),
+    vignette_url: document.getElementById('live-vignette').value.trim(),
+    date_debut: document.getElementById('live-date').value||null,
+  });
+  closeModal('modal-live');
+  document.getElementById('live-titre').value = '';
+  document.getElementById('live-desc').value = '';
+  document.getElementById('live-url').value = '';
+  await loadLives();
+  await loadStats();
+}
+
+/* ── Créer un Podcast ── */
+function openModalPodcast() { document.getElementById('modal-podcast').style.display='flex'; }
+async function createPodcast() {
+  const titre = document.getElementById('pod-titre').value.trim();
+  const url_audio = document.getElementById('pod-url').value.trim();
+  if (!titre || !url_audio) { alert('Titre et URL audio requis'); return; }
+  const dureeMin = parseInt(document.getElementById('pod-duree').value)||0;
+  const interv = document.getElementById('pod-interv').value.split(',').map(s=>s.trim()).filter(Boolean);
+  await api('POST', '/audiovisuel/episodes', {
+    titre,
+    description: document.getElementById('pod-desc').value.trim(),
+    url_audio,
+    categorie: document.getElementById('pod-cat').value,
+    duree_secondes: dureeMin*60,
+    image_url: document.getElementById('pod-image').value.trim(),
+    intervenants: interv,
+    is_public: 1,
+  });
+  closeModal('modal-podcast');
+  document.getElementById('pod-titre').value='';
+  document.getElementById('pod-url').value='';
+  await loadEpisodes();
+  await loadStats();
+}
+
+/* ── Démarrer / Terminer un live ── */
+async function demarrerLive(id) {
+  if (!confirm('Démarrer ce live maintenant ?')) return;
+  await api('POST', `/audiovisuel/lives/${id}/statut`, { statut: 'en_cours' });
+  await loadLives();
+  await loadStats();
+  window.open(`audiovisuel-live.html?id=${id}`, '_blank');
+}
+async function terminerLive(id) {
+  if (!confirm('Terminer ce live ? Le résumé IA sera généré automatiquement.')) return;
+  await api('POST', `/audiovisuel/lives/${id}/statut`, { statut: 'termine' });
+  await loadLives();
+  await loadStats();
+}
+async function deleteLive(id, nom) {
+  if (!confirm(`Supprimer le live "${nom}" ?`)) return;
+  await api('DELETE', `/audiovisuel/lives/${id}`);
+  await loadLives();
+  await loadStats();
+}
+
+/* ── Navigation ── */
+function openLive(id) { window.location.href = `audiovisuel-live.html?id=${id}`; }
+function openEpisode(id) { window.location.href = `audiovisuel-podcast.html?id=${id}`; }
+
+/* ── Init ── */
+async function init() {
+  me = await fetchCurrentUser();
+  if (!me) { window.location.href='login.html'; return; }
+  if (me.role !== 'initiative' && me.role !== 'administrateur') {
+    window.location.href = 'dashboard-utilisateur.html';
+    return;
+  }
+  await loadStats();
+  await loadLives();
+}
+init();
+</script>
+</body>
+</html>

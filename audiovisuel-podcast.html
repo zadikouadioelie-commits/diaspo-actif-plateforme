@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Podcast</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<style>
+.pod-shell{max-width:800px;margin:0 auto;padding:24px 20px 80px;}
+.pod-hero{display:flex;gap:24px;margin-bottom:28px;flex-wrap:wrap;}
+.pod-cover{width:180px;height:180px;border-radius:16px;object-fit:cover;background:linear-gradient(135deg,#ff6b00,#ffb27a);display:flex;align-items:center;justify-content:center;font-size:60px;flex-shrink:0;}
+.pod-hero-info{flex:1;min-width:220px;}
+.pod-hero-info h1{margin:0 0 6px;font-size:22px;}
+.pod-hero-info .pod-by{font-size:13px;color:var(--muted);margin-bottom:10px;}
+.pod-hero-info .pod-stats{display:flex;gap:16px;font-size:13px;color:var(--muted);flex-wrap:wrap;margin-bottom:14px;}
+
+/* Player HTML5 */
+.pod-player{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;}
+.pod-player audio{width:100%;border-radius:8px;}
+.pod-player .ext-link{margin-top:10px;font-size:13px;color:var(--muted);}
+
+/* Chapitres */
+.chapters{margin-bottom:20px;}
+.chapter-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;align-items:center;}
+.chapter-item:hover{color:var(--orange);}
+.chapter-time{font-family:monospace;font-size:12.5px;color:var(--orange);font-weight:700;flex-shrink:0;}
+.chapter-label{font-size:13.5px;}
+
+/* Commentaires */
+.com-form{display:flex;flex-direction:column;gap:10px;padding:16px;background:var(--bg);border-radius:12px;border:1px solid var(--border);margin-bottom:16px;}
+.star-row{display:flex;gap:4px;}
+.star{font-size:22px;cursor:pointer;color:#d1d5db;transition:color .1s;}
+.star.active,.star:hover{color:#f59e0b;}
+.com-item{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);}
+.com-av{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--orange),#ffb27a);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;}
+.com-body{flex:1;}
+.com-name{font-weight:700;font-size:13px;}
+.com-text{font-size:13.5px;color:var(--text);margin-top:4px;line-height:1.5;}
+
+/* IA card */
+.ia-card{background:linear-gradient(135deg,#f5f3ff,#fff);border:1px solid #e0d4fd;border-radius:14px;padding:20px;margin-bottom:20px;}
+.ia-card h3{margin:0 0 12px;font-size:15px;color:#6d28d9;}
+.ia-section{margin-bottom:12px;}
+.ia-section strong{font-size:11.5px;text-transform:uppercase;color:#6d28d9;letter-spacing:.5px;}
+.kw-chip{display:inline-block;background:#f5f3ff;color:#6d28d9;border:1px solid #e0d4fd;border-radius:99px;padding:3px 10px;font-size:11.5px;margin:3px;}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="audiovisuel.html" style="color:var(--muted);text-decoration:none;font-size:13px;font-weight:700;">← Audiovisuel</a>
+      <div class="logo" style="margin-left:16px;"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="pod-shell">
+    <div id="loading" style="text-align:center;padding:60px;color:var(--muted);">Chargement…</div>
+    <div id="content" style="display:none;">
+
+      <!-- Hero -->
+      <div class="pod-hero">
+        <div class="pod-cover" id="pod-cover">🎙</div>
+        <div class="pod-hero-info">
+          <div style="font-size:11.5px;font-weight:700;color:var(--orange);text-transform:uppercase;margin-bottom:6px;" id="pod-cat-label">Podcast</div>
+          <h1 id="pod-titre">—</h1>
+          <div class="pod-by">🏢 <span id="pod-init">—</span> <span id="pod-serie" style="display:none;">· 🎧 <span id="pod-serie-titre"></span></span></div>
+          <div class="pod-stats">
+            <span>🎧 <strong id="pod-ecoutes">0</strong> écoutes</span>
+            <span>⭐ <strong id="pod-note">—</strong></span>
+            <span>⏱ <strong id="pod-duree">—</strong></span>
+          </div>
+          <div id="pod-intervenants" style="font-size:12.5px;color:var(--muted);"></div>
+          <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+            <button class="btn btn-orange btn-sm" onclick="document.querySelector('audio')?.play()">▶ Écouter</button>
+            <a id="pod-dl-link" href="#" target="_blank" class="btn btn-outline btn-sm" download>⬇ Télécharger</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Player -->
+      <div class="pod-player">
+        <audio id="audio-player" controls>
+          Votre navigateur ne supporte pas l'audio HTML5.
+        </audio>
+        <div class="ext-link">🔗 Lien direct : <a id="audio-src-link" href="#" target="_blank" style="color:var(--orange);">Ouvrir la source</a></div>
+      </div>
+
+      <!-- Résumé IA -->
+      <div class="ia-card" id="ia-card" style="display:none;">
+        <h3>🧠 Relecture intelligente · Résumé automatique</h3>
+        <div class="ia-section">
+          <strong>Résumé</strong>
+          <p id="ia-resume" style="font-size:13.5px;color:var(--text);margin:6px 0 0;line-height:1.65;"></p>
+        </div>
+        <div id="ia-kw-wrap" style="display:none;">
+          <div class="ia-section">
+            <strong>Mots-clés</strong>
+            <div id="ia-kw" style="margin-top:6px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 12px;">À propos</h3>
+        <p id="pod-desc" style="margin:0;font-size:14px;line-height:1.65;color:var(--text);"></p>
+      </div>
+
+      <!-- Chapitres -->
+      <div id="chapters-wrap" style="display:none;" class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 14px;">📌 Chapitres</h3>
+        <div class="chapters" id="chapters-list"></div>
+      </div>
+
+      <!-- Commentaires -->
+      <div class="card">
+        <h3 style="margin:0 0 14px;">💬 Commentaires & notes</h3>
+        <div class="com-form" id="com-form">
+          <div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:6px;">Votre note</div>
+            <div class="star-row" id="star-row">
+              <span class="star" data-v="1" onclick="setStar(1)">★</span>
+              <span class="star" data-v="2" onclick="setStar(2)">★</span>
+              <span class="star" data-v="3" onclick="setStar(3)">★</span>
+              <span class="star" data-v="4" onclick="setStar(4)">★</span>
+              <span class="star" data-v="5" onclick="setStar(5)">★</span>
+            </div>
+          </div>
+          <textarea id="com-input" class="form-input" rows="3" placeholder="Laissez un commentaire…"></textarea>
+          <button class="btn btn-orange btn-sm" onclick="postComment()">Publier</button>
+        </div>
+        <div id="com-list"><div style="color:var(--muted);font-size:13px;">Chargement des commentaires…</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+let me = null;
+let epId = null;
+let selectedStar = null;
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDuree(s){ if(!s)return''; const m=Math.floor(s/60); const h=Math.floor(m/60); return h?`${h}h${String(m%60).padStart(2,'0')}`:`${m} min`; }
+const CAT_LABELS = { general:'Podcast', interview:'Interview', formation:'Formation', actualite:'Actualités', conseil:'Conseils', temoignage:'Témoignage', annonce:'Annonce' };
+
+function setStar(v) {
+  selectedStar = v;
+  document.querySelectorAll('.star').forEach((el,i) => el.classList.toggle('active', i<v));
+}
+
+async function postComment() {
+  const txt = document.getElementById('com-input').value.trim();
+  if (!txt) return;
+  await api('POST', `/audiovisuel/episodes/${epId}/commentaires`, { contenu: txt, note: selectedStar });
+  document.getElementById('com-input').value = '';
+  setStar(0); selectedStar = null;
+  await loadComments();
+}
+
+async function loadComments() {
+  const coms = await api('GET', `/audiovisuel/episodes/${epId}/commentaires`);
+  const el = document.getElementById('com-list');
+  if (!coms.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0;">Aucun commentaire. Soyez le premier !</div>'; return; }
+  el.innerHTML = coms.map(c => {
+    const init = ((c.user_nom||'?')[0]).toUpperCase();
+    const stars = c.note ? '★'.repeat(c.note)+'☆'.repeat(5-c.note) : '';
+    return `<div class="com-item">
+      <div class="com-av">${init}</div>
+      <div class="com-body">
+        <div class="com-name">${esc(c.user_nom||'Anonyme')} ${stars?`<span style="color:#f59e0b;font-size:12px;">${stars}</span>`:''}</div>
+        <div class="com-text">${esc(c.contenu)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">${new Date(c.created_at).toLocaleDateString('fr')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function init() {
+  me = await fetchCurrentUser();
+  epId = new URLSearchParams(location.search).get('id');
+  if (!epId) { window.location.href = 'audiovisuel.html'; return; }
+
+  const ep = await api('GET', `/audiovisuel/episodes/${epId}`);
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+
+  document.title = `${ep.titre} — Diaspo'Actif`;
+  document.getElementById('pod-cat-label').textContent = CAT_LABELS[ep.categorie]||ep.categorie;
+  document.getElementById('pod-titre').textContent = ep.titre;
+  document.getElementById('pod-init').textContent = ep.initiative_nom||'—';
+  document.getElementById('pod-ecoutes').textContent = ep.nb_ecoutes;
+  document.getElementById('pod-note').textContent = ep.note ? `${ep.note.toFixed(1)}/5` : '—';
+  document.getElementById('pod-duree').textContent = fmtDuree(ep.duree_secondes)||'—';
+  document.getElementById('pod-desc').textContent = ep.description||'Aucune description.';
+
+  if (ep.image_url) {
+    document.getElementById('pod-cover').innerHTML = `<img src="${esc(ep.image_url)}" style="width:180px;height:180px;object-fit:cover;border-radius:16px;">`;
+  }
+  if (ep.serie_titre) {
+    document.getElementById('pod-serie').style.display='inline';
+    document.getElementById('pod-serie-titre').textContent = ep.serie_titre;
+  }
+  if (ep.intervenants?.length) {
+    document.getElementById('pod-intervenants').textContent = '👤 ' + ep.intervenants.join(', ');
+  }
+
+  // Player audio
+  const audio = document.getElementById('audio-player');
+  audio.src = ep.url_audio;
+  document.getElementById('pod-dl-link').href = ep.url_audio;
+  document.getElementById('audio-src-link').href = ep.url_audio;
+  document.getElementById('audio-src-link').textContent = ep.url_audio.length>50?ep.url_audio.slice(0,50)+'…':ep.url_audio;
+
+  // Résumé IA
+  if (ep.resume_ia) {
+    document.getElementById('ia-card').style.display = 'block';
+    document.getElementById('ia-resume').textContent = ep.resume_ia;
+  }
+  if (ep.mots_cles?.length) {
+    document.getElementById('ia-kw-wrap').style.display = 'block';
+    document.getElementById('ia-kw').innerHTML = ep.mots_cles.map(k=>`<span class="kw-chip">${esc(k)}</span>`).join('');
+  }
+
+  // Chapitres
+  if (ep.chapitres?.length) {
+    document.getElementById('chapters-wrap').style.display = 'block';
+    document.getElementById('chapters-list').innerHTML = ep.chapitres.map(c => `
+      <div class="chapter-item" onclick="seekTo('${c.time||c.temps||'0:00'}')">
+        <span class="chapter-time">${c.time||c.temps||'—'}</span>
+        <span class="chapter-label">${esc(c.titre||c.label||'')}</span>
+      </div>`).join('');
+  }
+
+  await loadComments();
+  if (!me) document.getElementById('com-form').style.display = 'none';
+}
+
+function seekTo(timeStr) {
+  const audio = document.getElementById('audio-player');
+  const parts = timeStr.split(':');
+  const secs = parts.length===2 ? parseInt(parts[0])*60+parseInt(parts[1]) : parseInt(parts[0])*3600+parseInt(parts[1])*60+parseInt(parts[2]||0);
+  audio.currentTime = secs;
+  audio.play();
+}
+
+init();
+</script>
+</body>
+</html>

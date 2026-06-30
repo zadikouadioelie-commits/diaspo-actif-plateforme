@@ -3729,6 +3729,157 @@ db.exec(`
   );
 `);
 
+/* ═══════════════════════════════════════════════════════════
+   MODULE AUDIOVISUEL
+   ═══════════════════════════════════════════════════════════ */
+db.exec(`
+  -- Lives / diffusions
+  CREATE TABLE IF NOT EXISTS av_lives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    type TEXT DEFAULT 'conference',
+    statut TEXT DEFAULT 'programme',   -- programme | en_cours | termine | annule
+    acces TEXT DEFAULT 'public',       -- public | prive | membres | payant
+    prix REAL DEFAULT 0,
+    code_acces TEXT,
+    url_stream TEXT,                   -- URL YouTube Live / Zoom / Meet fournie par l'organisateur
+    url_replay TEXT,
+    vignette_url TEXT,
+    date_debut TEXT,
+    date_fin TEXT,
+    nb_vues INTEGER DEFAULT 0,
+    pic_audience INTEGER DEFAULT 0,
+    duree_secondes INTEGER DEFAULT 0,
+    enregistrement_url TEXT,
+    transcription TEXT,
+    resume_ia TEXT,
+    moments_cles TEXT DEFAULT '[]',
+    decisions TEXT DEFAULT '[]',
+    actions TEXT DEFAULT '[]',
+    tags TEXT DEFAULT '[]',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  -- Chat live
+  CREATE TABLE IF NOT EXISTS av_live_chat (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    live_id INTEGER NOT NULL,
+    user_id INTEGER,
+    pseudo TEXT,
+    message TEXT NOT NULL,
+    type TEXT DEFAULT 'chat',          -- chat | question | modere
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(live_id) REFERENCES av_lives(id) ON DELETE CASCADE
+  );
+
+  -- Sondages live
+  CREATE TABLE IF NOT EXISTS av_sondages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    live_id INTEGER NOT NULL,
+    question TEXT NOT NULL,
+    options_json TEXT DEFAULT '[]',
+    actif INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(live_id) REFERENCES av_lives(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS av_votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sondage_id INTEGER NOT NULL,
+    user_id INTEGER,
+    option_index INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(sondage_id) REFERENCES av_sondages(id) ON DELETE CASCADE
+  );
+
+  -- Réactions live
+  CREATE TABLE IF NOT EXISTS av_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    live_id INTEGER NOT NULL,
+    user_id INTEGER,
+    emoji TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  -- Podcasts / séries
+  CREATE TABLE IF NOT EXISTS av_series (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    categorie TEXT DEFAULT 'general',
+    image_url TEXT,
+    nb_abonnes INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  -- Épisodes podcast
+  CREATE TABLE IF NOT EXISTS av_episodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    serie_id INTEGER,
+    initiative_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    url_audio TEXT NOT NULL,           -- URL SoundCloud / Spotify / hébergement audio
+    duree_secondes INTEGER DEFAULT 0,
+    intervenants TEXT DEFAULT '[]',
+    categorie TEXT DEFAULT 'general',
+    nb_ecoutes INTEGER DEFAULT 0,
+    taux_completion REAL DEFAULT 0,
+    note REAL DEFAULT 0,
+    nb_notes INTEGER DEFAULT 0,
+    transcription TEXT,
+    resume_ia TEXT,
+    chapitres TEXT DEFAULT '[]',       -- [{time, titre}]
+    mots_cles TEXT DEFAULT '[]',
+    is_public INTEGER DEFAULT 1,
+    published_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(serie_id) REFERENCES av_series(id) ON DELETE SET NULL,
+    FOREIGN KEY(initiative_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  -- Commentaires podcasts
+  CREATE TABLE IF NOT EXISTS av_commentaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    episode_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    contenu TEXT NOT NULL,
+    note INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(episode_id) REFERENCES av_episodes(id) ON DELETE CASCADE
+  );
+
+  -- Participants live (pour accès privé/payant)
+  CREATE TABLE IF NOT EXISTS av_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    live_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    statut TEXT DEFAULT 'invite',      -- invite | confirme | bloque
+    token TEXT,
+    joined_at TEXT,
+    UNIQUE(live_id, user_id),
+    FOREIGN KEY(live_id) REFERENCES av_lives(id) ON DELETE CASCADE
+  );
+
+  -- Playlists
+  CREATE TABLE IF NOT EXISTS av_playlists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    items_json TEXT DEFAULT '[]',      -- [{type:'live'|'episode', id}]
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;

@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Live</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<style>
+/* ===== LAYOUT LIVE ===== */
+body{margin:0;background:#0f0f1a;}
+.live-layout{display:grid;grid-template-columns:1fr 360px;min-height:100vh;}
+.live-main{display:flex;flex-direction:column;background:#0f0f1a;color:#fff;}
+.live-sidebar{background:#1a1a2e;border-left:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;height:100vh;position:sticky;top:0;}
+
+/* Top bar */
+.live-topbar{padding:12px 20px;background:rgba(0,0,0,.3);display:flex;align-items:center;gap:14px;}
+.live-topbar a{color:rgba(255,255,255,.7);text-decoration:none;font-size:13px;}
+.live-badge-red{background:#dc2626;color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:800;letter-spacing:.5px;}
+.live-badge-prog{background:#f59e0b;color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:800;}
+.live-badge-fin{background:#6b7280;color:#fff;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:800;}
+
+/* Player zone */
+.player-zone{flex:1;position:relative;background:#000;min-height:400px;display:flex;align-items:center;justify-content:center;}
+.player-zone iframe{width:100%;height:100%;border:none;position:absolute;inset:0;}
+.player-placeholder{text-align:center;padding:60px 40px;color:rgba(255,255,255,.7);}
+.player-placeholder .big-ico{font-size:64px;margin-bottom:16px;}
+.player-placeholder h2{margin:0 0 10px;color:#fff;}
+.player-placeholder a.btn-live{display:inline-block;padding:14px 32px;background:#dc2626;color:#fff;border-radius:10px;font-weight:800;font-size:15px;text-decoration:none;margin-top:16px;}
+.player-placeholder a.btn-live:hover{background:#b91c1c;}
+
+/* Infos live */
+.live-info-bar{padding:16px 20px;background:rgba(0,0,0,.3);}
+.live-info-bar h1{margin:0 0 6px;font-size:20px;color:#fff;}
+.live-info-meta{display:flex;gap:16px;font-size:13px;color:rgba(255,255,255,.7);flex-wrap:wrap;}
+.reaction-strip{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;}
+.reaction-btn{background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:99px;padding:6px 14px;cursor:pointer;font-size:16px;transition:background .15s;}
+.reaction-btn:hover{background:rgba(255,255,255,.2);}
+
+/* Résumé IA */
+.ia-card{background:linear-gradient(135deg,rgba(109,40,217,.2),rgba(109,40,217,.1));border:1px solid rgba(109,40,217,.3);border-radius:12px;padding:16px;margin:16px 20px;}
+.ia-card h3{margin:0 0 10px;font-size:14px;color:#a78bfa;}
+.ia-section{margin-bottom:12px;}
+.ia-section strong{font-size:12px;text-transform:uppercase;color:#a78bfa;letter-spacing:.5px;}
+.ia-list{list-style:none;padding:0;margin:6px 0 0;}
+.ia-list li{font-size:13px;color:rgba(255,255,255,.85);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.07);display:flex;gap:8px;}
+.ia-list li::before{content:'▸';color:#a78bfa;}
+
+/* Sidebar — tabs */
+.side-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.1);}
+.side-tab{flex:1;padding:11px 4px;text-align:center;cursor:pointer;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.5);border:none;background:none;border-bottom:2px solid transparent;transition:all .15s;}
+.side-tab.active{color:#fff;border-bottom-color:var(--orange);}
+
+/* Chat */
+.chat-body{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.chat-msg{display:flex;gap:8px;font-size:13px;}
+.chat-msg .cm-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#ff6b00,#ff9a42);display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:800;flex-shrink:0;}
+.chat-msg .cm-body{flex:1;}
+.chat-msg .cm-name{font-size:11px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:2px;}
+.chat-msg .cm-text{color:rgba(255,255,255,.9);line-height:1.4;}
+.chat-input-row{padding:12px;border-top:1px solid rgba(255,255,255,.1);display:flex;gap:8px;}
+.chat-input{flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;}
+.chat-input::placeholder{color:rgba(255,255,255,.4);}
+.chat-input:focus{outline:none;border-color:var(--orange);}
+.chat-send{background:var(--orange);color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;}
+
+/* Sondages */
+.sond-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px;}
+.sond-card{background:rgba(255,255,255,.05);border-radius:10px;padding:14px;}
+.sond-question{font-size:14px;font-weight:700;color:#fff;margin-bottom:12px;}
+.sond-option{margin-bottom:8px;cursor:pointer;}
+.sond-bar-wrap{background:rgba(255,255,255,.1);border-radius:99px;height:8px;overflow:hidden;margin-top:3px;}
+.sond-bar{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--orange),#ff9a42);transition:width .4s;}
+.sond-labels{display:flex;justify-content:space-between;font-size:11.5px;color:rgba(255,255,255,.6);margin-top:2px;}
+.sond-empty{text-align:center;padding:40px;color:rgba(255,255,255,.4);font-size:13px;}
+
+/* Gestion (pour initiateurs) */
+.mgmt-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
+.mgmt-section{background:rgba(255,255,255,.05);border-radius:10px;padding:14px;}
+.mgmt-section h4{margin:0 0 12px;font-size:13px;font-weight:700;color:rgba(255,255,255,.8);}
+
+@media(max-width:768px){
+  .live-layout{grid-template-columns:1fr;}
+  .live-sidebar{height:400px;position:relative;}
+}
+</style>
+</head>
+<body style="background:#0f0f1a;">
+
+<div class="live-layout">
+
+  <!-- Main player -->
+  <div class="live-main">
+    <div class="live-topbar">
+      <a href="audiovisuel.html">← Audiovisuel</a>
+      <span id="live-statut-badge" class="live-badge-fin">Chargement…</span>
+      <span id="live-type-label" style="color:rgba(255,255,255,.6);font-size:13px;"></span>
+      <span style="flex:1;"></span>
+      <span id="live-vues" style="color:rgba(255,255,255,.6);font-size:13px;">👁 0</span>
+    </div>
+
+    <div class="player-zone" id="player-zone">
+      <div class="player-placeholder" id="player-placeholder">
+        <div class="big-ico">📺</div>
+        <h2>Chargement du live…</h2>
+      </div>
+    </div>
+
+    <div class="live-info-bar" id="live-info-bar">
+      <h1 id="live-titre-el">—</h1>
+      <div class="live-info-meta">
+        <span id="live-date-el">—</span>
+        <span id="live-init-el">—</span>
+        <span id="live-acces-el">—</span>
+      </div>
+      <div class="reaction-strip">
+        <button class="reaction-btn" onclick="sendReaction('❤️')">❤️</button>
+        <button class="reaction-btn" onclick="sendReaction('👏')">👏</button>
+        <button class="reaction-btn" onclick="sendReaction('🔥')">🔥</button>
+        <button class="reaction-btn" onclick="sendReaction('💪')">💪</button>
+        <button class="reaction-btn" onclick="sendReaction('🙏')">🙏</button>
+        <button class="reaction-btn" onclick="sendReaction('😮')">😮</button>
+        <span id="reaction-counts" style="font-size:13px;color:rgba(255,255,255,.6);align-self:center;margin-left:8px;"></span>
+      </div>
+    </div>
+
+    <!-- Résumé IA (visible si terminé) -->
+    <div class="ia-card" id="ia-card" style="display:none;">
+      <h3>🧠 Relecture intelligente · Résumé automatique</h3>
+      <div class="ia-section">
+        <strong>Résumé</strong>
+        <p id="ia-resume" style="font-size:13px;color:rgba(255,255,255,.85);margin:6px 0 0;line-height:1.6;"></p>
+      </div>
+      <div id="ia-moments-wrap" style="display:none;">
+        <div class="ia-section">
+          <strong>Moments clés</strong>
+          <ul class="ia-list" id="ia-moments"></ul>
+        </div>
+      </div>
+      <div id="ia-decisions-wrap" style="display:none;">
+        <div class="ia-section">
+          <strong>Décisions & Actions</strong>
+          <ul class="ia-list" id="ia-decisions"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div style="padding:16px 20px;color:rgba(255,255,255,.75);font-size:13.5px;line-height:1.65;border-top:1px solid rgba(255,255,255,.07);" id="live-desc-el"></div>
+
+  </div>
+
+  <!-- Sidebar -->
+  <div class="live-sidebar">
+    <div class="side-tabs">
+      <button class="side-tab active" onclick="switchSide('chat')" id="st-chat">💬 Chat</button>
+      <button class="side-tab" onclick="switchSide('sond')" id="st-sond">📊 Sondages</button>
+      <button class="side-tab" id="st-mgmt" onclick="switchSide('mgmt')" style="display:none;">⚙️ Gérer</button>
+    </div>
+
+    <!-- Chat -->
+    <div id="side-chat" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="chat-body" id="chat-body"><div style="text-align:center;color:rgba(255,255,255,.3);padding:30px;font-size:13px;">Connectez-vous pour participer au chat</div></div>
+      <div class="chat-input-row" id="chat-input-area">
+        <input class="chat-input" id="chat-input" placeholder="Envoyer un message…" maxlength="500">
+        <button class="chat-send" onclick="sendChat()">➤</button>
+      </div>
+    </div>
+
+    <!-- Sondages -->
+    <div id="side-sond" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="sond-body" id="sond-body"><div class="sond-empty">Aucun sondage en cours</div></div>
+      <div id="sond-create-area" style="display:none;padding:12px;border-top:1px solid rgba(255,255,255,.1);">
+        <input id="sond-q" class="chat-input" placeholder="Question du sondage…" style="margin-bottom:8px;width:100%;box-sizing:border-box;">
+        <div id="sond-options-inputs">
+          <input class="chat-input sond-opt-inp" placeholder="Option 1" style="margin-bottom:6px;width:100%;box-sizing:border-box;">
+          <input class="chat-input sond-opt-inp" placeholder="Option 2" style="margin-bottom:6px;width:100%;box-sizing:border-box;">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button onclick="addSondOption()" style="background:rgba(255,255,255,.1);color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;">+ Option</button>
+          <button onclick="createSondage()" style="flex:1;background:var(--orange);color:#fff;border:none;border-radius:8px;padding:6px;cursor:pointer;font-size:13px;font-weight:700;">Lancer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gestion -->
+    <div id="side-mgmt" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="mgmt-body">
+        <div class="mgmt-section" id="mgmt-statut-card">
+          <h4>Statut du live</h4>
+          <div style="display:flex;flex-direction:column;gap:8px;" id="mgmt-actions"></div>
+        </div>
+        <div class="mgmt-section">
+          <h4>URL de diffusion</h4>
+          <input id="mgmt-url" class="chat-input" placeholder="https://youtube.com/live/…" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+          <button onclick="updateUrl()" style="width:100%;background:var(--orange);color:#fff;border:none;border-radius:8px;padding:8px;cursor:pointer;font-weight:700;font-size:13px;">Mettre à jour l'URL</button>
+        </div>
+        <div class="mgmt-section">
+          <h4>Statistiques</h4>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;" id="mgmt-stats"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+/* =====================================================
+   AUDIOVISUEL — Page Live
+   ===================================================== */
+let me = null;
+let liveData = null;
+let liveId = null;
+let isOwner = false;
+let chatPollInterval = null;
+let sondPollInterval = null;
+let lastChatTime = '1970-01-01';
+let votedSondages = new Set();
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(d){ if(!d)return'—'; return new Date(d).toLocaleString('fr',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+
+const TYPE_LABELS = { conference:'Conférence', ag:'Assemblée Générale', formation:'Formation', evenement:'Événement', lancement:'Lancement', visite:'Visite de terrain', reunion:'Réunion', interview:'Interview' };
+
+/* ── Player ── */
+function setupPlayer(live) {
+  const zone = document.getElementById('player-zone');
+  if (live.statut === 'termine' && live.url_replay) {
+    zone.innerHTML = `<iframe src="${getEmbedUrl(live.url_replay)}" allowfullscreen allow="autoplay;fullscreen;picture-in-picture"></iframe>`;
+  } else if (live.url_stream && live.statut === 'en_cours') {
+    zone.innerHTML = `<iframe src="${getEmbedUrl(live.url_stream)}" allowfullscreen allow="autoplay;fullscreen;picture-in-picture"></iframe>`;
+  } else {
+    const icon = live.statut === 'en_cours' ? '🔴' : (live.statut === 'programme' ? '📅' : '📺');
+    const msg = live.statut === 'en_cours'
+      ? (live.url_stream ? `<a href="${esc(live.url_stream)}" target="_blank" class="btn-live">Rejoindre le live externe →</a>` : 'Diffusion en cours — aucun lien configuré')
+      : (live.statut === 'programme' ? `Live prévu le ${fmtDate(live.date_debut)}` : 'Replay non disponible');
+    zone.innerHTML = `<div class="player-placeholder"><div class="big-ico">${icon}</div><h2>${esc(live.titre)}</h2><div>${msg}</div></div>`;
+  }
+}
+
+function getEmbedUrl(url) {
+  if (!url) return '';
+  // YouTube
+  const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|live\/)|youtu\.be\/)([A-Za-z0-9_-]+)/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`;
+  // Vimeo
+  const vmMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vmMatch) return `https://player.vimeo.com/video/${vmMatch[1]}?autoplay=1`;
+  // Fallback: affiche le lien
+  return url;
+}
+
+/* ── Badges statuts ── */
+function getStatutBadge(statut) {
+  const map = { en_cours:'<span class="live-badge-red">🔴 EN DIRECT</span>', programme:'<span class="live-badge-prog">📅 Programmé</span>', termine:'<span class="live-badge-fin">✅ Terminé</span>', annule:'<span class="live-badge-fin">❌ Annulé</span>' };
+  return map[statut] || statut;
+}
+
+/* ── Résumé IA ── */
+function renderIACard(live) {
+  if (live.statut !== 'termine' || !live.resume_ia) return;
+  document.getElementById('ia-card').style.display = 'block';
+  document.getElementById('ia-resume').textContent = live.resume_ia;
+  if (live.moments_cles?.length) {
+    document.getElementById('ia-moments-wrap').style.display = 'block';
+    document.getElementById('ia-moments').innerHTML = live.moments_cles.map(m=>`<li><span style="color:#a78bfa;font-family:monospace;">${m.time||''}</span> ${esc(m.label||m.titre||'')}</li>`).join('');
+  }
+  if ([...(live.decisions||[]), ...(live.actions||[])].length) {
+    document.getElementById('ia-decisions-wrap').style.display = 'block';
+    document.getElementById('ia-decisions').innerHTML = [...(live.decisions||[]), ...(live.actions||[])].map(d=>`<li>${esc(d)}</li>`).join('');
+  }
+}
+
+/* ── Réactions ── */
+async function sendReaction(emoji) {
+  const uid = me?.id || null;
+  const res = await api('POST', `/audiovisuel/lives/${liveId}/reactions`, { emoji, user_id: uid });
+  renderReactionCounts(res.reactions || []);
+}
+function renderReactionCounts(reactions) {
+  document.getElementById('reaction-counts').textContent = reactions.map(r=>`${r.emoji} ${r.cnt}`).join(' ');
+}
+async function loadReactions() {
+  const data = await api('GET', `/audiovisuel/lives/${liveId}/reactions`);
+  renderReactionCounts(data);
+}
+
+/* ── Chat ── */
+function switchSide(tab) {
+  ['chat','sond','mgmt'].forEach(t => {
+    document.getElementById(`side-${t}`).style.display = t===tab?'flex':'none';
+    document.getElementById(`st-${t}`)?.classList.toggle('active', t===tab);
+  });
+}
+
+async function loadChat() {
+  const msgs = await api('GET', `/audiovisuel/lives/${liveId}/chat?since=${encodeURIComponent(lastChatTime)}`);
+  if (!msgs.length) return;
+  const body = document.getElementById('chat-body');
+  const wasAtBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 20;
+  msgs.forEach(m => {
+    if (m.type === 'modere') return;
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    const initial = ((m.user_nom||m.pseudo||'?')[0]).toUpperCase();
+    div.innerHTML = `<div class="cm-av">${initial}</div><div class="cm-body"><div class="cm-name">${esc(m.user_nom||m.pseudo||'Anonyme')}</div><div class="cm-text">${esc(m.message)}</div></div>`;
+    body.appendChild(div);
+    lastChatTime = m.created_at;
+  });
+  if (wasAtBottom || msgs.length) body.scrollTop = body.scrollHeight;
+}
+
+async function sendChat() {
+  const inp = document.getElementById('chat-input');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = '';
+  await api('POST', `/audiovisuel/lives/${liveId}/chat`, { message: msg, user_id: me?.id||null, pseudo: me ? `${me.prenom||''} ${me.nom||''}`.trim() : 'Spectateur' });
+  await loadChat();
+}
+document.getElementById('chat-input').addEventListener('keydown', e => { if(e.key==='Enter') sendChat(); });
+
+/* ── Sondages ── */
+async function loadSondages() {
+  const sonds = await api('GET', `/audiovisuel/lives/${liveId}/sondages`);
+  const el = document.getElementById('sond-body');
+  if (!sonds.length) { el.innerHTML = '<div class="sond-empty">Aucun sondage en cours</div>'; return; }
+  el.innerHTML = sonds.map(s => {
+    const voted = votedSondages.has(s.id);
+    return `<div class="sond-card">
+      <div class="sond-question">${esc(s.question)}</div>
+      ${s.options.map((o,i) => `
+        <div class="sond-option" onclick="${voted?'':'vote('+s.id+','+i+')'}">
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.85);margin-bottom:3px;">
+            <span>${esc(o.label)}</span><span>${voted?o.pct+'%':''}</span>
+          </div>
+          <div class="sond-bar-wrap"><div class="sond-bar" style="width:${voted?o.pct:0}%"></div></div>
+        </div>`).join('')}
+      <div style="font-size:11.5px;color:rgba(255,255,255,.4);margin-top:8px;">${s.total} vote${s.total>1?'s':''}</div>
+    </div>`;
+  }).join('');
+}
+
+async function vote(sondageId, optionIndex) {
+  await api('POST', `/audiovisuel/sondages/${sondageId}/voter`, { option_index: optionIndex, user_id: me?.id||null });
+  votedSondages.add(sondageId);
+  await loadSondages();
+}
+
+/* Créer sondage (owner) */
+function addSondOption() {
+  const c = document.querySelectorAll('.sond-opt-inp').length+1;
+  const inp = document.createElement('input');
+  inp.className = 'chat-input sond-opt-inp';
+  inp.placeholder = `Option ${c}`;
+  inp.style = 'margin-bottom:6px;width:100%;box-sizing:border-box;';
+  document.getElementById('sond-options-inputs').appendChild(inp);
+}
+async function createSondage() {
+  const q = document.getElementById('sond-q').value.trim();
+  const opts = [...document.querySelectorAll('.sond-opt-inp')].map(i=>i.value.trim()).filter(Boolean);
+  if (!q || opts.length < 2) { alert('Question et au moins 2 options requises'); return; }
+  await api('POST', `/audiovisuel/lives/${liveId}/sondages`, { question: q, options: opts });
+  document.getElementById('sond-q').value = '';
+  document.querySelectorAll('.sond-opt-inp').forEach((el,i)=>{ el.value=''; if(i>1) el.remove(); });
+  await loadSondages();
+}
+
+/* ── Gestion (owner) ── */
+function renderMgmt(live) {
+  const actions = [];
+  if (live.statut === 'programme') actions.push(`<button onclick="changeStatut('en_cours')" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:10px;cursor:pointer;font-weight:700;">🚀 Démarrer le live</button>`);
+  if (live.statut === 'en_cours') actions.push(`<button onclick="changeStatut('termine')" style="background:#6b7280;color:#fff;border:none;border-radius:8px;padding:10px;cursor:pointer;font-weight:700;">⏹ Terminer le live</button>`);
+  if (live.statut !== 'annule') actions.push(`<button onclick="changeStatut('annule')" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:none;border-radius:8px;padding:10px;cursor:pointer;">❌ Annuler</button>`);
+  document.getElementById('mgmt-actions').innerHTML = actions.join('');
+  document.getElementById('mgmt-url').value = live.url_stream || '';
+  document.getElementById('mgmt-stats').innerHTML = `
+    <div style="text-align:center;"><div style="font-size:22px;font-weight:900;color:#fff;">${live.nb_vues||0}</div><div style="font-size:11px;color:rgba(255,255,255,.5);">Vues</div></div>
+    <div style="text-align:center;"><div style="font-size:22px;font-weight:900;color:#fff;">${live.pic_audience||0}</div><div style="font-size:11px;color:rgba(255,255,255,.5);">Pic</div></div>`;
+}
+
+async function changeStatut(statut) {
+  await api('POST', `/audiovisuel/lives/${liveId}/statut`, { statut });
+  await refreshLive();
+}
+async function updateUrl() {
+  const url = document.getElementById('mgmt-url').value.trim();
+  await api('PUT', `/audiovisuel/lives/${liveId}`, { url_stream: url });
+  await refreshLive();
+}
+
+/* ── Incrémenter vues ── */
+async function trackView() {
+  try { await api('POST', `/audiovisuel/lives/${liveId}/vue`); } catch(e) {}
+}
+
+/* ── Refresh live data ── */
+async function refreshLive() {
+  liveData = await api('GET', `/audiovisuel/lives/${liveId}`);
+  setupPlayer(liveData);
+  document.getElementById('live-statut-badge').outerHTML = getStatutBadge(liveData.statut);
+  document.getElementById('live-titre-el').textContent = liveData.titre;
+  document.getElementById('live-date-el').textContent = `📅 ${fmtDate(liveData.date_debut)}`;
+  document.getElementById('live-init-el').textContent = `🏢 ${liveData.initiative_nom||'—'}`;
+  document.getElementById('live-acces-el').textContent = liveData.acces==='public'?'🌍 Public':liveData.acces==='payant'?`🎟 Payant`:`🔒 ${liveData.acces}`;
+  document.getElementById('live-desc-el').textContent = liveData.description||'';
+  document.getElementById('live-vues').textContent = `👁 ${liveData.nb_vues||0}`;
+  document.getElementById('live-type-label').textContent = TYPE_LABELS[liveData.type] || liveData.type;
+  renderIACard(liveData);
+  if (isOwner) renderMgmt(liveData);
+}
+
+/* ── Init ── */
+async function init() {
+  me = await fetchCurrentUser();
+  liveId = new URLSearchParams(location.search).get('id');
+  if (!liveId) { window.location.href = 'audiovisuel.html'; return; }
+
+  await refreshLive();
+  await loadReactions();
+  isOwner = me && (liveData.initiative_id === me.id || me.role === 'administrateur');
+
+  // Afficher onglet gestion si owner
+  if (isOwner) {
+    document.getElementById('st-mgmt').style.display = 'block';
+    document.getElementById('sond-create-area').style.display = 'block';
+  }
+
+  trackView();
+
+  // Polling chat + sondages si live en cours
+  if (liveData.statut === 'en_cours') {
+    await loadChat();
+    await loadSondages();
+    chatPollInterval = setInterval(loadChat, 3000);
+    sondPollInterval = setInterval(loadSondages, 5000);
+  } else if (liveData.statut === 'termine') {
+    await loadSondages();
+  }
+}
+init();
+</script>
+</body>
+</html>
