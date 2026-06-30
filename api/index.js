@@ -8,15 +8,20 @@ const path = require("node:path");
 
 const DB_PATH = "/tmp/diaspoactif.db";
 
-// Auto-seed si la DB n'existe pas encore (cold start Vercel)
-if (!fs.existsSync(DB_PATH)) {
-  try {
-    require("../server/seed.js");
-  } catch (e) {
-    console.error("[Vercel] Seed error:", e.message);
-  }
-}
+let handleRequest;
 
-const handleRequest = require("../server/index.js");
+try {
+  // Auto-seed si la DB n'existe pas encore (cold start Vercel)
+  if (!fs.existsSync(DB_PATH)) {
+    require("../server/seed.js");
+  }
+  handleRequest = require("../server/index.js");
+} catch (e) {
+  console.error("[Vercel] Init error:", e.stack || e.message);
+  handleRequest = function(req, res) {
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Server init failed", detail: e.message }));
+  };
+}
 
 module.exports = handleRequest;
