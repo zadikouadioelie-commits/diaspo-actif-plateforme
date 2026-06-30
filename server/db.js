@@ -3643,6 +3643,8 @@ db.exec(`
   const userCols2 = db.prepare('PRAGMA table_info(users)').all().map(c=>c.name);
   if (!userCols2.includes('reseaux_sociaux')) db.exec("ALTER TABLE users ADD COLUMN reseaux_sociaux TEXT DEFAULT '{}'");
   if (!userCols2.includes('disponibilites')) db.exec("ALTER TABLE users ADD COLUMN disponibilites TEXT DEFAULT '{}'");
+  if (!userCols2.includes('reset_token')) db.exec("ALTER TABLE users ADD COLUMN reset_token TEXT");
+  if (!userCols2.includes('reset_expires')) db.exec("ALTER TABLE users ADD COLUMN reset_expires INTEGER");
 }
 
 /* ═══════════════════════════════════════════════

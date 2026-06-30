@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Mot de passe oublié — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="/assets/design-upgrade.css">
+<style>
+body { min-height:100vh; background:linear-gradient(135deg,#060e1a 0%,#0D1B2A 50%,#0F2A50 100%); display:flex; align-items:center; justify-content:center; }
+.card { background:#fff; border-radius:20px; padding:44px 40px; width:100%; max-width:420px; box-shadow:0 24px 64px rgba(0,0,0,.4); }
+.logo-wrap { text-align:center; margin-bottom:28px; }
+.logo-text { font-size:22px; font-weight:900; color:#0D1B2A; letter-spacing:-.02em; }
+.logo-sub { font-size:12px; color:#94A3B8; margin-top:2px; }
+h1 { font-size:20px; font-weight:900; color:#0D1B2A; margin:0 0 8px; }
+p.desc { font-size:13px; color:#64748b; line-height:1.6; margin:0 0 24px; }
+label { font-size:13px; font-weight:700; color:#374151; display:block; margin-bottom:6px; }
+input[type=email] { width:100%; box-sizing:border-box; padding:12px 14px; border:1.5px solid #E2E8F0; border-radius:10px; font-size:14px; color:#0D1B2A; outline:none; transition:border .2s,box-shadow .2s; }
+input[type=email]:focus { border-color:#2563EB; box-shadow:0 0 0 3px rgba(37,99,235,.1); }
+.btn { width:100%; background:linear-gradient(135deg,#2563EB,#1d4ed8); color:#fff; border:none; border-radius:12px; padding:14px; font-size:15px; font-weight:800; cursor:pointer; margin-top:20px; box-shadow:0 4px 16px rgba(37,99,235,.3); transition:opacity .2s; }
+.btn:hover { opacity:.9; }
+.btn:disabled { opacity:.6; cursor:not-allowed; }
+.back { display:block; text-align:center; margin-top:20px; font-size:13px; color:#2563EB; font-weight:600; text-decoration:none; }
+.back:hover { text-decoration:underline; }
+.success-box { display:none; background:#F0FDF4; border:1.5px solid #86EFAC; border-radius:12px; padding:20px; text-align:center; }
+.success-box .icon { font-size:36px; margin-bottom:8px; }
+.success-box p { margin:0; font-size:14px; color:#166534; line-height:1.6; font-weight:600; }
+.error-msg { color:#EF4444; font-size:13px; margin-top:8px; display:none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-wrap">
+    <div class="logo-text">DIASPO'ACTIF</div>
+    <div class="logo-sub">Du Sud au Nord</div>
+  </div>
+
+  <div id="form-wrap">
+    <h1>Mot de passe oublié</h1>
+    <p class="desc">Entrez votre adresse e-mail. Nous vous enverrons un lien pour réinitialiser votre mot de passe.</p>
+
+    <form id="forgot-form" onsubmit="submit(event)">
+      <label for="email">Adresse e-mail</label>
+      <input type="email" id="email" placeholder="votre@email.com" required autocomplete="email">
+      <p class="error-msg" id="err-msg"></p>
+      <button type="submit" class="btn" id="submit-btn">Envoyer le lien →</button>
+    </form>
+  </div>
+
+  <div class="success-box" id="success-box">
+    <div class="icon">📬</div>
+    <p>Si un compte existe avec cette adresse, vous recevrez un email avec le lien de réinitialisation dans quelques minutes.</p>
+  </div>
+
+  <a href="login.html" class="back">← Retour à la connexion</a>
+</div>
+
+<script>
+async function submit(e) {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const btn = document.getElementById('submit-btn');
+  const err = document.getElementById('err-msg');
+  err.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Envoi en cours...';
+  try {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    document.getElementById('form-wrap').style.display = 'none';
+    document.getElementById('success-box').style.display = 'block';
+  } catch(ex) {
+    err.textContent = 'Une erreur est survenue. Veuillez réessayer.';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Envoyer le lien →';
+  }
+}
+</script>
+<script src="/assets/cookies-banner.js"></script>
+</body>
+</html>

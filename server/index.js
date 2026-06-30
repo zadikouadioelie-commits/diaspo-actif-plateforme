@@ -292,6 +292,36 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
 });
 
+/* POST /api/auth/forgot-password — demande de réinitialisation */
+route("POST", "/api/auth/forgot-password", async (req, res, params, body) => {
+  const { email } = body;
+  if (!email) return sendJSON(res, 400, { error: "Email requis" });
+  const user = await db.prepare("SELECT id, email, prenom, nom FROM users WHERE email=?").get(email.toLowerCase().trim());
+  // Toujours répondre OK pour ne pas révéler si l'email existe
+  if (!user) return sendJSON(res, 200, { ok: true });
+  const token = require("node:crypto").randomBytes(32).toString("hex");
+  const expires = Date.now() + 3600000; // 1 heure
+  await db.prepare("UPDATE users SET reset_token=?, reset_expires=? WHERE id=?").run(token, expires, user.id);
+  try {
+    const { emailResetPassword } = require("./mailer");
+    await emailResetPassword({ email: user.email, token });
+  } catch(e) { console.error("[forgot-password] email error:", e.message); }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/auth/reset-password — changement du mot de passe */
+route("POST", "/api/auth/reset-password", async (req, res, params, body) => {
+  const { token, password } = body;
+  if (!token || !password) return sendJSON(res, 400, { error: "Token et mot de passe requis" });
+  if (password.length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit comporter au moins 8 caractères" });
+  const user = await db.prepare("SELECT id, reset_token, reset_expires FROM users WHERE reset_token=?").get(token);
+  if (!user) return sendJSON(res, 400, { error: "Lien invalide ou expiré" });
+  if (Date.now() > user.reset_expires) return sendJSON(res, 400, { error: "Lien expiré, veuillez faire une nouvelle demande" });
+  const { hash, salt } = hashPassword(password);
+  await db.prepare("UPDATE users SET password_hash=?, password_salt=?, reset_token=NULL, reset_expires=NULL WHERE id=?").run(hash, salt, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("POST", "/api/auth/logout", async (req, res) => {
   const cookies = parseCookies(req);
   if (cookies.sid) destroySession(cookies.sid);
