@@ -402,7 +402,9 @@ async function trackView() {
 async function refreshLive() {
   liveData = await api('GET', `/audiovisuel/lives/${liveId}`);
   setupPlayer(liveData);
-  document.getElementById('live-statut-badge').outerHTML = getStatutBadge(liveData.statut);
+  const badgeEl = document.getElementById('live-statut-badge');
+  if (badgeEl) badgeEl.innerHTML = liveData.statut === 'en_cours' ? '🔴 EN DIRECT' : liveData.statut === 'programme' ? '📅 Programmé' : liveData.statut === 'termine' ? '✅ Terminé' : '❌ Annulé';
+  if (badgeEl) badgeEl.className = liveData.statut === 'en_cours' ? 'live-badge-red' : liveData.statut === 'programme' ? 'live-badge-prog' : 'live-badge-fin';
   document.getElementById('live-titre-el').textContent = liveData.titre;
   document.getElementById('live-date-el').textContent = `📅 ${fmtDate(liveData.date_debut)}`;
   document.getElementById('live-init-el').textContent = `🏢 ${liveData.initiative_nom||'—'}`;
@@ -441,6 +443,21 @@ async function init() {
   } else if (liveData.statut === 'termine') {
     await loadSondages();
   }
+
+  // Stopper le polling quand on quitte la page
+  window.addEventListener('beforeunload', () => {
+    clearInterval(chatPollInterval);
+    clearInterval(sondPollInterval);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      clearInterval(chatPollInterval);
+      clearInterval(sondPollInterval);
+    } else if (liveData?.statut === 'en_cours') {
+      chatPollInterval = setInterval(loadChat, 3000);
+      sondPollInterval = setInterval(loadSondages, 5000);
+    }
+  });
 }
 init();
 </script>

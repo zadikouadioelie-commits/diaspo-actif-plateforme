@@ -15634,11 +15634,12 @@ app.get('/api/audiovisuel/lives/:id/chat', (req, res) => {
   sendJSON(res, 200, msgs);
 });
 
-app.post('/api/audiovisuel/lives/:id/chat', async (req, res) => {
+app.post('/api/audiovisuel/lives/:id/chat', requireAuth, async (req, res) => {
   const body = await parseBody(req);
-  const { message, pseudo='Anonyme', user_id=null } = body;
+  const { message } = body;
   if (!message?.trim()) return sendJSON(res, 400, { error: 'Message vide' });
-  const r = db.prepare('INSERT INTO av_live_chat (live_id, user_id, pseudo, message) VALUES (?,?,?,?)').run(req.params.id, user_id||null, pseudo, message.trim().slice(0,500));
+  const pseudo = `${req.user.prenom||''} ${req.user.nom||''}`.trim() || 'Anonyme';
+  const r = db.prepare('INSERT INTO av_live_chat (live_id, user_id, pseudo, message) VALUES (?,?,?,?)').run(req.params.id, req.user.id, pseudo, message.trim().slice(0,500));
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -15671,13 +15672,13 @@ app.post('/api/audiovisuel/lives/:id/sondages', requireAuth, async (req, res) =>
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
-app.post('/api/audiovisuel/sondages/:id/voter', async (req, res) => {
+app.post('/api/audiovisuel/sondages/:id/voter', requireAuth, async (req, res) => {
   const body = await parseBody(req);
-  const { option_index, user_id=null } = body;
+  const { option_index } = body;
   try {
-    db.prepare('INSERT INTO av_votes (sondage_id, user_id, option_index) VALUES (?,?,?)').run(req.params.id, user_id||null, option_index);
+    db.prepare('INSERT INTO av_votes (sondage_id, user_id, option_index) VALUES (?,?,?)').run(req.params.id, req.user.id, option_index);
     sendJSON(res, 201, { ok: true });
-  } catch(e) { sendJSON(res, 409, { error: 'Déjà voté' }); }
+  } catch(e) { sendJSON(res, 409, { error: 'Vous avez déjà voté' }); }
 });
 
 /* ── RÉACTIONS ── */

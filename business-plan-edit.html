@@ -391,7 +391,7 @@ function buildNav() {
     return `<div class="bp-nav-item ${s.key===currentSection?'active':''}" onclick="navTo('${s.key}')">
       <span class="nav-icon">${s.icon}</span>
       <span>${s.label}</span>
-      <span class="check">${check?.(ok?'✅':'⚠️'):''}</span>
+      <span class="check">${check ? (ok?'✅':'⚠️') : ''}</span>
     </div>`;
   }).join('');
 }
@@ -593,7 +593,7 @@ function genResumeAuto() {
   if (!sections.resume_executif) sections.resume_executif = {};
   const s = sections.resume_executif;
   if (infos.nom_projet && !s.projet) s.projet = `${infos.nom_projet} est un(e) ${infos.type_initiative||'projet'} dans le secteur ${infos.secteur||'—'}, basé(e) à ${infos.ville||'—'}, ${infos.pays||'—'}.`;
-  if (pb.description && !s.probleme) s.projet = pb.description.substring(0,300);
+  if (pb.description && !s.probleme) s.probleme = pb.description.substring(0,300);
   if (sol.description && !s.solution) s.solution = sol.description.substring(0,300);
   if (mar.taille_marche && !s.marche) s.marche = `Taille du marché : ${mar.taille_marche}. ${mar.tendances||''}`;
   if (fin.montant && !s.besoins) s.besoins = `Montant recherché : ${fin.montant}€. Utilisation : ${fin.utilisation||'—'}`;

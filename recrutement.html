@@ -253,12 +253,8 @@ const RAYON_LABELS = {ville:'🏙️ Ville',commune:'🏘️ Commune',departemen
 
 /* Init */
 document.addEventListener('DOMContentLoaded', async () => {
-  // Détecter le user connecté via app.js (DA.getMe ou via API)
-  await new Promise(r => setTimeout(r, 400));
-  try {
-    const rMe = await api('GET', '/auth/me');
-    ME_RECR = rMe.user;
-  } catch(_) {}
+  // Détecter le user connecté
+  try { ME_RECR = await fetchCurrentUser(); } catch(_) {}
   initUIPerRole();
   loadCamps();
 });

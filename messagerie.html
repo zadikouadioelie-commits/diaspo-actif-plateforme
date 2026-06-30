@@ -847,7 +847,7 @@ document.getElementById('grp-search').addEventListener('input', function() {
       const r = await api('GET', `/users/search?q=${encodeURIComponent(q)}`);
       const el = document.getElementById('grp-results');
       el.style.display = 'block';
-      el.innerHTML = r.filter(u=>u.id!==me.id && !grpMembers.find(m=>m.id===u.id)).map(u=>`
+      el.innerHTML = (r.users||r||[]).filter(u=>u.id!==me.id && !grpMembers.find(m=>m.id===u.id)).map(u=>`
         <div class="msg-user-result" onclick="addGrpMember(${u.id},'${escHtml(u.nom||u.prenom||'').replace(/'/g,"\\'")}')">
           <div class="u-avatar">${avatarLetter(u.nom||u.prenom)}</div>
           <div class="u-info"><div class="u-name">${escHtml(u.nom||'')} ${escHtml(u.prenom||'')}</div><div class="u-sub">${escHtml(u.role||'')}</div></div>
@@ -1016,9 +1016,10 @@ async function openConvWithUser(userId){
   document.getElementById('btn-show-pins').addEventListener('click', ()=>{ if(activeConvId) showPinnedMessages(); });
   document.getElementById('btn-show-favs').addEventListener('click', showFavoris);
 
-  // Envoyer aussi le parent_message_id si reply
-  const origSend = document.getElementById('msg-send').onclick;
-  const origSendFn = async () => {
+  // Remplacer le handler d'envoi pour supporter reply (parent_message_id)
+  const sendBtn = document.getElementById('msg-send');
+  sendBtn.onclick = null;
+  sendBtn.addEventListener('click', async () => {
     if(!activeConvId) return;
     const inp = document.getElementById('msg-input');
     const contenu = inp.value.trim();
@@ -1037,7 +1038,7 @@ async function openConvWithUser(userId){
       renderMessages(msgs);
       await loadConvList();
     }catch(e){ alert(e.message); }
-  };
+  });
 
   // Vérifier ?with= dans l'URL pour ouvrir une conv directement
   const urlParams=new URLSearchParams(location.search);
