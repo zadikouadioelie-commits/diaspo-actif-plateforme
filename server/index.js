@@ -1075,7 +1075,7 @@ route("POST", "/api/fil/:id/signaler", async (req, res, params, body) => {
   const motif = (body.motif || "").trim();
   if (!motif) return sendJSON(res, 400, { error: "Motif requis." });
   creerNotif(
-    await db.prepare("SELECT id FROM users WHERE role='administrateur' LIMIT 1").get()?.id || 1,
+    (await db.prepare("SELECT id FROM users WHERE role='administrateur' LIMIT 1").get())?.id || 1,
     "signalement", `Publication signalée par ${user.nom}`,
     `Post #${params.id} — motif : ${motif}`, { post_id: Number(params.id) }
   );
@@ -2766,7 +2766,7 @@ route("GET", "/api/collaborations", async (req, res, params, body, query) => {
   if (query.type) rows = rows.filter(r => r.type_collab === query.type);
   if (query.statut) rows = rows.filter(r => r.statut === query.statut); else rows = rows.filter(r => (r.statut||"ouvert") === "ouvert");
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => ((r.titre||"")+(r.description||"")).toLowerCase().includes(q)); }
-  const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_candidatures: await db.prepare("SELECT COUNT(*) AS n FROM candidatures WHERE collaboration_id=?").get(r.id)?.n || 0, competences: safeParse(r.competences || "[]") })));
+  const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_candidatures: (await db.prepare("SELECT COUNT(*) AS n FROM candidatures WHERE collaboration_id=?").get(r.id))?.n || 0, competences: safeParse(r.competences || "[]") })));
   sendJSON(res, 200, { collaborations: withCounts });
 });
 
@@ -3270,7 +3270,7 @@ route("GET", "/api/admin/diaspora-stats/insights", async (req, res) => {
   }
 
   // Score moyen
-  const scoreMoy = await db.prepare(`
+  const scoreMoy = (await db.prepare(`
     SELECT ROUND(AVG(
       MIN(100, COALESCE(nb_vues,0)*0.05 +
         (SELECT COUNT(*) FROM abonnements a WHERE a.initiative_id=i.id)*8.0 +
@@ -3278,7 +3278,7 @@ route("GET", "/api/admin/diaspora-stats/insights", async (req, res) => {
         (SELECT COUNT(*) FROM formations f WHERE f.owner_user_id=i.owner_user_id)*10.0
       )
     ),1) AS s FROM initiatives i
-  `).get()?.s || 0;
+  `).get())?.s || 0;
   insights.push({ type:'analyse', icone:'⚡', texte:`Score d'activité moyen des initiatives : <strong>${scoreMoy}/100</strong>.` });
 
   // Ratio événements/initiatives
@@ -5289,7 +5289,7 @@ async function scrapeSite() {
     created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
   /* Seed catégories initiales */
-  const faqCatCount = await db.prepare(`SELECT COUNT(*) c FROM faq_categories`).get()?.c || 0;
+  const faqCatCount = (await db.prepare(`SELECT COUNT(*) c FROM faq_categories`).get())?.c || 0;
   if (faqCatCount === 0) {
     const cats = [
       { nom: 'Mon compte',      slug: 'mon-compte',       icone: '👤', ordre: 1 },
@@ -5589,7 +5589,7 @@ async function scrapeSite() {
     created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
   /* Seed tutoriels */
-  const obCount = await db.prepare(`SELECT COUNT(*) c FROM onboarding_tutorials`).get()?.c || 0;
+  const obCount = (await db.prepare(`SELECT COUNT(*) c FROM onboarding_tutorials`).get())?.c || 0;
   if (obCount === 0) {
     const insT = db.prepare(`INSERT INTO onboarding_tutorials (compte_type,titre,description,duree_estimee,actif) VALUES (?,?,?,?,1)`);
     const insS = db.prepare(`INSERT INTO onboarding_steps (tutorial_id,ordre,titre,contenu,type,illustration,narration,module_lien,module_label,action_selector,action_label) VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
@@ -5712,7 +5712,7 @@ async function scrapeSite() {
     updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
   /* ── O-Z : seed base de connaissance ── */
-  if ((await db.prepare('SELECT COUNT(*) n FROM oz_knowledge').get()?.n || 0) === 0) {
+  if (((await db.prepare('SELECT COUNT(*) n FROM oz_knowledge').get())?.n || 0) === 0) {
     const kbItems = [
       ['événement', "Pour créer un événement, allez dans le module Événements et cliquez sur 'Créer un événement'. Vous pouvez définir un titre, une date, un lieu et inviter des participants.", 'evenement,creation,guide'],
       ['initiative', "Les initiatives permettent de lancer des projets communautaires. Rendez-vous dans le module Initiatives et cliquez sur 'Nouvelle initiative'.", 'initiative,projet,diaspora'],
@@ -6120,12 +6120,12 @@ route("POST", "/api/faq/sans-reponse", async (req, res, _p, body) => {
 route("GET", "/api/faq/sans-reponse/stats", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  const total      = await db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='nouveau'`).get()?.n || 0;
-  const en_cours   = await db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='en_cours'`).get()?.n || 0;
-  const resolues   = await db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='resolu'`).get()?.n || 0;
+  const total      = (await db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='nouveau'`).get())?.n || 0;
+  const en_cours   = (await db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='en_cours'`).get())?.n || 0;
+  const resolues   = (await db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='resolu'`).get())?.n || 0;
   const top5       = await db.prepare(`SELECT question, count, priorite FROM faq_sans_reponse WHERE statut='nouveau' ORDER BY count DESC LIMIT 5`).all();
   const by_priorite= await db.prepare(`SELECT priorite, COUNT(*) n FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore') GROUP BY priorite`).all();
-  const avg_temps  = await db.prepare(`SELECT AVG((julianday(updated_at)-julianday(first_asked_at))*24) h FROM faq_sans_reponse WHERE statut='resolu'`).get()?.h;
+  const avg_temps  = (await db.prepare(`SELECT AVG((julianday(updated_at)-julianday(first_asked_at))*24) h FROM faq_sans_reponse WHERE statut='resolu'`).get())?.h;
   sendJSON(res, 200, { total, en_cours, resolues, top5, by_priorite, avg_temps_h: avg_temps });
 });
 
@@ -6370,9 +6370,9 @@ route("DELETE", "/api/faq/categories/:id", async (req, res, params) => {
 route("GET", "/api/faq/stats/dashboard", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  const total_questions  = await db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE statut='active'`).get()?.n || 0;
-  const total_vues       = await db.prepare(`SELECT SUM(vues) n FROM faq_questions`).get()?.n || 0;
-  const zero_vues        = await db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE vues=0 AND statut='active'`).get()?.n || 0;
+  const total_questions  = (await db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE statut='active'`).get())?.n || 0;
+  const total_vues       = (await db.prepare(`SELECT SUM(vues) n FROM faq_questions`).get())?.n || 0;
+  const zero_vues        = (await db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE vues=0 AND statut='active'`).get())?.n || 0;
   const top_questions    = await db.prepare(`SELECT id,question,vues,statut FROM faq_questions ORDER BY vues DESC LIMIT 10`).all();
   const no_results_searches = await db.prepare(`SELECT query, COUNT(*) n FROM faq_searches WHERE results_count=0 GROUP BY query ORDER BY n DESC LIMIT 10`).all();
   const top_searches     = await db.prepare(`SELECT query, COUNT(*) n FROM faq_searches GROUP BY query ORDER BY n DESC LIMIT 10`).all();
@@ -6496,10 +6496,10 @@ route("DELETE", "/api/onboarding/admin/steps/:id", async (req, res, params) => {
 route("GET", "/api/onboarding/admin/stats", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  const total_started   = await db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut != 'en_cours'`).get()?.n || 0;
-  const total_finished  = await db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'termine'`).get()?.n || 0;
-  const total_skipped   = await db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'ignore'`).get()?.n || 0;
-  const avg_note        = await db.prepare(`SELECT AVG(note) n FROM onboarding_progress WHERE note IS NOT NULL`).get()?.n;
+  const total_started   = (await db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut != 'en_cours'`).get())?.n || 0;
+  const total_finished  = (await db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'termine'`).get())?.n || 0;
+  const total_skipped   = (await db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'ignore'`).get())?.n || 0;
+  const avg_note        = (await db.prepare(`SELECT AVG(note) n FROM onboarding_progress WHERE note IS NOT NULL`).get())?.n;
   const by_role         = await db.prepare(`SELECT t.compte_type, COUNT(*) n, SUM(CASE WHEN p.statut='termine' THEN 1 ELSE 0 END) done FROM onboarding_progress p JOIN onboarding_tutorials t ON t.id=p.tutorial_id GROUP BY t.compte_type`).all();
   const top_abandon     = await db.prepare(`SELECT step_id, COUNT(*) n FROM onboarding_stats WHERE action='abandon' GROUP BY step_id ORDER BY n DESC LIMIT 5`).all();
   const top_skip_steps  = await db.prepare(`SELECT step_id, COUNT(*) n FROM onboarding_stats WHERE action='step_skip' GROUP BY step_id ORDER BY n DESC LIMIT 5`).all();
@@ -6555,10 +6555,10 @@ route("GET", "/api/oz/audit", async (req, res, _p, _b, query) => {
 route("GET", "/api/oz/stats", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  const total_actions = await db.prepare('SELECT COUNT(*) n FROM oz_audit').get()?.n || 0;
-  const today         = await db.prepare("SELECT COUNT(*) n FROM oz_audit WHERE date(created_at)=date('now')").get()?.n || 0;
+  const total_actions = (await db.prepare('SELECT COUNT(*) n FROM oz_audit').get())?.n || 0;
+  const today         = (await db.prepare("SELECT COUNT(*) n FROM oz_audit WHERE date(created_at)=date('now')").get())?.n || 0;
   const by_action     = await db.prepare('SELECT action, COUNT(*) n FROM oz_audit GROUP BY action ORDER BY n DESC LIMIT 10').all();
-  const users_actifs  = await db.prepare("SELECT COUNT(DISTINCT user_id) n FROM oz_audit WHERE date(created_at)>=date('now','-7 days')").get()?.n || 0;
+  const users_actifs  = (await db.prepare("SELECT COUNT(DISTINCT user_id) n FROM oz_audit WHERE date(created_at)>=date('now','-7 days')").get())?.n || 0;
   const top_modules   = await db.prepare("SELECT module, COUNT(*) n FROM oz_audit WHERE module IS NOT NULL AND module!='' GROUP BY module ORDER BY n DESC LIMIT 5").all();
   sendJSON(res, 200, { total_actions, today, by_action, users_actifs, top_modules });
 });
@@ -8272,7 +8272,7 @@ async function handleRequest(req, res) {
     if (req.method === 'GET' && /^\/api\/events\/\d+\/inscription\/status$/.test(pathname)) {
       const me = await getCurrentUser(req);
       const eid = parseInt(pathname.split('/')[3]);
-      const daId = me ? await db.prepare(`SELECT da_id FROM users WHERE id=?`).get(me.id)?.da_id : null;
+      const daId = me ? (await db.prepare(`SELECT da_id FROM users WHERE id=?`).get(me.id))?.da_id : null;
       if (!daId) return sendJSON(res, 200, { inscrit: false });
       const insc = await db.prepare(`SELECT statut,billet_qr,ds_id_signe,created_at FROM event_inscriptions_securisees WHERE event_id=? AND da_id_utilise=? AND statut NOT IN ('annule') ORDER BY id DESC LIMIT 1`).get(eid, daId);
       return sendJSON(res, 200, { inscrit: !!insc, ...(insc||{}) });
@@ -8369,7 +8369,7 @@ async function handleRequest(req, res) {
         if (insc.statut === 'archive') return logRejet('Dossier QR archivé');
         if (!['confirme','liste_attente'].includes(insc.statut) && insc.statut !== 'signe') return logRejet(`Inscription non confirmée (statut : ${insc.statut})`);
         // Compter les scans précédents
-        const nbScans = await db.prepare(`SELECT COUNT(*) n FROM event_checkins WHERE ticket_id=? AND event_id=? AND resultat='accepted'`).get(iid, eid)?.n || 0;
+        const nbScans = (await db.prepare(`SELECT COUNT(*) n FROM event_checkins WHERE ticket_id=? AND event_id=? AND resultat='accepted'`).get(iid, eid))?.n || 0;
         // Enregistrer le scan (on autorise mais on signale si déjà scanné)
         db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat) VALUES (?,?,?,'accepted')`).run(iid, eid, me.id);
         return sendJSON(res, 200, {
@@ -8406,7 +8406,7 @@ async function handleRequest(req, res) {
       const deja = ticket.statut === 'used';
       if (!deja) await db.prepare(`UPDATE tickets SET statut='used' WHERE id=?`).run(tid);
       db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat) VALUES (?,?,?,'accepted')`).run(tid, eid, me.id);
-      const nbScans = await db.prepare(`SELECT COUNT(*) n FROM event_checkins WHERE ticket_id=? AND event_id=? AND resultat='accepted'`).get(tid, eid)?.n || 1;
+      const nbScans = (await db.prepare(`SELECT COUNT(*) n FROM event_checkins WHERE ticket_id=? AND event_id=? AND resultat='accepted'`).get(tid, eid))?.n || 1;
       return sendJSON(res, 200, {
         valid: true,
         deja_scanne: deja,
@@ -8522,7 +8522,7 @@ async function handleRequest(req, res) {
       const me = await getCurrentUser(req);
       const ma_candidature = me ? await db.prepare(`SELECT statut,created_at FROM recrutement_candidatures WHERE campagne_id=? AND candidat_id=?`).get(cid, me.id) : null;
       const est_favori = me ? !!await db.prepare(`SELECT id FROM recrutement_favoris WHERE campagne_id=? AND user_id=?`).get(cid, me.id) : false;
-      const ma_reaction = me ? await db.prepare(`SELECT type FROM recrutement_reactions WHERE campagne_id=? AND user_id=?`).get(cid, me.id)?.type : null;
+      const ma_reaction = me ? (await db.prepare(`SELECT type FROM recrutement_reactions WHERE campagne_id=? AND user_id=?`).get(cid, me.id))?.type : null;
       return sendJSON(res, 200, { campagne: c, ma_candidature, est_favori, ma_reaction });
     }
 
@@ -8643,7 +8643,7 @@ async function handleRequest(req, res) {
       const cid = parseInt(pathname.split('/')[3]);
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c || (c.recruteur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
-      const nb_candidatures = await db.prepare(`SELECT COUNT(*) n FROM recrutement_candidatures WHERE campagne_id=?`).get(cid)?.n || 0;
+      const nb_candidatures = (await db.prepare(`SELECT COUNT(*) n FROM recrutement_candidatures WHERE campagne_id=?`).get(cid))?.n || 0;
       const taux_conversion = c.vues_total > 0 ? Math.round(nb_candidatures / c.vues_total * 100) : 0;
       const par_type = await db.prepare(`SELECT u.role AS type_compte, COUNT(*) n FROM recrutement_candidatures r JOIN users u ON u.id=r.candidat_id WHERE r.campagne_id=? GROUP BY u.role`).all(cid);
       const par_pays = await db.prepare(`SELECT u.pays, COUNT(*) n FROM recrutement_candidatures r JOIN users u ON u.id=r.candidat_id WHERE r.campagne_id=? AND u.pays IS NOT NULL GROUP BY u.pays ORDER BY n DESC LIMIT 10`).all(cid);
@@ -8674,7 +8674,7 @@ async function handleRequest(req, res) {
         db.prepare(`INSERT INTO recrutement_reactions(campagne_id,user_id,type) VALUES(?,?,?)`).run(cid, me.id, type);
         action = 'added';
       }
-      const nb = await db.prepare(`SELECT COUNT(*) n FROM recrutement_reactions WHERE campagne_id=?`).get(cid)?.n || 0;
+      const nb = (await db.prepare(`SELECT COUNT(*) n FROM recrutement_reactions WHERE campagne_id=?`).get(cid))?.n || 0;
       await db.prepare(`UPDATE recrutement_campagnes SET nb_reactions=? WHERE id=?`).run(nb, cid);
       const ma_reaction = await db.prepare(`SELECT type FROM recrutement_reactions WHERE campagne_id=? AND user_id=?`).get(cid, me.id);
       return sendJSON(res, 200, { action, nb_reactions: nb, ma_reaction: ma_reaction?.type || null });
@@ -8705,7 +8705,7 @@ async function handleRequest(req, res) {
       const { contenu, parent_id } = body;
       if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis.' });
       const r = db.prepare(`INSERT INTO recrutement_commentaires(campagne_id,user_id,contenu,parent_id) VALUES(?,?,?,?)`).run(cid, me.id, contenu.trim(), parent_id || null);
-      const nb = await db.prepare(`SELECT COUNT(*) n FROM recrutement_commentaires WHERE campagne_id=?`).get(cid)?.n || 0;
+      const nb = (await db.prepare(`SELECT COUNT(*) n FROM recrutement_commentaires WHERE campagne_id=?`).get(cid))?.n || 0;
       await db.prepare(`UPDATE recrutement_campagnes SET nb_commentaires=? WHERE id=?`).run(nb, cid);
       return sendJSON(res, 201, { id: Number(r.lastInsertRowid), nb_commentaires: nb });
     }
@@ -8723,7 +8723,7 @@ async function handleRequest(req, res) {
         db.prepare(`INSERT INTO recrutement_favoris(campagne_id,user_id) VALUES(?,?)`).run(cid, me.id);
         action = 'added';
       }
-      const nb = await db.prepare(`SELECT COUNT(*) n FROM recrutement_favoris WHERE campagne_id=?`).get(cid)?.n || 0;
+      const nb = (await db.prepare(`SELECT COUNT(*) n FROM recrutement_favoris WHERE campagne_id=?`).get(cid))?.n || 0;
       await db.prepare(`UPDATE recrutement_campagnes SET nb_favoris=? WHERE id=?`).run(nb, cid);
       return sendJSON(res, 200, { action, nb_favoris: nb, est_favori: action === 'added' });
     }
@@ -8748,7 +8748,7 @@ async function handleRequest(req, res) {
     /* ── POST /api/recrutement/:id/partager ── */
     if (req.method === 'POST' && /^\/api\/recrutement\/\d+\/partager$/.test(pathname)) {
       const cid = parseInt(pathname.split('/')[3]);
-      const nb = await db.prepare(`SELECT nb_partages FROM recrutement_campagnes WHERE id=?`).get(cid)?.nb_partages || 0;
+      const nb = (await db.prepare(`SELECT nb_partages FROM recrutement_campagnes WHERE id=?`).get(cid))?.nb_partages || 0;
       await db.prepare(`UPDATE recrutement_campagnes SET nb_partages=? WHERE id=?`).run(nb + 1, cid);
       return sendJSON(res, 200, { nb_partages: nb + 1 });
     }
@@ -8773,7 +8773,7 @@ async function handleRequest(req, res) {
       if (!profil) profil = { user_id: me.id, situation: 'en_recherche', types_opportunites: '[]', secteurs: '[]', competences: '[]', langues: '[]' };
       const experiences = await db.prepare(`SELECT * FROM profil_emploi_experiences WHERE user_id=? ORDER BY ordre, date_debut DESC`).all(me.id);
       const formations = await db.prepare(`SELECT * FROM profil_emploi_formations WHERE user_id=? ORDER BY ordre, date_obtention DESC`).all(me.id);
-      const nb_candidatures = await db.prepare(`SELECT COUNT(*) n FROM recrutement_candidatures WHERE candidat_id=?`).get(me.id)?.n || 0;
+      const nb_candidatures = (await db.prepare(`SELECT COUNT(*) n FROM recrutement_candidatures WHERE candidat_id=?`).get(me.id))?.n || 0;
       const cands_statuts = await db.prepare(`SELECT statut, COUNT(*) n FROM recrutement_candidatures WHERE candidat_id=? GROUP BY statut`).all(me.id);
       return sendJSON(res, 200, { profil, experiences, formations, nb_candidatures, cands_statuts });
     }
@@ -9050,7 +9050,7 @@ async function handleRequest(req, res) {
         if (existing.type === type) { await db.prepare(`DELETE FROM sondage_reactions WHERE sondage_id=? AND user_id=?`).run(sid, me.id); action = 'removed'; }
         else { await db.prepare(`UPDATE sondage_reactions SET type=? WHERE sondage_id=? AND user_id=?`).run(type,sid,me.id); action = 'changed'; }
       } else { db.prepare(`INSERT INTO sondage_reactions(sondage_id,user_id,type) VALUES(?,?,?)`).run(sid,me.id,type); action = 'added'; }
-      const nb = await db.prepare(`SELECT COUNT(*) n FROM sondage_reactions WHERE sondage_id=?`).get(sid)?.n || 0;
+      const nb = (await db.prepare(`SELECT COUNT(*) n FROM sondage_reactions WHERE sondage_id=?`).get(sid))?.n || 0;
       await db.prepare(`UPDATE sondages SET nb_reactions=? WHERE id=?`).run(nb, sid);
       return sendJSON(res, 200, { action, nb_reactions: nb });
     }
@@ -9072,7 +9072,7 @@ async function handleRequest(req, res) {
       const { contenu, parent_id } = body;
       if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis.' });
       const r = db.prepare(`INSERT INTO sondage_commentaires(sondage_id,user_id,contenu,parent_id) VALUES(?,?,?,?)`).run(sid,me.id,contenu.trim(),parent_id||null);
-      const nb = await db.prepare(`SELECT COUNT(*) n FROM sondage_commentaires WHERE sondage_id=?`).get(sid)?.n || 0;
+      const nb = (await db.prepare(`SELECT COUNT(*) n FROM sondage_commentaires WHERE sondage_id=?`).get(sid))?.n || 0;
       await db.prepare(`UPDATE sondages SET nb_commentaires=? WHERE id=?`).run(nb, sid);
       return sendJSON(res, 201, { id: Number(r.lastInsertRowid), nb_commentaires: nb });
     }
@@ -9085,7 +9085,7 @@ async function handleRequest(req, res) {
       let action;
       if (existing) { await db.prepare(`DELETE FROM sondage_favoris WHERE sondage_id=? AND user_id=?`).run(sid,me.id); action='removed'; }
       else { db.prepare(`INSERT INTO sondage_favoris(sondage_id,user_id) VALUES(?,?)`).run(sid,me.id); action='added'; }
-      const nb = await db.prepare(`SELECT COUNT(*) n FROM sondage_favoris WHERE sondage_id=?`).get(sid)?.n || 0;
+      const nb = (await db.prepare(`SELECT COUNT(*) n FROM sondage_favoris WHERE sondage_id=?`).get(sid))?.n || 0;
       await db.prepare(`UPDATE sondages SET nb_favoris=? WHERE id=?`).run(nb, sid);
       return sendJSON(res, 200, { action, nb_favoris: nb, est_favori: action === 'added' });
     }
@@ -9221,7 +9221,7 @@ async function handleRequest(req, res) {
       total += anciennete;
 
       // Accréditations DA max 20 pts
-      const nbAccred = await db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE user_id=? AND statut='active'`).get(userId)?.n || 0;
+      const nbAccred = (await db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE user_id=? AND statut='active'`).get(userId))?.n || 0;
       const accredPts = Math.min(20, nbAccred * 10);
       if (accredPts > 0) detail.push({ icon:'🏅', label:`${nbAccred} accréditation(s) Diaspo'Actif`, pts: accredPts, max:20 });
       total += accredPts;
@@ -9231,9 +9231,9 @@ async function handleRequest(req, res) {
       if (init?.numero_immatriculation) { total += 8; detail.push({ icon:'🏛️', label:'Initiative officiellement immatriculée', pts:8, max:8 }); }
 
       // Activité plateforme max 10 pts
-      const nbPosts = await db.prepare(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?`).get(userId)?.n || 0;
-      const nbCollabs = await db.prepare(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`).get(userId)?.n || 0;
-      const nbFollowers = await db.prepare(`SELECT COUNT(*) n FROM user_follows WHERE followed_id=?`).get(userId)?.n || 0;
+      const nbPosts = (await db.prepare(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?`).get(userId))?.n || 0;
+      const nbCollabs = (await db.prepare(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`).get(userId))?.n || 0;
+      const nbFollowers = (await db.prepare(`SELECT COUNT(*) n FROM user_follows WHERE followed_id=?`).get(userId))?.n || 0;
       const activPts = Math.min(10, Math.floor(nbPosts/5) + nbCollabs * 2 + Math.floor(nbFollowers/10));
       if (activPts > 0) detail.push({ icon:'📊', label:`Activité : ${nbPosts} publications, ${nbFollowers} abonnés`, pts: activPts, max:10 });
       total += activPts;
@@ -9279,7 +9279,7 @@ async function handleRequest(req, res) {
       `).all(userId, userId);
 
       if (!msgs.length) {
-        const lastActive = await db.prepare(`SELECT last_active FROM users WHERE id=?`).get(userId)?.last_active;
+        const lastActive = (await db.prepare(`SELECT last_active FROM users WHERE id=?`).get(userId))?.last_active;
         return { stars: 0, label: 'Aucune donnée disponible', avg_hours: null, lastActive };
       }
 
@@ -9626,7 +9626,7 @@ async function handleRequest(req, res) {
 
         // ── Emploi & opportunités ──
         const emploiStats = {
-          offres_emploi:    await db.prepare(`SELECT COUNT(*) n FROM offres_emploi`).get()?.n ?? 0,
+          offres_emploi:    (await db.prepare(`SELECT COUNT(*) n FROM offres_emploi`).get())?.n ?? 0,
           candidatures:     actStats.candidatures,
           collaborations:   actStats.collaborations,
         };
@@ -9636,8 +9636,8 @@ async function handleRequest(req, res) {
           verified,
           docs_verifies:    docsVerif,
           pct_verified:     totalMembres > 0 ? Math.round(verified * 100 / totalMembres) : 0,
-          score_moyen:      await db.prepare(`SELECT AVG(trust_score) avg FROM users WHERE trust_score > 0`).get()?.avg?.toFixed(1) ?? 0,
-          reactivity_moy:   await db.prepare(`SELECT AVG(reactivity_stars) avg FROM users WHERE reactivity_stars > 0`).get()?.avg?.toFixed(1) ?? 0,
+          score_moyen:      (await db.prepare(`SELECT AVG(trust_score) avg FROM users WHERE trust_score > 0`).get())?.avg?.toFixed(1) ?? 0,
+          reactivity_moy:   (await db.prepare(`SELECT AVG(reactivity_stars) avg FROM users WHERE reactivity_stars > 0`).get())?.avg?.toFixed(1) ?? 0,
           actifs_30j:       (await db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','-30 days')`).get())?.n,
           absents:          (await db.prepare(`SELECT COUNT(*) n FROM user_absence WHERE fin IS NULL OR fin >= date('now')`).get())?.n,
           suspendus:        (await db.prepare(`SELECT COUNT(*) n FROM account_reports WHERE statut='masque'`).get())?.n,
@@ -9646,8 +9646,8 @@ async function handleRequest(req, res) {
 
         // ── Stats IA ──
         const iaStats = {
-          recommandations: await db.prepare(`SELECT COUNT(*) n FROM chatbot_history WHERE type='recommend'`).get()?.n ?? 0,
-          recherches: await db.prepare(`SELECT COUNT(*) n FROM chatbot_history`).get()?.n ?? 0,
+          recommandations: (await db.prepare(`SELECT COUNT(*) n FROM chatbot_history WHERE type='recommend'`).get())?.n ?? 0,
+          recherches: (await db.prepare(`SELECT COUNT(*) n FROM chatbot_history`).get())?.n ?? 0,
         };
 
         // ── Top villes ──
@@ -9881,7 +9881,7 @@ async function handleRequest(req, res) {
     }
     /* Helper — nb recommandations */
     async function countRecos(initId) {
-      return await db.prepare(`SELECT COUNT(*) as c FROM reseau_recommandations WHERE initiative_id=?`).get(initId)?.c || 0;
+      return (await db.prepare(`SELECT COUNT(*) as c FROM reseau_recommandations WHERE initiative_id=?`).get(initId))?.c || 0;
     }
     /* Helper — enrichir fiche init pour le réseau */
     async function enrichInit(row) {
@@ -9893,7 +9893,7 @@ async function handleRequest(req, res) {
         nationalites_concernees: safeParse(row.nationalites_concernees) || [],
         accreditations: initAccreds(row.id),
         nb_recommandations: countRecos(row.id),
-        nb_affiliations: await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(row.id)?.c || 0,
+        nb_affiliations: (await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(row.id))?.c || 0,
       };
     }
 
@@ -9977,10 +9977,10 @@ async function handleRequest(req, res) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const myInit = getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
-      const total = await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(myInit.id)?.c || 0;
-      const enAttente = await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='en_attente'`).get(myInit.id)?.c || 0;
+      const total = (await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(myInit.id))?.c || 0;
+      const enAttente = (await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='en_attente'`).get(myInit.id))?.c || 0;
       const recos = countRecos(myInit.id);
-      const membreDe = await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE demandeur_id=? AND statut='accepte'`).get(myInit.id)?.c || 0;
+      const membreDe = (await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE demandeur_id=? AND statut='accepte'`).get(myInit.id))?.c || 0;
       const parPays = await db.prepare(`
         SELECT i.pays, COUNT(*) as nb FROM reseau_affiliations ra
         JOIN initiatives i ON i.id=ra.demandeur_id
@@ -11364,7 +11364,7 @@ async function handleRequest(req, res) {
         LEFT JOIN initiatives i ON i.user_id = dms.user_id
         ORDER BY dms.rang ASC
         LIMIT 200`).all();
-      const topPct = await db.prepare("SELECT top_pct FROM deal_master_editions WHERE statut IN ('en_cours','publiee') ORDER BY periode_debut DESC LIMIT 1").get()?.top_pct ?? 10;
+      const topPct = (await db.prepare("SELECT top_pct FROM deal_master_editions WHERE statut IN ('en_cours','publiee') ORDER BY periode_debut DESC LIMIT 1").get())?.top_pct ?? 10;
       return sendJSON(res, 200, { classement: rows, top_pct: topPct });
     }
 
@@ -13042,7 +13042,7 @@ async function runFreezeSuggestionEngine(userId) {
     for (const u of usages) {
       if (u.inactive_days < 20) continue;
       const uf = await db.prepare("SELECT statut FROM user_features WHERE user_id=? AND feature_id=?")
-        .get(userId, await db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug)?.id);
+        .get(userId, (await db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug))?.id);
       if (!uf || uf.statut !== 'active') continue;
 
       const niveau = u.inactive_days >= 60 ? 'high' : u.inactive_days >= 40 ? 'medium' : 'low';
@@ -13050,14 +13050,14 @@ async function runFreezeSuggestionEngine(userId) {
         VALUES (?,?,?,?)
         ON CONFLICT(user_id,feature_id) DO UPDATE SET
           inactive_days=excluded.inactive_days, niveau=excluded.niveau`)
-        .run(userId, await db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug)?.id, u.inactive_days, niveau);
+        .run(userId, (await db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug))?.id, u.inactive_days, niveau);
 
       // 1 notif max par semaine par feature
       const now = new Date();
       const weekIso = `${now.getFullYear()}-W${String(Math.ceil((now - new Date(now.getFullYear(),0,1)) / 604800000 + 1)).padStart(2,'0')}`;
       const alreadySent = await db.prepare(
         "SELECT id FROM feature_notification_logs WHERE user_id=? AND feature_id=? AND semaine_iso=?"
-      ).get(userId, await db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug)?.id, weekIso);
+      ).get(userId, (await db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug))?.id, weekIso);
       if (alreadySent) continue;
 
       const semaines = Math.floor(u.inactive_days / 7);
@@ -13067,7 +13067,7 @@ async function runFreezeSuggestionEngine(userId) {
         `Astuce : un espace plus léger améliore votre navigation. « ${u.nom} » est inactive depuis ${u.inactive_days} jours.`
       ];
       const msg = messages[Math.min(semaines - 3, messages.length - 1)] || messages[0];
-      const featId = await db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug)?.id;
+      const featId = (await db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug))?.id;
       if (!featId) continue;
       creerNotif(userId, 'freeze_suggestion', `💡 Simplifiez votre espace`, msg, { feature_slug: u.slug, action: 'freeze_suggestion' });
       db.prepare("INSERT INTO feature_notification_logs (user_id,feature_id,type,message,semaine_iso) VALUES (?,?,'freeze_suggestion',?,?)")
@@ -13626,27 +13626,27 @@ route("GET", "/api/observations/me", async (req, res) => {
   const monthAgo = new Date(now - 30*86400000).toISOString().slice(0,10);
 
   /* ── Fréquentation profil ── */
-  const visTotal = await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=?").get(uid)?.n || 0;
-  const visUniques = await db.prepare("SELECT COUNT(DISTINCT COALESCE(visiteur_id, -rowid)) AS n FROM profil_visites WHERE profil_user_id=?").get(uid)?.n || 0;
-  const visAujourd = await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)=?").get(uid, today)?.n || 0;
-  const visSemaine = await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=?").get(uid, weekAgo)?.n || 0;
-  const visMois = await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=?").get(uid, monthAgo)?.n || 0;
+  const visTotal = (await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=?").get(uid))?.n || 0;
+  const visUniques = (await db.prepare("SELECT COUNT(DISTINCT COALESCE(visiteur_id, -rowid)) AS n FROM profil_visites WHERE profil_user_id=?").get(uid))?.n || 0;
+  const visAujourd = (await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)=?").get(uid, today))?.n || 0;
+  const visSemaine = (await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=?").get(uid, weekAgo))?.n || 0;
+  const visMois = (await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=?").get(uid, monthAgo))?.n || 0;
 
   // Évolution vues (7 derniers jours)
   const evolVues = await db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=? GROUP BY jour ORDER BY jour`).all(uid, weekAgo);
 
   /* ── Réseau ── */
-  const nbAbonnes = await db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE followed_id=?").get(uid)?.n || 0;
-  const nbAbonnements = await db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE follower_id=?").get(uid)?.n || 0;
+  const nbAbonnes = (await db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE followed_id=?").get(uid))?.n || 0;
+  const nbAbonnements = (await db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE follower_id=?").get(uid))?.n || 0;
   // Évolution abonnés (30j)
   const evolAbonnes = await db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM user_follows WHERE followed_id=? AND date(created_at)>=? GROUP BY jour ORDER BY jour`).all(uid, monthAgo);
 
   /* ── Publications (fil) ── */
-  const nbPubs = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
-  const nbVuesPubs = await db.prepare("SELECT COALESCE(SUM(vues),0) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
-  const nbReactionsPubs = await db.prepare(`SELECT COUNT(*) AS n FROM fil_reactions fr JOIN fil_posts fp ON fr.post_id=fp.id WHERE fp.auteur_id=?`).get(uid)?.n || 0;
-  const nbComsPubs = await db.prepare(`SELECT COUNT(*) AS n FROM fil_commentaires fc JOIN fil_posts fp ON fc.post_id=fp.id WHERE fp.auteur_id=?`).get(uid)?.n || 0;
-  const nbRepubs = await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=? AND original_post_id IS NOT NULL`).get(uid)?.n || 0;
+  const nbPubs = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid))?.n || 0;
+  const nbVuesPubs = (await db.prepare("SELECT COALESCE(SUM(vues),0) AS n FROM fil_posts WHERE auteur_id=?").get(uid))?.n || 0;
+  const nbReactionsPubs = (await db.prepare(`SELECT COUNT(*) AS n FROM fil_reactions fr JOIN fil_posts fp ON fr.post_id=fp.id WHERE fp.auteur_id=?`).get(uid))?.n || 0;
+  const nbComsPubs = (await db.prepare(`SELECT COUNT(*) AS n FROM fil_commentaires fc JOIN fil_posts fp ON fc.post_id=fp.id WHERE fp.auteur_id=?`).get(uid))?.n || 0;
+  const nbRepubs = (await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=? AND original_post_id IS NOT NULL`).get(uid))?.n || 0;
   const tauxEngagement = nbVuesPubs > 0 ? Math.round((nbReactionsPubs + nbComsPubs) / nbVuesPubs * 100 * 10) / 10 : 0;
 
   // Évolution engagement (30j)
@@ -13654,8 +13654,8 @@ route("GET", "/api/observations/me", async (req, res) => {
 
   /* ── Profil emploi ── */
   const profilEmploi = await db.prepare("SELECT * FROM profil_emploi WHERE user_id=?").get(uid);
-  const nbCandidatures = await db.prepare("SELECT COUNT(*) AS n FROM recrutement_candidatures WHERE candidat_id=?").get(uid)?.n || 0;
-  const nbOffresRecues = await db.prepare(`SELECT COUNT(*) AS n FROM recrutement_campagnes WHERE statut='active'`).get()?.n || 0;
+  const nbCandidatures = (await db.prepare("SELECT COUNT(*) AS n FROM recrutement_candidatures WHERE candidat_id=?").get(uid))?.n || 0;
+  const nbOffresRecues = (await db.prepare(`SELECT COUNT(*) AS n FROM recrutement_campagnes WHERE statut='active'`).get())?.n || 0;
 
   /* ── Analyse réseau ── */
   const visiteursPays = await db.prepare(`SELECT visiteur_pays AS pays, COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND visiteur_pays IS NOT NULL GROUP BY visiteur_pays ORDER BY n DESC LIMIT 10`).all(uid);
@@ -13744,8 +13744,8 @@ route("GET", "/api/observations/approfondies", async (req, res) => {
     const evtIds = evts.map(e => e.id);
     if (evtIds.length) {
       const inIds = evtIds.map(() => '?').join(',');
-      evenements.inscrits = await db.prepare(`SELECT COUNT(*) AS n FROM tickets WHERE event_id IN (${inIds})`).get(...evtIds)?.n || 0;
-      evenements.presents = await db.prepare(`SELECT COUNT(*) AS n FROM event_checkins WHERE event_id IN (${inIds})`).get(...evtIds)?.n || 0;
+      evenements.inscrits = (await db.prepare(`SELECT COUNT(*) AS n FROM tickets WHERE event_id IN (${inIds})`).get(...evtIds))?.n || 0;
+      evenements.presents = (await db.prepare(`SELECT COUNT(*) AS n FROM event_checkins WHERE event_id IN (${inIds})`).get(...evtIds))?.n || 0;
     }
 
     /* Deals */
@@ -13781,12 +13781,12 @@ route("GET", "/api/observations/approfondies", async (req, res) => {
   const tauxConversionCamp = campagnes.vues > 0 ? Math.round(campagnes.candidatures / campagnes.vues * 100 * 10) / 10 : 0;
 
   /* Visibilité */
-  const nbImpressions = await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=?").get(uid)?.n || 0;
-  const nbApparitionsFil = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
+  const nbImpressions = (await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=?").get(uid))?.n || 0;
+  const nbApparitionsFil = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid))?.n || 0;
 
   /* Indice d'activité étendu */
   let score = 0;
-  const nbPubs = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
+  const nbPubs = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid))?.n || 0;
   score += Math.min(nbPubs * 2, 15);
   score += Math.min(evenements.total * 5, 15);
   score += Math.min(campagnes.total * 3, 12);
@@ -13796,7 +13796,7 @@ route("GET", "/api/observations/approfondies", async (req, res) => {
   if (user.is_verified) score += 5;
   if (user.photo_url) score += 5;
   score += Math.min(deals.clotures * 3, 9);
-  const nbReactions = await db.prepare(`SELECT COUNT(*) AS n FROM fil_reactions fr JOIN fil_posts fp ON fr.post_id=fp.id WHERE fp.auteur_id=?`).get(uid)?.n || 0;
+  const nbReactions = (await db.prepare(`SELECT COUNT(*) AS n FROM fil_reactions fr JOIN fil_posts fp ON fr.post_id=fp.id WHERE fp.auteur_id=?`).get(uid))?.n || 0;
   score += Math.min(nbReactions * 0.2, 8);
   score = Math.min(Math.round(score), 100);
 
@@ -13842,37 +13842,37 @@ route("GET", "/api/observatoire/global", async (req, res) => {
   const yearStart = new Date().getFullYear() + '-01-01';
 
   /* Comptes */
-  const totalComptes = await db.prepare("SELECT COUNT(*) AS n FROM users").get()?.n || 0;
-  const comptesUsers = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur'").get()?.n || 0;
-  const comptesInit = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='initiative'").get()?.n || 0;
-  const comptesEtat = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite'").get()?.n || 0;
-  const comptesVerif = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE is_verified=1").get()?.n || 0;
-  const nouveauxMois = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE date(created_at)>=?").get(monthAgo)?.n || 0;
-  const actifsMois = await db.prepare("SELECT COUNT(*) AS n FROM user_activity WHERE date>=?").get(monthAgo)?.n || 0;
-  const actifsSemaine = await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=?").get(weekAgo)?.n || 0;
+  const totalComptes = (await db.prepare("SELECT COUNT(*) AS n FROM users").get())?.n || 0;
+  const comptesUsers = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur'").get())?.n || 0;
+  const comptesInit = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='initiative'").get())?.n || 0;
+  const comptesEtat = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite'").get())?.n || 0;
+  const comptesVerif = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE is_verified=1").get())?.n || 0;
+  const nouveauxMois = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE date(created_at)>=?").get(monthAgo))?.n || 0;
+  const actifsMois = (await db.prepare("SELECT COUNT(*) AS n FROM user_activity WHERE date>=?").get(monthAgo))?.n || 0;
+  const actifsSemaine = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=?").get(weekAgo))?.n || 0;
 
   /* Activité */
-  const totalPubs = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get()?.n || 0;
-  const pubsAujourd = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE date(created_at)=?").get(today)?.n || 0;
-  const totalEvts = await db.prepare("SELECT COUNT(*) AS n FROM events").get()?.n || 0;
-  const evtsActifs = await db.prepare("SELECT COUNT(*) AS n FROM events WHERE statut='publie'").get()?.n || 0;
-  const totalCamps = await db.prepare("SELECT COUNT(*) AS n FROM recrutement_campagnes").get()?.n || 0;
-  const campsActives = await db.prepare("SELECT COUNT(*) AS n FROM recrutement_campagnes WHERE statut='active'").get()?.n || 0;
-  const totalSonds = await db.prepare("SELECT COUNT(*) AS n FROM sondages").get()?.n || 0;
-  const sondsOuverts = await db.prepare("SELECT COUNT(*) AS n FROM sondages WHERE statut='ouvert'").get()?.n || 0;
-  const totalDeals = await db.prepare("SELECT COUNT(*) AS n FROM deals").get()?.n || 0;
-  const dealsActifs = await db.prepare("SELECT COUNT(*) AS n FROM deals WHERE statut='actif'").get()?.n || 0;
-  const dealsClotures = await db.prepare("SELECT COUNT(*) AS n FROM deals WHERE statut='cloture'").get()?.n || 0;
-  const totalProjets = await db.prepare("SELECT COUNT(*) AS n FROM projets").get()?.n || 0;
+  const totalPubs = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get())?.n || 0;
+  const pubsAujourd = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE date(created_at)=?").get(today))?.n || 0;
+  const totalEvts = (await db.prepare("SELECT COUNT(*) AS n FROM events").get())?.n || 0;
+  const evtsActifs = (await db.prepare("SELECT COUNT(*) AS n FROM events WHERE statut='publie'").get())?.n || 0;
+  const totalCamps = (await db.prepare("SELECT COUNT(*) AS n FROM recrutement_campagnes").get())?.n || 0;
+  const campsActives = (await db.prepare("SELECT COUNT(*) AS n FROM recrutement_campagnes WHERE statut='active'").get())?.n || 0;
+  const totalSonds = (await db.prepare("SELECT COUNT(*) AS n FROM sondages").get())?.n || 0;
+  const sondsOuverts = (await db.prepare("SELECT COUNT(*) AS n FROM sondages WHERE statut='ouvert'").get())?.n || 0;
+  const totalDeals = (await db.prepare("SELECT COUNT(*) AS n FROM deals").get())?.n || 0;
+  const dealsActifs = (await db.prepare("SELECT COUNT(*) AS n FROM deals WHERE statut='actif'").get())?.n || 0;
+  const dealsClotures = (await db.prepare("SELECT COUNT(*) AS n FROM deals WHERE statut='cloture'").get())?.n || 0;
+  const totalProjets = (await db.prepare("SELECT COUNT(*) AS n FROM projets").get())?.n || 0;
 
   /* Économique */
-  const totalCandidatures = await db.prepare("SELECT COUNT(*) AS n FROM recrutement_candidatures").get()?.n || 0;
-  const revenusPlateforme = await db.prepare("SELECT COALESCE(SUM(montant),0) AS n FROM transactions WHERE statut='reussi'").get()?.n || 0;
-  const revenusAnnee = await db.prepare("SELECT COALESCE(SUM(montant),0) AS n FROM transactions WHERE statut='reussi' AND date_transaction>=?").get(yearStart)?.n || 0;
+  const totalCandidatures = (await db.prepare("SELECT COUNT(*) AS n FROM recrutement_candidatures").get())?.n || 0;
+  const revenusPlateforme = (await db.prepare("SELECT COALESCE(SUM(montant),0) AS n FROM transactions WHERE statut='reussi'").get())?.n || 0;
+  const revenusAnnee = (await db.prepare("SELECT COALESCE(SUM(montant),0) AS n FROM transactions WHERE statut='reussi' AND date_transaction>=?").get(yearStart))?.n || 0;
 
   /* Diasporas (par pays) */
   const diasporas = await db.prepare(`SELECT COALESCE(pays,'Non spécifié') AS pays, COUNT(*) AS nb_membres, COUNT(CASE WHEN role='initiative' THEN 1 END) AS nb_initiatives FROM users GROUP BY pays ORDER BY nb_membres DESC LIMIT 20`).all();
-  const nbDiasporas = await db.prepare("SELECT COUNT(DISTINCT pays) AS n FROM users WHERE pays IS NOT NULL").get()?.n || 0;
+  const nbDiasporas = (await db.prepare("SELECT COUNT(DISTINCT pays) AS n FROM users WHERE pays IS NOT NULL").get())?.n || 0;
 
   /* Classements */
   const classementInit = await db.prepare(`
@@ -13961,12 +13961,12 @@ route("GET", "/api/observatoire/mad", async (req, res) => {
   const formations = await db.prepare(`SELECT niveau_etudes, COUNT(*) AS n FROM profil_emploi pe JOIN users u ON pe.user_id=u.id ${whereClause} GROUP BY niveau_etudes ORDER BY n DESC`).all(...whereParams);
 
   /* Recrutements */
-  const nbOffres = await db.prepare(`SELECT COUNT(*) AS n FROM recrutement_campagnes rc JOIN users u ON rc.recruteur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
-  const nbCands = await db.prepare(`SELECT COUNT(*) AS n FROM recrutement_candidatures rc2 JOIN recrutement_campagnes rc ON rc2.campagne_id=rc.id JOIN users u ON rc.recruteur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
+  const nbOffres = (await db.prepare(`SELECT COUNT(*) AS n FROM recrutement_campagnes rc JOIN users u ON rc.recruteur_id=u.id ${whereClause}`).get(...whereParams))?.n || 0;
+  const nbCands = (await db.prepare(`SELECT COUNT(*) AS n FROM recrutement_candidatures rc2 JOIN recrutement_campagnes rc ON rc2.campagne_id=rc.id JOIN users u ON rc.recruteur_id=u.id ${whereClause}`).get(...whereParams))?.n || 0;
   const recrutements = { offres: nbOffres, candidatures: nbCands };
 
   /* Emploi disponible */
-  const enRecherche = await db.prepare(`SELECT COUNT(*) AS n FROM profil_emploi pe JOIN users u ON pe.user_id=u.id WHERE pe.disponible_pour_travailler=1 ${whereAnd}`).get(...whereParams)?.n || 0;
+  const enRecherche = (await db.prepare(`SELECT COUNT(*) AS n FROM profil_emploi pe JOIN users u ON pe.user_id=u.id WHERE pe.disponible_pour_travailler=1 ${whereAnd}`).get(...whereParams))?.n || 0;
 
   /* Événements */
   const evtsStats = await db.prepare(`SELECT COUNT(*) AS nb_evts FROM events e JOIN users u ON e.organisateur_id=u.id ${whereClause}`).get(...whereParams);
@@ -13982,9 +13982,9 @@ route("GET", "/api/observatoire/mad", async (req, res) => {
   const classementEmploi = await db.prepare(`SELECT COALESCE(u.pays,'Inconnu') AS pays, COUNT(rc.id) AS offres FROM users u LEFT JOIN recrutement_campagnes rc ON rc.recruteur_id=u.id GROUP BY u.pays ORDER BY offres DESC LIMIT 10`).all();
 
   /* Indices */
-  const totalMembres = await db.prepare(`SELECT COUNT(*) AS n FROM users u ${whereClause}`).get(...whereParams)?.n || 1;
-  const totalPubs2 = await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts fp JOIN users u ON fp.auteur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
-  const totalEvts2 = await db.prepare(`SELECT COUNT(*) AS n FROM events e JOIN users u ON e.organisateur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
+  const totalMembres = (await db.prepare(`SELECT COUNT(*) AS n FROM users u ${whereClause}`).get(...whereParams))?.n || 1;
+  const totalPubs2 = (await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts fp JOIN users u ON fp.auteur_id=u.id ${whereClause}`).get(...whereParams))?.n || 0;
+  const totalEvts2 = (await db.prepare(`SELECT COUNT(*) AS n FROM events e JOIN users u ON e.organisateur_id=u.id ${whereClause}`).get(...whereParams))?.n || 0;
   const totalDealsLoc = dealsStats?.total || 0;
   const totalCands = recrutements?.candidatures || 0;
   const totalOffres = recrutements?.offres || 0;
