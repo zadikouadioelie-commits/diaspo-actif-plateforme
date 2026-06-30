@@ -6,22 +6,22 @@
   --navy-light:#24487E;
   --orange:#1565C0;
   --orange-light:#E8F1FC;
-  --bg:#E6EBF4;
-  --card:#F0F4FB;
+  --bg:#EBF0F8;
+  --card:#F5F8FD;
   --text:#1A2332;
   --muted:#5A6880;
-  --border:#C8D3E5;
+  --border:#D0DAE8;
   --green:#1A7A52;
   --radius:10px;
   --shadow:0 2px 14px rgba(27,58,107,.08);
 }
-/* Adoucissement global — toutes les cartes passent en off-white doux */
+/* Fond et cartes : bleu doux sans blanc agressif */
 .stat-card,.card,.modal-box,.search-card,.nat-card,.chat-wrap,
 .profile-card,.price-card,.po-feed-card,.notif-dropdown,.tooltip-box{
   background:var(--card)!important;
 }
-.topbar{background:var(--card)!important;}
-input,select,textarea{background:var(--card)!important;}
+.topbar{background:#FAFCFF!important;}
+input,select,textarea{background:#FAFCFF!important;}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{
