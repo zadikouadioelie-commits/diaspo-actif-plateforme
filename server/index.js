@@ -367,6 +367,49 @@ route("POST", "/api/upload/banner", async (req, res) => {
   }
 });
 
+/* POST /api/upload/logo — upload logo initiative */
+route("POST", "/api/upload/logo", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["logo"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const url = await uploadToBunny(file.buffer, filename, "logos");
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, { error: e.message }); }
+});
+
+/* POST /api/upload/post — upload image pour publication/annonce */
+route("POST", "/api/upload/post", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["post"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  if (file.buffer.length > 10 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 10 Mo)" });
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const url = await uploadToBunny(file.buffer, filename, "posts");
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, { error: e.message }); }
+});
+
 /* ---------- Initiatives ---------- */
 /* Helper : certification d'une initiative */
 function getCertif(initiativeId) {

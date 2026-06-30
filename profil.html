@@ -650,20 +650,13 @@ function pickBannerFile() {
 async function handleBannerFile(input) {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 5 * 1024 * 1024) { alert('Image trop volumineuse (max 5 Mo).'); return; }
-  const reader = new FileReader();
-  reader.onload = async (ev) => {
-    try {
-      // Compress via canvas
-      const compressed = await compressImage(ev.target.result, 1200, 400, 0.82);
-      const up = await api('POST', '/upload', { data: compressed, nom: file.name });
-      await api('PUT', '/profil', { banner_url: up.url });
-      profil.banner_url = up.url;
-      renderBanner();
-    } catch(err) { alert('Erreur lors du chargement de la bannière.'); }
-  };
-  reader.readAsDataURL(file);
   input.value = '';
+  try {
+    const compressed = await compressImageFile(file, 1200, 400, 0.82);
+    const url = await uploadMedia(compressed, 'banner');
+    profil.banner_url = url;
+    renderBanner();
+  } catch(err) { alert('Erreur lors du chargement de la bannière : ' + err.message); }
 }
 
 async function removeBanner() {
@@ -718,11 +711,11 @@ function editAvatar() {
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        const up = await api('POST', '/upload', { data: ev.target.result, nom: file.name });
-        await api('PUT', '/profil', { photo_url: up.url });
-        profil.photo_url = up.url;
+        const compressed = await compressImageFile(file, 400, 400, 0.85);
+        const url = await uploadMedia(compressed, 'avatar');
+        profil.photo_url = url;
         renderAvatar();
-      } catch(err) { alert('Erreur lors du chargement de la photo.'); }
+      } catch(err) { alert('Erreur lors du chargement de la photo : ' + err.message); }
     };
     reader.readAsDataURL(file);
   };
@@ -2660,5 +2653,6 @@ init();
 <script src="assets/gsap-animations.js" defer></script>
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
+<script src="/assets/upload-media.js"></script>
 </body>
 </html>
