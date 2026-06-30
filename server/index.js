@@ -14336,6 +14336,42 @@ route("GET", "/api/admin/observatoire-eco", async (req, res) => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════
+   SHIM Express → route() — compatibilité app.get/post/put/delete/patch
+   ═══════════════════════════════════════════════════════════════════ */
+function requireAuth(req, res, next) {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Non authentifié' });
+  req.user = user;
+  next();
+}
+const app = {
+  get:    (path, ...h) => _appRoute('GET',    path, h),
+  post:   (path, ...h) => _appRoute('POST',   path, h),
+  put:    (path, ...h) => _appRoute('PUT',    path, h),
+  delete: (path, ...h) => _appRoute('DELETE', path, h),
+  patch:  (path, ...h) => _appRoute('PATCH',  path, h),
+};
+function _appRoute(method, path, handlers) {
+  const middlewares = handlers.slice(0, -1);
+  const handler = handlers[handlers.length - 1];
+  route(method, path, async (req, res, params, body) => {
+    req.params = params || {};
+    req.body   = body  || {};
+    if (!req.query) {
+      const qs = (req.url || '').split('?')[1] || '';
+      req.query = {};
+      for (const [k, v] of new URLSearchParams(qs)) req.query[k] = v;
+    }
+    let stopped = false;
+    for (const mw of middlewares) {
+      await new Promise(resolve => mw(req, res, () => { stopped = false; resolve(); }));
+      if (res.writableEnded) return;
+    }
+    await handler(req, res);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    MODULES V2 — Messagerie enrichie, Profil, Formations, OZ Chat
    ═══════════════════════════════════════════════════════════════════ */
 
