@@ -32,13 +32,11 @@ async function sendEmail({ to, subject, html }) {
 /* ── Templates ── */
 
 function emailBienvenue({ prenom, email, role, nom_institution }) {
-  if (role === "collectivite") {
-    return emailBienvenueEtatique({ email, nom_institution });
-  }
+  if (role === "collectivite") return emailBienvenueEtatique({ email, nom_institution });
+  if (role === "initiative") return emailBienvenueInitiative({ email, prenom, nom_institution });
 
   const roleLabel = {
     utilisateur: "Utilisateur",
-    initiative: "Initiative",
     administrateur: "Administrateur"
   }[role] || role;
 
@@ -72,6 +70,77 @@ function emailBienvenue({ prenom, email, role, nom_institution }) {
     </div>
     <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
       <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com · <a href="https://diaspoactif.com/politique-confidentialite.html" style="color:#2563EB;">Confidentialité</a></p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+function emailBienvenueInitiative({ email, prenom, nom_institution }) {
+  return sendEmail({
+    to: email,
+    subject: "Bienvenue sur Diaspo'Actif — Compte Initiative",
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:36px;text-align:center;">
+      <div style="font-size:30px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+      <div style="color:rgba(255,255,255,.55);font-size:13px;margin-top:6px;letter-spacing:.05em;">DU SUD AU NORD</div>
+      <div style="display:inline-block;margin-top:16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:99px;padding:5px 16px;font-size:12px;font-weight:700;color:rgba(255,255,255,.8);letter-spacing:.08em;text-transform:uppercase;">
+        🌱 Compte Initiative
+      </div>
+    </div>
+
+    <div style="padding:40px 36px;">
+      <p style="margin:0 0 24px;font-size:16px;font-weight:900;color:#0D1B2A;line-height:1.4;">
+        Bienvenue sur Diaspo'Actif${nom_institution ? ` — ${nom_institution}` : prenom ? ` — ${prenom}` : ""}.
+      </p>
+
+      <p style="color:#374151;line-height:1.85;font-size:14px;margin:0 0 14px;">
+        Nous sommes heureux de vous accueillir au sein de notre plateforme et vous remercions sincèrement de votre confiance.
+      </p>
+
+      <p style="color:#374151;line-height:1.85;font-size:14px;margin:0 0 14px;">
+        En rejoignant Diaspo'Actif, votre organisation intègre un écosystème international conçu pour favoriser les rencontres, les partenariats, les opportunités d'affaires, le recrutement, les investissements, les projets collaboratifs et le développement des diasporas.
+      </p>
+
+      <p style="color:#374151;line-height:1.85;font-size:14px;margin:0 0 14px;">
+        Qu'il s'agisse d'une entreprise, d'une association, d'une ONG, d'une fondation, d'un incubateur ou de toute autre organisation, votre engagement contribue à renforcer les liens entre les diasporas, leurs pays d'origine et leurs pays d'accueil.
+      </p>
+
+      <div style="background:#F0F4FF;border-left:4px solid #2563EB;border-radius:0 10px 10px 0;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0;color:#1B3A6B;font-size:14px;line-height:1.75;font-style:italic;">
+          Votre présence est essentielle. C'est grâce à l'implication et au soutien des organisations qui nous rejoignent que Diaspo'Actif peut aujourd'hui mettre à la disposition des diasporas un outil innovant, pensé pour répondre à leurs besoins, valoriser leurs talents et créer davantage d'opportunités de coopération et de développement.
+        </p>
+      </div>
+
+      <p style="color:#374151;line-height:1.85;font-size:14px;margin:0 0 28px;">
+        Nous vous remercions chaleureusement de prendre part à cette aventure collective et nous vous souhaitons une excellente expérience sur Diaspo'Actif.<br><br>
+        <strong>Ensemble, faisons de la coopération, de l'innovation et de l'engagement des diasporas une véritable force au service du développement.</strong>
+      </p>
+
+      <div style="text-align:center;margin:32px 0 24px;">
+        <a href="https://diaspoactif.com/login.html" style="display:inline-block;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;text-decoration:none;font-weight:800;font-size:15px;padding:16px 36px;border-radius:12px;box-shadow:0 4px 20px rgba(37,99,235,.35);letter-spacing:.02em;">
+          Accéder à mon espace Initiative →
+        </a>
+      </div>
+
+      <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">
+        Vous recevez cet email car vous venez de créer un compte sur diaspoactif.com
+      </p>
+    </div>
+
+    <div style="background:#F8FAFF;padding:18px 36px;border-top:1px solid #E8EFFE;display:flex;justify-content:space-between;align-items:center;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · Du Sud au Nord · 2026</p>
+      <p style="margin:0;font-size:11px;">
+        <a href="https://diaspoactif.com/politique-confidentialite.html" style="color:#2563EB;text-decoration:none;">Confidentialité</a> ·
+        <a href="https://diaspoactif.com/mentions-legales.html" style="color:#2563EB;text-decoration:none;">Mentions légales</a>
+      </p>
     </div>
   </div>
 </body>
