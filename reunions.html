@@ -106,6 +106,7 @@
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
 </head>
 <body>
 <div class="page">
@@ -806,6 +807,7 @@ ul{margin:6px 0 0 18px;}li{margin-bottom:4px;}
 table{width:100%;border-collapse:collapse;margin-top:8px;}
 th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;font-size:13px;}
 th{background:#f0f0f0;}</style><link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
 </head><body>
 <h1>📋 Résumé de réunion</h1>
 <div class="meta"><strong>${escH(reunion.titre)}</strong> · ${fmtDate(reunion.date_debut)} · ${fmtTime(reunion.started_at)||fmtTime(reunion.date_debut)} — ${fmtTime(reunion.ended_at)||''}</div>
@@ -815,6 +817,7 @@ ${actions.length?`<h2>Actions</h2><table><tr><th>Action</th><th>Responsable</th>
 ${resume.notes?`<h2>Notes</h2><p style="white-space:pre-wrap;">${escH(resume.notes)}</p>`:''}
 ${decisions.length?`<h2>Suivi des décisions</h2><table><tr><th>Décision</th><th>Type</th><th>Statut</th><th>Échéance</th></tr>${decisions.map(d=>`<tr><td>${escH(d.titre)}</td><td>${escH(d.type_suivi)}</td><td>${escH(d.statut)}</td><td>${escH(d.echeance||'—')}</td></tr>`).join('')}</table>`:''}
 <script src="/assets/cookies-banner.js"></script>
+  <script src="/assets/theme-manager.js"></script>
 </body></html>`;
     const w=window.open('','_blank');
     w.document.write(html);
@@ -832,6 +835,7 @@ async function exportResumeWord(rid){
     const actions=JSON.parse(resume.actions||'[]');
     const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="UTF-8">
 <style>body{font-family:Calibri,sans-serif;font-size:11pt;}h1{font-size:16pt;}h2{font-size:13pt;color:#1a1a2e;}</style><link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
 </head><body>
 <h1>Résumé de réunion — ${escH(reunion.titre)}</h1>
 <p><b>Date :</b> ${fmtDate(reunion.date_debut)}</p>
@@ -839,6 +843,7 @@ ${sujets.length?`<h2>Sujets abordés</h2><ul>${sujets.map(s=>`<li>${escH(s)}</li
 ${decs.length?`<h2>Décisions</h2><ul>${decs.map(s=>`<li>${escH(s)}</li>`).join('')}</ul>`:''}
 ${actions.length?`<h2>Actions</h2><table border="1" cellpadding="4"><tr><th>Action</th><th>Responsable</th><th>Échéance</th></tr>${actions.map(a=>`<tr><td>${escH(a.titre||a)}</td><td>${escH(a.responsable||'')}</td><td>${escH(a.echeance||'')}</td></tr>`).join('')}</table>`:''}
 ${resume.notes?`<h2>Notes</h2><p>${escH(resume.notes).replace(/\n/g,'<br>')}</p>`:''}
+  <script src="/assets/theme-manager.js"></script>
 </body></html>`;
     const blob=new Blob(['﻿'+html],{type:'application/msword'});
     const a=document.createElement('a');
@@ -989,8 +994,11 @@ init();
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
 <script src="assets/chatbot.js"></script>
+  <script src="/assets/theme-manager.js"></script>
 </body>
 </html>
+
+
 
 
 

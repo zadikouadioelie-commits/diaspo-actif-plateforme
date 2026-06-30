@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="assets/logo.svg">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
 </head>
 <body>
 <div class="page">
@@ -63,6 +64,9 @@
       <a href="#" data-usection="outils">🟧 CV, Lettres, Candidatures</a>
       <a href="profil.html">👤 Mon profil public</a>
       <a href="confidentialite.html">🔐 Confidentialité</a>
+
+      <div class="sb-group-lbl">07 — PARAMÈTRES</div>
+      <a href="#" data-usection="apparence">🎨 Apparence</a>
     </aside>
 
     <main class="content">
@@ -252,6 +256,15 @@
         </div>
 
         <div id="ad-dashboard-utilisateur" data-ad-slot="0"></div>
+      </section>
+
+      <!-- ── SECTION APPARENCE ── -->
+      <section id="usec-apparence" style="display:none;">
+        <h2 style="margin:0 0 20px;">🎨 Apparence</h2>
+        <div class="da-theme-selector">
+          <h4>Choisissez votre thème</h4>
+          <div class="da-theme-options" id="da-theme-options-list"></div>
+        </div>
       </section>
     </main>
   </div>
@@ -707,6 +720,30 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
       a.classList.toggle('active', a.dataset.usection===name);
     });
     if(name==='projets') loadMesProjets();
+    if(name==='apparence') renderThemeSelector();
+  };
+
+  function renderThemeSelector() {
+    const container = document.getElementById('da-theme-options-list');
+    if (!container || !window.daTheme) return;
+    const themes = [
+      { id:'classique',       label:'Classique',        desc:'Bleu marine & blanc – style sobre',    dot:'da-theme-dot-classique' },
+      { id:'institutionnel2', label:'Institutionnel 2',  desc:'Bleu #0D2B4E & fond gris-bleu – charte officielle', dot:'da-theme-dot-institutionnel2' }
+    ];
+    const current = window.daTheme.current();
+    container.innerHTML = themes.map(t => `
+      <button class="da-theme-option${t.id===current?' da-theme-active':''}" onclick="previewTheme('${t.id}')">
+        <span class="da-theme-dot ${t.dot}"></span>
+        <span class="da-theme-info">
+          <strong>${t.label}</strong>
+          <span>${t.desc}</span>
+        </span>
+        ${t.id===current ? '<span class="da-theme-badge">Actif</span>' : '<span class="da-theme-preview-btn">Aperçu →</span>'}
+      </button>`).join('');
+  }
+
+  window.previewTheme = function(id) {
+    if (window.daTheme) window.daTheme.preview(id);
   };
   document.querySelectorAll('.sidebar a[data-usection]').forEach(a=>{
     a.addEventListener('click', e=>{ e.preventDefault(); uShowSection(a.dataset.usection); });
@@ -858,8 +895,11 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
 </script>
 <script src="/assets/cookies-banner.js"></script>
 <script src="/assets/upload-media.js"></script>
+  <script src="/assets/theme-manager.js"></script>
 </body>
 </html>
+
+
 
 
 

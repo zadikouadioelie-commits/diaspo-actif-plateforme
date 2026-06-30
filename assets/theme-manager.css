@@ -1,0 +1,170 @@
+/* ============================================================
+   DIASPO'ACTIF — Bannière de preview de thème + Sélecteur
+   ============================================================ */
+
+/* ── Bannière preview ── */
+#da-theme-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 99999;
+  background: #0D2B4E;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 12px rgba(0,0,0,.25);
+  animation: da-banner-in .25s ease;
+}
+@keyframes da-banner-in {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+.da-tb-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 10px 24px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.da-tb-msg { flex: 1; min-width: 200px; }
+.da-tb-msg strong { color: #F26422; }
+.da-tb-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.da-tb-countdown {
+  background: rgba(255,255,255,.12);
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255,255,255,.7);
+  min-width: 34px;
+  text-align: center;
+}
+.da-tb-btn {
+  border: none;
+  border-radius: 7px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .1s, opacity .15s;
+}
+.da-tb-btn:hover { opacity: .88; transform: translateY(-1px); }
+.da-tb-confirm {
+  background: #F26422;
+  color: #fff;
+}
+.da-tb-revert {
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.25);
+}
+
+/* ── Flash succès ── */
+#da-theme-flash {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 99999;
+  background: #1A7A52;
+  color: #fff;
+  text-align: center;
+  padding: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  animation: da-flash-fade 2.5s ease forwards;
+}
+@keyframes da-flash-fade {
+  0%   { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── Sélecteur de thème (dans les paramètres / sidebar) ── */
+.da-theme-selector {
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #D6DEE8);
+  border-radius: 14px;
+  padding: 20px 24px;
+  max-width: 480px;
+}
+.da-theme-selector h4 {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text, #102A43);
+}
+.da-theme-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.da-theme-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 2px solid var(--border, #D6DEE8);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color .18s, background .18s;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+.da-theme-option:hover {
+  border-color: #4490E2;
+  background: rgba(68,144,226,.05);
+}
+.da-theme-option.da-theme-active {
+  border-color: #0D2B4E;
+  background: rgba(13,43,78,.04);
+}
+.da-theme-dot {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid rgba(0,0,0,.08);
+}
+.da-theme-dot-classique      { background: linear-gradient(135deg, #1B3A6B 50%, #F5F7FA 50%); }
+.da-theme-dot-institutionnel2 { background: linear-gradient(135deg, #0D2B4E 50%, #EEF2F8 50%); }
+.da-theme-info { flex: 1; }
+.da-theme-info strong { font-size: 14px; color: var(--text, #102A43); display: block; }
+.da-theme-info span   { font-size: 12px; color: var(--muted, #6B7280); }
+.da-theme-badge {
+  font-size: 11px;
+  background: #0D2B4E;
+  color: #fff;
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.da-theme-preview-btn {
+  margin-top: 4px;
+  background: #F26422;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 5px 13px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .18s;
+  pointer-events: none;
+}
+.da-theme-option:hover .da-theme-preview-btn,
+.da-theme-option.da-theme-active .da-theme-preview-btn {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* Décaler le contenu quand la bannière est visible */
+body.da-banner-open .topbar { top: 48px !important; }
+body.da-banner-open .sidebar { top: calc(48px + 64px) !important; }

@@ -114,6 +114,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:#0f172a
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
 </head>
 <body>
 
@@ -568,6 +569,7 @@ function exportPDF() {
     .meta{font-size:11px;color:#64748b;margin-bottom:20px;}
     @media print{button{display:none}}
   </style><link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
 </head><body>
   <h1>🌍 Observatoire Mondial Diaspo'Actif</h1>
   <div class="meta">Généré le ${new Date().toLocaleString('fr-FR')} · Période : ${currentPeriod}</div>
@@ -594,6 +596,7 @@ function exportPDF() {
   ${(STATS.competences.topTitres||[]).map(r=>`<tr><td>${r.titre_pro}</td><td>${r.n}</td></tr>`).join('')}
   </table>
   <script src="/assets/cookies-banner.js"></script>
+  <script src="/assets/theme-manager.js"></script>
 </body></html>`);
   w.document.close();
   setTimeout(() => w.print(), 500);
@@ -633,8 +636,11 @@ function startAutoRefresh() {
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
 <script src="assets/chatbot.js"></script>
+  <script src="/assets/theme-manager.js"></script>
 </body>
 </html>
+
+
 
 
 
