@@ -570,7 +570,7 @@ route("GET", "/api/search/comptes", async (req, res, params, body, query) => {
   }
   const like = `%${q}%`;
   // Utilisateurs
-  const users = db.prepare(`
+  const users = await db.prepare(`
     SELECT id, nom, prenom, role, photo_url AS avatar_url, da_id, 'user' AS source
     FROM users
     WHERE (nom LIKE ? OR prenom LIKE ? OR da_id LIKE ?) AND id != ?
@@ -665,7 +665,7 @@ route("GET", "/api/users/search", async (req, res, params, body, query) => {
   const q = (query.q || "").trim();
   if (q.length < 2) return sendJSON(res, 200, { users: [] });
   const like = `%${q}%`;
-  const rows = db.prepare(`
+  const rows = await db.prepare(`
     SELECT id, nom, prenom, email, role, avatar_url
     FROM users
     WHERE id != ?
@@ -772,7 +772,7 @@ route("GET", "/api/recommendations", async (req, res, params, body, query) => {
   const domaine = userFull.domaine || null;
   let candidates = [];
   /* 1. Initiatives avec même pays/domaine */
-  const inits = db.prepare(`
+  const inits = await db.prepare(`
     SELECT i.owner_user_id AS id, i.nom AS display_nom, i.description, i.type AS compte_type,
            i.domaine, i.pays AS pays_init, i.pays_origine, i.ville,
            u.photo_url AS avatar_url, u.role
@@ -785,7 +785,7 @@ route("GET", "/api/recommendations", async (req, res, params, body, query) => {
   candidates.push(...inits.map(r => ({ ...r, score: 2 })));
   /* 2. Utilisateurs avec même origine */
   if (candidates.length < 10 && origine) {
-    const usrs = db.prepare(`
+    const usrs = await db.prepare(`
       SELECT id, nom AS display_nom, bio AS description, role,
              ville, pays AS pays_init, NULL AS pays_origine,
              photo_url AS avatar_url, titre_pro AS compte_type,
@@ -799,7 +799,7 @@ route("GET", "/api/recommendations", async (req, res, params, body, query) => {
     const limit = 10 - candidates.length;
     const existIds = [...excluded, ...candidates.map(c => c.id)];
     const ph2 = existIds.map(() => "?").join(",");
-    const active = db.prepare(`
+    const active = await db.prepare(`
       SELECT id, nom AS display_nom, bio AS description, role,
              ville, pays AS pays_init, NULL AS pays_origine,
              photo_url AS avatar_url, titre_pro AS compte_type,
@@ -1277,7 +1277,7 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
     if (conv.user1_id === user.id && conv.deleted_u1) await db.prepare("UPDATE conversations SET deleted_u1=0 WHERE id=?").run(conv.id);
     if (conv.user2_id === user.id && conv.deleted_u2) await db.prepare("UPDATE conversations SET deleted_u2=0 WHERE id=?").run(conv.id);
   } else {
-    const id = db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet) VALUES (?, ?, ?)").run(user.id, otherId, body.sujet || null).lastInsertRowid;
+    const id = await db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet) VALUES (?, ?, ?)").run(user.id, otherId, body.sujet || null).lastInsertRowid;
     conv = { id };
   }
   sendJSON(res, 201, { conversation_id: conv.id });
@@ -1359,7 +1359,7 @@ route("DELETE", "/api/conversations/:id", async (req, res, params) => {
 route("GET", "/api/messages/non-lus", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 200, { total: 0 });
-  const r = db.prepare(`
+  const r = await db.prepare(`
     SELECT COUNT(*) AS n FROM messages m
     JOIN conversations c ON c.id = m.conversation_id
     WHERE m.sender_id != ? AND m.lu = 0
@@ -1382,7 +1382,7 @@ route("GET", "/api/users/search", async (req, res, params, body, query) => {
   if (!placeholders) return sendJSON(res, 200, { users: [] });
 
   const pattern = `%${q}%`;
-  const results = db.prepare(`
+  const results = await db.prepare(`
     SELECT id, nom, role, ville, pays FROM users
     WHERE id != ? AND role IN (${placeholders})
       AND (nom LIKE ? OR email LIKE ?)
@@ -1451,7 +1451,7 @@ async function hasAccreditation(userId, type) {
 }
 
 route("GET", "/api/formations", async (req, res, params, body, query) => {
-  let rows = db.prepare(`
+  let rows = await db.prepare(`
     SELECT f.*, u.nom AS auteur_nom
     FROM formations f
     LEFT JOIN users u ON u.id = f.owner_user_id
@@ -1487,7 +1487,7 @@ route("GET", "/api/formations/:id", async (req, res, params) => {
 route("GET", "/api/mes-formations", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const formations = db.prepare(`
+  const formations = await db.prepare(`
     SELECT f.*,
       (SELECT COUNT(*) FROM formation_inscriptions i WHERE i.formation_id=f.id AND i.statut='active') AS nb_inscrits,
       (SELECT COALESCE(SUM(montant_paye),0) FROM formation_inscriptions i WHERE i.formation_id=f.id AND i.statut='active') AS revenu_brut
@@ -1807,14 +1807,14 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   const mau = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=date('now','-29 days')").get())?.n;
 
   // Tendance inscriptions : 14 derniers jours
-  const tendance14j = db.prepare(`
+  const tendance14j = await db.prepare(`
     SELECT date(created_at) AS jour, COUNT(*) AS n FROM users
     WHERE created_at >= datetime('now','-13 days')
     GROUP BY jour ORDER BY jour ASC
   `).all();
 
   // Tendance activité : 14 derniers jours
-  const tendanceActif14j = db.prepare(`
+  const tendanceActif14j = await db.prepare(`
     SELECT date AS jour, COUNT(DISTINCT user_id) AS n FROM user_activity
     WHERE date >= date('now','-13 days')
     GROUP BY date ORDER BY date ASC
@@ -1842,7 +1842,7 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   const tempsSessionTotalH   = sessionRow.total_sec ? (sessionRow.total_sec / 3600).toFixed(1) : "0.0";
 
   // Tendance engagement 14j (publications + réactions + commentaires par jour)
-  const tendanceEngagement14j = db.prepare(`
+  const tendanceEngagement14j = await db.prepare(`
     WITH jours AS (
       SELECT date('now', '-' || d || ' days') AS jour
       FROM (SELECT 0 d UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION
@@ -1858,7 +1858,7 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   `).all();
 
   // Top 5 publications les plus engageantes
-  const topPosts = db.prepare(`
+  const topPosts = await db.prepare(`
     SELECT p.id, p.contenu, p.auteur_nom, p.categorie,
       substr(p.created_at, 1, 10) AS date_pub,
       COUNT(DISTINCT r.id) AS nb_reactions,
@@ -1970,7 +1970,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   const isFollowing  = me ? !!await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, u.id) : false;
   const initiativesSuivies = await db.prepare("SELECT i.id,i.slug,i.nom,i.domaine,i.pays FROM abonnements a JOIN initiatives i ON i.id=a.initiative_id WHERE a.user_id=? LIMIT 12").all(u.id);
   const usersSuivis  = await db.prepare("SELECT u2.id,u2.nom,u2.prenom,u2.titre_pro,u2.ville,u2.photo_url FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? LIMIT 12").all(u.id);
-  const publications = db.prepare(`
+  const publications = await db.prepare(`
     SELECT p.id, p.type, p.categorie, p.contenu, p.created_at,
       COUNT(DISTINCT r.id) AS nb_reactions,
       COUNT(DISTINCT c.id) AS nb_commentaires
@@ -2313,7 +2313,7 @@ route("GET", "/api/mentions", async (req, res, params, body, query) => {
   const q = (query.q || "").trim();
   if (q.length < 1) return sendJSON(res, 200, { results: [] });
   const like = `%${q}%`;
-  const users = db.prepare(`
+  const users = await db.prepare(`
     SELECT id, nom, prenom, role, ville, pays, photo_url
     FROM users WHERE (nom LIKE ? OR prenom LIKE ?) AND role != 'administrateur' LIMIT 5
   `).all(like, like);
@@ -2973,7 +2973,7 @@ route("GET", "/api/fil/meta", async (req, res) => {
 route("GET", "/api/fil/profiles", async (req, res, params, body, query) => {
   const cu = await getCurrentUser(req);
   // Exclure l'utilisateur connecté, retourner 8 profils enrichis
-  const users = db.prepare(`
+  const users = await db.prepare(`
     SELECT id, nom, prenom, photo_url, banner_url, ville, pays,
            nationalite1, nationalite2, titre_pro, bio, situation_pro, theme_couleur, role
     FROM users
@@ -3013,7 +3013,7 @@ route("GET", "/api/admin/reseau", async (req, res) => {
   const parVille    = await db.prepare("SELECT ville, pays, COUNT(*) n FROM users WHERE ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 10").all();
 
   // Top pays actifs = pays avec le plus d'activité (user_activity JOIN users)
-  const paysActifs  = db.prepare(`
+  const paysActifs  = await db.prepare(`
     SELECT u.pays, COUNT(DISTINCT a.user_id) n
     FROM user_activity a JOIN users u ON u.id=a.user_id
     WHERE a.date >= date('now','-30 days') AND u.pays IS NOT NULL
@@ -3021,7 +3021,7 @@ route("GET", "/api/admin/reseau", async (req, res) => {
   `).all();
 
   // Croissance internationale : nombre de pays distincts avec inscrits ce mois
-  const paysNouveaux = db.prepare(`
+  const paysNouveaux = await db.prepare(`
     SELECT COUNT(DISTINCT pays) n FROM users
     WHERE pays IS NOT NULL AND created_at >= datetime('now','-30 days')
   `).get().n;
@@ -3059,7 +3059,7 @@ route("GET", "/api/admin/reseau-pro", async (req, res) => {
   const whereStr = where.join(' AND ');
 
   const total = (await db.prepare(`SELECT COUNT(*) n FROM users u WHERE ${whereStr}`).get(...params))?.n;
-  const rows  = db.prepare(`
+  const rows  = await db.prepare(`
     SELECT u.id, u.nom, u.prenom, u.titre_pro, u.situation_pro,
            u.ville, u.pays, u.origine1 AS pays_origine, u.nationalite1 AS nationalite,
            u.role, substr(u.created_at,1,10) AS date_inscription,
@@ -3095,7 +3095,7 @@ route("GET", "/api/admin/reseau-pro/stats", async (req, res) => {
   const parSitPro    = await db.prepare(`SELECT situation_pro, COUNT(*) n FROM users WHERE ${roleFilter} AND situation_pro IS NOT NULL GROUP BY situation_pro ORDER BY n DESC LIMIT 10`).all();
 
   // Top villes actives (activité 30j)
-  const villesActives = db.prepare(`
+  const villesActives = await db.prepare(`
     SELECT u.ville, u.pays, COUNT(DISTINCT a.user_id) n
     FROM user_activity a JOIN users u ON u.id=a.user_id
     WHERE a.date >= date('now','-30 days') AND u.${roleFilter} AND u.ville IS NOT NULL
@@ -3103,7 +3103,7 @@ route("GET", "/api/admin/reseau-pro/stats", async (req, res) => {
   `).all();
 
   // Évolution inscriptions 6 derniers mois
-  const evolution = db.prepare(`
+  const evolution = await db.prepare(`
     SELECT substr(created_at,1,7) AS mois, COUNT(*) n
     FROM users WHERE ${roleFilter}
     GROUP BY mois ORDER BY mois DESC LIMIT 6
@@ -3133,7 +3133,7 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
   const actifs30j    = (await db.prepare("SELECT COUNT(DISTINCT i.id) n FROM initiatives i JOIN abonnements a ON a.initiative_id=i.id JOIN user_activity ua ON ua.user_id=a.user_id WHERE ua.date>=date('now','-30 days')").get())?.n;
 
   // Par domaine avec events + formations
-  const parDomaine = db.prepare(`
+  const parDomaine = await db.prepare(`
     SELECT domaine, COUNT(*) n,
       ROUND(AVG(COALESCE(nb_vues,0)),0) AS moy_vues
     FROM initiatives WHERE domaine IS NOT NULL
@@ -3143,20 +3143,20 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
   const formParDomaine   = await db.prepare(`SELECT domaine, COUNT(*) n FROM formations WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 10`).all();
 
   // Par pays d'origine
-  const parOrigine = db.prepare(`
+  const parOrigine = await db.prepare(`
     SELECT nationalite1 AS pays_origine, COUNT(*) n
     FROM initiatives WHERE nationalite1 IS NOT NULL
     GROUP BY nationalite1 ORDER BY n DESC LIMIT 20
   `).all();
 
   // Par pays de résidence
-  const parPaysResidence = db.prepare(`
+  const parPaysResidence = await db.prepare(`
     SELECT pays, COUNT(*) n FROM initiatives WHERE pays IS NOT NULL
     GROUP BY pays ORDER BY n DESC LIMIT 20
   `).all();
 
   // Par ville (top 20)
-  const parVille = db.prepare(`
+  const parVille = await db.prepare(`
     SELECT ville, pays, COUNT(*) n,
       SUM(COALESCE(nb_vues,0)) AS total_vues,
       (SELECT COUNT(*) FROM evenements e WHERE e.ville=i.ville) AS nb_events
@@ -3165,7 +3165,7 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
   `).all();
 
   // Score d'activité par initiative (top 15)
-  const topInitiatives = db.prepare(`
+  const topInitiatives = await db.prepare(`
     SELECT i.id, i.nom, i.slug, i.ville, i.pays, i.domaine,
       COALESCE(i.nb_vues,0) AS nb_vues,
       (SELECT COUNT(*) FROM abonnements a WHERE a.initiative_id=i.id) AS nb_abonnes,
@@ -3181,19 +3181,19 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
   `).all();
 
   // Évolution mensuelle inscriptions initiatives (12 mois)
-  const evolution = db.prepare(`
+  const evolution = await db.prepare(`
     SELECT substr(created_at,1,7) AS mois, COUNT(*) n
     FROM initiatives GROUP BY mois ORDER BY mois DESC LIMIT 12
   `).all().reverse();
 
   // Évolution événements (12 mois)
-  const evolutionEvents = db.prepare(`
+  const evolutionEvents = await db.prepare(`
     SELECT substr(created_at,1,7) AS mois, COUNT(*) n
     FROM evenements GROUP BY mois ORDER BY mois DESC LIMIT 12
   `).all().reverse();
 
   // Tendances: comparer mois courant vs précédent par domaine
-  const tendanceDomaine = db.prepare(`
+  const tendanceDomaine = await db.prepare(`
     SELECT domaine,
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS ce_mois,
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END) AS mois_prec
@@ -3203,7 +3203,7 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
   `).all();
 
   // Tendances villes
-  const tendanceVille = db.prepare(`
+  const tendanceVille = await db.prepare(`
     SELECT ville,
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS ce_mois,
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END) AS mois_prec
@@ -3243,7 +3243,7 @@ route("GET", "/api/admin/diaspora-stats/insights", async (req, res) => {
   if (topOrigine) insights.push({ type:'analyse', icone:'🌍', texte:`La diaspora <strong>${topOrigine.o}</strong> est la plus représentée avec ${topOrigine.n} initiatives actives.` });
 
   // Croissance domaine ce mois
-  const croissanceDom = db.prepare(`
+  const croissanceDom = await db.prepare(`
     SELECT domaine,
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS cm,
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END) AS pm
@@ -3257,7 +3257,7 @@ route("GET", "/api/admin/diaspora-stats/insights", async (req, res) => {
   }
 
   // Ville en croissance
-  const croissanceVille = db.prepare(`
+  const croissanceVille = await db.prepare(`
     SELECT ville,
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS cm,
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END) AS pm
@@ -3270,7 +3270,7 @@ route("GET", "/api/admin/diaspora-stats/insights", async (req, res) => {
   }
 
   // Score moyen
-  const scoreMoy = db.prepare(`
+  const scoreMoy = await db.prepare(`
     SELECT ROUND(AVG(
       MIN(100, COALESCE(nb_vues,0)*0.05 +
         (SELECT COUNT(*) FROM abonnements a WHERE a.initiative_id=i.id)*8.0 +
@@ -3299,7 +3299,7 @@ route("GET", "/api/admin/contenu", async (req, res) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // Publications les plus engageantes (vue simulée = score engagement)
-  const topPublications = db.prepare(`
+  const topPublications = await db.prepare(`
     SELECT p.id, p.contenu, p.auteur_nom, p.categorie, substr(p.created_at,1,10) AS date_pub,
       COUNT(DISTINCT r.id) AS nb_reactions, COUNT(DISTINCT c.id) AS nb_commentaires,
       (COUNT(DISTINCT r.id) * 2 + COUNT(DISTINCT c.id) * 3) AS score
@@ -3310,7 +3310,7 @@ route("GET", "/api/admin/contenu", async (req, res) => {
   `).all();
 
   // Articles les plus partagés
-  const topArticles = db.prepare(`
+  const topArticles = await db.prepare(`
     SELECT p.id, p.contenu, p.auteur_nom, substr(p.created_at,1,10) AS date_pub,
       COUNT(DISTINCT r.id) AS nb_reposts
     FROM fil_posts p
@@ -3320,7 +3320,7 @@ route("GET", "/api/admin/contenu", async (req, res) => {
   `).all();
 
   // Initiatives les plus consultées (par nb_vues ou score engagement)
-  const topInitiatives = db.prepare(`
+  const topInitiatives = await db.prepare(`
     SELECT i.id, i.nom, i.ville, i.pays, i.domaine, COALESCE(i.nb_vues,0) AS nb_vues,
       (SELECT COUNT(*) FROM user_follows f WHERE f.followed_id = u.id) AS nb_abonnes
     FROM initiatives i
@@ -3329,7 +3329,7 @@ route("GET", "/api/admin/contenu", async (req, res) => {
   `).all();
 
   // Utilisateurs les plus influents
-  const topInfluents = db.prepare(`
+  const topInfluents = await db.prepare(`
     SELECT u.id, u.nom, u.role, u.pays,
       COUNT(DISTINCT p.id) AS nb_posts,
       SUM(COALESCE(sub.nb_react,0)) AS nb_reactions_recues,
@@ -3343,7 +3343,7 @@ route("GET", "/api/admin/contenu", async (req, res) => {
   `).all();
 
   // Types de contenu les plus performants
-  const parCategorie = db.prepare(`
+  const parCategorie = await db.prepare(`
     SELECT p.categorie, COUNT(DISTINCT p.id) AS nb_posts,
       AVG(sub.score) AS score_moy
     FROM fil_posts p
@@ -3373,7 +3373,7 @@ route("GET", "/api/admin/finances", async (req, res) => {
   const abonnesActifs = (await db.prepare("SELECT COUNT(*) n FROM abonnements").get())?.n;
 
   // Transactions du mois courant
-  const txMois = db.prepare(`
+  const txMois = await db.prepare(`
     SELECT type, statut, SUM(montant) total, COUNT(*) nb
     FROM transactions
     WHERE date_transaction >= datetime('now','-30 days')
@@ -3381,7 +3381,7 @@ route("GET", "/api/admin/finances", async (req, res) => {
   `).all();
 
   // MRR = revenus abonnements réussis du mois en cours
-  const mrrRow = db.prepare(`
+  const mrrRow = await db.prepare(`
     SELECT COALESCE(SUM(montant),0) mrr FROM transactions
     WHERE type='abonnement' AND statut='reussi'
       AND date_transaction >= datetime('now','-30 days')
@@ -3390,7 +3390,7 @@ route("GET", "/api/admin/finances", async (req, res) => {
   const arr = Math.round(mrr * 12 * 100) / 100;
 
   // Revenus par source
-  const parSource = db.prepare(`
+  const parSource = await db.prepare(`
     SELECT type, COALESCE(SUM(CASE WHEN statut='reussi' THEN montant ELSE 0 END),0) AS total,
       COUNT(CASE WHEN statut='reussi' THEN 1 END) AS nb_reussis,
       COUNT(CASE WHEN statut='echoue' THEN 1 END) AS nb_echoues
@@ -3400,7 +3400,7 @@ route("GET", "/api/admin/finances", async (req, res) => {
   `).all();
 
   // Tendance revenus 30 jours
-  const tendance30j = db.prepare(`
+  const tendance30j = await db.prepare(`
     SELECT date(date_transaction) jour, SUM(CASE WHEN statut='reussi' THEN montant ELSE 0 END) revenu,
       COUNT(CASE WHEN statut='reussi' THEN 1 END) nb_ventes
     FROM transactions
@@ -3409,13 +3409,13 @@ route("GET", "/api/admin/finances", async (req, res) => {
   `).all();
 
   // Paiements réussis / échoués / remboursements
-  const paiementsStatuts = db.prepare(`
+  const paiementsStatuts = await db.prepare(`
     SELECT statut, COUNT(*) nb, COALESCE(SUM(montant),0) total
     FROM transactions GROUP BY statut
   `).all();
 
   // Top clients (utilisateurs avec le plus de dépenses)
-  const topClients = db.prepare(`
+  const topClients = await db.prepare(`
     SELECT u.nom, u.role, u.pays, COUNT(t.id) nb_achats,
       SUM(t.montant) total_depense
     FROM transactions t JOIN users u ON u.id = t.user_id
@@ -3428,13 +3428,13 @@ route("GET", "/api/admin/finances", async (req, res) => {
   const tauxConversion = totalUtilisateurs > 0 ? ((abonnesActifs / totalUtilisateurs) * 100).toFixed(1) : "0.0";
 
   // Ventes du jour
-  const venteJour = db.prepare(`
+  const venteJour = await db.prepare(`
     SELECT COUNT(*) nb, COALESCE(SUM(montant),0) total
     FROM transactions WHERE statut='reussi' AND date(date_transaction)=date('now')
   `).get();
 
   // Plans — performance
-  const parPlan = db.prepare(`
+  const parPlan = await db.prepare(`
     SELECT p.nom, p.prix_mensuel, p.prix_annuel,
       COUNT(t.id) AS nb_ventes,
       COALESCE(SUM(CASE WHEN t.statut='reussi' THEN t.montant ELSE 0 END),0) AS revenu
@@ -3552,7 +3552,7 @@ route("PUT", "/api/admin/parametres", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const updates = body.updates || {};
-  const stmt = db.prepare(`
+  const stmt = await db.prepare(`
     INSERT INTO parametres_plateforme (cle, valeur, updated_at, updated_by)
     VALUES (?,?,datetime('now'),?)
     ON CONFLICT(cle) DO UPDATE SET valeur=excluded.valeur, updated_at=excluded.updated_at, updated_by=excluded.updated_by
@@ -3603,10 +3603,10 @@ route("GET", "/api/admin/retention", async (req, res) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // Rétention J+7 : inscrits il y a 7–14 jours ET actifs dans les 7 derniers jours
-  const cohortJ7 = db.prepare(`
+  const cohortJ7 = await db.prepare(`
     SELECT COUNT(*) n FROM users WHERE created_at BETWEEN datetime('now','-14 days') AND datetime('now','-7 days')
   `).get().n;
-  const retentionJ7 = db.prepare(`
+  const retentionJ7 = await db.prepare(`
     SELECT COUNT(DISTINCT u.id) n FROM users u
     JOIN user_activity a ON a.user_id=u.id
     WHERE u.created_at BETWEEN datetime('now','-14 days') AND datetime('now','-7 days')
@@ -3614,10 +3614,10 @@ route("GET", "/api/admin/retention", async (req, res) => {
   `).get().n;
 
   // Rétention J+30 : inscrits il y a 30–60 jours ET actifs dans les 30 derniers jours
-  const cohortJ30 = db.prepare(`
+  const cohortJ30 = await db.prepare(`
     SELECT COUNT(*) n FROM users WHERE created_at BETWEEN datetime('now','-60 days') AND datetime('now','-30 days')
   `).get().n;
-  const retentionJ30 = db.prepare(`
+  const retentionJ30 = await db.prepare(`
     SELECT COUNT(DISTINCT u.id) n FROM users u
     JOIN user_activity a ON a.user_id=u.id
     WHERE u.created_at BETWEEN datetime('now','-60 days') AND datetime('now','-30 days')
@@ -3625,10 +3625,10 @@ route("GET", "/api/admin/retention", async (req, res) => {
   `).get().n;
 
   // Rétention J+90 : inscrits il y a 90–180 jours ET actifs dans les 90 derniers jours
-  const cohortJ90 = db.prepare(`
+  const cohortJ90 = await db.prepare(`
     SELECT COUNT(*) n FROM users WHERE created_at BETWEEN datetime('now','-180 days') AND datetime('now','-90 days')
   `).get().n;
-  const retentionJ90 = db.prepare(`
+  const retentionJ90 = await db.prepare(`
     SELECT COUNT(DISTINCT u.id) n FROM users u
     JOIN user_activity a ON a.user_id=u.id
     WHERE u.created_at BETWEEN datetime('now','-180 days') AND datetime('now','-90 days')
@@ -3730,7 +3730,7 @@ route("GET", "/api/publicites/servir", async (req, res, params, body, query) => 
   const user = await getCurrentUser(req);
   const now = new Date().toISOString().slice(0, 10);
 
-  const candidates = db.prepare(`
+  const candidates = await db.prepare(`
     SELECT * FROM publicites
     WHERE statut = 'active'
       AND format = ?
@@ -3947,24 +3947,24 @@ route("GET", "/api/admin/publicites/:id/stats", async (req, res, params) => {
     FROM publicites WHERE id=?
   `).get(params.id);
   if (!pub) return sendJSON(res, 404, { error: "Publicité introuvable." });
-  const parPays = db.prepare(`
+  const parPays = await db.prepare(`
     SELECT user_pays AS pays, COUNT(*) AS n FROM publicite_events
     WHERE publicite_id=? AND type='impression' AND user_pays IS NOT NULL
     GROUP BY user_pays ORDER BY n DESC LIMIT 10
   `).all(params.id);
-  const parJour = db.prepare(`
+  const parJour = await db.prepare(`
     SELECT date(created_at) AS jour,
       SUM(CASE WHEN type='impression' THEN 1 ELSE 0 END) AS impressions,
       SUM(CASE WHEN type='clic' THEN 1 ELSE 0 END) AS clics
     FROM publicite_events WHERE publicite_id=?
     GROUP BY jour ORDER BY jour DESC LIMIT 30
   `).all(params.id);
-  const parNationalite = db.prepare(`
+  const parNationalite = await db.prepare(`
     SELECT user_nationalite AS nationalite, COUNT(*) AS n FROM publicite_events
     WHERE publicite_id=? AND type='impression' AND user_nationalite IS NOT NULL
     GROUP BY user_nationalite ORDER BY n DESC LIMIT 10
   `).all(params.id);
-  const parRole = db.prepare(`
+  const parRole = await db.prepare(`
     SELECT user_role AS role, COUNT(*) AS n FROM publicite_events
     WHERE publicite_id=? AND type='impression' AND user_role IS NOT NULL
     GROUP BY user_role ORDER BY n DESC
@@ -4709,7 +4709,7 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
     if (await db.prepare("SELECT id FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(user.id, def.id))
       return sendJSON(res, 409, { error: "Vous possédez déjà cette accréditation." });
     const tarif = await db.prepare("SELECT validation_admin FROM accred_tarifs WHERE accred_id=? AND role=?").get(def.id, user.role);
-    const id = db.prepare("INSERT OR IGNORE INTO accred_demandes (user_id,accred_id,message) VALUES (?,?,?)").run(user.id, def.id, message||null).lastInsertRowid;
+    const id = await db.prepare("INSERT OR IGNORE INTO accred_demandes (user_id,accred_id,message) VALUES (?,?,?)").run(user.id, def.id, message||null).lastInsertRowid;
     if (!tarif || tarif.validation_admin !== 0) {
       const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
       admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation",
@@ -4728,7 +4728,7 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
   const existing = await db.prepare("SELECT id,statut FROM demandes_accreditation WHERE user_id=? AND type=? ORDER BY created_at DESC LIMIT 1").get(user.id, type);
   if (existing && existing.statut === "en_attente") return sendJSON(res, 409, { error: "Une demande est déjà en cours pour ce type." });
   if (hasAccred(user.id, type)) return sendJSON(res, 409, { error: "Vous possédez déjà cette accréditation." });
-  const id = db.prepare("INSERT INTO demandes_accreditation (user_id, type, message) VALUES (?,?,?)").run(user.id, type, message||null).lastInsertRowid;
+  const id = await db.prepare("INSERT INTO demandes_accreditation (user_id, type, message) VALUES (?,?,?)").run(user.id, type, message||null).lastInsertRowid;
   const DA_LABELS = { mobilisation_active:"Mobilisation Active", createur_opportunites:"Créateur d'Opportunités", observatoire_diaspora:"Observatoire Diaspora", institutionnelle:"Institutionnelle" };
   const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
   admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation", `${user.nom} demande l'accréditation « ${DA_LABELS[type]||type} »`, { demande_id: Number(id) }));
@@ -4831,7 +4831,7 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/reactiver", async (req, 
 
 /* GET /api/sondages */
 route("GET", "/api/sondages", async (req, res, params, body, query) => {
-  let rows = db.prepare(`
+  let rows = await db.prepare(`
     SELECT s.*, u.nom AS createur_nom, u.role AS createur_role
     FROM sondages s JOIN users u ON u.id=s.createur_id
     WHERE s.statut IN ('ouvert','cloture')
@@ -6697,7 +6697,7 @@ async function autoPublierProgrammes() {
 async function autoGererDossiersQR() {
   try {
     // 1. Notification 24h avant suppression (J-4 après date_fin = J+5 approche)
-    const aNotifier = db.prepare(`
+    const aNotifier = await db.prepare(`
       SELECT id, organisateur_id, titre FROM events
       WHERE date_fin IS NOT NULL
         AND date_fin < datetime('now','-4 days')
@@ -6715,7 +6715,7 @@ async function autoGererDossiersQR() {
       } catch(_){}
     }
     // 2. Suppression automatique des données opérationnelles J+5 après date_fin
-    const aPurger = db.prepare(`
+    const aPurger = await db.prepare(`
       SELECT id, organisateur_id, titre FROM events
       WHERE date_fin IS NOT NULL
         AND date_fin < datetime('now','-5 days')
@@ -7058,7 +7058,7 @@ async function handleRequest(req, res) {
       const p = new URLSearchParams(parsed.search || "");
       const from = p.get("from") || new Date(Date.now() - 30*24*3600000).toISOString().slice(0,10);
       const to   = p.get("to")   || new Date(Date.now() + 60*24*3600000).toISOString().slice(0,10);
-      const events = db.prepare(`
+      const events = await db.prepare(`
         SELECT e.*, u.prenom, u.nom FROM agenda_events e
         LEFT JOIN users u ON e.user_id = u.id
         WHERE e.user_id = ? AND date(e.date_debut) >= ? AND date(e.date_debut) <= ?
@@ -7123,7 +7123,7 @@ async function handleRequest(req, res) {
       const fin    = p.get("fin");
       if (!debut || !fin) return sendJSON(res, 400, { error: "debut et fin requis" });
       // Chercher conflits
-      const conflits = db.prepare(`
+      const conflits = await db.prepare(`
         SELECT id, titre, date_debut, date_fin FROM agenda_events
         WHERE user_id=? AND NOT (date_fin <= ? OR date_debut >= ?)
       `).all(userId, debut, fin);
@@ -7436,7 +7436,7 @@ async function handleRequest(req, res) {
       const p = new URLSearchParams(parsed.search || "");
       const peer = p.get("peer");
       const after = parseInt(p.get("after") || "0");
-      const signals = db.prepare(`
+      const signals = await db.prepare(`
         SELECT * FROM meeting_signals
         WHERE room_id=? AND id > ? AND consumed=0
         AND (to_peer IS NULL OR to_peer=?)
@@ -7626,7 +7626,7 @@ async function handleRequest(req, res) {
     /* ── GET /api/listes-diffusion ── */
     if (req.method === 'GET' && pathname === '/api/listes-diffusion') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
-      const listes = db.prepare(`
+      const listes = await db.prepare(`
         SELECT l.*, COUNT(c.id) AS nb_contacts
         FROM listes_diffusion l
         LEFT JOIN listes_diffusion_contacts c ON c.liste_id = l.id
@@ -7716,7 +7716,7 @@ async function handleRequest(req, res) {
       const lid = parseInt(pathname.split('/')[3]);
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
-      const contacts = db.prepare(`
+      const contacts = await db.prepare(`
         SELECT c.id, c.user_id, c.email, c.nom, c.created_at,
           u.nom AS nom_plateforme, u.email AS email_plateforme, u.photo_url, u.role, u.pays, u.ville, u.bio
         FROM listes_diffusion_contacts c
@@ -8308,7 +8308,7 @@ async function handleRequest(req, res) {
       if (ev.organisateur_id !== me.id && !['administrateur','collectivite'].includes(me.role))
         return sendJSON(res, 403, { error: 'Accès refusé.' });
       // Inscriptions sécurisées (ID DA + DS-ID)
-      const inscriptions = db.prepare(`
+      const inscriptions = await db.prepare(`
         SELECT i.id, i.da_id_utilise, i.nom, i.prenom, i.type_compte, i.organisation,
           i.statut, i.ds_id_signe, i.billet_qr, i.created_at, i.ds_id_signe_at,
           u.photo_url, u.pays AS user_pays, u.ville AS user_ville,
@@ -8318,7 +8318,7 @@ async function handleRequest(req, res) {
         WHERE i.event_id=? ORDER BY i.created_at DESC
       `).all(eid);
       // Billets payants (tickets)
-      const tickets_payants = db.prepare(`
+      const tickets_payants = await db.prepare(`
         SELECT t.id AS ticket_id, t.statut, t.payment_status, t.prix_paye, t.created_at,
           tt.nom AS type_billet, a.nom_display,
           u.da_id, u.nom, u.role AS type_compte, u.photo_url, u.pays, u.ville,
@@ -9270,7 +9270,7 @@ async function handleRequest(req, res) {
 
     /* ── Calcul Réactivité (fonction partagée) ── */
     async function computeReactivity(userId) {
-      const msgs = db.prepare(`
+      const msgs = await db.prepare(`
         SELECT m.auteur_id, m.created_at, m.conversation_id
         FROM messages m
         JOIN conversations c ON c.id=m.conversation_id
@@ -9377,7 +9377,7 @@ async function handleRequest(req, res) {
       if (absence) return sendJSON(res, 400, { error: 'Cet utilisateur est en mode absence. Aucun signalement possible.' });
 
       // Vérif : une conversation existe avec un message non répondu depuis 14 jours
-      const conv = db.prepare(`
+      const conv = await db.prepare(`
         SELECT c.id, MAX(m.created_at) AS last_from_me
         FROM conversations c
         JOIN messages m ON m.conversation_id=c.id
@@ -9542,7 +9542,7 @@ async function handleRequest(req, res) {
 
       try {
         // ── Membres par rôle ──
-        const roles = db.prepare(`
+        const roles = await db.prepare(`
           SELECT role, COUNT(*) n FROM users
           WHERE role NOT IN ('administrateur') ${fPays} ${sw.replace('created_at','created_at')}
           GROUP BY role
@@ -9556,7 +9556,7 @@ async function handleRequest(req, res) {
         const docsVerif = (await db.prepare(`SELECT COUNT(*) n FROM users WHERE documents_verifies=1 ${fPays}`).get(...fPaysArg))?.n;
 
         // ── Géographie ──
-        const countryRows = db.prepare(`
+        const countryRows = await db.prepare(`
           SELECT pays, COUNT(*) n FROM users
           WHERE pays IS NOT NULL AND pays!='' AND role NOT IN ('administrateur')
           ${fPays} GROUP BY pays ORDER BY n DESC LIMIT 50
@@ -9586,12 +9586,12 @@ async function handleRequest(req, res) {
         });
 
         // ── Compétences & métiers ──
-        const titres = db.prepare(`
+        const titres = await db.prepare(`
           SELECT titre_pro, COUNT(*) n FROM users
           WHERE titre_pro IS NOT NULL AND titre_pro!=''
           GROUP BY titre_pro ORDER BY n DESC LIMIT 20
         `).all();
-        const secteurs = db.prepare(`
+        const secteurs = await db.prepare(`
           SELECT secteur, COUNT(*) n FROM initiatives
           WHERE secteur IS NOT NULL AND secteur!=''
           GROUP BY secteur ORDER BY n DESC LIMIT 15
@@ -9618,7 +9618,7 @@ async function handleRequest(req, res) {
         };
 
         // Évolution membres par mois (12 derniers mois)
-        const evolutionMois = db.prepare(`
+        const evolutionMois = await db.prepare(`
           SELECT strftime('%Y-%m', created_at) AS mois, COUNT(*) n
           FROM users WHERE created_at >= datetime('now','-12 months') AND role NOT IN ('administrateur')
           GROUP BY mois ORDER BY mois ASC
@@ -9651,7 +9651,7 @@ async function handleRequest(req, res) {
         };
 
         // ── Top villes ──
-        const topVilles = db.prepare(`
+        const topVilles = await db.prepare(`
           SELECT ville, COUNT(*) n FROM users WHERE ville IS NOT NULL AND ville!=''
           AND role NOT IN ('administrateur') GROUP BY ville ORDER BY n DESC LIMIT 20
         `).all();
@@ -9714,7 +9714,7 @@ async function handleRequest(req, res) {
       const me = await getCurrentUser(req);
       const currentUserId = me?.id || 0;
 
-      const candidates = db.prepare(`
+      const candidates = await db.prepare(`
         SELECT u.id, u.nom, u.prenom, u.role, u.pays, u.ville, u.bio, u.titre_pro,
           u.competences, u.photo_url, u.experiences,
           u.is_verified, u.identite_verifiee, u.documents_verifies, u.diplomes_verifies,
@@ -9981,12 +9981,12 @@ async function handleRequest(req, res) {
       const enAttente = await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='en_attente'`).get(myInit.id)?.c || 0;
       const recos = countRecos(myInit.id);
       const membreDe = await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE demandeur_id=? AND statut='accepte'`).get(myInit.id)?.c || 0;
-      const parPays = db.prepare(`
+      const parPays = await db.prepare(`
         SELECT i.pays, COUNT(*) as nb FROM reseau_affiliations ra
         JOIN initiatives i ON i.id=ra.demandeur_id
         WHERE ra.destinataire_id=? AND ra.statut='accepte' GROUP BY i.pays ORDER BY nb DESC LIMIT 10
       `).all(myInit.id);
-      const parSecteur = db.prepare(`
+      const parSecteur = await db.prepare(`
         SELECT i.domaine, COUNT(*) as nb FROM reseau_affiliations ra
         JOIN initiatives i ON i.id=ra.demandeur_id
         WHERE ra.destinataire_id=? AND ra.statut='accepte' GROUP BY i.domaine ORDER BY nb DESC LIMIT 10
@@ -10167,7 +10167,7 @@ async function handleRequest(req, res) {
       const params = [me.id, me.id];
       if (statut) { where += ` AND r.statut=?`; params.push(statut); }
       if (search) { where += ` AND (r.titre LIKE ? OR r.description LIKE ?)`; params.push(`%${search}%`, `%${search}%`); }
-      const rows = db.prepare(`
+      const rows = await db.prepare(`
         SELECT DISTINCT r.*, u.prenom AS org_prenom, u.nom AS org_nom, u.photo_url AS org_photo,
           ri2.statut AS mon_statut, ri2.role AS mon_role,
           (SELECT COUNT(*) FROM reunion_invites WHERE reunion_id=r.id AND statut='accepte') AS nb_participants
@@ -10421,7 +10421,7 @@ async function handleRequest(req, res) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { q } = qs;
       if (!q) return sendJSON(res, 200, { reunions: [] });
-      const rows = db.prepare(`
+      const rows = await db.prepare(`
         SELECT DISTINCT r.*, u.prenom AS org_prenom, u.nom AS org_nom
         FROM reunions r
         LEFT JOIN reunion_invites ri ON ri.reunion_id=r.id
@@ -11372,7 +11372,7 @@ async function handleRequest(req, res) {
     if (req.method === "GET" && pathname === "/api/admin/deal-master/laureats-actuels") {
       const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const laureats = db.prepare(`
+      const laureats = await db.prepare(`
         SELECT dml.user_id, dml.score, dml.rang, dml.date_attribution, dml.date_expiration,
                dme.label AS edition_label, dme.periode_debut, dme.periode_fin,
                u.nom, u.prenom, u.photo_url, u.titre_pro,
@@ -11550,7 +11550,7 @@ async function handleRequest(req, res) {
     if (req.method === "GET" && pathname === "/api/partenaires/carousel") {
       const me = await getCurrentUser(req);
       const now = new Date().toISOString().slice(0, 10);
-      let rows = db.prepare(`
+      let rows = await db.prepare(`
         SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.banner_url, u.titre_pro, u.bio, u.ville, u.pays AS user_pays
         FROM partenaires_officiels po JOIN users u ON u.id = po.user_id
         WHERE po.statut = 'active'
@@ -11606,7 +11606,7 @@ async function handleRequest(req, res) {
     if (req.method === "GET" && pathname === "/api/admin/partenaires/stats") {
       const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const byPartner = db.prepare(`
+      const byPartner = await db.prepare(`
         SELECT po.id, u.nom, u.prenom, po.domaines_expertise,
           COUNT(CASE WHEN pi.event_type='view'         THEN 1 END) AS nb_vues,
           COUNT(CASE WHEN pi.event_type='click'        THEN 1 END) AS nb_clics,
@@ -11618,12 +11618,12 @@ async function handleRequest(req, res) {
         LEFT JOIN partenaires_impressions pi ON pi.partenaire_id = po.id
         WHERE po.statut = 'active'
         GROUP BY po.id ORDER BY nb_vues DESC`).all();
-      const bySecteur = db.prepare(`
+      const bySecteur = await db.prepare(`
         SELECT po.categorie, COUNT(pi.id) AS nb_impressions
         FROM partenaires_impressions pi
         JOIN partenaires_officiels po ON po.id = pi.partenaire_id
         GROUP BY po.categorie ORDER BY nb_impressions DESC`).all();
-      const totals = db.prepare(`
+      const totals = await db.prepare(`
         SELECT
           COUNT(CASE WHEN event_type='view'         THEN 1 END) AS total_vues,
           COUNT(CASE WHEN event_type='click'        THEN 1 END) AS total_clics,
@@ -12509,7 +12509,7 @@ route("GET", "/api/asso/analytics", async (req, res, params, body, query) => {
   const payees = (await db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(uid))?.n;
   const tauxRecouvrement = totalCot ? Math.round((payees / totalCot) * 100) : 0;
   // DSL ENGAGEMENT_SCORE par adhérent (TRACKING : paiements + votes)
-  const engagement = db.prepare(`
+  const engagement = await db.prepare(`
     SELECT a.id, a.prenom||' '||a.nom AS nom,
       (SELECT COUNT(*) FROM asso_cotisations c WHERE c.adherent_id=a.id AND c.statut='payee') AS paiements,
       (SELECT COUNT(*) FROM asso_votes_reponses vr WHERE vr.adherent_id=a.id) AS votes
@@ -12657,12 +12657,12 @@ route("GET", "/api/accreditations/catalogue", async (req, res) => {
   const user = await getCurrentUser(req);
   const role = user ? user.role : null;
   const defs = await db.prepare("SELECT * FROM accred_definitions WHERE actif=1 ORDER BY ordre,id").all();
-  const result = defs.map(d => {
-    const def = getAccredDef(d.id);
+  const result = (await Promise.all(defs.map(async d => {
+    const def = await getAccredDef(d.id);
     if (!def) return null;
-    if (role && !def.eligible.includes(role)) return null; // filtrer par rôle si connecté
+    if (role && !def.eligible.includes(role)) return null;
     return def;
-  }).filter(Boolean);
+  }))).filter(Boolean);
   sendJSON(res, 200, { catalogue: result });
 });
 
@@ -12673,7 +12673,8 @@ route("GET", "/api/admin/accred/definitions", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const defs = await db.prepare("SELECT * FROM accred_definitions ORDER BY ordre,id").all();
-  sendJSON(res, 200, { definitions: defs.map(d => getAccredDef(d.id)) });
+  const defsEnriched = await Promise.all(defs.map(d => getAccredDef(d.id)));
+  sendJSON(res, 200, { definitions: defsEnriched });
 });
 
 /* POST /api/admin/accred/definitions — créer une définition */
@@ -12728,7 +12729,7 @@ route("GET", "/api/admin/accred/definitions/:id/impact", async (req, res, params
     FROM user_accreditations ua JOIN users u ON u.id=ua.user_id
     WHERE ua.accred_id=? AND ua.statut='active' LIMIT 10
   `).all(params.id);
-  const repartition = db.prepare(`
+  const repartition = await db.prepare(`
     SELECT u.role, COUNT(*) AS n FROM user_accreditations ua JOIN users u ON u.id=ua.user_id
     WHERE ua.accred_id=? AND ua.statut='active' GROUP BY u.role
   `).all(params.id);
@@ -12873,11 +12874,9 @@ route("PATCH", "/api/admin/accred/demandes/:id/approuver", async (req, res, para
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const dem = await db.prepare("SELECT * FROM accred_demandes WHERE id=?").get(params.id);
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
-  const def = getAccredDef(dem.accred_id);
-  const tarif = def?.tarifs?.find(async t => {
-    const user = await db.prepare("SELECT role FROM users WHERE id=?").get(dem.user_id);
-    return user && t.role === user.role;
-  });
+  const def = await getAccredDef(dem.accred_id);
+  const _userForTarif = await db.prepare("SELECT role FROM users WHERE id=?").get(dem.user_id);
+  const tarif = def?.tarifs?.find(t => _userForTarif && t.role === _userForTarif.role);
   await db.prepare("UPDATE accred_demandes SET statut='approuvee' WHERE id=?").run(params.id);
   db.prepare(`INSERT INTO user_accreditations (user_id,accred_id,statut,admin_id,type_tarif,date_expiration,notes)
     VALUES (?,?,'active',?,?,?,?)
@@ -12909,7 +12908,7 @@ route("PATCH", "/api/admin/accred/demandes/:id/refuser", async (req, res, params
   await db.prepare("UPDATE accred_demandes SET statut='refusee',motif_refus=? WHERE id=?").run(body.motif||null, params.id);
   db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
     .run(dem.user_id, dem.accred_id, 'refuse', admin.id, admin.nom, body.motif||null);
-  const def = getAccredDef(dem.accred_id);
+  const def = await getAccredDef(dem.accred_id);
   creerNotif(dem.user_id, "validation", "Demande d'accréditation non retenue",
     `Votre demande pour « ${def?.label||''} » n'a pas été retenue${body.motif ? ` : ${body.motif}` : '.'}.`,
     { accred_type: def?.type });
@@ -13033,7 +13032,7 @@ async function trackFeatureUsage(userId, featureSlug) {
 */
 async function runFreezeSuggestionEngine(userId) {
   try {
-    const usages = db.prepare(`
+    const usages = await db.prepare(`
       SELECT fu.*, f.slug, f.nom, f.emoji,
              CAST(julianday('now') - julianday(fu.derniere_utilisation) AS INTEGER) AS inactive_days
       FROM feature_usage fu JOIN features f ON f.id=fu.feature_id
@@ -13342,13 +13341,13 @@ route("DELETE", "/api/admin/features/:id", async (req, res, params) => {
 route("GET", "/api/admin/features/stats", async (req, res) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  const top_usages = db.prepare(`
+  const top_usages = await db.prepare(`
     SELECT f.slug, f.nom, f.emoji, f.categorie,
            SUM(fu.nb_utilisations) AS total, COUNT(DISTINCT fu.user_id) AS nb_users
     FROM feature_usage fu JOIN features f ON f.id=fu.feature_id
     GROUP BY fu.feature_id ORDER BY total DESC LIMIT 10
   `).all();
-  const top_frozen = db.prepare(`
+  const top_frozen = await db.prepare(`
     SELECT f.slug, f.nom, f.emoji, COUNT(*) AS nb_gels
     FROM user_features uf JOIN features f ON f.id=uf.feature_id
     WHERE uf.statut='frozen' GROUP BY uf.feature_id ORDER BY nb_gels DESC LIMIT 5
@@ -13876,7 +13875,7 @@ route("GET", "/api/observatoire/global", async (req, res) => {
   const nbDiasporas = await db.prepare("SELECT COUNT(DISTINCT pays) AS n FROM users WHERE pays IS NOT NULL").get()?.n || 0;
 
   /* Classements */
-  const classementInit = db.prepare(`
+  const classementInit = await db.prepare(`
     SELECT u.nom, u.prenom, u.pays, u.photo_url,
       (SELECT COUNT(*) FROM fil_posts WHERE auteur_id=u.id) AS nb_pubs,
       (SELECT COUNT(*) FROM events WHERE organisateur_id=u.id) AS nb_evts,
@@ -14573,7 +14572,7 @@ app.post('/api/conversations/:cid/messages/:mid/reactions', requireAuth, async (
 
 app.get('/api/conversations/:cid/messages/:mid/reactions', requireAuth, async (req, res) => {
   const mid = parseInt(req.params.mid);
-  const rows = db.prepare(`
+  const rows = await db.prepare(`
     SELECT emoji, COUNT(*) as count, GROUP_CONCAT(u.nom) as noms,
     MAX(CASE WHEN mr.user_id=? THEN 1 ELSE 0 END) as moi
     FROM message_reactions mr JOIN users u ON u.id=mr.user_id
@@ -14644,7 +14643,7 @@ app.get('/api/messages/search', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const q = (req.query.q || '').trim();
   if (q.length < 2) return sendJSON(res, 200, []);
-  const rows = db.prepare(`
+  const rows = await db.prepare(`
     SELECT m.*, u.nom as expediteur_nom, c.id as conv_id,
     COALESCE(c.sujet, c.nom, 'Conversation') as conv_nom
     FROM messages m
@@ -14666,7 +14665,7 @@ app.post('/api/conversations/groupe', requireAuth, async (req, res) => {
     return sendJSON(res, 400, { error: 'Nom et au moins 1 membre requis' });
   }
   const allMembers = [...new Set([uid, ...membres_ids.map(Number)])];
-  const conv = db.prepare(`
+  const conv = await db.prepare(`
     INSERT INTO conversations (user1_id, user2_id, type, nom, created_by)
     VALUES (?, NULL, 'groupe', ?, ?)
   `).run(uid, nom, uid);
@@ -14963,7 +14962,7 @@ app.post('/api/oz/chat', requireAuth, async (req, res) => {
     if (ozConv) {
       convId = ozConv.id;
     } else {
-      convId = db.prepare('INSERT INTO oz_conversations (user_id, messages_json) VALUES (?,?)').run(uid, '[]').lastInsertRowid;
+      convId = await db.prepare('INSERT INTO oz_conversations (user_id, messages_json) VALUES (?,?)').run(uid, '[]').lastInsertRowid;
     }
   }
   try {
@@ -15035,7 +15034,7 @@ async function checkBPCompletude(sections) {
 
 /* ---- Liste des business plans ---- */
 app.get('/api/business-plans', requireAuth, async (req, res) => {
-  const rows = db.prepare(`
+  const rows = await db.prepare(`
     SELECT bp.*, u.nom as owner_nom, u.prenom as owner_prenom,
       (SELECT COUNT(*) FROM bp_collaborateurs bc WHERE bc.bp_id=bp.id) as nb_collab
     FROM business_plans bp
@@ -15128,7 +15127,7 @@ app.post('/api/business-plans/:id/duplicate', requireAuth, async (req, res) => {
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
   if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
-  const r = db.prepare(`
+  const r = await db.prepare(`
     INSERT INTO business_plans (user_id, nom_projet, slogan, type_initiative, secteur, template, sections_json)
     VALUES (?,?,?,?,?,?,?)
   `).run(req.user.id, `Copie de ${bp.nom_projet}`, bp.slogan, bp.type_initiative, bp.secteur, bp.template, bp.sections_json);
