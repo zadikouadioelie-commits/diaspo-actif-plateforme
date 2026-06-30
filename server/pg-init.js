@@ -45,31 +45,47 @@ async function pgInit() {
 
 async function seedPg(pool) {
   const crypto = require('crypto');
+  /* Utiliser scrypt — même algo que auth.js */
   function hashPassword(pwd) {
     const salt = crypto.randomBytes(16).toString('hex');
-    const hash = crypto.createHmac('sha256', salt).update(pwd).digest('hex');
+    const hash = crypto.scryptSync(pwd, salt, 64).toString('hex');
     return { hash, salt };
   }
 
-  // Vérifie si des utilisateurs existent déjà
-  const { rows } = await pool.query('SELECT COUNT(*)::int AS cnt FROM users');
-  if (rows[0].cnt > 0) return;
-
-  const users = [
-    { nom: "Diaspo'Actif Admin", prenom: null, email: 'admin@diaspoactif.demo', role: 'administrateur' },
-    { nom: 'Keïta', prenom: 'Aminata', email: 'aminata.keita@diaspoactif.demo', role: 'utilisateur' },
-    { nom: 'Diallo', prenom: 'Ibrahim', email: 'ibrahim.diallo@diaspoactif.demo', role: 'utilisateur' },
-    { nom: 'Bah', prenom: 'Fatoumata', email: 'fatoumata.bah@diaspoactif.demo', role: 'initiative' },
-    { nom: 'Coulibaly', prenom: 'Moussa', email: 'moussa.coulibaly@diaspoactif.demo', role: 'collectivite' },
+  const demoUsers = [
+    { nom: "Diaspo'Actif Admin", prenom: null,       email: 'admin@diaspoactif.demo',              role: 'administrateur' },
+    { nom: 'Jean K.',            prenom: 'Jean',      email: 'jean@diaspoactif.demo',               role: 'utilisateur' },
+    { nom: 'Keïta',              prenom: 'Aminata',   email: 'aminata.keita@diaspoactif.demo',      role: 'utilisateur' },
+    { nom: 'Diallo',             prenom: 'Ibrahim',   email: 'ibrahim.diallo@diaspoactif.demo',     role: 'utilisateur' },
+    { nom: 'Bah',                prenom: 'Fatoumata', email: 'fatoumata.bah@diaspoactif.demo',      role: 'initiative' },
+    { nom: 'Coulibaly',          prenom: 'Moussa',    email: 'moussa.coulibaly@diaspoactif.demo',   role: 'collectivite' },
   ];
 
-  for (const u of users) {
-    const { hash, salt } = hashPassword('Demo1234!');
-    await pool.query(
-      `INSERT INTO users (nom, prenom, email, password_hash, password_salt, role)
-       VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (email) DO NOTHING`,
-      [u.nom, u.prenom, u.email, hash, salt, u.role]
-    );
+  /* Vérifier si des utilisateurs existent déjà */
+  const { rows: cnt } = await pool.query('SELECT COUNT(*)::int AS cnt FROM users');
+
+  if (cnt[0].cnt === 0) {
+    /* Première installation : créer tous les comptes démo */
+    for (const u of demoUsers) {
+      const { hash, salt } = hashPassword('Demo1234!');
+      await pool.query(
+        `INSERT INTO users (nom, prenom, email, password_hash, password_salt, role)
+         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (email) DO NOTHING`,
+        [u.nom, u.prenom, u.email, hash, salt, u.role]
+      );
+    }
+  } else {
+    /* Migration : re-hasher les mots de passe avec scrypt si nécessaire
+       (corrige les anciens comptes hashés avec HMAC-SHA256) */
+    for (const u of demoUsers) {
+      const { hash, salt } = hashPassword('Demo1234!');
+      await pool.query(
+        `INSERT INTO users (nom, prenom, email, password_hash, password_salt, role)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (email) DO UPDATE SET password_hash=$4, password_salt=$5`,
+        [u.nom, u.prenom, u.email, hash, salt, u.role]
+      );
+    }
   }
 
   // Initialise le compteur de visites
