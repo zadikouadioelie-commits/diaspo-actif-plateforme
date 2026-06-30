@@ -1,4 +1,4 @@
-/* ===========================================================
+﻿/* ===========================================================
    DIASPO'ACTIF — UI/UX Pro Max Enhancements
    Appliqué selon les règles UI/UX Pro Max : accessibilité,
    interactions, typographie, animations, formulaires, navigation.
@@ -147,7 +147,7 @@ input::placeholder { color: var(--muted); opacity: .7; }
   font-size: 14px;
   font-family: inherit;
   color: var(--text);
-  background: #fff;
+  background:var(--card);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 .input-field:focus {

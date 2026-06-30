@@ -28,7 +28,9 @@
   box-shadow: 0 2px 16px rgba(13,43,78,.25) !important;
 }
 
-/* Badge type de compte — encre bleue */
+/* Badge type de compte — encre bleue (spécificité maximale) */
+.auth-area .role-tag,
+.topbar .role-tag,
 .role-tag {
   background: #1E4F8A !important;
   color: #fff !important;
@@ -43,8 +45,8 @@
 /* Bouton Connexion / Déconnexion — encre bleue */
 .topbar .btn-outline,
 .topbar a.btn-outline,
-.btn-deconnexion,
-a.btn-deconnexion {
+.auth-area .btn-outline,
+.auth-area a.btn-outline {
   background: #1E4F8A !important;
   color: #fff !important;
   border: none !important;
@@ -53,8 +55,7 @@ a.btn-deconnexion {
   padding: 6px 14px !important;
 }
 .topbar .btn-outline:hover,
-.topbar a.btn-outline:hover,
-.btn-deconnexion:hover {
+.auth-area .btn-outline:hover {
   background: #2E6BAD !important;
   color: #fff !important;
 }

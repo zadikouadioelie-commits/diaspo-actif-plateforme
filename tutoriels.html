@@ -939,7 +939,8 @@ async function lireTutoriel(id) {
   const r = await fetch(`/api/admin/tutoriels/${id}`, { credentials:'include' });
   const { tutoriel: t } = await r.json();
   document.getElementById('ai-read-titre').textContent = t.titre;
-  document.getElementById('ai-read-meta').textContent = `Niveau ${t.niveau} · ${t.vues} vues · Créé le ${new Date(t.created_at).toLocaleDateString('fr')}`;
+  document.getElementById('ai-read-meta').textContent = 
+iveau ${t.niveau} · ${t.vues} vues · Créé le ${new Date(t.created_at).toLocaleDateString('fr')}`;
   document.getElementById('ai-read-body').innerHTML = renderTutoContenu(t.contenu_json, t.format_souhaite);
   document.getElementById('ai-read-modal').style.display = 'flex';
 }
@@ -1004,6 +1005,7 @@ let _currentUser = null;
   <script src="/assets/theme-manager.js"></script>
 </body>
 </html>
+
 
 
 
