@@ -9,19 +9,19 @@
 <style>
 .sond-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
 .sond-tab{padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
-.sond-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.sond-tab.active{color:#2563EB;border-bottom-color:#2563EB;}
 .sond-section{display:none;}.sond-section.active{display:block;}
 .sond-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:box-shadow .2s;}
 .sond-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.08);}
 .sond-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
 .cat-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:#f3f4f6;color:#374151;}
 .prog-bar{height:8px;border-radius:4px;background:#f3f4f6;overflow:hidden;margin-top:4px;}
-.prog-fill{height:100%;border-radius:4px;background:var(--orange);transition:width .4s;}
+.prog-fill{height:100%;border-radius:4px;background:linear-gradient(135deg,#2563EB,#1d4ed8);transition:width .4s;}
 .q-card{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;position:relative;}
 .q-delete{position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;color:#ef4444;font-size:18px;}
 .interact-bar{display:flex;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border);margin-top:12px;}
 .ibtn{display:flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;cursor:pointer;font-size:12px;font-weight:700;transition:all .15s;color:#374151;}
-.ibtn:hover,.ibtn.active{border-color:var(--orange);color:var(--orange);background:#fff7f0;}
+.ibtn:hover,.ibtn.active{border-color:#2563EB;color:#2563EB;background:#fff7f0;}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.css">
   <link rel="stylesheet" href="/assets/design-upgrade.css">
@@ -35,7 +35,7 @@
         <a href="index.html">Accueil</a>
         <a href="fil-actualite.html">Fil</a>
         <a href="recrutement.html">Recrutement</a>
-        <a href="sondages.html" style="color:var(--orange);font-weight:700;">Sondages</a>
+        <a href="sondages.html" style="color:#2563EB;font-weight:700;">Sondages</a>
         <a href="evenements.html">Événements</a>
       </nav>
       <div class="topbar-right">
@@ -160,7 +160,7 @@
     <button class="btn btn-sm btn-outline" onclick="addQuestion()" style="margin-bottom:16px;">+ Ajouter une question</button>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:10px;">
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
-        <input type="checkbox" id="cs-publier" style="accent-color:var(--orange);"> Publier immédiatement
+        <input type="checkbox" id="cs-publier" style="accent-color:#2563EB;"> Publier immédiatement
       </label>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-outline" onclick="closeMod('modal-create-sond-bg')">Annuler</button>
@@ -246,7 +246,7 @@ function renderSonds(sonds){
         <button class="ibtn" onclick="toggleRxnSond(${s.id},this)">❤️ ${s.nb_reactions||0}</button>
         <button class="ibtn" onclick="toggleFavSond(${s.id},this)">⭐</button>
         <button class="ibtn" onclick="openSond(${s.id})">💬 ${s.nb_commentaires||0}</button>
-        <button class="ibtn" style="border-color:var(--orange);color:var(--orange);" onclick="openSond(${s.id})">📋 Participer</button>
+        <button class="ibtn" style="border-color:#2563EB;color:#2563EB;" onclick="openSond(${s.id})">📋 Participer</button>
       </div>
     </div>`;
   }).join('');
@@ -281,12 +281,12 @@ async function openSond(sid){
       ${dejaRepondu&&!ferme?'<div style="padding:12px;background:#d1fae5;border-radius:10px;margin-bottom:16px;text-align:center;font-size:13px;font-weight:700;color:#065f46;">✅ Vous avez déjà répondu.</div>':''}
       ${peutParticiper?`<div id="sond-form-${sid}">${qs.map((q2,i)=>renderQ(q2,i)).join('')}<button class="btn btn-orange" style="width:100%;margin-top:12px;" onclick="submitSond(${sid},[${qs.map(q2=>q2.id).join(',')}])">✅ Soumettre</button></div>`:''}
       ${(ferme||dejaRepondu)?`<button class="btn btn-sm btn-outline" onclick="loadResMini(${sid})">📊 Voir les résultats</button><div id="res-mini-${sid}"></div>`:''}
-      ${!ME_SOND&&!ferme?'<div style="padding:12px;background:#fef3c7;border-radius:10px;text-align:center;font-size:13px;">🔑 <a href="login.html" style="color:var(--orange);font-weight:700;">Connectez-vous</a> pour participer.</div>':''}
+      ${!ME_SOND&&!ferme?'<div style="padding:12px;background:#fef3c7;border-radius:10px;text-align:center;font-size:13px;">🔑 <a href="login.html" style="color:#2563EB;font-weight:700;">Connectez-vous</a> pour participer.</div>':''}
       <div class="interact-bar" style="margin-top:16px;">
         <button class="ibtn ${s.ma_reaction?'active':''}" onclick="toggleRxnSond(${sid},this)">❤️ ${s.nb_reactions||0}</button>
         <button class="ibtn ${s.est_favori?'active':''}" onclick="toggleFavSond(${sid},this)">⭐ ${s.est_favori?'Sauvegardé':'Favoris'}</button>
         <button class="ibtn" onclick="navigator.clipboard.writeText(location.origin+'/sondages.html?id=${sid}');DA.toast('Lien copié !',{type:'success'})">📤 Copier</button>
-        ${estCreateur?`<button class="btn btn-sm" style="border-color:var(--orange);color:var(--orange);" onclick="closeMod('modal-sond-bg');openStatsSond(${sid})">📊 Stats</button>`:''}
+        ${estCreateur?`<button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="closeMod('modal-sond-bg');openStatsSond(${sid})">📊 Stats</button>`:''}
         ${estCreateur&&!ferme?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="cloturerSond(${sid})">🔒 Clôturer</button>`:''}
         ${estCreateur?`<button class="btn btn-sm" onclick="window.location.href='/api/sondages/${sid}/export'">⬇️ CSV</button>`:''}
       </div>
@@ -513,7 +513,7 @@ async function openStatsSond(sid){
         <button onclick="closeMod('modal-stats-sond-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:20px;">
-        ${[['👁️','Vues',s.nb_vues||0],['👥','Répondants',s.nb_reponses||0],['🔄','Taux',r.taux_participation+'%'],['❤️','Réactions',s.nb_reactions||0],['💬','Commentaires',s.nb_commentaires||0],['⭐','Favoris',s.nb_favoris||0]].map(([ic,lb,v])=>`<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;"><div>${ic}</div><div style="font-size:22px;font-weight:800;color:var(--orange);">${v}</div><div style="font-size:10px;color:var(--muted);">${lb}</div></div>`).join('')}
+        ${[['👁️','Vues',s.nb_vues||0],['👥','Répondants',s.nb_reponses||0],['🔄','Taux',r.taux_participation+'%'],['❤️','Réactions',s.nb_reactions||0],['💬','Commentaires',s.nb_commentaires||0],['⭐','Favoris',s.nb_favoris||0]].map(([ic,lb,v])=>`<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;"><div>${ic}</div><div style="font-size:22px;font-weight:800;color:#2563EB;">${v}</div><div style="font-size:10px;color:var(--muted);">${lb}</div></div>`).join('')}
       </div>
       ${r.par_pays.length?`<div style="margin-bottom:16px;"><strong style="font-size:13px;">🌍 Par pays</strong><div style="margin-top:8px;">${r.par_pays.map(p=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;"><span>${escH(p.pays||'—')}</span><span style="font-weight:700;">${p.n}</span></div>`).join('')}</div></div>`:''}
       ${r.par_type.length?`<div style="margin-bottom:16px;"><strong style="font-size:13px;">👤 Par type de compte</strong><div style="margin-top:8px;">${r.par_type.map(t=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;"><span>${escH(t.type_compte||'—')}</span><span style="font-weight:700;">${t.n}</span></div>`).join('')}</div></div>`:''}

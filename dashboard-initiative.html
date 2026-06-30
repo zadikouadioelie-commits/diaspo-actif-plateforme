@@ -212,7 +212,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <div style="grid-column:1/-1;">
               <label class="cr-label">Forme de l'initiative</label>
               <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:8px;">
-                ${FORMES.map(f=>`<label class="forme-opt" style="display:flex;align-items:center;gap:7px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;"><input type="radio" name="cr-forme" value="${f.val}" style="accent-color:var(--orange);"> ${f.icon} ${f.val}</label>`).join('')}
+                ${FORMES.map(f=>`<label class="forme-opt" style="display:flex;align-items:center;gap:7px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;"><input type="radio" name="cr-forme" value="${f.val}" style="accent-color:#2563EB;"> ${f.icon} ${f.val}</label>`).join('')}
               </div>
               <div id="forme-autre-wrap" style="display:none;margin-top:10px;">
                 <label class="cr-label">Précisez *</label>
@@ -267,7 +267,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>`;
 
       } else if (currentStep === 6) {
-        const chips = membresEnAttente.map((m, i) => `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#F9FAFB;border:1px solid var(--border);border-radius:8px;margin-top:6px;"><div style="width:34px;height:34px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">${(m.prenom||m.nom||'?')[0].toUpperCase()}</div><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13px;">${m.prenom||''} ${m.nom||''}</div><div style="font-size:12px;color:var(--muted);">${m.email||''}</div></div><select style="border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:12px;" onchange="membresEnAttente[${i}].fonction=this.value"><option value="">— Fonction (facultatif) —</option>${FONCTIONS_MEMBRE.map(f=>`<option value="${f}" ${m.fonction===f?'selected':''}>${f}</option>`).join('')}</select><button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:4px;" onclick="membresEnAttente.splice(${i},1);mountStep()">✕</button></div>`).join('');
+        const chips = membresEnAttente.map((m, i) => `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#F9FAFB;border:1px solid var(--border);border-radius:8px;margin-top:6px;"><div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">${(m.prenom||m.nom||'?')[0].toUpperCase()}</div><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13px;">${m.prenom||''} ${m.nom||''}</div><div style="font-size:12px;color:var(--muted);">${m.email||''}</div></div><select style="border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:12px;" onchange="membresEnAttente[${i}].fonction=this.value"><option value="">— Fonction (facultatif) —</option>${FONCTIONS_MEMBRE.map(f=>`<option value="${f}" ${m.fonction===f?'selected':''}>${f}</option>`).join('')}</select><button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:4px;" onclick="membresEnAttente.splice(${i},1);mountStep()">✕</button></div>`).join('');
         body = `
           <h3 style="margin:0 0 6px;">👥 Membres <span style="font-size:12px;font-weight:400;color:var(--muted);">(facultatif)</span></h3>
           <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Invitez des membres inscrits. Chacun recevra une demande d'affiliation à accepter ou refuser.</p>
@@ -285,13 +285,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <div>
               <label class="cr-label">Comment avez-vous entendu parler de Diaspo'Actif ?</label>
               <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:7px;margin-top:10px;">
-                ${SOURCES.map(s=>`<label class="source-opt" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;"><input type="radio" name="cr-source" value="${s}" style="accent-color:var(--orange);"> ${s}</label>`).join('')}
+                ${SOURCES.map(s=>`<label class="source-opt" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;"><input type="radio" name="cr-source" value="${s}" style="accent-color:#2563EB;"> ${s}</label>`).join('')}
               </div>
             </div>
             <div id="source-autre-wrap" style="display:none;"><label class="cr-label">Précisez</label><input id="cr-source-autre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Comment avez-vous entendu parler de nous ?"></div>
             <div><label class="cr-label">Vos attentes <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label><textarea id="cr-attentes" style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;font-size:14px;margin-top:6px;resize:vertical;line-height:1.6;" placeholder="Pourquoi rejoignez-vous Diaspo'Actif ? Collaborations recherchées, ressources souhaitées…"></textarea></div>
             <label style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;cursor:pointer;">
-              <input type="checkbox" id="cr-autorisation-temoignage" style="margin-top:2px;accent-color:var(--orange);flex-shrink:0;">
+              <input type="checkbox" id="cr-autorisation-temoignage" style="margin-top:2px;accent-color:#2563EB;flex-shrink:0;">
               <span style="font-size:13px;line-height:1.55;color:#0369A1;"><strong>J'autorise Diaspo'Actif à publier tout ou partie de mon témoignage</strong> sur ses supports de communication.<br><span style="font-size:11.5px;color:var(--muted);display:block;margin-top:3px;">Facultatif — modifiable à tout moment depuis votre espace membre.</span></span>
             </label>
           </div>`;
@@ -406,7 +406,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               const ids=membresEnAttente.map(m=>m.id);
               const users=(data.users||[]).filter(u=>!ids.includes(u.id));
               if(!users.length){res.innerHTML='<div style="padding:12px;color:var(--muted);font-size:13px;">Aucun résultat</div>';res.style.display='block';return;}
-              res.innerHTML=users.map(u=>`<div class="mr-item" data-id="${u.id}" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);"><div style="width:32px;height:32px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">${(u.prenom||u.nom||'?')[0].toUpperCase()}</div><div><div style="font-weight:700;font-size:13px;">${u.prenom||''} ${u.nom||''}</div><div style="font-size:12px;color:var(--muted);">${u.email||''}</div></div></div>`).join('');
+              res.innerHTML=users.map(u=>`<div class="mr-item" data-id="${u.id}" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);"><div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">${(u.prenom||u.nom||'?')[0].toUpperCase()}</div><div><div style="font-weight:700;font-size:13px;">${u.prenom||''} ${u.nom||''}</div><div style="font-size:12px;color:var(--muted);">${u.email||''}</div></div></div>`).join('');
               res.style.display='block';
               res.querySelectorAll('.mr-item').forEach(el=>{
                 el.addEventListener('click',()=>{const u=users.find(x=>x.id===parseInt(el.dataset.id));if(u&&!membresEnAttente.find(m=>m.id===u.id)){membresEnAttente.push({...u,fonction:''});si.value='';res.style.display='none';mountStep();}});
@@ -532,7 +532,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <div class="card" style="margin-bottom:20px;" id="publications">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
         <h3 style="margin:0;">📣 Nouvelle publication</h3>
-        <a href="fil-actualite.html" style="font-size:12px;color:var(--orange);">Voir le fil →</a>
+        <a href="fil-actualite.html" style="font-size:12px;color:#2563EB;">Voir le fil →</a>
       </div>
       <p style="font-size:13px;color:var(--muted);margin:4px 0 14px;">Vos publications apparaissent dans le <strong>Fil d'actualité global</strong>. Format vidéo : max 3 min recommandé.</p>
 
@@ -554,9 +554,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <!-- Visibilité -->
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <label style="font-size:12px;font-weight:700;color:#555;">Visibilité :</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="radio" name="pub-visibilite" value="public" checked style="accent-color:var(--orange);"> 🌍 Public</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="radio" name="pub-visibilite" value="abonnes" style="accent-color:var(--orange);"> 👥 Abonnés</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="radio" name="pub-visibilite" value="prive" style="accent-color:var(--orange);"> 🔒 Privé</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="radio" name="pub-visibilite" value="public" checked style="accent-color:#2563EB;"> 🌍 Public</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="radio" name="pub-visibilite" value="abonnes" style="accent-color:#2563EB;"> 👥 Abonnés</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="radio" name="pub-visibilite" value="prive" style="accent-color:#2563EB;"> 🔒 Privé</label>
         </div>
 
         <!-- Mode publication -->
@@ -564,14 +564,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px;">📅 Quand publier ?</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
             <label id="pub-mode-lbl-now" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:2px solid var(--orange);border-radius:8px;background:#fff;">
-              <input type="radio" name="pub-mode" value="maintenant" checked style="accent-color:var(--orange);">
+              <input type="radio" name="pub-mode" value="maintenant" checked style="accent-color:#2563EB;">
               <div>
                 <strong style="font-size:13px;">🚀 Publier maintenant</strong>
                 <div style="font-size:11px;color:var(--muted);">La publication sera visible immédiatement sur le fil d'actualité</div>
               </div>
             </label>
             <label id="pub-mode-lbl-prog" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
-              <input type="radio" name="pub-mode" value="programme" style="accent-color:var(--orange);">
+              <input type="radio" name="pub-mode" value="programme" style="accent-color:#2563EB;">
               <div>
                 <strong style="font-size:13px;">⏰ Programmer la publication</strong>
                 <div style="font-size:11px;color:var(--muted);">Choisissez une date et une heure de diffusion</div>
@@ -583,7 +583,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <p style="font-size:11px;color:#3b82f6;margin:6px 0 0;">La publication sera envoyée automatiquement à la date et l'heure choisies.</p>
             </div>
             <label id="pub-mode-lbl-draft" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
-              <input type="radio" name="pub-mode" value="brouillon" style="accent-color:var(--orange);">
+              <input type="radio" name="pub-mode" value="brouillon" style="accent-color:#2563EB;">
               <div>
                 <strong style="font-size:13px;">💾 Enregistrer comme brouillon</strong>
                 <div style="font-size:11px;color:var(--muted);">Sauvegarder sans publier — accessible depuis "Mes brouillons"</div>
@@ -1185,7 +1185,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <input type="hidden" id="init-pub-id">
         <!-- Onglets -->
         <div style="display:flex;border-bottom:2px solid var(--border);overflow-x:auto;">
-          <button class="pub-tab" data-tab="1" onclick="initPubSwitchTab(1)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid var(--orange);background:none;cursor:pointer;font-size:12px;font-weight:800;color:var(--orange);min-width:80px;white-space:nowrap;">1 · Général</button>
+          <button class="pub-tab" data-tab="1" onclick="initPubSwitchTab(1)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid var(--orange);background:none;cursor:pointer;font-size:12px;font-weight:800;color:#2563EB;min-width:80px;white-space:nowrap;">1 · Général</button>
           <button class="pub-tab" data-tab="2" onclick="initPubSwitchTab(2)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);min-width:80px;white-space:nowrap;">2 · Contenu</button>
           <button class="pub-tab" data-tab="3" onclick="initPubSwitchTab(3)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);min-width:80px;white-space:nowrap;">3 · Liens</button>
           <button class="pub-tab" data-tab="4" onclick="initPubSwitchTab(4)" style="flex:1;padding:12px 8px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);min-width:80px;white-space:nowrap;">4 · Ciblage</button>
@@ -1830,7 +1830,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     let mp = []; try { mp = JSON.parse(p.moyens_paiement || '[]'); } catch {}
     const mpLabels = { carte_bancaire:'💳 Carte', paypal:'🅿️ PayPal', virement:'🏦 Virement', mobile_money:'📱 Mobile Money', orange_money:'🟠 Orange Money', mtn_money:'🟡 MTN Money', moov_money:'🔵 Moov Money', wave:'🌊 Wave', crypto:'₿ Crypto' };
     const _e = s => (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const logoEl = logo ? `<img loading="lazy" src="${logo}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:5px;background:#f5f5f5;flex-shrink:0;">` : `<div style="width:32px;height:32px;border-radius:5px;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;">📣</div>`;
+    const logoEl = logo ? `<img loading="lazy" src="${logo}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:5px;background:#f5f5f5;flex-shrink:0;">` : `<div style="width:32px;height:32px;border-radius:5px;background:linear-gradient(135deg,#2563EB,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;">📣</div>`;
     const sponsoTag = `<div style="font-size:10px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;">Sponsorisé · ${_e(p.annonceur)}</div>`;
     if (format === 'banniere') {
       return `<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
@@ -2211,7 +2211,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;">
         <div class="card" style="text-align:center;padding:14px;">
-          <div style="font-size:26px;font-weight:800;color:var(--orange);" id="init-kpi-membres">${(init.membres||0).toLocaleString('fr-FR')}</div>
+          <div style="font-size:26px;font-weight:800;color:#2563EB;" id="init-kpi-membres">${(init.membres||0).toLocaleString('fr-FR')}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;">Membres réseau</div>
         </div>
         <div class="card" style="text-align:center;padding:14px;">
@@ -2292,7 +2292,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <h2 style="margin:0 0 16px;">🟪 Statistiques & Impact</h2>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
         <div style="text-align:center;padding:14px;background:#f8fafc;border-radius:10px;">
-          <div style="font-size:26px;font-weight:800;color:var(--orange);">${(init.membres||0).toLocaleString('fr-FR')}</div>
+          <div style="font-size:26px;font-weight:800;color:#2563EB;">${(init.membres||0).toLocaleString('fr-FR')}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;">Membres réseau</div>
         </div>
         <div style="text-align:center;padding:14px;background:#f8fafc;border-radius:10px;">
@@ -2411,7 +2411,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             Votre identifiant numérique officiel Diaspo'Actif. Imprimez-le sur vos cartes de visite,
             badges, affiches ou supports de communication. Un scan suffit pour accéder à votre fiche publique.
           </p>
-          <a href="initiative.html?id=${init.id}" target="_blank" style="font-size:12px;color:var(--orange);font-weight:700;text-decoration:none;">
+          <a href="initiative.html?id=${init.id}" target="_blank" style="font-size:12px;color:#2563EB;font-weight:700;text-decoration:none;">
             Voir ma fiche publique →
           </a>
         </div>
@@ -2419,9 +2419,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div id="init-qr-dash"></div>
           ${init.da_id ? `
           <div style="text-align:center;">
-            <div id="init-da-id-badge" style="font-family:monospace;font-size:15px;font-weight:800;letter-spacing:2px;color:var(--orange);background:rgba(255,107,0,0.08);border:1.5px solid var(--orange);border-radius:8px;padding:6px 14px;margin-bottom:8px;">${init.da_id}</div>
+            <div id="init-da-id-badge" style="font-family:monospace;font-size:15px;font-weight:800;letter-spacing:2px;color:#2563EB;background:rgba(255,107,0,0.08);border:1.5px solid var(--orange);border-radius:8px;padding:6px 14px;margin-bottom:8px;">${init.da_id}</div>
             <div style="display:flex;gap:8px;justify-content:center;">
-              <button onclick="navigator.clipboard.writeText('${init.da_id}').then(()=>showToast('✅ Identifiant copié !'))" style="font-size:12px;padding:5px 12px;border:1.5px solid var(--orange);background:transparent;color:var(--orange);border-radius:6px;cursor:pointer;font-weight:600;">📋 Copier</button>
+              <button onclick="navigator.clipboard.writeText('${init.da_id}').then(()=>showToast('✅ Identifiant copié !'))" style="font-size:12px;padding:5px 12px;border:1.5px solid var(--orange);background:transparent;color:#2563EB;border-radius:6px;cursor:pointer;font-weight:600;">📋 Copier</button>
               <button onclick="navigator.share ? navigator.share({title:'Mon identifiant Diaspo\\'Actif',text:'Retrouvez-moi sur Diaspo\\'Actif avec l\\'identifiant ${init.da_id}',url:window.location.origin+'/initiative.html?id=${init.id}'}).catch(()=>{}) : navigator.clipboard.writeText('${init.da_id}').then(()=>showToast('✅ Identifiant copié !'))" style="font-size:12px;padding:5px 12px;border:1.5px solid #6366f1;background:transparent;color:#6366f1;border-radius:6px;cursor:pointer;font-weight:600;">🔗 Partager</button>
             </div>
           </div>` : ''}
@@ -2620,14 +2620,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div style="flex:1;min-width:0;">
             <input type="text" id="iev-video${n}-titre" value="${v(e?.[`video${n}_titre`])}" placeholder="Titre de la vidéo (facultatif)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;margin-bottom:6px;">
             <div style="display:flex;gap:6px;align-items:center;">
-              <button type="button" onclick="document.getElementById('iev-vf${n}').click()" style="padding:6px 12px;border:1px solid var(--orange);border-radius:6px;background:#fff;color:var(--orange);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">${e?.[`video${n}_url`]?'🔄 Remplacer':'📁 Choisir un MP4'}</button>
+              <button type="button" onclick="document.getElementById('iev-vf${n}').click()" style="padding:6px 12px;border:1px solid var(--orange);border-radius:6px;background:#fff;color:#2563EB;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">${e?.[`video${n}_url`]?'🔄 Remplacer':'📁 Choisir un MP4'}</button>
               ${e?.[`video${n}_url`]?`<span style="font-size:11px;color:#22c55e;font-weight:700;">✅ Vidéo enregistrée</span>`:'<span id="iev-vid'+n+'-name" style="font-size:11px;color:var(--muted);">Aucun fichier · max 1 min · MP4</span>'}
             </div>
             <div id="iev-vid${n}-progress-wrap" style="display:none;margin-top:6px;">
               <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
-                <div id="iev-vid${n}-bar" style="height:6px;background:var(--orange);width:0%;transition:width .2s;border-radius:4px;"></div>
+                <div id="iev-vid${n}-bar" style="height:6px;background:linear-gradient(135deg,#2563EB,#1d4ed8);width:0%;transition:width .2s;border-radius:4px;"></div>
               </div>
-              <span id="iev-vid${n}-pct" style="font-size:11px;color:var(--orange);">0%</span>
+              <span id="iev-vid${n}-pct" style="font-size:11px;color:#2563EB;">0%</span>
             </div>
           </div>
         </div>
@@ -2648,7 +2648,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
         <!-- Onglets PDF / Fiche structurée -->
         <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:12px;">
-          <button type="button" id="iev-fc-tab-pdf" onclick="ievSwitchFcTab('pdf')" style="flex:1;padding:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:var(--orange);color:#fff;">📎 Importer un PDF</button>
+          <button type="button" id="iev-fc-tab-pdf" onclick="ievSwitchFcTab('pdf')" style="flex:1;padding:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;">📎 Importer un PDF</button>
           <button type="button" id="iev-fc-tab-fiche" onclick="ievSwitchFcTab('fiche')" style="flex:1;padding:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:#f1f5f9;color:#64748b;">📝 Créer la fiche ici</button>
         </div>
 
@@ -2724,7 +2724,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div style="display:flex;flex-direction:column;gap:7px;" id="iev-cible-radios">
         ${[['tous','🌍 Tout le monde','Visible par tous les utilisateurs'],['abonnes','👥 Abonnés','Personnes qui vous suivent'],['liste','📋 Liste de diffusion','Envoyer à une liste de contacts']].map(([v,l,d])=>`
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;" id="iev-cible-lbl-${v}">
-          <input type="radio" name="iev-cible" value="${v}" ${(e?.cible_type||'tous')===v?'checked':''} style="accent-color:var(--orange);">
+          <input type="radio" name="iev-cible" value="${v}" ${(e?.cible_type||'tous')===v?'checked':''} style="accent-color:#2563EB;">
           <div><strong style="font-size:13px;">${l}</strong><div style="font-size:12px;color:var(--muted);">${d}</div></div>
         </label>`).join('')}
       </div>
@@ -2767,7 +2767,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             ['validation','🔍 Inscription avec validation','L\'organisateur valide chaque demande'],
           ].map(([val,lbl,desc])=>`
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
-            <input type="radio" name="iev-insc-mode" value="${val}" ${(e?.inscription_mode||'libre')===val?'checked':''} style="accent-color:var(--orange);" onchange="ievTogglePlaces()">
+            <input type="radio" name="iev-insc-mode" value="${val}" ${(e?.inscription_mode||'libre')===val?'checked':''} style="accent-color:#2563EB;" onchange="ievTogglePlaces()">
             <div><strong style="font-size:13px;">${lbl}</strong><div style="font-size:11px;color:var(--muted);">${desc}</div></div>
           </label>`).join('')}
         </div>
@@ -2779,7 +2779,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </div>
             <div style="display:flex;align-items:flex-end;">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid #86EFAC;border-radius:6px;background:#fff;width:100%;">
-                <input type="checkbox" id="iev-liste-attente" ${e?.liste_attente?'checked':''} style="accent-color:var(--orange);">
+                <input type="checkbox" id="iev-liste-attente" ${e?.liste_attente?'checked':''} style="accent-color:#2563EB;">
                 <div><strong style="font-size:12px;color:#166534;">📋 Liste d'attente</strong><div style="font-size:10px;color:var(--muted);">Automatique si complet</div></div>
               </label>
             </div>
@@ -2795,11 +2795,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px;">📅 Publication</div>
         <div style="display:flex;flex-direction:column;gap:7px;">
           <label id="iev-mode-lbl-now" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:2px solid var(--orange);border-radius:8px;background:#fff;">
-            <input type="radio" name="iev-mode-pub" value="publie" ${(e?.statut==='publie'||!e)?'checked':''} style="accent-color:var(--orange);">
+            <input type="radio" name="iev-mode-pub" value="publie" ${(e?.statut==='publie'||!e)?'checked':''} style="accent-color:#2563EB;">
             <div><strong style="font-size:13px;">🚀 Publier immédiatement</strong><div style="font-size:11px;color:var(--muted);">L'événement sera visible dès la validation</div></div>
           </label>
           <label id="iev-mode-lbl-prog" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
-            <input type="radio" name="iev-mode-pub" value="programme" ${e?.statut==='brouillon_programme'?'checked':''} style="accent-color:var(--orange);">
+            <input type="radio" name="iev-mode-pub" value="programme" ${e?.statut==='brouillon_programme'?'checked':''} style="accent-color:#2563EB;">
             <div><strong style="font-size:13px;">⏰ Programmer la publication</strong><div style="font-size:11px;color:var(--muted);">Diffusion automatique à la date choisie</div></div>
           </label>
           <div id="iev-prog-panel" style="display:${e?.statut==='brouillon_programme'?'':'none'};padding:12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;margin-top:-2px;">
@@ -2821,7 +2821,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </div>
           </div>
           <label id="iev-mode-lbl-draft" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
-            <input type="radio" name="iev-mode-pub" value="brouillon" ${e?.statut==='brouillon'?'checked':''} style="accent-color:var(--orange);">
+            <input type="radio" name="iev-mode-pub" value="brouillon" ${e?.statut==='brouillon'?'checked':''} style="accent-color:#2563EB;">
             <div><strong style="font-size:13px;">💾 Enregistrer comme brouillon</strong><div style="font-size:11px;color:var(--muted);">Reprendre plus tard avant publication</div></div>
           </label>
         </div>
@@ -3040,7 +3040,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       }
       el.innerHTML=listes.map(l=>`
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:#fff;margin-bottom:5px;">
-          <input type="checkbox" value="${l.id}" class="iev-liste-cb" ${selSet.has(l.id)?'checked':''} style="accent-color:var(--orange);">
+          <input type="checkbox" value="${l.id}" class="iev-liste-cb" ${selSet.has(l.id)?'checked':''} style="accent-color:#2563EB;">
           <span style="font-size:1rem;">${l.icone||'📋'}</span>
           <div><strong>${escH(l.nom)}</strong><span style="color:var(--muted);font-size:11px;margin-left:6px;">${l.nb_contacts||0} contact(s)</span></div>
         </label>`).join('');
@@ -3219,7 +3219,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px;">
-          <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:var(--orange);">${pubCount}</div><div style="font-size:12px;color:var(--muted);">Publiés</div></div>
+          <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#2563EB;">${pubCount}</div><div style="font-size:12px;color:var(--muted);">Publiés</div></div>
           <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#10b981;">${balance.toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Solde wallet</div></div>
           <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;">${totalBillets}</div><div style="font-size:12px;color:var(--muted);">Billets vendus</div></div>
         </div>
@@ -3256,7 +3256,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
               <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;">
-                <div style="font-size:18px;font-weight:800;color:var(--orange);">${e.billets_vendus||0}</div>
+                <div style="font-size:18px;font-weight:800;color:#2563EB;">${e.billets_vendus||0}</div>
                 <div style="font-size:10px;color:var(--muted);">billets</div>
               </div>
               <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;">
@@ -3295,7 +3295,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <div style="font-size:10px;color:var(--muted);">CA brut</div>
             </div>
             <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
-              <div style="font-size:20px;font-weight:800;color:var(--orange);">${(k.revenu_net||0).toFixed(2)} €</div>
+              <div style="font-size:20px;font-weight:800;color:#2563EB;">${(k.revenu_net||0).toFixed(2)} €</div>
               <div style="font-size:10px;color:var(--muted);">Revenu net (95%)</div>
             </div>
             <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
@@ -3318,7 +3318,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           ${pj.length ? `
           <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:10px;margin-bottom:6px;">VENTES PAR JOUR</div>
           <div style="display:flex;gap:4px;align-items:flex-end;height:50px;">
-            ${(()=>{ const maxCa=Math.max(...pj.map(p=>p.ca),1); return pj.map(p=>`<div title="${p.jour}: ${p.nb} billets, ${(p.ca).toFixed(0)}€" style="flex:1;background:var(--orange);border-radius:3px 3px 0 0;height:${Math.round((p.ca/maxCa)*100)}%;min-height:4px;"></div>`).join(''); })()}
+            ${(()=>{ const maxCa=Math.max(...pj.map(p=>p.ca),1); return pj.map(p=>`<div title="${p.jour}: ${p.nb} billets, ${(p.ca).toFixed(0)}€" style="flex:1;background:linear-gradient(135deg,#2563EB,#1d4ed8);border-radius:3px 3px 0 0;height:${Math.round((p.ca/maxCa)*100)}%;min-height:4px;"></div>`).join(''); })()}
           </div>
           ` : ''}
           <div style="margin-top:10px;display:flex;gap:8px;">
@@ -3366,7 +3366,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   /* Style commun projets */
   if(!document.getElementById('init-proj-style')){
     const s=document.createElement('style');s.id='init-proj-style';
-    s.textContent='.u-proj-filter{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}.u-proj-filter.active{background:var(--orange);color:#fff;border-color:var(--orange);}.u-proj-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}';
+    s.textContent='.u-proj-filter{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}.u-proj-filter.active{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;}.u-proj-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}';
     document.head.appendChild(s);
   }
 
@@ -3654,7 +3654,7 @@ async function renderAssoCockpit() {
       </div>`}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:20px;">
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
-          <div style="font-size:28px;font-weight:800;color:var(--orange);">${s.adherents}</div>
+          <div style="font-size:28px;font-weight:800;color:#2563EB;">${s.adherents}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:4px;">Adhérents actifs</div>
         </div>
         <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
@@ -3932,7 +3932,7 @@ async function renderAssoDocuments() {
         <div style="flex:1;">
           <div style="font-weight:700;font-size:14px;">${assoEsc(d.nom)}</div>
           <div style="font-size:12px;color:var(--muted);">${assoEsc(d.type)} · ${assoEsc(d.acces)} · ${assoDate(d.created_at)}</div>
-          ${d.url ? `<a href="${assoEsc(d.url)}" target="_blank" style="font-size:12px;color:var(--orange);">Ouvrir →</a>` : ''}
+          ${d.url ? `<a href="${assoEsc(d.url)}" target="_blank" style="font-size:12px;color:#2563EB;">Ouvrir →</a>` : ''}
         </div>
         <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;font-size:11px;" onclick="supprimerAssoDoc(${d.id})">Supprimer</button>
       </div>`).join('')}</div>`;
@@ -3992,7 +3992,7 @@ async function renderAssoVotes() {
             ${v.statut==='ouvert'?`<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="clorerVote(${v.id})">Clore</button>`:''}
           </div>
         </div>
-        ${v.statut==='clos'&&total>0?`<div style="margin-top:10px;">${opts.map(o=>{const n=res[o]||0;const pct=total>0?Math.round(n/total*100):0;return`<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span>${assoEsc(o)}</span><span>${n} (${pct}%)</span></div><div style="background:var(--border);border-radius:4px;height:6px;"><div style="background:var(--orange);height:6px;border-radius:4px;width:${pct}%"></div></div></div>`}).join('')}</div>`:''}
+        ${v.statut==='clos'&&total>0?`<div style="margin-top:10px;">${opts.map(o=>{const n=res[o]||0;const pct=total>0?Math.round(n/total*100):0;return`<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span>${assoEsc(o)}</span><span>${n} (${pct}%)</span></div><div style="background:var(--border);border-radius:4px;height:6px;"><div style="background:linear-gradient(135deg,#2563EB,#1d4ed8);height:6px;border-radius:4px;width:${pct}%"></div></div></div>`}).join('')}</div>`:''}
         ${v.statut!=='clos'?`<div style="font-size:12px;color:var(--muted);margin-top:8px;">Options : ${opts.map(o=>assoEsc(o)).join(' · ')}</div>`:''}
       </div>`;
     }).join('')}</div>`;

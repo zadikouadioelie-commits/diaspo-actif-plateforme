@@ -9,12 +9,12 @@
 <style>
 .ec-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
 .ec-tab{padding:11px 18px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
-.ec-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.ec-tab.active{color:#2563EB;border-bottom-color:#2563EB;}
 .ec-section{display:none;}.ec-section.active{display:block;}
 /* KPI cards */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:24px;}
 .kpi-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
-.kpi-val{font-size:28px;font-weight:800;color:var(--orange);}
+.kpi-val{font-size:28px;font-weight:800;color:#2563EB;}
 .kpi-lbl{font-size:11px;color:var(--muted);margin-top:2px;}
 /* Badge dispo */
 .badge-dispo{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#d1fae5;border:1.5px solid #6ee7b7;border-radius:20px;font-size:13px;font-weight:700;color:#065f46;cursor:pointer;}
@@ -26,7 +26,7 @@
 .match-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:box-shadow .2s;}
 .match-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.08);}
 .score-bar{height:4px;border-radius:2px;background:#f3f4f6;margin-top:6px;}
-.score-fill{height:100%;border-radius:2px;background:var(--orange);}
+.score-fill{height:100%;border-radius:2px;background:linear-gradient(135deg,#2563EB,#1d4ed8);}
 /* Candidatures historique */
 .cand-hist{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
 .statut-pill{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;}
@@ -37,12 +37,12 @@
 /* Rayon grid */
 .rayon-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .rayon-opt{cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 6px;text-align:center;transition:all .15s;background:#fff;}
-.rayon-opt.sel{border-color:var(--orange);background:#fff7f0;}
+.rayon-opt.sel{border-color:#2563EB;background:#fff7f0;}
 /* Lettre */
 #lettre-editor{min-height:300px;border:1px solid var(--border);border-radius:10px;padding:14px;font-size:14px;line-height:1.7;outline:none;background:#fff;}
 .editor-toolbar{display:flex;gap:4px;flex-wrap:wrap;padding:8px;background:#f8fafc;border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;}
 .editor-toolbar button{padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;}
-.editor-toolbar button:hover{background:var(--orange);color:#fff;border-color:var(--orange);}
+.editor-toolbar button:hover{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.css">
   <link rel="stylesheet" href="/assets/design-upgrade.css">
@@ -57,7 +57,7 @@
         <a href="annuaire.html">Annuaire</a>
         <a href="fil-actualite.html">Fil</a>
         <a href="recrutement.html">Recrutement</a>
-        <a href="espace-candidat.html" style="color:var(--orange);font-weight:700;">Espace Candidat</a>
+        <a href="espace-candidat.html" style="color:#2563EB;font-weight:700;">Espace Candidat</a>
       </nav>
       <div class="topbar-right">
         <select class="lang-select" id="lang-select"></select>
@@ -235,7 +235,7 @@
           <!-- Badge dispo for travailler -->
           <div style="border-top:1px solid var(--border);padding-top:16px;">
             <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;">
-              <input type="checkbox" id="p-badge-dispo" style="width:18px;height:18px;accent-color:var(--orange);margin-top:2px;" onchange="updateBadgePreview()">
+              <input type="checkbox" id="p-badge-dispo" style="width:18px;height:18px;accent-color:#2563EB;margin-top:2px;" onchange="updateBadgePreview()">
               <div>
                 <div style="font-weight:700;font-size:14px;">⭐ Disponible pour travailler</div>
                 <div style="font-size:12px;color:var(--muted);margin-top:2px;">Une étoile verte s'affichera discrètement sur votre profil. Aucune autre information n'est rendue publique.</div>
@@ -540,7 +540,7 @@ function renderExps(){
   el.innerHTML = EXPS.map(exp=>`
     <div class="exp-card">
       <div class="exp-actions">
-        <button class="btn btn-sm" style="padding:3px 8px;border-color:var(--orange);color:var(--orange);" onclick="editExp(${exp.id})">✏️</button>
+        <button class="btn btn-sm" style="padding:3px 8px;border-color:#2563EB;color:#2563EB;" onclick="editExp(${exp.id})">✏️</button>
         <button class="btn btn-sm" style="padding:3px 8px;border-color:#ef4444;color:#ef4444;" onclick="deleteExp(${exp.id})">🗑️</button>
       </div>
       <div style="padding-right:80px;">
@@ -593,7 +593,7 @@ function renderForms(){
   el.innerHTML=FORMS.map(f=>`
     <div class="exp-card">
       <div class="exp-actions">
-        <button class="btn btn-sm" style="padding:3px 8px;border-color:var(--orange);color:var(--orange);" onclick="editForm(${f.id})">✏️</button>
+        <button class="btn btn-sm" style="padding:3px 8px;border-color:#2563EB;color:#2563EB;" onclick="editForm(${f.id})">✏️</button>
         <button class="btn btn-sm" style="padding:3px 8px;border-color:#ef4444;color:#ef4444;" onclick="deleteForm(${f.id})">🗑️</button>
       </div>
       <div style="padding-right:80px;">
@@ -659,7 +659,7 @@ async function loadOffresMatch(){
           <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);">
             <span>Correspondance</span>
             <div class="score-bar" style="flex:1;"><div class="score-fill" style="width:${Math.min(c.score_matching,100)}%"></div></div>
-            <span style="font-weight:700;color:var(--orange);">${Math.min(c.score_matching,100)}%</span>
+            <span style="font-weight:700;color:#2563EB;">${Math.min(c.score_matching,100)}%</span>
           </div>`:''}
         ${!c.deja_postule?`<button class="btn btn-sm btn-orange" style="width:100%;margin-top:10px;" onclick="event.stopPropagation();postulerDirect(${c.id})">📩 Postuler</button>`:''}
       </div>`).join('');
@@ -685,7 +685,7 @@ async function loadCandidatures(){
     const cands=r.nb_candidatures;
     // On va requêter les candidatures directement via recrutement
     const r2=await api('GET','/recrutement?mine=1');
-    el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;">Utilisez la page <a href="recrutement.html" style="color:var(--orange);">Recrutement</a> pour voir le détail de vos candidatures.</div>';
+    el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:20px;">Utilisez la page <a href="recrutement.html" style="color:#2563EB;">Recrutement</a> pour voir le détail de vos candidatures.</div>';
   }catch(e){el.innerHTML=`<div style="color:#ef4444;">${escH(e.message)}</div>`;}
 }
 </script>

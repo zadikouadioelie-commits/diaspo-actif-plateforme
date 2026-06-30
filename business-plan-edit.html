@@ -18,12 +18,12 @@ html,body{height:100%;overflow:hidden;}
 .bp-sidebar-head{padding:14px 16px;border-bottom:1px solid var(--border);}
 .bp-sidebar-head .bp-name{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;}
 .prog-bar{height:6px;border-radius:99px;background:var(--border);overflow:hidden;}
-.prog-bar .fill{height:100%;border-radius:99px;background:var(--orange);transition:width .5s;}
+.prog-bar .fill{height:100%;border-radius:99px;background:linear-gradient(135deg,#2563EB,#1d4ed8);transition:width .5s;}
 .prog-label{font-size:11px;color:var(--muted);margin-top:3px;}
 .bp-nav{flex:1;overflow-y:auto;padding:8px 0;}
 .bp-nav-item{display:flex;align-items:center;gap:8px;padding:9px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);transition:background .1s;border-left:3px solid transparent;}
 .bp-nav-item:hover{background:var(--surface2);}
-.bp-nav-item.active{background:var(--orange-light);border-left-color:var(--orange);color:var(--orange);}
+.bp-nav-item.active{background:var(--orange-light);border-left-color:#2563EB;color:#2563EB;}
 .bp-nav-item .nav-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center;}
 .bp-nav-item .check{margin-left:auto;font-size:13px;}
 .bp-sidebar-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
@@ -51,7 +51,7 @@ html,body{height:100%;overflow:hidden;}
 .fg .full{grid-column:1/-1;}
 .fg label{display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;}
 .fg input,.fg select,.fg textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13.5px;box-sizing:border-box;background:var(--bg);}
-.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--orange);}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:#2563EB;}
 .fg textarea{resize:vertical;min-height:90px;}
 
 /* SWOT */
@@ -67,7 +67,7 @@ html,body{height:100%;overflow:hidden;}
 /* BMC - Business Model Canvas */
 .bmc-grid{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:auto auto;gap:8px;}
 .bmc-cell{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;}
-.bmc-cell label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;color:var(--orange);margin-bottom:6px;}
+.bmc-cell label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;color:#2563EB;margin-bottom:6px;}
 .bmc-cell textarea{width:100%;border:none;background:var(--bg);border-radius:6px;padding:6px;font-family:inherit;font-size:12px;resize:vertical;min-height:80px;box-sizing:border-box;}
 .bmc-cell.partenaires{grid-row:span 2;}
 .bmc-cell.activites{grid-column:2;}
@@ -88,7 +88,7 @@ html,body{height:100%;overflow:hidden;}
 
 /* Tableau financier */
 .fin-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:12px;}
-.fin-table th{background:var(--orange);color:#fff;padding:8px 10px;text-align:center;font-size:11px;font-weight:700;border:1px solid var(--border);}
+.fin-table th{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;padding:8px 10px;text-align:center;font-size:11px;font-weight:700;border:1px solid var(--border);}
 .fin-table td{padding:7px 10px;border:1px solid var(--border);text-align:right;}
 .fin-table td:first-child{text-align:left;font-weight:600;}
 .fin-table td input{border:none;background:transparent;width:70px;text-align:right;font-family:inherit;font-size:12px;padding:0;}
@@ -108,7 +108,7 @@ html,body{height:100%;overflow:hidden;}
 .gantt-table{width:100%;border-collapse:collapse;font-size:12px;}
 .gantt-table th{background:var(--surface2);padding:6px 8px;border:1px solid var(--border);font-size:11px;font-weight:700;text-align:center;}
 .gantt-table td{border:1px solid var(--border);padding:5px 8px;}
-.gantt-bar{height:14px;border-radius:99px;background:var(--orange);opacity:.8;}
+.gantt-bar{height:14px;border-radius:99px;background:linear-gradient(135deg,#2563EB,#1d4ed8);opacity:.8;}
 
 /* Complétude */
 .complet-table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -228,7 +228,7 @@ html,body{height:100%;overflow:hidden;}
         <button onclick="toggleComments()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);">✕</button>
       </div>
       <div class="comments-head" style="padding-top:0;border:none;">
-        <small id="comments-section-label" style="color:var(--orange);font-weight:700;">Section : —</small>
+        <small id="comments-section-label" style="color:#2563EB;font-weight:700;">Section : —</small>
       </div>
       <div class="comments-body" id="comments-body"></div>
       <div style="padding:12px;border-top:1px solid var(--border);">
@@ -564,7 +564,7 @@ function renderResumeExecutif() {
     <div class="bp-section-head"><h2>📄 Résumé exécutif</h2>
       <p>Une synthèse d'1 à 2 pages de votre business plan. <strong>Complétez les autres sections pour générer automatiquement ce résumé.</strong></p>
     </div>
-    ${Object.keys(sections).length > 2 ? `<div class="bp-card-inner" style="border-color:var(--orange);background:#fff7ed;">
+    ${Object.keys(sections).length > 2 ? `<div class="bp-card-inner" style="border-color:#2563EB;background:#fff7ed;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <h3 style="margin:0;">✨ Génération automatique</h3>
         <button class="btn btn-orange btn-sm" onclick="genResumeAuto()">Générer depuis mes données</button>
@@ -822,7 +822,7 @@ function renderProduitRows(items) {
       <td><input value="${esc(it.description||'')}" placeholder="Description…" oninput="updProduit(${i},'description',this.value)"></td>
       <td><input type="number" value="${esc(it.cout_revient||'')}" placeholder="0" oninput="updProduit(${i},'cout_revient',this.value);calcMarge(${i})"></td>
       <td><input type="number" value="${esc(it.prix_vente||'')}" placeholder="0" oninput="updProduit(${i},'prix_vente',this.value);calcMarge(${i})"></td>
-      <td><input id="marge-${i}" value="${esc(it.marge||'')}" readonly style="background:var(--surface2);color:var(--orange);font-weight:700;">%</td>
+      <td><input id="marge-${i}" value="${esc(it.marge||'')}" readonly style="background:var(--surface2);color:#2563EB;font-weight:700;">%</td>
       <td><input value="${esc(it.cycle||'')}" placeholder="Ex : 3 ans" oninput="updProduit(${i},'cycle',this.value)"></td>
       <td style="text-align:center;"><button onclick="delProduit(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">🗑</button></td>
     </tr>`).join('');
@@ -1220,7 +1220,7 @@ function renderCompletude() {
     <div class="bp-card-inner">
       <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;">
         <div style="text-align:center;">
-          <div style="font-size:48px;font-weight:900;color:var(--orange);">${prog}%</div>
+          <div style="font-size:48px;font-weight:900;color:#2563EB;">${prog}%</div>
           <div style="font-size:13px;color:var(--muted);">Complétude globale</div>
         </div>
         <div style="flex:1;">
@@ -1229,7 +1229,7 @@ function renderCompletude() {
           </div>
           <div style="font-size:12.5px;color:var(--muted);">${valides} sections sur ${total} renseignées</div>
           ${prog>=80?'<div style="font-size:13px;color:#10b981;margin-top:4px;">✅ Votre business plan est en bonne forme !</div>':
-            prog>=50?'<div style="font-size:13px;color:var(--orange);margin-top:4px;">⚡ Continuez ! Plus de la moitié est complétée.</div>':
+            prog>=50?'<div style="font-size:13px;color:#2563EB;margin-top:4px;">⚡ Continuez ! Plus de la moitié est complétée.</div>':
             '<div style="font-size:13px;color:#dc2626;margin-top:4px;">⚠️ Des sections importantes restent à compléter.</div>'}
         </div>
       </div>
@@ -1357,7 +1357,7 @@ document.getElementById('collab-search').addEventListener('input', function() {
       const r = await api('GET', `/users/search?q=${encodeURIComponent(q)}`);
       document.getElementById('collab-search-results').innerHTML = r.slice(0,5).map(u=>`
         <div onclick="selectCollab(${u.id},'${esc((u.nom+' '+(u.prenom||'')).replace(/'/g,"\\'"))}')" style="display:flex;align-items:center;gap:8px;padding:8px;cursor:pointer;border-radius:8px;hover:background:var(--surface2);">
-          <div style="width:32px;height:32px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;">${(u.nom||'?')[0]}</div>
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;">${(u.nom||'?')[0]}</div>
           <div><div style="font-size:13px;font-weight:700;">${esc(u.nom||'')} ${esc(u.prenom||'')}</div><div style="font-size:11px;color:var(--muted);">${esc(u.email||'')}</div></div>
         </div>`).join('') || '<div style="font-size:12px;color:var(--muted);padding:8px;">Aucun résultat</div>';
     } catch(e) {}
@@ -1396,8 +1396,8 @@ async function showCompletude() {
     buildNav();
     document.getElementById('completude-content').innerHTML = `
       <div style="text-align:center;margin-bottom:16px;">
-        <div style="font-size:48px;font-weight:900;color:var(--orange);">${data.progression}%</div>
-        <div style="height:8px;border-radius:99px;background:var(--border);overflow:hidden;margin:8px 20px;"><div style="height:100%;border-radius:99px;background:var(--orange);width:${data.progression}%;"></div></div>
+        <div style="font-size:48px;font-weight:900;color:#2563EB;">${data.progression}%</div>
+        <div style="height:8px;border-radius:99px;background:var(--border);overflow:hidden;margin:8px 20px;"><div style="height:100%;border-radius:99px;background:linear-gradient(135deg,#2563EB,#1d4ed8);width:${data.progression}%;"></div></div>
       </div>
       <table class="complet-table">
         <thead><tr><th>Section</th><th>Statut</th></tr></thead>

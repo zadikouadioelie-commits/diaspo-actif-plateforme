@@ -17,33 +17,33 @@
 .insc-stepper{display:flex;align-items:center;margin-bottom:32px}
 .insc-step-dot{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
 .insc-step-dot .dot{width:32px;height:32px;border-radius:50%;background:var(--border);color:var(--muted);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
-.insc-step-dot .dot.active{background:var(--orange);color:#fff}
-.insc-step-dot .dot.done{background:#22c55e;color:#fff}
+.insc-step-dot .dot.active{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.35)}
+.insc-step-dot .dot.done{background:linear-gradient(135deg,#10B981,#059669);color:#fff}
 .insc-step-dot span{font-size:11px;color:var(--muted);text-align:center}
 .insc-step-line{flex:1;height:2px;background:var(--border);max-width:60px;margin-top:-16px}
 .type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
 @media(max-width:580px){.type-grid{grid-template-columns:1fr}}
 .type-card{border:2px solid var(--border);border-radius:12px;padding:22px 18px;cursor:pointer;text-align:center;transition:border-color .15s}
-.type-card:hover{border-color:var(--orange)}
-.type-card.selected{border-color:var(--orange);background:#fff8f2;box-shadow:0 0 0 3px rgba(255,107,0,.12)}
+.type-card:hover{border-color:#2563EB;transform:translateY(-2px);box-shadow:0 6px 20px rgba(37,99,235,.1)}
+.type-card.selected{border-color:#2563EB;background:#EFF6FF;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
 .type-card .tc-icon{font-size:36px;margin-bottom:10px}
 .type-card h3{margin:0 0 6px;font-size:16px}
 .type-card p{font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.4}
 .type-card .badge{font-size:11px;padding:3px 10px;border-radius:99px;background:var(--bg);border:1px solid var(--border)}
-.type-card.selected .badge{background:var(--orange);color:#fff;border-color:var(--orange)}
+.type-card.selected .badge{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB}
 .form-section{margin-top:24px}
-.form-section h4{font-size:14px;color:var(--orange);text-transform:uppercase;letter-spacing:.05em;margin:0 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.form-section h4{font-size:14px;color:#2563EB;text-transform:uppercase;letter-spacing:.1em;font-weight:800;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid #DBEAFE}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
 @media(max-width:580px){.grid-2,.grid-3{grid-template-columns:1fr}}
 .nat-notice{background:#fff8e1;border:1px solid #ffd54f;border-radius:8px;padding:10px 14px;font-size:12px;color:#7a5700;margin-bottom:14px}
 .interests-grid{display:flex;flex-wrap:wrap;gap:8px}
 .interests-grid label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:5px 10px;border:1px solid var(--border);border-radius:99px}
-.interests-grid label:hover{border-color:var(--orange)}
-.interests-grid input[type=checkbox]{accent-color:var(--orange)}
+.interests-grid label:hover{border-color:#2563EB}
+.interests-grid input[type=checkbox]{accent-color:#2563EB}
 .radio-grid{display:flex;flex-wrap:wrap;gap:8px}
 .radio-grid label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:5px 12px;border:1px solid var(--border);border-radius:99px}
-.radio-grid input[type=radio]{accent-color:var(--orange)}
+.radio-grid input[type=radio]{accent-color:#2563EB}
 .pwd-strength{height:4px;border-radius:4px;margin-top:6px;background:var(--border);overflow:hidden}
 .pwd-strength-bar{height:100%;border-radius:4px;transition:width .3s,background .3s;width:0%}
 .pwd-hint{font-size:11px;color:var(--muted);margin-top:4px}
@@ -111,7 +111,7 @@
       </div>
       <div style="margin-top:24px;text-align:right"><button class="btn btn-orange" id="btn-next-1" disabled>Continuer &rarr;</button></div>
     </div>
-    <p style="text-align:center;font-size:13px;color:var(--muted);margin-top:16px">Deja inscrit ? <a href="login.html" style="color:var(--orange);font-weight:700">Se connecter</a></p>
+    <p style="text-align:center;font-size:13px;color:var(--muted);margin-top:16px">Deja inscrit ? <a href="login.html" style="color:#2563EB;font-weight:700">Se connecter</a></p>
   </div>
   <!-- ETAPE 2a : Utilisateur -->
   <div class="insc-pane" id="pane-utilisateur">
@@ -122,33 +122,33 @@
       </div>
       <div class="form-section"><h4>Identite</h4>
         <div class="grid-2">
-          <div><label>Nom <span style="color:var(--orange)">*</span></label><input type="text" id="u-nom" placeholder="Kouadio"></div>
-          <div><label>Prenom <span style="color:var(--orange)">*</span></label><input type="text" id="u-prenom" placeholder="Jean"></div>
+          <div><label>Nom <span style="color:#2563EB">*</span></label><input type="text" id="u-nom" placeholder="Kouadio"></div>
+          <div><label>Prenom <span style="color:#2563EB">*</span></label><input type="text" id="u-prenom" placeholder="Jean"></div>
         </div>
-        <div style="margin-top:12px"><label>Date de naissance <span style="color:var(--orange)">*</span></label><input type="date" id="u-dob"></div>
+        <div style="margin-top:12px"><label>Date de naissance <span style="color:#2563EB">*</span></label><input type="date" id="u-dob"></div>
       </div>
       <div class="form-section"><h4>Nationalites</h4>
         <div class="nat-notice">&#128274; <strong>Information privee</strong> — Jamais affichees publiquement. Utilisees uniquement pour le ciblage institutionnel anonymise et les recommandations.</div>
         <div class="grid-3">
-          <div><label>Nationalite 1 <span style="color:var(--orange)">*</span></label><input type="text" id="u-nat1" placeholder="Francaise"></div>
+          <div><label>Nationalite 1 <span style="color:#2563EB">*</span></label><input type="text" id="u-nat1" placeholder="Francaise"></div>
           <div><label>Nationalite 2</label><input type="text" id="u-nat2" placeholder="Senegalaise (opt.)"></div>
           <div><label>Nationalite 3</label><input type="text" id="u-nat3" placeholder="Optionnel"></div>
         </div>
       </div>
       <div class="form-section"><h4>Residence</h4>
         <div class="grid-2">
-          <div><label>Pays de residence <span style="color:var(--orange)">*</span></label><input type="text" id="u-pays" placeholder="France"></div>
-          <div><label>Region de residence <span style="color:var(--orange)">*</span></label><input type="text" id="u-region" placeholder="Occitanie"></div>
+          <div><label>Pays de residence <span style="color:#2563EB">*</span></label><input type="text" id="u-pays" placeholder="France"></div>
+          <div><label>Region de residence <span style="color:#2563EB">*</span></label><input type="text" id="u-region" placeholder="Occitanie"></div>
         </div>
         <div class="grid-3" style="margin-top:12px">
           <div><label>Departement</label><input type="text" id="u-dept" placeholder="Haute-Garonne"></div>
-          <div><label>Ville <span style="color:var(--orange)">*</span></label><input type="text" id="u-ville" placeholder="Toulouse"></div>
+          <div><label>Ville <span style="color:#2563EB">*</span></label><input type="text" id="u-ville" placeholder="Toulouse"></div>
           <div><label>Code postal</label><input type="text" id="u-cp" placeholder="31000"></div>
         </div>
       </div>
       <div class="form-section"><h4>Coordonnees</h4>
         <div class="grid-2">
-          <div><label>Email <span style="color:var(--orange)">*</span></label><input type="email" id="u-email" placeholder="jean@example.com"></div>
+          <div><label>Email <span style="color:#2563EB">*</span></label><input type="email" id="u-email" placeholder="jean@example.com"></div>
           <div><label>Telephone</label><input type="tel" id="u-tel" placeholder="+33 6 00 00 00 00"></div>
         </div>
       </div>
@@ -183,19 +183,19 @@
       <div class="form-section"><h4>Securite</h4>
         <div class="grid-2">
           <div>
-            <label>Mot de passe <span style="color:var(--orange)">*</span></label>
+            <label>Mot de passe <span style="color:#2563EB">*</span></label>
             <input type="password" id="u-pwd" minlength="8" placeholder="8 caracteres min" autocomplete="new-password" oninput="updateStrength(this,'u-sbar','u-shint')">
             <div class="pwd-strength"><div class="pwd-strength-bar" id="u-sbar"></div></div>
             <div class="pwd-hint" id="u-shint"></div>
           </div>
-          <div><label>Confirmer <span style="color:var(--orange)">*</span></label><input type="password" id="u-pwd2" minlength="8" placeholder="Repeter" autocomplete="new-password"></div>
+          <div><label>Confirmer <span style="color:#2563EB">*</span></label><input type="password" id="u-pwd2" minlength="8" placeholder="Repeter" autocomplete="new-password"></div>
         </div>
       </div>
       <div class="notice" style="margin-top:16px">&#9888; Demo : verification d'identite et paiements simules.</div>
       <div style="margin-top:18px;background:#fff8f2;border:1px solid #fed7aa;border-radius:10px;padding:14px 16px;">
         <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;line-height:1.5;">
-          <input type="checkbox" id="u-charte" style="margin-top:3px;accent-color:var(--orange);flex-shrink:0;width:16px;height:16px;">
-          <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:var(--orange);font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a>. Cet engagement est obligatoire pour créer un compte.</span>
+          <input type="checkbox" id="u-charte" style="margin-top:3px;accent-color:#2563EB;flex-shrink:0;width:16px;height:16px;">
+          <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a>. Cet engagement est obligatoire pour créer un compte.</span>
         </label>
       </div>
       <div class="auth-error" id="u-error"></div>
@@ -211,8 +211,8 @@
       </div>
       <div class="form-section"><h4>Organisation</h4>
         <div class="grid-2">
-          <div><label>Nom de l'organisation <span style="color:var(--orange)">*</span></label><input type="text" id="i-nom" placeholder="Association Solidarite Diaspora"></div>
-          <div><label>Type <span style="color:var(--orange)">*</span></label>
+          <div><label>Nom de l'organisation <span style="color:#2563EB">*</span></label><input type="text" id="i-nom" placeholder="Association Solidarite Diaspora"></div>
+          <div><label>Type <span style="color:#2563EB">*</span></label>
             <select id="i-type">
               <option value="">— Selectionner —</option>
               <option>Association</option><option>Entreprise</option><option>ONG</option>
@@ -230,7 +230,7 @@
             <option>Sport</option><option>Tourisme</option><option>Autre</option>
           </select>
         </div>
-        <div style="margin-top:12px"><label>Description <span style="color:var(--orange)">*</span></label>
+        <div style="margin-top:12px"><label>Description <span style="color:#2563EB">*</span></label>
           <textarea id="i-desc" rows="3" placeholder="Presentez votre initiative…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
         </div>
         <div style="margin-top:12px"><label>Objectifs</label>
@@ -240,14 +240,14 @@
       <div class="form-section"><h4>Nationalites concernees</h4>
         <div class="nat-notice">&#127760; Appartenance juridique ou administrative de l'organisation — affichee dans l'annuaire.</div>
         <div class="grid-2">
-          <div><label>Nationalite 1 <span style="color:var(--orange)">*</span></label><input type="text" id="i-nat1" placeholder="Ivoirienne"></div>
+          <div><label>Nationalite 1 <span style="color:#2563EB">*</span></label><input type="text" id="i-nat1" placeholder="Ivoirienne"></div>
           <div><label>Nationalite 2 (facultatif)</label><input type="text" id="i-nat2" placeholder="Française"></div>
         </div>
       </div>
       <div class="form-section"><h4>Origines culturelles</h4>
         <div class="nat-notice">&#127758; Racines culturelles, communautaires ou historiques de l'initiative — affichees dans l'annuaire.</div>
         <div class="grid-2">
-          <div><label>Origine 1 <span style="color:var(--orange)">*</span></label><input type="text" id="i-orig1" placeholder="Cote d'Ivoire"></div>
+          <div><label>Origine 1 <span style="color:#2563EB">*</span></label><input type="text" id="i-orig1" placeholder="Cote d'Ivoire"></div>
           <div><label>Origine 2 (facultatif)</label><input type="text" id="i-orig2" placeholder="Burkina Faso"></div>
         </div>
       </div>
@@ -266,23 +266,23 @@
       </div>
       <div class="form-section"><h4>Localisation</h4>
         <div class="grid-2">
-          <div><label>Pays <span style="color:var(--orange)">*</span></label><input type="text" id="i-pays" placeholder="France"></div>
+          <div><label>Pays <span style="color:#2563EB">*</span></label><input type="text" id="i-pays" placeholder="France"></div>
           <div><label>Region</label><input type="text" id="i-region" placeholder="Occitanie"></div>
         </div>
         <div class="grid-3" style="margin-top:12px">
-          <div><label>Ville <span style="color:var(--orange)">*</span></label><input type="text" id="i-ville" placeholder="Toulouse"></div>
+          <div><label>Ville <span style="color:#2563EB">*</span></label><input type="text" id="i-ville" placeholder="Toulouse"></div>
           <div><label>Adresse</label><input type="text" id="i-adresse" placeholder="12 rue de la Solidarite"></div>
           <div><label>Code postal</label><input type="text" id="i-cp" placeholder="31000"></div>
         </div>
       </div>
       <div class="form-section"><h4>Responsable principal</h4>
         <div class="grid-3">
-          <div><label>Nom <span style="color:var(--orange)">*</span></label><input type="text" id="i-rnom" placeholder="Diallo"></div>
-          <div><label>Prenom <span style="color:var(--orange)">*</span></label><input type="text" id="i-rprenom" placeholder="Aminata"></div>
+          <div><label>Nom <span style="color:#2563EB">*</span></label><input type="text" id="i-rnom" placeholder="Diallo"></div>
+          <div><label>Prenom <span style="color:#2563EB">*</span></label><input type="text" id="i-rprenom" placeholder="Aminata"></div>
           <div><label>Fonction</label><input type="text" id="i-rfct" placeholder="Presidente"></div>
         </div>
         <div class="grid-2" style="margin-top:12px">
-          <div><label>Email <span style="color:var(--orange)">*</span></label><input type="email" id="i-email" placeholder="contact@initiative.org"></div>
+          <div><label>Email <span style="color:#2563EB">*</span></label><input type="email" id="i-email" placeholder="contact@initiative.org"></div>
           <div><label>Telephone</label><input type="tel" id="i-tel" placeholder="+33 5 00 00 00 00"></div>
         </div>
       </div>
@@ -299,19 +299,19 @@
       <div class="form-section"><h4>Securite</h4>
         <div class="grid-2">
           <div>
-            <label>Mot de passe <span style="color:var(--orange)">*</span></label>
+            <label>Mot de passe <span style="color:#2563EB">*</span></label>
             <input type="password" id="i-pwd" minlength="8" placeholder="8 caracteres min" autocomplete="new-password" oninput="updateStrength(this,'i-sbar','i-shint')">
             <div class="pwd-strength"><div class="pwd-strength-bar" id="i-sbar"></div></div>
             <div class="pwd-hint" id="i-shint"></div>
           </div>
-          <div><label>Confirmer <span style="color:var(--orange)">*</span></label><input type="password" id="i-pwd2" minlength="8" placeholder="Repeter" autocomplete="new-password"></div>
+          <div><label>Confirmer <span style="color:#2563EB">*</span></label><input type="password" id="i-pwd2" minlength="8" placeholder="Repeter" autocomplete="new-password"></div>
         </div>
       </div>
       <div class="notice" style="margin-top:16px">&#9888; La création de compte est gratuite. La vérification des documents est simulée en mode démo.</div>
       <div style="margin-top:18px;background:#fff8f2;border:1px solid #fed7aa;border-radius:10px;padding:14px 16px;">
         <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;line-height:1.5;">
-          <input type="checkbox" id="i-charte" style="margin-top:3px;accent-color:var(--orange);flex-shrink:0;width:16px;height:16px;">
-          <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:var(--orange);font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a>. Cet engagement est obligatoire pour créer un compte.</span>
+          <input type="checkbox" id="i-charte" style="margin-top:3px;accent-color:#2563EB;flex-shrink:0;width:16px;height:16px;">
+          <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a>. Cet engagement est obligatoire pour créer un compte.</span>
         </label>
       </div>
       <div class="auth-error" id="i-error"></div>
@@ -335,9 +335,9 @@
           <div><strong>🏛 Compte Étatique</strong> — Section 1/4<br><span style="font-size:12px;color:var(--muted);">Informations sur l'institution</span></div>
         </div>
         <div class="grid-2" style="gap:14px;">
-          <div><label>Nom officiel <span style="color:var(--orange)">*</span></label><input id="ce-nom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ambassade de Côte d'Ivoire en France"></div>
+          <div><label>Nom officiel <span style="color:#2563EB">*</span></label><input id="ce-nom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ambassade de Côte d'Ivoire en France"></div>
           <div><label>Sigle <span style="font-size:11px;color:var(--muted);">(facultatif)</span></label><input id="ce-sigle" class="input-field" style="width:100%;margin-top:4px;" placeholder="ACF, CGCI…"></div>
-          <div><label>Type d'organisme <span style="color:var(--orange)">*</span></label>
+          <div><label>Type d'organisme <span style="color:#2563EB">*</span></label>
             <select id="ce-type" class="input-field" style="width:100%;margin-top:4px;"><option value="">— Sélectionner —</option><option>Ambassade</option><option>Consulat</option><option>Mairie</option><option>Préfecture</option><option>Sous-Préfecture</option><option>Région</option><option>Département</option><option>Province</option><option>Ministère</option><option>Gouvernorat</option><option>Agence publique</option><option>Administration</option><option>Collectivité territoriale</option><option>Chambre consulaire</option><option>Autorité administrative</option><option>Communauté de communes</option><option>Métropole</option><option>Organisation publique</option><option>Autre</option></select>
           </div>
           <div><label>Date de création <span style="font-size:11px;color:var(--muted);">(facultatif)</span></label><input id="ce-date-creation" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
@@ -364,7 +364,7 @@
           <strong>Exemples :</strong> Ambassade de Côte d'Ivoire à Paris → Pays d'origine : <strong>Côte d'Ivoire</strong> | Consulat du Sénégal à Lyon → Pays d'origine : <strong>Sénégal</strong>
         </div>
         <div class="grid-2" style="gap:14px;">
-          <div><label>Pays d'origine <span style="color:var(--orange)">*</span></label><input id="ce-pays-origine" class="input-field" list="ce-pays-dl" style="width:100%;margin-top:4px;" placeholder="Côte d'Ivoire, Sénégal…"></div>
+          <div><label>Pays d'origine <span style="color:#2563EB">*</span></label><input id="ce-pays-origine" class="input-field" list="ce-pays-dl" style="width:100%;margin-top:4px;" placeholder="Côte d'Ivoire, Sénégal…"></div>
           <div><label>Ministère / Autorité de tutelle</label><input id="ce-ministere" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ministère des Affaires Étrangères"></div>
           <div><label>Administration de rattachement</label><input id="ce-admin-rattachement" class="input-field" style="width:100%;margin-top:4px;" placeholder="Direction des Affaires Consulaires"></div>
           <div><label>Région / Collectivité d'origine <span style="font-size:11px;color:var(--muted);">(si applicable)</span></label><input id="ce-region-origine" class="input-field" style="width:100%;margin-top:4px;" placeholder="Région des Lagunes…"></div>
@@ -383,10 +383,10 @@
           <span style="font-size:12px;color:var(--muted);">Où l'institution exerce réellement ses activités.</span>
         </div>
         <div class="grid-2" style="gap:14px;">
-          <div><label>Pays d'exercice <span style="color:var(--orange)">*</span></label><input id="ce-pays-exercice" class="input-field" list="ce-pays-dl" style="width:100%;margin-top:4px;" placeholder="France, Belgique…"></div>
+          <div><label>Pays d'exercice <span style="color:#2563EB">*</span></label><input id="ce-pays-exercice" class="input-field" list="ce-pays-dl" style="width:100%;margin-top:4px;" placeholder="France, Belgique…"></div>
           <div><label>Région</label><input id="ce-region-exercice" class="input-field" style="width:100%;margin-top:4px;" placeholder="Île-de-France"></div>
           <div><label>Département / Province</label><input id="ce-dept-exercice" class="input-field" style="width:100%;margin-top:4px;" placeholder="Paris"></div>
-          <div><label>Ville <span style="color:var(--orange)">*</span></label><input id="ce-ville" class="input-field" style="width:100%;margin-top:4px;" placeholder="Paris"></div>
+          <div><label>Ville <span style="color:#2563EB">*</span></label><input id="ce-ville" class="input-field" style="width:100%;margin-top:4px;" placeholder="Paris"></div>
           <div style="grid-column:1/-1;"><label>Adresse complète</label><input id="ce-adresse" class="input-field" style="width:100%;margin-top:4px;" placeholder="1 avenue Blaise Pascal…"></div>
           <div><label>Code postal</label><input id="ce-cp" class="input-field" style="width:100%;margin-top:4px;" placeholder="75016"></div>
           <div><label>Coordonnées GPS <span style="font-size:11px;color:var(--muted);">(optionnel)</span></label><input id="ce-gps" class="input-field" style="width:100%;margin-top:4px;" placeholder="48.8566, 2.3522"></div>
@@ -399,7 +399,7 @@
           </div>
         </div>
         <details style="margin-top:14px;">
-          <summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--orange);">📱 Réseaux sociaux officiels (facultatif)</summary>
+          <summary style="cursor:pointer;font-weight:700;font-size:13px;color:#2563EB;">📱 Réseaux sociaux officiels (facultatif)</summary>
           <div class="grid-2" style="margin-top:10px;gap:10px;">
             <div><label style="font-size:12px;">Facebook</label><input id="ce-fb" type="url" class="input-field" style="width:100%;margin-top:3px;" placeholder="https://facebook.com/…"></div>
             <div><label style="font-size:12px;">X (Twitter)</label><input id="ce-tw" type="url" class="input-field" style="width:100%;margin-top:3px;" placeholder="https://x.com/…"></div>
@@ -422,12 +422,12 @@
           <span style="font-size:12px;color:var(--muted);">Ces informations sont indépendantes de l'institution et modifiables lors des changements de mandat.</span>
         </div>
         <div class="grid-2" style="gap:14px;">
-          <div><label>Nom <span style="color:var(--orange)">*</span></label><input id="ce-rnom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Kouassi"></div>
-          <div><label>Prénom <span style="color:var(--orange)">*</span></label><input id="ce-rprenom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Jean-Baptiste"></div>
-          <div style="grid-column:1/-1;"><label>Fonction <span style="color:var(--orange)">*</span></label><input id="ce-rfct" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ambassadeur, Consul Général, Maire, Préfet, Président du Conseil Régional…"></div>
+          <div><label>Nom <span style="color:#2563EB">*</span></label><input id="ce-rnom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Kouassi"></div>
+          <div><label>Prénom <span style="color:#2563EB">*</span></label><input id="ce-rprenom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Jean-Baptiste"></div>
+          <div style="grid-column:1/-1;"><label>Fonction <span style="color:#2563EB">*</span></label><input id="ce-rfct" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ambassadeur, Consul Général, Maire, Préfet, Président du Conseil Régional…"></div>
           <div><label>Date de prise de fonction</label><input id="ce-date-prise" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
           <div><label>Fin de mandat <span style="font-size:11px;color:var(--muted);">(si connue)</span></label><input id="ce-date-fin" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
-          <div><label>E-mail professionnel <span style="color:var(--orange)">*</span></label><input id="ce-email-resp" type="email" class="input-field" style="width:100%;margin-top:4px;" placeholder="j.kouassi@ambassade.fr"></div>
+          <div><label>E-mail professionnel <span style="color:#2563EB">*</span></label><input id="ce-email-resp" type="email" class="input-field" style="width:100%;margin-top:4px;" placeholder="j.kouassi@ambassade.fr"></div>
           <div><label>Téléphone professionnel</label><input id="ce-tel-resp" type="tel" class="input-field" style="width:100%;margin-top:4px;" placeholder="+33 1 00 00 00 03"></div>
         </div>
 
@@ -436,7 +436,7 @@
           <strong style="font-size:13px;color:#C2410C;">📜 Déclaration officielle obligatoire</strong>
           <p style="font-size:12px;color:#78350F;margin:8px 0 12px;line-height:1.6;">En soumettant cette demande, je certifie que ce compte est créé avec l'accord du responsable légal de cette institution ainsi que des personnes habilitées à représenter officiellement cette administration.</p>
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-            <input type="checkbox" id="ce-declaration" style="margin-top:2px;accent-color:var(--orange);flex-shrink:0;">
+            <input type="checkbox" id="ce-declaration" style="margin-top:2px;accent-color:#2563EB;flex-shrink:0;">
             <span style="font-size:12.5px;color:#78350F;line-height:1.55;"><strong>J'accepte et je certifie</strong> que cette demande est faite avec l'autorisation du responsable légal de l'institution.</span>
           </label>
         </div>
@@ -446,12 +446,12 @@
           <h4 style="margin:0 0 12px;font-size:14px;">🔑 Sécurité du compte</h4>
           <div class="grid-2" style="gap:14px;">
             <div>
-              <label>Mot de passe <span style="color:var(--orange)">*</span></label>
+              <label>Mot de passe <span style="color:#2563EB">*</span></label>
               <input type="password" id="c-pwd" minlength="8" placeholder="8 caractères min" autocomplete="new-password" oninput="updateStrength(this,'c-sbar','c-shint')" class="input-field" style="width:100%;margin-top:4px;">
               <div class="pwd-strength"><div class="pwd-strength-bar" id="c-sbar"></div></div>
               <div class="pwd-hint" id="c-shint"></div>
             </div>
-            <div><label>Confirmer <span style="color:var(--orange)">*</span></label><input type="password" id="c-pwd2" minlength="8" placeholder="Répéter" autocomplete="new-password" class="input-field" style="width:100%;margin-top:4px;"></div>
+            <div><label>Confirmer <span style="color:#2563EB">*</span></label><input type="password" id="c-pwd2" minlength="8" placeholder="Répéter" autocomplete="new-password" class="input-field" style="width:100%;margin-top:4px;"></div>
           </div>
         </div>
 

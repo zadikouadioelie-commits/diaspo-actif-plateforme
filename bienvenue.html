@@ -154,7 +154,7 @@
 
   function renderGrid() {
     if (!recos.length) {
-      grid.innerHTML = `<div class="bv-empty">Aucune recommandation disponible pour l'instant.<br>Explorez l'<a href="annuaire.html" style="color:var(--orange);">annuaire</a> pour découvrir la communauté.</div>`;
+      grid.innerHTML = `<div class="bv-empty">Aucune recommandation disponible pour l'instant.<br>Explorez l'<a href="annuaire.html" style="color:#2563EB;">annuaire</a> pour découvrir la communauté.</div>`;
       return;
     }
     grid.innerHTML = recos.map((r, i) => renderReco(r, i)).join('');

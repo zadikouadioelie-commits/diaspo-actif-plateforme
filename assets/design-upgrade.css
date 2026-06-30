@@ -374,9 +374,232 @@ footer, .footer {
   animation: fadeInUp .4s ease both;
 }
 
+/* ── Dashboard layout ── */
+.dashboard-layout, .dash-layout {
+  display: grid;
+  gap: 0;
+}
+.dash-header, .dashboard-header {
+  background: linear-gradient(135deg, #0D1B2A 0%, #1B3A6B 100%) !important;
+  color: #fff !important;
+  padding: 32px 32px 40px !important;
+}
+.dash-header h1, .dashboard-header h1 {
+  font-weight: 900 !important;
+  font-size: clamp(20px, 2.5vw, 30px) !important;
+  letter-spacing: -.02em !important;
+}
+.dash-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: -24px 24px 24px;
+}
+.dash-kpi {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  border: 1.5px solid #E8EFFE;
+  box-shadow: 0 4px 16px rgba(37,99,235,.1);
+}
+.dash-kpi-value {
+  font-size: 32px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #2563EB, #38BDF8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.dash-kpi-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+/* ── Annuaire / Recherche ── */
+.search-bar, .annuaire-search {
+  background: #fff;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(37,99,235,.06);
+  transition: box-shadow .2s, border-color .2s;
+}
+.search-bar:focus-within, .annuaire-search:focus-within {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+.filter-bar {
+  background: #F8FAFF;
+  border: 1.5px solid #E8EFFE;
+  border-radius: 12px;
+  padding: 16px;
+}
+.filter-tag, .filter-chip {
+  background: #EFF6FF;
+  color: #2563EB;
+  border: 1.5px solid #BFDBFE;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.filter-tag:hover, .filter-chip:hover,
+.filter-tag.active, .filter-chip.active {
+  background: #2563EB;
+  color: #fff;
+  border-color: #2563EB;
+}
+
+/* ── Profil page ── */
+.profil-banner, .profile-banner {
+  background: linear-gradient(135deg, #0D1B2A, #1B3A6B) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+.profil-card, .profile-card {
+  border-radius: 16px !important;
+  border: 1.5px solid #E8EFFE !important;
+  box-shadow: 0 8px 32px rgba(37,99,235,.1) !important;
+  overflow: hidden;
+}
+.profil-avatar, .profile-avatar {
+  border: 4px solid #fff !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,.15) !important;
+}
+
+/* ── Fil d'actualité ── */
+.post-composer, .new-post-box {
+  border-radius: 14px !important;
+  border: 1.5px solid #E8EFFE !important;
+  background: #fff !important;
+}
+.post-composer input, .new-post-box input,
+.post-composer textarea, .new-post-box textarea {
+  border-radius: 10px !important;
+}
+.post-action-btn {
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  transition: all .15s !important;
+}
+
+/* ── Événements ── */
+.event-card {
+  border-radius: 14px !important;
+  overflow: hidden;
+  border: 1.5px solid #E8EFFE !important;
+  transition: transform .2s, box-shadow .2s !important;
+}
+.event-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 12px 36px rgba(37,99,235,.14) !important;
+}
+.event-date-badge {
+  background: linear-gradient(135deg, #2563EB, #1d4ed8) !important;
+  border-radius: 10px !important;
+  color: #fff !important;
+}
+
+/* ── Messagerie ── */
+.conv-list-item {
+  border-radius: 10px !important;
+  transition: background .15s !important;
+}
+.conv-list-item:hover, .conv-list-item.active {
+  background: #EFF6FF !important;
+}
+.msg-bubble {
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+}
+.msg-bubble.sent {
+  background: linear-gradient(135deg, #2563EB, #1d4ed8) !important;
+  color: #fff !important;
+}
+.msg-bubble.received {
+  background: #F1F5F9 !important;
+  color: #0D1B2A !important;
+}
+
+/* ── Pages légales / FAQ / Statiques ── */
+.prose h1, .content h1, .page-content h1 {
+  font-size: clamp(24px, 3vw, 36px) !important;
+  font-weight: 900 !important;
+  color: #0D1B2A !important;
+  letter-spacing: -.02em !important;
+}
+.prose h2, .content h2, .page-content h2 {
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  color: #0D1B2A !important;
+  margin-top: 32px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 2px solid #EFF6FF !important;
+}
+.prose p, .content p {
+  line-height: 1.75 !important;
+  color: #374151 !important;
+}
+
+/* ── Notifications ── */
+.notif-item {
+  border-radius: 10px !important;
+  border: 1.5px solid #E8EFFE !important;
+  transition: background .15s !important;
+}
+.notif-item:hover { background: #F8FAFF !important; }
+.notif-item.unread { border-left: 3px solid #2563EB !important; background: #EFF6FF !important; }
+
+/* ── Formulaires étendus ── */
+.form-label, label {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #374151 !important;
+}
+.form-hint, .hint {
+  font-size: 12px !important;
+  color: #94A3B8 !important;
+  margin-top: 4px !important;
+}
+.checkbox-label, .radio-label {
+  cursor: pointer !important;
+  transition: color .15s !important;
+}
+.checkbox-label:hover, .radio-label:hover {
+  color: #2563EB !important;
+}
+
+/* ── Tabs ── */
+.tabs, .tab-bar {
+  border-bottom: 2px solid #E8EFFE !important;
+  gap: 0 !important;
+}
+.tab, .tab-btn {
+  padding: 10px 20px !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  color: #64748b !important;
+  border-bottom: 2px solid transparent !important;
+  margin-bottom: -2px !important;
+  transition: all .15s !important;
+  cursor: pointer !important;
+}
+.tab.active, .tab-btn.active,
+.tab:hover, .tab-btn:hover {
+  color: #2563EB !important;
+  border-bottom-color: #2563EB !important;
+}
+
 /* ── Responsive général ── */
 @media (max-width: 768px) {
   .hero h1 { font-size: 26px !important; }
   .btn { padding: 10px 16px !important; font-size: 14px !important; }
   .card { padding: 16px !important; }
+  .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); margin: -16px 16px 16px; }
 }

@@ -9,17 +9,17 @@
 <style>
 .obs-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
 .obs-tab{padding:11px 16px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
-.obs-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.obs-tab.active{color:#2563EB;border-bottom-color:#2563EB;}
 .obs-section{display:none;}.obs-section.active{display:block;}
 /* KPI */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;}
 .kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
-.kpi-val{font-size:26px;font-weight:900;color:var(--orange);line-height:1.1;margin-bottom:3px;}
+.kpi-val{font-size:26px;font-weight:900;color:#2563EB;line-height:1.1;margin-bottom:3px;}
 .kpi-lbl{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
 .kpi-sub{font-size:11px;color:#555;margin-top:2px;}
 /* Bar chart */
 .bar-chart{display:flex;align-items:flex-end;gap:3px;height:70px;margin-top:10px;}
-.bar-chart-bar{flex:1;border-radius:3px 3px 0 0;background:var(--orange);opacity:.75;min-height:2px;}
+.bar-chart-bar{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(135deg,#2563EB,#1d4ed8);opacity:.75;min-height:2px;}
 /* Liste stat */
 .stat-list{list-style:none;padding:0;margin:8px 0 0;}
 .stat-list li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:13px;}
@@ -40,7 +40,7 @@
 .audit-row:last-child{border-bottom:none;}
 /* Prog bar */
 .prog-bar{height:8px;border-radius:4px;background:#f3f4f6;overflow:hidden;margin-top:3px;}
-.prog-fill{height:100%;border-radius:4px;background:var(--orange);}
+.prog-fill{height:100%;border-radius:4px;background:linear-gradient(135deg,#2563EB,#1d4ed8);}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.css">
   <link rel="stylesheet" href="/assets/design-upgrade.css">
@@ -54,7 +54,7 @@
         <a href="index.html">Accueil</a>
         <a href="admin.html">Admin</a>
         <a href="observations.html">Observations</a>
-        <a href="observatoire.html" style="color:var(--orange);font-weight:700;">Observatoire</a>
+        <a href="observatoire.html" style="color:#2563EB;font-weight:700;">Observatoire</a>
       </nav>
       <div class="topbar-right">
         <select class="lang-select" id="lang-select"></select>
@@ -89,7 +89,7 @@
 
       <!-- Niveaux d'observation -->
       <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
-        <button class="btn btn-sm" id="btn-level-global" style="background:var(--orange);color:#fff;border-color:var(--orange);" onclick="setLevel('global')">🌍 Global</button>
+        <button class="btn btn-sm" id="btn-level-global" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;" onclick="setLevel('global')">🌍 Global</button>
         <button class="btn btn-sm btn-outline" id="btn-level-mad" onclick="setLevel('mad')">🌐 MAD — Analyse Diasporas</button>
         <button class="btn btn-sm btn-outline" id="btn-level-obs" onclick="setLevel('obs')">📊 Observations Personnelles</button>
         <button class="btn btn-sm btn-outline" id="btn-level-audit" onclick="setLevel('audit')">📜 Journal d'audit</button>
@@ -192,7 +192,7 @@
               <div class="form-row">
                 <label>Contenu</label>
                 <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-                  ${['Comptes &amp; utilisateurs','Activité &amp; publications','Diasporas','Campagnes recrutement','Événements','Deals &amp; projets','Indices stratégiques','Alertes intelligentes'].map((l,i)=>`<label style="font-size:13px;cursor:pointer;font-weight:normal;"><input type="checkbox" checked style="accent-color:var(--orange);"> ${l}</label>`).join('')}
+                  ${['Comptes &amp; utilisateurs','Activité &amp; publications','Diasporas','Campagnes recrutement','Événements','Deals &amp; projets','Indices stratégiques','Alertes intelligentes'].map((l,i)=>`<label style="font-size:13px;cursor:pointer;font-weight:normal;"><input type="checkbox" checked style="accent-color:#2563EB;"> ${l}</label>`).join('')}
                 </div>
               </div>
               <div class="form-row">
@@ -237,7 +237,7 @@
       <!-- NIVEAU OBS personnelles (accès admin à n'importe quel compte) -->
       <div id="level-obs" style="display:none;">
         <div style="padding:20px;background:#f8fafc;border-radius:12px;text-align:center;">
-          <p style="color:var(--muted);font-size:13px;">🔍 Consultez les observations personnelles depuis <a href="observations.html" style="color:var(--orange);">la page Observations</a>.</p>
+          <p style="color:var(--muted);font-size:13px;">🔍 Consultez les observations personnelles depuis <a href="observations.html" style="color:#2563EB;">la page Observations</a>.</p>
           <p style="color:var(--muted);font-size:13px;">En tant qu'administrateur, vous avez accès à tous les niveaux d'observation.</p>
         </div>
       </div>

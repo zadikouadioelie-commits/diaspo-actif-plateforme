@@ -9,12 +9,12 @@
 <style>
 .obs-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
 .obs-tab{padding:11px 18px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
-.obs-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.obs-tab.active{color:#2563EB;border-bottom-color:#2563EB;}
 .obs-section{display:none;}.obs-section.active{display:block;}
 /* KPI cards */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:24px;}
 .kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center;}
-.kpi-val{font-size:28px;font-weight:900;color:var(--orange);line-height:1.1;margin-bottom:4px;}
+.kpi-val{font-size:28px;font-weight:900;color:#2563EB;line-height:1.1;margin-bottom:4px;}
 .kpi-lbl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
 .kpi-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 /* Indice activité */
@@ -22,7 +22,7 @@
 .indice-fill{height:100%;border-radius:10px;transition:width 1s ease;}
 /* Mini bar chart */
 .bar-chart{display:flex;align-items:flex-end;gap:3px;height:60px;}
-.bar-chart-bar{flex:1;border-radius:3px 3px 0 0;background:var(--orange);opacity:.7;min-height:2px;transition:height .3s;}
+.bar-chart-bar{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(135deg,#2563EB,#1d4ed8);opacity:.7;min-height:2px;transition:height .3s;}
 /* List */
 .stat-list li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:13px;}
 .stat-list li:last-child{border-bottom:none;}
@@ -33,7 +33,7 @@
 .reco-moyenne{background:#dbeafe;}
 .reco-basse{background:#f0fdf4;}
 .prog-bar{height:8px;border-radius:4px;background:#f3f4f6;overflow:hidden;margin-top:4px;}
-.prog-fill{height:100%;border-radius:4px;background:var(--orange);}
+.prog-fill{height:100%;border-radius:4px;background:linear-gradient(135deg,#2563EB,#1d4ed8);}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.css">
   <link rel="stylesheet" href="/assets/design-upgrade.css">
@@ -297,7 +297,7 @@ function renderProfil(d){
     <div class="card" style="padding:16px;">
       <strong style="font-size:14px;">📋 Statut du profil emploi</strong>
       <div style="margin-top:10px;font-size:13px;color:var(--muted);">
-        ${p.profil_emploi_actif ? '<span style="color:#065f46;font-weight:700;">✅ Profil emploi actif — vous recevez des offres ciblées.</span>' : '<span>❌ Profil emploi inactif. <a href="espace-candidat.html" style="color:var(--orange);">Activez-le ici</a> pour recevoir des offres.</span>'}
+        ${p.profil_emploi_actif ? '<span style="color:#065f46;font-weight:700;">✅ Profil emploi actif — vous recevez des offres ciblées.</span>' : '<span>❌ Profil emploi inactif. <a href="espace-candidat.html" style="color:#2563EB;">Activez-le ici</a> pour recevoir des offres.</span>'}
       </div>
     </div>`;
 }

@@ -56,7 +56,7 @@
 <div class="modal-bg" id="modal-bg">
   <div class="modal">
     <h3>Publier un appel a contribution</h3>
-    <div><label>Titre <span style="color:var(--orange)">*</span></label><input type="text" id="c-titre" placeholder="Ex: Cherche benevoles pour forum..."></div>
+    <div><label>Titre <span style="color:#2563EB">*</span></label><input type="text" id="c-titre" placeholder="Ex: Cherche benevoles pour forum..."></div>
     <div style="margin-top:10px"><label>Type</label><select id="c-type"><option value="benevolat">Benevolat</option><option value="partenariat">Partenariat</option><option value="financement">Financement</option><option value="expertise">Expertise</option></select></div>
     <div style="margin-top:10px"><label>Description</label><textarea id="c-desc" rows="3" style="width:100%;resize:vertical;box-sizing:border-box" placeholder="Decrivez votre besoin..."></textarea></div>
     <div style="margin-top:10px"><label>Competences / profils recherches (separes par virgule)</label><input type="text" id="c-comp" placeholder="developpeur, designer, comptable..."></div>
@@ -109,7 +109,7 @@ async function loadCollabs(){
       return `<div class="collab-card">
         <span class="collab-type ${TYPE_COLORS[c.type_collab]||''}">${icon} ${c.type_collab||'Autre'}</span>
         <div style="font-weight:700;font-size:15px;margin-bottom:6px">${escHtml(c.titre||c.partenaire)}</div>
-        ${c.initiative_nom?'<div style="font-size:12px;color:var(--orange);margin-bottom:6px">'+escHtml(c.initiative_nom)+'</div>':''}
+        ${c.initiative_nom?'<div style="font-size:12px;color:#2563EB;margin-bottom:6px">'+escHtml(c.initiative_nom)+'</div>':''}
         ${c.description?'<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.5">'+escHtml(c.description.slice(0,120))+(c.description.length>120?'...':'')+'</p>':''}
         ${comp.length?'<div style="margin-bottom:10px">'+comp.map(k=>'<span class="tag">'+escHtml(k)+'</span>').join('')+'</div>':''}
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)">

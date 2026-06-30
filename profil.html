@@ -1106,7 +1106,7 @@ function renderSections() {
     conf.className = 'p-tab-panel';
     conf.innerHTML = `
       <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;">
-        <button id="conf-sub-privacy" onclick="switchConfTab('privacy')" style="padding:10px 20px;font-size:13px;font-weight:700;background:none;border:none;border-bottom:2.5px solid var(--orange);color:var(--orange);cursor:pointer;margin-bottom:-2px;">🔒 Confidentialité</button>
+        <button id="conf-sub-privacy" onclick="switchConfTab('privacy')" style="padding:10px 20px;font-size:13px;font-weight:700;background:none;border:none;border-bottom:2.5px solid var(--orange);color:#2563EB;cursor:pointer;margin-bottom:-2px;">🔒 Confidentialité</button>
         <button id="conf-sub-codes" onclick="switchConfTab('codes')" style="padding:10px 20px;font-size:13px;font-weight:700;background:none;border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;margin-bottom:-2px;">🔑 Codes</button>
       </div>
       <div id="conf-panel-privacy"></div>
@@ -1387,12 +1387,12 @@ async function renderCodesPanel() {
       .codes-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;}
       .codes-card h4{margin:0 0 6px;font-size:14px;font-weight:800;}
       .codes-card .codes-sub{font-size:12px;color:var(--muted);margin:0 0 14px;}
-      .da-badge{font-family:monospace;font-size:18px;font-weight:900;letter-spacing:3px;color:var(--orange);background:rgba(255,107,0,0.07);border:1.5px solid var(--orange);border-radius:8px;padding:8px 18px;display:inline-block;margin-bottom:12px;}
+      .da-badge{font-family:monospace;font-size:18px;font-weight:900;letter-spacing:3px;color:#2563EB;background:rgba(255,107,0,0.07);border:1.5px solid var(--orange);border-radius:8px;padding:8px 18px;display:inline-block;margin-bottom:12px;}
       .ds-masked{font-size:20px;letter-spacing:4px;color:var(--muted);margin-bottom:12px;font-family:monospace;}
       .ds-revealed{font-family:monospace;font-size:16px;font-weight:800;letter-spacing:3px;color:#1e293b;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:8px;padding:8px 16px;margin-bottom:12px;word-break:break-all;}
       .codes-btn-row{display:flex;gap:8px;flex-wrap:wrap;}
       .codes-btn{font-size:12px;padding:6px 14px;border-radius:7px;cursor:pointer;font-weight:700;border:1.5px solid;background:transparent;}
-      .codes-btn.orange{color:var(--orange);border-color:var(--orange);}
+      .codes-btn.orange{color:#2563EB;border-color:#2563EB;}
       .codes-btn.purple{color:#7c3aed;border-color:#7c3aed;}
       .codes-btn.red{color:#dc2626;border-color:#dc2626;}
       .codes-btn.green{color:#16a34a;border-color:#16a34a;}
@@ -1443,7 +1443,7 @@ async function renderCodesPanel() {
         <input type="password" id="ds-pwd-input" placeholder="Votre mot de passe" autocomplete="current-password">
         <div id="ds-pwd-err" class="ds-err"></div>
         <div class="codes-btn-row" style="margin-top:4px;">
-          <button class="codes-btn green" onclick="window._submitDsId()" style="background:var(--orange);color:#fff;border-color:var(--orange);">Valider</button>
+          <button class="codes-btn green" onclick="window._submitDsId()" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;">Valider</button>
           <button class="codes-btn orange" onclick="window._cancelDsId()">Annuler</button>
         </div>
       </div>
@@ -2426,7 +2426,7 @@ function openEditDisponibilites() {
   f.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
       ${types.map(t=>`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;">
-        <input type="checkbox" id="dispo-${t.key}" ${d[t.key]?'checked':''} style="width:16px;height:16px;accent-color:var(--orange);"> ${t.label}
+        <input type="checkbox" id="dispo-${t.key}" ${d[t.key]?'checked':''} style="width:16px;height:16px;accent-color:#2563EB;"> ${t.label}
       </label>`).join('')}
     </div>
     <div class="edit-btns">
@@ -2479,7 +2479,7 @@ async function loadPortfolioTab() {
               ${it.description ? `<p style="font-size:13px;color:var(--muted);margin:8px 0;">${esc(it.description).substring(0,200)}</p>` : ''}
               ${it.partenaires ? `<div style="font-size:12px;color:var(--muted);">👥 ${esc(it.partenaires)}</div>` : ''}
               ${it.resultats ? `<div style="font-size:12px;color:#10b981;margin-top:4px;">✅ ${esc(it.resultats)}</div>` : ''}
-              ${it.lien ? `<a href="${esc(it.lien)}" target="_blank" style="display:inline-block;margin-top:8px;font-size:12px;color:var(--orange);">🔗 Voir le projet</a>` : ''}
+              ${it.lien ? `<a href="${esc(it.lien)}" target="_blank" style="display:inline-block;margin-top:8px;font-size:12px;color:#2563EB;">🔗 Voir le projet</a>` : ''}
             </div>`).join('')}
         </div>` : `<p style="color:var(--muted);font-size:13px;">${isOwn?'Ajoutez vos projets, publications et réalisations.':'Aucune réalisation partagée.'}</p>`}
     </div>`;

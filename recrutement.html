@@ -9,7 +9,7 @@
 <style>
 .recr-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
 .recr-tab{padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
-.recr-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.recr-tab.active{color:#2563EB;border-bottom-color:#2563EB;}
 .recr-section{display:none;}.recr-section.active{display:block;}
 /* Cartes campagne */
 .camp-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;transition:box-shadow .2s;cursor:pointer;}
@@ -29,15 +29,15 @@
 .t-appel{background:#ffedd5;color:#9a3412;}
 /* Quota */
 .quota-bar{height:8px;border-radius:4px;background:#f3f4f6;overflow:hidden;margin-top:6px;}
-.quota-fill{height:100%;border-radius:4px;background:var(--orange);transition:width .4s;}
+.quota-fill{height:100%;border-radius:4px;background:linear-gradient(135deg,#2563EB,#1d4ed8);transition:width .4s;}
 /* Interactions bar */
 .interact-bar{display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border);margin-top:10px;}
 .ibtn{display:flex;align-items:center;gap:3px;padding:4px 9px;border:1px solid var(--border);border-radius:20px;background:#fff;cursor:pointer;font-size:11px;font-weight:700;transition:all .15s;color:#374151;}
-.ibtn:hover,.ibtn.active{border-color:var(--orange);color:var(--orange);background:#fff7f0;}
+.ibtn:hover,.ibtn.active{border-color:#2563EB;color:#2563EB;background:#fff7f0;}
 /* Rayon grid */
 .rayon-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .rayon-opt{cursor:pointer;border:2px solid var(--border);border-radius:10px;padding:10px 6px;text-align:center;transition:all .15s;background:#fff;}
-.rayon-opt.sel{border-color:var(--orange);background:#fff7f0;}
+.rayon-opt.sel{border-color:#2563EB;background:#fff7f0;}
 /* Candidatures */
 .cand-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
 .stat-kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
@@ -56,7 +56,7 @@
         <a href="annuaire.html">Annuaire</a>
         <a href="fil-actualite.html">Fil</a>
         <a href="evenements.html">Événements</a>
-        <a href="recrutement.html" style="color:var(--orange);font-weight:700;">Recrutement</a>
+        <a href="recrutement.html" style="color:#2563EB;font-weight:700;">Recrutement</a>
         <a href="billetterie.html">Billetterie</a>
       </nav>
       <div class="topbar-right">
@@ -208,7 +208,7 @@
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;flex-wrap:wrap;gap:10px;">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
-          <input type="checkbox" id="camp-publier" style="accent-color:var(--orange);"> Publier immédiatement
+          <input type="checkbox" id="camp-publier" style="accent-color:#2563EB;"> Publier immédiatement
         </label>
         <div style="display:flex;gap:10px;">
           <button class="btn btn-outline" onclick="closeMod('modal-create-camp-bg')">Annuler</button>
@@ -332,7 +332,7 @@ function renderCamps(camps) {
         <button class="ibtn" onclick="openCamp(${c.id})">💬 ${c.nb_commentaires||0}</button>
         <button class="ibtn" onclick="favCamp(${c.id},this)">⭐</button>
         <button class="ibtn" onclick="partagerCamp(${c.id})">📤</button>
-        <button class="ibtn" style="border-color:var(--orange);color:var(--orange);" onclick="openCamp(${c.id})">📩 Postuler</button>
+        <button class="ibtn" style="border-color:#2563EB;color:#2563EB;" onclick="openCamp(${c.id})">📩 Postuler</button>
       </div>
     </div>`).join('');
 }
@@ -374,11 +374,11 @@ async function openCamp(cid) {
       <!-- Stats rapides -->
       <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
         <div style="flex:1;min-width:80px;background:#f8fafc;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-size:20px;font-weight:800;color:var(--orange);">${c.vues_total||0}</div>
+          <div style="font-size:20px;font-weight:800;color:#2563EB;">${c.vues_total||0}</div>
           <div style="font-size:11px;color:var(--muted);">Vues</div>
         </div>
         <div style="flex:1;min-width:80px;background:#f8fafc;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-size:20px;font-weight:800;color:var(--orange);">${c.nb_candidatures||0}</div>
+          <div style="font-size:20px;font-weight:800;color:#2563EB;">${c.nb_candidatures||0}</div>
           <div style="font-size:11px;color:var(--muted);">Candidatures</div>
         </div>
       </div>
@@ -398,7 +398,7 @@ async function openCamp(cid) {
           <button class="btn btn-orange" style="width:100%;margin-top:10px;" onclick="postuler(${c.id})">✉️ Envoyer ma candidature</button>
         </div>` : `
         <div style="padding:12px;background:#fef3c7;border-radius:10px;text-align:center;font-size:13px;">
-          🔑 <a href="login.html" style="color:var(--orange);font-weight:700;">Connectez-vous</a> pour postuler à cette offre.
+          🔑 <a href="login.html" style="color:#2563EB;font-weight:700;">Connectez-vous</a> pour postuler à cette offre.
         </div>`}
       <!-- Interactions modal -->
       <div class="interact-bar" style="margin-top:16px;">
@@ -523,7 +523,7 @@ async function loadMesCamps() {
           ${c.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="publierCamp(${c.id})">🟢 Publier</button>`:''}
           <button class="btn btn-sm btn-outline" onclick="openCandidatures(${c.id})">👥 Candidatures</button>
           <button class="btn btn-sm btn-outline" onclick="openStatsCamp(${c.id})">📊 Stats</button>
-          <button class="btn btn-sm" style="border-color:var(--orange);color:var(--orange);" onclick="editCamp(${c.id})">✏️ Modifier</button>
+          <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="editCamp(${c.id})">✏️ Modifier</button>
           ${c.statut!=='archivee'?`<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="archiveCamp(${c.id})">🗄️ Archiver</button>`:''}
         </div>
       </div>`).join('');
@@ -702,7 +702,7 @@ async function openStatsCamp(cid) {
           ['👤','Candidatures',nb_candidatures],
           ['🔄','Taux conversion',taux_conversion+'%'],
           ['📤','Partages',c.nb_partages||0],
-        ].map(([ic,lb,v])=>`<div class="stat-kpi"><div style="font-size:18px;">${ic}</div><div style="font-size:24px;font-weight:800;color:var(--orange);">${v}</div><div style="font-size:10px;color:var(--muted);">${lb}</div></div>`).join('')}
+        ].map(([ic,lb,v])=>`<div class="stat-kpi"><div style="font-size:18px;">${ic}</div><div style="font-size:24px;font-weight:800;color:#2563EB;">${v}</div><div style="font-size:10px;color:var(--muted);">${lb}</div></div>`).join('')}
       </div>
       ${par_type.length?`<div style="margin-bottom:16px;">
         <strong style="font-size:13px;">Types de candidats</strong>

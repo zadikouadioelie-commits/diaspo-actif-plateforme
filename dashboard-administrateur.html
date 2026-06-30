@@ -335,7 +335,7 @@
             <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Observatoire numérique mondial des diasporas — analyse, tendances, prédictions</p>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;" id="ds-tabs-bar">
-            <button class="btn btn-sm" id="ds-tab-global"    onclick="dsTab('global')"    style="background:var(--orange);color:#fff;">🌐 Vue Globale</button>
+            <button class="btn btn-sm" id="ds-tab-global"    onclick="dsTab('global')"    style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;">🌐 Vue Globale</button>
             <button class="btn btn-sm btn-outline" id="ds-tab-pays"     onclick="dsTab('pays')">🗺️ Pays</button>
             <button class="btn btn-sm btn-outline" id="ds-tab-villes"   onclick="dsTab('villes')">📍 Villes</button>
             <button class="btn btn-sm btn-outline" id="ds-tab-domaines" onclick="dsTab('domaines')">💼 Domaines</button>
@@ -355,7 +355,7 @@
           <!-- KPI row -->
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px;">
             <div class="card" style="text-align:center;padding:16px;">
-              <div style="font-size:26px;font-weight:800;color:var(--orange);" id="ds-kpi-init">—</div>
+              <div style="font-size:26px;font-weight:800;color:#2563EB;" id="ds-kpi-init">—</div>
               <div style="font-size:11px;color:var(--muted);margin-top:4px;">Initiatives actives</div>
             </div>
             <div class="card" style="text-align:center;padding:16px;">
@@ -544,7 +544,7 @@
                 <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Élément B</label>
                 <input id="ds-cmp-b" class="input-field" style="width:180px;font-size:13px;" placeholder="Ex: Toulouse">
               </div>
-              <button class="btn" onclick="dsRunCompare()" style="background:var(--orange);color:#fff;">Comparer</button>
+              <button class="btn" onclick="dsRunCompare()" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;">Comparer</button>
             </div>
           </div>
           <div id="ds-cmp-result"></div>
@@ -1147,7 +1147,7 @@
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
             <div style="background:#f8fafc;border-radius:10px;padding:14px;text-align:center;">
               <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;">Aujourd'hui</div>
-              <div id="oeg-tx-jour" style="font-size:22px;font-weight:800;color:var(--orange);">—</div>
+              <div id="oeg-tx-jour" style="font-size:22px;font-weight:800;color:#2563EB;">—</div>
             </div>
             <div style="background:#f8fafc;border-radius:10px;padding:14px;text-align:center;">
               <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;">Ce mois</div>
@@ -1536,7 +1536,7 @@
             <div class="card">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <h3 style="margin:0;font-size:15px;">Taux de réponse</h3>
-                <span id="cbs-taux" style="font-size:22px;font-weight:800;color:var(--orange);">—%</span>
+                <span id="cbs-taux" style="font-size:22px;font-weight:800;color:#2563EB;">—%</span>
               </div>
               <div style="background:#e2e8f0;border-radius:99px;height:10px;overflow:hidden;">
                 <div id="cbs-taux-bar" style="height:100%;background:linear-gradient(90deg,#10b981,#34d399);border-radius:99px;width:0%;transition:width .8s;"></div>
@@ -1613,7 +1613,7 @@
           <input type="hidden" id="mem-id">
           <div class="grid grid-2" style="gap:12px;margin-bottom:12px;">
             <div style="grid-column:1/-1;">
-              <label class="form-label">Titre <span style="color:var(--orange)">*</span></label>
+              <label class="form-label">Titre <span style="color:#2563EB">*</span></label>
               <input id="mem-titre" class="input-field" style="width:100%;" placeholder="Ex : Pourquoi Diaspo'Actif a-t-il été créé ?">
             </div>
             <div>
@@ -1630,7 +1630,7 @@
             </div>
           </div>
           <div style="margin-bottom:12px;">
-            <label class="form-label">Contenu <span style="color:var(--orange)">*</span></label>
+            <label class="form-label">Contenu <span style="color:#2563EB">*</span></label>
             <textarea id="mem-contenu" class="input-field" rows="7" style="width:100%;resize:vertical;" placeholder="Rédigez ici la réponse que le chatbot utilisera…"></textarea>
           </div>
           <div style="margin-bottom:12px;">
@@ -1674,11 +1674,11 @@
             <div id="q-meta" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
           </div>
           <div style="margin-bottom:12px;">
-            <label class="form-label">Titre de la connaissance <span style="color:var(--orange)">*</span></label>
+            <label class="form-label">Titre de la connaissance <span style="color:#2563EB">*</span></label>
             <input id="q-titre" class="input-field" style="width:100%;">
           </div>
           <div style="margin-bottom:12px;">
-            <label class="form-label">Réponse / Contenu <span style="color:var(--orange)">*</span></label>
+            <label class="form-label">Réponse / Contenu <span style="color:#2563EB">*</span></label>
             <textarea id="q-contenu" class="input-field" rows="6" style="width:100%;resize:vertical;" placeholder="Rédigez la réponse que le chatbot utilisera pour cette question…"></textarea>
           </div>
           <div class="grid grid-2" style="gap:10px;margin-bottom:16px;">
@@ -1704,9 +1704,9 @@
 
       <style>
         .cb-admin-tab { background:none;border:none;padding:10px 18px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s; }
-        .cb-admin-tab.active { color:var(--orange);border-bottom-color:var(--orange); }
+        .cb-admin-tab.active { color:#2563EB;border-bottom-color:#2563EB; }
         .cb-mem-card { background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px; }
-        .cb-mem-card:hover { border-color:var(--orange); }
+        .cb-mem-card:hover { border-color:#2563EB; }
         .cb-src-admin { background:#DCFCE7;color:#166534;border-radius:4px;font-size:11px;font-weight:700;padding:2px 7px; }
         .cb-src-import { background:#DBEAFE;color:#1E40AF;border-radius:4px;font-size:11px;font-weight:700;padding:2px 7px; }
         .cb-q-card { background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px; }
@@ -1730,7 +1730,7 @@
         <!-- KPIs FAQ -->
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
           <div class="card" style="text-align:center;padding:16px;">
-            <div style="font-size:24px;font-weight:800;color:var(--orange);" id="faq-kpi-total">—</div>
+            <div style="font-size:24px;font-weight:800;color:#2563EB;" id="faq-kpi-total">—</div>
             <div style="font-size:12px;color:var(--muted);">Questions actives</div>
           </div>
           <div class="card" style="text-align:center;padding:16px;">
@@ -2726,7 +2726,7 @@
             <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Observatoire des compétences et dynamiques économiques de la diaspora</p>
           </div>
           <div style="display:flex;gap:8px;">
-            <button class="btn btn-sm" id="rp-tab-stats" onclick="rpShowTab('stats')" style="background:var(--orange);color:#fff;">📊 Statistiques</button>
+            <button class="btn btn-sm" id="rp-tab-stats" onclick="rpShowTab('stats')" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;">📊 Statistiques</button>
             <button class="btn btn-sm btn-outline" id="rp-tab-liste" onclick="rpShowTab('liste')">🗂️ Liste</button>
           </div>
         </div>
@@ -2764,7 +2764,7 @@
           <!-- KPI cards -->
           <div class="grid grid-3" style="gap:14px;margin-bottom:20px;">
             <div class="card" style="text-align:center;padding:18px;">
-              <div style="font-size:28px;font-weight:800;color:var(--orange);" id="rp-stat-total">—</div>
+              <div style="font-size:28px;font-weight:800;color:#2563EB;" id="rp-stat-total">—</div>
               <div style="font-size:12px;color:var(--muted);margin-top:4px;">Professionnels total</div>
             </div>
             <div class="card" style="text-align:center;padding:18px;">
@@ -3291,7 +3291,7 @@
           <!-- Onglets packs -->
           <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
             <button class="btn btn-orange" id="pack-tab-packs" onclick="switchPackTab('packs')">📦 Packs</button>
-            <button class="btn btn-outline" id="pack-tab-demandes" onclick="switchPackTab('demandes')">⏳ Demandes <span id="pack-demandes-badge" style="display:none;background:rgba(255,90,0,.15);color:var(--orange);padding:1px 6px;border-radius:99px;font-size:11px;margin-left:4px;"></span></button>
+            <button class="btn btn-outline" id="pack-tab-demandes" onclick="switchPackTab('demandes')">⏳ Demandes <span id="pack-demandes-badge" style="display:none;background:rgba(255,90,0,.15);color:#2563EB;padding:1px 6px;border-radius:99px;font-size:11px;margin-left:4px;"></span></button>
           </div>
 
           <div id="pack-panel-packs">
@@ -3493,7 +3493,7 @@
           <div id="fe-panel-stats" style="display:none;">
             <div class="grid grid-3" style="gap:12px;margin-bottom:20px;">
               <div class="card" style="text-align:center;padding:16px;">
-                <div style="font-size:24px;font-weight:800;color:var(--orange);" id="fe-stat-total">—</div>
+                <div style="font-size:24px;font-weight:800;color:#2563EB;" id="fe-stat-total">—</div>
                 <div style="font-size:12px;color:var(--muted);">Features actives</div>
               </div>
               <div class="card" style="text-align:center;padding:16px;">
@@ -3614,7 +3614,7 @@
             <button class="btn btn-orange" id="da-tab-demandes" onclick="switchDATab('demandes')">⏳ Demandes en attente <span id="da-demandes-count" style="display:none;background:rgba(255,255,255,.3);padding:1px 6px;border-radius:99px;font-size:11px;margin-left:4px;"></span></button>
             <button class="btn btn-outline" id="da-tab-actives" onclick="switchDATab('actives')">✅ Accréditations actives</button>
             <button class="btn btn-outline" id="da-tab-histo" onclick="switchDATab('histo')">📋 Historique</button>
-            <button class="btn btn-outline" style="margin-left:auto;border-color:var(--orange);color:var(--orange);font-weight:700;" onclick="openAccordDirectModal()">➕ Accorder une accréditation</button>
+            <button class="btn btn-outline" style="margin-left:auto;border-color:#2563EB;color:#2563EB;font-weight:700;" onclick="openAccordDirectModal()">➕ Accorder une accréditation</button>
           </div>
           <div id="da-panel-demandes">
             <div class="card" style="padding:0;overflow:hidden;">
@@ -4869,7 +4869,7 @@ async function loadModerationContenus() {
     el.innerHTML = posts.map(p => `
       <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border);" id="contenu-row-${p.id}">
         <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;font-weight:700;color:var(--orange);margin-bottom:3px;">${esc(p.auteur_nom||p.auteur||'—')} · ${p.created_at ? p.created_at.slice(0,10) : ''}</div>
+          <div style="font-size:12px;font-weight:700;color:#2563EB;margin-bottom:3px;">${esc(p.auteur_nom||p.auteur||'—')} · ${p.created_at ? p.created_at.slice(0,10) : ''}</div>
           <div style="font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc((p.contenu||'').slice(0,120))}${(p.contenu||'').length>120?'…':''}</div>
         </div>
         <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;flex-shrink:0;" onclick="supprimerContenu('post',${p.id})">🗑 Supprimer</button>
@@ -6223,10 +6223,10 @@ async function dsRunCompare() {
     <h4 style="margin:0 0 16px;text-align:center;">${lblA} vs ${lblB}</h4>
     <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;">
       <div style="text-align:center;">
-        <div style="font-size:32px;font-weight:800;color:var(--orange);">${nA}</div>
+        <div style="font-size:32px;font-weight:800;color:#2563EB;">${nA}</div>
         <div style="font-weight:700;margin:4px 0;">${lblA}</div>
         <div style="background:var(--border);border-radius:99px;height:8px;margin-top:8px;">
-          <div style="width:${pA}%;background:var(--orange);height:8px;border-radius:99px;"></div>
+          <div style="width:${pA}%;background:linear-gradient(135deg,#2563EB,#1d4ed8);height:8px;border-radius:99px;"></div>
         </div>
       </div>
       <div style="font-size:24px;font-weight:900;color:var(--muted);">VS</div>
@@ -7786,7 +7786,7 @@ async function submitAccordDirect(){
         const h = Math.max(8, Math.round((e.n / maxEvo) * 76));
         return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
           <div style="font-size:11px;color:var(--muted);font-weight:600;">${e.n}</div>
-          <div style="width:100%;background:var(--orange);border-radius:4px 4px 0 0;height:${h}px;"></div>
+          <div style="width:100%;background:linear-gradient(135deg,#2563EB,#1d4ed8);border-radius:4px 4px 0 0;height:${h}px;"></div>
           <div style="font-size:10px;color:var(--muted);">${(e.mois||'').slice(5)}</div>
         </div>`;
       }).join('');
@@ -8263,7 +8263,7 @@ async function submitAccordDirect(){
             <tbody>${membres.map(m => `
               <tr style="border-bottom:1px solid var(--border);">
                 <td style="padding:8px;font-weight:600;">${esc(m.nom||'')} ${esc(m.prenom||'')}</td>
-                <td style="padding:8px;"><a href="mailto:${esc(m.email)}" style="color:var(--orange);text-decoration:none;">${esc(m.email)}</a></td>
+                <td style="padding:8px;"><a href="mailto:${esc(m.email)}" style="color:#2563EB;text-decoration:none;">${esc(m.email)}</a></td>
                 <td style="padding:8px;">${m.telephone ? `<a href="tel:${esc(m.telephone)}" style="color:var(--text);text-decoration:none;">${esc(m.telephone)}</a>` : '<span style="color:var(--muted)">—</span>'}</td>
                 <td style="padding:8px;">${esc(m.role)}</td>
                 <td style="padding:8px;">${m.statut_verification==='valide'?'✅ Validé':m.statut_verification==='en_attente'?'⏳ En attente':'❌ Rejeté'}</td>
@@ -8834,7 +8834,7 @@ async function submitAccordDirect(){
     const mpLabels = { carte_bancaire:"💳 Carte", paypal:"🅿️ PayPal", virement:"🏦 Virement",
       mobile_money:"📱 Mobile Money", orange_money:"🟠 Orange Money",
       mtn_money:"🟡 MTN Money", moov_money:"🔵 Moov Money", wave:"🌊 Wave", crypto:"₿ Crypto" };
-    const logoEl  = logo ? `<img loading="lazy" src="${logo}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:5px;background:#f5f5f5;flex-shrink:0;">` : `<div style="width:32px;height:32px;border-radius:5px;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;">📣</div>`;
+    const logoEl  = logo ? `<img loading="lazy" src="${logo}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:5px;background:#f5f5f5;flex-shrink:0;">` : `<div style="width:32px;height:32px;border-radius:5px;background:linear-gradient(135deg,#2563EB,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;">📣</div>`;
     const sponsoTag = `<div style="font-size:10px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;">Sponsorisé · ${esc(p.annonceur)}</div>`;
 
     if (format === "banniere") {
@@ -9105,7 +9105,7 @@ async function submitAccordDirect(){
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
         <div style="width:90px;font-size:12px;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(String(g[keyLabel]||"?"))}</div>
         <div style="flex:1;height:14px;background:var(--surface);border-radius:6px;overflow:hidden;">
-          <div style="height:100%;background:var(--orange);border-radius:6px;width:${pct}%;"></div>
+          <div style="height:100%;background:linear-gradient(135deg,#2563EB,#1d4ed8);border-radius:6px;width:${pct}%;"></div>
         </div>
         <div style="width:28px;font-size:12px;font-weight:600;text-align:right;">${g.n}</div>
       </div>`;
@@ -9585,7 +9585,7 @@ async function loadFaqStats() {
     const topEl = document.getElementById('faq-top-list');
     if (topEl) topEl.innerHTML = (d.top_questions||[]).slice(0,5).map((q,i) =>
       `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;${i>0?'border-top:1px solid var(--border)':''}">
-        <span style="font-weight:700;color:var(--orange);min-width:20px;">${i+1}</span>
+        <span style="font-weight:700;color:#2563EB;min-width:20px;">${i+1}</span>
         <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_faqEsc(q.question)}">${_faqEsc(q.question)}</span>
         <span style="font-size:12px;color:var(--muted);white-space:nowrap;">${q.vues} vue${q.vues>1?'s':''}</span>
       </div>`).join('') || '<span style="color:var(--muted)">Aucune donnée</span>';
@@ -10493,7 +10493,7 @@ async function loadAdminBilletterie() {
       const w = rWallet.wallet || {};
       document.getElementById('admin-wallet-kpis').innerHTML = `
         <div class="card" style="padding:14px;text-align:center;border:2px solid var(--orange);">
-          <div style="font-size:28px;font-weight:800;color:var(--orange);">${(w.total_commissions||0).toFixed(2)} €</div>
+          <div style="font-size:28px;font-weight:800;color:#2563EB;">${(w.total_commissions||0).toFixed(2)} €</div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;">Total commissions reçues</div>
         </div>
         <div class="card" style="padding:14px;text-align:center;">
@@ -10513,7 +10513,7 @@ async function loadAdminBilletterie() {
       document.getElementById('admin-wallet-events').innerHTML = evts.length
         ? evts.map(e=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;">
             <span>${e.titre}</span>
-            <strong style="color:var(--orange);white-space:nowrap;">${(e.total_fees||0).toFixed(2)} €</strong>
+            <strong style="color:#2563EB;white-space:nowrap;">${(e.total_fees||0).toFixed(2)} €</strong>
           </div>`).join('')
         : '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune commission encore.</div>';
 
@@ -10521,7 +10521,7 @@ async function loadAdminBilletterie() {
       document.getElementById('admin-wallet-pays').innerHTML = pays.length
         ? pays.map(p=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;">
             <span>🌍 ${p.pays}</span>
-            <strong style="color:var(--orange);">${(p.total||0).toFixed(2)} €</strong>
+            <strong style="color:#2563EB;">${(p.total||0).toFixed(2)} €</strong>
           </div>`).join('')
         : '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune donnée par pays.</div>';
 
@@ -10532,7 +10532,7 @@ async function loadAdminBilletterie() {
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">Événement</th>
               <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">Prix billet</th>
               <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);">95% → Initiative</th>
-              <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);color:var(--orange);">5% → DA</th>
+              <th style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);color:#2563EB;">5% → DA</th>
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);">Date</th>
             </tr></thead>
             <tbody>${hist.map(h=>`
@@ -10540,7 +10540,7 @@ async function loadAdminBilletterie() {
                 <td style="padding:7px 10px;">${h.event_titre||'—'}</td>
                 <td style="padding:7px 10px;text-align:right;">${(h.prix_billet||0).toFixed(2)} €</td>
                 <td style="padding:7px 10px;text-align:right;color:#10b981;">${(h.organizer_amount||0).toFixed(2)} €</td>
-                <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--orange);">${(h.platform_fee||0).toFixed(2)} €</td>
+                <td style="padding:7px 10px;text-align:right;font-weight:700;color:#2563EB;">${(h.platform_fee||0).toFixed(2)} €</td>
                 <td style="padding:7px 10px;color:var(--muted);">${fmtTs(h.timestamp)}</td>
               </tr>`).join('')}
             </tbody></table>`
@@ -10552,7 +10552,7 @@ async function loadAdminBilletterie() {
       <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;">${s.total_events||0}</div><div style="font-size:12px;color:var(--muted);">Événements total</div></div>
       <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#10b981;">${s.publies||0}</div><div style="font-size:12px;color:var(--muted);">Publiés</div></div>
       <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;">${s.total_tickets||0}</div><div style="font-size:12px;color:var(--muted);">Billets vendus</div></div>
-      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:var(--orange);">${(s.revenu_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Revenus bruts</div></div>
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#2563EB;">${(s.revenu_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Revenus bruts</div></div>
       <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#8b5cf6;">${(s.commission_total||0).toFixed(2)} €</div><div style="font-size:12px;color:var(--muted);">Commission DA (5%)</div></div>`;
     /* Par pays */
     const pays = s.par_pays||[];
@@ -10564,7 +10564,7 @@ async function loadAdminBilletterie() {
     const top = s.top_events||[];
     document.getElementById('admin-billet-top').innerHTML = top.length
       ? top.map((e,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
-          <span><strong style="color:var(--orange);">#${i+1}</strong> ${e.titre}</span>
+          <span><strong style="color:#2563EB;">#${i+1}</strong> ${e.titre}</span>
           <strong>${(e.revenu||0).toFixed(2)} €</strong></div>`).join('')
       : '<div style="color:var(--muted);font-size:13px;padding:10px 0;">Aucun événement avec revenus.</div>';
     /* Table complète */

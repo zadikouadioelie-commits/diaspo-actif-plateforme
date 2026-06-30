@@ -14,7 +14,7 @@
 /* ── Layout ── */
 .billet-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
 .billet-tab{padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);transition:all .15s;}
-.billet-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.billet-tab.active{color:#2563EB;border-bottom-color:#2563EB;}
 .billet-section{display:none;}.billet-section.active{display:block;}
 
 /* ── Cartes événements ── */
@@ -24,7 +24,7 @@
 .evt-cover{width:100%;height:150px;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:54px;background:linear-gradient(135deg,#ff6b00,#ff9f43);}
 .evt-cover img{width:100%;height:150px;object-fit:cover;}
 .evt-body{padding:16px;}
-.evt-date{font-size:11px;color:var(--orange);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+.evt-date{font-size:11px;color:#2563EB;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
 .evt-title{font-size:15px;font-weight:700;margin:0 0 6px;line-height:1.3;}
 .evt-meta{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
 .tag-type{background:#fff3e0;color:#e65100;border-radius:99px;padding:2px 8px;font-size:11px;font-weight:700;}
@@ -59,7 +59,7 @@
 /* ── Dashboard organisateur ── */
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px;}
 .stat-box{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;}
-.stat-num{font-size:28px;font-weight:800;color:var(--orange);}
+.stat-num{font-size:28px;font-weight:800;color:#2563EB;}
 .stat-lbl{font-size:12px;color:var(--muted);margin-top:4px;}
 .attendee-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
 .checkin-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
@@ -284,7 +284,7 @@
           </select>
           <input type="file" id="blt-pdf-file" accept="application/pdf" style="display:none">
         </div>
-        <div id="blt-pdf-progress" style="display:none;margin-top:4px;"><div style="height:3px;background:#f0f0f0;border-radius:2px;"><div id="blt-pdf-bar" style="height:100%;background:var(--orange);width:0%;transition:width .3s;border-radius:2px;"></div></div></div>
+        <div id="blt-pdf-progress" style="display:none;margin-top:4px;"><div style="height:3px;background:#f0f0f0;border-radius:2px;"><div id="blt-pdf-bar" style="height:100%;background:linear-gradient(135deg,#2563EB,#1d4ed8);width:0%;transition:width .3s;border-radius:2px;"></div></div></div>
       </div>
 
       <!-- ── RAYON DE PUBLICATION ── -->
@@ -334,15 +334,15 @@
         <label style="margin-bottom:8px;display:block;">À qui s'adresse cet événement ?</label>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;transition:border-color .2s;" id="cible-label-tous">
-            <input type="radio" name="ev-cible" value="tous" id="cible-tous" checked style="accent-color:var(--orange);">
+            <input type="radio" name="ev-cible" value="tous" id="cible-tous" checked style="accent-color:#2563EB;">
             <div><strong style="font-size:13px;">🌍 Tout le monde</strong><br><span style="font-size:12px;color:var(--muted);">Visible par tous les utilisateurs de la plateforme</span></div>
           </label>
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;transition:border-color .2s;" id="cible-label-abonnes">
-            <input type="radio" name="ev-cible" value="abonnes" id="cible-abonnes" style="accent-color:var(--orange);">
+            <input type="radio" name="ev-cible" value="abonnes" id="cible-abonnes" style="accent-color:#2563EB;">
             <div><strong style="font-size:13px;">👥 Abonnés au compte</strong><br><span style="font-size:12px;color:var(--muted);">Envoyé uniquement aux personnes qui vous suivent</span></div>
           </label>
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;transition:border-color .2s;" id="cible-label-liste">
-            <input type="radio" name="ev-cible" value="liste" id="cible-liste" style="accent-color:var(--orange);">
+            <input type="radio" name="ev-cible" value="liste" id="cible-liste" style="accent-color:#2563EB;">
             <div><strong style="font-size:13px;">📋 Liste de diffusion</strong><br><span style="font-size:12px;color:var(--muted);">Envoyer à une ou plusieurs listes de contacts</span></div>
           </label>
         </div>
@@ -571,7 +571,7 @@ async function openEvent(eid) {
       ${ME && ME.role !== 'utilisateur' ? '<div class="notice" style="margin-top:16px;">ℹ️ Seuls les membres Diaspora peuvent acheter des billets.</div>' : ''}
       ${e.inscription_mode && e.inscription_mode !== 'libre' ? await renderInscriptionSecuriseeSection(e) : ''}
       <div style="margin-top:18px;background:var(--surface-2,#f8f9fa);border-radius:12px;padding:14px 16px;border:1px solid var(--border);">
-        <div style="font-weight:700;font-size:13px;color:var(--orange);margin-bottom:10px;">💡 Vos deux codes Diaspo'Actif</div>
+        <div style="font-weight:700;font-size:13px;color:#2563EB;margin-bottom:10px;">💡 Vos deux codes Diaspo'Actif</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;line-height:1.5;">
           <div><strong>🆔 Identifiant DA (ID DA)</strong><br>Votre identifiant public. Permet de vous identifier et relier votre compte à vos actions. Peut être communiqué sans risque.</div>
           <div><strong>🔑 Code de Sécurité (DS-ID)</strong><br>Votre signature numérique privée. Confirme que vous approuvez personnellement une action engageante. Ne jamais le communiquer.</div>
@@ -614,7 +614,7 @@ async function renderInscriptionSecuriseeSection(e) {
   const modeLabel = { 'obligatoire': 'Inscription obligatoire', 'facultative': 'Pré-inscription', 'validation': 'Inscription avec validation', 'libre': '' }[e.inscription_mode] || e.inscription_mode;
   const placesTxt = e.nb_places ? ` · ${e.nb_places} places${e.liste_attente?' (liste d\'attente activée)':''}` : '';
   return `<div style="margin-top:16px;padding:14px 16px;background:rgba(255,107,0,0.06);border:1.5px solid var(--orange);border-radius:12px;">
-    <div style="font-weight:700;color:var(--orange);margin-bottom:8px;">📋 ${modeLabel}${placesTxt}</div>
+    <div style="font-weight:700;color:#2563EB;margin-bottom:8px;">📋 ${modeLabel}${placesTxt}</div>
     <p style="font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5;">Pour vous inscrire, vous aurez besoin de votre <strong>Identifiant Diaspo'Actif (ID DA)</strong> et de votre <strong>Code de Sécurité (DS-ID)</strong>.</p>
     <button class="btn btn-orange" style="font-size:13px;" onclick="ouvrirInscriptionSecurisee(${e.id},'${escH(e.titre)}','${escH(e.date_debut||'')}','${escH(e.ville||'')}')">🔐 S'inscrire avec mon ID DA</button>
   </div>`;
@@ -799,7 +799,7 @@ async function openDossierQR(eid) {
           ['✅','Confirmés',stats.total_confirmes],
           ['🎫','Billets payants',stats.total_billets],
           ['🚶','Présents (scannés)',stats.total_presents]
-        ].map(([ic,lb,v])=>`<div class="card" style="padding:10px;text-align:center;"><div style="font-size:20px;">${ic}</div><div style="font-size:22px;font-weight:800;color:var(--orange);">${v}</div><div style="font-size:10px;color:var(--muted);">${lb}</div></div>`).join('')}
+        ].map(([ic,lb,v])=>`<div class="card" style="padding:10px;text-align:center;"><div style="font-size:20px;">${ic}</div><div style="font-size:22px;font-weight:800;color:#2563EB;">${v}</div><div style="font-size:10px;color:var(--muted);">${lb}</div></div>`).join('')}
       </div>
 
       <!-- Alerte suppression -->
@@ -925,7 +925,7 @@ async function openObservations(eid) {
       <div style="display:flex;align-items:flex-end;gap:4px;height:60px;padding:0 4px;">
         ${timeline.map(t=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;">
           <div style="flex:1;display:flex;align-items:flex-end;width:100%;">
-            <div style="width:100%;background:var(--orange);border-radius:3px 3px 0 0;height:${Math.round(t.n/maxTl*100)}%;min-height:4px;" title="${t.n} inscription(s) le ${t.jour}"></div>
+            <div style="width:100%;background:linear-gradient(135deg,#2563EB,#1d4ed8);border-radius:3px 3px 0 0;height:${Math.round(t.n/maxTl*100)}%;min-height:4px;" title="${t.n} inscription(s) le ${t.jour}"></div>
           </div>
           <div style="font-size:9px;color:var(--muted);transform:rotate(-30deg);white-space:nowrap;">${t.jour?.slice(5)||''}</div>
         </div>`).join('')}
@@ -1008,7 +1008,7 @@ async function openObservations(eid) {
               <tbody>${parts.map((p,i)=>`
                 <tr style="border-bottom:1px solid var(--border);background:${i%2?'#fafafa':'#fff'};">
                   <td style="padding:6px 8px;font-weight:600;">${escH(p.nom||'—')}</td>
-                  <td style="padding:6px 8px;font-family:monospace;color:var(--orange);">${escH(p.da_id||'—')}</td>
+                  <td style="padding:6px 8px;font-family:monospace;color:#2563EB;">${escH(p.da_id||'—')}</td>
                   <td style="padding:6px 8px;">${escH(p.type_compte||'—')}</td>
                   <td style="padding:6px 8px;"><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${{confirme:'#dcfce7',signe:'#dbeafe',liste_attente:'#fef3c7',annule:'#fee2e2',identifie:'#f3f4f6'}[p.statut]||'#f3f4f6'};color:${{confirme:'#166534',signe:'#1d4ed8',liste_attente:'#92400e',annule:'#991b1b',identifie:'#374151'}[p.statut]||'#374151'};">${p.statut?.toUpperCase()||'—'}</span></td>
                   <td style="padding:6px 8px;color:var(--muted);">${p.created_at?.slice(0,10)||'—'}</td>
@@ -1236,7 +1236,7 @@ async function loadOrgEvents() {
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline" onclick="openOrgDetail(${e.id})">📊 Tableau de bord</button>
-            <button class="btn btn-sm" style="border-color:var(--orange);color:var(--orange);" onclick="openObservations(${e.id})">🔭 Observations</button>
+            <button class="btn btn-sm" style="border-color:#2563EB;color:#2563EB;" onclick="openObservations(${e.id})">🔭 Observations</button>
             ${e.qr_folder_purged_at ? `<button class="btn btn-sm" style="border-color:#6b7280;color:#6b7280;" disabled title="Dossier archivé ${new Date(e.qr_folder_purged_at).toLocaleDateString('fr-FR')}">🗄️ QR Archivé</button>` : `<button class="btn btn-sm" style="border-color:#0369a1;color:#0369a1;" onclick="openDossierQR(${e.id})">📁 Dossier QR</button>`}
             ${e.statut==='brouillon' ? `<button class="btn btn-sm btn-orange" onclick="publishEvent(${e.id})">🟢 Publier</button>` : ''}
             ${e.statut==='publie' ? `<button class="btn btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="closeEvent(${e.id})">🔒 Fermer</button>` : ''}
@@ -1422,7 +1422,7 @@ function renderListesCheckboxes() {
   }
   el.innerHTML = mesListesDiffusion.map(l => `
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:#fff;font-size:13px;">
-      <input type="checkbox" value="${l.id}" class="cible-liste-cb" style="accent-color:var(--orange);">
+      <input type="checkbox" value="${l.id}" class="cible-liste-cb" style="accent-color:#2563EB;">
       <div>
         <strong>${escH(l.nom)}</strong>
         <span style="color:var(--muted);font-size:11px;margin-left:6px;">${l.nb_contacts} contact(s)</span>
@@ -1578,7 +1578,7 @@ async function loadAdminEvents() {
       <div class="stat-box"><div class="stat-num">${s.total_events||0}</div><div class="stat-lbl">Événements total</div></div>
       <div class="stat-box"><div class="stat-num" style="color:#10b981;">${s.publies||0}</div><div class="stat-lbl">Publiés</div></div>
       <div class="stat-box"><div class="stat-num">${s.total_tickets||0}</div><div class="stat-lbl">Billets vendus</div></div>
-      <div class="stat-box"><div class="stat-num" style="color:var(--orange);">${(s.revenu_total||0).toFixed(2)} €</div><div class="stat-lbl">Revenus globaux</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:#2563EB;">${(s.revenu_total||0).toFixed(2)} €</div><div class="stat-lbl">Revenus globaux</div></div>
       <div class="stat-box"><div class="stat-num" style="color:#8b5cf6;">${(s.commission_total||0).toFixed(2)} €</div><div class="stat-lbl">Commission DA</div></div>`;
     const events = rEvents.events||[];
     document.getElementById('admin-events-table').innerHTML = `

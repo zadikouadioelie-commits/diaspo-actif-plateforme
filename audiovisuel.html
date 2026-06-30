@@ -23,7 +23,7 @@
 /* Tabs */
 .av-tabs{display:flex;gap:4px;background:var(--bg);border-radius:12px;padding:4px;margin-bottom:20px;border:1px solid var(--border);}
 .av-tab{flex:1;padding:9px;text-align:center;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:700;color:var(--muted);border:none;background:none;transition:all .15s;}
-.av-tab.active{background:#fff;color:var(--orange);box-shadow:0 1px 6px rgba(0,0,0,.1);}
+.av-tab.active{background:#fff;color:#2563EB;box-shadow:0 1px 6px rgba(0,0,0,.1);}
 
 /* Live cards */
 .live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:16px;}
@@ -59,7 +59,7 @@
 .pod-title{font-weight:800;font-size:13.5px;margin:0 0 3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .pod-meta{font-size:11.5px;color:var(--muted);}
 .pod-progress{height:3px;border-radius:99px;background:var(--border);overflow:hidden;margin-top:6px;}
-.pod-progress .fill{height:100%;border-radius:99px;background:var(--orange);}
+.pod-progress .fill{height:100%;border-radius:99px;background:linear-gradient(135deg,#2563EB,#1d4ed8);}
 
 /* Bibliothèque */
 .bib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;}
@@ -77,7 +77,7 @@
 /* Accès live */
 .acces-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .acces-opt{border:2px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;text-align:center;transition:all .15s;}
-.acces-opt:hover,.acces-opt.selected{border-color:var(--orange);background:var(--orange-light);}
+.acces-opt:hover,.acces-opt.selected{border-color:#2563EB;background:var(--orange-light);}
 .acces-opt .ai{font-size:22px;margin-bottom:4px;}
 .acces-opt .an{font-size:12.5px;font-weight:700;}
 
@@ -458,7 +458,7 @@ function renderBibCard(c) {
   return `<div class="bib-card" onclick="${onclick}">
     <div class="bib-thumb">${c.vignette_url?`<img src="${esc(c.vignette_url)}" alt="">`:icon}</div>
     <div class="bib-info">
-      <div style="font-size:10.5px;color:var(--orange);font-weight:700;margin-bottom:3px;">${icon} ${c.content_type==='live'?'Live':'Podcast'}</div>
+      <div style="font-size:10.5px;color:#2563EB;font-weight:700;margin-bottom:3px;">${icon} ${c.content_type==='live'?'Live':'Podcast'}</div>
       <div class="bib-title">${esc(c.titre)}</div>
       <div class="bib-sub">👁 ${fmtNum(c.nb_vues)} · ${new Date(c.date_ref||Date.now()).toLocaleDateString('fr')}</div>
     </div>

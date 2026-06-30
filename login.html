@@ -8,7 +8,124 @@
   <link rel="stylesheet" href="/assets/responsive.css">
 <link rel="stylesheet" href="/assets/ui-enhancements.css">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ff6b00">
+<meta name="theme-color" content="#1565C0">
+<style>
+/* ── Page login redesign ── */
+body { background: #060e1a; }
+.page { min-height: 100vh; background: linear-gradient(135deg, #060e1a 0%, #0c1e38 50%, #0F2A50 100%); }
+.topbar { background: rgba(255,255,255,.04) !important; border-bottom: 1px solid rgba(255,255,255,.07) !important; }
+.topbar .logo, .topbar .nav a, .topbar .topbar-right { color: rgba(255,255,255,.8) !important; }
+.topbar .nav a:hover, .topbar .nav a.active { color: #fff !important; border-bottom-color: #60A5FA !important; }
+.lang-select { background: rgba(255,255,255,.06) !important; border-color: rgba(255,255,255,.15) !important; color: #fff !important; }
+main.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+.auth-form-card {
+  background: #fff;
+  border-radius: 20px !important;
+  padding: 40px !important;
+  box-shadow: 0 32px 80px rgba(0,0,0,.4) !important;
+  border: none !important;
+}
+.auth-form-card h2 {
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  color: #0D1B2A !important;
+  margin-bottom: 6px !important;
+}
+.auth-form-card .sub {
+  font-size: 14px !important;
+  color: #64748b !important;
+  margin-bottom: 28px !important;
+}
+.auth-form-card label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  display: block;
+  margin-bottom: 6px;
+  margin-top: 16px;
+}
+.auth-form-card input {
+  width: 100%;
+  height: 48px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-family: inherit;
+  transition: border-color .15s, box-shadow .15s;
+  box-sizing: border-box;
+}
+.auth-form-card input:focus {
+  outline: none;
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+}
+.auth-form-card .btn-orange {
+  height: 50px;
+  font-size: 15px;
+  font-weight: 800;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #2563EB, #1d4ed8) !important;
+  box-shadow: 0 4px 20px rgba(37,99,235,.35) !important;
+  letter-spacing: .02em;
+}
+.auth-form-card .btn-orange:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 28px rgba(37,99,235,.45) !important;
+}
+.auth-error {
+  background: #FEF2F2 !important;
+  border: 1.5px solid #FECACA !important;
+  color: #dc2626 !important;
+  border-radius: 10px !important;
+  padding: 12px 16px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  margin-top: 12px !important;
+}
+.notice {
+  background: #F8FAFF;
+  border: 1.5px solid #E8EFFE;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 24px;
+}
+.notice strong {
+  font-size: 13px;
+  color: #0D1B2A;
+}
+.notice table td { font-size: 12px !important; }
+footer.footer {
+  background: transparent !important;
+  color: rgba(255,255,255,.35) !important;
+  text-align: center;
+  padding: 20px;
+  border-top: none !important;
+  font-size: 12px;
+}
+footer.footer a { color: rgba(255,255,255,.5) !important; }
+
+/* Badge "Demo" */
+.login-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
+  border: 1px solid #BFDBFE;
+  color: #2563EB;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 99px;
+  margin-bottom: 24px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+</style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="assets/logo.svg">
@@ -48,7 +165,7 @@
         <div class="auth-error" id="login-error"></div>
       </form>
 
-      <p style="margin-top:18px;font-size:13px;color:var(--muted);">Pas encore de compte ? <a href="inscription.html" style="color:var(--orange);font-weight:700;">Créer un compte</a></p>
+      <p style="margin-top:18px;font-size:13px;color:var(--muted);">Pas encore de compte ? <a href="inscription.html" style="color:#2563EB;font-weight:700;">Créer un compte</a></p>
 
       <div class="notice" style="margin-top:18px;">
         <strong>🔎 Comptes de démonstration</strong><br>
@@ -56,25 +173,25 @@
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:5px 6px;font-weight:700;">jean@diaspoactif.demo</td>
             <td style="padding:5px 6px;color:var(--muted);">👤 Utilisateur</td>
-            <td style="padding:5px 6px;font-weight:700;color:var(--orange);">Demo1234!</td>
+            <td style="padding:5px 6px;font-weight:700;color:#2563EB;">Demo1234!</td>
             <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('jean@diaspoactif.demo','Demo1234!')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:5px 6px;font-weight:700;">contact@aito.diaspoactif.demo</td>
             <td style="padding:5px 6px;color:var(--muted);">🌐 Initiative</td>
-            <td style="padding:5px 6px;font-weight:700;color:var(--orange);">Demo1234!</td>
+            <td style="padding:5px 6px;font-weight:700;color:#2563EB;">Demo1234!</td>
             <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('contact@aito.diaspoactif.demo','Demo1234!')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:5px 6px;font-weight:700;">consulat.senegal@diaspoactif.demo</td>
             <td style="padding:5px 6px;color:var(--muted);">🏛️ Collectivité</td>
-            <td style="padding:5px 6px;font-weight:700;color:var(--orange);">Demo1234!</td>
+            <td style="padding:5px 6px;font-weight:700;color:#2563EB;">Demo1234!</td>
             <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('consulat.senegal@diaspoactif.demo','Demo1234!')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
           </tr>
           <tr>
             <td style="padding:5px 6px;font-weight:700;">admin@diaspoactif.demo</td>
             <td style="padding:5px 6px;color:var(--muted);">👑 Super Administrateur</td>
-            <td style="padding:5px 6px;font-weight:700;color:var(--orange);">Demo1234!</td>
+            <td style="padding:5px 6px;font-weight:700;color:#2563EB;">Demo1234!</td>
             <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('admin@diaspoactif.demo','Demo1234!')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
           </tr>
         </table>

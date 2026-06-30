@@ -18,7 +18,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f7;color:#1a2b4
 .ag-nav-btn:hover{background:rgba(255,255,255,.22);}
 .ag-nav-btn.accent{background:var(--accent);border-color:var(--accent);}
 .ag-nav-btn.green{background:var(--green);border-color:var(--green);}
-.ag-nav-btn.orange{background:var(--orange);border-color:var(--orange);}
+.ag-nav-btn.orange{background:linear-gradient(135deg,#2563EB,#1d4ed8);border-color:#2563EB;}
 #ag-period{font-size:.82rem;font-weight:700;min-width:180px;text-align:center;}
 
 /* IDENTITY BANNER */
@@ -92,7 +92,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .btn-green{background:var(--green);color:#fff;}
 .btn-red{background:var(--red);color:#fff;}
 .btn-outline{background:#f0f4ff;color:var(--primary);border:1.5px solid #d0d8e4;}
-.btn-orange{background:var(--orange);color:#fff;}
+.btn-orange{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;}
 .btn-purple{background:var(--purple);color:#fff;}
 
 /* PARTICIPANTS */
@@ -100,7 +100,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .part-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
 .part-counter{font-size:.78rem;font-weight:800;}
 .part-counter.ok{color:var(--green);}
-.part-counter.warn{color:var(--orange);}
+.part-counter.warn{color:#2563EB;}
 .part-counter.max{color:var(--red);}
 .part-gauge{height:5px;background:#e0e8f0;border-radius:99px;overflow:hidden;margin-bottom:10px;}
 .part-gauge-fill{height:100%;border-radius:99px;transition:width .3s,background .3s;}
@@ -120,7 +120,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 /* RDV PANEL */
 .rdv-item{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:8px;background:#f8f9ff;margin-bottom:8px;border-left:4px solid #e0e8f0;cursor:pointer;transition:box-shadow .15s;}
 .rdv-item:hover{box-shadow:0 2px 10px rgba(0,0,0,.07);}
-.rdv-item.en_attente{border-color:var(--orange);}
+.rdv-item.en_attente{border-color:#2563EB;}
 .rdv-item.accepte{border-color:var(--green);}
 .rdv-item.refuse{border-color:var(--red);}
 .rdv-item.peut_etre{border-color:var(--purple);}
@@ -254,7 +254,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
         <input type="text" id="part-search" placeholder="🔍 Ajouter un participant (nom, email…)" oninput="partSearch(this.value)" autocomplete="off">
         <div id="part-results" class="part-search-results" style="display:none;"></div>
       </div>
-      <div id="part-limit-msg" style="font-size:.74rem;color:var(--orange);margin-top:6px;display:none;">
+      <div id="part-limit-msg" style="font-size:.74rem;color:#2563EB;margin-top:6px;display:none;">
         ⚠️ Maximum 10 participants atteint.
       </div>
     </div>
@@ -814,7 +814,7 @@ function addParticipantById(id, fullName, prenom, nom) {
     document.getElementById('part-limit-msg').innerHTML=
       '⛔ Maximum 10 participants atteint. L\'Agenda est réservé aux rendez-vous privés. ' +
       'Pour un événement communautaire (plus de 10 personnes, billetterie, invitations de masse) : ' +
-      '<a href="/evenements.html" style="color:var(--orange);font-weight:700;">→ Mobiliser la diaspora</a>';
+      '<a href="/evenements.html" style="color:#2563EB;font-weight:700;">→ Mobiliser la diaspora</a>';
     return;
   }
   if(fullName && !prenom) {
@@ -878,7 +878,7 @@ async function proposerRdv() {
     showMsg(`✅ Invitations envoyées à ${rdvParticipants.length} participant${rdvParticipants.length>1?'s':''}!`,'success');
   } else {
     if(j.code==='MAX_PARTICIPANTS') {
-      dispo.innerHTML='<span style="color:var(--red);">❌ Maximum 10 participants. Pour un événement communautaire : <a href="/evenements.html" style="color:var(--orange);">→ Mobiliser la diaspora</a></span>';
+      dispo.innerHTML='<span style="color:var(--red);">❌ Maximum 10 participants. Pour un événement communautaire : <a href="/evenements.html" style="color:#2563EB;">→ Mobiliser la diaspora</a></span>';
     } else {
       dispo.innerHTML=`<span style="color:var(--red);">❌ ${j.error}</span>`;
     }
