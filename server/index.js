@@ -6795,7 +6795,7 @@ async function handleRequest(req, res) {
         await r.handler(req, res, params, body, parsed.query);
       } catch (e) {
         console.error(e);
-        sendJSON(res, 500, { error: "Erreur serveur." });
+        sendJSON(res, 500, { error: "Erreur serveur.", detail: e.message });
       }
       return;
     }
