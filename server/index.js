@@ -1231,7 +1231,7 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
     JOIN users u ON u.id = CASE WHEN c.user1_id = ? THEN c.user2_id ELSE c.user1_id END
     WHERE (c.user1_id = ? OR c.user2_id = ?)
       AND (CASE WHEN c.user1_id = ? THEN c.deleted_u1 ELSE c.deleted_u2 END) = 0
-    ORDER BY COALESCE(derniere_date, c.created_at) DESC
+    ORDER BY COALESCE((SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1), c.created_at) DESC
   `).all(user.id, user.id, user.id, user.id, user.id);
 
   let filtered = rows.map(r => ({ ...r, archive: r.user1_id === user.id ? !!r.archive_u1 : !!r.archive_u2 }));
