@@ -19,7 +19,7 @@ function toPg(sql) {
   return sql
     .replace(/\?/g, () => `$${++i}`)
     .replace(/datetime\('now'\)/gi, "NOW()")
-    .replace(/date\('now'\)/gi, "CURRENT_DATE")
+    .replace(/date\('now'\)/gi, "to_char(CURRENT_DATE,'YYYY-MM-DD')")
     .replace(/\bINTEGER PRIMARY KEY AUTOINCREMENT\b/gi, "BIGSERIAL PRIMARY KEY")
     .replace(/\bBLOB\b/gi, "BYTEA")
     // INSERT OR IGNORE → INSERT avec ON CONFLICT DO NOTHING (si pas déjà présent)
