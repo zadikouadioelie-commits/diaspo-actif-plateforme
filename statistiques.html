@@ -593,7 +593,8 @@ function exportPDF() {
   <table><tr><th>Métier</th><th>Membres</th></tr>
   ${(STATS.competences.topTitres||[]).map(r=>`<tr><td>${r.titre_pro}</td><td>${r.n}</td></tr>`).join('')}
   </table>
-  </body></html>`);
+  <script src="/assets/cookies-banner.js"></script>
+</body></html>`);
   w.document.close();
   setTimeout(() => w.print(), 500);
 }
