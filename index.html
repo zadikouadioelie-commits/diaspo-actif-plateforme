@@ -39,62 +39,76 @@
   align-items: center;
   gap: 8px;
   background: rgba(21,101,192,.18);
-  border: 1px solid rgba(21,101,192,.4);
+  border: 1px solid rgba(74,144,217,.5);
   color: #7EB8F7;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
-  padding: 6px 14px;
+  padding: 7px 16px;
   border-radius: 99px;
   margin-bottom: 24px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 20px rgba(74,144,217,.15);
+  animation: eyebrowPulse 3s ease-in-out infinite;
+}
+@keyframes eyebrowPulse {
+  0%,100% { box-shadow: 0 0 20px rgba(74,144,217,.15); }
+  50%      { box-shadow: 0 0 32px rgba(74,144,217,.3); }
 }
 .hp-hero-title {
-  font-size: clamp(28px, 4vw, 52px);
+  font-size: clamp(28px, 4vw, 54px);
   font-weight: 900;
-  line-height: 1.1;
+  line-height: 1.08;
   color: #fff;
-  margin: 0 0 20px;
-  letter-spacing: -.02em;
+  margin: 0 0 22px;
+  letter-spacing: -.03em;
 }
-.hp-hero-title span { color: #4A90D9; }
+.hp-hero-title span {
+  background: linear-gradient(135deg, #60A5FA 0%, #38BDF8 50%, #34D399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 .hp-hero-sub {
   font-size: 16px;
-  line-height: 1.65;
-  color: rgba(255,255,255,.72);
+  line-height: 1.7;
+  color: rgba(255,255,255,.7);
   margin: 0 0 36px;
-  max-width: 480px;
+  max-width: 500px;
 }
 .hp-hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; }
 .hp-cta-primary {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  background: #1565C0;
+  background: linear-gradient(135deg, #2563EB, #1d4ed8);
   color: #fff;
-  padding: 14px 28px;
-  border-radius: 8px;
-  font-weight: 700;
+  padding: 15px 30px;
+  border-radius: 10px;
+  font-weight: 800;
   font-size: 15px;
   text-decoration: none;
-  transition: background .2s, transform .15s;
+  transition: transform .2s, box-shadow .2s;
+  box-shadow: 0 4px 20px rgba(37,99,235,.4);
 }
-.hp-cta-primary:hover { background: #1976D2; transform: translateY(-1px); }
+.hp-cta-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(37,99,235,.5); }
 .hp-cta-secondary {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.07);
+  border: 1.5px solid rgba(255,255,255,.25);
   color: #fff;
   padding: 14px 24px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 600;
   font-size: 15px;
   text-decoration: none;
-  transition: background .2s;
+  transition: background .2s, border-color .2s;
+  backdrop-filter: blur(8px);
 }
-.hp-cta-secondary:hover { background: rgba(255,255,255,.14); }
+.hp-cta-secondary:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.4); }
 .hp-hero-map {
   position: relative;
   height: 420px;
@@ -149,38 +163,53 @@
 
 /* --- Compteur visites --- */
 .hp-counter {
-  background: linear-gradient(90deg, #0D1B2A 0%, #1B3A6B 50%, #0D1B2A 100%);
-  padding: 36px 24px;
+  background: linear-gradient(135deg, #060e1a 0%, #0c1e38 60%, #0F2A50 100%);
+  padding: 48px 24px;
   text-align: center;
-  border-bottom: 1px solid rgba(74,144,217,.15);
+  border-bottom: 1px solid rgba(74,144,217,.12);
+  position: relative;
+  overflow: hidden;
+}
+.hp-counter::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 500px; height: 200px;
+  background: radial-gradient(ellipse, rgba(37,99,235,.12) 0%, transparent 70%);
+  pointer-events: none;
 }
 .hp-counter-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255,255,255,.45);
-  letter-spacing: .1em;
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(255,255,255,.4);
+  letter-spacing: .14em;
   text-transform: uppercase;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 .hp-counter-number {
-  font-size: clamp(42px, 6vw, 72px);
+  font-size: clamp(48px, 7vw, 80px);
   font-weight: 900;
-  color: #fff;
-  letter-spacing: -.03em;
+  background: linear-gradient(135deg, #fff 30%, #93C5FD 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -.04em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.hp-counter-number span { color: #4A90D9; }
+.hp-counter-number span { -webkit-text-fill-color: transparent; }
 .hp-counter-sub {
   font-size: 14px;
-  color: rgba(255,255,255,.5);
-  margin-top: 8px;
+  color: rgba(255,255,255,.4);
+  margin-top: 10px;
+  letter-spacing: .02em;
 }
 
 /* --- Stats bande --- */
 .hp-stats {
-  background: #fff;
-  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, #0D1B2A 0%, #1B3A6B 100%);
+  border-bottom: 1px solid rgba(74,144,217,.15);
 }
 .hp-stats-inner {
   max-width: 1180px;
@@ -191,23 +220,32 @@
   gap: 0;
 }
 .hp-stat-item {
-  padding: 28px 24px;
+  padding: 36px 24px;
   text-align: center;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid rgba(255,255,255,.08);
+  position: relative;
 }
 .hp-stat-item:last-child { border-right: none; }
-.hp-stat-n {
-  font-size: 36px;
-  font-weight: 900;
-  color: #1565C0;
-  line-height: 1;
-  margin-bottom: 4px;
+.hp-stat-icon {
+  font-size: 28px;
+  margin-bottom: 10px;
+  display: block;
 }
-.hp-stat-lbl { font-size: 13px; color: var(--muted); font-weight: 600; }
+.hp-stat-n {
+  font-size: 38px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #60A5FA, #38BDF8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.hp-stat-lbl { font-size: 13px; color: rgba(255,255,255,.55); font-weight: 600; letter-spacing: .03em; }
 
 /* --- Section commune --- */
 .hp-section {
-  padding: 72px 0;
+  padding: 80px 0;
 }
 .hp-section-inner {
   max-width: 1180px;
@@ -215,30 +253,41 @@
   padding: 0 24px;
 }
 .hp-section-eyebrow {
-  font-size: 12px;
-  font-weight: 700;
-  color: #1565C0;
-  letter-spacing: .1em;
+  font-size: 11px;
+  font-weight: 800;
+  color: #2563EB;
+  letter-spacing: .14em;
   text-transform: uppercase;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hp-section-eyebrow::before {
+  content: '';
+  display: inline-block;
+  width: 24px;
+  height: 2px;
+  background: linear-gradient(90deg, #2563EB, #38BDF8);
+  border-radius: 2px;
 }
 .hp-section-title {
-  font-size: clamp(24px, 3vw, 38px);
+  font-size: clamp(26px, 3vw, 40px);
   font-weight: 900;
   color: #0D1B2A;
   margin: 0 0 16px;
-  letter-spacing: -.02em;
+  letter-spacing: -.03em;
 }
 .hp-section-sub {
   font-size: 16px;
   color: var(--muted);
   max-width: 600px;
-  line-height: 1.65;
-  margin: 0 0 48px;
+  line-height: 1.7;
+  margin: 0 0 52px;
 }
 
 /* --- Pourquoi Diaspo'Actif --- */
-.hp-why { background: #F8FAFF; }
+.hp-why { background: #F0F4FF; }
 .hp-why-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -246,34 +295,39 @@
 }
 .hp-why-card {
   background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 32px 28px;
+  border: 1.5px solid #E8EFFE;
+  border-radius: 16px;
+  padding: 36px 30px;
   position: relative;
   overflow: hidden;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+.hp-why-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(37,99,235,.1);
+  border-color: #BFDBFE;
 }
 .hp-why-card::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #1565C0, #4A90D9);
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #2563EB, #38BDF8, #34D399);
 }
 .hp-why-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  background: #EFF6FF;
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  margin-bottom: 20px;
+  font-size: 28px;
+  margin-bottom: 22px;
+  box-shadow: 0 4px 12px rgba(37,99,235,.1);
 }
 .hp-why-card h3 { font-size: 18px; font-weight: 800; margin: 0 0 12px; color: #0D1B2A; }
-.hp-why-card p { font-size: 14px; color: var(--muted); line-height: 1.65; margin: 0; }
+.hp-why-card p { font-size: 14px; color: var(--muted); line-height: 1.7; margin: 0; }
 .hp-why-tags {
   display: flex;
   gap: 8px;
@@ -286,8 +340,9 @@
   padding: 4px 10px;
   border-radius: 99px;
   background: #EFF6FF;
-  color: #1565C0;
+  color: #2563EB;
   letter-spacing: .04em;
+  border: 1px solid #DBEAFE;
 }
 
 /* --- Initiatives vedettes --- */
@@ -308,9 +363,9 @@
   transition: transform .2s, box-shadow .2s;
   box-shadow: 0 2px 8px rgba(0,0,0,.06);
 }
-.hp-init-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(27,58,107,.14); }
+.hp-init-card:hover { transform: translateY(-5px); box-shadow: 0 16px 48px rgba(27,58,107,.18); }
 .hp-init-photo {
-  height: 200px;
+  height: 220px;
   position: relative;
   overflow: hidden;
 }
@@ -400,17 +455,18 @@
 .hp-view-all a {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: #1565C0;
-  font-weight: 700;
+  gap: 10px;
+  color: #2563EB;
+  font-weight: 800;
   font-size: 14px;
   text-decoration: none;
-  padding: 10px 24px;
-  border: 2px solid #1565C0;
-  border-radius: 8px;
-  transition: background .2s, color .2s;
+  padding: 13px 30px;
+  border: 2px solid #2563EB;
+  border-radius: 10px;
+  transition: background .2s, color .2s, transform .15s, box-shadow .2s;
+  letter-spacing: .01em;
 }
-.hp-view-all a:hover { background: #1565C0; color: #fff; }
+.hp-view-all a:hover { background: #2563EB; color: #fff; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,.25); }
 
 /* --- Talent showcase --- */
 .hp-talents { background: #F8FAFF; }
@@ -885,24 +941,28 @@
   <div class="hp-stats">
     <div class="hp-stats-inner">
       <div class="hp-stat-item">
+        <span class="hp-stat-icon">👥</span>
         <div class="hp-stat-n" id="stat-membres">—</div>
         <div class="hp-stat-lbl">Membres inscrits</div>
       </div>
       <div class="hp-stat-item">
+        <span class="hp-stat-icon">🌱</span>
         <div class="hp-stat-n" id="stat-initiatives">—</div>
         <div class="hp-stat-lbl">Initiatives référencées</div>
       </div>
       <div class="hp-stat-item">
+        <span class="hp-stat-icon">🌍</span>
         <div class="hp-stat-n" id="stat-pays">—</div>
         <div class="hp-stat-lbl">Pays représentés</div>
       </div>
       <div class="hp-stat-item" style="position:relative;">
+        <span class="hp-stat-icon">💬</span>
         <div class="hp-stat-n" id="stat-messages">—</div>
         <div class="hp-stat-lbl">Messages échangés</div>
       </div>
     </div>
-    <div style="text-align:center;padding:10px 0 14px;border-top:1px solid var(--border);">
-      <a href="statistiques.html" style="font-size:12px;font-weight:800;color:#1565C0;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+    <div style="text-align:center;padding:12px 0 16px;border-top:1px solid rgba(255,255,255,.07);">
+      <a href="statistiques.html" style="font-size:12px;font-weight:700;color:rgba(255,255,255,.5);text-decoration:none;display:inline-flex;align-items:center;gap:5px;letter-spacing:.05em;text-transform:uppercase;">
         📊 Voir l'observatoire complet →
       </a>
     </div>
