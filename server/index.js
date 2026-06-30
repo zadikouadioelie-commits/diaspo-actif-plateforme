@@ -12880,6 +12880,14 @@ route("PATCH", "/api/admin/accred/demandes/:id/approuver", async (req, res, para
   creerNotif(dem.user_id, "validation", "Accréditation accordée !",
     `Félicitations ! Votre accréditation « ${def?.emoji||''} ${def?.label||''} » vient d'être validée.`,
     { accred_type: def?.type });
+  // Envoyer email de notification
+  try {
+    const userRow = await db.prepare("SELECT email, prenom, nom FROM users WHERE id=?").get(dem.user_id);
+    if (userRow) {
+      const { emailAccreditation } = require("./mailer");
+      emailAccreditation({ email: userRow.email, prenom: userRow.prenom || userRow.nom, typeAccred: def?.label || def?.type || 'accréditation', statut: 'accordee' });
+    }
+  } catch(e) { console.error("[accred] email error:", e.message); }
   sendJSON(res, 200, { ok: true });
 });
 
@@ -12896,6 +12904,13 @@ route("PATCH", "/api/admin/accred/demandes/:id/refuser", async (req, res, params
   creerNotif(dem.user_id, "validation", "Demande d'accréditation non retenue",
     `Votre demande pour « ${def?.label||''} » n'a pas été retenue${body.motif ? ` : ${body.motif}` : '.'}.`,
     { accred_type: def?.type });
+  try {
+    const userRow = await db.prepare("SELECT email, prenom, nom FROM users WHERE id=?").get(dem.user_id);
+    if (userRow) {
+      const { emailAccreditation } = require("./mailer");
+      emailAccreditation({ email: userRow.email, prenom: userRow.prenom || userRow.nom, typeAccred: def?.label || def?.type || 'accréditation', statut: 'refusee' });
+    }
+  } catch(e) { console.error("[accred] email error:", e.message); }
   sendJSON(res, 200, { ok: true });
 });
 
