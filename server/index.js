@@ -1220,7 +1220,7 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
   const filtre = query.filtre || "tous"; // tous | non_lus | archives
   const q = (query.q || "").toLowerCase();
 
-  const rows = db.prepare(`
+  const rows = await db.prepare(`
     SELECT c.*,
       u.nom AS avec_nom, u.role AS avec_role, u.ville AS avec_ville,
       (SELECT contenu FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere,
@@ -2865,7 +2865,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   if (mode === "populaires") {
     // Fenêtre 30 jours, score = likes×3 + commentaires×2 + reposts
     const since = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,19).replace("T"," ");
-    const posts = db.prepare(`
+    const posts = await db.prepare(`
       SELECT p.*,
         (SELECT COUNT(*) FROM fil_reactions r WHERE r.post_id=p.id AND r.type='like')*3 +
         (SELECT COUNT(*) FROM fil_commentaires c WHERE c.post_id=p.id)*2 +
@@ -2876,7 +2876,8 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       ORDER BY score_calc DESC, p.created_at DESC
       LIMIT ? OFFSET ?
     `).all(since, limit, offset);
-    const total = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).get(since).n;
+    const _totalPop = await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).get(since);
+    const total = _totalPop ? _totalPop.n : 0;
     return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "populaire" }))), total, page, pages: Math.ceil(total/limit), mode });
   }
 
