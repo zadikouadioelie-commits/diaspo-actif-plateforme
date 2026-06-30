@@ -2345,6 +2345,51 @@ route("GET", "/api/mes-evenements", async (req, res) => {
 });
 
 /* ---------- Modération administrateur ---------- */
+/* ══ D'A TUTOR AI ══ */
+route("GET", "/api/admin/tutoriels", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
+  const rows = db.prepare("SELECT id,titre,sujet,niveau,statut,vues,created_at FROM da_tutoriels ORDER BY created_at DESC").all();
+  sendJSON(res, 200, { tutoriels: rows });
+});
+
+route("GET", "/api/admin/tutoriels/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
+  const t = db.prepare("SELECT * FROM da_tutoriels WHERE id=?").get(params.id);
+  if (!t) return sendJSON(res, 404, { error: "Tutoriel introuvable." });
+  db.prepare("UPDATE da_tutoriels SET vues=vues+1 WHERE id=?").run(params.id);
+  t.contenu_json = safeJSON(t.contenu_json, {});
+  sendJSON(res, 200, { tutoriel: t });
+});
+
+route("POST", "/api/admin/tutoriels", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
+  const { titre, sujet, objectif, niveau = "debutant", format_souhaite = "texte", contenu_json } = body;
+  if (!titre || !sujet) return sendJSON(res, 400, { error: "Titre et sujet obligatoires." });
+  const r = db.prepare("INSERT INTO da_tutoriels (titre,sujet,objectif,niveau,format_souhaite,contenu_json) VALUES (?,?,?,?,?,?)").run(
+    titre, sujet, objectif||null, niveau, format_souhaite, JSON.stringify(contenu_json||{})
+  );
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/admin/tutoriels/:id", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
+  const { titre, sujet, objectif, niveau, statut, contenu_json } = body;
+  db.prepare("UPDATE da_tutoriels SET titre=COALESCE(?,titre), sujet=COALESCE(?,sujet), objectif=COALESCE(?,objectif), niveau=COALESCE(?,niveau), statut=COALESCE(?,statut), contenu_json=COALESCE(?,contenu_json), updated_at=datetime('now') WHERE id=?")
+    .run(titre||null, sujet||null, objectif||null, niveau||null, statut||null, contenu_json ? JSON.stringify(contenu_json) : null, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/admin/tutoriels/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
+  db.prepare("DELETE FROM da_tutoriels WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("GET", "/api/admin/membres", async (req, res, params, body, query) => {
   const user = getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
@@ -5323,6 +5368,21 @@ async function scrapeSite() {
       } catch(e) { console.error('FAQ seed error:', e.message); }
     });
   }
+
+  /* ──────── D'A TUTOR AI — TUTOS CRÉÉS PAR SUPER ADMIN ──────── */
+  db.prepare(`CREATE TABLE IF NOT EXISTS da_tutoriels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titre TEXT NOT NULL,
+    sujet TEXT NOT NULL,
+    objectif TEXT,
+    niveau TEXT DEFAULT 'debutant',
+    format_souhaite TEXT DEFAULT 'texte',
+    contenu_json TEXT NOT NULL DEFAULT '{}',
+    statut TEXT DEFAULT 'publie',
+    vues INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  )`).run();
 
   /* ──────── ONBOARDING ──────── */
   try { db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_tutorials (

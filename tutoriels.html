@@ -206,7 +206,119 @@
         <div class="tuto-cards" id="cards-news"></div>
       </div>
 
+      <!-- Tab D'A Tutor AI — Super Admin uniquement -->
+      <div class="tuto-tab-content" id="tab-tutor-ai" style="display:none;">
+        <div style="background:linear-gradient(135deg,#1e1e2e 0%,#312e81 100%);border-radius:16px;padding:28px 24px;margin-bottom:24px;color:#fff;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+          <div style="font-size:52px;flex-shrink:0;">🧠</div>
+          <div>
+            <h2 style="margin:0 0 4px;font-size:20px;font-weight:900;">D'A Tutor AI</h2>
+            <p style="margin:0 0 14px;font-size:13px;opacity:.88;">Créez des tutoriels structurés en quelques secondes grâce à l'intelligence artificielle de Diaspo'Actif.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button onclick="openTutorModal()" style="background:#fff;color:#312e81;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;">➕ Créer un tuto IA</button>
+              <button onclick="loadBibliotheque()" style="background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;">📚 Bibliothèque</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats rapides -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;" id="ai-stats-bar">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:24px;font-weight:900;color:#312e81;" id="ai-stat-total">—</div>
+            <div style="font-size:12px;color:var(--muted);">Tutos créés</div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:24px;font-weight:900;color:#0f766e;" id="ai-stat-vues">—</div>
+            <div style="font-size:12px;color:var(--muted);">Vues totales</div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:24px;font-weight:900;color:#b45309;" id="ai-stat-publie">—</div>
+            <div style="font-size:12px;color:var(--muted);">Publiés</div>
+          </div>
+        </div>
+
+        <!-- Bibliothèque -->
+        <div class="tuto-section-title">📚 Bibliothèque des tutos</div>
+        <div id="ai-bibliotheque"><div style="color:var(--muted);font-size:13px;padding:20px 0;">Aucun tutoriel créé pour l'instant.</div></div>
+      </div>
+
     </main>
+  </div>
+</div>
+
+<!-- Modal D'A Tutor AI -->
+<div id="tutor-ai-modal" style="display:none;position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.65);align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:20px;max-width:680px;width:100%;margin:0 auto;overflow:hidden;">
+    <!-- Header modal -->
+    <div style="background:linear-gradient(135deg,#1e1e2e,#312e81);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="color:#fff;"><strong style="font-size:16px;">🧠 D'A Tutor AI — Créer un tutoriel</strong><br><span style="font-size:12px;opacity:.75;">Super Administrateur · Génération automatique</span></div>
+      <button onclick="closeTutorModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;">✕</button>
+    </div>
+    <!-- Body -->
+    <div style="padding:24px;" id="tutor-modal-body">
+      <div id="tutor-form-step">
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;">📌 Sujet du tutoriel <span style="color:var(--orange)">*</span></label>
+          <input id="ai-sujet" class="input-field" placeholder="ex: Comment créer une initiative sur Diaspo'Actif" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;">🎯 Objectif pédagogique</label>
+          <input id="ai-objectif" class="input-field" placeholder="ex: Permettre aux nouveaux membres de publier leur première initiative" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;">📊 Niveau</label>
+            <select id="ai-niveau" class="input-field" style="width:100%;">
+              <option value="debutant">🟢 Débutant</option>
+              <option value="intermediaire">🟡 Intermédiaire</option>
+              <option value="avance">🔴 Avancé</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;">📦 Format</label>
+            <select id="ai-format" class="input-field" style="width:100%;">
+              <option value="texte">📄 Texte structuré</option>
+              <option value="texte+audio">📄🎙 Texte + Script audio</option>
+              <option value="complet">📄🎙🖼 Complet (texte + audio + visuels)</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:20px;">
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;">🏷 Public cible</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" value="utilisateur" id="ai-pub-u" checked style="accent-color:var(--orange)"> 👤 Utilisateurs</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" value="initiative" id="ai-pub-i" style="accent-color:var(--orange)"> 🏢 Initiatives</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" value="collectivite" id="ai-pub-c" style="accent-color:var(--orange)"> 🏛 Collectivités</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" value="tous" id="ai-pub-t" style="accent-color:var(--orange)"> 🌍 Tous</label>
+          </div>
+        </div>
+        <div id="ai-gen-error" style="display:none;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;"></div>
+        <button onclick="genererTutoriel()" id="ai-gen-btn" style="background:linear-gradient(135deg,#312e81,#4f46e5);color:#fff;border:none;border-radius:10px;padding:13px 28px;font-size:14px;font-weight:800;cursor:pointer;width:100%;">
+          🧠 Générer le tutoriel avec l'IA
+        </button>
+      </div>
+
+      <!-- Résultat généré -->
+      <div id="tutor-result-step" style="display:none;">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#166534;">✅ Tutoriel généré avec succès par D'A Tutor AI</div>
+        <div id="tutor-result-content" style="font-size:13.5px;line-height:1.7;"></div>
+        <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+          <button onclick="sauvegarderTutoriel()" style="background:var(--orange);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:13px;font-weight:800;cursor:pointer;">💾 Sauvegarder</button>
+          <button onclick="document.getElementById('tutor-form-step').style.display='';document.getElementById('tutor-result-step').style.display='none';" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 18px;font-size:13px;font-weight:700;cursor:pointer;">✏ Modifier les paramètres</button>
+          <button onclick="closeTutorModal()" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 18px;font-size:13px;color:var(--muted);cursor:pointer;">Fermer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal lecture tutoriel IA -->
+<div id="ai-read-modal" style="display:none;position:fixed;inset:0;z-index:99991;background:rgba(0,0,0,.7);align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:20px;max-width:720px;width:100%;margin:0 auto;padding:32px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+      <div><strong id="ai-read-titre" style="font-size:20px;display:block;margin-bottom:4px;"></strong><span id="ai-read-meta" style="font-size:12px;color:var(--muted);"></span></div>
+      <button onclick="document.getElementById('ai-read-modal').style.display='none'" style="background:var(--surface);border:1px solid var(--border);border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;flex-shrink:0;">✕</button>
+    </div>
+    <div id="ai-read-body" style="font-size:14px;line-height:1.75;"></div>
   </div>
 </div>
 
@@ -634,6 +746,209 @@ function renderMonEspace(user) {
   });
 }
 
+/* ══════════════ D'A TUTOR AI ══════════════ */
+
+let _tutoGenere = null;
+
+function openTutorModal() {
+  document.getElementById('tutor-ai-modal').style.display = 'flex';
+  document.getElementById('tutor-form-step').style.display = '';
+  document.getElementById('tutor-result-step').style.display = 'none';
+  document.getElementById('ai-gen-error').style.display = 'none';
+}
+function closeTutorModal() {
+  document.getElementById('tutor-ai-modal').style.display = 'none';
+  _tutoGenere = null;
+}
+
+/* Générateur IA keyword-based */
+function genererTutoriel() {
+  const sujet = document.getElementById('ai-sujet').value.trim();
+  const objectif = document.getElementById('ai-objectif').value.trim();
+  const niveau = document.getElementById('ai-niveau').value;
+  const format = document.getElementById('ai-format').value;
+  const errEl = document.getElementById('ai-gen-error');
+
+  if (!sujet) { errEl.textContent = 'Le sujet est obligatoire.'; errEl.style.display = ''; return; }
+  errEl.style.display = 'none';
+
+  const btn = document.getElementById('ai-gen-btn');
+  btn.disabled = true; btn.textContent = '⏳ Génération en cours…';
+
+  setTimeout(() => {
+    const contenu = genIA(sujet, objectif, niveau, format);
+    _tutoGenere = { titre: sujet, sujet, objectif, niveau, format_souhaite: format, contenu_json: contenu };
+
+    document.getElementById('tutor-result-content').innerHTML = renderTutoContenu(contenu, format);
+    document.getElementById('tutor-form-step').style.display = 'none';
+    document.getElementById('tutor-result-step').style.display = '';
+    btn.disabled = false; btn.textContent = '🧠 Générer le tutoriel avec l\'IA';
+  }, 900);
+}
+
+function genIA(sujet, objectif, niveau, format) {
+  const niveauLabel = { debutant: 'débutant', intermediaire: 'intermédiaire', avance: 'avancé' }[niveau] || 'débutant';
+  const s = sujet.toLowerCase();
+
+  /* Détection du contexte par mots-clés */
+  const isCompte = /compte|inscription|créer un compte|inscription/.test(s);
+  const isInitiative = /initiative|organisation|association|ong|projet/.test(s);
+  const isDeal = /deal|contrat|accord|partenariat/.test(s);
+  const isMessagerie = /message|messagerie|chat|conversation/.test(s);
+  const isBP = /business.?plan|plan d'affaires|bp/.test(s);
+  const isAudio = /audiovisuel|live|podcast|vidéo/.test(s);
+  const isPubli = /publication|post|publier|contenu/.test(s);
+  const isProfil = /profil|compte|paramètre/.test(s);
+
+  let prerequis, etapes, erreurs, conseils;
+
+  if (isCompte) {
+    prerequis = ['Une adresse email valide', 'Un mot de passe sécurisé (8 caractères minimum)'];
+    etapes = [
+      { titre: 'Accéder à la page d\'inscription', detail: 'Rendez-vous sur diaspo-actif-plateforme.vercel.app et cliquez sur "Créer un compte" dans la barre de navigation.' },
+      { titre: 'Choisir le type de compte', detail: 'Sélectionnez votre profil : Utilisateur (particulier), Initiative (organisation), ou Collectivité (institution).' },
+      { titre: 'Remplir le formulaire', detail: 'Saisissez vos informations : nom, prénom, email, nationalité(s), pays de résidence, ville et mot de passe.' },
+      { titre: 'Accepter la charte', detail: 'Lisez et cochez la Charte Institutionnelle de Diaspo\'Actif — obligatoire pour les comptes Utilisateur et Initiative.' },
+      { titre: 'Valider et accéder à votre espace', detail: 'Cliquez sur "Créer mon compte". Vous serez redirigé vers votre tableau de bord personnalisé.' },
+    ];
+    erreurs = ['Email déjà utilisé → utilisez un email différent ou connectez-vous', 'Mot de passe trop court → minimum 8 caractères', 'Charte non cochée → obligatoire avant validation'];
+    conseils = ['Choisissez un mot de passe fort avec majuscules, chiffres et symboles', 'Les données personnelles (nationalité) sont strictement privées sur Diaspo\'Actif'];
+  } else if (isInitiative) {
+    prerequis = ['Avoir un compte Diaspo\'Actif de type Initiative', 'Disposer des informations officielles de l\'organisation'];
+    etapes = [
+      { titre: 'Se connecter au compte Initiative', detail: 'Accédez à votre tableau de bord depuis login.html avec vos identifiants.' },
+      { titre: 'Accéder au profil public', detail: 'Depuis le dashboard, cliquez sur "Mon profil" dans la barre latérale.' },
+      { titre: 'Compléter les informations', detail: 'Renseignez le nom, secteur, description, pays d\'intervention, site web et réseaux sociaux.' },
+      { titre: 'Ajouter des membres d\'équipe', detail: 'Utilisez la section "Équipe" pour inviter des collaborateurs à rejoindre votre page initiative.' },
+      { titre: 'Publier votre première actualité', detail: 'Rédigez un post depuis le fil d\'actualité pour présenter votre initiative à la communauté.' },
+    ];
+    erreurs = ['Profil incomplet → les initiatives sans description apparaissent moins dans l\'annuaire', 'Logo manquant → réduire la confiance des partenaires potentiels'];
+    conseils = ['Un profil complet à 100% apparaît en tête de l\'annuaire', 'Publiez régulièrement pour maintenir votre visibilité'];
+  } else if (isDeal) {
+    prerequis = ['Compte Initiative accrédité', 'Avoir identifié un partenaire potentiel'];
+    etapes = [
+      { titre: 'Accéder à la section Deals', detail: 'Depuis votre dashboard Initiative, cliquez sur "Deals" dans la barre latérale.' },
+      { titre: 'Créer un nouveau deal', detail: 'Cliquez sur "+ Nouveau Deal" et choisissez le type : partenariat, prestation, collaboration.' },
+      { titre: 'Définir les termes', detail: 'Renseignez les conditions, montant (si applicable), durée et responsabilités de chaque partie.' },
+      { titre: 'Inviter le partenaire', detail: 'Sélectionnez le partenaire depuis l\'annuaire et envoyez la proposition de deal.' },
+      { titre: 'Suivi et validation', detail: 'Une fois accepté, le deal est tracé sur la plateforme. Les deux parties reçoivent une confirmation.' },
+    ];
+    erreurs = ['Termes vagues → risque de litige, soyez précis', 'Deal sans validation → manque de traçabilité officielle'];
+    conseils = ['Utilisez les outils de formalisation de Diaspo\'Actif pour sécuriser vos deals', 'Consultez les partenaires D\'A pour les deals importants'];
+  } else {
+    prerequis = ['Un compte Diaspo\'Actif actif', 'Connexion internet stable'];
+    etapes = [
+      { titre: 'Se connecter à Diaspo\'Actif', detail: 'Accédez à login.html et entrez vos identifiants. Vous serez redirigé vers votre tableau de bord.' },
+      { titre: `Accéder à la fonctionnalité "${sujet}"`, detail: `Depuis votre dashboard, naviguez jusqu'à la section correspondante dans la barre latérale.` },
+      { titre: 'Configurer vos préférences', detail: 'Personnalisez les paramètres selon vos besoins en suivant les instructions affichées à l\'écran.' },
+      { titre: 'Effectuer l\'action principale', detail: `Réalisez l'action souhaitée en suivant les étapes affichées. ${objectif ? 'Objectif : ' + objectif + '.' : ''}` },
+      { titre: 'Valider et sauvegarder', detail: 'Confirmez votre action. Un message de confirmation apparaît en cas de succès.' },
+    ];
+    erreurs = ['Session expirée → reconnectez-vous', 'Champs manquants → vérifiez les champs obligatoires marqués *', 'Erreur réseau → vérifiez votre connexion'];
+    conseils = [`Ce tutoriel est adapté au niveau ${niveauLabel}`, 'En cas de blocage, consultez la FAQ de Diaspo\'Actif', 'L\'assistant O-Z est disponible 24h/24 pour vous aider'];
+  }
+
+  const resume = `Ce tutoriel explique ${sujet.toLowerCase()}. ${objectif ? objectif + '.' : ''} En suivant ces ${etapes.length} étapes, vous maîtriserez cette fonctionnalité de Diaspo'Actif.`;
+
+  const scriptAudio = format.includes('audio') ? `Bienvenue dans ce tutoriel Diaspo'Actif. Aujourd'hui, nous allons apprendre ${sujet.toLowerCase()}. ${objectif ? objectif + '. ' : ''}Ce guide est adapté au niveau ${niveauLabel} et se découpe en ${etapes.length} étapes simples. Commençons.` : null;
+
+  const illustrations = format === 'complet' ? etapes.map((e, i) => `📸 Illustration ${i+1} : Capture d'écran de l'étape "${e.titre}" — Zone à mettre en surbrillance.`) : null;
+
+  return { titre: sujet, objectif, niveau: niveauLabel, prerequis, etapes, erreurs, conseils, resume, scriptAudio, illustrations };
+}
+
+function renderTutoContenu(c, format) {
+  let html = `
+    <div style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">📘 Titre</div>
+      <div style="font-size:18px;font-weight:900;">${c.titre}</div>
+    </div>`;
+
+  if (c.objectif) html += `<div style="background:#fff8f2;border-left:3px solid var(--orange);border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:14px;font-size:13.5px;"><strong>🎯 Objectif :</strong> ${c.objectif}</div>`;
+
+  html += `<div style="margin-bottom:14px;"><strong style="font-size:13px;color:var(--orange);text-transform:uppercase;letter-spacing:.04em;">🧭 Prérequis</strong><ul style="margin:8px 0 0;padding-left:18px;">${c.prerequis.map(p => `<li style="font-size:13px;line-height:1.7;">${p}</li>`).join('')}</ul></div>`;
+
+  html += `<div style="margin-bottom:14px;"><strong style="font-size:13px;color:var(--orange);text-transform:uppercase;letter-spacing:.04em;">🪜 Étapes détaillées</strong>`;
+  c.etapes.forEach((e, i) => {
+    html += `<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px;display:flex;gap:12px;">
+      <div style="background:var(--orange);color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">${i+1}</div>
+      <div><strong style="font-size:13px;">${e.titre}</strong><p style="margin:4px 0 0;font-size:13px;color:#475569;">${e.detail}</p></div>
+    </div>`;
+  });
+  html += '</div>';
+
+  html += `<div style="margin-bottom:14px;"><strong style="font-size:13px;color:#dc2626;text-transform:uppercase;letter-spacing:.04em;">⚠️ Erreurs fréquentes</strong><ul style="margin:8px 0 0;padding-left:18px;">${c.erreurs.map(e => `<li style="font-size:13px;line-height:1.7;color:#dc2626;">${e}</li>`).join('')}</ul></div>`;
+
+  html += `<div style="margin-bottom:14px;"><strong style="font-size:13px;color:#0f766e;text-transform:uppercase;letter-spacing:.04em;">💡 Conseils</strong><ul style="margin:8px 0 0;padding-left:18px;">${c.conseils.map(c => `<li style="font-size:13px;line-height:1.7;">${c}</li>`).join('')}</ul></div>`;
+
+  html += `<div style="background:#f0fdf4;border-radius:10px;padding:14px 16px;margin-bottom:14px;font-size:13.5px;"><strong>🧾 Résumé :</strong> ${c.resume}</div>`;
+
+  if (c.scriptAudio) html += `<div style="background:#f5f3ff;border:1px solid #e9d5ff;border-radius:10px;padding:14px 16px;margin-bottom:14px;"><strong style="font-size:13px;color:#7c3aed;text-transform:uppercase;letter-spacing:.04em;">🎙 Script audio (voice-over)</strong><p style="margin:8px 0 0;font-size:13.5px;font-style:italic;">${c.scriptAudio}</p></div>`;
+
+  if (c.illustrations) html += `<div style="margin-bottom:14px;"><strong style="font-size:13px;color:#0369a1;text-transform:uppercase;letter-spacing:.04em;">🖼 Illustrations associées</strong><ul style="margin:8px 0 0;padding-left:18px;">${c.illustrations.map(i => `<li style="font-size:13px;line-height:1.7;color:#0369a1;">${i}</li>`).join('')}</ul></div>`;
+
+  return html;
+}
+
+async function sauvegarderTutoriel() {
+  if (!_tutoGenere) return;
+  try {
+    const r = await fetch('/api/admin/tutoriels', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(_tutoGenere) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Erreur');
+    closeTutorModal();
+    loadBibliotheque();
+    alert('✅ Tutoriel sauvegardé dans la bibliothèque !');
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function loadBibliotheque() {
+  const el = document.getElementById('ai-bibliotheque');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/admin/tutoriels', { credentials:'include' });
+    const { tutoriels = [] } = await r.json();
+    const s1 = document.getElementById('ai-stat-total');
+    const s2 = document.getElementById('ai-stat-vues');
+    const s3 = document.getElementById('ai-stat-publie');
+    if (s1) s1.textContent = tutoriels.length;
+    if (s2) s2.textContent = tutoriels.reduce((a, t) => a + (t.vues||0), 0);
+    if (s3) s3.textContent = tutoriels.filter(t => t.statut === 'publie').length;
+    if (!tutoriels.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px 0;">Aucun tutoriel créé pour l\'instant. Cliquez sur "Créer un tuto IA" pour commencer.</div>'; return; }
+    const niv = { debutant:'🟢', intermediaire:'🟡', avance:'🔴' };
+    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">' +
+      tutoriels.map(t => `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+          <div style="background:linear-gradient(135deg,#1e1e2e,#312e81);padding:14px 16px;">
+            <div style="font-size:18px;margin-bottom:4px;">🧠</div>
+            <div style="font-weight:700;font-size:13px;color:#fff;">${t.titre}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;">${niv[t.niveau]||'🟢'} ${t.niveau} · ${t.vues} vue${t.vues!==1?'s':''}</div>
+          </div>
+          <div style="padding:12px 14px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button onclick="lireTutoriel(${t.id})" style="background:var(--orange);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">▶ Lire</button>
+            <button onclick="supprimerTutoriel(${t.id},'${t.titre.replace(/'/g,"\\'")}')" style="background:var(--surface);border:1px solid #fecaca;color:#dc2626;border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;">🗑</button>
+          </div>
+        </div>`).join('') + '</div>';
+  } catch(e) { if (el) el.innerHTML = '<div style="color:var(--muted);">Erreur de chargement.</div>'; }
+}
+
+async function lireTutoriel(id) {
+  const r = await fetch(`/api/admin/tutoriels/${id}`, { credentials:'include' });
+  const { tutoriel: t } = await r.json();
+  document.getElementById('ai-read-titre').textContent = t.titre;
+  document.getElementById('ai-read-meta').textContent = `Niveau ${t.niveau} · ${t.vues} vues · Créé le ${new Date(t.created_at).toLocaleDateString('fr')}`;
+  document.getElementById('ai-read-body').innerHTML = renderTutoContenu(t.contenu_json, t.format_souhaite);
+  document.getElementById('ai-read-modal').style.display = 'flex';
+}
+
+async function supprimerTutoriel(id, titre) {
+  if (!confirm(`Supprimer "${titre}" ?`)) return;
+  await fetch(`/api/admin/tutoriels/${id}`, { method:'DELETE', credentials:'include' });
+  loadBibliotheque();
+}
+
+/* ══════════════ FIN D'A TUTOR AI ══════════════ */
+
 /* ── Utilisateur connecté ── */
 let _currentUser = null;
 (async () => {
@@ -641,6 +956,18 @@ let _currentUser = null;
     const data = await fetch('/api/auth/me', {credentials:'include'}).then(r=>r.json());
     _currentUser = data.user;
     if (_currentUser) {
+      /* Afficher D'A Tutor AI si Super Admin */
+      if (_currentUser.role === 'administrateur') {
+        const aiTabBtn = document.createElement('button');
+        aiTabBtn.className = 'tuto-tab';
+        aiTabBtn.dataset.tab = 'tutor-ai';
+        aiTabBtn.innerHTML = '🧠 D\'A Tutor AI';
+        aiTabBtn.style.cssText = 'background:linear-gradient(135deg,#312e81,#4f46e5);color:#fff;border-color:#312e81;';
+        document.querySelector('.tuto-tabs').appendChild(aiTabBtn);
+        document.getElementById('tab-tutor-ai').style.display = '';
+        loadBibliotheque();
+      }
+
       /* Afficher onglet Mon espace + le sélectionner par défaut */
       const tabBtn = document.getElementById('tab-btn-monespace');
       tabBtn.style.display = 'inline-flex';
