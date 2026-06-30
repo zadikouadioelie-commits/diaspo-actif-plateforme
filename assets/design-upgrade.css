@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    DIASPO'ACTIF — Design Upgrade Global
    S'applique à toutes les pages. Améliore l'existant sans casser.
    ============================================================ */
@@ -21,12 +21,11 @@
   --du-radius-xl: 20px;
 }
 
-/* ── Topbar / Header amélioré ── */
+/* ── Topbar / Header — palette officielle Diaspo'Actif ── */
 .topbar {
-  background: #fff !important;
-  border-bottom: 1px solid rgba(37,99,235,.1) !important;
-  box-shadow: 0 1px 12px rgba(0,0,0,.06) !important;
-  backdrop-filter: blur(8px);
+  background:#0D2B4E !important;
+  border-bottom: 1px solid rgba(255,255,255,.08) !important;
+  box-shadow: 0 2px 16px rgba(13,43,78,.25) !important;
 }
 .topbar-inner {
   padding: 12px 24px !important;
@@ -34,7 +33,7 @@
 .logo {
   font-size: 15px !important;
   letter-spacing: .5px !important;
-  color: #0D1B2A !important;
+  color: #fff !important;
 }
 .logo-img {
   width: 36px !important;
@@ -43,14 +42,14 @@
 .nav a {
   font-size: 13.5px !important;
   font-weight: 600 !important;
-  color: #475569 !important;
+  color: rgba(255,255,255,.75) !important;
   padding: 6px 2px !important;
   border-bottom: 2px solid transparent !important;
   transition: color .15s, border-color .15s !important;
 }
 .nav a.active, .nav a:hover {
-  color: #2563EB !important;
-  border-bottom-color: #2563EB !important;
+  color: #fff !important;
+  border-bottom-color: #F26422 !important;
 }
 
 /* ── Boutons ── */
@@ -81,7 +80,7 @@
 .btn-outline {
   border: 1.5px solid #BFDBFE !important;
   color: #2563EB !important;
-  background: #fff !important;
+  background:var(--card) !important;
 }
 .btn-outline:hover {
   background: #EFF6FF !important;
@@ -200,7 +199,7 @@ tbody td {
 
 /* ── Sidebar / Dashboard ── */
 .sidebar {
-  background: #fff !important;
+  background:var(--card) !important;
   border-right: 1px solid rgba(37,99,235,.08) !important;
   box-shadow: 2px 0 16px rgba(0,0,0,.04) !important;
 }
@@ -396,7 +395,7 @@ footer, .footer {
   margin: -24px 24px 24px;
 }
 .dash-kpi {
-  background: #fff;
+  background:var(--card);
   border-radius: 14px;
   padding: 20px;
   border: 1.5px solid #E8EFFE;
@@ -422,7 +421,7 @@ footer, .footer {
 
 /* ── Annuaire / Recherche ── */
 .search-bar, .annuaire-search {
-  background: #fff;
+  background:var(--card);
   border: 1.5px solid #E2E8F0;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(37,99,235,.06);
@@ -476,7 +475,7 @@ footer, .footer {
 .post-composer, .new-post-box {
   border-radius: 14px !important;
   border: 1.5px solid #E8EFFE !important;
-  background: #fff !important;
+  background:var(--card) !important;
 }
 .post-composer input, .new-post-box input,
 .post-composer textarea, .new-post-box textarea {
