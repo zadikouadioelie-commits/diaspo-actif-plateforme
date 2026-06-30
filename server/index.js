@@ -989,7 +989,7 @@ route("GET", "/api/fil/:id", async (req, res, params) => {
   if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
   // Enregistrer la vue
   if (cu) { try { db.prepare("INSERT OR IGNORE INTO fil_post_views (post_id, user_id) VALUES (?,?)").run(p.id, cu.id); } catch(e){} }
-  sendJSON(res, 200, { post: enrichPost(p, cu) });
+  sendJSON(res, 200, { post: await enrichPost(p, cu) });
 });
 
 /* ---------- Modifier post ---------- */
@@ -2785,9 +2785,10 @@ route("GET", "/api/mes-candidatures", async (req, res) => {
 
 /* ---------- Helper : enrichir un post ---------- */
 async function enrichPost(p, cu) {
-  const reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
+  const reactions = await db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
   const counts = {}; reactions.forEach(r => counts[r.type] = r.n);
-  const nb_commentaires = db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id).n;
+  const _nbComm = await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id);
+  const nb_commentaires = _nbComm ? _nbComm.n : 0;
   const user_a_aime = cu ? !!await db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
 
   let auteur = {}, auteur_certif = null;
@@ -2808,7 +2809,8 @@ async function enrichPost(p, cu) {
   }
 
   // Score de popularité : likes×3 + commentaires×2 + reposts×1
-  const nb_reposts = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE original_post_id=?").get(p.id).n;
+  const _nbReposts = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE original_post_id=?").get(p.id);
+  const nb_reposts = _nbReposts ? _nbReposts.n : 0;
   const score = (counts.like||0)*3 + nb_commentaires*2 + nb_reposts;
 
   let original_post = null;
@@ -2820,7 +2822,7 @@ async function enrichPost(p, cu) {
         const ou = await db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur FROM users WHERE id=?").get(orig.auteur_id);
         if (ou) orig_auteur = ou;
       }
-      const orig_reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(orig.id);
+      const orig_reactions = await db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(orig.id);
       const orig_counts = {}; orig_reactions.forEach(r => orig_counts[r.type] = r.n);
       original_post = { ...orig, reactions: orig_counts, auteur_profil: orig_auteur };
     }
@@ -2856,7 +2858,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     const placeholders = allIds.map(()=>"?").join(",");
     const total = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).get(...allIds).n;
     const posts = db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT ? OFFSET ?`).all(...allIds, limit, offset);
-    return sendJSON(res, 200, { posts: posts.map(p => ({ ...enrichPost(p, cu), source: "suivi" })), total, page, pages: Math.ceil(total/limit), mode });
+    return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "suivi" }))), total, page, pages: Math.ceil(total/limit), mode });
   }
 
   // ─── MODE POPULAIRES ───────────────────────────────────────────────────────
@@ -2875,7 +2877,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       LIMIT ? OFFSET ?
     `).all(since, limit, offset);
     const total = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).get(since).n;
-    return sendJSON(res, 200, { posts: posts.map(p => ({ ...enrichPost(p, cu), source: "populaire" })), total, page, pages: Math.ceil(total/limit), mode });
+    return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "populaire" }))), total, page, pages: Math.ceil(total/limit), mode });
   }
 
   // ─── MODE ARTICLES MIS EN AVANT ────────────────────────────────────────────
@@ -2886,7 +2888,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       ORDER BY p.created_at DESC LIMIT ? OFFSET ?
     `).all(limit, offset);
     const total = db.prepare("SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get().n;
-    return sendJSON(res, 200, { posts: posts.map(p => ({ ...enrichPost(p, cu), source: "article" })), total, page, pages: Math.ceil(total/limit), mode });
+    return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "article" }))), total, page, pages: Math.ceil(total/limit), mode });
   }
 
   // ─── MODE TOUS (fil global enrichi) ────────────────────────────────────────
@@ -2933,7 +2935,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   // Pagination sur le résultat fusionné
   const total = allPosts.length;
   const paginated = allPosts.slice(offset, offset + limit);
-  sendJSON(res, 200, { posts: paginated.map(p => enrichPost(p, cu)), total, page, pages: Math.ceil(total/limit), mode });
+  sendJSON(res, 200, { posts: await Promise.all(paginated.map(p => enrichPost(p, cu))), total, page, pages: Math.ceil(total/limit), mode });
 });
 
 /* ---------- Follow / Unfollow utilisateur ---------- */
