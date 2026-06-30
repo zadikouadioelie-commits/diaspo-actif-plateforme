@@ -938,7 +938,7 @@ route("GET", "/api/fil/:id/commentaires", async (req, res, params) => {
            u.photo_url, u.theme_couleur, u.role
     FROM fil_commentaires c
     LEFT JOIN users u ON u.id = c.auteur_id
-    WHERE c.post_id = ?
+    WHERE c.post_id = ? AND (u.is_demo IS NULL OR u.is_demo = FALSE)
     ORDER BY c.created_at ASC
   `).all(params.id);
   // Ajouter la certification pour les commentaires d'initiatives
@@ -2852,8 +2852,8 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       return sendJSON(res, 200, { posts: [], total: 0, page, pages: 0, mode, conseil: "Suivez des personnes et des initiatives pour voir leurs publications ici." });
     }
     const placeholders = allIds.map(()=>"?").join(",");
-    const total = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id IN (${placeholders})`).get(...allIds).n;
-    const posts = db.prepare(`SELECT * FROM fil_posts WHERE auteur_id IN (${placeholders}) ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...allIds, limit, offset);
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).get(...allIds).n;
+    const posts = db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT ? OFFSET ?`).all(...allIds, limit, offset);
     return sendJSON(res, 200, { posts: posts.map(p => ({ ...enrichPost(p, cu), source: "suivi" })), total, page, pages: Math.ceil(total/limit), mode });
   }
 
@@ -2866,23 +2866,24 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
         (SELECT COUNT(*) FROM fil_reactions r WHERE r.post_id=p.id AND r.type='like')*3 +
         (SELECT COUNT(*) FROM fil_commentaires c WHERE c.post_id=p.id)*2 +
         (SELECT COUNT(*) FROM fil_posts rp WHERE rp.original_post_id=p.id) AS score_calc
-      FROM fil_posts p
+      FROM fil_posts p JOIN users u ON u.id=p.auteur_id
       WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (p.type IS NULL OR p.type != 'repost')
+        AND (u.is_demo IS NULL OR u.is_demo=FALSE)
       ORDER BY score_calc DESC, p.created_at DESC
       LIMIT ? OFFSET ?
     `).all(since, limit, offset);
-    const total = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts WHERE created_at >= ? AND (pub_type IS NULL OR pub_type != 'repost')`).get(since).n;
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).get(since).n;
     return sendJSON(res, 200, { posts: posts.map(p => ({ ...enrichPost(p, cu), source: "populaire" })), total, page, pages: Math.ceil(total/limit), mode });
   }
 
   // ─── MODE ARTICLES MIS EN AVANT ────────────────────────────────────────────
   if (mode === "articles") {
     const posts = db.prepare(`
-      SELECT * FROM fil_posts
-      WHERE (pub_type='article' OR type='article')
-      ORDER BY created_at DESC LIMIT ? OFFSET ?
+      SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
+      WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+      ORDER BY p.created_at DESC LIMIT ? OFFSET ?
     `).all(limit, offset);
-    const total = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE pub_type='article' OR type='article'").get().n;
+    const total = db.prepare("SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get().n;
     return sendJSON(res, 200, { posts: posts.map(p => ({ ...enrichPost(p, cu), source: "article" })), total, page, pages: Math.ceil(total/limit), mode });
   }
 
@@ -2901,7 +2902,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     const followedAll = [...new Set([...followedUsers, ...initOwners])];
     if (followedAll.length) {
       const ph = followedAll.map(()=>"?").join(",");
-      db.prepare(`SELECT * FROM fil_posts WHERE auteur_id IN (${ph}) ORDER BY created_at DESC LIMIT 10`).all(...followedAll)
+      db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${ph}) AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 10`).all(...followedAll)
         .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"suivi" }); } });
     }
   }
@@ -2909,8 +2910,8 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   // 2) Posts populaires récents (30j)
   const since = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,19).replace("T"," ");
   db.prepare(`
-    SELECT p.* FROM fil_posts p
-    WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost')
+    SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
+    WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (u.is_demo IS NULL OR u.is_demo=FALSE)
     ORDER BY (SELECT COUNT(*) FROM fil_reactions r WHERE r.post_id=p.id)*3 +
              (SELECT COUNT(*) FROM fil_commentaires c WHERE c.post_id=p.id)*2 DESC,
              p.created_at DESC
@@ -2918,13 +2919,13 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   `).all(since).forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"populaire" }); } });
 
   // 3) Articles récents mis en avant
-  db.prepare(`SELECT * FROM fil_posts WHERE (pub_type='article' OR type='article') ORDER BY created_at DESC LIMIT 5`).all()
+  db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 5`).all()
     .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"article" }); } });
 
   // 4) Reste chronologique
   const excludeClause = orderedIds.size ? `AND id NOT IN (${[...orderedIds].map(()=>"?").join(",")})` : "";
   const excludeArgs = orderedIds.size ? [...orderedIds] : [];
-  await db.prepare(`SELECT * FROM fil_posts WHERE 1=1 ${excludeClause} ORDER BY created_at DESC LIMIT 30`).all(...excludeArgs)
+  await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE 1=1 ${excludeClause} AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 30`).all(...excludeArgs)
     .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"global" }); } });
 
   // Pagination sur le résultat fusionné
