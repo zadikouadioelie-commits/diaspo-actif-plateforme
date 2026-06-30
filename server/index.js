@@ -2350,7 +2350,7 @@ route("GET", "/api/admin/membres", async (req, res, params, body, query) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const role = query.role || null;
   const q = query.q ? `%${query.q}%` : null;
-  let sql = "SELECT id,nom,prenom,email,role,ville,pays,statut_verification,created_at FROM users WHERE 1=1";
+  let sql = "SELECT id,nom,prenom,email,telephone,role,ville,pays,statut_verification,created_at FROM users WHERE 1=1";
   const args = [];
   if (role) { sql += " AND role=?"; args.push(role); }
   if (q) { sql += " AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ?)"; args.push(q, q, q); }

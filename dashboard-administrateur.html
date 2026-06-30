@@ -8244,11 +8244,15 @@ async function submitAccordDirect(){
       const { membres = [] } = await api('GET', '/admin/membres');
       if (!membres.length) { el.innerHTML = '<div class="notice">Aucun membre.</div>'; return; }
       el.innerHTML = `
+        <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#92400e;">
+          🔐 <strong>Accès administrateur uniquement.</strong> Les coordonnées (email, téléphone) sont confidentielles et ne sont jamais affichées aux autres membres.
+        </div>
         <div style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead><tr style="border-bottom:2px solid var(--border);">
               <th style="padding:8px;text-align:left;">Nom</th>
-              <th style="padding:8px;text-align:left;">Email</th>
+              <th style="padding:8px;text-align:left;">📧 Email</th>
+              <th style="padding:8px;text-align:left;">📞 Téléphone</th>
               <th style="padding:8px;text-align:left;">Rôle</th>
               <th style="padding:8px;text-align:left;">Statut</th>
               <th style="padding:8px;text-align:left;">Inscription</th>
@@ -8256,8 +8260,9 @@ async function submitAccordDirect(){
             </tr></thead>
             <tbody>${membres.map(m => `
               <tr style="border-bottom:1px solid var(--border);">
-                <td style="padding:8px;">${esc(m.nom||'')} ${esc(m.prenom||'')}</td>
-                <td style="padding:8px;color:var(--muted);">${esc(m.email)}</td>
+                <td style="padding:8px;font-weight:600;">${esc(m.nom||'')} ${esc(m.prenom||'')}</td>
+                <td style="padding:8px;"><a href="mailto:${esc(m.email)}" style="color:var(--orange);text-decoration:none;">${esc(m.email)}</a></td>
+                <td style="padding:8px;">${m.telephone ? `<a href="tel:${esc(m.telephone)}" style="color:var(--text);text-decoration:none;">${esc(m.telephone)}</a>` : '<span style="color:var(--muted)">—</span>'}</td>
                 <td style="padding:8px;">${esc(m.role)}</td>
                 <td style="padding:8px;">${m.statut_verification==='valide'?'✅ Validé':m.statut_verification==='en_attente'?'⏳ En attente':'❌ Rejeté'}</td>
                 <td style="padding:8px;color:var(--muted);">${fmtDate(m.created_at)}</td>
