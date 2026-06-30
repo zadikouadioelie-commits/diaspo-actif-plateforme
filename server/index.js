@@ -303,6 +303,70 @@ route("GET", "/api/auth/me", async (req, res) => {
   sendJSON(res, 200, { user: publicUser(user) });
 });
 
+/* POST /api/upload/avatar — upload photo de profil vers Bunny.net */
+route("POST", "/api/upload/avatar", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+
+  const chunks = [];
+  req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["avatar"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+
+  if (file.buffer.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 5 Mo)" });
+
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const url = await uploadToBunny(file.buffer, filename, "avatars");
+    await db.prepare("UPDATE users SET photo_url=? WHERE id=?").run(url, user.id);
+    sendJSON(res, 200, { url });
+  } catch (e) {
+    console.error("[Upload avatar]", e.message);
+    sendJSON(res, 500, { error: "Erreur upload: " + e.message });
+  }
+});
+
+/* POST /api/upload/banner — upload bannière profil */
+route("POST", "/api/upload/banner", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+
+  const chunks = [];
+  req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["banner"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+
+  if (file.buffer.length > 10 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 10 Mo)" });
+
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const url = await uploadToBunny(file.buffer, filename, "banners");
+    await db.prepare("UPDATE users SET banner_url=? WHERE id=?").run(url, user.id);
+    sendJSON(res, 200, { url });
+  } catch (e) {
+    console.error("[Upload banner]", e.message);
+    sendJSON(res, 500, { error: "Erreur upload: " + e.message });
+  }
+});
+
 /* ---------- Initiatives ---------- */
 /* Helper : certification d'une initiative */
 function getCertif(initiativeId) {
