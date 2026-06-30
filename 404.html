@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Page introuvable — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #060e1a 0%, #0D1B2A 50%, #0F2A50 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: Inter, Arial, sans-serif;
+    color: #fff;
+    padding: 24px;
+  }
+  .wrap { text-align: center; max-width: 480px; }
+  .logo { font-size: 18px; font-weight: 900; letter-spacing: -.02em; color: #94A3B8; margin-bottom: 48px; }
+  .code {
+    font-size: 120px; font-weight: 900; line-height: 1;
+    background: linear-gradient(135deg, #2563EB, #60A5FA);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+  }
+  h1 { font-size: 24px; font-weight: 800; margin-bottom: 12px; }
+  p { font-size: 14px; color: #94A3B8; line-height: 1.7; margin-bottom: 36px; }
+  .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn-primary {
+    background: linear-gradient(135deg, #2563EB, #1d4ed8);
+    color: #fff; text-decoration: none; font-weight: 700; font-size: 14px;
+    padding: 12px 24px; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(37,99,235,.4);
+    transition: opacity .2s;
+  }
+  .btn-primary:hover { opacity: .88; }
+  .btn-secondary {
+    background: rgba(255,255,255,.08); border: 1.5px solid rgba(255,255,255,.15);
+    color: #CBD5E1; text-decoration: none; font-weight: 600; font-size: 14px;
+    padding: 12px 24px; border-radius: 10px;
+    transition: background .2s;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,.14); }
+  .history-btn {
+    margin-top: 24px; background: none; border: none; color: #64748B;
+    font-size: 13px; cursor: pointer; text-decoration: underline;
+  }
+  .history-btn:hover { color: #94A3B8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">DIASPO'ACTIF</div>
+  <div class="code">404</div>
+  <h1>Cette page est introuvable</h1>
+  <p>La page que vous cherchez a peut-être été déplacée,<br>supprimée, ou n'a jamais existé.</p>
+  <div class="actions">
+    <a href="index.html" class="btn-primary">Retour à l'accueil →</a>
+    <a href="fil-actualite.html" class="btn-secondary">Fil d'actualité</a>
+  </div>
+  <button class="history-btn" onclick="history.back()">← Page précédente</button>
+</div>
+</body>
+</html>
