@@ -80,7 +80,7 @@ async function getCurrentUser(req) {
   return user || null;
 }
 
-async function publicUser(u) {
+function publicUser(u) {
   if (!u) return null;
   return { id: u.id, nom: u.nom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
     nb_connexions: u.nb_connexions || 0, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
@@ -88,10 +88,10 @@ async function publicUser(u) {
   // NOTE: ds_id est intentionnellement exclu — jamais exposé via cette fonction
 }
 
-async function safeParse(s) {
+function safeParse(s) {
   try { return JSON.parse(s || "{}"); } catch (e) { return {}; }
 }
-async function safeJSON(s, fallback) {
+function safeJSON(s, fallback) {
   try { return JSON.parse(s || JSON.stringify(fallback)); } catch (e) { return fallback; }
 }
 
@@ -16105,6 +16105,7 @@ if (require.main === module) {
     console.log(`Diaspo'Actif — serveur démarré sur http://localhost:${PORT}`);
   });
 }
+
 
 
 
