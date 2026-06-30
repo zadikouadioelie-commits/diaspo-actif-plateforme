@@ -19,10 +19,18 @@ function toPg(sql) {
   return sql
     .replace(/\?/g, () => `$${++i}`)
     .replace(/datetime\('now'\)/gi, "NOW()")
+    // strftime SQLite → to_char PostgreSQL (ordre important: plus spécifique d'abord)
+    .replace(/strftime\('%Y-%m',\s*'now',\s*'-1 month'\)/gi, "to_char(NOW() - INTERVAL '1 month','YYYY-MM')")
+    .replace(/strftime\('%Y-%m',\s*'now'\)/gi, "to_char(NOW(),'YYYY-MM')")
+    .replace(/strftime\('%Y',\s*'now'\)/gi, "to_char(NOW(),'YYYY')")
+    // date('now', modifier) SQLite → PostgreSQL
+    .replace(/date\('now',\s*'-(\d+)\s*days?'\)/gi, (_, d) => `to_char(CURRENT_DATE - INTERVAL '${d} days','YYYY-MM-DD')`)
+    .replace(/date\('now',\s*'-(\d+)\s*months?'\)/gi, (_, m) => `to_char(CURRENT_DATE - INTERVAL '${m} months','YYYY-MM-DD')`)
     .replace(/date\('now'\)/gi, "to_char(CURRENT_DATE,'YYYY-MM-DD')")
+    // MIN(val, expr) SQLite (LEAST) → LEAST PostgreSQL (MIN() seul est un agrégat)
+    .replace(/\bMIN\((\d+),/gi, "LEAST($1,")
     .replace(/\bINTEGER PRIMARY KEY AUTOINCREMENT\b/gi, "BIGSERIAL PRIMARY KEY")
     .replace(/\bBLOB\b/gi, "BYTEA")
-    // INSERT OR IGNORE → INSERT avec ON CONFLICT DO NOTHING (si pas déjà présent)
     .replace(/\bINSERT OR IGNORE INTO\b/gi, "INSERT INTO")
     .replace(/\bINSERT OR REPLACE INTO\b/gi, "INSERT INTO")
     .replace(/ON CONFLICT\b/gi, "ON CONFLICT");

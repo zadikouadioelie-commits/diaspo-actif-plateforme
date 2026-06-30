@@ -3186,16 +3186,16 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
   `).all();
 
   // Évolution mensuelle inscriptions initiatives (12 mois)
-  const evolution = await db.prepare(`
+  const evolution = (await db.prepare(`
     SELECT substr(created_at,1,7) AS mois, COUNT(*) n
     FROM initiatives GROUP BY mois ORDER BY mois DESC LIMIT 12
-  `).all().reverse();
+  `).all()).reverse();
 
   // Évolution événements (12 mois)
-  const evolutionEvents = await db.prepare(`
+  const evolutionEvents = (await db.prepare(`
     SELECT substr(created_at,1,7) AS mois, COUNT(*) n
     FROM evenements GROUP BY mois ORDER BY mois DESC LIMIT 12
-  `).all().reverse();
+  `).all()).reverse();
 
   // Tendances: comparer mois courant vs précédent par domaine
   const tendanceDomaine = await db.prepare(`

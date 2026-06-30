@@ -94,6 +94,30 @@ async function seedPg(pool) {
   await pool.query(
     `INSERT INTO counters (key, value) VALUES ('visits', 0) ON CONFLICT (key) DO NOTHING`
   );
+
+  // Données démo — initiative pour fatoumata.bah
+  const { rows: [fatou] } = await pool.query(`SELECT id FROM users WHERE email='fatoumata.bah@diaspoactif.demo'`);
+  if (fatou) {
+    await pool.query(`
+      INSERT INTO initiatives (owner_user_id, nom, slug, domaine, description, pays, ville, vues)
+      VALUES ($1, 'Diaspora Santé Africa', 'diaspora-sante-africa',
+              'Santé', 'Initiative dédiée à l''amélioration de l''accès aux soins pour la diaspora africaine et les communautés locales.',
+              'France', 'Paris', 128)
+      ON CONFLICT (slug) DO NOTHING
+    `, [fatou.id]).catch(() => {});
+  }
+
+  // Données démo — profil ambassade pour moussa.coulibaly
+  const { rows: [moussa] } = await pool.query(`SELECT id FROM users WHERE email='moussa.coulibaly@diaspoactif.demo'`);
+  if (moussa) {
+    await pool.query(`
+      INSERT INTO ambassade_profil (user_id, nom_officiel, pays_represente, description, site_web)
+      VALUES ($1, 'Ambassade de Guinée en France', 'Guinée',
+              'Représentation diplomatique officielle de la République de Guinée en France.',
+              'https://ambassade-guinee.fr')
+      ON CONFLICT (user_id) DO NOTHING
+    `, [moussa.id]).catch(() => {});
+  }
 }
 
 module.exports = pgInit;
