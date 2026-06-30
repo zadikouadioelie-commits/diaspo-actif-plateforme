@@ -6,8 +6,8 @@
 <title>Audit Design System — Diaspo'Actif</title>
 <link rel="icon" href="/assets/logo.svg">
 <link rel="stylesheet" href="/assets/ds.css">
-  <link rel="stylesheet" href="/assets/responsive.css?v=20260630c">
-<link rel="stylesheet" href="/assets/ui-enhancements.css?v=20260630c">
+  <link rel="stylesheet" href="/assets/responsive.css?v=20260630d">
+<link rel="stylesheet" href="/assets/ui-enhancements.css?v=20260630d">
 <style>
 .audit-result{margin-bottom:2rem;}
 .audit-file{background:#fff;border-radius:var(--da-radius-lg);border:1px solid var(--da-color-border);overflow:hidden;margin-bottom:1rem;}
@@ -29,7 +29,7 @@
 .stat-row{display:flex;align-items:center;gap:1rem;padding:.5rem 0;border-bottom:1px solid var(--da-color-border);}
 .stat-row:last-child{border-bottom:none;}
 </style>
-  <link rel="stylesheet" href="/assets/design-upgrade.css?v=20260630c">
+  <link rel="stylesheet" href="/assets/design-upgrade.css?v=20260630d">
 </head>
 <body>
 <nav class="da-navbar">
@@ -95,8 +95,8 @@ const RULES = [
     severity: 'error',
     check: html => html.includes('/assets/ds.css') || html.includes('ds.css'),
     fix: 'Ajouter <link rel="stylesheet" href="/assets/ds.css">
-  <link rel="stylesheet" href="/assets/responsive.css?v=20260630c">
-<link rel="stylesheet" href="/assets/ui-enhancements.css?v=20260630c"> dans le <head>',
+  <link rel="stylesheet" href="/assets/responsive.css?v=20260630d">
+<link rel="stylesheet" href="/assets/ui-enhancements.css?v=20260630d"> dans le <head>',
   },
   {
     id: 'ds-js-loaded',
@@ -361,4 +361,5 @@ function exportReport() {
 <script src="assets/chatbot.js"></script>
 </body>
 </html>
+
 

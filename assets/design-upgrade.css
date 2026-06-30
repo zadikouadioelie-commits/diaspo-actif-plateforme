@@ -199,9 +199,9 @@ tbody td {
 
 /* ── Sidebar / Dashboard ── */
 .sidebar {
-  background:var(--card) !important;
-  border-right: 1px solid rgba(37,99,235,.08) !important;
-  box-shadow: 2px 0 16px rgba(0,0,0,.04) !important;
+  background: #0D2B4E !important;
+  border-right: none !important;
+  box-shadow: 3px 0 20px rgba(13,43,78,.25) !important;
 }
 .sidebar-link,
 .sidebar a,
@@ -209,18 +209,19 @@ tbody td {
   border-radius: 8px !important;
   transition: background .15s, color .15s !important;
   font-weight: 600 !important;
+  color: rgba(255,255,255,.75) !important;
 }
 .sidebar-link:hover,
 .sidebar a:hover,
 .side-nav a:hover {
-  background: #EFF6FF !important;
-  color: #2563EB !important;
+  background: rgba(255,255,255,.1) !important;
+  color: #fff !important;
 }
 .sidebar-link.active,
 .sidebar a.active,
 .side-nav a.active {
-  background: #EFF6FF !important;
-  color: #2563EB !important;
+  background: #F26422 !important;
+  color: #fff !important;
   font-weight: 700 !important;
 }
 
