@@ -273,7 +273,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Invitez des membres inscrits. Chacun recevra une demande d'affiliation à accepter ou refuser.</p>
           <div style="position:relative;margin-bottom:12px;">
             <input id="cr-membre-search" class="input-field" style="width:100%;" placeholder="Nom, prénom, e-mail ou identifiant Diaspo'Actif…" autocomplete="off">
-            <div id="cr-membre-results" style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:50;display:none;max-height:200px;overflow-y:auto;"></div>
+            <div id="cr-membre-results" style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:50;display:none;max-height:200px;overflow-y:auto;"></div>
           </div>
           <div id="membres-list">${chips||'<p style="color:var(--muted);font-size:13px;margin:0;">Aucun membre ajouté. Vous pourrez en inviter depuis votre tableau de bord après création.</p>'}</div>`;
 
@@ -563,14 +563,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <div style="margin-top:14px;padding:14px;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;">
           <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px;">📅 Quand publier ?</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
-            <label id="pub-mode-lbl-now" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:2px solid var(--orange);border-radius:8px;background:#fff;">
+            <label id="pub-mode-lbl-now" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:2px solid var(--orange);border-radius:8px;background:var(--card);">
               <input type="radio" name="pub-mode" value="maintenant" checked style="accent-color:#2563EB;">
               <div>
                 <strong style="font-size:13px;">🚀 Publier maintenant</strong>
                 <div style="font-size:11px;color:var(--muted);">La publication sera visible immédiatement sur le fil d'actualité</div>
               </div>
             </label>
-            <label id="pub-mode-lbl-prog" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
+            <label id="pub-mode-lbl-prog" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);">
               <input type="radio" name="pub-mode" value="programme" style="accent-color:#2563EB;">
               <div>
                 <strong style="font-size:13px;">⏰ Programmer la publication</strong>
@@ -579,10 +579,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </label>
             <div id="pub-prog-panel" style="display:none;padding:10px 12px;border:1px solid #C7D7F5;border-radius:8px;background:#EFF6FF;margin-top:2px;">
               <label style="font-size:12px;font-weight:700;color:#1d4ed8;display:block;margin-bottom:6px;">📅 Date et heure de publication :</label>
-              <input type="datetime-local" id="pub-programmed-at" style="width:100%;padding:8px 12px;border:1px solid #93C5FD;border-radius:7px;font-family:inherit;font-size:13px;background:#fff;">
+              <input type="datetime-local" id="pub-programmed-at" style="width:100%;padding:8px 12px;border:1px solid #93C5FD;border-radius:7px;font-family:inherit;font-size:13px;background:var(--card);">
               <p style="font-size:11px;color:#3b82f6;margin:6px 0 0;">La publication sera envoyée automatiquement à la date et l'heure choisies.</p>
             </div>
-            <label id="pub-mode-lbl-draft" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
+            <label id="pub-mode-lbl-draft" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);">
               <input type="radio" name="pub-mode" value="brouillon" style="accent-color:#2563EB;">
               <div>
                 <strong style="font-size:13px;">💾 Enregistrer comme brouillon</strong>
@@ -1494,7 +1494,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     const now = new Date().toLocaleString('fr-FR');
     const w = window.open('', '_blank', 'width=480,height=400');
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Aperçu</title>
-    <style>body{font-family:sans-serif;padding:20px;background:#f8fafc;} .post{background:#fff;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
+    <style>body{font-family:sans-serif;padding:20px;background:#f8fafc;} .post{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
     .cat{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:#f1f5f9;margin-bottom:8px;}
     .contenu{font-size:14px;line-height:1.6;} .meta{font-size:11px;color:#94a3b8;margin-top:10px;}</style></head>
     <body><p style="font-size:12px;color:#64748b;margin-bottom:12px;">📋 Aperçu avant publication</p>
@@ -2137,7 +2137,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>`).join('');
     const modal = document.createElement('div');
     modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;';
-    modal.innerHTML=`<div style="background:#fff;border-radius:14px;padding:24px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;">
+    modal.innerHTML=`<div style="background:var(--card);border-radius:14px;padding:24px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <h3 style="margin:0;font-size:1rem;">👤 Fiche candidat</h3>
         <button onclick="this.closest('.modal-fiche').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;">×</button>
@@ -2352,7 +2352,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
     /* Modal nouveau projet */
     const mhtml=`<div id="init-modal-projet" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
-      <div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:560px;margin:auto;">
+      <div style="background:var(--card);border-radius:18px;padding:28px;width:100%;max-width:560px;margin:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
           <h3 style="margin:0;">🟩 Nouveau projet</h3>
           <button onclick="document.getElementById('init-modal-projet').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;">✕</button>
@@ -2622,7 +2622,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div style="flex:1;min-width:0;">
             <input type="text" id="iev-video${n}-titre" value="${v(e?.[`video${n}_titre`])}" placeholder="Titre de la vidéo (facultatif)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;margin-bottom:6px;">
             <div style="display:flex;gap:6px;align-items:center;">
-              <button type="button" onclick="document.getElementById('iev-vf${n}').click()" style="padding:6px 12px;border:1px solid var(--orange);border-radius:6px;background:#fff;color:#2563EB;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">${e?.[`video${n}_url`]?'🔄 Remplacer':'📁 Choisir un MP4'}</button>
+              <button type="button" onclick="document.getElementById('iev-vf${n}').click()" style="padding:6px 12px;border:1px solid var(--orange);border-radius:6px;background:var(--card);color:#2563EB;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">${e?.[`video${n}_url`]?'🔄 Remplacer':'📁 Choisir un MP4'}</button>
               ${e?.[`video${n}_url`]?`<span style="font-size:11px;color:#22c55e;font-weight:700;">✅ Vidéo enregistrée</span>`:'<span id="iev-vid'+n+'-name" style="font-size:11px;color:var(--muted);">Aucun fichier · max 1 min · MP4</span>'}
             </div>
             <div id="iev-vid${n}-progress-wrap" style="display:none;margin-top:6px;">
@@ -2701,7 +2701,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <div style="margin-top:4px;position:relative;">
                 <input type="text" id="iev-part-search" placeholder="Rechercher un compte (ambassade, association, entreprise…)" autocomplete="off"
                   style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
-                <div id="iev-part-dropdown" style="display:none;position:absolute;z-index:100;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;margin-top:2px;"></div>
+                <div id="iev-part-dropdown" style="display:none;position:absolute;z-index:100;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;margin-top:2px;"></div>
               </div>
               <div id="iev-part-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:0;">
                 ${(()=>{try{const ps=JSON.parse(e?.fc_partenaires_ids||'[]');return ps.map(p=>`<span class="iev-part-chip" data-id="${p.id}" data-source="${p.source}" data-nom="${escH(p.nom)}" style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:20px;font-size:12px;"><strong>${escH(p.nom)}</strong><span style="font-size:10px;color:#64748b;">${escH(p.role||'')}</span><button onclick="ievRemovePartenaire(this)" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:14px;padding:0 0 0 2px;line-height:1;">×</button></span>`).join('');}catch{return '';}})()}
@@ -2725,7 +2725,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div style="margin:16px 0 8px;font-size:13px;font-weight:700;color:#555;border-top:1px solid var(--border);padding-top:14px;">🎯 Cible</div>
       <div style="display:flex;flex-direction:column;gap:7px;" id="iev-cible-radios">
         ${[['tous','🌍 Tout le monde','Visible par tous les utilisateurs'],['abonnes','👥 Abonnés','Personnes qui vous suivent'],['liste','📋 Liste de diffusion','Envoyer à une liste de contacts']].map(([v,l,d])=>`
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;" id="iev-cible-lbl-${v}">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);" id="iev-cible-lbl-${v}">
           <input type="radio" name="iev-cible" value="${v}" ${(e?.cible_type||'tous')===v?'checked':''} style="accent-color:#2563EB;">
           <div><strong style="font-size:13px;">${l}</strong><div style="font-size:12px;color:var(--muted);">${d}</div></div>
         </label>`).join('')}
@@ -2749,7 +2749,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
              ['national','🇫🇷 National','Tout le pays'],
              ['international','🌍 International','Diffusion mondiale']
             ].map(([val,lbl,desc])=>`
-          <label style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;cursor:pointer;padding:10px 8px;border:1.5px solid var(--border);border-radius:10px;background:#fff;transition:border-color .15s;" id="iev-rayon-lbl-${val}" onclick="ievSelectRayon('${val}')">
+          <label style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;cursor:pointer;padding:10px 8px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);transition:border-color .15s;" id="iev-rayon-lbl-${val}" onclick="ievSelectRayon('${val}')">
             <input type="radio" name="iev-rayon" value="${val}" ${(e?.rayon_publication||'international')===val?'checked':''} style="display:none;">
             <span style="font-size:15px;">${lbl.split(' ')[0]}</span>
             <strong style="font-size:11px;">${lbl.split(' ').slice(1).join(' ')}</strong>
@@ -2768,7 +2768,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             ['obligatoire','✅ Pré-inscription obligatoire','Requiert une inscription avec ID DA + DS-ID'],
             ['validation','🔍 Inscription avec validation','L\'organisateur valide chaque demande'],
           ].map(([val,lbl,desc])=>`
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);">
             <input type="radio" name="iev-insc-mode" value="${val}" ${(e?.inscription_mode||'libre')===val?'checked':''} style="accent-color:#2563EB;" onchange="ievTogglePlaces()">
             <div><strong style="font-size:13px;">${lbl}</strong><div style="font-size:11px;color:var(--muted);">${desc}</div></div>
           </label>`).join('')}
@@ -2780,7 +2780,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <input type="number" id="iev-nb-places" min="0" value="${e?.nb_places||''}" placeholder="0 = illimité" style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid #86EFAC;border-radius:6px;font-size:13px;font-family:inherit;">
             </div>
             <div style="display:flex;align-items:flex-end;">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid #86EFAC;border-radius:6px;background:#fff;width:100%;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid #86EFAC;border-radius:6px;background:var(--card);width:100%;">
                 <input type="checkbox" id="iev-liste-attente" ${e?.liste_attente?'checked':''} style="accent-color:#2563EB;">
                 <div><strong style="font-size:12px;color:#166534;">📋 Liste d'attente</strong><div style="font-size:10px;color:var(--muted);">Automatique si complet</div></div>
               </label>
@@ -2796,11 +2796,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
         <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px;">📅 Publication</div>
         <div style="display:flex;flex-direction:column;gap:7px;">
-          <label id="iev-mode-lbl-now" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:2px solid var(--orange);border-radius:8px;background:#fff;">
+          <label id="iev-mode-lbl-now" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:2px solid var(--orange);border-radius:8px;background:var(--card);">
             <input type="radio" name="iev-mode-pub" value="publie" ${(e?.statut==='publie'||!e)?'checked':''} style="accent-color:#2563EB;">
             <div><strong style="font-size:13px;">🚀 Publier immédiatement</strong><div style="font-size:11px;color:var(--muted);">L'événement sera visible dès la validation</div></div>
           </label>
-          <label id="iev-mode-lbl-prog" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
+          <label id="iev-mode-lbl-prog" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);">
             <input type="radio" name="iev-mode-pub" value="programme" ${e?.statut==='brouillon_programme'?'checked':''} style="accent-color:#2563EB;">
             <div><strong style="font-size:13px;">⏰ Programmer la publication</strong><div style="font-size:11px;color:var(--muted);">Diffusion automatique à la date choisie</div></div>
           </label>
@@ -2822,7 +2822,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               </div>
             </div>
           </div>
-          <label id="iev-mode-lbl-draft" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;">
+          <label id="iev-mode-lbl-draft" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);">
             <input type="radio" name="iev-mode-pub" value="brouillon" ${e?.statut==='brouillon'?'checked':''} style="accent-color:#2563EB;">
             <div><strong style="font-size:13px;">💾 Enregistrer comme brouillon</strong><div style="font-size:11px;color:var(--muted);">Reprendre plus tard avant publication</div></div>
           </label>
@@ -3041,7 +3041,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         return;
       }
       el.innerHTML=listes.map(l=>`
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:#fff;margin-bottom:5px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--card);margin-bottom:5px;">
           <input type="checkbox" value="${l.id}" class="iev-liste-cb" ${selSet.has(l.id)?'checked':''} style="accent-color:#2563EB;">
           <span style="font-size:1rem;">${l.icone||'📋'}</span>
           <div><strong>${escH(l.nom)}</strong><span style="color:var(--muted);font-size:11px;margin-left:6px;">${l.nb_contacts||0} contact(s)</span></div>
@@ -3368,7 +3368,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   /* Style commun projets */
   if(!document.getElementById('init-proj-style')){
     const s=document.createElement('style');s.id='init-proj-style';
-    s.textContent='.u-proj-filter{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}.u-proj-filter.active{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;}.u-proj-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}';
+    s.textContent='.u-proj-filter{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}.u-proj-filter.active{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;}.u-proj-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}';
     document.head.appendChild(s);
   }
 
@@ -4237,7 +4237,7 @@ initFormationsSidebar();
 
 <!-- ══ MODAL CRÉATION / MODIFICATION ÉVÉNEMENT (dashboard initiative) ══ -->
 <div id="init-evt-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;overflow-y:auto;padding:20px;align-items:flex-start;justify-content:center;">
-  <div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:700px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+  <div style="background:var(--card);border-radius:18px;padding:28px;width:100%;max-width:700px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
       <h3 style="margin:0;font-size:1.1rem;" id="init-evt-modal-titre">📅 Créer un événement</h3>
       <button onclick="closeInitEvtModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b;line-height:1;">×</button>

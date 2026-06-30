@@ -418,19 +418,19 @@
             <div style="margin-bottom:14px;">
               <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Photos (max 4)</div>
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="coll-photo-grid">
-                <label id="coll-ph-0" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;transition:border-color .2s;">
+                <label id="coll-ph-0" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--card);overflow:hidden;position:relative;transition:border-color .2s;">
                   <span style="font-size:22px;">📷</span><span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
                   <input type="file" accept="image/*" style="display:none;" onchange="collAddPhoto(this,0)">
                 </label>
-                <label id="coll-ph-1" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;transition:border-color .2s;">
+                <label id="coll-ph-1" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--card);overflow:hidden;position:relative;transition:border-color .2s;">
                   <span style="font-size:22px;">📷</span><span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
                   <input type="file" accept="image/*" style="display:none;" onchange="collAddPhoto(this,1)">
                 </label>
-                <label id="coll-ph-2" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;transition:border-color .2s;">
+                <label id="coll-ph-2" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--card);overflow:hidden;position:relative;transition:border-color .2s;">
                   <span style="font-size:22px;">📷</span><span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
                   <input type="file" accept="image/*" style="display:none;" onchange="collAddPhoto(this,2)">
                 </label>
-                <label id="coll-ph-3" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;overflow:hidden;position:relative;transition:border-color .2s;">
+                <label id="coll-ph-3" class="coll-photo-slot" style="aspect-ratio:1;border:1.5px dashed #CBD5E1;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--card);overflow:hidden;position:relative;transition:border-color .2s;">
                   <span style="font-size:22px;">📷</span><span style="font-size:11px;color:var(--muted);margin-top:4px;">Ajouter</span>
                   <input type="file" accept="image/*" style="display:none;" onchange="collAddPhoto(this,3)">
                 </label>
@@ -440,7 +440,7 @@
             <!-- Vidéo -->
             <div style="margin-bottom:14px;">
               <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Vidéo (max 2 min)</div>
-              <div id="coll-video-zone" style="border:1.5px dashed #CBD5E1;border-radius:10px;background:#fff;padding:14px;text-align:center;cursor:pointer;position:relative;" onclick="document.getElementById('coll-video-input').click()">
+              <div id="coll-video-zone" style="border:1.5px dashed #CBD5E1;border-radius:10px;background:var(--card);padding:14px;text-align:center;cursor:pointer;position:relative;" onclick="document.getElementById('coll-video-input').click()">
                 <div id="coll-video-placeholder"><div style="font-size:28px;">🎬</div><div style="font-size:13px;color:var(--muted);margin-top:4px;">Cliquer pour ajouter une vidéo</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">MP4, WebM, MOV — max 2 min</div></div>
                 <video id="coll-video-preview" style="display:none;width:100%;max-height:160px;border-radius:8px;" controls></video>
                 <button id="coll-video-remove" style="display:none;position:absolute;top:8px;right:8px;background:#EF4444;color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1;" onclick="event.stopPropagation();collRemoveVideo()">×</button>
@@ -452,7 +452,7 @@
             <!-- Audio -->
             <div>
               <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Message audio (max 20 sec)</div>
-              <div id="coll-audio-zone" style="border:1.5px dashed #CBD5E1;border-radius:10px;background:#fff;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="document.getElementById('coll-audio-input').click()">
+              <div id="coll-audio-zone" style="border:1.5px dashed #CBD5E1;border-radius:10px;background:var(--card);padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="document.getElementById('coll-audio-input').click()">
                 <div id="coll-audio-placeholder" style="display:flex;align-items:center;gap:10px;width:100%;"><span style="font-size:28px;">🎙️</span><div><div style="font-size:13px;color:var(--muted);">Ajouter un message audio</div><div style="font-size:11px;color:#94a3b8;">MP3, AAC, WAV — max 20 secondes</div></div></div>
                 <div id="coll-audio-preview" style="display:none;width:100%;align-items:center;gap:10px;"><span style="font-size:22px;">🎵</span><audio id="coll-audio-player" controls style="flex:1;height:36px;"></audio><button style="background:#EF4444;color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;flex-shrink:0;" onclick="event.stopPropagation();collRemoveAudio()">×</button></div>
               </div>
@@ -737,7 +737,7 @@ window.collRejeterProjet = async function(id) {
 /* Style commun */
 if(!document.getElementById('coll-proj-style')){
   const s=document.createElement('style');s.id='coll-proj-style';
-  s.textContent='.u-proj-filter{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}.u-proj-filter.active{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;}.u-proj-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}';
+  s.textContent='.u-proj-filter{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}.u-proj-filter.active{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;}.u-proj-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}';
   document.head.appendChild(s);
 }
 

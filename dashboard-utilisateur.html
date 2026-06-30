@@ -258,7 +258,7 @@
 
   <!-- ── Modal : Nouveau projet ── -->
   <div id="u-modal-projet-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
-    <div style="background:#fff;border-radius:18px;padding:28px;width:100%;max-width:600px;margin:auto;">
+    <div style="background:var(--card);border-radius:18px;padding:28px;width:100%;max-width:600px;margin:auto;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
         <h3 style="margin:0;">🟩 Nouveau projet</h3>
         <button onclick="document.getElementById('u-modal-projet-bg').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
@@ -294,7 +294,7 @@
     .sb-group-lbl { font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:rgba(255,255,255,.4);padding:12px 16px 4px;margin-top:4px; }
     .u-proj-filter { background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s; }
     .u-proj-filter.active { background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB; }
-    .u-proj-card { background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px; }
+    .u-proj-card { background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px; }
     .u-proj-card:hover { border-color:#2563EB; }
     .u-statut { display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px; }
     .u-statut-brouillon { background:#f1f5f9;color:#475569; }
@@ -537,7 +537,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
       bg.addEventListener('click', e => { if(e.target===bg) bg.remove(); });
       document.body.appendChild(bg);
     }
-    bg.innerHTML = `<div style="background:#fff;border-radius:12px;padding:20px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;">
+    bg.innerHTML = `<div style="background:var(--card);border-radius:12px;padding:20px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
         <strong style="font-size:.95rem;">${esc(titre)}</strong>
         <button onclick="document.getElementById('generic-modal-bg').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">×</button>
@@ -761,7 +761,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
 #oz-widget{position:fixed;bottom:80px;right:20px;z-index:300;display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
 #oz-toggle{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#ff6b00,#ff9a42);border:none;cursor:pointer;box-shadow:0 4px 16px rgba(255,107,0,.4);display:flex;align-items:center;justify-content:center;font-size:24px;transition:transform .2s;}
 #oz-toggle:hover{transform:scale(1.1);}
-#oz-panel{width:320px;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden;border:1px solid var(--border);}
+#oz-panel{width:320px;background:var(--card);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden;border:1px solid var(--border);}
 #oz-panel.open{display:flex;}
 #oz-header{background:linear-gradient(135deg,#ff6b00,#ff9a42);padding:14px 16px;display:flex;align-items:center;gap:10px;color:#fff;}
 #oz-header .oz-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
@@ -771,10 +771,10 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
 #oz-close{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0;}
 #oz-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;max-height:320px;background:#fafafa;}
 .oz-msg{max-width:85%;padding:9px 13px;border-radius:12px;font-size:13px;line-height:1.5;word-break:break-word;}
-.oz-msg.bot{background:#fff;border:1px solid var(--border);border-bottom-left-radius:4px;align-self:flex-start;}
+.oz-msg.bot{background:var(--card);border:1px solid var(--border);border-bottom-left-radius:4px;align-self:flex-start;}
 .oz-msg.user{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-bottom-right-radius:4px;align-self:flex-end;}
 .oz-msg.typing{color:var(--muted);font-style:italic;font-size:12px;}
-#oz-input-row{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--border);background:#fff;}
+#oz-input-row{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--border);background:var(--card);}
 #oz-input{flex:1;padding:8px 12px;border-radius:20px;border:1px solid var(--border);font-size:13px;font-family:inherit;outline:none;}
 #oz-input:focus{border-color:#2563EB;}
 #oz-send{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border:none;border-radius:50%;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
