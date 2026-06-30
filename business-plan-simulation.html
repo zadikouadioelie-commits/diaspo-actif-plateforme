@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Simulation Présentation BP</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+/* ===== LAYOUT ===== */
+.simu-shell{max-width:900px;margin:0 auto;padding:24px 20px 60px;}
+
+/* Setup */
+.scenario-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px;}
+.scenario-card{border:2px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;text-align:center;transition:all .18s;}
+.scenario-card:hover{border-color:var(--orange);transform:translateY(-2px);}
+.scenario-card.selected{border-color:var(--orange);background:linear-gradient(135deg,#fff7ed,#fff);}
+.scenario-card .icon{font-size:32px;margin-bottom:8px;}
+.scenario-card .name{font-weight:800;font-size:14px;}
+.scenario-card .desc{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+
+.diff-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;}
+.diff-card{border:2px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;text-align:center;transition:all .15s;}
+.diff-card:hover,.diff-card.selected{border-color:var(--orange);background:var(--orange-light);}
+.diff-card .dlevel{font-size:20px;margin-bottom:4px;}
+.diff-card .dname{font-weight:700;font-size:13px;}
+.diff-card .ddesc{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* Chat simulation */
+.simu-chat{background:#fff;border:1px solid var(--border);border-radius:18px;overflow:hidden;margin-top:20px;}
+.simu-chat-head{padding:14px 20px;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;display:flex;align-items:center;gap:12px;}
+.simu-chat-head .hd-av{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.simu-chat-head .hd-info{flex:1;}
+.simu-chat-head .hd-name{font-weight:800;font-size:15px;}
+.simu-chat-head .hd-role{font-size:12px;opacity:.85;}
+.simu-timer{font-size:20px;font-weight:900;font-family:monospace;background:rgba(255,255,255,.15);padding:4px 12px;border-radius:8px;}
+.simu-body{padding:20px;display:flex;flex-direction:column;gap:12px;min-height:300px;max-height:450px;overflow-y:auto;background:#f8fafc;}
+.simu-msg{max-width:82%;border-radius:14px;padding:12px 16px;font-size:13.5px;line-height:1.55;word-break:break-word;}
+.simu-msg.interviewer{background:#fff;border:1px solid var(--border);align-self:flex-start;border-bottom-left-radius:4px;}
+.simu-msg.user{background:linear-gradient(135deg,#ff6b00,#ff9a42);color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.simu-msg .msg-label{font-size:10.5px;font-weight:700;text-transform:uppercase;margin-bottom:4px;opacity:.7;}
+.simu-input-area{padding:14px 20px;border-top:1px solid var(--border);background:#fff;}
+.simu-input-row{display:flex;gap:8px;align-items:flex-end;}
+.simu-input-box{flex:1;padding:10px 16px;border-radius:20px;border:1.5px solid var(--border);font-size:13.5px;font-family:inherit;resize:none;max-height:100px;line-height:1.4;}
+.simu-input-box:focus{outline:none;border-color:var(--orange);}
+.simu-send{height:40px;padding:0 20px;border-radius:20px;background:var(--orange);color:#fff;border:none;cursor:pointer;font-weight:700;font-size:13px;}
+.simu-send:disabled{opacity:.5;cursor:not-allowed;}
+.simu-actions{display:flex;gap:8px;margin-top:10px;}
+
+/* Rapport */
+.rapport-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:24px;margin-top:20px;}
+.score-big{text-align:center;padding:24px;background:linear-gradient(135deg,#f8fafc,#fff);border-radius:14px;margin-bottom:20px;}
+.score-num{font-size:72px;font-weight:900;line-height:1;}
+.score-mention{font-size:18px;font-weight:700;margin-top:6px;}
+.critere-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
+.critere-label{font-size:13px;font-weight:600;}
+.critere-score{font-size:13px;font-weight:800;}
+.critere-bar{flex:1;height:6px;border-radius:99px;background:var(--border);overflow:hidden;margin:0 12px;}
+.critere-fill{height:100%;border-radius:99px;transition:width .6s;}
+.rec-item{display:flex;gap:10px;padding:10px;background:var(--bg);border-radius:8px;margin-bottom:6px;font-size:13px;}
+.rec-item .ri{font-size:16px;flex-shrink:0;}
+
+/* Historique */
+.hist-item{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:#fff;cursor:pointer;transition:all .15s;}
+.hist-item:hover{box-shadow:0 2px 10px rgba(0,0,0,.08);}
+.hist-score{font-size:22px;font-weight:900;}
+
+/* BP select */
+.bp-select-card{border:2px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:14px;margin-bottom:10px;}
+.bp-select-card:hover,.bp-select-card.selected{border-color:var(--orange);background:var(--orange-light);}
+.bp-select-card .bp-logo2{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--orange),#ffb27a);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+
+/* Timer */
+.timer-opts{display:flex;gap:8px;flex-wrap:wrap;}
+.timer-opt{border:1px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;}
+.timer-opt:hover,.timer-opt.selected{border-color:var(--orange);background:var(--orange-light);color:var(--orange);}
+
+@media(max-width:640px){
+  .scenario-grid{grid-template-columns:1fr 1fr;}
+  .diff-grid{grid-template-columns:1fr 1fr 1fr;}
+  .score-num{font-size:56px;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="business-plan.html" style="color:var(--muted);text-decoration:none;font-size:13px;font-weight:700;">← Business Plans</a>
+      <div class="logo" style="margin-left:16px;"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="simu-shell">
+
+    <!-- ÉTAPE 0 : Chargement -->
+    <div id="step-loading" style="text-align:center;padding:60px;color:var(--muted);">Chargement…</div>
+
+    <!-- ÉTAPE 1 : Setup -->
+    <div id="step-setup" style="display:none;">
+      <div style="margin-bottom:28px;">
+        <h1 style="margin:0;font-size:24px;">🎭 Simulation de présentation</h1>
+        <p style="margin:6px 0 0;color:var(--muted);font-size:14px;">Entraînez-vous à défendre votre Business Plan dans des conditions réelles.</p>
+      </div>
+
+      <!-- Sélection BP -->
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 14px;">1. Sélectionnez votre Business Plan</h3>
+        <div id="bp-select-list"><div style="color:var(--muted);">Chargement…</div></div>
+      </div>
+
+      <!-- Scénario -->
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 14px;">2. Choisissez le scénario</h3>
+        <div class="scenario-grid" id="scenario-grid">
+          <div class="scenario-card selected" data-scenario="investisseur">
+            <div class="icon">💼</div>
+            <div class="name">Investisseur</div>
+            <div class="desc">Rentabilité, ROI, stratégie de croissance, exit</div>
+          </div>
+          <div class="scenario-card" data-scenario="banque">
+            <div class="icon">🏦</div>
+            <div class="name">Banque</div>
+            <div class="desc">Solvabilité, garanties, trésorerie, remboursement</div>
+          </div>
+          <div class="scenario-card" data-scenario="partenaire">
+            <div class="icon">🤝</div>
+            <div class="name">Partenaire</div>
+            <div class="desc">Synergies, gouvernance, bénéfices mutuels</div>
+          </div>
+          <div class="scenario-card" data-scenario="client">
+            <div class="icon">🛍</div>
+            <div class="name">Client</div>
+            <div class="desc">Valeur ajoutée, prix, qualité, SAV</div>
+          </div>
+          <div class="scenario-card" data-scenario="jury">
+            <div class="icon">🏆</div>
+            <div class="name">Jury concours</div>
+            <div class="desc">Innovation, impact, faisabilité, équipe</div>
+          </div>
+          <div class="scenario-card" data-scenario="collectivite">
+            <div class="icon">🏛</div>
+            <div class="name">Collectivité</div>
+            <div class="desc">Intérêt général, emplois, impact territorial</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Difficulté -->
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 14px;">3. Niveau de difficulté</h3>
+        <div class="diff-grid">
+          <div class="diff-card" data-diff="debutant">
+            <div class="dlevel">🟢</div>
+            <div class="dname">Débutant</div>
+            <div class="ddesc">Questions pédagogiques et progressives</div>
+          </div>
+          <div class="diff-card selected" data-diff="intermediaire">
+            <div class="dlevel">🟡</div>
+            <div class="dname">Intermédiaire</div>
+            <div class="ddesc">Questions réalistes avec justifications</div>
+          </div>
+          <div class="diff-card" data-diff="expert">
+            <div class="dlevel">🔴</div>
+            <div class="dname">Expert</div>
+            <div class="ddesc">Objections, relances, analyses critiques</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chronomètre -->
+      <div class="card" style="margin-bottom:28px;">
+        <h3 style="margin:0 0 14px;">4. Durée (optionnel)</h3>
+        <div class="timer-opts" id="timer-opts">
+          <div class="timer-opt selected" data-timer="0">⏱ Libre</div>
+          <div class="timer-opt" data-timer="180">3 min</div>
+          <div class="timer-opt" data-timer="300">5 min</div>
+          <div class="timer-opt" data-timer="600">10 min</div>
+          <div class="timer-opt" data-timer="1200">20 min</div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <a href="business-plan.html" class="btn btn-outline">← Retour</a>
+        <button class="btn btn-orange" onclick="startSimulation()" id="btn-start">🎭 Lancer la simulation →</button>
+      </div>
+    </div>
+
+    <!-- ÉTAPE 2 : Simulation en cours -->
+    <div id="step-simu" style="display:none;">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h2 style="margin:0;font-size:18px;">🎭 Simulation en cours</h2>
+          <div style="font-size:13px;color:var(--muted);margin-top:2px;" id="simu-meta">—</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div id="simu-q-count" style="font-size:13px;font-weight:700;color:var(--muted);">Question 1</div>
+          <button class="btn btn-outline btn-sm" onclick="if(confirm('Terminer la simulation ?')) finishSimulation()">Terminer →</button>
+        </div>
+      </div>
+
+      <div class="simu-chat">
+        <div class="simu-chat-head">
+          <div class="hd-av" id="simu-av">💼</div>
+          <div class="hd-info">
+            <div class="hd-name" id="simu-interv-name">Interlocuteur</div>
+            <div class="hd-role" id="simu-interv-role">—</div>
+          </div>
+          <div class="simu-timer" id="simu-timer" style="display:none;">00:00</div>
+        </div>
+        <div class="simu-body" id="simu-body"></div>
+        <div class="simu-input-area">
+          <div class="simu-input-row">
+            <textarea class="simu-input-box" id="simu-input" placeholder="Votre réponse…" rows="2"></textarea>
+            <button class="simu-send" id="simu-send" onclick="sendSimuAnswer()">Envoyer</button>
+          </div>
+          <div class="simu-actions">
+            <button class="btn btn-outline btn-sm" onclick="finishSimulation()">🏁 Terminer et voir le rapport</button>
+            <span id="simu-conseil" style="font-size:12px;color:var(--muted);align-self:center;">💡 Répondez naturellement, comme en vrai entretien.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ÉTAPE 3 : Rapport -->
+    <div id="step-rapport" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+        <h2 style="margin:0;font-size:22px;">📊 Rapport d'évaluation</h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline" onclick="showStep('setup')">🔄 Nouvelle simulation</button>
+          <button class="btn btn-orange" onclick="exportRapport()">📄 Exporter PDF</button>
+        </div>
+      </div>
+      <div id="rapport-content"></div>
+
+      <!-- Historique -->
+      <div class="card" style="margin-top:20px;">
+        <h3 style="margin:0 0 14px;">📋 Mes simulations passées</h3>
+        <div id="hist-list"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
+      </div>
+    </div>
+
+    <!-- Historique standalone -->
+    <div id="step-history" style="display:none;">
+      <h2 style="margin:0 0 20px;">📋 Historique des simulations</h2>
+      <div id="hist-list-full"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+/* =====================================================
+   SIMULATION DE PRÉSENTATION BP
+   ===================================================== */
+let me = null;
+let allBPs = [];
+let selectedBPId = null;
+let selectedScenario = 'investisseur';
+let selectedDiff = 'intermediaire';
+let timerSecs = 0;
+let timerInterval = null;
+let elapsedSecs = 0;
+let simuId = null;
+let qIndex = 0;
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(d){ return d ? new Date(d).toLocaleDateString('fr',{day:'2-digit',month:'short',year:'numeric'}) : '—'; }
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtTime(s){ return `${pad(Math.floor(s/60))}:${pad(s%60)}`; }
+
+const SCENARIO_META = {
+  investisseur: { icon:'💼', name:'Investisseur professionnel', role:'Capital-risqueur · Analyse ROI & stratégie', av:'💼' },
+  banque: { icon:'🏦', name:'Conseiller bancaire', role:'Analyste crédit · Évaluation risques financiers', av:'🏦' },
+  partenaire: { icon:'🤝', name:'Responsable partenariats', role:'Développement commercial · Alliances stratégiques', av:'🤝' },
+  client: { icon:'🛍', name:'Client potentiel', role:'Décideur achat · Évaluation solution', av:'🛍' },
+  jury: { icon:'🏆', name:'Jury de concours', role:'Experts sélectionneurs · Évaluation innovation & impact', av:'🏆' },
+  collectivite: { icon:'🏛', name:'Élu / Fonctionnaire territorial', role:'Intérêt général · Développement local', av:'🏛' },
+};
+
+const DIFF_META = {
+  debutant: { label:'🟢 Débutant', desc:'Questions pédagogiques' },
+  intermediaire: { label:'🟡 Intermédiaire', desc:'Questions réalistes' },
+  expert: { label:'🔴 Expert', desc:'Questions exigeantes' },
+};
+
+/* ---- Init ---- */
+async function init() {
+  me = await fetchCurrentUser();
+  if (!me) { window.location.href='login.html'; return; }
+
+  // Charger les BPs
+  try {
+    const data = await api('GET', '/business-plans');
+    allBPs = [...(data.mes_plans||[]), ...(data.partages||[])];
+  } catch(e) {}
+
+  document.getElementById('step-loading').style.display = 'none';
+
+  // Si ?bp= dans l'URL, pré-sélectionner
+  const urlBP = new URLSearchParams(location.search).get('bp');
+  if (urlBP) {
+    selectedBPId = parseInt(urlBP);
+  }
+
+  // Si ?simu= dans l'URL, charger directement un rapport
+  const urlSimu = new URLSearchParams(location.search).get('simu');
+  if (urlSimu) {
+    await loadRapport(urlSimu);
+    return;
+  }
+
+  renderBPSelect();
+  showStep('setup');
+}
+
+function renderBPSelect() {
+  const el = document.getElementById('bp-select-list');
+  if (!allBPs.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun business plan. <a href="business-plan.html">Créez-en un</a> d\'abord.</p>';
+    return;
+  }
+  el.innerHTML = allBPs.slice(0,4).map(bp => `
+    <div class="bp-select-card ${bp.id===selectedBPId?'selected':''}" onclick="selectBP(${bp.id})" data-bp="${bp.id}">
+      <div class="bp-logo2">${bp.logo_url?`<img src="${esc(bp.logo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`:['🚀','🏢','🤝','🌍','🌾','💚'][allBPs.indexOf(bp)%6]}</div>
+      <div style="flex:1;">
+        <div style="font-weight:800;font-size:14px;">${esc(bp.nom_projet||'Sans titre')}</div>
+        <div style="font-size:12px;color:var(--muted);">${esc(bp.type_initiative||'')} · ${esc(bp.secteur||'')} · ${bp.progression||0}% complété</div>
+      </div>
+      <div style="font-size:22px;font-weight:900;color:${(bp.progression||0)>=60?'#10b981':'var(--orange)'};">${bp.progression||0}%</div>
+    </div>`).join('');
+
+  if (!selectedBPId && allBPs.length) {
+    selectedBPId = allBPs[0].id;
+    document.querySelector('.bp-select-card')?.classList.add('selected');
+  }
+}
+
+function selectBP(id) {
+  selectedBPId = id;
+  document.querySelectorAll('.bp-select-card').forEach(c => c.classList.toggle('selected', parseInt(c.dataset.bp)===id));
+}
+
+// Sélections scénario
+document.querySelectorAll('.scenario-card').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('.scenario-card').forEach(x=>x.classList.remove('selected'));
+    c.classList.add('selected');
+    selectedScenario = c.dataset.scenario;
+  });
+});
+
+document.querySelectorAll('.diff-card').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('.diff-card').forEach(x=>x.classList.remove('selected'));
+    c.classList.add('selected');
+    selectedDiff = c.dataset.diff;
+  });
+});
+
+document.querySelectorAll('.timer-opt').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('.timer-opt').forEach(x=>x.classList.remove('selected'));
+    c.classList.add('selected');
+    timerSecs = parseInt(c.dataset.timer);
+  });
+});
+
+/* ---- Lancer la simulation ---- */
+async function startSimulation() {
+  if (!selectedBPId) { alert('Sélectionnez un Business Plan'); return; }
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-start').textContent = 'Préparation…';
+
+  try {
+    const r = await api('POST', '/bp-simulations', { bp_id: selectedBPId, scenario: selectedScenario, difficulte: selectedDiff });
+    simuId = r.id;
+    qIndex = 1;
+    elapsedSecs = 0;
+
+    // Setup UI
+    const meta = SCENARIO_META[selectedScenario];
+    document.getElementById('simu-av').textContent = meta.av;
+    document.getElementById('simu-interv-name').textContent = meta.name;
+    document.getElementById('simu-interv-role').textContent = meta.role;
+    const bp = allBPs.find(b=>b.id===selectedBPId);
+    document.getElementById('simu-meta').textContent = `${bp?.nom_projet||'—'} · ${meta.icon} ${selectedScenario} · ${DIFF_META[selectedDiff].label}`;
+
+    // Afficher première question
+    document.getElementById('simu-body').innerHTML = '';
+    addSimuMsg(r.firstQuestion, 'interviewer');
+
+    // Timer
+    if (timerSecs > 0) {
+      document.getElementById('simu-timer').style.display = 'block';
+      updateTimer();
+      timerInterval = setInterval(() => {
+        elapsedSecs++;
+        updateTimer();
+        if (timerSecs > 0 && elapsedSecs >= timerSecs) {
+          clearInterval(timerInterval);
+          finishSimulation();
+        }
+      }, 1000);
+    }
+
+    showStep('simu');
+  } catch(e) {
+    alert('Erreur : ' + e.message);
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-start').textContent = '🎭 Lancer la simulation →';
+  }
+}
+
+function updateTimer() {
+  const el = document.getElementById('simu-timer');
+  if (timerSecs > 0) {
+    const remaining = Math.max(0, timerSecs - elapsedSecs);
+    el.textContent = fmtTime(remaining);
+    el.style.color = remaining < 30 ? '#dc2626' : '#fff';
+  } else {
+    el.textContent = fmtTime(elapsedSecs);
+  }
+}
+
+function addSimuMsg(text, role) {
+  const body = document.getElementById('simu-body');
+  const d = document.createElement('div');
+  d.className = `simu-msg ${role}`;
+  const label = role === 'interviewer' ? SCENARIO_META[selectedScenario]?.name : 'Vous';
+  d.innerHTML = `<div class="msg-label">${label}</div>${text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}`;
+  body.appendChild(d);
+  body.scrollTop = body.scrollHeight;
+}
+
+async function sendSimuAnswer() {
+  const inp = document.getElementById('simu-input');
+  const reponse = inp.value.trim();
+  if (!reponse) return;
+  inp.value = '';
+  inp.style.height = 'auto';
+  document.getElementById('simu-send').disabled = true;
+
+  addSimuMsg(reponse, 'user');
+
+  // Typing indicator
+  const typing = document.createElement('div');
+  typing.className = 'simu-msg interviewer';
+  typing.innerHTML = '<div class="msg-label">…</div><em style="color:var(--muted)">L\'interlocuteur réfléchit…</em>';
+  document.getElementById('simu-body').appendChild(typing);
+
+  try {
+    const r = await api('POST', `/bp-simulations/${simuId}/messages`, { reponse, duree_seconds: elapsedSecs });
+    typing.remove();
+    qIndex++;
+    document.getElementById('simu-q-count').textContent = `Question ${qIndex}`;
+    addSimuMsg(r.nextQuestion, 'interviewer');
+  } catch(e) {
+    typing.remove();
+    addSimuMsg('Une erreur s\'est produite. Réessayez.', 'interviewer');
+  }
+  document.getElementById('simu-send').disabled = false;
+  document.getElementById('simu-input').focus();
+}
+
+document.getElementById('simu-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSimuAnswer(); }
+});
+
+/* ---- Terminer et générer rapport ---- */
+async function finishSimulation() {
+  clearInterval(timerInterval);
+  try {
+    const r = await api('POST', `/bp-simulations/${simuId}/finish`, { duree_seconds: elapsedSecs });
+    renderRapport(r.rapport);
+    showStep('rapport');
+    loadHistorique();
+  } catch(e) { alert('Erreur lors de la génération du rapport : ' + e.message); }
+}
+
+async function loadRapport(id) {
+  try {
+    simuId = id;
+    const data = await api('GET', `/bp-simulations/${id}`);
+    if (data.rapport) {
+      renderRapport(data.rapport);
+    } else {
+      renderRapport(data.rapport_json ? JSON.parse(data.rapport_json) : {});
+    }
+    showStep('rapport');
+    loadHistorique();
+  } catch(e) {
+    document.getElementById('step-loading').style.display = 'none';
+    showStep('setup');
+    renderBPSelect();
+  }
+}
+
+function renderRapport(rapport) {
+  if (!rapport) { document.getElementById('rapport-content').innerHTML = '<p style="color:var(--muted);">Rapport non disponible.</p>'; return; }
+  const scoreColor = rapport.score >= 80 ? '#10b981' : rapport.score >= 60 ? '#f59e0b' : '#dc2626';
+  const evals = rapport.evaluations || [];
+  const recs = rapport.recommandations || [];
+  const pts_forts = rapport.pointsForts || [];
+  const pts_faibles = rapport.pointsFaibles || [];
+  const dur = rapport.duree || 0;
+  const meta = SCENARIO_META[rapport.scenario||'investisseur'];
+
+  document.getElementById('rapport-content').innerHTML = `
+    <div class="rapport-card">
+      <div class="score-big">
+        <div class="score-num" style="color:${scoreColor};">${rapport.score||0}/100</div>
+        <div class="score-mention">${rapport.mention||'—'}</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:6px;">${meta?.icon||''} Scénario : ${rapport.scenario||'—'} · ${DIFF_META[rapport.difficulte||'intermediaire']?.label||''}</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${rapport.nbQuestions||0} questions · ${rapport.nbReponses||0} réponses · Durée : ${fmtTime(dur)}</div>
+      </div>
+
+      ${evals.length ? `
+      <h3 style="margin:0 0 12px;font-size:15px;">📊 Évaluation par critère</h3>
+      ${evals.map(e => {
+        const fillColor = e.score>=70?'#10b981':e.score>=50?'#f59e0b':'#dc2626';
+        return `<div class="critere-row">
+          <div style="min-width:180px;"><div class="critere-label">${esc(e.label)}</div><div style="font-size:11.5px;color:var(--muted);">${esc(e.commentaire||'')}</div></div>
+          <div class="critere-bar"><div class="critere-fill" style="width:${e.score}%;background:${fillColor};"></div></div>
+          <div class="critere-score" style="color:${fillColor};">${e.score}/100</div>
+        </div>`;
+      }).join('')}` : ''}
+
+      ${pts_forts.length ? `
+      <div style="margin-top:20px;">
+        <h3 style="margin:0 0 10px;font-size:15px;color:#10b981;">💪 Points forts</h3>
+        ${pts_forts.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;"><span>✅</span> ${esc(p)}</div>`).join('')}
+      </div>` : ''}
+
+      ${pts_faibles.length ? `
+      <div style="margin-top:14px;">
+        <h3 style="margin:0 0 10px;font-size:15px;color:#f59e0b;">⚠️ Points à améliorer</h3>
+        ${pts_faibles.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;"><span>🔧</span> ${esc(p)}</div>`).join('')}
+      </div>` : ''}
+
+      ${recs.length ? `
+      <div style="margin-top:20px;">
+        <h3 style="margin:0 0 10px;font-size:15px;">🎯 Recommandations personnalisées</h3>
+        ${recs.map((r,i)=>`<div class="rec-item"><div class="ri">${i+1}.</div><div>${esc(r)}</div></div>`).join('')}
+      </div>` : ''}
+
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="business-plan-edit.html?id=${rapport.bp_id||selectedBPId||''}" class="btn btn-outline">✏️ Améliorer le Business Plan</a>
+        <button class="btn btn-orange" onclick="showStep('setup');renderBPSelect()">🔄 Relancer une simulation</button>
+      </div>
+    </div>`;
+}
+
+async function loadHistorique() {
+  const el = document.getElementById('hist-list');
+  if (!el) return;
+  try {
+    const simus = await api('GET', `/bp-simulations${selectedBPId?`?bp_id=${selectedBPId}`:''}`);
+    if (!simus.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune simulation passée.</p>'; return; }
+    el.innerHTML = simus.slice(0,10).map(s => {
+      const meta = SCENARIO_META[s.scenario||'investisseur'];
+      const scoreColor = s.score>=80?'#10b981':s.score>=60?'#f59e0b':'#dc2626';
+      return `<div class="hist-item" onclick="loadRapport(${s.id})">
+        <div style="display:flex;align-items:center;gap:12px;flex:1;">
+          <div style="font-size:24px;">${meta.icon}</div>
+          <div>
+            <div style="font-weight:700;font-size:13.5px;">${esc(s.nom_projet||'—')} · ${esc(s.scenario||'')} · ${DIFF_META[s.difficulte||'intermediaire']?.label||''}</div>
+            <div style="font-size:11.5px;color:var(--muted);">${fmtDate(s.created_at)} · ${fmtTime(s.duree_seconds||0)}</div>
+          </div>
+        </div>
+        <div class="hist-score" style="color:${scoreColor};">${s.score!==null&&s.score!==undefined?`${s.score}/100`:'—'}</div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = '<p style="color:#D33;font-size:12px;">Erreur de chargement</p>'; }
+}
+
+function showStep(step) {
+  ['loading','setup','simu','rapport','history'].forEach(s => {
+    const el = document.getElementById(`step-${s}`);
+    if (el) el.style.display = s===step ? 'block' : 'none';
+  });
+}
+
+function exportRapport() {
+  window.print();
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1006,12 +1006,14 @@ function renderSections() {
   wrap.innerHTML = '';
 
   const tabs = [
-    { id:'resume',        label:'📋 Résumé' },
-    { id:'activite',      label:'⚡ Activité' },
-    { id:'publications',  label:'📝 Publications' },
-    { id:'publicites',    label:'📣 Publicités' },
-    { id:'suivis',        label:'👥 Suivis' },
-    { id:'abonnes',       label:'❤️ Abonnés' },
+    { id:'resume',           label:'📋 Résumé' },
+    { id:'portfolio',        label:'🗂 Portfolio' },
+    { id:'recommandations',  label:'⭐ Recommandations' },
+    { id:'activite',         label:'⚡ Activité' },
+    { id:'publications',     label:'📝 Publications' },
+    { id:'publicites',       label:'📣 Publicités' },
+    { id:'suivis',           label:'👥 Suivis' },
+    { id:'abonnes',          label:'❤️ Abonnés' },
   ];
   if (!isOwn && CU) tabs.push({ id:'communs', label:'🤝 En commun' });
   if (isOwn) tabs.push({ id:'confidentialite', label:'🔒 Confidentialité' });
@@ -1027,6 +1029,13 @@ function renderSections() {
   const resume = document.createElement('div');
   resume.id = 'ptab-resume';
   resume.className = 'p-tab-panel active';
+  resume.appendChild(buildSectionDisponibilites());
+  resume.appendChild(buildSectionReseaux());
+  // buildSectionLangues est async — on insère un placeholder et on le remplace
+  const langPlaceholder = document.createElement('div');
+  langPlaceholder.id = 'p-langues';
+  resume.appendChild(langPlaceholder);
+  buildSectionLangues().then(el => langPlaceholder.replaceWith(el));
   resume.appendChild(buildSectionExp());
   resume.appendChild(buildInlineAd());
   resume.appendChild(buildSectionSkills());
@@ -1034,6 +1043,18 @@ function renderSections() {
   resume.appendChild(buildSectionInitiatives());
   resume.appendChild(buildSectionUsers());
   wrap.appendChild(resume);
+
+  // Panel Portfolio
+  const portfolio = document.createElement('div');
+  portfolio.id = 'ptab-portfolio'; portfolio.className = 'p-tab-panel';
+  portfolio.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement du portfolio…</div>';
+  wrap.appendChild(portfolio);
+
+  // Panel Recommandations
+  const recommandations = document.createElement('div');
+  recommandations.id = 'ptab-recommandations'; recommandations.className = 'p-tab-panel';
+  recommandations.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement…</div>';
+  wrap.appendChild(recommandations);
 
   // Panel Activité (lazy-loaded)
   const activite = document.createElement('div');
@@ -1118,6 +1139,8 @@ function switchProfileTab(id) {
   if (id === 'suivis') loadSuivisTab();
   if (id === 'abonnes') loadAbonnesTab();
   if (id === 'communs') loadCommunsTab();
+  if (id === 'portfolio') loadPortfolioTab();
+  if (id === 'recommandations') loadRecommandationsTab();
 }
 
 /* ======================================================
@@ -2235,6 +2258,393 @@ function rebuildSection(id, newEl) {
   const old = document.getElementById(id);
   if (old) old.replaceWith(newEl);
   else document.getElementById('p-sections').appendChild(newEl);
+}
+
+/* ======================================================
+   SECTION RÉSEAUX SOCIAUX
+   ====================================================== */
+let _reseaux = {};
+function buildSectionReseaux() {
+  const s = document.createElement('div');
+  s.id = 'p-reseaux';
+  s.className = 'p-card';
+  s.style.marginTop = '14px';
+  const r = profil.reseaux_sociaux || {};
+  const icons = { linkedin:'🔗', facebook:'📘', instagram:'📷', x:'🐦', youtube:'▶️', tiktok:'🎵', site_web:'🌐', github:'🐙', autre1:'🔗', autre2:'🔗' };
+  const labels = { linkedin:'LinkedIn', facebook:'Facebook', instagram:'Instagram', x:'X / Twitter', youtube:'YouTube', tiktok:'TikTok', site_web:'Site web', github:'GitHub', autre1:'Lien 1', autre2:'Lien 2' };
+  const links = Object.entries(r).filter(([k,v]) => v);
+  s.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${links.length?'12px':'0'};">
+      <h3 style="margin:0;font-size:14px;font-weight:700;">🌐 Réseaux & Liens</h3>
+      ${isOwn ? `<button class="btn btn-outline btn-sm" onclick="openEditReseaux()">✏️ Modifier</button>` : ''}
+    </div>
+    <div id="reseaux-list">${links.length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${links.map(([k,v])=>`<a href="${esc(v.startsWith('http')?v:'https://'+v)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border);border-radius:99px;font-size:13px;font-weight:600;text-decoration:none;color:inherit;">${icons[k]||'🔗'} ${labels[k]||k}</a>`).join('')}</div>`
+      : `<p style="color:var(--muted);font-size:13px;margin:0;">${isOwn?'Ajoutez vos réseaux sociaux pour être facilement trouvé.':'Aucun réseau renseigné.'}</p>`
+    }</div>
+    <div id="reseaux-form" style="display:none;margin-top:12px;"></div>
+  `;
+  _reseaux = r;
+  return s;
+}
+function openEditReseaux() {
+  const f = document.getElementById('reseaux-form');
+  if (f.style.display !== 'none') { f.style.display='none'; return; }
+  const labels = { linkedin:'LinkedIn', facebook:'Facebook', instagram:'Instagram', x:'X / Twitter', youtube:'YouTube', tiktok:'TikTok', site_web:'Site web', github:'GitHub', autre1:'Autre lien 1', autre2:'Autre lien 2' };
+  f.innerHTML = `
+    <div class="fg">${Object.entries(labels).map(([k,l])=>`
+      <div><label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">${l}</label>
+      <input id="rs-${k}" placeholder="https://..." value="${esc(_reseaux[k]||'')}"></div>`).join('')}
+    </div>
+    <div class="edit-btns">
+      <button class="btn-save" onclick="saveReseaux()">Enregistrer</button>
+      <button class="btn-cancel" onclick="document.getElementById('reseaux-form').style.display='none'">Annuler</button>
+    </div>
+    <p class="e-msg ok" id="rs-ok" style="display:none;">Sauvegardé ✓</p>`;
+  f.style.display = 'block';
+}
+async function saveReseaux() {
+  const keys = ['linkedin','facebook','instagram','x','youtube','tiktok','site_web','github','autre1','autre2'];
+  const reseaux = {};
+  for (const k of keys) { const v = document.getElementById('rs-'+k)?.value.trim(); if(v) reseaux[k]=v; }
+  try {
+    await api('PUT', '/profil/reseaux-sociaux', { reseaux });
+    _reseaux = reseaux;
+    profil.reseaux_sociaux = reseaux;
+    document.getElementById('reseaux-form').style.display = 'none';
+    rebuildSection('p-reseaux', buildSectionReseaux());
+  } catch(e) { alert(e.message||'Erreur'); }
+}
+
+/* ======================================================
+   SECTION LANGUES
+   ====================================================== */
+let _langues = [];
+async function buildSectionLangues() {
+  const s = document.createElement('div');
+  s.id = 'p-langues';
+  s.className = 'p-card';
+  s.style.marginTop = '14px';
+  try { _langues = await api('GET', `/profil/${profil.id}/langues`); } catch(e) { _langues = []; }
+  const niveaux = { debutant:'🟡 Débutant', intermediaire:'🟠 Intermédiaire', avance:'🔵 Avancé', bilingue:'🟢 Bilingue', maternelle:'⭐ Maternelle' };
+  s.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${_langues.length?'12px':'0'};">
+      <h3 style="margin:0;font-size:14px;font-weight:700;">🗣 Langues</h3>
+      ${isOwn ? `<button class="btn btn-outline btn-sm" onclick="openAddLangue()">+ Ajouter</button>` : ''}
+    </div>
+    <div id="langues-list">${_langues.length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${_langues.map(l=>`
+          <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--border);border-radius:99px;font-size:13px;">
+            ${esc(l.langue)} <span style="color:var(--muted);font-size:11px;">${niveaux[l.niveau]||l.niveau}</span>
+            ${isOwn?`<button onclick="deleteLangue(${l.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:0 0 0 4px;">✕</button>`:''}
+          </div>`).join('')}</div>`
+      : `<p style="color:var(--muted);font-size:13px;margin:0;">${isOwn?'Ajoutez vos langues parlées.':'Non renseigné.'}</p>`
+    }</div>
+    <div id="langue-form" style="display:none;margin-top:12px;"></div>
+  `;
+  return s;
+}
+function openAddLangue() {
+  const f = document.getElementById('langue-form');
+  if (f.style.display !== 'none') { f.style.display='none'; return; }
+  f.innerHTML = `
+    <div class="fg">
+      <div><label>Langue</label><input id="lg-langue" placeholder="Ex : Français, Anglais, Wolof…"></div>
+      <div><label>Niveau</label>
+        <select id="lg-niveau">
+          <option value="debutant">Débutant</option>
+          <option value="intermediaire">Intermédiaire</option>
+          <option value="avance" selected>Avancé</option>
+          <option value="bilingue">Bilingue</option>
+          <option value="maternelle">Langue maternelle</option>
+        </select>
+      </div>
+      <div><label>Certification (optionnel)</label><input id="lg-cert" placeholder="Ex: DELF B2, TOEIC 850…"></div>
+    </div>
+    <div class="edit-btns">
+      <button class="btn-save" onclick="saveLangue()">Ajouter</button>
+      <button class="btn-cancel" onclick="document.getElementById('langue-form').style.display='none'">Annuler</button>
+    </div>`;
+  f.style.display = 'block';
+}
+async function saveLangue() {
+  const langue = document.getElementById('lg-langue').value.trim();
+  if (!langue) return alert('Entrez une langue');
+  await api('POST', '/profil/langues', { langue, niveau: document.getElementById('lg-niveau').value, certification: document.getElementById('lg-cert').value.trim()||null });
+  document.getElementById('langue-form').style.display = 'none';
+  rebuildSection('p-langues', await buildSectionLangues());
+}
+async function deleteLangue(id) {
+  if (!confirm('Supprimer cette langue ?')) return;
+  await api('DELETE', '/profil/langues/'+id);
+  rebuildSection('p-langues', await buildSectionLangues());
+}
+
+/* ======================================================
+   SECTION DISPONIBILITÉS
+   ====================================================== */
+function buildSectionDisponibilites() {
+  const s = document.createElement('div');
+  s.id = 'p-disponibilites';
+  s.className = 'p-card';
+  s.style.marginTop = '14px';
+  const d = profil.disponibilites || {};
+  const types = [
+    { key:'travailler', label:'Disponible pour travailler', color:'#10b981' },
+    { key:'collaborer', label:'Disponible pour collaborer', color:'#3b82f6' },
+    { key:'investir', label:'Disponible pour investir', color:'#f59e0b' },
+    { key:'former', label:'Disponible pour former', color:'#8b5cf6' },
+    { key:'recruter', label:'Disponible pour recruter', color:'#ec4899' },
+  ];
+  const actives = types.filter(t => d[t.key]);
+  s.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${actives.length?'12px':'0'};">
+      <h3 style="margin:0;font-size:14px;font-weight:700;">🎯 Disponibilités</h3>
+      ${isOwn ? `<button class="btn btn-outline btn-sm" onclick="openEditDisponibilites()">✏️ Modifier</button>` : ''}
+    </div>
+    <div id="dispo-list">${actives.length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${actives.map(t=>`<span style="display:inline-block;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700;color:${t.color};background:${t.color}15;border:1px solid ${t.color}40;">✓ ${t.label}</span>`).join('')}</div>`
+      : `<p style="color:var(--muted);font-size:13px;margin:0;">${isOwn?'Indiquez vos disponibilités pour être contacté.':'Aucune disponibilité renseignée.'}</p>`
+    }</div>
+    <div id="dispo-form" style="display:none;margin-top:12px;"></div>
+  `;
+  return s;
+}
+function openEditDisponibilites() {
+  const f = document.getElementById('dispo-form');
+  if (f.style.display !== 'none') { f.style.display='none'; return; }
+  const d = profil.disponibilites || {};
+  const types = [
+    { key:'travailler', label:'Disponible pour travailler' },
+    { key:'collaborer', label:'Disponible pour collaborer' },
+    { key:'investir', label:'Disponible pour investir' },
+    { key:'former', label:'Disponible pour former' },
+    { key:'recruter', label:'Disponible pour recruter' },
+  ];
+  f.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
+      ${types.map(t=>`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;">
+        <input type="checkbox" id="dispo-${t.key}" ${d[t.key]?'checked':''} style="width:16px;height:16px;accent-color:var(--orange);"> ${t.label}
+      </label>`).join('')}
+    </div>
+    <div class="edit-btns">
+      <button class="btn-save" onclick="saveDisponibilites()">Enregistrer</button>
+      <button class="btn-cancel" onclick="document.getElementById('dispo-form').style.display='none'">Annuler</button>
+    </div>`;
+  f.style.display = 'block';
+}
+async function saveDisponibilites() {
+  const keys = ['travailler','collaborer','investir','former','recruter'];
+  const disponibilites = {};
+  for (const k of keys) disponibilites[k] = document.getElementById('dispo-'+k).checked;
+  await api('PUT', '/profil/disponibilites', { disponibilites });
+  profil.disponibilites = disponibilites;
+  document.getElementById('dispo-form').style.display = 'none';
+  rebuildSection('p-disponibilites', buildSectionDisponibilites());
+}
+
+/* ======================================================
+   ONGLET PORTFOLIO
+   ====================================================== */
+async function loadPortfolioTab() {
+  const el = document.getElementById('ptab-portfolio');
+  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement…</div>';
+  let items = [];
+  try { items = await api('GET', `/profil/${profil.id}/portfolio`); } catch(e) {}
+  const types = { projet:'💼 Projet', publication:'📄 Publication', realisation:'🏆 Réalisation', autre:'📎 Autre' };
+  el.innerHTML = `
+    <div class="p-card" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${items.length?'16px':'0'};">
+        <h3 style="margin:0;font-size:15px;font-weight:700;">🗂 Portfolio & Réalisations</h3>
+        ${isOwn ? `<button class="btn btn-orange btn-sm" onclick="openAddPortfolio()">+ Ajouter</button>` : ''}
+      </div>
+      <div id="portfolio-form" style="display:none;margin-bottom:16px;"></div>
+      ${items.length ? `
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+          ${items.map(it => `
+            <div style="border:1px solid var(--border);border-radius:10px;padding:16px;background:var(--bg);">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                <div>
+                  <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">${types[it.type]||it.type}</span>
+                  ${it.annee ? `<span style="font-size:11px;color:var(--muted);margin-left:8px;">${it.annee}</span>` : ''}
+                  <div style="font-weight:700;font-size:14px;margin-top:4px;">${esc(it.titre)}</div>
+                </div>
+                ${isOwn ? `<div style="display:flex;gap:4px;">
+                  <button onclick="openEditPortfolio(${it.id})" style="background:none;border:none;cursor:pointer;font-size:16px;">✏️</button>
+                  <button onclick="deletePortfolio(${it.id})" style="background:none;border:none;cursor:pointer;font-size:16px;">🗑</button>
+                </div>` : ''}
+              </div>
+              ${it.description ? `<p style="font-size:13px;color:var(--muted);margin:8px 0;">${esc(it.description).substring(0,200)}</p>` : ''}
+              ${it.partenaires ? `<div style="font-size:12px;color:var(--muted);">👥 ${esc(it.partenaires)}</div>` : ''}
+              ${it.resultats ? `<div style="font-size:12px;color:#10b981;margin-top:4px;">✅ ${esc(it.resultats)}</div>` : ''}
+              ${it.lien ? `<a href="${esc(it.lien)}" target="_blank" style="display:inline-block;margin-top:8px;font-size:12px;color:var(--orange);">🔗 Voir le projet</a>` : ''}
+            </div>`).join('')}
+        </div>` : `<p style="color:var(--muted);font-size:13px;">${isOwn?'Ajoutez vos projets, publications et réalisations.':'Aucune réalisation partagée.'}</p>`}
+    </div>`;
+}
+
+function openAddPortfolio() {
+  const f = document.getElementById('portfolio-form');
+  if (f.style.display !== 'none' && !f.dataset.editId) { f.style.display='none'; return; }
+  delete f.dataset.editId;
+  f.innerHTML = buildPortfolioFormHtml({});
+  f.style.display = 'block';
+}
+function openEditPortfolio(id) {
+  // Reload tab to get fresh data
+  document.getElementById('ptab-portfolio').dataset.loaded = '';
+  loadPortfolioTab();
+}
+function buildPortfolioFormHtml(it) {
+  return `
+    <div class="p-card" style="background:var(--bg-soft,#f8f8f8);border:1px dashed var(--border);">
+      <h4 style="margin:0 0 12px;">Nouvelle réalisation</h4>
+      <div class="fg">
+        <div><label>Titre *</label><input id="pf-titre" value="${esc(it.titre||'')}" placeholder="Mon projet de développement…"></div>
+        <div><label>Type</label><select id="pf-type">
+          <option value="projet" ${it.type==='projet'?'selected':''}>💼 Projet</option>
+          <option value="publication" ${it.type==='publication'?'selected':''}>📄 Publication</option>
+          <option value="realisation" ${it.type==='realisation'?'selected':''}>🏆 Réalisation</option>
+          <option value="autre" ${it.type==='autre'?'selected':''}>📎 Autre</option>
+        </select></div>
+        <div><label>Année</label><input id="pf-annee" type="number" min="1990" max="2030" value="${it.annee||''}" placeholder="2024"></div>
+        <div><label>Lien</label><input id="pf-lien" value="${esc(it.lien||'')}" placeholder="https://…"></div>
+        <div><label>Partenaires</label><input id="pf-part" value="${esc(it.partenaires||'')}" placeholder="Nom des partenaires…"></div>
+        <div><label>Résultats</label><input id="pf-res" value="${esc(it.resultats||'')}" placeholder="Impact, résultats obtenus…"></div>
+      </div>
+      <div class="fg full"><div><label>Description</label><textarea id="pf-desc" rows="3" placeholder="Décrivez ce projet…">${esc(it.description||'')}</textarea></div></div>
+      <div class="edit-btns">
+        <button class="btn-save" onclick="savePortfolio()">Enregistrer</button>
+        <button class="btn-cancel" onclick="document.getElementById('portfolio-form').style.display='none'">Annuler</button>
+      </div>
+    </div>`;
+}
+async function savePortfolio() {
+  const titre = document.getElementById('pf-titre').value.trim();
+  if (!titre) return alert('Titre requis');
+  const body = {
+    titre, type: document.getElementById('pf-type').value,
+    annee: parseInt(document.getElementById('pf-annee').value)||null,
+    lien: document.getElementById('pf-lien').value.trim()||null,
+    partenaires: document.getElementById('pf-part').value.trim()||null,
+    resultats: document.getElementById('pf-res').value.trim()||null,
+    description: document.getElementById('pf-desc').value.trim()||null,
+  };
+  await api('POST', '/profil/portfolio', body);
+  document.getElementById('portfolio-form').style.display = 'none';
+  document.getElementById('ptab-portfolio').dataset.loaded = '';
+  loadPortfolioTab();
+}
+async function deletePortfolio(id) {
+  if (!confirm('Supprimer cette réalisation ?')) return;
+  await api('DELETE', '/profil/portfolio/'+id);
+  document.getElementById('ptab-portfolio').dataset.loaded = '';
+  loadPortfolioTab();
+}
+
+/* ======================================================
+   ONGLET RECOMMANDATIONS
+   ====================================================== */
+async function loadRecommandationsTab() {
+  const el = document.getElementById('ptab-recommandations');
+  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement…</div>';
+  let recs = [];
+  try { recs = await api('GET', `/profil/${profil.id}/recommandations`); } catch(e) {}
+  const stars = n => '⭐'.repeat(n) + '☆'.repeat(5-n);
+  const canWrite = CU && !isOwn;
+  el.innerHTML = `
+    <div class="p-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${recs.length||canWrite?'16px':'0'};">
+        <h3 style="margin:0;font-size:15px;font-weight:700;">⭐ Recommandations (${recs.length})</h3>
+        ${canWrite ? `<button class="btn btn-orange btn-sm" onclick="toggleRecForm()">+ Écrire une recommandation</button>` : ''}
+        ${isOwn ? `<button class="btn btn-outline btn-sm" onclick="loadMesRecommandations()">📥 Mes recommandations reçues</button>` : ''}
+      </div>
+      <div id="rec-form" style="display:none;margin-bottom:16px;"></div>
+      <div id="mes-recs-panel" style="display:none;margin-bottom:16px;"></div>
+      ${recs.length ? recs.map(r => `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;background:var(--bg);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="width:40px;height:40px;border-radius:50%;background:var(--tp);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:16px;flex-shrink:0;overflow:hidden;">
+              ${r.auteur_photo?`<img src="${esc(r.auteur_photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`:(r.auteur_nom||'?')[0]}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;font-size:13px;">${esc(r.auteur_nom)}</div>
+              ${r.auteur_titre?`<div style="font-size:11px;color:var(--muted);">${esc(r.auteur_titre)}</div>`:''}
+              ${r.relation?`<div style="font-size:11px;color:var(--muted);">Relation : ${esc(r.relation)}</div>`:''}
+            </div>
+            <div style="font-size:14px;">${stars(r.note||5)}</div>
+          </div>
+          <p style="margin:0;font-size:13px;color:var(--text);font-style:italic;">"${esc(r.texte)}"</p>
+        </div>`).join('') : `<p style="color:var(--muted);font-size:13px;">Aucune recommandation pour l'instant.</p>`}
+    </div>`;
+}
+
+function toggleRecForm() {
+  const f = document.getElementById('rec-form');
+  if (f.style.display !== 'none') { f.style.display='none'; return; }
+  f.innerHTML = `
+    <div class="p-card" style="background:var(--bg-soft,#f8f8f8);border:1px dashed var(--border);">
+      <h4 style="margin:0 0 12px;">Écrire une recommandation</h4>
+      <div class="fg">
+        <div><label>Note</label><select id="rec-note">
+          <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+          <option value="4">⭐⭐⭐⭐ Très bien</option>
+          <option value="3">⭐⭐⭐ Bien</option>
+          <option value="2">⭐⭐ Passable</option>
+          <option value="1">⭐ Insuffisant</option>
+        </select></div>
+        <div><label>Votre relation</label><input id="rec-rel" placeholder="Ex : Collègue, Partenaire…"></div>
+      </div>
+      <div class="fg full"><div><label>Votre recommandation *</label><textarea id="rec-texte" rows="4" placeholder="Décrivez vos interactions avec cette personne (min. 20 caractères)…"></textarea></div></div>
+      <div class="edit-btns">
+        <button class="btn-save" onclick="saveRecommandation()">Publier</button>
+        <button class="btn-cancel" onclick="document.getElementById('rec-form').style.display='none'">Annuler</button>
+      </div>
+      <p class="e-msg ok" id="rec-ok" style="display:none;"></p>
+    </div>`;
+  f.style.display = 'block';
+}
+async function saveRecommandation() {
+  const texte = document.getElementById('rec-texte').value.trim();
+  if (texte.length < 20) { alert('La recommandation doit faire au moins 20 caractères'); return; }
+  const ok = document.getElementById('rec-ok');
+  try {
+    await api('POST', `/profil/${profil.id}/recommandations`, { texte, note: parseInt(document.getElementById('rec-note').value), relation: document.getElementById('rec-rel').value.trim()||null });
+    ok.style.display='block'; ok.textContent='✓ Recommandation envoyée ! Elle sera visible après validation.';
+    setTimeout(()=>document.getElementById('rec-form').style.display='none', 2000);
+  } catch(e) { alert(e.message||'Erreur'); }
+}
+async function loadMesRecommandations() {
+  const panel = document.getElementById('mes-recs-panel');
+  if (panel.style.display !== 'none') { panel.style.display='none'; return; }
+  panel.innerHTML = '<div style="color:var(--muted);font-size:13px;">Chargement…</div>';
+  panel.style.display = 'block';
+  try {
+    const data = await api('GET', '/profil/mes-recommandations');
+    const statutBtns = r => `
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        ${r.statut !== 'approuve' ? `<button onclick="modifierRec(${r.id},'approuve')" class="btn btn-outline btn-sm" style="font-size:11px;color:#10b981;">✅ Approuver</button>` : '<span style="font-size:11px;color:#10b981;">✅ Approuvée</span>'}
+        ${r.statut !== 'masque' ? `<button onclick="modifierRec(${r.id},'masque')" class="btn btn-outline btn-sm" style="font-size:11px;">🙈 Masquer</button>` : ''}
+        ${r.statut !== 'refuse' ? `<button onclick="modifierRec(${r.id},'refuse')" class="btn btn-outline btn-sm" style="font-size:11px;color:#dc2626;">❌ Refuser</button>` : ''}
+      </div>`;
+    panel.innerHTML = `
+      <div style="background:var(--bg-soft,#f8f8f8);border:1px solid var(--border);border-radius:10px;padding:14px;">
+        <h4 style="margin:0 0 12px;font-size:13px;">Recommandations reçues (${data.recues.length})</h4>
+        ${data.recues.length ? data.recues.map(r=>`
+          <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:#fff;">
+            <div style="font-weight:700;font-size:13px;">${esc(r.auteur_nom)}</div>
+            <p style="font-size:12px;margin:6px 0;font-style:italic;">"${esc(r.texte)}"</p>
+            <span style="font-size:11px;font-weight:700;color:${r.statut==='approuve'?'#10b981':r.statut==='refuse'?'#dc2626':'#f59e0b'};">${r.statut}</span>
+            ${statutBtns(r)}
+          </div>`).join('') : '<p style="color:var(--muted);font-size:12px;">Aucune recommandation reçue.</p>'}
+      </div>`;
+  } catch(e) { panel.innerHTML = '<p style="color:red;">Erreur lors du chargement.</p>'; }
+}
+async function modifierRec(id, statut) {
+  await api('PATCH', '/profil/recommandations/'+id, { statut });
+  loadMesRecommandations();
+  document.getElementById('ptab-recommandations').dataset.loaded = '';
+  loadRecommandationsTab();
 }
 
 /* ---- démarrage ---- */

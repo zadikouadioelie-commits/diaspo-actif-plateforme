@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Éditeur Business Plan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+/* ===== LAYOUT ===== */
+html,body{height:100%;overflow:hidden;}
+.bp-shell{display:flex;height:calc(100vh - 56px);overflow:hidden;}
+
+/* Sidebar navigation */
+.bp-sidebar{width:260px;flex-shrink:0;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.bp-sidebar-head{padding:14px 16px;border-bottom:1px solid var(--border);}
+.bp-sidebar-head .bp-name{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;}
+.prog-bar{height:6px;border-radius:99px;background:var(--border);overflow:hidden;}
+.prog-bar .fill{height:100%;border-radius:99px;background:var(--orange);transition:width .5s;}
+.prog-label{font-size:11px;color:var(--muted);margin-top:3px;}
+.bp-nav{flex:1;overflow-y:auto;padding:8px 0;}
+.bp-nav-item{display:flex;align-items:center;gap:8px;padding:9px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);transition:background .1s;border-left:3px solid transparent;}
+.bp-nav-item:hover{background:var(--surface2);}
+.bp-nav-item.active{background:var(--orange-light);border-left-color:var(--orange);color:var(--orange);}
+.bp-nav-item .nav-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center;}
+.bp-nav-item .check{margin-left:auto;font-size:13px;}
+.bp-sidebar-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
+
+/* Zone centrale */
+.bp-main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+.bp-topbar{padding:10px 20px;border-bottom:1px solid var(--border);background:#fff;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.bp-topbar .bp-title-input{flex:1;border:none;font-size:16px;font-weight:800;font-family:inherit;outline:none;background:transparent;}
+.bp-topbar .bp-title-input:focus{border-bottom:2px solid var(--orange);}
+.bp-save-status{font-size:12px;color:var(--muted);flex-shrink:0;}
+.bp-content{flex:1;overflow-y:auto;padding:24px;}
+
+/* Section */
+.bp-section{max-width:860px;margin:0 auto;}
+.bp-section-head{margin-bottom:20px;}
+.bp-section-head h2{margin:0;font-size:20px;font-weight:800;}
+.bp-section-head p{margin:6px 0 0;color:var(--muted);font-size:13.5px;}
+.bp-section-head .section-comment-btn{float:right;font-size:12px;}
+
+.bp-card-inner{background:#fff;border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:16px;}
+.bp-card-inner h3{margin:0 0 14px;font-size:14px;font-weight:800;color:var(--text);}
+
+/* Formulaires */
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.fg .full{grid-column:1/-1;}
+.fg label{display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;}
+.fg input,.fg select,.fg textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13.5px;box-sizing:border-box;background:var(--bg);}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--orange);}
+.fg textarea{resize:vertical;min-height:90px;}
+
+/* SWOT */
+.swot-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.swot-cell{border-radius:12px;padding:16px;}
+.swot-cell.forces{background:#d1fae5;border:1px solid #6ee7b7;}
+.swot-cell.faiblesses{background:#fee2e2;border:1px solid #fca5a5;}
+.swot-cell.opportunites{background:#dbeafe;border:1px solid #93c5fd;}
+.swot-cell.menaces{background:#fef3c7;border:1px solid #fcd34d;}
+.swot-cell label{display:block;font-weight:800;font-size:12px;text-transform:uppercase;margin-bottom:8px;}
+.swot-cell textarea{width:100%;border:none;background:rgba(255,255,255,.7);border-radius:8px;padding:8px;font-family:inherit;font-size:13px;resize:vertical;min-height:100px;box-sizing:border-box;}
+
+/* BMC - Business Model Canvas */
+.bmc-grid{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:auto auto;gap:8px;}
+.bmc-cell{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;}
+.bmc-cell label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;color:var(--orange);margin-bottom:6px;}
+.bmc-cell textarea{width:100%;border:none;background:var(--bg);border-radius:6px;padding:6px;font-family:inherit;font-size:12px;resize:vertical;min-height:80px;box-sizing:border-box;}
+.bmc-cell.partenaires{grid-row:span 2;}
+.bmc-cell.activites{grid-column:2;}
+.bmc-cell.proposition{grid-column:3;grid-row:span 2;}
+.bmc-cell.relations{grid-column:4;}
+.bmc-cell.segments{grid-column:5;grid-row:span 2;}
+.bmc-cell.ressources{grid-column:2;grid-row:2;}
+.bmc-cell.canaux{grid-column:4;grid-row:2;}
+.bmc-foot{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+.bmc-foot .bmc-cell{border-color:var(--orange-light);}
+
+/* Tableau produits/services */
+.bp-table{width:100%;border-collapse:collapse;font-size:13px;}
+.bp-table th{background:var(--surface2);padding:8px 12px;text-align:left;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);}
+.bp-table td{padding:8px 10px;border:1px solid var(--border);vertical-align:top;}
+.bp-table td input{border:none;background:transparent;width:100%;font-family:inherit;font-size:13px;padding:0;outline:none;}
+.bp-table tr:hover td{background:var(--surface2);}
+
+/* Tableau financier */
+.fin-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:12px;}
+.fin-table th{background:var(--orange);color:#fff;padding:8px 10px;text-align:center;font-size:11px;font-weight:700;border:1px solid var(--border);}
+.fin-table td{padding:7px 10px;border:1px solid var(--border);text-align:right;}
+.fin-table td:first-child{text-align:left;font-weight:600;}
+.fin-table td input{border:none;background:transparent;width:70px;text-align:right;font-family:inherit;font-size:12px;padding:0;}
+.fin-table .total-row td{background:#fff7ed;font-weight:800;}
+.fin-table .header-row td{background:var(--surface2);font-weight:700;font-size:11px;text-transform:uppercase;}
+
+/* Risques */
+.risk-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 2fr;gap:8px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:#fff;}
+.risk-row select,.risk-row input{border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:12px;}
+.risk-badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;}
+.risk-faible{background:#d1fae5;color:#065f46;}
+.risk-moyen{background:#fef3c7;color:#92400e;}
+.risk-eleve{background:#fee2e2;color:#991b1b;}
+.risk-critique{background:#7f1d1d;color:#fff;}
+
+/* Gantt simplifié */
+.gantt-table{width:100%;border-collapse:collapse;font-size:12px;}
+.gantt-table th{background:var(--surface2);padding:6px 8px;border:1px solid var(--border);font-size:11px;font-weight:700;text-align:center;}
+.gantt-table td{border:1px solid var(--border);padding:5px 8px;}
+.gantt-bar{height:14px;border-radius:99px;background:var(--orange);opacity:.8;}
+
+/* Complétude */
+.complet-table{width:100%;border-collapse:collapse;font-size:13px;}
+.complet-table th{padding:8px 12px;text-align:left;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);background:var(--surface2);border:1px solid var(--border);}
+.complet-table td{padding:8px 12px;border:1px solid var(--border);}
+
+/* Commentaires sidebar */
+.comments-panel{width:280px;background:#fff;border-left:1px solid var(--border);display:none;flex-direction:column;overflow:hidden;}
+.comments-panel.open{display:flex;}
+.comments-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.comments-body{flex:1;overflow-y:auto;padding:12px;}
+.comment-item{background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;font-size:12.5px;}
+.comment-item .ca{font-weight:700;font-size:11px;margin-bottom:3px;}
+
+/* Versions */
+.ver-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+
+/* Export buttons */
+.export-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+
+/* Mobile */
+@media(max-width:768px){
+  .bp-sidebar{position:fixed;left:-260px;z-index:100;height:100%;transition:left .25s;}
+  .bp-sidebar.open{left:0;}
+  .bmc-grid{grid-template-columns:1fr 1fr;display:flex;flex-direction:column;}
+  .bmc-cell{grid-column:auto!important;grid-row:auto!important;}
+  .fg{grid-template-columns:1fr;}
+  .swot-grid{grid-template-columns:1fr;}
+}
+
+/* ===== ASSISTANT BP ===== */
+#bpa-widget{position:fixed;bottom:24px;right:24px;z-index:400;display:flex;flex-direction:column;align-items:flex-end;gap:10px;}
+#bpa-toggle{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#6d28d9,#a78bfa);border:none;cursor:pointer;box-shadow:0 4px 20px rgba(109,40,217,.4);display:flex;align-items:center;justify-content:center;font-size:26px;transition:transform .2s;position:relative;}
+#bpa-toggle:hover{transform:scale(1.08);}
+#bpa-badge{position:absolute;top:-2px;right:-2px;width:14px;height:14px;background:#10b981;border-radius:50%;border:2px solid #fff;}
+#bpa-panel{width:360px;background:#fff;border-radius:18px;box-shadow:0 8px 40px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden;border:1px solid #e0d4fd;max-height:70vh;}
+#bpa-panel.open{display:flex;}
+#bpa-panel.minimized{max-height:56px;}
+#bpa-header{background:linear-gradient(135deg,#6d28d9,#a78bfa);padding:14px 16px;display:flex;align-items:center;gap:10px;color:#fff;cursor:pointer;flex-shrink:0;}
+#bpa-header .bpa-av{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+#bpa-header .bpa-info{flex:1;}
+#bpa-header .bpa-name{font-weight:800;font-size:14px;}
+#bpa-header .bpa-status{font-size:11px;opacity:.85;}
+.bpa-head-btns{display:flex;gap:4px;}
+.bpa-head-btn{background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+.bpa-head-btn:hover{background:rgba(255,255,255,.35);}
+#bpa-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#faf5ff;}
+.bpa-msg{max-width:88%;border-radius:12px;padding:10px 13px;font-size:13px;line-height:1.55;word-break:break-word;}
+.bpa-msg.bot{background:#fff;border:1px solid #e0d4fd;align-self:flex-start;border-bottom-left-radius:3px;}
+.bpa-msg.user{background:linear-gradient(135deg,#6d28d9,#8b5cf6);color:#fff;align-self:flex-end;border-bottom-right-radius:3px;}
+.bpa-msg.typing{color:#9ca3af;font-style:italic;font-size:12px;background:#fff;border:1px solid #e0d4fd;border-bottom-left-radius:3px;}
+.bpa-msg strong{font-weight:700;}
+#bpa-quick{display:flex;flex-wrap:wrap;gap:5px;padding:8px 12px 0;flex-shrink:0;}
+.bpa-q{border:1px solid #a78bfa;background:#f5f3ff;color:#6d28d9;border-radius:99px;padding:4px 11px;font-size:11.5px;cursor:pointer;white-space:nowrap;transition:background .1s;}
+.bpa-q:hover{background:#ede9fe;}
+#bpa-input-row{display:flex;gap:6px;padding:10px 12px;border-top:1px solid #e0d4fd;background:#fff;flex-shrink:0;}
+#bpa-input{flex:1;padding:8px 12px;border-radius:20px;border:1px solid #a78bfa;font-size:13px;font-family:inherit;outline:none;background:#faf5ff;}
+#bpa-input:focus{border-color:#6d28d9;}
+#bpa-send{background:linear-gradient(135deg,#6d28d9,#a78bfa);color:#fff;border:none;border-radius:50%;width:34px;height:34px;cursor:pointer;font-size:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.bpa-section-tag{font-size:10.5px;font-weight:700;text-transform:uppercase;color:#6d28d9;background:#f5f3ff;border-radius:99px;padding:2px 8px;margin-bottom:6px;display:inline-block;}
+.bpa-prog-mini{background:#f5f3ff;border-radius:10px;padding:10px 12px;margin-bottom:4px;}
+.bpa-prog-mini .bar{height:6px;border-radius:99px;background:#e0d4fd;overflow:hidden;margin:4px 0;}
+.bpa-prog-mini .bar .fill{height:100%;border-radius:99px;background:#6d28d9;transition:width .5s;}
+</style>
+</head>
+<body>
+<div class="page" style="height:100vh;overflow:hidden;display:flex;flex-direction:column;">
+
+  <header class="topbar" style="flex-shrink:0;">
+    <div class="topbar-inner">
+      <a href="business-plan.html" style="color:var(--muted);text-decoration:none;font-size:13px;font-weight:700;">← Mes plans</a>
+      <div class="logo" style="margin-left:16px;"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="bp-shell" id="bp-shell">
+
+    <!-- SIDEBAR navigation -->
+    <div class="bp-sidebar" id="bp-sidebar">
+      <div class="bp-sidebar-head">
+        <div class="bp-name" id="sidebar-name">Chargement…</div>
+        <div class="prog-bar"><div class="fill" id="sidebar-prog" style="width:0%"></div></div>
+        <div class="prog-label" id="sidebar-prog-label">0% complété</div>
+      </div>
+      <nav class="bp-nav" id="bp-nav"></nav>
+      <div class="bp-sidebar-foot">
+        <button class="btn btn-outline btn-sm" onclick="saveVersion()">💾 Sauvegarder version</button>
+        <button class="btn btn-outline btn-sm" onclick="showVersions()">🕓 Historique</button>
+        <button class="btn btn-orange btn-sm" onclick="exportPDF()">📄 Exporter PDF</button>
+      </div>
+    </div>
+
+    <!-- ZONE PRINCIPALE -->
+    <div class="bp-main" id="bp-main">
+      <div class="bp-topbar">
+        <input class="bp-title-input" id="bp-title-input" placeholder="Nom du projet…" onchange="patchMeta()">
+        <span class="bp-save-status" id="save-status">✓ Sauvegardé</span>
+        <button class="btn btn-outline btn-sm" onclick="toggleComments()">💬 Commentaires</button>
+        <button class="btn btn-outline btn-sm" onclick="showCompletude()">📊 Complétude</button>
+        <button class="btn btn-outline btn-sm" onclick="showCollaborateurs()">👥 Collaborateurs</button>
+      </div>
+      <div class="bp-content" id="bp-content">
+        <div style="text-align:center;padding:60px;color:var(--muted);">Chargement du business plan…</div>
+      </div>
+    </div>
+
+    <!-- PANEL COMMENTAIRES -->
+    <div class="comments-panel" id="comments-panel">
+      <div class="comments-head">
+        <strong style="font-size:13px;">💬 Commentaires</strong>
+        <button onclick="toggleComments()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);">✕</button>
+      </div>
+      <div class="comments-head" style="padding-top:0;border:none;">
+        <small id="comments-section-label" style="color:var(--orange);font-weight:700;">Section : —</small>
+      </div>
+      <div class="comments-body" id="comments-body"></div>
+      <div style="padding:12px;border-top:1px solid var(--border);">
+        <textarea id="comment-input" rows="2" placeholder="Ajouter un commentaire…" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-family:inherit;font-size:13px;box-sizing:border-box;resize:none;"></textarea>
+        <button class="btn btn-orange btn-sm btn-block" style="margin-top:6px;" onclick="postComment()">Envoyer</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL Versions -->
+  <div class="modal-bg" id="modal-versions" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;width:480px;max-height:70vh;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+        <strong>Historique des versions</strong>
+        <button onclick="document.getElementById('modal-versions').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);">✕</button>
+      </div>
+      <div id="versions-list" style="flex:1;overflow-y:auto;padding:16px;"></div>
+    </div>
+  </div>
+
+  <!-- MODAL Collaborateurs -->
+  <div class="modal-bg" id="modal-collab" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;width:500px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+        <strong>Collaborateurs</strong>
+        <button onclick="document.getElementById('modal-collab').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);">✕</button>
+      </div>
+      <div style="padding:16px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;gap:8px;">
+          <input id="collab-search" placeholder="Email ou nom d'utilisateur…" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;">
+          <select id="collab-role" style="padding:8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;">
+            <option value="lecteur">Lecteur</option>
+            <option value="commentateur">Commentateur</option>
+            <option value="editeur">Éditeur</option>
+            <option value="validateur">Validateur</option>
+          </select>
+          <button class="btn btn-orange btn-sm" onclick="searchAndAddCollab()">Inviter</button>
+        </div>
+        <div id="collab-search-results" style="margin-top:8px;"></div>
+      </div>
+      <div id="collab-list" style="flex:1;overflow-y:auto;padding:16px;"></div>
+    </div>
+  </div>
+
+  <!-- MODAL Complétude -->
+  <div class="modal-bg" id="modal-completude" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;width:560px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <strong>📊 Vérification de complétude</strong>
+        <button onclick="document.getElementById('modal-completude').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);">✕</button>
+      </div>
+      <div id="completude-content" style="flex:1;overflow-y:auto;padding:16px;"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════ ASSISTANT BP ═══════════ -->
+<div id="bpa-widget">
+  <div id="bpa-panel">
+    <div id="bpa-header" onclick="toggleBPAMinimize()">
+      <div class="bpa-av">🧠</div>
+      <div class="bpa-info">
+        <div class="bpa-name">Consultant BP IA</div>
+        <div class="bpa-status" id="bpa-status">● En ligne · Prêt à vous conseiller</div>
+      </div>
+      <div class="bpa-head-btns" onclick="event.stopPropagation()">
+        <button class="bpa-head-btn" onclick="openBPASimulation()" title="Simulation de présentation">🎭</button>
+        <button class="bpa-head-btn" onclick="bpaAudit()" title="Audit complet">📊</button>
+        <button class="bpa-head-btn" onclick="toggleBPAMinimize()" title="Réduire/agrandir">—</button>
+        <button class="bpa-head-btn" onclick="closeBPA()" title="Fermer">✕</button>
+      </div>
+    </div>
+    <div id="bpa-body"></div>
+    <div id="bpa-quick"></div>
+    <div id="bpa-input-row">
+      <input id="bpa-input" placeholder="Posez votre question…" autocomplete="off">
+      <button id="bpa-send">➤</button>
+    </div>
+  </div>
+  <button id="bpa-toggle" title="Assistant Business Plan IA" onclick="toggleBPA()">
+    🧠
+    <div id="bpa-badge"></div>
+  </button>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+/* ===================================================
+   BUSINESS PLAN EDITOR
+   =================================================== */
+let me = null;
+let bpId = null;
+let bp = null;
+let sections = {};
+let currentSection = 'infos_generales';
+let monRole = 'proprietaire';
+let autoSaveTimer = null;
+let hasUnsaved = false;
+
+const SECTIONS = [
+  { key:'infos_generales', icon:'🏷', label:'Informations générales' },
+  { key:'resume_executif', icon:'📄', label:'Résumé exécutif' },
+  { key:'presentation', icon:'🏢', label:'Présentation détaillée' },
+  { key:'probleme', icon:'🔍', label:'Analyse du problème' },
+  { key:'solution', icon:'💡', label:'Solution proposée' },
+  { key:'marche', icon:'📊', label:'Étude de marché' },
+  { key:'swot', icon:'⚡', label:'Analyse SWOT' },
+  { key:'business_model', icon:'🎯', label:'Business Model Canvas' },
+  { key:'produits', icon:'📦', label:'Produits & Services' },
+  { key:'strategie_marketing', icon:'📢', label:'Stratégie marketing' },
+  { key:'plan_commercial', icon:'💼', label:'Plan commercial' },
+  { key:'plan_operationnel', icon:'⚙️', label:'Plan opérationnel' },
+  { key:'organisation', icon:'🏗', label:'Organisation & Gouvernance' },
+  { key:'rh', icon:'👥', label:'Ressources humaines' },
+  { key:'calendrier', icon:'📅', label:'Calendrier de mise en œuvre' },
+  { key:'plan_financier', icon:'💰', label:'Plan financier' },
+  { key:'risques', icon:'⚠️', label:'Analyse des risques' },
+  { key:'impact', icon:'🌱', label:'Impact' },
+  { key:'financement', icon:'🏦', label:'Recherche de financement' },
+  { key:'annexes', icon:'📎', label:'Annexes' },
+  { key:'completude', icon:'✅', label:'Vérification complétude', noSave:true },
+];
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function g(id){ return sections[currentSection]?.[id]||''; }
+
+/* ---- Chargement initial ---- */
+async function loadBP() {
+  bpId = new URLSearchParams(location.search).get('id');
+  if (!bpId) { window.location.href='business-plan.html'; return; }
+  try {
+    bp = await api('GET', `/business-plans/${bpId}`);
+    sections = bp.sections || {};
+    monRole = bp.mon_role || 'lecteur';
+    document.title = `BP — ${bp.nom_projet||'Sans titre'} · Diaspo\'Actif`;
+    document.getElementById('bp-title-input').value = bp.nom_projet || '';
+    buildNav();
+    updateProgress(bp.progression||0);
+    renderSection(currentSection);
+  } catch(e) {
+    document.getElementById('bp-content').innerHTML = `<div style="padding:40px;text-align:center;color:#D33;">${e.message}</div>`;
+  }
+}
+
+function updateProgress(prog) {
+  document.getElementById('sidebar-prog').style.width = prog+'%';
+  document.getElementById('sidebar-prog-label').textContent = `${prog}% complété`;
+  document.getElementById('sidebar-name').textContent = bp?.nom_projet||'Sans titre';
+}
+
+/* ---- Navigation ---- */
+function buildNav() {
+  const completude = bp?.completude || [];
+  const nav = document.getElementById('bp-nav');
+  nav.innerHTML = SECTIONS.map(s => {
+    const check = completude.find(c=>c.key===s.key);
+    const ok = check?.ok;
+    return `<div class="bp-nav-item ${s.key===currentSection?'active':''}" onclick="navTo('${s.key}')">
+      <span class="nav-icon">${s.icon}</span>
+      <span>${s.label}</span>
+      <span class="check">${check?.(ok?'✅':'⚠️'):''}</span>
+    </div>`;
+  }).join('');
+}
+
+function navTo(key) {
+  saveCurrentSection();
+  currentSection = key;
+  buildNav();
+  renderSection(key);
+  loadComments(key);
+}
+
+/* ---- Auto-save ---- */
+function markDirty() {
+  hasUnsaved = true;
+  document.getElementById('save-status').textContent = '● Non sauvegardé';
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(saveCurrentSection, 3000);
+}
+
+async function saveCurrentSection() {
+  if (!hasUnsaved || monRole==='lecteur') return;
+  hasUnsaved = false;
+  document.getElementById('save-status').textContent = 'Sauvegarde…';
+  try {
+    const nom = document.getElementById('bp-title-input').value.trim();
+    await api('PUT', `/business-plans/${bpId}`, {
+      nom_projet: nom||undefined,
+      sections: { [currentSection]: sections[currentSection]||{} }
+    });
+    const updated = await api('GET', `/business-plans/${bpId}`);
+    bp.completude = updated.completude;
+    bp.progression = updated.progression;
+    updateProgress(updated.progression);
+    buildNav();
+    document.getElementById('save-status').textContent = '✓ Sauvegardé';
+  } catch(e) {
+    document.getElementById('save-status').textContent = '✗ Erreur sauvegarde';
+  }
+}
+
+async function patchMeta() {
+  const nom = document.getElementById('bp-title-input').value.trim();
+  if (nom) { bp.nom_projet=nom; document.getElementById('sidebar-name').textContent=nom; }
+  markDirty();
+}
+
+/* ---- Helpers de saisie ---- */
+function field(key, label, placeholder='', type='text', full=false, required=false) {
+  const val = sections[currentSection]?.[key]||'';
+  const ro = monRole==='lecteur';
+  return `<div class="${full?'full':''}">
+    <label>${label}${required?` <span style="color:#D33;">*</span>`:''}</label>
+    <input type="${type}" data-key="${key}" value="${esc(val)}" placeholder="${placeholder}" ${ro?'readonly':''} oninput="updateField('${key}',this.value)">
+  </div>`;
+}
+
+function textarea(key, label, placeholder='', rows=3, full=true) {
+  const val = sections[currentSection]?.[key]||'';
+  const ro = monRole==='lecteur';
+  return `<div class="${full?'full':''}">
+    <label>${label}</label>
+    <textarea data-key="${key}" rows="${rows}" placeholder="${placeholder}" ${ro?'readonly':''} oninput="updateField('${key}',this.value)">${esc(val)}</textarea>
+  </div>`;
+}
+
+function select(key, label, options, full=false) {
+  const val = sections[currentSection]?.[key]||'';
+  const ro = monRole==='lecteur';
+  return `<div class="${full?'full':''}">
+    <label>${label}</label>
+    <select data-key="${key}" ${ro?'disabled':''} onchange="updateField('${key}',this.value)">
+      ${options.map(o=>typeof o==='string'?`<option value="${o}" ${val===o?'selected':''}>${o}</option>`:`<option value="${o.v}" ${val===o.v?'selected':''}>${o.l}</option>`).join('')}
+    </select>
+  </div>`;
+}
+
+function updateField(key, value) {
+  if (!sections[currentSection]) sections[currentSection]={};
+  sections[currentSection][key] = value;
+  markDirty();
+}
+
+/* ════════════════════════════════════════════════════
+   RENDU DE CHAQUE SECTION
+   ════════════════════════════════════════════════════ */
+function renderSection(key) {
+  const content = document.getElementById('bp-content');
+  const def = SECTIONS.find(s=>s.key===key);
+  const renderers = {
+    infos_generales: renderInfosGenerales,
+    resume_executif: renderResumeExecutif,
+    presentation: renderPresentation,
+    probleme: renderProbleme,
+    solution: renderSolution,
+    marche: renderMarche,
+    swot: renderSWOT,
+    business_model: renderBMC,
+    produits: renderProduits,
+    strategie_marketing: renderMarketing,
+    plan_commercial: renderCommercial,
+    plan_operationnel: renderOperationnel,
+    organisation: renderOrganisation,
+    rh: renderRH,
+    calendrier: renderCalendrier,
+    plan_financier: renderFinancier,
+    risques: renderRisques,
+    impact: renderImpact,
+    financement: renderFinancement,
+    annexes: renderAnnexes,
+    completude: renderCompletude,
+  };
+  const fn = renderers[key] || (() => '<div class="bp-section"><div class="bp-card-inner"><p>Section en cours de développement.</p></div></div>');
+  content.innerHTML = fn();
+  content.scrollTop = 0;
+}
+
+/* ---- 1. Informations générales ---- */
+function renderInfosGenerales() {
+  const s = sections.infos_generales || {};
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>🏷 Informations générales</h2><p>La carte d'identité de votre projet.</p></div>
+    <div class="bp-card-inner"><h3>Identité du projet</h3><div class="fg">
+      ${field('nom_projet','Nom du projet','Mon projet…','text',false,true)}
+      ${field('slogan','Slogan / Accroche','Une phrase qui résume tout…','text',false)}
+      ${select('type_initiative','Type d\'initiative',[
+        {v:'startup',l:'🚀 Startup'},{v:'pme',l:'🏢 PME'},{v:'association',l:'🤝 Association'},
+        {v:'ong',l:'🌍 ONG'},{v:'cooperative',l:'🌾 Coopérative'},{v:'social',l:'💚 Entreprise sociale'},
+        {v:'freelance',l:'💻 Freelance / Auto-entrepreneur'},{v:'autre',l:'📋 Autre'}
+      ])}
+      ${select('stade','Stade du projet',[
+        {v:'idee',l:'💭 Idée'},{v:'prototype',l:'🔧 Prototype / MVP'},{v:'lancement',l:'🚀 Lancement'},
+        {v:'croissance',l:'📈 Croissance'},{v:'expansion',l:'🌍 Expansion'}
+      ])}
+      ${field('secteur','Secteur d\'activité','Ex : Numérique, Agriculture…','text')}
+      ${field('sous_secteur','Sous-secteur','Spécialité…','text')}
+      ${field('date_creation','Date de création','','date')}
+    </div></div>
+    <div class="bp-card-inner"><h3>Localisation</h3><div class="fg">
+      ${field('pays','Pays','Ex : Sénégal, France…')}
+      ${field('region','Région / Province')}
+      ${field('ville','Ville')}
+      ${field('adresse','Adresse complète','','text',true)}
+    </div></div>
+    <div class="bp-card-inner"><h3>Contacts & présence en ligne</h3><div class="fg">
+      ${field('email','Email professionnel','contact@monprojet.com','email')}
+      ${field('telephone','Téléphone','+221 77 000 00 00')}
+      ${field('site_web','Site internet','https://')}
+      ${field('linkedin','LinkedIn','https://linkedin.com/company/…')}
+      ${field('facebook','Facebook')}
+      ${field('instagram','Instagram')}
+    </div></div>
+    <div class="bp-card-inner"><h3>Équipe fondatrice</h3><div class="fg">
+      ${field('responsable','Responsable principal','Prénom NOM','text',false,true)}
+      ${field('responsable_poste','Poste / Rôle','Directeur Général…')}
+      ${field('nb_collaborateurs','Nombre de collaborateurs','','number')}
+      ${textarea('equipe_fondatrice','Membres de l\'équipe fondatrice','Un fondateur par ligne : NOM Prénom — Rôle',3,true)}
+      ${textarea('organigramme','Description de l\'organigramme','Décrivez la structure organisationnelle…',3,true)}
+    </div></div>
+  </div>`;
+}
+
+/* ---- 2. Résumé exécutif ---- */
+function renderResumeExecutif() {
+  const s = sections.resume_executif || {};
+  const infos = sections.infos_generales || {};
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>📄 Résumé exécutif</h2>
+      <p>Une synthèse d'1 à 2 pages de votre business plan. <strong>Complétez les autres sections pour générer automatiquement ce résumé.</strong></p>
+    </div>
+    ${Object.keys(sections).length > 2 ? `<div class="bp-card-inner" style="border-color:var(--orange);background:#fff7ed;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h3 style="margin:0;">✨ Génération automatique</h3>
+        <button class="btn btn-orange btn-sm" onclick="genResumeAuto()">Générer depuis mes données</button>
+      </div>
+      <p style="font-size:12.5px;color:var(--muted);margin:0;">Cliquez pour pré-remplir ce résumé avec les informations saisies dans les autres sections.</p>
+    </div>` : ''}
+    <div class="bp-card-inner"><h3>Le projet</h3><div class="fg">
+      ${textarea('projet','Description du projet (2-3 phrases)','Présentez brièvement votre projet…',4,true)}
+    </div></div>
+    <div class="bp-card-inner"><h3>Problème & Solution</h3><div class="fg">
+      ${textarea('probleme','Problème identifié','Quel problème résolvez-vous ?',3,true)}
+      ${textarea('solution','Solution proposée','Comment le résolvez-vous ?',3,true)}
+    </div></div>
+    <div class="bp-card-inner"><h3>Marché & Finances</h3><div class="fg">
+      ${textarea('marche','Marché visé','Qui sont vos clients ? Quelle taille de marché ?',3,true)}
+      ${textarea('besoins','Besoins financiers','Quel montant recherchez-vous ? Pour quoi ?',3,true)}
+      ${textarea('objectifs','Objectifs','Quels résultats attendez-vous ?',3,true)}
+    </div></div>
+  </div>`;
+}
+
+function genResumeAuto() {
+  const infos = sections.infos_generales || {};
+  const pb = sections.probleme || {};
+  const sol = sections.solution || {};
+  const mar = sections.marche || {};
+  const fin = sections.financement || {};
+  if (!sections.resume_executif) sections.resume_executif = {};
+  const s = sections.resume_executif;
+  if (infos.nom_projet && !s.projet) s.projet = `${infos.nom_projet} est un(e) ${infos.type_initiative||'projet'} dans le secteur ${infos.secteur||'—'}, basé(e) à ${infos.ville||'—'}, ${infos.pays||'—'}.`;
+  if (pb.description && !s.probleme) s.projet = pb.description.substring(0,300);
+  if (sol.description && !s.solution) s.solution = sol.description.substring(0,300);
+  if (mar.taille_marche && !s.marche) s.marche = `Taille du marché : ${mar.taille_marche}. ${mar.tendances||''}`;
+  if (fin.montant && !s.besoins) s.besoins = `Montant recherché : ${fin.montant}€. Utilisation : ${fin.utilisation||'—'}`;
+  markDirty();
+  renderSection('resume_executif');
+}
+
+/* ---- 3. Présentation ---- */
+function renderPresentation() {
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>🏢 Présentation détaillée de l'initiative</h2></div>
+    <div class="bp-card-inner"><h3>Vision, Mission & Valeurs</h3><div class="fg">
+      ${textarea('vision','Vision','Où voulez-vous aller dans 5-10 ans ?',3,true)}
+      ${textarea('mission','Mission','Pourquoi votre organisation existe-t-elle ?',3,true)}
+      ${textarea('valeurs','Valeurs fondamentales','Ex : Innovation, Solidarité, Excellence…',2,true)}
+    </div></div>
+    <div class="bp-card-inner"><h3>Objectifs</h3><div class="fg">
+      ${textarea('obj_court','Objectifs à court terme (0-1 an)','',3,true)}
+      ${textarea('obj_moyen','Objectifs à moyen terme (1-3 ans)','',3,true)}
+      ${textarea('obj_long','Objectifs à long terme (3-5 ans+)','',3,true)}
+    </div></div>
+    <div class="bp-card-inner"><h3>Histoire & Motivations</h3><div class="fg">
+      ${textarea('historique','Historique de l\'organisation','Comment est né ce projet ?',4,true)}
+      ${textarea('motivations','Motivations des fondateurs','Pourquoi avez-vous lancé ce projet ?',3,true)}
+    </div></div>
+  </div>`;
+}
+
+/* ---- 4. Problème ---- */
+function renderProbleme() {
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>🔍 Analyse du problème</h2></div>
+    <div class="bp-card-inner"><div class="fg">
+      ${textarea('description','Quel problème résolvez-vous ?','Décrivez le problème en détail…',5,true)}
+      ${textarea('pourquoi','Pourquoi ce problème existe-t-il ?','Causes profondes…',3,true)}
+      ${textarea('qui_concerne','Qui est concerné ?','Population touchée, chiffres clés…',3,true)}
+      ${textarea('ampleur','Quelle est son ampleur ?','Statistiques, données, ordres de grandeur…',3,true)}
+      ${textarea('consequences','Conséquences actuelles','Impacts économiques, sociaux, humains…',3,true)}
+      ${textarea('pourquoi_pas_resolu','Pourquoi n\'a-t-il pas encore été résolu ?','Barrières existantes, tentatives échouées…',3,true)}
+      ${textarea('preuves','Preuves & Sources','Études, articles, rapports, statistiques…',3,true)}
+    </div></div>
+  </div>`;
+}
+
+/* ---- 5. Solution ---- */
+function renderSolution() {
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>💡 Solution proposée</h2></div>
+    <div class="bp-card-inner"><div class="fg">
+      ${textarea('description','Décrivez précisément votre produit / service','Qu\'est-ce que vous proposez concrètement ?',5,true)}
+      ${textarea('fonctionnement','Comment ça fonctionne ?','Expliquez le mécanisme…',4,true)}
+      ${textarea('innovation','En quoi est-ce innovant ?','Ce qui n\'existait pas avant…',3,true)}
+      ${textarea('avantages','Avantages pour l\'utilisateur','Bénéfices concrets…',3,true)}
+      ${textarea('valeur_ajoutee','Valeur ajoutée','Ce que vous apportez en plus…',3,true)}
+      ${textarea('differenciants','Éléments différenciants','Ce qui vous rend unique face à la concurrence…',3,true)}
+    </div></div>
+  </div>`;
+}
+
+/* ---- 6. Marché ---- */
+function renderMarche() {
+  const s = sections.marche || {};
+  const concurrents = s.concurrents || [{ nom:'', produits:'', prix:'', forces:'', faiblesses:'' }];
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>📊 Étude de marché</h2></div>
+    <div class="bp-card-inner"><h3>Le marché global</h3><div class="fg">
+      ${field('taille_marche','Taille du marché','Ex : 500 millions €')}
+      ${field('evolution','Évolution / croissance','Ex : +12% par an')}
+      ${field('potentiel','Potentiel pour votre projet','')}
+      ${textarea('tendances','Tendances du marché','Quels sont les grands mouvements actuels ?',3,true)}
+    </div></div>
+    <div class="bp-card-inner"><h3>Clients cibles</h3><div class="fg">
+      ${textarea('profil_client','Profil type du client','Age, situation, besoins…',3,true)}
+      ${textarea('segmentation','Segmentation','Comment découpez-vous votre marché ?',3,true)}
+      ${textarea('besoins_clients','Besoins des clients','Ce qu\'ils recherchent vraiment…',3,true)}
+      ${field('localisation_clients','Localisation géographique des clients','')}
+    </div></div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Concurrents</h3>
+        <button class="btn btn-outline btn-sm" onclick="addConcurrent()">+ Ajouter</button>
+      </div>
+      <div id="concurrents-list">${renderConcurrents(concurrents)}</div>
+    </div>
+    <div class="bp-card-inner"><h3>Analyse stratégique</h3><div class="fg">
+      ${textarea('opportunites','Opportunités de marché','',3,true)}
+      ${textarea('menaces_marche','Menaces','',3,true)}
+      ${textarea('positionnement','Positionnement','Comment vous positionnez-vous ?',3,true)}
+      ${textarea('avantage_concurrentiel','Avantage concurrentiel','Ce qui vous donne un avantage durable…',3,true)}
+    </div></div>
+  </div>`;
+}
+
+function renderConcurrents(list) {
+  return list.map((c,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <strong style="font-size:13px;">Concurrent ${i+1}</strong>
+        <button onclick="removeConcurrent(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Nom</label><input value="${esc(c.nom||'')}" oninput="updConcurrent(${i},'nom',this.value)"></div>
+        <div><label>Localisation</label><input value="${esc(c.localisation||'')}" oninput="updConcurrent(${i},'localisation',this.value)"></div>
+        <div><label>Produits / Services</label><input value="${esc(c.produits||'')}" oninput="updConcurrent(${i},'produits',this.value)"></div>
+        <div><label>Niveau de prix</label><input value="${esc(c.prix||'')}" oninput="updConcurrent(${i},'prix',this.value)"></div>
+        <div><label>Forces</label><input value="${esc(c.forces||'')}" oninput="updConcurrent(${i},'forces',this.value)"></div>
+        <div><label>Faiblesses</label><input value="${esc(c.faiblesses||'')}" oninput="updConcurrent(${i},'faiblesses',this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+
+function addConcurrent() {
+  if (!sections.marche) sections.marche={};
+  if (!sections.marche.concurrents) sections.marche.concurrents=[];
+  sections.marche.concurrents.push({nom:'',produits:'',prix:'',forces:'',faiblesses:''});
+  document.getElementById('concurrents-list').innerHTML = renderConcurrents(sections.marche.concurrents);
+  markDirty();
+}
+function removeConcurrent(i) {
+  sections.marche.concurrents.splice(i,1);
+  document.getElementById('concurrents-list').innerHTML = renderConcurrents(sections.marche.concurrents);
+  markDirty();
+}
+function updConcurrent(i,key,val) {
+  if (!sections.marche) sections.marche={};
+  if (!sections.marche.concurrents) sections.marche.concurrents=[];
+  if (!sections.marche.concurrents[i]) sections.marche.concurrents[i]={};
+  sections.marche.concurrents[i][key]=val;
+  markDirty();
+}
+
+/* ---- 7. SWOT ---- */
+function renderSWOT() {
+  const s = sections.swot || {};
+  const ro = monRole==='lecteur';
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>⚡ Analyse SWOT</h2><p>Forces · Faiblesses · Opportunités · Menaces</p></div>
+    <div class="bp-card-inner">
+      <div class="swot-grid">
+        <div class="swot-cell forces"><label>💪 Forces (internes)</label>
+          <textarea data-swot="forces" placeholder="Vos atouts, ressources, compétences uniques…" ${ro?'readonly':''} oninput="updateSwot('forces',this.value)">${esc(s.forces||'')}</textarea></div>
+        <div class="swot-cell faiblesses"><label>🔻 Faiblesses (internes)</label>
+          <textarea data-swot="faiblesses" placeholder="Vos points faibles, manques à combler…" ${ro?'readonly':''} oninput="updateSwot('faiblesses',this.value)">${esc(s.faiblesses||'')}</textarea></div>
+        <div class="swot-cell opportunites"><label>🌟 Opportunités (externes)</label>
+          <textarea data-swot="opportunites" placeholder="Tendances favorables, marchés ouverts…" ${ro?'readonly':''} oninput="updateSwot('opportunites',this.value)">${esc(s.opportunites||'')}</textarea></div>
+        <div class="swot-cell menaces"><label>⚠️ Menaces (externes)</label>
+          <textarea data-swot="menaces" placeholder="Risques externes, concurrence, réglementation…" ${ro?'readonly':''} oninput="updateSwot('menaces',this.value)">${esc(s.menaces||'')}</textarea></div>
+      </div>
+    </div>
+  </div>`;
+}
+function updateSwot(key,val) {
+  if (!sections.swot) sections.swot={};
+  sections.swot[key]=val;
+  markDirty();
+}
+
+/* ---- 8. Business Model Canvas ---- */
+function renderBMC() {
+  const s = sections.business_model || {};
+  const ro = monRole==='lecteur';
+  const bmcField = (key, label, placeholder) =>
+    `<div class="bmc-cell ${key}">
+       <label>${label}</label>
+       <textarea placeholder="${placeholder}" ${ro?'readonly':''} oninput="updateBMC('${key}',this.value)">${esc(s[key]||'')}</textarea>
+     </div>`;
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>🎯 Business Model Canvas</h2><p>Les 9 blocs de votre modèle économique.</p></div>
+    <div class="bp-card-inner">
+      <div class="bmc-grid">
+        ${bmcField('partenaires','🤝 Partenaires clés','Qui sont vos fournisseurs et partenaires stratégiques ?')}
+        ${bmcField('activites','⚙️ Activités clés','Que faites-vous de plus important ?')}
+        ${bmcField('proposition','💎 Proposition de valeur','Quelle valeur apportez-vous à vos clients ?')}
+        ${bmcField('relations','❤️ Relations clients','Comment interagissez-vous avec vos clients ?')}
+        ${bmcField('segments','👥 Segments de clientèle','Pour qui créez-vous de la valeur ?')}
+        ${bmcField('ressources','🔑 Ressources clés','De quoi avez-vous absolument besoin ?')}
+        ${bmcField('canaux','📡 Canaux','Comment rejoignez-vous vos clients ?')}
+      </div>
+      <div class="bmc-foot">
+        ${bmcField('couts','💸 Structure des coûts','Quels sont vos coûts les plus importants ?')}
+        ${bmcField('revenus','💰 Sources de revenus','Comment gagnez-vous de l\'argent ?')}
+      </div>
+    </div>
+  </div>`;
+}
+function updateBMC(key,val) {
+  if (!sections.business_model) sections.business_model={};
+  sections.business_model[key]=val;
+  markDirty();
+}
+
+/* ---- 9. Produits & Services ---- */
+function renderProduits() {
+  const s = sections.produits || {};
+  const items = s.items || [{ nom:'', description:'', prix_vente:'', cout_revient:'', marge:'' }];
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>📦 Produits & Services</h2></div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Catalogue</h3>
+        <button class="btn btn-outline btn-sm" onclick="addProduit()">+ Ajouter</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="bp-table" id="produits-table">
+          <thead><tr>
+            <th style="min-width:160px;">Nom</th>
+            <th style="min-width:200px;">Description</th>
+            <th style="min-width:100px;">Coût de revient</th>
+            <th style="min-width:100px;">Prix de vente</th>
+            <th style="min-width:80px;">Marge %</th>
+            <th style="min-width:120px;">Cycle de vie</th>
+            <th>Action</th>
+          </tr></thead>
+          <tbody id="produits-tbody">${renderProduitRows(items)}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+function renderProduitRows(items) {
+  return items.map((it,i) => `
+    <tr>
+      <td><input value="${esc(it.nom||'')}" placeholder="Nom du produit" oninput="updProduit(${i},'nom',this.value)"></td>
+      <td><input value="${esc(it.description||'')}" placeholder="Description…" oninput="updProduit(${i},'description',this.value)"></td>
+      <td><input type="number" value="${esc(it.cout_revient||'')}" placeholder="0" oninput="updProduit(${i},'cout_revient',this.value);calcMarge(${i})"></td>
+      <td><input type="number" value="${esc(it.prix_vente||'')}" placeholder="0" oninput="updProduit(${i},'prix_vente',this.value);calcMarge(${i})"></td>
+      <td><input id="marge-${i}" value="${esc(it.marge||'')}" readonly style="background:var(--surface2);color:var(--orange);font-weight:700;">%</td>
+      <td><input value="${esc(it.cycle||'')}" placeholder="Ex : 3 ans" oninput="updProduit(${i},'cycle',this.value)"></td>
+      <td style="text-align:center;"><button onclick="delProduit(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">🗑</button></td>
+    </tr>`).join('');
+}
+function calcMarge(i) {
+  const items = sections.produits?.items||[];
+  const it = items[i]||{};
+  const cout = parseFloat(it.cout_revient)||0;
+  const prix = parseFloat(it.prix_vente)||0;
+  const marge = prix>0 ? Math.round((prix-cout)/prix*100) : 0;
+  it.marge = marge;
+  const el = document.getElementById('marge-'+i);
+  if(el) el.value = marge;
+}
+function addProduit() {
+  if(!sections.produits) sections.produits={};
+  if(!sections.produits.items) sections.produits.items=[];
+  sections.produits.items.push({nom:'',description:'',cout_revient:'',prix_vente:'',marge:''});
+  document.getElementById('produits-tbody').innerHTML = renderProduitRows(sections.produits.items);
+  markDirty();
+}
+function delProduit(i) {
+  sections.produits.items.splice(i,1);
+  document.getElementById('produits-tbody').innerHTML = renderProduitRows(sections.produits.items);
+  markDirty();
+}
+function updProduit(i,key,val) {
+  if(!sections.produits) sections.produits={};
+  if(!sections.produits.items) sections.produits.items=[];
+  if(!sections.produits.items[i]) sections.produits.items[i]={};
+  sections.produits.items[i][key]=val;
+  markDirty();
+}
+
+/* ---- 10-14. Sections texte (marketing, commercial, opérationnel, organisation, RH) ---- */
+function renderMarketing() {
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>📢 Stratégie marketing</h2></div>
+    <div class="bp-card-inner"><div class="fg">
+      ${textarea('identite_marque','Identité de marque','Nom, logo, couleurs, valeurs de marque…',3,true)}
+      ${textarea('strategie_digitale','Stratégie digitale','Réseaux sociaux, site web, SEO…',3,true)}
+      ${textarea('communication','Plan de communication','Messages clés, canaux, calendrier…',3,true)}
+      ${textarea('publicite','Publicité','Quels types de publicité ? Quel budget ?',3,true)}
+      ${textarea('partenariats','Partenariats & co-marketing','Avec qui allez-vous vous associer ?',3,true)}
+      ${textarea('evenements','Événements & présence terrain','Salons, conférences, événements locaux…',2,true)}
+      ${textarea('fidelisation','Stratégie de fidélisation','Comment garder vos clients ?',2,true)}
+    </div></div>
+  </div>`;
+}
+function renderCommercial() {
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>💼 Plan commercial</h2></div>
+    <div class="bp-card-inner"><div class="fg">
+      ${textarea('objectifs_vente','Objectifs de vente','CA visé, nb clients, volume…',3,true)}
+      ${textarea('prospection','Méthodes de prospection','Comment trouvez-vous vos clients ?',3,true)}
+      ${textarea('tunnel_vente','Tunnel de vente / Funnel','Étapes de la conversion client…',3,true)}
+      ${textarea('politique_tarifaire','Politique tarifaire','Grille de prix, remises, conditions…',3,true)}
+      ${textarea('argumentaire','Argumentaire commercial','Vos arguments de vente clés…',3,true)}
+      ${textarea('sav','Service après-vente','Comment gérez-vous le SAV ?',2,true)}
+      ${textarea('kpi_commerciaux','KPI commerciaux','Indicateurs à suivre…',2,true)}
+    </div></div>
+  </div>`;
+}
+function renderOperationnel() {
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>⚙️ Plan opérationnel</h2></div>
+    <div class="bp-card-inner"><div class="fg">
+      ${textarea('production','Processus de production','Comment faites-vous votre produit/service ?',4,true)}
+      ${textarea('logistique','Logistique','Stockage, livraison, distribution…',3,true)}
+      ${textarea('fournisseurs','Fournisseurs','Vos principaux fournisseurs et conditions…',3,true)}
+      ${textarea('equipements','Équipements & matériel','Ce dont vous avez besoin physiquement…',3,true)}
+      ${textarea('technologies','Technologies utilisées','Logiciels, systèmes, plateformes…',3,true)}
+      ${textarea('qualite','Contrôle qualité','Comment garantissez-vous la qualité ?',2,true)}
+      ${textarea('securite','Sécurité','Mesures de sécurité en place…',2,true)}
+    </div></div>
+  </div>`;
+}
+function renderOrganisation() {
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>🏗 Organisation & Gouvernance</h2></div>
+    <div class="bp-card-inner"><div class="fg">
+      ${textarea('dirigeants','Direction & Gouvernance','Qui dirige ? Quelles instances ?',3,true)}
+      ${textarea('equipe','Équipe actuelle','Qui fait quoi ?',3,true)}
+      ${textarea('responsabilites','Répartition des responsabilités','Qui est responsable de quoi ?',3,true)}
+      ${textarea('consultants','Consultants & Experts','Experts externes mobilisés…',2,true)}
+      ${textarea('benevoles','Bénévoles (si applicable)','Organisation du bénévolat…',2,true)}
+    </div></div>
+  </div>`;
+}
+function renderRH() {
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>👥 Ressources humaines</h2></div>
+    <div class="bp-card-inner"><div class="fg">
+      ${field('effectif_actuel','Effectif actuel','','number')}
+      ${field('effectif_prevu','Effectif prévu (1 an)','','number')}
+      ${textarea('recrutements','Recrutements prévus','Postes à ouvrir, profils recherchés…',3,true)}
+      ${textarea('competences','Compétences recherchées','Quelles expertises vous manquent ?',3,true)}
+      ${textarea('formations','Formations prévues','Développement des compétences…',2,true)}
+      ${textarea('politique_rh','Politique RH','Rémunération, avantages, culture d\'entreprise…',3,true)}
+    </div></div>
+  </div>`;
+}
+
+/* ---- 15. Calendrier (Gantt simplifié) ---- */
+function renderCalendrier() {
+  const s = sections.calendrier || {};
+  const phases = s.phases || [{ nom:'Phase 1', responsable:'', debut:'', fin:'', taches:'', statut:'planifie' }];
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>📅 Calendrier de mise en œuvre</h2></div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Phases du projet</h3>
+        <button class="btn btn-outline btn-sm" onclick="addPhase()">+ Ajouter une phase</button>
+      </div>
+      <div id="phases-list">${renderPhases(phases)}</div>
+    </div>
+  </div>`;
+}
+function renderPhases(phases) {
+  const statuts = [{v:'planifie',l:'📋 Planifié'},{v:'en_cours',l:'🔄 En cours'},{v:'termine',l:'✅ Terminé'},{v:'retard',l:'⚠️ En retard'}];
+  return phases.map((p,i) => `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <input value="${esc(p.nom||'')}" style="font-weight:700;font-size:14px;border:none;background:transparent;font-family:inherit;flex:1;outline:none;" placeholder="Nom de la phase" oninput="updPhase(${i},'nom',this.value)">
+        <button onclick="delPhase(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Début</label><input type="date" value="${esc(p.debut||'')}" oninput="updPhase(${i},'debut',this.value)"></div>
+        <div><label>Fin prévue</label><input type="date" value="${esc(p.fin||'')}" oninput="updPhase(${i},'fin',this.value)"></div>
+        <div><label>Responsable</label><input value="${esc(p.responsable||'')}" placeholder="Prénom NOM" oninput="updPhase(${i},'responsable',this.value)"></div>
+        <div><label>Statut</label><select onchange="updPhase(${i},'statut',this.value)">
+          ${statuts.map(s=>`<option value="${s.v}" ${p.statut===s.v?'selected':''}>${s.l}</option>`).join('')}
+        </select></div>
+        <div class="full"><label>Tâches</label><textarea rows="2" placeholder="Tâches de cette phase…" oninput="updPhase(${i},'taches',this.value)">${esc(p.taches||'')}</textarea></div>
+      </div>
+    </div>`).join('');
+}
+function addPhase() {
+  if(!sections.calendrier) sections.calendrier={};
+  if(!sections.calendrier.phases) sections.calendrier.phases=[];
+  sections.calendrier.phases.push({nom:`Phase ${sections.calendrier.phases.length+1}`,responsable:'',debut:'',fin:'',taches:'',statut:'planifie'});
+  document.getElementById('phases-list').innerHTML = renderPhases(sections.calendrier.phases);
+  markDirty();
+}
+function delPhase(i) {
+  sections.calendrier.phases.splice(i,1);
+  document.getElementById('phases-list').innerHTML = renderPhases(sections.calendrier.phases);
+  markDirty();
+}
+function updPhase(i,key,val) {
+  if(!sections.calendrier) sections.calendrier={};
+  if(!sections.calendrier.phases) sections.calendrier.phases=[];
+  if(!sections.calendrier.phases[i]) sections.calendrier.phases[i]={};
+  sections.calendrier.phases[i][key]=val;
+  markDirty();
+}
+
+/* ---- 16. Plan financier ---- */
+function renderFinancier() {
+  const s = sections.plan_financier || {};
+  const annees = ['An 1','An 2','An 3','An 4','An 5'];
+  const fv = (key,an) => s[`${key}_${an}`]||'';
+  const finInput = (key,an) => `<input type="number" value="${esc(fv(key,an))}" placeholder="0" oninput="updFin('${key}_${an}',this.value);calcFinRow()">`;
+
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>💰 Plan financier</h2><p>Prévisions sur 5 ans — toutes les valeurs en unité monétaire locale (€, XOF, MAD…)</p></div>
+    <div class="bp-card-inner"><h3>Investissements initiaux</h3><div class="fg">
+      ${field('investissement_initial','Investissement total requis (€)','','number')}
+      ${field('apport_personnel','Apport personnel / fonds propres (€)','','number')}
+      ${field('financement_recherche','Financement externe recherché (€)','','number')}
+      ${textarea('immobilisations','Détail des immobilisations','Équipements, locaux, brevets…',3,true)}
+      ${textarea('bfr','Besoin en fonds de roulement (BFR)','Explication et montant…',2,true)}
+    </div></div>
+    <div class="bp-card-inner">
+      <h3>Compte de résultat prévisionnel</h3>
+      <div style="overflow-x:auto;">
+        <table class="fin-table">
+          <thead><tr><th>Poste</th>${annees.map(a=>`<th>${a}</th>`).join('')}</tr></thead>
+          <tbody>
+            <tr class="header-row"><td colspan="6">PRODUITS</td></tr>
+            <tr><td>Chiffre d'affaires</td>${annees.map((_,i)=>`<td>${finInput('ca',i+1)}</td>`).join('')}</tr>
+            <tr><td>Autres produits</td>${annees.map((_,i)=>`<td>${finInput('autres_produits',i+1)}</td>`).join('')}</tr>
+            <tr class="header-row"><td colspan="6">CHARGES</td></tr>
+            <tr><td>Achats & matières</td>${annees.map((_,i)=>`<td>${finInput('achats',i+1)}</td>`).join('')}</tr>
+            <tr><td>Salaires & charges</td>${annees.map((_,i)=>`<td>${finInput('salaires',i+1)}</td>`).join('')}</tr>
+            <tr><td>Loyers & immobilier</td>${annees.map((_,i)=>`<td>${finInput('loyers',i+1)}</td>`).join('')}</tr>
+            <tr><td>Marketing & comm.</td>${annees.map((_,i)=>`<td>${finInput('marketing_charge',i+1)}</td>`).join('')}</tr>
+            <tr><td>Autres charges</td>${annees.map((_,i)=>`<td>${finInput('autres_charges',i+1)}</td>`).join('')}</tr>
+            <tr class="total-row" id="fin-resultat-row"><td>RÉSULTAT NET</td>${annees.map((_,i)=>`<td id="fin-res-${i+1}">—</td>`).join('')}</tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:8px;text-align:right;">
+        <button class="btn btn-outline btn-sm" onclick="calcFinRow()">🔄 Recalculer</button>
+        <button class="btn btn-outline btn-sm" onclick="exportFinancierCSV()">📥 Exporter CSV</button>
+      </div>
+    </div>
+    <div class="bp-card-inner"><h3>Seuil de rentabilité</h3><div class="fg">
+      ${field('seuil_rentabilite','Seuil de rentabilité (€ de CA)','','number')}
+      ${field('point_mort','Point mort (nb de mois)','','number')}
+      ${textarea('amortissements','Plan d\'amortissement','',3,true)}
+    </div></div>
+    <div class="bp-card-inner"><h3>Scénarios</h3><div class="fg">
+      ${textarea('scenario_optimiste','Scénario optimiste','Meilleures hypothèses…',3,false)}
+      ${textarea('scenario_realiste','Scénario réaliste','Hypothèses centrales…',3,false)}
+      ${textarea('scenario_prudent','Scénario prudent','Hypothèses basses…',3,false)}
+    </div></div>
+  </div>`;
+}
+function updFin(key,val) {
+  if(!sections.plan_financier) sections.plan_financier={};
+  sections.plan_financier[key]=val;
+  markDirty();
+}
+function calcFinRow() {
+  const s = sections.plan_financier||{};
+  for(let i=1;i<=5;i++){
+    const ca=(parseFloat(s[`ca_${i}`])||0)+(parseFloat(s[`autres_produits_${i}`])||0);
+    const charges=(parseFloat(s[`achats_${i}`])||0)+(parseFloat(s[`salaires_${i}`])||0)+
+      (parseFloat(s[`loyers_${i}`])||0)+(parseFloat(s[`marketing_charge_${i}`])||0)+(parseFloat(s[`autres_charges_${i}`])||0);
+    const res=ca-charges;
+    const el=document.getElementById(`fin-res-${i}`);
+    if(el){el.textContent=res.toLocaleString('fr')+'€';el.style.color=res>=0?'#10b981':'#dc2626';}
+  }
+}
+function exportFinancierCSV() {
+  const s=sections.plan_financier||{};
+  const rows=[['Poste','An 1','An 2','An 3','An 4','An 5']];
+  const keys=['ca','autres_produits','achats','salaires','loyers','marketing_charge','autres_charges'];
+  const labels={'ca':'CA','autres_produits':'Autres produits','achats':'Achats','salaires':'Salaires','loyers':'Loyers','marketing_charge':'Marketing','autres_charges':'Autres charges'};
+  for(const k of keys) rows.push([labels[k],...[1,2,3,4,5].map(i=>s[`${k}_${i}`]||'0')]);
+  const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=`finances_${bp?.nom_projet||'bp'}.csv`;
+  a.click();
+}
+
+/* ---- 17. Risques ---- */
+function renderRisques() {
+  const s = sections.risques || {};
+  const risques = s.items || [{ description:'', probabilite:'moyen', impact:'moyen', prevention:'', urgence:'' }];
+  const badges={faible:'risk-faible',moyen:'risk-moyen',eleve:'risk-eleve',critique:'risk-critique'};
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>⚠️ Analyse des risques</h2></div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Inventaire des risques</h3>
+        <button class="btn btn-outline btn-sm" onclick="addRisque()">+ Ajouter un risque</button>
+      </div>
+      <div id="risques-list">${renderRisqueItems(risques)}</div>
+    </div>
+  </div>`;
+}
+function renderRisqueItems(items) {
+  const opts=['faible','moyen','eleve','critique'];
+  return items.map((r,i) => `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <strong style="font-size:13px;">Risque ${i+1}</strong>
+        <button onclick="delRisque(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div class="full"><label>Description du risque</label><input value="${esc(r.description||'')}" placeholder="Décrivez ce risque…" oninput="updRisque(${i},'description',this.value)"></div>
+        <div><label>Probabilité</label><select onchange="updRisque(${i},'probabilite',this.value)">
+          ${opts.map(o=>`<option value="${o}" ${r.probabilite===o?'selected':''}>${{faible:'🟢 Faible',moyen:'🟡 Moyen',eleve:'🟠 Élevé',critique:'🔴 Critique'}[o]}</option>`).join('')}
+        </select></div>
+        <div><label>Impact</label><select onchange="updRisque(${i},'impact',this.value)">
+          ${opts.map(o=>`<option value="${o}" ${r.impact===o?'selected':''}>${{faible:'🟢 Faible',moyen:'🟡 Moyen',eleve:'🟠 Élevé',critique:'🔴 Critique'}[o]}</option>`).join('')}
+        </select></div>
+        <div><label>Mesures préventives</label><input value="${esc(r.prevention||'')}" placeholder="Comment prévenir ce risque ?" oninput="updRisque(${i},'prevention',this.value)"></div>
+        <div><label>Plan d'urgence</label><input value="${esc(r.urgence||'')}" placeholder="Que faire si le risque survient ?" oninput="updRisque(${i},'urgence',this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+function addRisque() {
+  if(!sections.risques) sections.risques={};
+  if(!sections.risques.items) sections.risques.items=[];
+  sections.risques.items.push({description:'',probabilite:'moyen',impact:'moyen',prevention:'',urgence:''});
+  document.getElementById('risques-list').innerHTML = renderRisqueItems(sections.risques.items);
+  markDirty();
+}
+function delRisque(i) {
+  sections.risques.items.splice(i,1);
+  document.getElementById('risques-list').innerHTML = renderRisqueItems(sections.risques.items);
+  markDirty();
+}
+function updRisque(i,key,val) {
+  if(!sections.risques) sections.risques={};
+  if(!sections.risques.items) sections.risques.items=[];
+  if(!sections.risques.items[i]) sections.risques.items[i]={};
+  sections.risques.items[i][key]=val;
+  markDirty();
+}
+
+/* ---- 18-19. Impact & Financement ---- */
+function renderImpact() {
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>🌱 Impact</h2></div>
+    <div class="bp-card-inner"><div class="fg">
+      ${textarea('economique','Impact économique','Emplois créés, revenus générés, valeur économique…',3,true)}
+      ${textarea('social','Impact social','Personnes aidées, problèmes résolus, changement social…',3,true)}
+      ${textarea('environnemental','Impact environnemental','Réduction carbone, préservation, ressources…',3,true)}
+      ${textarea('territorial','Impact territorial','Développement local, partenariats communautaires…',3,true)}
+      ${textarea('kpi_impact','KPI & Indicateurs de performance','Comment mesurez-vous votre impact ?',3,true)}
+    </div></div>
+  </div>`;
+}
+function renderFinancement() {
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>🏦 Recherche de financement</h2></div>
+    <div class="bp-card-inner"><div class="fg">
+      ${field('montant','Montant recherché (€)','','number')}
+      ${field('calendrier_decaissement','Calendrier de décaissement','Ex : 30% à la signature…')}
+      ${textarea('utilisation','Utilisation des fonds','Détaillez comment seront utilisés les fonds levés…',4,true)}
+      ${textarea('contreparties','Contreparties proposées','Parts sociales, redevances, royalties…',3,true)}
+      ${textarea('roi','Retour sur investissement attendu','Pour les investisseurs : IRR, multiple, durée…',3,true)}
+      ${textarea('strategie_sortie','Stratégie de sortie','Rachat, introduction en bourse, remboursement…',3,true)}
+      ${textarea('recherche_active','Financeurs ciblés','Banques, fonds, subventions, crowdfunding…',3,true)}
+    </div></div>
+  </div>`;
+}
+
+/* ---- 20. Annexes ---- */
+function renderAnnexes() {
+  const s = sections.annexes || {};
+  const docs = s.items || [];
+  const types = [
+    { ext:'pdf', icon:'📄', label:'PDF' }, { ext:'doc', icon:'📝', label:'Word' },
+    { ext:'xls', icon:'📊', label:'Excel' }, { ext:'ppt', icon:'📊', label:'PowerPoint' },
+    { ext:'img', icon:'🖼', label:'Image' }, { ext:'autre', icon:'📎', label:'Autre' }
+  ];
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>📎 Annexes</h2><p>Centralisez tous vos documents justificatifs.</p></div>
+    <div class="notice" style="margin-bottom:16px;">📎 Les pièces jointes sont référencées avec un nom et un lien. Dans la version production, un hébergement sécurisé sera disponible.</div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Documents (${docs.length})</h3>
+        <button class="btn btn-orange btn-sm" onclick="addAnnexe()">+ Ajouter un document</button>
+      </div>
+      <div id="annexes-form" style="display:none;border:1px dashed var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+        <div class="fg">
+          <div><label>Nom du document</label><input id="ann-nom" placeholder="Ex : Statuts de la société…"></div>
+          <div><label>Type</label><select id="ann-type">
+            ${types.map(t=>`<option value="${t.ext}">${t.icon} ${t.label}</option>`).join('')}
+          </select></div>
+          <div class="full"><label>URL / Lien</label><input id="ann-url" placeholder="https://drive.google.com/…"></div>
+          <div class="full"><label>Description</label><input id="ann-desc" placeholder="Brève description du document…"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn btn-orange btn-sm" onclick="saveAnnexe()">Ajouter</button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('annexes-form').style.display='none'">Annuler</button>
+        </div>
+      </div>
+      ${docs.length ? `
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${docs.map((d,i) => `
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);">
+              <span style="font-size:20px;">${types.find(t=>t.ext===d.type)?.icon||'📎'}</span>
+              <div style="flex:1;">
+                <div style="font-weight:700;font-size:13px;">${esc(d.nom)}</div>
+                ${d.description?`<div style="font-size:11px;color:var(--muted);">${esc(d.description)}</div>`:''}
+              </div>
+              ${d.url?`<a href="${esc(d.url)}" target="_blank" class="btn btn-outline btn-sm" style="font-size:11px;">🔗 Ouvrir</a>`:''}
+              <button onclick="delAnnexe(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">🗑</button>
+            </div>`).join('')}
+        </div>` : '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">Aucune annexe ajoutée.</p>'}
+    </div>
+  </div>`;
+}
+function addAnnexe() { document.getElementById('annexes-form').style.display='block'; }
+function saveAnnexe() {
+  const nom = document.getElementById('ann-nom').value.trim();
+  if (!nom) return alert('Nom requis');
+  if (!sections.annexes) sections.annexes={};
+  if (!sections.annexes.items) sections.annexes.items=[];
+  sections.annexes.items.push({ nom, type:document.getElementById('ann-type').value, url:document.getElementById('ann-url').value.trim(), description:document.getElementById('ann-desc').value.trim() });
+  markDirty();
+  renderSection('annexes');
+}
+function delAnnexe(i) {
+  sections.annexes.items.splice(i,1);
+  markDirty();
+  renderSection('annexes');
+}
+
+/* ---- 21. Complétude ---- */
+function renderCompletude() {
+  const completude = bp?.completude || [];
+  const prog = bp?.progression || 0;
+  const valides = completude.filter(c=>c.ok).length;
+  const total = completude.length;
+  return `<div class="bp-section">
+    <div class="bp-section-head"><h2>✅ Vérification de complétude</h2></div>
+    <div class="bp-card-inner">
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;">
+        <div style="text-align:center;">
+          <div style="font-size:48px;font-weight:900;color:var(--orange);">${prog}%</div>
+          <div style="font-size:13px;color:var(--muted);">Complétude globale</div>
+        </div>
+        <div style="flex:1;">
+          <div style="height:12px;border-radius:99px;background:var(--border);overflow:hidden;margin-bottom:6px;">
+            <div style="height:100%;border-radius:99px;background:${prog>=80?'#10b981':prog>=50?'var(--orange)':'#dc2626'};width:${prog}%;transition:width .5s;"></div>
+          </div>
+          <div style="font-size:12.5px;color:var(--muted);">${valides} sections sur ${total} renseignées</div>
+          ${prog>=80?'<div style="font-size:13px;color:#10b981;margin-top:4px;">✅ Votre business plan est en bonne forme !</div>':
+            prog>=50?'<div style="font-size:13px;color:var(--orange);margin-top:4px;">⚡ Continuez ! Plus de la moitié est complétée.</div>':
+            '<div style="font-size:13px;color:#dc2626;margin-top:4px;">⚠️ Des sections importantes restent à compléter.</div>'}
+        </div>
+      </div>
+      <table class="complet-table">
+        <thead><tr><th>Section</th><th>Statut</th><th>Action</th></tr></thead>
+        <tbody>
+          ${completude.map(c=>`
+            <tr>
+              <td>${c.label}</td>
+              <td style="text-align:center;">${c.ok?'<span style="color:#10b981;">✅ OK</span>':'<span style="color:#f59e0b;">⚠️ Incomplet</span>'}</td>
+              <td><button class="btn btn-outline btn-sm" onclick="navTo('${c.key}')" style="font-size:11px;">${c.ok?'Voir':'Compléter'}</button></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="export-btns" style="margin-top:20px;">
+        <button class="btn btn-orange" onclick="exportPDF()">📄 Exporter en PDF</button>
+        <button class="btn btn-outline" onclick="exportFinancierCSV()">📊 Exporter finances CSV</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ════════════════════════════════════════════════════
+   COMMENTAIRES
+   ════════════════════════════════════════════════════ */
+function toggleComments() {
+  document.getElementById('comments-panel').classList.toggle('open');
+  loadComments(currentSection);
+}
+
+async function loadComments(sectionKey) {
+  if (!document.getElementById('comments-panel').classList.contains('open')) return;
+  const def = SECTIONS.find(s=>s.key===sectionKey);
+  document.getElementById('comments-section-label').textContent = def?.label||sectionKey;
+  document.getElementById('comments-body').innerHTML = '<div style="color:var(--muted);font-size:12px;">Chargement…</div>';
+  try {
+    const list = await api('GET', `/business-plans/${bpId}/commentaires/${sectionKey}`);
+    document.getElementById('comments-body').innerHTML = list.length
+      ? list.map(c=>`<div class="comment-item"><div class="ca">${esc(c.nom||'')} ${esc(c.prenom||'')} · <span style="font-weight:400;color:var(--muted);">${new Date(c.created_at).toLocaleDateString('fr')}</span></div><div>${esc(c.texte)}</div></div>`).join('')
+      : '<div style="color:var(--muted);font-size:12px;">Aucun commentaire pour cette section.</div>';
+  } catch(e) {}
+}
+
+async function postComment() {
+  const texte = document.getElementById('comment-input').value.trim();
+  if (!texte) return;
+  try {
+    await api('POST', `/business-plans/${bpId}/commentaires/${currentSection}`, { texte });
+    document.getElementById('comment-input').value = '';
+    loadComments(currentSection);
+  } catch(e) { alert(e.message); }
+}
+
+/* ════════════════════════════════════════════════════
+   VERSIONS
+   ════════════════════════════════════════════════════ */
+async function saveVersion() {
+  try {
+    await saveCurrentSection();
+    const r = await api('POST', `/business-plans/${bpId}/versions`);
+    document.getElementById('save-status').textContent = `✓ Version ${r.version} sauvegardée`;
+    setTimeout(()=>document.getElementById('save-status').textContent='✓ Sauvegardé',3000);
+  } catch(e) { alert(e.message); }
+}
+
+async function showVersions() {
+  document.getElementById('modal-versions').style.display='flex';
+  document.getElementById('versions-list').innerHTML = '<div style="color:var(--muted);">Chargement…</div>';
+  try {
+    const list = await api('GET', `/business-plans/${bpId}/versions`);
+    document.getElementById('versions-list').innerHTML = list.length
+      ? list.map(v=>`<div class="ver-item">
+          <div>
+            <div style="font-weight:700;font-size:13px;">Version ${v.version} — ${v.label||''}</div>
+            <div style="font-size:11px;color:var(--muted);">${new Date(v.created_at).toLocaleString('fr')} par ${v.nom||''} ${v.prenom||''}</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="restoreVersion(${v.version})" style="font-size:11px;">Restaurer</button>
+        </div>`).join('')
+      : '<div style="color:var(--muted);">Aucune version sauvegardée.</div>';
+  } catch(e) { document.getElementById('versions-list').innerHTML='<div style="color:#D33;">Erreur</div>'; }
+}
+
+async function restoreVersion(ver) {
+  if (!confirm(`Restaurer la version ${ver} ? Vos modifications actuelles seront sauvegardées avant la restauration.`)) return;
+  try {
+    await api('POST', `/business-plans/${bpId}/versions/${ver}/restore`);
+    document.getElementById('modal-versions').style.display='none';
+    location.reload();
+  } catch(e) { alert(e.message); }
+}
+
+/* ════════════════════════════════════════════════════
+   COLLABORATEURS
+   ════════════════════════════════════════════════════ */
+async function showCollaborateurs() {
+  if (monRole !== 'proprietaire') { alert('Seul le propriétaire peut gérer les collaborateurs.'); return; }
+  document.getElementById('modal-collab').style.display='flex';
+  loadCollaborateurs();
+}
+
+async function loadCollaborateurs() {
+  const el = document.getElementById('collab-list');
+  el.innerHTML = '<div style="color:var(--muted);font-size:13px;">Chargement…</div>';
+  try {
+    const list = await api('GET', `/business-plans/${bpId}/collaborateurs`);
+    el.innerHTML = list.length
+      ? list.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-weight:700;font-size:13px;">${esc(c.nom||'')} ${esc(c.prenom||'')}</div>
+            <div style="font-size:11px;color:var(--muted);">${esc(c.email||'')} · <strong>${c.role}</strong></div>
+          </div>
+          <button class="btn btn-outline btn-sm" style="color:#D33;font-size:11px;" onclick="removeCollab(${c.user_id})">Retirer</button>
+        </div>`).join('')
+      : '<div style="color:var(--muted);font-size:13px;">Aucun collaborateur pour l\'instant.</div>';
+  } catch(e) { el.innerHTML='<div style="color:#D33;">Erreur</div>'; }
+}
+
+let collabSearchTimer = null;
+document.getElementById('collab-search').addEventListener('input', function() {
+  clearTimeout(collabSearchTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { document.getElementById('collab-search-results').innerHTML=''; return; }
+  collabSearchTimer = setTimeout(async ()=>{
+    try {
+      const r = await api('GET', `/users/search?q=${encodeURIComponent(q)}`);
+      document.getElementById('collab-search-results').innerHTML = r.slice(0,5).map(u=>`
+        <div onclick="selectCollab(${u.id},'${esc((u.nom+' '+(u.prenom||'')).replace(/'/g,"\\'"))}')" style="display:flex;align-items:center;gap:8px;padding:8px;cursor:pointer;border-radius:8px;hover:background:var(--surface2);">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;">${(u.nom||'?')[0]}</div>
+          <div><div style="font-size:13px;font-weight:700;">${esc(u.nom||'')} ${esc(u.prenom||'')}</div><div style="font-size:11px;color:var(--muted);">${esc(u.email||'')}</div></div>
+        </div>`).join('') || '<div style="font-size:12px;color:var(--muted);padding:8px;">Aucun résultat</div>';
+    } catch(e) {}
+  }, 300);
+});
+
+async function searchAndAddCollab() {
+  const el = document.getElementById('collab-search');
+  alert('Sélectionnez un utilisateur dans les résultats de recherche.');
+}
+async function selectCollab(userId, nom) {
+  const role = document.getElementById('collab-role').value;
+  try {
+    await api('POST', `/business-plans/${bpId}/collaborateurs`, { user_id: userId, role });
+    document.getElementById('collab-search').value='';
+    document.getElementById('collab-search-results').innerHTML='';
+    loadCollaborateurs();
+  } catch(e) { alert(e.message); }
+}
+async function removeCollab(userId) {
+  if (!confirm('Retirer ce collaborateur ?')) return;
+  await api('DELETE', `/business-plans/${bpId}/collaborateurs/${userId}`);
+  loadCollaborateurs();
+}
+
+/* ════════════════════════════════════════════════════
+   COMPLÉTUDE MODALE
+   ════════════════════════════════════════════════════ */
+async function showCompletude() {
+  document.getElementById('modal-completude').style.display='flex';
+  try {
+    const data = await api('GET', `/business-plans/${bpId}/completude`);
+    bp.completude = data.completude;
+    bp.progression = data.progression;
+    updateProgress(data.progression);
+    buildNav();
+    document.getElementById('completude-content').innerHTML = `
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:48px;font-weight:900;color:var(--orange);">${data.progression}%</div>
+        <div style="height:8px;border-radius:99px;background:var(--border);overflow:hidden;margin:8px 20px;"><div style="height:100%;border-radius:99px;background:var(--orange);width:${data.progression}%;"></div></div>
+      </div>
+      <table class="complet-table">
+        <thead><tr><th>Section</th><th>Statut</th></tr></thead>
+        <tbody>${(data.completude||[]).map(c=>`<tr>
+          <td><button onclick="document.getElementById('modal-completude').style.display='none';navTo('${c.key}')" style="background:none;border:none;cursor:pointer;text-align:left;color:var(--text);font-size:13px;">${c.label}</button></td>
+          <td>${c.ok?'<span style="color:#10b981;">✅</span>':'<span style="color:#f59e0b;">⚠️</span>'}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+  } catch(e) {}
+}
+
+/* ════════════════════════════════════════════════════
+   EXPORT PDF
+   ════════════════════════════════════════════════════ */
+function exportPDF() {
+  window.print();
+}
+
+/* ════════════════════════════════════════════════════
+   ASSISTANT BP — Logique frontend
+   ════════════════════════════════════════════════════ */
+let bpaOpen = false;
+let bpaMinimized = false;
+
+function renderMarkdown(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.*?)__/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`(.*?)`/g, '<code>$1</code>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>')
+    .replace(/^/, '<p>').replace(/$/, '</p>');
+}
+
+function bpaAddMsg(text, role) {
+  const body = document.getElementById('bpa-body');
+  const d = document.createElement('div');
+  d.className = `bpa-msg ${role}`;
+  if (role === 'bot') d.innerHTML = renderMarkdown(text);
+  else d.textContent = text;
+  body.appendChild(d);
+  body.scrollTop = body.scrollHeight;
+  return d;
+}
+
+function bpaSetQuickBtns(section) {
+  const el = document.getElementById('bpa-quick');
+  const btns = {
+    infos_generales: ['Que mettre dans le type ?', 'Quels réseaux renseigner ?', 'Audit complet'],
+    resume_executif: ['Génère un résumé', 'Conseils structure', 'Audit complet'],
+    marche: ['Comment analyser mes concurrents ?', 'Qu\'est-ce que le TAM/SAM/SOM ?', 'Génère un exemple'],
+    swot: ['Génère une SWOT', 'Comment l\'utiliser en présentation ?', 'Audit complet'],
+    business_model: ['Explique le Business Model Canvas', 'Génère un exemple', 'Qu\'est-ce que la proposition de valeur ?'],
+    plan_financier: ['Qu\'est-ce que le BFR ?', 'Explique le seuil de rentabilité', 'Génère des conseils financiers'],
+    risques: ['Quels risques prioritaires ?', 'Génère des risques courants', 'Comment gérer une crise ?'],
+    default: ['Analyse ma progression', 'Génère un exemple', 'Audit complet', 'Simulation de présentation'],
+  };
+  const list = btns[section] || btns.default;
+  el.innerHTML = list.map(b => `<button class="bpa-q" onclick="bpaSend('${b.replace(/'/g,"\\'")}')">💬 ${b}</button>`).join('');
+}
+
+async function bpaSend(text) {
+  const msg = (text || document.getElementById('bpa-input').value).trim();
+  if (!msg) return;
+  document.getElementById('bpa-input').value = '';
+
+  if (!bpaOpen) toggleBPA();
+
+  bpaAddMsg(msg, 'user');
+  const typing = bpaAddMsg('Je réfléchis…', 'typing');
+
+  try {
+    const r = await api('POST', `/business-plans/${bpId}/assistant`, {
+      message: msg,
+      currentSection
+    });
+    typing.remove();
+    bpaAddMsg(r.response || 'Je n\'ai pas compris. Reformulez.', 'bot');
+  } catch(e) {
+    typing.remove();
+    bpaAddMsg('Une erreur s\'est produite. Réessayez.', 'bot');
+  }
+}
+
+window.bpaSend = bpaSend;
+
+function toggleBPA() {
+  bpaOpen = !bpaOpen;
+  const panel = document.getElementById('bpa-panel');
+  if (bpaOpen) {
+    panel.classList.add('open');
+    bpaMinimized = false;
+    panel.classList.remove('minimized');
+    document.getElementById('bpa-input').focus();
+    bpaUpdateContext();
+  } else {
+    panel.classList.remove('open');
+  }
+}
+
+function closeBPA() {
+  bpaOpen = false;
+  document.getElementById('bpa-panel').classList.remove('open');
+}
+
+function toggleBPAMinimize() {
+  bpaMinimized = !bpaMinimized;
+  document.getElementById('bpa-panel').classList.toggle('minimized', bpaMinimized);
+}
+
+function bpaUpdateContext() {
+  const def = SECTIONS.find(s => s.key === currentSection);
+  const prog = bp?.progression || 0;
+  const body = document.getElementById('bpa-body');
+
+  // Si premier message, afficher l'intro
+  if (!body.children.length) {
+    bpaAddMsg(`Bonjour ! Je suis votre **consultant spécialisé Business Plan** pour **"${bp?.nom_projet||'votre projet'}"**.\n\nJe connais tout votre dossier et je m'adapte à chaque section.\n\nVous êtes actuellement dans la section **"${def?.label||currentSection}"**. Que puis-je faire pour vous ?`, 'bot');
+
+    // Mini-progress
+    const progDiv = document.createElement('div');
+    progDiv.className = 'bpa-prog-mini';
+    progDiv.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:11px;color:#6d28d9;font-weight:700;"><span>Progression du Business Plan</span><span>${prog}%</span></div><div class="bar"><div class="fill" style="width:${prog}%"></div></div><div style="font-size:10.5px;color:#9ca3af;">${prog<50?'Continuez à remplir les sections !':prog<80?'Bon avancement, continuez !':'Excellent niveau de complétude !'}</div>`;
+    body.appendChild(progDiv);
+  }
+
+  // Mettre à jour les suggestions contextuelles
+  bpaSetQuickBtns(currentSection);
+
+  // Afficher un tag de section
+  document.getElementById('bpa-status').textContent = `● Section active : ${def?.label||currentSection}`;
+}
+
+function bpaAudit() {
+  if (!bpaOpen) toggleBPA();
+  bpaSend('Fais un audit complet de mon business plan');
+}
+
+function openBPASimulation() {
+  if (bpId) window.open(`business-plan-simulation.html?bp=${bpId}`, '_blank');
+}
+
+// Mettre à jour l'assistant quand on change de section (hook dans navTo)
+const _origNavTo = navTo;
+function navTo(key) {
+  _origNavTo(key);
+  if (bpaOpen) {
+    bpaSetQuickBtns(key);
+    document.getElementById('bpa-status').textContent = `● Section active : ${SECTIONS.find(s=>s.key===key)?.label||key}`;
+  }
+}
+
+document.getElementById('bpa-send').addEventListener('click', () => bpaSend());
+document.getElementById('bpa-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); bpaSend(); }
+});
+
+/* ════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════ */
+// Sauvegarder avant de quitter
+window.addEventListener('beforeunload', (e) => {
+  if (hasUnsaved) {
+    saveCurrentSection();
+    e.preventDefault();
+    e.returnValue='';
+  }
+});
+
+(async()=>{
+  me = await fetchCurrentUser();
+  if (!me) { window.location.href='login.html'; return; }
+  await loadBP();
+  // Auto-save toutes les 60s
+  setInterval(saveCurrentSection, 60000);
+  // Ouvrir l'assistant automatiquement après 1.5s
+  setTimeout(() => {
+    toggleBPA();
+    bpaUpdateContext();
+  }, 1500);
+})();
+</script>
+</body>
+</html>

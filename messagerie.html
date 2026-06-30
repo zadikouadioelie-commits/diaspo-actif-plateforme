@@ -100,6 +100,32 @@
 .attach-chip{display:flex;gap:6px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:pointer;}
 .attach-chip:hover{border-color:var(--orange);}
 
+/* Réactions */
+.bubble-reactions{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+.reaction-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:#fff;font-size:12px;cursor:pointer;transition:border-color .15s;}
+.reaction-chip:hover,.reaction-chip.mine{border-color:var(--orange);background:var(--orange-light);}
+.reaction-picker{display:none;position:absolute;bottom:calc(100% + 4px);background:#fff;border:1px solid var(--border);border-radius:12px;padding:6px 8px;box-shadow:0 4px 20px rgba(0,0,0,.15);gap:4px;flex-wrap:wrap;z-index:50;max-width:220px;}
+.reaction-picker.open{display:flex;}
+.reaction-pick-btn{font-size:20px;cursor:pointer;padding:3px;border-radius:6px;transition:background .1s;border:none;background:none;}
+.reaction-pick-btn:hover{background:var(--surface2);}
+/* Réponse à un message */
+.reply-preview{background:var(--orange-light);border-left:3px solid var(--orange);border-radius:0 8px 8px 0;padding:8px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.reply-preview-text{font-size:12.5px;color:var(--text);line-height:1.4;}
+.reply-preview .reply-author{font-weight:700;font-size:11px;color:var(--orange);margin-bottom:2px;}
+/* Bulle reply */
+.bubble-reply{background:rgba(0,0,0,.06);border-radius:8px;padding:5px 8px;margin-bottom:6px;font-size:12px;border-left:3px solid var(--orange);}
+.bubble-reply .ra{font-weight:700;font-size:11px;color:var(--orange);margin-bottom:2px;}
+/* Recherche globale */
+.msg-search-panel{background:#fff;border:1px solid var(--border);border-radius:12px;margin:8px;padding:12px;display:none;}
+.msg-search-panel.open{display:block;}
+.search-result{display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:8px;cursor:pointer;border-bottom:1px solid var(--border);}
+.search-result:hover{background:var(--surface2);}
+/* Favoris bar */
+.fav-bar{background:#fff;border:1px solid var(--border);border-radius:10px;margin:8px;padding:10px;display:none;}
+.fav-bar.open{display:block;}
+/* Épinglé */
+.pinned-bar{background:var(--orange-light);border-bottom:1px solid var(--orange);padding:8px 16px;font-size:12.5px;font-weight:600;color:var(--orange);cursor:pointer;display:none;}
+.pinned-bar.visible{display:block;}
 /* Responsive mobile */
 @media (max-width:700px){
   .msg-left{width:100%;position:absolute;z-index:10;height:calc(100vh - 58px);left:0;transform:translateX(0);transition:transform .25s;}
@@ -136,6 +162,7 @@
     <div class="msg-left" id="msg-left">
       <div class="msg-left-head">
         <h2>Messages</h2>
+        <button class="btn btn-sm btn-outline" id="btn-new-groupe" title="Nouveau groupe">👥</button>
         <button class="btn btn-sm btn-orange" id="btn-new-conv" title="Nouvelle conversation">+ Nouveau</button>
       </div>
 
@@ -173,13 +200,41 @@
             <div class="hd-sub" id="hd-sub">—</div>
           </div>
           <div class="hd-actions">
+            <button class="hd-btn" id="btn-search-msg" title="Rechercher dans la conversation">🔍</button>
+            <button class="hd-btn" id="btn-show-pins" title="Messages épinglés">📌</button>
+            <button class="hd-btn" id="btn-show-favs" title="Mes favoris">⭐</button>
             <button class="hd-btn" id="btn-archive" title="Archiver">📁</button>
             <button class="hd-btn" id="btn-delete-conv" title="Supprimer" style="color:#D33;">🗑</button>
           </div>
         </div>
 
+        <!-- Barre messages épinglés -->
+        <div class="pinned-bar" id="pinned-bar">📌 <span id="pinned-count">0</span> message(s) épinglé(s) — <span onclick="showPinnedMessages()" style="cursor:pointer;text-decoration:underline;">Voir</span></div>
+
+        <!-- Panel recherche dans conv -->
+        <div class="msg-search-panel" id="msg-search-panel">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="msg-search-input" placeholder="Rechercher dans cette conversation…" style="flex:1;padding:8px 12px;border-radius:20px;border:1px solid var(--border);font-size:13px;font-family:inherit;">
+            <button onclick="searchInConv()" class="btn btn-orange btn-sm">Chercher</button>
+            <button onclick="closeSearchPanel()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);">✕</button>
+          </div>
+          <div id="msg-search-results" style="margin-top:8px;max-height:200px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- Panel favoris -->
+        <div class="fav-bar" id="fav-bar">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="font-size:13px;">⭐ Messages favoris</strong>
+            <button onclick="document.getElementById('fav-bar').classList.remove('open')" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+          </div>
+          <div id="fav-list"></div>
+        </div>
+
         <!-- Corps messages -->
         <div class="msg-body" id="msg-body"></div>
+
+        <!-- Reply preview -->
+        <div id="reply-preview" style="display:none;padding:0 16px 0;"></div>
 
         <!-- Pièce jointe préparée -->
         <div id="attach-panel" class="attach-panel" style="display:none;margin:0 16px 0;">
@@ -219,6 +274,26 @@
       </div>
       <div class="msg-modal-results" id="modal-results">
         <div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Tapez au moins 2 caractères pour chercher.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL Groupe -->
+  <div class="msg-modal-bg" id="modal-groupe" style="display:none;">
+    <div class="msg-modal" style="height:auto;max-height:80vh;">
+      <div class="msg-modal-head">
+        <h3>Créer un groupe</h3>
+        <button class="hd-btn" onclick="document.getElementById('modal-groupe').style.display='none'">✕</button>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <div><label style="font-size:12px;font-weight:700;color:var(--muted);">NOM DU GROUPE</label><input id="grp-nom" placeholder="Ex : Équipe projet, Alumni…" style="width:100%;padding:9px 14px;border-radius:10px;border:1px solid var(--border);font-family:inherit;font-size:13.5px;box-sizing:border-box;margin-top:4px;"></div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--muted);">AJOUTER DES MEMBRES</label>
+          <input id="grp-search" placeholder="Rechercher un utilisateur…" style="width:100%;padding:9px 14px;border-radius:10px;border:1px solid var(--border);font-family:inherit;font-size:13.5px;box-sizing:border-box;margin-top:4px;">
+          <div id="grp-results" style="max-height:160px;overflow-y:auto;margin-top:6px;border:1px solid var(--border);border-radius:10px;display:none;"></div>
+        </div>
+        <div id="grp-members-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <button class="btn btn-orange btn-block" onclick="creerGroupe()">Créer le groupe</button>
       </div>
     </div>
   </div>
@@ -608,6 +683,287 @@ async function searchUsers(q){
   }catch(e){ el.innerHTML=`<div style="padding:16px;color:#D33;font-size:13px;">${e.message}</div>`; }
 }
 
+/* ======================================================
+   RÉACTIONS
+   ====================================================== */
+const REACTION_EMOJIS = ["👍","❤️","😂","🙏","🎉","🔥","💪","😮","👏","✅"];
+let replyTo = null; // { id, contenu, auteur }
+
+function toggleReactionPicker(msgId, btn) {
+  document.querySelectorAll('.reaction-picker.open').forEach(p=>{ if(p.dataset.mid!=msgId){ p.classList.remove('open'); } });
+  const picker = document.getElementById('rpicker-'+msgId);
+  if (!picker) return;
+  picker.classList.toggle('open');
+}
+
+async function sendReaction(msgId, emoji) {
+  document.getElementById('rpicker-'+msgId)?.classList.remove('open');
+  try {
+    await api('POST', `/conversations/${activeConvId}/messages/${msgId}/reactions`, { emoji });
+    renderMessages(await api('GET', `/conversations/${activeConvId}/messages`));
+  } catch(e) {}
+}
+
+function buildReactionPicker(msgId) {
+  return `<div class="reaction-picker" id="rpicker-${msgId}" data-mid="${msgId}">
+    ${REACTION_EMOJIS.map(e=>`<button class="reaction-pick-btn" onclick="sendReaction(${msgId},'${e}')">${e}</button>`).join('')}
+  </div>`;
+}
+
+/* ======================================================
+   RÉPONDRE À UN MESSAGE
+   ====================================================== */
+function startReply(msgId, contenu, auteur) {
+  replyTo = { id: msgId, contenu, auteur };
+  const el = document.getElementById('reply-preview');
+  el.style.display = 'block';
+  el.innerHTML = `<div class="reply-preview">
+    <div><div class="reply-author">↩ Répondre à ${escHtml(auteur)}</div><div class="reply-preview-text">${escHtml(contenu.substring(0,80))}${contenu.length>80?'…':''}</div></div>
+    <button onclick="cancelReply()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;flex-shrink:0;">✕</button>
+  </div>`;
+  document.getElementById('msg-input').focus();
+}
+function cancelReply() {
+  replyTo = null;
+  const el = document.getElementById('reply-preview');
+  el.style.display = 'none';
+  el.innerHTML = '';
+}
+
+/* ======================================================
+   ÉPINGLER / DÉSÉPINGLER
+   ====================================================== */
+async function togglePin(msgId) {
+  try {
+    const r = await api('POST', `/conversations/${activeConvId}/messages/${msgId}/epingle`);
+    await loadPinnedBar();
+    renderMessages(await api('GET', `/conversations/${activeConvId}/messages`));
+  } catch(e) {}
+}
+
+async function loadPinnedBar() {
+  try {
+    const pins = await api('GET', `/conversations/${activeConvId}/epingles`);
+    const bar = document.getElementById('pinned-bar');
+    if (pins.length > 0) {
+      bar.classList.add('visible');
+      document.getElementById('pinned-count').textContent = pins.length;
+    } else {
+      bar.classList.remove('visible');
+    }
+  } catch(e) {}
+}
+
+async function showPinnedMessages() {
+  try {
+    const pins = await api('GET', `/conversations/${activeConvId}/epingles`);
+    if (!pins.length) { alert('Aucun message épinglé.'); return; }
+    alert('Messages épinglés :\n\n' + pins.map(p=>`📌 ${p.contenu||'[pièce jointe]'}`).join('\n\n'));
+  } catch(e) {}
+}
+
+/* ======================================================
+   FAVORIS
+   ====================================================== */
+async function toggleFavori(msgId) {
+  try {
+    const r = await api('POST', `/messages/${msgId}/favori`);
+  } catch(e) {}
+}
+
+async function showFavoris() {
+  const bar = document.getElementById('fav-bar');
+  if (bar.classList.contains('open')) { bar.classList.remove('open'); return; }
+  bar.classList.add('open');
+  document.getElementById('fav-list').innerHTML = '<div style="color:var(--muted);font-size:12px;">Chargement…</div>';
+  try {
+    const favs = await api('GET', '/messages/favoris');
+    if (!favs.length) {
+      document.getElementById('fav-list').innerHTML = '<div style="color:var(--muted);font-size:12px;">Aucun favori.</div>';
+      return;
+    }
+    document.getElementById('fav-list').innerHTML = favs.map(f=>`
+      <div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+        <span style="font-weight:700;font-size:11px;color:var(--muted);">${escHtml(f.expediteur_nom||'')}</span>
+        <div>${escHtml((f.contenu||'').substring(0,80))}</div>
+      </div>`).join('');
+  } catch(e) { document.getElementById('fav-list').innerHTML = '<div style="color:red;font-size:12px;">Erreur</div>'; }
+}
+
+/* ======================================================
+   RECHERCHE DANS LA CONVERSATION
+   ====================================================== */
+function openSearchPanel() {
+  const p = document.getElementById('msg-search-panel');
+  p.classList.toggle('open');
+  if (p.classList.contains('open')) document.getElementById('msg-search-input').focus();
+}
+function closeSearchPanel() {
+  document.getElementById('msg-search-panel').classList.remove('open');
+  document.getElementById('msg-search-results').innerHTML = '';
+}
+async function searchInConv() {
+  const q = document.getElementById('msg-search-input').value.trim();
+  if (!q) return;
+  const res = document.getElementById('msg-search-results');
+  res.innerHTML = '<div style="color:var(--muted);font-size:12px;">Recherche…</div>';
+  try {
+    const results = await api('GET', `/messages/search?q=${encodeURIComponent(q)}&conv=${activeConvId}`);
+    if (!results.length) { res.innerHTML = '<div style="color:var(--muted);font-size:12px;">Aucun résultat.</div>'; return; }
+    res.innerHTML = results.map(r=>`
+      <div class="search-result" onclick="scrollToMsg(${r.id})">
+        <span style="font-size:11px;color:var(--muted);">${escHtml(r.expediteur_nom||'')} · ${timeLabel(r.created_at)}</span>
+        <span style="font-size:13px;">${escHtml(r.contenu||'')}</span>
+      </div>`).join('');
+  } catch(e) { res.innerHTML = '<div style="color:red;font-size:12px;">Erreur</div>'; }
+}
+function scrollToMsg(msgId) {
+  const el = document.getElementById('msg-'+msgId);
+  if (el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.background='var(--orange-light)'; setTimeout(()=>el.style.background='',2000); }
+  closeSearchPanel();
+}
+
+/* ======================================================
+   GROUPE
+   ====================================================== */
+let grpMembers = [];
+
+document.getElementById('btn-new-groupe').addEventListener('click', ()=>{
+  grpMembers = [];
+  document.getElementById('grp-nom').value = '';
+  document.getElementById('grp-search').value = '';
+  document.getElementById('grp-results').style.display = 'none';
+  document.getElementById('grp-members-list').innerHTML = '';
+  document.getElementById('modal-groupe').style.display = 'flex';
+});
+
+let grpSearchTimer = null;
+document.getElementById('grp-search').addEventListener('input', function() {
+  clearTimeout(grpSearchTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { document.getElementById('grp-results').style.display='none'; return; }
+  grpSearchTimer = setTimeout(async ()=>{
+    try {
+      const r = await api('GET', `/users/search?q=${encodeURIComponent(q)}`);
+      const el = document.getElementById('grp-results');
+      el.style.display = 'block';
+      el.innerHTML = r.filter(u=>u.id!==me.id && !grpMembers.find(m=>m.id===u.id)).map(u=>`
+        <div class="msg-user-result" onclick="addGrpMember(${u.id},'${escHtml(u.nom||u.prenom||'').replace(/'/g,"\\'")}')">
+          <div class="u-avatar">${avatarLetter(u.nom||u.prenom)}</div>
+          <div class="u-info"><div class="u-name">${escHtml(u.nom||'')} ${escHtml(u.prenom||'')}</div><div class="u-sub">${escHtml(u.role||'')}</div></div>
+        </div>`).join('') || '<div style="padding:12px;color:var(--muted);font-size:13px;">Aucun résultat</div>';
+    } catch(e) {}
+  }, 300);
+});
+
+function addGrpMember(id, nom) {
+  if (grpMembers.find(m=>m.id===id)) return;
+  grpMembers.push({id, nom});
+  renderGrpMembers();
+  document.getElementById('grp-search').value = '';
+  document.getElementById('grp-results').style.display = 'none';
+}
+function removeGrpMember(id) {
+  grpMembers = grpMembers.filter(m=>m.id!==id);
+  renderGrpMembers();
+}
+function renderGrpMembers() {
+  document.getElementById('grp-members-list').innerHTML = grpMembers.map(m=>`
+    <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border-radius:99px;padding:4px 12px 4px 8px;font-size:12.5px;">
+      <div style="width:20px;height:20px;border-radius:50%;background:var(--orange);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700;">${(m.nom||'?')[0]}</div>
+      ${escHtml(m.nom)}
+      <button onclick="removeGrpMember(${m.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:0 0 0 2px;">✕</button>
+    </div>`).join('');
+}
+
+async function creerGroupe() {
+  const nom = document.getElementById('grp-nom').value.trim();
+  if (!nom) { alert('Donnez un nom au groupe'); return; }
+  if (grpMembers.length < 1) { alert('Ajoutez au moins 1 membre'); return; }
+  try {
+    const r = await api('POST', '/conversations/groupe', { nom, membres: grpMembers.map(m=>m.id) });
+    document.getElementById('modal-groupe').style.display = 'none';
+    await loadConvList();
+    openConv(r.conversation_id);
+  } catch(e) { alert(e.message||'Erreur création groupe'); }
+}
+
+/* ======================================================
+   PATCH renderMessages pour réactions + répondre + épingler
+   ====================================================== */
+const _origRenderMessages = window.renderMessages;
+
+function renderMessages(msgs) {
+  const body = document.getElementById("msg-body");
+  if(!body) return;
+  if(!msgs||!msgs.length){
+    body.innerHTML='<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;">Pas encore de messages</div>';
+    return;
+  }
+  let lastDay="", html="";
+  msgs.forEach(m=>{
+    const day=m.created_at?new Date(m.created_at).toLocaleDateString("fr",{weekday:"long",day:"numeric",month:"long"}):"";
+    if(day!==lastDay){
+      html+=`<div class="msg-day-sep"><span>${day}</span></div>`;
+      lastDay=day;
+    }
+    const isMe=m.expediteur_id===me.id;
+    const nom=m.expediteur_nom||"?";
+    let inner="";
+
+    // Reply parent
+    if(m.parent_message_id && m.parent_contenu){
+      inner+=`<div class="bubble-reply"><div class="ra">${escHtml(m.parent_auteur||'')}</div>${escHtml((m.parent_contenu||'').substring(0,80))}</div>`;
+    }
+
+    // Contenu
+    if(m.fichier_type&&m.fichier_url){
+      inner+=`<div class="bubble-file"><span>${m.fichier_icon||"📎"}</span><a href="${escHtml(m.fichier_url)}" class="bubble-link" target="_blank">${escHtml(m.fichier_nom||m.fichier_url)}</a></div>`;
+    } else if(m.contenu){
+      const linkified=escHtml(m.contenu).replace(/(https?:\/\/\S+)/g,'<a href="$1" target="_blank" class="bubble-link">$1</a>');
+      inner+=linkified;
+    }
+    inner+=`<span class="bubble-time">${timeLabel(m.created_at)}</span>`;
+
+    // Réactions
+    const reactions = m.reactions || [];
+    let reacHtml = '';
+    if(reactions.length){
+      const grouped={};
+      reactions.forEach(r=>{ grouped[r.emoji]=(grouped[r.emoji]||[]).concat(r); });
+      reacHtml=`<div class="bubble-reactions">${Object.entries(grouped).map(([e,arr])=>{
+        const mine=arr.find(r=>r.user_id===me.id);
+        return `<button class="reaction-chip${mine?' mine':''}" onclick="sendReaction(${m.id},'${e}')" title="${arr.map(r=>r.user_nom||'').join(', ')}">${e} ${arr.length}</button>`;
+      }).join('')}</div>`;
+    }
+
+    // Actions au survol
+    const actions=`<div class="bubble-hover-actions" style="display:flex;gap:4px;opacity:0;transition:opacity .15s;position:absolute;${isMe?'left:-88px':'right:-88px'};bottom:4px;">
+      <button onclick="startReply(${m.id},${JSON.stringify(m.contenu||'')},${JSON.stringify(nom)})" title="Répondre" style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 6px;cursor:pointer;font-size:13px;">↩</button>
+      <button onclick="toggleFavori(${m.id})" title="Favori" style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 6px;cursor:pointer;font-size:13px;">⭐</button>
+      <button onclick="togglePin(${m.id})" title="Épingler" style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 6px;cursor:pointer;font-size:13px;">📌</button>
+    </div>`;
+
+    html+=`
+      <div class="bubble-row ${isMe?"me":""}" id="msg-${m.id}" onmouseenter="this.querySelector('.bubble-hover-actions').style.opacity=1" onmouseleave="this.querySelector('.bubble-hover-actions').style.opacity=0" style="position:relative;">
+        ${!isMe?`<div class="bubble-avatar">${avatarLetter(nom)}</div>`:""}
+        <div style="display:flex;flex-direction:column;gap:2px;${isMe?'align-items:flex-end':'align-items:flex-start'};">
+          ${!isMe&&msgs.filter(x=>x.expediteur_id!==me.id).length>0?`<span style="font-size:11px;color:var(--muted);margin-left:4px;">${escHtml(nom)}</span>`:""}
+          <div style="position:relative;">
+            <div class="bubble ${isMe?"me":"them"}">${inner}</div>
+            ${buildReactionPicker(m.id)}
+            ${actions}
+          </div>
+          <button onclick="toggleReactionPicker(${m.id},this)" style="background:none;border:none;cursor:pointer;font-size:14px;opacity:.5;padding:0 4px;" title="Réagir">😊</button>
+          ${reacHtml}
+        </div>
+        ${isMe?`<div class="bubble-avatar">${avatarLetter(nom)}</div>`:""}
+      </div>`;
+  });
+  body.innerHTML=html;
+  body.scrollTop=body.scrollHeight;
+}
+
 /* ---- Filtres ---- */
 document.querySelectorAll(".msg-tab").forEach(tab=>{
   tab.addEventListener("click",()=>{
@@ -654,6 +1010,34 @@ async function openConvWithUser(userId){
 
   // Charger la liste des conversations
   await loadConvList();
+
+  // Boutons header conversation
+  document.getElementById('btn-search-msg').addEventListener('click', openSearchPanel);
+  document.getElementById('btn-show-pins').addEventListener('click', ()=>{ if(activeConvId) showPinnedMessages(); });
+  document.getElementById('btn-show-favs').addEventListener('click', showFavoris);
+
+  // Envoyer aussi le parent_message_id si reply
+  const origSend = document.getElementById('msg-send').onclick;
+  const origSendFn = async () => {
+    if(!activeConvId) return;
+    const inp = document.getElementById('msg-input');
+    const contenu = inp.value.trim();
+    const attach = window.pendingAttach;
+    if(!contenu && !attach) return;
+    const body = { contenu };
+    if(attach) { body.fichier_type=attach.type; body.fichier_icon=attach.icon; body.fichier_nom=attach.nom; body.fichier_url=attach.url; }
+    if(replyTo) { body.parent_message_id=replyTo.id; }
+    try{
+      await api('POST', `/conversations/${activeConvId}/messages`, body);
+      inp.value=''; inp.style.height='auto';
+      cancelReply();
+      window.pendingAttach=null;
+      document.getElementById('attach-panel').style.display='none';
+      const msgs=await api('GET', `/conversations/${activeConvId}/messages`);
+      renderMessages(msgs);
+      await loadConvList();
+    }catch(e){ alert(e.message); }
+  };
 
   // Vérifier ?with= dans l'URL pour ouvrir une conv directement
   const urlParams=new URLSearchParams(location.search);

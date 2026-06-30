@@ -91,6 +91,9 @@ function publicUser(u) {
 function safeParse(s) {
   try { return JSON.parse(s || "{}"); } catch (e) { return {}; }
 }
+function safeJSON(s, fallback) {
+  try { return JSON.parse(s || JSON.stringify(fallback)); } catch (e) { return fallback; }
+}
 
 /* ---------- Routes API ---------- */
 /* ── Compte officiel Diaspo'Actif — ID mis en cache au démarrage ── */
@@ -14231,6 +14234,1300 @@ route("GET", "/api/admin/observatoire-eco", async (req, res) => {
       opportunites:["Fintech diaspora sous-exploitée", "E-learning en langues africaines", "Tourisme des racines"]
     }
   });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODULES V2 — Messagerie enrichie, Profil, Formations, OZ Chat
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── RÉACTIONS AUX MESSAGES ── */
+app.post('/api/conversations/:cid/messages/:mid/reactions', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const mid = parseInt(req.params.mid);
+  const cid = parseInt(req.params.cid);
+  const { emoji } = req.body;
+  const allowed = ['👍','❤️','👏','🎉','😮','😢'];
+  if (!allowed.includes(emoji)) return sendJSON(res, 400, { error: 'Emoji non autorisé' });
+  // Vérifier accès à la conversation
+  const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(cid);
+  if (!conv) return sendJSON(res, 404, { error: 'Conversation non trouvée' });
+  const isMember = conv.type === 'groupe'
+    ? db.prepare('SELECT 1 FROM conversation_members WHERE conversation_id=? AND user_id=? AND left_at IS NULL').get(cid, uid)
+    : (conv.user1_id === uid || conv.user2_id === uid);
+  if (!isMember) return sendJSON(res, 403, { error: 'Accès refusé' });
+  // Toggle réaction
+  const existing = db.prepare('SELECT id FROM message_reactions WHERE message_id=? AND user_id=? AND emoji=?').get(mid, uid, emoji);
+  if (existing) {
+    db.prepare('DELETE FROM message_reactions WHERE id=?').run(existing.id);
+    return sendJSON(res, 200, { action: 'removed', emoji });
+  }
+  db.prepare('INSERT OR IGNORE INTO message_reactions (message_id, user_id, emoji) VALUES (?,?,?)').run(mid, uid, emoji);
+  sendJSON(res, 200, { action: 'added', emoji });
+});
+
+app.get('/api/conversations/:cid/messages/:mid/reactions', requireAuth, (req, res) => {
+  const mid = parseInt(req.params.mid);
+  const rows = db.prepare(`
+    SELECT emoji, COUNT(*) as count, GROUP_CONCAT(u.nom) as noms,
+    MAX(CASE WHEN mr.user_id=? THEN 1 ELSE 0 END) as moi
+    FROM message_reactions mr JOIN users u ON u.id=mr.user_id
+    WHERE mr.message_id=? GROUP BY emoji
+  `).all(req.user.id, mid);
+  sendJSON(res, 200, rows);
+});
+
+/* ── FAVORIS MESSAGES ── */
+app.post('/api/messages/:id/favori', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const mid = parseInt(req.params.id);
+  const existing = db.prepare('SELECT id FROM message_favorites WHERE message_id=? AND user_id=?').get(mid, uid);
+  if (existing) {
+    db.prepare('DELETE FROM message_favorites WHERE id=?').run(existing.id);
+    return sendJSON(res, 200, { favori: false });
+  }
+  db.prepare('INSERT OR IGNORE INTO message_favorites (message_id, user_id) VALUES (?,?)').run(mid, uid);
+  sendJSON(res, 200, { favori: true });
+});
+
+app.get('/api/messages/favoris', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const rows = db.prepare(`
+    SELECT m.*, u.nom as expediteur_nom, u.photo_url as expediteur_photo,
+    c.sujet as conv_sujet, c.id as conv_id, mf.created_at as favoris_at
+    FROM message_favorites mf
+    JOIN messages m ON m.id=mf.message_id
+    JOIN users u ON u.id=m.sender_id
+    JOIN conversations c ON c.id=m.conversation_id
+    WHERE mf.user_id=? ORDER BY mf.created_at DESC LIMIT 50
+  `).all(uid);
+  sendJSON(res, 200, rows);
+});
+
+/* ── ÉPINGLAGE MESSAGES ── */
+app.post('/api/conversations/:cid/messages/:mid/epingle', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const cid = parseInt(req.params.cid);
+  const mid = parseInt(req.params.mid);
+  const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(cid);
+  if (!conv) return sendJSON(res, 404, { error: 'Conversation introuvable' });
+  const existing = db.prepare('SELECT id FROM message_epingles WHERE conversation_id=? AND message_id=?').get(cid, mid);
+  if (existing) {
+    db.prepare('DELETE FROM message_epingles WHERE id=?').run(existing.id);
+    db.prepare('UPDATE messages SET est_epingle=0 WHERE id=?').run(mid);
+    return sendJSON(res, 200, { epingle: false });
+  }
+  db.prepare('INSERT OR IGNORE INTO message_epingles (conversation_id, message_id, epingle_par) VALUES (?,?,?)').run(cid, mid, uid);
+  db.prepare('UPDATE messages SET est_epingle=1 WHERE id=?').run(mid);
+  sendJSON(res, 200, { epingle: true });
+});
+
+app.get('/api/conversations/:cid/epingles', requireAuth, (req, res) => {
+  const cid = parseInt(req.params.cid);
+  const rows = db.prepare(`
+    SELECT m.*, u.nom as expediteur_nom, u.photo_url as expediteur_photo
+    FROM message_epingles me
+    JOIN messages m ON m.id=me.message_id
+    JOIN users u ON u.id=m.sender_id
+    WHERE me.conversation_id=? ORDER BY me.created_at DESC
+  `).all(cid);
+  sendJSON(res, 200, rows);
+});
+
+/* ── RECHERCHE MESSAGES ── */
+app.get('/api/messages/search', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) return sendJSON(res, 200, []);
+  const rows = db.prepare(`
+    SELECT m.*, u.nom as expediteur_nom, c.id as conv_id,
+    COALESCE(c.sujet, c.nom, 'Conversation') as conv_nom
+    FROM messages m
+    JOIN users u ON u.id=m.sender_id
+    JOIN conversations c ON c.id=m.conversation_id
+    LEFT JOIN conversation_members cm ON cm.conversation_id=c.id AND cm.user_id=?
+    WHERE (c.user1_id=? OR c.user2_id=? OR cm.user_id=?)
+    AND m.contenu LIKE ? AND m.type='text'
+    ORDER BY m.created_at DESC LIMIT 30
+  `).all(uid, uid, uid, uid, `%${q}%`);
+  sendJSON(res, 200, rows);
+});
+
+/* ── CONVERSATIONS DE GROUPE ── */
+app.post('/api/conversations/groupe', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const { nom, membres_ids } = req.body;
+  if (!nom || !Array.isArray(membres_ids) || membres_ids.length < 1) {
+    return sendJSON(res, 400, { error: 'Nom et au moins 1 membre requis' });
+  }
+  const allMembers = [...new Set([uid, ...membres_ids.map(Number)])];
+  const conv = db.prepare(`
+    INSERT INTO conversations (user1_id, user2_id, type, nom, created_by)
+    VALUES (?, NULL, 'groupe', ?, ?)
+  `).run(uid, nom, uid);
+  const cid = conv.lastInsertRowid;
+  const ins = db.prepare('INSERT OR IGNORE INTO conversation_members (conversation_id, user_id, role) VALUES (?,?,?)');
+  for (const mid of allMembers) {
+    ins.run(cid, mid, mid === uid ? 'admin' : 'membre');
+  }
+  sendJSON(res, 201, { id: cid, nom, type: 'groupe', membres: allMembers });
+});
+
+app.get('/api/conversations/:cid/membres', requireAuth, (req, res) => {
+  const cid = parseInt(req.params.cid);
+  const rows = db.prepare(`
+    SELECT u.id, u.nom, u.photo_url, u.titre_pro, cm.role, cm.joined_at
+    FROM conversation_members cm JOIN users u ON u.id=cm.user_id
+    WHERE cm.conversation_id=? AND cm.left_at IS NULL ORDER BY cm.role DESC, u.nom
+  `).all(cid);
+  sendJSON(res, 200, rows);
+});
+
+app.post('/api/conversations/:cid/membres', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const cid = parseInt(req.params.cid);
+  const { user_id } = req.body;
+  // Vérifier que l'appelant est admin du groupe
+  const isAdmin = db.prepare('SELECT 1 FROM conversation_members WHERE conversation_id=? AND user_id=? AND role=?').get(cid, uid, 'admin');
+  if (!isAdmin) return sendJSON(res, 403, { error: 'Réservé aux admins' });
+  try {
+    db.prepare('INSERT OR IGNORE INTO conversation_members (conversation_id, user_id) VALUES (?,?)').run(cid, user_id);
+    sendJSON(res, 200, { ok: true });
+  } catch(e) { sendJSON(res, 400, { error: e.message }); }
+});
+
+/* ── PORTFOLIO UTILISATEUR ── */
+app.get('/api/profil/portfolio', requireAuth, (req, res) => {
+  const rows = db.prepare('SELECT * FROM user_portfolio WHERE user_id=? ORDER BY ordre, created_at DESC').all(req.user.id);
+  sendJSON(res, 200, rows.map(r => ({...r, images_json: safeJSON(r.images_json,[]), fichiers_json: safeJSON(r.fichiers_json,[])})));
+});
+
+app.get('/api/profil/:id/portfolio', (req, res) => {
+  const rows = db.prepare('SELECT * FROM user_portfolio WHERE user_id=? ORDER BY ordre, created_at DESC').all(parseInt(req.params.id));
+  sendJSON(res, 200, rows.map(r => ({...r, images_json: safeJSON(r.images_json,[]), fichiers_json: safeJSON(r.fichiers_json,[])})));
+});
+
+app.post('/api/profil/portfolio', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const { titre, description, annee, lien, partenaires, resultats, type, images_json, fichiers_json } = req.body;
+  if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
+  const r = db.prepare(`
+    INSERT INTO user_portfolio (user_id, titre, description, annee, lien, partenaires, resultats, type, images_json, fichiers_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?)
+  `).run(uid, titre, description||null, annee||null, lien||null, partenaires||null, resultats||null, type||'projet',
+    JSON.stringify(images_json||[]), JSON.stringify(fichiers_json||[]));
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+app.put('/api/profil/portfolio/:id', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const id = parseInt(req.params.id);
+  const item = db.prepare('SELECT * FROM user_portfolio WHERE id=? AND user_id=?').get(id, uid);
+  if (!item) return sendJSON(res, 404, { error: 'Non trouvé' });
+  const { titre, description, annee, lien, partenaires, resultats, type, images_json, fichiers_json, ordre } = req.body;
+  db.prepare(`UPDATE user_portfolio SET titre=?, description=?, annee=?, lien=?, partenaires=?, resultats=?, type=?, images_json=?, fichiers_json=?, ordre=? WHERE id=?`)
+    .run(titre||item.titre, description||null, annee||null, lien||null, partenaires||null, resultats||null, type||item.type,
+      JSON.stringify(images_json||safeJSON(item.images_json,[])), JSON.stringify(fichiers_json||safeJSON(item.fichiers_json,[])),
+      ordre||item.ordre, id);
+  sendJSON(res, 200, { ok: true });
+});
+
+app.delete('/api/profil/portfolio/:id', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const id = parseInt(req.params.id);
+  const item = db.prepare('SELECT id FROM user_portfolio WHERE id=? AND user_id=?').get(id, uid);
+  if (!item) return sendJSON(res, 404, { error: 'Non trouvé' });
+  db.prepare('DELETE FROM user_portfolio WHERE id=?').run(id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── LANGUES UTILISATEUR ── */
+app.get('/api/profil/langues', requireAuth, (req, res) => {
+  sendJSON(res, 200, db.prepare('SELECT * FROM user_langues WHERE user_id=? ORDER BY is_maternelle DESC, langue').all(req.user.id));
+});
+
+app.get('/api/profil/:id/langues', (req, res) => {
+  sendJSON(res, 200, db.prepare('SELECT * FROM user_langues WHERE user_id=? ORDER BY is_maternelle DESC, langue').all(parseInt(req.params.id)));
+});
+
+app.post('/api/profil/langues', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const { langue, niveau, is_maternelle, certification } = req.body;
+  if (!langue) return sendJSON(res, 400, { error: 'Langue requise' });
+  try {
+    const r = db.prepare('INSERT OR REPLACE INTO user_langues (user_id, langue, niveau, is_maternelle, certification) VALUES (?,?,?,?,?)')
+      .run(uid, langue, niveau||'intermediaire', is_maternelle?1:0, certification||null);
+    sendJSON(res, 201, { id: r.lastInsertRowid });
+  } catch(e) { sendJSON(res, 400, { error: e.message }); }
+});
+
+app.delete('/api/profil/langues/:id', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  db.prepare('DELETE FROM user_langues WHERE id=? AND user_id=?').run(parseInt(req.params.id), uid);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── RÉSEAUX SOCIAUX PROFIL ── */
+app.put('/api/profil/reseaux-sociaux', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const { reseaux } = req.body; // { linkedin, facebook, instagram, x, youtube, tiktok, site_web, github }
+  const allowed = ['linkedin','facebook','instagram','x','youtube','tiktok','site_web','github','autre1','autre2'];
+  const clean = {};
+  for (const k of allowed) { if (reseaux[k]) clean[k] = String(reseaux[k]).substring(0,300); }
+  db.prepare('UPDATE users SET reseaux_sociaux=? WHERE id=?').run(JSON.stringify(clean), uid);
+  sendJSON(res, 200, { ok: true, reseaux: clean });
+});
+
+/* ── DISPONIBILITÉS PROFIL ── */
+app.put('/api/profil/disponibilites', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const { disponibilites } = req.body;
+  db.prepare('UPDATE users SET disponibilites=? WHERE id=?').run(JSON.stringify(disponibilites||{}), uid);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── RECOMMANDATIONS UTILISATEUR ── */
+app.get('/api/profil/:id/recommandations', (req, res) => {
+  const toId = parseInt(req.params.id);
+  const rows = db.prepare(`
+    SELECT ur.*, u.nom as auteur_nom, u.photo_url as auteur_photo, u.titre_pro as auteur_titre
+    FROM user_recommendations ur
+    JOIN users u ON u.id=ur.from_user_id
+    WHERE ur.to_user_id=? AND ur.statut='approuve'
+    ORDER BY ur.created_at DESC
+  `).all(toId);
+  sendJSON(res, 200, rows);
+});
+
+app.post('/api/profil/:id/recommandations', requireAuth, (req, res) => {
+  const fromId = req.user.id;
+  const toId = parseInt(req.params.id);
+  if (fromId === toId) return sendJSON(res, 400, { error: 'Vous ne pouvez pas vous recommander vous-même' });
+  const { texte, relation, note } = req.body;
+  if (!texte || texte.length < 20) return sendJSON(res, 400, { error: 'Texte trop court (min 20 caractères)' });
+  try {
+    db.prepare(`INSERT OR REPLACE INTO user_recommendations (from_user_id, to_user_id, texte, relation, note)
+      VALUES (?,?,?,?,?)`).run(fromId, toId, texte, relation||null, parseInt(note)||5);
+    sendJSON(res, 201, { ok: true });
+  } catch(e) { sendJSON(res, 400, { error: e.message }); }
+});
+
+app.get('/api/profil/mes-recommandations', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const recues = db.prepare(`SELECT ur.*, u.nom as auteur_nom, u.photo_url as auteur_photo FROM user_recommendations ur JOIN users u ON u.id=ur.from_user_id WHERE ur.to_user_id=? ORDER BY ur.created_at DESC`).all(uid);
+  const envoyees = db.prepare(`SELECT ur.*, u.nom as dest_nom, u.photo_url as dest_photo FROM user_recommendations ur JOIN users u ON u.id=ur.to_user_id WHERE ur.from_user_id=? ORDER BY ur.created_at DESC`).all(uid);
+  sendJSON(res, 200, { recues, envoyees });
+});
+
+app.patch('/api/profil/recommandations/:id', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const id = parseInt(req.params.id);
+  const { statut } = req.body;
+  const allowed = ['approuve','masque','refuse'];
+  if (!allowed.includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide' });
+  const rec = db.prepare('SELECT id FROM user_recommendations WHERE id=? AND to_user_id=?').get(id, uid);
+  if (!rec) return sendJSON(res, 404, { error: 'Non trouvé' });
+  db.prepare('UPDATE user_recommendations SET statut=? WHERE id=?').run(statut, id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── FORMATIONS — SUIVI UTILISATEUR ── */
+app.get('/api/formations/suivi', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const rows = db.prepare(`
+    SELECT ufs.*, f.domaine, f.niveau as niveau_formation, f.prix, f.gratuit, f.duree
+    FROM user_formations_suivi ufs
+    LEFT JOIN formations f ON f.id=ufs.formation_id
+    WHERE ufs.user_id=? ORDER BY ufs.created_at DESC
+  `).all(uid);
+  sendJSON(res, 200, rows);
+});
+
+app.post('/api/formations/suivi', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const { formation_id, titre, organisme } = req.body;
+  // Vérifier si déjà inscrit
+  if (formation_id) {
+    const exists = db.prepare('SELECT id FROM user_formations_suivi WHERE user_id=? AND formation_id=?').get(uid, formation_id);
+    if (exists) return sendJSON(res, 409, { error: 'Déjà inscrit à cette formation' });
+  }
+  let formTitre = titre;
+  if (formation_id && !titre) {
+    const f = db.prepare('SELECT titre, organisme FROM formations WHERE id=?').get(formation_id);
+    if (f) formTitre = f.titre;
+  }
+  if (!formTitre) return sendJSON(res, 400, { error: 'Titre requis' });
+  const r = db.prepare('INSERT INTO user_formations_suivi (user_id, formation_id, titre, organisme) VALUES (?,?,?,?)')
+    .run(uid, formation_id||null, formTitre, organisme||null);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+app.patch('/api/formations/suivi/:id', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const id = parseInt(req.params.id);
+  const item = db.prepare('SELECT * FROM user_formations_suivi WHERE id=? AND user_id=?').get(id, uid);
+  if (!item) return sendJSON(res, 404, { error: 'Non trouvé' });
+  const { progression, statut, notes, date_fin } = req.body;
+  db.prepare('UPDATE user_formations_suivi SET progression=?, statut=?, notes=?, date_fin=? WHERE id=?')
+    .run(progression??item.progression, statut||item.statut, notes??item.notes, date_fin||item.date_fin, id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── CERTIFICATIONS NUMÉRIQUES UTILISATEUR ── */
+app.get('/api/certifications', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  sendJSON(res, 200, db.prepare('SELECT * FROM user_certifications_obtenues WHERE user_id=? ORDER BY date_obtention DESC').all(uid));
+});
+
+app.post('/api/certifications', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const { titre, organisme, formation_id, date_obtention, date_expiration } = req.body;
+  if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
+  const code = 'CERT-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2,6).toUpperCase();
+  const qr_data = JSON.stringify({ code, titre, organisme, uid, date: date_obtention || new Date().toISOString().slice(0,10) });
+  const r = db.prepare(`INSERT INTO user_certifications_obtenues (user_id, titre, organisme, formation_id, date_obtention, date_expiration, code_verification, qr_data)
+    VALUES (?,?,?,?,?,?,?,?)`).run(uid, titre, organisme||null, formation_id||null, date_obtention||new Date().toISOString().slice(0,10), date_expiration||null, code, qr_data);
+  sendJSON(res, 201, { id: r.lastInsertRowid, code_verification: code });
+});
+
+app.get('/api/certifications/verify/:code', (req, res) => {
+  const cert = db.prepare(`
+    SELECT uco.*, u.nom, u.titre_pro FROM user_certifications_obtenues uco
+    JOIN users u ON u.id=uco.user_id
+    WHERE uco.code_verification=? AND uco.partage_public=1
+  `).get(req.params.code);
+  if (!cert) return sendJSON(res, 404, { error: 'Certification non trouvée ou non publique' });
+  sendJSON(res, 200, cert);
+});
+
+/* ── OZ CHAT INTERACTIF ── */
+const OZ_SYSTEM = `Tu es OZ, l'assistant intelligent de Diaspo'Actif — la plateforme de la diaspora africaine et internationale.
+Tu aides les utilisateurs à : naviguer sur la plateforme, trouver des partenaires, préparer des projets, améliorer leurs profils, comprendre les fonctionnalités, et répondre à toutes leurs questions.
+Réponds toujours en français, de manière concise, professionnelle et encourageante.`;
+
+app.post('/api/oz/chat', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const { message, conversation_id } = req.body;
+  if (!message || !message.trim()) return sendJSON(res, 400, { error: 'Message vide' });
+
+  // Récupérer le contexte utilisateur
+  const user = db.prepare('SELECT nom, titre_pro, bio, competences, ville, pays FROM users WHERE id=?').get(uid);
+  const msgLower = message.toLowerCase();
+
+  // Récupérer la knowledge base pertinente
+  const kb = db.prepare("SELECT titre, contenu FROM chatbot_memoire WHERE actif=1 ORDER BY priorite DESC LIMIT 20").all();
+  let kbContext = '';
+  for (const k of kb) {
+    if (msgLower.split(' ').some(w => w.length > 3 && (k.titre.toLowerCase().includes(w) || k.contenu.toLowerCase().includes(w)))) {
+      kbContext += `\n--- ${k.titre} ---\n${k.contenu.substring(0,300)}\n`;
+    }
+  }
+
+  // Construire une réponse intelligente basée sur des patterns
+  let reply = '';
+  const userName = user?.nom?.split(' ')[0] || 'vous';
+
+  if (msgLower.includes('bonjour') || msgLower.includes('salut') || msgLower.includes('bonsoir')) {
+    reply = `Bonjour ${userName} ! Je suis OZ, votre assistant Diaspo'Actif. Comment puis-je vous aider aujourd'hui ? Vous pouvez me poser des questions sur la plateforme, vos projets, votre profil, ou me demander de l'aide pour trouver des partenaires.`;
+  } else if (msgLower.includes('cv') || msgLower.includes('curriculum')) {
+    reply = `Pour créer ou améliorer votre CV sur Diaspo'Actif :\n1. Allez dans **Outils & Documents** depuis votre tableau de bord\n2. Cliquez sur **+ Créer mon CV**\n3. Remplissez les sections : expériences, compétences, formation\n4. Téléchargez votre CV en PDF\n\nSouhaitez-vous des conseils pour rendre votre CV plus percutant pour la diaspora ?`;
+  } else if (msgLower.includes('initiative') || msgLower.includes('association') || msgLower.includes('projet')) {
+    reply = `Diaspo'Actif vous permet de :\n• **Créer une initiative** : présentez votre association, ONG ou projet\n• **Rejoindre** des initiatives existantes dans l'annuaire\n• **Collaborer** via le système de Deals\n\nVous cherchez à créer une nouvelle initiative ou à en rejoindre une existante ?`;
+  } else if (msgLower.includes('partenaire') || msgLower.includes('réseau') || msgLower.includes('contact')) {
+    reply = `Pour trouver des partenaires sur Diaspo'Actif :\n• Explorez l'**Annuaire** avec filtres par nationalité, domaine, pays\n• Consultez les **Initiatives** actives\n• Utilisez le système de **Deals** pour des collaborations formelles\n\n${user?.pays ? `En tant que membre basé en ${user.pays}, vous pourriez intéresser des initiatives de la région.` : ''}`;
+  } else if (msgLower.includes('profil') || msgLower.includes('photo') || msgLower.includes('bio')) {
+    reply = `Pour enrichir votre profil :\n• Ajoutez une **photo professionnelle** et une **bannière**\n• Rédigez une **bio** percutante (150-200 mots)\n• Listez vos **compétences** et **expériences**\n• Ajoutez vos **réseaux sociaux** (LinkedIn, etc.)\n• Définissez vos **disponibilités**\n\nUn profil complet augmente vos chances de contact de +300%.`;
+  } else if (msgLower.includes('message') || msgLower.includes('messagerie') || msgLower.includes('contact')) {
+    reply = `La messagerie Diaspo'Actif permet :\n• **Messages privés** avec n'importe quel membre\n• **Groupes de conversation** pour vos équipes\n• **Partage de fichiers** (PDF, images, etc.)\n• **Réactions** et réponses aux messages\n\nPour contacter un membre, visitez son profil et cliquez sur **Envoyer un message**.`;
+  } else if (msgLower.includes('formation') || msgLower.includes('apprendre') || msgLower.includes('cours')) {
+    reply = `L'espace **Formations** de Diaspo'Actif propose :\n• Des formations organisées par les initiatives membres\n• Des webinaires et ateliers en ligne\n• Le suivi de votre progression\n• Des **certifications numériques** téléchargeables\n\nConsultez l'espace Formations dans votre tableau de bord.`;
+  } else if (msgLower.includes('agenda') || msgLower.includes('calendrier') || msgLower.includes('réunion') || msgLower.includes('rendez-vous')) {
+    reply = `Votre **Agenda Diaspo'Actif** vous permet de :\n• Créer et gérer vos événements (vues jour/semaine/mois/année)\n• Inviter des participants\n• Définir vos disponibilités publiques\n• Recevoir des rappels automatiques\n\nAccédez à votre agenda depuis le menu **Mon Agenda**.`;
+  } else if (msgLower.includes('deal') || msgLower.includes('collaboration') || msgLower.includes('contrat')) {
+    reply = `Le système **Deals** de Diaspo'Actif :\n• Formalise les collaborations entre initiatives\n• Structure les termes d'un partenariat\n• Permet le suivi des accords\n• Nécessite une accréditation initiative\n\nPour accéder aux Deals, vous devez avoir ou rejoindre une initiative accréditée.`;
+  } else if (kbContext) {
+    reply = `D'après les informations disponibles :\n\n${kbContext.substring(0,600)}\n\nAvez-vous besoin de précisions sur ce point ?`;
+  } else {
+    reply = `Je comprends votre question sur "${message.substring(0,50)}${message.length>50?'...':''}".\n\nEn tant qu'assistant de Diaspo'Actif, je peux vous aider avec :\n• Navigation sur la plateforme\n• Création et enrichissement de profil\n• Recherche de partenaires\n• Utilisation des outils (CV, lettres, formations)\n• Questions sur les initiatives et événements\n\nPouvez-vous préciser votre besoin ?`;
+  }
+
+  // Sauvegarder dans l'historique
+  let convId = conversation_id;
+  if (!convId) {
+    const ozConv = db.prepare('SELECT id FROM oz_conversations WHERE user_id=? ORDER BY updated_at DESC LIMIT 1').get(uid);
+    if (ozConv) {
+      convId = ozConv.id;
+    } else {
+      convId = db.prepare('INSERT INTO oz_conversations (user_id, messages_json) VALUES (?,?)').run(uid, '[]').lastInsertRowid;
+    }
+  }
+  try {
+    const convRow = db.prepare('SELECT messages_json FROM oz_conversations WHERE id=? AND user_id=?').get(convId, uid);
+    if (convRow) {
+      const msgs = safeJSON(convRow.messages_json, []);
+      msgs.push({ role: 'user', content: message, at: new Date().toISOString() });
+      msgs.push({ role: 'oz', content: reply, at: new Date().toISOString() });
+      if (msgs.length > 100) msgs.splice(0, msgs.length - 100);
+      db.prepare('UPDATE oz_conversations SET messages_json=?, updated_at=datetime("now") WHERE id=?').run(JSON.stringify(msgs), convId);
+    }
+  } catch(e) {}
+
+  sendJSON(res, 200, { reply, conversation_id: convId });
+});
+
+app.get('/api/oz/history', requireAuth, (req, res) => {
+  const uid = req.user.id;
+  const conv = db.prepare('SELECT * FROM oz_conversations WHERE user_id=? ORDER BY updated_at DESC LIMIT 1').get(uid);
+  if (!conv) return sendJSON(res, 200, { messages: [], id: null });
+  sendJSON(res, 200, { messages: safeJSON(conv.messages_json, []), id: conv.id });
+});
+
+app.delete('/api/oz/history', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM oz_conversations WHERE user_id=?').run(req.user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE BUSINESS PLAN
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Calcul de progression (nb de sections non vides / total) */
+function calcBPProgression(sections) {
+  const obligatoires = ['infos_generales','resume_executif','presentation','probleme','solution','marche','swot','business_model','produits','strategie_marketing','plan_commercial','plan_operationnel','organisation','rh','calendrier','plan_financier','risques','impact','financement'];
+  const remplis = obligatoires.filter(k => {
+    const s = sections[k];
+    if (!s) return false;
+    if (typeof s === 'string') return s.trim().length > 0;
+    if (typeof s === 'object') return Object.values(s).some(v => v && String(v).trim().length > 0);
+    return false;
+  });
+  return Math.round((remplis.length / obligatoires.length) * 100);
+}
+
+/* Vérification complétude */
+function checkBPCompletude(sections) {
+  const checks = [
+    { key: 'infos_generales', label: 'Informations générales', champs: ['nom_projet','type_initiative','secteur','pays','responsable'] },
+    { key: 'resume_executif', label: 'Résumé exécutif', champs: ['projet','probleme','solution','marche','besoins'] },
+    { key: 'presentation', label: 'Présentation de l\'initiative', champs: ['vision','mission','valeurs'] },
+    { key: 'probleme', label: 'Analyse du problème', champs: ['description'] },
+    { key: 'solution', label: 'Solution proposée', champs: ['description'] },
+    { key: 'marche', label: 'Étude de marché', champs: ['taille_marche'] },
+    { key: 'swot', label: 'Analyse SWOT', champs: ['forces','faiblesses','opportunites','menaces'] },
+    { key: 'business_model', label: 'Business Model Canvas', champs: ['segments','proposition_valeur','sources_revenus'] },
+    { key: 'produits', label: 'Produits & services', champs: [] },
+    { key: 'plan_financier', label: 'Plan financier', champs: ['investissement_initial'] },
+    { key: 'risques', label: 'Analyse des risques', champs: [] },
+  ];
+  return checks.map(c => {
+    const s = sections[c.key] || {};
+    const ok = c.champs.length === 0
+      ? !!(s && (typeof s === 'string' ? s.trim() : Object.values(s).some(v=>v&&String(v).trim())))
+      : c.champs.every(f => s[f] && String(s[f]).trim().length > 0);
+    return { ...c, ok, champs: undefined };
+  });
+}
+
+/* ---- Liste des business plans ---- */
+app.get('/api/business-plans', requireAuth, (req, res) => {
+  const rows = db.prepare(`
+    SELECT bp.*, u.nom as owner_nom, u.prenom as owner_prenom,
+      (SELECT COUNT(*) FROM bp_collaborateurs bc WHERE bc.bp_id=bp.id) as nb_collab
+    FROM business_plans bp
+    JOIN users u ON u.id=bp.user_id
+    WHERE bp.user_id=?
+    ORDER BY bp.updated_at DESC
+  `).all(req.user.id);
+  // Aussi les BPs où l'utilisateur est collaborateur
+  const collab = db.prepare(`
+    SELECT bp.*, u.nom as owner_nom, u.prenom as owner_prenom, bc.role as mon_role
+    FROM business_plans bp
+    JOIN users u ON u.id=bp.user_id
+    JOIN bp_collaborateurs bc ON bc.bp_id=bp.id AND bc.user_id=?
+    ORDER BY bp.updated_at DESC
+  `).all(req.user.id);
+  sendJSON(res, 200, { mes_plans: rows, partages: collab });
+});
+
+/* ---- Créer un business plan ---- */
+app.post('/api/business-plans', requireAuth, async (req, res) => {
+  const body = await parseBody(req);
+  const { nom_projet='Sans titre', type_initiative='startup', template='startup', secteur='' } = body;
+  const r = db.prepare(`
+    INSERT INTO business_plans (user_id, nom_projet, type_initiative, template, secteur, sections_json)
+    VALUES (?,?,?,?,?,?)
+  `).run(req.user.id, nom_projet, type_initiative, template, secteur, JSON.stringify({
+    infos_generales: { nom_projet, type_initiative, secteur }
+  }));
+  sendJSON(res, 201, { id: r.lastInsertRowid, nom_projet });
+});
+
+/* ---- Lire un business plan ---- */
+app.get('/api/business-plans/:id', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Plan introuvable' });
+  // Vérifier accès (propriétaire ou collaborateur)
+  const collab = db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const sections = safeJSON(bp.sections_json, {});
+  const completude = checkBPCompletude(sections);
+  const progression = calcBPProgression(sections);
+  sendJSON(res, 200, { ...bp, sections, completude, progression, mon_role: bp.user_id===req.user.id?'proprietaire':(collab?.role||'lecteur') });
+});
+
+/* ---- Mise à jour (auto-save) ---- */
+app.put('/api/business-plans/:id', requireAuth, async (req, res) => {
+  const bp = db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Plan introuvable' });
+  const collab = db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
+  const canEdit = bp.user_id===req.user.id || ['editeur','validateur'].includes(collab?.role);
+  if (!canEdit) return sendJSON(res, 403, { error: 'Accès refusé' });
+
+  const body = await parseBody(req);
+  const { sections, nom_projet, slogan, logo_url, type_initiative, secteur, statut, is_public } = body;
+
+  const currentSections = safeJSON(bp.sections_json, {});
+  const newSections = sections ? { ...currentSections, ...sections } : currentSections;
+  const progression = calcBPProgression(newSections);
+
+  db.prepare(`UPDATE business_plans SET
+    sections_json=?, progression=?,
+    nom_projet=COALESCE(?,nom_projet),
+    slogan=COALESCE(?,slogan),
+    logo_url=COALESCE(?,logo_url),
+    type_initiative=COALESCE(?,type_initiative),
+    secteur=COALESCE(?,secteur),
+    statut=COALESCE(?,statut),
+    is_public=COALESCE(?,is_public),
+    updated_at=datetime('now')
+    WHERE id=?
+  `).run(JSON.stringify(newSections), progression,
+    nom_projet||null, slogan||null, logo_url||null,
+    type_initiative||null, secteur||null, statut||null,
+    is_public!=null?is_public:null, bp.id);
+
+  sendJSON(res, 200, { ok: true, progression });
+});
+
+/* ---- Supprimer ---- */
+app.delete('/api/business-plans/:id', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
+  db.prepare('DELETE FROM business_plans WHERE id=?').run(bp.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ---- Dupliquer ---- */
+app.post('/api/business-plans/:id/duplicate', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const r = db.prepare(`
+    INSERT INTO business_plans (user_id, nom_projet, slogan, type_initiative, secteur, template, sections_json)
+    VALUES (?,?,?,?,?,?,?)
+  `).run(req.user.id, `Copie de ${bp.nom_projet}`, bp.slogan, bp.type_initiative, bp.secteur, bp.template, bp.sections_json);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* ---- Versions ---- */
+app.get('/api/business-plans/:id/versions', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const versions = db.prepare(`
+    SELECT bv.id, bv.version, bv.label, bv.created_at, u.nom, u.prenom
+    FROM bp_versions bv LEFT JOIN users u ON u.id=bv.saved_by
+    WHERE bv.bp_id=? ORDER BY bv.version DESC LIMIT 50
+  `).all(req.params.id);
+  sendJSON(res, 200, versions);
+});
+
+app.post('/api/business-plans/:id/versions', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  if (bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const newVer = (bp.version || 1) + 1;
+  db.prepare('INSERT INTO bp_versions (bp_id, version, snapshot_json, saved_by, label) VALUES (?,?,?,?,?)').run(
+    bp.id, bp.version, bp.sections_json, req.user.id, `Version ${bp.version}`
+  );
+  db.prepare('UPDATE business_plans SET version=?, updated_at=datetime("now") WHERE id=?').run(newVer, bp.id);
+  // Garder max 20 versions
+  const oldVersions = db.prepare('SELECT id FROM bp_versions WHERE bp_id=? ORDER BY version DESC LIMIT -1 OFFSET 20').all(bp.id);
+  if (oldVersions.length) db.prepare(`DELETE FROM bp_versions WHERE id IN (${oldVersions.map(()=>'?').join(',')})`).run(...oldVersions.map(v=>v.id));
+  sendJSON(res, 201, { version: newVer });
+});
+
+app.get('/api/business-plans/:id/versions/:v', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const ver = db.prepare('SELECT * FROM bp_versions WHERE bp_id=? AND version=?').get(req.params.id, req.params.v);
+  if (!ver) return sendJSON(res, 404, { error: 'Version introuvable' });
+  sendJSON(res, 200, { ...ver, sections: safeJSON(ver.snapshot_json, {}) });
+});
+
+/* ---- Restaurer une version ---- */
+app.post('/api/business-plans/:id/versions/:v/restore', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const ver = db.prepare('SELECT * FROM bp_versions WHERE bp_id=? AND version=?').get(req.params.id, req.params.v);
+  if (!ver) return sendJSON(res, 404, { error: 'Version introuvable' });
+  // Sauvegarder version actuelle avant restauration
+  db.prepare('INSERT INTO bp_versions (bp_id, version, snapshot_json, saved_by, label) VALUES (?,?,?,?,?)').run(
+    bp.id, bp.version, bp.sections_json, req.user.id, `Avant restauration v${ver.version}`
+  );
+  db.prepare('UPDATE business_plans SET sections_json=?, version=version+1, updated_at=datetime("now") WHERE id=?').run(ver.snapshot_json, bp.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ---- Complétude ---- */
+app.get('/api/business-plans/:id/completude', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const sections = safeJSON(bp.sections_json, {});
+  sendJSON(res, 200, { completude: checkBPCompletude(sections), progression: calcBPProgression(sections) });
+});
+
+/* ---- Collaborateurs ---- */
+app.get('/api/business-plans/:id/collaborateurs', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  if (bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const list = db.prepare(`
+    SELECT bc.*, u.nom, u.prenom, u.email, u.role as user_role
+    FROM bp_collaborateurs bc JOIN users u ON u.id=bc.user_id
+    WHERE bc.bp_id=?
+  `).all(req.params.id);
+  sendJSON(res, 200, list);
+});
+
+app.post('/api/business-plans/:id/collaborateurs', requireAuth, async (req, res) => {
+  const bp = db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const { user_id, role='lecteur' } = await parseBody(req);
+  if (!user_id) return sendJSON(res, 400, { error: 'user_id requis' });
+  if (!['lecteur','commentateur','editeur','validateur'].includes(role)) return sendJSON(res, 400, { error: 'Rôle invalide' });
+  try {
+    db.prepare('INSERT OR REPLACE INTO bp_collaborateurs (bp_id, user_id, role, invite_par) VALUES (?,?,?,?)').run(req.params.id, user_id, role, req.user.id);
+    sendJSON(res, 201, { ok: true });
+  } catch(e) { sendJSON(res, 400, { error: e.message }); }
+});
+
+app.delete('/api/business-plans/:id/collaborateurs/:uid', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
+  db.prepare('DELETE FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').run(req.params.id, req.params.uid);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ---- Commentaires par section ---- */
+app.get('/api/business-plans/:id/commentaires/:section', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const list = db.prepare(`
+    SELECT bc.*, u.nom, u.prenom FROM bp_commentaires bc
+    JOIN users u ON u.id=bc.user_id
+    WHERE bc.bp_id=? AND bc.section_key=? ORDER BY bc.created_at ASC
+  `).all(req.params.id, req.params.section);
+  sendJSON(res, 200, list);
+});
+
+app.post('/api/business-plans/:id/commentaires/:section', requireAuth, async (req, res) => {
+  const bp = db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const { texte } = await parseBody(req);
+  if (!texte?.trim()) return sendJSON(res, 400, { error: 'Texte requis' });
+  const r = db.prepare('INSERT INTO bp_commentaires (bp_id, section_key, user_id, texte) VALUES (?,?,?,?)').run(req.params.id, req.params.section, req.user.id, texte.trim());
+  sendJSON(res, 201, { id: r.lastInsertRowid, texte: texte.trim() });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   ASSISTANT BP — Logique de réponse contextuelle
+   ═══════════════════════════════════════════════════════════════════ */
+
+function getBPAssistantResponse(message, bp, currentSection, sections) {
+  const msg = message.toLowerCase();
+  const type = bp.type_initiative || 'startup';
+  const secteur = bp.secteur || '';
+  const pays = (sections.infos_generales || {}).pays || '';
+  const nom = bp.nom_projet || 'votre projet';
+  const prog = bp.progression || 0;
+
+  // ── Conseils spécifiques à la section courante ──
+  const sectionAdvice = {
+    infos_generales: `Pour **"${nom}"**, assurez-vous de renseigner tous les champs d'identification : nom exact, secteur précis, pays, et coordonnées. Ces informations seront reprises automatiquement dans le résumé exécutif.`,
+    resume_executif: `Le résumé exécutif est la première chose que lit un investisseur. Il doit tenir en **1 page maximum** et répondre à 5 questions : Qui ? Quoi ? Pour qui ? Comment ? Combien ? Cliquez sur "Générer depuis mes données" pour obtenir une première version automatique.`,
+    presentation: `Votre **vision** doit être ambitieuse mais crédible (horizon 5-10 ans). Votre **mission** explique pourquoi vous existez aujourd'hui. Vos **valeurs** guident vos décisions. Ces 3 éléments doivent être cohérents entre eux.`,
+    probleme: `Une bonne analyse du problème montre que vous le connaissez mieux que quiconque. Appuyez-vous sur des chiffres, études, témoignages. Montrez l'ampleur : combien de personnes sont touchées ? Quel coût économique ?`,
+    solution: `Décrivez votre solution en termes de **bénéfices client**, pas de fonctionnalités techniques. La question clé : pourquoi votre solution est-elle meilleure que ce qui existe ? Quel est l'élément différenciant principal ?`,
+    marche: `L'étude de marché doit montrer que vous connaissez vos clients, vos concurrents et les tendances. Pour ${secteur ? `le secteur "${secteur}"` : 'votre secteur'}, identifiez votre TAM (Total Addressable Market), SAM (Serviceable) et SOM (Obtainable).`,
+    swot: `La SWOT doit être honnête. Les faiblesses et menaces sont tout aussi importantes que les forces. Un investisseur veut voir que vous êtes lucide sur vos risques. Chaque cellule devrait contenir 3 à 5 éléments concrets.`,
+    business_model: `Le Business Model Canvas vous force à synthétiser votre modèle en 9 blocs. La **proposition de valeur** est le cœur : que résolvez-vous et pour qui ? Les **sources de revenus** répondent à "comment gagnez-vous de l'argent ?".`,
+    produits: `Pour chaque produit/service, précisez le coût de revient réel et le prix de vente cible. La marge brute est calculée automatiquement. Une marge inférieure à 30% mérite réflexion pour un ${type}.`,
+    strategie_marketing: `Pour un ${type} dans le secteur ${secteur || 'que vous opérez'}, commencez par identifier vos 2-3 canaux d'acquisition principaux. Ne dispersez pas votre budget : concentrez-vous sur ce qui fonctionne avant d'élargir.`,
+    plan_commercial: `Le plan commercial traduit votre stratégie en actions concrètes. Fixez des objectifs de vente **SMART** (Spécifiques, Mesurables, Atteignables, Réalistes, Temporels). Quel est votre objectif de CA pour les 12 premiers mois ?`,
+    plan_operationnel: `Le plan opérationnel montre que vous savez comment produire et livrer. Identifiez votre chaîne de valeur complète : de l'approvisionnement jusqu'à la livraison client. Quels sont les maillons critiques ?`,
+    organisation: `La gouvernance rassure les partenaires. Décrivez clairement qui décide quoi. Si c'est une ${type}, précisez les instances décisionnelles et les mécanismes de contrôle.`,
+    rh: `Pour ${pays ? `un projet basé ${pays}` : 'votre projet'}, tenez compte des contraintes légales locales (contrats, charges sociales, droit du travail). Prévoyez toujours une marge de 20-30% sur les coûts salariaux pour les charges patronales.`,
+    calendrier: `Découpez votre projet en phases de 3 à 6 mois maximum. Chaque phase doit avoir un livrable clairement défini. Identifiez le **chemin critique** : les tâches dont le retard impacte tout le planning.`,
+    plan_financier: `Le plan financier sur 5 ans doit être cohérent avec vos objectifs commerciaux. Vérifiez que votre CA prévisionnel est réaliste par rapport à la taille de votre équipe et de votre marché cible. Quel est votre BFR estimé ?`,
+    risques: `Identifiez au minimum 5-8 risques. Couvrez : risques marché, financiers, opérationnels, réglementaires et humains. Pour chaque risque critique, définissez un plan B concret.`,
+    impact: `L'impact est de plus en plus scruté par les financeurs. Définissez vos indicateurs d'impact **avant** le démarrage pour pouvoir les mesurer. Combien d'emplois directs et indirects créez-vous ?`,
+    financement: `Pour rechercher ${(sections.financement || {}).montant ? `${(sections.financement||{}).montant}€` : 'un financement'}, préparez un dossier différent selon le type de financeur : banque (garanties, flux), investisseur (ROI, exit), subvention (impact, critères d'éligibilité).`,
+    annexes: `Les annexes essentielles pour un dossier de financement complet : statuts ou projet de statuts, CV des fondateurs, études de marché, devis fournisseurs, lettres d'intention de clients, et si disponibles : contrats signés.`,
+  };
+
+  // ── Détection des intentions ──
+
+  // Génération de texte pour une section
+  if (msg.includes('génère') || msg.includes('propose') || msg.includes('écris') || msg.includes('rédige') || msg.includes('aide') || msg.includes('example') || msg.includes('exemple')) {
+    return genTextForSection(currentSection, bp, sections);
+  }
+
+  // Analyse qualité / audit
+  if (msg.includes('audit') || msg.includes('analyse') || msg.includes('vérif') || msg.includes('qualité') || msg.includes('complet') || msg.includes('manque')) {
+    return auditBP(bp, sections);
+  }
+
+  // Définition d'un terme financier ou business
+  const termes = {
+    'seuil de rentabilité': 'Le **seuil de rentabilité** (ou point mort) est le niveau de chiffre d\'affaires à partir duquel votre activité devient bénéficiaire. Formule : Charges fixes ÷ (1 - Charges variables/CA). Ex : si vos charges fixes sont 50 000€ et votre taux de marge variable est 60%, votre seuil est 50 000 ÷ 0,60 = 83 333€.',
+    'bfr': 'Le **Besoin en Fonds de Roulement (BFR)** représente le décalage de trésorerie entre vos encaissements et décaissements. BFR = Stocks + Créances clients - Dettes fournisseurs. Un BFR élevé signifie que vous devez financer un décalage important avant d\'être payé.',
+    'amortissement': 'L\'**amortissement** est la répartition du coût d\'un investissement sur sa durée de vie utile. Ex : un équipement à 10 000€ amorti sur 5 ans représente 2 000€/an de charge. Cela réduit votre résultat imposable sans impact sur la trésorerie.',
+    'marge brute': 'La **marge brute** = CA - Coûts des marchandises vendues (COGS). Elle mesure l\'efficacité de votre modèle de production. Une marge brute de 70%+ est excellente pour une startup SaaS ; 30-50% est typique pour le commerce.',
+    'trésorerie': 'La **trésorerie** est l\'argent disponible à tout instant. Une entreprise peut être rentable mais en faillite si elle manque de liquidités. Le plan de trésorerie suit les encaissements et décaissements mois par mois.',
+    'roi': 'Le **ROI (Return on Investment)** mesure le rendement d\'un investissement. Formule : (Gain net / Coût de l\'investissement) × 100. Un ROI de 20% signifie que pour 100€ investis, vous gagnez 20€.',
+    'swot': 'La **SWOT** analyse 4 dimensions : Forces (internes, positives), Faiblesses (internes, négatives), Opportunités (externes, positives), Menaces (externes, négatives). Elle aide à définir une stratégie cohérente avec votre réalité.',
+    'canvas': 'Le **Business Model Canvas** (BMC) est un outil visuel en 9 blocs créé par Alexander Osterwalder. Il permet de décrire, analyser et concevoir un modèle économique sur une seule page. Les 9 blocs : Segments, Valeur, Canaux, Relations, Revenus, Ressources, Activités, Partenaires, Coûts.',
+    'proposition de valeur': 'La **proposition de valeur** décrit clairement pourquoi votre client vous choisit plutôt qu\'un concurrent. Elle répond à : Quel problème résolvez-vous ? Quels bénéfices apportez-vous ? Pourquoi vous et pas un autre ?',
+    'segmentation': 'La **segmentation client** consiste à diviser votre marché total en groupes homogènes (segments) partageant des caractéristiques communes : âge, revenus, comportements, besoins. Vous ne pouvez pas plaire à tout le monde ; choisissez vos segments prioritaires.',
+  };
+
+  for (const [terme, def] of Object.entries(termes)) {
+    if (msg.includes(terme)) return def;
+  }
+
+  // Conseils financiers
+  if (msg.includes('financ') || msg.includes('argent') || msg.includes('budget') || msg.includes('invest') || msg.includes('ca') || msg.includes('chiffre')) {
+    return genFinancialAdvice(bp, sections);
+  }
+
+  // Conseils marketing
+  if (msg.includes('marketing') || msg.includes('client') || msg.includes('vente') || msg.includes('commercial') || msg.includes('publicité')) {
+    return `Pour **${nom}** dans le secteur ${secteur||'que vous opérez'}, voici mes recommandations marketing :\n\n**Canal prioritaire** : Identifiez où se trouvent vos clients (digital, terrain, réseau). Ne dispersez pas votre budget sur 10 canaux.\n\n**Message clé** : Quelle est votre promesse en 1 phrase ? Elle doit mettre en avant le bénéfice client, pas la technologie.\n\n**Acquisition** : Quel coût d'acquisition client (CAC) pouvez-vous supporter ? Comparez-le à votre valeur vie client (LTV).\n\nSouhaitez-vous que je vous aide à rédiger votre stratégie marketing complète ?`;
+  }
+
+  // Risques / objections
+  if (msg.includes('risque') || msg.includes('danger') || msg.includes('problème') || msg.includes('obstacle') || msg.includes('défi')) {
+    return genRiskAdvice(type, secteur, sections);
+  }
+
+  // Progression / statut
+  if (msg.includes('progress') || msg.includes('avancement') || msg.includes('où en') || msg.includes('statut') || msg.includes('reste')) {
+    return getProgressReport(bp, sections);
+  }
+
+  // Conseil export / présentation
+  if (msg.includes('export') || msg.includes('pdf') || msg.includes('présent') || msg.includes('investisseur') || msg.includes('banque')) {
+    return `Avant d'exporter ou de présenter **${nom}**, voici un audit rapide :\n\n${auditBP(bp, sections)}\n\n💡 **Conseil** : Utilisez le module "Simulation de présentation" pour vous entraîner à défendre votre Business Plan face à différents profils (investisseur, banque, jury…).`;
+  }
+
+  // Conseil par défaut basé sur la section courante
+  const sectionMsg = sectionAdvice[currentSection];
+  if (sectionMsg) {
+    return `**Section "${currentSection.replace(/_/g,' ')}"** — ${sectionMsg}\n\nVous pouvez me demander :\n• "Génère un exemple pour cette section"\n• "Quels sont les points clés à renseigner ?"\n• "Analyse la qualité de mon BP"\n• Définition d'un terme (ex: "Qu'est-ce que le BFR ?")`;
+  }
+
+  return `Je suis votre consultant Business Plan pour **${nom}**. Je peux vous aider à :\n\n• **Rédiger** chaque section (dites "génère un exemple")\n• **Analyser** la qualité de votre dossier (dites "fais un audit")\n• **Expliquer** les termes (BFR, SWOT, BMC, ROI…)\n• **Conseiller** sur votre stratégie financière, marketing ou commerciale\n• **Préparer** votre présentation à des investisseurs\n\nQuelle section souhaitez-vous travailler ?`;
+}
+
+function genTextForSection(section, bp, sections) {
+  const nom = bp.nom_projet || 'votre projet';
+  const type = bp.type_initiative || 'startup';
+  const secteur = bp.secteur || 'votre secteur';
+  const pays = (sections.infos_generales||{}).pays || '';
+  const s = sections[section] || {};
+
+  const generators = {
+    resume_executif: () => `Voici une proposition de résumé exécutif :\n\n---\n**${nom}** est un(e) ${type} innovant(e) dans le secteur **${secteur}**${pays?`, basé(e) en ${pays}`:''}.\n\nFace au problème de [${s.probleme||'problème identifié'}], nous proposons [${s.solution||'votre solution unique'}]. Notre marché cible représente [taille du marché] avec un potentiel de croissance de [X]% par an.\n\nNous recherchons [montant] pour [utilisation des fonds]. Notre modèle économique repose sur [sources de revenus] avec un objectif de rentabilité à [date].\n\n*Modifiez ce texte avec vos données réelles dans la section "Résumé exécutif".*`,
+    presentation: () => `**Vision proposée :** "Dans 5 ans, ${nom} sera la référence en matière de [résultat attendu] pour [population cible] dans [zone géographique]."\n\n**Mission proposée :** "Notre mission est de [action concrète] pour permettre à [cible] de [bénéfice]."\n\n**Valeurs suggérées :** Innovation · Excellence · Impact · Solidarité · Transparence\n\n*Adaptez ces propositions à votre identité.*`,
+    probleme: () => `**Structure recommandée pour votre analyse du problème :**\n\n🔍 **Le problème :** [Décrivez clairement le problème que vous résolvez en 2-3 phrases]\n\n📊 **Ampleur :** [X millions de personnes] sont touchées par ce problème, représentant un coût annuel de [X€] pour [qui].\n\n❓ **Cause profonde :** Ce problème existe car [raisons structurelles].\n\n🚫 **Solutions actuelles insuffisantes :** [Nommez 2-3 solutions existantes et pourquoi elles ne suffisent pas].\n\n*Renseignez ces informations dans la section "Problème".*`,
+    solution: () => `**Proposition de description de solution :**\n\n💡 **${nom}** est une solution [digitale/physique/hybride] qui permet à [cible] de [bénéfice principal] grâce à [mécanisme clé].\n\n**Comment ça fonctionne :**\n1. Le client [action 1]\n2. Notre système [action 2]\n3. Le client obtient [résultat]\n\n**Ce qui nous différencie :**\n• [Différenciateur 1] — [explication]\n• [Différenciateur 2] — [explication]\n\n*Complétez avec vos informations réelles.*`,
+    swot: () => `**SWOT suggérée pour un ${type} dans ${secteur} :**\n\n💪 **Forces :** Expertise de l'équipe · Innovation produit · Connaissance du marché local · Coûts compétitifs\n\n🔻 **Faiblesses :** Notoriété à construire · Ressources financières limitées · Équipe à renforcer · Dépendance fournisseurs\n\n🌟 **Opportunités :** Marché en croissance · Digitalisation accélérée · Soutiens publics disponibles · Partenariats potentiels\n\n⚠️ **Menaces :** Concurrents établis · Évolution réglementaire · Conjoncture économique · Dépendance technologique\n\n*Adaptez chaque point à votre réalité dans la section SWOT.*`,
+    plan_financier: () => `**Conseils pour votre plan financier :**\n\nPour un ${type} dans ${secteur}, voici des ordres de grandeur :\n\n📈 **An 1** : Objectif de CA prudent, focus sur l'acquisition client et la validation du modèle.\n📈 **An 2** : Croissance de 50-100% du CA, début d'optimisation opérationnelle.\n📈 **An 3** : Seuil de rentabilité visé, consolidation du modèle.\n\n💰 **Points clés à renseigner dans votre tableau :**\n• Charges fixes mensuelles (loyer, salaires, abonnements)\n• Coût d'acquisition client (CAC)\n• Prix de vente moyen et fréquence d'achat\n• Délai avant premier encaissement\n\n*Remplissez les tableaux financiers avec vos données réelles.*`,
+  };
+
+  const gen = generators[section];
+  if (gen) return gen();
+  return `Je vais vous aider à rédiger la section **"${section.replace(/_/g,' ')}"** pour ${nom}.\n\nPour générer une proposition pertinente, pouvez-vous me préciser :\n• Votre cible client principale\n• Votre principal avantage concurrentiel\n• Votre zone géographique d'opération\n\nAvec ces éléments, je pourrai vous proposer un texte adapté.`;
+}
+
+function auditBP(bp, sections) {
+  const obligatoires = [
+    { key:'infos_generales', label:'Informations générales', champs:['nom_projet','type_initiative','secteur'] },
+    { key:'resume_executif', label:'Résumé exécutif', champs:['projet'] },
+    { key:'presentation', label:'Présentation', champs:['vision','mission'] },
+    { key:'probleme', label:'Problème', champs:['description'] },
+    { key:'solution', label:'Solution', champs:['description'] },
+    { key:'marche', label:'Étude de marché', champs:['taille_marche'] },
+    { key:'swot', label:'SWOT', champs:['forces','faiblesses','opportunites','menaces'] },
+    { key:'business_model', label:'Business Model Canvas', champs:['proposition','segments','revenus'] },
+    { key:'produits', label:'Produits & Services', champs:[] },
+    { key:'plan_financier', label:'Plan financier', champs:['ca_1'] },
+    { key:'risques', label:'Risques', champs:[] },
+  ];
+
+  const manquants = [];
+  const ok = [];
+
+  for (const ob of obligatoires) {
+    const s = sections[ob.key] || {};
+    const rempli = ob.champs.length === 0
+      ? !!(s && (typeof s === 'string' ? s.trim() : Object.keys(s).length > 0))
+      : ob.champs.every(f => s[f] && String(s[f]).trim().length > 10);
+    if (rempli) ok.push(ob.label);
+    else manquants.push(ob.label);
+  }
+
+  const prog = bp.progression || 0;
+  const rating = prog >= 80 ? '🟢 Excellent' : prog >= 60 ? '🟡 Bon' : prog >= 40 ? '🟠 À compléter' : '🔴 Insuffisant';
+
+  let rapport = `**📊 Audit de votre Business Plan "${bp.nom_projet||'Sans titre'}"**\n\n`;
+  rapport += `**Progression globale :** ${rating} (${prog}%)\n\n`;
+
+  if (ok.length) rapport += `✅ **Sections complètes (${ok.length}) :** ${ok.join(', ')}\n\n`;
+  if (manquants.length) rapport += `⚠️ **Sections à compléter (${manquants.length}) :**\n${manquants.map(m=>`• ${m}`).join('\n')}\n\n`;
+
+  if (prog >= 80) {
+    rapport += `🏆 **Verdict :** Votre Business Plan est bien avancé. Concentrez-vous sur la qualité des textes, la cohérence financière et la rigueur de l'étude de marché avant de le présenter.`;
+  } else if (prog >= 50) {
+    rapport += `💡 **Priorité :** Complétez d'abord le **Plan financier** et l'**Étude de marché** — ce sont les sections les plus scrutées par les investisseurs et les banques.`;
+  } else {
+    rapport += `🚀 **Par où commencer :** Renseignez d'abord les **Informations générales**, le **Résumé exécutif** et la description du **Problème** — cela donnera la colonne vertébrale de votre dossier.`;
+  }
+
+  return rapport;
+}
+
+function genFinancialAdvice(bp, sections) {
+  const fin = sections.plan_financier || {};
+  const ca1 = parseFloat(fin.ca_1) || 0;
+  const sal1 = parseFloat(fin.salaires_1) || 0;
+  const invest = parseFloat(fin.investissement_initial) || 0;
+  const nom = bp.nom_projet || 'votre projet';
+
+  let advice = `**💰 Analyse financière de ${nom} :**\n\n`;
+
+  if (!ca1 && !invest) {
+    advice += `Votre plan financier n'est pas encore renseigné. Commencez par :\n\n1. **Investissement initial** : Listez vos besoins matériels, logiciels et fonds de démarrage.\n2. **CA An 1** : Estimez vos ventes de façon prudente. Multipliez votre prix moyen par le nombre de clients réalistes.\n3. **Charges** : Identifiez vos charges fixes mensuelles (loyer, salaires, outils).\n\nSouhaitez-vous que je vous guide section par section ?`;
+  } else {
+    if (ca1 > 0) advice += `📈 **CA An 1 prévu :** ${ca1.toLocaleString('fr')}€\n`;
+    if (sal1 > 0) advice += `👥 **Masse salariale An 1 :** ${sal1.toLocaleString('fr')}€ (${ca1>0?Math.round(sal1/ca1*100)+'% du CA':'à comparer au CA'})\n`;
+    if (invest > 0) advice += `🏗 **Investissement initial :** ${invest.toLocaleString('fr')}€\n\n`;
+
+    // Conseils basés sur les ratios
+    if (ca1 > 0 && sal1 > 0) {
+      const ratioSal = sal1 / ca1;
+      if (ratioSal > 0.6) advice += `⚠️ **Attention :** La masse salariale représente ${Math.round(ratioSal*100)}% du CA en An 1 — c'est élevé. Vérifiez que votre croissance de CA couvre bien cette charge.\n`;
+    }
+    advice += `\n💡 **Recommandation :** Renseignez les 5 années pour visualiser votre trajectoire vers la rentabilité. N'oubliez pas le seuil de rentabilité et le BFR.`;
+  }
+  return advice;
+}
+
+function genRiskAdvice(type, secteur, sections) {
+  const risquesCommuns = {
+    startup: ['Échec de la validation marché (produit ne correspond pas au besoin)', 'Manque de trésorerie avant d\'atteindre le seuil de rentabilité', 'Arrivée d\'un concurrent bien financé', 'Difficultés de recrutement de profils clés', 'Dépendance technologique envers un fournisseur'],
+    association: ['Tarissement des subventions publiques', 'Dépendance à quelques donateurs principaux', 'Turnover des bénévoles clés', 'Évolution réglementaire du secteur', 'Difficultés à démontrer l\'impact'],
+    pme: ['Défaillance d\'un client majeur (risque de concentration)', 'Hausse des coûts matières premières', 'Recrutement et fidélisation des talents', 'Évolution technologique du secteur', 'Risque de trésorerie lié aux délais de paiement'],
+  };
+  const risques = risquesCommuns[type] || risquesCommuns.startup;
+  return `**⚠️ Risques prioritaires pour un ${type} dans le secteur ${secteur||'que vous opérez'} :**\n\n${risques.map((r,i)=>`${i+1}. ${r}`).join('\n')}\n\n**Pour chaque risque, définissez :**\n• Probabilité (faible/moyen/élevé/critique)\n• Impact si le risque survient\n• Mesure préventive concrète\n• Plan B si ça arrive\n\nSouhaitez-vous que je vous aide à rédiger votre analyse des risques complète ?`;
+}
+
+function getProgressReport(bp, sections) {
+  const prog = bp.progression || 0;
+  const completude = bp.completude || [];
+  const manquants = completude.filter(c=>!c.ok).map(c=>c.label);
+  const ok = completude.filter(c=>c.ok).map(c=>c.label);
+
+  return `**📊 Avancement de "${bp.nom_projet||'votre BP'}" : ${prog}%**\n\n${ok.length ? `✅ **Complètes (${ok.length}) :** ${ok.slice(0,5).join(', ')}${ok.length>5?` et ${ok.length-5} autres…`:''}\n\n` : ''}${manquants.length ? `⚠️ **À compléter (${manquants.length}) :**\n${manquants.map(m=>`• ${m}`).join('\n')}\n\n` : '✅ **Toutes les sections obligatoires sont renseignées !**\n\n'}${prog < 100 ? `🎯 **Prochain objectif :** ${manquants[0]||'Affiner la qualité des textes'}` : `🏆 **Business Plan complet !** Prêt pour l'export et la simulation de présentation.`}`;
+}
+
+/* ── Route : message à l'assistant BP ── */
+app.post('/api/business-plans/:id/assistant', requireAuth, async (req, res) => {
+  const bp = db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Plan introuvable' });
+  const collab = db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+
+  const body = await parseBody(req);
+  const { message, currentSection='infos_generales' } = body;
+  if (!message?.trim()) return sendJSON(res, 400, { error: 'Message requis' });
+
+  const sections = safeJSON(bp.sections_json, {});
+  const bpCtx = { ...bp, progression: bp.progression||0, completude: JSON.parse(require('./db').prepare?bp.sections_json:bp.sections_json||'{}') };
+
+  const response = getBPAssistantResponse(message, bp, currentSection, sections);
+
+  // Sauvegarder historique
+  let conv = db.prepare('SELECT * FROM bp_assistant_conv WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
+  const msgs = conv ? safeJSON(conv.messages_json, []) : [];
+  msgs.push({ role:'user', content:message, ts:new Date().toISOString() });
+  msgs.push({ role:'assistant', content:response, ts:new Date().toISOString() });
+  // Garder 50 derniers messages
+  const trimmed = msgs.slice(-50);
+  if (conv) {
+    db.prepare('UPDATE bp_assistant_conv SET messages_json=?, updated_at=datetime("now") WHERE id=?').run(JSON.stringify(trimmed), conv.id);
+  } else {
+    db.prepare('INSERT INTO bp_assistant_conv (bp_id, user_id, messages_json) VALUES (?,?,?)').run(bp.id, req.user.id, JSON.stringify(trimmed));
+  }
+
+  sendJSON(res, 200, { response, messages: trimmed });
+});
+
+/* ── Route : historique assistant BP ── */
+app.get('/api/business-plans/:id/assistant/history', requireAuth, (req, res) => {
+  const bp = db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const conv = db.prepare('SELECT * FROM bp_assistant_conv WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  sendJSON(res, 200, { messages: conv ? safeJSON(conv.messages_json, []) : [] });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   SIMULATIONS DE PRÉSENTATION BP
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Questions par scénario et difficulté */
+function getSimulationQuestion(scenario, difficulte, bp, sections, qIndex, userLastAnswer) {
+  const nom = bp.nom_projet || 'votre projet';
+  const type = bp.type_initiative || 'startup';
+  const secteur = bp.secteur || 'votre secteur';
+  const infos = sections.infos_generales || {};
+  const fin = sections.plan_financier || {};
+  const ca1 = fin.ca_1 ? `${parseFloat(fin.ca_1).toLocaleString('fr')}€` : 'non précisé';
+  const invest = fin.investissement_initial ? `${parseFloat(fin.investissement_initial).toLocaleString('fr')}€` : 'non précisé';
+  const montantRech = (sections.financement||{}).montant ? `${parseFloat((sections.financement||{}).montant).toLocaleString('fr')}€` : 'non précisé';
+
+  const scenarios = {
+    investisseur: {
+      debutant: [
+        `Bonjour, pouvez-vous me présenter **${nom}** en 2 minutes ?`,
+        `Quel est le problème précis que vous résolvez, et comment l'avez-vous identifié ?`,
+        `Qui sont vos clients cibles ? Comment les avez-vous définis ?`,
+        `Quel est votre modèle de revenus ? Comment allez-vous gagner de l'argent ?`,
+        `Quels sont vos principaux concurrents, et en quoi vous différenciez-vous ?`,
+        `Quel est votre besoin de financement et comment comptez-vous l'utiliser ?`,
+        `Quels sont vos objectifs à 1 an, 3 ans et 5 ans ?`,
+        `Qu'est-ce qui pourrait faire échouer ce projet, et comment vous y préparez-vous ?`,
+      ],
+      intermediaire: [
+        `Présentez-moi ${nom} — vous avez 3 minutes, allez à l'essentiel.`,
+        `Vous mentionnez un CA An 1 de ${ca1}. Sur quelle base avez-vous fait cette estimation ? Quelle est votre hypothèse d'acquisition client ?`,
+        `Comment justifiez-vous votre positionnement prix par rapport à vos concurrents ? Avez-vous validé ce prix avec de vrais clients ?`,
+        `Vous recherchez ${montantRech}. Quelle est votre trajectoire vers la rentabilité et en combien de mois ?`,
+        `Votre marché semble établi. Pourquoi un acteur déjà en place ne fait-il pas exactement ce que vous faites dans les 6 prochains mois ?`,
+        `Quelle est la compétence principale de votre équipe fondatrice ? Avez-vous déjà exécuté un projet similaire ?`,
+        `Quel est votre indicateur de succès principal à 18 mois ? Comment le mesurez-vous ?`,
+        `Si je vous donnais le double du montant demandé, que feriez-vous différemment ?`,
+      ],
+      expert: [
+        `Vous avez 90 secondes pour me donner une raison convaincante d'aller plus loin dans ce dossier.`,
+        `Votre CA An 1 de ${ca1} implique combien de clients, à quel prix moyen, avec quel taux de conversion ? Déroulez les hypothèses.`,
+        `Donnez-moi votre CAC (coût d'acquisition client) estimé et votre LTV (valeur vie client). Quel est votre ratio LTV/CAC ?`,
+        `J'ai vu 3 projets similaires ce mois-ci dans ${secteur}. Qu'est-ce qui m'assure que vous gagnerez et pas eux ?`,
+        `Quel est votre plan B si votre canal d'acquisition principal ne fonctionne pas comme prévu ?`,
+        `Vous êtes à 18 mois et vous avez consommé 70% du financement demandé mais atteint seulement 40% de vos objectifs. Que faites-vous ?`,
+        `Parlez-moi de votre stratégie de sortie — dans 5 ans, comment je récupère ma mise avec un multiple attractif ?`,
+        `Quel est l'élément dans votre dossier que vous savez être le moins solide, et comment le renforcez-vous ?`,
+      ],
+    },
+    banque: {
+      debutant: [
+        `Présentez-moi votre projet en quelques mots — activité, localisation, stade.`,
+        `Depuis combien de temps cette activité existe-t-elle ? Avez-vous déjà des revenus ?`,
+        `Quel montant sollicitez-vous et sur quelle durée souhaitez-vous le rembourser ?`,
+        `Quelles garanties pouvez-vous apporter pour ce financement ?`,
+        `Quelles sont vos charges fixes mensuelles prévisionnelles ?`,
+        `Avez-vous d'autres sources de financement en parallèle (apport, subvention, autre prêt) ?`,
+      ],
+      intermediaire: [
+        `Votre projet nécessite ${invest} d'investissement. Quelle part apportez-vous en fonds propres ?`,
+        `Présentez-moi votre plan de trésorerie pour les 12 premiers mois — où sont les tensions ?`,
+        `Quel est votre seuil de rentabilité et quand le franchissez-vous ?`,
+        `Quelles garanties personnelles ou réelles pouvez-vous mobiliser ?`,
+        `En cas de baisse de 20% de votre CA prévisionnel, pouvez-vous toujours honorer vos remboursements ?`,
+        `Avez-vous des clients engagés ou des contrats signés qui sécurisent votre CA An 1 ?`,
+      ],
+      expert: [
+        `Votre BFR est-il correctement calculé ? Détaillez vos hypothèses de délai encaissement et décaissement.`,
+        `Si votre principal client représente plus de 30% de votre CA, comment gérez-vous ce risque de concentration ?`,
+        `Votre ratio dettes/fonds propres après ce financement sera-t-il soutenable ? Présentez-moi votre bilan prévisionnel.`,
+        `Quels sont vos ratios de couverture de la dette sur 3 ans ? (DSCR)`,
+        `Avez-vous prévu une ligne de crédit court terme pour absorber les décalages de trésorerie ?`,
+      ],
+    },
+    partenaire: {
+      debutant: [
+        `Parlez-moi de ${nom} — qu'est-ce que vous faites exactement ?`,
+        `Pourquoi cherchez-vous des partenaires à ce stade ? Qu'est-ce que vous apportez à un partenaire ?`,
+        `Quel type de partenariat envisagez-vous — co-développement, distribution, sous-traitance ?`,
+        `Quelle serait votre contribution dans un partenariat ? Quelles ressources pouvez-vous mobiliser ?`,
+        `Avez-vous déjà des partenariats actifs ? Qu'est-ce que vous en avez appris ?`,
+      ],
+      intermediaire: [
+        `En quoi nos missions sont-elles complémentaires plutôt que concurrentes ?`,
+        `Comment envisagez-vous la gouvernance de ce partenariat — qui décide quoi ?`,
+        `Quels seraient les KPIs de succès de notre collaboration ? Comment les mesurez-vous ?`,
+        `Comment gérez-vous les conflits d'intérêts potentiels dans ce type de partenariat ?`,
+        `Quelle est votre vision à 3 ans pour cette collaboration ?`,
+      ],
+      expert: [
+        `Notre organisation a des contraintes de conformité et de réputation. Comment vous assurez-vous que votre activité les respecte ?`,
+        `Si les résultats du partenariat ne sont pas au rendez-vous à 12 mois, quelles sont les clauses de sortie que vous proposez ?`,
+        `Comment gérez-vous la propriété intellectuelle développée conjointement ?`,
+      ],
+    },
+    client: {
+      debutant: [
+        `Qu'est-ce que ${nom} m'apporte concrètement que je n'ai pas aujourd'hui ?`,
+        `Comment ça fonctionne exactement ? Montrez-moi le parcours d'un client.`,
+        `Combien ça coûte ? Pourquoi ce prix est-il justifié ?`,
+        `Qui d'autre utilise déjà votre solution ? Pouvez-vous me donner des références ?`,
+        `Si j'ai un problème, comment vous contactez-je ? Quel est votre délai de réponse ?`,
+        `Puis-je tester avant de m'engager ?`,
+      ],
+      intermediaire: [
+        `En quoi votre solution est-elle meilleure que [concurrent direct] que j'utilise actuellement ?`,
+        `Quelle est votre garantie si le résultat n'est pas au rendez-vous ?`,
+        `Comment vos tarifs évoluent-ils dans le temps — y a-t-il des frais cachés ?`,
+        `Quel est le délai de mise en œuvre et qui fait quoi de mon côté ?`,
+      ],
+      expert: [
+        `Nous avons un besoin spécifique : [personnalisez]. Pouvez-vous y répondre et à quel coût ?`,
+        `Quelles sont vos certifications, conformités réglementaires ? Avez-vous subi des audits ?`,
+        `Quelle est votre capacité à absorber notre volume ? Avez-vous des références à cette échelle ?`,
+      ],
+    },
+    jury: {
+      debutant: [
+        `Présentez votre projet en 2 minutes — problème, solution, marché.`,
+        `En quoi votre solution est-elle innovante ? Qu'est-ce qui n'existait pas avant ?`,
+        `Quel est l'impact social ou économique de votre projet ?`,
+        `Votre équipe a-t-elle les compétences pour exécuter ce projet ?`,
+        `Qu'est-ce que vous avez déjà réalisé concrètement à ce stade ?`,
+      ],
+      intermediaire: [
+        `Comment avez-vous validé votre idée sur le terrain ? Quels retours avez-vous obtenus ?`,
+        `Votre modèle économique est-il viable ? Sur quelle hypothèse repose votre rentabilité ?`,
+        `Quelles sont les 3 choses qui vous rendent unique sur ce marché ?`,
+        `Quel serait l'impact si votre projet atteignait l'échelle nationale ou internationale ?`,
+        `Comment gérerez-vous la croissance si vous gagnez ce concours et obtenez du financement ?`,
+      ],
+      expert: [
+        `Votre innovation est-elle protégeable ? Avez-vous déposé ou prévu de déposer des brevets ?`,
+        `Comment mesurez-vous l'impact de votre solution — quels indicateurs, quelle méthodologie ?`,
+        `Pourquoi vous et pas un acteur établi qui déciderait de faire exactement la même chose demain ?`,
+        `Quel est votre plan de passage à l'échelle (scalabilité) sans explosion des coûts ?`,
+      ],
+    },
+    collectivite: {
+      debutant: [
+        `En quoi votre projet sert-il l'intérêt général de notre territoire ?`,
+        `Combien d'emplois directs et indirects votre projet va-t-il créer ?`,
+        `Comment ce projet s'inscrit-il dans les priorités de développement de notre collectivité ?`,
+        `Quelles sont vos attentes vis-à-vis de la collectivité — subvention, partenariat, foncier ?`,
+        `Comment assurez-vous la durabilité de votre projet au-delà du financement public ?`,
+      ],
+      intermediaire: [
+        `Quel est l'impact territorial chiffré de votre projet sur 3 ans ?`,
+        `Comment votre projet contribue-t-il à nos engagements environnementaux ?`,
+        `Avez-vous consulté les citoyens ou les associations locales ? Quel est leur accueil ?`,
+        `Comment garantissez-vous la bonne utilisation des fonds publics mobilisés ?`,
+      ],
+      expert: [
+        `Votre projet est-il conforme aux règlements d'urbanisme, d'environnement et aux normes sectorielles ?`,
+        `Comment s'articule votre projet avec les politiques publiques nationales et européennes en vigueur ?`,
+        `Quel est votre modèle de gouvernance inclusive des parties prenantes territoriales ?`,
+      ],
+    },
+  };
+
+  const scenarioQuestions = (scenarios[scenario]||scenarios.investisseur)[difficulte] || (scenarios[scenario]||scenarios.investisseur).intermediaire;
+
+  // Relances contextuelles basées sur la dernière réponse
+  if (qIndex > 0 && userLastAnswer) {
+    const answer = userLastAnswer.toLowerCase();
+    if (answer.length < 30) {
+      return `Votre réponse est un peu courte. Pouvez-vous développer davantage ? En particulier, ${scenarioQuestions[qIndex % scenarioQuestions.length]}`;
+    }
+    if (answer.includes('je ne sais pas') || answer.includes('à préciser') || answer.includes('pas encore')) {
+      return `C'est un point important que vous n'avez pas encore défini. Dans un vrai entretien, cette lacune serait notée. Voici la question suivante : ${scenarioQuestions[(qIndex) % scenarioQuestions.length]}`;
+    }
+  }
+
+  return scenarioQuestions[qIndex % scenarioQuestions.length];
+}
+
+function generateSimulationReport(simulation, bp, sections) {
+  const messages = safeJSON(simulation.messages_json, []);
+  const userMsgs = messages.filter(m=>m.role==='user');
+  const scenario = simulation.scenario;
+  const difficulte = simulation.difficulte;
+
+  // Calcul du score basique sur la longueur et la qualité des réponses
+  let scoreTotal = 0;
+  const evaluations = [];
+
+  const criteria = [
+    { key:'clarté', label:'Clarté de la présentation', weight:20 },
+    { key:'precision', label:'Précision et maîtrise du projet', weight:20 },
+    { key:'conviction', label:'Capacité à convaincre', weight:20 },
+    { key:'financier', label:'Maîtrise des chiffres', weight:20 },
+    { key:'gestion_objections', label:'Gestion des objections', weight:20 },
+  ];
+
+  const avgAnswerLength = userMsgs.length > 0
+    ? userMsgs.reduce((s,m)=>s+(m.content||'').length,0)/userMsgs.length
+    : 0;
+
+  // Score approximatif basé sur longueur des réponses et progression du BP
+  const bpScore = bp.progression || 0;
+  const answerScore = Math.min(100, avgAnswerLength / 3);
+  const baseScore = Math.round((bpScore * 0.4) + (answerScore * 0.6));
+
+  for (const c of criteria) {
+    const score = Math.max(30, Math.min(100, baseScore + (Math.random()*20-10)));
+    const rounded = Math.round(score);
+    scoreTotal += rounded * c.weight / 100;
+    evaluations.push({ ...c, score: rounded, commentaire: getScoreComment(rounded, c.key) });
+  }
+
+  const finalScore = Math.round(scoreTotal);
+  const mention = finalScore >= 85 ? '🏆 Excellent' : finalScore >= 70 ? '🟢 Très bien' : finalScore >= 55 ? '🟡 Bien' : finalScore >= 40 ? '🟠 À améliorer' : '🔴 Insuffisant';
+
+  const pointsForts = evaluations.filter(e=>e.score>=70).map(e=>e.label);
+  const pointsFaibles = evaluations.filter(e=>e.score<55).map(e=>e.label);
+
+  return {
+    score: finalScore,
+    mention,
+    evaluations,
+    pointsForts,
+    pointsFaibles,
+    nbQuestions: messages.filter(m=>m.role==='assistant').length,
+    nbReponses: userMsgs.length,
+    duree: simulation.duree_seconds,
+    scenario,
+    difficulte,
+    recommandations: genSimuRecommandations(pointsFaibles, bp, sections),
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function getScoreComment(score, key) {
+  const comments = {
+    clarté: { high:'Présentation claire et structurée, l\'interlocuteur comprend rapidement le projet.', mid:'La présentation manque parfois de structure. Travaillez votre pitch elevator.', low:'Difficile à suivre. Structurez votre présentation en 3 parties : Problème → Solution → Business Model.' },
+    precision: { high:'Excellente maîtrise du projet, réponses précises et argumentées.', mid:'Certains éléments manquent de précision, notamment sur les chiffres clés.', low:'Manque de précision sur des éléments fondamentaux. Approfondissez votre connaissance des données.' },
+    conviction: { high:'Très convaincant(e), vous inspirez confiance et enthousiasme.', mid:'Vous convainquez sur certains points mais manquez d\'assurance sur d\'autres.', low:'Travaillez votre assurance et votre enthousiasme. La conviction se prépare autant que les arguments.' },
+    financier: { high:'Bonne maîtrise des chiffres et des indicateurs financiers.', mid:'Des lacunes sur certains indicateurs financiers. Revoyez les notions de BFR, seuil de rentabilité.', low:'La dimension financière doit être renforcée significativement. C\'est souvent le point bloquant avec banques et investisseurs.' },
+    gestion_objections: { high:'Excellente gestion des objections, vous transformez les questions difficiles en opportunités.', mid:'Gestion des objections à améliorer. Anticipez les questions difficiles.', low:'Préparez des réponses aux objections classiques avant votre prochaine simulation.' },
+  };
+  const c = comments[key] || { high:'Très bien.', mid:'Correct.', low:'À améliorer.' };
+  return score >= 70 ? c.high : score >= 50 ? c.mid : c.low;
+}
+
+function genSimuRecommandations(pointsFaibles, bp, sections) {
+  const recs = [];
+  if (pointsFaibles.includes('Maîtrise des chiffres')) recs.push('Complétez et mémorisez vos chiffres clés : CA prévu, BFR, seuil de rentabilité, montant recherché, utilisation des fonds.');
+  if (pointsFaibles.includes('Clarté de la présentation')) recs.push('Préparez un pitch de 90 secondes (elevator pitch) que vous connaissez par cœur : problème → solution → marché → modèle → équipe → besoin.');
+  if (pointsFaibles.includes('Gestion des objections')) recs.push('Listez les 10 objections les plus courantes de votre scénario et préparez une réponse précise pour chacune.');
+  if (pointsFaibles.includes('Capacité à convaincre')) recs.push('Entraînez-vous devant un miroir ou en vidéo. La conviction passe autant par le non-verbal que par les arguments.');
+  if ((bp.progression||0) < 60) recs.push(`Complétez votre Business Plan (actuellement à ${bp.progression}%) avant de vous présenter — les lacunes seront détectées par tout interlocuteur averti.`);
+  if (!recs.length) recs.push('Excellent niveau ! Relevez le niveau de difficulté de la simulation ou essayez un scénario différent.');
+  return recs;
+}
+
+/* ── Lister les simulations ── */
+app.get('/api/bp-simulations', requireAuth, (req, res) => {
+  const bpId = req.query.bp_id;
+  let query = 'SELECT bs.*, bp.nom_projet FROM bp_simulations bs JOIN business_plans bp ON bp.id=bs.bp_id WHERE bs.user_id=?';
+  const params = [req.user.id];
+  if (bpId) { query += ' AND bs.bp_id=?'; params.push(bpId); }
+  query += ' ORDER BY bs.created_at DESC LIMIT 50';
+  sendJSON(res, 200, db.prepare(query).all(...params));
+});
+
+/* ── Créer une simulation ── */
+app.post('/api/bp-simulations', requireAuth, async (req, res) => {
+  const body = await parseBody(req);
+  const { bp_id, scenario, difficulte='intermediaire' } = body;
+  if (!bp_id || !scenario) return sendJSON(res, 400, { error: 'bp_id et scenario requis' });
+  const bp = db.prepare('SELECT * FROM business_plans WHERE id=? AND user_id=?').get(bp_id, req.user.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Business Plan introuvable' });
+  const sections = safeJSON(bp.sections_json, {});
+  // Première question
+  const firstQ = getSimulationQuestion(scenario, difficulte, bp, sections, 0, null);
+  const initMessages = [{ role:'assistant', content:firstQ, ts:new Date().toISOString() }];
+  const r = db.prepare('INSERT INTO bp_simulations (bp_id, user_id, scenario, difficulte, messages_json) VALUES (?,?,?,?,?)').run(bp_id, req.user.id, scenario, difficulte, JSON.stringify(initMessages));
+  sendJSON(res, 201, { id: r.lastInsertRowid, firstQuestion: firstQ });
+});
+
+/* ── Obtenir une simulation ── */
+app.get('/api/bp-simulations/:id', requireAuth, (req, res) => {
+  const sim = db.prepare('SELECT bs.*, bp.nom_projet, bp.sections_json, bp.progression FROM bp_simulations bs JOIN business_plans bp ON bp.id=bs.bp_id WHERE bs.id=? AND bs.user_id=?').get(req.params.id, req.user.id);
+  if (!sim) return sendJSON(res, 404, { error: 'Simulation introuvable' });
+  sendJSON(res, 200, { ...sim, messages: safeJSON(sim.messages_json, []), rapport: sim.rapport_json ? safeJSON(sim.rapport_json, {}) : null });
+});
+
+/* ── Envoyer une réponse dans la simulation ── */
+app.post('/api/bp-simulations/:id/messages', requireAuth, async (req, res) => {
+  const sim = db.prepare('SELECT bs.*, bp.* FROM bp_simulations bs JOIN business_plans bp ON bp.id=bs.bp_id WHERE bs.id=? AND bs.user_id=?').get(req.params.id, req.user.id);
+  if (!sim) return sendJSON(res, 404, { error: 'Simulation introuvable' });
+  if (sim.statut === 'termine') return sendJSON(res, 400, { error: 'Simulation terminée' });
+
+  const body = await parseBody(req);
+  const { reponse, duree_seconds=0 } = body;
+  if (!reponse?.trim()) return sendJSON(res, 400, { error: 'Réponse requise' });
+
+  const sections = safeJSON(sim.sections_json, {});
+  const messages = safeJSON(sim.messages_json, []);
+  const qIndex = messages.filter(m=>m.role==='assistant').length;
+
+  messages.push({ role:'user', content:reponse, ts:new Date().toISOString() });
+
+  // Générer la prochaine question
+  const nextQ = getSimulationQuestion(sim.scenario, sim.difficulte, sim, sections, qIndex, reponse);
+  messages.push({ role:'assistant', content:nextQ, ts:new Date().toISOString() });
+
+  db.prepare('UPDATE bp_simulations SET messages_json=?, duree_seconds=? WHERE id=?').run(JSON.stringify(messages), duree_seconds, sim.id);
+  sendJSON(res, 200, { nextQuestion: nextQ, messages, qIndex: qIndex+1 });
+});
+
+/* ── Terminer et générer le rapport ── */
+app.post('/api/bp-simulations/:id/finish', requireAuth, async (req, res) => {
+  const sim = db.prepare('SELECT bs.*, bp.* FROM bp_simulations bs JOIN business_plans bp ON bp.id=bs.bp_id WHERE bs.id=? AND bs.user_id=?').get(req.params.id, req.user.id);
+  if (!sim) return sendJSON(res, 404, { error: 'Simulation introuvable' });
+  const body = await parseBody(req);
+  const sections = safeJSON(sim.sections_json, {});
+  const rapport = generateSimulationReport(sim, sim, sections);
+  db.prepare("UPDATE bp_simulations SET statut='termine', rapport_json=?, score=?, finished_at=datetime('now'), duree_seconds=? WHERE id=?").run(JSON.stringify(rapport), rapport.score, body.duree_seconds||sim.duree_seconds, sim.id);
+  sendJSON(res, 200, { rapport });
+});
+
+/* ── Obtenir le rapport ── */
+app.get('/api/bp-simulations/:id/rapport', requireAuth, (req, res) => {
+  const sim = db.prepare('SELECT * FROM bp_simulations WHERE id=? AND user_id=?').get(req.params.id, req.user.id);
+  if (!sim) return sendJSON(res, 404, { error: 'Introuvable' });
+  sendJSON(res, 200, { rapport: sim.rapport_json ? safeJSON(sim.rapport_json, {}) : null, score: sim.score, statut: sim.statut });
 });
 
 /* ═══════════════════════════════════════════════════════════════════ */

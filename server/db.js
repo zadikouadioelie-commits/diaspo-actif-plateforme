@@ -3476,6 +3476,259 @@ db.exec(`
   );
 `);
 
+/* =====================================================================
+   NOUVEAUX MODULES v2 — Messagerie enrichie, Profil, Formations, OZ
+   ===================================================================== */
+db.exec(`
+  /* ── Réactions aux messages ── */
+  CREATE TABLE IF NOT EXISTS message_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    emoji TEXT NOT NULL DEFAULT '👍',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(message_id, user_id, emoji),
+    FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Messages favoris ── */
+  CREATE TABLE IF NOT EXISTS message_favorites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(message_id, user_id),
+    FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Messages épinglés ── */
+  CREATE TABLE IF NOT EXISTS message_epingles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    epingle_par INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(conversation_id, message_id),
+    FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE
+  );
+
+  /* ── Membres groupes ── */
+  CREATE TABLE IF NOT EXISTS conversation_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role TEXT DEFAULT 'membre' CHECK(role IN ('admin','membre')),
+    joined_at TEXT DEFAULT (datetime('now')),
+    left_at TEXT,
+    UNIQUE(conversation_id, user_id),
+    FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Portfolio utilisateur ── */
+  CREATE TABLE IF NOT EXISTS user_portfolio (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    images_json TEXT DEFAULT '[]',
+    fichiers_json TEXT DEFAULT '[]',
+    annee INTEGER,
+    lien TEXT,
+    partenaires TEXT,
+    resultats TEXT,
+    type TEXT DEFAULT 'projet' CHECK(type IN ('projet','publication','realisation','autre')),
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Langues utilisateur ── */
+  CREATE TABLE IF NOT EXISTS user_langues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    langue TEXT NOT NULL,
+    niveau TEXT DEFAULT 'intermediaire' CHECK(niveau IN ('debutant','intermediaire','avance','bilingue','maternelle')),
+    is_maternelle INTEGER DEFAULT 0,
+    certification TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, langue),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Recommandations entre utilisateurs ── */
+  CREATE TABLE IF NOT EXISTS user_recommendations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user_id INTEGER NOT NULL,
+    to_user_id INTEGER NOT NULL,
+    texte TEXT NOT NULL,
+    relation TEXT,
+    note INTEGER DEFAULT 5 CHECK(note BETWEEN 1 AND 5),
+    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','approuve','masque','refuse')),
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(from_user_id, to_user_id),
+    FOREIGN KEY(from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(to_user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Suivi formations utilisateur ── */
+  CREATE TABLE IF NOT EXISTS user_formations_suivi (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    formation_id INTEGER,
+    titre TEXT NOT NULL,
+    organisme TEXT,
+    statut TEXT DEFAULT 'en_cours' CHECK(statut IN ('en_cours','termine','abandonne','certifie')),
+    progression INTEGER DEFAULT 0 CHECK(progression BETWEEN 0 AND 100),
+    date_debut TEXT DEFAULT (date('now')),
+    date_fin TEXT,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(formation_id) REFERENCES formations(id) ON DELETE SET NULL
+  );
+
+  /* ── Certifications numériques utilisateur ── */
+  CREATE TABLE IF NOT EXISTS user_certifications_obtenues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    organisme TEXT,
+    formation_id INTEGER,
+    date_obtention TEXT DEFAULT (date('now')),
+    date_expiration TEXT,
+    code_verification TEXT UNIQUE,
+    qr_data TEXT,
+    partage_public INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(formation_id) REFERENCES formations(id) ON DELETE SET NULL
+  );
+
+  /* ── Conversations OZ (historique chat IA) ── */
+  CREATE TABLE IF NOT EXISTS oz_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    messages_json TEXT DEFAULT '[]',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
+
+/* ── Migrations douces v2 ── */
+{
+  const msgCols = db.prepare('PRAGMA table_info(messages)').all().map(c=>c.name);
+  if (!msgCols.includes('parent_message_id')) db.exec('ALTER TABLE messages ADD COLUMN parent_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL');
+  if (!msgCols.includes('est_epingle')) db.exec('ALTER TABLE messages ADD COLUMN est_epingle INTEGER DEFAULT 0');
+
+  const convCols = db.prepare('PRAGMA table_info(conversations)').all().map(c=>c.name);
+  if (!convCols.includes('type')) db.exec("ALTER TABLE conversations ADD COLUMN type TEXT DEFAULT 'prive' CHECK(type IN ('prive','groupe'))");
+  if (!convCols.includes('nom')) db.exec('ALTER TABLE conversations ADD COLUMN nom TEXT');
+  if (!convCols.includes('avatar')) db.exec('ALTER TABLE conversations ADD COLUMN avatar TEXT');
+  if (!convCols.includes('created_by')) db.exec('ALTER TABLE conversations ADD COLUMN created_by INTEGER REFERENCES users(id)');
+
+  const userCols2 = db.prepare('PRAGMA table_info(users)').all().map(c=>c.name);
+  if (!userCols2.includes('reseaux_sociaux')) db.exec("ALTER TABLE users ADD COLUMN reseaux_sociaux TEXT DEFAULT '{}'");
+  if (!userCols2.includes('disponibilites')) db.exec("ALTER TABLE users ADD COLUMN disponibilites TEXT DEFAULT '{}'");
+}
+
+/* ═══════════════════════════════════════════════
+   MODULE BUSINESS PLAN — Tables
+   ═══════════════════════════════════════════════ */
+db.exec(`
+  /* ── Business Plans ── */
+  CREATE TABLE IF NOT EXISTS business_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    nom_projet TEXT DEFAULT 'Sans titre',
+    slogan TEXT,
+    logo_url TEXT,
+    type_initiative TEXT DEFAULT 'startup',
+    secteur TEXT,
+    statut TEXT DEFAULT 'brouillon',
+    template TEXT DEFAULT 'startup',
+    sections_json TEXT DEFAULT '{}',
+    version INTEGER DEFAULT 1,
+    progression INTEGER DEFAULT 0,
+    is_public INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Versions / historique ── */
+  CREATE TABLE IF NOT EXISTS bp_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bp_id INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    saved_by INTEGER,
+    label TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(saved_by) REFERENCES users(id) ON DELETE SET NULL
+  );
+
+  /* ── Collaborateurs ── */
+  CREATE TABLE IF NOT EXISTS bp_collaborateurs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bp_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role TEXT DEFAULT 'lecteur',
+    invite_par INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(bp_id, user_id),
+    FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Commentaires par section ── */
+  CREATE TABLE IF NOT EXISTS bp_commentaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bp_id INTEGER NOT NULL,
+    section_key TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    texte TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Assistant BP — historique des conversations ── */
+  CREATE TABLE IF NOT EXISTS bp_assistant_conv (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bp_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    messages_json TEXT DEFAULT '[]',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Simulations de présentation ── */
+  CREATE TABLE IF NOT EXISTS bp_simulations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bp_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    scenario TEXT NOT NULL,
+    difficulte TEXT DEFAULT 'intermediaire',
+    duree_seconds INTEGER DEFAULT 0,
+    statut TEXT DEFAULT 'en_cours',
+    messages_json TEXT DEFAULT '[]',
+    rapport_json TEXT,
+    score INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    finished_at TEXT,
+    FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;

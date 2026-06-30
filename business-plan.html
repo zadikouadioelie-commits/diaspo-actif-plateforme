@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Business Plans</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+.bp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:20px;}
+.bp-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s;position:relative;display:flex;flex-direction:column;gap:8px;}
+.bp-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.1);transform:translateY(-2px);}
+.bp-card-head{display:flex;gap:12px;align-items:flex-start;}
+.bp-logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--orange),#ffb27a);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden;}
+.bp-logo img{width:100%;height:100%;object-fit:cover;border-radius:10px;}
+.bp-title{font-weight:800;font-size:15px;line-height:1.3;}
+.bp-slogan{font-size:12px;color:var(--muted);font-style:italic;margin-top:2px;}
+.bp-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+.bp-tag{font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px;background:var(--surface2);color:var(--muted);}
+.bp-tag.statut-brouillon{background:#fef3c7;color:#92400e;}
+.bp-tag.statut-complet{background:#d1fae5;color:#065f46;}
+.bp-tag.statut-archive{background:#e5e7eb;color:#6b7280;}
+.bp-progress-bar{height:5px;border-radius:99px;background:var(--border);overflow:hidden;margin-top:8px;}
+.bp-progress-bar .fill{height:100%;border-radius:99px;background:var(--orange);transition:width .4s;}
+.bp-progress-label{font-size:11px;color:var(--muted);margin-top:3px;}
+.bp-actions{display:flex;gap:6px;margin-top:8px;}
+.bp-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;border-top:1px solid var(--border);padding-top:10px;}
+.bp-date{font-size:11px;color:var(--muted);}
+
+/* Modal création */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;}
+.modal-box{background:#fff;border-radius:16px;width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);}
+.modal-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.modal-head h3{margin:0;font-size:18px;}
+.modal-body{padding:24px;}
+.template-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;}
+.tpl-card{border:2px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;text-align:center;transition:all .15s;}
+.tpl-card:hover{border-color:var(--orange);}
+.tpl-card.selected{border-color:var(--orange);background:var(--orange-light);}
+.tpl-card .icon{font-size:26px;margin-bottom:6px;}
+.tpl-card .name{font-size:12px;font-weight:700;}
+.tpl-card .desc{font-size:10.5px;color:var(--muted);margin-top:2px;}
+
+/* Tabs */
+.bp-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.bp-tab{padding:10px 20px;font-size:13.5px;font-weight:700;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;}
+.bp-tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="formations.html">Formations</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:32px;padding-bottom:60px;">
+
+    <!-- En-tête -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+      <div>
+        <h1 style="margin:0;font-size:24px;">📋 Mes Business Plans</h1>
+        <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Concevez, structurez et partagez vos projets professionnellement.</p>
+      </div>
+      <button class="btn btn-orange" onclick="openCreateModal()">+ Nouveau Business Plan</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="bp-tabs">
+      <button class="bp-tab active" data-tab="mes">Mes plans (<span id="tab-mes-count">0</span>)</button>
+      <button class="bp-tab" data-tab="partages">Partagés avec moi (<span id="tab-part-count">0</span>)</button>
+    </div>
+
+    <!-- Mes plans -->
+    <div class="tab-panel active" id="tab-mes">
+      <div id="bp-mes-list" class="bp-grid">
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Partagés -->
+    <div class="tab-panel" id="tab-partages">
+      <div id="bp-part-list" class="bp-grid">
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL Création -->
+  <div class="modal-bg" id="modal-create" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3>Nouveau Business Plan</h3>
+        <button onclick="closeCreateModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="fg">
+          <div>
+            <label>Nom du projet *</label>
+            <input id="new-nom" placeholder="Mon projet innovant…" autofocus>
+          </div>
+          <div>
+            <label>Secteur d'activité</label>
+            <select id="new-secteur">
+              <option value="">Choisir…</option>
+              <option>Agriculture & Agroalimentaire</option>
+              <option>Commerce & Distribution</option>
+              <option>Construction & BTP</option>
+              <option>Culture & Arts</option>
+              <option>Éducation & Formation</option>
+              <option>Énergie & Environnement</option>
+              <option>Finance & Investissement</option>
+              <option>Immobilier</option>
+              <option>Industrie & Manufacture</option>
+              <option>Numérique & Tech</option>
+              <option>Santé & Bien-être</option>
+              <option>Services aux entreprises</option>
+              <option>Social & Solidaire</option>
+              <option>Tourisme & Hôtellerie</option>
+              <option>Transport & Logistique</option>
+              <option>Autre</option>
+            </select>
+          </div>
+        </div>
+
+        <label style="display:block;margin:16px 0 8px;font-size:13px;font-weight:700;">Modèle de Business Plan</label>
+        <div class="template-grid" id="tpl-grid">
+          <div class="tpl-card selected" data-tpl="startup"><div class="icon">🚀</div><div class="name">Startup</div><div class="desc">Projet tech ou innovant</div></div>
+          <div class="tpl-card" data-tpl="pme"><div class="icon">🏢</div><div class="name">PME</div><div class="desc">Petite / moyenne entreprise</div></div>
+          <div class="tpl-card" data-tpl="association"><div class="icon">🤝</div><div class="name">Association</div><div class="desc">Sans but lucratif</div></div>
+          <div class="tpl-card" data-tpl="ong"><div class="icon">🌍</div><div class="name">ONG</div><div class="desc">Projet humanitaire</div></div>
+          <div class="tpl-card" data-tpl="cooperative"><div class="icon">🌾</div><div class="name">Coopérative</div><div class="desc">Agriculture, artisanat…</div></div>
+          <div class="tpl-card" data-tpl="social"><div class="icon">💚</div><div class="name">Social</div><div class="desc">Impact social fort</div></div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end;">
+          <button class="btn btn-outline" onclick="closeCreateModal()">Annuler</button>
+          <button class="btn btn-orange" onclick="createBP()">Créer le Business Plan →</button>
+        </div>
+        <p class="e-msg" id="create-error" style="display:none;margin-top:10px;"></p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+let me = null;
+let selectedTpl = 'startup';
+
+function fmtDate(d){ return d ? new Date(d).toLocaleDateString('fr',{day:'2-digit',month:'short',year:'numeric'}) : ''; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+const TYPES = { startup:'🚀 Startup', pme:'🏢 PME', association:'🤝 Association', ong:'🌍 ONG', cooperative:'🌾 Coopérative', social:'💚 Social', autre:'📋 Autre' };
+
+function renderBPCard(bp, partage) {
+  const prog = bp.progression || 0;
+  const statutCls = `statut-${bp.statut||'brouillon'}`;
+  const statutLabel = { brouillon:'✏️ Brouillon', complet:'✅ Complet', archive:'📦 Archivé' }[bp.statut] || 'Brouillon';
+  return `
+    <div class="bp-card" onclick="openBP(${bp.id})">
+      <div class="bp-card-head">
+        <div class="bp-logo">${bp.logo_url?`<img src="${esc(bp.logo_url)}" alt="">`:( TYPES[bp.type_initiative]||'📋')[0]}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="bp-title">${esc(bp.nom_projet||'Sans titre')}</div>
+          ${bp.slogan?`<div class="bp-slogan">"${esc(bp.slogan)}"</div>`:''}
+        </div>
+      </div>
+      <div class="bp-meta">
+        <span class="bp-tag">${TYPES[bp.type_initiative]||bp.type_initiative||'—'}</span>
+        ${bp.secteur?`<span class="bp-tag">📂 ${esc(bp.secteur)}</span>`:''}
+        <span class="bp-tag ${statutCls}">${statutLabel}</span>
+        ${partage?`<span class="bp-tag" style="background:#ede9fe;color:#6d28d9;">🔗 Partagé — ${esc(bp.mon_role)}</span>`:''}
+      </div>
+      <div>
+        <div class="bp-progress-bar"><div class="fill" style="width:${prog}%"></div></div>
+        <div class="bp-progress-label">Complétude : <strong>${prog}%</strong></div>
+      </div>
+      <div class="bp-foot">
+        <span class="bp-date">Modifié le ${fmtDate(bp.updated_at)}</span>
+        <div style="display:flex;gap:6px;" onclick="event.stopPropagation()">
+          <button class="btn btn-sm btn-outline" onclick="dupBP(${bp.id})">📋 Dupliquer</button>
+          ${!partage?`<button class="btn btn-sm btn-outline" style="color:#D33;" onclick="delBP(${bp.id},'${esc(bp.nom_projet||'').replace(/'/g,"\\'")}')">🗑</button>`:''}
+        </div>
+      </div>
+    </div>`;
+}
+
+async function loadBPs() {
+  try {
+    const data = await api('GET', '/business-plans');
+    const mes = data.mes_plans || [];
+    const part = data.partages || [];
+
+    document.getElementById('tab-mes-count').textContent = mes.length;
+    document.getElementById('tab-part-count').textContent = part.length;
+
+    document.getElementById('bp-mes-list').innerHTML = mes.length
+      ? mes.map(bp => renderBPCard(bp, false)).join('')
+      : `<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted);">
+          <div style="font-size:48px;margin-bottom:12px;">📋</div>
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Aucun business plan</div>
+          <p style="font-size:13px;max-width:360px;margin:0 auto 16px;">Créez votre premier business plan professionnel pour structurer votre projet et convaincre vos partenaires.</p>
+          <button class="btn btn-orange" onclick="openCreateModal()">+ Créer mon premier Business Plan</button>
+        </div>`;
+
+    document.getElementById('bp-part-list').innerHTML = part.length
+      ? part.map(bp => renderBPCard(bp, true)).join('')
+      : `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucun plan partagé avec vous.</div>`;
+  } catch(e) {
+    document.getElementById('bp-mes-list').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#D33;">${e.message}</div>`;
+  }
+}
+
+function openBP(id) { window.location.href = `business-plan-edit.html?id=${id}`; }
+
+async function dupBP(id) {
+  try {
+    const r = await api('POST', `/business-plans/${id}/duplicate`);
+    window.location.href = `business-plan-edit.html?id=${r.id}`;
+  } catch(e) { alert(e.message); }
+}
+
+async function delBP(id, nom) {
+  if (!confirm(`Supprimer le business plan "${nom}" ? Cette action est irréversible.`)) return;
+  try {
+    await api('DELETE', `/business-plans/${id}`);
+    loadBPs();
+  } catch(e) { alert(e.message); }
+}
+
+function openCreateModal() { document.getElementById('modal-create').style.display='flex'; document.getElementById('new-nom').focus(); }
+function closeCreateModal() { document.getElementById('modal-create').style.display='none'; }
+
+document.querySelectorAll('.tpl-card').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('.tpl-card').forEach(x=>x.classList.remove('selected'));
+    c.classList.add('selected');
+    selectedTpl = c.dataset.tpl;
+  });
+});
+
+async function createBP() {
+  const nom = document.getElementById('new-nom').value.trim();
+  if (!nom) { alert('Donnez un nom à votre projet'); return; }
+  const errEl = document.getElementById('create-error');
+  errEl.style.display='none';
+  try {
+    const r = await api('POST', '/business-plans', {
+      nom_projet: nom,
+      secteur: document.getElementById('new-secteur').value,
+      type_initiative: selectedTpl,
+      template: selectedTpl
+    });
+    window.location.href = `business-plan-edit.html?id=${r.id}`;
+  } catch(e) { errEl.textContent=e.message; errEl.style.display='block'; }
+}
+
+document.querySelectorAll('.bp-tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.bp-tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+// Enter dans le modal
+document.getElementById('new-nom').addEventListener('keydown', e => { if(e.key==='Enter') createBP(); });
+
+(async()=>{
+  me = await fetchCurrentUser();
+  if (!me) { window.location.href='login.html'; return; }
+  loadBPs();
+})();
+</script>
+</body>
+</html>
