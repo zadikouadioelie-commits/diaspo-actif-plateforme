@@ -1,27 +1,48 @@
 /* ===========================================================
    DIASPO'ACTIF — Point d'entrée Vercel Serverless
-   Toutes les requêtes /api/* sont routées ici.
-   La DB SQLite est en /tmp (éphémère — se re-seed au cold start).
+   Production : PostgreSQL (Neon) via DATABASE_URL
+   Développement : SQLite dans /tmp
    =========================================================== */
-const fs = require("node:fs");
+const fs   = require("node:fs");
 const path = require("node:path");
 
-const DB_PATH = "/tmp/diaspoactif.db";
+const DB_PATH  = "/tmp/diaspoactif.db";
+const IS_PG    = !!process.env.DATABASE_URL;
 
 let handleRequest;
+let initPromise;
 
 try {
-  // Auto-seed si la DB n'existe pas encore (cold start Vercel)
-  if (!fs.existsSync(DB_PATH)) {
-    require("../server/seed.js");
+  if (IS_PG) {
+    /* ── Mode PostgreSQL (production Neon) ── */
+    const pgInit = require("../server/pg-init");
+    initPromise = pgInit();
+    handleRequest = require("../server/index.js");
+  } else {
+    /* ── Mode SQLite (développement local) ── */
+    if (!fs.existsSync(DB_PATH)) {
+      require("../server/seed.js");
+    }
+    handleRequest = require("../server/index.js");
+    initPromise = Promise.resolve();
   }
-  handleRequest = require("../server/index.js");
 } catch (e) {
   console.error("[Vercel] Init error:", e.stack || e.message);
   handleRequest = function(req, res) {
     res.writeHead(500, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "Server init failed", detail: e.message }));
   };
+  initPromise = Promise.resolve();
 }
 
-module.exports = handleRequest;
+module.exports = async function(req, res) {
+  try {
+    await initPromise;
+  } catch (e) {
+    console.error("[Vercel] DB init error:", e.message);
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "DB init failed", detail: e.message }));
+    return;
+  }
+  return handleRequest(req, res);
+};

@@ -1,8 +1,17 @@
 /* ===========================================================
-   DIASPO'ACTIF — Couche base de données (node:sqlite natif Node 22+)
-   Rôles : utilisateur | initiative | administrateur | collectivite
-   En production (Vercel) : DB en /tmp (éphémère, re-seedée au cold start)
+   DIASPO'ACTIF — Couche base de données
+   En production (DATABASE_URL définie) : PostgreSQL via Neon
+   En développement local : SQLite via node:sqlite
    =========================================================== */
+if (process.env.DATABASE_URL) {
+  const pg = require('./db-pg');
+  module.exports = pg;
+  module.exports.backfillOfficialFollow = () => {};
+  module.exports.generateDaId = () => Math.random().toString(36).slice(2,10).toUpperCase();
+  module.exports.generateDsId = () => 'DS-' + Math.random().toString(36).slice(2,8).toUpperCase();
+  return;
+}
+
 const { DatabaseSync } = require("node:sqlite");
 const path = require("node:path");
 
