@@ -1,0 +1,435 @@
+/* ===========================================================
+   DIASPO'ACTIF — UI/UX Pro Max Enhancements
+   Appliqué selon les règles UI/UX Pro Max : accessibilité,
+   interactions, typographie, animations, formulaires, navigation.
+   =========================================================== */
+
+/* ── Tokens supplémentaires ── */
+:root {
+  --shadow-sm: 0 1px 3px rgba(27,58,107,.07), 0 1px 2px rgba(27,58,107,.04);
+  --shadow-md: 0 4px 16px rgba(27,58,107,.10), 0 2px 6px rgba(27,58,107,.06);
+  --shadow-lg: 0 12px 40px rgba(27,58,107,.14), 0 4px 12px rgba(27,58,107,.08);
+  --shadow-xl: 0 24px 64px rgba(27,58,107,.18);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --transition: 200ms cubic-bezier(.4,0,.2,1);
+  --transition-fast: 140ms cubic-bezier(.4,0,.2,1);
+  --surface: #fff;
+  --surface-2: #f8fafc;
+  --primary: var(--navy);
+  --orange-hover: #0f4a99;
+  --danger: #dc2626;
+  --success: #16a34a;
+}
+
+/* ── Accessibilité : focus rings visibles (WCAG AA) ── */
+*:focus-visible {
+  outline: 2.5px solid var(--orange);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+*:focus:not(:focus-visible) { outline: none; }
+
+/* ── Tous les éléments cliquables → cursor pointer ── */
+button, [role="button"], label[for], .card[onclick],
+.chat-item, .feed-actions span, .init-card, a { cursor: pointer; }
+
+/* ── Transitions globales fluides (transform + opacity seulement) ── */
+.btn, .card, .sidebar a, .nav a, .chat-item,
+.feed-post, .init-card, .tag, .badge, .tab-btn,
+.tuto-tab, .feed-filter-bar button, button {
+  transition: transform var(--transition-fast),
+              box-shadow var(--transition),
+              background-color var(--transition-fast),
+              border-color var(--transition-fast),
+              color var(--transition-fast),
+              opacity var(--transition-fast);
+}
+
+/* ── Boutons — états améliorés ── */
+.btn {
+  position: relative;
+  overflow: hidden;
+  letter-spacing: .01em;
+  transition: transform var(--transition-fast), box-shadow var(--transition), background-color var(--transition-fast);
+}
+.btn:hover:not([disabled]) { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn:active:not([disabled]) { transform: translateY(0) scale(.97); box-shadow: var(--shadow-sm); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; transform: none !important; }
+
+.btn-orange:hover:not([disabled]) { background: var(--orange-hover); }
+.btn-navy:hover:not([disabled])   { background: var(--navy-light); }
+.btn-outline:hover:not([disabled]){ background: var(--orange-light); }
+
+/* Bouton en état chargement */
+.btn.loading { pointer-events: none; opacity: .75; }
+.btn.loading::after {
+  content: '';
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,.5);
+  border-top-color: #fff;
+  border-radius: 50%;
+  margin-left: 8px;
+  animation: spin .6s linear infinite;
+  vertical-align: middle;
+}
+
+/* ── Cards — elevation cohérente ── */
+.card {
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition), transform var(--transition-fast);
+}
+.card:has(onclick):hover, a .card:hover, .card.hoverable:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* ── Navigation topbar — hover amélioré ── */
+.nav a {
+  position: relative;
+  padding-bottom: 4px;
+  border-bottom: 2px solid transparent;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.nav a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px; left: 0; right: 0;
+  height: 2px;
+  background: var(--orange);
+  transform: scaleX(0);
+  transition: transform var(--transition);
+  transform-origin: left;
+}
+.nav a:hover::after, .nav a.active::after { transform: scaleX(1); }
+.nav a:hover { color: var(--navy); }
+
+/* ── Sidebar — liens plus lisibles ── */
+.sidebar a {
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+.sidebar a:hover {
+  background: rgba(255,255,255,.1);
+  color: #fff;
+  transform: translateX(2px);
+}
+.sidebar a.active {
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  box-shadow: inset 3px 0 0 var(--orange);
+}
+
+/* ── Inputs — focus state amélioré + tap-friendly ── */
+input, select, textarea {
+  min-height: 44px;
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--orange) !important;
+  box-shadow: 0 0 0 3px rgba(21,101,192,.12);
+}
+input::placeholder { color: var(--muted); opacity: .7; }
+
+/* Input field générique */
+.input-field {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.input-field:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(21,101,192,.10);
+  outline: none;
+}
+
+/* ── Formulaires — labels explicites ── */
+.auth-form-card label,
+.form-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 5px;
+  display: block;
+}
+.auth-form-card input:focus,
+.auth-form-card select:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(21,101,192,.10);
+  outline: none;
+}
+
+/* Indicateur champ requis */
+.required::after { content: ' *'; color: var(--danger); }
+
+/* ── Toasts / notifications ── */
+.toast {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  z-index: 99999;
+  background: #1e293b;
+  color: #fff;
+  border-radius: var(--radius-md);
+  padding: 13px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  display: flex; align-items: center; gap: 10px;
+  max-width: 340px;
+  animation: toastIn .22s cubic-bezier(.34,1.56,.64,1) both;
+}
+.toast.toast-success { background: #15803d; }
+.toast.toast-error   { background: #dc2626; }
+.toast.toast-info    { background: #1d4ed8; }
+.toast.toast-out     { animation: toastOut .18s ease-in forwards; }
+
+@keyframes toastIn  { from { opacity:0; transform:translateY(12px) scale(.95); } to { opacity:1; transform:none; } }
+@keyframes toastOut { to   { opacity:0; transform:translateY(8px) scale(.95); } }
+
+/* ── Skeleton loaders ── */
+.skeleton {
+  background: linear-gradient(90deg, #f0f2f5 25%, #e4e7ed 50%, #f0f2f5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius-sm);
+}
+.skeleton-text  { height: 14px; margin-bottom: 8px; }
+.skeleton-title { height: 20px; width: 60%; margin-bottom: 12px; }
+.skeleton-card  { height: 120px; border-radius: var(--radius-md); }
+
+@keyframes shimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+
+/* ── Animations d'entrée ── */
+@keyframes fadeInUp {
+  from { opacity:0; transform:translateY(12px); }
+  to   { opacity:1; transform:none; }
+}
+@keyframes fadeIn {
+  from { opacity:0; }
+  to   { opacity:1; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes scaleIn {
+  from { opacity:0; transform:scale(.94); }
+  to   { opacity:1; transform:scale(1); }
+}
+
+/* Appliquer à l'ouverture des modaux */
+[id$="-modal"] > div,
+[id^="modal-"] > div {
+  animation: scaleIn .22s cubic-bezier(.34,1.56,.64,1) both;
+}
+
+/* Cartes qui apparaissent */
+.card-appear { animation: fadeInUp .22s ease-out both; }
+.card-appear:nth-child(2) { animation-delay:.04s; }
+.card-appear:nth-child(3) { animation-delay:.08s; }
+.card-appear:nth-child(4) { animation-delay:.12s; }
+.card-appear:nth-child(5) { animation-delay:.16s; }
+
+/* ── Feed posts — hover amélioré ── */
+.feed-post {
+  transition: box-shadow var(--transition), transform var(--transition-fast);
+}
+.feed-post:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Init cards — hover ── */
+.init-card {
+  transition: box-shadow var(--transition), transform var(--transition-fast);
+}
+.init-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* ── Stat cards — micro-animation chiffres ── */
+.stat-card { overflow: hidden; position: relative; }
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--orange), var(--navy));
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+/* ── Badges — style cohérent ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  padding: 3px 10px;
+  border-radius: 99px;
+}
+
+/* ── Tags — hover ── */
+.tag:hover {
+  background: var(--orange-light);
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+/* ── Chat bubbles — améliorées ── */
+.bubble.me   { background: var(--navy); box-shadow: 0 2px 8px rgba(27,58,107,.2); }
+.bubble.them { background: var(--bg); border: 1px solid var(--border); }
+
+/* ── Tables — readability ── */
+.simple-table th {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  background: var(--bg);
+}
+.simple-table tr:hover td { background: #f8fafc; }
+
+/* ── Modal overlay — backdrop amélioré ── */
+.modal-overlay {
+  background: rgba(15,23,42,.6);
+  backdrop-filter: blur(4px);
+}
+.modal-box {
+  box-shadow: var(--shadow-xl);
+  border-radius: var(--radius-lg);
+  animation: scaleIn .2s cubic-bezier(.34,1.56,.64,1) both;
+}
+
+/* ── Empty states ── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.empty::before {
+  content: '📭';
+  font-size: 36px;
+  opacity: .5;
+}
+
+/* ── Section titles — hiérarchie visuelle ── */
+.tuto-section-title,
+.section h2,
+.content h1 {
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+
+/* ── Hover sur les liens de navigation footer / breadcrumb ── */
+.footer-link { transition: opacity var(--transition-fast); }
+.footer-link:hover { opacity: .75; }
+
+/* ── Filter bars — pill actives animées ── */
+.feed-filter-bar button,
+.tuto-tab {
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.feed-filter-bar button:hover:not(.active),
+.tuto-tab:hover:not(.active) {
+  background: var(--orange-light);
+  color: var(--orange);
+  border-color: var(--orange);
+  transform: translateY(-1px);
+}
+.feed-filter-bar button.active,
+.tuto-tab.active {
+  box-shadow: 0 2px 8px rgba(27,58,107,.2);
+}
+
+/* ── Sidebar pill / badge ── */
+.sidebar .pill {
+  background: var(--orange);
+  animation: pulse 2.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(21,101,192,.4); }
+  50%      { box-shadow: 0 0 0 4px rgba(21,101,192,.0); }
+}
+
+/* ── Scrollbar custom (Webkit) ── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ── Amélioration typographique ── */
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+p, .card p, .feed-body { line-height: 1.65; }
+h1,h2,h3,h4,h5,h6 { line-height: 1.25; }
+
+/* ── Section hero — gradient animé subtil ── */
+.hero {
+  background-size: 200% 200%;
+  animation: gradientShift 12s ease infinite;
+}
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ── Checkbox / radio custom ── */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: var(--orange);
+  width: 16px; height: 16px;
+  cursor: pointer;
+  min-height: unset;
+}
+
+/* ── Pagination / Step indicators ── */
+.step-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background var(--transition), transform var(--transition-fast);
+}
+.step-dot.active {
+  background: var(--orange);
+  transform: scale(1.3);
+}
+
+/* ── Notice banners ── */
+.notice {
+  border-left: 3px solid var(--orange);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--orange-light);
+}
+
+/* ── Print ── */
+@media print {
+  .sidebar, .topbar, .mobile-bottom-nav, .toast { display: none !important; }
+  .content { padding: 0; }
+}

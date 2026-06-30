@@ -104,6 +104,7 @@
   .reunion-actions{flex-direction:row;align-self:stretch;justify-content:flex-end;}
 }
 </style>
+<link rel="stylesheet" href="/assets/ui-enhancements.css">
 </head>
 <body>
 <div class="page">
@@ -803,7 +804,8 @@ h2{font-size:16px;margin-top:20px;color:#444;}
 ul{margin:6px 0 0 18px;}li{margin-bottom:4px;}
 table{width:100%;border-collapse:collapse;margin-top:8px;}
 th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;font-size:13px;}
-th{background:#f0f0f0;}</style></head><body>
+th{background:#f0f0f0;}</style><link rel="stylesheet" href="/assets/ui-enhancements.css">
+</head><body>
 <h1>📋 Résumé de réunion</h1>
 <div class="meta"><strong>${escH(reunion.titre)}</strong> · ${fmtDate(reunion.date_debut)} · ${fmtTime(reunion.started_at)||fmtTime(reunion.date_debut)} — ${fmtTime(reunion.ended_at)||''}</div>
 ${sujets.length?`<h2>Sujets abordés</h2><ul>${sujets.map(s=>`<li>${escH(s)}</li>`).join('')}</ul>`:''}
@@ -827,7 +829,8 @@ async function exportResumeWord(rid){
     const decs=JSON.parse(resume.decisions||'[]');
     const actions=JSON.parse(resume.actions||'[]');
     const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="UTF-8">
-<style>body{font-family:Calibri,sans-serif;font-size:11pt;}h1{font-size:16pt;}h2{font-size:13pt;color:#1a1a2e;}</style></head><body>
+<style>body{font-family:Calibri,sans-serif;font-size:11pt;}h1{font-size:16pt;}h2{font-size:13pt;color:#1a1a2e;}</style><link rel="stylesheet" href="/assets/ui-enhancements.css">
+</head><body>
 <h1>Résumé de réunion — ${escH(reunion.titre)}</h1>
 <p><b>Date :</b> ${fmtDate(reunion.date_debut)}</p>
 ${sujets.length?`<h2>Sujets abordés</h2><ul>${sujets.map(s=>`<li>${escH(s)}</li>`).join('')}</ul>`:''}

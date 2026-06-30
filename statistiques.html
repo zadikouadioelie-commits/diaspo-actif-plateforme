@@ -112,6 +112,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:#0f172a
   .st-export-grp{margin-left:0;width:100%;}
 }
 </style>
+<link rel="stylesheet" href="/assets/ui-enhancements.css">
 </head>
 <body>
 
@@ -565,7 +566,8 @@ function exportPDF() {
     tr:nth-child(even){background:#f8fafc;}
     .meta{font-size:11px;color:#64748b;margin-bottom:20px;}
     @media print{button{display:none}}
-  </style></head><body>
+  </style><link rel="stylesheet" href="/assets/ui-enhancements.css">
+</head><body>
   <h1>🌍 Observatoire Mondial Diaspo'Actif</h1>
   <div class="meta">Généré le ${new Date().toLocaleString('fr-FR')} · Période : ${currentPeriod}</div>
   <h2>Chiffres clés</h2>
