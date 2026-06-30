@@ -12,7 +12,7 @@ const { generateDaId, generateDsId } = require("./db");
 const DAA = require("./daa-lang");
 
 const TICKET_SECRET = process.env.TICKET_SECRET || "diaspoactif-qr-2026-secret";
-function signTicket(ticketId, eventId, ts) {
+async function signTicket(ticketId, eventId, ts) {
   return crypto.createHmac("sha256", TICKET_SECRET)
     .update(`${ticketId}:${eventId}:${ts}`).digest("hex").slice(0, 40);
 }
@@ -33,7 +33,7 @@ const MIME = {
   ".ico": "image/x-icon"
 };
 
-function send(res, status, data, headers = {}) {
+async function send(res, status, data, headers = {}) {
   res.writeHead(status, headers);
   res.end(data);
 }
@@ -80,7 +80,7 @@ async function getCurrentUser(req) {
   return user || null;
 }
 
-function publicUser(u) {
+async function publicUser(u) {
   if (!u) return null;
   return { id: u.id, nom: u.nom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
     nb_connexions: u.nb_connexions || 0, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
@@ -88,10 +88,10 @@ function publicUser(u) {
   // NOTE: ds_id est intentionnellement exclu — jamais exposé via cette fonction
 }
 
-function safeParse(s) {
+async function safeParse(s) {
   try { return JSON.parse(s || "{}"); } catch (e) { return {}; }
 }
-function safeJSON(s, fallback) {
+async function safeJSON(s, fallback) {
   try { return JSON.parse(s || JSON.stringify(fallback)); } catch (e) { return fallback; }
 }
 
@@ -103,7 +103,7 @@ async function getOfficialUserId() {
 }
 
 const routes = [];
-function route(method, pattern, handler) {
+async function route(method, pattern, handler) {
   const keys = [];
   const regex = new RegExp("^" + pattern.replace(/:[^/]+/g, (m) => { keys.push(m.slice(1)); return "([^/]+)"; }) + "$");
   routes.push({ method, regex, keys, handler });
@@ -920,7 +920,7 @@ route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
   try {
     db.prepare("INSERT INTO fil_reactions (post_id, user_id, type) VALUES (?, ?, ?)").run(params.id, user.id, type);
   } catch (e) { /* déjà réagi avec ce type : ignorer (contrainte UNIQUE) */ }
-  const reactions = db.prepare("SELECT type, COUNT(*) AS n FROM fil_reactions WHERE post_id = ? GROUP BY type").all(params.id);
+  const reactions = await db.prepare("SELECT type, COUNT(*) AS n FROM fil_reactions WHERE post_id = ? GROUP BY type").all(params.id);
   const counts = {};
   reactions.forEach(r => counts[r.type] = r.n);
   // Notifier l'auteur du post
@@ -1085,7 +1085,7 @@ route("GET", "/api/mes-bookmarks", async (req, res, params, body, query) => {
     ORDER BY b.created_at DESC
     LIMIT ? OFFSET ?
   `).all(user.id, limit, offset);
-  const total = db.prepare("SELECT COUNT(*) AS n FROM fil_bookmarks WHERE user_id=?").get(user.id).n;
+  const total = (await db.prepare("SELECT COUNT(*) AS n FROM fil_bookmarks WHERE user_id=?").get(user.id))?.n;
   sendJSON(res, 200, { posts: rows.map(p => enrichPost(p, user)), total, page, pages: Math.ceil(total/limit) });
 });
 
@@ -1120,16 +1120,16 @@ route("GET", "/api/fil/:id/stats", async (req, res, params) => {
   const p = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(params.id);
   if (!p || p.auteur_id !== user.id) return sendJSON(res, 403, { error: "Non autorisé." });
 
-  const reactions = db.prepare("SELECT type, COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
+  const reactions = await db.prepare("SELECT type, COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
   const reactionCounts = {};
   reactions.forEach(r => reactionCounts[r.type] = r.n);
   const totalReactions = reactions.reduce((s, r) => s + r.n, 0);
 
-  const nb_commentaires = db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id).n;
-  const nb_reposts = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE original_post_id=?").get(p.id).n;
-  const nb_bookmarks = db.prepare("SELECT COUNT(*) AS n FROM fil_bookmarks WHERE post_id=?").get(p.id).n;
-  const nb_contributions = db.prepare("SELECT COUNT(*) AS n FROM fil_contributions WHERE post_id=?").get(p.id).n;
-  const nb_vues = db.prepare("SELECT COUNT(*) AS n FROM fil_post_views WHERE post_id=?").get(p.id).n;
+  const nb_commentaires = (await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id))?.n;
+  const nb_reposts = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE original_post_id=?").get(p.id))?.n;
+  const nb_bookmarks = (await db.prepare("SELECT COUNT(*) AS n FROM fil_bookmarks WHERE post_id=?").get(p.id))?.n;
+  const nb_contributions = (await db.prepare("SELECT COUNT(*) AS n FROM fil_contributions WHERE post_id=?").get(p.id))?.n;
+  const nb_vues = (await db.prepare("SELECT COUNT(*) AS n FROM fil_post_views WHERE post_id=?").get(p.id))?.n;
 
   const contributions = await db.prepare(`
     SELECT fc.*, u.email, u.ville, u.pays FROM fil_contributions fc
@@ -1260,7 +1260,7 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
   const other = await db.prepare("SELECT id, nom, role FROM users WHERE id = ?").get(otherId);
   if (!other) return sendJSON(res, 404, { error: "Destinataire introuvable." });
 
-  let conv = db.prepare("SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, otherId, otherId, user.id);
+  let conv = await db.prepare("SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, otherId, otherId, user.id);
 
   // Vérification d'initiation uniquement pour les NOUVELLES conversations
   if (!conv) {
@@ -1479,7 +1479,7 @@ route("GET", "/api/formations/:id", async (req, res, params) => {
   `).get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Formation introuvable." });
   const avis = await db.prepare("SELECT a.*, u.nom AS auteur FROM formation_avis a JOIN users u ON u.id=a.user_id WHERE a.formation_id=? ORDER BY a.created_at DESC").all(params.id);
-  const nb_inscrits = db.prepare("SELECT COUNT(*) AS n FROM formation_inscriptions WHERE formation_id=? AND statut='active'").get(params.id).n;
+  const nb_inscrits = (await db.prepare("SELECT COUNT(*) AS n FROM formation_inscriptions WHERE formation_id=? AND statut='active'").get(params.id))?.n;
   sendJSON(res, 200, { formation: { ...row, avis, nb_inscrits } });
 });
 
@@ -1766,7 +1766,7 @@ route("GET", "/api/dashboard/initiative", async (req, res) => {
   if (user.role !== "initiative") return sendJSON(res, 403, { error: "Réservé aux comptes Initiative." });
 
   const initiative = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id = ?").get(user.id);
-  const messagesNonLusRow = db.prepare(`SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE m.sender_id!=? AND m.lu=0 AND (c.user1_id=? OR c.user2_id=?)`).get(user.id, user.id, user.id);
+  const messagesNonLusRow = await db.prepare(`SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE m.sender_id!=? AND m.lu=0 AND (c.user1_id=? OR c.user2_id=?)`).get(user.id, user.id, user.id);
   const messagesNonLus = messagesNonLusRow.n;
   const publications = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id = ? ORDER BY created_at DESC LIMIT 5").all(user.id);
 
@@ -1789,22 +1789,22 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   if (user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
 
   // Totaux globaux
-  const totalUtilisateurs  = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur'").get().n;
-  const totalInitiatives   = db.prepare("SELECT COUNT(*) AS n FROM initiatives").get().n;
-  const totalInstitutions  = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite'").get().n;
-  const totalPublications  = db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get().n;
-  const totalFormations    = db.prepare("SELECT COUNT(*) AS n FROM formations").get().n;
-  const totalAbonnements   = db.prepare("SELECT COUNT(*) AS n FROM abonnements").get().n;
+  const totalUtilisateurs  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur'").get())?.n;
+  const totalInitiatives   = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives").get())?.n;
+  const totalInstitutions  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite'").get())?.n;
+  const totalPublications  = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get())?.n;
+  const totalFormations    = (await db.prepare("SELECT COUNT(*) AS n FROM formations").get())?.n;
+  const totalAbonnements   = (await db.prepare("SELECT COUNT(*) AS n FROM abonnements").get())?.n;
 
   // Nouveaux inscrits
-  const inscJour    = db.prepare("SELECT COUNT(*) AS n FROM users WHERE date(created_at)=date('now')").get().n;
-  const inscSemaine = db.prepare("SELECT COUNT(*) AS n FROM users WHERE created_at>=datetime('now','-7 days')").get().n;
-  const inscMois    = db.prepare("SELECT COUNT(*) AS n FROM users WHERE created_at>=datetime('now','-30 days')").get().n;
+  const inscJour    = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE date(created_at)=date('now')").get())?.n;
+  const inscSemaine = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE created_at>=datetime('now','-7 days')").get())?.n;
+  const inscMois    = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE created_at>=datetime('now','-30 days')").get())?.n;
 
   // Utilisateurs actifs (DAU/WAU/MAU)
-  const dau = db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date=date('now')").get().n;
-  const wau = db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=date('now','-6 days')").get().n;
-  const mau = db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=date('now','-29 days')").get().n;
+  const dau = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date=date('now')").get())?.n;
+  const wau = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=date('now','-6 days')").get())?.n;
+  const mau = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=date('now','-29 days')").get())?.n;
 
   // Tendance inscriptions : 14 derniers jours
   const tendance14j = db.prepare(`
@@ -1821,15 +1821,15 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   `).all();
 
   // Répartition par rôle
-  const parRole = db.prepare("SELECT role, COUNT(*) AS n FROM users GROUP BY role ORDER BY n DESC").all();
+  const parRole = await db.prepare("SELECT role, COUNT(*) AS n FROM users GROUP BY role ORDER BY n DESC").all();
 
   // Top pays
-  const topPays = db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 8").all();
+  const topPays = await db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 8").all();
 
   // ── Engagement
-  const totalCommentaires = db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires").get().n;
-  const totalLikes    = db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE type='like'").get().n;
-  const totalReposts  = db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE type IN ('repost','partage','share')").get().n;
+  const totalCommentaires = (await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires").get())?.n;
+  const totalLikes    = (await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE type='like'").get())?.n;
+  const totalReposts  = (await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE type IN ('repost','partage','share')").get())?.n;
 
   // Taux d'interaction moyen par publication (likes + commentaires + reposts) / nb_posts
   const tauxInteraction = totalPublications > 0
@@ -1837,7 +1837,7 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
     : "0.00";
 
   // Temps moyen de session (secondes → minutes)
-  const sessionRow = db.prepare("SELECT AVG(duree_sec) AS avg_sec, SUM(duree_sec) AS total_sec FROM user_sessions WHERE duree_sec > 30").get();
+  const sessionRow = await db.prepare("SELECT AVG(duree_sec) AS avg_sec, SUM(duree_sec) AS total_sec FROM user_sessions WHERE duree_sec > 30").get();
   const tempsSessionMoyenMin = sessionRow.avg_sec ? (sessionRow.avg_sec / 60).toFixed(1) : "0.0";
   const tempsSessionTotalH   = sessionRow.total_sec ? (sessionRow.total_sec / 3600).toFixed(1) : "0.0";
 
@@ -1918,15 +1918,15 @@ route("GET", "/api/dashboard/collectivite", async (req, res) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux Collectivités." });
 
-  const totalMembres = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur', 'initiative')").get().n;
-  const totalInitiatives = db.prepare("SELECT COUNT(*) AS n FROM initiatives").get().n;
-  const paysRows = db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 10").all();
+  const totalMembres = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur', 'initiative')").get())?.n;
+  const totalInitiatives = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives").get())?.n;
+  const paysRows = await db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 10").all();
   const profil = await db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
-  const nbMessages = db.prepare("SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON m.conversation_id=c.id WHERE (c.user1_id=? OR c.user2_id=?) AND m.sender_id!=? AND m.lu=0").get(user.id,user.id,user.id).n;
-  const nbComms = db.prepare("SELECT COUNT(*) AS n FROM communications_institutionnelles WHERE emetteur_id=?").get(user.id).n;
-  const nbServices = db.prepare("SELECT COUNT(*) AS n FROM ambassade_services WHERE user_id=? AND actif=1").get(user.id).n;
-  const nbAgenda = db.prepare("SELECT COUNT(*) AS n FROM ambassade_agenda WHERE user_id=? AND date_debut >= date('now')").get(user.id).n;
-  const nbOpportunites = db.prepare("SELECT COUNT(*) AS n FROM ambassade_opportunites WHERE user_id=? AND actif=1").get(user.id).n;
+  const nbMessages = (await db.prepare("SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON m.conversation_id=c.id WHERE (c.user1_id=? OR c.user2_id=?) AND m.sender_id!=? AND m.lu=0").get(user.id,user.id,user.id))?.n;
+  const nbComms = (await db.prepare("SELECT COUNT(*) AS n FROM communications_institutionnelles WHERE emetteur_id=?").get(user.id))?.n;
+  const nbServices = (await db.prepare("SELECT COUNT(*) AS n FROM ambassade_services WHERE user_id=? AND actif=1").get(user.id))?.n;
+  const nbAgenda = (await db.prepare("SELECT COUNT(*) AS n FROM ambassade_agenda WHERE user_id=? AND date_debut >= date('now')").get(user.id))?.n;
+  const nbOpportunites = (await db.prepare("SELECT COUNT(*) AS n FROM ambassade_opportunites WHERE user_id=? AND actif=1").get(user.id))?.n;
 
   sendJSON(res, 200, {
     total_membres: totalMembres,
@@ -1946,7 +1946,7 @@ route("GET", "/api/dashboard/collectivite", async (req, res) => {
 /* ---------- Observatoire statistique (agrégé, anonymisé) ---------- */
 route("GET", "/api/observatoire", async (req, res, params, body, query) => {
   const nationalite = query.nationalite || null;
-  let rows = db.prepare("SELECT pays, ville, COUNT(*) AS n FROM users WHERE role = 'utilisateur' GROUP BY pays, ville").all();
+  let rows = await db.prepare("SELECT pays, ville, COUNT(*) AS n FROM users WHERE role = 'utilisateur' GROUP BY pays, ville").all();
   rows = rows.filter(r => r.pays);
   const mask = (n) => n < SEUIL_CONFIDENTIALITE ? null : n;
   const parPays = {};
@@ -1956,7 +1956,7 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
     if (r.ville) parPays[r.pays].villes.push({ ville: r.ville, membres: mask(r.n) });
   });
   Object.values(parPays).forEach(p => p.membres = mask(p.membres));
-  const totalMembres = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur'").get().n;
+  const totalMembres = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur'").get())?.n;
   sendJSON(res, 200, { nationalite, seuil_confidentialite: SEUIL_CONFIDENTIALITE, total_membres: totalMembres, par_pays: Object.values(parPays) });
 });
 
@@ -1965,8 +1965,8 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id FROM users WHERE id=?").get(params.id);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
   const me = await getCurrentUser(req);
-  const nbAbonnes    = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(u.id).n;
-  const nbSuivis     = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE follower_id=?").get(u.id).n;
+  const nbAbonnes    = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(u.id))?.n;
+  const nbSuivis     = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE follower_id=?").get(u.id))?.n;
   const isFollowing  = me ? !!await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, u.id) : false;
   const initiativesSuivies = await db.prepare("SELECT i.id,i.slug,i.nom,i.domaine,i.pays FROM abonnements a JOIN initiatives i ON i.id=a.initiative_id WHERE a.user_id=? LIMIT 12").all(u.id);
   const usersSuivis  = await db.prepare("SELECT u2.id,u2.nom,u2.prenom,u2.titre_pro,u2.ville,u2.photo_url FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? LIMIT 12").all(u.id);
@@ -1983,7 +1983,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   const dmLaureat = await db.prepare(`SELECT dml.rang, dml.score, dme.label AS edition_label, dme.periode_fin
     FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
     WHERE dml.user_id=? AND dml.actif=1 ORDER BY dml.edition_id DESC LIMIT 1`).get(u.id);
-  const dmHistorique = db.prepare(`SELECT COUNT(*) AS n FROM deal_master_laureats WHERE user_id=?`).get(u.id).n;
+  const dmHistorique = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_master_laureats WHERE user_id=?`).get(u.id))?.n;
   sendJSON(res, 200, { profil: {
     ...publicUser(u),
     bio: u.bio, photo_url: u.photo_url, banner_url: u.banner_url,
@@ -2117,12 +2117,12 @@ route("GET", "/api/profil/:id/publications", async (req, res, params) => {
   const LIMIT = 15, OFFSET = (page-1)*LIMIT;
   let rows;
   if (cat === 'all') {
-    rows = db.prepare(`SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, COUNT(DISTINCT r.id) AS nb_reactions, COUNT(DISTINCT c.id) AS nb_commentaires FROM fil_posts p LEFT JOIN fil_reactions r ON r.post_id=p.id LEFT JOIN fil_commentaires c ON c.post_id=p.id WHERE p.auteur_id=? GROUP BY p.id ORDER BY p.id DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
+    rows = await db.prepare(`SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, COUNT(DISTINCT r.id) AS nb_reactions, COUNT(DISTINCT c.id) AS nb_commentaires FROM fil_posts p LEFT JOIN fil_reactions r ON r.post_id=p.id LEFT JOIN fil_commentaires c ON c.post_id=p.id WHERE p.auteur_id=? GROUP BY p.id ORDER BY p.id DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
   } else {
-    rows = db.prepare(`SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, COUNT(DISTINCT r.id) AS nb_reactions, COUNT(DISTINCT c.id) AS nb_commentaires FROM fil_posts p LEFT JOIN fil_reactions r ON r.post_id=p.id LEFT JOIN fil_commentaires c ON c.post_id=p.id WHERE p.auteur_id=? AND (p.categorie=? OR p.type=?) GROUP BY p.id ORDER BY p.id DESC LIMIT ? OFFSET ?`).all(uid, cat, cat, LIMIT, OFFSET);
+    rows = await db.prepare(`SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, COUNT(DISTINCT r.id) AS nb_reactions, COUNT(DISTINCT c.id) AS nb_commentaires FROM fil_posts p LEFT JOIN fil_reactions r ON r.post_id=p.id LEFT JOIN fil_commentaires c ON c.post_id=p.id WHERE p.auteur_id=? AND (p.categorie=? OR p.type=?) GROUP BY p.id ORDER BY p.id DESC LIMIT ? OFFSET ?`).all(uid, cat, cat, LIMIT, OFFSET);
   }
   if (q) rows = rows.filter(r => (r.contenu||'').toLowerCase().includes(q));
-  const total = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid).n;
+  const total = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid))?.n;
   sendJSON(res, 200, { publications: rows, total, page, pages: Math.ceil(total/LIMIT) });
 });
 
@@ -2130,7 +2130,7 @@ route("GET", "/api/profil/:id/publications", async (req, res, params) => {
 route("GET", "/api/profil/:id/publicites", async (req, res, params) => {
   const uid = parseInt(params.id);
   try {
-    const rows = db.prepare(`SELECT id,nom_campagne,titre,format,statut,date_debut,date_fin,image_url,description,lien_cible FROM publicites WHERE created_by=? AND statut IN ('active','terminee') ORDER BY created_at DESC LIMIT 20`).all(uid);
+    const rows = await db.prepare(`SELECT id,nom_campagne,titre,format,statut,date_debut,date_fin,image_url,description,lien_cible FROM publicites WHERE created_by=? AND statut IN ('active','terminee') ORDER BY created_at DESC LIMIT 20`).all(uid);
     sendJSON(res, 200, { publicites: rows });
   } catch(e) { sendJSON(res, 200, { publicites: [] }); }
 });
@@ -2156,7 +2156,7 @@ route("GET", "/api/profil/:id/suivis", async (req, res, params) => {
     FROM user_follows uf JOIN users u2 ON u2.id = uf.followed_id
     WHERE uf.follower_id = ? ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
   if (q) rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.pays||''}`.toLowerCase().includes(q));
-  const total = db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE follower_id=?").get(uid).n;
+  const total = (await db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE follower_id=?").get(uid))?.n;
   sendJSON(res, 200, { suivis: rows, total, page, pages: Math.ceil(total/LIMIT) });
 });
 
@@ -2179,7 +2179,7 @@ route("GET", "/api/profil/:id/abonnes", async (req, res, params) => {
     FROM user_follows uf JOIN users u2 ON u2.id = uf.follower_id
     WHERE uf.followed_id = ? ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
   if (q) rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.pays||''}`.toLowerCase().includes(q));
-  const total = db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE followed_id=?").get(uid).n;
+  const total = (await db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE followed_id=?").get(uid))?.n;
   sendJSON(res, 200, { abonnes: rows, total, page, pages: Math.ceil(total/LIMIT) });
 });
 
@@ -2257,7 +2257,7 @@ route("POST", "/api/users/:id/suivre", async (req, res, params) => {
   if (me.id == params.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
   try {
     db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, parseInt(params.id));
-    const n = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(parseInt(params.id)).n;
+    const n = await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(parseInt(params.id)).n;
     sendJSON(res, 200, { ok: true, nbAbonnes: n });
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
 });
@@ -2271,7 +2271,7 @@ route("DELETE", "/api/users/:id/suivre", async (req, res, params) => {
     return sendJSON(res, 403, { error: "L'abonnement au compte officiel Diaspo'Actif est obligatoire et ne peut pas être supprimé." });
   }
   await db.prepare("DELETE FROM user_follows WHERE follower_id=? AND followed_id=?").run(me.id, parseInt(params.id));
-  const n = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(parseInt(params.id)).n;
+  const n = await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(parseInt(params.id)).n;
   sendJSON(res, 200, { ok: true, nbAbonnes: n });
 });
 
@@ -2349,7 +2349,7 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
   const type = query.type || "tous";
 
   const utilisateurs = (type === "tous" || type === "utilisateurs")
-    ? db.prepare("SELECT id,nom,role,ville,pays FROM users WHERE (nom LIKE ? OR ville LIKE ?) AND role != 'administrateur' LIMIT 8").all(like, like)
+    ? await db.prepare("SELECT id,nom,role,ville,pays FROM users WHERE (nom LIKE ? OR ville LIKE ?) AND role != 'administrateur' LIMIT 8").all(like, like)
     : [];
   const _rawInits = (type === "tous" || type === "initiatives")
     ? await db.prepare("SELECT id,slug,nom,domaine,pays,ville,description,owner_user_id FROM initiatives WHERE nom LIKE ? OR description LIKE ? OR domaine LIKE ? LIMIT 8").all(like, like, like)
@@ -2385,7 +2385,7 @@ route("GET", "/api/notifications", async (req, res, params, body, query) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const limit = Math.min(Number(query.limit) || 20, 50);
   const rows = await db.prepare("SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT ?").all(user.id, limit);
-  const non_lues = db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id=? AND lue=0").get(user.id).n;
+  const non_lues = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id=? AND lue=0").get(user.id))?.n;
   sendJSON(res, 200, { notifications: rows.map(r => ({ ...r, data: safeParse(r.data_json) })), non_lues });
 });
 
@@ -2410,7 +2410,7 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   if (query.pays) rows = rows.filter(r => r.pays === query.pays);
   if (query.type) rows = rows.filter(r => r.type_evt === query.type);
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.lieu+r.description||"").toLowerCase().includes(q)); }
-  const withCounts = rows.map(r => ({ ...r, nb_participants: db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id)?.n || 0 }));
+  const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
   sendJSON(res, 200, { evenements: withCounts });
 });
 
@@ -2466,7 +2466,7 @@ route("POST", "/api/evenements/:id/rejoindre", async (req, res, params) => {
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (!evt.inscription_ouverte) return sendJSON(res, 400, { error: "Les inscriptions sont fermées." });
   if (evt.places_max) {
-    const nb = db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(params.id).n;
+    const nb = (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(params.id))?.n;
     if (nb >= evt.places_max) return sendJSON(res, 400, { error: "Plus de places disponibles." });
   }
   try {
@@ -2741,7 +2741,7 @@ route("GET", "/api/collaborations", async (req, res, params, body, query) => {
   if (query.type) rows = rows.filter(r => r.type_collab === query.type);
   if (query.statut) rows = rows.filter(r => r.statut === query.statut); else rows = rows.filter(r => (r.statut||"ouvert") === "ouvert");
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => ((r.titre||"")+(r.description||"")).toLowerCase().includes(q)); }
-  const withCounts = rows.map(r => ({ ...r, nb_candidatures: db.prepare("SELECT COUNT(*) AS n FROM candidatures WHERE collaboration_id=?").get(r.id)?.n || 0, competences: safeParse(r.competences || "[]") }));
+  const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_candidatures: await db.prepare("SELECT COUNT(*) AS n FROM candidatures WHERE collaboration_id=?").get(r.id)?.n || 0, competences: safeParse(r.competences || "[]") })));
   sendJSON(res, 200, { collaborations: withCounts });
 });
 
@@ -2856,8 +2856,8 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       return sendJSON(res, 200, { posts: [], total: 0, page, pages: 0, mode, conseil: "Suivez des personnes et des initiatives pour voir leurs publications ici." });
     }
     const placeholders = allIds.map(()=>"?").join(",");
-    const total = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).get(...allIds).n;
-    const posts = db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT ? OFFSET ?`).all(...allIds, limit, offset);
+    const total = (await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).get(...allIds))?.n;
+    const posts = await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT ? OFFSET ?`).all(...allIds, limit, offset);
     return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "suivi" }))), total, page, pages: Math.ceil(total/limit), mode });
   }
 
@@ -3006,11 +3006,11 @@ route("GET", "/api/admin/reseau", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
-  const parPays     = db.prepare("SELECT pays, COUNT(*) n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 12").all();
-  const parNat1     = db.prepare("SELECT nationalite1 AS nat, COUNT(*) n FROM users WHERE nationalite1 IS NOT NULL GROUP BY nat ORDER BY n DESC LIMIT 10").all();
-  const parNat2     = db.prepare("SELECT nationalite2 AS nat, COUNT(*) n FROM users WHERE nationalite2 IS NOT NULL GROUP BY nat ORDER BY n DESC LIMIT 8").all();
-  const parOrig1    = db.prepare("SELECT origine1 AS orig, COUNT(*) n FROM users WHERE origine1 IS NOT NULL GROUP BY orig ORDER BY n DESC LIMIT 10").all();
-  const parVille    = db.prepare("SELECT ville, pays, COUNT(*) n FROM users WHERE ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 10").all();
+  const parPays     = await db.prepare("SELECT pays, COUNT(*) n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 12").all();
+  const parNat1     = await db.prepare("SELECT nationalite1 AS nat, COUNT(*) n FROM users WHERE nationalite1 IS NOT NULL GROUP BY nat ORDER BY n DESC LIMIT 10").all();
+  const parNat2     = await db.prepare("SELECT nationalite2 AS nat, COUNT(*) n FROM users WHERE nationalite2 IS NOT NULL GROUP BY nat ORDER BY n DESC LIMIT 8").all();
+  const parOrig1    = await db.prepare("SELECT origine1 AS orig, COUNT(*) n FROM users WHERE origine1 IS NOT NULL GROUP BY orig ORDER BY n DESC LIMIT 10").all();
+  const parVille    = await db.prepare("SELECT ville, pays, COUNT(*) n FROM users WHERE ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 10").all();
 
   // Top pays actifs = pays avec le plus d'activité (user_activity JOIN users)
   const paysActifs  = db.prepare(`
@@ -3058,7 +3058,7 @@ route("GET", "/api/admin/reseau-pro", async (req, res) => {
 
   const whereStr = where.join(' AND ');
 
-  const total = db.prepare(`SELECT COUNT(*) n FROM users u WHERE ${whereStr}`).get(...params).n;
+  const total = (await db.prepare(`SELECT COUNT(*) n FROM users u WHERE ${whereStr}`).get(...params))?.n;
   const rows  = db.prepare(`
     SELECT u.id, u.nom, u.prenom, u.titre_pro, u.situation_pro,
            u.ville, u.pays, u.origine1 AS pays_origine, u.nationalite1 AS nationalite,
@@ -3083,16 +3083,16 @@ route("GET", "/api/admin/reseau-pro/stats", async (req, res) => {
 
   const roleFilter = "role IN ('utilisateur','initiative','collectivite','officiel')";
 
-  const total        = db.prepare(`SELECT COUNT(*) n FROM users WHERE ${roleFilter}`).get().n;
-  const actifs30j    = db.prepare(`SELECT COUNT(DISTINCT u.id) n FROM users u JOIN user_activity a ON a.user_id=u.id WHERE a.date >= date('now','-30 days') AND u.${roleFilter}`).get().n;
-  const nouveaux30j  = db.prepare(`SELECT COUNT(*) n FROM users WHERE ${roleFilter} AND created_at >= datetime('now','-30 days')`).get().n;
+  const total        = (await db.prepare(`SELECT COUNT(*) n FROM users WHERE ${roleFilter}`).get())?.n;
+  const actifs30j    = (await db.prepare(`SELECT COUNT(DISTINCT u.id) n FROM users u JOIN user_activity a ON a.user_id=u.id WHERE a.date >= date('now','-30 days') AND u.${roleFilter}`).get())?.n;
+  const nouveaux30j  = (await db.prepare(`SELECT COUNT(*) n FROM users WHERE ${roleFilter} AND created_at >= datetime('now','-30 days')`).get())?.n;
 
-  const parVille     = db.prepare(`SELECT ville, pays, COUNT(*) n FROM users WHERE ${roleFilter} AND ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 15`).all();
-  const parPays      = db.prepare(`SELECT pays, COUNT(*) n FROM users WHERE ${roleFilter} AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 12`).all();
-  const parOrigine   = db.prepare(`SELECT origine1 AS origine, COUNT(*) n FROM users WHERE ${roleFilter} AND origine1 IS NOT NULL GROUP BY origine ORDER BY n DESC LIMIT 12`).all();
-  const parNat       = db.prepare(`SELECT nationalite1 AS nationalite, COUNT(*) n FROM users WHERE ${roleFilter} AND nationalite1 IS NOT NULL GROUP BY nationalite ORDER BY n DESC LIMIT 10`).all();
-  const parRole      = db.prepare(`SELECT role, COUNT(*) n FROM users WHERE ${roleFilter} GROUP BY role ORDER BY n DESC`).all();
-  const parSitPro    = db.prepare(`SELECT situation_pro, COUNT(*) n FROM users WHERE ${roleFilter} AND situation_pro IS NOT NULL GROUP BY situation_pro ORDER BY n DESC LIMIT 10`).all();
+  const parVille     = await db.prepare(`SELECT ville, pays, COUNT(*) n FROM users WHERE ${roleFilter} AND ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 15`).all();
+  const parPays      = await db.prepare(`SELECT pays, COUNT(*) n FROM users WHERE ${roleFilter} AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 12`).all();
+  const parOrigine   = await db.prepare(`SELECT origine1 AS origine, COUNT(*) n FROM users WHERE ${roleFilter} AND origine1 IS NOT NULL GROUP BY origine ORDER BY n DESC LIMIT 12`).all();
+  const parNat       = await db.prepare(`SELECT nationalite1 AS nationalite, COUNT(*) n FROM users WHERE ${roleFilter} AND nationalite1 IS NOT NULL GROUP BY nationalite ORDER BY n DESC LIMIT 10`).all();
+  const parRole      = await db.prepare(`SELECT role, COUNT(*) n FROM users WHERE ${roleFilter} GROUP BY role ORDER BY n DESC`).all();
+  const parSitPro    = await db.prepare(`SELECT situation_pro, COUNT(*) n FROM users WHERE ${roleFilter} AND situation_pro IS NOT NULL GROUP BY situation_pro ORDER BY n DESC LIMIT 10`).all();
 
   // Top villes actives (activité 30j)
   const villesActives = db.prepare(`
@@ -3124,13 +3124,13 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // KPIs globaux
-  const totalInit    = db.prepare("SELECT COUNT(*) n FROM initiatives").get().n;
-  const totalEvents  = db.prepare("SELECT COUNT(*) n FROM evenements WHERE statut='ouvert'").get().n;
-  const totalForm    = db.prepare("SELECT COUNT(*) n FROM formations").get().n;
-  const totalAbos    = db.prepare("SELECT COUNT(*) n FROM abonnements").get().n;
-  const totalPays    = db.prepare("SELECT COUNT(DISTINCT pays) n FROM initiatives WHERE pays IS NOT NULL").get().n;
-  const totalVilles  = db.prepare("SELECT COUNT(DISTINCT ville) n FROM initiatives WHERE ville IS NOT NULL").get().n;
-  const actifs30j    = db.prepare("SELECT COUNT(DISTINCT i.id) n FROM initiatives i JOIN abonnements a ON a.initiative_id=i.id JOIN user_activity ua ON ua.user_id=a.user_id WHERE ua.date>=date('now','-30 days')").get().n;
+  const totalInit    = (await db.prepare("SELECT COUNT(*) n FROM initiatives").get())?.n;
+  const totalEvents  = (await db.prepare("SELECT COUNT(*) n FROM evenements WHERE statut='ouvert'").get())?.n;
+  const totalForm    = (await db.prepare("SELECT COUNT(*) n FROM formations").get())?.n;
+  const totalAbos    = (await db.prepare("SELECT COUNT(*) n FROM abonnements").get())?.n;
+  const totalPays    = (await db.prepare("SELECT COUNT(DISTINCT pays) n FROM initiatives WHERE pays IS NOT NULL").get())?.n;
+  const totalVilles  = (await db.prepare("SELECT COUNT(DISTINCT ville) n FROM initiatives WHERE ville IS NOT NULL").get())?.n;
+  const actifs30j    = (await db.prepare("SELECT COUNT(DISTINCT i.id) n FROM initiatives i JOIN abonnements a ON a.initiative_id=i.id JOIN user_activity ua ON ua.user_id=a.user_id WHERE ua.date>=date('now','-30 days')").get())?.n;
 
   // Par domaine avec events + formations
   const parDomaine = db.prepare(`
@@ -3139,8 +3139,8 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
     FROM initiatives WHERE domaine IS NOT NULL
     GROUP BY domaine ORDER BY n DESC LIMIT 12
   `).all();
-  const eventsParDomaine = db.prepare(`SELECT domaine, COUNT(*) n FROM evenements WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 10`).all();
-  const formParDomaine   = db.prepare(`SELECT domaine, COUNT(*) n FROM formations WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 10`).all();
+  const eventsParDomaine = await db.prepare(`SELECT domaine, COUNT(*) n FROM evenements WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 10`).all();
+  const formParDomaine   = await db.prepare(`SELECT domaine, COUNT(*) n FROM formations WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 10`).all();
 
   // Par pays d'origine
   const parOrigine = db.prepare(`
@@ -3231,15 +3231,15 @@ route("GET", "/api/admin/diaspora-stats/insights", async (req, res) => {
   const alertes  = [];
 
   // Top domaine
-  const topDom = db.prepare(`SELECT domaine, COUNT(*) n FROM initiatives WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 1`).get();
+  const topDom = await db.prepare(`SELECT domaine, COUNT(*) n FROM initiatives WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 1`).get();
   if (topDom) insights.push({ type:'analyse', icone:'📊', texte:`Le domaine <strong>${topDom.domaine}</strong> domine avec ${topDom.n} initiatives enregistrées.` });
 
   // Top ville
-  const topVille = db.prepare(`SELECT ville, pays, COUNT(*) n FROM initiatives WHERE ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 1`).get();
+  const topVille = await db.prepare(`SELECT ville, pays, COUNT(*) n FROM initiatives WHERE ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 1`).get();
   if (topVille) insights.push({ type:'analyse', icone:'📍', texte:`<strong>${topVille.ville}</strong> (${topVille.pays||'—'}) est la ville avec la plus forte concentration d'initiatives diaspora (${topVille.n}).` });
 
   // Top pays d'origine
-  const topOrigine = db.prepare(`SELECT nationalite1 AS o, COUNT(*) n FROM initiatives WHERE nationalite1 IS NOT NULL GROUP BY nationalite1 ORDER BY n DESC LIMIT 1`).get();
+  const topOrigine = await db.prepare(`SELECT nationalite1 AS o, COUNT(*) n FROM initiatives WHERE nationalite1 IS NOT NULL GROUP BY nationalite1 ORDER BY n DESC LIMIT 1`).get();
   if (topOrigine) insights.push({ type:'analyse', icone:'🌍', texte:`La diaspora <strong>${topOrigine.o}</strong> est la plus représentée avec ${topOrigine.n} initiatives actives.` });
 
   // Croissance domaine ce mois
@@ -3282,8 +3282,8 @@ route("GET", "/api/admin/diaspora-stats/insights", async (req, res) => {
   insights.push({ type:'analyse', icone:'⚡', texte:`Score d'activité moyen des initiatives : <strong>${scoreMoy}/100</strong>.` });
 
   // Ratio événements/initiatives
-  const nbInit = db.prepare("SELECT COUNT(*) n FROM initiatives").get().n;
-  const nbEvt  = db.prepare("SELECT COUNT(*) n FROM evenements").get().n;
+  const nbInit = (await db.prepare("SELECT COUNT(*) n FROM initiatives").get())?.n;
+  const nbEvt  = (await db.prepare("SELECT COUNT(*) n FROM evenements").get())?.n;
   if (nbInit > 0) {
     const ratio = (nbEvt / nbInit).toFixed(1);
     insights.push({ type:'analyse', icone:'📅', texte:`En moyenne, chaque initiative génère <strong>${ratio} événements</strong> enregistrés sur la plateforme.` });
@@ -3370,7 +3370,7 @@ route("GET", "/api/admin/finances", async (req, res) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // Abonnés actifs (abonnements table)
-  const abonnesActifs = db.prepare("SELECT COUNT(*) n FROM abonnements").get().n;
+  const abonnesActifs = (await db.prepare("SELECT COUNT(*) n FROM abonnements").get())?.n;
 
   // Transactions du mois courant
   const txMois = db.prepare(`
@@ -3424,7 +3424,7 @@ route("GET", "/api/admin/finances", async (req, res) => {
   `).all();
 
   // Taux de conversion (abonnés / total utilisateurs)
-  const totalUtilisateurs = db.prepare("SELECT COUNT(*) n FROM users WHERE role IN ('utilisateur','initiative')").get().n;
+  const totalUtilisateurs = (await db.prepare("SELECT COUNT(*) n FROM users WHERE role IN ('utilisateur','initiative')").get())?.n;
   const tauxConversion = totalUtilisateurs > 0 ? ((abonnesActifs / totalUtilisateurs) * 100).toFixed(1) : "0.0";
 
   // Ventes du jour
@@ -3573,8 +3573,8 @@ route("GET", "/api/admin/abonnes", async (req, res) => {
     ORDER BY a.created_at DESC LIMIT 50
   `).all();
   // Taux de renouvellement simulé
-  const totalExpires = db.prepare("SELECT COUNT(*) n FROM abonnements WHERE statut='expire'").get().n;
-  const totalRenouveles = db.prepare("SELECT COUNT(*) n FROM abonnements WHERE statut='actif' AND date_debut > date('now','-60 days')").get().n;
+  const totalExpires = (await db.prepare("SELECT COUNT(*) n FROM abonnements WHERE statut='expire'").get())?.n;
+  const totalRenouveles = (await db.prepare("SELECT COUNT(*) n FROM abonnements WHERE statut='actif' AND date_debut > date('now','-60 days')").get())?.n;
   const tauxRenouvellement = (totalExpires + totalRenouveles) > 0
     ? ((totalRenouveles / (totalExpires + totalRenouveles)) * 100).toFixed(1)
     : "0.0";
@@ -3785,7 +3785,7 @@ route("GET", "/api/admin/publicites", async (req, res) => {
   sendJSON(res, 200, { publicites: rows });
 });
 
-function _pubBody(body) {
+async function _pubBody(body) {
   const j = (v, def="[]") => { try { return JSON.stringify(Array.isArray(v) ? v : JSON.parse(v||def)); } catch { return def; } };
   const jo = (v) => { try { return JSON.stringify(typeof v==="object"&&!Array.isArray(v) ? v : JSON.parse(v||"{}")); } catch { return "{}"; } };
   return {
@@ -3981,7 +3981,7 @@ async function getAccred(institutionId) {
 }
 
 /* Helper : construit la clause WHERE pour filtrer users selon le périmètre de l'accréditation */
-function buildObsWhere(accred, tableAlias = "u") {
+async function buildObsWhere(accred, tableAlias = "u") {
   const nats = safeParse(accred.nationalites_autorisees);
   const terrs = safeParse(accred.territoires_autorises);
   const conds = [];
@@ -4120,10 +4120,10 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation Observatoire requise." });
     const { where, params: p } = buildObsWhere(accred);
-    const totalMembres = db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='utilisateur' ${where}`).get(...p).n;
-    const totalInitiatives = db.prepare(`SELECT COUNT(*) AS n FROM initiatives i WHERE 1=1 ${where.replace(/u\./g,"i.")}`).get(...p).n;
-    const totalPays = db.prepare(`SELECT COUNT(DISTINCT u.pays) AS n FROM users u WHERE role='utilisateur' AND u.pays IS NOT NULL ${where}`).get(...p).n;
-    const totalAssociations = db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='initiative' ${where}`).get(...p).n;
+    const totalMembres = (await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='utilisateur' ${where}`).get(...p))?.n;
+    const totalInitiatives = (await db.prepare(`SELECT COUNT(*) AS n FROM initiatives i WHERE 1=1 ${where.replace(/u\./g,"i.")}`).get(...p))?.n;
+    const totalPays = (await db.prepare(`SELECT COUNT(DISTINCT u.pays) AS n FROM users u WHERE role='utilisateur' AND u.pays IS NOT NULL ${where}`).get(...p))?.n;
+    const totalAssociations = (await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='initiative' ${where}`).get(...p))?.n;
     sendJSON(res, 200, {
       seuil_confidentialite: SEUIL_CONFIDENTIALITE,
       total_membres: totalMembres >= SEUIL_CONFIDENTIALITE ? totalMembres : null,
@@ -4139,9 +4139,9 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
     const { where, params: p } = buildObsWhere(accred);
-    const parPays = db.prepare(`SELECT u.pays, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.pays IS NOT NULL ${where} GROUP BY u.pays ORDER BY n DESC LIMIT 30`).all(...p);
-    const parRegion = db.prepare(`SELECT u.region, u.pays, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.region IS NOT NULL ${where} GROUP BY u.region, u.pays ORDER BY n DESC LIMIT 20`).all(...p);
-    const parVille = db.prepare(`SELECT u.ville, u.pays, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.ville IS NOT NULL ${where} GROUP BY u.ville, u.pays ORDER BY n DESC LIMIT 20`).all(...p);
+    const parPays = await db.prepare(`SELECT u.pays, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.pays IS NOT NULL ${where} GROUP BY u.pays ORDER BY n DESC LIMIT 30`).all(...p);
+    const parRegion = await db.prepare(`SELECT u.region, u.pays, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.region IS NOT NULL ${where} GROUP BY u.region, u.pays ORDER BY n DESC LIMIT 20`).all(...p);
+    const parVille = await db.prepare(`SELECT u.ville, u.pays, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.ville IS NOT NULL ${where} GROUP BY u.ville, u.pays ORDER BY n DESC LIMIT 20`).all(...p);
     const mask = n => n >= SEUIL_CONFIDENTIALITE ? n : null;
     sendJSON(res, 200, {
       par_pays: parPays.map(r => ({ ...r, n: mask(r.n) })).filter(r => r.n),
@@ -4156,7 +4156,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
     const { where, params: p } = buildObsWhere(accred);
-    const rows = db.prepare(`SELECT u.situation_pro, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.situation_pro IS NOT NULL ${where} GROUP BY u.situation_pro ORDER BY n DESC`).all(...p);
+    const rows = await db.prepare(`SELECT u.situation_pro, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.situation_pro IS NOT NULL ${where} GROUP BY u.situation_pro ORDER BY n DESC`).all(...p);
     const mask = n => n >= SEUIL_CONFIDENTIALITE ? n : null;
     sendJSON(res, 200, { competences: rows.map(r => ({ label: r.situation_pro, n: mask(r.n) })).filter(r => r.n) });
   });
@@ -4167,7 +4167,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
     const { where, params: p } = buildObsWhere(accred);
-    const rows = db.prepare(`SELECT i.domaine, COUNT(*) AS n FROM initiatives i WHERE i.domaine IS NOT NULL GROUP BY i.domaine ORDER BY n DESC`).all();
+    const rows = await db.prepare(`SELECT i.domaine, COUNT(*) AS n FROM initiatives i WHERE i.domaine IS NOT NULL GROUP BY i.domaine ORDER BY n DESC`).all();
     const mask = n => n >= SEUIL_CONFIDENTIALITE ? n : null;
     sendJSON(res, 200, { secteurs: rows.map(r => ({ label: r.domaine, n: r.n })) });
   });
@@ -4183,9 +4183,9 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (nats.length) { const ph = nats.map(()=>"?").join(","); conds.push(`(i.nationalite1 IN (${ph}) OR i.nationalite2 IN (${ph}))`); p.push(...nats,...nats); }
     if (terrs.length) { const tc = terrs.map(t => { if(t.ville){p.push(t.pays,t.region,t.ville);return`(i.pays=? AND i.region=? AND i.ville=?)`;}if(t.region){p.push(t.pays,t.region);return`(i.pays=? AND i.region=?)`;}p.push(t.pays);return`(i.pays=?)`;});conds.push(`(${tc.join(" OR ")})`); }
     const where = conds.length ? "AND "+conds.join(" AND ") : "";
-    const parDomaine = db.prepare(`SELECT domaine, COUNT(*) AS n, SUM(membres) AS total_membres, SUM(vues) AS total_vues FROM initiatives i WHERE 1=1 ${where} GROUP BY domaine ORDER BY n DESC`).all(...p);
-    const parPays = db.prepare(`SELECT pays, COUNT(*) AS n FROM initiatives i WHERE pays IS NOT NULL ${where} GROUP BY pays ORDER BY n DESC LIMIT 15`).all(...p);
-    const total = db.prepare(`SELECT COUNT(*) AS n, SUM(membres) AS membres, SUM(abonnes) AS abonnes FROM initiatives i WHERE 1=1 ${where}`).get(...p);
+    const parDomaine = await db.prepare(`SELECT domaine, COUNT(*) AS n, SUM(membres) AS total_membres, SUM(vues) AS total_vues FROM initiatives i WHERE 1=1 ${where} GROUP BY domaine ORDER BY n DESC`).all(...p);
+    const parPays = await db.prepare(`SELECT pays, COUNT(*) AS n FROM initiatives i WHERE pays IS NOT NULL ${where} GROUP BY pays ORDER BY n DESC LIMIT 15`).all(...p);
+    const total = await db.prepare(`SELECT COUNT(*) AS n, SUM(membres) AS membres, SUM(abonnes) AS abonnes FROM initiatives i WHERE 1=1 ${where}`).get(...p);
     sendJSON(res, 200, { total, par_domaine: parDomaine, par_pays: parPays });
   });
 
@@ -4195,10 +4195,10 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
     // Offres de type investissement
-    const parType = db.prepare(`SELECT type, COUNT(*) AS n FROM offres WHERE type IN ('investissement','financement','incubation','acceleration') GROUP BY type ORDER BY n DESC`).all();
-    const parSecteur = db.prepare(`SELECT secteur, COUNT(*) AS n FROM offres WHERE secteur IS NOT NULL AND type IN ('investissement','financement') GROUP BY secteur ORDER BY n DESC LIMIT 10`).all();
-    const parPays = db.prepare(`SELECT pays, COUNT(*) AS n FROM offres WHERE pays IS NOT NULL AND type='investissement' GROUP BY pays ORDER BY n DESC LIMIT 10`).all();
-    const totalMontant = db.prepare(`SELECT SUM(salaire_min) AS min, SUM(salaire_max) AS max FROM offres WHERE type='investissement'`).get();
+    const parType = await db.prepare(`SELECT type, COUNT(*) AS n FROM offres WHERE type IN ('investissement','financement','incubation','acceleration') GROUP BY type ORDER BY n DESC`).all();
+    const parSecteur = await db.prepare(`SELECT secteur, COUNT(*) AS n FROM offres WHERE secteur IS NOT NULL AND type IN ('investissement','financement') GROUP BY secteur ORDER BY n DESC LIMIT 10`).all();
+    const parPays = await db.prepare(`SELECT pays, COUNT(*) AS n FROM offres WHERE pays IS NOT NULL AND type='investissement' GROUP BY pays ORDER BY n DESC LIMIT 10`).all();
+    const totalMontant = await db.prepare(`SELECT SUM(salaire_min) AS min, SUM(salaire_max) AS max FROM offres WHERE type='investissement'`).get();
     sendJSON(res, 200, {
       par_type: parType,
       par_secteur: parSecteur.map(r => ({ ...r, label: r.secteur })),
@@ -4212,11 +4212,11 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
-    const parType = db.prepare(`SELECT type, COUNT(*) AS n FROM offres WHERE type IN ('emploi','stage','mission','contrat') GROUP BY type ORDER BY n DESC`).all();
-    const parSecteur = db.prepare(`SELECT secteur, COUNT(*) AS n FROM offres WHERE secteur IS NOT NULL AND type IN ('emploi','stage','mission','contrat') GROUP BY secteur ORDER BY n DESC LIMIT 10`).all();
-    const parPays = db.prepare(`SELECT pays, COUNT(*) AS n FROM offres WHERE pays IS NOT NULL AND type IN ('emploi','stage','mission','contrat') GROUP BY pays ORDER BY n DESC LIMIT 10`).all();
-    const parMois = db.prepare(`SELECT strftime('%Y-%m', created_at) AS mois, COUNT(*) AS n FROM offres WHERE type IN ('emploi','stage','mission','contrat') AND created_at >= datetime('now','-12 months') GROUP BY mois ORDER BY mois`).all();
-    const totalCandidatures = db.prepare(`SELECT COUNT(*) AS n FROM offres_candidatures`).get().n;
+    const parType = await db.prepare(`SELECT type, COUNT(*) AS n FROM offres WHERE type IN ('emploi','stage','mission','contrat') GROUP BY type ORDER BY n DESC`).all();
+    const parSecteur = await db.prepare(`SELECT secteur, COUNT(*) AS n FROM offres WHERE secteur IS NOT NULL AND type IN ('emploi','stage','mission','contrat') GROUP BY secteur ORDER BY n DESC LIMIT 10`).all();
+    const parPays = await db.prepare(`SELECT pays, COUNT(*) AS n FROM offres WHERE pays IS NOT NULL AND type IN ('emploi','stage','mission','contrat') GROUP BY pays ORDER BY n DESC LIMIT 10`).all();
+    const parMois = await db.prepare(`SELECT strftime('%Y-%m', created_at) AS mois, COUNT(*) AS n FROM offres WHERE type IN ('emploi','stage','mission','contrat') AND created_at >= datetime('now','-12 months') GROUP BY mois ORDER BY mois`).all();
+    const totalCandidatures = (await db.prepare(`SELECT COUNT(*) AS n FROM offres_candidatures`).get())?.n;
     sendJSON(res, 200, {
       par_type: parType.map(r => ({ ...r, label: r.type })),
       par_secteur: parSecteur.map(r => ({ ...r, label: r.secteur })),
@@ -4232,9 +4232,9 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
     const { where, params: p } = buildObsWhere(accred);
-    const parDomaine = db.prepare(`SELECT i.domaine, COUNT(*) AS n FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') ${where.replace(/u\./g,"i.")} GROUP BY i.domaine ORDER BY n DESC LIMIT 15`).all(...p);
-    const parPays = db.prepare(`SELECT i.pays, COUNT(*) AS n FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') AND i.pays IS NOT NULL ${where.replace(/u\./g,"i.")} GROUP BY i.pays ORDER BY n DESC LIMIT 15`).all(...p);
-    const total = db.prepare(`SELECT COUNT(*) AS n, SUM(membres) AS membres FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') ${where.replace(/u\./g,"i.")}`).get(...p);
+    const parDomaine = await db.prepare(`SELECT i.domaine, COUNT(*) AS n FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') ${where.replace(/u\./g,"i.")} GROUP BY i.domaine ORDER BY n DESC LIMIT 15`).all(...p);
+    const parPays = await db.prepare(`SELECT i.pays, COUNT(*) AS n FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') AND i.pays IS NOT NULL ${where.replace(/u\./g,"i.")} GROUP BY i.pays ORDER BY n DESC LIMIT 15`).all(...p);
+    const total = await db.prepare(`SELECT COUNT(*) AS n, SUM(membres) AS membres FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') ${where.replace(/u\./g,"i.")}`).get(...p);
     const mask = n => n >= SEUIL_CONFIDENTIALITE ? n : null;
     sendJSON(res, 200, {
       total: { n: total?.n || 0, membres: mask(total?.membres) },
@@ -4249,8 +4249,8 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
     const { where, params: p } = buildObsWhere(accred);
-    const geo = db.prepare(`SELECT u.pays, u.ville, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.pays IS NOT NULL ${where} GROUP BY u.pays, u.ville ORDER BY n DESC`).all(...p);
-    const comp = db.prepare(`SELECT u.situation_pro, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.situation_pro IS NOT NULL ${where} GROUP BY u.situation_pro ORDER BY n DESC`).all(...p);
+    const geo = await db.prepare(`SELECT u.pays, u.ville, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.pays IS NOT NULL ${where} GROUP BY u.pays, u.ville ORDER BY n DESC`).all(...p);
+    const comp = await db.prepare(`SELECT u.situation_pro, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.situation_pro IS NOT NULL ${where} GROUP BY u.situation_pro ORDER BY n DESC`).all(...p);
     // Build CSV
     const lines = ["Type,Catégorie,Valeur,Nombre"];
     geo.forEach(r => r.n >= SEUIL_CONFIDENTIALITE && lines.push(`Géographie,${r.pays},${r.ville||''},${r.n}`));
@@ -4279,12 +4279,12 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
       return "datetime('now','-1 year')";
     };
     const dr = dateRef(periode);
-    const total = db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='utilisateur' ${where}`).get(...p);
-    const nouveaux = db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.created_at >= ${dr} ${where}`).get(...p);
-    const initiatives = db.prepare(`SELECT COUNT(*) AS n FROM initiatives i WHERE 1=1 ${where.replace(/u\./g,"i.")}`).get(...p);
-    const nouvInits = db.prepare(`SELECT COUNT(*) AS n FROM initiatives i WHERE i.created_at >= ${dr} ${where.replace(/u\./g,"i.")}`).get(...p);
-    const consultations = db.prepare(`SELECT COUNT(*) AS n FROM consultations WHERE emetteur_id=? AND created_at >= ${dr}`).get(user.id).n;
-    const reponses = db.prepare(`SELECT COUNT(*) AS n FROM consultation_reponses cr JOIN consultations c ON c.id=cr.consultation_id WHERE c.emetteur_id=? AND cr.created_at >= ${dr}`).get(user.id).n;
+    const total = await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='utilisateur' ${where}`).get(...p);
+    const nouveaux = await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.created_at >= ${dr} ${where}`).get(...p);
+    const initiatives = await db.prepare(`SELECT COUNT(*) AS n FROM initiatives i WHERE 1=1 ${where.replace(/u\./g,"i.")}`).get(...p);
+    const nouvInits = await db.prepare(`SELECT COUNT(*) AS n FROM initiatives i WHERE i.created_at >= ${dr} ${where.replace(/u\./g,"i.")}`).get(...p);
+    const consultations = (await db.prepare(`SELECT COUNT(*) AS n FROM consultations WHERE emetteur_id=? AND created_at >= ${dr}`).get(user.id))?.n;
+    const reponses = (await db.prepare(`SELECT COUNT(*) AS n FROM consultation_reponses cr JOIN consultations c ON c.id=cr.consultation_id WHERE c.emetteur_id=? AND cr.created_at >= ${dr}`).get(user.id))?.n;
     sendJSON(res, 200, {
       periode,
       date_rapport: new Date().toISOString(),
@@ -4324,7 +4324,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
       if (c.pays?.length) { const ph = c.pays.map(()=>"?").join(","); conds.push(`pays IN (${ph})`); p.push(...c.pays); }
       if (c.villes?.length) { const ph = c.villes.map(()=>"?").join(","); conds.push(`ville IN (${ph})`); p.push(...c.villes); }
       if (c.nationalites?.length) { const ph = c.nationalites.map(()=>"?").join(","); conds.push(`(nationalite1 IN (${ph}) OR nationalite2 IN (${ph}))`); p.push(...c.nationalites,...c.nationalites); }
-      nb = db.prepare(`SELECT COUNT(*) AS n FROM users WHERE ${conds.join(" AND ")}`).get(...p).n;
+      nb = (await db.prepare(`SELECT COUNT(*) AS n FROM users WHERE ${conds.join(" AND ")}`).get(...p))?.n;
     } catch(e) { nb = 0; }
     // Alter table si colonnes manquantes (migration SQLite)
     try {
@@ -4397,9 +4397,9 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     let rows;
     if (["collectivite","administrateur"].includes(user.role)) {
-      rows = db.prepare("SELECT c.*,(SELECT COUNT(*) FROM consultation_reponses WHERE consultation_id=c.id) AS nb_reponses FROM consultations c WHERE emetteur_id=? ORDER BY created_at DESC").all(user.id);
+      rows = await db.prepare("SELECT c.*,(SELECT COUNT(*) FROM consultation_reponses WHERE consultation_id=c.id) AS nb_reponses FROM consultations c WHERE emetteur_id=? ORDER BY created_at DESC").all(user.id);
     } else {
-      rows = db.prepare("SELECT c.*,u.nom AS emetteur_nom,(SELECT COUNT(*) FROM consultation_reponses WHERE consultation_id=c.id) AS nb_reponses FROM consultations c JOIN users u ON u.id=c.emetteur_id WHERE c.statut='ouverte' ORDER BY c.created_at DESC LIMIT 20").all();
+      rows = await db.prepare("SELECT c.*,u.nom AS emetteur_nom,(SELECT COUNT(*) FROM consultation_reponses WHERE consultation_id=c.id) AS nb_reponses FROM consultations c JOIN users u ON u.id=c.emetteur_id WHERE c.statut='ouverte' ORDER BY c.created_at DESC LIMIT 20").all();
     }
     sendJSON(res, 200, { consultations: rows });
   });
@@ -4433,11 +4433,11 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!c) return sendJSON(res, 404, { error: "Consultation introuvable." });
     if (c.emetteur_id !== user.id && user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès réservé à l'émetteur." });
     const questions = await db.prepare("SELECT * FROM consultation_questions WHERE consultation_id=? ORDER BY ordre").all(params.id);
-    const nb_repondants = db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM consultation_reponses WHERE consultation_id=?").get(params.id).n;
-    const resultats = questions.map(q => {
-      const reps = db.prepare("SELECT reponse, COUNT(*) AS n FROM consultation_reponses WHERE question_id=? GROUP BY reponse ORDER BY n DESC").all(q.id);
+    const nb_repondants = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM consultation_reponses WHERE consultation_id=?").get(params.id))?.n;
+    const resultats = await Promise.all(questions.map(async q => {
+      const reps = await db.prepare("SELECT reponse, COUNT(*) AS n FROM consultation_reponses WHERE question_id=? GROUP BY reponse ORDER BY n DESC").all(q.id);
       return { question: q, nb_reponses: reps.reduce((a,r)=>a+r.n,0), repartition: reps };
-    });
+    }));
     sendJSON(res, 200, { consultation: c, nb_repondants, resultats });
   });
 
@@ -4506,13 +4506,13 @@ route("GET", "/api/collectivite/stats-diaspora", async (req, res) => {
   const pays = profil?.pays_represente || user.pays;
   const SEUIL = 10;
   const mask = n => n >= SEUIL ? n : null;
-  const ressortissants = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?)").get(pays, pays).n;
+  const ressortissants = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?)").get(pays, pays))?.n;
   const parVille = (await db.prepare("SELECT ville, COUNT(*) AS n FROM users WHERE role='utilisateur' AND ville IS NOT NULL AND (nationalite1=? OR nationalite2=?) GROUP BY ville ORDER BY n DESC LIMIT 20").all(pays, pays)).map(r=>({...r, n: mask(r.n)})).filter(r=>r.n);
   const parRegion = (await db.prepare("SELECT pays AS region, COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?) AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 15").all(pays, pays)).map(r=>({...r, n: mask(r.n)})).filter(r=>r.n);
-  const initiatives = db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE nationalite1=? OR nationalite2=?").get(pays, pays).n;
-  const associations = db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE (nationalite1=? OR nationalite2=?) AND domaine='associatif'").get(pays, pays).n;
-  const entreprises = db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE (nationalite1=? OR nationalite2=?) AND domaine IN ('commerce','finance','tech','industrie')").get(pays, pays).n;
-  const experts = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?) AND titre_pro IS NOT NULL").get(pays, pays).n;
+  const initiatives = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE nationalite1=? OR nationalite2=?").get(pays, pays))?.n;
+  const associations = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE (nationalite1=? OR nationalite2=?) AND domaine='associatif'").get(pays, pays))?.n;
+  const entreprises = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE (nationalite1=? OR nationalite2=?) AND domaine IN ('commerce','finance','tech','industrie')").get(pays, pays))?.n;
+  const experts = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?) AND titre_pro IS NOT NULL").get(pays, pays))?.n;
   sendJSON(res, 200, {
     pays, seuil: SEUIL,
     ressortissants: mask(ressortissants),
@@ -4915,24 +4915,28 @@ route("GET", "/api/sondages/:id/resultats", async (req, res, params) => {
   if (!s) return sendJSON(res, 404, { error: "Sondage introuvable." });
   if (s.createur_id !== user.id && user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au créateur." });
   const questions = await db.prepare("SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre").all(params.id);
-  const resultats = questions.map(q => {
-    const reps = db.prepare("SELECT reponse, COUNT(*) AS n FROM sondage_reponses WHERE question_id=? GROUP BY reponse").all(q.id);
+  const resultats = await Promise.all(questions.map(async q => {
+    const reps = await db.prepare("SELECT reponse, COUNT(*) AS n FROM sondage_reponses WHERE question_id=? GROUP BY reponse").all(q.id);
     return { question: q.texte, type: q.type, options: safeParse(q.options_json), reponses: reps };
-  });
+  }));
   // Stats géographiques des répondants
   const repartition_pays = db.prepare(
     "SELECT u.pays, COUNT(DISTINCT sr.user_id) AS n FROM sondage_reponses sr JOIN users u ON u.id=sr.user_id WHERE sr.sondage_id=? AND u.pays IS NOT NULL GROUP BY u.pays ORDER BY n DESC LIMIT 10"
   ).all(params.id);
-  const nb_repondants = db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM sondage_reponses WHERE sondage_id=?").get(params.id).n;
-  const taux_participation = s.cible_roles
-    ? (() => {
-        const cibles = safeParse(s.cible_roles);
-        const total = Array.isArray(cibles) && cibles.length
-          ? db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN (" + cibles.map(()=>"?").join(",") + ")").get(...cibles).n
-          : db.prepare("SELECT COUNT(*) AS n FROM users").get().n;
-        return total > 0 ? Math.round((nb_repondants / total) * 100) : 0;
-      })()
-    : 0;
+  const nb_repondants = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM sondage_reponses WHERE sondage_id=?").get(params.id))?.n;
+  let taux_participation = 0;
+  if (s.cible_roles) {
+    const cibles = safeParse(s.cible_roles);
+    let total = 0;
+    if (Array.isArray(cibles) && cibles.length) {
+      const _t = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN (" + cibles.map(()=>"?").join(",") + ")").get(...cibles);
+      total = _t?.n || 0;
+    } else {
+      const _t = await db.prepare("SELECT COUNT(*) AS n FROM users").get();
+      total = _t?.n || 0;
+    }
+    taux_participation = total > 0 ? Math.round((nb_repondants / total) * 100) : 0;
+  }
   sendJSON(res, 200, { sondage: s, resultats, nb_reponses: s.nb_reponses, nb_repondants, taux_participation, repartition_pays });
 });
 
@@ -5285,7 +5289,7 @@ async function scrapeSite() {
     created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
   /* Seed catégories initiales */
-  const faqCatCount = db.prepare(`SELECT COUNT(*) c FROM faq_categories`).get()?.c || 0;
+  const faqCatCount = await db.prepare(`SELECT COUNT(*) c FROM faq_categories`).get()?.c || 0;
   if (faqCatCount === 0) {
     const cats = [
       { nom: 'Mon compte',      slug: 'mon-compte',       icone: '👤', ordre: 1 },
@@ -5585,7 +5589,7 @@ async function scrapeSite() {
     created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
   /* Seed tutoriels */
-  const obCount = db.prepare(`SELECT COUNT(*) c FROM onboarding_tutorials`).get()?.c || 0;
+  const obCount = await db.prepare(`SELECT COUNT(*) c FROM onboarding_tutorials`).get()?.c || 0;
   if (obCount === 0) {
     const insT = db.prepare(`INSERT INTO onboarding_tutorials (compte_type,titre,description,duree_estimee,actif) VALUES (?,?,?,?,1)`);
     const insS = db.prepare(`INSERT INTO onboarding_steps (tutorial_id,ordre,titre,contenu,type,illustration,narration,module_lien,module_label,action_selector,action_label) VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
@@ -5708,7 +5712,7 @@ async function scrapeSite() {
     updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
   /* ── O-Z : seed base de connaissance ── */
-  if ((db.prepare('SELECT COUNT(*) n FROM oz_knowledge').get()?.n || 0) === 0) {
+  if ((await db.prepare('SELECT COUNT(*) n FROM oz_knowledge').get()?.n || 0) === 0) {
     const kbItems = [
       ['événement', "Pour créer un événement, allez dans le module Événements et cliquez sur 'Créer un événement'. Vous pouvez définir un titre, une date, un lieu et inviter des participants.", 'evenement,creation,guide'],
       ['initiative', "Les initiatives permettent de lancer des projets communautaires. Rendez-vous dans le module Initiatives et cliquez sur 'Nouvelle initiative'.", 'initiative,projet,diaspora'],
@@ -5865,12 +5869,12 @@ route("POST", "/api/chatbot/importer-site", async (req, res, params, body) => {
 route("GET", "/api/chatbot/stats", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
-  const total       = db.prepare("SELECT COUNT(*) n FROM chatbot_memoire WHERE actif=1").get().n;
-  const ce_mois     = db.prepare("SELECT COUNT(*) n FROM chatbot_memoire WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now') AND actif=1").get().n;
-  const modifs      = db.prepare("SELECT COUNT(*) n FROM chatbot_memoire_historique").get().n;
-  const sans_rep    = db.prepare("SELECT COUNT(*) n FROM chatbot_questions WHERE statut='ouvert'").get().n;
-  const total_q     = db.prepare("SELECT COUNT(*) n FROM chatbot_questions").get().n;
-  const top_cats    = db.prepare("SELECT categorie, COUNT(*) n FROM chatbot_memoire WHERE actif=1 GROUP BY categorie ORDER BY n DESC LIMIT 5").all();
+  const total       = (await db.prepare("SELECT COUNT(*) n FROM chatbot_memoire WHERE actif=1").get())?.n;
+  const ce_mois     = (await db.prepare("SELECT COUNT(*) n FROM chatbot_memoire WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now') AND actif=1").get())?.n;
+  const modifs      = (await db.prepare("SELECT COUNT(*) n FROM chatbot_memoire_historique").get())?.n;
+  const sans_rep    = (await db.prepare("SELECT COUNT(*) n FROM chatbot_questions WHERE statut='ouvert'").get())?.n;
+  const total_q     = (await db.prepare("SELECT COUNT(*) n FROM chatbot_questions").get())?.n;
+  const top_cats    = await db.prepare("SELECT categorie, COUNT(*) n FROM chatbot_memoire WHERE actif=1 GROUP BY categorie ORDER BY n DESC LIMIT 5").all();
   const top_connus  = await db.prepare("SELECT titre, nb_consultations FROM chatbot_memoire WHERE actif=1 ORDER BY nb_consultations DESC LIMIT 5").all();
   const questions_freq = await db.prepare("SELECT question, nb_fois, categorie_estimee, last_asked_at FROM chatbot_questions WHERE statut='ouvert' ORDER BY nb_fois DESC LIMIT 10").all();
   const taux_reponse = total_q > 0 ? Math.round(((total_q - sans_rep) / total_q) * 100) : 100;
@@ -6094,7 +6098,7 @@ route("POST", "/api/faq/sans-reponse", async (req, res, _p, body) => {
   if (!question || question.trim().length < 5) return sendJSON(res, 400, { error: 'Question trop courte' });
   const user = await getCurrentUser(req);
   const norm = normSR(question);
-  const open = db.prepare(`SELECT id, question_norm, count FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore')`).all();
+  const open = await db.prepare(`SELECT id, question_norm, count FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore')`).all();
   let matched = null;
   for (const row of open) {
     if (similariteSR(norm, row.question_norm || '') >= 0.6) { matched = row; break; }
@@ -6116,19 +6120,19 @@ route("POST", "/api/faq/sans-reponse", async (req, res, _p, body) => {
 route("GET", "/api/faq/sans-reponse/stats", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  const total      = db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='nouveau'`).get()?.n || 0;
-  const en_cours   = db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='en_cours'`).get()?.n || 0;
-  const resolues   = db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='resolu'`).get()?.n || 0;
+  const total      = await db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='nouveau'`).get()?.n || 0;
+  const en_cours   = await db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='en_cours'`).get()?.n || 0;
+  const resolues   = await db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='resolu'`).get()?.n || 0;
   const top5       = await db.prepare(`SELECT question, count, priorite FROM faq_sans_reponse WHERE statut='nouveau' ORDER BY count DESC LIMIT 5`).all();
-  const by_priorite= db.prepare(`SELECT priorite, COUNT(*) n FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore') GROUP BY priorite`).all();
-  const avg_temps  = db.prepare(`SELECT AVG((julianday(updated_at)-julianday(first_asked_at))*24) h FROM faq_sans_reponse WHERE statut='resolu'`).get()?.h;
+  const by_priorite= await db.prepare(`SELECT priorite, COUNT(*) n FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore') GROUP BY priorite`).all();
+  const avg_temps  = await db.prepare(`SELECT AVG((julianday(updated_at)-julianday(first_asked_at))*24) h FROM faq_sans_reponse WHERE statut='resolu'`).get()?.h;
   sendJSON(res, 200, { total, en_cours, resolues, top5, by_priorite, avg_temps_h: avg_temps });
 });
 
 route("GET", "/api/faq/sans-reponse/similaires", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  const open = db.prepare(`SELECT id, question, question_norm, count FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore') ORDER BY count DESC`).all();
+  const open = await db.prepare(`SELECT id, question, question_norm, count FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore') ORDER BY count DESC`).all();
   const groupes = [], used = new Set();
   for (let i = 0; i < open.length; i++) {
     if (used.has(open[i].id)) continue;
@@ -6198,7 +6202,7 @@ route("POST", "/api/faq/sans-reponse/fusion", async (req, res, _p, body) => {
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { ids, question_principale } = body;
   if (!Array.isArray(ids) || ids.length < 2) return sendJSON(res, 400, { error: '≥2 IDs requis' });
-  const rows = db.prepare(`SELECT * FROM faq_sans_reponse WHERE id IN (${ids.map(()=>'?').join(',')})`).all(...ids.map(Number));
+  const rows = await db.prepare(`SELECT * FROM faq_sans_reponse WHERE id IN (${ids.map(()=>'?').join(',')})`).all(...ids.map(Number));
   const totalCount = rows.reduce((s, r) => s + (r.count||1), 0);
   const mainId = ids[0];
   db.prepare(`UPDATE faq_sans_reponse SET question=?,question_norm=?,count=?,priorite=?,updated_at=datetime('now') WHERE id=?`)
@@ -6366,13 +6370,13 @@ route("DELETE", "/api/faq/categories/:id", async (req, res, params) => {
 route("GET", "/api/faq/stats/dashboard", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  const total_questions  = db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE statut='active'`).get()?.n || 0;
-  const total_vues       = db.prepare(`SELECT SUM(vues) n FROM faq_questions`).get()?.n || 0;
-  const zero_vues        = db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE vues=0 AND statut='active'`).get()?.n || 0;
+  const total_questions  = await db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE statut='active'`).get()?.n || 0;
+  const total_vues       = await db.prepare(`SELECT SUM(vues) n FROM faq_questions`).get()?.n || 0;
+  const zero_vues        = await db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE vues=0 AND statut='active'`).get()?.n || 0;
   const top_questions    = await db.prepare(`SELECT id,question,vues,statut FROM faq_questions ORDER BY vues DESC LIMIT 10`).all();
-  const no_results_searches = db.prepare(`SELECT query, COUNT(*) n FROM faq_searches WHERE results_count=0 GROUP BY query ORDER BY n DESC LIMIT 10`).all();
-  const top_searches     = db.prepare(`SELECT query, COUNT(*) n FROM faq_searches GROUP BY query ORDER BY n DESC LIMIT 10`).all();
-  const satisfaction     = db.prepare(`SELECT helpful, COUNT(*) n FROM faq_ratings GROUP BY helpful`).all();
+  const no_results_searches = await db.prepare(`SELECT query, COUNT(*) n FROM faq_searches WHERE results_count=0 GROUP BY query ORDER BY n DESC LIMIT 10`).all();
+  const top_searches     = await db.prepare(`SELECT query, COUNT(*) n FROM faq_searches GROUP BY query ORDER BY n DESC LIMIT 10`).all();
+  const satisfaction     = await db.prepare(`SELECT helpful, COUNT(*) n FROM faq_ratings GROUP BY helpful`).all();
   const helpful_yes      = satisfaction.find(r=>r.helpful===1)?.n || 0;
   const helpful_no       = satisfaction.find(r=>r.helpful===0)?.n || 0;
   const taux_satisfaction = (helpful_yes + helpful_no) > 0
@@ -6438,7 +6442,7 @@ route("POST", "/api/onboarding/stats", async (req, res, _p, body) => {
 route("GET", "/api/onboarding/admin/list", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  const tuts = db.prepare(`SELECT t.*, (SELECT COUNT(*) FROM onboarding_steps WHERE tutorial_id=t.id AND actif=1) nb_steps FROM onboarding_tutorials t ORDER BY t.compte_type`).all();
+  const tuts = await db.prepare(`SELECT t.*, (SELECT COUNT(*) FROM onboarding_steps WHERE tutorial_id=t.id AND actif=1) nb_steps FROM onboarding_tutorials t ORDER BY t.compte_type`).all();
   sendJSON(res, 200, tuts);
 });
 
@@ -6492,13 +6496,13 @@ route("DELETE", "/api/onboarding/admin/steps/:id", async (req, res, params) => {
 route("GET", "/api/onboarding/admin/stats", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  const total_started   = db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut != 'en_cours'`).get()?.n || 0;
-  const total_finished  = db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'termine'`).get()?.n || 0;
-  const total_skipped   = db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'ignore'`).get()?.n || 0;
-  const avg_note        = db.prepare(`SELECT AVG(note) n FROM onboarding_progress WHERE note IS NOT NULL`).get()?.n;
-  const by_role         = db.prepare(`SELECT t.compte_type, COUNT(*) n, SUM(CASE WHEN p.statut='termine' THEN 1 ELSE 0 END) done FROM onboarding_progress p JOIN onboarding_tutorials t ON t.id=p.tutorial_id GROUP BY t.compte_type`).all();
-  const top_abandon     = db.prepare(`SELECT step_id, COUNT(*) n FROM onboarding_stats WHERE action='abandon' GROUP BY step_id ORDER BY n DESC LIMIT 5`).all();
-  const top_skip_steps  = db.prepare(`SELECT step_id, COUNT(*) n FROM onboarding_stats WHERE action='step_skip' GROUP BY step_id ORDER BY n DESC LIMIT 5`).all();
+  const total_started   = await db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut != 'en_cours'`).get()?.n || 0;
+  const total_finished  = await db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'termine'`).get()?.n || 0;
+  const total_skipped   = await db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'ignore'`).get()?.n || 0;
+  const avg_note        = await db.prepare(`SELECT AVG(note) n FROM onboarding_progress WHERE note IS NOT NULL`).get()?.n;
+  const by_role         = await db.prepare(`SELECT t.compte_type, COUNT(*) n, SUM(CASE WHEN p.statut='termine' THEN 1 ELSE 0 END) done FROM onboarding_progress p JOIN onboarding_tutorials t ON t.id=p.tutorial_id GROUP BY t.compte_type`).all();
+  const top_abandon     = await db.prepare(`SELECT step_id, COUNT(*) n FROM onboarding_stats WHERE action='abandon' GROUP BY step_id ORDER BY n DESC LIMIT 5`).all();
+  const top_skip_steps  = await db.prepare(`SELECT step_id, COUNT(*) n FROM onboarding_stats WHERE action='step_skip' GROUP BY step_id ORDER BY n DESC LIMIT 5`).all();
   sendJSON(res, 200, { total_started, total_finished, total_skipped, avg_note, by_role, top_abandon, top_skip_steps });
 });
 
@@ -6551,11 +6555,11 @@ route("GET", "/api/oz/audit", async (req, res, _p, _b, query) => {
 route("GET", "/api/oz/stats", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  const total_actions = db.prepare('SELECT COUNT(*) n FROM oz_audit').get()?.n || 0;
-  const today         = db.prepare("SELECT COUNT(*) n FROM oz_audit WHERE date(created_at)=date('now')").get()?.n || 0;
-  const by_action     = db.prepare('SELECT action, COUNT(*) n FROM oz_audit GROUP BY action ORDER BY n DESC LIMIT 10').all();
-  const users_actifs  = db.prepare("SELECT COUNT(DISTINCT user_id) n FROM oz_audit WHERE date(created_at)>=date('now','-7 days')").get()?.n || 0;
-  const top_modules   = db.prepare("SELECT module, COUNT(*) n FROM oz_audit WHERE module IS NOT NULL AND module!='' GROUP BY module ORDER BY n DESC LIMIT 5").all();
+  const total_actions = await db.prepare('SELECT COUNT(*) n FROM oz_audit').get()?.n || 0;
+  const today         = await db.prepare("SELECT COUNT(*) n FROM oz_audit WHERE date(created_at)=date('now')").get()?.n || 0;
+  const by_action     = await db.prepare('SELECT action, COUNT(*) n FROM oz_audit GROUP BY action ORDER BY n DESC LIMIT 10').all();
+  const users_actifs  = await db.prepare("SELECT COUNT(DISTINCT user_id) n FROM oz_audit WHERE date(created_at)>=date('now','-7 days')").get()?.n || 0;
+  const top_modules   = await db.prepare("SELECT module, COUNT(*) n FROM oz_audit WHERE module IS NOT NULL AND module!='' GROUP BY module ORDER BY n DESC LIMIT 5").all();
   sendJSON(res, 200, { total_actions, today, by_action, users_actifs, top_modules });
 });
 
@@ -6812,9 +6816,9 @@ async function handleRequest(req, res) {
     /* ---- GET /api/stats — statistiques agrégées publiques ---- */
     if (req.method === "GET" && pathname === "/api/stats") {
       try {
-        const membres = db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur'`).get().n;
-        const initiatives = db.prepare(`SELECT COUNT(*) AS n FROM initiatives`).get().n;
-        const pays = db.prepare(`SELECT COUNT(DISTINCT pays) AS n FROM initiatives WHERE pays IS NOT NULL`).get().n;
+        const membres = (await db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur'`).get())?.n;
+        const initiatives = (await db.prepare(`SELECT COUNT(*) AS n FROM initiatives`).get())?.n;
+        const pays = (await db.prepare(`SELECT COUNT(DISTINCT pays) AS n FROM initiatives WHERE pays IS NOT NULL`).get())?.n;
         return sendJSON(res, 200, { membres, initiatives, pays });
       } catch (e) {
         return sendJSON(res, 200, { membres: 0, initiatives: 0, pays: 0 });
@@ -7132,7 +7136,7 @@ async function handleRequest(req, res) {
         for (const base of bases) {
           const s = base.toISOString();
           const e = new Date(base.getTime() + dureeMs).toISOString();
-          const c = db.prepare(`SELECT id FROM agenda_events WHERE user_id=? AND NOT (date_fin <= ? OR date_debut >= ?)`).all(userId, s, e);
+          const c = await db.prepare(`SELECT id FROM agenda_events WHERE user_id=? AND NOT (date_fin <= ? OR date_debut >= ?)`).all(userId, s, e);
           if (c.length === 0) suggestions.push({ debut: s, fin: e });
           if (suggestions.length >= 3) break;
         }
@@ -7529,15 +7533,15 @@ async function handleRequest(req, res) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       let stats;
       if (me.role === 'administrateur' || me.role === 'collectivite') {
-        const total = db.prepare(`SELECT COUNT(*) AS n FROM projets`).get().n;
-        const en_attente = db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='en_attente'`).get().n;
-        const validation = db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='validation'`).get().n;
-        const execution = db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='execution'`).get().n;
-        const termine = db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='termine'`).get().n;
-        const rejete = db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='rejete'`).get().n;
+        const total = (await db.prepare(`SELECT COUNT(*) AS n FROM projets`).get())?.n;
+        const en_attente = (await db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='en_attente'`).get())?.n;
+        const validation = (await db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='validation'`).get())?.n;
+        const execution = (await db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='execution'`).get())?.n;
+        const termine = (await db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='termine'`).get())?.n;
+        const rejete = (await db.prepare(`SELECT COUNT(*) AS n FROM projets WHERE statut='rejete'`).get())?.n;
         stats = { total, en_attente, validation, execution, termine, rejete };
       } else {
-        const mes = db.prepare(`SELECT statut, COUNT(*) AS n FROM projets WHERE createur_id=? GROUP BY statut`).all(me.id);
+        const mes = await db.prepare(`SELECT statut, COUNT(*) AS n FROM projets WHERE createur_id=? GROUP BY statut`).all(me.id);
         stats = { total: 0, brouillon: 0, en_attente: 0, execution: 0, termine: 0 };
         mes.forEach(r => { stats[r.statut] = r.n; stats.total += r.n; });
       }
@@ -7638,7 +7642,7 @@ async function handleRequest(req, res) {
       const { nom, description, couleur, icone, notes } = body;
       if (!nom?.trim()) return sendJSON(res, 400, { error: 'Nom requis.' });
       const ts = new Date().toISOString();
-      const maxOrdre = db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
+      const maxOrdre = await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
       const id = db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,notes,ordre,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`)
         .run(me.id, nom.trim(), description||null, couleur||'#1B3A6B', icone||'📋', notes||null, maxOrdre+1, ts, ts).lastInsertRowid;
       return sendJSON(res, 201, { id });
@@ -7663,7 +7667,7 @@ async function handleRequest(req, res) {
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
       const ts = new Date().toISOString();
-      const maxOrdre = db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
+      const maxOrdre = await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
       const newId = db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,notes,ordre,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`)
         .run(me.id, `${liste.nom} (copie)`, liste.description, liste.couleur, liste.icone, liste.notes, maxOrdre+1, ts, ts).lastInsertRowid;
       const contacts = await db.prepare(`SELECT * FROM listes_diffusion_contacts WHERE liste_id=?`).all(lid);
@@ -7828,12 +7832,12 @@ async function handleRequest(req, res) {
     if (req.method === 'GET' && pathname === '/api/events/stats') {
       const me = await getCurrentUser(req);
       if (!me || !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé.' });
-      const total_events = db.prepare("SELECT COUNT(*) n FROM events").get().n;
-      const publies = db.prepare("SELECT COUNT(*) n FROM events WHERE statut='publie'").get().n;
-      const total_tickets = db.prepare("SELECT COUNT(*) n FROM tickets WHERE payment_status='paid'").get().n;
-      const revenu_total = db.prepare("SELECT COALESCE(SUM(prix_paye),0) n FROM tickets WHERE payment_status='paid'").get().n;
-      const commission_total = db.prepare("SELECT COALESCE(SUM(commission),0) n FROM tickets WHERE payment_status='paid'").get().n;
-      const par_pays = db.prepare(`SELECT pays, COUNT(*) n FROM events WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 10`).all();
+      const total_events = (await db.prepare("SELECT COUNT(*) n FROM events").get())?.n;
+      const publies = (await db.prepare("SELECT COUNT(*) n FROM events WHERE statut='publie'").get())?.n;
+      const total_tickets = (await db.prepare("SELECT COUNT(*) n FROM tickets WHERE payment_status='paid'").get())?.n;
+      const revenu_total = await db.prepare("SELECT COALESCE(SUM(prix_paye),0) n FROM tickets WHERE payment_status='paid'").get().n;
+      const commission_total = await db.prepare("SELECT COALESCE(SUM(commission),0) n FROM tickets WHERE payment_status='paid'").get().n;
+      const par_pays = await db.prepare(`SELECT pays, COUNT(*) n FROM events WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 10`).all();
       const top_events = db.prepare(`SELECT e.titre, COUNT(t.id) nb_billets, COALESCE(SUM(t.prix_paye),0) revenu
         FROM events e LEFT JOIN tickets t ON t.event_id=e.id AND t.payment_status='paid'
         GROUP BY e.id ORDER BY revenu DESC LIMIT 10`).all();
@@ -7902,8 +7906,8 @@ async function handleRequest(req, res) {
       const eid = parseInt(pathname.split('/')[3]);
       const ev = await db.prepare(`SELECT e.*, u.nom AS organisateur_nom FROM events e LEFT JOIN users u ON u.id=e.organisateur_id WHERE e.id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
-      const types = db.prepare(`SELECT tt.*, (tt.quantite_totale - tt.quantite_vendue) AS dispo FROM ticket_types tt WHERE tt.event_id=? AND tt.actif=1`).all(eid);
-      const stats = db.prepare(`SELECT COUNT(*) nb, COALESCE(SUM(prix_paye),0) revenu FROM tickets WHERE event_id=? AND payment_status='paid'`).get(eid);
+      const types = await db.prepare(`SELECT tt.*, (tt.quantite_totale - tt.quantite_vendue) AS dispo FROM ticket_types tt WHERE tt.event_id=? AND tt.actif=1`).all(eid);
+      const stats = await db.prepare(`SELECT COUNT(*) nb, COALESCE(SUM(prix_paye),0) revenu FROM tickets WHERE event_id=? AND payment_status='paid'`).get(eid);
       return sendJSON(res, 200, { event: ev, ticket_types: types, stats });
     }
 
@@ -8088,7 +8092,7 @@ async function handleRequest(req, res) {
       const checkins = await db.prepare(`SELECT c.*, a.nom_display, u.nom AS scanner_nom
         FROM event_checkins c LEFT JOIN event_attendees a ON a.ticket_id=c.ticket_id LEFT JOIN users u ON u.id=c.scanner_id
         WHERE c.event_id=? ORDER BY c.timestamp DESC LIMIT 200`).all(eid);
-      const totaux = db.prepare(`SELECT COUNT(*) total, SUM(CASE WHEN resultat='accepted' THEN 1 ELSE 0 END) accepted FROM event_checkins WHERE event_id=?`).get(eid);
+      const totaux = await db.prepare(`SELECT COUNT(*) total, SUM(CASE WHEN resultat='accepted' THEN 1 ELSE 0 END) accepted FROM event_checkins WHERE event_id=?`).get(eid);
       return sendJSON(res, 200, { checkins, totaux });
     }
 
@@ -8123,7 +8127,7 @@ async function handleRequest(req, res) {
         WHERE t.event_id=? ORDER BY t.created_at DESC`).all(eid) : [];
 
       // Check-ins (présents)
-      const checkins = db.prepare(`SELECT COUNT(*) AS n FROM event_checkins WHERE event_id=? AND resultat='accepted'`).get(eid);
+      const checkins = await db.prepare(`SELECT COUNT(*) AS n FROM event_checkins WHERE event_id=? AND resultat='accepted'`).get(eid);
       const nbPresents = checkins?.n || 0;
 
       // Profil des inscrits
@@ -8145,7 +8149,7 @@ async function handleRequest(req, res) {
       const sortObj = o => Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>({label:k,n:v}));
 
       // Timeline inscriptions (7 derniers jours)
-      const timeline = db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM event_inscriptions_securisees WHERE event_id=? GROUP BY date(created_at) ORDER BY jour DESC LIMIT 14`).all(eid);
+      const timeline = await db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM event_inscriptions_securisees WHERE event_id=? GROUP BY date(created_at) ORDER BY jour DESC LIMIT 14`).all(eid);
 
       // Stats participation
       const nbInscrits = inscrits.length + acheteurs.length;
@@ -8184,11 +8188,11 @@ async function handleRequest(req, res) {
       const compte = user || init;
       if (!compte) return sendJSON(res, 404, { error: 'Aucun compte trouvé avec cet Identifiant Diaspo\'Actif.' });
       // Vérifier déjà inscrit
-      const dejaInscrit = db.prepare(`SELECT id FROM event_inscriptions_securisees WHERE event_id=? AND da_id_utilise=? AND statut NOT IN ('annule')`).get(eid, normalizedId);
+      const dejaInscrit = await db.prepare(`SELECT id FROM event_inscriptions_securisees WHERE event_id=? AND da_id_utilise=? AND statut NOT IN ('annule')`).get(eid, normalizedId);
       if (dejaInscrit) return sendJSON(res, 409, { error: 'Ce compte est déjà inscrit à cet événement.' });
       // Vérifier places
       if (ev.nb_places) {
-        const nbInscrits = db.prepare(`SELECT COUNT(*) AS n FROM event_inscriptions_securisees WHERE event_id=? AND statut IN ('signe','confirme')`).get(eid).n;
+        const nbInscrits = (await db.prepare(`SELECT COUNT(*) AS n FROM event_inscriptions_securisees WHERE event_id=? AND statut IN ('signe','confirme')`).get(eid))?.n;
         if (nbInscrits >= ev.nb_places && !ev.liste_attente) return sendJSON(res, 400, { error: 'Plus de places disponibles.' });
       }
       // Créer inscription en statut 'identifie' (provisoire)
@@ -8234,7 +8238,7 @@ async function handleRequest(req, res) {
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       let statutFinal = 'confirme';
       if (ev.nb_places) {
-        const nbInscrits = db.prepare(`SELECT COUNT(*) AS n FROM event_inscriptions_securisees WHERE event_id=? AND statut IN ('signe','confirme')`).get(eid).n;
+        const nbInscrits = (await db.prepare(`SELECT COUNT(*) AS n FROM event_inscriptions_securisees WHERE event_id=? AND statut IN ('signe','confirme')`).get(eid))?.n;
         if (nbInscrits >= ev.nb_places) {
           if (ev.liste_attente) statutFinal = 'liste_attente';
           else {
@@ -8270,7 +8274,7 @@ async function handleRequest(req, res) {
       const eid = parseInt(pathname.split('/')[3]);
       const daId = me ? await db.prepare(`SELECT da_id FROM users WHERE id=?`).get(me.id)?.da_id : null;
       if (!daId) return sendJSON(res, 200, { inscrit: false });
-      const insc = db.prepare(`SELECT statut,billet_qr,ds_id_signe,created_at FROM event_inscriptions_securisees WHERE event_id=? AND da_id_utilise=? AND statut NOT IN ('annule') ORDER BY id DESC LIMIT 1`).get(eid, daId);
+      const insc = await db.prepare(`SELECT statut,billet_qr,ds_id_signe,created_at FROM event_inscriptions_securisees WHERE event_id=? AND da_id_utilise=? AND statut NOT IN ('annule') ORDER BY id DESC LIMIT 1`).get(eid, daId);
       return sendJSON(res, 200, { inscrit: !!insc, ...(insc||{}) });
     }
 
@@ -8365,7 +8369,7 @@ async function handleRequest(req, res) {
         if (insc.statut === 'archive') return logRejet('Dossier QR archivé');
         if (!['confirme','liste_attente'].includes(insc.statut) && insc.statut !== 'signe') return logRejet(`Inscription non confirmée (statut : ${insc.statut})`);
         // Compter les scans précédents
-        const nbScans = db.prepare(`SELECT COUNT(*) n FROM event_checkins WHERE ticket_id=? AND event_id=? AND resultat='accepted'`).get(iid, eid)?.n || 0;
+        const nbScans = await db.prepare(`SELECT COUNT(*) n FROM event_checkins WHERE ticket_id=? AND event_id=? AND resultat='accepted'`).get(iid, eid)?.n || 0;
         // Enregistrer le scan (on autorise mais on signale si déjà scanné)
         db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat) VALUES (?,?,?,'accepted')`).run(iid, eid, me.id);
         return sendJSON(res, 200, {
@@ -8402,7 +8406,7 @@ async function handleRequest(req, res) {
       const deja = ticket.statut === 'used';
       if (!deja) await db.prepare(`UPDATE tickets SET statut='used' WHERE id=?`).run(tid);
       db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat) VALUES (?,?,?,'accepted')`).run(tid, eid, me.id);
-      const nbScans = db.prepare(`SELECT COUNT(*) n FROM event_checkins WHERE ticket_id=? AND event_id=? AND resultat='accepted'`).get(tid, eid)?.n || 1;
+      const nbScans = await db.prepare(`SELECT COUNT(*) n FROM event_checkins WHERE ticket_id=? AND event_id=? AND resultat='accepted'`).get(tid, eid)?.n || 1;
       return sendJSON(res, 200, {
         valid: true,
         deja_scanne: deja,
@@ -8431,8 +8435,8 @@ async function handleRequest(req, res) {
       const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
       const pw = await db.prepare(`SELECT * FROM platform_wallet WHERE id=1`).get();
-      const par_event = db.prepare(`SELECT e.titre, e.pays, COUNT(wt.id) nb_transactions, COALESCE(SUM(wt.montant),0) total_fees FROM wallet_transactions wt JOIN events e ON e.id=wt.event_id WHERE wt.type='platform_fee' GROUP BY wt.event_id ORDER BY total_fees DESC LIMIT 20`).all();
-      const par_pays = db.prepare(`SELECT e.pays, COUNT(wt.id) nb, COALESCE(SUM(wt.montant),0) total FROM wallet_transactions wt JOIN events e ON e.id=wt.event_id WHERE wt.type='platform_fee' AND e.pays IS NOT NULL GROUP BY e.pays ORDER BY total DESC LIMIT 10`).all();
+      const par_event = await db.prepare(`SELECT e.titre, e.pays, COUNT(wt.id) nb_transactions, COALESCE(SUM(wt.montant),0) total_fees FROM wallet_transactions wt JOIN events e ON e.id=wt.event_id WHERE wt.type='platform_fee' GROUP BY wt.event_id ORDER BY total_fees DESC LIMIT 20`).all();
+      const par_pays = await db.prepare(`SELECT e.pays, COUNT(wt.id) nb, COALESCE(SUM(wt.montant),0) total FROM wallet_transactions wt JOIN events e ON e.id=wt.event_id WHERE wt.type='platform_fee' AND e.pays IS NOT NULL GROUP BY e.pays ORDER BY total DESC LIMIT 10`).all();
       const historique = await db.prepare(`SELECT wt.*, e.titre AS event_titre, u.nom AS organisateur_nom FROM wallet_transactions wt LEFT JOIN events e ON e.id=wt.event_id LEFT JOIN users u ON u.id=wt.beneficiaire_id WHERE wt.type='platform_fee' ORDER BY wt.timestamp DESC LIMIT 100`).all();
       return sendJSON(res, 200, { wallet: pw, par_event, par_pays, historique });
     }
@@ -8469,7 +8473,7 @@ async function handleRequest(req, res) {
       let quota = null;
       if (me && ['initiative','collectivite','administrateur'].includes(me.role)) {
         const annee = new Date().getFullYear();
-        const utilisees = db.prepare(`SELECT COUNT(*) n FROM recrutement_campagnes WHERE recruteur_id=? AND strftime('%Y',created_at)=?`).get(me.id, String(annee))?.n || 0;
+        const utilisees = await db.prepare(`SELECT COUNT(*) n FROM recrutement_campagnes WHERE recruteur_id=? AND strftime('%Y',created_at)=?`).get(me.id, String(annee))?.n || 0;
         quota = { utilisees, max: 2, annee };
       }
       return sendJSON(res, 200, { campagnes, quota });
@@ -8482,7 +8486,7 @@ async function handleRequest(req, res) {
         return sendJSON(res, 403, { error: 'Réservé aux Comptes Initiatives et Étatiques.' });
       // Vérifier quota annuel
       const annee = new Date().getFullYear();
-      const utilisees = db.prepare(`SELECT COUNT(*) n FROM recrutement_campagnes WHERE recruteur_id=? AND strftime('%Y',created_at)=?`).get(me.id, String(annee))?.n || 0;
+      const utilisees = await db.prepare(`SELECT COUNT(*) n FROM recrutement_campagnes WHERE recruteur_id=? AND strftime('%Y',created_at)=?`).get(me.id, String(annee))?.n || 0;
       if (utilisees >= 2 && me.role !== 'administrateur')
         return sendJSON(res, 403, { error: 'Quota annuel atteint (2 campagnes par an maximum).' });
       const { nom, description, titre_poste, type_recrutement, organisme, secteur_activite, pays, region, departement, ville, adresse, teletravail, rayon_publication, image_b64, statut: statutInit, niveau_etudes, experience_annees, competences, langues, certifications, qualites, date_debut, duree_mission, remuneration, devise, nb_postes, photos_json, pdf_b64, pdf_nom, date_limite_candidature } = body;
@@ -8639,11 +8643,11 @@ async function handleRequest(req, res) {
       const cid = parseInt(pathname.split('/')[3]);
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c || (c.recruteur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
-      const nb_candidatures = db.prepare(`SELECT COUNT(*) n FROM recrutement_candidatures WHERE campagne_id=?`).get(cid)?.n || 0;
+      const nb_candidatures = await db.prepare(`SELECT COUNT(*) n FROM recrutement_candidatures WHERE campagne_id=?`).get(cid)?.n || 0;
       const taux_conversion = c.vues_total > 0 ? Math.round(nb_candidatures / c.vues_total * 100) : 0;
-      const par_type = db.prepare(`SELECT u.role AS type_compte, COUNT(*) n FROM recrutement_candidatures r JOIN users u ON u.id=r.candidat_id WHERE r.campagne_id=? GROUP BY u.role`).all(cid);
-      const par_pays = db.prepare(`SELECT u.pays, COUNT(*) n FROM recrutement_candidatures r JOIN users u ON u.id=r.candidat_id WHERE r.campagne_id=? AND u.pays IS NOT NULL GROUP BY u.pays ORDER BY n DESC LIMIT 10`).all(cid);
-      const par_statut = db.prepare(`SELECT statut, COUNT(*) n FROM recrutement_candidatures WHERE campagne_id=? GROUP BY statut`).all(cid);
+      const par_type = await db.prepare(`SELECT u.role AS type_compte, COUNT(*) n FROM recrutement_candidatures r JOIN users u ON u.id=r.candidat_id WHERE r.campagne_id=? GROUP BY u.role`).all(cid);
+      const par_pays = await db.prepare(`SELECT u.pays, COUNT(*) n FROM recrutement_candidatures r JOIN users u ON u.id=r.candidat_id WHERE r.campagne_id=? AND u.pays IS NOT NULL GROUP BY u.pays ORDER BY n DESC LIMIT 10`).all(cid);
+      const par_statut = await db.prepare(`SELECT statut, COUNT(*) n FROM recrutement_candidatures WHERE campagne_id=? GROUP BY statut`).all(cid);
       return sendJSON(res, 200, { campagne: c, nb_candidatures, taux_conversion, par_type, par_pays, par_statut });
     }
 
@@ -8670,7 +8674,7 @@ async function handleRequest(req, res) {
         db.prepare(`INSERT INTO recrutement_reactions(campagne_id,user_id,type) VALUES(?,?,?)`).run(cid, me.id, type);
         action = 'added';
       }
-      const nb = db.prepare(`SELECT COUNT(*) n FROM recrutement_reactions WHERE campagne_id=?`).get(cid)?.n || 0;
+      const nb = await db.prepare(`SELECT COUNT(*) n FROM recrutement_reactions WHERE campagne_id=?`).get(cid)?.n || 0;
       await db.prepare(`UPDATE recrutement_campagnes SET nb_reactions=? WHERE id=?`).run(nb, cid);
       const ma_reaction = await db.prepare(`SELECT type FROM recrutement_reactions WHERE campagne_id=? AND user_id=?`).get(cid, me.id);
       return sendJSON(res, 200, { action, nb_reactions: nb, ma_reaction: ma_reaction?.type || null });
@@ -8701,7 +8705,7 @@ async function handleRequest(req, res) {
       const { contenu, parent_id } = body;
       if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis.' });
       const r = db.prepare(`INSERT INTO recrutement_commentaires(campagne_id,user_id,contenu,parent_id) VALUES(?,?,?,?)`).run(cid, me.id, contenu.trim(), parent_id || null);
-      const nb = db.prepare(`SELECT COUNT(*) n FROM recrutement_commentaires WHERE campagne_id=?`).get(cid)?.n || 0;
+      const nb = await db.prepare(`SELECT COUNT(*) n FROM recrutement_commentaires WHERE campagne_id=?`).get(cid)?.n || 0;
       await db.prepare(`UPDATE recrutement_campagnes SET nb_commentaires=? WHERE id=?`).run(nb, cid);
       return sendJSON(res, 201, { id: Number(r.lastInsertRowid), nb_commentaires: nb });
     }
@@ -8719,7 +8723,7 @@ async function handleRequest(req, res) {
         db.prepare(`INSERT INTO recrutement_favoris(campagne_id,user_id) VALUES(?,?)`).run(cid, me.id);
         action = 'added';
       }
-      const nb = db.prepare(`SELECT COUNT(*) n FROM recrutement_favoris WHERE campagne_id=?`).get(cid)?.n || 0;
+      const nb = await db.prepare(`SELECT COUNT(*) n FROM recrutement_favoris WHERE campagne_id=?`).get(cid)?.n || 0;
       await db.prepare(`UPDATE recrutement_campagnes SET nb_favoris=? WHERE id=?`).run(nb, cid);
       return sendJSON(res, 200, { action, nb_favoris: nb, est_favori: action === 'added' });
     }
@@ -8769,8 +8773,8 @@ async function handleRequest(req, res) {
       if (!profil) profil = { user_id: me.id, situation: 'en_recherche', types_opportunites: '[]', secteurs: '[]', competences: '[]', langues: '[]' };
       const experiences = await db.prepare(`SELECT * FROM profil_emploi_experiences WHERE user_id=? ORDER BY ordre, date_debut DESC`).all(me.id);
       const formations = await db.prepare(`SELECT * FROM profil_emploi_formations WHERE user_id=? ORDER BY ordre, date_obtention DESC`).all(me.id);
-      const nb_candidatures = db.prepare(`SELECT COUNT(*) n FROM recrutement_candidatures WHERE candidat_id=?`).get(me.id)?.n || 0;
-      const cands_statuts = db.prepare(`SELECT statut, COUNT(*) n FROM recrutement_candidatures WHERE candidat_id=? GROUP BY statut`).all(me.id);
+      const nb_candidatures = await db.prepare(`SELECT COUNT(*) n FROM recrutement_candidatures WHERE candidat_id=?`).get(me.id)?.n || 0;
+      const cands_statuts = await db.prepare(`SELECT statut, COUNT(*) n FROM recrutement_candidatures WHERE candidat_id=? GROUP BY statut`).all(me.id);
       return sendJSON(res, 200, { profil, experiences, formations, nb_candidatures, cands_statuts });
     }
 
@@ -9016,7 +9020,7 @@ async function handleRequest(req, res) {
       const questions = await db.prepare(`SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre`).all(sid);
       const resultats = [];
       for (const q2 of questions) {
-        const reponses = db.prepare(`SELECT reponse, COUNT(*) n FROM sondage_reponses WHERE question_id=? GROUP BY reponse ORDER BY n DESC`).all(q2.id);
+        const reponses = await db.prepare(`SELECT reponse, COUNT(*) n FROM sondage_reponses WHERE question_id=? GROUP BY reponse ORDER BY n DESC`).all(q2.id);
         resultats.push({ question: q2, reponses });
       }
       return sendJSON(res, 200, { sondage: s, resultats });
@@ -9029,9 +9033,9 @@ async function handleRequest(req, res) {
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
       const taux = s.nb_vues > 0 ? Math.round(s.nb_reponses / s.nb_vues * 100) : 0;
-      const par_pays = db.prepare(`SELECT u.pays, COUNT(DISTINCT r.user_id) n FROM sondage_reponses r LEFT JOIN users u ON u.id=r.user_id WHERE r.sondage_id=? AND u.pays IS NOT NULL GROUP BY u.pays ORDER BY n DESC LIMIT 10`).all(sid);
-      const par_type = db.prepare(`SELECT u.role AS type_compte, COUNT(DISTINCT r.user_id) n FROM sondage_reponses r LEFT JOIN users u ON u.id=r.user_id WHERE r.sondage_id=? GROUP BY u.role`).all(sid);
-      const evolution = db.prepare(`SELECT DATE(r.created_at) AS jour, COUNT(*) n FROM sondage_reponses r WHERE r.sondage_id=? GROUP BY jour ORDER BY jour`).all(sid);
+      const par_pays = await db.prepare(`SELECT u.pays, COUNT(DISTINCT r.user_id) n FROM sondage_reponses r LEFT JOIN users u ON u.id=r.user_id WHERE r.sondage_id=? AND u.pays IS NOT NULL GROUP BY u.pays ORDER BY n DESC LIMIT 10`).all(sid);
+      const par_type = await db.prepare(`SELECT u.role AS type_compte, COUNT(DISTINCT r.user_id) n FROM sondage_reponses r LEFT JOIN users u ON u.id=r.user_id WHERE r.sondage_id=? GROUP BY u.role`).all(sid);
+      const evolution = await db.prepare(`SELECT DATE(r.created_at) AS jour, COUNT(*) n FROM sondage_reponses r WHERE r.sondage_id=? GROUP BY jour ORDER BY jour`).all(sid);
       return sendJSON(res, 200, { sondage: s, taux_participation: taux, par_pays, par_type, evolution });
     }
 
@@ -9046,7 +9050,7 @@ async function handleRequest(req, res) {
         if (existing.type === type) { await db.prepare(`DELETE FROM sondage_reactions WHERE sondage_id=? AND user_id=?`).run(sid, me.id); action = 'removed'; }
         else { await db.prepare(`UPDATE sondage_reactions SET type=? WHERE sondage_id=? AND user_id=?`).run(type,sid,me.id); action = 'changed'; }
       } else { db.prepare(`INSERT INTO sondage_reactions(sondage_id,user_id,type) VALUES(?,?,?)`).run(sid,me.id,type); action = 'added'; }
-      const nb = db.prepare(`SELECT COUNT(*) n FROM sondage_reactions WHERE sondage_id=?`).get(sid)?.n || 0;
+      const nb = await db.prepare(`SELECT COUNT(*) n FROM sondage_reactions WHERE sondage_id=?`).get(sid)?.n || 0;
       await db.prepare(`UPDATE sondages SET nb_reactions=? WHERE id=?`).run(nb, sid);
       return sendJSON(res, 200, { action, nb_reactions: nb });
     }
@@ -9068,7 +9072,7 @@ async function handleRequest(req, res) {
       const { contenu, parent_id } = body;
       if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis.' });
       const r = db.prepare(`INSERT INTO sondage_commentaires(sondage_id,user_id,contenu,parent_id) VALUES(?,?,?,?)`).run(sid,me.id,contenu.trim(),parent_id||null);
-      const nb = db.prepare(`SELECT COUNT(*) n FROM sondage_commentaires WHERE sondage_id=?`).get(sid)?.n || 0;
+      const nb = await db.prepare(`SELECT COUNT(*) n FROM sondage_commentaires WHERE sondage_id=?`).get(sid)?.n || 0;
       await db.prepare(`UPDATE sondages SET nb_commentaires=? WHERE id=?`).run(nb, sid);
       return sendJSON(res, 201, { id: Number(r.lastInsertRowid), nb_commentaires: nb });
     }
@@ -9081,7 +9085,7 @@ async function handleRequest(req, res) {
       let action;
       if (existing) { await db.prepare(`DELETE FROM sondage_favoris WHERE sondage_id=? AND user_id=?`).run(sid,me.id); action='removed'; }
       else { db.prepare(`INSERT INTO sondage_favoris(sondage_id,user_id) VALUES(?,?)`).run(sid,me.id); action='added'; }
-      const nb = db.prepare(`SELECT COUNT(*) n FROM sondage_favoris WHERE sondage_id=?`).get(sid)?.n || 0;
+      const nb = await db.prepare(`SELECT COUNT(*) n FROM sondage_favoris WHERE sondage_id=?`).get(sid)?.n || 0;
       await db.prepare(`UPDATE sondages SET nb_favoris=? WHERE id=?`).run(nb, sid);
       return sendJSON(res, 200, { action, nb_favoris: nb, est_favori: action === 'added' });
     }
@@ -9217,7 +9221,7 @@ async function handleRequest(req, res) {
       total += anciennete;
 
       // Accréditations DA max 20 pts
-      const nbAccred = db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE user_id=? AND statut='active'`).get(userId)?.n || 0;
+      const nbAccred = await db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE user_id=? AND statut='active'`).get(userId)?.n || 0;
       const accredPts = Math.min(20, nbAccred * 10);
       if (accredPts > 0) detail.push({ icon:'🏅', label:`${nbAccred} accréditation(s) Diaspo'Actif`, pts: accredPts, max:20 });
       total += accredPts;
@@ -9227,9 +9231,9 @@ async function handleRequest(req, res) {
       if (init?.numero_immatriculation) { total += 8; detail.push({ icon:'🏛️', label:'Initiative officiellement immatriculée', pts:8, max:8 }); }
 
       // Activité plateforme max 10 pts
-      const nbPosts = db.prepare(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?`).get(userId)?.n || 0;
-      const nbCollabs = db.prepare(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`).get(userId)?.n || 0;
-      const nbFollowers = db.prepare(`SELECT COUNT(*) n FROM user_follows WHERE followed_id=?`).get(userId)?.n || 0;
+      const nbPosts = await db.prepare(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?`).get(userId)?.n || 0;
+      const nbCollabs = await db.prepare(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`).get(userId)?.n || 0;
+      const nbFollowers = await db.prepare(`SELECT COUNT(*) n FROM user_follows WHERE followed_id=?`).get(userId)?.n || 0;
       const activPts = Math.min(10, Math.floor(nbPosts/5) + nbCollabs * 2 + Math.floor(nbFollowers/10));
       if (activPts > 0) detail.push({ icon:'📊', label:`Activité : ${nbPosts} publications, ${nbFollowers} abonnés`, pts: activPts, max:10 });
       total += activPts;
@@ -9328,7 +9332,7 @@ async function handleRequest(req, res) {
     if (req.method === 'GET' && /^\/api\/users\/\d+\/trust-score$/.test(pathname)) {
       const uid = parseInt(pathname.split('/')[3]);
       // Check cache (5 minutes)
-      const cached = db.prepare(`SELECT * FROM trust_cache WHERE user_id=? AND computed_at >= datetime('now','-5 minutes')`).get(uid);
+      const cached = await db.prepare(`SELECT * FROM trust_cache WHERE user_id=? AND computed_at >= datetime('now','-5 minutes')`).get(uid);
       if (cached) {
         return sendJSON(res, 200, { score: cached.score, detail: JSON.parse(cached.detail_json||'[]'), label: cached.label });
       }
@@ -9340,7 +9344,7 @@ async function handleRequest(req, res) {
     /* ── GET /api/users/:id/absence — mode absence public ── */
     if (req.method === 'GET' && /^\/api\/users\/\d+\/absence$/.test(pathname)) {
       const uid = parseInt(pathname.split('/')[3]);
-      const absence = db.prepare(`SELECT * FROM user_absence WHERE user_id=? AND (fin IS NULL OR fin >= date('now'))`).get(uid);
+      const absence = await db.prepare(`SELECT * FROM user_absence WHERE user_id=? AND (fin IS NULL OR fin >= date('now'))`).get(uid);
       return sendJSON(res, 200, { absence: absence || null });
     }
 
@@ -9369,7 +9373,7 @@ async function handleRequest(req, res) {
       if (uid === me.id) return sendJSON(res, 400, { error: 'Vous ne pouvez pas vous signaler vous-même.' });
 
       // Vérif : mode absence actif ?
-      const absence = db.prepare(`SELECT id FROM user_absence WHERE user_id=? AND (fin IS NULL OR fin >= date('now'))`).get(uid);
+      const absence = await db.prepare(`SELECT id FROM user_absence WHERE user_id=? AND (fin IS NULL OR fin >= date('now'))`).get(uid);
       if (absence) return sendJSON(res, 400, { error: 'Cet utilisateur est en mode absence. Aucun signalement possible.' });
 
       // Vérif : une conversation existe avec un message non répondu depuis 14 jours
@@ -9392,7 +9396,7 @@ async function handleRequest(req, res) {
       db.prepare(`INSERT INTO account_reports (reporter_id,reported_id,conv_id) VALUES (?,?,?)`).run(me.id, uid, conv.id);
 
       // Auto-action si plusieurs signalements (≥3 en 30 jours)
-      const recentCount = db.prepare(`SELECT COUNT(*) n FROM account_reports WHERE reported_id=? AND created_at >= datetime('now','-30 days')`).get(uid).n;
+      const recentCount = (await db.prepare(`SELECT COUNT(*) n FROM account_reports WHERE reported_id=? AND created_at >= datetime('now','-30 days')`).get(uid))?.n;
       if (recentCount >= 3) {
         await db.prepare(`UPDATE users SET last_active=NULL WHERE id=?`).run(uid);
       }
@@ -9417,14 +9421,14 @@ async function handleRequest(req, res) {
       if (!MOTIFS_VALIDES.includes(motif)) return sendJSON(res, 400, { error: 'Motif invalide.' });
 
       // Anti-doublon dans les 30 jours
-      const existing = db.prepare(`SELECT id FROM initiative_reports WHERE reporter_id=? AND initiative_id=? AND created_at >= datetime('now','-30 days')`).get(me.id, iid);
+      const existing = await db.prepare(`SELECT id FROM initiative_reports WHERE reporter_id=? AND initiative_id=? AND created_at >= datetime('now','-30 days')`).get(me.id, iid);
       if (existing) return sendJSON(res, 400, { error: 'Vous avez déjà signalé cette initiative récemment.' });
 
       db.prepare(`INSERT INTO initiative_reports (reporter_id,initiative_id,motif,description,preuves) VALUES (?,?,?,?,?)`)
         .run(me.id, iid, motif, description||null, JSON.stringify(preuves||[]));
 
       // Auto-compteur
-      const nbRep = db.prepare(`SELECT COUNT(*) n FROM initiative_reports WHERE initiative_id=? AND statut IN ('en_attente','en_cours')`).get(iid).n;
+      const nbRep = (await db.prepare(`SELECT COUNT(*) n FROM initiative_reports WHERE initiative_id=? AND statut IN ('en_attente','en_cours')`).get(iid))?.n;
       if (nbRep >= 5) {
         await db.prepare(`UPDATE initiatives SET signalements_confirmes=signalements_confirmes+1 WHERE id=?`).run(iid);
       }
@@ -9524,7 +9528,7 @@ async function handleRequest(req, res) {
       const roleFilt = q.role || null;
 
       // Plage temporelle
-      function since(period) {
+      async function since(period) {
         if (period === 'today')  return `AND created_at >= datetime('now','start of day')`;
         if (period === 'week')   return `AND created_at >= datetime('now','-7 days')`;
         if (period === 'month')  return `AND created_at >= datetime('now','start of month')`;
@@ -9548,8 +9552,8 @@ async function handleRequest(req, res) {
         const totalMembres = roles.reduce((s,r)=>s+r.n,0);
 
         // ── Vérifications ──
-        const verified = db.prepare(`SELECT COUNT(*) n FROM users WHERE is_verified=1 ${fPays} ${sw}`).get(...fPaysArg).n;
-        const docsVerif = db.prepare(`SELECT COUNT(*) n FROM users WHERE documents_verifies=1 ${fPays}`).get(...fPaysArg).n;
+        const verified = (await db.prepare(`SELECT COUNT(*) n FROM users WHERE is_verified=1 ${fPays} ${sw}`).get(...fPaysArg))?.n;
+        const docsVerif = (await db.prepare(`SELECT COUNT(*) n FROM users WHERE documents_verifies=1 ${fPays}`).get(...fPaysArg))?.n;
 
         // ── Géographie ──
         const countryRows = db.prepare(`
@@ -9557,9 +9561,9 @@ async function handleRequest(req, res) {
           WHERE pays IS NOT NULL AND pays!='' AND role NOT IN ('administrateur')
           ${fPays} GROUP BY pays ORDER BY n DESC LIMIT 50
         `).all(...fPaysArg);
-        const nbPays = db.prepare(`SELECT COUNT(DISTINCT pays) n FROM users WHERE pays IS NOT NULL AND pays!=''`).get().n;
-        const nbVilles = db.prepare(`SELECT COUNT(DISTINCT ville) n FROM users WHERE ville IS NOT NULL AND ville!=''`).get().n;
-        const nbRegions = db.prepare(`SELECT COUNT(DISTINCT region) n FROM users WHERE region IS NOT NULL AND region!=''`).get().n;
+        const nbPays = (await db.prepare(`SELECT COUNT(DISTINCT pays) n FROM users WHERE pays IS NOT NULL AND pays!=''`).get())?.n;
+        const nbVilles = (await db.prepare(`SELECT COUNT(DISTINCT ville) n FROM users WHERE ville IS NOT NULL AND ville!=''`).get())?.n;
+        const nbRegions = (await db.prepare(`SELECT COUNT(DISTINCT region) n FROM users WHERE region IS NOT NULL AND region!=''`).get())?.n;
 
         // Continents mapping simplifié
         const CONTINENTS = {
@@ -9592,25 +9596,25 @@ async function handleRequest(req, res) {
           WHERE secteur IS NOT NULL AND secteur!=''
           GROUP BY secteur ORDER BY n DESC LIMIT 15
         `).all();
-        const nbMetiers = db.prepare(`SELECT COUNT(DISTINCT titre_pro) n FROM users WHERE titre_pro IS NOT NULL AND titre_pro!=''`).get().n;
+        const nbMetiers = (await db.prepare(`SELECT COUNT(DISTINCT titre_pro) n FROM users WHERE titre_pro IS NOT NULL AND titre_pro!=''`).get())?.n;
 
         // ── Activité plateforme ──
         const now_str = "datetime('now')";
         const actStats = {
-          connexions_jour:  db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','start of day')`).get().n,
-          connexions_semaine: db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','-7 days')`).get().n,
-          nouveaux_membres: db.prepare(`SELECT COUNT(*) n FROM users WHERE created_at >= datetime('now','-30 days')`).get().n,
-          messages:         db.prepare(`SELECT COUNT(*) n FROM messages ${sw?'WHERE 1=1 '+sw:''}`).get().n,
-          evenements:       db.prepare(`SELECT COUNT(*) n FROM evenements ${sw?'WHERE 1=1 '+sw:''}`).get().n,
-          billets_vendus:   db.prepare(`SELECT COUNT(*) n FROM event_tickets WHERE statut IN ('paye','valide') ${sw}`).get().n,
-          qr_codes:         db.prepare(`SELECT COUNT(*) n FROM event_tickets ${sw?'WHERE 1=1 '+sw:''}`).get().n,
-          initiatives_pub:  db.prepare(`SELECT COUNT(*) n FROM initiatives WHERE statut='publiee' ${sw}`).get().n,
-          reunions:         db.prepare(`SELECT COUNT(*) n FROM reunions ${sw?'WHERE 1=1 '+sw:''}`).get().n,
-          resumes_ia:       db.prepare(`SELECT COUNT(*) n FROM reunions WHERE resume_ai IS NOT NULL AND resume_ai!='' ${sw}`).get().n,
-          candidatures:     db.prepare(`SELECT COUNT(*) n FROM candidatures ${sw?'WHERE 1=1 '+sw:''}`).get().n,
-          collaborations:   db.prepare(`SELECT COUNT(*) n FROM collaborations ${sw?'WHERE 1=1 '+sw:''}`).get().n,
-          posts:            db.prepare(`SELECT COUNT(*) n FROM fil_posts ${sw?'WHERE 1=1 '+sw:''}`).get().n,
-          accreditations:   db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE statut='active' ${sw}`).get().n,
+          connexions_jour:  (await db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','start of day')`).get())?.n,
+          connexions_semaine: (await db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','-7 days')`).get())?.n,
+          nouveaux_membres: (await db.prepare(`SELECT COUNT(*) n FROM users WHERE created_at >= datetime('now','-30 days')`).get())?.n,
+          messages:         (await db.prepare(`SELECT COUNT(*) n FROM messages ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
+          evenements:       (await db.prepare(`SELECT COUNT(*) n FROM evenements ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
+          billets_vendus:   (await db.prepare(`SELECT COUNT(*) n FROM event_tickets WHERE statut IN ('paye','valide') ${sw}`).get())?.n,
+          qr_codes:         (await db.prepare(`SELECT COUNT(*) n FROM event_tickets ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
+          initiatives_pub:  (await db.prepare(`SELECT COUNT(*) n FROM initiatives WHERE statut='publiee' ${sw}`).get())?.n,
+          reunions:         (await db.prepare(`SELECT COUNT(*) n FROM reunions ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
+          resumes_ia:       (await db.prepare(`SELECT COUNT(*) n FROM reunions WHERE resume_ai IS NOT NULL AND resume_ai!='' ${sw}`).get())?.n,
+          candidatures:     (await db.prepare(`SELECT COUNT(*) n FROM candidatures ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
+          collaborations:   (await db.prepare(`SELECT COUNT(*) n FROM collaborations ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
+          posts:            (await db.prepare(`SELECT COUNT(*) n FROM fil_posts ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
+          accreditations:   (await db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE statut='active' ${sw}`).get())?.n,
         };
 
         // Évolution membres par mois (12 derniers mois)
@@ -9622,7 +9626,7 @@ async function handleRequest(req, res) {
 
         // ── Emploi & opportunités ──
         const emploiStats = {
-          offres_emploi:    db.prepare(`SELECT COUNT(*) n FROM offres_emploi`).get()?.n ?? 0,
+          offres_emploi:    await db.prepare(`SELECT COUNT(*) n FROM offres_emploi`).get()?.n ?? 0,
           candidatures:     actStats.candidatures,
           collaborations:   actStats.collaborations,
         };
@@ -9632,18 +9636,18 @@ async function handleRequest(req, res) {
           verified,
           docs_verifies:    docsVerif,
           pct_verified:     totalMembres > 0 ? Math.round(verified * 100 / totalMembres) : 0,
-          score_moyen:      db.prepare(`SELECT AVG(trust_score) avg FROM users WHERE trust_score > 0`).get()?.avg?.toFixed(1) ?? 0,
-          reactivity_moy:   db.prepare(`SELECT AVG(reactivity_stars) avg FROM users WHERE reactivity_stars > 0`).get()?.avg?.toFixed(1) ?? 0,
-          actifs_30j:       db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','-30 days')`).get().n,
-          absents:          db.prepare(`SELECT COUNT(*) n FROM user_absence WHERE fin IS NULL OR fin >= date('now')`).get().n,
-          suspendus:        db.prepare(`SELECT COUNT(*) n FROM account_reports WHERE statut='masque'`).get().n,
-          accrédités:       db.prepare(`SELECT COUNT(DISTINCT user_id) n FROM compte_accreditations WHERE statut='active'`).get().n,
+          score_moyen:      await db.prepare(`SELECT AVG(trust_score) avg FROM users WHERE trust_score > 0`).get()?.avg?.toFixed(1) ?? 0,
+          reactivity_moy:   await db.prepare(`SELECT AVG(reactivity_stars) avg FROM users WHERE reactivity_stars > 0`).get()?.avg?.toFixed(1) ?? 0,
+          actifs_30j:       (await db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','-30 days')`).get())?.n,
+          absents:          (await db.prepare(`SELECT COUNT(*) n FROM user_absence WHERE fin IS NULL OR fin >= date('now')`).get())?.n,
+          suspendus:        (await db.prepare(`SELECT COUNT(*) n FROM account_reports WHERE statut='masque'`).get())?.n,
+          accrédités:       (await db.prepare(`SELECT COUNT(DISTINCT user_id) n FROM compte_accreditations WHERE statut='active'`).get())?.n,
         };
 
         // ── Stats IA ──
         const iaStats = {
-          recommandations: db.prepare(`SELECT COUNT(*) n FROM chatbot_history WHERE type='recommend'`).get()?.n ?? 0,
-          recherches: db.prepare(`SELECT COUNT(*) n FROM chatbot_history`).get()?.n ?? 0,
+          recommandations: await db.prepare(`SELECT COUNT(*) n FROM chatbot_history WHERE type='recommend'`).get()?.n ?? 0,
+          recherches: await db.prepare(`SELECT COUNT(*) n FROM chatbot_history`).get()?.n ?? 0,
         };
 
         // ── Top villes ──
@@ -9732,7 +9736,7 @@ async function handleRequest(req, res) {
       `).all(currentUserId);
 
       /* ── Scoring multi-critères ── */
-      function scoreProfile(u) {
+      async function scoreProfile(u) {
         let score = 0;
         const haystack = norm([
           u.nom, u.prenom, u.titre_pro, u.bio,
@@ -9877,7 +9881,7 @@ async function handleRequest(req, res) {
     }
     /* Helper — nb recommandations */
     async function countRecos(initId) {
-      return db.prepare(`SELECT COUNT(*) as c FROM reseau_recommandations WHERE initiative_id=?`).get(initId)?.c || 0;
+      return await db.prepare(`SELECT COUNT(*) as c FROM reseau_recommandations WHERE initiative_id=?`).get(initId)?.c || 0;
     }
     /* Helper — enrichir fiche init pour le réseau */
     async function enrichInit(row) {
@@ -9889,7 +9893,7 @@ async function handleRequest(req, res) {
         nationalites_concernees: safeParse(row.nationalites_concernees) || [],
         accreditations: initAccreds(row.id),
         nb_recommandations: countRecos(row.id),
-        nb_affiliations: db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(row.id)?.c || 0,
+        nb_affiliations: await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(row.id)?.c || 0,
       };
     }
 
@@ -9973,10 +9977,10 @@ async function handleRequest(req, res) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const myInit = getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
-      const total = db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(myInit.id)?.c || 0;
-      const enAttente = db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='en_attente'`).get(myInit.id)?.c || 0;
+      const total = await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(myInit.id)?.c || 0;
+      const enAttente = await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='en_attente'`).get(myInit.id)?.c || 0;
       const recos = countRecos(myInit.id);
-      const membreDe = db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE demandeur_id=? AND statut='accepte'`).get(myInit.id)?.c || 0;
+      const membreDe = await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE demandeur_id=? AND statut='accepte'`).get(myInit.id)?.c || 0;
       const parPays = db.prepare(`
         SELECT i.pays, COUNT(*) as nb FROM reseau_affiliations ra
         JOIN initiatives i ON i.id=ra.demandeur_id
@@ -10691,7 +10695,7 @@ async function handleRequest(req, res) {
         });
       }
       // Si aucune invitation, passer direct en actif
-      const pendingCount = db.prepare("SELECT COUNT(*) as n FROM deal_participants WHERE deal_id=? AND statut='invite'").get(dealId).n;
+      const pendingCount = (await db.prepare("SELECT COUNT(*) as n FROM deal_participants WHERE deal_id=? AND statut='invite'").get(dealId))?.n;
       if (pendingCount === 0) await db.prepare("UPDATE deals SET statut='actif' WHERE id=?").run(dealId);
       else await db.prepare("UPDATE deals SET statut='en_attente' WHERE id=?").run(dealId);
       return sendJSON(res, 201, { ok: true, deal_id: dealId });
@@ -10752,7 +10756,7 @@ async function handleRequest(req, res) {
       db.prepare("UPDATE deal_participants SET statut=?,repondu_at=datetime('now') WHERE deal_id=? AND initiative_id=?").run(nouveauStatut, did, myInit.id);
       dealLog(did, me.id, myInit.nom, accepte ? "acceptation" : "refus", `${myInit.nom} ${accepte ? "a rejoint" : "a décliné"} le deal`);
       // Si tout le monde a répondu → passer en actif
-      const pending = db.prepare("SELECT COUNT(*) as n FROM deal_participants WHERE deal_id=? AND statut='invite'").get(did).n;
+      const pending = (await db.prepare("SELECT COUNT(*) as n FROM deal_participants WHERE deal_id=? AND statut='invite'").get(did))?.n;
       if (pending === 0 && accepte) db.prepare("UPDATE deals SET statut='actif',updated_at=datetime('now') WHERE id=? AND statut='en_attente'").run(did);
       return sendJSON(res, 200, { ok: true, statut: nouveauStatut });
     }
@@ -11140,7 +11144,7 @@ async function handleRequest(req, res) {
       const score = await db.prepare("SELECT * FROM deal_master_scores WHERE user_id=?").get(me.id);
       const isMaster = await db.prepare("SELECT * FROM deal_master_laureats WHERE user_id=? AND actif=1 ORDER BY edition_id DESC LIMIT 1").get(me.id);
       const criteres = await db.prepare("SELECT * FROM deal_master_criteres WHERE actif=1 ORDER BY poids DESC").all();
-      const ed = db.prepare("SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee') ORDER BY periode_debut DESC LIMIT 1").get();
+      const ed = await db.prepare("SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee') ORDER BY periode_debut DESC LIMIT 1").get();
       return sendJSON(res, 200, {
         score: score ? { ...score, score_detail: safeParse(score.score_detail || '{}') } : null,
         is_deal_master: !!isMaster,
@@ -11209,19 +11213,19 @@ async function handleRequest(req, res) {
         if (!init?.user_id) continue;
         const uid = init.user_id;
         const detail = {};
-        const finalises = db.prepare(`SELECT COUNT(*) AS n FROM deals d JOIN deal_participants dp ON dp.deal_id=d.id WHERE dp.initiative_id=? AND d.statut='cloture' AND d.created_at BETWEEN ? AND ?`).get(initiative_id, debut+' 00:00:00', fin+' 23:59:59').n;
+        const finalises = (await db.prepare(`SELECT COUNT(*) AS n FROM deals d JOIN deal_participants dp ON dp.deal_id=d.id WHERE dp.initiative_id=? AND d.statut='cloture' AND d.created_at BETWEEN ? AND ?`).get(initiative_id, debut+' 00:00:00', fin+' 23:59:59'))?.n;
         detail.deals_finalises = finalises;
-        const totalDeals = db.prepare(`SELECT COUNT(*) AS n FROM deal_participants dp JOIN deals d ON d.id=dp.deal_id WHERE dp.initiative_id=? AND dp.statut='accepte' AND d.created_at BETWEEN ? AND ?`).get(initiative_id, debut+' 00:00:00', fin+' 23:59:59').n || 1;
+        const totalDeals = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_participants dp JOIN deals d ON d.id=dp.deal_id WHERE dp.initiative_id=? AND dp.statut='accepte' AND d.created_at BETWEEN ? AND ?`).get(initiative_id, debut+' 00:00:00', fin+' 23:59:59'))?.n || 1;
         detail.taux_reussite = Math.round((finalises / totalDeals) * 100) / 100;
-        const jalonsTotal = db.prepare(`SELECT COUNT(*) AS n FROM deal_jalons dj JOIN deal_participants dp ON dp.deal_id=dj.deal_id WHERE dp.initiative_id=?`).get(initiative_id).n || 1;
-        const jalonsOk = db.prepare(`SELECT COUNT(*) AS n FROM deal_jalons dj JOIN deal_participants dp ON dp.deal_id=dj.deal_id WHERE dp.initiative_id=? AND dj.statut='atteint'`).get(initiative_id).n;
+        const jalonsTotal = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_jalons dj JOIN deal_participants dp ON dp.deal_id=dj.deal_id WHERE dp.initiative_id=?`).get(initiative_id))?.n || 1;
+        const jalonsOk = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_jalons dj JOIN deal_participants dp ON dp.deal_id=dj.deal_id WHERE dp.initiative_id=? AND dj.statut='atteint'`).get(initiative_id))?.n;
         detail.progression_deals = Math.round((jalonsOk / jalonsTotal) * 100) / 100;
-        const noteMoy = db.prepare(`SELECT AVG(CAST(dn.contenu AS REAL)) AS avg FROM deal_notes dn JOIN deals d ON d.id=dn.deal_id JOIN deal_participants dp ON dp.deal_id=d.id WHERE dp.initiative_id=? AND dn.type='evaluation'`).get(initiative_id).avg || 0;
+        const noteMoy = await db.prepare(`SELECT AVG(CAST(dn.contenu AS REAL)) AS avg FROM deal_notes dn JOIN deals d ON d.id=dn.deal_id JOIN deal_participants dp ON dp.deal_id=d.id WHERE dp.initiative_id=? AND dn.type='evaluation'`).get(initiative_id).avg || 0;
         detail.evaluations_recues = Math.min(noteMoy / 5, 1);
-        const partenaires = db.prepare(`SELECT COUNT(DISTINCT dp2.initiative_id) AS n FROM deal_participants dp JOIN deal_participants dp2 ON dp2.deal_id=dp.deal_id AND dp2.initiative_id!=dp.initiative_id WHERE dp.initiative_id=? AND dp2.statut='accepte'`).get(initiative_id).n;
+        const partenaires = (await db.prepare(`SELECT COUNT(DISTINCT dp2.initiative_id) AS n FROM deal_participants dp JOIN deal_participants dp2 ON dp2.deal_id=dp.deal_id AND dp2.initiative_id!=dp.initiative_id WHERE dp.initiative_id=? AND dp2.statut='accepte'`).get(initiative_id))?.n;
         detail.qualite_collaboration = Math.min(partenaires / 10, 1);
-        const tachesTotal = db.prepare(`SELECT COUNT(*) AS n FROM deal_tasks dt JOIN deal_participants dp ON dp.deal_id=dt.deal_id WHERE dp.initiative_id=?`).get(initiative_id).n || 1;
-        const tachesOk = db.prepare(`SELECT COUNT(*) AS n FROM deal_tasks dt JOIN deal_participants dp ON dp.deal_id=dt.deal_id WHERE dp.initiative_id=? AND dt.statut='terminee'`).get(initiative_id).n;
+        const tachesTotal = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_tasks dt JOIN deal_participants dp ON dp.deal_id=dt.deal_id WHERE dp.initiative_id=?`).get(initiative_id))?.n || 1;
+        const tachesOk = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_tasks dt JOIN deal_participants dp ON dp.deal_id=dt.deal_id WHERE dp.initiative_id=? AND dt.statut='terminee'`).get(initiative_id))?.n;
         detail.respect_engagements = Math.round((tachesOk / tachesTotal) * 100) / 100;
         detail.diversite_partenaires = Math.min(partenaires / 5, 1);
         let scoreGlobal = 0;
@@ -11248,9 +11252,9 @@ async function handleRequest(req, res) {
     }
 
     /* ── AUTO-RECALCUL : vérifie si une édition expirée attend son calcul ── */
-    function _dmAutoRecalculate() {
+    async function _dmAutoRecalculate() {
       try {
-        const expired = db.prepare(`SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee','calculee') AND date(periode_fin) < date('now')`).all();
+        const expired = await db.prepare(`SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee','calculee') AND date(periode_fin) < date('now')`).all();
         for (const ed of expired) {
           if (ed.statut !== 'calculee') _dmScoreEdition(ed.id);
           // Auto-publier
@@ -11266,7 +11270,7 @@ async function handleRequest(req, res) {
           const ne = nextEnd.toISOString().slice(0, 10);
           const nextSem = nextStart.getMonth() < 6 ? 1 : 2;
           const nextLabel = `Semestre ${nextSem} – ${nextStart.getFullYear()}`;
-          const existingNext = db.prepare("SELECT id FROM deal_master_editions WHERE date(periode_debut)=date(?)").get(ns);
+          const existingNext = await db.prepare("SELECT id FROM deal_master_editions WHERE date(periode_debut)=date(?)").get(ns);
           if (!existingNext) {
             db.prepare("INSERT INTO deal_master_editions (label,periode_debut,periode_fin,statut,top_pct) VALUES (?,?,?,'en_cours',10.0)").run(nextLabel, ns, ne);
           }
@@ -11327,8 +11331,8 @@ async function handleRequest(req, res) {
       const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const activeEd = await db.prepare("SELECT * FROM deal_master_editions WHERE statut='publiee' ORDER BY periode_debut DESC LIMIT 1").get();
-      const currentEd = db.prepare("SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee') ORDER BY periode_debut DESC LIMIT 1").get();
-      const nbActifs = db.prepare("SELECT COUNT(*) AS n FROM users WHERE is_deal_master=1").get().n;
+      const currentEd = await db.prepare("SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee') ORDER BY periode_debut DESC LIMIT 1").get();
+      const nbActifs = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE is_deal_master=1").get())?.n;
       // Prochain recalcul = fin de l'édition en cours + 1 jour
       let nextRecalcul = null;
       if (currentEd) {
@@ -11360,7 +11364,7 @@ async function handleRequest(req, res) {
         LEFT JOIN initiatives i ON i.user_id = dms.user_id
         ORDER BY dms.rang ASC
         LIMIT 200`).all();
-      const topPct = db.prepare("SELECT top_pct FROM deal_master_editions WHERE statut IN ('en_cours','publiee') ORDER BY periode_debut DESC LIMIT 1").get()?.top_pct ?? 10;
+      const topPct = await db.prepare("SELECT top_pct FROM deal_master_editions WHERE statut IN ('en_cours','publiee') ORDER BY periode_debut DESC LIMIT 1").get()?.top_pct ?? 10;
       return sendJSON(res, 200, { classement: rows, top_pct: topPct });
     }
 
@@ -11410,7 +11414,7 @@ async function handleRequest(req, res) {
         dme.label AS edition_label, dme.periode_debut, dme.periode_fin, dme.statut AS edition_statut
         FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
         WHERE dml.user_id=? AND dml.actif=1 ORDER BY dml.edition_id DESC LIMIT 1`).get(uid);
-      const nb_editions = db.prepare("SELECT COUNT(*) AS n FROM deal_master_laureats WHERE user_id=?").get(uid).n;
+      const nb_editions = (await db.prepare("SELECT COUNT(*) AS n FROM deal_master_laureats WHERE user_id=?").get(uid))?.n;
       return sendJSON(res, 200, {
         valide: !!laureat,
         utilisateur: { id: u.id, nom: u.nom, prenom: u.prenom, photo_url: u.photo_url, titre_pro: u.titre_pro },
@@ -11559,7 +11563,7 @@ async function handleRequest(req, res) {
         const uData = await db.prepare("SELECT centres_interet, situation_pro, pays, role FROM users WHERE id=?").get(me.id);
         const ciUser = safeParse(uData?.centres_interet || "[]").map(s => s.toLowerCase());
         const paysUser = (uData?.pays || "").toLowerCase();
-        rows = rows.map(r => {
+        rows = (await Promise.all(rows.map(async r => {
           let score = r.mise_en_avant * 100 + r.priorite * 10;
           const domaines = safeParse(r.domaines_expertise || "[]").map(s => s.toLowerCase());
           const cles = safeParse(r.cles_matching || "[]").map(s => s.toLowerCase());
@@ -11567,11 +11571,10 @@ async function handleRequest(req, res) {
           allKeys.forEach(k => { if (ciUser.some(ci => ci.includes(k) || k.includes(ci))) score += 15; });
           const pays = safeParse(r.pays_intervention || "[]").map(s => s.toLowerCase());
           if (paysUser && pays.some(p => p.includes(paysUser) || paysUser.includes(p))) score += 10;
-          // Anti-répétition : pénaliser les partenaires récemment affichés
-          const recentViews = db.prepare("SELECT COUNT(*) AS n FROM partenaires_impressions WHERE partenaire_id=? AND user_id=? AND event_type='view' AND created_at > datetime('now','-1 hour')").get(r.id, me.id).n;
-          score -= recentViews * 5;
+          const recentViews = (await db.prepare("SELECT COUNT(*) AS n FROM partenaires_impressions WHERE partenaire_id=? AND user_id=? AND event_type='view' AND created_at > datetime('now','-1 hour')").get(r.id, me.id))?.n;
+          score -= (recentViews || 0) * 5;
           return { ...r, _score: score };
-        }).sort((a, b) => b._score - a._score);
+        }))).sort((a, b) => b._score - a._score);
       }
 
       const limit = parseInt(new URL("http://x" + req.url).searchParams.get('limit') || '8');
@@ -11664,7 +11667,7 @@ async function handleRequest(req, res) {
       if (domaine) rows = rows.filter(r => (safeParse(r.domaines_expertise||'[]')).some(d => d.toLowerCase().includes(domaine.toLowerCase())));
       if (pays)    rows = rows.filter(r => (safeParse(r.pays_intervention||'[]')).some(p => p.toLowerCase().includes(pays.toLowerCase())));
       if (q)       rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.bio||''} ${r.description_complete||''}`.toLowerCase().includes(q));
-      const total = db.prepare("SELECT COUNT(*) AS n FROM partenaires_officiels WHERE statut='active'").get().n;
+      const total = (await db.prepare("SELECT COUNT(*) AS n FROM partenaires_officiels WHERE statut='active'").get())?.n;
       const parsed = rows.map(r => ({
         ...r,
         domaines_expertise: safeParse(r.domaines_expertise||'[]'),
@@ -11851,7 +11854,7 @@ route("POST", "/api/asso/demande", async (req, res, params, body) => {
   if (accred && accred.niveau === niveau) return sendJSON(res, 409, { error: "Vous possédez déjà ce niveau." });
   const id = db.prepare(`INSERT INTO asso_demandes (user_id,niveau,periodicite,nom_asso,pays,ville,siret,description) VALUES (?,?,?,?,?,?,?,?)`)
     .run(user.id, niveau, periodicite, nom_asso, pays||null, ville||null, siret||null, description||null).lastInsertRowid;
-  const admins = db.prepare(`SELECT id FROM users WHERE role IN ('administrateur','super_administrateur')`).all();
+  const admins = await db.prepare(`SELECT id FROM users WHERE role IN ('administrateur','super_administrateur')`).all();
   admins.forEach(a => creerNotif(a.id, "validation", "Demande accréditation association",
     `${user.nom} demande l'accréditation « Association ${niveau === "accreditee" ? "Accréditée" : "Vérifiée"} »`, { demande_id: Number(id) }));
   sendJSON(res, 201, { id, ok: true });
@@ -11877,7 +11880,7 @@ route("GET", "/api/asso/adherents", async (req, res, params, body, query) => {
   if (q) { sql += ` AND (prenom LIKE ? OR nom LIKE ? OR email LIKE ?)`; p.push(`%${q}%`,`%${q}%`,`%${q}%`); }
   sql += ` ORDER BY nom,prenom LIMIT ? OFFSET ?`;
   p.push(Number(lim), Number(off));
-  const total = db.prepare(`SELECT COUNT(*) AS n FROM asso_adherents WHERE asso_user_id=?`).get(user.id).n;
+  const total = (await db.prepare(`SELECT COUNT(*) AS n FROM asso_adherents WHERE asso_user_id=?`).get(user.id))?.n;
   const adherents = await db.prepare(sql).all(...p);
   sendJSON(res, 200, { adherents, total });
 });
@@ -11932,7 +11935,7 @@ route("GET", "/api/asso/cotisations", async (req, res, params, body, query) => {
   sql += ` ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
   p.push(Number(lim), Number(off));
   const cotisations = await db.prepare(sql).all(...p);
-  const stats = db.prepare(`SELECT SUM(CASE WHEN statut='payee' THEN montant ELSE 0 END) AS total_percu, SUM(CASE WHEN statut='en_attente' THEN montant ELSE 0 END) AS total_attendu, COUNT(*) AS total, SUM(CASE WHEN statut='en_retard' THEN 1 ELSE 0 END) AS en_retard FROM asso_cotisations WHERE asso_user_id=?`).get(user.id);
+  const stats = await db.prepare(`SELECT SUM(CASE WHEN statut='payee' THEN montant ELSE 0 END) AS total_percu, SUM(CASE WHEN statut='en_attente' THEN montant ELSE 0 END) AS total_attendu, COUNT(*) AS total, SUM(CASE WHEN statut='en_retard' THEN 1 ELSE 0 END) AS en_retard FROM asso_cotisations WHERE asso_user_id=?`).get(user.id);
   sendJSON(res, 200, { cotisations, stats });
 });
 
@@ -11973,7 +11976,7 @@ route("GET", "/api/asso/finances", async (req, res, params, body, query) => {
   sql += ` ORDER BY date_op DESC LIMIT ? OFFSET ?`;
   p.push(Number(lim), Number(off));
   const mouvements = await db.prepare(sql).all(...p);
-  const bilan = db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) AS recettes, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) AS depenses, SUM(CASE WHEN type='recette' THEN montant ELSE -montant END) AS solde FROM asso_finances WHERE asso_user_id=?`).get(user.id);
+  const bilan = await db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) AS recettes, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) AS depenses, SUM(CASE WHEN type='recette' THEN montant ELSE -montant END) AS solde FROM asso_finances WHERE asso_user_id=?`).get(user.id);
   sendJSON(res, 200, { mouvements, bilan });
 });
 
@@ -12071,7 +12074,7 @@ route("PUT", "/api/asso/votes/:id/clore", async (req, res, params) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const v = await db.prepare(`SELECT * FROM asso_votes WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
   if (!v) return sendJSON(res, 404, { error: "Vote introuvable." });
-  const reponses = db.prepare(`SELECT choix, COUNT(*) AS n FROM asso_votes_reponses WHERE vote_id=? GROUP BY choix`).all(v.id);
+  const reponses = await db.prepare(`SELECT choix, COUNT(*) AS n FROM asso_votes_reponses WHERE vote_id=? GROUP BY choix`).all(v.id);
   const resultat = {};
   reponses.forEach(r => { resultat[r.choix] = r.n; });
   await db.prepare(`UPDATE asso_votes SET statut='clos', resultat_json=? WHERE id=?`).run(JSON.stringify(resultat), v.id);
@@ -12110,13 +12113,13 @@ route("GET", "/api/asso/dashboard", async (req, res) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const accred = getAssoAccred(user.id);
   if (!accred) return sendJSON(res, 403, { error: "Module requis." });
-  const adherents = db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=? AND statut='actif'`).get(user.id).n;
-  const adherentsTotal = db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=?`).get(user.id).n;
-  const cotisations = db.prepare(`SELECT SUM(montant) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(user.id).n || 0;
-  const en_retard = db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='en_retard'`).get(user.id).n;
-  const bilan = db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE -montant END) solde FROM asso_finances WHERE asso_user_id=?`).get(user.id).solde || 0;
-  const votes_ouverts = db.prepare(`SELECT COUNT(*) n FROM asso_votes WHERE asso_user_id=? AND statut='ouvert'`).get(user.id).n;
-  const documents = db.prepare(`SELECT COUNT(*) n FROM asso_documents WHERE asso_user_id=?`).get(user.id).n;
+  const adherents = (await db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=? AND statut='actif'`).get(user.id))?.n;
+  const adherentsTotal = (await db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=?`).get(user.id))?.n;
+  const cotisations = (await db.prepare(`SELECT SUM(montant) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(user.id))?.n || 0;
+  const en_retard = (await db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='en_retard'`).get(user.id))?.n;
+  const bilan = (await db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE -montant END) solde FROM asso_finances WHERE asso_user_id=?`).get(user.id))?.solde || 0;
+  const votes_ouverts = (await db.prepare(`SELECT COUNT(*) n FROM asso_votes WHERE asso_user_id=? AND statut='ouvert'`).get(user.id))?.n;
+  const documents = (await db.prepare(`SELECT COUNT(*) n FROM asso_documents WHERE asso_user_id=?`).get(user.id))?.n;
   sendJSON(res, 200, { accreditation: accred, stats: { adherents, adherentsTotal, cotisations, en_retard, bilan, votes_ouverts, documents } });
 });
 
@@ -12390,8 +12393,8 @@ route("GET", "/api/asso/finance/rapport", async (req, res, params, body, query) 
       SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) recettes,
       SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) depenses
     FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=? GROUP BY mois ORDER BY mois`).all(g.user.id, String(annee));
-  const parCategorie = db.prepare(`SELECT categorie, type, SUM(montant) total FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=? GROUP BY categorie,type`).all(g.user.id, String(annee));
-  const total = db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) recettes, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) depenses FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=?`).get(g.user.id, String(annee));
+  const parCategorie = await db.prepare(`SELECT categorie, type, SUM(montant) total FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=? GROUP BY categorie,type`).all(g.user.id, String(annee));
+  const total = await db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) recettes, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) depenses FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=?`).get(g.user.id, String(annee));
   const resultat = (total.recettes||0) - (total.depenses||0);
   sendJSON(res, 200, { annee, parMois, parCategorie, total, resultat, devises: DAA.FINANCE.CURRENCIES });
 });
@@ -12499,11 +12502,11 @@ route("GET", "/api/asso/analytics", async (req, res, params, body, query) => {
   const g = assoGuard(req, res, "analytics.read");
   if (!g) return;
   const uid = g.user.id;
-  const membres = db.prepare(`SELECT statut, COUNT(*) n FROM asso_adherents WHERE asso_user_id=? GROUP BY statut`).all(uid);
-  const parPays = db.prepare(`SELECT COALESCE(pays,'—') pays, COUNT(*) n FROM asso_adherents WHERE asso_user_id=? GROUP BY pays ORDER BY n DESC LIMIT 20`).all(uid);
-  const cotisations = db.prepare(`SELECT statut, COUNT(*) n, COALESCE(SUM(montant),0) total FROM asso_cotisations WHERE asso_user_id=? GROUP BY statut`).all(uid);
-  const totalCot = db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=?`).get(uid).n;
-  const payees = db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(uid).n;
+  const membres = await db.prepare(`SELECT statut, COUNT(*) n FROM asso_adherents WHERE asso_user_id=? GROUP BY statut`).all(uid);
+  const parPays = await db.prepare(`SELECT COALESCE(pays,'—') pays, COUNT(*) n FROM asso_adherents WHERE asso_user_id=? GROUP BY pays ORDER BY n DESC LIMIT 20`).all(uid);
+  const cotisations = await db.prepare(`SELECT statut, COUNT(*) n, COALESCE(SUM(montant),0) total FROM asso_cotisations WHERE asso_user_id=? GROUP BY statut`).all(uid);
+  const totalCot = (await db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=?`).get(uid))?.n;
+  const payees = (await db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(uid))?.n;
   const tauxRecouvrement = totalCot ? Math.round((payees / totalCot) * 100) : 0;
   // DSL ENGAGEMENT_SCORE par adhérent (TRACKING : paiements + votes)
   const engagement = db.prepare(`
@@ -12516,7 +12519,7 @@ route("GET", "/api/asso/analytics", async (req, res, params, body, query) => {
   // DSL AUTO_INSIGHTS
   const insights = [];
   if (tauxRecouvrement < 60) insights.push("Taux de recouvrement faible : lancez une campagne de relance.");
-  const enRetard = db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='en_retard'`).get(uid).n;
+  const enRetard = (await db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='en_retard'`).get(uid))?.n;
   if (enRetard > 0) insights.push(`${enRetard} cotisation(s) en retard à traiter.`);
   if (!engagement.length) insights.push("Aucun adhérent enregistré : commencez par ajouter vos membres.");
   sendJSON(res, 200, { membres, parPays, cotisations, tauxRecouvrement, engagement, insights });
@@ -12534,7 +12537,7 @@ route("POST", "/api/asso/ai", async (req, res, params, body) => {
   const tache = String((body && body.tache) || "").toUpperCase();
   const out = { tache };
   if (tache === "FINANCE_ANALYSIS" && DAA.AI_ASSISTANT.FINANCE_ANALYSIS) {
-    const b = db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) r, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) d FROM asso_finances WHERE asso_user_id=?`).get(uid);
+    const b = await db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) r, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) d FROM asso_finances WHERE asso_user_id=?`).get(uid);
     const solde = (b.r||0) - (b.d||0);
     out.resume = `Recettes ${b.r||0} / Dépenses ${b.d||0} → solde ${solde}. ${solde < 0 ? "Attention : trésorerie déficitaire." : "Trésorerie positive."}`;
   } else if (tache === "ENGAGEMENT_PREDICTION" && DAA.AI_ASSISTANT.ENGAGEMENT_PREDICTION) {
@@ -12543,8 +12546,8 @@ route("POST", "/api/asso/ai", async (req, res, params, body) => {
     out.a_risque = risque.map(x => x.nom);
     out.resume = `${risque.length} membre(s) à risque de non-renouvellement (aucun paiement sur 12 mois).`;
   } else if (tache === "AUTO_REPORTS" && DAA.AI_ASSISTANT.AUTO_REPORTS) {
-    const nb = db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=? AND statut='actif'`).get(uid).n;
-    const cot = db.prepare(`SELECT COALESCE(SUM(montant),0) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(uid).n;
+    const nb = (await db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=? AND statut='actif'`).get(uid))?.n;
+    const cot = await db.prepare(`SELECT COALESCE(SUM(montant),0) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(uid).n;
     out.rapport = `Rapport d'activité — ${nb} adhérent(s) actif(s), ${cot} encaissés en cotisations.`;
   } else {
     return sendJSON(res, 400, { error: "Tâche IA non reconnue ou non activée dans le DSL.", disponibles: Object.keys(DAA.AI_ASSISTANT).filter(k => DAA.AI_ASSISTANT[k] === true) });
@@ -12718,8 +12721,8 @@ route("GET", "/api/admin/accred/definitions/:id/impact", async (req, res, params
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const def = await db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(params.id);
   if (!def) return sendJSON(res, 404, { error: "Définition introuvable." });
-  const nb_titulaires = db.prepare("SELECT COUNT(*) AS n FROM user_accreditations WHERE accred_id=? AND statut='active'").get(params.id).n;
-  const nb_demandes_attente = db.prepare("SELECT COUNT(*) AS n FROM accred_demandes WHERE accred_id=? AND statut='en_attente'").get(params.id).n;
+  const nb_titulaires = (await db.prepare("SELECT COUNT(*) AS n FROM user_accreditations WHERE accred_id=? AND statut='active'").get(params.id))?.n;
+  const nb_demandes_attente = (await db.prepare("SELECT COUNT(*) AS n FROM accred_demandes WHERE accred_id=? AND statut='en_attente'").get(params.id))?.n;
   const titulaires = await db.prepare(`
     SELECT ua.statut, u.nom, u.email, u.role
     FROM user_accreditations ua JOIN users u ON u.id=ua.user_id
@@ -12810,7 +12813,7 @@ route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body)
   });
 
   /* Journal d'audit */
-  const nb_titulaires = db.prepare("SELECT COUNT(*) AS n FROM user_accreditations WHERE accred_id=? AND statut='active'").get(params.id).n;
+  const nb_titulaires = (await db.prepare("SELECT COUNT(*) AS n FROM user_accreditations WHERE accred_id=? AND statut='active'").get(params.id))?.n;
   db.prepare(`INSERT INTO accred_audit_log
     (accred_id,admin_id,admin_nom,champ,ancienne_valeur,nouvelle_valeur,motif,mode_application,date_application,nb_comptes_impactes)
     VALUES (?,?,?,'definition_complete',?,?,?,?,?,?)`)
@@ -13222,9 +13225,9 @@ async function _generateRecommendations(userId, userRole) {
   try {
     const allFeatures = await db.prepare("SELECT * FROM features WHERE actif=1").all();
     const states = computeFeatureStates(userId, userRole);
-    const stateMap = new Map(states.map(s => [s.slug, s]));
+    const stateMap = new Map(states.map(async s => [s.slug, s]));
     const usages = await db.prepare("SELECT feature_id, nb_utilisations FROM feature_usage WHERE user_id=?").all(userId);
-    const usageMap = new Map(usages.map(u => [u.feature_id, u.nb_utilisations]));
+    const usageMap = new Map(usages.map(async u => [u.feature_id, u.nb_utilisations]));
 
     for (const f of allFeatures) {
       const state = stateMap.get(f.slug);
@@ -13249,8 +13252,8 @@ async function _generateRecommendations(userId, userRole) {
       }
 
       // Bonus si l'utilisateur utilise intensément des features de la même catégorie
-      const sameCategory = allFeatures.filter(ff => ff.categorie === f.categorie && ff.id !== f.id);
-      const categoryUsage = sameCategory.reduce((acc, ff) => acc + (usageMap.get(ff.id) || 0), 0);
+      const sameCategory = allFeatures.filter(async ff => ff.categorie === f.categorie && ff.id !== f.id);
+      const categoryUsage = sameCategory.reduce(async (acc, ff) => acc + (usageMap.get(ff.id) || 0), 0);
       if (categoryUsage > 10) score = Math.min(score + 0.1, 1.0);
 
       if (!raison || score < 0.5) continue;
@@ -13270,12 +13273,13 @@ route("GET", "/api/admin/features", async (req, res, params, body, query) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const features = await db.prepare("SELECT * FROM features ORDER BY categorie, ordre").all();
-  const stats = features.map(f => {
-    const nb_actifs = db.prepare("SELECT COUNT(*) AS n FROM user_features WHERE feature_id=? AND statut='active'").get(f.id).n;
-    const nb_geles = db.prepare("SELECT COUNT(*) AS n FROM user_features WHERE feature_id=? AND statut='frozen'").get(f.id).n;
-    const total_usages = db.prepare("SELECT COALESCE(SUM(nb_utilisations),0) AS n FROM feature_usage WHERE feature_id=?").get(f.id).n;
+  const stats = await Promise.all(features.map(async f => {
+    const nb_actifs = (await db.prepare("SELECT COUNT(*) AS n FROM user_features WHERE feature_id=? AND statut='active'").get(f.id))?.n;
+    const nb_geles = (await db.prepare("SELECT COUNT(*) AS n FROM user_features WHERE feature_id=? AND statut='frozen'").get(f.id))?.n;
+    const _tu = await db.prepare("SELECT COALESCE(SUM(nb_utilisations),0) AS n FROM feature_usage WHERE feature_id=?").get(f.id);
+    const total_usages = _tu?.n || 0;
     return { ...f, nb_actifs, nb_geles, total_usages };
-  });
+  }));
   sendJSON(res, 200, { features: stats });
 });
 
@@ -13349,7 +13353,7 @@ route("GET", "/api/admin/features/stats", async (req, res) => {
     FROM user_features uf JOIN features f ON f.id=uf.feature_id
     WHERE uf.statut='frozen' GROUP BY uf.feature_id ORDER BY nb_gels DESC LIMIT 5
   `).all();
-  const nb_suggestions_actives = db.prepare("SELECT COUNT(*) AS n FROM freeze_suggestions WHERE dismissed=0").get().n;
+  const nb_suggestions_actives = (await db.prepare("SELECT COUNT(*) AS n FROM freeze_suggestions WHERE dismissed=0").get())?.n;
   sendJSON(res, 200, { top_usages, top_frozen, nb_suggestions_actives });
 });
 
@@ -13437,8 +13441,8 @@ route("GET", "/api/admin/accred/packs", async (req, res) => {
     `).all(p.id);
     const regles = await db.prepare("SELECT * FROM accred_pack_regles WHERE pack_id=?").all(p.id);
     const tarifs = await db.prepare("SELECT * FROM accred_pack_tarifs WHERE pack_id=?").all(p.id);
-    const nb_titulaires = db.prepare("SELECT COUNT(*) AS n FROM user_packs WHERE pack_id=? AND statut='active'").get(p.id).n;
-    const nb_demandes = db.prepare("SELECT COUNT(*) AS n FROM accred_pack_demandes WHERE pack_id=? AND statut='en_attente'").get(p.id).n;
+    const nb_titulaires = (await db.prepare("SELECT COUNT(*) AS n FROM user_packs WHERE pack_id=? AND statut='active'").get(p.id))?.n;
+    const nb_demandes = (await db.prepare("SELECT COUNT(*) AS n FROM accred_pack_demandes WHERE pack_id=? AND statut='en_attente'").get(p.id))?.n;
     return { ...p, accreditations: items, regles, tarifs, nb_titulaires, nb_demandes };
   });
   sendJSON(res, 200, { packs: result });
@@ -13623,41 +13627,41 @@ route("GET", "/api/observations/me", async (req, res) => {
   const monthAgo = new Date(now - 30*86400000).toISOString().slice(0,10);
 
   /* ── Fréquentation profil ── */
-  const visTotal = db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=?").get(uid)?.n || 0;
-  const visUniques = db.prepare("SELECT COUNT(DISTINCT COALESCE(visiteur_id, -rowid)) AS n FROM profil_visites WHERE profil_user_id=?").get(uid)?.n || 0;
-  const visAujourd = db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)=?").get(uid, today)?.n || 0;
-  const visSemaine = db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=?").get(uid, weekAgo)?.n || 0;
-  const visMois = db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=?").get(uid, monthAgo)?.n || 0;
+  const visTotal = await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=?").get(uid)?.n || 0;
+  const visUniques = await db.prepare("SELECT COUNT(DISTINCT COALESCE(visiteur_id, -rowid)) AS n FROM profil_visites WHERE profil_user_id=?").get(uid)?.n || 0;
+  const visAujourd = await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)=?").get(uid, today)?.n || 0;
+  const visSemaine = await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=?").get(uid, weekAgo)?.n || 0;
+  const visMois = await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=?").get(uid, monthAgo)?.n || 0;
 
   // Évolution vues (7 derniers jours)
-  const evolVues = db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=? GROUP BY jour ORDER BY jour`).all(uid, weekAgo);
+  const evolVues = await db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND date(created_at)>=? GROUP BY jour ORDER BY jour`).all(uid, weekAgo);
 
   /* ── Réseau ── */
-  const nbAbonnes = db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE followed_id=?").get(uid)?.n || 0;
-  const nbAbonnements = db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE follower_id=?").get(uid)?.n || 0;
+  const nbAbonnes = await db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE followed_id=?").get(uid)?.n || 0;
+  const nbAbonnements = await db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE follower_id=?").get(uid)?.n || 0;
   // Évolution abonnés (30j)
-  const evolAbonnes = db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM user_follows WHERE followed_id=? AND date(created_at)>=? GROUP BY jour ORDER BY jour`).all(uid, monthAgo);
+  const evolAbonnes = await db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM user_follows WHERE followed_id=? AND date(created_at)>=? GROUP BY jour ORDER BY jour`).all(uid, monthAgo);
 
   /* ── Publications (fil) ── */
-  const nbPubs = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
-  const nbVuesPubs = db.prepare("SELECT COALESCE(SUM(vues),0) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
-  const nbReactionsPubs = db.prepare(`SELECT COUNT(*) AS n FROM fil_reactions fr JOIN fil_posts fp ON fr.post_id=fp.id WHERE fp.auteur_id=?`).get(uid)?.n || 0;
-  const nbComsPubs = db.prepare(`SELECT COUNT(*) AS n FROM fil_commentaires fc JOIN fil_posts fp ON fc.post_id=fp.id WHERE fp.auteur_id=?`).get(uid)?.n || 0;
-  const nbRepubs = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=? AND original_post_id IS NOT NULL`).get(uid)?.n || 0;
+  const nbPubs = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
+  const nbVuesPubs = await db.prepare("SELECT COALESCE(SUM(vues),0) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
+  const nbReactionsPubs = await db.prepare(`SELECT COUNT(*) AS n FROM fil_reactions fr JOIN fil_posts fp ON fr.post_id=fp.id WHERE fp.auteur_id=?`).get(uid)?.n || 0;
+  const nbComsPubs = await db.prepare(`SELECT COUNT(*) AS n FROM fil_commentaires fc JOIN fil_posts fp ON fc.post_id=fp.id WHERE fp.auteur_id=?`).get(uid)?.n || 0;
+  const nbRepubs = await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=? AND original_post_id IS NOT NULL`).get(uid)?.n || 0;
   const tauxEngagement = nbVuesPubs > 0 ? Math.round((nbReactionsPubs + nbComsPubs) / nbVuesPubs * 100 * 10) / 10 : 0;
 
   // Évolution engagement (30j)
-  const evolEngagement = db.prepare(`SELECT date(fr.created_at) AS jour, COUNT(*) AS n FROM fil_reactions fr JOIN fil_posts fp ON fr.post_id=fp.id WHERE fp.auteur_id=? AND date(fr.created_at)>=? GROUP BY jour ORDER BY jour`).all(uid, monthAgo);
+  const evolEngagement = await db.prepare(`SELECT date(fr.created_at) AS jour, COUNT(*) AS n FROM fil_reactions fr JOIN fil_posts fp ON fr.post_id=fp.id WHERE fp.auteur_id=? AND date(fr.created_at)>=? GROUP BY jour ORDER BY jour`).all(uid, monthAgo);
 
   /* ── Profil emploi ── */
   const profilEmploi = await db.prepare("SELECT * FROM profil_emploi WHERE user_id=?").get(uid);
-  const nbCandidatures = db.prepare("SELECT COUNT(*) AS n FROM recrutement_candidatures WHERE candidat_id=?").get(uid)?.n || 0;
-  const nbOffresRecues = db.prepare(`SELECT COUNT(*) AS n FROM recrutement_campagnes WHERE statut='active'`).get()?.n || 0;
+  const nbCandidatures = await db.prepare("SELECT COUNT(*) AS n FROM recrutement_candidatures WHERE candidat_id=?").get(uid)?.n || 0;
+  const nbOffresRecues = await db.prepare(`SELECT COUNT(*) AS n FROM recrutement_campagnes WHERE statut='active'`).get()?.n || 0;
 
   /* ── Analyse réseau ── */
-  const visiteursPays = db.prepare(`SELECT visiteur_pays AS pays, COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND visiteur_pays IS NOT NULL GROUP BY visiteur_pays ORDER BY n DESC LIMIT 10`).all(uid);
-  const visiteursVilles = db.prepare(`SELECT visiteur_ville AS ville, COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND visiteur_ville IS NOT NULL GROUP BY visiteur_ville ORDER BY n DESC LIMIT 10`).all(uid);
-  const visiteursTypes = db.prepare(`SELECT visiteur_role AS type_compte, COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND visiteur_role IS NOT NULL GROUP BY visiteur_role ORDER BY n DESC LIMIT 10`).all(uid);
+  const visiteursPays = await db.prepare(`SELECT visiteur_pays AS pays, COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND visiteur_pays IS NOT NULL GROUP BY visiteur_pays ORDER BY n DESC LIMIT 10`).all(uid);
+  const visiteursVilles = await db.prepare(`SELECT visiteur_ville AS ville, COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND visiteur_ville IS NOT NULL GROUP BY visiteur_ville ORDER BY n DESC LIMIT 10`).all(uid);
+  const visiteursTypes = await db.prepare(`SELECT visiteur_role AS type_compte, COUNT(*) AS n FROM profil_visites WHERE profil_user_id=? AND visiteur_role IS NOT NULL GROUP BY visiteur_role ORDER BY n DESC LIMIT 10`).all(uid);
 
   /* ── Calcul indice d'activité (0-100) ── */
   let score = 0;
@@ -13741,8 +13745,8 @@ route("GET", "/api/observations/approfondies", async (req, res) => {
     const evtIds = evts.map(e => e.id);
     if (evtIds.length) {
       const inIds = evtIds.map(() => '?').join(',');
-      evenements.inscrits = db.prepare(`SELECT COUNT(*) AS n FROM tickets WHERE event_id IN (${inIds})`).get(...evtIds)?.n || 0;
-      evenements.presents = db.prepare(`SELECT COUNT(*) AS n FROM event_checkins WHERE event_id IN (${inIds})`).get(...evtIds)?.n || 0;
+      evenements.inscrits = await db.prepare(`SELECT COUNT(*) AS n FROM tickets WHERE event_id IN (${inIds})`).get(...evtIds)?.n || 0;
+      evenements.presents = await db.prepare(`SELECT COUNT(*) AS n FROM event_checkins WHERE event_id IN (${inIds})`).get(...evtIds)?.n || 0;
     }
 
     /* Deals */
@@ -13774,16 +13778,16 @@ route("GET", "/api/observations/approfondies", async (req, res) => {
   }
 
   /* Performance par campagne (top 5) */
-  const perfCampagnes = db.prepare(`SELECT rc.nom, rc.vues_total, COUNT(c.id) AS nb_candidatures, rc.statut, rc.expire_at FROM recrutement_campagnes rc LEFT JOIN recrutement_candidatures c ON c.campagne_id=rc.id WHERE rc.recruteur_id=? GROUP BY rc.id ORDER BY rc.vues_total DESC LIMIT 5`).all(uid);
+  const perfCampagnes = await db.prepare(`SELECT rc.nom, rc.vues_total, COUNT(c.id) AS nb_candidatures, rc.statut, rc.expire_at FROM recrutement_campagnes rc LEFT JOIN recrutement_candidatures c ON c.campagne_id=rc.id WHERE rc.recruteur_id=? GROUP BY rc.id ORDER BY rc.vues_total DESC LIMIT 5`).all(uid);
   const tauxConversionCamp = campagnes.vues > 0 ? Math.round(campagnes.candidatures / campagnes.vues * 100 * 10) / 10 : 0;
 
   /* Visibilité */
-  const nbImpressions = db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=?").get(uid)?.n || 0;
-  const nbApparitionsFil = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
+  const nbImpressions = await db.prepare("SELECT COUNT(*) AS n FROM profil_visites WHERE profil_user_id=?").get(uid)?.n || 0;
+  const nbApparitionsFil = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
 
   /* Indice d'activité étendu */
   let score = 0;
-  const nbPubs = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
+  const nbPubs = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid)?.n || 0;
   score += Math.min(nbPubs * 2, 15);
   score += Math.min(evenements.total * 5, 15);
   score += Math.min(campagnes.total * 3, 12);
@@ -13793,7 +13797,7 @@ route("GET", "/api/observations/approfondies", async (req, res) => {
   if (user.is_verified) score += 5;
   if (user.photo_url) score += 5;
   score += Math.min(deals.clotures * 3, 9);
-  const nbReactions = db.prepare(`SELECT COUNT(*) AS n FROM fil_reactions fr JOIN fil_posts fp ON fr.post_id=fp.id WHERE fp.auteur_id=?`).get(uid)?.n || 0;
+  const nbReactions = await db.prepare(`SELECT COUNT(*) AS n FROM fil_reactions fr JOIN fil_posts fp ON fr.post_id=fp.id WHERE fp.auteur_id=?`).get(uid)?.n || 0;
   score += Math.min(nbReactions * 0.2, 8);
   score = Math.min(Math.round(score), 100);
 
@@ -13839,37 +13843,37 @@ route("GET", "/api/observatoire/global", async (req, res) => {
   const yearStart = new Date().getFullYear() + '-01-01';
 
   /* Comptes */
-  const totalComptes = db.prepare("SELECT COUNT(*) AS n FROM users").get()?.n || 0;
-  const comptesUsers = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur'").get()?.n || 0;
-  const comptesInit = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='initiative'").get()?.n || 0;
-  const comptesEtat = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite'").get()?.n || 0;
-  const comptesVerif = db.prepare("SELECT COUNT(*) AS n FROM users WHERE is_verified=1").get()?.n || 0;
-  const nouveauxMois = db.prepare("SELECT COUNT(*) AS n FROM users WHERE date(created_at)>=?").get(monthAgo)?.n || 0;
-  const actifsMois = db.prepare("SELECT COUNT(*) AS n FROM user_activity WHERE date>=?").get(monthAgo)?.n || 0;
-  const actifsSemaine = db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=?").get(weekAgo)?.n || 0;
+  const totalComptes = await db.prepare("SELECT COUNT(*) AS n FROM users").get()?.n || 0;
+  const comptesUsers = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur'").get()?.n || 0;
+  const comptesInit = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='initiative'").get()?.n || 0;
+  const comptesEtat = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite'").get()?.n || 0;
+  const comptesVerif = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE is_verified=1").get()?.n || 0;
+  const nouveauxMois = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE date(created_at)>=?").get(monthAgo)?.n || 0;
+  const actifsMois = await db.prepare("SELECT COUNT(*) AS n FROM user_activity WHERE date>=?").get(monthAgo)?.n || 0;
+  const actifsSemaine = await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=?").get(weekAgo)?.n || 0;
 
   /* Activité */
-  const totalPubs = db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get()?.n || 0;
-  const pubsAujourd = db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE date(created_at)=?").get(today)?.n || 0;
-  const totalEvts = db.prepare("SELECT COUNT(*) AS n FROM events").get()?.n || 0;
-  const evtsActifs = db.prepare("SELECT COUNT(*) AS n FROM events WHERE statut='publie'").get()?.n || 0;
-  const totalCamps = db.prepare("SELECT COUNT(*) AS n FROM recrutement_campagnes").get()?.n || 0;
-  const campsActives = db.prepare("SELECT COUNT(*) AS n FROM recrutement_campagnes WHERE statut='active'").get()?.n || 0;
-  const totalSonds = db.prepare("SELECT COUNT(*) AS n FROM sondages").get()?.n || 0;
-  const sondsOuverts = db.prepare("SELECT COUNT(*) AS n FROM sondages WHERE statut='ouvert'").get()?.n || 0;
-  const totalDeals = db.prepare("SELECT COUNT(*) AS n FROM deals").get()?.n || 0;
-  const dealsActifs = db.prepare("SELECT COUNT(*) AS n FROM deals WHERE statut='actif'").get()?.n || 0;
-  const dealsClotures = db.prepare("SELECT COUNT(*) AS n FROM deals WHERE statut='cloture'").get()?.n || 0;
-  const totalProjets = db.prepare("SELECT COUNT(*) AS n FROM projets").get()?.n || 0;
+  const totalPubs = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get()?.n || 0;
+  const pubsAujourd = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE date(created_at)=?").get(today)?.n || 0;
+  const totalEvts = await db.prepare("SELECT COUNT(*) AS n FROM events").get()?.n || 0;
+  const evtsActifs = await db.prepare("SELECT COUNT(*) AS n FROM events WHERE statut='publie'").get()?.n || 0;
+  const totalCamps = await db.prepare("SELECT COUNT(*) AS n FROM recrutement_campagnes").get()?.n || 0;
+  const campsActives = await db.prepare("SELECT COUNT(*) AS n FROM recrutement_campagnes WHERE statut='active'").get()?.n || 0;
+  const totalSonds = await db.prepare("SELECT COUNT(*) AS n FROM sondages").get()?.n || 0;
+  const sondsOuverts = await db.prepare("SELECT COUNT(*) AS n FROM sondages WHERE statut='ouvert'").get()?.n || 0;
+  const totalDeals = await db.prepare("SELECT COUNT(*) AS n FROM deals").get()?.n || 0;
+  const dealsActifs = await db.prepare("SELECT COUNT(*) AS n FROM deals WHERE statut='actif'").get()?.n || 0;
+  const dealsClotures = await db.prepare("SELECT COUNT(*) AS n FROM deals WHERE statut='cloture'").get()?.n || 0;
+  const totalProjets = await db.prepare("SELECT COUNT(*) AS n FROM projets").get()?.n || 0;
 
   /* Économique */
-  const totalCandidatures = db.prepare("SELECT COUNT(*) AS n FROM recrutement_candidatures").get()?.n || 0;
-  const revenusPlateforme = db.prepare("SELECT COALESCE(SUM(montant),0) AS n FROM transactions WHERE statut='reussi'").get()?.n || 0;
-  const revenusAnnee = db.prepare("SELECT COALESCE(SUM(montant),0) AS n FROM transactions WHERE statut='reussi' AND date_transaction>=?").get(yearStart)?.n || 0;
+  const totalCandidatures = await db.prepare("SELECT COUNT(*) AS n FROM recrutement_candidatures").get()?.n || 0;
+  const revenusPlateforme = await db.prepare("SELECT COALESCE(SUM(montant),0) AS n FROM transactions WHERE statut='reussi'").get()?.n || 0;
+  const revenusAnnee = await db.prepare("SELECT COALESCE(SUM(montant),0) AS n FROM transactions WHERE statut='reussi' AND date_transaction>=?").get(yearStart)?.n || 0;
 
   /* Diasporas (par pays) */
-  const diasporas = db.prepare(`SELECT COALESCE(pays,'Non spécifié') AS pays, COUNT(*) AS nb_membres, COUNT(CASE WHEN role='initiative' THEN 1 END) AS nb_initiatives FROM users GROUP BY pays ORDER BY nb_membres DESC LIMIT 20`).all();
-  const nbDiasporas = db.prepare("SELECT COUNT(DISTINCT pays) AS n FROM users WHERE pays IS NOT NULL").get()?.n || 0;
+  const diasporas = await db.prepare(`SELECT COALESCE(pays,'Non spécifié') AS pays, COUNT(*) AS nb_membres, COUNT(CASE WHEN role='initiative' THEN 1 END) AS nb_initiatives FROM users GROUP BY pays ORDER BY nb_membres DESC LIMIT 20`).all();
+  const nbDiasporas = await db.prepare("SELECT COUNT(DISTINCT pays) AS n FROM users WHERE pays IS NOT NULL").get()?.n || 0;
 
   /* Classements */
   const classementInit = db.prepare(`
@@ -13881,16 +13885,16 @@ route("GET", "/api/observatoire/global", async (req, res) => {
     ORDER BY (nb_pubs + nb_evts*3 + nb_camps*2) DESC LIMIT 10`).all();
 
   /* Évolution mensuelle comptes */
-  const evolComptes = db.prepare(`SELECT strftime('%Y-%m', created_at) AS mois, COUNT(*) AS n FROM users GROUP BY mois ORDER BY mois DESC LIMIT 12`).all().reverse();
+  const evolComptes = await db.prepare(`SELECT strftime('%Y-%m', created_at) AS mois, COUNT(*) AS n FROM users GROUP BY mois ORDER BY mois DESC LIMIT 12`).all().reverse();
 
   /* Évolution pubs */
-  const evolPubs = db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM fil_posts WHERE date(created_at)>=? GROUP BY jour ORDER BY jour`).all(monthAgo);
+  const evolPubs = await db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM fil_posts WHERE date(created_at)>=? GROUP BY jour ORDER BY jour`).all(monthAgo);
 
   /* Répartition par pays */
-  const parPays = db.prepare(`SELECT COALESCE(pays,'Inconnu') AS pays, COUNT(*) AS n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 15`).all();
+  const parPays = await db.prepare(`SELECT COALESCE(pays,'Inconnu') AS pays, COUNT(*) AS n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 15`).all();
 
   /* Répartition par role */
-  const parRole = db.prepare(`SELECT role, COUNT(*) AS n FROM users GROUP BY role ORDER BY n DESC`).all();
+  const parRole = await db.prepare(`SELECT role, COUNT(*) AS n FROM users GROUP BY role ORDER BY n DESC`).all();
 
   /* Indices stratégiques */
   const ied = Math.min(Math.round(totalPubs / Math.max(totalComptes,1) * 20 + totalEvts / Math.max(totalComptes,1) * 30), 100);
@@ -13948,40 +13952,40 @@ route("GET", "/api/observatoire/mad", async (req, res) => {
   }
 
   /* Taille diaspora */
-  const diaspora = db.prepare(`SELECT COALESCE(u.pays,'Inconnu') AS pays, COUNT(*) AS nb_membres, COUNT(CASE WHEN u.role='initiative' THEN 1 END) AS nb_initiatives, COUNT(CASE WHEN u.is_verified=1 THEN 1 END) AS nb_verifies FROM users u ${whereClause} GROUP BY u.pays ORDER BY nb_membres DESC LIMIT 30`).all(...whereParams);
+  const diaspora = await db.prepare(`SELECT COALESCE(u.pays,'Inconnu') AS pays, COUNT(*) AS nb_membres, COUNT(CASE WHEN u.role='initiative' THEN 1 END) AS nb_initiatives, COUNT(CASE WHEN u.is_verified=1 THEN 1 END) AS nb_verifies FROM users u ${whereClause} GROUP BY u.pays ORDER BY nb_membres DESC LIMIT 30`).all(...whereParams);
 
   /* Secteurs d'activité */
   const whereAnd = whereClause ? whereClause.replace('WHERE', 'AND') : '';
-  const secteurs = db.prepare(`SELECT JSON_EXTRACT(u.profil_json,'$.secteur') AS secteur, COUNT(*) AS n FROM users u WHERE JSON_EXTRACT(u.profil_json,'$.secteur') IS NOT NULL ${whereAnd} GROUP BY secteur ORDER BY n DESC LIMIT 15`).all(...whereParams);
+  const secteurs = await db.prepare(`SELECT JSON_EXTRACT(u.profil_json,'$.secteur') AS secteur, COUNT(*) AS n FROM users u WHERE JSON_EXTRACT(u.profil_json,'$.secteur') IS NOT NULL ${whereAnd} GROUP BY secteur ORDER BY n DESC LIMIT 15`).all(...whereParams);
 
   /* Répartition formation */
-  const formations = db.prepare(`SELECT niveau_etudes, COUNT(*) AS n FROM profil_emploi pe JOIN users u ON pe.user_id=u.id ${whereClause} GROUP BY niveau_etudes ORDER BY n DESC`).all(...whereParams);
+  const formations = await db.prepare(`SELECT niveau_etudes, COUNT(*) AS n FROM profil_emploi pe JOIN users u ON pe.user_id=u.id ${whereClause} GROUP BY niveau_etudes ORDER BY n DESC`).all(...whereParams);
 
   /* Recrutements */
-  const nbOffres = db.prepare(`SELECT COUNT(*) AS n FROM recrutement_campagnes rc JOIN users u ON rc.recruteur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
-  const nbCands = db.prepare(`SELECT COUNT(*) AS n FROM recrutement_candidatures rc2 JOIN recrutement_campagnes rc ON rc2.campagne_id=rc.id JOIN users u ON rc.recruteur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
+  const nbOffres = await db.prepare(`SELECT COUNT(*) AS n FROM recrutement_campagnes rc JOIN users u ON rc.recruteur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
+  const nbCands = await db.prepare(`SELECT COUNT(*) AS n FROM recrutement_candidatures rc2 JOIN recrutement_campagnes rc ON rc2.campagne_id=rc.id JOIN users u ON rc.recruteur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
   const recrutements = { offres: nbOffres, candidatures: nbCands };
 
   /* Emploi disponible */
-  const enRecherche = db.prepare(`SELECT COUNT(*) AS n FROM profil_emploi pe JOIN users u ON pe.user_id=u.id WHERE pe.disponible_pour_travailler=1 ${whereAnd}`).get(...whereParams)?.n || 0;
+  const enRecherche = await db.prepare(`SELECT COUNT(*) AS n FROM profil_emploi pe JOIN users u ON pe.user_id=u.id WHERE pe.disponible_pour_travailler=1 ${whereAnd}`).get(...whereParams)?.n || 0;
 
   /* Événements */
-  const evtsStats = db.prepare(`SELECT COUNT(*) AS nb_evts FROM events e JOIN users u ON e.organisateur_id=u.id ${whereClause}`).get(...whereParams);
+  const evtsStats = await db.prepare(`SELECT COUNT(*) AS nb_evts FROM events e JOIN users u ON e.organisateur_id=u.id ${whereClause}`).get(...whereParams);
 
   /* Deals & projets */
-  const dealsStats = db.prepare(`SELECT COUNT(*) AS total, COUNT(CASE WHEN d.statut='cloture' THEN 1 END) AS clotures FROM deals d JOIN initiatives i ON d.createur_id=i.id JOIN users u ON i.owner_user_id=u.id ${whereClause}`).get(...whereParams);
-  const projetsStats = db.prepare(`SELECT COUNT(*) AS total FROM projets p JOIN users u ON p.createur_id=u.id ${whereClause}`).get(...whereParams);
+  const dealsStats = await db.prepare(`SELECT COUNT(*) AS total, COUNT(CASE WHEN d.statut='cloture' THEN 1 END) AS clotures FROM deals d JOIN initiatives i ON d.createur_id=i.id JOIN users u ON i.owner_user_id=u.id ${whereClause}`).get(...whereParams);
+  const projetsStats = await db.prepare(`SELECT COUNT(*) AS total FROM projets p JOIN users u ON p.createur_id=u.id ${whereClause}`).get(...whereParams);
 
   /* Classements diasporas actives */
-  const classementActivite = db.prepare(`SELECT COALESCE(u.pays,'Inconnu') AS pays, COUNT(fp.id) AS nb_pubs, COUNT(DISTINCT u.id) AS nb_membres FROM users u LEFT JOIN fil_posts fp ON fp.auteur_id=u.id GROUP BY u.pays ORDER BY nb_pubs DESC LIMIT 10`).all();
+  const classementActivite = await db.prepare(`SELECT COALESCE(u.pays,'Inconnu') AS pays, COUNT(fp.id) AS nb_pubs, COUNT(DISTINCT u.id) AS nb_membres FROM users u LEFT JOIN fil_posts fp ON fp.auteur_id=u.id GROUP BY u.pays ORDER BY nb_pubs DESC LIMIT 10`).all();
 
   /* Classement emploi */
-  const classementEmploi = db.prepare(`SELECT COALESCE(u.pays,'Inconnu') AS pays, COUNT(rc.id) AS offres FROM users u LEFT JOIN recrutement_campagnes rc ON rc.recruteur_id=u.id GROUP BY u.pays ORDER BY offres DESC LIMIT 10`).all();
+  const classementEmploi = await db.prepare(`SELECT COALESCE(u.pays,'Inconnu') AS pays, COUNT(rc.id) AS offres FROM users u LEFT JOIN recrutement_campagnes rc ON rc.recruteur_id=u.id GROUP BY u.pays ORDER BY offres DESC LIMIT 10`).all();
 
   /* Indices */
-  const totalMembres = db.prepare(`SELECT COUNT(*) AS n FROM users u ${whereClause}`).get(...whereParams)?.n || 1;
-  const totalPubs2 = db.prepare(`SELECT COUNT(*) AS n FROM fil_posts fp JOIN users u ON fp.auteur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
-  const totalEvts2 = db.prepare(`SELECT COUNT(*) AS n FROM events e JOIN users u ON e.organisateur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
+  const totalMembres = await db.prepare(`SELECT COUNT(*) AS n FROM users u ${whereClause}`).get(...whereParams)?.n || 1;
+  const totalPubs2 = await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts fp JOIN users u ON fp.auteur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
+  const totalEvts2 = await db.prepare(`SELECT COUNT(*) AS n FROM events e JOIN users u ON e.organisateur_id=u.id ${whereClause}`).get(...whereParams)?.n || 0;
   const totalDealsLoc = dealsStats?.total || 0;
   const totalCands = recrutements?.candidatures || 0;
   const totalOffres = recrutements?.offres || 0;
@@ -14035,9 +14039,9 @@ route("GET", "/api/admin/observatoire-institutionnel", async (req, res) => {
   const nbActifs = allColl.filter(c => c.nb_connexions > 0).length;
   const nbInactifs = nbTotal - nbActifs;
 
-  const evByOrg = db.prepare("SELECT organisateur_id, COUNT(*) as n FROM events GROUP BY organisateur_id").all();
-  const postsByUser = db.prepare("SELECT auteur_id, COUNT(*) as n FROM fil_posts GROUP BY auteur_id").all();
-  const recrutByUser = db.prepare("SELECT recruteur_id, COUNT(*) as n FROM recrutement_campagnes GROUP BY recruteur_id").all();
+  const evByOrg = await db.prepare("SELECT organisateur_id, COUNT(*) as n FROM events GROUP BY organisateur_id").all();
+  const postsByUser = await db.prepare("SELECT auteur_id, COUNT(*) as n FROM fil_posts GROUP BY auteur_id").all();
+  const recrutByUser = await db.prepare("SELECT recruteur_id, COUNT(*) as n FROM recrutement_campagnes GROUP BY recruteur_id").all();
 
   const evMap={}, postMap={}, recrutMap={};
   evByOrg.forEach(r => evMap[r.organisateur_id]=r.n);
@@ -14190,14 +14194,14 @@ route("GET", "/api/admin/export-data", async (req, res) => {
     export_date: new Date().toISOString(),
     module,
     platform: "Diaspo'Actif",
-    users: { total: db.prepare("SELECT COUNT(*) as n FROM users").get().n },
-    initiatives: { total: db.prepare("SELECT COUNT(*) as n FROM initiatives").get().n },
-    events: { total: db.prepare("SELECT COUNT(*) as n FROM events").get().n },
-    collectivites: { total: db.prepare("SELECT COUNT(*) as n FROM users WHERE role='collectivite'").get().n },
-    publications: { total: db.prepare("SELECT COUNT(*) as n FROM fil_posts").get().n },
-    recrutements: { total: db.prepare("SELECT COUNT(*) as n FROM recrutement_campagnes").get().n },
-    projets: { total: db.prepare("SELECT COUNT(*) as n FROM projets").get().n },
-    deals: { total: db.prepare("SELECT COUNT(*) as n FROM deals").get().n },
+    users: { total: (await db.prepare("SELECT COUNT(*) as n FROM users").get())?.n },
+    initiatives: { total: (await db.prepare("SELECT COUNT(*) as n FROM initiatives").get())?.n },
+    events: { total: (await db.prepare("SELECT COUNT(*) as n FROM events").get())?.n },
+    collectivites: { total: (await db.prepare("SELECT COUNT(*) as n FROM users WHERE role='collectivite'").get())?.n },
+    publications: { total: (await db.prepare("SELECT COUNT(*) as n FROM fil_posts").get())?.n },
+    recrutements: { total: (await db.prepare("SELECT COUNT(*) as n FROM recrutement_campagnes").get())?.n },
+    projets: { total: (await db.prepare("SELECT COUNT(*) as n FROM projets").get())?.n },
+    deals: { total: (await db.prepare("SELECT COUNT(*) as n FROM deals").get())?.n },
     note: "Données agrégées et anonymisées - Diaspo'Actif"
   };
 
@@ -14219,13 +14223,13 @@ route("GET", "/api/admin/observatoire-coop", async (req, res) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // Données réelles
-  const nbInit   = db.prepare("SELECT COUNT(*) as n FROM initiatives").get().n || 0;
-  const nbIntl   = db.prepare("SELECT COUNT(*) as n FROM initiatives WHERE rayonnement IN ('internationale','internationale+')").get().n || 0;
-  const nbEvents = db.prepare("SELECT COUNT(*) as n FROM events").get().n || 0;
-  const nbDeals  = db.prepare("SELECT COUNT(*) as n FROM deals").get().n || 0;
-  const nbProjets= db.prepare("SELECT COUNT(*) as n FROM projets").get().n || 0;
-  const nbUsers  = db.prepare("SELECT COUNT(*) as n FROM users").get().n || 0;
-  const nbCampagnes = db.prepare("SELECT COUNT(*) as n FROM recrutement_campagnes").get().n || 0;
+  const nbInit   = (await db.prepare("SELECT COUNT(*) as n FROM initiatives").get())?.n || 0;
+  const nbIntl   = (await db.prepare("SELECT COUNT(*) as n FROM initiatives WHERE rayonnement IN ('internationale','internationale+')").get())?.n || 0;
+  const nbEvents = (await db.prepare("SELECT COUNT(*) as n FROM events").get())?.n || 0;
+  const nbDeals  = (await db.prepare("SELECT COUNT(*) as n FROM deals").get())?.n || 0;
+  const nbProjets= (await db.prepare("SELECT COUNT(*) as n FROM projets").get())?.n || 0;
+  const nbUsers  = (await db.prepare("SELECT COUNT(*) as n FROM users").get())?.n || 0;
+  const nbCampagnes = (await db.prepare("SELECT COUNT(*) as n FROM recrutement_campagnes").get())?.n || 0;
   const paysList = (await db.prepare("SELECT DISTINCT pays FROM initiatives WHERE pays IS NOT NULL").all()).map(r=>r.pays);
   const nbPays   = new Set([...paysList, "France", "Belgique", "Canada", "Maroc", "Espagne"]).size;
 
@@ -14387,11 +14391,11 @@ route("GET", "/api/admin/observatoire-eco", async (req, res) => {
   const pays = url.searchParams.get("pays") || "";
 
   // Données réelles de la DB
-  const nbUsers = db.prepare("SELECT COUNT(*) as n FROM users").get().n || 0;
-  const nbInit  = db.prepare("SELECT COUNT(*) as n FROM initiatives").get().n || 0;
-  const nbEvents= db.prepare("SELECT COUNT(*) as n FROM events").get().n || 0;
-  const nbPosts = db.prepare("SELECT COUNT(*) as n FROM fil_posts").get().n || 0;
-  const nbProjets=db.prepare("SELECT COUNT(*) as n FROM projets").get().n || 0;
+  const nbUsers = (await db.prepare("SELECT COUNT(*) as n FROM users").get())?.n || 0;
+  const nbInit  = (await db.prepare("SELECT COUNT(*) as n FROM initiatives").get())?.n || 0;
+  const nbEvents= (await db.prepare("SELECT COUNT(*) as n FROM events").get())?.n || 0;
+  const nbPosts = (await db.prepare("SELECT COUNT(*) as n FROM fil_posts").get())?.n || 0;
+  const nbProjets=(await db.prepare("SELECT COUNT(*) as n FROM projets").get())?.n || 0;
 
   // Simulation économique réaliste (prototype — DB vide de transactions réelles)
   const seed = nbUsers * 31 + nbInit * 17 + nbEvents * 7;
@@ -14993,7 +14997,7 @@ app.delete('/api/oz/history', requireAuth, async (req, res) => {
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Calcul de progression (nb de sections non vides / total) */
-function calcBPProgression(sections) {
+async function calcBPProgression(sections) {
   const obligatoires = ['infos_generales','resume_executif','presentation','probleme','solution','marche','swot','business_model','produits','strategie_marketing','plan_commercial','plan_operationnel','organisation','rh','calendrier','plan_financier','risques','impact','financement'];
   const remplis = obligatoires.filter(k => {
     const s = sections[k];
@@ -15006,7 +15010,7 @@ function calcBPProgression(sections) {
 }
 
 /* Vérification complétude */
-function checkBPCompletude(sections) {
+async function checkBPCompletude(sections) {
   const checks = [
     { key: 'infos_generales', label: 'Informations générales', champs: ['nom_projet','type_initiative','secteur','pays','responsable'] },
     { key: 'resume_executif', label: 'Résumé exécutif', champs: ['projet','probleme','solution','marche','besoins'] },
@@ -15351,7 +15355,7 @@ function getBPAssistantResponse(message, bp, currentSection, sections) {
   return `Je suis votre consultant Business Plan pour **${nom}**. Je peux vous aider à :\n\n• **Rédiger** chaque section (dites "génère un exemple")\n• **Analyser** la qualité de votre dossier (dites "fais un audit")\n• **Expliquer** les termes (BFR, SWOT, BMC, ROI…)\n• **Conseiller** sur votre stratégie financière, marketing ou commerciale\n• **Préparer** votre présentation à des investisseurs\n\nQuelle section souhaitez-vous travailler ?`;
 }
 
-function genTextForSection(section, bp, sections) {
+async function genTextForSection(section, bp, sections) {
   const nom = bp.nom_projet || 'votre projet';
   const type = bp.type_initiative || 'startup';
   const secteur = bp.secteur || 'votre secteur';
@@ -15372,7 +15376,7 @@ function genTextForSection(section, bp, sections) {
   return `Je vais vous aider à rédiger la section **"${section.replace(/_/g,' ')}"** pour ${nom}.\n\nPour générer une proposition pertinente, pouvez-vous me préciser :\n• Votre cible client principale\n• Votre principal avantage concurrentiel\n• Votre zone géographique d'opération\n\nAvec ces éléments, je pourrai vous proposer un texte adapté.`;
 }
 
-function auditBP(bp, sections) {
+async function auditBP(bp, sections) {
   const obligatoires = [
     { key:'infos_generales', label:'Informations générales', champs:['nom_projet','type_initiative','secteur'] },
     { key:'resume_executif', label:'Résumé exécutif', champs:['projet'] },
@@ -15419,7 +15423,7 @@ function auditBP(bp, sections) {
   return rapport;
 }
 
-function genFinancialAdvice(bp, sections) {
+async function genFinancialAdvice(bp, sections) {
   const fin = sections.plan_financier || {};
   const ca1 = parseFloat(fin.ca_1) || 0;
   const sal1 = parseFloat(fin.salaires_1) || 0;
@@ -15679,7 +15683,7 @@ function getSimulationQuestion(scenario, difficulte, bp, sections, qIndex, userL
   return scenarioQuestions[qIndex % scenarioQuestions.length];
 }
 
-function generateSimulationReport(simulation, bp, sections) {
+async function generateSimulationReport(simulation, bp, sections) {
   const messages = safeJSON(simulation.messages_json, []);
   const userMsgs = messages.filter(m=>m.role==='user');
   const scenario = simulation.scenario;
@@ -15735,7 +15739,7 @@ function generateSimulationReport(simulation, bp, sections) {
   };
 }
 
-function getScoreComment(score, key) {
+async function getScoreComment(score, key) {
   const comments = {
     clarté: { high:'Présentation claire et structurée, l\'interlocuteur comprend rapidement le projet.', mid:'La présentation manque parfois de structure. Travaillez votre pitch elevator.', low:'Difficile à suivre. Structurez votre présentation en 3 parties : Problème → Solution → Business Model.' },
     precision: { high:'Excellente maîtrise du projet, réponses précises et argumentées.', mid:'Certains éléments manquent de précision, notamment sur les chiffres clés.', low:'Manque de précision sur des éléments fondamentaux. Approfondissez votre connaissance des données.' },
@@ -15889,7 +15893,7 @@ app.put('/api/audiovisuel/lives/:id', requireAuth, async (req, res) => {
   const body = await parseBody(req);
   const fields = ['titre','description','type','acces','prix','code_acces','url_stream','url_replay','vignette_url','date_debut','date_fin','statut','enregistrement_url','transcription','resume_ia','tags','moments_cles','decisions','actions'];
   const sets = []; const vals = [];
-  fields.forEach(f => { if (body[f] !== undefined) { sets.push(`${f}=?`); vals.push(typeof body[f]==='object'?JSON.stringify(body[f]):body[f]); } });
+  fields.forEach(async f => { if (body[f] !== undefined) { sets.push(`${f}=?`); vals.push(typeof body[f]==='object'?JSON.stringify(body[f]):body[f]); } });
   sets.push("updated_at=datetime('now')");
   db.prepare(`UPDATE av_lives SET ${sets.join(',')} WHERE id=?`).run(...vals, req.params.id);
   sendJSON(res, 200, { ok: true });
@@ -15954,13 +15958,13 @@ app.delete('/api/audiovisuel/lives/:id/chat/:msgId', requireAuth, async (req, re
 
 app.get('/api/audiovisuel/lives/:id/sondages', async (req, res) => {
   const sondages = await db.prepare('SELECT * FROM av_sondages WHERE live_id=? AND actif=1').all(req.params.id);
-  const result = sondages.map(s => {
+  const result = await Promise.all(sondages.map(async s => {
     const options = safeJSON(s.options_json, []);
-    const votes = db.prepare('SELECT option_index, COUNT(*) as cnt FROM av_votes WHERE sondage_id=? GROUP BY option_index').all(s.id);
-    const totaux = {}; votes.forEach(v => totaux[v.option_index] = v.cnt);
+    const votes = await db.prepare('SELECT option_index, COUNT(*) as cnt FROM av_votes WHERE sondage_id=? GROUP BY option_index').all(s.id);
+    const totaux = {}; votes.forEach(v => { totaux[v.option_index] = v.cnt; });
     const total = votes.reduce((a,v)=>a+v.cnt,0);
     return { ...s, options: options.map((o,i)=>({ label:o, votes:totaux[i]||0, pct:total?(((totaux[i]||0)/total)*100).toFixed(1):0 })), total };
-  });
+  }));
   sendJSON(res, 200, result);
 });
 
@@ -15989,12 +15993,12 @@ app.post('/api/audiovisuel/lives/:id/reactions', async (req, res) => {
   const body = await parseBody(req);
   const { emoji='❤️', user_id=null } = body;
   db.prepare('INSERT INTO av_reactions (live_id, user_id, emoji) VALUES (?,?,?)').run(req.params.id, user_id||null, emoji);
-  const total = db.prepare('SELECT emoji, COUNT(*) as cnt FROM av_reactions WHERE live_id=? GROUP BY emoji').all(req.params.id);
+  const total = await db.prepare('SELECT emoji, COUNT(*) as cnt FROM av_reactions WHERE live_id=? GROUP BY emoji').all(req.params.id);
   sendJSON(res, 200, { ok: true, reactions: total });
 });
 
 app.get('/api/audiovisuel/lives/:id/reactions', async (req, res) => {
-  const total = db.prepare('SELECT emoji, COUNT(*) as cnt FROM av_reactions WHERE live_id=? GROUP BY emoji ORDER BY cnt DESC').all(req.params.id);
+  const total = await db.prepare('SELECT emoji, COUNT(*) as cnt FROM av_reactions WHERE live_id=? GROUP BY emoji ORDER BY cnt DESC').all(req.params.id);
   sendJSON(res, 200, total);
 });
 
@@ -16105,12 +16109,12 @@ app.get('/api/audiovisuel/bibliotheque', async (req, res) => {
 /* ── STATS AUDIOVISUEL ── */
 app.get('/api/audiovisuel/stats', requireAuth, async (req, res) => {
   const id = req.user.id;
-  const totalLives = db.prepare('SELECT COUNT(*) as n FROM av_lives WHERE initiative_id=?').get(id).n;
-  const totalVuesLive = db.prepare('SELECT COALESCE(SUM(nb_vues),0) as n FROM av_lives WHERE initiative_id=?').get(id).n;
-  const livesEnCours = db.prepare("SELECT COUNT(*) as n FROM av_lives WHERE initiative_id=? AND statut='en_cours'").get(id).n;
-  const totalEpisodes = db.prepare('SELECT COUNT(*) as n FROM av_episodes WHERE initiative_id=?').get(id).n;
-  const totalEcoutes = db.prepare('SELECT COALESCE(SUM(nb_ecoutes),0) as n FROM av_episodes WHERE initiative_id=?').get(id).n;
-  const totalSeries = db.prepare('SELECT COUNT(*) as n FROM av_series WHERE initiative_id=?').get(id).n;
+  const totalLives = (await db.prepare('SELECT COUNT(*) as n FROM av_lives WHERE initiative_id=?').get(id))?.n;
+  const totalVuesLive = await db.prepare('SELECT COALESCE(SUM(nb_vues),0) as n FROM av_lives WHERE initiative_id=?').get(id).n;
+  const livesEnCours = (await db.prepare("SELECT COUNT(*) as n FROM av_lives WHERE initiative_id=? AND statut='en_cours'").get(id))?.n;
+  const totalEpisodes = (await db.prepare('SELECT COUNT(*) as n FROM av_episodes WHERE initiative_id=?').get(id))?.n;
+  const totalEcoutes = await db.prepare('SELECT COALESCE(SUM(nb_ecoutes),0) as n FROM av_episodes WHERE initiative_id=?').get(id).n;
+  const totalSeries = (await db.prepare('SELECT COUNT(*) as n FROM av_series WHERE initiative_id=?').get(id))?.n;
   sendJSON(res, 200, { totalLives, totalVuesLive, livesEnCours, totalEpisodes, totalEcoutes, totalSeries });
 });
 
