@@ -273,7 +273,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   // Email de bienvenue (non bloquant)
   try {
     const { emailBienvenue } = require("./mailer");
-    emailBienvenue({ prenom: user.prenom || user.nom, email: user.email, role: user.role });
+    emailBienvenue({ prenom: user.prenom || user.nom, email: user.email, role: user.role, nom_institution: nom_institution || null });
   } catch (_) {}
 
   sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
