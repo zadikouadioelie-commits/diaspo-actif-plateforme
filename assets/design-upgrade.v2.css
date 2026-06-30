@@ -27,6 +27,49 @@
   border-bottom: 1px solid rgba(255,255,255,.08) !important;
   box-shadow: 0 2px 16px rgba(13,43,78,.25) !important;
 }
+
+/* Sélecteur de langue dans la topbar */
+.topbar .lang-select,
+.topbar select,
+.lang-select {
+  background: rgba(255,255,255,.12) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,.25) !important;
+  border-radius: 20px !important;
+}
+.topbar .lang-select option,
+.topbar select option,
+.lang-select option {
+  background: #0D2B4E !important;
+  color: #fff !important;
+}
+
+/* Bouton Déconnexion et autres boutons dans la topbar */
+.topbar .btn-deconnexion,
+.topbar a[href*="logout"],
+.topbar a[href*="deconnex"],
+.topbar button[onclick*="logout"],
+.topbar button[onclick*="deconnex"],
+a.btn-deconnexion,
+.btn-deconnexion {
+  background: rgba(255,255,255,.12) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,.25) !important;
+}
+.topbar .btn-deconnexion:hover,
+.btn-deconnexion:hover {
+  background: rgba(255,255,255,.2) !important;
+}
+
+/* Tous les textes dans la topbar en blanc */
+.topbar *:not(.btn-orange):not(.btn-primary):not(.pill):not(img) {
+  color: #fff !important;
+}
+/* Exceptions : bouton S'inscrire reste orange */
+.topbar .btn-orange,
+.topbar .btn-primary {
+  color: #fff !important;
+}
 .topbar-inner {
   padding: 12px 24px !important;
 }
