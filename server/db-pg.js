@@ -120,4 +120,17 @@ function prepare(sql) {
   return new PgStatement(sql);
 }
 
+/* Migrations automatiques au démarrage */
+(async () => {
+  try {
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires BIGINT");
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url TEXT");
+  } catch(e) {
+    if (!e.message.includes("already exists") && !e.message.includes("duplicate column")) {
+      console.error("[db-pg] migration error:", e.message);
+    }
+  }
+})();
+
 module.exports = { prepare, exec, pool };
