@@ -59,6 +59,19 @@ function pragmaToTable(sql) {
   return m ? m[1] : null;
 }
 
+/* Convertit les BigInt en Number dans les résultats (COUNT(*) PostgreSQL retourne BigInt) */
+function normalizeBigInt(obj) {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'bigint') return Number(obj);
+  if (Array.isArray(obj)) return obj.map(normalizeBigInt);
+  if (typeof obj === 'object') {
+    const out = {};
+    for (const k of Object.keys(obj)) out[k] = normalizeBigInt(obj[k]);
+    return out;
+  }
+  return obj;
+}
+
 /* Classe statement — équivalent de DatabaseSync.prepare() */
 class PgStatement {
   constructor(sql) {
@@ -79,7 +92,7 @@ class PgStatement {
     }
     const params = args.flat();
     const r = await pool.query(this._sql, params);
-    return r.rows[0] || null;
+    return normalizeBigInt(r.rows[0]) || null;
   }
 
   /* Retourne toutes les lignes */
@@ -93,7 +106,7 @@ class PgStatement {
     }
     const params = args.flat();
     const r = await pool.query(this._sql, params);
-    return r.rows;
+    return normalizeBigInt(r.rows);
   }
 
   /* Exécute (INSERT/UPDATE/DELETE) — retourne { changes, lastInsertRowid } */
