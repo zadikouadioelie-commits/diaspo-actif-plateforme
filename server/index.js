@@ -1248,6 +1248,15 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
 
   sendJSON(res, 200, { conversations: filtered });
 });
+// DEBUG TEMPORAIRE
+route("GET", "/api/conversations-debug", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  try {
+    const rows = await db.prepare("SELECT id, user1_id, user2_id FROM conversations WHERE user1_id=? OR user2_id=? LIMIT 5").all(user.id, user.id);
+    sendJSON(res, 200, { ok: true, rows, user_id: user.id });
+  } catch(e) { sendJSON(res, 500, { error: e.message }); }
+});
 
 /* POST /api/conversations — créer ou retrouver une conversation */
 route("POST", "/api/conversations", async (req, res, params, body) => {
