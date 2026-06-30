@@ -1943,15 +1943,16 @@ route("GET", "/api/dashboard/collectivite", async (req, res) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux Collectivités." });
 
-  const totalMembres = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur', 'initiative')").get())?.n;
-  const totalInitiatives = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives").get())?.n;
+  try {
+  const totalMembres = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur', 'initiative')").get())?.n ?? 0;
+  const totalInitiatives = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives").get())?.n ?? 0;
   const paysRows = await db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 10").all();
   const profil = await db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
-  const nbMessages = (await db.prepare("SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON m.conversation_id=c.id WHERE (c.user1_id=? OR c.user2_id=?) AND m.sender_id!=? AND m.lu=0").get(user.id,user.id,user.id))?.n;
-  const nbComms = (await db.prepare("SELECT COUNT(*) AS n FROM communications_institutionnelles WHERE emetteur_id=?").get(user.id))?.n;
-  const nbServices = (await db.prepare("SELECT COUNT(*) AS n FROM ambassade_services WHERE user_id=? AND actif=1").get(user.id))?.n;
-  const nbAgenda = (await db.prepare("SELECT COUNT(*) AS n FROM ambassade_agenda WHERE user_id=? AND date_debut >= date('now')").get(user.id))?.n;
-  const nbOpportunites = (await db.prepare("SELECT COUNT(*) AS n FROM ambassade_opportunites WHERE user_id=? AND actif=1").get(user.id))?.n;
+  const nbMessages = (await db.prepare("SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON m.conversation_id=c.id WHERE (c.user1_id=? OR c.user2_id=?) AND m.sender_id!=? AND m.lu=0").get(user.id,user.id,user.id))?.n ?? 0;
+  const nbComms = (await db.prepare("SELECT COUNT(*) AS n FROM communications_institutionnelles WHERE emetteur_id=?").get(user.id))?.n ?? 0;
+  const nbServices = (await db.prepare("SELECT COUNT(*) AS n FROM ambassade_services WHERE user_id=? AND actif=1").get(user.id))?.n ?? 0;
+  const nbAgenda = (await db.prepare("SELECT COUNT(*) AS n FROM ambassade_agenda WHERE user_id=? AND date_debut >= date('now')").get(user.id))?.n ?? 0;
+  const nbOpportunites = (await db.prepare("SELECT COUNT(*) AS n FROM ambassade_opportunites WHERE user_id=? AND actif=1").get(user.id))?.n ?? 0;
 
   sendJSON(res, 200, {
     total_membres: totalMembres,
@@ -1966,6 +1967,10 @@ route("GET", "/api/dashboard/collectivite", async (req, res) => {
       opportunites_actives: nbOpportunites,
     }
   });
+  } catch (e) {
+    console.error('[collectivite dashboard]', e);
+    sendJSON(res, 500, { error: e.message });
+  }
 });
 
 /* ---------- Observatoire statistique (agrégé, anonymisé) ---------- */
