@@ -6,22 +6,25 @@
   --navy-light:#24487E;
   --orange:#1565C0;
   --orange-light:#E8F1FC;
-  --bg:#D8E3F0;
-  --card:#EBF1FA;
+  --bg:#CDD9ED;
+  --card:#E4EDF8;
   --text:#1A2332;
   --muted:#5A6880;
-  --border:#C0CEE3;
+  --border:#B8C9DE;
   --green:#1A7A52;
   --radius:10px;
-  --shadow:0 2px 14px rgba(27,58,107,.08);
+  --shadow:0 2px 14px rgba(27,58,107,.10);
 }
-/* Fond et cartes : bleu doux sans blanc agressif */
+/* Palette bleue douce — fond et cartes */
+html,body{background:var(--bg)!important;}
 .stat-card,.card,.modal-box,.search-card,.nat-card,.chat-wrap,
-.profile-card,.price-card,.po-feed-card,.notif-dropdown,.tooltip-box{
+.profile-card,.price-card,.po-feed-card,.notif-dropdown,.tooltip-box,
+.section,.content-box,.dash-section,.bloc{
   background:var(--card)!important;
 }
-.topbar{background:#FAFCFF!important;}
-input,select,textarea{background:#FAFCFF!important;}
+.content{background:var(--bg)!important;}
+.topbar{background:#EAF0FA!important;}
+input,select,textarea{background:#EAF0FA!important;}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{
