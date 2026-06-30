@@ -2846,7 +2846,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     // IDs des initiatives suivies → propriétaires (owner_user_id)
     const followedInits = (await db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id)).map(r => r.initiative_id);
     const initAuthorIds = followedInits.length
-      ? db.prepare(`SELECT owner_user_id AS id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")}) AND owner_user_id IS NOT NULL`).all(...followedInits).map(r => r.id)
+      ? (await db.prepare(`SELECT owner_user_id AS id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")}) AND owner_user_id IS NOT NULL`).all(...followedInits)).map(r => r.id)
       : [];
     const allIds = [...new Set([...followedUsers, ...initAuthorIds])];
 
@@ -2899,7 +2899,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     const followedUsers = (await db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(cu.id)).map(r => r.followed_id);
     const followedInits = (await db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id)).map(r => r.initiative_id);
     const initOwners = followedInits.length
-      ? db.prepare(`SELECT owner_user_id AS id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")}) AND owner_user_id IS NOT NULL`).all(...followedInits).map(r => r.id)
+      ? (await db.prepare(`SELECT owner_user_id AS id FROM initiatives WHERE id IN (${followedInits.map(()=>"?").join(",")}) AND owner_user_id IS NOT NULL`).all(...followedInits)).map(r => r.id)
       : [];
     const followedAll = [...new Set([...followedUsers, ...initOwners])];
     if (followedAll.length) {
@@ -4503,8 +4503,8 @@ route("GET", "/api/collectivite/stats-diaspora", async (req, res) => {
   const SEUIL = 10;
   const mask = n => n >= SEUIL ? n : null;
   const ressortissants = db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?)").get(pays, pays).n;
-  const parVille = db.prepare("SELECT ville, COUNT(*) AS n FROM users WHERE role='utilisateur' AND ville IS NOT NULL AND (nationalite1=? OR nationalite2=?) GROUP BY ville ORDER BY n DESC LIMIT 20").all(pays, pays).map(r=>({...r, n: mask(r.n)})).filter(r=>r.n);
-  const parRegion = db.prepare("SELECT pays AS region, COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?) AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 15").all(pays, pays).map(r=>({...r, n: mask(r.n)})).filter(r=>r.n);
+  const parVille = (await db.prepare("SELECT ville, COUNT(*) AS n FROM users WHERE role='utilisateur' AND ville IS NOT NULL AND (nationalite1=? OR nationalite2=?) GROUP BY ville ORDER BY n DESC LIMIT 20").all(pays, pays)).map(r=>({...r, n: mask(r.n)})).filter(r=>r.n);
+  const parRegion = (await db.prepare("SELECT pays AS region, COUNT(*) AS n FROM users WHERE role='utilisateur' AND (nationalite1=? OR nationalite2=?) AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 15").all(pays, pays)).map(r=>({...r, n: mask(r.n)})).filter(r=>r.n);
   const initiatives = db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE nationalite1=? OR nationalite2=?").get(pays, pays).n;
   const associations = db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE (nationalite1=? OR nationalite2=?) AND domaine='associatif'").get(pays, pays).n;
   const entreprises = db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE (nationalite1=? OR nationalite2=?) AND domaine IN ('commerce','finance','tech','industrie')").get(pays, pays).n;
@@ -5731,9 +5731,10 @@ async function normQuestion(q) {
 /* GET /api/chatbot/context — public (priorité : mémoire > import > vide) */
 route("GET", "/api/chatbot/context", async (req, res) => {
   // Incrémenter nb_consultations est fait côté chatbot via /api/chatbot/memoire/:id/consulter
-  const memories = await db.prepare(
+  const _memoriesRaw = await db.prepare(
     "SELECT id, titre, contenu, categorie, mots_cles, priorite, source, actif FROM chatbot_memoire WHERE actif=1 ORDER BY priorite ASC, ordre ASC, created_at ASC"
-  ).all().map(m => ({ ...m, mots_cles: (() => { try { return JSON.parse(m.mots_cles||"[]"); } catch(e){ return []; } })() }));
+  ).all();
+  const memories = _memoriesRaw.map(m => ({ ...m, mots_cles: (() => { try { return JSON.parse(m.mots_cles||"[]"); } catch(e){ return []; } })() }));
 
   // Contenu importé depuis le site (source='import') déjà dans la table, sinon scrape live
   const importedInDb = memories.filter(m => m.source === "import");
