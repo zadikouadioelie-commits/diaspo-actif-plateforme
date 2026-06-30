@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Charte Institutionnelle — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+.charte-wrap{max-width:860px;margin:0 auto;padding:32px 20px 80px}
+.charte-hero{background:linear-gradient(135deg,#ff6b00 0%,#ff8c38 100%);color:#fff;border-radius:16px;padding:40px 36px;margin-bottom:40px;text-align:center}
+.charte-hero h1{margin:0 0 8px;font-size:28px;font-weight:800;letter-spacing:-.3px}
+.charte-hero p{margin:0;font-size:14px;opacity:.9}
+.charte-badge{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);border-radius:99px;padding:4px 14px;font-size:12px;font-weight:700;letter-spacing:.5px;margin-bottom:18px}
+.ch-toc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:36px}
+.ch-toc h3{margin:0 0 14px;font-size:14px;color:var(--orange);text-transform:uppercase;letter-spacing:.05em}
+.ch-toc ol{margin:0;padding-left:20px;display:grid;grid-template-columns:1fr 1fr;gap:4px 24px}
+@media(max-width:580px){.ch-toc ol{grid-template-columns:1fr}}
+.ch-toc li{font-size:13px;color:var(--muted);line-height:1.8}
+.ch-toc a{color:var(--orange);text-decoration:none}.ch-toc a:hover{text-decoration:underline}
+.ch-section{margin-bottom:40px;scroll-margin-top:80px}
+.ch-section-header{display:flex;align-items:center;gap:12px;margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid var(--border)}
+.ch-badge{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ch-badge.blue{background:#dbeafe}.ch-badge.green{background:#dcfce7}.ch-badge.red{background:#fee2e2}
+.ch-badge.yellow{background:#fef9c3}.ch-badge.purple{background:#f3e8ff}.ch-badge.orange{background:#fff7ed}
+.ch-section-header h2{margin:0;font-size:19px;font-weight:700}
+.ch-section-header .num{font-size:12px;color:var(--muted);font-weight:600}
+.ch-body{font-size:14px;line-height:1.75;color:var(--text)}
+.ch-body p{margin:0 0 12px}
+.ch-body ul{margin:8px 0 14px;padding-left:0;list-style:none}
+.ch-body ul li{padding:5px 0 5px 22px;position:relative;font-size:13.5px;border-bottom:1px solid var(--border)}
+.ch-body ul li:last-child{border-bottom:none}
+.ch-body ul li::before{content:'›';position:absolute;left:0;color:var(--orange);font-weight:700;font-size:16px}
+.ch-body h4{font-size:14px;color:var(--orange);text-transform:uppercase;letter-spacing:.04em;margin:20px 0 10px}
+.ch-highlight{background:#fff8f2;border-left:3px solid var(--orange);border-radius:0 8px 8px 0;padding:12px 16px;margin:16px 0;font-size:13.5px}
+.ch-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}
+@media(max-width:580px){.ch-grid-3{grid-template-columns:1fr}}
+.ch-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:13px;text-align:center}
+.ch-card .icon{font-size:26px;margin-bottom:6px}
+.ch-card strong{display:block;margin-bottom:4px;font-size:13px}
+.ch-card p{margin:0;color:var(--muted);font-size:12px;line-height:1.4}
+.badge-grid{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+.badge-item{background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:13px;display:flex;align-items:center;gap:6px}
+.ch-final{background:linear-gradient(135deg,#1e3a5f 0%,#0f2647 100%);color:#fff;border-radius:16px;padding:36px;text-align:center;margin-top:48px}
+.ch-final h2{margin:0 0 10px;font-size:22px}
+.ch-final p{margin:0 0 20px;opacity:.85;font-size:14px}
+.ch-final .btn-white{background:#fff;color:#1e3a5f;border:none;border-radius:99px;padding:12px 28px;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none;display:inline-block}
+.ch-final .btn-white:hover{background:#f0f4ff}
+.back-top{position:fixed;bottom:28px;right:28px;background:var(--orange);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(255,107,0,.35);z-index:99;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <nav class="nav">
+      <a href="index.html">Accueil</a>
+      <a href="annuaire.html">Annuaire</a>
+      <a href="inscription.html">S'inscrire</a>
+      <a href="login.html">Connexion</a>
+    </nav>
+    <div class="topbar-right">
+      <select class="lang-select" id="lang-select"></select>
+      <div id="auth-area" class="auth-area"></div>
+    </div>
+  </div>
+</header>
+
+<main class="charte-wrap">
+
+  <!-- HERO -->
+  <div class="charte-hero">
+    <div class="charte-badge">📜 Document officiel</div>
+    <h1>Charte Institutionnelle de Diaspo'Actif</h1>
+    <p>Gouvernance · Sécurité · Engagement utilisateur — Document de référence</p>
+  </div>
+
+  <!-- TABLE DES MATIÈRES -->
+  <div class="ch-toc">
+    <h3>Table des matières</h3>
+    <ol>
+      <li><a href="#s1">Objet de la charte</a></li>
+      <li><a href="#s2">Origine et raison d'être</a></li>
+      <li><a href="#s3">Valeurs fondamentales</a></li>
+      <li><a href="#s4">Création de compte</a></li>
+      <li><a href="#s5">Sécurité et protection</a></li>
+      <li><a href="#s6">Engagement des initiatives</a></li>
+      <li><a href="#s7">Protection des données</a></li>
+      <li><a href="#s8">Utilisation acceptable</a></li>
+      <li><a href="#s9">Réputation et confiance</a></li>
+      <li><a href="#s10">Positionnement</a></li>
+      <li><a href="#s11">Sécurité des collaborations</a></li>
+      <li><a href="#s12">Responsabilité</a></li>
+      <li><a href="#s13">Sanctions</a></li>
+      <li><a href="#s14">Engagement final</a></li>
+    </ol>
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="ch-section" id="s1">
+    <div class="ch-section-header">
+      <div class="ch-badge blue">🏛</div>
+      <div><div class="num">Article 1</div><h2>Objet de la charte</h2></div>
+    </div>
+    <div class="ch-body">
+      <p>La présente charte définit les règles, engagements, mécanismes de sécurité et principes de gouvernance applicables à toute personne ou organisation utilisant la plateforme Diaspo'Actif (D'A), incluant :</p>
+      <ul>
+        <li>👤 Utilisateurs individuels</li>
+        <li>🏢 Initiatives (entreprises, associations, ONG, projets)</li>
+        <li>🏛 Institutions partenaires ou publiques</li>
+      </ul>
+      <p>Elle a pour objectif de garantir :</p>
+      <ul>
+        <li>🔐 La sécurité des membres</li>
+        <li>🤝 La fiabilité des interactions</li>
+        <li>📊 La transparence des activités</li>
+        <li>🧾 La traçabilité des engagements</li>
+        <li>🛡 La protection des données et des transactions</li>
+        <li>🚀 La qualité des opportunités échangées</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="ch-section" id="s2">
+    <div class="ch-section-header">
+      <div class="ch-badge green">🌍</div>
+      <div><div class="num">Article 2</div><h2>Origine et raison d'être de Diaspo'Actif</h2></div>
+    </div>
+    <div class="ch-body">
+      <p>Diaspo'Actif (D'A) est né d'un constat simple mais profond : la diaspora, bien qu'extrêmement riche en compétences, en ressources et en potentiel économique, reste souvent dispersée, insuffisamment structurée et parfois limitée dans sa capacité à collaborer efficacement.</p>
+      <p>Dans de nombreux contextes, les initiatives issues de la diaspora manquent d'outils centralisés pour :</p>
+      <ul>
+        <li>Se former de manière continue et accessible</li>
+        <li>Se mobiliser autour de projets communs</li>
+        <li>S'organiser de façon structurée et professionnelle</li>
+        <li>Créer des passerelles fiables entre talents, projets et opportunités</li>
+      </ul>
+      <div class="ch-highlight">
+        <strong>🧭 Une réponse à un besoin réel</strong><br>
+        Diaspo'Actif a été conçu comme un outil numérique complet mis à la disposition de la diaspora — pas un simple réseau social, mais une infrastructure de développement, de collaboration et d'organisation.
+      </div>
+      <h4>Notre mission en trois axes</h4>
+      <div class="ch-grid-3">
+        <div class="ch-card"><div class="icon">📚</div><strong>Se former</strong><p>Développement continu des compétences accessibles à tous</p></div>
+        <div class="ch-card"><div class="icon">🤝</div><strong>Se mobiliser</strong><p>Rejoindre ou créer des initiatives structurées et impactantes</p></div>
+        <div class="ch-card"><div class="icon">🧭</div><strong>S'organiser</strong><p>Structurer, coordonner et maximiser l'impact collectif</p></div>
+      </div>
+      <p>L'ambition de Diaspo'Actif est de transformer la diaspora en une force organisée, coordonnée et efficace, capable de collaborer au-delà des frontières, de structurer ses actions, de sécuriser ses engagements et de maximiser son impact économique, social et culturel.</p>
+    </div>
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="ch-section" id="s3">
+    <div class="ch-section-header">
+      <div class="ch-badge green">🌱</div>
+      <div><div class="num">Article 3</div><h2>Valeurs fondamentales</h2></div>
+    </div>
+    <div class="ch-body">
+      <p>Tout utilisateur de Diaspo'Actif s'engage à respecter :</p>
+      <ul>
+        <li>🤝 Respect mutuel et non-discrimination</li>
+        <li>🔐 Intégrité et honnêteté des informations</li>
+        <li>🌍 Esprit de coopération et de diaspora</li>
+        <li>🚀 Innovation et développement responsable</li>
+        <li>📊 Transparence dans les projets et collaborations</li>
+        <li>🧭 Responsabilité dans les engagements pris</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 4 -->
+  <div class="ch-section" id="s4">
+    <div class="ch-section-header">
+      <div class="ch-badge red">🔒</div>
+      <div><div class="num">Article 4</div><h2>Création de compte et identité numérique</h2></div>
+    </div>
+    <div class="ch-body">
+      <h4>4.1 Véracité des informations</h4>
+      <p>Tout compte doit fournir des informations exactes, complètes et vérifiables. Toute falsification entraîne une suspension immédiate, une vérification renforcée et une suppression possible du compte.</p>
+      <h4>4.2 Typologie des comptes</h4>
+      <div class="ch-grid-3">
+        <div class="ch-card"><div class="icon">👤</div><strong>Utilisateur</strong><p>Particulier membre de la diaspora</p></div>
+        <div class="ch-card"><div class="icon">🏢</div><strong>Initiative</strong><p>Association, entreprise, ONG, projet</p></div>
+        <div class="ch-card"><div class="icon">🏛</div><strong>Institution</strong><p>Collectivité, consulat, organisme public</p></div>
+      </div>
+      <p>Chaque type dispose de droits spécifiques, de niveaux de vérification différents et de règles de publication adaptées.</p>
+      <h4>4.3 Protection de l'identité</h4>
+      <ul>
+        <li>Aucun numéro privé visible publiquement</li>
+        <li>Aucun email personnel affiché</li>
+        <li>Communications internes sécurisées</li>
+        <li>Chiffrement des données sensibles</li>
+        <li>Contrôle des accès utilisateurs</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 5 -->
+  <div class="ch-section" id="s5">
+    <div class="ch-section-header">
+      <div class="ch-badge yellow">🛡</div>
+      <div><div class="num">Article 5</div><h2>Sécurité et protection des membres</h2></div>
+    </div>
+    <div class="ch-body">
+      <p>Diaspo'Actif met en œuvre :</p>
+      <ul>
+        <li>🔍 Vérification des comptes (KYC léger ou renforcé selon cas)</li>
+        <li>🧠 Analyse comportementale des activités</li>
+        <li>🛡 Systèmes anti-fraude et anti-spam</li>
+        <li>🤖 Détection automatisée des comportements suspects</li>
+        <li>👮 Modération humaine complémentaire</li>
+      </ul>
+      <h4>5.1 Système de confiance</h4>
+      <p>Chaque compte possède un score de confiance, une réputation publique, un historique des actions et un historique des collaborations.</p>
+      <h4>5.2 Signalement et modération</h4>
+      <p>Les utilisateurs peuvent signaler un compte, signaler un contenu ou bloquer un utilisateur. Les sanctions possibles vont de l'avertissement à la suppression définitive.</p>
+    </div>
+  </div>
+
+  <!-- SECTION 6 -->
+  <div class="ch-section" id="s6">
+    <div class="ch-section-header">
+      <div class="ch-badge purple">🏢</div>
+      <div><div class="num">Article 6</div><h2>Engagement des initiatives</h2></div>
+    </div>
+    <div class="ch-body">
+      <p>Les initiatives s'engagent à publier des informations véridiques, respecter leurs engagements contractuels, éviter toute communication trompeuse et utiliser la plateforme à des fins professionnelles ou sociales légitimes.</p>
+      <h4>6.1 Transparence</h4>
+      <p>Chaque initiative peut publier : projets, résultats, partenaires, événements, documents officiels.</p>
+      <h4>6.2 Responsabilité contractuelle</h4>
+      <p>Sont considérés comme engagements traçables :</p>
+      <ul>
+        <li>🤝 Deals</li>
+        <li>🎟 Billetterie</li>
+        <li>📋 Candidatures</li>
+        <li>🤝 Partenariats</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 7 -->
+  <div class="ch-section" id="s7">
+    <div class="ch-section-header">
+      <div class="ch-badge blue">🔐</div>
+      <div><div class="num">Article 7</div><h2>Protection des données</h2></div>
+    </div>
+    <div class="ch-body">
+      <p>Diaspo'Actif garantit :</p>
+      <ul>
+        <li>🔐 Confidentialité des échanges</li>
+        <li>🚫 Absence de vente de données personnelles</li>
+        <li>👤 Contrôle utilisateur total</li>
+        <li>🗑 Droit à la suppression</li>
+        <li>📦 Export des données personnelles</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 8 -->
+  <div class="ch-section" id="s8">
+    <div class="ch-section-header">
+      <div class="ch-badge red">🚫</div>
+      <div><div class="num">Article 8</div><h2>Utilisation acceptable de la plateforme</h2></div>
+    </div>
+    <div class="ch-body">
+      <p>Il est strictement interdit de :</p>
+      <ul>
+        <li>Mener des activités illégales</li>
+        <li>Exercer fraude ou escroquerie</li>
+        <li>Procéder à des usurpations d'identité</li>
+        <li>Diffuser du spam massif</li>
+        <li>Pratiquer le harcèlement sous toute forme</li>
+        <li>Détourner le système ou ses fonctionnalités</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 9 -->
+  <div class="ch-section" id="s9">
+    <div class="ch-section-header">
+      <div class="ch-badge orange">⭐</div>
+      <div><div class="num">Article 9</div><h2>Système de réputation et confiance D'A</h2></div>
+    </div>
+    <div class="ch-body">
+      <p>Le score de confiance est basé sur : collaborations réussies, évaluations mutuelles, respect des engagements, activité réelle et contributions à l'écosystème.</p>
+      <h4>Badges de reconnaissance</h4>
+      <div class="badge-grid">
+        <div class="badge-item">🏅 Membre fiable</div>
+        <div class="badge-item">🤝 Collaborateur validé</div>
+        <div class="badge-item">🚀 Initiative active</div>
+        <div class="badge-item">⭐ Profil recommandé</div>
+        <div class="badge-item">🏆 Deal Master</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 10 -->
+  <div class="ch-section" id="s10">
+    <div class="ch-section-header">
+      <div class="ch-badge green">🌐</div>
+      <div><div class="num">Article 10</div><h2>Positionnement de Diaspo'Actif</h2></div>
+    </div>
+    <div class="ch-body">
+      <div class="ch-grid-3">
+        <div class="ch-card" style="border-color:#22c55e">
+          <div class="icon">✅</div>
+          <strong>Diaspo'Actif est</strong>
+          <p>Une plateforme de confiance<br>Un espace professionnel<br>Un accélérateur d'opportunités<br>Un réseau de coopération internationale</p>
+        </div>
+        <div class="ch-card" style="border-color:#ef4444">
+          <div class="icon">❌</div>
+          <strong>Diaspo'Actif n'est pas</strong>
+          <p>Un réseau social informel<br>Un espace anonyme non contrôlé<br>Une plateforme de contenus non vérifiés</p>
+        </div>
+        <div class="ch-card" style="border-color:var(--orange)">
+          <div class="icon">🎯</div>
+          <strong>Notre ambition</strong>
+          <p>Transformer la diaspora en une force organisée, coordonnée et efficace, au-delà des frontières</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 11 -->
+  <div class="ch-section" id="s11">
+    <div class="ch-section-header">
+      <div class="ch-badge red">🔒</div>
+      <div><div class="num">Article 11</div><h2>Sécurité renforcée des collaborations</h2></div>
+    </div>
+    <div class="ch-body">
+      <p>Diaspo'Actif met en œuvre tous les moyens techniques, organisationnels et humains pour vérifier les comptes et sécuriser les échanges.</p>
+      <h4>11.1 Principe de prudence renforcée</h4>
+      <p>Toute collaboration significative (deal, contrat, partenariat, financement) doit être considérée comme une étape sensible nécessitant un encadrement formel.</p>
+      <h4>11.2 Accompagnement des collaborations</h4>
+      <p>Diaspo'Actif encourage l'implication de la plateforme dès qu'un engagement est envisagé. La plateforme met à disposition des partenaires capables de :</p>
+      <ul>
+        <li>Conseiller les parties</li>
+        <li>Sécuriser les collaborations</li>
+        <li>Accompagner la rédaction de contrats</li>
+        <li>Analyser les accords</li>
+        <li>Faciliter les relations juridiques et financières</li>
+      </ul>
+      <h4>11.3 Recommandation officielle</h4>
+      <ul>
+        <li>Formaliser les engagements par écrit</li>
+        <li>Utiliser les outils Diaspo'Actif</li>
+        <li>Solliciter les partenaires d'accompagnement</li>
+        <li>Passer par une validation des deals</li>
+      </ul>
+      <h4>11.4 Objectifs</h4>
+      <ul>
+        <li>Réduire les risques de litiges</li>
+        <li>Sécuriser les transactions</li>
+        <li>Renforcer la confiance</li>
+        <li>Professionnaliser les échanges</li>
+        <li>Positionner D'A comme tiers de confiance</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 12 -->
+  <div class="ch-section" id="s12">
+    <div class="ch-section-header">
+      <div class="ch-badge yellow">⚖️</div>
+      <div><div class="num">Article 12</div><h2>Responsabilité et limitation de responsabilité</h2></div>
+    </div>
+    <div class="ch-body">
+      <h4>12.1 Responsabilité individuelle</h4>
+      <p>Chaque utilisateur, initiative ou institution est entièrement responsable de ce qu'il dit, publie, partage et de ses engagements.</p>
+      <h4>12.2 Limitation de responsabilité de Diaspo'Actif</h4>
+      <p>Diaspo'Actif ne pourra être tenu responsable des contenus publiés par les utilisateurs, des engagements non respectés entre membres, des accords conclus entre utilisateurs, des comportements frauduleux individuels ni des manquements des initiatives, entreprises, utilisateurs ou institutions.</p>
+    </div>
+  </div>
+
+  <!-- SECTION 13 -->
+  <div class="ch-section" id="s13">
+    <div class="ch-section-header">
+      <div class="ch-badge red">🛡</div>
+      <div><div class="num">Article 13</div><h2>Sanctions et protection de l'écosystème</h2></div>
+    </div>
+    <div class="ch-body">
+      <p>Toute violation entraîne :</p>
+      <ul>
+        <li>Restriction de compte</li>
+        <li>Suspension temporaire</li>
+        <li>Suppression de contenu</li>
+        <li>Exclusion définitive</li>
+      </ul>
+      <p>Les décisions visent à protéger les utilisateurs, les initiatives et la stabilité de la plateforme.</p>
+    </div>
+  </div>
+
+  <!-- SECTION 14 -->
+  <div class="ch-section" id="s14">
+    <div class="ch-section-header">
+      <div class="ch-badge green">✅</div>
+      <div><div class="num">Article 14</div><h2>Engagement final</h2></div>
+    </div>
+    <div class="ch-body">
+      <div class="ch-highlight">
+        En créant un compte sur Diaspo'Actif, chaque utilisateur reconnaît avoir lu et accepté la présente charte, s'engage à respecter ses règles et contribue à un environnement sûr et collaboratif.
+      </div>
+    </div>
+  </div>
+
+  <!-- CONCLUSION STRATÉGIQUE -->
+  <div class="ch-final">
+    <div style="font-size:40px;margin-bottom:14px">🏛</div>
+    <h2>Position finale de Diaspo'Actif</h2>
+    <p>Tiers de confiance numérique · Infrastructure de collaboration sécurisée<br>Écosystème de projets et d'opportunités · Plateforme professionnelle internationale de la diaspora</p>
+    <div style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:16px;margin:20px 0;font-size:13px;line-height:1.8;text-align:left;">
+      Cette charte constitue :<br>
+      👉 Le socle juridique et éthique de Diaspo'Actif<br>
+      👉 La base de la confiance entre tous les acteurs<br>
+      👉 Le cadre de sécurisation des collaborations<br>
+      👉 La fondation de tout l'écosystème numérique D'A
+    </div>
+    <a href="inscription.html" class="btn-white">Créer mon compte →</a>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <span>Diaspo'Actif · Du Sud au Nord — Charte institutionnelle · 2026</span>
+  · <a href="confidentialite.html" class="footer-link">Confidentialité des données</a>
+</footer>
+
+<a class="back-top" href="#" title="Haut de page" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">↑</a>
+</div>
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/ds.js"></script>
+</body>
+</html>
