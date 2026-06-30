@@ -2883,12 +2883,13 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
 
   // ─── MODE ARTICLES MIS EN AVANT ────────────────────────────────────────────
   if (mode === "articles") {
-    const posts = db.prepare(`
+    const posts = await db.prepare(`
       SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
       WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE)
       ORDER BY p.created_at DESC LIMIT ? OFFSET ?
     `).all(limit, offset);
-    const total = db.prepare("SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get().n;
+    const _totalArt = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get();
+    const total = _totalArt ? _totalArt.n : 0;
     return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "article" }))), total, page, pages: Math.ceil(total/limit), mode });
   }
 
@@ -8196,7 +8197,8 @@ async function handleRequest(req, res) {
       const typeCompte = compte.role || '';
       db.prepare(`INSERT INTO event_inscriptions_securisees (event_id,user_id,da_id_utilise,nom,type_compte,ip,user_agent) VALUES (?,?,?,?,?,?,?)`)
         .run(eid, user ? user.id : null, normalizedId, nom, typeCompte, req.headers['x-forwarded-for']||'', req.headers['user-agent']||'');
-      const inscriptionId = await db.prepare(`SELECT id FROM event_inscriptions_securisees WHERE event_id=? AND da_id_utilise=? ORDER BY id DESC LIMIT 1`).get(eid, normalizedId).id;
+      const _insc = await db.prepare(`SELECT id FROM event_inscriptions_securisees WHERE event_id=? AND da_id_utilise=? ORDER BY id DESC LIMIT 1`).get(eid, normalizedId);
+      const inscriptionId = _insc ? _insc.id : null;
       return sendJSON(res, 200, {
         ok: true,
         inscription_id: inscriptionId,
