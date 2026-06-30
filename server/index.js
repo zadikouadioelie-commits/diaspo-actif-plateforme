@@ -1,4 +1,4 @@
-/* ===========================================================
+﻿/* ===========================================================
    DIASPO'ACTIF — Serveur (HTTP natif Node, sans dépendance externe)
    Build: 2026-06-28-b
    =========================================================== */
@@ -38,11 +38,11 @@ function send(res, status, data, headers = {}) {
   res.end(data);
 }
 
-function sendJSON(res, status, obj, extraHeaders = {}) {
+async function sendJSON(res, status, obj, extraHeaders = {}) {
   send(res, status, JSON.stringify(obj), { "Content-Type": "application/json; charset=utf-8", ...extraHeaders });
 }
 
-function readBody(req) {
+async function readBody(req) {
   // Idempotent : si le corps a déjà été bufferisé (cold-start Vercel), on le retourne directement
   if (req._bodyPromise) return req._bodyPromise;
   req._bodyPromise = new Promise((resolve, reject) => {
@@ -60,7 +60,7 @@ function readBody(req) {
   return req._bodyPromise;
 }
 
-function getCurrentUser(req) {
+async function getCurrentUser(req) {
   const cookies = parseCookies(req);
   /* 1. Token stateless signé (résiste aux cold starts Vercel) */
   const authCookie = cookies.auth;
@@ -80,7 +80,7 @@ function getCurrentUser(req) {
   return user || null;
 }
 
-function publicUser(u) {
+async function publicUser(u) {
   if (!u) return null;
   return { id: u.id, nom: u.nom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
     nb_connexions: u.nb_connexions || 0, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
@@ -88,16 +88,16 @@ function publicUser(u) {
   // NOTE: ds_id est intentionnellement exclu — jamais exposé via cette fonction
 }
 
-function safeParse(s) {
+async function safeParse(s) {
   try { return JSON.parse(s || "{}"); } catch (e) { return {}; }
 }
-function safeJSON(s, fallback) {
+async function safeJSON(s, fallback) {
   try { return JSON.parse(s || JSON.stringify(fallback)); } catch (e) { return fallback; }
 }
 
 /* ---------- Routes API ---------- */
 /* ── Compte officiel Diaspo'Actif — ID mis en cache au démarrage ── */
-function getOfficialUserId() {
+async function getOfficialUserId() {
   const row = await db.prepare("SELECT id FROM users WHERE is_official=1 LIMIT 1").get();
   return row ? row.id : null;
 }
@@ -329,13 +329,13 @@ route("POST", "/api/auth/logout", async (req, res) => {
 });
 
 route("GET", "/api/auth/me", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   sendJSON(res, 200, { user: publicUser(user) });
 });
 
 /* POST /api/upload/avatar — upload photo de profil vers Bunny.net */
 route("POST", "/api/upload/avatar", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
 
   const contentType = req.headers["content-type"] || "";
@@ -367,7 +367,7 @@ route("POST", "/api/upload/avatar", async (req, res) => {
 
 /* POST /api/upload/banner — upload bannière profil */
 route("POST", "/api/upload/banner", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
 
   const contentType = req.headers["content-type"] || "";
@@ -399,7 +399,7 @@ route("POST", "/api/upload/banner", async (req, res) => {
 
 /* POST /api/upload/logo — upload logo initiative */
 route("POST", "/api/upload/logo", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
   const contentType = req.headers["content-type"] || "";
   const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
@@ -420,7 +420,7 @@ route("POST", "/api/upload/logo", async (req, res) => {
 
 /* POST /api/upload/post — upload image pour publication/annonce */
 route("POST", "/api/upload/post", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
   const contentType = req.headers["content-type"] || "";
   const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
@@ -442,7 +442,7 @@ route("POST", "/api/upload/post", async (req, res) => {
 
 /* ---------- Initiatives ---------- */
 /* Helper : certification d'une initiative */
-function getCertif(initiativeId) {
+async function getCertif(initiativeId) {
   return await db.prepare("SELECT niveau, statut, date_attribution FROM certifications WHERE initiative_id=? AND statut='actif'").get(initiativeId) || null;
 }
 
@@ -457,17 +457,18 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   // Filtre par accréditation DA
   if (query.accreditation) {
     const type = query.accreditation;
-    rows = rows.filter(r => {
+    const keeps = await Promise.all(rows.map(async r => {
       if (!r.owner_user_id) return false;
       return !!await db.prepare("SELECT 1 FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(r.owner_user_id, type);
-    });
+    }));
+    rows = rows.filter((_, i) => keeps[i]);
   }
-  rows = rows.map(r => {
+  rows = await Promise.all(rows.map(async r => {
     const accreds = r.owner_user_id
-      ? await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(r.owner_user_id).map(a => a.type)
+      ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(r.owner_user_id)).map(a => a.type)
       : [];
-    return { ...r, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: getCertif(r.id), accreditations: accreds };
-  });
+    return { ...r, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: await getCertif(r.id), accreditations: accreds };
+  }));
   sendJSON(res, 200, { initiatives: rows });
 });
 
@@ -485,7 +486,7 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
 });
 
 route("POST", "/api/initiatives", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || !["initiative", "collectivite", "administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Seul un compte Initiative, Collectivité ou Administrateur peut créer une initiative." });
   const { nom, sigle, pays, pays_origine, region, ville, commune, departement, zone, domaine, type, description,
     nationalite1, nationalite2, nationalites_concernees, nationalite_unique,
@@ -541,7 +542,7 @@ route("POST", "/api/initiatives", async (req, res, params, body) => {
 
 /* ---------- Abonnement (simulation — aucun paiement réel) ---------- */
 route("POST", "/api/initiatives/:id/abonnement", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT * FROM initiatives WHERE id = ?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
@@ -553,7 +554,7 @@ route("POST", "/api/initiatives/:id/abonnement", async (req, res, params, body) 
 
 /* ══ Recherche comptes pour autocomplete partenaires ══ */
 route("GET", "/api/search/comptes", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
   const q = (query.q || '').trim();
   if (q.length < 2) return sendJSON(res, 200, { comptes: [] });
@@ -597,7 +598,7 @@ route("GET", "/api/search/comptes", async (req, res, params, body, query) => {
 
 /* ══ Lookup compte par DA-ID ══ */
 route("GET", "/api/account/by-da-id/:daId", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
   const daId = (params.daId || '').toUpperCase();
   const u = await db.prepare(`SELECT id, nom, prenom, role, photo_url AS avatar_url, da_id, ville, pays FROM users WHERE da_id=?`).get(daId);
@@ -609,7 +610,7 @@ route("GET", "/api/account/by-da-id/:daId", async (req, res, params) => {
 
 /* ══ DS-ID — Révéler (vérification mot de passe requise) ══ */
 route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
   const { password } = body;
   if (!password) return sendJSON(res, 400, { error: 'Mot de passe requis.' });
@@ -625,7 +626,7 @@ route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
 
 /* ══ DS-ID — Log copie ══ */
 route("POST", "/api/profil/ds-id/log-copy", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
   db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'copie', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
   sendJSON(res, 200, { ok: true });
@@ -633,7 +634,7 @@ route("POST", "/api/profil/ds-id/log-copy", async (req, res, params, body) => {
 
 /* ══ DS-ID — Régénérer ══ */
 route("POST", "/api/profil/ds-id/regenerate", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
   const { password } = body;
   if (!password) return sendJSON(res, 400, { error: 'Mot de passe requis.' });
@@ -651,7 +652,7 @@ route("POST", "/api/profil/ds-id/regenerate", async (req, res, params, body) => 
 
 /* ══ DS-ID — Historique ══ */
 route("GET", "/api/profil/ds-id/history", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
   const history = await db.prepare(`SELECT action, ip, user_agent, created_at FROM ds_id_history WHERE user_id=? ORDER BY created_at DESC LIMIT 50`).all(user.id);
   sendJSON(res, 200, { history });
@@ -659,7 +660,7 @@ route("GET", "/api/profil/ds-id/history", async (req, res) => {
 
 /* ---------- Recherche utilisateurs (pour ajout membres) ---------- */
 route("GET", "/api/users/search", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const q = (query.q || "").trim();
   if (q.length < 2) return sendJSON(res, 200, { users: [] });
@@ -690,7 +691,7 @@ route("GET", "/api/initiatives/:id/membres", async (req, res, params) => {
 });
 
 route("POST", "/api/initiatives/:id/membres", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id = ?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
@@ -716,7 +717,7 @@ route("POST", "/api/initiatives/:id/membres", async (req, res, params, body) => 
 });
 
 route("PUT", "/api/initiatives/:id/membres/:userId", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const { statut, fonction } = body;
   const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id = ?").get(params.id);
@@ -747,7 +748,7 @@ route("PUT", "/api/initiatives/:id/membres/:userId", async (req, res, params, bo
 });
 
 route("DELETE", "/api/initiatives/:id/membres/:userId", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT id, owner_user_id FROM initiatives WHERE id = ?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
@@ -759,7 +760,7 @@ route("DELETE", "/api/initiatives/:id/membres/:userId", async (req, res, params)
 
 /* ---------- Recommandations post-inscription ---------- */
 route("GET", "/api/recommendations", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const userFull = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
   const followed = await db.prepare("SELECT followed_id FROM user_follows WHERE follower_id = ?").all(user.id).map(r => r.followed_id);
@@ -822,7 +823,7 @@ route("GET", "/api/actualites", async (req, res) => {
 const TYPE_PAR_ROLE = { utilisateur: "Utilisateur", initiative: "Initiative", administrateur: "Compte Étatique", collectivite: "Compte Étatique" };
 
 route("POST", "/api/fil", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise pour publier." });
 
   const pub_type = body.pub_type || "texte";
@@ -913,7 +914,7 @@ route("POST", "/api/fil", async (req, res, params, body) => {
 });
 
 route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const type = body.type || "like";
   try {
@@ -942,19 +943,19 @@ route("GET", "/api/fil/:id/commentaires", async (req, res, params) => {
     ORDER BY c.created_at ASC
   `).all(params.id);
   // Ajouter la certification pour les commentaires d'initiatives
-  const enriched = comms.map(c => {
+  const enriched = await Promise.all(comms.map(async c => {
     let certif = null;
     if (c.role === "initiative" && c.auteur_id) {
       const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(c.auteur_id);
-      if (init) certif = getCertif(init.id);
+      if (init) certif = await getCertif(init.id);
     }
     return { ...c, certif };
-  });
+  }));
   sendJSON(res, 200, { commentaires: enriched });
 });
 
 route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const contenu = (body.contenu || "").trim();
   if (!contenu) return sendJSON(res, 400, { error: "Le commentaire ne peut pas être vide." });
@@ -983,7 +984,7 @@ route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
 
 /* ---------- GET post unique ---------- */
 route("GET", "/api/fil/:id", async (req, res, params) => {
-  const cu = getCurrentUser(req);
+  const cu = await getCurrentUser(req);
   const p = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(params.id);
   if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
   // Enregistrer la vue
@@ -993,7 +994,7 @@ route("GET", "/api/fil/:id", async (req, res, params) => {
 
 /* ---------- Modifier post ---------- */
 route("PUT", "/api/fil/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const p = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(params.id);
   if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
@@ -1018,7 +1019,7 @@ route("PUT", "/api/fil/:id", async (req, res, params, body) => {
 
 /* ---------- Supprimer post ---------- */
 route("DELETE", "/api/fil/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const p = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(params.id);
   if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
@@ -1034,7 +1035,7 @@ route("DELETE", "/api/fil/:id", async (req, res, params) => {
 
 /* ---------- Archiver post ---------- */
 route("POST", "/api/fil/:id/archiver", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const p = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(params.id);
   if (!p || p.auteur_id !== user.id) return sendJSON(res, 403, { error: "Action non autorisée." });
@@ -1044,7 +1045,7 @@ route("POST", "/api/fil/:id/archiver", async (req, res, params) => {
 
 /* ---------- Signaler post ---------- */
 route("POST", "/api/fil/:id/signaler", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const motif = (body.motif || "").trim();
   if (!motif) return sendJSON(res, 400, { error: "Motif requis." });
@@ -1058,7 +1059,7 @@ route("POST", "/api/fil/:id/signaler", async (req, res, params, body) => {
 
 /* ---------- Bookmark toggle ---------- */
 route("POST", "/api/fil/:id/bookmark", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const existing = await db.prepare("SELECT id FROM fil_bookmarks WHERE user_id=? AND post_id=?").get(user.id, params.id);
   if (existing) {
@@ -1072,7 +1073,7 @@ route("POST", "/api/fil/:id/bookmark", async (req, res, params) => {
 
 /* ---------- Mes bookmarks ---------- */
 route("GET", "/api/mes-bookmarks", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const page = Math.max(1, Number(query.page) || 1);
   const limit = 20;
@@ -1090,7 +1091,7 @@ route("GET", "/api/mes-bookmarks", async (req, res, params, body, query) => {
 
 /* ---------- Contribuer ---------- */
 route("POST", "/api/fil/:id/contribuer", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const type_contribution = (body.type_contribution || "").trim();
   if (!type_contribution) return sendJSON(res, 400, { error: "Type de contribution requis." });
@@ -1114,7 +1115,7 @@ route("POST", "/api/fil/:id/contribuer", async (req, res, params, body) => {
 
 /* ---------- Stats post ---------- */
 route("GET", "/api/fil/:id/stats", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const p = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(params.id);
   if (!p || p.auteur_id !== user.id) return sendJSON(res, 403, { error: "Non autorisé." });
@@ -1144,7 +1145,7 @@ route("GET", "/api/fil/:id/stats", async (req, res, params) => {
 
 /* ---------- Brouillons ---------- */
 route("GET", "/api/fil/brouillons", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? AND statut='brouillon' ORDER BY created_at DESC").all(user.id);
   sendJSON(res, 200, { brouillons: rows.map(p => enrichPost(p, user)) });
@@ -1153,7 +1154,7 @@ route("GET", "/api/fil/brouillons", async (req, res) => {
 /* ---------- Republier ---------- */
 
 route("POST", "/api/fil/:id/republier", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
 
   const original = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(params.id);
@@ -1201,7 +1202,7 @@ const PEUT_INITIER = {
 };
 const PEUT_CONTACTER = PEUT_INITIER;
 
-function convAnonyme(conv, userId) {
+async function convAnonyme(conv, userId) {
   const isU1 = conv.user1_id === userId;
   return {
     ...conv,
@@ -1213,7 +1214,7 @@ function convAnonyme(conv, userId) {
 
 /* GET /api/conversations — liste des conversations (avec stats) */
 route("GET", "/api/conversations", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
 
   const filtre = query.filtre || "tous"; // tous | non_lus | archives
@@ -1250,7 +1251,7 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
 
 /* POST /api/conversations — créer ou retrouver une conversation */
 route("POST", "/api/conversations", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
 
   const otherId = Number(body.user_id);
@@ -1284,7 +1285,7 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
 
 /* GET /api/conversations/:id/messages — charger les messages + marquer lu */
 route("GET", "/api/conversations/:id/messages", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
 
   const conv = await db.prepare("SELECT * FROM conversations WHERE id = ?").get(params.id);
@@ -1301,7 +1302,7 @@ route("GET", "/api/conversations/:id/messages", async (req, res, params) => {
 
 /* POST /api/conversations/:id/messages — envoyer un message */
 route("POST", "/api/conversations/:id/messages", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
 
   const conv = await db.prepare("SELECT * FROM conversations WHERE id = ?").get(params.id);
@@ -1331,7 +1332,7 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
 
 /* PATCH /api/conversations/:id/archive — archiver/désarchiver */
 route("PATCH", "/api/conversations/:id/archive", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const conv = await db.prepare("SELECT * FROM conversations WHERE id = ?").get(params.id);
   if (!conv || (conv.user1_id !== user.id && conv.user2_id !== user.id)) return sendJSON(res, 403, { error: "Accès refusé." });
@@ -1344,7 +1345,7 @@ route("PATCH", "/api/conversations/:id/archive", async (req, res, params) => {
 
 /* DELETE /api/conversations/:id — suppression douce côté utilisateur */
 route("DELETE", "/api/conversations/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const conv = await db.prepare("SELECT * FROM conversations WHERE id = ?").get(params.id);
   if (!conv || (conv.user1_id !== user.id && conv.user2_id !== user.id)) return sendJSON(res, 403, { error: "Accès refusé." });
@@ -1356,7 +1357,7 @@ route("DELETE", "/api/conversations/:id", async (req, res, params) => {
 
 /* GET /api/messages/non-lus — compteur global pour la topbar */
 route("GET", "/api/messages/non-lus", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 200, { total: 0 });
   const r = db.prepare(`
     SELECT COUNT(*) AS n FROM messages m
@@ -1370,7 +1371,7 @@ route("GET", "/api/messages/non-lus", async (req, res) => {
 
 /* GET /api/users/search?q= — chercher des utilisateurs pour démarrer une conversation */
 route("GET", "/api/users/search", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
 
   const q = (query.q || "").trim();
@@ -1394,7 +1395,7 @@ route("GET", "/api/users/search", async (req, res, params, body, query) => {
 
 /* ---------- Abonnements : suivre / ne plus suivre une initiative ---------- */
 route("POST", "/api/initiatives/:id/suivre", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (user.role !== "utilisateur") return sendJSON(res, 403, { error: "Seuls les comptes Utilisateur peuvent suivre une initiative." });
   const init = await db.prepare("SELECT id, abonnes FROM initiatives WHERE id = ?").get(params.id);
@@ -1409,7 +1410,7 @@ route("POST", "/api/initiatives/:id/suivre", async (req, res, params) => {
 });
 
 route("DELETE", "/api/initiatives/:id/suivre", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const info = await db.prepare("DELETE FROM abonnements WHERE user_id = ? AND initiative_id = ?").run(user.id, params.id);
   if (info.changes > 0) db.prepare("UPDATE initiatives SET abonnes = MAX(0, abonnes - 1) WHERE id = ?").run(params.id);
@@ -1417,7 +1418,7 @@ route("DELETE", "/api/initiatives/:id/suivre", async (req, res, params) => {
 });
 
 route("GET", "/api/mes-suivis", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare(`
     SELECT i.*, a.created_at AS suivi_depuis
@@ -1440,7 +1441,7 @@ route("GET", "/api/mes-suivis", async (req, res) => {
    DIASPO FORMATION — Routes publiques & créateur
    ────────────────────────────────────────────────────────── */
 
-function hasAccreditation(userId, type) {
+async function hasAccreditation(userId, type) {
   const ancien = await db.prepare("SELECT id FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type);
   if (ancien) return true;
   const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
@@ -1484,7 +1485,7 @@ route("GET", "/api/formations/:id", async (req, res, params) => {
 
 /* Mes formations (créateur) */
 route("GET", "/api/mes-formations", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const formations = db.prepare(`
     SELECT f.*,
@@ -1499,7 +1500,7 @@ route("GET", "/api/mes-formations", async (req, res) => {
 
 /* Mes inscriptions (apprenant) */
 route("GET", "/api/mes-inscriptions", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const inscriptions = await db.prepare(`
     SELECT i.*, f.titre, f.description, f.image_url, f.mode_acces, f.niveau
@@ -1511,7 +1512,7 @@ route("GET", "/api/mes-inscriptions", async (req, res) => {
 
 /* Créer une formation */
 route("POST", "/api/formations", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (user.role === 'utilisateur') return sendJSON(res, 403, { error: "Accréditation Créateur de formations requise." });
   if (!['initiative','collectivite','administrateur'].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Institution." });
@@ -1543,7 +1544,7 @@ route("POST", "/api/formations", async (req, res, params, body) => {
 
 /* Modifier une formation (brouillon ou refusée) */
 route("PUT", "/api/formations/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
@@ -1575,7 +1576,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
 
 /* Supprimer une formation (brouillon seulement) */
 route("DELETE", "/api/formations/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
@@ -1587,7 +1588,7 @@ route("DELETE", "/api/formations/:id", async (req, res, params) => {
 
 /* Soumettre à validation */
 route("POST", "/api/formations/:id/publier", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
@@ -1605,7 +1606,7 @@ route("POST", "/api/formations/:id/publier", async (req, res, params) => {
 
 /* S'inscrire à une formation */
 route("POST", "/api/formations/:id/inscrire", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f || f.statut !== 'publiee') return sendJSON(res, 404, { error: "Formation introuvable ou non publiée." });
@@ -1635,7 +1636,7 @@ route("POST", "/api/formations/:id/inscrire", async (req, res, params, body) => 
 
 /* Ajouter un avis */
 route("POST", "/api/formations/:id/avis", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const inscrit = await db.prepare("SELECT id FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active'").get(params.id, user.id);
   if (!inscrit) return sendJSON(res, 403, { error: "Vous devez être inscrit pour laisser un avis." });
@@ -1647,7 +1648,7 @@ route("POST", "/api/formations/:id/avis", async (req, res, params, body) => {
 
 /* Répondre à un avis (créateur) */
 route("PATCH", "/api/formations/avis/:avisId/repondre", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const avis = await db.prepare("SELECT a.*, f.owner_user_id FROM formation_avis a JOIN formations f ON f.id=a.formation_id WHERE a.id=?").get(params.avisId);
   if (!avis) return sendJSON(res, 404, { error: "Avis introuvable." });
@@ -1661,7 +1662,7 @@ route("PATCH", "/api/formations/avis/:avisId/repondre", async (req, res, params,
    ────────────────────────────────────────────────────────── */
 
 route("GET", "/api/admin/formations/en-attente", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   const formations = await db.prepare(`
     SELECT f.*, u.nom AS auteur_nom, u.email AS auteur_email
@@ -1673,7 +1674,7 @@ route("GET", "/api/admin/formations/en-attente", async (req, res) => {
 });
 
 route("GET", "/api/admin/formations", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   const statut = query.statut || null;
   const formations = statut
@@ -1683,7 +1684,7 @@ route("GET", "/api/admin/formations", async (req, res, params, body, query) => {
 });
 
 route("PATCH", "/api/admin/formations/:id/valider", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
@@ -1694,7 +1695,7 @@ route("PATCH", "/api/admin/formations/:id/valider", async (req, res, params, bod
 });
 
 route("PATCH", "/api/admin/formations/:id/refuser", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
@@ -1706,7 +1707,7 @@ route("PATCH", "/api/admin/formations/:id/refuser", async (req, res, params, bod
 });
 
 route("PATCH", "/api/admin/formations/:id/suspendre", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
@@ -1722,13 +1723,13 @@ route("PATCH", "/api/admin/formations/:id/suspendre", async (req, res, params, b
 
 /* Codes d'accès gratuit (membres Diaspo'Actif) */
 route("GET", "/api/admin/codes-acces", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   sendJSON(res, 200, { codes: await db.prepare("SELECT * FROM formation_codes_acces ORDER BY created_at DESC").all() });
 });
 
 route("POST", "/api/admin/codes-acces", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   const { code, description, limite_utilisations, date_expiration } = body;
   if (!code) return sendJSON(res, 400, { error: "Code requis." });
@@ -1738,7 +1739,7 @@ route("POST", "/api/admin/codes-acces", async (req, res, params, body) => {
 });
 
 route("PATCH", "/api/admin/codes-acces/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   const c = await db.prepare("SELECT * FROM formation_codes_acces WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Code introuvable." });
@@ -1752,7 +1753,7 @@ route("PATCH", "/api/admin/codes-acces/:id", async (req, res, params, body) => {
 });
 
 route("DELETE", "/api/admin/codes-acces/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   await db.prepare("DELETE FROM formation_codes_acces WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
@@ -1760,7 +1761,7 @@ route("DELETE", "/api/admin/codes-acces/:id", async (req, res, params) => {
 
 /* ---------- Dashboard Initiative (données réelles de l'initiative de l'utilisateur connecté) ---------- */
 route("GET", "/api/dashboard/initiative", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (user.role !== "initiative") return sendJSON(res, 403, { error: "Réservé aux comptes Initiative." });
 
@@ -1783,7 +1784,7 @@ route("GET", "/api/dashboard/initiative", async (req, res) => {
 
 /* ---------- Dashboard Administrateur ---------- */
 route("GET", "/api/dashboard/administrateur", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
 
@@ -1913,7 +1914,7 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
 
 /* ---------- Dashboard Collectivité ---------- */
 route("GET", "/api/dashboard/collectivite", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux Collectivités." });
 
@@ -1963,7 +1964,7 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
 route("GET", "/api/profil/:id", async (req, res, params) => {
   const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id FROM users WHERE id=?").get(params.id);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   const nbAbonnes    = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(u.id).n;
   const nbSuivis     = db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE follower_id=?").get(u.id).n;
   const isFollowing  = me ? !!await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, u.id) : false;
@@ -2012,7 +2013,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
 
 /* ---------- Profil (mise à jour étendue) ---------- */
 route("PUT", "/api/profil", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const { nom, prenom, ville, pays, bio, photo_url, banner_url, titre_pro,
           centres_interet, situation_pro, telephone, competences, experiences, theme_couleur } = body;
@@ -2054,7 +2055,7 @@ route("GET", "/api/profil/:id/activite", async (req, res, params) => {
   if (!uid) return sendJSON(res, 400, { error: "ID invalide." });
   const u = await db.prepare("SELECT id,privacy_json FROM users WHERE id=?").get(uid);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   const isOwn = me && me.id === uid;
   const privacy = safeParse(u.privacy_json || "{}");
   const query = new URL("http://x" + req.url).searchParams;
@@ -2064,7 +2065,7 @@ route("GET", "/api/profil/:id/activite", async (req, res, params) => {
   const LIMIT = 20;
   const OFFSET = (page - 1) * LIMIT;
 
-  function visOk(section) {
+  async function visOk(section) {
     const v = privacy[section] || 'public';
     if (v === 'public') return true;
     if (v === 'prive') return isOwn;
@@ -2139,7 +2140,7 @@ route("GET", "/api/profil/:id/suivis", async (req, res, params) => {
   const uid = parseInt(params.id);
   const u = await db.prepare("SELECT privacy_json FROM users WHERE id=?").get(uid);
   if (!u) return sendJSON(res, 404, { error: "Introuvable." });
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   const privacy = safeParse(u.privacy_json || "{}");
   const vis = privacy.contacts || 'public';
   if (vis === 'prive' && !(me && me.id === uid)) return sendJSON(res, 200, { suivis: [], total: 0, masque: true });
@@ -2164,7 +2165,7 @@ route("GET", "/api/profil/:id/abonnes", async (req, res, params) => {
   const uid = parseInt(params.id);
   const u = await db.prepare("SELECT privacy_json FROM users WHERE id=?").get(uid);
   if (!u) return sendJSON(res, 404, { error: "Introuvable." });
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   const privacy = safeParse(u.privacy_json || "{}");
   const vis = privacy.contacts || 'public';
   if (vis === 'prive' && !(me && me.id === uid)) return sendJSON(res, 200, { abonnes: [], total: 0, masque: true });
@@ -2185,7 +2186,7 @@ route("GET", "/api/profil/:id/abonnes", async (req, res, params) => {
 /* ---------- Profil — Relations & points en commun ---------- */
 route("GET", "/api/profil/:id/communs", async (req, res, params) => {
   const uid = parseInt(params.id);
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me || me.id === uid) return sendJSON(res, 200, { users_communs:[], initiatives_communes:[], evenements_communs:[], points:[], suggestions:[] });
 
   // Utilisateurs suivis en commun
@@ -2251,7 +2252,7 @@ route("GET", "/api/profil/:id/communs", async (req, res, params) => {
 
 /* ---------- Suivre / ne plus suivre un utilisateur ---------- */
 route("POST", "/api/users/:id/suivre", async (req, res, params) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   if (me.id == params.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
   try {
@@ -2262,7 +2263,7 @@ route("POST", "/api/users/:id/suivre", async (req, res, params) => {
 });
 
 route("DELETE", "/api/users/:id/suivre", async (req, res, params) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   // Blocage : impossible de se désabonner du compte officiel Diaspo'Actif
   const officialId = getOfficialUserId();
@@ -2276,7 +2277,7 @@ route("DELETE", "/api/users/:id/suivre", async (req, res, params) => {
 
 /* ---------- Upload simulé ---------- */
 route("POST", "/api/upload", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
 
   const { data, nom } = body; // data = "data:<mime>;base64,<b64>"
@@ -2350,14 +2351,15 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
   const utilisateurs = (type === "tous" || type === "utilisateurs")
     ? db.prepare("SELECT id,nom,role,ville,pays FROM users WHERE (nom LIKE ? OR ville LIKE ?) AND role != 'administrateur' LIMIT 8").all(like, like)
     : [];
-  const initiatives = (type === "tous" || type === "initiatives")
-    ? await db.prepare("SELECT id,slug,nom,domaine,pays,ville,description,owner_user_id FROM initiatives WHERE nom LIKE ? OR description LIKE ? OR domaine LIKE ? LIMIT 8").all(like, like, like).map(i => ({
-        ...i,
-        accreditations: i.owner_user_id
-          ? await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(i.owner_user_id).map(a => a.type)
-          : []
-      }))
+  const _rawInits = (type === "tous" || type === "initiatives")
+    ? await db.prepare("SELECT id,slug,nom,domaine,pays,ville,description,owner_user_id FROM initiatives WHERE nom LIKE ? OR description LIKE ? OR domaine LIKE ? LIMIT 8").all(like, like, like)
     : [];
+  const initiatives = await Promise.all(_rawInits.map(async i => ({
+    ...i,
+    accreditations: i.owner_user_id
+      ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(i.owner_user_id)).map(a => a.type)
+      : []
+  })));
   const publications = (type === "tous" || type === "publications")
     ? await db.prepare("SELECT id,auteur_nom,contenu,categorie,created_at FROM fil_posts WHERE contenu LIKE ? OR auteur_nom LIKE ? LIMIT 8").all(like, like)
     : [];
@@ -2372,14 +2374,14 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
 });
 
 /* ---------- Notifications ---------- */
-function creerNotif(userId, type, titre, contenu, data = {}) {
+async function creerNotif(userId, type, titre, contenu, data = {}) {
   try {
     db.prepare("INSERT INTO notifications (user_id,type,titre,contenu,data_json) VALUES (?,?,?,?,?)").run(userId, type, titre, contenu, JSON.stringify(data));
   } catch (e) { /* silencieux */ }
 }
 
 route("GET", "/api/notifications", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const limit = Math.min(Number(query.limit) || 20, 50);
   const rows = await db.prepare("SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT ?").all(user.id, limit);
@@ -2388,14 +2390,14 @@ route("GET", "/api/notifications", async (req, res, params, body, query) => {
 });
 
 route("PATCH", "/api/notifications/:id/lire", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await db.prepare("UPDATE notifications SET lue=1 WHERE id=? AND user_id=?").run(params.id, user.id);
   sendJSON(res, 200, { ok: true });
 });
 
 route("POST", "/api/notifications/lire-tout", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await db.prepare("UPDATE notifications SET lue=1 WHERE user_id=?").run(user.id);
   sendJSON(res, 200, { ok: true });
@@ -2413,7 +2415,7 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
 });
 
 route("POST", "/api/evenements", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || !["initiative","administrateur","collectivite"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative, Collectivité et Administrateur." });
   const {
     titre, organisateur, date_evt, lieu, pays, ville, description, type_evt, domaine,
@@ -2458,7 +2460,7 @@ route("GET", "/api/evenements/:id", async (req, res, params) => {
 });
 
 route("POST", "/api/evenements/:id/rejoindre", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
@@ -2475,14 +2477,14 @@ route("POST", "/api/evenements/:id/rejoindre", async (req, res, params) => {
 });
 
 route("DELETE", "/api/evenements/:id/quitter", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await db.prepare("DELETE FROM evenements_participants WHERE evenement_id=? AND user_id=?").run(params.id, user.id);
   sendJSON(res, 200, { ok: true, inscrit: false });
 });
 
 route("GET", "/api/mes-evenements", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare("SELECT e.* FROM evenements_participants ep JOIN evenements e ON e.id=ep.evenement_id WHERE ep.user_id=? ORDER BY e.date_evt ASC").all(user.id);
   sendJSON(res, 200, { evenements: rows });
@@ -2491,14 +2493,14 @@ route("GET", "/api/mes-evenements", async (req, res) => {
 /* ---------- Modération administrateur ---------- */
 /* ══ D'A TUTOR AI ══ */
 route("GET", "/api/admin/tutoriels", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
   const rows = await db.prepare("SELECT id,titre,sujet,niveau,statut,vues,created_at FROM da_tutoriels ORDER BY created_at DESC").all();
   sendJSON(res, 200, { tutoriels: rows });
 });
 
 route("GET", "/api/admin/tutoriels/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
   const t = await db.prepare("SELECT * FROM da_tutoriels WHERE id=?").get(params.id);
   if (!t) return sendJSON(res, 404, { error: "Tutoriel introuvable." });
@@ -2508,7 +2510,7 @@ route("GET", "/api/admin/tutoriels/:id", async (req, res, params) => {
 });
 
 route("POST", "/api/admin/tutoriels", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
   const { titre, sujet, objectif, niveau = "debutant", format_souhaite = "texte", contenu_json } = body;
   if (!titre || !sujet) return sendJSON(res, 400, { error: "Titre et sujet obligatoires." });
@@ -2519,7 +2521,7 @@ route("POST", "/api/admin/tutoriels", async (req, res, params, body) => {
 });
 
 route("PUT", "/api/admin/tutoriels/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
   const { titre, sujet, objectif, niveau, statut, contenu_json } = body;
   db.prepare("UPDATE da_tutoriels SET titre=COALESCE(?,titre), sujet=COALESCE(?,sujet), objectif=COALESCE(?,objectif), niveau=COALESCE(?,niveau), statut=COALESCE(?,statut), contenu_json=COALESCE(?,contenu_json), updated_at=datetime('now') WHERE id=?")
@@ -2528,14 +2530,14 @@ route("PUT", "/api/admin/tutoriels/:id", async (req, res, params, body) => {
 });
 
 route("DELETE", "/api/admin/tutoriels/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
   await db.prepare("DELETE FROM da_tutoriels WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 
 route("GET", "/api/admin/membres", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const role = query.role || null;
   const q = query.q ? `%${query.q}%` : null;
@@ -2549,7 +2551,7 @@ route("GET", "/api/admin/membres", async (req, res, params, body, query) => {
 });
 
 route("DELETE", "/api/admin/membres/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   if (Number(params.id) === user.id) return sendJSON(res, 400, { error: "Impossible de supprimer votre propre compte." });
   await db.prepare("DELETE FROM users WHERE id=?").run(params.id);
@@ -2557,7 +2559,7 @@ route("DELETE", "/api/admin/membres/:id", async (req, res, params) => {
 });
 
 route("GET", "/api/admin/comptes", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const statut = query.statut || "en_attente";
   const rows = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,statut_verification,created_at FROM users WHERE statut_verification=? ORDER BY created_at DESC").all(statut);
@@ -2565,7 +2567,7 @@ route("GET", "/api/admin/comptes", async (req, res, params, body, query) => {
 });
 
 route("PATCH", "/api/admin/comptes/:id/valider", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   await db.prepare("UPDATE users SET statut_verification='valide' WHERE id=?").run(params.id);
   const cible = await db.prepare("SELECT nom FROM users WHERE id=?").get(params.id);
@@ -2574,7 +2576,7 @@ route("PATCH", "/api/admin/comptes/:id/valider", async (req, res, params) => {
 });
 
 route("PATCH", "/api/admin/comptes/:id/rejeter", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   await db.prepare("UPDATE users SET statut_verification='rejete' WHERE id=?").run(params.id);
   const motif = body.motif || "Documents insuffisants";
@@ -2583,7 +2585,7 @@ route("PATCH", "/api/admin/comptes/:id/rejeter", async (req, res, params, body) 
 });
 
 route("DELETE", "/api/admin/contenu/:type/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const tables = { post: "fil_posts", formation: "formations", evenement: "evenements" };
   const table = tables[params.type];
@@ -2593,7 +2595,7 @@ route("DELETE", "/api/admin/contenu/:type/:id", async (req, res, params) => {
 });
 
 route("GET", "/api/admin/contenus", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const posts = await db.prepare("SELECT p.*,u.nom AS auteur FROM fil_posts p LEFT JOIN users u ON u.id=p.auteur_id ORDER BY p.created_at DESC LIMIT 20").all();
   const formations = await db.prepare("SELECT f.*,u.nom AS auteur FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id ORDER BY f.created_at DESC LIMIT 20").all();
@@ -2604,14 +2606,14 @@ route("GET", "/api/admin/contenus", async (req, res) => {
 /* ========== ROUTES CERTIFICATION ========== */
 
 /* Helper : enregistrer une action dans l'historique */
-function histoCertif(initiative_id, action, admin, motif, contenu) {
+async function histoCertif(initiative_id, action, admin, motif, contenu) {
   db.prepare("INSERT INTO certification_historique (initiative_id,action,admin_id,admin_nom,motif,contenu) VALUES (?,?,?,?,?,?)")
     .run(initiative_id, action, admin.id, admin.nom, motif || null, contenu || null);
 }
 
 /* Liste toutes les initiatives avec statut certif — admin only */
 route("GET", "/api/admin/certifications", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const rows = await db.prepare("SELECT i.id,i.nom,i.slug,i.domaine,i.pays,i.created_at, c.statut AS certif_statut, c.niveau AS certif_niveau, c.date_attribution FROM initiatives i LEFT JOIN certifications c ON c.initiative_id=i.id ORDER BY i.nom ASC").all();
   sendJSON(res, 200, { initiatives: rows });
@@ -2619,7 +2621,7 @@ route("GET", "/api/admin/certifications", async (req, res) => {
 
 /* Fiche d'évaluation : lecture */
 route("GET", "/api/admin/certifications/:id/evaluation", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const eval_ = await db.prepare("SELECT * FROM certification_evaluations WHERE initiative_id=?").get(params.id) || { initiative_id: Number(params.id) };
   sendJSON(res, 200, { evaluation: eval_ });
@@ -2627,7 +2629,7 @@ route("GET", "/api/admin/certifications/:id/evaluation", async (req, res, params
 
 /* Fiche d'évaluation : sauvegarde */
 route("PUT", "/api/admin/certifications/:id/evaluation", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const fields = [
     "anciennete_score","publications_regularite","profil_completude","participation_communaute",
@@ -2655,7 +2657,7 @@ route("PUT", "/api/admin/certifications/:id/evaluation", async (req, res, params
 
 /* Attribuer le badge */
 route("POST", "/api/admin/certifications/:id/attribuer", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const init = await db.prepare("SELECT id,nom FROM initiatives WHERE id=?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
@@ -2677,7 +2679,7 @@ route("POST", "/api/admin/certifications/:id/attribuer", async (req, res, params
 
 /* Suspendre le badge */
 route("POST", "/api/admin/certifications/:id/suspendre", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const existing = await db.prepare("SELECT id FROM certifications WHERE initiative_id=?").get(params.id);
   if (!existing) return sendJSON(res, 404, { error: "Aucune certification pour cette initiative." });
@@ -2688,7 +2690,7 @@ route("POST", "/api/admin/certifications/:id/suspendre", async (req, res, params
 
 /* Retirer le badge */
 route("POST", "/api/admin/certifications/:id/retirer", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const existing = await db.prepare("SELECT id FROM certifications WHERE initiative_id=?").get(params.id);
   if (!existing) return sendJSON(res, 404, { error: "Aucune certification pour cette initiative." });
@@ -2699,7 +2701,7 @@ route("POST", "/api/admin/certifications/:id/retirer", async (req, res, params, 
 
 /* Ajouter une note interne */
 route("POST", "/api/admin/certifications/:id/note", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   if (!body.contenu) return sendJSON(res, 400, { error: "Contenu requis." });
   histoCertif(Number(params.id), "note", user, body.titre || "Note interne", body.contenu);
@@ -2708,7 +2710,7 @@ route("POST", "/api/admin/certifications/:id/note", async (req, res, params, bod
 
 /* Historique des décisions */
 route("GET", "/api/admin/certifications/:id/historique", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const rows = await db.prepare("SELECT * FROM certification_historique WHERE initiative_id=? ORDER BY created_at DESC").all(params.id);
   sendJSON(res, 200, { historique: rows });
@@ -2718,14 +2720,14 @@ route("GET", "/api/admin/certifications/:id/historique", async (req, res, params
 
 /* ---------- Financements ---------- */
 route("GET", "/api/financements", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const fins = await db.prepare("SELECT * FROM financements WHERE user_id=? ORDER BY date_don DESC").all(user.id);
   sendJSON(res, 200, { financements: fins });
 });
 
 route("POST", "/api/financements", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const { projet, montant } = body;
   if (!projet || !montant) return sendJSON(res, 400, { error: "Champs manquants." });
@@ -2744,7 +2746,7 @@ route("GET", "/api/collaborations", async (req, res, params, body, query) => {
 });
 
 route("POST", "/api/collaborations", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || !["initiative","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Administrateur." });
   const { titre, partenaire, description, type_collab, competences, deadline } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
@@ -2762,7 +2764,7 @@ route("GET", "/api/collaborations/:id", async (req, res, params) => {
 });
 
 route("POST", "/api/collaborations/:id/candidater", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const collab = await db.prepare("SELECT * FROM collaborations WHERE id=?").get(params.id);
   if (!collab) return sendJSON(res, 404, { error: "Collaboration introuvable." });
@@ -2775,14 +2777,14 @@ route("POST", "/api/collaborations/:id/candidater", async (req, res, params, bod
 });
 
 route("GET", "/api/mes-candidatures", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare("SELECT ca.*,c.titre,c.partenaire,c.type_collab,u2.nom AS auteur_nom FROM candidatures ca JOIN collaborations c ON c.id=ca.collaboration_id LEFT JOIN users u2 ON u2.id=c.user_id WHERE ca.user_id=? ORDER BY ca.created_at DESC").all(user.id);
   sendJSON(res, 200, { candidatures: rows });
 });
 
 /* ---------- Helper : enrichir un post ---------- */
-function enrichPost(p, cu) {
+async function enrichPost(p, cu) {
   const reactions = db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
   const counts = {}; reactions.forEach(r => counts[r.type] = r.n);
   const nb_commentaires = db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id).n;
@@ -2831,7 +2833,7 @@ function enrichPost(p, cu) {
 
 /* ---------- Fil intelligent ---------- */
 route("GET", "/api/fil", async (req, res, params, body, query) => {
-  const cu = getCurrentUser(req);
+  const cu = await getCurrentUser(req);
   const mode  = query.mode  || "tous";   // suivis | populaires | articles | tous
   const page  = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(Number(query.limit) || 20, 50);
@@ -2936,7 +2938,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
 
 /* ---------- Follow / Unfollow utilisateur ---------- */
 route("POST", "/api/follow/:id", async (req, res, params) => {
-  const cu = getCurrentUser(req);
+  const cu = await getCurrentUser(req);
   if (!cu) return sendJSON(res, 401, { error: "Connexion requise." });
   const targetId = Number(params.id);
   if (targetId === cu.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
@@ -2948,7 +2950,7 @@ route("POST", "/api/follow/:id", async (req, res, params) => {
 });
 
 route("DELETE", "/api/follow/:id", async (req, res, params) => {
-  const cu = getCurrentUser(req);
+  const cu = await getCurrentUser(req);
   if (!cu) return sendJSON(res, 401, { error: "Connexion requise." });
   await db.prepare("DELETE FROM user_follows WHERE follower_id=? AND followed_id=?").run(cu.id, Number(params.id));
   sendJSON(res, 200, { ok: true, suivi: false });
@@ -2956,7 +2958,7 @@ route("DELETE", "/api/follow/:id", async (req, res, params) => {
 
 /* ---------- Meta du fil (mes follows pour l'UI) ---------- */
 route("GET", "/api/fil/meta", async (req, res) => {
-  const cu = getCurrentUser(req);
+  const cu = await getCurrentUser(req);
   if (!cu) return sendJSON(res, 200, { suivis_users: [], suivis_initiatives: [] });
   const suivis_users = await db.prepare("SELECT followed_id AS id FROM user_follows WHERE follower_id=?").all(cu.id).map(r => r.id);
   const suivis_initiatives = await db.prepare("SELECT initiative_id AS id FROM abonnements WHERE user_id=?").all(cu.id).map(r => r.id);
@@ -2965,7 +2967,7 @@ route("GET", "/api/fil/meta", async (req, res) => {
 
 /* ---------- Profils à découvrir dans le fil ---------- */
 route("GET", "/api/fil/profiles", async (req, res, params, body, query) => {
-  const cu = getCurrentUser(req);
+  const cu = await getCurrentUser(req);
   // Exclure l'utilisateur connecté, retourner 8 profils enrichis
   const users = db.prepare(`
     SELECT id, nom, prenom, photo_url, banner_url, ville, pays,
@@ -2980,7 +2982,7 @@ route("GET", "/api/fil/profiles", async (req, res, params, body, query) => {
 });
 
 /* ---------- Static file server (frontend existant) ---------- */
-function serveStatic(req, res, pathname) {
+async function serveStatic(req, res, pathname) {
   let filePath = path.join(ROOT, pathname === "/" ? "index.html" : pathname);
   if (!filePath.startsWith(ROOT)) return send(res, 403, "Forbidden");
   fs.stat(filePath, (err, stat) => {
@@ -2997,7 +2999,7 @@ function serveStatic(req, res, pathname) {
 /* ===== MODULE RÉSEAU & DIASPORA ===== */
 
 route("GET", "/api/admin/reseau", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   const parPays     = db.prepare("SELECT pays, COUNT(*) n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 12").all();
@@ -3029,7 +3031,7 @@ route("GET", "/api/admin/reseau", async (req, res) => {
 
 // Liste paginée des professionnels avec filtres
 route("GET", "/api/admin/reseau-pro", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   const q = req.query || {};
@@ -3072,7 +3074,7 @@ route("GET", "/api/admin/reseau-pro", async (req, res) => {
 
 // Statistiques agrégées du réseau pro
 route("GET", "/api/admin/reseau-pro/stats", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   const roleFilter = "role IN ('utilisateur','initiative','collectivite','officiel')";
@@ -3114,7 +3116,7 @@ route("GET", "/api/admin/reseau-pro/stats", async (req, res) => {
 /* ===== DIASPORA DONNÉES STATISTIQUES ===== */
 
 route("GET", "/api/admin/diaspora-stats", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // KPIs globaux
@@ -3218,7 +3220,7 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
 
 // Insights IA algorithmiques
 route("GET", "/api/admin/diaspora-stats/insights", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   const insights = [];
@@ -3289,7 +3291,7 @@ route("GET", "/api/admin/diaspora-stats/insights", async (req, res) => {
 /* ===== MODULE CONTENU ===== */
 
 route("GET", "/api/admin/contenu", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // Publications les plus engageantes (vue simulée = score engagement)
@@ -3360,7 +3362,7 @@ route("GET", "/api/admin/contenu", async (req, res) => {
 /* ===== MODULE FINANCES ===== */
 
 route("GET", "/api/admin/finances", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // Abonnés actifs (abonnements table)
@@ -3454,13 +3456,13 @@ route("GET", "/api/admin/finances", async (req, res) => {
 /* ===== PLANS D'ABONNEMENT — CRUD ===== */
 
 route("GET", "/api/admin/plans", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   sendJSON(res, 200, { plans: await db.prepare("SELECT * FROM plans_abonnement ORDER BY ordre").all() });
 });
 
 route("POST", "/api/admin/plans", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { nom, description, prix_mensuel, prix_annuel, cible, avantages } = body;
   if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
@@ -3473,7 +3475,7 @@ route("POST", "/api/admin/plans", async (req, res, params, body) => {
 });
 
 route("PUT", "/api/admin/plans/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { nom, description, prix_mensuel, prix_annuel, cible, avantages, actif } = body;
   db.prepare(`
@@ -3485,7 +3487,7 @@ route("PUT", "/api/admin/plans/:id", async (req, res, params, body) => {
 });
 
 route("DELETE", "/api/admin/plans/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   await db.prepare("UPDATE plans_abonnement SET actif=0 WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
@@ -3494,13 +3496,13 @@ route("DELETE", "/api/admin/plans/:id", async (req, res, params) => {
 /* ===== CODES PROMO — CRUD ===== */
 
 route("GET", "/api/admin/promos", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   sendJSON(res, 200, { promos: await db.prepare("SELECT * FROM codes_promo ORDER BY created_at DESC").all() });
 });
 
 route("POST", "/api/admin/promos", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { nom, code, type, valeur, date_debut, date_fin, nb_max_utilisations, cible } = body;
   if (!nom || !code || !type) return sendJSON(res, 400, { error: "Nom, code et type requis." });
@@ -3513,7 +3515,7 @@ route("POST", "/api/admin/promos", async (req, res, params, body) => {
 });
 
 route("PUT", "/api/admin/promos/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { nom, type, valeur, date_debut, date_fin, nb_max_utilisations, cible, actif } = body;
   await db.prepare(`
@@ -3525,7 +3527,7 @@ route("PUT", "/api/admin/promos/:id", async (req, res, params, body) => {
 });
 
 route("DELETE", "/api/admin/promos/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   await db.prepare("UPDATE codes_promo SET actif=0 WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
@@ -3534,7 +3536,7 @@ route("DELETE", "/api/admin/promos/:id", async (req, res, params) => {
 /* ===== PARAMÈTRES PLATEFORME ===== */
 
 route("GET", "/api/admin/parametres", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const params2 = await db.prepare("SELECT * FROM parametres_plateforme ORDER BY cle").all();
   const obj = {};
@@ -3543,7 +3545,7 @@ route("GET", "/api/admin/parametres", async (req, res) => {
 });
 
 route("PUT", "/api/admin/parametres", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const updates = body.updates || {};
   const stmt = db.prepare(`
@@ -3558,7 +3560,7 @@ route("PUT", "/api/admin/parametres", async (req, res, params, body) => {
 /* ===== ABONNÉS — LISTE DÉTAILLÉE ===== */
 
 route("GET", "/api/admin/abonnes", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const abonnes = await db.prepare(`
     SELECT a.id, a.user_id, u.nom, u.email, u.role, u.pays,
@@ -3578,7 +3580,7 @@ route("GET", "/api/admin/abonnes", async (req, res) => {
 /* ===== TRANSACTIONS — LISTE ===== */
 
 route("GET", "/api/admin/transactions", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const txs = await db.prepare(`
     SELECT t.*, u.nom AS user_nom, p.nom AS plan_nom
@@ -3593,7 +3595,7 @@ route("GET", "/api/admin/transactions", async (req, res) => {
 /* ===== RÉTENTION ===== */
 
 route("GET", "/api/admin/retention", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // Rétention J+7 : inscrits il y a 7–14 jours ET actifs dans les 7 derniers jours
@@ -3641,7 +3643,7 @@ route("GET", "/api/admin/retention", async (req, res) => {
 /* ===== HEARTBEAT SESSION (temps passé sur la plateforme) ===== */
 
 route("POST", "/api/session/heartbeat", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 200, { ok: false });
   const secs = Math.min(Math.max(parseInt(body.secs) || 30, 1), 120);
   db.prepare(`
@@ -3656,7 +3658,7 @@ route("POST", "/api/session/heartbeat", async (req, res, params, body) => {
 /* ===== MODULE PUBLICITÉS ===== */
 
 /* Helper : vérifie si un tableau de ciblage accepte une valeur (vide = tous) */
-function pubCibleMatch(cibleJson, valeurs) {
+async function pubCibleMatch(cibleJson, valeurs) {
   const cible = safeParse(cibleJson);
   if (!Array.isArray(cible) || cible.length === 0) return true;
   if (!valeurs) return false;
@@ -3667,7 +3669,7 @@ function pubCibleMatch(cibleJson, valeurs) {
 /* Servir une publicité adaptée à l'utilisateur courant */
 /* GET /api/publicites/mes — publicités soumises par l'initiative connectée */
 route("GET", "/api/publicites/mes", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare("SELECT id,nom_campagne,titre,statut,format,created_at,updated_at,nb_impressions,nb_clics,date_debut,date_fin FROM publicites WHERE created_by=? ORDER BY created_at DESC").all(user.id);
   sendJSON(res, 200, { publicites: rows });
@@ -3675,7 +3677,7 @@ route("GET", "/api/publicites/mes", async (req, res) => {
 
 /* POST /api/publicites — soumettre une publicité (requiert accréditation creation_publicite) */
 route("POST", "/api/publicites", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!hasAccred(user.id, "creation_publicite")) return sendJSON(res, 403, { error: "Accréditation « Création de Publicité » requise pour soumettre une publicité." });
   const b = _pubBody(body);
@@ -3721,7 +3723,7 @@ route("POST", "/api/publicites", async (req, res, params, body) => {
 
 route("GET", "/api/publicites/servir", async (req, res, params, body, query) => {
   const format = query.format || "banniere";
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const now = new Date().toISOString().slice(0, 10);
 
   const candidates = db.prepare(`
@@ -3764,7 +3766,7 @@ route("GET", "/api/publicites/servir", async (req, res, params, body, query) => 
 
 /* Enregistrer un clic */
 route("POST", "/api/publicites/:id/clic", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   db.prepare("INSERT INTO publicite_events (publicite_id,type,user_id,user_pays,user_ville) VALUES (?,?,?,?,?)")
     .run(params.id, "clic", user?.id || null, user?.pays || null, user?.ville || null);
   db.prepare("UPDATE publicites SET nb_clics=nb_clics+1,updated_at=datetime('now') WHERE id=?").run(params.id);
@@ -3773,7 +3775,7 @@ route("POST", "/api/publicites/:id/clic", async (req, res, params) => {
 
 /* ---- Admin : CRUD publicités ---- */
 route("GET", "/api/admin/publicites", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
   const rows = await db.prepare("SELECT * FROM publicites ORDER BY created_at DESC").all();
   sendJSON(res, 200, { publicites: rows });
@@ -3836,7 +3838,7 @@ function _pubBody(body) {
 }
 
 route("POST", "/api/admin/publicites", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
   const b = _pubBody(body);
   if (!b.titre || !b.annonceur) return sendJSON(res, 400, { error: "titre et annonceur requis." });
@@ -3873,7 +3875,7 @@ route("POST", "/api/admin/publicites", async (req, res, params, body) => {
 });
 
 route("PUT", "/api/admin/publicites/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
   const b = _pubBody(body);
   db.prepare(`
@@ -3909,7 +3911,7 @@ route("PUT", "/api/admin/publicites/:id", async (req, res, params, body) => {
 });
 
 route("POST", "/api/admin/publicites/:id/statut", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
   const { statut, refus_motif } = body;
   const valides = ["brouillon","en_attente","active","suspendue","terminee","refusee","pausee","expiree"];
@@ -3926,7 +3928,7 @@ route("POST", "/api/admin/publicites/:id/statut", async (req, res, params, body)
 });
 
 route("DELETE", "/api/admin/publicites/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
   await db.prepare("DELETE FROM publicite_events WHERE publicite_id=?").run(params.id);
   await db.prepare("DELETE FROM publicites WHERE id=?").run(params.id);
@@ -3934,7 +3936,7 @@ route("DELETE", "/api/admin/publicites/:id", async (req, res, params) => {
 });
 
 route("GET", "/api/admin/publicites/:id/stats", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
   const pub = await db.prepare(`
     SELECT id,titre,annonceur,statut,nb_impressions,nb_clics,nb_portee,nb_partages,nb_enregistrements,nb_contacts,nb_messages
@@ -3970,7 +3972,7 @@ route("GET", "/api/admin/publicites/:id/stats", async (req, res, params) => {
 /* ===== MODULE INSTITUTIONS & OBSERVATOIRE ===== */
 
 /* Helper : accréditation active d'une institution */
-function getAccred(institutionId) {
+async function getAccred(institutionId) {
   return await db.prepare("SELECT * FROM accreditations_observatoire WHERE institution_id=? AND statut='actif'").get(institutionId) || null;
 }
 
@@ -3999,7 +4001,7 @@ function buildObsWhere(accred, tableAlias = "u") {
 }
 
 /* Helper : historique accréditation */
-function histoAccred(accredId, action, admin, details) {
+async function histoAccred(accredId, action, admin, details) {
   db.prepare("INSERT INTO accreditations_historique (accreditation_id,action,admin_id,admin_nom,details) VALUES (?,?,?,?,?)")
     .run(accredId, action, admin.id, admin.nom, details || null);
   db.prepare("UPDATE accreditations_observatoire SET updated_at=datetime('now') WHERE id=?").run(accredId);
@@ -4009,7 +4011,7 @@ function histoAccred(accredId, action, admin, details) {
    ADMIN — Accréditations Observatoire
 =========================== */
 route("GET", "/api/admin/accreditations", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
     const rows = await db.prepare(`
       SELECT ao.*, u.nom AS institution_nom, u.email AS institution_email, u.ville, u.pays, u.type_institution
@@ -4022,7 +4024,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("POST", "/api/admin/accreditations", async (req, res, params, body) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
     const { institution_id, date_fin, nationalites_autorisees, territoires_autorises, droits, notes_admin } = body;
     if (!institution_id) return sendJSON(res, 400, { error: "institution_id requis." });
@@ -4041,7 +4043,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("PUT", "/api/admin/accreditations/:id", async (req, res, params, body) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
     const accred = await db.prepare("SELECT * FROM accreditations_observatoire WHERE id=?").get(params.id);
     if (!accred) return sendJSON(res, 404, { error: "Accréditation introuvable." });
@@ -4054,7 +4056,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("POST", "/api/admin/accreditations/:id/suspendre", async (req, res, params, body) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
     const accred = await db.prepare("SELECT * FROM accreditations_observatoire WHERE id=?").get(params.id);
     if (!accred) return sendJSON(res, 404, { error: "Accréditation introuvable." });
@@ -4064,7 +4066,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("POST", "/api/admin/accreditations/:id/retirer", async (req, res, params, body) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
     const accred = await db.prepare("SELECT * FROM accreditations_observatoire WHERE id=?").get(params.id);
     if (!accred) return sendJSON(res, 404, { error: "Accréditation introuvable." });
@@ -4074,7 +4076,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("POST", "/api/admin/accreditations/:id/reactiver", async (req, res, params, body) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
     db.prepare("UPDATE accreditations_observatoire SET statut='actif',updated_at=datetime('now') WHERE id=?").run(params.id);
     histoAccred(params.id, "reactivation", user, body.motif || "Réactivation");
@@ -4082,7 +4084,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/admin/accreditations/:id/historique", async (req, res, params) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
     const rows = await db.prepare("SELECT * FROM accreditations_historique WHERE accreditation_id=? ORDER BY created_at DESC").all(params.id);
     sendJSON(res, 200, { historique: rows });
@@ -4092,7 +4094,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
      OBSERVATOIRE — Stats accréditées (collectivite uniquement)
   =========================== */
   route("GET", "/api/observatoire/statut", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 200, { accreditee: false });
@@ -4109,7 +4111,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/observatoire/vue-generale", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation Observatoire requise." });
@@ -4128,7 +4130,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/observatoire/geographie", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
@@ -4145,7 +4147,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/observatoire/competences", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
@@ -4156,7 +4158,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/observatoire/secteurs", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
@@ -4167,7 +4169,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/observatoire/initiatives-stats", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
@@ -4184,7 +4186,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/observatoire/investissements", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
@@ -4202,7 +4204,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/observatoire/emploi", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
@@ -4221,7 +4223,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/observatoire/associations", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
@@ -4238,7 +4240,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/observatoire/export-csv", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
@@ -4261,7 +4263,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
      RAPPORTS AUTOMATIQUES OBSERVATOIRE
   =========================== */
   route("GET", "/api/observatoire/rapport", async (req, res, params, body, query) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
@@ -4298,7 +4300,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
      COMMUNICATIONS INSTITUTIONNELLES
   =========================== */
   route("POST", "/api/communications", async (req, res, params, body) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || !["collectivite","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux collectivités et administrateurs." });
     const { titre, contenu, type, cible, photos_json, video_b64, audio_b64 } = body;
     if (!titre || !contenu) return sendJSON(res, 400, { error: "titre et contenu requis." });
@@ -4339,7 +4341,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/communications", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || !["collectivite","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const rows = await db.prepare("SELECT id,emetteur_id,titre,contenu,type,cible_json,nb_destinataires,statut,photos_json,video_b64,audio_b64,created_at FROM communications_institutionnelles WHERE emetteur_id=? ORDER BY created_at DESC LIMIT 50").all(user.id);
     sendJSON(res, 200, { communications: rows.map(r => ({
@@ -4349,7 +4351,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/communications/recues", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     // Toutes communications qui ne sont pas bloquées par l'utilisateur
     const desabo = await db.prepare("SELECT institution_id FROM comm_desabonnements WHERE user_id=?").all(user.id).map(r=>r.institution_id);
@@ -4359,7 +4361,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("POST", "/api/communications/:id/desabonner", async (req, res, params) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     const comm = await db.prepare("SELECT emetteur_id FROM communications_institutionnelles WHERE id=?").get(params.id);
     if (!comm) return sendJSON(res, 404, { error: "Communication introuvable." });
@@ -4373,7 +4375,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
      CONSULTATIONS ET SONDAGES
   =========================== */
   route("POST", "/api/consultations", async (req, res, params, body) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user || !["collectivite","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const { titre, description, type, date_cloture, cible, questions, statut } = body;
     if (!titre) return sendJSON(res, 400, { error: "titre requis." });
@@ -4387,7 +4389,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/consultations", async (req, res) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     let rows;
     if (["collectivite","administrateur"].includes(user.role)) {
@@ -4399,7 +4401,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/consultations/:id", async (req, res, params) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     const c = await db.prepare("SELECT c.*,u.nom AS emetteur_nom FROM consultations c JOIN users u ON u.id=c.emetteur_id WHERE c.id=?").get(params.id);
     if (!c) return sendJSON(res, 404, { error: "Consultation introuvable." });
@@ -4409,7 +4411,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("POST", "/api/consultations/:id/repondre", async (req, res, params, body) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     const c = await db.prepare("SELECT * FROM consultations WHERE id=? AND statut='ouverte'").get(params.id);
     if (!c) return sendJSON(res, 404, { error: "Consultation fermée ou introuvable." });
@@ -4421,7 +4423,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("GET", "/api/consultations/:id/resultats", async (req, res, params) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     const c = await db.prepare("SELECT * FROM consultations WHERE id=?").get(params.id);
     if (!c) return sendJSON(res, 404, { error: "Consultation introuvable." });
@@ -4436,7 +4438,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   });
 
   route("POST", "/api/consultations/:id/cloturer", async (req, res, params) => {
-    const user = getCurrentUser(req);
+    const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     const c = await db.prepare("SELECT * FROM consultations WHERE id=?").get(params.id);
     if (!c) return sendJSON(res, 404, { error: "Introuvable." });
@@ -4449,8 +4451,8 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
    MODULE AMBASSADE / COLLECTIVITÉ
    ============================================================ */
 
-function requireCollectivite(req, res) {
-  const user = getCurrentUser(req);
+async function requireCollectivite(req, res) {
+  const user = await getCurrentUser(req);
   if (!user) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
   if (user.role !== "collectivite") { sendJSON(res, 403, { error: "Réservé aux collectivités." }); return null; }
   return user;
@@ -4643,14 +4645,14 @@ route("DELETE", "/api/collectivite/opportunites/:id", async (req, res, params) =
    ================================================================ */
 
 /* Helper : vérifie qu'un user a une accréditation active */
-function hasAccred(userId, type) {
+async function hasAccred(userId, type) {
   const r = await db.prepare("SELECT id FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type);
   return !!r;
 }
 
 /* GET /api/accreditations/mes — mes accréditations (ancien + nouveau système) */
 route("GET", "/api/accreditations/mes", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const anciens = await db.prepare("SELECT * FROM compte_accreditations WHERE user_id=? ORDER BY created_at DESC").all(user.id);
   const nouveaux = await db.prepare(`
@@ -4664,7 +4666,7 @@ route("GET", "/api/accreditations/mes", async (req, res) => {
 
 /* GET /api/accreditations/demandes — mes propres demandes (ancien + nouveau système) */
 route("GET", "/api/accreditations/demandes", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const anciens = await db.prepare("SELECT * FROM demandes_accreditation WHERE user_id=? ORDER BY created_at DESC").all(user.id);
   const nouveaux = await db.prepare(`
@@ -4684,7 +4686,7 @@ route("GET", "/api/accreditations/user/:id", async (req, res, params) => {
 
 /* POST /api/accreditations/demande — demander une accréditation (nouveau + ancien système) */
 route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const { type, message } = body;
   if (!type) return sendJSON(res, 400, { error: "Type requis." });
@@ -4733,7 +4735,7 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
 
 /* GET /api/admin/accreditations/demandes — liste des demandes */
 route("GET", "/api/admin/accreditations/demandes", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const statut = query.statut || "en_attente";
   const rows = await db.prepare(`
@@ -4746,7 +4748,7 @@ route("GET", "/api/admin/accreditations/demandes", async (req, res, params, body
 
 /* GET /api/admin/accreditations — liste de tous les comptes accrédités */
 route("GET", "/api/admin/accreditations", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const rows = await db.prepare(`
     SELECT ca.*, u.nom AS user_nom, u.email AS user_email, u.role AS user_role
@@ -4758,7 +4760,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
 
 /* PATCH /api/admin/accreditations/:userId/:type/accorder */
 route("PATCH", "/api/admin/accreditations/:userId/:type/accorder", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
   const TYPES_DA = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle","creation_publicite"];
@@ -4779,7 +4781,7 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/accorder", async (req, r
 
 /* PATCH /api/admin/accreditations/:userId/:type/refuser */
 route("PATCH", "/api/admin/accreditations/:userId/:type/refuser", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
   await db.prepare("UPDATE demandes_accreditation SET statut='refusee', motif_refus=? WHERE user_id=? AND type=? AND statut='en_attente'").run(body.motif||null, userId, type);
@@ -4790,7 +4792,7 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/refuser", async (req, re
 
 /* PATCH /api/admin/accreditations/:userId/:type/suspendre */
 route("PATCH", "/api/admin/accreditations/:userId/:type/suspendre", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
   db.prepare("UPDATE compte_accreditations SET statut='suspendue', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
@@ -4801,7 +4803,7 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/suspendre", async (req, 
 
 /* PATCH /api/admin/accreditations/:userId/:type/retirer */
 route("PATCH", "/api/admin/accreditations/:userId/:type/retirer", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
   db.prepare("UPDATE compte_accreditations SET statut='retiree', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
@@ -4812,7 +4814,7 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/retirer", async (req, re
 
 /* PATCH /api/admin/accreditations/:userId/:type/reactiver */
 route("PATCH", "/api/admin/accreditations/:userId/:type/reactiver", async (req, res, params) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
   db.prepare("UPDATE compte_accreditations SET statut='active', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
@@ -4840,7 +4842,7 @@ route("GET", "/api/sondages", async (req, res, params, body, query) => {
 
 /* POST /api/sondages */
 route("POST", "/api/sondages", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!hasAccred(user.id, "mobilisation_active")) return sendJSON(res, 403, { error: "Accréditation « Mobilisation Active » requise." });
   const { titre, description, type, sous_type, anonyme, cible_roles, cible_pays, date_cloture, questions } = body;
@@ -4868,7 +4870,7 @@ route("GET", "/api/sondages/:id", async (req, res, params) => {
   const s = await db.prepare("SELECT s.*,u.nom AS createur_nom,u.role AS createur_role FROM sondages s JOIN users u ON u.id=s.createur_id WHERE s.id=?").get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Sondage introuvable." });
   const questions = await db.prepare("SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre ASC").all(params.id);
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   const dejaRepondu = me ? !!await db.prepare("SELECT 1 FROM sondage_reponses WHERE sondage_id=? AND user_id=?").get(params.id, me.id) : false;
   sendJSON(res, 200, {
     sondage: { ...s, cible_roles: safeParse(s.cible_roles), cible_pays: safeParse(s.cible_pays) },
@@ -4879,7 +4881,7 @@ route("GET", "/api/sondages/:id", async (req, res, params) => {
 
 /* POST /api/sondages/:id/repondre */
 route("POST", "/api/sondages/:id/repondre", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const s = await db.prepare("SELECT * FROM sondages WHERE id=?").get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Sondage introuvable." });
@@ -4903,7 +4905,7 @@ route("POST", "/api/sondages/:id/repondre", async (req, res, params, body) => {
 
 /* GET /api/sondages/:id/resultats — créateur uniquement */
 route("GET", "/api/sondages/:id/resultats", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const s = await db.prepare("SELECT * FROM sondages WHERE id=?").get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Sondage introuvable." });
@@ -4932,7 +4934,7 @@ route("GET", "/api/sondages/:id/resultats", async (req, res, params) => {
 
 /* PATCH /api/sondages/:id/cloturer */
 route("PATCH", "/api/sondages/:id/cloturer", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const s = await db.prepare("SELECT * FROM sondages WHERE id=?").get(params.id);
   if (!s || s.createur_id !== user.id) return sendJSON(res, 403, { error: "Non autorisé." });
@@ -4942,7 +4944,7 @@ route("PATCH", "/api/sondages/:id/cloturer", async (req, res, params) => {
 
 /* GET /api/mes-sondages */
 route("GET", "/api/mes-sondages", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare("SELECT * FROM sondages WHERE createur_id=? ORDER BY created_at DESC").all(user.id);
   sendJSON(res, 200, { sondages: rows });
@@ -4967,7 +4969,7 @@ route("GET", "/api/offres", async (req, res, params, body, query) => {
 
 /* POST /api/offres */
 route("POST", "/api/offres", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!hasAccred(user.id, "createur_opportunites")) return sendJSON(res, 403, { error: "Accréditation « Créateur d'Opportunités » requise." });
   const { titre, type, description, competences_requises, localisation, pays, remuneration, date_limite, nb_postes } = body;
@@ -4985,14 +4987,14 @@ route("POST", "/api/offres", async (req, res, params, body) => {
 route("GET", "/api/offres/:id", async (req, res, params) => {
   const o = await db.prepare("SELECT o.*,u.nom AS createur_nom,u.role AS createur_role FROM offres o JOIN users u ON u.id=o.createur_id WHERE o.id=?").get(params.id);
   if (!o) return sendJSON(res, 404, { error: "Offre introuvable." });
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   const dejaPostule = me ? !!await db.prepare("SELECT 1 FROM offres_candidatures WHERE offre_id=? AND candidat_id=?").get(params.id, me.id) : false;
   sendJSON(res, 200, { offre: { ...o, competences_requises: safeParse(o.competences_requises) }, dejaPostule });
 });
 
 /* POST /api/offres/:id/postuler */
 route("POST", "/api/offres/:id/postuler", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const o = await db.prepare("SELECT * FROM offres WHERE id=?").get(params.id);
   if (!o) return sendJSON(res, 404, { error: "Offre introuvable." });
@@ -5012,7 +5014,7 @@ route("POST", "/api/offres/:id/postuler", async (req, res, params, body) => {
 
 /* GET /api/offres/:id/candidatures — créateur uniquement */
 route("GET", "/api/offres/:id/candidatures", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const o = await db.prepare("SELECT * FROM offres WHERE id=?").get(params.id);
   if (!o || o.createur_id !== user.id) return sendJSON(res, 403, { error: "Réservé au créateur." });
@@ -5026,7 +5028,7 @@ route("GET", "/api/offres/:id/candidatures", async (req, res, params) => {
 
 /* PATCH /api/offres/:id/candidatures/:cid */
 route("PATCH", "/api/offres/:id/candidatures/:cid", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const o = await db.prepare("SELECT * FROM offres WHERE id=?").get(params.id);
   if (!o || o.createur_id !== user.id) return sendJSON(res, 403, { error: "Non autorisé." });
@@ -5043,7 +5045,7 @@ route("PATCH", "/api/offres/:id/candidatures/:cid", async (req, res, params, bod
 
 /* GET /api/mes-offres */
 route("GET", "/api/mes-offres", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare("SELECT * FROM offres WHERE createur_id=? ORDER BY created_at DESC").all(user.id);
   sendJSON(res, 200, { offres: rows.map(r => ({ ...r, competences_requises: safeParse(r.competences_requises) })) });
@@ -5051,7 +5053,7 @@ route("GET", "/api/mes-offres", async (req, res) => {
 
 /* GET /api/mes-candidatures-offres — mes candidatures aux offres */
 route("GET", "/api/mes-candidatures-offres", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare(`
     SELECT oc.*, o.titre AS offre_titre, o.type AS offre_type, u.nom AS createur_nom
@@ -5068,8 +5070,8 @@ route("GET", "/api/mes-candidatures-offres", async (req, res) => {
 const _trackStmt = db.prepare(
   "INSERT OR IGNORE INTO user_activity (user_id, date) VALUES (?, date('now'))"
 );
-function trackActivity(req) {
-  try { const u = getCurrentUser(req); if (u) _trackStmt.run(u.id); } catch {}
+async function trackActivity(req) {
+  try { const u = await getCurrentUser(req); if (u) _trackStmt.run(u.id); } catch {}
 }
 
 /* ── Géographie mondiale — proxy CountriesNow API ── */
@@ -5114,7 +5116,7 @@ route("GET", "/api/geo/countries", async (req, res, params, body, query) => {
   sendJSON(res, 200, _restCountriesCache[cacheKey]);
 });
 
-function _toEnCountry(localName, lang) {
+async function _toEnCountry(localName, lang) {
   const code = "countries_" + (lang || "fr");
   const map = (_restCountriesCache[code] || {}).map || {};
   return map[localName] || localName;
@@ -5197,9 +5199,9 @@ async function scrapeSite() {
 }
 
 /* ── Migration colonnes chatbot (exécutée une seule fois au démarrage) ── */
-(function migrateChatbot() {
-  const cols = db.prepare("PRAGMA table_info(chatbot_memoire)").all().map(c => c.name);
-  const add = (col, def) => { if (!cols.includes(col)) { try { await db.prepare(`ALTER TABLE chatbot_memoire ADD COLUMN ${col} ${def}`).run(); } catch(e){} } };
+(async function migrateChatbot() {
+  const cols = (await db.prepare("PRAGMA table_info(chatbot_memoire)").all()).map(c => c.name);
+  const add = async (col, def) => { if (!cols.includes(col)) { try { await db.prepare(`ALTER TABLE chatbot_memoire ADD COLUMN ${col} ${def}`).run(); } catch(e){} } };
   add("categorie", "TEXT DEFAULT 'Général'");
   add("mots_cles", "TEXT DEFAULT '[]'");
   add("priorite",  "INTEGER DEFAULT 5");
@@ -5299,7 +5301,7 @@ async function scrapeSite() {
     cats.forEach(c => { try { insC.run(c.nom, c.slug, c.icone, c.ordre); } catch(e){} });
 
     /* Seed questions initiales */
-    const getCat = (slug) => await db.prepare(`SELECT id FROM faq_categories WHERE slug=?`).get(slug)?.id || null;
+    const getCat = async (slug) => (await db.prepare(`SELECT id FROM faq_categories WHERE slug=?`).get(slug))?.id || null;
     const insQ = db.prepare(`INSERT INTO faq_questions
       (category_id,compte_types,question,reponse,synonymes,mots_cles,etapes,module_lien,module_label)
       VALUES (?,?,?,?,?,?,?,?,?)`);
@@ -5722,7 +5724,7 @@ async function scrapeSite() {
 })();
 
 /* ── Helpers ── */
-function normQuestion(q) {
+async function normQuestion(q) {
   return (q||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g,"").replace(/\s+/g," ").trim().slice(0,200);
 }
 
@@ -5751,7 +5753,7 @@ route("POST", "/api/chatbot/memoire/:id/consulter", async (req, res, params) => 
 
 /* GET /api/chatbot/memoire — admin, liste complète */
 route("GET", "/api/chatbot/memoire", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const q = await db.prepare("SELECT * FROM chatbot_memoire ORDER BY priorite ASC, ordre ASC, created_at ASC").all();
   sendJSON(res, 200, { memoires: q.map(m => ({
@@ -5763,7 +5765,7 @@ route("GET", "/api/chatbot/memoire", async (req, res) => {
 
 /* POST /api/chatbot/memoire — admin, créer */
 route("POST", "/api/chatbot/memoire", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const { titre, contenu, categorie="Général", mots_cles=[], priorite=5, liens_json=[], ordre=0 } = body || {};
   if (!titre?.trim() || !contenu?.trim()) return sendJSON(res, 400, { error: "Titre et contenu requis." });
@@ -5778,7 +5780,7 @@ route("POST", "/api/chatbot/memoire", async (req, res, params, body) => {
 
 /* PUT /api/chatbot/memoire/:id — admin, modifier */
 route("PUT", "/api/chatbot/memoire/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const id = params.id;
   const ancien = await db.prepare("SELECT * FROM chatbot_memoire WHERE id=?").get(id);
@@ -5805,7 +5807,7 @@ route("PUT", "/api/chatbot/memoire/:id", async (req, res, params, body) => {
 
 /* DELETE /api/chatbot/memoire/:id — admin */
 route("DELETE", "/api/chatbot/memoire/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   await db.prepare("DELETE FROM chatbot_memoire WHERE id = ?").run(params.id);
   sendJSON(res, 200, { ok: true });
@@ -5813,7 +5815,7 @@ route("DELETE", "/api/chatbot/memoire/:id", async (req, res, params) => {
 
 /* GET /api/chatbot/memoire/:id/historique — admin */
 route("GET", "/api/chatbot/memoire/:id/historique", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const rows = await db.prepare("SELECT * FROM chatbot_memoire_historique WHERE memoire_id=? ORDER BY created_at DESC").all(params.id);
   sendJSON(res, 200, { historique: rows });
@@ -5821,7 +5823,7 @@ route("GET", "/api/chatbot/memoire/:id/historique", async (req, res, params) => 
 
 /* POST /api/chatbot/memoire/:id/restaurer — admin, restaure une version */
 route("POST", "/api/chatbot/memoire/:id/restaurer", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const { historique_id } = body || {};
   const version = await db.prepare("SELECT * FROM chatbot_memoire_historique WHERE id=? AND memoire_id=?").get(historique_id, params.id);
@@ -5836,7 +5838,7 @@ route("POST", "/api/chatbot/memoire/:id/restaurer", async (req, res, params, bod
 
 /* POST /api/chatbot/importer-site — admin, snapshot permanent du site */
 route("POST", "/api/chatbot/importer-site", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const sentences = await scrapeSite();
   if (!sentences.length) return sendJSON(res, 502, { error: "Site inaccessible ou vide." });
@@ -5856,7 +5858,7 @@ route("POST", "/api/chatbot/importer-site", async (req, res, params, body) => {
 
 /* GET /api/chatbot/stats — admin */
 route("GET", "/api/chatbot/stats", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const total       = db.prepare("SELECT COUNT(*) n FROM chatbot_memoire WHERE actif=1").get().n;
   const ce_mois     = db.prepare("SELECT COUNT(*) n FROM chatbot_memoire WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now') AND actif=1").get().n;
@@ -5872,7 +5874,7 @@ route("GET", "/api/chatbot/stats", async (req, res) => {
 
 /* GET /api/chatbot/questions — admin */
 route("GET", "/api/chatbot/questions", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const { statut = "ouvert" } = url.parse(req.url, true).query;
   const rows = await db.prepare("SELECT * FROM chatbot_questions WHERE statut=? ORDER BY nb_fois DESC, last_asked_at DESC LIMIT 100").all(statut);
@@ -5883,7 +5885,7 @@ route("GET", "/api/chatbot/questions", async (req, res) => {
 route("POST", "/api/chatbot/questions", async (req, res, params, body) => {
   const { question, langue="fr", categorie_estimee, contexte } = body || {};
   if (!question?.trim()) return sendJSON(res, 400, { error: "Question requise." });
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const norm = normQuestion(question);
   const existing = await db.prepare("SELECT id, nb_fois FROM chatbot_questions WHERE question_norm=? AND statut='ouvert'").get(norm);
   if (existing) {
@@ -5898,7 +5900,7 @@ route("POST", "/api/chatbot/questions", async (req, res, params, body) => {
 
 /* PUT /api/chatbot/questions/:id — admin, répondre / changer statut */
 route("PUT", "/api/chatbot/questions/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const { reponse_admin, statut } = body || {};
   db.prepare("UPDATE chatbot_questions SET reponse_admin=COALESCE(?,reponse_admin), statut=COALESCE(?,statut) WHERE id=?")
@@ -5908,7 +5910,7 @@ route("PUT", "/api/chatbot/questions/:id", async (req, res, params, body) => {
 
 /* POST /api/chatbot/questions/:id/convertir — admin, convertit en connaissance */
 route("POST", "/api/chatbot/questions/:id/convertir", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const q = await db.prepare("SELECT * FROM chatbot_questions WHERE id=?").get(params.id);
   if (!q) return sendJSON(res, 404, { error: "Question introuvable." });
@@ -5927,7 +5929,7 @@ route("POST", "/api/chatbot/questions/:id/convertir", async (req, res, params, b
 
 /* DELETE /api/chatbot/questions/:id — admin */
 route("DELETE", "/api/chatbot/questions/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   await db.prepare("UPDATE chatbot_questions SET statut='ignore' WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
@@ -5935,18 +5937,19 @@ route("DELETE", "/api/chatbot/questions/:id", async (req, res, params) => {
 
 /* POST /api/chatbot/questions/fusionner — admin */
 route("POST", "/api/chatbot/questions/fusionner", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const { ids, id_principal } = body || {};
   if (!Array.isArray(ids) || !id_principal) return sendJSON(res, 400, { error: "ids et id_principal requis." });
-  const total = ids.reduce((sum, id) => {
+  const counts = await Promise.all(ids.map(async id => {
     const q = await db.prepare("SELECT nb_fois FROM chatbot_questions WHERE id=?").get(id);
-    return sum + (q?.nb_fois || 0);
-  }, 0);
+    return q?.nb_fois || 0;
+  }));
+  const total = counts.reduce((sum, n) => sum + n, 0);
   await db.prepare("UPDATE chatbot_questions SET nb_fois=? WHERE id=?").run(total, id_principal);
-  ids.filter(id => id !== id_principal).forEach(id =>
+  await Promise.all(ids.filter(id => id !== id_principal).map(async id =>
     await db.prepare("UPDATE chatbot_questions SET statut='fusionne' WHERE id=?").run(id)
-  );
+  ));
   sendJSON(res, 200, { ok: true, total_fusionnes: ids.length - 1 });
 });
 
@@ -5955,7 +5958,7 @@ route("POST", "/api/chatbot/questions/fusionner", async (req, res, params, body)
    ════════════════════════════════════════════════════════════════ */
 
 /* Helper normalisation recherche */
-function normFaq(s) {
+async function normFaq(s) {
   return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
 }
 
@@ -6058,14 +6061,14 @@ route("GET", "/api/faq/search", async (req, res, _p, _b, q) => {
    FAQ — QUESTIONS SANS RÉPONSE (avant /:id pour éviter conflit de route)
    ════════════════════════════════════════════════════════════════ */
 
-function normSR(s) {
+async function normSR(s) {
   return (s || '').toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9 ]/g, ' ')
     .replace(/\s+/g, ' ').trim();
 }
 
-function similariteSR(a, b) {
+async function similariteSR(a, b) {
   const wa = new Set(a.split(' ').filter(w => w.length > 3));
   const wb = new Set(b.split(' ').filter(w => w.length > 3));
   if (wa.size === 0 || wb.size === 0) return 0;
@@ -6074,7 +6077,7 @@ function similariteSR(a, b) {
   return inter / Math.min(wa.size, wb.size);
 }
 
-function calcPriorite(count) {
+async function calcPriorite(count) {
   if (count >= 20) return 'critique';
   if (count > 10)  return 'elevee';
   if (count >= 3)  return 'moyenne';
@@ -6084,7 +6087,7 @@ function calcPriorite(count) {
 route("POST", "/api/faq/sans-reponse", async (req, res, _p, body) => {
   const { question, source, compte_type, pays, langue } = body;
   if (!question || question.trim().length < 5) return sendJSON(res, 400, { error: 'Question trop courte' });
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const norm = normSR(question);
   const open = db.prepare(`SELECT id, question_norm, count FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore')`).all();
   let matched = null;
@@ -6106,7 +6109,7 @@ route("POST", "/api/faq/sans-reponse", async (req, res, _p, body) => {
 });
 
 route("GET", "/api/faq/sans-reponse/stats", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const total      = db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='nouveau'`).get()?.n || 0;
   const en_cours   = db.prepare(`SELECT COUNT(*) n FROM faq_sans_reponse WHERE statut='en_cours'`).get()?.n || 0;
@@ -6118,7 +6121,7 @@ route("GET", "/api/faq/sans-reponse/stats", async (req, res) => {
 });
 
 route("GET", "/api/faq/sans-reponse/similaires", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const open = db.prepare(`SELECT id, question, question_norm, count FROM faq_sans_reponse WHERE statut NOT IN ('resolu','ignore') ORDER BY count DESC`).all();
   const groupes = [], used = new Set();
@@ -6135,7 +6138,7 @@ route("GET", "/api/faq/sans-reponse/similaires", async (req, res) => {
 });
 
 route("GET", "/api/faq/sans-reponse", async (req, res, _p, _b, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const statut = query.statut||'', priorite = query.priorite||'', search = query.q||'';
   const limit = parseInt(query.limit)||50;
@@ -6152,7 +6155,7 @@ route("GET", "/api/faq/sans-reponse", async (req, res, _p, _b, query) => {
 });
 
 route("PUT", "/api/faq/sans-reponse/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { statut, priorite, admin_id } = body;
   const sets = [], vals = [];
@@ -6166,14 +6169,14 @@ route("PUT", "/api/faq/sans-reponse/:id", async (req, res, params, body) => {
 });
 
 route("POST", "/api/faq/sans-reponse/:id/ignorer", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   db.prepare(`UPDATE faq_sans_reponse SET statut='ignore',updated_at=datetime('now') WHERE id=?`).run(parseInt(params.id));
   sendJSON(res, 200, { ok: true });
 });
 
 route("POST", "/api/faq/sans-reponse/:id/convertir", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const sr = await db.prepare(`SELECT * FROM faq_sans_reponse WHERE id=?`).get(parseInt(params.id));
   if (!sr) return sendJSON(res, 404, { error: 'Question introuvable' });
@@ -6186,7 +6189,7 @@ route("POST", "/api/faq/sans-reponse/:id/convertir", async (req, res, params, bo
 });
 
 route("POST", "/api/faq/sans-reponse/fusion", async (req, res, _p, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { ids, question_principale } = body;
   if (!Array.isArray(ids) || ids.length < 2) return sendJSON(res, 400, { error: '≥2 IDs requis' });
@@ -6220,7 +6223,7 @@ route("GET", "/api/faq/:id", async (req, res, params) => {
 route("POST", "/api/faq/:id/view", async (req, res, params, _b) => {
   const id = parseInt(params.id);
   await db.prepare(`UPDATE faq_questions SET vues = vues + 1 WHERE id = ?`).run(id);
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   try {
     db.prepare(`INSERT INTO faq_views (question_id, user_id, user_role) VALUES (?,?,?)`)
       .run(id, user?.id || null, user?.role || null);
@@ -6232,7 +6235,7 @@ route("POST", "/api/faq/:id/view", async (req, res, params, _b) => {
 route("POST", "/api/faq/:id/rating", async (req, res, params, body) => {
   const id      = parseInt(params.id);
   const helpful = body.helpful ? 1 : 0;
-  const user    = getCurrentUser(req);
+  const user    = await getCurrentUser(req);
   db.prepare(`INSERT INTO faq_ratings (question_id, user_id, helpful, comment) VALUES (?,?,?,?)`)
     .run(id, user?.id || null, helpful, body.comment || null);
   sendJSON(res, 200, { ok: true });
@@ -6242,7 +6245,7 @@ route("POST", "/api/faq/:id/rating", async (req, res, params, body) => {
 
 /* POST /api/faq — créer une question */
 route("POST", "/api/faq", async (req, res, _p, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { category_id, compte_types, question, reponse, synonymes, mots_cles, etapes, medias, module_lien, module_label, ordre } = body;
   if (!question?.trim() || !reponse?.trim()) return sendJSON(res, 400, { error: 'Question et réponse requises' });
@@ -6268,7 +6271,7 @@ route("POST", "/api/faq", async (req, res, _p, body) => {
 
 /* PUT /api/faq/:id — modifier */
 route("PUT", "/api/faq/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const id = parseInt(params.id);
   const { category_id, compte_types, question, reponse, synonymes, mots_cles, etapes, medias, module_lien, module_label, ordre, statut } = body;
@@ -6291,7 +6294,7 @@ route("PUT", "/api/faq/:id", async (req, res, params, body) => {
 
 /* PATCH /api/faq/:id/statut — changer statut (active/inactive/archived) */
 route("PATCH", "/api/faq/:id/statut", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const id     = parseInt(params.id);
   const statut = body.statut;
@@ -6302,7 +6305,7 @@ route("PATCH", "/api/faq/:id/statut", async (req, res, params, body) => {
 
 /* POST /api/faq/:id/duplicate — dupliquer */
 route("POST", "/api/faq/:id/duplicate", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const src = await db.prepare(`SELECT * FROM faq_questions WHERE id=?`).get(parseInt(params.id));
   if (!src) return sendJSON(res, 404, { error: 'Introuvable' });
@@ -6318,7 +6321,7 @@ route("POST", "/api/faq/:id/duplicate", async (req, res, params) => {
 
 /* DELETE /api/faq/:id — supprimer */
 route("DELETE", "/api/faq/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   await db.prepare(`DELETE FROM faq_questions WHERE id=?`).run(parseInt(params.id));
   sendJSON(res, 200, { ok: true });
@@ -6326,7 +6329,7 @@ route("DELETE", "/api/faq/:id", async (req, res, params) => {
 
 /* POST /api/faq/categories — créer catégorie */
 route("POST", "/api/faq/categories", async (req, res, _p, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { nom, icone, ordre } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: 'Nom requis' });
@@ -6339,7 +6342,7 @@ route("POST", "/api/faq/categories", async (req, res, _p, body) => {
 
 /* PUT /api/faq/categories/:id — modifier catégorie */
 route("PUT", "/api/faq/categories/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   await db.prepare(`UPDATE faq_categories SET nom=?, icone=?, ordre=? WHERE id=?`)
     .run(body.nom||'', body.icone||'📋', parseInt(body.ordre)||0, parseInt(params.id));
@@ -6348,7 +6351,7 @@ route("PUT", "/api/faq/categories/:id", async (req, res, params, body) => {
 
 /* DELETE /api/faq/categories/:id — supprimer catégorie */
 route("DELETE", "/api/faq/categories/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   await db.prepare(`DELETE FROM faq_categories WHERE id=?`).run(parseInt(params.id));
   sendJSON(res, 200, { ok: true });
@@ -6356,7 +6359,7 @@ route("DELETE", "/api/faq/categories/:id", async (req, res, params) => {
 
 /* GET /api/faq/stats/dashboard — admin stats */
 route("GET", "/api/faq/stats/dashboard", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const total_questions  = db.prepare(`SELECT COUNT(*) n FROM faq_questions WHERE statut='active'`).get()?.n || 0;
   const total_vues       = db.prepare(`SELECT SUM(vues) n FROM faq_questions`).get()?.n || 0;
@@ -6391,7 +6394,7 @@ route("GET", "/api/onboarding/:role", async (req, res, params) => {
 
 /* GET /api/onboarding/progress/me — progression de l'utilisateur connecté */
 route("GET", "/api/onboarding/progress/me", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Non connecté' });
   const row = await db.prepare(`SELECT * FROM onboarding_progress WHERE user_id=? ORDER BY updated_at DESC LIMIT 1`).get(user.id);
   sendJSON(res, 200, row || null);
@@ -6399,7 +6402,7 @@ route("GET", "/api/onboarding/progress/me", async (req, res) => {
 
 /* POST /api/onboarding/progress — sauvegarder la progression */
 route("POST", "/api/onboarding/progress", async (req, res, _p, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Non connecté' });
   const { tutorial_id, statut, etapes_completees, note, commentaire } = body;
   const existing = await db.prepare(`SELECT id FROM onboarding_progress WHERE user_id=? AND tutorial_id=?`).get(user.id, tutorial_id);
@@ -6415,7 +6418,7 @@ route("POST", "/api/onboarding/progress", async (req, res, _p, body) => {
 
 /* POST /api/onboarding/stats — log d'une action (start, step_complete, abandon…) */
 route("POST", "/api/onboarding/stats", async (req, res, _p, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const { tutorial_id, step_id, action, data } = body;
   try {
     db.prepare(`INSERT INTO onboarding_stats (tutorial_id,step_id,user_id,action,data) VALUES (?,?,?,?,?)`)
@@ -6428,7 +6431,7 @@ route("POST", "/api/onboarding/stats", async (req, res, _p, body) => {
 
 /* GET /api/onboarding/admin/list — liste tous les tutoriels */
 route("GET", "/api/onboarding/admin/list", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const tuts = db.prepare(`SELECT t.*, (SELECT COUNT(*) FROM onboarding_steps WHERE tutorial_id=t.id AND actif=1) nb_steps FROM onboarding_tutorials t ORDER BY t.compte_type`).all();
   sendJSON(res, 200, tuts);
@@ -6436,7 +6439,7 @@ route("GET", "/api/onboarding/admin/list", async (req, res) => {
 
 /* PUT /api/onboarding/admin/:id — modifier un tutoriel */
 route("PUT", "/api/onboarding/admin/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { titre, description, duree_estimee, obligatoire, actif } = body;
   db.prepare(`UPDATE onboarding_tutorials SET titre=?,description=?,duree_estimee=?,obligatoire=?,actif=?,version=version+1,updated_at=datetime('now') WHERE id=?`)
@@ -6446,7 +6449,7 @@ route("PUT", "/api/onboarding/admin/:id", async (req, res, params, body) => {
 
 /* GET /api/onboarding/admin/:id/steps — étapes d'un tutoriel */
 route("GET", "/api/onboarding/admin/:id/steps", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const steps = await db.prepare(`SELECT * FROM onboarding_steps WHERE tutorial_id=? ORDER BY ordre`).all(parseInt(params.id));
   sendJSON(res, 200, steps);
@@ -6454,7 +6457,7 @@ route("GET", "/api/onboarding/admin/:id/steps", async (req, res, params) => {
 
 /* POST /api/onboarding/admin/:id/steps — ajouter une étape */
 route("POST", "/api/onboarding/admin/:id/steps", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { titre, contenu, type, illustration, narration, module_lien, module_label, ordre } = body;
   const r = db.prepare(`INSERT INTO onboarding_steps (tutorial_id,ordre,titre,contenu,type,illustration,narration,module_lien,module_label) VALUES (?,?,?,?,?,?,?,?,?)`)
@@ -6464,7 +6467,7 @@ route("POST", "/api/onboarding/admin/:id/steps", async (req, res, params, body) 
 
 /* PUT /api/onboarding/admin/steps/:id — modifier une étape */
 route("PUT", "/api/onboarding/admin/steps/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { titre, contenu, type, illustration, narration, module_lien, module_label, ordre, actif } = body;
   await db.prepare(`UPDATE onboarding_steps SET titre=?,contenu=?,type=?,illustration=?,narration=?,module_lien=?,module_label=?,ordre=?,actif=? WHERE id=?`)
@@ -6474,7 +6477,7 @@ route("PUT", "/api/onboarding/admin/steps/:id", async (req, res, params, body) =
 
 /* DELETE /api/onboarding/admin/steps/:id — supprimer une étape */
 route("DELETE", "/api/onboarding/admin/steps/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   await db.prepare(`DELETE FROM onboarding_steps WHERE id=?`).run(parseInt(params.id));
   sendJSON(res, 200, { ok: true });
@@ -6482,7 +6485,7 @@ route("DELETE", "/api/onboarding/admin/steps/:id", async (req, res, params) => {
 
 /* GET /api/onboarding/admin/stats — statistiques globales */
 route("GET", "/api/onboarding/admin/stats", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const total_started   = db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut != 'en_cours'`).get()?.n || 0;
   const total_finished  = db.prepare(`SELECT COUNT(*) n FROM onboarding_progress WHERE statut = 'termine'`).get()?.n || 0;
@@ -6499,14 +6502,14 @@ route("GET", "/api/onboarding/admin/stats", async (req, res) => {
    ════════════════════════════════════════════════════════════════ */
 
 route("GET", "/api/oz/settings", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 200, {});
   const s = await db.prepare('SELECT * FROM oz_settings WHERE user_id=?').get(user.id);
   sendJSON(res, 200, s || {});
 });
 
 route("PUT", "/api/oz/settings", async (req, res, _p, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Non connecté' });
   const { avatar, theme, size, animations, voice_enabled, language, pos_x, pos_y } = body;
   db.prepare(`INSERT INTO oz_settings (user_id,avatar,theme,size,animations,voice_enabled,language,pos_x,pos_y,updated_at)
@@ -6521,7 +6524,7 @@ route("PUT", "/api/oz/settings", async (req, res, _p, body) => {
 });
 
 route("POST", "/api/oz/audit", async (req, res, _p, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const { action, module, params, result } = body;
   db.prepare('INSERT INTO oz_audit (user_id,action,module,params,result) VALUES (?,?,?,?,?)')
     .run(user?.id||null, action||'', module||'', params||null, result||'ok');
@@ -6529,7 +6532,7 @@ route("POST", "/api/oz/audit", async (req, res, _p, body) => {
 });
 
 route("GET", "/api/oz/audit", async (req, res, _p, _b, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const limit = parseInt(query.limit)||100;
   const rows = await db.prepare(
@@ -6541,7 +6544,7 @@ route("GET", "/api/oz/audit", async (req, res, _p, _b, query) => {
 });
 
 route("GET", "/api/oz/stats", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const total_actions = db.prepare('SELECT COUNT(*) n FROM oz_audit').get()?.n || 0;
   const today         = db.prepare("SELECT COUNT(*) n FROM oz_audit WHERE date(created_at)=date('now')").get()?.n || 0;
@@ -6557,14 +6560,14 @@ route("GET", "/api/oz/knowledge", async (req, res) => {
 });
 
 route("GET", "/api/oz/knowledge/all", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const rows = await db.prepare('SELECT * FROM oz_knowledge ORDER BY actif DESC, id').all();
   sendJSON(res, 200, rows);
 });
 
 route("POST", "/api/oz/knowledge", async (req, res, _p, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { topic, content, tags } = body;
   if (!topic || !content) return sendJSON(res, 400, { error: 'topic + content requis' });
@@ -6573,7 +6576,7 @@ route("POST", "/api/oz/knowledge", async (req, res, _p, body) => {
 });
 
 route("PUT", "/api/oz/knowledge/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { topic, content, tags, actif } = body;
   db.prepare(`UPDATE oz_knowledge SET topic=?,content=?,tags=?,actif=?,updated_at=datetime('now') WHERE id=?`)
@@ -6582,14 +6585,14 @@ route("PUT", "/api/oz/knowledge/:id", async (req, res, params, body) => {
 });
 
 route("DELETE", "/api/oz/knowledge/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   await db.prepare('UPDATE oz_knowledge SET actif=0 WHERE id=?').run(parseInt(params.id));
   sendJSON(res, 200, { ok: true });
 });
 
 /* ══ Notifications lors de la publication d'un événement ══ */
-function envoyerNotificationsEvenement(eventId, organisateurId, titre, cibleListeStr, partenairesIdsStr) {
+async function envoyerNotificationsEvenement(eventId, organisateurId, titre, cibleListeStr, partenairesIdsStr) {
   const notifExists = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='notifications'").get();
   if (!notifExists) return;
   const destinataires = new Set();
@@ -6616,7 +6619,7 @@ function envoyerNotificationsEvenement(eventId, organisateurId, titre, cibleList
 }
 
 /* ══ Gestion automatique des campagnes de recrutement (lazy) ══ */
-function autoGererRecrutement() {
+async function autoGererRecrutement() {
   try {
     const now = new Date().toISOString();
     // Expiration automatique à 2 mois
@@ -6670,7 +6673,7 @@ function autoGererRecrutement() {
 }
 
 /* ══ Auto-publication des événements programmés (lazy) ══ */
-function autoPublierProgrammes() {
+async function autoPublierProgrammes() {
   try {
     const now = new Date().toISOString();
     const dues = await db.prepare("SELECT id,organisateur_id,titre,cible_liste_ids,fc_partenaires_ids FROM events WHERE statut='brouillon_programme' AND programmed_at IS NOT NULL AND programmed_at <= ?").all(now);
@@ -6682,7 +6685,7 @@ function autoPublierProgrammes() {
 }
 
 /* ══ Gestion automatique des Dossiers QR Code Participants (lazy) ══ */
-function autoGererDossiersQR() {
+async function autoGererDossiersQR() {
   try {
     // 1. Notification 24h avant suppression (J-4 après date_fin = J+5 approche)
     const aNotifier = db.prepare(`
@@ -6725,7 +6728,7 @@ function autoGererDossiersQR() {
 
 /* ══ UPLOAD VIDÉO MP4 (handler binaire hors readBody) ══ */
 async function handleVideoUpload(req, res) {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
   const uploadsDir = path.join(__dirname, 'uploads');
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -6823,14 +6826,14 @@ async function handleRequest(req, res) {
 
     /* --- GET /api/cv — liste CVs de l'utilisateur connecté --- */
     if (req.method === "GET" && pathname === "/api/cv") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const cvs = await db.prepare(`SELECT id, numero, titre, theme, updated_at FROM cv_profiles WHERE user_id = ? ORDER BY numero`).all(me.id);
       return sendJSON(res, 200, cvs);
     }
 
     /* --- GET /api/cv/:id --- */
     if (req.method === "GET" && /^\/api\/cv\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const cv = await db.prepare(`SELECT * FROM cv_profiles WHERE id = ? AND user_id = ?`).get(id, me.id);
       if (!cv) return sendJSON(res, 404, { error: "CV introuvable" });
@@ -6841,7 +6844,7 @@ async function handleRequest(req, res) {
 
     /* --- POST /api/cv — créer ou mettre à jour un CV (upsert par numero) --- */
     if (req.method === "POST" && pathname === "/api/cv") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { numero = 1, titre = 'Mon CV', theme = 'bleu', data = {}, save_version = false } = body;
       if (![1, 2].includes(Number(numero))) return sendJSON(res, 400, { error: "numero doit être 1 ou 2" });
       const existing = await db.prepare(`SELECT id, data_json, versions_json FROM cv_profiles WHERE user_id = ? AND numero = ?`).get(me.id, numero);
@@ -6865,7 +6868,7 @@ async function handleRequest(req, res) {
 
     /* --- DELETE /api/cv/:id --- */
     if (req.method === "DELETE" && /^\/api\/cv\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       await db.prepare(`DELETE FROM cv_profiles WHERE id = ? AND user_id = ?`).run(id, me.id);
       return sendJSON(res, 200, { deleted: true });
@@ -6873,14 +6876,14 @@ async function handleRequest(req, res) {
 
     /* --- GET /api/lettres --- */
     if (req.method === "GET" && pathname === "/api/lettres") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const lettres = await db.prepare(`SELECT id, numero, titre, updated_at FROM lettres_motivation WHERE user_id = ? ORDER BY numero`).all(me.id);
       return sendJSON(res, 200, lettres);
     }
 
     /* --- GET /api/lettres/:id --- */
     if (req.method === "GET" && /^\/api\/lettres\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const l = await db.prepare(`SELECT * FROM lettres_motivation WHERE id = ? AND user_id = ?`).get(id, me.id);
       if (!l) return sendJSON(res, 404, { error: "Lettre introuvable" });
@@ -6890,7 +6893,7 @@ async function handleRequest(req, res) {
 
     /* --- POST /api/lettres --- */
     if (req.method === "POST" && pathname === "/api/lettres") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { numero = 1, titre = 'Ma lettre', data = {} } = body;
       if (![1, 2].includes(Number(numero))) return sendJSON(res, 400, { error: "numero doit être 1 ou 2" });
       const existing = await db.prepare(`SELECT id FROM lettres_motivation WHERE user_id = ? AND numero = ?`).get(me.id, numero);
@@ -6907,7 +6910,7 @@ async function handleRequest(req, res) {
 
     /* --- DELETE /api/lettres/:id --- */
     if (req.method === "DELETE" && /^\/api\/lettres\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       await db.prepare(`DELETE FROM lettres_motivation WHERE id = ? AND user_id = ?`).run(id, me.id);
       return sendJSON(res, 200, { deleted: true });
@@ -6915,7 +6918,7 @@ async function handleRequest(req, res) {
 
     /* --- GET /api/candidatures/mes — candidatures du candidat connecté --- */
     if (req.method === "GET" && pathname === "/api/candidatures/mes") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       try {
         const rows = await db.prepare(`
           SELECT oc.id, oc.offre_id, oc.candidat_id, oc.message, oc.statut, oc.created_at,
@@ -6939,7 +6942,7 @@ async function handleRequest(req, res) {
 
     /* --- GET /api/candidatures/:id/historique --- */
     if (req.method === "GET" && /^\/api\/candidatures\/\d+\/historique$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const cand = await db.prepare(`SELECT * FROM offres_candidatures WHERE id = ?`).get(id);
       if (!cand || (cand.candidat_id !== me.id && me.role !== 'admin')) {
@@ -6952,7 +6955,7 @@ async function handleRequest(req, res) {
 
     /* --- PATCH /api/candidatures/:id/statut — changer le statut (recruteur ou admin) --- */
     if (req.method === "PATCH" && /^\/api\/candidatures\/\d+\/statut$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const cand = await db.prepare(`SELECT * FROM offres_candidatures WHERE id=?`).get(id);
       if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable" });
@@ -6973,7 +6976,7 @@ async function handleRequest(req, res) {
 
     /* --- PATCH /api/candidatures/:id/recruteur — notes & évaluation recruteur --- */
     if (req.method === "PATCH" && /^\/api\/candidatures\/\d+\/recruteur$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const cand = await db.prepare(`SELECT * FROM offres_candidatures WHERE id=?`).get(id);
       if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable" });
@@ -6987,7 +6990,7 @@ async function handleRequest(req, res) {
 
     /* --- GET /api/offres/:id/candidatures — candidatures d'une offre (recruteur) --- */
     if (req.method === "GET" && /^\/api\/offres\/\d+\/candidatures$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const offreId = parseInt(pathname.split('/')[3]);
       const offre = await db.prepare(`SELECT * FROM offres WHERE id=?`).get(offreId);
       if (!offre) return sendJSON(res, 404, { error: "Offre introuvable" });
@@ -7009,7 +7012,7 @@ async function handleRequest(req, res) {
 
     /* --- POST /api/offres/:id/postuler — postuler avec CV+LM --- */
     if (req.method === "POST" && /^\/api\/offres\/\d+\/postuler$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const offreId = parseInt(pathname.split('/')[3]);
       const { message, cv_profile_id, lettre_id } = body;
       const existing = await db.prepare(`SELECT id FROM offres_candidatures WHERE offre_id=? AND candidat_id=?`).get(offreId, me.id);
@@ -7042,7 +7045,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/agenda/events — événements de l'utilisateur (avec range dates) */
     if (req.method === "GET" && pathname === "/api/agenda/events") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const p = new URLSearchParams(parsed.search || "");
       const from = p.get("from") || new Date(Date.now() - 30*24*3600000).toISOString().slice(0,10);
       const to   = p.get("to")   || new Date(Date.now() + 60*24*3600000).toISOString().slice(0,10);
@@ -7057,7 +7060,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/agenda/events */
     if (req.method === "POST" && pathname === "/api/agenda/events") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { titre, description, date_debut, date_fin, lieu, lieu_type, couleur, notes_privees, all_day, rdv_id, meeting_id } = body;
       if (!titre || !date_debut || !date_fin) return sendJSON(res, 400, { error: "Champs requis manquants" });
       const r = db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,notes_privees,all_day,rdv_id,meeting_id)
@@ -7083,7 +7086,7 @@ async function handleRequest(req, res) {
 
     /* PUT /api/agenda/events/:id */
     if (req.method === "PUT" && /^\/api\/agenda\/events\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const evId = parseInt(pathname.split('/')[4]);
       const ev = await db.prepare(`SELECT * FROM agenda_events WHERE id=? AND user_id=?`).get(evId, me.id);
       if (!ev) return sendJSON(res, 404, { error: "Événement introuvable" });
@@ -7095,7 +7098,7 @@ async function handleRequest(req, res) {
 
     /* DELETE /api/agenda/events/:id */
     if (req.method === "DELETE" && /^\/api\/agenda\/events\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const evId = parseInt(pathname.split('/')[4]);
       await db.prepare(`DELETE FROM agenda_events WHERE id=? AND user_id=?`).run(evId, me.id);
       await db.prepare(`DELETE FROM agenda_reminders WHERE event_id=? AND user_id=?`).run(evId, me.id);
@@ -7104,7 +7107,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/agenda/availability — vérifier dispo d'un user sur un créneau */
     if (req.method === "GET" && pathname === "/api/agenda/availability") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const p = new URLSearchParams(parsed.search || "");
       const userId = parseInt(p.get("user_id") || me.id);
       const debut  = p.get("debut");
@@ -7138,7 +7141,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/rdv — mes RDV */
     if (req.method === "GET" && pathname === "/api/rdv") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rdvs = await db.prepare(`
         SELECT r.*,
           up.prenom AS proposeur_prenom, up.nom AS proposeur_nom, up.photo_url AS proposeur_photo,
@@ -7154,7 +7157,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/rdv — proposer un RDV (multi-participants, max 10 au total) */
     if (req.method === "POST" && pathname === "/api/rdv") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { destinataire_id, titre, description, date_proposee, heure_debut, heure_fin, duree_minutes,
               lieu, lieu_type, lien_visio, participants_json } = body;
       if (!titre || !date_proposee || !heure_debut || !heure_fin)
@@ -7198,7 +7201,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/rdv/:id/respond — accepter/refuser/contre-proposer */
     if (req.method === "PATCH" && /^\/api\/rdv\/\d+\/respond$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rdvId = parseInt(pathname.split('/')[3]);
       const rdv = await db.prepare(`SELECT * FROM rdv_proposals WHERE id=?`).get(rdvId);
       if (!rdv) return sendJSON(res, 404, { error: "RDV introuvable" });
@@ -7298,7 +7301,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/rdv/:id — détail d'un RDV */
     if (req.method === "GET" && /^\/api\/rdv\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rdvId = parseInt(pathname.split('/')[3]);
       const rdv = await db.prepare(`SELECT r.*,
         up.prenom AS proposeur_prenom, up.nom AS proposeur_nom,
@@ -7312,7 +7315,7 @@ async function handleRequest(req, res) {
       let participantsInfo = [];
       try {
         const ids = JSON.parse(rdv.participants_json || '[]');
-        participantsInfo = ids.map(id => {
+        participantsInfo = ids.map(async id => {
           const u = await db.prepare(`SELECT id, prenom, nom, photo_url FROM users WHERE id=?`).get(id);
           return u || { id };
         });
@@ -7322,7 +7325,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/rdv/:id/convert-to-event — convertir un RDV en Événement */
     if (req.method === "POST" && /^\/api\/rdv\/\d+\/convert-to-event$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rdvId = parseInt(pathname.split('/')[3]);
       const rdv = await db.prepare(`SELECT * FROM rdv_proposals WHERE id=?`).get(rdvId);
       if (!rdv) return sendJSON(res, 404, { error: "RDV introuvable" });
@@ -7350,7 +7353,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/meetings — créer une salle de réunion directe */
     if (req.method === "POST" && pathname === "/api/meetings") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { titre, destinataire_id, rdv_id } = body;
       const roomId = genId(12);
       const tokenHost  = genId(16);
@@ -7383,7 +7386,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/meetings/:id/start — démarrer la réunion */
     if (req.method === "PATCH" && /^\/api\/meetings\/\d+\/start$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const meetId = parseInt(pathname.split('/')[3]);
       db.prepare(`UPDATE meetings SET statut='actif', started_at=datetime('now') WHERE id=? AND host_id=?`).run(meetId, me.id);
       return sendJSON(res, 200, { started: true });
@@ -7391,7 +7394,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/meetings/:id/end — terminer la réunion */
     if (req.method === "PATCH" && /^\/api\/meetings\/\d+\/end$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const meetId = parseInt(pathname.split('/')[3]);
       const m = await db.prepare(`SELECT * FROM meetings WHERE id=?`).get(meetId);
       if (!m) return sendJSON(res, 404, { error: "Salle introuvable" });
@@ -7453,7 +7456,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/agenda/reminders — check & envoyer rappels dus */
     if (req.method === "GET" && pathname === "/api/agenda/reminders") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const now = new Date().toISOString();
       const dues = await db.prepare(`
         SELECT r.*, e.titre, e.date_debut FROM agenda_reminders r
@@ -7491,7 +7494,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/projets — liste selon rôle */
     if (req.method === 'GET' && pathname === '/api/projets') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const q = parsed.query;
       let rows;
       if (me.role === 'administrateur' || me.role === 'collectivite') {
@@ -7508,7 +7511,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/projets — créer */
     if (req.method === 'POST' && pathname === '/api/projets') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const { titre, description, type, categorie, pays, region, ville, budget_estime, date_debut, date_fin, tags } = body;
       if (!titre) return sendJSON(res, 400, { error: 'Titre obligatoire' });
       const r = db.prepare(`INSERT INTO projets (titre,description,type,categorie,pays,region,ville,budget_estime,date_debut,date_fin,tags,createur_id,statut) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'brouillon')`)
@@ -7518,7 +7521,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/projets/stats — stats cockpit */
     if (req.method === 'GET' && pathname === '/api/projets/stats') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       let stats;
       if (me.role === 'administrateur' || me.role === 'collectivite') {
         const total = db.prepare(`SELECT COUNT(*) AS n FROM projets`).get().n;
@@ -7538,7 +7541,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/projets/:id */
     if (req.method === 'GET' && /^\/api\/projets\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const id = parseInt(pathname.split('/')[3]);
       const p = await db.prepare(`SELECT p.*, u.nom AS createur_nom FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.id=?`).get(id);
       if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
@@ -7549,7 +7552,7 @@ async function handleRequest(req, res) {
 
     /* PUT /api/projets/:id — modifier */
     if (req.method === 'PUT' && /^\/api\/projets\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const id = parseInt(pathname.split('/')[3]);
       const p = await db.prepare(`SELECT * FROM projets WHERE id=?`).get(id);
       if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
@@ -7562,7 +7565,7 @@ async function handleRequest(req, res) {
 
     /* PUT /api/projets/:id/statut — transition lifecycle */
     if (req.method === 'PUT' && /^\/api\/projets\/\d+\/statut$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const id = parseInt(pathname.split('/')[3]);
       const p = await db.prepare(`SELECT * FROM projets WHERE id=?`).get(id);
       if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
@@ -7586,7 +7589,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/projets/:id/commentaires */
     if (req.method === 'POST' && /^\/api\/projets\/\d+\/commentaires$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const id = parseInt(pathname.split('/')[3]);
       const { contenu } = body;
       if (!contenu) return sendJSON(res, 400, { error: 'Contenu obligatoire' });
@@ -7596,7 +7599,7 @@ async function handleRequest(req, res) {
 
     /* DELETE /api/projets/:id */
     if (req.method === 'DELETE' && /^\/api\/projets\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const id = parseInt(pathname.split('/')[3]);
       const p = await db.prepare(`SELECT * FROM projets WHERE id=?`).get(id);
       if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
@@ -7613,7 +7616,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/listes-diffusion ── */
     if (req.method === 'GET' && pathname === '/api/listes-diffusion') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const listes = db.prepare(`
         SELECT l.*, COUNT(c.id) AS nb_contacts
         FROM listes_diffusion l
@@ -7626,7 +7629,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/listes-diffusion — créer ── */
     if (req.method === 'POST' && pathname === '/api/listes-diffusion') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { nom, description, couleur, icone, notes } = body;
       if (!nom?.trim()) return sendJSON(res, 400, { error: 'Nom requis.' });
       const ts = new Date().toISOString();
@@ -7638,7 +7641,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT /api/listes-diffusion/:id — modifier ── */
     if (req.method === 'PUT' && /^\/api\/listes-diffusion\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const lid = parseInt(pathname.split('/')[3]);
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
@@ -7650,7 +7653,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/listes-diffusion/:id/duplicate — dupliquer ── */
     if (req.method === 'POST' && /^\/api\/listes-diffusion\/\d+\/duplicate$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const lid = parseInt(pathname.split('/')[3]);
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
@@ -7667,7 +7670,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/listes-diffusion/:id/export — export CSV ── */
     if (req.method === 'GET' && /^\/api\/listes-diffusion\/\d+\/export$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const lid = parseInt(pathname.split('/')[3]);
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
@@ -7689,7 +7692,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT /api/listes-diffusion/reorder — réordonner ── */
     if (req.method === 'PUT' && pathname === '/api/listes-diffusion/reorder') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { ordre } = body; // [{id, ordre}]
       if (!Array.isArray(ordre)) return sendJSON(res, 400, { error: 'ordre[] requis.' });
       for (const { id, ordre: o } of ordre) {
@@ -7700,7 +7703,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/listes-diffusion/:id/contacts ── */
     if (req.method === 'GET' && /^\/api\/listes-diffusion\/\d+\/contacts$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const lid = parseInt(pathname.split('/')[3]);
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
@@ -7716,7 +7719,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/listes-diffusion/:id/contacts — ajouter ── */
     if (req.method === 'POST' && /^\/api\/listes-diffusion\/\d+\/contacts$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const lid = parseInt(pathname.split('/')[3]);
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
@@ -7748,7 +7751,7 @@ async function handleRequest(req, res) {
 
     /* ── DELETE /api/listes-diffusion/:id/contacts/:cid ── */
     if (req.method === 'DELETE' && /^\/api\/listes-diffusion\/\d+\/contacts\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const parts = pathname.split('/');
       const lid = parseInt(parts[3]), cid = parseInt(parts[5]);
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
@@ -7759,7 +7762,7 @@ async function handleRequest(req, res) {
 
     /* ── DELETE /api/listes-diffusion/:id ── */
     if (req.method === 'DELETE' && /^\/api\/listes-diffusion\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const lid = parseInt(pathname.split('/')[3]);
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
@@ -7769,7 +7772,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/listes-diffusion/check-user — listes contenant un user ── */
     if (req.method === 'POST' && pathname === '/api/listes-diffusion/check-user') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { user_id } = body;
       const ids = await db.prepare(`SELECT c.liste_id FROM listes_diffusion_contacts c JOIN listes_diffusion l ON l.id=c.liste_id WHERE l.proprietaire_id=? AND c.user_id=?`).all(me.id, user_id).map(r=>r.liste_id);
       return sendJSON(res, 200, { liste_ids: ids });
@@ -7804,7 +7807,7 @@ async function handleRequest(req, res) {
       if (q.organisateur_id) { sql += ' AND e.organisateur_id=?'; args.push(q.organisateur_id); }
       if (q.all === '1') { sql = sql.replace("AND e.statut IN ('publie','ferme')", ''); }
       if (q.mine === '1') {
-        const me = getCurrentUser(req);
+        const me = await getCurrentUser(req);
         if (me) { sql += ' AND e.organisateur_id=?'; args.push(me.id); sql = sql.replace("AND e.statut IN ('publie','ferme')", ''); }
       }
       // Par défaut : exclure du listing public les événements terminés ou expirés (sauf si ?mode=archive ou ?mine=1)
@@ -7818,7 +7821,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/events/stats — admin stats globales ── */
     if (req.method === 'GET' && pathname === '/api/events/stats') {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé.' });
       const total_events = db.prepare("SELECT COUNT(*) n FROM events").get().n;
       const publies = db.prepare("SELECT COUNT(*) n FROM events WHERE statut='publie'").get().n;
@@ -7834,7 +7837,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/events — créer un événement ── */
     if (req.method === 'POST' && pathname === '/api/events') {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || !['initiative','administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé aux initiatives.' });
       const {
         titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie,
@@ -7901,7 +7904,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT /api/events/:id ── */
     if (req.method === 'PUT' && /^\/api\/events\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/')[3]);
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
@@ -7969,7 +7972,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/events/:id/ticket-types ── */
     if (req.method === 'POST' && /^\/api\/events\/\d+\/ticket-types$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/')[3]);
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
@@ -7983,7 +7986,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/events/:id/buy — achat billet ── */
     if (req.method === 'POST' && /^\/api\/events\/\d+\/buy$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/')[3]);
       const { ticket_type_id } = body;
       if (!ticket_type_id) return sendJSON(res, 400, { error: 'ticket_type_id requis.' });
@@ -8036,7 +8039,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/tickets/mes — mes billets ── */
     if (req.method === 'GET' && pathname === '/api/tickets/mes') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const tickets = await db.prepare(`SELECT t.*, e.titre AS event_titre, e.date_debut, e.ville, e.pays, e.image_b64,
         tt.nom AS type_nom, tt.type AS type_cat
         FROM tickets t JOIN events e ON e.id=t.event_id JOIN ticket_types tt ON tt.id=t.ticket_type_id
@@ -8046,7 +8049,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/tickets/:id — détail + QR ── */
     if (req.method === 'GET' && /^\/api\/tickets\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const tid = parseInt(pathname.split('/')[3]);
       const t = await db.prepare(`SELECT t.*, e.titre AS event_titre, e.date_debut, e.date_fin, e.ville, e.pays, e.adresse, u.nom AS user_nom, tt.nom AS type_nom, tt.type AS type_cat
         FROM tickets t JOIN events e ON e.id=t.event_id JOIN ticket_types tt ON tt.id=t.ticket_type_id JOIN users u ON u.id=t.user_id WHERE t.id=?`).get(tid);
@@ -8059,7 +8062,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/events/:id/attendees ── */
     if (req.method === 'GET' && /^\/api\/events\/\d+\/attendees$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/')[3]);
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
@@ -8072,7 +8075,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/events/:id/checkins ── */
     if (req.method === 'GET' && /^\/api\/events\/\d+\/checkins$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/')[3]);
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
@@ -8087,7 +8090,7 @@ async function handleRequest(req, res) {
     /* ── POST /api/events/:id/view — incrémenter compteur de vues ── */
     if (req.method === 'POST' && /^\/api\/events\/\d+\/view$/.test(pathname)) {
       const eid = parseInt(pathname.split('/')[3]);
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       db.prepare(`UPDATE events SET vues_total=COALESCE(vues_total,0)+1 WHERE id=?`).run(eid);
       if (!me) db.prepare(`UPDATE events SET vues_uniques=COALESCE(vues_uniques,0)+1 WHERE id=?`).run(eid);
       return sendJSON(res, 200, { ok: true });
@@ -8095,7 +8098,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/events/:id/observations — tableau de bord analytique ── */
     if (req.method === 'GET' && /^\/api\/events\/\d+\/observations$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/')[3]);
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
@@ -8257,7 +8260,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/events/:id/inscription/status ── */
     if (req.method === 'GET' && /^\/api\/events\/\d+\/inscription\/status$/.test(pathname)) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       const eid = parseInt(pathname.split('/')[3]);
       const daId = me ? await db.prepare(`SELECT da_id FROM users WHERE id=?`).get(me.id)?.da_id : null;
       if (!daId) return sendJSON(res, 200, { inscrit: false });
@@ -8288,7 +8291,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/events/:id/qr-participants — Dossier QR Code Participants ── */
     if (req.method === 'GET' && /^\/api\/events\/\d+\/qr-participants$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/')[3]);
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
@@ -8331,7 +8334,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/scanner/validate — valider QR code (billets payants + inscriptions DA) ── */
     if (req.method === 'POST' && pathname === '/api/scanner/validate') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       if (!['initiative','administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Rôle non autorisé à scanner.' });
       const { qr_payload } = body;
       if (!qr_payload) return sendJSON(res, 400, { error: 'qr_payload manquant.' });
@@ -8411,7 +8414,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/wallet/balance — solde wallet initiative ── */
     if (req.method === 'GET' && pathname === '/api/wallet/balance') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const user = await db.prepare(`SELECT wallet_balance FROM users WHERE id=?`).get(me.id);
       const historique = await db.prepare(`SELECT wt.*, e.titre AS event_titre FROM wallet_transactions wt LEFT JOIN events e ON e.id=wt.event_id WHERE wt.beneficiaire_id=? AND wt.type='organizer_credit' ORDER BY wt.timestamp DESC LIMIT 50`).all(me.id);
       return sendJSON(res, 200, { balance: user?.wallet_balance || 0, commission_rate: 0.05, historique });
@@ -8419,7 +8422,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/admin/wallet — wallet plateforme (admin only) ── */
     if (req.method === 'GET' && pathname === '/api/admin/wallet') {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
       const pw = await db.prepare(`SELECT * FROM platform_wallet WHERE id=1`).get();
       const par_event = db.prepare(`SELECT e.titre, e.pays, COUNT(wt.id) nb_transactions, COALESCE(SUM(wt.montant),0) total_fees FROM wallet_transactions wt JOIN events e ON e.id=wt.event_id WHERE wt.type='platform_fee' GROUP BY wt.event_id ORDER BY total_fees DESC LIMIT 20`).all();
@@ -8442,7 +8445,7 @@ async function handleRequest(req, res) {
         FROM recrutement_campagnes c LEFT JOIN users u ON u.id=c.recruteur_id WHERE 1=1`;
       const args = [];
       if (q.mine === '1') {
-        const me = getCurrentUser(req);
+        const me = await getCurrentUser(req);
         if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
         sql += ' AND c.recruteur_id=?'; args.push(me.id);
       } else {
@@ -8456,7 +8459,7 @@ async function handleRequest(req, res) {
       sql += ' ORDER BY en_promotion DESC, c.publie_at DESC LIMIT 60';
       const campagnes = await db.prepare(sql).all(...args);
       // Quota annuel du user connecté
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       let quota = null;
       if (me && ['initiative','collectivite','administrateur'].includes(me.role)) {
         const annee = new Date().getFullYear();
@@ -8468,7 +8471,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/recrutement — créer une campagne ── */
     if (req.method === 'POST' && pathname === '/api/recrutement') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       if (!['initiative','collectivite','administrateur'].includes(me.role))
         return sendJSON(res, 403, { error: 'Réservé aux Comptes Initiatives et Étatiques.' });
       // Vérifier quota annuel
@@ -8506,7 +8509,7 @@ async function handleRequest(req, res) {
         FROM recrutement_campagnes c LEFT JOIN users u ON u.id=c.recruteur_id WHERE c.id=?`).get(cid);
       if (!c) return sendJSON(res, 404, { error: 'Campagne introuvable.' });
       // Candidature et interactions du visiteur connecté
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       const ma_candidature = me ? await db.prepare(`SELECT statut,created_at FROM recrutement_candidatures WHERE campagne_id=? AND candidat_id=?`).get(cid, me.id) : null;
       const est_favori = me ? !!await db.prepare(`SELECT id FROM recrutement_favoris WHERE campagne_id=? AND user_id=?`).get(cid, me.id) : false;
       const ma_reaction = me ? await db.prepare(`SELECT type FROM recrutement_reactions WHERE campagne_id=? AND user_id=?`).get(cid, me.id)?.type : null;
@@ -8515,7 +8518,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT /api/recrutement/:id — modifier ── */
     if (req.method === 'PUT' && /^\/api\/recrutement\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const cid = parseInt(pathname.split('/')[3]);
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c) return sendJSON(res, 404, { error: 'Introuvable.' });
@@ -8558,7 +8561,7 @@ async function handleRequest(req, res) {
 
     /* ── DELETE /api/recrutement/:id — archiver ── */
     if (req.method === 'DELETE' && /^\/api\/recrutement\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const cid = parseInt(pathname.split('/')[3]);
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c) return sendJSON(res, 404, { error: 'Introuvable.' });
@@ -8570,7 +8573,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/recrutement/:id/candidature — postuler ── */
     if (req.method === 'POST' && /^\/api\/recrutement\/\d+\/candidature$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const cid = parseInt(pathname.split('/')[3]);
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c) return sendJSON(res, 404, { error: 'Campagne introuvable.' });
@@ -8594,7 +8597,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/recrutement/:id/candidatures — liste (recruteur) ── */
     if (req.method === 'GET' && /^\/api\/recrutement\/\d+\/candidatures$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const cid = parseInt(pathname.split('/')[3]);
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c) return sendJSON(res, 404, { error: 'Introuvable.' });
@@ -8607,7 +8610,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT /api/recrutement/:id/candidatures/:cand_id — changer statut ── */
     if (req.method === 'PUT' && /^\/api\/recrutement\/\d+\/candidatures\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const parts = pathname.split('/');
       const cid = parseInt(parts[3]); const candId = parseInt(parts[5]);
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
@@ -8626,7 +8629,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/recrutement/:id/stats — tableau de bord ── */
     if (req.method === 'GET' && /^\/api\/recrutement\/\d+\/stats$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const cid = parseInt(pathname.split('/')[3]);
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c || (c.recruteur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
@@ -8644,7 +8647,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/recrutement/:id/reaction — toggle réaction ── */
     if (req.method === 'POST' && /^\/api\/recrutement\/\d+\/reaction$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const cid = parseInt(pathname.split('/')[3]);
       const { type = 'jaime' } = body;
       const existing = await db.prepare(`SELECT id, type FROM recrutement_reactions WHERE campagne_id=? AND user_id=?`).get(cid, me.id);
@@ -8687,7 +8690,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/recrutement/:id/commentaires ── */
     if (req.method === 'POST' && /^\/api\/recrutement\/\d+\/commentaires$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const cid = parseInt(pathname.split('/')[3]);
       const { contenu, parent_id } = body;
       if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis.' });
@@ -8699,7 +8702,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/recrutement/:id/favori — toggle ── */
     if (req.method === 'POST' && /^\/api\/recrutement\/\d+\/favori$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const cid = parseInt(pathname.split('/')[3]);
       const existing = await db.prepare(`SELECT id FROM recrutement_favoris WHERE campagne_id=? AND user_id=?`).get(cid, me.id);
       let action;
@@ -8717,7 +8720,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/recrutement/:id/republier ── */
     if (req.method === 'POST' && /^\/api\/recrutement\/\d+\/republier$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const cid = parseInt(pathname.split('/')[3]);
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c) return sendJSON(res, 404, { error: 'Campagne introuvable.' });
@@ -8742,7 +8745,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/recrutement/:id/signaler ── */
     if (req.method === 'POST' && /^\/api\/recrutement\/\d+\/signaler$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       return sendJSON(res, 200, { message: 'Signalement reçu. Notre équipe examinera cette campagne.' });
     }
 
@@ -8755,7 +8758,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/profil-emploi ── */
     if (req.method === 'GET' && pathname === '/api/profil-emploi') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       let profil = await db.prepare(`SELECT * FROM profil_emploi WHERE user_id=?`).get(me.id);
       if (!profil) profil = { user_id: me.id, situation: 'en_recherche', types_opportunites: '[]', secteurs: '[]', competences: '[]', langues: '[]' };
       const experiences = await db.prepare(`SELECT * FROM profil_emploi_experiences WHERE user_id=? ORDER BY ordre, date_debut DESC`).all(me.id);
@@ -8767,7 +8770,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT /api/profil-emploi ── */
     if (req.method === 'PUT' && pathname === '/api/profil-emploi') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { situation, types_opportunites, secteurs, metier, competences, experience, niveau_etudes, langues, mobilite, teletravail, salaire_min, salaire_max, devise, date_disponibilite, disponible_pour_travailler, suspendre_offres, lettre_contenu, cv_pdf, lettre_pdf, portfolio_pdf } = body;
       const existing = await db.prepare(`SELECT id FROM profil_emploi WHERE user_id=?`).get(me.id);
       if (existing) {
@@ -8786,7 +8789,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/profil-emploi/experiences ── */
     if (req.method === 'POST' && pathname === '/api/profil-emploi/experiences') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { poste, entreprise, ville, pays, date_debut, date_fin, en_cours, description, realisations, ordre } = body;
       if (!poste) return sendJSON(res, 400, { error: 'Poste requis.' });
       const r = db.prepare(`INSERT INTO profil_emploi_experiences(user_id,poste,entreprise,ville,pays,date_debut,date_fin,en_cours,description,realisations,ordre) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
@@ -8796,7 +8799,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT /api/profil-emploi/experiences/:id ── */
     if (req.method === 'PUT' && /^\/api\/profil-emploi\/experiences\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/').pop());
       const { poste, entreprise, ville, pays, date_debut, date_fin, en_cours, description, realisations, ordre } = body;
       await db.prepare(`UPDATE profil_emploi_experiences SET poste=?,entreprise=?,ville=?,pays=?,date_debut=?,date_fin=?,en_cours=?,description=?,realisations=?,ordre=? WHERE id=? AND user_id=?`)
@@ -8806,7 +8809,7 @@ async function handleRequest(req, res) {
 
     /* ── DELETE /api/profil-emploi/experiences/:id ── */
     if (req.method === 'DELETE' && /^\/api\/profil-emploi\/experiences\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/').pop());
       await db.prepare(`DELETE FROM profil_emploi_experiences WHERE id=? AND user_id=?`).run(eid, me.id);
       return sendJSON(res, 200, { message: 'Supprimé.' });
@@ -8814,7 +8817,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/profil-emploi/formations ── */
     if (req.method === 'POST' && pathname === '/api/profil-emploi/formations') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { diplome, etablissement, ville, pays, date_obtention, description, ordre } = body;
       if (!diplome) return sendJSON(res, 400, { error: 'Diplôme requis.' });
       const r = db.prepare(`INSERT INTO profil_emploi_formations(user_id,diplome,etablissement,ville,pays,date_obtention,description,ordre) VALUES(?,?,?,?,?,?,?,?)`)
@@ -8824,7 +8827,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT /api/profil-emploi/formations/:id ── */
     if (req.method === 'PUT' && /^\/api\/profil-emploi\/formations\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const fid = parseInt(pathname.split('/').pop());
       const { diplome, etablissement, ville, pays, date_obtention, description, ordre } = body;
       await db.prepare(`UPDATE profil_emploi_formations SET diplome=?,etablissement=?,ville=?,pays=?,date_obtention=?,description=?,ordre=? WHERE id=? AND user_id=?`)
@@ -8834,7 +8837,7 @@ async function handleRequest(req, res) {
 
     /* ── DELETE /api/profil-emploi/formations/:id ── */
     if (req.method === 'DELETE' && /^\/api\/profil-emploi\/formations\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const fid = parseInt(pathname.split('/').pop());
       await db.prepare(`DELETE FROM profil_emploi_formations WHERE id=? AND user_id=?`).run(fid, me.id);
       return sendJSON(res, 200, { message: 'Supprimé.' });
@@ -8842,7 +8845,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/profil-emploi/offres-matchees ── */
     if (req.method === 'GET' && pathname === '/api/profil-emploi/offres-matchees') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const profil = await db.prepare(`SELECT * FROM profil_emploi WHERE user_id=?`).get(me.id);
       // Récupère les campagnes actives
       let camps = db.prepare(`SELECT c.*, u.nom AS recruteur_nom, u.photo_url AS recruteur_photo, u.da_id AS recruteur_da_id,
@@ -8874,7 +8877,7 @@ async function handleRequest(req, res) {
     /* ── GET /api/sondages ── */
     if (req.method === 'GET' && (pathname === '/api/sondages' || pathname.startsWith('/api/sondages?'))) {
       const mine = q.mine === '1';
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       let sql = `SELECT s.*, u.nom AS createur_nom, u.photo_url AS createur_photo, u.da_id AS createur_da_id,
         (SELECT COUNT(*) FROM sondage_questions sq WHERE sq.sondage_id=s.id) AS nb_questions
         FROM sondages s LEFT JOIN users u ON u.id=s.createur_id WHERE 1=1`;
@@ -8896,7 +8899,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/sondages ── */
     if (req.method === 'POST' && pathname === '/api/sondages') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       if (!['initiative','collectivite','administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé aux Initiatives et Comptes Étatiques.' });
       const { titre, description, objectif, categorie, type = 'sondage', ville, pays, region, departement, rayon_publication, date_debut, date_cloture, anonyme, confidentialite, resultats_visibles, une_reponse_par_compte, modification_autorisee, cible_roles, photos_json, pdf_b64, pdf_nom, video_url, questions = [], statut = 'brouillon' } = body;
       if (!titre) return sendJSON(res, 400, { error: 'Titre requis.' });
@@ -8932,7 +8935,7 @@ async function handleRequest(req, res) {
         FROM sondages s LEFT JOIN users u ON u.id=s.createur_id WHERE s.id=?`).get(sid);
       if (!sondage) return sendJSON(res, 404, { error: 'Sondage introuvable.' });
       const questions = await db.prepare(`SELECT * FROM sondage_questions WHERE sondage_id=? ORDER BY ordre`).all(sid);
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       let ma_participation = null;
       if (me) {
         ma_participation = await db.prepare(`SELECT * FROM sondage_reponses WHERE sondage_id=? AND user_id=? LIMIT 1`).get(sid, me.id);
@@ -8946,7 +8949,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT /api/sondages/:id ── */
     if (req.method === 'PUT' && /^\/api\/sondages\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const sid = parseInt(pathname.split('/')[3]);
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
@@ -8958,7 +8961,7 @@ async function handleRequest(req, res) {
 
     /* ── DELETE /api/sondages/:id ── */
     if (req.method === 'DELETE' && /^\/api\/sondages\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const sid = parseInt(pathname.split('/')[3]);
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
@@ -8975,7 +8978,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/sondages/:id/participer ── */
     if (req.method === 'POST' && /^\/api\/sondages\/\d+\/participer$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const sid = parseInt(pathname.split('/')[3]);
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s || s.statut !== 'ouvert') return sendJSON(res, 400, { error: 'Ce sondage est fermé.' });
@@ -9000,7 +9003,7 @@ async function handleRequest(req, res) {
       const sid = parseInt(pathname.split('/')[3]);
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s) return sendJSON(res, 404, { error: 'Sondage introuvable.' });
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       const estCreateur = me && (me.id === s.createur_id || me.role === 'administrateur');
       if (s.resultats_visibles === 'createur' && !estCreateur) return sendJSON(res, 403, { error: 'Résultats réservés au créateur.' });
       if (s.resultats_visibles === 'apres_cloture' && s.statut === 'ouvert' && !estCreateur) return sendJSON(res, 403, { error: 'Résultats disponibles après clôture.' });
@@ -9015,7 +9018,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/sondages/:id/stats ── */
     if (req.method === 'GET' && /^\/api\/sondages\/\d+\/stats$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const sid = parseInt(pathname.split('/')[3]);
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
@@ -9028,7 +9031,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/sondages/:id/reaction ── */
     if (req.method === 'POST' && /^\/api\/sondages\/\d+\/reaction$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const sid = parseInt(pathname.split('/')[3]);
       const { type = 'jaime' } = body;
       const existing = await db.prepare(`SELECT id, type FROM sondage_reactions WHERE sondage_id=? AND user_id=?`).get(sid, me.id);
@@ -9054,7 +9057,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/sondages/:id/commentaires ── */
     if (req.method === 'POST' && /^\/api\/sondages\/\d+\/commentaires$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const sid = parseInt(pathname.split('/')[3]);
       const { contenu, parent_id } = body;
       if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis.' });
@@ -9066,7 +9069,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/sondages/:id/favori ── */
     if (req.method === 'POST' && /^\/api\/sondages\/\d+\/favori$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const sid = parseInt(pathname.split('/')[3]);
       const existing = await db.prepare(`SELECT id FROM sondage_favoris WHERE sondage_id=? AND user_id=?`).get(sid, me.id);
       let action;
@@ -9079,7 +9082,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/sondages/:id/export ── */
     if (req.method === 'GET' && /^\/api\/sondages\/\d+\/export$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const sid = parseInt(pathname.split('/')[3]);
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
@@ -9103,7 +9106,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/admin/events ── */
     if (req.method === 'GET' && pathname === '/api/admin/events') {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || !['administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé.' });
       const events = db.prepare(`SELECT e.*, u.nom AS organisateur_nom,
         (SELECT COUNT(*) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') nb_billets,
@@ -9114,7 +9117,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/events/:id/financier — tableau de bord financier d'un événement ── */
     if (req.method === 'GET' && /^\/api\/events\/\d+\/financier$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/')[3]);
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
@@ -9155,7 +9158,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/dashboard/financier — tableau de bord global billetterie (initiative) ── */
     if (req.method === 'GET' && pathname === '/api/dashboard/financier') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
 
       const events = db.prepare(`SELECT e.id, e.titre, e.date_debut, e.statut, e.pays, e.ville,
         (SELECT COUNT(*) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') AS nb_billets,
@@ -9187,7 +9190,7 @@ async function handleRequest(req, res) {
     ============================================================ */
 
     /* ── Calcul du Trust Score (fonction partagée) ── */
-    function computeTrustScore(userId) {
+    async function computeTrustScore(userId) {
       const user = db.prepare(`SELECT *,
         CAST((julianday('now') - julianday(COALESCE(created_at,datetime('now')))) / 30 AS INTEGER) AS months_old
         FROM users WHERE id=?`).get(userId);
@@ -9256,7 +9259,7 @@ async function handleRequest(req, res) {
     }
 
     /* ── Calcul Réactivité (fonction partagée) ── */
-    function computeReactivity(userId) {
+    async function computeReactivity(userId) {
       const msgs = db.prepare(`
         SELECT m.auteur_id, m.created_at, m.conversation_id
         FROM messages m
@@ -9337,7 +9340,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT /api/users/me/absence — activer mode absence ── */
     if (req.method === 'PUT' && pathname === '/api/users/me/absence') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { mode, fin, message } = body;
       const MODES = ['vacances','deplacement','indisponible','mission','conge','autre'];
       if (!MODES.includes(mode)) return sendJSON(res, 400, { error: 'Mode invalide.' });
@@ -9348,14 +9351,14 @@ async function handleRequest(req, res) {
 
     /* ── DELETE /api/users/me/absence — désactiver mode absence ── */
     if (req.method === 'DELETE' && pathname === '/api/users/me/absence') {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       await db.prepare(`DELETE FROM user_absence WHERE user_id=?`).run(me.id);
       return sendJSON(res, 200, { ok: true });
     }
 
     /* ── POST /api/users/:id/signaler — signaler compte inactif ── */
     if (req.method === 'POST' && /^\/api\/users\/\d+\/signaler$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const uid = parseInt(pathname.split('/')[3]);
       if (uid === me.id) return sendJSON(res, 400, { error: 'Vous ne pouvez pas vous signaler vous-même.' });
 
@@ -9392,7 +9395,7 @@ async function handleRequest(req, res) {
 
     /* ── POST /api/initiatives/:id/signaler — signaler une initiative ── */
     if (req.method === 'POST' && /^\/api\/initiatives\/\d+\/signaler$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const iid = parseInt(pathname.split('/')[3]);
       const init = await db.prepare(`SELECT * FROM initiatives WHERE id=?`).get(iid);
       if (!init) return sendJSON(res, 404, { error: 'Initiative introuvable.' });
@@ -9424,7 +9427,7 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/admin/signalements — tous les signalements (admin) ── */
     if (req.method === 'GET' && pathname === '/api/admin/signalements') {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || !['administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé.' });
       const comptes = await db.prepare(`
         SELECT ar.*, u1.nom AS reporter_nom, u2.nom AS reported_nom, u2.role AS reported_role
@@ -9447,7 +9450,7 @@ async function handleRequest(req, res) {
 
     /* ── PATCH /api/admin/signalements/compte/:id — modérer signalement compte ── */
     if (req.method === 'PATCH' && /^\/api\/admin\/signalements\/compte\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
       const rid = parseInt(pathname.split('/')[5]);
       const { action, note } = body;
@@ -9467,7 +9470,7 @@ async function handleRequest(req, res) {
 
     /* ── PATCH /api/admin/signalements/initiative/:id — modérer signalement initiative ── */
     if (req.method === 'PATCH' && /^\/api\/admin\/signalements\/initiative\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
       const rid = parseInt(pathname.split('/')[5]);
       const { action, note } = body;
@@ -9486,7 +9489,7 @@ async function handleRequest(req, res) {
 
     /* ── PATCH /api/admin/users/:id/verify — vérifier un compte (admin) ── */
     if (req.method === 'PATCH' && /^\/api\/admin\/users\/\d+\/verify$/.test(pathname)) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
       const uid = parseInt(pathname.split('/')[4]);
       const { identite_verifiee, documents_verifies, diplomes_verifies, entreprise_verifiee, is_verified } = body;
@@ -9508,7 +9511,7 @@ async function handleRequest(req, res) {
     ============================================================ */
 
     if (req.method === 'GET' && pathname === '/api/stats') {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       const p = q.period || 'all';   // today|week|month|year|all
       const paysFilt = q.pays || null;
       const contFilt = q.continent || null;
@@ -9698,7 +9701,7 @@ async function handleRequest(req, res) {
         .filter(w => w.length >= 3 && !STOPS.has(w) && !/^\d+$/.test(w));
 
       /* ── Requête DB — candidats ── */
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       const currentUserId = me?.id || 0;
 
       const candidates = db.prepare(`
@@ -9855,25 +9858,23 @@ async function handleRequest(req, res) {
     ============================================================ */
 
     /* Helper — récupère l'initiative de l'utilisateur connecté */
-    function getMyInit(userId) {
-      return await db.prepare(`SELECT * FROM initiatives WHERE owner_user_id=? ORDER BY created_at DESC LIMIT 1`).get(userId);
+    async function getMyInit(userId) { return await db.prepare(`SELECT * FROM initiatives WHERE owner_user_id=? ORDER BY created_at DESC LIMIT 1`).get(userId);
     }
     /* Helper — sécurité : initiative immatriculée uniquement */
-    function initImmat(id) {
-      return await db.prepare(`SELECT i.* FROM initiatives i WHERE i.id=? AND i.numero_immatriculation IS NOT NULL AND i.numero_immatriculation != ''`).get(id);
+    async function initImmat(id) { return await db.prepare(`SELECT i.* FROM initiatives i WHERE i.id=? AND i.numero_immatriculation IS NOT NULL AND i.numero_immatriculation != ''`).get(id);
     }
     /* Helper — accréditations d'une initiative */
-    function initAccreds(initId) {
+    async function initAccreds(initId) {
       const row = await db.prepare(`SELECT owner_user_id FROM initiatives WHERE id=?`).get(initId);
       if (!row?.owner_user_id) return [];
       return await db.prepare(`SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'`).all(row.owner_user_id).map(a => a.type);
     }
     /* Helper — nb recommandations */
-    function countRecos(initId) {
+    async function countRecos(initId) {
       return db.prepare(`SELECT COUNT(*) as c FROM reseau_recommandations WHERE initiative_id=?`).get(initId)?.c || 0;
     }
     /* Helper — enrichir fiche init pour le réseau */
-    function enrichInit(row) {
+    async function enrichInit(row) {
       if (!row) return null;
       return {
         ...row,
@@ -9910,7 +9911,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/reseau/me — mon réseau (initiative connectée) */
     if (req.method === "GET" && pathname === "/api/reseau/me") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const myInit = getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative associée à ce compte." });
       // Affiliations acceptées (réseaux où je suis membre)
@@ -9936,7 +9937,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/reseau/me/demandes — demandes reçues */
     if (req.method === "GET" && pathname === "/api/reseau/me/demandes") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const myInit = getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
       const rows = await db.prepare(`
@@ -9950,7 +9951,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/reseau/me/envoyees — mes demandes envoyées */
     if (req.method === "GET" && pathname === "/api/reseau/me/envoyees") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const myInit = getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
       const rows = await db.prepare(`
@@ -9963,7 +9964,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/reseau/me/stats — statistiques de mon réseau */
     if (req.method === "GET" && pathname === "/api/reseau/me/stats") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const myInit = getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
       const total = db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(myInit.id)?.c || 0;
@@ -10015,7 +10016,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/reseau/:id/affiliation — demander une affiliation */
     if (req.method === "POST" && /^\/api\/reseau\/\d+\/affiliation$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const destId = parseInt(pathname.split('/')[3]);
       const myInit = getMyInit(me.id);
       if (!myInit) return sendJSON(res, 400, { error: "Vous devez avoir une initiative pour faire une demande." });
@@ -10042,7 +10043,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/reseau/affiliations/:id — traiter une demande */
     if (req.method === "PATCH" && /^\/api\/reseau\/affiliations\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const affId = parseInt(pathname.split('/')[4]);
       const aff = await db.prepare(`SELECT ra.*, i.owner_user_id, i.nom AS dest_nom FROM reseau_affiliations ra JOIN initiatives i ON i.id=ra.destinataire_id WHERE ra.id=?`).get(affId);
       if (!aff) return sendJSON(res, 404, { error: "Demande introuvable." });
@@ -10063,7 +10064,7 @@ async function handleRequest(req, res) {
 
     /* DELETE /api/reseau/affiliations/:id — retirer du réseau */
     if (req.method === "DELETE" && /^\/api\/reseau\/affiliations\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const affId = parseInt(pathname.split('/')[4]);
       const aff = await db.prepare(`SELECT ra.*, id.owner_user_id AS dest_owner, id2.owner_user_id AS dem_owner FROM reseau_affiliations ra JOIN initiatives id ON id.id=ra.destinataire_id JOIN initiatives id2 ON id2.id=ra.demandeur_id WHERE ra.id=?`).get(affId);
       if (!aff) return sendJSON(res, 404, { error: "Affiliation introuvable." });
@@ -10074,7 +10075,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/reseau/:id/recommander — recommander une initiative */
     if (req.method === "POST" && /^\/api\/reseau\/\d+\/recommander$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const targetId = parseInt(pathname.split('/')[3]);
       const myInit = getMyInit(me.id);
       if (!myInit?.numero_immatriculation) return sendJSON(res, 400, { error: "Votre initiative doit être immatriculée pour recommander." });
@@ -10093,7 +10094,7 @@ async function handleRequest(req, res) {
 
     /* DELETE /api/reseau/:id/recommander — retirer sa recommandation */
     if (req.method === "DELETE" && /^\/api\/reseau\/\d+\/recommander$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const targetId = parseInt(pathname.split('/')[3]);
       const myInit = getMyInit(me.id);
       if (!myInit) return sendJSON(res, 400, { error: "Aucune initiative." });
@@ -10103,7 +10104,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/reseau/me/profil — enrichir le profil réseau */
     if (req.method === "PATCH" && pathname === "/api/reseau/me/profil") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const myInit = getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
       const { numero_immatriculation, pays_immatriculation, taille_structure, annee_creation, services, langues, reseau_visible, accepte_messages } = body;
@@ -10134,7 +10135,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/reunions — créer une réunion */
     if (req.method === "POST" && pathname === "/api/reunions") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { titre, description, type, acces, date_debut, date_fin, ordre_du_jour, enregistrement_active } = body;
       if (!titre || !date_debut) return sendJSON(res, 400, { error: "Titre et date de début requis." });
       const jitsi_room = `diaspoactif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -10150,7 +10151,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/reunions — liste des réunions */
     if (req.method === "GET" && pathname === "/api/reunions") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { statut, search, role } = qs;
       let where = `WHERE (r.organisateur_id=? OR ri.user_id=?)`;
       const params = [me.id, me.id];
@@ -10172,7 +10173,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/reunions/decisions — toutes mes décisions */
     if (req.method === "GET" && pathname === "/api/reunions/decisions") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const decisions = await db.prepare(`
         SELECT d.*, r.titre AS reunion_titre, r.date_debut, u.prenom, u.nom, u.photo_url
         FROM reunion_decisions d
@@ -10186,7 +10187,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/reunions/:id — détail réunion */
     if (req.method === "GET" && /^\/api\/reunions\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const reunion = await db.prepare(`
         SELECT r.*, u.prenom AS org_prenom, u.nom AS org_nom, u.photo_url AS org_photo
@@ -10206,7 +10207,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/reunions/:id — modifier */
     if (req.method === "PATCH" && /^\/api\/reunions\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
       if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
@@ -10219,7 +10220,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/reunions/:id/start — démarrer */
     if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/start$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
       if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
@@ -10230,7 +10231,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/reunions/:id/end — terminer */
     if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/end$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
       if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
@@ -10248,7 +10249,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/reunions/:id/invites — inviter des participants */
     if (req.method === "POST" && /^\/api\/reunions\/\d+\/invites$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
       if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
@@ -10274,7 +10275,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/reunions/:id/invites/me — accepter ou refuser */
     if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/invites\/me$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const { statut } = body;
       if (!['accepte','refuse'].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
@@ -10297,7 +10298,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/reunions/:id/presence — pointer arrivée */
     if (req.method === "POST" && /^\/api\/reunions\/\d+\/presence$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       db.prepare(`UPDATE reunion_invites SET rejoint_at=COALESCE(rejoint_at,datetime('now')),statut='accepte' WHERE reunion_id=? AND user_id=?`).run(rid, me.id);
       return sendJSON(res, 200, { ok: true });
@@ -10305,7 +10306,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/reunions/:id/presence — pointer départ */
     if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/presence$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const inv = await db.prepare(`SELECT * FROM reunion_invites WHERE reunion_id=? AND user_id=?`).get(rid, me.id);
       const now = new Date().toISOString();
@@ -10317,7 +10318,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/reunions/:id/resume — obtenir le résumé */
     if (req.method === "GET" && /^\/api\/reunions\/\d+\/resume$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const resume = await db.prepare(`SELECT rr.*, u.prenom AS red_prenom, u.nom AS red_nom FROM reunion_resumes rr LEFT JOIN users u ON u.id=rr.redacteur_id WHERE rr.reunion_id=?`).get(rid);
       const decisions = await db.prepare(`SELECT d.*, u.prenom, u.nom FROM reunion_decisions d LEFT JOIN users u ON u.id=d.responsable_id WHERE d.reunion_id=? ORDER BY d.created_at ASC`).all(rid);
@@ -10326,7 +10327,7 @@ async function handleRequest(req, res) {
 
     /* PUT /api/reunions/:id/resume — sauvegarder le résumé */
     if (req.method === "PUT" && /^\/api\/reunions\/\d+\/resume$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
       if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
@@ -10342,7 +10343,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/reunions/:id/resume/valider — valider le résumé */
     if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/resume\/valider$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
       if (!r || (r.organisateur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10352,7 +10353,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/reunions/:id/resume/partager — envoyer résumé via messagerie */
     if (req.method === "POST" && /^\/api\/reunions\/\d+\/resume\/partager$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
       if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
@@ -10372,7 +10373,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/reunions/:id/decisions — ajouter une décision */
     if (req.method === "POST" && /^\/api\/reunions\/\d+\/decisions$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
       const { titre, description, responsable_id, type_suivi, echeance } = body;
       if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
@@ -10398,7 +10399,7 @@ async function handleRequest(req, res) {
 
     /* PATCH /api/decisions/:id — modifier statut d'une décision */
     if (req.method === "PATCH" && /^\/api\/decisions\/\d+$/.test(pathname)) {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const did = parseInt(pathname.split('/')[3]);
       const { statut, echeance } = body;
       db.prepare(`UPDATE reunion_decisions SET statut=COALESCE(?,statut),echeance=COALESCE(?,echeance) WHERE id=?`).run(statut||null, echeance||null, did);
@@ -10407,7 +10408,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/reunions/search — recherche avancée */
     if (req.method === "GET" && pathname === "/api/reunions/search") {
-      const me = getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { q } = qs;
       if (!q) return sendJSON(res, 200, { reunions: [] });
       const rows = db.prepare(`
@@ -10443,7 +10444,7 @@ async function handleRequest(req, res) {
 
     // GET /api/admin/packages  — admin
     if (req.method === "GET" && pathname === "/api/admin/packages") {
-      const user = getCurrentUser(req);
+      const user = await getCurrentUser(req);
       if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
       const rows = await db.prepare("SELECT * FROM da_packages ORDER BY sort_order ASC").all();
       return sendJSON(res, 200, { packages: rows });
@@ -10451,7 +10452,7 @@ async function handleRequest(req, res) {
 
     // POST /api/admin/packages  — ajouter
     if (req.method === "POST" && pathname === "/api/admin/packages") {
-      const user = getCurrentUser(req);
+      const user = await getCurrentUser(req);
       if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
       const body = await readBody(req);
       const { name, slug, icon, url, enabled, sort_order, show_on, category } = body;
@@ -10467,7 +10468,7 @@ async function handleRequest(req, res) {
 
     // PUT /api/admin/packages/reorder  — réorganiser (avant /:id pour éviter conflit)
     if (req.method === "PUT" && pathname === "/api/admin/packages/reorder") {
-      const user = getCurrentUser(req);
+      const user = await getCurrentUser(req);
       if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
       const body = await readBody(req);
       const { order } = body;
@@ -10480,7 +10481,7 @@ async function handleRequest(req, res) {
     // PUT /api/admin/packages/:id  — modifier
     const pkgMatch = pathname.match(/^\/api\/admin\/packages\/(\d+)$/);
     if (pkgMatch) {
-      const user = getCurrentUser(req);
+      const user = await getCurrentUser(req);
       if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
       const pkgId = pkgMatch[1];
       if (req.method === "PUT") {
@@ -10511,24 +10512,24 @@ async function handleRequest(req, res) {
     ══════════════════════════════════════════════════════ */
 
     // Helper : vérifier accréditation deal d'une initiative
-    function hasDealAccred(initiative_id) {
+    async function hasDealAccred(initiative_id) {
       return !!await db.prepare("SELECT 1 FROM deal_accreditations WHERE initiative_id=? AND statut='active'").get(initiative_id);
     }
     // Helper : vérifier qu'un user est membre actif d'un deal
-    function isDealMember(deal_id, user) {
+    async function isDealMember(deal_id, user) {
       const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
       if (!init) return false;
       return !!await db.prepare("SELECT 1 FROM deal_participants WHERE deal_id=? AND initiative_id=? AND statut='accepte'").get(deal_id, init.id);
     }
     // Helper : logguer une action dans le journal du deal
-    function dealLog(deal_id, acteur_id, acteur_nom, action, detail) {
+    async function dealLog(deal_id, acteur_id, acteur_nom, action, detail) {
       db.prepare("INSERT INTO deal_history (deal_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)").run(deal_id, acteur_id, acteur_nom, action, detail||null);
     }
 
     /* ── ADMIN : accréditation Gérer un Deal ── */
     const adminDealAccredM = pathname.match(/^\/api\/admin\/deals\/accreditations\/(\d+)\/(attribuer|suspendre|retirer)$/);
     if (req.method === "POST" && adminDealAccredM) {
-      const admin = getCurrentUser(req);
+      const admin = await getCurrentUser(req);
       if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
       const body = await readBody(req);
       const [, init_id, action] = adminDealAccredM;
@@ -10553,7 +10554,7 @@ async function handleRequest(req, res) {
 
     /* ── ADMIN : liste de tous les deals ── */
     if (req.method === "GET" && pathname === "/api/admin/deals") {
-      const admin = getCurrentUser(req);
+      const admin = await getCurrentUser(req);
       if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
       const deals = db.prepare(`SELECT d.*,i.nom as createur_nom,
         (SELECT COUNT(*) FROM deal_participants dp WHERE dp.deal_id=d.id AND dp.statut='accepte') as nb_participants
@@ -10563,7 +10564,7 @@ async function handleRequest(req, res) {
 
     /* ── ADMIN : liste des accreditations deal ── */
     if (req.method === "GET" && pathname === "/api/admin/deals/accreditations") {
-      const admin = getCurrentUser(req);
+      const admin = await getCurrentUser(req);
       if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
       const rows = await db.prepare(`SELECT da.*,i.nom as initiative_nom,i.slug FROM deal_accreditations da
         JOIN initiatives i ON i.id=da.initiative_id ORDER BY da.created_at DESC`).all();
@@ -10572,7 +10573,7 @@ async function handleRequest(req, res) {
 
     /* ── ADMIN : Deals Diaspo'Actif — liste et création ── */
     if (pathname === "/api/admin/diaspoactif/deals") {
-      const admin = getCurrentUser(req);
+      const admin = await getCurrentUser(req);
       if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
       let daInit = await db.prepare("SELECT id FROM initiatives WHERE slug='diaspoactif-platform'").get();
       if (!daInit) {
@@ -10638,7 +10639,7 @@ async function handleRequest(req, res) {
 
     /* ── GET mes deals (initiative connectée) ── */
     if (req.method === "GET" && pathname === "/api/deals") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const myInit = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(me.id);
       if (!myInit) return sendJSON(res, 403, { error: "Compte initiative requis." });
@@ -10654,7 +10655,7 @@ async function handleRequest(req, res) {
 
     /* ── POST créer un deal ── */
     if (req.method === "POST" && pathname === "/api/deals") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const myInit = await db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
       if (!myInit) return sendJSON(res, 403, { error: "Compte initiative requis." });
@@ -10671,7 +10672,7 @@ async function handleRequest(req, res) {
       dealLog(dealId, me.id, myInit.nom, "creation", `Deal créé par ${myInit.nom}`);
       // Envoyer les invitations
       if (Array.isArray(invites)) {
-        invites.forEach(invId => {
+        invites.forEach(async invId => {
           const inv = await db.prepare("SELECT id,nom,owner_user_id FROM initiatives WHERE id=?").get(invId);
           if (!inv || inv.id === myInit.id) return;
           db.prepare("INSERT OR IGNORE INTO deal_participants (deal_id,initiative_id,role,statut) VALUES (?,?,'participant','invite')").run(dealId, inv.id);
@@ -10693,7 +10694,7 @@ async function handleRequest(req, res) {
     /* ── GET deal/:id ── */
     const dealBase = pathname.match(/^\/api\/deals\/(\d+)$/);
     if (req.method === "GET" && dealBase) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = dealBase[1];
       const deal = await db.prepare("SELECT d.*,i.nom as createur_nom FROM deals d JOIN initiatives i ON i.id=d.createur_id WHERE d.id=?").get(did);
@@ -10712,7 +10713,7 @@ async function handleRequest(req, res) {
 
     /* ── PUT mettre à jour un deal ── */
     if (req.method === "PUT" && dealBase) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = dealBase[1];
       const myInit = await db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
@@ -10731,7 +10732,7 @@ async function handleRequest(req, res) {
     /* ── POST répondre à une invitation ── */
     const dealRepondre = pathname.match(/^\/api\/deals\/(\d+)\/repondre$/);
     if (req.method === "POST" && dealRepondre) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = dealRepondre[1];
       const body = await readBody(req);
@@ -10753,7 +10754,7 @@ async function handleRequest(req, res) {
     /* ── POST inviter une initiative supplémentaire ── */
     const dealInviter = pathname.match(/^\/api\/deals\/(\d+)\/inviter$/);
     if (req.method === "POST" && dealInviter) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = dealInviter[1];
       const body = await readBody(req);
@@ -10774,7 +10775,7 @@ async function handleRequest(req, res) {
     /* ── MESSAGES ── */
     const dealMessages = pathname.match(/^\/api\/deals\/(\d+)\/messages$/);
     if (dealMessages) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = dealMessages[1];
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10797,7 +10798,7 @@ async function handleRequest(req, res) {
     /* ── TÂCHES ── */
     const dealTaches = pathname.match(/^\/api\/deals\/(\d+)\/taches$/);
     if (dealTaches) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = dealTaches[1];
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10816,7 +10817,7 @@ async function handleRequest(req, res) {
 
     const dealTacheItem = pathname.match(/^\/api\/deals\/(\d+)\/taches\/(\d+)$/);
     if (dealTacheItem) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const [, did, tid] = dealTacheItem;
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10839,7 +10840,7 @@ async function handleRequest(req, res) {
     /* ── DOCUMENTS ── */
     const dealDocs = pathname.match(/^\/api\/deals\/(\d+)\/documents$/);
     if (dealDocs) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = dealDocs[1];
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10860,7 +10861,7 @@ async function handleRequest(req, res) {
 
     const dealDocItem = pathname.match(/^\/api\/deals\/(\d+)\/documents\/(\d+)$/);
     if (dealDocItem) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const [, did, docId] = dealDocItem;
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10882,7 +10883,7 @@ async function handleRequest(req, res) {
     /* ── NOTES ── */
     const dealNotes = pathname.match(/^\/api\/deals\/(\d+)\/notes$/);
     if (dealNotes) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = dealNotes[1];
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10901,7 +10902,7 @@ async function handleRequest(req, res) {
 
     const dealNoteItem = pathname.match(/^\/api\/deals\/(\d+)\/notes\/(\d+)$/);
     if (dealNoteItem && req.method === "PUT") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const [, did, nid] = dealNoteItem;
       if (!isDealMember(did, me)) return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10914,7 +10915,7 @@ async function handleRequest(req, res) {
     /* ── CALENDRIER ── */
     const dealEvents = pathname.match(/^\/api\/deals\/(\d+)\/evenements$/);
     if (dealEvents) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = dealEvents[1];
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10934,7 +10935,7 @@ async function handleRequest(req, res) {
 
     const dealEventItem = pathname.match(/^\/api\/deals\/(\d+)\/evenements\/(\d+)$/);
     if (dealEventItem && req.method === "DELETE") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const [, did, eid] = dealEventItem;
       if (!isDealMember(did, me)) return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10945,7 +10946,7 @@ async function handleRequest(req, res) {
     /* ── HISTORIQUE ── */
     const dealHistorique = pathname.match(/^\/api\/deals\/(\d+)\/historique$/);
     if (req.method === "GET" && dealHistorique) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = dealHistorique[1];
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -10955,7 +10956,7 @@ async function handleRequest(req, res) {
     /* ── CLÔTURER / ARCHIVER / RÉACTIVER ── */
     const dealAction = pathname.match(/^\/api\/deals\/(\d+)\/(cloturer|archiver|reactiver)$/);
     if (req.method === "PUT" && dealAction) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const [, did, action] = dealAction;
       const myInit = await db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
@@ -10970,7 +10971,7 @@ async function handleRequest(req, res) {
     /* ── Cockpit de Pilotage ── */
     const cockpitM = pathname.match(/^\/api\/deals\/(\d+)\/cockpit$/);
     if (req.method === "GET" && cockpitM) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = parseInt(cockpitM[1]);
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -11011,7 +11012,7 @@ async function handleRequest(req, res) {
     const objBase = pathname.match(/^\/api\/deals\/(\d+)\/objectifs$/);
     const objItem = pathname.match(/^\/api\/deals\/(\d+)\/objectifs\/(\d+)$/);
     if (objBase || objItem) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = parseInt((objBase||objItem)[1]);
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -11050,7 +11051,7 @@ async function handleRequest(req, res) {
     const jalBase = pathname.match(/^\/api\/deals\/(\d+)\/jalons$/);
     const jalItem = pathname.match(/^\/api\/deals\/(\d+)\/jalons\/(\d+)$/);
     if (jalBase || jalItem) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const did = parseInt((jalBase||jalItem)[1]);
       if (!isDealMember(did, me) && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
@@ -11128,7 +11129,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/deal-master/mon-score — score personnel (connecté) */
     if (req.method === "GET" && pathname === "/api/deal-master/mon-score") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const score = await db.prepare("SELECT * FROM deal_master_scores WHERE user_id=?").get(me.id);
       const isMaster = await db.prepare("SELECT * FROM deal_master_laureats WHERE user_id=? AND actif=1 ORDER BY edition_id DESC LIMIT 1").get(me.id);
@@ -11151,7 +11152,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/deal-master/temoignage — soumettre un témoignage (lauréat) */
     if (req.method === "POST" && pathname === "/api/deal-master/temoignage") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const isMaster = await db.prepare("SELECT * FROM deal_master_laureats WHERE user_id=? AND actif=1 ORDER BY edition_id DESC LIMIT 1").get(me.id);
       if (!isMaster) return sendJSON(res, 403, { error: "Réservé aux Deal Masters actifs." });
@@ -11166,7 +11167,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/admin/deal-master/editions */
     if (req.method === "GET" && pathname === "/api/admin/deal-master/editions") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const eds = await db.prepare("SELECT * FROM deal_master_editions ORDER BY periode_debut DESC").all();
       return sendJSON(res, 200, { editions: eds });
@@ -11174,7 +11175,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/admin/deal-master/editions — créer une nouvelle édition */
     if (req.method === "POST" && pathname === "/api/admin/deal-master/editions") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const { label, periode_debut, periode_fin, top_pct = 10 } = body;
       if (!label || !periode_debut || !periode_fin) return sendJSON(res, 400, { error: "label, periode_debut, periode_fin requis." });
@@ -11186,7 +11187,7 @@ async function handleRequest(req, res) {
        Calcule les scores, attribue les badges, publie l'édition.
        Appelé automatiquement + par le handler admin si besoin.
     ───────────────────────────────────────────────────────────── */
-    function _dmScoreEdition(edId) {
+    async function _dmScoreEdition(edId) {
       const ed = await db.prepare("SELECT * FROM deal_master_editions WHERE id=?").get(edId);
       if (!ed) return null;
       const criteres = await db.prepare("SELECT * FROM deal_master_criteres WHERE actif=1").all();
@@ -11234,7 +11235,7 @@ async function handleRequest(req, res) {
       const insLaureat = db.prepare(`INSERT INTO deal_master_laureats (edition_id,user_id,score,rang,score_detail,date_expiration,actif) VALUES (?,?,?,?,?,?,1) ON CONFLICT(edition_id,user_id) DO UPDATE SET score=excluded.score,rang=excluded.rang,score_detail=excluded.score_detail,actif=1`);
       laureats.forEach((l, i) => insLaureat.run(edId, l.user_id, l.score, i+1, JSON.stringify(l.detail), ed.periode_fin));
       await db.prepare("UPDATE users SET is_deal_master=0, deal_master_edition_id=NULL WHERE is_deal_master=1").run();
-      laureats.forEach(l => await db.prepare("UPDATE users SET is_deal_master=1, deal_master_edition_id=? WHERE id=?").run(edId, l.user_id));
+      await Promise.all(laureats.map(async l => await db.prepare("UPDATE users SET is_deal_master=1, deal_master_edition_id=? WHERE id=?").run(edId, l.user_id)));
       db.prepare("UPDATE deal_master_editions SET statut='calculee', nb_laureats=?, calcule_at=datetime('now'), criteres_json=?, updated_at=datetime('now') WHERE id=?")
         .run(laureats.length, JSON.stringify(Object.fromEntries(criteres.map(c=>[c.cle,c.poids]))), edId);
       return { nb_scores: scores.length, nb_laureats: laureats.length, top_pct: ed.top_pct };
@@ -11271,7 +11272,7 @@ async function handleRequest(req, res) {
     /* POST /api/admin/deal-master/editions/:id/calculer — déclenché par le moteur (conservé pour rétrocompatibilité) */
     const dmCalcM = pathname.match(/^\/api\/admin\/deal-master\/editions\/(\d+)\/calculer$/);
     if (req.method === "POST" && dmCalcM) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const edId = parseInt(dmCalcM[1]);
       const result = _dmScoreEdition(edId);
@@ -11282,7 +11283,7 @@ async function handleRequest(req, res) {
     /* POST /api/admin/deal-master/editions/:id/publier */
     const dmPubM = pathname.match(/^\/api\/admin\/deal-master\/editions\/(\d+)\/publier$/);
     if (req.method === "POST" && dmPubM) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const edId = parseInt(dmPubM[1]);
       const ed = await db.prepare("SELECT * FROM deal_master_editions WHERE id=?").get(edId);
@@ -11297,7 +11298,7 @@ async function handleRequest(req, res) {
     /* PUT /api/admin/deal-master/criteres/:cle */
     const dmCritM = pathname.match(/^\/api\/admin\/deal-master\/criteres\/([a-z_]+)$/);
     if (req.method === "PUT" && dmCritM) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const { poids, actif, label, description } = body;
       db.prepare(`UPDATE deal_master_criteres SET
@@ -11310,14 +11311,14 @@ async function handleRequest(req, res) {
 
     /* GET /api/admin/deal-master/criteres */
     if (req.method === "GET" && pathname === "/api/admin/deal-master/criteres") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       return sendJSON(res, 200, { criteres: await db.prepare("SELECT * FROM deal_master_criteres ORDER BY poids DESC").all() });
     }
 
     /* GET /api/admin/deal-master/status — état du moteur + prochain recalcul */
     if (req.method === "GET" && pathname === "/api/admin/deal-master/status") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const activeEd = await db.prepare("SELECT * FROM deal_master_editions WHERE statut='publiee' ORDER BY periode_debut DESC LIMIT 1").get();
       const currentEd = db.prepare("SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee') ORDER BY periode_debut DESC LIMIT 1").get();
@@ -11342,7 +11343,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/admin/deal-master/classement — classement complet (scores + rangs) */
     if (req.method === "GET" && pathname === "/api/admin/deal-master/classement") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const rows = await db.prepare(`
         SELECT dms.user_id, dms.score, dms.rang, dms.rang_total, dms.computed_at,
@@ -11359,7 +11360,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/admin/deal-master/laureats-actuels — Deal Masters actifs */
     if (req.method === "GET" && pathname === "/api/admin/deal-master/laureats-actuels") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const laureats = db.prepare(`
         SELECT dml.user_id, dml.score, dml.rang, dml.date_attribution, dml.date_expiration,
@@ -11378,7 +11379,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/admin/deal-master/historique — historique complet de tous les Deal Masters */
     if (req.method === "GET" && pathname === "/api/admin/deal-master/historique") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const historique = await db.prepare(`
         SELECT dml.id, dml.user_id, dml.score, dml.rang, dml.date_attribution, dml.date_expiration, dml.actif,
@@ -11448,7 +11449,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/temoignage — soumettre un témoignage */
     if (req.method === "POST" && pathname === "/api/temoignage") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const body2 = await readBody(req);
       const { note, description, fonctionnalites, points_positifs, suggestions, type_usage, consentement_affichage, nom_affichage } = body2;
@@ -11484,7 +11485,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/temoignage/ignorer — reporter/refuser la demande */
     if (req.method === "POST" && pathname === "/api/temoignage/ignorer") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const body2 = await readBody(req);
       const statut = body2.refus_definitif ? 'refuse' : 'non_demande';
@@ -11494,7 +11495,7 @@ async function handleRequest(req, res) {
 
     /* POST /api/demo/vu — marquer la démo comme vue */
     if (req.method === "POST" && pathname === "/api/demo/vu") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       await db.prepare("UPDATE users SET demo_vue=1 WHERE id=?").run(me.id);
       return sendJSON(res, 200, { ok: true });
@@ -11508,7 +11509,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/admin/temoignages — liste admin */
     if (req.method === "GET" && pathname === "/api/admin/temoignages") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
       const rows = await db.prepare(`
         SELECT t.*, u.nom AS user_nom, u.email AS user_email, u.pays AS user_pays
@@ -11520,7 +11521,7 @@ async function handleRequest(req, res) {
 
     /* PUT /api/admin/temoignages/:id/statut — approuver/rejeter */
     if (req.method === "PUT" && /^\/api\/admin\/temoignages\/(\d+)\/statut$/.test(pathname)) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
       const tid = pathname.match(/\/(\d+)\/statut$/)[1];
       const body2 = await readBody(req);
@@ -11537,7 +11538,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/partenaires/carousel — liste personnalisée pour la homepage */
     if (req.method === "GET" && pathname === "/api/partenaires/carousel") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       const now = new Date().toISOString().slice(0, 10);
       let rows = db.prepare(`
         SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.banner_url, u.titre_pro, u.bio, u.ville, u.pays AS user_pays
@@ -11580,7 +11581,7 @@ async function handleRequest(req, res) {
     /* POST /api/partenaires/:id/impression — tracking vue/clic */
     const impM = pathname.match(/^\/api\/partenaires\/(\d+)\/impression$/);
     if (req.method === "POST" && impM) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       const pid = parseInt(impM[1]);
       const { event_type = "view", source = "homepage" } = body;
       if (!['view','click','contact','profile_visit'].includes(event_type)) return sendJSON(res, 400, { error: "event_type invalide." });
@@ -11594,7 +11595,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/admin/partenaires/stats — statistiques admin */
     if (req.method === "GET" && pathname === "/api/admin/partenaires/stats") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const byPartner = db.prepare(`
         SELECT po.id, u.nom, u.prenom, po.domaines_expertise,
@@ -11626,7 +11627,7 @@ async function handleRequest(req, res) {
     /* PUT /api/admin/partenaires/:id/config — admin configure priorité/rotation */
     const configM = pathname.match(/^\/api\/admin\/partenaires\/(\d+)\/config$/);
     if (req.method === "PUT" && configM) {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const pid = parseInt(configM[1]);
       const { priorite, mise_en_avant, periode_debut, periode_fin, slogan, cles_matching } = body;
@@ -11686,7 +11687,7 @@ async function handleRequest(req, res) {
 
     /* PUT /api/partenaires/moi — le partenaire met à jour sa fiche */
     if (req.method === "PUT" && pathname === "/api/partenaires/moi") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const po = await db.prepare("SELECT id FROM partenaires_officiels WHERE user_id=? AND statut='active'").get(me.id);
       if (!po) return sendJSON(res, 403, { error: "Vous n'êtes pas Partenaire Officiel." });
@@ -11713,7 +11714,7 @@ async function handleRequest(req, res) {
 
     /* GET /api/partenaires/moi — vérifie si l'utilisateur connecté est partenaire */
     if (req.method === "GET" && pathname === "/api/partenaires/moi") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 200, { partenaire: false });
       const po = await db.prepare("SELECT * FROM partenaires_officiels WHERE user_id=?").get(me.id);
       if (!po) return sendJSON(res, 200, { partenaire: false });
@@ -11738,7 +11739,7 @@ async function handleRequest(req, res) {
       if (q)   rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.description_complete||''} ${r.domaines_expertise||''}`.toLowerCase().includes(q));
       rows = rows.slice(0, 5);
       // Compter la recommandation
-      rows.forEach(r => await db.prepare("UPDATE partenaires_officiels SET nbr_recommandations=nbr_recommandations+1 WHERE id=?").run(r.id));
+      await Promise.all(rows.map(async r => db.prepare("UPDATE partenaires_officiels SET nbr_recommandations=nbr_recommandations+1 WHERE id=?").run(r.id)));
       return sendJSON(res, 200, { partenaires: rows.map(r => ({
         ...r, domaines_expertise: safeParse(r.domaines_expertise||'[]'),
         pays_intervention: safeParse(r.pays_intervention||'[]'),
@@ -11747,7 +11748,7 @@ async function handleRequest(req, res) {
 
     /* ── Admin : gestion des partenaires ── */
     if (pathname === "/api/admin/partenaires") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
 
       if (req.method === "GET") {
@@ -11791,7 +11792,7 @@ async function handleRequest(req, res) {
 
     const adminPartM = pathname.match(/^\/api\/admin\/partenaires\/(\d+)\/statut$/);
     if (adminPartM && req.method === "PUT") {
-      const me = getCurrentUser(req);
+      const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const pid = parseInt(adminPartM[1]);
       const { statut, motif } = body;
@@ -11818,13 +11819,13 @@ async function handleRequest(req, res) {
    documents, votes électroniques, badges
    ════════════════════════════════════════════════════════════════ */
 
-function getAssoAccred(userId) {
+async function getAssoAccred(userId) {
   return await db.prepare(`SELECT * FROM asso_accreditations WHERE user_id=? AND statut='active'`).get(userId);
 }
 
 /* GET /api/asso/accreditation */
 route("GET", "/api/asso/accreditation", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const accred = await db.prepare(`SELECT * FROM asso_accreditations WHERE user_id=?`).get(user.id);
   const demande = await db.prepare(`SELECT * FROM asso_demandes WHERE user_id=? ORDER BY created_at DESC LIMIT 1`).get(user.id);
@@ -11833,7 +11834,7 @@ route("GET", "/api/asso/accreditation", async (req, res) => {
 
 /* POST /api/asso/demande */
 route("POST", "/api/asso/demande", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const { niveau = "verifiee", periodicite = "annuel", nom_asso, pays, ville, siret, description } = body;
   if (!nom_asso) return sendJSON(res, 400, { error: "Le nom de l'association est requis." });
@@ -11852,7 +11853,7 @@ route("POST", "/api/asso/demande", async (req, res, params, body) => {
 
 /* GET /api/asso/demandes */
 route("GET", "/api/asso/demandes", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const demandes = await db.prepare(`SELECT * FROM asso_demandes WHERE user_id=? ORDER BY created_at DESC`).all(user.id);
   sendJSON(res, 200, { demandes });
@@ -11860,7 +11861,7 @@ route("GET", "/api/asso/demandes", async (req, res) => {
 
 /* GET /api/asso/adherents */
 route("GET", "/api/asso/adherents", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module Gestion des Associations requis." });
   const { q, statut, limit: lim = 50, offset: off = 0 } = query;
@@ -11877,7 +11878,7 @@ route("GET", "/api/asso/adherents", async (req, res, params, body, query) => {
 
 /* POST /api/asso/adherents */
 route("POST", "/api/asso/adherents", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module Gestion des Associations requis." });
   const { prenom, nom, email, telephone, adresse, pays, date_naissance, nationalite, type_adhesion = "standard", date_expiration, notes } = body;
@@ -11889,7 +11890,7 @@ route("POST", "/api/asso/adherents", async (req, res, params, body) => {
 
 /* PUT /api/asso/adherents/:id */
 route("PUT", "/api/asso/adherents/:id", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const adh = await db.prepare(`SELECT * FROM asso_adherents WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
@@ -11904,7 +11905,7 @@ route("PUT", "/api/asso/adherents/:id", async (req, res, params, body) => {
 
 /* DELETE /api/asso/adherents/:id */
 route("DELETE", "/api/asso/adherents/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const adh = await db.prepare(`SELECT id FROM asso_adherents WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
@@ -11915,7 +11916,7 @@ route("DELETE", "/api/asso/adherents/:id", async (req, res, params) => {
 
 /* GET /api/asso/cotisations */
 route("GET", "/api/asso/cotisations", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const { statut, limit: lim = 50, offset: off = 0 } = query;
@@ -11931,7 +11932,7 @@ route("GET", "/api/asso/cotisations", async (req, res, params, body, query) => {
 
 /* POST /api/asso/cotisations */
 route("POST", "/api/asso/cotisations", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const { adherent_id, intitule, montant, devise = "EUR", periodicite = "annuel", statut = "en_attente", date_echeance, date_paiement, mode_paiement, reference, notes } = body;
@@ -11943,7 +11944,7 @@ route("POST", "/api/asso/cotisations", async (req, res, params, body) => {
 
 /* PUT /api/asso/cotisations/:id/statut */
 route("PUT", "/api/asso/cotisations/:id/statut", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const cot = await db.prepare(`SELECT id FROM asso_cotisations WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
@@ -11956,7 +11957,7 @@ route("PUT", "/api/asso/cotisations/:id/statut", async (req, res, params, body) 
 
 /* GET /api/asso/finances */
 route("GET", "/api/asso/finances", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const { annee, limit: lim = 100, offset: off = 0 } = query;
@@ -11972,7 +11973,7 @@ route("GET", "/api/asso/finances", async (req, res, params, body, query) => {
 
 /* POST /api/asso/finances */
 route("POST", "/api/asso/finances", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const { type, categorie, intitule, montant, devise = "EUR", date_op, mode_paiement, piece_justif, notes } = body;
@@ -11985,7 +11986,7 @@ route("POST", "/api/asso/finances", async (req, res, params, body) => {
 
 /* DELETE /api/asso/finances/:id */
 route("DELETE", "/api/asso/finances/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const row = await db.prepare(`SELECT id FROM asso_finances WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
@@ -11996,7 +11997,7 @@ route("DELETE", "/api/asso/finances/:id", async (req, res, params) => {
 
 /* GET /api/asso/documents */
 route("GET", "/api/asso/documents", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const docs = await db.prepare(`SELECT * FROM asso_documents WHERE asso_user_id=? ORDER BY created_at DESC`).all(user.id);
@@ -12005,7 +12006,7 @@ route("GET", "/api/asso/documents", async (req, res) => {
 
 /* POST /api/asso/documents */
 route("POST", "/api/asso/documents", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const { nom, type = "autre", url, taille, acces = "bureau" } = body;
@@ -12017,7 +12018,7 @@ route("POST", "/api/asso/documents", async (req, res, params, body) => {
 
 /* DELETE /api/asso/documents/:id */
 route("DELETE", "/api/asso/documents/:id", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const doc = await db.prepare(`SELECT id FROM asso_documents WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
@@ -12028,7 +12029,7 @@ route("DELETE", "/api/asso/documents/:id", async (req, res, params) => {
 
 /* GET /api/asso/votes */
 route("GET", "/api/asso/votes", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const votes = await db.prepare(`SELECT * FROM asso_votes WHERE asso_user_id=? ORDER BY created_at DESC`).all(user.id);
@@ -12037,7 +12038,7 @@ route("GET", "/api/asso/votes", async (req, res) => {
 
 /* POST /api/asso/votes */
 route("POST", "/api/asso/votes", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const { titre, description, type = "resolution", options = [], anonyme = true, date_debut, date_fin, quorum = 0 } = body;
@@ -12050,7 +12051,7 @@ route("POST", "/api/asso/votes", async (req, res, params, body) => {
 
 /* PUT /api/asso/votes/:id/ouvrir */
 route("PUT", "/api/asso/votes/:id/ouvrir", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const v = await db.prepare(`SELECT id FROM asso_votes WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
   if (!v) return sendJSON(res, 404, { error: "Vote introuvable." });
@@ -12060,7 +12061,7 @@ route("PUT", "/api/asso/votes/:id/ouvrir", async (req, res, params) => {
 
 /* PUT /api/asso/votes/:id/clore */
 route("PUT", "/api/asso/votes/:id/clore", async (req, res, params) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const v = await db.prepare(`SELECT * FROM asso_votes WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
   if (!v) return sendJSON(res, 404, { error: "Vote introuvable." });
@@ -12073,7 +12074,7 @@ route("PUT", "/api/asso/votes/:id/clore", async (req, res, params) => {
 
 /* POST /api/asso/votes/:id/voter */
 route("POST", "/api/asso/votes/:id/voter", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const v = await db.prepare(`SELECT * FROM asso_votes WHERE id=? AND statut='ouvert'`).get(Number(params.id));
   if (!v) return sendJSON(res, 404, { error: "Vote non disponible." });
@@ -12099,7 +12100,7 @@ route("GET", "/api/asso/badge/:userId", async (req, res, params) => {
 
 /* GET /api/asso/dashboard */
 route("GET", "/api/asso/dashboard", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const accred = getAssoAccred(user.id);
   if (!accred) return sendJSON(res, 403, { error: "Module requis." });
@@ -12115,7 +12116,7 @@ route("GET", "/api/asso/dashboard", async (req, res) => {
 
 /* ADMIN routes */
 route("GET", "/api/admin/asso/demandes", async (req, res, params, body, query) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
   const statut = query.statut || "en_attente";
   const rows = await db.prepare(`SELECT d.*, u.nom AS user_nom, u.email AS user_email FROM asso_demandes d JOIN users u ON u.id=d.user_id WHERE d.statut=? ORDER BY d.created_at DESC`).all(statut);
@@ -12123,7 +12124,7 @@ route("GET", "/api/admin/asso/demandes", async (req, res, params, body, query) =
 });
 
 route("POST", "/api/admin/asso/demandes/:id/approuver", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
   const dem = await db.prepare(`SELECT * FROM asso_demandes WHERE id=?`).get(Number(params.id));
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
@@ -12145,7 +12146,7 @@ route("POST", "/api/admin/asso/demandes/:id/approuver", async (req, res, params,
 });
 
 route("POST", "/api/admin/asso/demandes/:id/refuser", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
   const dem = await db.prepare(`SELECT * FROM asso_demandes WHERE id=?`).get(Number(params.id));
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
@@ -12159,7 +12160,7 @@ route("POST", "/api/admin/asso/demandes/:id/refuser", async (req, res, params, b
 });
 
 route("POST", "/api/admin/asso/:userId/suspendre", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
   const { motif } = body;
   db.prepare(`UPDATE asso_accreditations SET statut='suspendue',motif=?,updated_at=datetime('now') WHERE user_id=?`).run(motif||null, Number(params.userId));
@@ -12169,7 +12170,7 @@ route("POST", "/api/admin/asso/:userId/suspendre", async (req, res, params, body
 });
 
 route("POST", "/api/admin/asso/:userId/retirer", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
   const { motif } = body;
   db.prepare(`UPDATE asso_accreditations SET statut='retiree',motif=?,updated_at=datetime('now') WHERE user_id=?`).run(motif||null, Number(params.userId));
@@ -12179,7 +12180,7 @@ route("POST", "/api/admin/asso/:userId/retirer", async (req, res, params, body) 
 });
 
 route("GET", "/api/admin/asso/liste", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
   const rows = await db.prepare(`SELECT a.*, u.nom AS user_nom, u.email AS user_email FROM asso_accreditations a JOIN users u ON u.id=a.user_id ORDER BY a.updated_at DESC`).all();
   sendJSON(res, 200, { associations: rows });
@@ -12195,7 +12196,7 @@ route("GET", "/api/admin/asso/liste", async (req, res) => {
 /* Rôle DAA-Lang de l'utilisateur courant dans une association.
    Le titulaire de l'accréditation est PRESIDENT ; sinon on lit
    asso_membre_roles. */
-function assoRole(assoUserId, daUserId) {
+async function assoRole(assoUserId, daUserId) {
   if (assoUserId === daUserId) return "PRESIDENT";
   const r = await db.prepare(`SELECT role FROM asso_membre_roles WHERE asso_user_id=? AND da_user_id=?`).get(assoUserId, daUserId);
   return r ? r.role : "GUEST";
@@ -12203,8 +12204,8 @@ function assoRole(assoUserId, daUserId) {
 
 /* Garde de permission unifiée : accréditation active + capacité DSL.
    Renvoie { user, accred } si OK, sinon écrit la réponse et renvoie null. */
-function assoGuard(req, res, action) {
-  const user = getCurrentUser(req);
+async function assoGuard(req, res, action) {
+  const user = await getCurrentUser(req);
   if (!user) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
   const accred = getAssoAccred(user.id);
   if (!accred) { sendJSON(res, 403, { error: "Module Gestion des Associations requis." }); return null; }
@@ -12217,7 +12218,7 @@ function assoGuard(req, res, action) {
 }
 
 /* Journalisation d'audit (DSL SECURITY.AUDIT_LOGS / FINANCE.AUDIT_TRAIL) */
-function assoAudit(assoUserId, acteurId, action, entite, entiteId, details) {
+async function assoAudit(assoUserId, acteurId, action, entite, entiteId, details) {
   try {
     db.prepare(`INSERT INTO asso_audit_log (asso_user_id,acteur_id,action,entite,entite_id,details) VALUES (?,?,?,?,?,?)`)
       .run(assoUserId, acteurId || null, action, entite || null, entiteId || null, details ? JSON.stringify(details) : null);
@@ -12625,7 +12626,7 @@ route("POST", "/api/asso/membre-roles", async (req, res, params, body) => {
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Helper : récupère la définition complète (def + regles + tarifs) */
-function getAccredDef(idOrType) {
+async function getAccredDef(idOrType) {
   const def = typeof idOrType === 'number'
     ? await db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(idOrType)
     : await db.prepare("SELECT * FROM accred_definitions WHERE type=?").get(idOrType);
@@ -12644,7 +12645,7 @@ function getAccredDef(idOrType) {
 
 /* GET /api/accreditations/catalogue — liste filtrée par rôle */
 route("GET", "/api/accreditations/catalogue", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   const role = user ? user.role : null;
   const defs = await db.prepare("SELECT * FROM accred_definitions WHERE actif=1 ORDER BY ordre,id").all();
   const result = defs.map(d => {
@@ -12660,7 +12661,7 @@ route("GET", "/api/accreditations/catalogue", async (req, res) => {
 
 /* GET /api/admin/accred/definitions */
 route("GET", "/api/admin/accred/definitions", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const defs = await db.prepare("SELECT * FROM accred_definitions ORDER BY ordre,id").all();
   sendJSON(res, 200, { definitions: defs.map(d => getAccredDef(d.id)) });
@@ -12668,7 +12669,7 @@ route("GET", "/api/admin/accred/definitions", async (req, res) => {
 
 /* POST /api/admin/accred/definitions — créer une définition */
 route("POST", "/api/admin/accred/definitions", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { type, label, emoji, description, droits, couleur, couleur_bg, couleur_border, couleur_text,
           module: mod, fonctionnalite, ordre, regles, tarifs } = body;
@@ -12707,7 +12708,7 @@ route("POST", "/api/admin/accred/definitions", async (req, res, params, body) =>
 
 /* GET /api/admin/accred/definitions/:id/impact — aperçu avant modification */
 route("GET", "/api/admin/accred/definitions/:id/impact", async (req, res, params) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const def = await db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(params.id);
   if (!def) return sendJSON(res, 404, { error: "Définition introuvable." });
@@ -12727,7 +12728,7 @@ route("GET", "/api/admin/accred/definitions/:id/impact", async (req, res, params
 
 /* GET /api/admin/accred/definitions/:id/audit — journal des modifications */
 route("GET", "/api/admin/accred/definitions/:id/audit", async (req, res, params) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const logs = await db.prepare("SELECT * FROM accred_audit_log WHERE accred_id=? ORDER BY created_at DESC LIMIT 100").all(params.id);
   sendJSON(res, 200, { logs });
@@ -12735,7 +12736,7 @@ route("GET", "/api/admin/accred/definitions/:id/audit", async (req, res, params)
 
 /* PUT /api/admin/accred/definitions/:id — modifier une définition (v2 avec audit + modes) */
 route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const def = await db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(params.id);
   if (!def) return sendJSON(res, 404, { error: "Définition introuvable." });
@@ -12835,7 +12836,7 @@ route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body)
 
 /* DELETE /api/admin/accred/definitions/:id — désactiver */
 route("DELETE", "/api/admin/accred/definitions/:id", async (req, res, params) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   db.prepare("UPDATE accred_definitions SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
@@ -12843,7 +12844,7 @@ route("DELETE", "/api/admin/accred/definitions/:id", async (req, res, params) =>
 
 /* GET /api/admin/accred/demandes — toutes les demandes (nouveau système) */
 route("GET", "/api/admin/accred/demandes", async (req, res, params, body, query) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const statut = query.statut || "en_attente";
   const rows = await db.prepare(`
@@ -12859,12 +12860,12 @@ route("GET", "/api/admin/accred/demandes", async (req, res, params, body, query)
 
 /* PATCH /api/admin/accred/demandes/:id/approuver */
 route("PATCH", "/api/admin/accred/demandes/:id/approuver", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const dem = await db.prepare("SELECT * FROM accred_demandes WHERE id=?").get(params.id);
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
   const def = getAccredDef(dem.accred_id);
-  const tarif = def?.tarifs?.find(t => {
+  const tarif = def?.tarifs?.find(async t => {
     const user = await db.prepare("SELECT role FROM users WHERE id=?").get(dem.user_id);
     return user && t.role === user.role;
   });
@@ -12884,7 +12885,7 @@ route("PATCH", "/api/admin/accred/demandes/:id/approuver", async (req, res, para
 
 /* PATCH /api/admin/accred/demandes/:id/refuser */
 route("PATCH", "/api/admin/accred/demandes/:id/refuser", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const dem = await db.prepare("SELECT * FROM accred_demandes WHERE id=?").get(params.id);
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
@@ -12900,7 +12901,7 @@ route("PATCH", "/api/admin/accred/demandes/:id/refuser", async (req, res, params
 
 /* GET /api/admin/accred/users — liste des accréditations attribuées */
 route("GET", "/api/admin/accred/users", async (req, res) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const rows = await db.prepare(`
     SELECT ua.*, u.nom AS user_nom, u.email AS user_email, u.role AS user_role,
@@ -12915,7 +12916,7 @@ route("GET", "/api/admin/accred/users", async (req, res) => {
 
 /* PATCH /api/admin/accred/users/:userId/:accredId/retirer */
 route("PATCH", "/api/admin/accred/users/:userId/:accredId/retirer", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   db.prepare("UPDATE user_accreditations SET statut='retiree',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
     .run(params.userId, params.accredId);
@@ -12939,7 +12940,7 @@ route("PATCH", "/api/admin/accred/users/:userId/:accredId/retirer", async (req, 
    4. require_accreditation → vérifie accred → locked si absente
    5. sinon locked
 */
-function computeFeatureStates(userId, userRole) {
+async function computeFeatureStates(userId, userRole) {
   const features = await db.prepare("SELECT * FROM features WHERE actif=1 ORDER BY ordre").all();
   const userFeats = await db.prepare("SELECT * FROM user_features WHERE user_id=?").all(userId);
   const ufMap = new Map(userFeats.map(uf => [uf.feature_id, uf]));
@@ -12988,7 +12989,7 @@ function computeFeatureStates(userId, userRole) {
 }
 
 /* ── Tracker d'usage ── */
-function trackFeatureUsage(userId, featureSlug) {
+async function trackFeatureUsage(userId, featureSlug) {
   try {
     const f = await db.prepare("SELECT id FROM features WHERE slug=? AND actif=1").get(featureSlug);
     if (!f) return;
@@ -13006,7 +13007,7 @@ function trackFeatureUsage(userId, featureSlug) {
    Appelé lors du chargement du dashboard, pas en cron (Vercel serverless).
    Crée des freeze_suggestions et envoie max 1 notif/semaine/feature.
 */
-function runFreezeSuggestionEngine(userId) {
+async function runFreezeSuggestionEngine(userId) {
   try {
     const usages = db.prepare(`
       SELECT fu.*, f.slug, f.nom, f.emoji,
@@ -13056,7 +13057,7 @@ function runFreezeSuggestionEngine(userId) {
 
 /* GET /api/features — catalogue public */
 route("GET", "/api/features", async (req, res, params, body, query) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   const categorie = query.categorie || null;
   const features = await db.prepare(
     categorie
@@ -13075,7 +13076,7 @@ route("GET", "/api/features", async (req, res, params, body, query) => {
 
 /* GET /api/me/features — état complet de toutes les features pour l'utilisateur connecté */
 route("GET", "/api/me/features", async (req, res) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   runFreezeSuggestionEngine(me.id);
   const states = computeFeatureStates(me.id, me.role);
@@ -13094,7 +13095,7 @@ route("GET", "/api/me/features", async (req, res) => {
 
 /* GET /api/features/check/:slug — vérification rapide (gateway check) */
 route("GET", "/api/features/check/:slug", async (req, res, params) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM features WHERE slug=? AND actif=1").get(params.slug);
   if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
@@ -13106,7 +13107,7 @@ route("GET", "/api/features/check/:slug", async (req, res, params) => {
 
 /* POST /api/features/:slug/freeze — geler une feature */
 route("POST", "/api/features/:slug/freeze", async (req, res, params) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM features WHERE slug=? AND actif=1").get(params.slug);
   if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
@@ -13121,7 +13122,7 @@ route("POST", "/api/features/:slug/freeze", async (req, res, params) => {
 
 /* POST /api/features/:slug/unfreeze — dégeler une feature */
 route("POST", "/api/features/:slug/unfreeze", async (req, res, params) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM features WHERE slug=? AND actif=1").get(params.slug);
   if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
@@ -13133,7 +13134,7 @@ route("POST", "/api/features/:slug/unfreeze", async (req, res, params) => {
 
 /* POST /api/usage/log — tracker l'usage d'une feature */
 route("POST", "/api/usage/log", async (req, res, params, body) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const { slug } = body;
   if (!slug) return sendJSON(res, 400, { error: "slug requis." });
@@ -13143,7 +13144,7 @@ route("POST", "/api/usage/log", async (req, res, params, body) => {
 
 /* GET /api/me/freeze-suggestions — suggestions de gel en attente */
 route("GET", "/api/me/freeze-suggestions", async (req, res) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare(`
     SELECT fs.*, f.slug, f.nom, f.emoji, f.categorie,
@@ -13159,7 +13160,7 @@ route("GET", "/api/me/freeze-suggestions", async (req, res) => {
 
 /* POST /api/me/freeze-suggestions/:featureSlug/dismiss */
 route("POST", "/api/me/freeze-suggestions/:featureSlug/dismiss", async (req, res, params) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT id FROM features WHERE slug=?").get(params.featureSlug);
   if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
@@ -13170,7 +13171,7 @@ route("POST", "/api/me/freeze-suggestions/:featureSlug/dismiss", async (req, res
 
 /* GET /api/me/recommendations — recommandations personnalisées */
 route("GET", "/api/me/recommendations", async (req, res) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   // Générer des recommandations basées sur le profil et les usages
   _generateRecommendations(me.id, me.role);
@@ -13186,7 +13187,7 @@ route("GET", "/api/me/recommendations", async (req, res) => {
 
 /* POST /api/me/recommendations/:featureSlug/dismiss */
 route("POST", "/api/me/recommendations/:featureSlug/dismiss", async (req, res, params) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT id FROM features WHERE slug=?").get(params.featureSlug);
   if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
@@ -13196,7 +13197,7 @@ route("POST", "/api/me/recommendations/:featureSlug/dismiss", async (req, res, p
 });
 
 /* Moteur de recommandations */
-function _generateRecommendations(userId, userRole) {
+async function _generateRecommendations(userId, userRole) {
   try {
     const allFeatures = await db.prepare("SELECT * FROM features WHERE actif=1").all();
     const states = computeFeatureStates(userId, userRole);
@@ -13245,7 +13246,7 @@ function _generateRecommendations(userId, userRole) {
 
 /* GET /api/admin/features — liste toutes les features */
 route("GET", "/api/admin/features", async (req, res, params, body, query) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const features = await db.prepare("SELECT * FROM features ORDER BY categorie, ordre").all();
   const stats = features.map(f => {
@@ -13259,7 +13260,7 @@ route("GET", "/api/admin/features", async (req, res, params, body, query) => {
 
 /* POST /api/admin/features — créer une feature */
 route("POST", "/api/admin/features", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { slug, nom, description, categorie, visibilite_defaut, require_accreditation, accred_type,
           roles_acces, emoji, couleur, ordre } = body;
@@ -13285,7 +13286,7 @@ route("POST", "/api/admin/features", async (req, res, params, body) => {
 
 /* PUT /api/admin/features/:id — modifier une feature */
 route("PUT", "/api/admin/features/:id", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const n = v => v === undefined ? null : v;
   const { slug, nom, description, categorie, visibilite_defaut, require_accreditation, accred_type,
@@ -13306,7 +13307,7 @@ route("PUT", "/api/admin/features/:id", async (req, res, params, body) => {
 
 /* DELETE /api/admin/features/:id — désactiver une feature */
 route("DELETE", "/api/admin/features/:id", async (req, res, params) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   db.prepare("UPDATE features SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
@@ -13314,7 +13315,7 @@ route("DELETE", "/api/admin/features/:id", async (req, res, params) => {
 
 /* GET /api/admin/features/stats — tableau de bord usage global */
 route("GET", "/api/admin/features/stats", async (req, res) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const top_usages = db.prepare(`
     SELECT f.slug, f.nom, f.emoji, f.categorie,
@@ -13333,7 +13334,7 @@ route("GET", "/api/admin/features/stats", async (req, res) => {
 
 /* GET /api/admin/features/:id/users — utilisateurs par état pour une feature */
 route("GET", "/api/admin/features/:id/users", async (req, res, params) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const rows = await db.prepare(`
     SELECT uf.statut, uf.source, uf.activated_at, uf.frozen_at,
@@ -13349,7 +13350,7 @@ route("GET", "/api/admin/features/:id/users", async (req, res, params) => {
 /* ─── PACKS D'ACCRÉDITATIONS ─── */
 
 /* Helper : attribue toutes les accréditations d'un pack à un utilisateur */
-function _attribuerPackItems(user, packId) {
+async function _attribuerPackItems(user, packId) {
   const items = await db.prepare("SELECT accred_id FROM accred_pack_items WHERE pack_id=?").all(packId);
   const ins = db.prepare("INSERT OR IGNORE INTO user_accreditations (user_id,accred_id,statut) VALUES (?,?,'active')");
   for (const it of items) ins.run(user.id, it.accred_id);
@@ -13357,9 +13358,9 @@ function _attribuerPackItems(user, packId) {
 
 /* GET /api/accreditations/packs — liste publique des packs actifs */
 route("GET", "/api/accreditations/packs", async (req, res) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   const packs = await db.prepare("SELECT * FROM accred_packs WHERE actif=1 ORDER BY ordre, nom").all();
-  const result = packs.map(p => {
+  const result = packs.map(async p => {
     const items = await db.prepare(`
       SELECT d.id, d.type, d.label, d.emoji, d.couleur
       FROM accred_pack_items pi JOIN accred_definitions d ON d.id=pi.accred_id WHERE pi.pack_id=?
@@ -13379,7 +13380,7 @@ route("GET", "/api/accreditations/packs", async (req, res) => {
 
 /* POST /api/accreditations/packs/:id/demande — demander un pack */
 route("POST", "/api/accreditations/packs/:id/demande", async (req, res, params, body) => {
-  const me = getCurrentUser(req);
+  const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const pack = await db.prepare("SELECT * FROM accred_packs WHERE id=? AND actif=1").get(params.id);
   if (!pack) return sendJSON(res, 404, { error: "Pack introuvable." });
@@ -13405,10 +13406,10 @@ route("POST", "/api/accreditations/packs/:id/demande", async (req, res, params, 
 
 /* GET /api/admin/accred/packs — liste admin des packs */
 route("GET", "/api/admin/accred/packs", async (req, res) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const packs = await db.prepare("SELECT * FROM accred_packs ORDER BY ordre, nom").all();
-  const result = packs.map(p => {
+  const result = packs.map(async p => {
     const items = await db.prepare(`
       SELECT d.id, d.type, d.label, d.emoji FROM accred_pack_items pi
       JOIN accred_definitions d ON d.id=pi.accred_id WHERE pi.pack_id=?
@@ -13424,7 +13425,7 @@ route("GET", "/api/admin/accred/packs", async (req, res) => {
 
 /* POST /api/admin/accred/packs — créer un pack */
 route("POST", "/api/admin/accred/packs", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { nom, description, emoji, couleur, couleur_bg, slug, ordre, date_debut, date_fin, accred_ids, regles, tarifs } = body;
   if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
@@ -13459,7 +13460,7 @@ route("POST", "/api/admin/accred/packs", async (req, res, params, body) => {
 
 /* PUT /api/admin/accred/packs/:id — modifier un pack */
 route("PUT", "/api/admin/accred/packs/:id", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const pack = await db.prepare("SELECT * FROM accred_packs WHERE id=?").get(params.id);
   if (!pack) return sendJSON(res, 404, { error: "Pack introuvable." });
@@ -13499,7 +13500,7 @@ route("PUT", "/api/admin/accred/packs/:id", async (req, res, params, body) => {
 
 /* DELETE /api/admin/accred/packs/:id — désactiver un pack */
 route("DELETE", "/api/admin/accred/packs/:id", async (req, res, params) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   db.prepare("UPDATE accred_packs SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
@@ -13507,7 +13508,7 @@ route("DELETE", "/api/admin/accred/packs/:id", async (req, res, params) => {
 
 /* GET /api/admin/accred/packs/demandes — demandes de packs en attente */
 route("GET", "/api/admin/accred/packs/demandes", async (req, res) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const rows = await db.prepare(`
     SELECT pd.*, u.nom AS user_nom, u.email AS user_email, u.role AS user_role,
@@ -13520,7 +13521,7 @@ route("GET", "/api/admin/accred/packs/demandes", async (req, res) => {
 
 /* PATCH /api/admin/accred/packs/demandes/:id/approuver */
 route("PATCH", "/api/admin/accred/packs/demandes/:id/approuver", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const dem = await db.prepare("SELECT * FROM accred_pack_demandes WHERE id=?").get(params.id);
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
@@ -13538,7 +13539,7 @@ route("PATCH", "/api/admin/accred/packs/demandes/:id/approuver", async (req, res
 
 /* PATCH /api/admin/accred/packs/demandes/:id/refuser */
 route("PATCH", "/api/admin/accred/packs/demandes/:id/refuser", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const dem = await db.prepare("SELECT * FROM accred_pack_demandes WHERE id=?").get(params.id);
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
@@ -13552,7 +13553,7 @@ route("PATCH", "/api/admin/accred/packs/demandes/:id/refuser", async (req, res, 
 
 /* PATCH /api/admin/accred/packs/:id/attribuer — attribution manuelle directe */
 route("PATCH", "/api/admin/accred/packs/:id/attribuer", async (req, res, params, body) => {
-  const admin = getCurrentUser(req);
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { user_id } = body;
   if (!user_id) return sendJSON(res, 400, { error: "user_id requis." });
@@ -13573,7 +13574,7 @@ route("PATCH", "/api/admin/accred/packs/:id/attribuer", async (req, res, params,
 
 /* POST /api/profil/:id/visit — enregistre une visite de profil */
 route("POST", "/api/profil/:id/visit", async (req, res, params) => {
-  const visitor = getCurrentUser(req);
+  const visitor = await getCurrentUser(req);
   const pid = parseInt(params.id);
   if (!pid) return sendJSON(res, 400, { error: "id requis." });
   // Ne pas enregistrer les auto-visites
@@ -13591,7 +13592,7 @@ route("POST", "/api/profil/:id/visit", async (req, res, params) => {
 
 /* GET /api/observations/me — stats personnelles */
 route("GET", "/api/observations/me", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
 
   const uid = user.id;
@@ -13685,7 +13686,7 @@ route("GET", "/api/observations/me", async (req, res) => {
 
 /* GET /api/observations/approfondies — stats étendues (initiative/collectivite/admin) */
 route("GET", "/api/observations/approfondies", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!['initiative','collectivite','administrateur'].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux Comptes Initiatives et Étatiques." });
 
@@ -13808,7 +13809,7 @@ route("GET", "/api/observations/approfondies", async (req, res) => {
 
 /* GET /api/observatoire/global — tableau de bord mondial (admin) */
 route("GET", "/api/observatoire/global", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administrateur." });
 
   const today = new Date().toISOString().slice(0,10);
@@ -13902,7 +13903,7 @@ route("GET", "/api/observatoire/global", async (req, res) => {
 
 /* GET /api/observatoire/mad — Moteur d'Analyse des Diasporas */
 route("GET", "/api/observatoire/mad", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || !['administrateur','collectivite'].includes(user.role)) return sendJSON(res, 403, { error: "Accès réservé." });
 
   const monthAgo = new Date(Date.now() - 30*86400000).toISOString().slice(0,10);
@@ -13983,7 +13984,7 @@ route("GET", "/api/observatoire/mad", async (req, res) => {
 
 /* POST /api/audit-log — enregistre une action admin */
 route("POST", "/api/audit-log", async (req, res, params, body) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé." });
   const { action, cible_type, cible_id, detail } = body;
   if (!action) return sendJSON(res, 400, { error: "action requis." });
@@ -13993,7 +13994,7 @@ route("POST", "/api/audit-log", async (req, res, params, body) => {
 
 /* GET /api/audit-log — historique des actions admin */
 route("GET", "/api/audit-log", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé." });
   const logs = await db.prepare(`SELECT al.*, u.nom, u.prenom, u.email FROM audit_log al JOIN users u ON al.admin_id=u.id ORDER BY al.created_at DESC LIMIT 100`).all();
   sendJSON(res, 200, { logs });
@@ -14003,7 +14004,7 @@ route("GET", "/api/audit-log", async (req, res) => {
 /* ══ OBSERVATOIRE INSTITUTIONNEL (Admin) ══ */
 
 route("GET", "/api/admin/observatoire-institutionnel", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // Données réelles
@@ -14157,7 +14158,7 @@ route("GET", "/api/admin/observatoire-institutionnel", async (req, res) => {
 
 /* Export données admin (téléchargement) */
 route("GET", "/api/admin/export-data", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const url = new URL("http://x" + req.url);
   const module = url.searchParams.get("module") || "all";
@@ -14193,7 +14194,7 @@ route("GET", "/api/admin/export-data", async (req, res) => {
 /* ══ OBSERVATOIRE DE LA COOPÉRATION INTERNATIONALE (Admin) ══ */
 
 route("GET", "/api/admin/observatoire-coop", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
   // Données réelles
@@ -14357,7 +14358,7 @@ route("GET", "/api/admin/observatoire-coop", async (req, res) => {
 /* ══ OBSERVATOIRE ÉCONOMIQUE GLOBAL (Admin uniquement) ══ */
 
 route("GET", "/api/admin/observatoire-eco", async (req, res) => {
-  const user = getCurrentUser(req);
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const url = new URL("http://x" + req.url);
   const periode = url.searchParams.get("periode") || "all";
@@ -14483,8 +14484,8 @@ route("GET", "/api/admin/observatoire-eco", async (req, res) => {
 /* ═══════════════════════════════════════════════════════════════════
    SHIM Express → route() — compatibilité app.get/post/put/delete/patch
    ═══════════════════════════════════════════════════════════════════ */
-function requireAuth(req, res, next) {
-  const user = getCurrentUser(req);
+async function requireAuth(req, res, next) {
+  const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Non authentifié' });
   req.user = user;
   next();
@@ -14496,7 +14497,7 @@ const app = {
   delete: (path, ...h) => _appRoute('DELETE', path, h),
   patch:  (path, ...h) => _appRoute('PATCH',  path, h),
 };
-function _appRoute(method, path, handlers) {
+async function _appRoute(method, path, handlers) {
   const middlewares = handlers.slice(0, -1);
   const handler = handlers[handlers.length - 1];
   route(method, path, async (req, res, params, body) => {
@@ -14521,7 +14522,7 @@ function _appRoute(method, path, handlers) {
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── RÉACTIONS AUX MESSAGES ── */
-app.post('/api/conversations/:cid/messages/:mid/reactions', requireAuth, (req, res) => {
+app.post('/api/conversations/:cid/messages/:mid/reactions', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const mid = parseInt(req.params.mid);
   const cid = parseInt(req.params.cid);
@@ -14545,7 +14546,7 @@ app.post('/api/conversations/:cid/messages/:mid/reactions', requireAuth, (req, r
   sendJSON(res, 200, { action: 'added', emoji });
 });
 
-app.get('/api/conversations/:cid/messages/:mid/reactions', requireAuth, (req, res) => {
+app.get('/api/conversations/:cid/messages/:mid/reactions', requireAuth, async (req, res) => {
   const mid = parseInt(req.params.mid);
   const rows = db.prepare(`
     SELECT emoji, COUNT(*) as count, GROUP_CONCAT(u.nom) as noms,
@@ -14557,7 +14558,7 @@ app.get('/api/conversations/:cid/messages/:mid/reactions', requireAuth, (req, re
 });
 
 /* ── FAVORIS MESSAGES ── */
-app.post('/api/messages/:id/favori', requireAuth, (req, res) => {
+app.post('/api/messages/:id/favori', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const mid = parseInt(req.params.id);
   const existing = await db.prepare('SELECT id FROM message_favorites WHERE message_id=? AND user_id=?').get(mid, uid);
@@ -14569,7 +14570,7 @@ app.post('/api/messages/:id/favori', requireAuth, (req, res) => {
   sendJSON(res, 200, { favori: true });
 });
 
-app.get('/api/messages/favoris', requireAuth, (req, res) => {
+app.get('/api/messages/favoris', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const rows = await db.prepare(`
     SELECT m.*, u.nom as expediteur_nom, u.photo_url as expediteur_photo,
@@ -14584,7 +14585,7 @@ app.get('/api/messages/favoris', requireAuth, (req, res) => {
 });
 
 /* ── ÉPINGLAGE MESSAGES ── */
-app.post('/api/conversations/:cid/messages/:mid/epingle', requireAuth, (req, res) => {
+app.post('/api/conversations/:cid/messages/:mid/epingle', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const cid = parseInt(req.params.cid);
   const mid = parseInt(req.params.mid);
@@ -14601,7 +14602,7 @@ app.post('/api/conversations/:cid/messages/:mid/epingle', requireAuth, (req, res
   sendJSON(res, 200, { epingle: true });
 });
 
-app.get('/api/conversations/:cid/epingles', requireAuth, (req, res) => {
+app.get('/api/conversations/:cid/epingles', requireAuth, async (req, res) => {
   const cid = parseInt(req.params.cid);
   const rows = await db.prepare(`
     SELECT m.*, u.nom as expediteur_nom, u.photo_url as expediteur_photo
@@ -14614,7 +14615,7 @@ app.get('/api/conversations/:cid/epingles', requireAuth, (req, res) => {
 });
 
 /* ── RECHERCHE MESSAGES ── */
-app.get('/api/messages/search', requireAuth, (req, res) => {
+app.get('/api/messages/search', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const q = (req.query.q || '').trim();
   if (q.length < 2) return sendJSON(res, 200, []);
@@ -14633,7 +14634,7 @@ app.get('/api/messages/search', requireAuth, (req, res) => {
 });
 
 /* ── CONVERSATIONS DE GROUPE ── */
-app.post('/api/conversations/groupe', requireAuth, (req, res) => {
+app.post('/api/conversations/groupe', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const { nom, membres_ids } = req.body;
   if (!nom || !Array.isArray(membres_ids) || membres_ids.length < 1) {
@@ -14652,7 +14653,7 @@ app.post('/api/conversations/groupe', requireAuth, (req, res) => {
   sendJSON(res, 201, { id: cid, nom, type: 'groupe', membres: allMembers });
 });
 
-app.get('/api/conversations/:cid/membres', requireAuth, (req, res) => {
+app.get('/api/conversations/:cid/membres', requireAuth, async (req, res) => {
   const cid = parseInt(req.params.cid);
   const rows = await db.prepare(`
     SELECT u.id, u.nom, u.photo_url, u.titre_pro, cm.role, cm.joined_at
@@ -14662,7 +14663,7 @@ app.get('/api/conversations/:cid/membres', requireAuth, (req, res) => {
   sendJSON(res, 200, rows);
 });
 
-app.post('/api/conversations/:cid/membres', requireAuth, (req, res) => {
+app.post('/api/conversations/:cid/membres', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const cid = parseInt(req.params.cid);
   const { user_id } = req.body;
@@ -14676,17 +14677,17 @@ app.post('/api/conversations/:cid/membres', requireAuth, (req, res) => {
 });
 
 /* ── PORTFOLIO UTILISATEUR ── */
-app.get('/api/profil/portfolio', requireAuth, (req, res) => {
+app.get('/api/profil/portfolio', requireAuth, async (req, res) => {
   const rows = await db.prepare('SELECT * FROM user_portfolio WHERE user_id=? ORDER BY ordre, created_at DESC').all(req.user.id);
   sendJSON(res, 200, rows.map(r => ({...r, images_json: safeJSON(r.images_json,[]), fichiers_json: safeJSON(r.fichiers_json,[])})));
 });
 
-app.get('/api/profil/:id/portfolio', (req, res) => {
+app.get('/api/profil/:id/portfolio', async (req, res) => {
   const rows = await db.prepare('SELECT * FROM user_portfolio WHERE user_id=? ORDER BY ordre, created_at DESC').all(parseInt(req.params.id));
   sendJSON(res, 200, rows.map(r => ({...r, images_json: safeJSON(r.images_json,[]), fichiers_json: safeJSON(r.fichiers_json,[])})));
 });
 
-app.post('/api/profil/portfolio', requireAuth, (req, res) => {
+app.post('/api/profil/portfolio', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const { titre, description, annee, lien, partenaires, resultats, type, images_json, fichiers_json } = req.body;
   if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
@@ -14698,7 +14699,7 @@ app.post('/api/profil/portfolio', requireAuth, (req, res) => {
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
-app.put('/api/profil/portfolio/:id', requireAuth, (req, res) => {
+app.put('/api/profil/portfolio/:id', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const id = parseInt(req.params.id);
   const item = await db.prepare('SELECT * FROM user_portfolio WHERE id=? AND user_id=?').get(id, uid);
@@ -14711,7 +14712,7 @@ app.put('/api/profil/portfolio/:id', requireAuth, (req, res) => {
   sendJSON(res, 200, { ok: true });
 });
 
-app.delete('/api/profil/portfolio/:id', requireAuth, (req, res) => {
+app.delete('/api/profil/portfolio/:id', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const id = parseInt(req.params.id);
   const item = await db.prepare('SELECT id FROM user_portfolio WHERE id=? AND user_id=?').get(id, uid);
@@ -14721,15 +14722,15 @@ app.delete('/api/profil/portfolio/:id', requireAuth, (req, res) => {
 });
 
 /* ── LANGUES UTILISATEUR ── */
-app.get('/api/profil/langues', requireAuth, (req, res) => {
+app.get('/api/profil/langues', requireAuth, async (req, res) => {
   sendJSON(res, 200, await db.prepare('SELECT * FROM user_langues WHERE user_id=? ORDER BY is_maternelle DESC, langue').all(req.user.id));
 });
 
-app.get('/api/profil/:id/langues', (req, res) => {
+app.get('/api/profil/:id/langues', async (req, res) => {
   sendJSON(res, 200, await db.prepare('SELECT * FROM user_langues WHERE user_id=? ORDER BY is_maternelle DESC, langue').all(parseInt(req.params.id)));
 });
 
-app.post('/api/profil/langues', requireAuth, (req, res) => {
+app.post('/api/profil/langues', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const { langue, niveau, is_maternelle, certification } = req.body;
   if (!langue) return sendJSON(res, 400, { error: 'Langue requise' });
@@ -14740,14 +14741,14 @@ app.post('/api/profil/langues', requireAuth, (req, res) => {
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
 });
 
-app.delete('/api/profil/langues/:id', requireAuth, (req, res) => {
+app.delete('/api/profil/langues/:id', requireAuth, async (req, res) => {
   const uid = req.user.id;
   await db.prepare('DELETE FROM user_langues WHERE id=? AND user_id=?').run(parseInt(req.params.id), uid);
   sendJSON(res, 200, { ok: true });
 });
 
 /* ── RÉSEAUX SOCIAUX PROFIL ── */
-app.put('/api/profil/reseaux-sociaux', requireAuth, (req, res) => {
+app.put('/api/profil/reseaux-sociaux', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const { reseaux } = req.body; // { linkedin, facebook, instagram, x, youtube, tiktok, site_web, github }
   const allowed = ['linkedin','facebook','instagram','x','youtube','tiktok','site_web','github','autre1','autre2'];
@@ -14758,7 +14759,7 @@ app.put('/api/profil/reseaux-sociaux', requireAuth, (req, res) => {
 });
 
 /* ── DISPONIBILITÉS PROFIL ── */
-app.put('/api/profil/disponibilites', requireAuth, (req, res) => {
+app.put('/api/profil/disponibilites', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const { disponibilites } = req.body;
   await db.prepare('UPDATE users SET disponibilites=? WHERE id=?').run(JSON.stringify(disponibilites||{}), uid);
@@ -14766,7 +14767,7 @@ app.put('/api/profil/disponibilites', requireAuth, (req, res) => {
 });
 
 /* ── RECOMMANDATIONS UTILISATEUR ── */
-app.get('/api/profil/:id/recommandations', (req, res) => {
+app.get('/api/profil/:id/recommandations', async (req, res) => {
   const toId = parseInt(req.params.id);
   const rows = await db.prepare(`
     SELECT ur.*, u.nom as auteur_nom, u.photo_url as auteur_photo, u.titre_pro as auteur_titre
@@ -14778,7 +14779,7 @@ app.get('/api/profil/:id/recommandations', (req, res) => {
   sendJSON(res, 200, rows);
 });
 
-app.post('/api/profil/:id/recommandations', requireAuth, (req, res) => {
+app.post('/api/profil/:id/recommandations', requireAuth, async (req, res) => {
   const fromId = req.user.id;
   const toId = parseInt(req.params.id);
   if (fromId === toId) return sendJSON(res, 400, { error: 'Vous ne pouvez pas vous recommander vous-même' });
@@ -14791,14 +14792,14 @@ app.post('/api/profil/:id/recommandations', requireAuth, (req, res) => {
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
 });
 
-app.get('/api/profil/mes-recommandations', requireAuth, (req, res) => {
+app.get('/api/profil/mes-recommandations', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const recues = await db.prepare(`SELECT ur.*, u.nom as auteur_nom, u.photo_url as auteur_photo FROM user_recommendations ur JOIN users u ON u.id=ur.from_user_id WHERE ur.to_user_id=? ORDER BY ur.created_at DESC`).all(uid);
   const envoyees = await db.prepare(`SELECT ur.*, u.nom as dest_nom, u.photo_url as dest_photo FROM user_recommendations ur JOIN users u ON u.id=ur.to_user_id WHERE ur.from_user_id=? ORDER BY ur.created_at DESC`).all(uid);
   sendJSON(res, 200, { recues, envoyees });
 });
 
-app.patch('/api/profil/recommandations/:id', requireAuth, (req, res) => {
+app.patch('/api/profil/recommandations/:id', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const id = parseInt(req.params.id);
   const { statut } = req.body;
@@ -14811,7 +14812,7 @@ app.patch('/api/profil/recommandations/:id', requireAuth, (req, res) => {
 });
 
 /* ── FORMATIONS — SUIVI UTILISATEUR ── */
-app.get('/api/formations/suivi', requireAuth, (req, res) => {
+app.get('/api/formations/suivi', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const rows = await db.prepare(`
     SELECT ufs.*, f.domaine, f.niveau as niveau_formation, f.prix, f.gratuit, f.duree
@@ -14822,7 +14823,7 @@ app.get('/api/formations/suivi', requireAuth, (req, res) => {
   sendJSON(res, 200, rows);
 });
 
-app.post('/api/formations/suivi', requireAuth, (req, res) => {
+app.post('/api/formations/suivi', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const { formation_id, titre, organisme } = req.body;
   // Vérifier si déjà inscrit
@@ -14841,7 +14842,7 @@ app.post('/api/formations/suivi', requireAuth, (req, res) => {
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
-app.patch('/api/formations/suivi/:id', requireAuth, (req, res) => {
+app.patch('/api/formations/suivi/:id', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const id = parseInt(req.params.id);
   const item = await db.prepare('SELECT * FROM user_formations_suivi WHERE id=? AND user_id=?').get(id, uid);
@@ -14853,12 +14854,12 @@ app.patch('/api/formations/suivi/:id', requireAuth, (req, res) => {
 });
 
 /* ── CERTIFICATIONS NUMÉRIQUES UTILISATEUR ── */
-app.get('/api/certifications', requireAuth, (req, res) => {
+app.get('/api/certifications', requireAuth, async (req, res) => {
   const uid = req.user.id;
   sendJSON(res, 200, await db.prepare('SELECT * FROM user_certifications_obtenues WHERE user_id=? ORDER BY date_obtention DESC').all(uid));
 });
 
-app.post('/api/certifications', requireAuth, (req, res) => {
+app.post('/api/certifications', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const { titre, organisme, formation_id, date_obtention, date_expiration } = req.body;
   if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
@@ -14869,7 +14870,7 @@ app.post('/api/certifications', requireAuth, (req, res) => {
   sendJSON(res, 201, { id: r.lastInsertRowid, code_verification: code });
 });
 
-app.get('/api/certifications/verify/:code', (req, res) => {
+app.get('/api/certifications/verify/:code', async (req, res) => {
   const cert = await db.prepare(`
     SELECT uco.*, u.nom, u.titre_pro FROM user_certifications_obtenues uco
     JOIN users u ON u.id=uco.user_id
@@ -14884,7 +14885,7 @@ const OZ_SYSTEM = `Tu es OZ, l'assistant intelligent de Diaspo'Actif — la plat
 Tu aides les utilisateurs à : naviguer sur la plateforme, trouver des partenaires, préparer des projets, améliorer leurs profils, comprendre les fonctionnalités, et répondre à toutes leurs questions.
 Réponds toujours en français, de manière concise, professionnelle et encourageante.`;
 
-app.post('/api/oz/chat', requireAuth, (req, res) => {
+app.post('/api/oz/chat', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const { message, conversation_id } = req.body;
   if (!message || !message.trim()) return sendJSON(res, 400, { error: 'Message vide' });
@@ -14954,14 +14955,14 @@ app.post('/api/oz/chat', requireAuth, (req, res) => {
   sendJSON(res, 200, { reply, conversation_id: convId });
 });
 
-app.get('/api/oz/history', requireAuth, (req, res) => {
+app.get('/api/oz/history', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const conv = await db.prepare('SELECT * FROM oz_conversations WHERE user_id=? ORDER BY updated_at DESC LIMIT 1').get(uid);
   if (!conv) return sendJSON(res, 200, { messages: [], id: null });
   sendJSON(res, 200, { messages: safeJSON(conv.messages_json, []), id: conv.id });
 });
 
-app.delete('/api/oz/history', requireAuth, (req, res) => {
+app.delete('/api/oz/history', requireAuth, async (req, res) => {
   await db.prepare('DELETE FROM oz_conversations WHERE user_id=?').run(req.user.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -15008,7 +15009,7 @@ function checkBPCompletude(sections) {
 }
 
 /* ---- Liste des business plans ---- */
-app.get('/api/business-plans', requireAuth, (req, res) => {
+app.get('/api/business-plans', requireAuth, async (req, res) => {
   const rows = db.prepare(`
     SELECT bp.*, u.nom as owner_nom, u.prenom as owner_prenom,
       (SELECT COUNT(*) FROM bp_collaborateurs bc WHERE bc.bp_id=bp.id) as nb_collab
@@ -15042,7 +15043,7 @@ app.post('/api/business-plans', requireAuth, async (req, res) => {
 });
 
 /* ---- Lire un business plan ---- */
-app.get('/api/business-plans/:id', requireAuth, (req, res) => {
+app.get('/api/business-plans/:id', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Plan introuvable' });
   // Vérifier accès (propriétaire ou collaborateur)
@@ -15089,7 +15090,7 @@ app.put('/api/business-plans/:id', requireAuth, async (req, res) => {
 });
 
 /* ---- Supprimer ---- */
-app.delete('/api/business-plans/:id', requireAuth, (req, res) => {
+app.delete('/api/business-plans/:id', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
   await db.prepare('DELETE FROM business_plans WHERE id=?').run(bp.id);
@@ -15097,7 +15098,7 @@ app.delete('/api/business-plans/:id', requireAuth, (req, res) => {
 });
 
 /* ---- Dupliquer ---- */
-app.post('/api/business-plans/:id/duplicate', requireAuth, (req, res) => {
+app.post('/api/business-plans/:id/duplicate', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
@@ -15110,7 +15111,7 @@ app.post('/api/business-plans/:id/duplicate', requireAuth, (req, res) => {
 });
 
 /* ---- Versions ---- */
-app.get('/api/business-plans/:id/versions', requireAuth, (req, res) => {
+app.get('/api/business-plans/:id/versions', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
@@ -15123,7 +15124,7 @@ app.get('/api/business-plans/:id/versions', requireAuth, (req, res) => {
   sendJSON(res, 200, versions);
 });
 
-app.post('/api/business-plans/:id/versions', requireAuth, (req, res) => {
+app.post('/api/business-plans/:id/versions', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   if (bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
@@ -15138,7 +15139,7 @@ app.post('/api/business-plans/:id/versions', requireAuth, (req, res) => {
   sendJSON(res, 201, { version: newVer });
 });
 
-app.get('/api/business-plans/:id/versions/:v', requireAuth, (req, res) => {
+app.get('/api/business-plans/:id/versions/:v', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
@@ -15149,7 +15150,7 @@ app.get('/api/business-plans/:id/versions/:v', requireAuth, (req, res) => {
 });
 
 /* ---- Restaurer une version ---- */
-app.post('/api/business-plans/:id/versions/:v/restore', requireAuth, (req, res) => {
+app.post('/api/business-plans/:id/versions/:v/restore', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
   const ver = await db.prepare('SELECT * FROM bp_versions WHERE bp_id=? AND version=?').get(req.params.id, req.params.v);
@@ -15163,7 +15164,7 @@ app.post('/api/business-plans/:id/versions/:v/restore', requireAuth, (req, res) 
 });
 
 /* ---- Complétude ---- */
-app.get('/api/business-plans/:id/completude', requireAuth, (req, res) => {
+app.get('/api/business-plans/:id/completude', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
@@ -15173,7 +15174,7 @@ app.get('/api/business-plans/:id/completude', requireAuth, (req, res) => {
 });
 
 /* ---- Collaborateurs ---- */
-app.get('/api/business-plans/:id/collaborateurs', requireAuth, (req, res) => {
+app.get('/api/business-plans/:id/collaborateurs', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   if (bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
@@ -15197,7 +15198,7 @@ app.post('/api/business-plans/:id/collaborateurs', requireAuth, async (req, res)
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
 });
 
-app.delete('/api/business-plans/:id/collaborateurs/:uid', requireAuth, (req, res) => {
+app.delete('/api/business-plans/:id/collaborateurs/:uid', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
   await db.prepare('DELETE FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').run(req.params.id, req.params.uid);
@@ -15205,7 +15206,7 @@ app.delete('/api/business-plans/:id/collaborateurs/:uid', requireAuth, (req, res
 });
 
 /* ---- Commentaires par section ---- */
-app.get('/api/business-plans/:id/commentaires/:section', requireAuth, (req, res) => {
+app.get('/api/business-plans/:id/commentaires/:section', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
@@ -15423,7 +15424,7 @@ function genFinancialAdvice(bp, sections) {
   return advice;
 }
 
-function genRiskAdvice(type, secteur, sections) {
+async function genRiskAdvice(type, secteur, sections) {
   const risquesCommuns = {
     startup: ['Échec de la validation marché (produit ne correspond pas au besoin)', 'Manque de trésorerie avant d\'atteindre le seuil de rentabilité', 'Arrivée d\'un concurrent bien financé', 'Difficultés de recrutement de profils clés', 'Dépendance technologique envers un fournisseur'],
     association: ['Tarissement des subventions publiques', 'Dépendance à quelques donateurs principaux', 'Turnover des bénévoles clés', 'Évolution réglementaire du secteur', 'Difficultés à démontrer l\'impact'],
@@ -15433,7 +15434,7 @@ function genRiskAdvice(type, secteur, sections) {
   return `**⚠️ Risques prioritaires pour un ${type} dans le secteur ${secteur||'que vous opérez'} :**\n\n${risques.map((r,i)=>`${i+1}. ${r}`).join('\n')}\n\n**Pour chaque risque, définissez :**\n• Probabilité (faible/moyen/élevé/critique)\n• Impact si le risque survient\n• Mesure préventive concrète\n• Plan B si ça arrive\n\nSouhaitez-vous que je vous aide à rédiger votre analyse des risques complète ?`;
 }
 
-function getProgressReport(bp, sections) {
+async function getProgressReport(bp, sections) {
   const prog = bp.progression || 0;
   const completude = bp.completude || [];
   const manquants = completude.filter(c=>!c.ok).map(c=>c.label);
@@ -15475,7 +15476,7 @@ app.post('/api/business-plans/:id/assistant', requireAuth, async (req, res) => {
 });
 
 /* ── Route : historique assistant BP ── */
-app.get('/api/business-plans/:id/assistant/history', requireAuth, (req, res) => {
+app.get('/api/business-plans/:id/assistant/history', requireAuth, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const conv = await db.prepare('SELECT * FROM bp_assistant_conv WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
@@ -15725,7 +15726,7 @@ function getScoreComment(score, key) {
   return score >= 70 ? c.high : score >= 50 ? c.mid : c.low;
 }
 
-function genSimuRecommandations(pointsFaibles, bp, sections) {
+async function genSimuRecommandations(pointsFaibles, bp, sections) {
   const recs = [];
   if (pointsFaibles.includes('Maîtrise des chiffres')) recs.push('Complétez et mémorisez vos chiffres clés : CA prévu, BFR, seuil de rentabilité, montant recherché, utilisation des fonds.');
   if (pointsFaibles.includes('Clarté de la présentation')) recs.push('Préparez un pitch de 90 secondes (elevator pitch) que vous connaissez par cœur : problème → solution → marché → modèle → équipe → besoin.');
@@ -15737,7 +15738,7 @@ function genSimuRecommandations(pointsFaibles, bp, sections) {
 }
 
 /* ── Lister les simulations ── */
-app.get('/api/bp-simulations', requireAuth, (req, res) => {
+app.get('/api/bp-simulations', requireAuth, async (req, res) => {
   const bpId = req.query.bp_id;
   let query = 'SELECT bs.*, bp.nom_projet FROM bp_simulations bs JOIN business_plans bp ON bp.id=bs.bp_id WHERE bs.user_id=?';
   const params = [req.user.id];
@@ -15762,7 +15763,7 @@ app.post('/api/bp-simulations', requireAuth, async (req, res) => {
 });
 
 /* ── Obtenir une simulation ── */
-app.get('/api/bp-simulations/:id', requireAuth, (req, res) => {
+app.get('/api/bp-simulations/:id', requireAuth, async (req, res) => {
   const sim = await db.prepare('SELECT bs.*, bp.nom_projet, bp.sections_json, bp.progression FROM bp_simulations bs JOIN business_plans bp ON bp.id=bs.bp_id WHERE bs.id=? AND bs.user_id=?').get(req.params.id, req.user.id);
   if (!sim) return sendJSON(res, 404, { error: 'Simulation introuvable' });
   sendJSON(res, 200, { ...sim, messages: safeJSON(sim.messages_json, []), rapport: sim.rapport_json ? safeJSON(sim.rapport_json, {}) : null });
@@ -15804,7 +15805,7 @@ app.post('/api/bp-simulations/:id/finish', requireAuth, async (req, res) => {
 });
 
 /* ── Obtenir le rapport ── */
-app.get('/api/bp-simulations/:id/rapport', requireAuth, (req, res) => {
+app.get('/api/bp-simulations/:id/rapport', requireAuth, async (req, res) => {
   const sim = await db.prepare('SELECT * FROM bp_simulations WHERE id=? AND user_id=?').get(req.params.id, req.user.id);
   if (!sim) return sendJSON(res, 404, { error: 'Introuvable' });
   sendJSON(res, 200, { rapport: sim.rapport_json ? safeJSON(sim.rapport_json, {}) : null, score: sim.score, statut: sim.statut });
@@ -15815,7 +15816,7 @@ app.get('/api/bp-simulations/:id/rapport', requireAuth, (req, res) => {
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Helpers ── */
-function genResumeIA(titre, description, type) {
+async function genResumeIA(titre, description, type) {
   const types = { conference:'conférence', ag:'assemblée générale', formation:'formation', evenement:'événement', podcast:'podcast', interview:'interview' };
   const t = types[type] || type;
   return `Résumé de la ${t} "${titre}" : ${description ? description.slice(0,200) : 'Contenu audiovisuel produit par l\'initiative.'} Points abordés : vision stratégique, actualités de l'initiative, échanges avec les participants. Ce contenu est disponible en replay dans la bibliothèque audiovisuelle.`;
@@ -15833,7 +15834,7 @@ function genMomentsClés(titre) {
 /* ── LIVES ── */
 
 /* Lister les lives d'une initiative */
-app.get('/api/audiovisuel/lives', requireAuth, (req, res) => {
+app.get('/api/audiovisuel/lives', requireAuth, async (req, res) => {
   const initiativeId = req.query.initiative_id || req.user.id;
   const statut = req.query.statut;
   let q = 'SELECT l.*, u.nom as initiative_nom FROM av_lives l JOIN users u ON u.id=l.initiative_id WHERE l.initiative_id=?';
@@ -15854,7 +15855,7 @@ app.post('/api/audiovisuel/lives', requireAuth, async (req, res) => {
 });
 
 /* Obtenir un live */
-app.get('/api/audiovisuel/lives/:id', (req, res) => {
+app.get('/api/audiovisuel/lives/:id', async (req, res) => {
   const live = await db.prepare('SELECT l.*, u.nom as initiative_nom, u.avatar as initiative_avatar FROM av_lives l JOIN users u ON u.id=l.initiative_id WHERE l.id=?').get(req.params.id);
   if (!live) return sendJSON(res, 404, { error: 'Live introuvable' });
   sendJSON(res, 200, { ...live, tags: safeJSON(live.tags, []), moments_cles: safeJSON(live.moments_cles, []), decisions: safeJSON(live.decisions, []), actions: safeJSON(live.actions, []) });
@@ -15874,7 +15875,7 @@ app.put('/api/audiovisuel/lives/:id', requireAuth, async (req, res) => {
 });
 
 /* Supprimer un live */
-app.delete('/api/audiovisuel/lives/:id', requireAuth, (req, res) => {
+app.delete('/api/audiovisuel/lives/:id', requireAuth, async (req, res) => {
   const live = await db.prepare('SELECT * FROM av_lives WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
   if (!live) return sendJSON(res, 404, { error: 'Introuvable' });
   await db.prepare('DELETE FROM av_lives WHERE id=?').run(req.params.id);
@@ -15901,14 +15902,14 @@ app.post('/api/audiovisuel/lives/:id/statut', requireAuth, async (req, res) => {
 });
 
 /* Incrémenter vues */
-app.post('/api/audiovisuel/lives/:id/vue', (req, res) => {
+app.post('/api/audiovisuel/lives/:id/vue', async (req, res) => {
   await db.prepare('UPDATE av_lives SET nb_vues=nb_vues+1 WHERE id=?').run(req.params.id);
   sendJSON(res, 200, { ok: true });
 });
 
 /* ── CHAT LIVE ── */
 
-app.get('/api/audiovisuel/lives/:id/chat', (req, res) => {
+app.get('/api/audiovisuel/lives/:id/chat', async (req, res) => {
   const since = req.query.since || '1970-01-01';
   const msgs = await db.prepare("SELECT c.*, u.nom as user_nom, u.avatar as user_avatar FROM av_live_chat c LEFT JOIN users u ON u.id=c.user_id WHERE c.live_id=? AND c.created_at>? ORDER BY c.created_at ASC LIMIT 100").all(req.params.id, since);
   sendJSON(res, 200, msgs);
@@ -15923,14 +15924,14 @@ app.post('/api/audiovisuel/lives/:id/chat', requireAuth, async (req, res) => {
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
-app.delete('/api/audiovisuel/lives/:id/chat/:msgId', requireAuth, (req, res) => {
+app.delete('/api/audiovisuel/lives/:id/chat/:msgId', requireAuth, async (req, res) => {
   await db.prepare('UPDATE av_live_chat SET type=? WHERE id=? AND live_id=?').run('modere', req.params.msgId, req.params.id);
   sendJSON(res, 200, { ok: true });
 });
 
 /* ── SONDAGES ── */
 
-app.get('/api/audiovisuel/lives/:id/sondages', (req, res) => {
+app.get('/api/audiovisuel/lives/:id/sondages', async (req, res) => {
   const sondages = await db.prepare('SELECT * FROM av_sondages WHERE live_id=? AND actif=1').all(req.params.id);
   const result = sondages.map(s => {
     const options = safeJSON(s.options_json, []);
@@ -15971,14 +15972,14 @@ app.post('/api/audiovisuel/lives/:id/reactions', async (req, res) => {
   sendJSON(res, 200, { ok: true, reactions: total });
 });
 
-app.get('/api/audiovisuel/lives/:id/reactions', (req, res) => {
+app.get('/api/audiovisuel/lives/:id/reactions', async (req, res) => {
   const total = db.prepare('SELECT emoji, COUNT(*) as cnt FROM av_reactions WHERE live_id=? GROUP BY emoji ORDER BY cnt DESC').all(req.params.id);
   sendJSON(res, 200, total);
 });
 
 /* ── PODCASTS / SÉRIES ── */
 
-app.get('/api/audiovisuel/series', (req, res) => {
+app.get('/api/audiovisuel/series', async (req, res) => {
   const initiativeId = req.query.initiative_id;
   let q = 'SELECT s.*, u.nom as initiative_nom, (SELECT COUNT(*) FROM av_episodes e WHERE e.serie_id=s.id) as nb_episodes FROM av_series s JOIN users u ON u.id=s.initiative_id';
   const params = [];
@@ -15998,7 +15999,7 @@ app.post('/api/audiovisuel/series', requireAuth, async (req, res) => {
 
 /* ── ÉPISODES ── */
 
-app.get('/api/audiovisuel/episodes', (req, res) => {
+app.get('/api/audiovisuel/episodes', async (req, res) => {
   const initiativeId = req.query.initiative_id;
   const serieId = req.query.serie_id;
   let q = 'SELECT e.*, u.nom as initiative_nom, s.titre as serie_titre FROM av_episodes e JOIN users u ON u.id=e.initiative_id LEFT JOIN av_series s ON s.id=e.serie_id WHERE e.is_public=1';
@@ -16009,7 +16010,7 @@ app.get('/api/audiovisuel/episodes', (req, res) => {
   sendJSON(res, 200, await db.prepare(q).all(...params));
 });
 
-app.get('/api/audiovisuel/episodes/:id', (req, res) => {
+app.get('/api/audiovisuel/episodes/:id', async (req, res) => {
   const ep = await db.prepare('SELECT e.*, u.nom as initiative_nom, s.titre as serie_titre FROM av_episodes e JOIN users u ON u.id=e.initiative_id LEFT JOIN av_series s ON s.id=e.serie_id WHERE e.id=?').get(req.params.id);
   if (!ep) return sendJSON(res, 404, { error: 'Épisode introuvable' });
   await db.prepare('UPDATE av_episodes SET nb_ecoutes=nb_ecoutes+1 WHERE id=?').run(req.params.id);
@@ -16038,7 +16039,7 @@ app.put('/api/audiovisuel/episodes/:id', requireAuth, async (req, res) => {
   sendJSON(res, 200, { ok: true });
 });
 
-app.delete('/api/audiovisuel/episodes/:id', requireAuth, (req, res) => {
+app.delete('/api/audiovisuel/episodes/:id', requireAuth, async (req, res) => {
   const ep = await db.prepare('SELECT * FROM av_episodes WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
   if (!ep) return sendJSON(res, 404, { error: 'Introuvable' });
   await db.prepare('DELETE FROM av_episodes WHERE id=?').run(req.params.id);
@@ -16046,7 +16047,7 @@ app.delete('/api/audiovisuel/episodes/:id', requireAuth, (req, res) => {
 });
 
 /* Commenter un épisode */
-app.get('/api/audiovisuel/episodes/:id/commentaires', (req, res) => {
+app.get('/api/audiovisuel/episodes/:id/commentaires', async (req, res) => {
   const coms = await db.prepare('SELECT c.*, u.nom as user_nom, u.avatar as user_avatar FROM av_commentaires c JOIN users u ON u.id=c.user_id WHERE c.episode_id=? ORDER BY c.created_at DESC LIMIT 50').all(req.params.id);
   sendJSON(res, 200, coms);
 });
@@ -16060,7 +16061,7 @@ app.post('/api/audiovisuel/episodes/:id/commentaires', requireAuth, async (req, 
 });
 
 /* ── BIBLIOTHÈQUE (mixte lives + épisodes) ── */
-app.get('/api/audiovisuel/bibliotheque', (req, res) => {
+app.get('/api/audiovisuel/bibliotheque', async (req, res) => {
   const initiativeId = req.query.initiative_id;
   const type = req.query.type; // 'live' | 'episode' | null (tous)
   let lives = [], episodes = [];
@@ -16081,7 +16082,7 @@ app.get('/api/audiovisuel/bibliotheque', (req, res) => {
 });
 
 /* ── STATS AUDIOVISUEL ── */
-app.get('/api/audiovisuel/stats', requireAuth, (req, res) => {
+app.get('/api/audiovisuel/stats', requireAuth, async (req, res) => {
   const id = req.user.id;
   const totalLives = db.prepare('SELECT COUNT(*) as n FROM av_lives WHERE initiative_id=?').get(id).n;
   const totalVuesLive = db.prepare('SELECT COALESCE(SUM(nb_vues),0) as n FROM av_lives WHERE initiative_id=?').get(id).n;
@@ -16104,3 +16105,11 @@ if (require.main === module) {
     console.log(`Diaspo'Actif — serveur démarré sur http://localhost:${PORT}`);
   });
 }
+
+
+
+
+
+
+
+
