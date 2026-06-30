@@ -2904,30 +2904,30 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     const followedAll = [...new Set([...followedUsers, ...initOwners])];
     if (followedAll.length) {
       const ph = followedAll.map(()=>"?").join(",");
-      db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${ph}) AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 10`).all(...followedAll)
+      (await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${ph}) AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 10`).all(...followedAll))
         .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"suivi" }); } });
     }
   }
 
   // 2) Posts populaires récents (30j)
   const since = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,19).replace("T"," ");
-  db.prepare(`
+  (await db.prepare(`
     SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
     WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (u.is_demo IS NULL OR u.is_demo=FALSE)
     ORDER BY (SELECT COUNT(*) FROM fil_reactions r WHERE r.post_id=p.id)*3 +
              (SELECT COUNT(*) FROM fil_commentaires c WHERE c.post_id=p.id)*2 DESC,
              p.created_at DESC
     LIMIT 10
-  `).all(since).forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"populaire" }); } });
+  `).all(since)).forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"populaire" }); } });
 
   // 3) Articles récents mis en avant
-  db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 5`).all()
+  (await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 5`).all())
     .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"article" }); } });
 
   // 4) Reste chronologique
   const excludeClause = orderedIds.size ? `AND id NOT IN (${[...orderedIds].map(()=>"?").join(",")})` : "";
   const excludeArgs = orderedIds.size ? [...orderedIds] : [];
-  await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE 1=1 ${excludeClause} AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 30`).all(...excludeArgs)
+  (await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE 1=1 ${excludeClause} AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 30`).all(...excludeArgs))
     .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"global" }); } });
 
   // Pagination sur le résultat fusionné
