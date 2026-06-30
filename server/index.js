@@ -982,6 +982,30 @@ route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
   sendJSON(res, 201, { commentaire: comm });
 });
 
+/* ---------- Meta du fil (mes follows pour l'UI) ---------- */
+route("GET", "/api/fil/meta", async (req, res) => {
+  const cu = await getCurrentUser(req);
+  if (!cu) return sendJSON(res, 200, { suivis_users: [], suivis_initiatives: [] });
+  const suivis_users = (await db.prepare("SELECT followed_id AS id FROM user_follows WHERE follower_id=?").all(cu.id)).map(r => r.id);
+  const suivis_initiatives = (await db.prepare("SELECT initiative_id AS id FROM abonnements WHERE user_id=?").all(cu.id)).map(r => r.id);
+  sendJSON(res, 200, { suivis_users, suivis_initiatives });
+});
+
+/* ---------- Profils à découvrir dans le fil ---------- */
+route("GET", "/api/fil/profiles", async (req, res, params, body, query) => {
+  const cu = await getCurrentUser(req);
+  const users = await db.prepare(`
+    SELECT id, nom, prenom, photo_url, banner_url, ville, pays,
+           nationalite1, nationalite2, titre_pro, bio, situation_pro, theme_couleur, role
+    FROM users
+    WHERE role IN ('utilisateur','initiative')
+    ${cu ? "AND id != " + cu.id : ""}
+    ORDER BY created_at DESC
+    LIMIT 8
+  `).all();
+  sendJSON(res, 200, { profiles: users });
+});
+
 /* ---------- GET post unique ---------- */
 route("GET", "/api/fil/:id", async (req, res, params) => {
   const cu = await getCurrentUser(req);
@@ -2958,31 +2982,6 @@ route("DELETE", "/api/follow/:id", async (req, res, params) => {
   if (!cu) return sendJSON(res, 401, { error: "Connexion requise." });
   await db.prepare("DELETE FROM user_follows WHERE follower_id=? AND followed_id=?").run(cu.id, Number(params.id));
   sendJSON(res, 200, { ok: true, suivi: false });
-});
-
-/* ---------- Meta du fil (mes follows pour l'UI) ---------- */
-route("GET", "/api/fil/meta", async (req, res) => {
-  const cu = await getCurrentUser(req);
-  if (!cu) return sendJSON(res, 200, { suivis_users: [], suivis_initiatives: [] });
-  const suivis_users = (await db.prepare("SELECT followed_id AS id FROM user_follows WHERE follower_id=?").all(cu.id)).map(r => r.id);
-  const suivis_initiatives = (await db.prepare("SELECT initiative_id AS id FROM abonnements WHERE user_id=?").all(cu.id)).map(r => r.id);
-  sendJSON(res, 200, { suivis_users, suivis_initiatives });
-});
-
-/* ---------- Profils à découvrir dans le fil ---------- */
-route("GET", "/api/fil/profiles", async (req, res, params, body, query) => {
-  const cu = await getCurrentUser(req);
-  // Exclure l'utilisateur connecté, retourner 8 profils enrichis
-  const users = await db.prepare(`
-    SELECT id, nom, prenom, photo_url, banner_url, ville, pays,
-           nationalite1, nationalite2, titre_pro, bio, situation_pro, theme_couleur, role
-    FROM users
-    WHERE role IN ('utilisateur','initiative')
-    ${cu ? "AND id != " + cu.id : ""}
-    ORDER BY created_at DESC
-    LIMIT 8
-  `).all();
-  sendJSON(res, 200, { profiles: users });
 });
 
 /* ---------- Static file server (frontend existant) ---------- */
