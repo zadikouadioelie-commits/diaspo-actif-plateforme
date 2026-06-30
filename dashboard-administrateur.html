@@ -6390,6 +6390,8 @@ async function submitAccordDirect(){
     'temoignages-admin':   () => loadTemoignagesAdmin(),
     parametres:  () => loadParametres(),
     publicites:  () => loadPublicites(),
+    membres:     () => loadAdminMembres(),
+    initiatives: () => loadAdminInitiatives(),
     chatbot:     () => switchCbTab('stats'),
     billetterie: () => loadAdminBilletterie(),
     faq:         () => loadFaqAdmin(),
@@ -8232,6 +8234,86 @@ async function submitAccordDirect(){
         <td style="padding:8px;text-align:center;font-size:11px;color:var(--muted);">${(t.date_transaction||"").slice(0,16)}</td>
       </tr>`;
     }).join("") || `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Aucune transaction.</td></tr>`;
+  }
+
+  // ══ MEMBRES ═════════════════════════════════════════════════
+  async function loadAdminMembres() {
+    const el = document.getElementById('membres-list');
+    el.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const { membres = [] } = await api('GET', '/admin/membres');
+      if (!membres.length) { el.innerHTML = '<div class="notice">Aucun membre.</div>'; return; }
+      el.innerHTML = `
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="border-bottom:2px solid var(--border);">
+              <th style="padding:8px;text-align:left;">Nom</th>
+              <th style="padding:8px;text-align:left;">Email</th>
+              <th style="padding:8px;text-align:left;">Rôle</th>
+              <th style="padding:8px;text-align:left;">Statut</th>
+              <th style="padding:8px;text-align:left;">Inscription</th>
+              <th style="padding:8px;"></th>
+            </tr></thead>
+            <tbody>${membres.map(m => `
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px;">${esc(m.nom||'')} ${esc(m.prenom||'')}</td>
+                <td style="padding:8px;color:var(--muted);">${esc(m.email)}</td>
+                <td style="padding:8px;">${esc(m.role)}</td>
+                <td style="padding:8px;">${m.statut_verification==='valide'?'✅ Validé':m.statut_verification==='en_attente'?'⏳ En attente':'❌ Rejeté'}</td>
+                <td style="padding:8px;color:var(--muted);">${fmtDate(m.created_at)}</td>
+                <td style="padding:8px;text-align:right;">
+                  ${m.statut_verification==='en_attente'?`<button class="btn btn-sm btn-orange" onclick="adminValiderMembre(${m.id})">Valider</button> `:''}
+                  <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="adminSupprimerMembre(${m.id},'${esc(m.nom||m.email)}')">Suppr.</button>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    } catch(e) { el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+
+  async function adminValiderMembre(id) {
+    await api('PATCH', `/admin/comptes/${id}/valider`).catch(()=>{});
+    loadAdminMembres();
+  }
+
+  async function adminSupprimerMembre(id, nom) {
+    if (!confirm(`Supprimer définitivement le compte de "${nom}" ?`)) return;
+    await api('DELETE', `/admin/membres/${id}`).catch(e => alert(e.message));
+    loadAdminMembres();
+  }
+
+  // ══ INITIATIVES ADMIN ════════════════════════════════════════
+  async function loadAdminInitiatives() {
+    const el = document.getElementById('initiatives-admin-list');
+    el.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const { initiatives = [] } = await api('GET', '/initiatives?limit=200').catch(() => ({ initiatives: [] }));
+      if (!initiatives.length) { el.innerHTML = '<div class="notice">Aucune initiative.</div>'; return; }
+      el.innerHTML = `
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="border-bottom:2px solid var(--border);">
+              <th style="padding:8px;text-align:left;">Nom</th>
+              <th style="padding:8px;text-align:left;">Secteur</th>
+              <th style="padding:8px;text-align:left;">Pays</th>
+              <th style="padding:8px;text-align:left;">Créée le</th>
+              <th style="padding:8px;"></th>
+            </tr></thead>
+            <tbody>${initiatives.map(i => `
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px;font-weight:600;">${esc(i.nom||'')}</td>
+                <td style="padding:8px;color:var(--muted);">${esc(i.secteur||'—')}</td>
+                <td style="padding:8px;">${esc(i.pays||'—')}</td>
+                <td style="padding:8px;color:var(--muted);">${fmtDate(i.created_at||'')}</td>
+                <td style="padding:8px;text-align:right;">
+                  <a href="initiative.html?id=${i.id}" target="_blank" class="btn btn-sm btn-outline">Voir</a>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    } catch(e) { el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
   }
 
   // ══ PARAMÈTRES ═════════════════════════════════════════════

@@ -494,11 +494,7 @@ async function loadRapport(id) {
   try {
     simuId = id;
     const data = await api('GET', `/bp-simulations/${id}`);
-    if (data.rapport) {
-      renderRapport(data.rapport);
-    } else {
-      renderRapport(data.rapport_json ? JSON.parse(data.rapport_json) : {});
-    }
+    renderRapport(data.rapport || data.rapport_json || {});
     showStep('rapport');
     loadHistorique();
   } catch(e) {

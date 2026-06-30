@@ -2345,6 +2345,28 @@ route("GET", "/api/mes-evenements", async (req, res) => {
 });
 
 /* ---------- Modération administrateur ---------- */
+route("GET", "/api/admin/membres", async (req, res, params, body, query) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const role = query.role || null;
+  const q = query.q ? `%${query.q}%` : null;
+  let sql = "SELECT id,nom,prenom,email,role,ville,pays,statut_verification,created_at FROM users WHERE 1=1";
+  const args = [];
+  if (role) { sql += " AND role=?"; args.push(role); }
+  if (q) { sql += " AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ?)"; args.push(q, q, q); }
+  sql += " ORDER BY created_at DESC LIMIT 200";
+  const rows = db.prepare(sql).all(...args);
+  sendJSON(res, 200, { membres: rows });
+});
+
+route("DELETE", "/api/admin/membres/:id", async (req, res, params) => {
+  const user = getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  if (Number(params.id) === user.id) return sendJSON(res, 400, { error: "Impossible de supprimer votre propre compte." });
+  db.prepare("DELETE FROM users WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("GET", "/api/admin/comptes", async (req, res, params, body, query) => {
   const user = getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
@@ -2504,6 +2526,23 @@ route("GET", "/api/admin/certifications/:id/historique", async (req, res, params
 });
 
 /* ========== FIN ROUTES CERTIFICATION ========== */
+
+/* ---------- Financements ---------- */
+route("GET", "/api/financements", async (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const fins = db.prepare("SELECT * FROM financements WHERE user_id=? ORDER BY date_don DESC").all(user.id);
+  sendJSON(res, 200, { financements: fins });
+});
+
+route("POST", "/api/financements", async (req, res, params, body) => {
+  const user = getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { projet, montant } = body;
+  if (!projet || !montant) return sendJSON(res, 400, { error: "Champs manquants." });
+  const r = db.prepare("INSERT INTO financements (user_id, projet, montant) VALUES (?,?,?)").run(user.id, projet, montant);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
 
 /* ---------- Collaborations (appels à contribution) ---------- */
 route("GET", "/api/collaborations", async (req, res, params, body, query) => {
