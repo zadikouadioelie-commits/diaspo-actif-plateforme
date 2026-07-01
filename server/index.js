@@ -3128,6 +3128,7 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
 
+  try {
   // KPIs globaux
   const totalInit    = (await db.prepare("SELECT COUNT(*) n FROM initiatives").get())?.n;
   const totalEvents  = (await db.prepare("SELECT COUNT(*) n FROM evenements WHERE statut='ouvert'").get())?.n;
@@ -3140,11 +3141,11 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
   // Par domaine avec events + formations
   const parDomaine = await db.prepare(`
     SELECT domaine, COUNT(*) n,
-      ROUND(AVG(COALESCE(nb_vues,0)),0) AS moy_vues
+      ROUND(AVG(COALESCE(vues,0)),0) AS moy_vues
     FROM initiatives WHERE domaine IS NOT NULL
     GROUP BY domaine ORDER BY n DESC LIMIT 12
   `).all();
-  const eventsParDomaine = await db.prepare(`SELECT domaine, COUNT(*) n FROM evenements WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 10`).all();
+  const eventsParDomaine = await db.prepare(`SELECT i.domaine, COUNT(*) n FROM evenements e JOIN initiatives i ON i.owner_user_id=e.owner_user_id WHERE i.domaine IS NOT NULL GROUP BY i.domaine ORDER BY n DESC LIMIT 10`).all();
   const formParDomaine   = await db.prepare(`SELECT domaine, COUNT(*) n FROM formations WHERE domaine IS NOT NULL GROUP BY domaine ORDER BY n DESC LIMIT 10`).all();
 
   // Par pays d'origine
@@ -3163,21 +3164,21 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
   // Par ville (top 20)
   const parVille = await db.prepare(`
     SELECT ville, pays, COUNT(*) n,
-      SUM(COALESCE(nb_vues,0)) AS total_vues,
-      (SELECT COUNT(*) FROM evenements e WHERE e.ville=i.ville) AS nb_events
+      SUM(COALESCE(vues,0)) AS total_vues,
+      (SELECT COUNT(*) FROM evenements e JOIN initiatives i2 ON i2.owner_user_id=e.owner_user_id WHERE i2.ville=i.ville) AS nb_events
     FROM initiatives i WHERE ville IS NOT NULL
-    GROUP BY ville ORDER BY n DESC LIMIT 20
+    GROUP BY ville, pays ORDER BY n DESC LIMIT 20
   `).all();
 
   // Score d'activité par initiative (top 15)
   const topInitiatives = await db.prepare(`
     SELECT i.id, i.nom, i.slug, i.ville, i.pays, i.domaine,
-      COALESCE(i.nb_vues,0) AS nb_vues,
+      COALESCE(i.vues,0) AS nb_vues,
       (SELECT COUNT(*) FROM abonnements a WHERE a.initiative_id=i.id) AS nb_abonnes,
       (SELECT COUNT(*) FROM evenements e WHERE e.owner_user_id=i.owner_user_id) AS nb_events,
       (SELECT COUNT(*) FROM formations f WHERE f.owner_user_id=i.owner_user_id) AS nb_formations,
       MIN(100, ROUND(
-        COALESCE(i.nb_vues,0)*0.05 +
+        COALESCE(i.vues,0)*0.05 +
         (SELECT COUNT(*) FROM abonnements a WHERE a.initiative_id=i.id)*8.0 +
         (SELECT COUNT(*) FROM evenements e WHERE e.owner_user_id=i.owner_user_id)*12.0 +
         (SELECT COUNT(*) FROM formations f WHERE f.owner_user_id=i.owner_user_id)*10.0
@@ -3203,8 +3204,11 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS ce_mois,
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END) AS mois_prec
     FROM initiatives WHERE domaine IS NOT NULL
-    GROUP BY domaine HAVING ce_mois>0 OR mois_prec>0
-    ORDER BY (ce_mois - mois_prec) DESC LIMIT 8
+    GROUP BY domaine
+    HAVING SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END)>0
+        OR SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END)>0
+    ORDER BY (SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END)
+            - SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END)) DESC LIMIT 8
   `).all();
 
   // Tendances villes
@@ -3213,8 +3217,11 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS ce_mois,
       SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END) AS mois_prec
     FROM initiatives WHERE ville IS NOT NULL
-    GROUP BY ville HAVING ce_mois>0 OR mois_prec>0
-    ORDER BY (ce_mois - mois_prec) DESC LIMIT 8
+    GROUP BY ville
+    HAVING SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END)>0
+        OR SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END)>0
+    ORDER BY (SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now') THEN 1 ELSE 0 END)
+            - SUM(CASE WHEN substr(created_at,1,7)=strftime('%Y-%m','now','-1 month') THEN 1 ELSE 0 END)) DESC LIMIT 8
   `).all();
 
   sendJSON(res, 200, {
@@ -3225,6 +3232,10 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
     evolution, evolution_events: evolutionEvents,
     tendance_domaine: tendanceDomaine, tendance_ville: tendanceVille
   });
+  } catch(e) {
+    console.error('[admin/diaspora-stats]', e);
+    sendJSON(res, 500, { error: e.message });
+  }
 });
 
 // Insights IA algorithmiques
