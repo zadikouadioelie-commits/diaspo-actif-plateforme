@@ -1,0 +1,131 @@
+/* ===========================================================
+   DIASPO'ACTIF — Widget Board (styles)
+   Grille 12 colonnes, cartes, mode édition, responsive.
+   =========================================================== */
+
+.wb-board { width:100%; }
+
+.wb-grid {
+  display:grid;
+  grid-template-columns:repeat(12, 1fr);
+  gap:16px;
+  align-items:start;
+}
+
+/* Tailles (span sur 12) */
+.wb-size-small  { grid-column:span 4; }
+.wb-size-medium { grid-column:span 6; }
+.wb-size-large  { grid-column:span 8; }
+.wb-size-xlarge { grid-column:span 9; }
+.wb-size-full   { grid-column:span 12; }
+
+/* Carte = conteneur transparent (passthrough). La carte interne du widget
+   (.p-section/.p-widget/.p-card) fournit l'encadrement visible. */
+.wb-card {
+  background:transparent; border:none; box-shadow:none; border-radius:14px;
+  display:flex; flex-direction:column; min-width:0; overflow:visible;
+  transition:transform .18s, opacity .18s;
+}
+/* Neutraliser la marge-bas des cartes internes (la grille gère l'espacement) */
+.wb-card-body > .p-section,
+.wb-card-body > .p-widget,
+.wb-card-body > .p-card { margin-bottom:0 !important; }
+
+/* En-tête de contrôle : masqué en lecture, visible en mode édition */
+.wb-card-head { display:none; align-items:center; justify-content:space-between; gap:8px; padding:6px 4px 8px; }
+.wb-editing .wb-card-head { display:flex; }
+.wb-card-title { font-size:12px; font-weight:800; color:var(--tp,#1565C0); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wb-card-tools { display:flex; align-items:center; gap:4px; flex-shrink:0; }
+.wb-card-body { min-width:0; }
+.wb-card.wb-collapsed .wb-card-body > * { display:none; }
+
+/* Contour en mode édition */
+.wb-editing .wb-card { outline:2px dashed var(--tp-light,#cde3fb); outline-offset:3px; border-radius:14px; }
+.wb-editing .wb-card:hover { outline-color:var(--tp,#1565C0); }
+
+/* Outils (visibles en mode édition) */
+.wb-tool, .wb-handle { display:none; }
+.wb-editing .wb-tool {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; border:none; background:var(--bg, #eef2f8); color:#64748b;
+  border-radius:7px; cursor:pointer; font-size:13px; transition:background .15s, color .15s;
+}
+.wb-editing .wb-tool:hover { background:var(--tp-light, #E3F2FD); color:var(--tp, #1565C0); }
+.wb-editing .wb-handle {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; cursor:grab; color:#94a3b8; font-size:16px; user-select:none;
+}
+
+/* Menu taille */
+.wb-size-menu { position:relative; }
+.wb-size-pop {
+  display:none; position:absolute; top:30px; right:0; z-index:30;
+  background:#fff; border:1px solid var(--border,#e2e8f0); border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.14); padding:5px; min-width:150px;
+}
+.wb-size-menu:hover .wb-size-pop { display:block; }
+.wb-size-pop button {
+  display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+  background:none; border:none; padding:7px 10px; border-radius:7px; cursor:pointer;
+  font-size:12.5px; color:#334155;
+}
+.wb-size-pop button:hover { background:var(--bg,#eef2f8); }
+.wb-size-pop button.active { background:var(--tp-light,#E3F2FD); color:var(--tp,#1565C0); font-weight:700; }
+
+/* Drag & drop */
+.wb-card.wb-dragging { opacity:.5; transform:scale(.98); }
+.wb-card.wb-drop-before { box-shadow:-4px 0 0 var(--tp, #1565C0); }
+.wb-card.wb-drop-after  { box-shadow:4px 0 0 var(--tp, #1565C0); }
+
+/* Barre d'outils du board */
+.wb-toolbar {
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+.wb-tb-btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:8px 14px; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer;
+  border:1.5px solid var(--tp, #1565C0); background:#fff; color:var(--tp, #1565C0);
+  transition:all .15s;
+}
+.wb-tb-btn:hover { background:var(--tp-light, #E3F2FD); }
+.wb-tb-btn.primary { background:var(--tp, #1565C0); color:#fff; }
+.wb-tb-btn.primary:hover { background:var(--tp-dark, #0D47A1); }
+.wb-tb-btn.ghost { border-color:var(--border,#e2e8f0); color:#64748b; }
+.wb-tb-btn.ghost:hover { background:var(--bg,#eef2f8); color:#334155; }
+.wb-tb-hint { font-size:12px; color:#94a3b8; }
+
+/* Modale bibliothèque */
+.wb-modal-overlay {
+  position:fixed; inset:0; background:rgba(13,27,42,.55); z-index:9999;
+  display:flex; align-items:center; justify-content:center; padding:16px;
+  opacity:0; transition:opacity .16s;
+}
+.wb-modal-overlay.show { opacity:1; }
+.wb-modal {
+  background:#fff; border-radius:16px; width:100%; max-width:560px;
+  box-shadow:0 20px 60px rgba(0,0,0,.3); overflow:hidden;
+  transform:scale(.95); transition:transform .16s;
+}
+.wb-modal-overlay.show .wb-modal { transform:scale(1); }
+.wb-modal-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border,#eef2f8); font-weight:800; color:#0D1B2A; }
+.wb-modal-close { background:none; border:none; font-size:18px; color:#64748b; cursor:pointer; }
+.wb-modal-body { padding:16px 20px; max-height:60vh; overflow-y:auto; }
+.wb-lib-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+.wb-lib-item {
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:16px 10px; border:1.5px solid var(--border,#e2e8f0); border-radius:12px;
+  background:#fff; cursor:pointer; font-size:12.5px; font-weight:600; color:#334155;
+  transition:all .15s;
+}
+.wb-lib-item:hover { border-color:var(--tp,#1565C0); background:var(--tp-light,#E3F2FD); color:var(--tp,#1565C0); transform:translateY(-2px); }
+.wb-lib-item span { text-align:center; line-height:1.3; }
+
+/* Responsive : tablette -> 6/12 max ; mobile -> tout 12 */
+@media(max-width:1000px){
+  .wb-size-small, .wb-size-medium { grid-column:span 6; }
+  .wb-size-large, .wb-size-xlarge, .wb-size-full { grid-column:span 12; }
+}
+@media(max-width:680px){
+  .wb-grid { gap:12px; }
+  .wb-size-small, .wb-size-medium, .wb-size-large, .wb-size-xlarge, .wb-size-full { grid-column:span 12; }
+}

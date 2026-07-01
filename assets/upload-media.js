@@ -15,7 +15,8 @@ async function uploadMedia(file, type = 'avatar') {
   }[type] || '/api/upload/avatar';
 
   const formData = new FormData();
-  formData.append(type, file);
+  // file peut être un File (avec .name) ou un Blob brut (ex: sortie du recadreur) — on force un nom dans ce dernier cas.
+  formData.append(type, file, file.name || `${type}.jpg`);
 
   const res = await fetch(endpoint, {
     method: 'POST',
