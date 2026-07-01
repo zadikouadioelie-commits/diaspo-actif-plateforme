@@ -68,7 +68,7 @@ async function getCurrentUser(req) {
     const payload = verifyAuthToken(authCookie);
     if (payload?.uid) {
       const user = await db.prepare("SELECT id, nom, email, role, ville, pays, profil_json FROM users WHERE id = ?").get(payload.uid);
-      if (user) return user;
+      if (user) { user.id = Number(user.id); return user; }
     }
   }
   /* 2. Session DB classique (fallback) */
@@ -77,12 +77,13 @@ async function getCurrentUser(req) {
   const session = getSession(sid);
   if (!session) return null;
   const user = await db.prepare("SELECT id, nom, email, role, ville, pays, profil_json FROM users WHERE id = ?").get(session.userId);
+  if (user) user.id = Number(user.id);
   return user || null;
 }
 
 function publicUser(u) {
   if (!u) return null;
-  return { id: u.id, nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
+  return { id: Number(u.id), nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
     photo_url: u.photo_url || null,
     nb_connexions: u.nb_connexions || 0, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
     demo_vue: u.demo_vue || 0, da_id: u.da_id || null };
