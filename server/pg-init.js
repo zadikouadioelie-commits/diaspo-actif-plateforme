@@ -19,7 +19,8 @@ async function pgInit() {
     "SELECT COUNT(*)::int AS cnt FROM information_schema.tables WHERE table_schema = 'public'"
   );
   if (rows[0].cnt > 3) {
-    /* Schéma déjà en place — mais toujours corriger les comptes démo */
+    /* Schéma déjà en place — appliquer migrations de colonnes + corriger les comptes démo */
+    await migratePg(pool);
     await seedPg(pool);
     _initialized = true;
     return;
@@ -38,11 +39,62 @@ async function pgInit() {
     await pg.exec(sql);
   }
 
-  console.log('[pg-init] Schéma créé. Seeding données initiales...');
+  console.log('[pg-init] Schéma créé. Migrations + seeding...');
+  await migratePg(pool);
   await seedPg(pool);
 
   _initialized = true;
   console.log('[pg-init] ✅ Base de données Postgres prête.');
+}
+
+/* Migrations de colonnes ajoutées via ALTER TABLE dans db.js
+   (jamais exécutées en Postgres car pg-init ignore les ALTER).
+   Idempotent grâce à ADD COLUMN IF NOT EXISTS. */
+async function migratePg(pool) {
+  const cols = [
+    // users
+    ['users', 'da_id', 'TEXT'],
+    ['users', 'ds_id', 'TEXT'],
+    ['users', 'disponibilites', 'TEXT'],
+    ['users', 'reseaux_sociaux', 'TEXT'],
+    // initiatives
+    ['initiatives', 'da_id', 'TEXT'],
+    // fil_posts
+    ['fil_posts', 'media_url', 'TEXT'],
+    ['fil_posts', 'media_type', 'TEXT'],
+    ['fil_posts', 'article_titre', 'TEXT'],
+    ['fil_posts', 'article_contenu', 'TEXT'],
+    ['fil_posts', 'video_duree', 'INTEGER'],
+    ['fil_posts', 'repost_commentaire', 'TEXT'],
+    ['fil_posts', 'visibilite', "TEXT DEFAULT 'public'"],
+    ['fil_posts', 'medias', 'TEXT'],
+    ['fil_posts', 'hashtags', 'TEXT'],
+    ['fil_posts', 'statut', 'TEXT'],
+    ['fil_posts', 'programmed_at', 'TEXT'],
+    ['fil_posts', 'localisation_pays', 'TEXT'],
+    ['fil_posts', 'localisation_ville', 'TEXT'],
+    ['fil_posts', 'vues', 'INTEGER DEFAULT 0'],
+    // conversations
+    ['conversations', 'type', 'TEXT'],
+    ['conversations', 'nom', 'TEXT'],
+    ['conversations', 'avatar', 'TEXT'],
+    ['conversations', 'created_by', 'INTEGER'],
+    // messages
+    ['messages', 'parent_message_id', 'INTEGER'],
+    ['messages', 'est_epingle', 'INTEGER DEFAULT 0'],
+    // user_accreditations
+    ['user_accreditations', 'feature_slug', 'TEXT'],
+  ];
+  for (const [table, col, type] of cols) {
+    try {
+      await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+    } catch (e) {
+      console.error(`[pg-init migration] ${table}.${col}:`, e.message);
+    }
+  }
+  // Index unique da_id (comme en SQLite)
+  try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_da_id ON users(da_id) WHERE da_id IS NOT NULL`); } catch(_) {}
+  try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_initiatives_da_id ON initiatives(da_id) WHERE da_id IS NOT NULL`); } catch(_) {}
 }
 
 async function seedPg(pool) {
