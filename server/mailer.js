@@ -222,6 +222,45 @@ function emailBienvenueEtatique({ email, nom_institution }) {
   });
 }
 
+function emailVerification({ email, prenom, token }) {
+  const lien = `https://diaspoactif.com/verifier-email.html?token=${token}`;
+  return sendEmail({
+    to: email,
+    subject: "Confirmez votre adresse e-mail — Diaspo'Actif",
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+      <div style="color:rgba(255,255,255,.6);font-size:13px;margin-top:4px;">Du Sud au Nord</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#0D1B2A;">Confirmez votre adresse e-mail ${prenom ? `, ${prenom}` : ""} ✉️</h1>
+      <p style="color:#475569;line-height:1.7;margin:0 0 20px;">
+        Merci de votre inscription sur Diaspo'Actif. Pour activer pleinement votre compte, confirmez que cette adresse e-mail vous appartient bien.<br>
+        Ce lien est valable <strong>24 heures</strong>.
+      </p>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${lien}" style="display:inline-block;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;text-decoration:none;font-weight:800;font-size:15px;padding:14px 32px;border-radius:12px;box-shadow:0 4px 16px rgba(37,99,235,.3);">
+          Confirmer mon adresse e-mail →
+        </a>
+      </div>
+      <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">
+        Si vous n'êtes pas à l'origine de cette inscription, ignorez cet email.
+      </p>
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
 function emailResetPassword({ email, token }) {
   const lien = `https://diaspoactif.com/reset-password.html?token=${token}`;
   return sendEmail({
@@ -297,4 +336,4 @@ function emailAccreditation({ email, prenom, typeAccred, statut }) {
   });
 }
 
-module.exports = { sendEmail, emailBienvenue, emailResetPassword, emailAccreditation };
+module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation };

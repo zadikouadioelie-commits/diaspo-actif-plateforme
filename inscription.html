@@ -61,6 +61,9 @@
 </head>
 <body>
 <div class="page">
+<!-- Honeypot anti-bot : champ invisible aux humains, souvent rempli par les robots -->
+<input type="text" id="site_perso" name="site_perso" autocomplete="off" tabindex="-1"
+  style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;" aria-hidden="true">
 <header class="topbar">
   <div class="topbar-inner">
     <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
@@ -485,6 +488,7 @@
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
 <script>
+const PAGE_LOAD_TS = Date.now(); // sert au calcul du délai anti-bot côté serveur
 let currentRole=null;
 function goToStep(step){
   document.querySelectorAll(".insc-pane").forEach(p=>p.classList.remove("active"));
@@ -526,6 +530,8 @@ async function submitForm(btnId,errId,body){
   const btn=document.getElementById(btnId),errBox=document.getElementById(errId);
   errBox.style.display="none";const orig=btn.textContent;
   btn.disabled=true;btn.textContent="Creation en cours…";
+  body.site_perso = document.getElementById("site_perso")?.value || "";
+  body._form_ts = PAGE_LOAD_TS;
   try{
     const r=await api("POST","/auth/signup",body);
     const role=r.user.role;

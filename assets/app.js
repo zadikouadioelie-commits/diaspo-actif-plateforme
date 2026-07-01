@@ -289,6 +289,40 @@ document.addEventListener("click", e => {
   }
 });
 
+/* ---------- Bandeau de rappel : vérification d'adresse e-mail ---------- */
+function showEmailVerifBanner(user) {
+  if (!user || user.email_verifie) return;
+  const dismissKey = "da_verif_banner_dismiss";
+  const dismissedAt = Number(localStorage.getItem(dismissKey) || 0);
+  if (Date.now() - dismissedAt < 6 * 3600000) return; // re-proposer après 6h
+  if (document.getElementById("email-verif-banner")) return;
+
+  const bar = document.createElement("div");
+  bar.id = "email-verif-banner";
+  bar.style.cssText = "position:sticky;top:0;z-index:900;background:#FEF3C7;color:#92400E;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;";
+  bar.innerHTML = `
+    <span>✉️ Confirmez votre adresse e-mail pour sécuriser votre compte.</span>
+    <button id="verif-resend-btn" style="background:#92400E;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;">Renvoyer l'e-mail</button>
+    <button id="verif-dismiss-btn" style="background:none;border:none;color:#92400E;font-size:16px;cursor:pointer;line-height:1;">✕</button>`;
+  document.body.prepend(bar);
+
+  document.getElementById("verif-dismiss-btn").onclick = () => {
+    localStorage.setItem(dismissKey, String(Date.now()));
+    bar.remove();
+  };
+  document.getElementById("verif-resend-btn").onclick = async (e) => {
+    const btn = e.target;
+    btn.disabled = true; btn.textContent = "Envoi…";
+    try {
+      const r = await api("POST", "/auth/resend-verification");
+      btn.textContent = r.deja_verifie ? "Déjà vérifié ✓" : "Envoyé ✓";
+    } catch (err) {
+      btn.textContent = "Réessayer";
+      btn.disabled = false;
+    }
+  };
+}
+
 async function applyAuthState() {
   const el = document.getElementById("auth-area");
   if (!el) return;
@@ -334,6 +368,7 @@ async function applyAuthState() {
         nb.classList.add("show");
       }
     } catch (e) { /* silencieux */ }
+    showEmailVerifBanner(user);
   } else {
     el.innerHTML = `
       <a href="login.html" class="btn btn-sm btn-outline">Se connecter</a>

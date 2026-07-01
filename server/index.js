@@ -20,14 +20,23 @@ const { hashPassword, verifyPassword, createSession, getSession, destroySession,
 // verifyPassword(password, salt, expectedHash) → boolean
 const SEC = require("./security");
 
+/* Journal d'erreurs maison (table error_logs) — sans service externe (Sentry).
+   Best-effort : ne doit jamais lui-même faire planter le serveur. */
+async function logError(err, context, req) {
+  const message = err && err.message ? err.message : String(err);
+  const stack = err && err.stack ? String(err.stack).slice(0, 4000) : null;
+  console.error(`[${context || "error"}]`, message);
+  try {
+    await db.prepare("INSERT INTO error_logs (message, stack, context, url, method) VALUES (?,?,?,?,?)").run(
+      message, stack, context || null, req ? req.url : null, req ? req.method : null
+    );
+  } catch (_) { /* le monitoring ne doit jamais faire planter le serveur */ }
+}
+
 /* Filet de sécurité : une requête boguée (colonne SQL manquante, etc.)
    ne doit JAMAIS tuer tout le serveur. On journalise et on continue. */
-process.on("unhandledRejection", (reason) => {
-  console.error("[unhandledRejection]", reason && reason.message ? reason.message : reason);
-});
-process.on("uncaughtException", (err) => {
-  console.error("[uncaughtException]", err && err.message ? err.message : err);
-});
+process.on("unhandledRejection", (reason) => { logError(reason, "unhandledRejection"); });
+process.on("uncaughtException", (err) => { logError(err, "uncaughtException"); });
 
 const PORT = process.env.PORT || 3000;
 const ROOT = path.join(__dirname, ".."); // dossier diaspoactif-site (fichiers statiques)
@@ -77,7 +86,7 @@ async function getCurrentUser(req) {
   if (authCookie) {
     const payload = verifyAuthToken(authCookie);
     if (payload?.uid) {
-      const user = await db.prepare("SELECT id, nom, email, role, ville, pays, profil_json FROM users WHERE id = ?").get(payload.uid);
+      const user = await db.prepare("SELECT id, nom, email, role, ville, pays, profil_json, email_verifie FROM users WHERE id = ?").get(payload.uid);
       if (user) { user.id = Number(user.id); return user; }
     }
   }
@@ -86,7 +95,7 @@ async function getCurrentUser(req) {
   if (!sid) return null;
   const session = getSession(sid);
   if (!session) return null;
-  const user = await db.prepare("SELECT id, nom, email, role, ville, pays, profil_json FROM users WHERE id = ?").get(session.userId);
+  const user = await db.prepare("SELECT id, nom, email, role, ville, pays, profil_json, email_verifie FROM users WHERE id = ?").get(session.userId);
   if (user) user.id = Number(user.id);
   return user || null;
 }
@@ -96,7 +105,7 @@ function publicUser(u) {
   return { id: Number(u.id), nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
     photo_url: u.photo_url || null,
     nb_connexions: u.nb_connexions || 0, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
-    demo_vue: u.demo_vue || 0, da_id: u.da_id || null };
+    demo_vue: u.demo_vue || 0, da_id: u.da_id || null, email_verifie: !!u.email_verifie };
   // NOTE: ds_id est intentionnellement exclu — jamais exposé via cette fonction
 }
 
@@ -122,6 +131,26 @@ async function route(method, pattern, handler) {
 }
 
 route("POST", "/api/auth/signup", async (req, res, params, body) => {
+  /* ── Anti-bot (sans dépendance externe) ──
+     1) Honeypot : champ caché "site_perso" que les humains laissent vide.
+     2) Délai minimum : un bot remplit/soumet le formulaire en <2s, un humain non.
+     3) Rate-limit IP : évite la création de comptes en masse. */
+  const ip = SEC.clientIp(req);
+  if (body.site_perso) {
+    SEC.logSecurity("signup_honeypot", { ip });
+    return sendJSON(res, 400, { error: "Requête invalide." });
+  }
+  const renderedAt = Number(body._form_ts) || 0;
+  if (renderedAt && (Date.now() - renderedAt) < 2000) {
+    SEC.logSecurity("signup_too_fast", { ip, ms: Date.now() - renderedAt });
+    return sendJSON(res, 400, { error: "Veuillez réessayer dans quelques secondes." });
+  }
+  const ipSignupLimit = SEC.rateLimit(`signup:ip:${ip}`, 5, 3600000);
+  if (!ipSignupLimit.allowed) {
+    SEC.logSecurity("signup_ratelimited", { ip });
+    return sendJSON(res, 429, { error: `Trop d'inscriptions depuis cette connexion. Réessayez dans ${ipSignupLimit.retryAfter}s.` });
+  }
+
   const {
     nom, prenom, email, password, role,
     date_naissance, nationalite1, nationalite2, nationalite3,
@@ -276,19 +305,28 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   }
 
   // ── Abonnement obligatoire au compte officiel Diaspo'Actif ──
-  const officialId = getOfficialUserId();
-  if (officialId && Number(id) !== officialId) {
+  const officialId = await getOfficialUserId();
+  if (officialId && Number(id) !== Number(officialId)) {
     db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(Number(id), officialId);
   }
 
   const token = createSession(id);
-  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, statut_verification FROM users WHERE id = ?").get(id);
+  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, statut_verification, email_verifie FROM users WHERE id = ?").get(id);
   const authTok = signAuthToken({ uid: id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
 
   // Email de bienvenue (non bloquant)
   try {
     const { emailBienvenue } = require("./mailer");
     emailBienvenue({ prenom: user.prenom || user.nom, email: user.email, role: user.role, nom_institution: nom_institution || null });
+  } catch (_) {}
+
+  // Email de vérification d'adresse (non bloquant — soft gate, ne bloque pas la connexion)
+  try {
+    const verifToken = crypto.randomBytes(32).toString("hex");
+    const verifExpires = Date.now() + 24 * 3600000; // 24h
+    await db.prepare("UPDATE users SET email_verif_token=?, email_verif_expires=? WHERE id=?").run(verifToken, verifExpires, id);
+    const { emailVerification } = require("./mailer");
+    emailVerification({ email: user.email, prenom: user.prenom || user.nom, token: verifToken });
   } catch (_) {}
 
   sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
@@ -354,6 +392,101 @@ route("POST", "/api/auth/reset-password", async (req, res, params, body) => {
   if (Date.now() > user.reset_expires) return sendJSON(res, 400, { error: "Lien expiré, veuillez faire une nouvelle demande" });
   const { hash, salt } = hashPassword(password);
   await db.prepare("UPDATE users SET password_hash=?, password_salt=?, reset_token=NULL, reset_expires=NULL WHERE id=?").run(hash, salt, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/auth/verify-email — confirme une adresse e-mail via token */
+route("POST", "/api/auth/verify-email", async (req, res, params, body) => {
+  const { token } = body;
+  if (!token) return sendJSON(res, 400, { error: "Token requis" });
+  const user = await db.prepare("SELECT id, email_verif_expires FROM users WHERE email_verif_token=?").get(token);
+  if (!user) return sendJSON(res, 400, { error: "Lien invalide ou déjà utilisé." });
+  if (Date.now() > Number(user.email_verif_expires)) return sendJSON(res, 400, { error: "Lien expiré. Demandez un nouvel envoi depuis votre compte." });
+  await db.prepare("UPDATE users SET email_verifie=1, email_verif_token=NULL, email_verif_expires=NULL WHERE id=?").run(user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/admin/error-logs — journal d'erreurs serveur (monitoring maison) */
+route("GET", "/api/admin/error-logs", async (req, res, params, body, query) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const filtre = query.statut === "resolu" ? "WHERE resolu=1" : query.statut === "actif" ? "WHERE resolu=0" : "";
+  const logs = await db.prepare(`SELECT * FROM error_logs ${filtre} ORDER BY id DESC LIMIT 100`).all();
+  const stats = {
+    total_24h: (await db.prepare(`SELECT COUNT(*) n FROM error_logs WHERE created_at >= datetime('now','-1 day')`).get())?.n,
+    non_resolues: (await db.prepare(`SELECT COUNT(*) n FROM error_logs WHERE resolu=0`).get())?.n,
+  };
+  sendJSON(res, 200, { logs, stats });
+});
+
+/* PATCH /api/admin/error-logs/:id — marquer une erreur comme résolue */
+route("PATCH", "/api/admin/error-logs/:id", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  await db.prepare("UPDATE error_logs SET resolu=1 WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/admin/error-logs — purger le journal (erreurs résolues) */
+route("DELETE", "/api/admin/error-logs", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  await db.prepare("DELETE FROM error_logs WHERE resolu=1").run();
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/auth/account — suppression du compte par son propriétaire (droit à l'oubli RGPD).
+   Anonymise les données personnelles plutôt qu'un DELETE brut : 122 tables référencent
+   users(id) et seule la moitié a ON DELETE CASCADE — un vrai DELETE casserait l'intégrité
+   (posts, commentaires, conversations d'autres utilisateurs, etc.). */
+route("DELETE", "/api/auth/account", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  const full = await db.prepare("SELECT password_hash, password_salt FROM users WHERE id=?").get(user.id);
+  if (!full || !verifyPassword(body.password || "", full.password_salt, full.password_hash)) {
+    return sendJSON(res, 401, { error: "Mot de passe incorrect." });
+  }
+
+  const anonEmail = `compte-supprime-${user.id}-${Date.now()}@diaspoactif.invalid`;
+  const { hash, salt } = hashPassword(crypto.randomBytes(32).toString("hex")); // mot de passe aléatoire = connexion impossible
+
+  await db.prepare(`
+    UPDATE users SET
+      nom='Compte supprimé', prenom=NULL, email=?, password_hash=?, password_salt=?,
+      photo_url=NULL, banner_url=NULL, bio=NULL, telephone=NULL, ville=NULL, pays=NULL,
+      titre_pro=NULL, situation_pro=NULL, date_naissance=NULL,
+      nationalite1=NULL, nationalite2=NULL, nationalite3=NULL,
+      centres_interet='[]', competences='[]', experiences='[]',
+      reseaux_sociaux='{}', disponibilites='{}', profil_json='{}', privacy_json='{}',
+      reset_token=NULL, reset_expires=NULL, email_verif_token=NULL, email_verif_expires=NULL,
+      email_verifie=0
+    WHERE id=?
+  `).run(anonEmail, hash, salt, user.id);
+
+  SEC.logSecurity("account_self_deleted", { uid: user.id });
+
+  const cookies = parseCookies(req);
+  if (cookies.sid) destroySession(cookies.sid);
+  sendJSON(res, 200, { ok: true }, { "Set-Cookie": ["sid=; HttpOnly; Path=/; Max-Age=0", "auth=; HttpOnly; Path=/; Max-Age=0"] });
+});
+
+/* POST /api/auth/resend-verification — renvoie l'email de confirmation (utilisateur connecté) */
+route("POST", "/api/auth/resend-verification", async (req, res) => {
+  const cu = await getCurrentUser(req);
+  if (!cu) return sendJSON(res, 401, { error: "Connexion requise." });
+  const limit = SEC.rateLimit(`resend-verif:${cu.id}`, 3, 15 * 60 * 1000);
+  if (!limit.allowed) return sendJSON(res, 429, { error: `Trop de demandes. Réessayez dans ${limit.retryAfter}s.` });
+  const user = await db.prepare("SELECT id, email, prenom, nom, email_verifie FROM users WHERE id=?").get(cu.id);
+  if (!user) return sendJSON(res, 404, { error: "Introuvable." });
+  if (user.email_verifie) return sendJSON(res, 200, { ok: true, deja_verifie: true });
+  const verifToken = crypto.randomBytes(32).toString("hex");
+  const verifExpires = Date.now() + 24 * 3600000;
+  await db.prepare("UPDATE users SET email_verif_token=?, email_verif_expires=? WHERE id=?").run(verifToken, verifExpires, user.id);
+  try {
+    const { emailVerification } = require("./mailer");
+    await emailVerification({ email: user.email, prenom: user.prenom || user.nom, token: verifToken });
+  } catch (e) { console.error("[resend-verification] email error:", e.message); }
   sendJSON(res, 200, { ok: true });
 });
 
@@ -3058,7 +3191,7 @@ route("GET", "/api/admin/reseau", async (req, res) => {
   const parPays     = await db.prepare("SELECT pays, COUNT(*) n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 12").all();
   const parNat1     = await db.prepare("SELECT nationalite1 AS nat, COUNT(*) n FROM users WHERE nationalite1 IS NOT NULL GROUP BY nat ORDER BY n DESC LIMIT 10").all();
   const parNat2     = await db.prepare("SELECT nationalite2 AS nat, COUNT(*) n FROM users WHERE nationalite2 IS NOT NULL GROUP BY nat ORDER BY n DESC LIMIT 8").all();
-  const parOrig1    = await db.prepare("SELECT origine1 AS orig, COUNT(*) n FROM users WHERE origine1 IS NOT NULL GROUP BY orig ORDER BY n DESC LIMIT 10").all();
+  const parOrig1    = []; // "origine1" n'existe que sur la table initiatives, pas sur users — pas de données pertinentes ici
   const parVille    = await db.prepare("SELECT ville, pays, COUNT(*) n FROM users WHERE ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 10").all();
 
   // Top pays actifs = pays avec le plus d'activité (user_activity JOIN users)
@@ -6856,10 +6989,10 @@ async function handleRequest(req, res) {
       const params = {};
       r.keys.forEach((k, i) => params[k] = m[i + 1]);
       try {
-        const body = (!isMultipart && (req.method === "POST" || req.method === "PUT" || req.method === "PATCH")) ? await readBody(req) : {};
+        const body = (!isMultipart && (req.method === "POST" || req.method === "PUT" || req.method === "PATCH" || req.method === "DELETE")) ? await readBody(req) : {};
         await r.handler(req, res, params, body, parsed.query);
       } catch (e) {
-        console.error(e);
+        logError(e, "route_handler", req);
         sendJSON(res, 500, { error: "Erreur serveur." });
       }
       return;

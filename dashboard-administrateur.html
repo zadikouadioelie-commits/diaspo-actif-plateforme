@@ -71,6 +71,7 @@
       <a href="audiovisuel.html">📺 Audiovisuel</a>
 
       <span class="sb-group-lbl">🟧 Outils</span>
+      <a href="#error-logs" data-section="error-logs" style="display:flex;justify-content:space-between;align-items:center;">🩺 Journal d'erreurs <span id="errlog-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="#formations" data-section="formations">📚 Formations</a>
       <a href="#chatbot" data-section="chatbot">🧠 Mémoire Chatbot</a>
       <a href="#faq" data-section="faq">💡 Gestion FAQ</a>
@@ -4479,6 +4480,36 @@
         </div>
       </section>
 
+      <!-- JOURNAL D'ERREURS (monitoring maison) -->
+      <section id="section-error-logs" style="display:none;">
+        <h2>🩺 Journal d'erreurs serveur</h2>
+        <div class="notice" style="margin-bottom:16px;">Chaque erreur serveur (route qui plante, exception non gérée) est journalisée ici automatiquement. Remplace un service externe type Sentry pour un usage local/petite échelle.</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px;">
+          <div class="card" style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Dernières 24h</div>
+            <div id="errlog-24h" style="font-size:28px;font-weight:800;">—</div>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Non résolues</div>
+            <div id="errlog-nonresolues" style="font-size:28px;font-weight:800;color:#dc2626;">—</div>
+          </div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-orange" id="errlog-filtre-actif" onclick="loadErrorLogs('actif')">🔴 Actives</button>
+              <button class="btn btn-sm btn-outline" id="errlog-filtre-resolu" onclick="loadErrorLogs('resolu')">✅ Résolues</button>
+              <button class="btn btn-sm btn-outline" id="errlog-filtre-tout" onclick="loadErrorLogs('tout')">Tout</button>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-outline" onclick="loadErrorLogs()">↺ Rafraîchir</button>
+              <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="purgerErreursResolues()">🗑 Purger résolues</button>
+            </div>
+          </div>
+          <div id="errlog-list"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+      </section>
+
       <!-- COMMUNICATION -->
       <section id="section-communication" style="display:none;">
         <h2>Communication institutionnelle</h2>
@@ -4793,6 +4824,62 @@ async function actSigInit(id, action) {
   await api('PATCH', `/admin/signalements/initiative/${id}`, { action, note });
   loadSignalements();
 }
+
+/* ===== Journal d'erreurs (monitoring maison) ===== */
+let _errLogFiltre = 'actif';
+async function loadErrorLogs(filtre) {
+  if (filtre) _errLogFiltre = filtre;
+  ['actif','resolu','tout'].forEach(f => {
+    const btn = document.getElementById('errlog-filtre-' + f);
+    if (btn) btn.className = 'btn btn-sm ' + (f === _errLogFiltre ? 'btn-orange' : 'btn-outline');
+  });
+  const el = document.getElementById('errlog-list');
+  el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Chargement…</p>';
+  try {
+    const qs = _errLogFiltre !== 'tout' ? '?statut=' + _errLogFiltre : '';
+    const data = await api('GET', '/admin/error-logs' + qs);
+    document.getElementById('errlog-24h').textContent = data.stats.total_24h ?? 0;
+    document.getElementById('errlog-nonresolues').textContent = data.stats.non_resolues ?? 0;
+    const badge = document.getElementById('errlog-badge');
+    if (badge) {
+      const n = data.stats.non_resolues || 0;
+      badge.textContent = n; badge.style.display = n ? '' : 'none';
+    }
+    if (!data.logs.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0;">Aucune erreur.</p>'; return; }
+    el.innerHTML = data.logs.map(l => `
+      <div style="padding:12px 0;border-bottom:1px solid var(--border);" id="errlog-row-${l.id}">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+          <div style="flex:1;min-width:240px;">
+            <div style="font-size:13px;font-weight:700;color:#dc2626;">${esc(l.message || '—')}</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">
+              ${l.context ? '<strong>' + esc(l.context) + '</strong> · ' : ''}${l.method ? esc(l.method) + ' ' : ''}${esc(l.url || '')}
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${l.created_at ? l.created_at.slice(0,19).replace('T',' ') : ''}</div>
+            ${l.stack ? `<pre style="font-size:10.5px;color:#94a3b8;background:#f8fafc;padding:8px;border-radius:6px;margin-top:6px;max-height:120px;overflow:auto;white-space:pre-wrap;">${esc(l.stack)}</pre>` : ''}
+          </div>
+          <div style="flex-shrink:0;">
+            ${l.resolu ? `<span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;background:#dcfce7;color:#166534;">✅ Résolue</span>`
+              : `<button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="resoudreErreur(${l.id})">✅ Marquer résolue</button>`}
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<p style="color:red;font-size:13px;">Erreur de chargement.</p>`;
+  }
+}
+async function resoudreErreur(id) {
+  await api('PATCH', `/admin/error-logs/${id}`);
+  loadErrorLogs();
+}
+async function purgerErreursResolues() {
+  if (!confirm('Purger définitivement toutes les erreurs marquées résolues ?')) return;
+  await api('DELETE', '/admin/error-logs');
+  loadErrorLogs();
+}
+// Badge au chargement de la section modération (compte aussi les erreurs actives)
+document.querySelector('[data-section="error-logs"]')?.addEventListener('click', () => {
+  setTimeout(() => loadErrorLogs(), 100);
+});
 
 // Charger le badge au chargement de la section modération
 document.querySelectorAll(".sidebar a[data-section='moderation']").forEach(a => {
@@ -6402,6 +6489,7 @@ async function submitAccordDirect(){
     'faq-sr':    () => loadFaqSansReponse(),
     'oz-admin':  () => loadOzAdmin(),
     onboarding:  () => loadObAdmin(),
+    'error-logs': () => loadErrorLogs(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {

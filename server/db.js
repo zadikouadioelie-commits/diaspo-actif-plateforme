@@ -1833,6 +1833,19 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
+  /* ── Journal d'erreurs serveur (monitoring maison, sans service externe) ── */
+  CREATE TABLE IF NOT EXISTS error_logs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    message    TEXT,
+    stack      TEXT,
+    context    TEXT,
+    url        TEXT,
+    method     TEXT,
+    user_id    INTEGER,
+    resolu     INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
 `);
 
 /* ── Package Diaspo'Actif ── */
@@ -3645,6 +3658,11 @@ db.exec(`
   if (!userCols2.includes('disponibilites')) db.exec("ALTER TABLE users ADD COLUMN disponibilites TEXT DEFAULT '{}'");
   if (!userCols2.includes('reset_token')) db.exec("ALTER TABLE users ADD COLUMN reset_token TEXT");
   if (!userCols2.includes('reset_expires')) db.exec("ALTER TABLE users ADD COLUMN reset_expires INTEGER");
+  if (!userCols2.includes('email_verifie')) db.exec("ALTER TABLE users ADD COLUMN email_verifie INTEGER DEFAULT 0");
+  if (!userCols2.includes('email_verif_token')) db.exec("ALTER TABLE users ADD COLUMN email_verif_token TEXT");
+  if (!userCols2.includes('email_verif_expires')) db.exec("ALTER TABLE users ADD COLUMN email_verif_expires INTEGER");
+  // Comptes démo (adresses fictives) : considérés comme déjà vérifiés
+  try { db.exec("UPDATE users SET email_verifie=1 WHERE email LIKE '%@diaspoactif.demo' OR email LIKE '%@demo.fr' OR email LIKE '%@admin.fr'"); } catch(_) {}
 }
 
 /* ═══════════════════════════════════════════════

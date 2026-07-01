@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Vérification e-mail — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<style>
+body { min-height:100vh; background:linear-gradient(135deg,#060e1a 0%,#0D1B2A 50%,#0F2A50 100%); display:flex; align-items:center; justify-content:center; }
+.card { background:#fff; border-radius:20px; padding:44px 40px; width:100%; max-width:420px; box-shadow:0 24px 64px rgba(0,0,0,.4); text-align:center; }
+.logo-wrap { margin-bottom:28px; }
+.logo-text { font-size:22px; font-weight:900; color:#0D1B2A; letter-spacing:-.02em; }
+.logo-sub { font-size:12px; color:#94A3B8; margin-top:2px; }
+.icon { font-size:48px; margin-bottom:12px; }
+h1 { font-size:20px; font-weight:900; color:#0D1B2A; margin:0 0 8px; }
+p { font-size:13px; color:#64748b; margin:0 0 20px; line-height:1.6; }
+a.btn, button.btn { display:inline-block; background:linear-gradient(135deg,#2563EB,#1d4ed8); color:#fff; text-decoration:none; font-weight:800; padding:12px 28px; border-radius:12px; font-size:14px; border:none; cursor:pointer; }
+.spinner { width:32px; height:32px; border:3px solid #E2E8F0; border-top-color:#2563EB; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+  <link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="card">
+  <div class="logo-wrap">
+    <div class="logo-text">DIASPO'ACTIF</div>
+    <div class="logo-sub">Du Sud au Nord</div>
+  </div>
+
+  <div id="loading-box">
+    <div class="spinner"></div>
+    <p>Vérification de votre adresse e-mail en cours…</p>
+  </div>
+
+  <div id="success-box" style="display:none;">
+    <div class="icon">✅</div>
+    <h1>E-mail confirmé !</h1>
+    <p>Votre adresse e-mail a bien été vérifiée. Merci de votre confiance.</p>
+    <a href="login.html" class="btn">Se connecter →</a>
+  </div>
+
+  <div id="invalid-box" style="display:none;">
+    <div class="icon">⚠️</div>
+    <h1>Lien invalide</h1>
+    <p id="invalid-msg">Ce lien de vérification est invalide ou a expiré.</p>
+    <a href="login.html" class="btn">Retour à la connexion →</a>
+  </div>
+</div>
+
+<script>
+(async function () {
+  const token = new URLSearchParams(window.location.search).get('token');
+  const loading = document.getElementById('loading-box');
+  const success = document.getElementById('success-box');
+  const invalid = document.getElementById('invalid-box');
+
+  if (!token) {
+    loading.style.display = 'none';
+    invalid.style.display = 'block';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/verify-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+    loading.style.display = 'none';
+    if (res.ok) {
+      success.style.display = 'block';
+    } else {
+      document.getElementById('invalid-msg').textContent = data.error || 'Ce lien de vérification est invalide ou a expiré.';
+      invalid.style.display = 'block';
+    }
+  } catch (e) {
+    loading.style.display = 'none';
+    invalid.style.display = 'block';
+  }
+})();
+</script>
+<script src="/assets/cookies-banner.js"></script>
+  <script src="/assets/theme-manager.js"></script>
+</body>
+</html>

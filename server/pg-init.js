@@ -57,6 +57,9 @@ async function migratePg(pool) {
     ['users', 'ds_id', 'TEXT'],
     ['users', 'disponibilites', 'TEXT'],
     ['users', 'reseaux_sociaux', 'TEXT'],
+    ['users', 'email_verifie', 'INTEGER DEFAULT 0'],
+    ['users', 'email_verif_token', 'TEXT'],
+    ['users', 'email_verif_expires', 'BIGINT'],
     // initiatives
     ['initiatives', 'da_id', 'TEXT'],
     // fil_posts
@@ -141,6 +144,9 @@ async function seedPg(pool) {
       );
     }
   }
+
+  // Comptes de démonstration : pas de vraie adresse email → déjà "vérifiés"
+  await pool.query(`UPDATE users SET email_verifie=1 WHERE email LIKE '%@diaspoactif.demo'`).catch(()=>{});
 
   // Initialise le compteur de visites
   await pool.query(
