@@ -656,6 +656,7 @@ async function handleBannerFile(input) {
   try {
     const compressed = await compressImageFile(file, 1200, 400, 0.82);
     const url = await uploadMedia(compressed, 'banner');
+    await api('PUT', '/profil', { banner_url: url });
     profil.banner_url = url;
     renderBanner();
   } catch(err) { alert('Erreur lors du chargement de la bannière : ' + err.message); }
@@ -715,6 +716,7 @@ function editAvatar() {
       try {
         const compressed = await compressImageFile(file, 400, 400, 0.85);
         const url = await uploadMedia(compressed, 'avatar');
+        await api('PUT', '/profil', { photo_url: url });
         profil.photo_url = url;
         renderAvatar();
       } catch(err) { alert('Erreur lors du chargement de la photo : ' + err.message); }

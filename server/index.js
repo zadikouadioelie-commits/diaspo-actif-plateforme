@@ -18,6 +18,16 @@ async function signTicket(ticketId, eventId, ts) {
 }
 const { hashPassword, verifyPassword, createSession, getSession, destroySession, parseCookies, signAuthToken, verifyAuthToken, TOKEN_TTL } = require("./auth");
 // verifyPassword(password, salt, expectedHash) → boolean
+const SEC = require("./security");
+
+/* Filet de sécurité : une requête boguée (colonne SQL manquante, etc.)
+   ne doit JAMAIS tuer tout le serveur. On journalise et on continue. */
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason && reason.message ? reason.message : reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err && err.message ? err.message : err);
+});
 
 const PORT = process.env.PORT || 3000;
 const ROOT = path.join(__dirname, ".."); // dossier diaspoactif-site (fichiers statiques)
@@ -143,9 +153,12 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   if (!nom || !email || !password || !role) return sendJSON(res, 400, { error: "Champs requis manquants (nom, email, password, role)." });
   if (!["utilisateur", "initiative", "administrateur", "collectivite"].includes(role)) return sendJSON(res, 400, { error: "Rôle invalide." });
+  if (!SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
   if (password.length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit comporter au moins 8 caractères." });
 
-  const existing = await db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+  const emailNorm = SEC.normalizeEmail(email);
+  /* Anti-doublon insensible à la casse (empêche 2 comptes ne différant que par la casse). */
+  const existing = await db.prepare("SELECT id FROM users WHERE LOWER(email) = ?").get(emailNorm);
   if (existing) return sendJSON(res, 409, { error: "Un compte existe déjà avec cet e-mail." });
 
   const { hash, salt } = hashPassword(password);
@@ -159,7 +172,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
       centres_interet, situation_pro, type_institution, statut_verification)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    nom, prenom || null, email, hash, salt, role,
+    nom, prenom || null, emailNorm, hash, salt, role,
     ville || null, (role === "collectivite" ? pays_concerne : pays) || null,
     region || null, departement || null,
     adresse || null, code_postal || null, (telephone || telephone_pro) || null,
@@ -282,15 +295,35 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 });
 
 route("POST", "/api/auth/login", async (req, res, params, body) => {
-  const { email, password } = body;
-  const user = await db.prepare("SELECT * FROM users WHERE email = ?").get(email || "");
-  if (!user || !verifyPassword(password || "", user.password_salt, user.password_hash)) {
+  const ip = SEC.clientIp(req);
+  const email = SEC.normalizeEmail(body.email);
+  const password = body.password || "";
+
+  /* Anti brute-force : rate-limit par IP puis par compte (fenêtre 15 min). */
+  const ipLimit = SEC.rateLimit(`login:ip:${ip}`, 20, 15 * 60 * 1000);
+  if (!ipLimit.allowed) {
+    SEC.logSecurity("login_ratelimited", { ip, scope: "ip" });
+    return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  }
+  const emailLimit = SEC.rateLimit(`login:email:${email}`, 8, 15 * 60 * 1000);
+  if (!emailLimit.allowed) {
+    SEC.logSecurity("login_ratelimited", { ip, email, scope: "email" });
+    return sendJSON(res, 429, { error: `Trop de tentatives sur ce compte. Réessayez dans ${emailLimit.retryAfter}s.` });
+  }
+
+  if (!email || !password) return sendJSON(res, 400, { error: "E-mail et mot de passe requis." });
+
+  /* Recherche insensible à la casse (ne casse aucun compte existant). */
+  const user = await db.prepare("SELECT * FROM users WHERE LOWER(email) = ?").get(email);
+  if (!user || !verifyPassword(password, user.password_salt, user.password_hash)) {
+    SEC.logSecurity("login_failed", { ip, email });
     return sendJSON(res, 401, { error: "E-mail ou mot de passe incorrect." });
   }
   db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
   const authTok = signAuthToken({ uid: user.id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  SEC.logSecurity("login_success", { ip, email, uid: Number(user.id), role: user.role });
   sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
 });
 
@@ -355,15 +388,17 @@ route("POST", "/api/upload/avatar", async (req, res) => {
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
 
   if (file.buffer.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 5 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
 
   try {
     const filename = uniqueFilename(file.filename, user.id);
     const url = await uploadToBunny(file.buffer, filename, "avatars");
     await db.prepare("UPDATE users SET photo_url=? WHERE id=?").run(url, user.id);
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "avatar", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
   } catch (e) {
-    console.error("[Upload avatar]", e.message);
-    sendJSON(res, 500, { error: "Erreur upload: " + e.message });
+    sendJSON(res, 500, SEC.safeError(e, "upload avatar"));
   }
 });
 
@@ -387,15 +422,17 @@ route("POST", "/api/upload/banner", async (req, res) => {
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
 
   if (file.buffer.length > 10 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 10 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
 
   try {
     const filename = uniqueFilename(file.filename, user.id);
     const url = await uploadToBunny(file.buffer, filename, "banners");
     await db.prepare("UPDATE users SET banner_url=? WHERE id=?").run(url, user.id);
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "banner", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
   } catch (e) {
-    console.error("[Upload banner]", e.message);
-    sendJSON(res, 500, { error: "Erreur upload: " + e.message });
+    sendJSON(res, 500, SEC.safeError(e, "upload banner"));
   }
 });
 
@@ -413,11 +450,15 @@ route("POST", "/api/upload/logo", async (req, res) => {
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["logo"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  if (file.buffer.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 5 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
   try {
     const filename = uniqueFilename(file.filename, user.id);
     const url = await uploadToBunny(file.buffer, filename, "logos");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "logo", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
-  } catch (e) { sendJSON(res, 500, { error: e.message }); }
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload logo")); }
 });
 
 /* POST /api/upload/post — upload image pour publication/annonce */
@@ -435,11 +476,14 @@ route("POST", "/api/upload/post", async (req, res) => {
   const file = files["post"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
   if (file.buffer.length > 10 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 10 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
   try {
     const filename = uniqueFilename(file.filename, user.id);
     const url = await uploadToBunny(file.buffer, filename, "posts");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "post", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
-  } catch (e) { sendJSON(res, 500, { error: e.message }); }
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload post")); }
 });
 
 /* ---------- Initiatives ---------- */
@@ -1969,8 +2013,7 @@ route("GET", "/api/dashboard/collectivite", async (req, res) => {
     }
   });
   } catch (e) {
-    console.error('[collectivite dashboard]', e);
-    sendJSON(res, 500, { error: e.message });
+    sendJSON(res, 500, SEC.safeError(e, "collectivite dashboard"));
   }
 });
 
@@ -2960,7 +3003,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"article" }); } });
 
   // 4) Reste chronologique
-  const excludeClause = orderedIds.size ? `AND id NOT IN (${[...orderedIds].map(()=>"?").join(",")})` : "";
+  const excludeClause = orderedIds.size ? `AND p.id NOT IN (${[...orderedIds].map(()=>"?").join(",")})` : "";
   const excludeArgs = orderedIds.size ? [...orderedIds] : [];
   (await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE 1=1 ${excludeClause} AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 30`).all(...excludeArgs))
     .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"global" }); } });
@@ -3234,8 +3277,7 @@ route("GET", "/api/admin/diaspora-stats", async (req, res) => {
     tendance_domaine: tendanceDomaine, tendance_ville: tendanceVille
   });
   } catch(e) {
-    console.error('[admin/diaspora-stats]', e);
-    sendJSON(res, 500, { error: e.message });
+    sendJSON(res, 500, SEC.safeError(e, "admin/diaspora-stats"));
   }
 });
 
@@ -6772,6 +6814,9 @@ async function handleVideoUpload(req, res) {
 }
 
 async function handleRequest(req, res) {
+  /* En-têtes de sécurité sur TOUTES les réponses (CSP, HSTS, X-Frame-Options…) */
+  SEC.applySecurityHeaders(res);
+
   const parsed = url.parse(req.url, true);
   const pathname = decodeURIComponent(parsed.pathname);
 
@@ -6797,7 +6842,10 @@ async function handleRequest(req, res) {
 
     // Sur Vercel, le body stream peut déjà être terminé avant qu'on ajoute des listeners.
     // On bufferise le body UNE FOIS ici pour que tous les blocs if tardifs puissent y accéder.
-    if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") {
+    // Exception : multipart/form-data (uploads) — ces routes lisent le flux brut elles-mêmes,
+    // donc on NE DOIT PAS le consommer ici sous peine de bloquer indéfiniment l'upload.
+    const isMultipart = (req.headers["content-type"] || "").startsWith("multipart/form-data");
+    if (!isMultipart && (req.method === "POST" || req.method === "PUT" || req.method === "PATCH")) {
       await readBody(req);
     }
 
@@ -6808,7 +6856,7 @@ async function handleRequest(req, res) {
       const params = {};
       r.keys.forEach((k, i) => params[k] = m[i + 1]);
       try {
-        const body = (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") ? await readBody(req) : {};
+        const body = (!isMultipart && (req.method === "POST" || req.method === "PUT" || req.method === "PATCH")) ? await readBody(req) : {};
         await r.handler(req, res, params, body, parsed.query);
       } catch (e) {
         console.error(e);
@@ -6961,8 +7009,7 @@ async function handleRequest(req, res) {
         `).all(me.id);
         return sendJSON(res, 200, rows);
       } catch(e) {
-        console.error('candidatures/mes error:', e.message);
-        return sendJSON(res, 500, { error: e.message });
+        return sendJSON(res, 500, SEC.safeError(e, "candidatures/mes"));
       }
     }
 
@@ -9288,7 +9335,7 @@ async function handleRequest(req, res) {
     /* ── Calcul Réactivité (fonction partagée) ── */
     async function computeReactivity(userId) {
       const msgs = await db.prepare(`
-        SELECT m.auteur_id, m.created_at, m.conversation_id
+        SELECT m.sender_id AS auteur_id, m.created_at, m.conversation_id
         FROM messages m
         JOIN conversations c ON c.id=m.conversation_id
         WHERE (c.user1_id=? OR c.user2_id=?) AND m.created_at >= datetime('now','-90 days')
@@ -9353,8 +9400,8 @@ async function handleRequest(req, res) {
       if (cached) {
         return sendJSON(res, 200, { score: cached.score, detail: JSON.parse(cached.detail_json||'[]'), label: cached.label });
       }
-      const result = computeTrustScore(uid);
-      const reactivity = computeReactivity(uid);
+      const result = await computeTrustScore(uid);
+      const reactivity = await computeReactivity(uid);
       return sendJSON(res, 200, { ...result, reactivity });
     }
 
@@ -9399,7 +9446,7 @@ async function handleRequest(req, res) {
         FROM conversations c
         JOIN messages m ON m.conversation_id=c.id
         WHERE ((c.user1_id=? AND c.user2_id=?) OR (c.user1_id=? AND c.user2_id=?))
-          AND m.auteur_id=?
+          AND m.sender_id=?
           AND m.created_at <= datetime('now','-14 days')
         HAVING last_from_me IS NOT NULL
       `).get(me.id, uid, uid, me.id, me.id);
@@ -9685,7 +9732,7 @@ async function handleRequest(req, res) {
           meta: { period: p, generated_at: new Date().toISOString() }
         });
       } catch(e) {
-        return sendJSON(res, 500, { error: e.message });
+        return sendJSON(res, 500, SEC.safeError(e, "stats"));
       }
     }
 
