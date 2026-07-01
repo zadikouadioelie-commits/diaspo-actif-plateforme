@@ -194,7 +194,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   const statutVerif = role === "utilisateur" ? "auto" : "en_attente";
 
-  const id = db.prepare(`
+  const id = (await db.prepare(`
     INSERT INTO users (nom, prenom, email, password_hash, password_salt, role,
       ville, pays, region, departement, adresse, code_postal, telephone, date_naissance,
       nationalite1, nationalite2, nationalite3,
@@ -211,7 +211,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     situation_pro || null,
     type_institution || null,
     statutVerif
-  ).lastInsertRowid;
+  )).lastInsertRowid;
 
   // Assigner le DA-ID à l'utilisateur
   try { await db.prepare('UPDATE users SET da_id=? WHERE id=?').run(generateDaId(), id); } catch (_) {}

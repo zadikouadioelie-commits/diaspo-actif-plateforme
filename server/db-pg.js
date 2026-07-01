@@ -18,6 +18,10 @@ function toPg(sql) {
   let i = 0;
   return sql
     .replace(/\?/g, () => `$${++i}`)
+    // datetime('now', modifier) SQLite → PostgreSQL (avant la forme sans modificateur)
+    .replace(/datetime\('now',\s*'-(\d+)\s*days?'\)/gi, (_, d) => `to_char(NOW() - INTERVAL '${d} days','YYYY-MM-DD HH24:MI:SS')`)
+    .replace(/datetime\('now',\s*'-(\d+)\s*hours?'\)/gi, (_, h) => `to_char(NOW() - INTERVAL '${h} hours','YYYY-MM-DD HH24:MI:SS')`)
+    .replace(/datetime\('now',\s*'-(\d+)\s*minutes?'\)/gi, (_, m) => `to_char(NOW() - INTERVAL '${m} minutes','YYYY-MM-DD HH24:MI:SS')`)
     .replace(/datetime\('now'\)/gi, "NOW()")
     // strftime SQLite → to_char PostgreSQL (ordre important: plus spécifique d'abord)
     .replace(/strftime\('%Y-%m',\s*'now',\s*'-1 month'\)/gi, "to_char(NOW() - INTERVAL '1 month','YYYY-MM')")
