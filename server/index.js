@@ -10054,6 +10054,7 @@ async function handleRequest(req, res) {
         const reactivity = await computeReactivity(uid);
         return sendJSON(res, 200, { ...result, reactivity });
       } catch (e) {
+        logError(e, "trust-score", req); // journal maison : garde le vrai message côté serveur
         return sendJSON(res, 500, SEC.safeError(e, "trust-score"));
       }
     }
@@ -10065,6 +10066,7 @@ async function handleRequest(req, res) {
         const absence = await db.prepare(`SELECT * FROM user_absence WHERE user_id=? AND (fin IS NULL OR fin >= date('now'))`).get(uid);
         return sendJSON(res, 200, { absence: absence || null });
       } catch (e) {
+        logError(e, "absence", req);
         return sendJSON(res, 500, SEC.safeError(e, "absence"));
       }
     }
