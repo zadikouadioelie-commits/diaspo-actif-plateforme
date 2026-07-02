@@ -985,6 +985,16 @@ function render() {
   renderStats();
   initWidgetBoard();
   initVitrineSwitch();
+
+  // Retour depuis Stripe Identity (?identity=retour) : faire défiler jusqu'au widget Confidentialité et rafraîchir le statut
+  if (isOwn && new URLSearchParams(location.search).get('identity') === 'retour') {
+    history.replaceState(null, '', location.pathname + location.hash);
+    setTimeout(() => {
+      const card = document.querySelector('[data-wid="confidentialite"]');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (typeof renderIdentityCard === 'function') renderIdentityCard();
+    }, 600);
+  }
 }
 
 /* ======================================================
@@ -1073,7 +1083,20 @@ function buildWidgetRegistry() {
 
   // Confidentialité + suppression de compte — visible uniquement par le propriétaire
   if (isOwn) {
-    R.confidentialite = { title:'Confidentialité', icon:'🔒', defaultSize:'full', render:(b)=>b.appendChild(buildPrivacyPanel()) };
+    R.confidentialite = { title:'Confidentialité', icon:'🔒', defaultSize:'full', render:(b)=>{
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `
+        <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;">
+          <button id="conf-sub-privacy" onclick="switchConfTab('privacy')" style="padding:10px 20px;font-size:13px;font-weight:700;background:none;border:none;border-bottom:2.5px solid var(--orange);color:#2563EB;cursor:pointer;margin-bottom:-2px;">🔒 Confidentialité</button>
+          <button id="conf-sub-codes" onclick="switchConfTab('codes')" style="padding:10px 20px;font-size:13px;font-weight:700;background:none;border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;margin-bottom:-2px;">🔑 Codes</button>
+        </div>
+        <div id="conf-panel-privacy"></div>
+        <div id="conf-panel-codes" style="display:none;"></div>
+      `;
+      b.appendChild(wrap);
+      wrap.querySelector('#conf-panel-privacy').appendChild(buildPrivacyPanel());
+      renderIdentityCard();
+    } };
   }
 
   return R;
@@ -3021,6 +3044,10 @@ function buildPrivacyPanel() {
         </select>
       </div>`).join('')}
     <div id="priv-msg" style="font-size:12px;color:#16a34a;margin-top:10px;display:none">✅ Paramètres sauvegardés</div>
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
+      <h3 style="font-size:14px;margin:0 0 12px;">🔐 Vérifier mon identité</h3>
+      <div id="identity-card-body"><p style="font-size:13px;color:var(--muted);">Chargement…</p></div>
+    </div>
     <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
       <h3 style="color:#dc2626;font-size:14px;margin:0 0 6px;">⚠️ Zone de danger</h3>
       <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Supprimer votre compte est <strong>définitif</strong>. Vos informations personnelles (nom, photo, coordonnées) seront effacées. Vos publications resteront visibles sous "Compte supprimé" pour préserver l'historique des échanges.</p>
@@ -3271,6 +3298,62 @@ async function renderCodesPanel() {
     } catch(e) { el.innerHTML = '<p style="font-size:13px;color:var(--muted);">Historique indisponible.</p>'; }
   }
   loadDsHistory();
+}
+
+/* ---- Carte "Vérifier mon identité" (Stripe Identity) ---- */
+function fmtDateFr(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' }); }
+  catch (e) { return iso; }
+}
+
+async function renderIdentityCard() {
+  const body = document.getElementById('identity-card-body');
+  if (!body) return;
+  body.innerHTML = '<p style="font-size:13px;color:var(--muted);">Chargement…</p>';
+  try {
+    const r = await api('GET', '/identity/status');
+    if (r.verifie) {
+      body.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <span style="font-size:22px;">✔️</span>
+          <div>
+            <div style="font-weight:800;color:#166534;font-size:14px;">Identité vérifiée</div>
+            <div style="font-size:12px;color:#166534;">Identité vérifiée par Diaspo'Actif le ${fmtDateFr(r.verifie_le)}.</div>
+          </div>
+        </div>
+        <p class="codes-sub" style="margin:0;">Valable jusqu'au <strong>${fmtDateFr(r.expire_le)}</strong>. Aucun document personnel n'est affiché publiquement — seul ce badge est visible des autres utilisateurs.</p>`;
+    } else if (r.session_en_cours) {
+      body.innerHTML = `
+        <p class="codes-sub" style="margin:0 0 12px;">Une vérification est en cours de traitement chez Stripe. Cela peut prendre quelques minutes après l'envoi de vos documents.</p>
+        <div class="codes-btn-row">
+          <button class="codes-btn orange" onclick="renderIdentityCard()">↺ Actualiser le statut</button>
+          <button class="codes-btn green" onclick="startIdentityVerification()">🔐 Reprendre / recommencer la vérification</button>
+        </div>`;
+    } else {
+      body.innerHTML = `
+        <p class="codes-sub" style="margin:0 0 12px;">Faites vérifier votre identité (pièce d'identité + selfie) pour obtenir le badge <strong>✔️ Identité vérifiée</strong> visible sur votre profil, valable 24 mois. Aucun document n'est conservé par Diaspo'Actif — la vérification est effectuée et hébergée par Stripe Identity.</p>
+        <div class="codes-btn-row">
+          <button class="codes-btn green" id="identity-start-btn" onclick="startIdentityVerification()">🔐 Vérifier mon identité</button>
+        </div>
+        <p id="identity-err" style="color:#dc2626;font-size:12px;margin:8px 0 0;display:none;"></p>`;
+    }
+  } catch (e) {
+    body.innerHTML = '<p style="font-size:13px;color:var(--muted);">Statut de vérification indisponible.</p>';
+  }
+}
+
+async function startIdentityVerification() {
+  const btn = document.getElementById('identity-start-btn');
+  const err = document.getElementById('identity-err');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await api('POST', '/identity/verify', {});
+    window.location.href = r.url; // redirige vers la page hébergée Stripe Identity
+  } catch (e) {
+    if (err) { err.textContent = e.message || 'Erreur lors du lancement de la vérification.'; err.style.display = 'block'; }
+    if (btn) btn.disabled = false;
+  }
 }
 
 /* ======================================================

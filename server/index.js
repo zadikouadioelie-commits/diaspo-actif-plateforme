@@ -3098,6 +3098,225 @@ async function notifierAbonnes(initiativeId, type, titre, contenu, data = {}, ex
   } catch (e) { /* silencieux */ }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   VÉRIFICATION D'IDENTITÉ (Stripe Identity) — 🔐 badge "Identité vérifiée"
+   Aucun document n'est jamais stocké côté Diaspo'Actif : Stripe Identity
+   héberge les documents/selfies, on ne conserve que le statut, les dates
+   et l'identifiant technique de session (voir identity_verifications_log).
+   ═══════════════════════════════════════════════════════════════ */
+const IDENTITY_VALIDITY_MONTHS = 24;
+
+function getOrigin(req) {
+  const proto = req.headers["x-forwarded-proto"] || (req.socket && req.socket.encrypted ? "https" : "http");
+  const host = req.headers.host || "localhost:3000";
+  return `${proto}://${host}`;
+}
+
+function addMonths(dateStr, months) {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString();
+}
+
+/* POST /api/identity/verify — crée une session de vérification Stripe Identity, renvoie l'URL hébergée */
+route("POST", "/api/identity/verify", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Vérification d'identité momentanément indisponible." });
+
+  // Déjà vérifié et non expiré → rien à refaire
+  const current = await db.prepare("SELECT identite_verifiee, identite_expire_le FROM users WHERE id=?").get(user.id);
+  if (current?.identite_verifiee && current.identite_expire_le && new Date(current.identite_expire_le) > new Date()) {
+    return sendJSON(res, 400, { error: "Votre identité est déjà vérifiée et valide." });
+  }
+
+  try {
+    const origin = getOrigin(req);
+    const session = await stripe.identity.verificationSessions.create({
+      type: "document",
+      options: { document: { require_matching_selfie: true } },
+      metadata: { diaspoactif_user_id: String(user.id) },
+      return_url: `${origin}/profil.html?identity=retour`,
+    });
+    await db.prepare("UPDATE users SET stripe_identity_session_id=? WHERE id=?").run(session.id, user.id);
+    await db.prepare(
+      "INSERT INTO identity_verifications_log (user_id, stripe_session_id, type, statut) VALUES (?,?,?,?)"
+    ).run(user.id, session.id, "personne", "requires_input");
+    sendJSON(res, 200, { url: session.url });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "identity-verify"));
+  }
+});
+
+/* GET /api/identity/status — statut de vérification de l'utilisateur connecté */
+route("GET", "/api/identity/status", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const row = await db.prepare(
+    "SELECT identite_verifiee, identite_verifiee_le, identite_expire_le, stripe_identity_session_id FROM users WHERE id=?"
+  ).get(user.id);
+  const verifie = !!row?.identite_verifiee && row.identite_expire_le && new Date(row.identite_expire_le) > new Date();
+  sendJSON(res, 200, {
+    verifie,
+    verifie_le: row?.identite_verifiee_le || null,
+    expire_le: row?.identite_expire_le || null,
+    session_en_cours: !verifie && !!row?.stripe_identity_session_id,
+  });
+});
+
+/* POST /api/stripe/webhook — événements Identity (vérification) + Connect (comptes vendeurs).
+   Appelé AVANT readBody() global (nécessite le corps BRUT pour vérifier la signature). */
+async function handleStripeWebhook(req, res) {
+  const { stripe } = require("./stripe-client");
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!stripe || !webhookSecret) {
+    console.log("[Stripe webhook] Non configuré (clé ou secret webhook absent) — événement ignoré.");
+    return sendJSON(res, 200, { received: false });
+  }
+  const chunks = [];
+  req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const rawBody = Buffer.concat(chunks);
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, req.headers["stripe-signature"], webhookSecret);
+  } catch (e) {
+    SEC.logSecurity("stripe_webhook_bad_signature", { error: e.message });
+    return sendJSON(res, 400, { error: "Signature invalide." });
+  }
+
+  try {
+    if (event.type === "identity.verification_session.verified") {
+      const session = event.data.object;
+      const userId = Number(session.metadata?.diaspoactif_user_id);
+      if (userId) {
+        const now = new Date().toISOString();
+        const expire = addMonths(now, IDENTITY_VALIDITY_MONTHS);
+        await db.prepare(
+          "UPDATE users SET identite_verifiee=1, identite_verifiee_le=?, identite_expire_le=?, identite_renouvellement_notifie=0 WHERE id=?"
+        ).run(now, expire, userId);
+        await db.prepare(
+          "INSERT INTO identity_verifications_log (user_id, stripe_session_id, type, statut) VALUES (?,?,?,?)"
+        ).run(userId, session.id, "personne", "verified");
+        creerNotif(userId, "identite_verifiee", "Identité vérifiée ✔️",
+          "Votre identité a été vérifiée avec succès. Le badge est maintenant visible sur votre profil.", {});
+      }
+    } else if (event.type === "identity.verification_session.requires_input") {
+      const session = event.data.object;
+      const userId = Number(session.metadata?.diaspoactif_user_id);
+      if (userId) {
+        await db.prepare(
+          "INSERT INTO identity_verifications_log (user_id, stripe_session_id, type, statut) VALUES (?,?,?,?)"
+        ).run(userId, session.id, "personne", "requires_input");
+        const reason = session.last_error?.reason || "Document non valide.";
+        creerNotif(userId, "identite_echec", "Vérification d'identité incomplète",
+          `La vérification n'a pas pu être finalisée : ${reason} Vous pouvez réessayer depuis votre profil.`, {});
+      }
+    } else if (event.type === "account.updated") {
+      const account = event.data.object;
+      const row = await db.prepare("SELECT initiative_id FROM stripe_connect_accounts WHERE stripe_account_id=?").get(account.id);
+      if (row) {
+        const detailsSubmitted = account.details_submitted ? 1 : 0;
+        const chargesEnabled = account.charges_enabled ? 1 : 0;
+        const payoutsEnabled = account.payouts_enabled ? 1 : 0;
+        await db.prepare(
+          "UPDATE stripe_connect_accounts SET details_submitted=?, charges_enabled=?, payouts_enabled=?, statut=?, updated_at=datetime('now') WHERE stripe_account_id=?"
+        ).run(detailsSubmitted, chargesEnabled, payoutsEnabled, (chargesEnabled && payoutsEnabled) ? "active" : "pending", account.id);
+
+        if (chargesEnabled && payoutsEnabled && detailsSubmitted) {
+          const init = await db.prepare("SELECT organisation_verifiee, owner_user_id, nom FROM initiatives WHERE id=?").get(row.initiative_id);
+          if (init && !init.organisation_verifiee) {
+            const now = new Date().toISOString();
+            await db.prepare(
+              "UPDATE initiatives SET organisation_verifiee=1, organisation_verifiee_le=?, organisation_expire_le=? WHERE id=?"
+            ).run(now, addMonths(now, IDENTITY_VALIDITY_MONTHS), row.initiative_id);
+            if (init.owner_user_id) {
+              creerNotif(init.owner_user_id, "organisation_verifiee", "Organisation vérifiée 🏢",
+                `« ${init.nom} » a obtenu le badge Organisation vérifiée.`, { initiative_id: row.initiative_id });
+            }
+          }
+        }
+      }
+    }
+    sendJSON(res, 200, { received: true });
+  } catch (e) {
+    logError(e, "stripe-webhook", req);
+    sendJSON(res, 200, { received: true }); // toujours 200 pour éviter les réessais infinis de Stripe sur une erreur interne
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STRIPE CONNECT — comptes vendeurs marketplace (initiatives)
+   Le statut "🏢 Organisation vérifiée" découle de l'onboarding Connect
+   (Stripe collecte et vérifie lui-même les documents d'entreprise),
+   voir mise à jour dans handleStripeWebhook() sur account.updated.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* POST /api/initiatives/:id/connect/onboard — owner only, crée/poursuit l'onboarding Stripe Connect */
+route("POST", "/api/initiatives/:id/connect/onboard", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+
+  try {
+    let existing = await db.prepare("SELECT * FROM stripe_connect_accounts WHERE initiative_id=?").get(init.id);
+    let accountId;
+    if (existing) {
+      accountId = existing.stripe_account_id;
+    } else {
+      const account = await stripe.accounts.create({
+        type: "express",
+        business_type: "company",
+        business_profile: { name: init.nom },
+        metadata: { diaspoactif_initiative_id: String(init.id) },
+      });
+      accountId = account.id;
+      await db.prepare(
+        "INSERT INTO stripe_connect_accounts (initiative_id, stripe_account_id, statut) VALUES (?,?,?)"
+      ).run(init.id, accountId, "pending");
+    }
+
+    const origin = getOrigin(req);
+    const link = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${origin}/dashboard-initiative.html?connect=refresh`,
+      return_url: `${origin}/dashboard-initiative.html?connect=retour`,
+      type: "account_onboarding",
+    });
+    sendJSON(res, 200, { url: link.url });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "connect-onboard"));
+  }
+});
+
+/* GET /api/initiatives/:id/connect/status — owner only, statut du compte Connect */
+route("GET", "/api/initiatives/:id/connect/status", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id, organisation_verifiee, organisation_verifiee_le, organisation_expire_le FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+
+  const account = await db.prepare("SELECT statut, charges_enabled, payouts_enabled, details_submitted FROM stripe_connect_accounts WHERE initiative_id=?").get(params.id);
+  sendJSON(res, 200, {
+    connecte: !!account,
+    statut: account?.statut || "non_demarre",
+    charges_enabled: !!account?.charges_enabled,
+    payouts_enabled: !!account?.payouts_enabled,
+    details_submitted: !!account?.details_submitted,
+    organisation_verifiee: !!init.organisation_verifiee,
+    organisation_verifiee_le: init.organisation_verifiee_le || null,
+    organisation_expire_le: init.organisation_expire_le || null,
+  });
+});
+
 route("GET", "/api/notifications", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -7485,6 +7704,11 @@ async function handleRequest(req, res) {
     return handleVideoUpload(req, res);
   }
 
+  /* ── Webhook Stripe (avant readBody — nécessite le corps brut pour la signature) ── */
+  if (pathname === '/api/stripe/webhook' && req.method === 'POST') {
+    return handleStripeWebhook(req, res);
+  }
+
   if (pathname.startsWith("/api/")) {
     // Enregistrer l'activité de l'utilisateur connecté (pour DAU/WAU/MAU)
     if (req.method === "GET") trackActivity(req);
@@ -9940,8 +10164,11 @@ async function handleRequest(req, res) {
       total += accredPts;
 
       // Initiative immatriculée 8 pts
-      const init = await db.prepare(`SELECT numero_immatriculation FROM initiatives WHERE owner_user_id=?`).get(userId);
+      const init = await db.prepare(`SELECT numero_immatriculation, organisation_verifiee FROM initiatives WHERE owner_user_id=?`).get(userId);
       if (init?.numero_immatriculation) { total += 8; detail.push({ icon:'🏛️', label:'Initiative officiellement immatriculée', pts:8, max:8 }); }
+
+      // Organisation vérifiée (KYB Stripe Connect) 10 pts
+      if (init?.organisation_verifiee) { total += 10; detail.push({ icon:'🏢', label:'Organisation vérifiée (Stripe)', pts:10, max:10 }); }
 
       // Activité plateforme max 10 pts
       const nbPosts = (await db.prepare(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?`).get(userId))?.n || 0;

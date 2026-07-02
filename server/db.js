@@ -1122,6 +1122,16 @@ const MIGRATIONS = [
   ["users", "temoignage_statut TEXT DEFAULT 'non_demande'"],
   ["users", "temoignage_derniere_demande TEXT"],
   ["users", "demo_vue INTEGER DEFAULT 0"],
+  // ── Vérification d'identité (Stripe Identity) — 🔐 "Vérifier mon identité" ──
+  ["users", "stripe_identity_session_id TEXT"],
+  ["users", "identite_verifiee_le TEXT"],
+  ["users", "identite_expire_le TEXT"],
+  ["users", "identite_renouvellement_notifie INTEGER DEFAULT 0"],
+  // ── Vérification d'organisation (initiatives) — 🏢 "Organisation vérifiée" ──
+  ["initiatives", "organisation_verifiee INTEGER DEFAULT 0"],
+  ["initiatives", "organisation_verifiee_le TEXT"],
+  ["initiatives", "organisation_expire_le TEXT"],
+  ["initiatives", "stripe_identity_session_id TEXT"],
   ["initiatives", "signalements_confirmes INTEGER DEFAULT 0"],
   ["initiatives", "commune TEXT"],
   ["initiatives", "departement TEXT"],
@@ -3777,6 +3787,33 @@ db.exec(`
     contenu TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(publication_id) REFERENCES vitrine_publications(id)
+  );
+
+  -- Comptes Stripe Connect des initiatives (paiements marketplace, commission plateforme)
+  CREATE TABLE IF NOT EXISTS stripe_connect_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL UNIQUE,
+    stripe_account_id TEXT NOT NULL UNIQUE,
+    statut TEXT DEFAULT 'pending' CHECK(statut IN ('pending','active','restricted','rejected')),
+    charges_enabled INTEGER DEFAULT 0,
+    payouts_enabled INTEGER DEFAULT 0,
+    details_submitted INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
+  -- Journal d'audit des vérifications d'identité (aucun document stocké — uniquement le statut/dates)
+  CREATE TABLE IF NOT EXISTS identity_verifications_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    initiative_id INTEGER,
+    stripe_session_id TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('personne','organisation')),
+    statut TEXT NOT NULL CHECK(statut IN ('requires_input','processing','verified','canceled')),
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
   );
 `);
 

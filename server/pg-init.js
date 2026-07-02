@@ -136,6 +136,15 @@ async function migratePg(pool) {
     ['messages', 'est_epingle', 'INTEGER DEFAULT 0'],
     // user_accreditations
     ['user_accreditations', 'feature_slug', 'TEXT'],
+    // vérification d'identité (Stripe Identity)
+    ['users', 'stripe_identity_session_id', 'TEXT'],
+    ['users', 'identite_verifiee_le', 'TEXT'],
+    ['users', 'identite_expire_le', 'TEXT'],
+    ['users', 'identite_renouvellement_notifie', 'INTEGER DEFAULT 0'],
+    ['initiatives', 'organisation_verifiee', 'INTEGER DEFAULT 0'],
+    ['initiatives', 'organisation_verifiee_le', 'TEXT'],
+    ['initiatives', 'organisation_expire_le', 'TEXT'],
+    ['initiatives', 'stripe_identity_session_id', 'TEXT'],
   ];
   for (const [table, col, type] of cols) {
     try {

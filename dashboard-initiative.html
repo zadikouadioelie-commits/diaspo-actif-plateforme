@@ -633,6 +633,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <div id="evenements" style="display:none;"></div>
     <div id="billetterie-init" style="display:none;"></div>
 
+    <div class="card" style="margin-bottom:20px;" id="paiement-marketplace">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">💳 Paiements de la boutique (Stripe Connect)</h3>
+        <button class="btn btn-sm btn-outline" onclick="renderPaiementMarketplace()" style="font-size:12px;">↺ Actualiser</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Activez les paiements réels pour recevoir directement l'argent des ventes de votre boutique. La plateforme prélève une commission sur chaque vente. Vos documents d'entreprise sont vérifiés et hébergés par Stripe — Diaspo'Actif ne les stocke jamais.</p>
+      <div id="paiement-marketplace-body"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
     <div class="card" style="margin-bottom:20px;" id="paiement">
       <h3>Module de paiement — billetterie &amp; cotisations</h3>
       <p>Activez un module de paiement pour vos événements : vente de billets, cotisations, inscriptions, collectes de fonds, dons.</p>
@@ -2493,6 +2502,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'deals') renderDealsSection();
     if (name === 'messages-vitrine') renderMessagesVitrine();
+    if (name === 'paiement') renderPaiementMarketplace();
     if (name === 'asso-accreditation') renderAssoAccreditation();
     if (name === 'asso-cockpit') renderAssoCockpit();
     if (name === 'asso-adherents') renderAssoAdherents();
@@ -3484,6 +3494,58 @@ async function replyVitrineMessage(convId){
     if(typeof showToast==='function') showToast('✅ Réponse envoyée');
     renderMessagesVitrine();
   }catch(e){ alert(e.message || 'Envoi impossible'); }
+}
+
+/* ══════════════════════════════════════════════
+   PAIEMENTS MARKETPLACE — Stripe Connect
+══════════════════════════════════════════════ */
+async function renderPaiementMarketplace(){
+  const body = document.getElementById('paiement-marketplace-body');
+  const initId = window.__vitrineInitId;
+  if(!body) return;
+  if(!initId){ body.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune initiative liée.</p>'; return; }
+  body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+  try{
+    const r = await api('GET', `/initiatives/${initId}/connect/status`);
+    if(!r.connecte){
+      body.innerHTML = `
+        <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Aucun compte de paiement configuré pour l'instant.</p>
+        <button class="btn btn-orange" id="connect-start-btn" onclick="startConnectOnboarding()">💳 Activer les paiements</button>
+        <p id="connect-err" style="color:#dc2626;font-size:12px;margin:8px 0 0;display:none;"></p>`;
+    } else if(r.charges_enabled && r.payouts_enabled){
+      body.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+          <span style="font-size:22px;">✅</span>
+          <div>
+            <div style="font-weight:800;color:#166534;font-size:14px;">Paiements activés</div>
+            <div style="font-size:12px;color:#166534;">Votre boutique peut recevoir de vrais paiements et virements.</div>
+          </div>
+        </div>
+        ${r.organisation_verifiee ? `<p style="font-size:12px;color:var(--muted);margin:0;">🏢 Organisation vérifiée le ${new Date(r.organisation_verifiee_le).toLocaleDateString('fr-FR')}, valable jusqu'au ${new Date(r.organisation_expire_le).toLocaleDateString('fr-FR')}.</p>` : ''}`;
+    } else {
+      body.innerHTML = `
+        <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Configuration en cours — Stripe vérifie encore vos informations d'entreprise.
+        ${r.details_submitted ? ' Documents envoyés, vérification en cours.' : ' Merci de compléter les informations manquantes.'}</p>
+        <button class="btn btn-orange" id="connect-start-btn" onclick="startConnectOnboarding()">${r.details_submitted ? '↺ Vérifier / actualiser' : '📝 Compléter la configuration'}</button>
+        <p id="connect-err" style="color:#dc2626;font-size:12px;margin:8px 0 0;display:none;"></p>`;
+    }
+  } catch(e){
+    body.innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur : ${e.message||'chargement impossible'}</p>`;
+  }
+}
+
+async function startConnectOnboarding(){
+  const initId = window.__vitrineInitId;
+  const btn = document.getElementById('connect-start-btn');
+  const err = document.getElementById('connect-err');
+  if(btn) btn.disabled = true;
+  try{
+    const r = await api('POST', `/initiatives/${initId}/connect/onboard`, {});
+    window.location.href = r.url;
+  } catch(e){
+    if(err){ err.textContent = e.message || 'Erreur lors du lancement.'; err.style.display = 'block'; }
+    if(btn) btn.disabled = false;
+  }
 }
 
 async function renderDealsSection() {
