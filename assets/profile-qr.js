@@ -311,7 +311,7 @@
       userId = null, initId = null, userName = 'Profil',
       userRole = 'Membre', userOrg = '', userSlug = null,
       initNom = 'Initiative', initSlug = null, size = 180,
-      showActions = true, compact = false,
+      showActions = true, compact = false, url: customUrl = null,
     } = opts;
 
     const type = initId ? 'initiative' : 'user';
@@ -319,7 +319,8 @@
     const name = initId ? initNom : userName;
     const role = userRole;
     const org  = userOrg;
-    const url  = profileUrl(id, type);
+    // Si une URL personnalisée est fournie (ex: vitrine avec #vitrine), elle prime.
+    const url  = customUrl || profileUrl(id, type);
 
     container.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:8px;">Génération du QR…</div>';
 

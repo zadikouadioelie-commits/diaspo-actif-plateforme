@@ -3663,7 +3663,122 @@ db.exec(`
   if (!userCols2.includes('email_verif_expires')) db.exec("ALTER TABLE users ADD COLUMN email_verif_expires INTEGER");
   // Comptes démo (adresses fictives) : considérés comme déjà vérifiés
   try { db.exec("UPDATE users SET email_verifie=1 WHERE email LIKE '%@diaspoactif.demo' OR email LIKE '%@demo.fr' OR email LIKE '%@admin.fr'"); } catch(_) {}
+
+  // ── Vitrine commerciale (comptes Initiative) ──
+  const initCols2 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
+  if (!initCols2.includes('vitrine_active')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_active INTEGER DEFAULT 0");
+  if (!initCols2.includes('vitrine_banniere_url')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_banniere_url TEXT");
+  if (!initCols2.includes('vitrine_horaires')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_horaires TEXT");
+  if (!initCols2.includes('vitrine_services')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_services TEXT");
+
+  // ── Vitrine v2 : statuts d'indisponibilité + messagerie contextuelle ──
+  const prodCols = db.prepare('PRAGMA table_info(produits_vitrine)').all().map(c=>c.name);
+  if (prodCols.length) {
+    if (!prodCols.includes('statut')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN statut TEXT DEFAULT 'disponible'");
+    if (!prodCols.includes('date_retour')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN date_retour TEXT");
+    if (!prodCols.includes('reference')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN reference TEXT");
+  }
+  const msgCols3 = db.prepare('PRAGMA table_info(messages)').all().map(c=>c.name);
+  if (!msgCols3.includes('produit_id')) db.exec("ALTER TABLE messages ADD COLUMN produit_id INTEGER");
+  const convCols3 = db.prepare('PRAGMA table_info(conversations)').all().map(c=>c.name);
+  if (!convCols3.includes('contexte')) db.exec("ALTER TABLE conversations ADD COLUMN contexte TEXT");
+
+  // ── Vitrine v3 : publications promotionnelles ──
+  const initCols3 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
+  if (!initCols3.includes('vitrine_pub_onglet')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_pub_onglet TEXT DEFAULT 'À la une'");
+  const cmdCols = db.prepare('PRAGMA table_info(commandes_vitrine)').all().map(c=>c.name);
+  if (cmdCols.length && !cmdCols.includes('publication_id')) db.exec("ALTER TABLE commandes_vitrine ADD COLUMN publication_id INTEGER");
+  const pubCols = db.prepare('PRAGMA table_info(vitrine_publications)').all().map(c=>c.name);
+  if (pubCols.length && !pubCols.includes('media_bg')) db.exec("ALTER TABLE vitrine_publications ADD COLUMN media_bg TEXT");
 }
+
+/* ── Boutique de la Vitrine (produits/services, max 20 par initiative) ── */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS produits_vitrine (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    description TEXT,
+    prix REAL,
+    devise TEXT DEFAULT 'EUR',
+    disponible INTEGER DEFAULT 1,
+    statut TEXT DEFAULT 'disponible',
+    date_retour TEXT,
+    reference TEXT,
+    categorie TEXT,
+    photos_json TEXT DEFAULT '[]',
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS produit_alertes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    produit_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    notifie INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(produit_id, user_id),
+    FOREIGN KEY(produit_id) REFERENCES produits_vitrine(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS commandes_vitrine (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    produit_id INTEGER NOT NULL,
+    initiative_id INTEGER NOT NULL,
+    acheteur_id INTEGER NOT NULL,
+    publication_id INTEGER,
+    message TEXT,
+    quantite INTEGER DEFAULT 1,
+    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','traitee','annulee')),
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(produit_id) REFERENCES produits_vitrine(id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(acheteur_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS vitrine_publications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    produit_id INTEGER,
+    titre TEXT NOT NULL,
+    description TEXT,
+    prix REAL,
+    promo TEXT,
+    medias_json TEXT DEFAULT '[]',
+    media_bg TEXT,
+    cta_type TEXT DEFAULT 'aucun',
+    statut TEXT DEFAULT 'publie',
+    vues INTEGER DEFAULT 0,
+    partages INTEGER DEFAULT 0,
+    clics_fiche INTEGER DEFAULT 0,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(produit_id) REFERENCES produits_vitrine(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS vitrine_pub_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    publication_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(publication_id, user_id),
+    FOREIGN KEY(publication_id) REFERENCES vitrine_publications(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS vitrine_pub_commentaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    publication_id INTEGER NOT NULL,
+    auteur_id INTEGER,
+    auteur_nom TEXT NOT NULL,
+    contenu TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(publication_id) REFERENCES vitrine_publications(id)
+  );
+`);
 
 /* ═══════════════════════════════════════════════
    MODULE BUSINESS PLAN — Tables

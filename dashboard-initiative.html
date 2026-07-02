@@ -60,6 +60,7 @@
 
       <div class="sb-group-lbl">05 — COMMUNICATION</div>
       <a href="messagerie.html">🟥 Messages <span class="pill" id="msg-count">—</span></a>
+      <a href="#messages-vitrine" data-section="messages-vitrine">🛍️ Messages de la vitrine <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
       <a href="#recrutement" data-section="recrutement">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
       <a href="agenda.html">📅 Mon Agenda</a>
       <a href="reseau.html">🌐 Mon Réseau Pro <span class="pill" id="reseau-badge" style="display:none;"></span></a>
@@ -150,6 +151,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   /* Compteur messages */
   const msgPill = document.getElementById("msg-count");
   if (msgPill) msgPill.textContent = messages_non_lus || 0;
+
+  /* Vitrine : id initiative exposé + badge messages vitrine */
+  window.__vitrineInitId = init ? init.id : null;
+  if (init) { try { updateVitrineBadge(); } catch(e){} }
 
   /* Pas encore d'initiative liée → formulaire de création multi-étapes */
   if (!init) {
@@ -859,6 +864,16 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <div id="deals-invites-list" style="margin-bottom:16px;"></div>
         <div id="deals-list"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
       </div>
+    </div>
+
+    <!-- ══ SECTION MESSAGES DE LA VITRINE ══ -->
+    <div class="card" style="margin-bottom:20px;display:none;" id="messages-vitrine">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">🛍️ Messages de la vitrine</h3>
+        <button class="btn btn-sm btn-outline" onclick="renderMessagesVitrine()">↺ Actualiser</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Conversations issues de votre boutique. Chaque message peut être lié à un produit précis.</p>
+      <div id="messages-vitrine-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
     </div>
 
     <!-- ══ SECTIONS GESTION ASSOCIATION ══ -->
@@ -2250,8 +2265,28 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <span style="font-size:20px;">🌐</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Réseau Pro</div><div style="font-size:11px;color:#0f766e;opacity:.8;">Affiliations &amp; annuaire</div></div>
         </a>
       </div>
+      <div class="card" style="margin-top:16px;">
+        <h3 style="margin:0 0 12px;font-size:15px;">📱 QR code de ma vitrine</h3>
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+          <div id="cockpit-vitrine-qr" style="flex-shrink:0;"></div>
+          <div style="flex:1;min-width:200px;font-size:13px;color:var(--muted);line-height:1.6;">
+            Partagez ce QR code pour donner un accès direct à votre boutique. Les visiteurs arrivent directement sur votre vitrine.
+          </div>
+        </div>
+      </div>
     </div>`;
     content.insertAdjacentHTML('afterbegin', cockpitHTML);
+
+    // QR code vers la vitrine publique (profil.html?id=<owner>#vitrine)
+    try {
+      const ownerId = init.owner_user_id || (typeof me !== 'undefined' && me ? me.id : null);
+      if (ownerId && window.ProfileQR) {
+        ProfileQR.render(document.getElementById('cockpit-vitrine-qr'), {
+          url: `${location.origin}/profil.html?id=${ownerId}#vitrine`,
+          userName: (init.nom || 'Vitrine'), userRole: 'Vitrine', size: 150
+        });
+      }
+    } catch(e) {}
 
     /* Section mes-projets */
     const projetsSec = document.createElement('div');
@@ -2445,7 +2480,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
+  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals','messages-vitrine','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -2457,6 +2492,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'evenements') window.renderInitEvenements?.();
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'deals') renderDealsSection();
+    if (name === 'messages-vitrine') renderMessagesVitrine();
     if (name === 'asso-accreditation') renderAssoAccreditation();
     if (name === 'asso-cockpit') renderAssoCockpit();
     if (name === 'asso-adherents') renderAssoAdherents();
@@ -3381,6 +3417,75 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 /* ══════════════════════════════════════════════
    MODULE GÉRER UN DEAL — Dashboard Initiative
 ══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   MESSAGES DE LA VITRINE — Dashboard Initiative
+══════════════════════════════════════════════ */
+function _mvEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _mvDate(d){ if(!d) return ''; const dt=new Date(d.replace(' ','T')); if(isNaN(dt)) return d; return dt.toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+
+async function updateVitrineBadge(){
+  const initId = window.__vitrineInitId;
+  const badge = document.getElementById('vitrine-msg-count');
+  if(!initId || !badge) return;
+  try{
+    const r = await api('GET', `/initiatives/${initId}/vitrine-messages`);
+    const n = r.total_non_lus || 0;
+    if(n>0){ badge.textContent = n; badge.style.display=''; } else { badge.style.display='none'; }
+  }catch(e){ /* silencieux */ }
+}
+
+async function renderMessagesVitrine(){
+  const el = document.getElementById('messages-vitrine-list');
+  const initId = window.__vitrineInitId;
+  if(!el) return;
+  if(!initId){ el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune initiative liée.</p>'; return; }
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+  try{
+    const r = await api('GET', `/initiatives/${initId}/vitrine-messages`);
+    const msgs = r.messages || [];
+    // Rafraîchit le badge du menu
+    const badge = document.getElementById('vitrine-msg-count');
+    if(badge){ const n=r.total_non_lus||0; if(n>0){badge.textContent=n;badge.style.display='';}else{badge.style.display='none';} }
+    if(!msgs.length){ el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun message de la vitrine pour le moment.</p>'; return; }
+    el.innerHTML = msgs.map(m => {
+      const prod = m.produit ? `<a href="profil.html?id=${initId}#vitrine" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#2563EB;text-decoration:none;background:rgba(37,99,235,.08);border-radius:6px;padding:3px 10px;margin-top:6px;">🛍️ ${_mvEsc(m.produit.nom)}${m.produit.reference?` · ${_mvEsc(m.produit.reference)}`:''}</a>` : '';
+      const unread = m.non_lus>0;
+      return `
+      <div class="card" style="margin-bottom:12px;border-left:4px solid ${unread?'#2563EB':'var(--border)'};padding:14px 16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <strong>${_mvEsc(m.autre_nom)}</strong>
+            ${unread?`<span class="pill" style="background:#2563EB;color:#fff;">${m.non_lus} non lu${m.non_lus>1?'s':''}</span>`:''}
+          </div>
+          <span style="font-size:12px;color:var(--muted);">${_mvDate(m.date)}</span>
+        </div>
+        <p style="margin:8px 0 0;font-size:13px;color:var(--text);white-space:pre-wrap;">${_mvEsc(m.apercu)}</p>
+        ${prod}
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <textarea id="mv-reply-${m.conversation_id}" class="input-field" rows="1" placeholder="Répondre…" style="flex:1;min-width:180px;resize:vertical;"></textarea>
+          <button class="btn btn-sm btn-orange" onclick="replyVitrineMessage(${m.conversation_id})">Envoyer</button>
+          <a href="messagerie.html?with=${m.autre_id}" class="btn btn-sm btn-outline">Ouvrir</a>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur : ${_mvEsc(e.message||'chargement impossible')}</p>`;
+  }
+}
+
+async function replyVitrineMessage(convId){
+  const ta = document.getElementById('mv-reply-'+convId);
+  if(!ta) return;
+  const contenu = ta.value.trim();
+  if(!contenu){ ta.focus(); return; }
+  try{
+    await api('POST', `/conversations/${convId}/messages`, { contenu, type:'text' });
+    ta.value='';
+    if(typeof showToast==='function') showToast('✅ Réponse envoyée');
+    renderMessagesVitrine();
+  }catch(e){ alert(e.message || 'Envoi impossible'); }
+}
+
 async function renderDealsSection() {
   const gate = document.getElementById('deals-gate');
   const content = document.getElementById('deals-content');

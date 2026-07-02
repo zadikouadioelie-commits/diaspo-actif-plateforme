@@ -8,10 +8,12 @@
  */
 async function uploadMedia(file, type = 'avatar') {
   const endpoint = {
-    avatar: '/api/upload/avatar',
-    banner: '/api/upload/banner',
-    logo:   '/api/upload/logo',
-    post:   '/api/upload/post'
+    avatar:      '/api/upload/avatar',
+    banner:      '/api/upload/banner',
+    logo:        '/api/upload/logo',
+    post:        '/api/upload/post',
+    produit:     '/api/upload/produit',
+    publication: '/api/upload/post'
   }[type] || '/api/upload/avatar';
 
   const formData = new FormData();

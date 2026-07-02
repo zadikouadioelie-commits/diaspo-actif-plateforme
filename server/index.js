@@ -619,6 +619,501 @@ route("POST", "/api/upload/post", async (req, res) => {
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload post")); }
 });
 
+/* POST /api/upload/produit — photo produit (Vitrine/Boutique) */
+route("POST", "/api/upload/produit", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["produit"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  if (file.buffer.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 5 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const url = await uploadToBunny(file.buffer, filename, "produits");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "produit", type: imgType, size: file.buffer.length });
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload produit")); }
+});
+
+/* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
+const MAX_PRODUITS_VITRINE = 20;
+
+/* GET /api/initiatives/:id/produits — public, catalogue trié */
+route("GET", "/api/initiatives/:id/produits", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  const isOwner = me && init && Number(init.owner_user_id) === Number(me.id);
+
+  let rows = await db.prepare("SELECT * FROM produits_vitrine WHERE initiative_id=? ORDER BY ordre ASC, id ASC").all(params.id);
+  // Les produits "masqué" ne sont visibles que par le propriétaire
+  if (!isOwner) rows = rows.filter(p => (p.statut || 'disponible') !== 'masque');
+
+  const produits = [];
+  for (const p of rows) {
+    const item = { ...p, statut: p.statut || 'disponible', photos: safeParse(p.photos_json || "[]") };
+    if (isOwner) {
+      item.nb_alertes = Number((await db.prepare("SELECT COUNT(*) n FROM produit_alertes WHERE produit_id=? AND notifie=0").get(p.id))?.n) || 0;
+      item.nb_commandes = Number((await db.prepare("SELECT COUNT(*) n FROM commandes_vitrine WHERE produit_id=?").get(p.id))?.n) || 0;
+    }
+    produits.push(item);
+  }
+  sendJSON(res, 200, { produits, is_owner: !!isOwner });
+});
+
+/* GET /api/produits/:id — public, un seul produit (pour message préchargé + fiche) */
+route("GET", "/api/produits/:id", async (req, res, params) => {
+  const p = await db.prepare("SELECT * FROM produits_vitrine WHERE id=?").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Produit introuvable." });
+  const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id=?").get(p.initiative_id);
+  sendJSON(res, 200, { produit: {
+    ...p, statut: p.statut || 'disponible', photos: safeParse(p.photos_json || "[]"),
+    initiative_nom: init ? init.nom : null, owner_user_id: init ? Number(init.owner_user_id) : null
+  }});
+});
+
+/* POST /api/initiatives/:id/produits — owner only, limite 20 */
+route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+
+  const count = (await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.n || 0;
+  if (Number(count) >= MAX_PRODUITS_VITRINE) return sendJSON(res, 400, { error: `Limite de ${MAX_PRODUITS_VITRINE} produits atteinte. Supprimez-en un pour en ajouter un nouveau.` });
+
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference } = body;
+  if (!nom) return sendJSON(res, 400, { error: "Nom du produit requis." });
+  const photosArr = Array.isArray(photos) ? photos.slice(0, 4) : [];
+  const st = ['disponible','indisponible','epuise','masque'].includes(statut) ? statut : 'disponible';
+  const dispo = st === 'disponible' ? 1 : 0;
+  const maxOrdre = (await db.prepare("SELECT MAX(ordre) m FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.m;
+  const ref = (reference && reference.trim()) || ('REF-' + Date.now().toString(36).toUpperCase().slice(-6));
+  const id = (await db.prepare(`
+    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1)).lastInsertRowid;
+  // Notifie les abonnés de la vitrine (sauf produit masqué)
+  if (st !== 'masque') {
+    notifierAbonnes(params.id, "vitrine_produit", "Nouveau produit en boutique",
+      `${init.nom} a ajouté « ${nom} » à sa boutique.`, { produit_id: Number(id) }, [Number(user.id)]);
+  }
+  sendJSON(res, 201, { id });
+});
+
+/* PUT /api/produits/:id — owner only */
+route("PUT", "/api/produits/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const prod = await db.prepare("SELECT * FROM produits_vitrine WHERE id=?").get(params.id);
+  if (!prod) return sendJSON(res, 404, { error: "Produit introuvable." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(prod.initiative_id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference } = body;
+  const photosArr = Array.isArray(photos) ? photos.slice(0, 4) : safeParse(prod.photos_json || "[]");
+  const ancienStatut = prod.statut || 'disponible';
+  const nouveauStatut = ['disponible','indisponible','epuise','masque'].includes(statut) ? statut : ancienStatut;
+  const dispo = nouveauStatut === 'disponible' ? 1 : 0;
+  await db.prepare(`
+    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=? WHERE id=?
+  `).run(
+    nom || prod.nom, description !== undefined ? description : prod.description,
+    prix != null ? Number(prix) : prod.prix, devise || prod.devise, dispo,
+    nouveauStatut, date_retour !== undefined ? date_retour : prod.date_retour,
+    reference !== undefined ? reference : prod.reference,
+    categorie !== undefined ? categorie : prod.categorie, JSON.stringify(photosArr), params.id
+  );
+
+  // Retour en stock : notifier les personnes en liste d'attente (in-app)
+  if (ancienStatut !== 'disponible' && nouveauStatut === 'disponible') {
+    const alertes = await db.prepare("SELECT id, user_id FROM produit_alertes WHERE produit_id=? AND notifie=0").all(params.id);
+    const dejaNotifies = [];
+    for (const a of alertes) {
+      creerNotif(a.user_id, "produit_dispo", "Produit de nouveau disponible",
+        `« ${prod.nom} » est à nouveau disponible.`, { produit_id: Number(params.id), initiative_id: Number(prod.initiative_id) });
+      await db.prepare("UPDATE produit_alertes SET notifie=1 WHERE id=?").run(a.id);
+      dejaNotifies.push(Number(a.user_id));
+    }
+    // Notifie aussi les abonnés de la vitrine (sauf ceux déjà prévenus via la liste d'attente + le propriétaire)
+    const initNom = (await db.prepare("SELECT nom FROM initiatives WHERE id=?").get(prod.initiative_id))?.nom || 'La boutique';
+    notifierAbonnes(prod.initiative_id, "vitrine_dispo", "Produit de nouveau disponible",
+      `${initNom} — « ${prod.nom} » est à nouveau disponible.`, { produit_id: Number(params.id) },
+      [...dejaNotifies, Number(user.id)]);
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/produits/:id/alerte — visiteur : être averti quand dispo */
+route("POST", "/api/produits/:id/alerte", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const prod = await db.prepare("SELECT * FROM produits_vitrine WHERE id=?").get(params.id);
+  if (!prod) return sendJSON(res, 404, { error: "Produit introuvable." });
+  try {
+    await db.prepare("INSERT INTO produit_alertes (produit_id, user_id, notifie) VALUES (?,?,0) ON CONFLICT (produit_id, user_id) DO UPDATE SET notifie=0")
+      .run(params.id, user.id);
+  } catch (e) {
+    // SQLite : INSERT OR IGNORE si ON CONFLICT non supporté par la couche
+    try { await db.prepare("INSERT OR IGNORE INTO produit_alertes (produit_id, user_id) VALUES (?,?)").run(params.id, user.id); } catch (_) {}
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/produits/:id — owner only */
+route("DELETE", "/api/produits/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const prod = await db.prepare("SELECT * FROM produits_vitrine WHERE id=?").get(params.id);
+  if (!prod) return sendJSON(res, 404, { error: "Produit introuvable." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(prod.initiative_id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  try {
+    await db.prepare("DELETE FROM produits_vitrine WHERE id=?").run(params.id);
+    sendJSON(res, 200, { ok: true });
+  } catch (e) {
+    if (/FOREIGN KEY|foreign key/i.test(e.message)) {
+      return sendJSON(res, 400, { error: "Impossible de supprimer ce produit : il a des commandes associées. Marquez-le plutôt comme indisponible." });
+    }
+    sendJSON(res, 500, SEC.safeError(e, "delete produit"));
+  }
+});
+
+/* PATCH /api/initiatives/:id/produits/reorder — owner only, tableau d'IDs dans le nouvel ordre */
+route("PATCH", "/api/initiatives/:id/produits/reorder", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const order = Array.isArray(body.order) ? body.order : [];
+  for (let i = 0; i < order.length; i++) {
+    await db.prepare("UPDATE produits_vitrine SET ordre=? WHERE id=? AND initiative_id=?").run(i, order[i], params.id);
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PUT /api/initiatives/:id/vitrine — owner only, infos vitrine (bannière/horaires/services + champs déjà existants) */
+route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  const { vitrine_active, vitrine_banniere_url, vitrine_horaires, vitrine_services, description, mission, galerie_json, vitrine_pub_onglet } = body;
+  await db.prepare(`
+    UPDATE initiatives SET
+      vitrine_active=?, vitrine_banniere_url=?, vitrine_horaires=?, vitrine_services=?,
+      description=?, mission=?, galerie_json=?, vitrine_pub_onglet=?
+    WHERE id=?
+  `).run(
+    vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
+    vitrine_banniere_url !== undefined ? vitrine_banniere_url : init.vitrine_banniere_url,
+    vitrine_horaires !== undefined ? vitrine_horaires : init.vitrine_horaires,
+    vitrine_services !== undefined ? vitrine_services : init.vitrine_services,
+    description !== undefined ? description : init.description,
+    mission !== undefined ? mission : init.mission,
+    galerie_json !== undefined ? JSON.stringify(galerie_json) : init.galerie_json,
+    vitrine_pub_onglet !== undefined ? vitrine_pub_onglet : (init.vitrine_pub_onglet || 'À la une'),
+    params.id
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/produits/:id/commander — visiteur connecté, demande de contact (PAS de paiement réel) */
+route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const prod = await db.prepare("SELECT * FROM produits_vitrine WHERE id=?").get(params.id);
+  if (!prod) return sendJSON(res, 404, { error: "Produit introuvable." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(prod.initiative_id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) === Number(user.id)) return sendJSON(res, 400, { error: "Vous ne pouvez pas commander votre propre produit." });
+
+  const quantite = Number(body.quantite) || 1;
+  const publicationId = body.publication_id != null ? Number(body.publication_id) : null;
+  const id = (await db.prepare(`
+    INSERT INTO commandes_vitrine (produit_id, initiative_id, acheteur_id, publication_id, message, quantite) VALUES (?,?,?,?,?,?)
+  `).run(params.id, prod.initiative_id, user.id, publicationId, body.message || null, quantite)).lastInsertRowid;
+
+  creerNotif(init.owner_user_id, "commande", "Nouvelle demande de commande",
+    `${user.nom} souhaite commander « ${prod.nom} » (x${quantite})`,
+    { produit_id: prod.id, commande_id: id });
+
+  sendJSON(res, 201, { ok: true, id });
+});
+
+/* GET /api/initiatives/:id/commandes — owner only, demandes reçues */
+route("GET", "/api/initiatives/:id/commandes", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const rows = await db.prepare(`
+    SELECT cv.*, p.nom AS produit_nom, u.nom AS acheteur_nom, u.email AS acheteur_email
+    FROM commandes_vitrine cv
+    JOIN produits_vitrine p ON p.id=cv.produit_id
+    JOIN users u ON u.id=cv.acheteur_id
+    WHERE cv.initiative_id=? ORDER BY cv.created_at DESC
+  `).all(params.id);
+  sendJSON(res, 200, { commandes: rows });
+});
+
+/* PATCH /api/commandes_vitrine/:id — owner only, changer statut */
+route("PATCH", "/api/commandes_vitrine/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const cmd = await db.prepare("SELECT * FROM commandes_vitrine WHERE id=?").get(params.id);
+  if (!cmd) return sendJSON(res, 404, { error: "Commande introuvable." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(cmd.initiative_id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const statut = ["en_attente", "traitee", "annulee"].includes(body.statut) ? body.statut : null;
+  if (!statut) return sendJSON(res, 400, { error: "Statut invalide." });
+  await db.prepare("UPDATE commandes_vitrine SET statut=? WHERE id=?").run(statut, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/initiatives/:id/vitrine-messages — owner : conversations issues de la vitrine */
+route("GET", "/api/initiatives/:id/vitrine-messages", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const oid = Number(user.id);
+
+  const convs = await db.prepare(`
+    SELECT c.id, c.user1_id, c.user2_id, c.created_at
+    FROM conversations c
+    WHERE c.contexte='vitrine' AND (c.user1_id=? OR c.user2_id=?)
+    ORDER BY c.id DESC LIMIT 100
+  `).all(oid, oid);
+
+  let totalNonLus = 0;
+  const items = [];
+  for (const c of convs) {
+    const autreId = Number(c.user1_id) === oid ? c.user2_id : c.user1_id;
+    const autre = await db.prepare("SELECT nom FROM users WHERE id=?").get(autreId);
+    const dernier = await db.prepare("SELECT contenu, created_at, produit_id, sender_id FROM messages WHERE conversation_id=? ORDER BY id DESC LIMIT 1").get(c.id);
+    const nonLus = Number((await db.prepare("SELECT COUNT(*) n FROM messages WHERE conversation_id=? AND sender_id!=? AND lu=0").get(c.id, oid))?.n) || 0;
+    totalNonLus += nonLus;
+    // Produit concerné = dernier message lié à un produit dans cette conversation
+    const prodMsg = await db.prepare("SELECT produit_id FROM messages WHERE conversation_id=? AND produit_id IS NOT NULL ORDER BY id DESC LIMIT 1").get(c.id);
+    let produit = null;
+    if (prodMsg && prodMsg.produit_id) {
+      produit = await db.prepare("SELECT id, nom, reference FROM produits_vitrine WHERE id=?").get(prodMsg.produit_id);
+    }
+    items.push({
+      conversation_id: c.id,
+      autre_id: Number(autreId),
+      autre_nom: autre ? autre.nom : "Utilisateur",
+      apercu: dernier ? (dernier.contenu || "").slice(0, 120) : "",
+      date: dernier ? dernier.created_at : c.created_at,
+      non_lus: nonLus,
+      produit: produit || null,
+    });
+  }
+  sendJSON(res, 200, { messages: items, total_non_lus: totalNonLus });
+});
+
+/* ═══════════ PUBLICATIONS PROMOTIONNELLES (vitrine uniquement) ═══════════ */
+const PUB_CTA = ['aucun', 'acheter', 'voir'];
+
+/* Sérialise une publication + compteurs pour l'API */
+async function serializePub(p, viewerId, isOwner) {
+  const likes = Number((await db.prepare("SELECT COUNT(*) n FROM vitrine_pub_reactions WHERE publication_id=?").get(p.id))?.n) || 0;
+  const nbComs = Number((await db.prepare("SELECT COUNT(*) n FROM vitrine_pub_commentaires WHERE publication_id=?").get(p.id))?.n) || 0;
+  let liked = false;
+  if (viewerId) liked = !!(await db.prepare("SELECT 1 FROM vitrine_pub_reactions WHERE publication_id=? AND user_id=?").get(p.id, viewerId));
+  let produit = null;
+  if (p.produit_id) produit = await db.prepare("SELECT id, nom, reference, statut, prix FROM produits_vitrine WHERE id=?").get(p.produit_id);
+  const item = {
+    id: p.id, initiative_id: p.initiative_id, produit_id: p.produit_id,
+    titre: p.titre, description: p.description, prix: p.prix, promo: p.promo,
+    medias: safeParse(p.medias_json || "[]"), media_bg: p.media_bg || null, cta_type: p.cta_type || 'aucun',
+    statut: p.statut || 'publie', created_at: p.created_at,
+    likes, nb_commentaires: nbComs, liked, produit: produit || null,
+  };
+  if (isOwner) {
+    item.vues = Number(p.vues) || 0;
+    item.partages = Number(p.partages) || 0;
+    item.clics_fiche = Number(p.clics_fiche) || 0;
+    item.ventes = Number((await db.prepare("SELECT COUNT(*) n FROM commandes_vitrine WHERE publication_id=?").get(p.id))?.n) || 0;
+  }
+  return item;
+}
+
+/* GET /api/initiatives/:id/publications — public, cloisonné à la vitrine */
+route("GET", "/api/initiatives/:id/publications", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  const isOwner = me && Number(init.owner_user_id) === Number(me.id);
+  let rows = await db.prepare("SELECT * FROM vitrine_publications WHERE initiative_id=? ORDER BY ordre DESC, id DESC").all(params.id);
+  if (!isOwner) rows = rows.filter(p => (p.statut || 'publie') === 'publie');
+  const publications = [];
+  for (const p of rows) publications.push(await serializePub(p, me ? me.id : null, isOwner));
+  sendJSON(res, 200, { publications, is_owner: !!isOwner });
+});
+
+/* GET /api/publications/:id — public, une publication (incrémente les vues) */
+route("GET", "/api/publications/:id", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  const p = await db.prepare("SELECT * FROM vitrine_publications WHERE id=?").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(p.initiative_id);
+  const isOwner = me && init && Number(init.owner_user_id) === Number(me.id);
+  if (!isOwner && (p.statut || 'publie') !== 'publie') return sendJSON(res, 404, { error: "Publication introuvable." });
+  // Compter une vue seulement pour les non-propriétaires
+  if (!isOwner) { try { await db.prepare("UPDATE vitrine_publications SET vues=vues+1 WHERE id=?").run(params.id); } catch(_){} }
+  sendJSON(res, 200, { publication: await serializePub(p, me ? me.id : null, isOwner), owner_user_id: init ? Number(init.owner_user_id) : null });
+});
+
+/* POST /api/initiatives/:id/publications — owner only */
+route("POST", "/api/initiatives/:id/publications", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { titre, description, prix, promo, medias, media_bg, cta_type, produit_id, statut } = body;
+  if (!titre || !titre.trim()) return sendJSON(res, 400, { error: "Titre requis." });
+  const mediasArr = Array.isArray(medias) ? medias.filter(Boolean).slice(0, 2) : [];
+  const cta = PUB_CTA.includes(cta_type) ? cta_type : 'aucun';
+  const st = ['publie', 'brouillon'].includes(statut) ? statut : 'publie';
+  const bg = media_bg && String(media_bg).slice(0, 200) || null;
+  const maxOrdre = (await db.prepare("SELECT MAX(ordre) m FROM vitrine_publications WHERE initiative_id=?").get(params.id))?.m;
+  const id = (await db.prepare(`
+    INSERT INTO vitrine_publications (initiative_id, produit_id, titre, description, prix, promo, medias_json, media_bg, cta_type, statut, ordre)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+  `).run(params.id, produit_id != null ? Number(produit_id) : null, titre.trim(), description || null,
+    prix != null && prix !== '' ? Number(prix) : null, promo || null, JSON.stringify(mediasArr), bg, cta, st, (Number(maxOrdre) || 0) + 1)).lastInsertRowid;
+  // Notifie les abonnés de la vitrine (publications publiées uniquement, pas les brouillons)
+  if (st === 'publie') {
+    const initNom = (await db.prepare("SELECT nom FROM initiatives WHERE id=?").get(params.id))?.nom || 'La boutique';
+    const libelle = promo ? `Promotion : ${titre.trim()}` : `Nouvelle publication : ${titre.trim()}`;
+    notifierAbonnes(params.id, "vitrine_publication", "Nouveauté À la une",
+      `${initNom} — ${libelle}`, { publication_id: Number(id) }, [Number(user.id)]);
+  }
+  sendJSON(res, 201, { id });
+});
+
+/* PUT /api/publications/:id — owner only */
+route("PUT", "/api/publications/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const p = await db.prepare("SELECT * FROM vitrine_publications WHERE id=?").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(p.initiative_id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { titre, description, prix, promo, medias, media_bg, cta_type, produit_id, statut } = body;
+  const mediasArr = Array.isArray(medias) ? medias.filter(Boolean).slice(0, 2) : safeParse(p.medias_json || "[]");
+  const cta = PUB_CTA.includes(cta_type) ? cta_type : (p.cta_type || 'aucun');
+  const st = ['publie', 'brouillon'].includes(statut) ? statut : (p.statut || 'publie');
+  await db.prepare(`
+    UPDATE vitrine_publications SET titre=?, description=?, prix=?, promo=?, medias_json=?, media_bg=?, cta_type=?, produit_id=?, statut=? WHERE id=?
+  `).run(
+    titre && titre.trim() ? titre.trim() : p.titre,
+    description !== undefined ? description : p.description,
+    prix !== undefined ? (prix != null && prix !== '' ? Number(prix) : null) : p.prix,
+    promo !== undefined ? promo : p.promo,
+    JSON.stringify(mediasArr),
+    media_bg !== undefined ? (media_bg ? String(media_bg).slice(0, 200) : null) : (p.media_bg || null),
+    cta,
+    produit_id !== undefined ? (produit_id != null ? Number(produit_id) : null) : p.produit_id,
+    st, params.id
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/publications/:id — owner only */
+route("DELETE", "/api/publications/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const p = await db.prepare("SELECT * FROM vitrine_publications WHERE id=?").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(p.initiative_id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  await db.prepare("DELETE FROM vitrine_pub_reactions WHERE publication_id=?").run(params.id);
+  await db.prepare("DELETE FROM vitrine_pub_commentaires WHERE publication_id=?").run(params.id);
+  await db.prepare("UPDATE commandes_vitrine SET publication_id=NULL WHERE publication_id=?").run(params.id);
+  await db.prepare("DELETE FROM vitrine_publications WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/publications/:id/like — toggle (visiteur connecté) */
+route("POST", "/api/publications/:id/like", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const p = await db.prepare("SELECT * FROM vitrine_publications WHERE id=?").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
+  const existing = await db.prepare("SELECT id FROM vitrine_pub_reactions WHERE publication_id=? AND user_id=?").get(params.id, user.id);
+  let liked;
+  if (existing) {
+    await db.prepare("DELETE FROM vitrine_pub_reactions WHERE id=?").run(existing.id);
+    liked = false;
+  } else {
+    await db.prepare("INSERT INTO vitrine_pub_reactions (publication_id, user_id) VALUES (?,?)").run(params.id, user.id);
+    liked = true;
+    const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(p.initiative_id);
+    if (init && Number(init.owner_user_id) !== Number(user.id)) {
+      creerNotif(init.owner_user_id, "pub_like", "Nouveau J'aime",
+        `${user.nom} aime votre publication « ${p.titre} »`, { publication_id: Number(params.id), initiative_id: Number(p.initiative_id) });
+    }
+  }
+  const likes = Number((await db.prepare("SELECT COUNT(*) n FROM vitrine_pub_reactions WHERE publication_id=?").get(params.id))?.n) || 0;
+  sendJSON(res, 200, { ok: true, liked, likes });
+});
+
+/* GET /api/publications/:id/commentaires — public */
+route("GET", "/api/publications/:id/commentaires", async (req, res, params) => {
+  const rows = await db.prepare("SELECT id, auteur_id, auteur_nom, contenu, created_at FROM vitrine_pub_commentaires WHERE publication_id=? ORDER BY id ASC").all(params.id);
+  sendJSON(res, 200, { commentaires: rows });
+});
+
+/* POST /api/publications/:id/commentaires — visiteur connecté */
+route("POST", "/api/publications/:id/commentaires", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const p = await db.prepare("SELECT * FROM vitrine_publications WHERE id=?").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
+  const contenu = (body.contenu || "").trim();
+  if (!contenu) return sendJSON(res, 400, { error: "Commentaire vide." });
+  const id = (await db.prepare("INSERT INTO vitrine_pub_commentaires (publication_id, auteur_id, auteur_nom, contenu) VALUES (?,?,?,?)")
+    .run(params.id, user.id, user.nom || "Utilisateur", contenu.slice(0, 1000))).lastInsertRowid;
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(p.initiative_id);
+  if (init && Number(init.owner_user_id) !== Number(user.id)) {
+    creerNotif(init.owner_user_id, "pub_commentaire", "Nouveau commentaire",
+      `${user.nom} a commenté « ${p.titre} »`, { publication_id: Number(params.id), initiative_id: Number(p.initiative_id) });
+  }
+  sendJSON(res, 201, { id });
+});
+
+/* POST /api/publications/:id/partage — incrémente le compteur de partages */
+route("POST", "/api/publications/:id/partage", async (req, res, params) => {
+  const p = await db.prepare("SELECT id FROM vitrine_publications WHERE id=?").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
+  try { await db.prepare("UPDATE vitrine_publications SET partages=partages+1 WHERE id=?").run(params.id); } catch(_){}
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/publications/:id/clic — clic vers la fiche produit */
+route("POST", "/api/publications/:id/clic", async (req, res, params) => {
+  const p = await db.prepare("SELECT id FROM vitrine_publications WHERE id=?").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
+  try { await db.prepare("UPDATE vitrine_publications SET clics_fiche=clics_fiche+1 WHERE id=?").run(params.id); } catch(_){}
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ========== FIN VITRINE COMMERCIALE + BOUTIQUE ========== */
+
 /* ---------- Initiatives ---------- */
 /* Helper : certification d'une initiative */
 async function getCertif(initiativeId) {
@@ -1514,13 +2009,17 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
   const contenu = (body.contenu || "").trim();
   const type = body.type || "text"; // text | file | image | link
   const fichier = body.fichier || null; // { nom, url, taille, mime }
+  const produitId = body.produit_id != null ? Number(body.produit_id) : null;
 
   if (!contenu && !fichier) return sendJSON(res, 400, { error: "Message vide." });
 
-  const id = db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type, fichier_json) VALUES (?, ?, ?, ?, ?)").run(
+  const id = (await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type, fichier_json, produit_id) VALUES (?, ?, ?, ?, ?, ?)").run(
     params.id, user.id, contenu || (fichier?.nom || ""), type,
-    fichier ? JSON.stringify(fichier) : null
-  ).lastInsertRowid;
+    fichier ? JSON.stringify(fichier) : null, produitId
+  )).lastInsertRowid;
+
+  // Message lié à un produit → marquer la conversation comme issue de la vitrine
+  if (produitId) await db.prepare("UPDATE conversations SET contexte='vitrine' WHERE id=?").run(conv.id);
 
   // Réactiver la conv si l'autre l'avait supprimée
   if (conv.user1_id === user.id && conv.deleted_u2) await db.prepare("UPDATE conversations SET deleted_u2=0 WHERE id=?").run(conv.id);
@@ -1529,7 +2028,7 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
   const msg = await db.prepare("SELECT m.*, u.nom AS sender_nom FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.id=?").get(id);
   // Notifier le destinataire
   const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
-  creerNotif(otherId, "message", "Nouveau message", `${user.nom} vous a envoyé un message`, { conversation_id: conv.id });
+  creerNotif(otherId, "message", "Nouveau message", `${user.nom} vous a envoyé un message`, { conversation_id: conv.id, produit_id: produitId });
   sendJSON(res, 201, { message: msg });
 });
 
@@ -2587,6 +3086,18 @@ async function creerNotif(userId, type, titre, contenu, data = {}) {
   } catch (e) { /* silencieux */ }
 }
 
+/* Notifie tous les abonnés d'une vitrine (initiative), sauf les user_id exclus (ex: déjà notifiés) */
+async function notifierAbonnes(initiativeId, type, titre, contenu, data = {}, exceptIds = []) {
+  try {
+    const skip = new Set((exceptIds || []).map(Number));
+    const abonnes = await db.prepare("SELECT user_id FROM abonnements WHERE initiative_id=?").all(initiativeId);
+    for (const a of abonnes) {
+      if (skip.has(Number(a.user_id))) continue;
+      creerNotif(a.user_id, type, titre, contenu, { ...data, initiative_id: Number(initiativeId) });
+    }
+  } catch (e) { /* silencieux */ }
+}
+
 route("GET", "/api/notifications", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -3174,7 +3685,12 @@ async function serveStatic(req, res, pathname) {
   fs.stat(filePath, (err, stat) => {
     if (err || !stat.isFile()) return send(res, 404, "Not found");
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+    const headers = { "Content-Type": MIME[ext] || "application/octet-stream" };
+    // Le HTML doit toujours être revalidé (évite qu'un navigateur serve une vieille page en cache).
+    // Les JS/CSS restent revalidés aussi mais peuvent être mis en cache court.
+    if (ext === ".html") headers["Cache-Control"] = "no-cache, must-revalidate";
+    else if (ext === ".js" || ext === ".css") headers["Cache-Control"] = "no-cache";
+    res.writeHead(200, headers);
     fs.createReadStream(filePath).pipe(res);
   });
 }

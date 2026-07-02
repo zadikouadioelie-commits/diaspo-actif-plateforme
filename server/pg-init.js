@@ -9,6 +9,36 @@ const pg   = require('./db-pg');
 
 let _initialized = false;
 
+/* Exécute tous les blocs db.exec(`CREATE TABLE...`) trouvés dans db.js (hors ALTER).
+   Idempotent grâce à `CREATE TABLE IF NOT EXISTS` — donc appelable SANS RISQUE
+   même sur une base déjà initialisée : les tables existantes sont ignorées,
+   seules les NOUVELLES tables (ajoutées après le premier déploiement) sont créées.
+   Corrige le bug racine : avant, une base déjà initialisée ne recevait jamais
+   les nouvelles tables ajoutées ultérieurement dans db.js (ex: error_logs). */
+async function createMissingTables(pool) {
+  const dbSrc = fs.readFileSync(path.join(__dirname, 'db.js'), 'utf8');
+  const sqlRegex = /db\.exec\(`([\s\S]*?)`\)/g;
+  let match;
+  while ((match = sqlRegex.exec(dbSrc)) !== null) {
+    const sql = match[1];
+    // Ignore les blocs de migration ALTER TABLE (gérés séparément par migratePg)
+    if (/^\s*ALTER TABLE/im.test(sql)) continue;
+    // Ne garder que les instructions CREATE TABLE / CREATE INDEX (idempotentes grâce à IF NOT EXISTS).
+    // Certains blocs mélangent CREATE TABLE + INSERT OR IGNORE de seed — ces INSERT ne sont
+    // pas rejouables sans risque ici (rôle de seedPg()), donc on les exclut explicitement.
+    const statements = sql.split(';').map(s => s.trim()).filter(Boolean);
+    const createOnly = statements.filter(s => /^CREATE (TABLE|INDEX|UNIQUE INDEX)/i.test(s));
+    if (!createOnly.length) continue;
+    for (const stmt of createOnly) {
+      try {
+        await pg.exec(stmt + ';');
+      } catch (e) {
+        console.error('[pg-init] createMissingTables — erreur sur une instruction:', e.message);
+      }
+    }
+  }
+}
+
 async function pgInit() {
   if (_initialized) return;
 
@@ -19,7 +49,9 @@ async function pgInit() {
     "SELECT COUNT(*)::int AS cnt FROM information_schema.tables WHERE table_schema = 'public'"
   );
   if (rows[0].cnt > 3) {
-    /* Schéma déjà en place — appliquer migrations de colonnes + corriger les comptes démo */
+    /* Schéma déjà en place — créer les tables manquantes (nouvelles depuis le dernier
+       déploiement) + migrations de colonnes + corriger les comptes démo */
+    await createMissingTables(pool);
     await migratePg(pool);
     await seedPg(pool);
     _initialized = true;
@@ -27,17 +59,7 @@ async function pgInit() {
   }
 
   console.log('[pg-init] Création du schéma Postgres...');
-
-  // Extrait tous les blocs SQL depuis db.js
-  const dbSrc = fs.readFileSync(path.join(__dirname, 'db.js'), 'utf8');
-  const sqlRegex = /db\.exec\(`([\s\S]*?)`\)/g;
-  let match;
-  while ((match = sqlRegex.exec(dbSrc)) !== null) {
-    const sql = match[1];
-    // Ignore les blocs de migration ALTER TABLE (on crée directement avec toutes colonnes)
-    if (/^\s*ALTER TABLE/im.test(sql)) continue;
-    await pg.exec(sql);
-  }
+  await createMissingTables(pool);
 
   console.log('[pg-init] Schéma créé. Migrations + seeding...');
   await migratePg(pool);
@@ -62,6 +84,20 @@ async function migratePg(pool) {
     ['users', 'email_verif_expires', 'BIGINT'],
     // initiatives
     ['initiatives', 'da_id', 'TEXT'],
+    ['initiatives', 'vitrine_active', 'INTEGER DEFAULT 0'],
+    ['initiatives', 'vitrine_banniere_url', 'TEXT'],
+    ['initiatives', 'vitrine_horaires', 'TEXT'],
+    ['initiatives', 'vitrine_services', 'TEXT'],
+    // vitrine v2 : statuts + messagerie contextuelle
+    ['produits_vitrine', 'statut', "TEXT DEFAULT 'disponible'"],
+    ['produits_vitrine', 'date_retour', 'TEXT'],
+    ['produits_vitrine', 'reference', 'TEXT'],
+    ['messages', 'produit_id', 'INTEGER'],
+    ['conversations', 'contexte', 'TEXT'],
+    // vitrine v3 : publications promotionnelles
+    ['initiatives', 'vitrine_pub_onglet', "TEXT DEFAULT 'À la une'"],
+    ['commandes_vitrine', 'publication_id', 'INTEGER'],
+    ['vitrine_publications', 'media_bg', 'TEXT'],
     // fil_posts
     ['fil_posts', 'media_url', 'TEXT'],
     ['fil_posts', 'media_type', 'TEXT'],
@@ -152,6 +188,10 @@ async function seedPg(pool) {
   await pool.query(
     `INSERT INTO counters (key, value) VALUES ('visits', 0) ON CONFLICT (key) DO NOTHING`
   );
+
+  // Initialise platform_wallet et da_id_counter (id=1) — idempotent, requis dès la création des tables
+  await pool.query(`INSERT INTO platform_wallet (id, total_commissions, total_transactions) VALUES (1, 0, 0) ON CONFLICT (id) DO NOTHING`).catch(()=>{});
+  await pool.query(`INSERT INTO da_id_counter (id, last_value) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`).catch(()=>{});
 
   // Données démo — initiative pour fatoumata.bah
   const { rows: [fatou] } = await pool.query(`SELECT id FROM users WHERE email='fatoumata.bah@diaspoactif.demo'`);

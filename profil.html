@@ -34,6 +34,18 @@
   transition:opacity .5s ease, transform .6s ease;
 }
 .p-banner img.loaded { opacity:1; transform:scale(1); }
+
+/* ===== BANNIÈRE VITRINE ===== */
+.p-vitrine-banner {
+  width:100%; height:220px; border-radius:14px;
+  background:linear-gradient(135deg,var(--tp,#1565C0),var(--tp-dark,#0D47A1));
+  background-size:cover; background-position:center;
+  position:relative; display:flex; align-items:flex-end; justify-content:flex-end; padding:14px;
+}
+.vt-banner-edit {
+  background:rgba(0,0,0,.5); color:#fff; border:none; border-radius:8px;
+  padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer;
+}
 .p-banner-edit {
   position:absolute; bottom:10px; right:12px;
   background:rgba(0,0,0,.45); color:#fff; border:none; border-radius:6px;
@@ -337,6 +349,95 @@
 .evt-meta { font-size:12px; color:var(--muted); display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
 .evt-tag { background:var(--bg); border:1px solid var(--border); border-radius:99px; padding:2px 8px; font-size:11px; }
 .evt-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+
+/* ===== BOUTIQUE (produits vitrine) ===== */
+.prod-card { position:relative; cursor:default; }
+.prod-card.draggable { cursor:grab; }
+.prod-card.dragging { opacity:.5; }
+.prod-price { font-size:16px; font-weight:800; color:var(--tp); margin-bottom:6px; }
+.prod-badge-indispo { background:#fef2f2; color:#dc2626; border-color:#fecaca; }
+.prod-actions { display:flex; gap:6px; margin-top:8px; }
+.prod-actions button { flex:1; padding:7px 10px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; border:none; }
+.prod-btn-commander { background:var(--tp); color:#fff; }
+.prod-btn-commander:hover { background:var(--tp-dark); }
+.prod-btn-contact { background:var(--bg); color:var(--tp); border:1.5px solid var(--tp) !important; }
+.prod-btn-contact:hover { background:var(--tp-light); }
+.prod-btn-alerte { background:#fff7ed; color:#c2410c; border:1.5px solid #fdba74 !important; }
+.prod-btn-alerte:hover { background:#ffedd5; }
+.prod-banner { position:absolute; top:8px; left:8px; background:rgba(220,38,38,.92); color:#fff; font-size:11px; font-weight:800; padding:4px 10px; border-radius:6px; letter-spacing:.02em; }
+.prod-btn-edit { background:var(--bg); color:#334155; }
+.prod-btn-delete { background:#fef2f2; color:#dc2626; }
+.prod-counter { font-size:12.5px; color:var(--muted); font-weight:600; }
+.prod-photo-slots { display:flex; gap:8px; flex-wrap:wrap; }
+.prod-photo-slot { width:70px; height:70px; border-radius:8px; border:1.5px dashed var(--border); display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; overflow:hidden; background:var(--bg); font-size:20px; color:#94a3b8; }
+.prod-photo-slot img { width:100%; height:100%; object-fit:cover; }
+.prod-photo-slot .slot-del { position:absolute; top:2px; right:2px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:50%; width:18px; height:18px; font-size:11px; cursor:pointer; line-height:1; }
+
+/* ===== PUBLICATIONS PROMOTIONNELLES (namespace vtp- pour éviter toute collision) ===== */
+.vt-pub-wrap { border:1.5px solid var(--tp-light); }
+.vtp-card { border:1px solid var(--border); border-radius:16px; overflow:hidden; margin-bottom:18px; background:#fff; box-shadow:0 2px 10px rgba(13,27,42,.05); }
+.vtp-card:last-child { margin-bottom:0; }
+.vtp-brouillon { background:#fef3c7; color:#92400e; font-size:11.5px; font-weight:700; padding:5px 12px; }
+/* Affichage "affiche premium" : image entière (contain), grande surface, fond neutre, ratio conservé */
+.vtp-media { width:100%; background:#f1f3f5; display:flex; align-items:center; justify-content:center; }
+.vtp-media img { width:100%; height:auto; max-height:72vh; display:block; object-fit:contain; }
+.vtp-media video { width:100%; height:auto; max-height:72vh; display:block; object-fit:contain; background:#f1f3f5; }
+.vtp-media-empty { display:flex; align-items:center; justify-content:center; font-size:60px; min-height:260px; color:#94a3b8; }
+.vtp-media-duo { display:grid; grid-template-columns:1fr 1fr; gap:4px; background:#f1f3f5; }
+.vtp-media-duo img { width:100%; height:auto; max-height:60vh; object-fit:contain; }
+.vtp-body { padding:16px 18px; }
+.vtp-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.vtp-titre { margin:0; font-size:19px; font-weight:800; color:#0d1b2a; line-height:1.25; }
+.vtp-actions-owner { display:flex; gap:2px; flex-shrink:0; }
+.vtp-meta { display:flex; gap:10px; flex-wrap:wrap; margin:8px 0 0; align-items:center; }
+.vtp-prix { font-size:18px; font-weight:800; color:var(--tp); }
+.vtp-promo { font-size:13px; font-weight:700; color:#b91c1c; background:#fee2e2; padding:3px 10px; border-radius:99px; }
+.vtp-desc { font-size:14px; line-height:1.6; color:#334155; margin:10px 0 0; }
+.vtp-interactions { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; align-items:center; }
+.vtp-btn { display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:600; padding:7px 12px; border-radius:99px; border:1.5px solid var(--border); background:var(--bg); color:#334155; cursor:pointer; transition:all .15s; }
+.vtp-btn:hover { background:#eef2f7; }
+.vtp-btn.liked { border-color:#fca5a5; background:#fef2f2; color:#b91c1c; }
+.vtp-btn-cta { background:var(--tp); color:#fff; border-color:var(--tp); margin-left:auto; }
+.vtp-btn-cta:hover { filter:brightness(1.08); background:var(--tp); }
+.vtp-stats { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }
+.vtp-stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.vtp-stats-grid > div { background:var(--bg); border-radius:10px; padding:10px; text-align:center; }
+.vtp-stats-grid b { display:block; font-size:20px; color:#0d1b2a; }
+.vtp-stats-grid span { font-size:11px; color:var(--muted); }
+.vtp-comments { margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+.vtp-com-list { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+.vtp-com { font-size:13px; color:#334155; line-height:1.5; }
+.vtp-com b { color:#0d1b2a; }
+.vtp-com-form { display:flex; gap:8px; }
+.vtp-com-form input { flex:1; padding:8px 12px; border:1.5px solid var(--border); border-radius:99px; font-size:13px; }
+.vtp-lbl { font-size:13px; font-weight:700; color:#374151; display:block; margin:12px 0 5px; }
+.vtp-input { width:100%; box-sizing:border-box; padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:14px; }
+.vtp-photo-slots { display:flex; gap:10px; }
+.vtp-photo-slot { width:110px; height:90px; border-radius:10px; border:1.5px dashed var(--border); display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; overflow:hidden; background:var(--bg); font-size:24px; color:#94a3b8; }
+.vtp-photo-slot img { width:100%; height:100%; object-fit:cover; }
+.vtp-photo-slot .slot-del { position:absolute; top:3px; right:3px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; cursor:pointer; line-height:1; }
+.vt-highlight { outline:3px solid var(--tp); outline-offset:3px; border-radius:12px; transition:outline .3s; }
+.vtp-bg-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(84px, 1fr)); gap:8px; }
+.vtp-bg-thumb { display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px; border:2px solid var(--border); border-radius:10px; background:#fff; cursor:pointer; transition:all .15s; }
+.vtp-bg-thumb:hover { border-color:var(--tp-light); }
+.vtp-bg-thumb.sel { border-color:var(--tp); box-shadow:0 0 0 2px var(--tp-light); }
+.vtp-bg-prev { width:100%; height:52px; border-radius:6px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.vtp-bg-prev img { max-width:100%; max-height:100%; object-fit:contain; }
+.vtp-bg-lbl { font-size:10.5px; color:#475569; text-align:center; line-height:1.15; }
+.vtp-bg-live { width:100%; height:170px; border-radius:12px; display:flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid var(--border); transition:background .2s ease; margin-bottom:6px; }
+.vtp-bg-live img { max-width:100%; max-height:100%; object-fit:contain; }
+.vtp-bg-live-lbl { font-size:12px; color:var(--muted); text-align:center; margin-bottom:10px; }
+.vtp-bg-prev { position:relative; }
+.vtp-bg-check { position:absolute; top:2px; right:2px; width:16px; height:16px; border-radius:50%; background:var(--tp); color:#fff; font-size:10px; line-height:16px; text-align:center; font-weight:800; }
+.vt-sub-card { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; background:linear-gradient(135deg, rgba(37,99,235,.06), rgba(255,107,0,.06)); border:1.5px solid var(--tp-light); border-radius:14px; padding:14px 18px; }
+.vt-sub-txt { display:flex; flex-direction:column; gap:2px; }
+.vt-sub-txt strong { font-size:15px; color:#0d1b2a; }
+.vt-sub-txt span { font-size:12.5px; color:var(--muted); }
+.vt-sub-btn { flex-shrink:0; font-size:14px; font-weight:700; padding:10px 20px; border-radius:99px; border:none; background:var(--tp); color:#fff; cursor:pointer; transition:all .15s; }
+.vt-sub-btn:hover { filter:brightness(1.08); }
+.vt-sub-btn.abonne { background:#dcfce7; color:#166534; border:1.5px solid #86efac; }
+@media (max-width:560px){ .vt-sub-card { flex-direction:column; align-items:stretch; text-align:left; } .vt-sub-btn { width:100%; } }
+@media (max-width:560px){ .vtp-media-duo { grid-template-columns:1fr; } .vtp-media img, .vtp-media video { max-height:60vh; } .vtp-titre { font-size:17px; } .vtp-stats-grid { grid-template-columns:repeat(2,1fr); } .vtp-btn-cta { margin-left:0; } }
 
 /* ===== CARROUSEL GALERIE (repris de evenements.html) ===== */
 .carousel-wrap { position:relative; overflow:hidden; border-radius:12px; background:#111; }
@@ -667,11 +768,27 @@
     <div class="p-stats" id="p-stats"></div>
   </div>
 
+  <!-- SWITCH PROFIL / VITRINE (comptes Initiative uniquement) -->
+  <div id="p-view-switch" style="display:none;margin-bottom:16px;">
+    <div style="display:inline-flex;background:#fff;border:1px solid var(--border);border-radius:12px;padding:4px;gap:4px;">
+      <button id="p-view-btn-profil" class="p-view-btn active" onclick="switchProfileView('profil')">📱 Profil</button>
+      <button id="p-view-btn-vitrine" class="p-view-btn" onclick="switchProfileView('vitrine')">🏪 Vitrine</button>
+    </div>
+  </div>
+  <style>
+    .p-view-btn { padding:9px 18px; border-radius:9px; border:none; background:none; font-size:13px; font-weight:700; color:var(--muted); cursor:pointer; transition:all .15s; }
+    .p-view-btn:hover { color:var(--tp); }
+    .p-view-btn.active { background:var(--tp); color:#fff; }
+  </style>
+
   <!-- BARRE PERSONNALISATION (propriétaire) -->
   <div id="wb-toolbar-slot" style="margin:6px 0 14px;"></div>
 
-  <!-- TABLEAU DE WIDGETS PERSONNALISABLE -->
+  <!-- TABLEAU DE WIDGETS PERSONNALISABLE (vue Profil) -->
   <div id="p-board"></div>
+
+  <!-- VUE VITRINE (comptes Initiative) -->
+  <div id="p-vitrine" style="display:none;"></div>
 
 </main>
 
@@ -867,6 +984,7 @@ function render() {
   }
   renderStats();
   initWidgetBoard();
+  initVitrineSwitch();
 }
 
 /* ======================================================
@@ -953,6 +1071,11 @@ function buildWidgetRegistry() {
     b.appendChild(w); loadProfileSuggestions();
   }};
 
+  // Confidentialité + suppression de compte — visible uniquement par le propriétaire
+  if (isOwn) {
+    R.confidentialite = { title:'Confidentialité', icon:'🔒', defaultSize:'full', render:(b)=>b.appendChild(buildPrivacyPanel()) };
+  }
+
   return R;
 }
 
@@ -982,6 +1105,7 @@ function defaultLayout(role) {
       { id:'suggestions', size:'small' },
       { id:'recommandations', size:'medium' },
       { id:'activite', size:'medium' },
+      { id:'confidentialite', size:'full' },
     ];
   }
   // citoyen : allégé
@@ -998,6 +1122,7 @@ function defaultLayout(role) {
     { id:'activite', size:'medium' },
     { id:'qrcode', size:'small' },
     { id:'suggestions', size:'small' },
+    { id:'confidentialite', size:'full' },
   ];
 }
 
@@ -1048,6 +1173,1045 @@ function renderBoardToolbar() {
   };
   addBtn.onclick = () => _board.openLibrary();
   resetBtn.onclick = () => { if (confirm('Réinitialiser la disposition par défaut ?')) _board.reset(); };
+}
+
+/* ======================================================
+   VITRINE COMMERCIALE (comptes Initiative uniquement)
+   ====================================================== */
+let _vitrineLoaded = false;
+
+function initVitrineSwitch() {
+  const sw = document.getElementById('p-view-switch');
+  if (!sw) return;
+  if (profil.role !== 'initiative') { sw.style.display = 'none'; return; }
+  sw.style.display = 'block';
+  const startView = (window.location.hash || '').startsWith('#vitrine') ? 'vitrine' : 'profil';
+  switchProfileView(startView);
+}
+
+function switchProfileView(view) {
+  const board = document.getElementById('p-board');
+  const vitrine = document.getElementById('p-vitrine');
+  const toolbar = document.getElementById('wb-toolbar-slot');
+  const btnProfil = document.getElementById('p-view-btn-profil');
+  const btnVitrine = document.getElementById('p-view-btn-vitrine');
+  const isVitrine = view === 'vitrine';
+
+  board.style.display = isVitrine ? 'none' : '';
+  vitrine.style.display = isVitrine ? '' : 'none';
+  if (toolbar) toolbar.style.display = isVitrine ? 'none' : '';
+  btnProfil.classList.toggle('active', !isVitrine);
+  btnVitrine.classList.toggle('active', isVitrine);
+
+  if (isVitrine) {
+    // Préserve un éventuel &pub=<id> pour le lien profond
+    const pubMatch = (window.location.hash || '').match(/pub=(\d+)/);
+    history.replaceState(null, '', pubMatch ? `#vitrine&pub=${pubMatch[1]}` : '#vitrine');
+    if (!_vitrineLoaded) { _vitrineLoaded = true; renderVitrine(); }
+  } else {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+}
+
+async function renderVitrine() {
+  const el = document.getElementById('p-vitrine');
+  el.innerHTML = '<div class="empty-p" style="padding:30px 0;">Chargement de la vitrine…</div>';
+
+  // Récupérer l'initiative liée à ce profil (le propriétaire ou n'importe quel visiteur la consulte)
+  let init = null;
+  try {
+    const all = await api('GET', '/initiatives');
+    init = (all.initiatives || []).find(i => Number(i.owner_user_id) === Number(profil.id)) || null;
+  } catch (e) { init = null; }
+
+  if (!init) {
+    el.innerHTML = `<div class="empty-p" style="padding:40px 0;"><div class="ei">🏪</div>${isOwn ? "Vous n'avez pas encore d'initiative associée pour activer la vitrine." : "Cette initiative n'a pas encore de vitrine."}</div>`;
+    return;
+  }
+  _vitrineInit = init;
+
+  const banniere = init.vitrine_banniere_url || '';
+  const galerie = safeParseJson(init.galerie_json, []);
+
+  el.innerHTML = `
+    <div class="p-vitrine-banner" id="vt-banner" style="${banniere ? `background-image:url('${esc(banniere)}');` : ''}">
+      ${isOwn ? `<button class="btn-ico vt-banner-edit" onclick="editVitrineBanner()">📷 ${banniere ? 'Changer' : 'Ajouter'} la bannière</button>` : ''}
+    </div>
+    <div id="vt-subscribe" style="margin-top:14px;"></div>
+    <div id="vt-publications" style="margin-top:14px;"></div>
+    <div class="p-widget" style="margin-top:14px;">
+      <div class="p-widget-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>📝 Présentation de l'activité</span>
+        ${isOwn ? `<button class="btn-ico" onclick="editVitrineText('description','Présentation','Décrivez votre activité…')">✏️ Modifier</button>` : ''}
+      </div>
+      <div id="vt-description" style="font-size:14px;line-height:1.6;color:#334155;">${init.description ? esc(init.description).replace(/\n/g,'<br>') : '<span style="color:#94a3b8;">Aucune présentation.</span>'}</div>
+    </div>
+    <div class="p-widget" style="margin-top:14px;">
+      <div class="p-widget-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>🛠 Services proposés</span>
+        ${isOwn ? `<button class="btn-ico" onclick="editVitrineText('vitrine_services','Services','Décrivez vos services…')">✏️ Modifier</button>` : ''}
+      </div>
+      <div id="vt-services" style="font-size:14px;line-height:1.6;color:#334155;">${init.vitrine_services ? esc(init.vitrine_services).replace(/\n/g,'<br>') : '<span style="color:#94a3b8;">Aucun service renseigné.</span>'}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
+      <div class="p-widget">
+        <div class="p-widget-title">📍 Coordonnées</div>
+        <div style="font-size:13.5px;line-height:1.8;color:#334155;">
+          ${init.adresse ? `📌 ${esc(init.adresse)}<br>` : ''}
+          ${init.tel_responsable ? `📞 ${esc(init.tel_responsable)}<br>` : ''}
+          ${init.email_responsable ? `✉️ ${esc(init.email_responsable)}<br>` : ''}
+          ${init.site_web ? `🔗 <a href="${esc(init.site_web)}" target="_blank" rel="noopener">${esc(init.site_web)}</a>` : ''}
+          ${!init.adresse && !init.tel_responsable && !init.email_responsable && !init.site_web ? '<span style="color:#94a3b8;">Aucune coordonnée renseignée.</span>' : ''}
+        </div>
+        ${isOwn ? `<button class="btn-ico" style="margin-top:8px;" onclick="alert('Modifiez ces informations depuis votre tableau de bord Initiative.')">✏️ Modifier</button>` : ''}
+      </div>
+      <div class="p-widget">
+        <div class="p-widget-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>🕒 Horaires</span>
+          ${isOwn ? `<button class="btn-ico" onclick="editVitrineText('vitrine_horaires','Horaires','Ex: Lun-Ven 9h-18h…')">✏️ Modifier</button>` : ''}
+        </div>
+        <div id="vt-horaires" style="font-size:13.5px;line-height:1.8;color:#334155;">${init.vitrine_horaires ? esc(init.vitrine_horaires).replace(/\n/g,'<br>') : '<span style="color:#94a3b8;">Non renseignés.</span>'}</div>
+      </div>
+    </div>
+    ${galerie.length ? `
+    <div class="p-widget" style="margin-top:14px;">
+      <div class="p-widget-title">📸 Galerie</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">
+        ${galerie.map(u => `<img loading="lazy" src="${esc(u)}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;">`).join('')}
+      </div>
+    </div>` : ''}
+    <div class="p-widget" style="margin-top:14px;">
+      <div class="p-widget-title">📱 Partager la vitrine</div>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+        <div id="vt-qr" style="flex-shrink:0;"></div>
+        <div style="flex:1;min-width:180px;font-size:13px;color:var(--muted);line-height:1.6;">
+          Scannez ou partagez ce QR code pour accéder directement à cette vitrine.
+        </div>
+      </div>
+    </div>
+    <div id="vt-boutique" style="margin-top:14px;"></div>
+  `;
+
+  // QR code pointant vers la vitrine publique
+  const vitrineUrl = `${location.origin}/profil.html?id=${profil.id}#vitrine`;
+  if (window.ProfileQR) {
+    ProfileQR.render(document.getElementById('vt-qr'), {
+      url: vitrineUrl,
+      userName: (init.nom || 'Vitrine'),
+      userRole: 'Vitrine', size: 150
+    });
+  }
+
+  if (window.renderBoutique) renderBoutique(init, isOwn);
+  if (window.renderPublications) renderPublications(init, isOwn);
+  if (window.renderVitrineSubscribe) renderVitrineSubscribe(init, isOwn);
+}
+
+/* ---- Bouton "S'abonner à cette vitrine" (visiteur Utilisateur) ---- */
+let _vtAbonne = false;
+async function renderVitrineSubscribe(init, ownerFlag) {
+  const box = document.getElementById('vt-subscribe');
+  if (!box) return;
+  box.innerHTML = '';
+  // Réservé aux comptes Utilisateur connectés qui ne sont pas le propriétaire
+  if (ownerFlag || !CU || CU.role !== 'utilisateur') return;
+  // État d'abonnement via /api/mes-suivis
+  try {
+    const r = await api('GET', '/mes-suivis');
+    _vtAbonne = (r.initiatives || []).some(i => Number(i.id) === Number(init.id));
+  } catch (e) { _vtAbonne = false; }
+  paintSubscribeBtn(init.id);
+}
+
+function paintSubscribeBtn(initId) {
+  const box = document.getElementById('vt-subscribe');
+  if (!box) return;
+  box.innerHTML = `
+    <div class="vt-sub-card">
+      <div class="vt-sub-txt">
+        <strong>${_vtAbonne ? '✓ Vous suivez cette vitrine' : 'Suivez cette vitrine'}</strong>
+        <span>Soyez averti des nouveaux produits, publications « À la une », promotions et disponibilités.</span>
+      </div>
+      <button class="vt-sub-btn ${_vtAbonne ? 'abonne' : ''}" onclick="toggleVitrineSubscribe(${initId})">
+        ${_vtAbonne ? '✓ Abonné' : '➕ S’abonner à cette vitrine'}
+      </button>
+    </div>`;
+}
+
+async function toggleVitrineSubscribe(initId) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  try {
+    if (_vtAbonne) { await api('DELETE', `/initiatives/${initId}/suivre`); _vtAbonne = false; }
+    else { await api('POST', `/initiatives/${initId}/suivre`); _vtAbonne = true; }
+    paintSubscribeBtn(initId);
+  } catch (e) { alert(e.message || 'Erreur.'); }
+}
+
+function safeParseJson(s, fallback) {
+  if (!s) return fallback;
+  try { const v = JSON.parse(s); return v == null ? fallback : v; } catch (e) { return fallback; }
+}
+
+let _vitrineInit = null;
+
+async function editVitrineBanner() {
+  if (!isOwn || !_vitrineInit) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const cropped = await openImageCropper(file, { shape: 'rect', aspect: 16/6, outW: 2000, outH: 750 });
+      if (!cropped) return;
+      const url = await uploadMedia(cropped, 'banner');
+      await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_banniere_url: url });
+      _vitrineInit.vitrine_banniere_url = url;
+      document.getElementById('vt-banner').style.backgroundImage = `url('${url}')`;
+    } catch (err) { alert('Erreur : ' + err.message); }
+  };
+  input.click();
+}
+
+async function editVitrineText(field, label, placeholder) {
+  if (!isOwn || !_vitrineInit) return;
+  const current = _vitrineInit[field] || '';
+  const val = prompt(label + ' :', current);
+  if (val === null) return;
+  try {
+    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { [field]: val });
+    _vitrineInit[field] = val;
+    const targetId = field === 'description' ? 'vt-description' : field === 'vitrine_services' ? 'vt-services' : field === 'vitrine_horaires' ? 'vt-horaires' : null;
+    if (targetId) document.getElementById(targetId).innerHTML = val ? esc(val).replace(/\n/g,'<br>') : `<span style="color:#94a3b8;">${placeholder}</span>`;
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+/* ======================================================
+   BOUTIQUE (produits de la Vitrine, max 20)
+   ====================================================== */
+const MAX_PRODUITS_VITRINE = 20;
+let _produitsVitrine = [];
+let _boutiqueDragId = null;
+
+async function renderBoutique(init, ownerFlag) {
+  const box = document.getElementById('vt-boutique');
+  if (!box) return;
+  box.innerHTML = '<div class="empty-p" style="padding:20px 0;">Chargement de la boutique…</div>';
+
+  let produits = [];
+  try {
+    const r = await api('GET', `/initiatives/${init.id}/produits`);
+    produits = r.produits || [];
+  } catch (e) { produits = []; }
+  _produitsVitrine = produits;
+
+  const count = produits.length;
+  const ownerId = init.owner_user_id;
+  box.innerHTML = `
+    <div class="p-widget-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <span>🛍️ Boutique</span>
+      <span class="prod-counter">${count}/${MAX_PRODUITS_VITRINE} produits</span>
+    </div>
+    ${!ownerFlag ? `<button class="btn btn-outline" style="margin-bottom:12px;" onclick="contacterBoutique(${ownerId})">💬 Contacter la boutique</button>` : ''}
+    ${ownerFlag ? `<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-orange" id="pf-filtre-tous" onclick="filtrerProduits('tous')">Tous</button>
+      <button class="btn btn-sm btn-outline" id="pf-filtre-dispo" onclick="filtrerProduits('disponible')">Disponibles</button>
+      <button class="btn btn-sm btn-outline" id="pf-filtre-indispo" onclick="filtrerProduits('indisponible')">Indisponibles</button>
+    </div>` : ''}
+    ${ownerFlag ? `<button class="btn btn-orange" style="margin-bottom:12px;" id="btn-add-produit" ${count>=MAX_PRODUITS_VITRINE?'disabled':''} onclick="openProductModal()">➕ Ajouter un produit${count>=MAX_PRODUITS_VITRINE?' (limite atteinte)':''}</button>` : ''}
+    <div class="evt-grid" id="prod-grid"></div>
+    ${ownerFlag ? '<div id="vt-commandes" style="margin-top:20px;"></div>' : ''}
+  `;
+
+  _boutiqueInit = init;
+  renderProductGrid(produits, init, ownerFlag);
+  if (ownerFlag) renderMesCommandes(init.id);
+}
+
+let _boutiqueInit = null;
+let _produitFiltre = 'tous';
+
+function contacterBoutique(ownerId) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  window.location.href = `messagerie.html?with=${ownerId}`;
+}
+
+function filtrerProduits(f) {
+  _produitFiltre = f;
+  ['tous','dispo','indispo'].forEach(k => {
+    const map = { tous:'tous', dispo:'disponible', indispo:'indisponible' };
+    const btn = document.getElementById('pf-filtre-'+k);
+    if (btn) btn.className = 'btn btn-sm ' + (map[k] === f ? 'btn-orange' : 'btn-outline');
+  });
+  renderProductGrid(_produitsVitrine, _boutiqueInit, true);
+}
+
+const STATUT_LABEL = { disponible:'Disponible', indisponible:'Temporairement indisponible', epuise:'Épuisé', masque:'Masqué' };
+const STATUT_BANNER = { indisponible:'Temporairement indisponible', epuise:'Épuisé' };
+
+function fmtDateRetour(d) {
+  if (!d) return '';
+  try {
+    const dt = new Date(d);
+    return dt.toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
+  } catch (e) { return d; }
+}
+
+function renderProductGrid(produits, init, ownerFlag) {
+  const grid = document.getElementById('prod-grid');
+  if (!grid) return;
+  const ownerId = init.owner_user_id;
+
+  // Filtre propriétaire
+  let liste = produits;
+  if (ownerFlag && _produitFiltre === 'disponible') liste = produits.filter(p => (p.statut||'disponible') === 'disponible');
+  else if (ownerFlag && _produitFiltre === 'indisponible') liste = produits.filter(p => (p.statut||'disponible') !== 'disponible');
+
+  if (!liste.length) {
+    grid.innerHTML = `<div class="empty-p" style="grid-column:1/-1;padding:20px 0;"><div class="ei">🛍️</div>${ownerFlag ? 'Aucun produit dans ce filtre.' : 'Aucun produit pour le moment.'}</div>`;
+    return;
+  }
+  grid.innerHTML = liste.map(p => {
+    const photos = p.photos || [];
+    const cover = photos[0];
+    const statut = p.statut || 'disponible';
+    const dispo = statut === 'disponible';
+    const banner = STATUT_BANNER[statut];
+    return `
+    <div class="evt-card prod-card${ownerFlag?' draggable':''}" data-pid="${p.id}" ${ownerFlag?'draggable="true"':''}>
+      <div style="position:relative;">
+        ${cover ? `<img loading="lazy" class="evt-img" src="${esc(cover)}" style="object-fit:cover;">` : `<div class="evt-img">🛍️</div>`}
+        ${banner ? `<div class="prod-banner">${banner}</div>` : ''}
+      </div>
+      <div class="evt-body">
+        <div class="prod-price">${p.prix != null ? Number(p.prix).toFixed(2) + ' ' + (p.devise||'EUR') : 'Prix sur demande'}</div>
+        <div class="evt-title">${esc(p.nom)}</div>
+        ${p.reference ? `<div style="font-size:11px;color:#94a3b8;margin-bottom:4px;">Réf. ${esc(p.reference)}</div>` : ''}
+        ${p.description ? `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;line-height:1.4;">${esc(p.description).slice(0,90)}${p.description.length>90?'…':''}</div>` : ''}
+        ${!dispo && p.date_retour ? `<div style="font-size:12px;color:var(--tp);font-weight:600;margin-bottom:6px;">↩️ Retour estimé : ${fmtDateRetour(p.date_retour)}</div>` : ''}
+        <div class="evt-meta">
+          ${p.categorie ? `<span class="evt-tag">${esc(p.categorie)}</span>` : ''}
+          <span class="evt-tag${dispo?'':' prod-badge-indispo'}">${dispo ? '✅ Disponible' : (statut==='epuise' ? '⛔ Épuisé' : statut==='masque' ? '🙈 Masqué' : '❌ Indisponible')}</span>
+          ${ownerFlag && p.nb_alertes ? `<span class="evt-tag" title="Personnes en attente d'alerte">🔔 ${p.nb_alertes} intéressé${p.nb_alertes>1?'s':''}</span>` : ''}
+          ${ownerFlag && p.nb_commandes ? `<span class="evt-tag" title="Demandes reçues">📦 ${p.nb_commandes} demande${p.nb_commandes>1?'s':''}</span>` : ''}
+        </div>
+        <div class="prod-actions">
+          ${ownerFlag
+            ? `<button class="prod-btn-edit" onclick="openProductModal(${p.id})">✏️ Modifier</button><button class="prod-btn-delete" onclick="deleteProduct(${p.id})">🗑️</button>`
+            : `${dispo ? `<button class="prod-btn-commander" onclick="openCommanderModal(${p.id})">📦 Commander</button>` : `<button class="prod-btn-alerte" onclick="alerteProduit(${p.id})">🔔 M'avertir</button>`}
+               <button class="prod-btn-contact" onclick="contacterVendeur(${ownerId},${p.id})">💬 Contacter le vendeur</button>`}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if (ownerFlag) wireProductDrag(grid, init.id);
+}
+
+function contacterVendeur(ownerId, produitId) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  window.location.href = `messagerie.html?with=${ownerId}&produit=${produitId}`;
+}
+
+async function alerteProduit(produitId) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  try {
+    await api('POST', `/produits/${produitId}/alerte`);
+    alert('✅ Vous serez averti dès que ce produit sera de nouveau disponible.');
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+/* ---- Drag & drop réorganisation (pattern simplifié inspiré de widget-board.js) ---- */
+function wireProductDrag(grid, initiativeId) {
+  grid.querySelectorAll('.prod-card').forEach(card => {
+    card.addEventListener('dragstart', () => { _boutiqueDragId = card.dataset.pid; card.classList.add('dragging'); });
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+    card.addEventListener('dragover', (e) => e.preventDefault());
+    card.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const targetId = card.dataset.pid;
+      if (!_boutiqueDragId || _boutiqueDragId === targetId) return;
+      const ids = [...grid.querySelectorAll('.prod-card')].map(c => c.dataset.pid);
+      const from = ids.indexOf(_boutiqueDragId);
+      ids.splice(from, 1);
+      const to = ids.indexOf(targetId);
+      ids.splice(to, 0, _boutiqueDragId);
+      const dragCard = grid.querySelector(`[data-pid="${_boutiqueDragId}"]`);
+      grid.insertBefore(dragCard, card);
+      try { await api('PATCH', `/initiatives/${initiativeId}/produits/reorder`, { order: ids.map(Number) }); } catch (e) {}
+    });
+  });
+}
+
+/* ---- Modale ajout/édition produit (jusqu'à 4 photos, pattern evenements.html) ---- */
+let _prodPhotoData = [null, null, null, null];
+
+function openProductModal(productId) {
+  const editing = !!productId;
+  const prod = editing ? _produitsVitrine.find(p => p.id === productId) : null;
+  _prodPhotoData = [null, null, null, null];
+  if (prod && prod.photos) prod.photos.forEach((u, i) => { if (i < 4) _prodPhotoData[i] = u; });
+
+  const overlay = document.createElement('div');
+  overlay.id = 'prod-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:24px;max-height:90vh;overflow-y:auto;">
+      <h2 style="margin:0 0 16px;font-size:17px;">${editing?'✏️ Modifier':'➕ Ajouter'} un produit</h2>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Nom *</label>
+      <input type="text" id="pf-nom" value="${prod?esc(prod.nom):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Description</label>
+      <textarea id="pf-description" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;min-height:70px;">${prod?esc(prod.description||''):''}</textarea>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Prix</label>
+          <input type="number" step="0.01" id="pf-prix" value="${prod&&prod.prix!=null?prod.prix:''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Catégorie</label>
+          <input type="text" id="pf-categorie" value="${prod?esc(prod.categorie||''):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Référence</label>
+          <input type="text" id="pf-reference" value="${prod?esc(prod.reference||''):''}" placeholder="Auto si vide" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Statut</label>
+          <select id="pf-statut" onchange="pfToggleDateRetour()" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;background:#fff;">
+            ${['disponible','indisponible','epuise','masque'].map(s => `<option value="${s}" ${((prod&&prod.statut)||'disponible')===s?'selected':''}>${STATUT_LABEL[s]}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div id="pf-date-retour-wrap" style="margin-bottom:12px;display:${((prod&&prod.statut)||'disponible')==='indisponible'?'block':'none'};">
+        <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Date de retour estimée (facultatif)</label>
+        <input type="date" id="pf-date-retour" value="${prod&&prod.date_retour?esc(prod.date_retour):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+      </div>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Photos (jusqu'à 4)</label>
+      <div class="prod-photo-slots" id="pf-photo-slots" style="margin-bottom:16px;"></div>
+      <p id="pf-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('prod-modal-overlay').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
+        <button id="pf-save" style="padding:9px 16px;border-radius:8px;border:none;background:var(--tp);color:#fff;font-weight:700;cursor:pointer;">${editing?'Enregistrer':'Ajouter'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  renderPhotoSlots();
+  document.getElementById('pf-save').onclick = () => saveProduct(productId);
+}
+
+function renderPhotoSlots() {
+  const wrap = document.getElementById('pf-photo-slots');
+  if (!wrap) return;
+  wrap.innerHTML = [0,1,2,3].map(i => `
+    <div class="prod-photo-slot" id="pf-slot-${i}" onclick="document.getElementById('pf-file-${i}').click()">
+      ${_prodPhotoData[i] ? `<img src="${esc(_prodPhotoData[i])}"><button class="slot-del" onclick="event.stopPropagation();clearProductPhoto(${i})">✕</button>` : '＋'}
+      <input type="file" id="pf-file-${i}" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handleProductPhoto(${i}, this)">
+    </div>`).join('');
+}
+
+async function handleProductPhoto(i, input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const compressed = await compressImageFile(file, 800, 800, 0.82);
+    const url = await uploadMedia(compressed, 'produit');
+    _prodPhotoData[i] = url;
+    renderPhotoSlots();
+  } catch (e) { alert('Erreur upload photo : ' + e.message); }
+}
+function clearProductPhoto(i) { _prodPhotoData[i] = null; renderPhotoSlots(); }
+
+function pfToggleDateRetour() {
+  const st = document.getElementById('pf-statut').value;
+  const wrap = document.getElementById('pf-date-retour-wrap');
+  if (wrap) wrap.style.display = st === 'indisponible' ? 'block' : 'none';
+}
+
+async function saveProduct(productId) {
+  const nom = document.getElementById('pf-nom').value.trim();
+  const err = document.getElementById('pf-err');
+  if (!nom) { err.textContent = 'Le nom est requis.'; err.style.display = 'block'; return; }
+  const statut = document.getElementById('pf-statut').value;
+  const payload = {
+    nom,
+    description: document.getElementById('pf-description').value.trim() || null,
+    prix: document.getElementById('pf-prix').value ? Number(document.getElementById('pf-prix').value) : null,
+    categorie: document.getElementById('pf-categorie').value.trim() || null,
+    reference: document.getElementById('pf-reference').value.trim() || null,
+    statut,
+    date_retour: statut === 'indisponible' ? (document.getElementById('pf-date-retour').value || null) : null,
+    photos: _prodPhotoData.filter(Boolean),
+  };
+  try {
+    if (productId) await api('PUT', `/produits/${productId}`, payload);
+    else await api('POST', `/initiatives/${_vitrineInit.id}/produits`, payload);
+    document.getElementById('prod-modal-overlay').remove();
+    renderBoutique(_vitrineInit, isOwn);
+  } catch (e) {
+    err.textContent = e.message || 'Erreur.';
+    err.style.display = 'block';
+  }
+}
+
+async function deleteProduct(id) {
+  if (!confirm('Supprimer ce produit ?')) return;
+  try {
+    await api('DELETE', `/produits/${id}`);
+    renderBoutique(_vitrineInit, isOwn);
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+/* ---- Modale "Commander" (visiteur — demande de contact, PAS de paiement) ---- */
+function openCommanderModal(productId, publicationId) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  let prod = _produitsVitrine.find(p => p.id === productId);
+  if (!prod) prod = (_publications || []).map(x => x.produit).find(x => x && x.id === productId);
+  if (!prod) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'cmd-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:24px;">
+      <h2 style="margin:0 0 6px;font-size:17px;">📦 Commander « ${esc(prod.nom)} »</h2>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">Ceci envoie une demande de contact à l'initiative — aucun paiement n'est effectué ici.</p>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Quantité</label>
+      <input type="number" min="1" id="cmd-qte" value="1" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Message (optionnel)</label>
+      <textarea id="cmd-msg" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;min-height:70px;margin-bottom:8px;"></textarea>
+      <p id="cmd-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('cmd-modal-overlay').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
+        <button id="cmd-send" style="padding:9px 16px;border-radius:8px;border:none;background:var(--tp);color:#fff;font-weight:700;cursor:pointer;">Envoyer la demande</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('cmd-send').onclick = async () => {
+    const err = document.getElementById('cmd-err');
+    try {
+      await api('POST', `/produits/${productId}/commander`, {
+        quantite: Number(document.getElementById('cmd-qte').value) || 1,
+        message: document.getElementById('cmd-msg').value.trim() || null,
+        publication_id: publicationId != null ? publicationId : null,
+      });
+      overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:32px;text-align:center;">
+        <div style="font-size:40px;margin-bottom:10px;">✅</div>
+        <h2 style="margin:0 0 8px;font-size:17px;">Demande envoyée !</h2>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">L'initiative a été notifiée et pourra vous contacter.</p>
+        <button onclick="document.getElementById('cmd-modal-overlay').remove()" style="padding:9px 20px;border-radius:8px;border:none;background:var(--tp);color:#fff;font-weight:700;cursor:pointer;">Fermer</button>
+      </div>`;
+    } catch (e) {
+      err.textContent = e.message || 'Erreur.';
+      err.style.display = 'block';
+    }
+  };
+}
+
+/* ---- "Mes commandes" (owner) ---- */
+async function renderMesCommandes(initiativeId) {
+  const box = document.getElementById('vt-commandes');
+  if (!box) return;
+  box.innerHTML = '<div class="p-widget-title">📬 Commandes reçues</div><div class="empty-p" style="padding:14px 0;">Chargement…</div>';
+  try {
+    const r = await api('GET', `/initiatives/${initiativeId}/commandes`);
+    const cmds = r.commandes || [];
+    if (!cmds.length) { box.innerHTML = '<div class="p-widget-title">📬 Commandes reçues</div><div class="empty-p" style="padding:14px 0;">Aucune commande reçue pour le moment.</div>'; return; }
+    box.innerHTML = `<div class="p-widget-title">📬 Commandes reçues</div>` + cmds.map(c => `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;" id="cmdrow-${c.id}">
+        <div>
+          <strong style="font-size:13px;">${esc(c.produit_nom)}</strong> × ${c.quantite} — <span style="font-size:12px;color:var(--muted);">${esc(c.acheteur_nom)}</span>
+          ${c.message ? `<div style="font-size:12px;color:#334155;margin-top:2px;">"${esc(c.message)}"</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="evt-tag" style="background:${c.statut==='traitee'?'#dcfce7':c.statut==='annulee'?'#fef2f2':'#fef3c7'};">${c.statut}</span>
+          ${c.statut==='en_attente' ? `<button class="btn btn-sm btn-outline" onclick="updateCommandeStatut(${c.id},'traitee')">✅ Traiter</button>` : ''}
+        </div>
+      </div>`).join('');
+  } catch (e) { box.innerHTML = '<div class="p-widget-title">📬 Commandes reçues</div><div class="empty-p" style="padding:14px 0;color:#dc2626;">Erreur de chargement.</div>'; }
+}
+
+async function updateCommandeStatut(id, statut) {
+  try {
+    await api('PATCH', `/commandes_vitrine/${id}`, { statut });
+    if (_vitrineInit) renderMesCommandes(_vitrineInit.id);
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+/* ======================================================
+   PUBLICATIONS PROMOTIONNELLES (« À la une » de la vitrine)
+   ====================================================== */
+let _publications = [];
+let _pubInit = null;
+let _pubOwner = false;
+let _pubOnglet = 'À la une';
+const PUB_ONGLETS = ['À la une', 'Promotions', 'Nouveautés'];
+const PUB_CTA_LABEL = { acheter: '🛒 Acheter maintenant', voir: '🔎 Voir le produit', aucun: '' };
+
+async function renderPublications(init, ownerFlag) {
+  const box = document.getElementById('vt-publications');
+  if (!box) return;
+  _pubInit = init; _pubOwner = ownerFlag;
+  _pubOnglet = init.vitrine_pub_onglet || 'À la une';
+  box.innerHTML = '<div class="empty-p" style="padding:14px 0;">Chargement…</div>';
+  try {
+    const r = await api('GET', `/initiatives/${init.id}/publications`);
+    _publications = r.publications || [];
+  } catch (e) { _publications = []; }
+
+  if (!ownerFlag && !_publications.length) { box.innerHTML = ''; return; } // rien à montrer au visiteur
+
+  box.innerHTML = `
+    <div class="p-widget vt-pub-wrap">
+      <div class="p-widget-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <span>📢 ${esc(_pubOnglet)}</span>
+        ${ownerFlag ? `<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <select id="pub-onglet-sel" onchange="changePubOnglet(this.value)" style="font-size:12px;padding:5px 8px;border:1.5px solid var(--border);border-radius:8px;">
+            ${PUB_ONGLETS.map(o => `<option value="${esc(o)}" ${o===_pubOnglet?'selected':''}>${esc(o)}</option>`).join('')}
+          </select>
+          <button class="btn btn-sm btn-orange" onclick="openPublicationModal()">➕ Créer une publication</button>
+        </span>` : ''}
+      </div>
+      <div id="vtpub-list"></div>
+    </div>`;
+  renderPubList();
+
+  // Lien profond : #vitrine&pub=<id> → cible la publication
+  const m = (location.hash || '').match(/pub=(\d+)/);
+  if (m) {
+    const target = document.getElementById('vtpubcard-' + m[1]);
+    if (target) {
+      setTimeout(() => {
+        target.scrollIntoView({ behavior:'smooth', block:'center' });
+        target.classList.add('vt-highlight');
+        setTimeout(() => target.classList.remove('vt-highlight'), 2000);
+      }, 300);
+    }
+  }
+}
+
+async function changePubOnglet(val) {
+  if (!_pubInit) return;
+  try {
+    await api('PUT', `/initiatives/${_pubInit.id}/vitrine`, { vitrine_pub_onglet: val });
+    _pubInit.vitrine_pub_onglet = val; _pubOnglet = val;
+    const t = document.querySelector('.vt-pub-wrap .p-widget-title > span');
+    if (t) t.textContent = `📢 ${val}`;
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+function renderPubList() {
+  const list = document.getElementById('vtpub-list');
+  if (!list) return;
+  if (!_publications.length) {
+    list.innerHTML = `<div class="empty-p" style="padding:18px 0;"><div class="ei">📢</div>${_pubOwner ? 'Aucune publication. Créez-en une pour mettre un produit en avant.' : 'Aucune publication.'}</div>`;
+    return;
+  }
+  list.innerHTML = _publications.map(pubCard).join('');
+}
+
+function pubMediaHtml(p) {
+  const medias = p.medias || [];
+  const bg = p.media_bg ? `style="background:${esc(p.media_bg)}"` : '';
+  if (!medias.length) return `<div class="vtp-media vtp-media-empty">📢</div>`;
+  if (medias.length === 1) return `<div class="vtp-media" ${bg}><img loading="lazy" src="${esc(medias[0])}" alt="${esc(p.titre)}"></div>`;
+  return `<div class="vtp-media vtp-media-duo" ${bg}>${medias.map(m => `<img loading="lazy" src="${esc(m)}" alt="${esc(p.titre)}">`).join('')}</div>`;
+}
+
+function pubCard(p) {
+  const owner = _pubOwner;
+  const prixHtml = p.prix != null ? `<span class="vtp-prix">${Number(p.prix).toFixed(2)} EUR</span>` : '';
+  const promoHtml = p.promo ? `<span class="vtp-promo">🎁 ${esc(p.promo)}</span>` : '';
+  const brouillon = (p.statut || 'publie') === 'brouillon';
+  let cta = '';
+  if (p.produit_id && p.cta_type === 'acheter') cta = `<button class="vtp-btn vtp-btn-cta" onclick="pubAcheter(${p.id},${p.produit_id})">${PUB_CTA_LABEL.acheter}</button>`;
+  else if (p.produit_id && p.cta_type === 'voir') cta = `<button class="vtp-btn vtp-btn-cta" onclick="pubVoirProduit(${p.id},${p.produit_id})">${PUB_CTA_LABEL.voir}</button>`;
+  const ownerId = _pubInit ? _pubInit.owner_user_id : null;
+  return `
+  <div class="vtp-card" id="vtpubcard-${p.id}">
+    ${brouillon ? `<div class="vtp-brouillon">Brouillon (visible par vous seul)</div>` : ''}
+    ${pubMediaHtml(p)}
+    <div class="vtp-body">
+      <div class="vtp-head">
+        <h3 class="vtp-titre">${esc(p.titre)}</h3>
+        ${owner ? `<span class="vtp-actions-owner">
+          <button class="btn-ico" title="Statistiques" onclick="togglePubStats(${p.id})">📊</button>
+          <button class="btn-ico" title="Modifier" onclick="openPublicationModal(${p.id})">✏️</button>
+          <button class="btn-ico" title="Supprimer" onclick="deletePublication(${p.id})">🗑️</button>
+        </span>` : ''}
+      </div>
+      ${(prixHtml||promoHtml) ? `<div class="vtp-meta">${prixHtml}${promoHtml}</div>` : ''}
+      ${p.description ? `<p class="vtp-desc">${esc(p.description).replace(/\n/g,'<br>')}</p>` : ''}
+      <div class="vtp-interactions">
+        <button class="vtp-btn ${p.liked?'liked':''}" onclick="togglePubLike(${p.id})"><span id="vtp-like-ico-${p.id}">${p.liked?'❤️':'🤍'}</span> <span id="vtp-like-n-${p.id}">${p.likes}</span></button>
+        <button class="vtp-btn" onclick="openPubComments(${p.id})">💬 <span id="vtp-com-n-${p.id}">${p.nb_commentaires}</span></button>
+        <button class="vtp-btn" onclick="sharePub(${p.id})">↗️ Partager</button>
+        ${!owner && ownerId ? `<button class="vtp-btn" onclick="pubContacter(${ownerId},${p.produit_id||'null'})">📩 Contacter</button>` : ''}
+        ${cta}
+      </div>
+      ${owner ? `<div class="vtp-stats" id="vtp-stats-${p.id}" style="display:none;"></div>` : ''}
+      <div class="vtp-comments" id="vtp-comments-${p.id}" style="display:none;"></div>
+    </div>
+  </div>`;
+}
+
+function togglePubStats(id) {
+  const box = document.getElementById('vtp-stats-'+id);
+  const p = _publications.find(x => x.id === id);
+  if (!box || !p) return;
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div class="vtp-stats-grid">
+      <div><b>${p.vues||0}</b><span>👁 Vues</span></div>
+      <div><b>${p.likes||0}</b><span>❤️ J'aime</span></div>
+      <div><b>${p.nb_commentaires||0}</b><span>💬 Comm.</span></div>
+      <div><b>${p.partages||0}</b><span>↗️ Partages</span></div>
+      <div><b>${p.clics_fiche||0}</b><span>🔎 Clics fiche</span></div>
+      <div><b>${p.ventes||0}</b><span>🛒 Ventes</span></div>
+    </div>`;
+}
+
+async function togglePubLike(id) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  try {
+    const r = await api('POST', `/publications/${id}/like`);
+    const p = _publications.find(x => x.id === id);
+    if (p) { p.liked = r.liked; p.likes = r.likes; }
+    const ico = document.getElementById('vtp-like-ico-'+id);
+    const n = document.getElementById('vtp-like-n-'+id);
+    if (ico) ico.textContent = r.liked ? '❤️' : '🤍';
+    if (n) n.textContent = r.likes;
+    const btn = ico ? ico.closest('.vtp-btn') : null;
+    if (btn) btn.classList.toggle('liked', r.liked);
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+async function openPubComments(id) {
+  const box = document.getElementById('vtp-comments-'+id);
+  if (!box) return;
+  if (box.style.display !== 'none' && box.dataset.loaded) { box.style.display = 'none'; box.dataset.loaded=''; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Chargement…</div>';
+  try {
+    const r = await api('GET', `/publications/${id}/commentaires`);
+    const coms = r.commentaires || [];
+    box.innerHTML = `
+      <div class="vtp-com-list">${coms.length ? coms.map(c => `
+        <div class="vtp-com"><b>${esc(c.auteur_nom)}</b> <span>${esc(c.contenu)}</span></div>`).join('') : '<div style="font-size:12px;color:var(--muted);">Aucun commentaire. Soyez le premier !</div>'}</div>
+      ${CU ? `<div class="vtp-com-form">
+        <input type="text" id="vtp-com-input-${id}" placeholder="Votre commentaire…" maxlength="1000">
+        <button class="btn btn-sm btn-orange" onclick="submitPubComment(${id})">Envoyer</button>
+      </div>` : '<div style="font-size:12px;color:var(--muted);"><a href="login.html">Connectez-vous</a> pour commenter.</div>'}`;
+    box.dataset.loaded = '1';
+  } catch (e) { box.innerHTML = '<div style="font-size:12px;color:#dc2626;">Erreur de chargement.</div>'; }
+}
+
+async function submitPubComment(id) {
+  const inp = document.getElementById('vtp-com-input-'+id);
+  if (!inp) return;
+  const contenu = inp.value.trim();
+  if (!contenu) { inp.focus(); return; }
+  try {
+    await api('POST', `/publications/${id}/commentaires`, { contenu });
+    const p = _publications.find(x => x.id === id);
+    if (p) { p.nb_commentaires = (p.nb_commentaires||0) + 1; const n = document.getElementById('vtp-com-n-'+id); if (n) n.textContent = p.nb_commentaires; }
+    const box = document.getElementById('vtp-comments-'+id);
+    if (box) box.dataset.loaded = '';
+    openPubComments(id); // recharge
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+async function sharePub(id) {
+  const url = `${location.origin}/profil.html?id=${_pubInit ? _pubInit.owner_user_id : (profil?profil.id:'')}#vitrine&pub=${id}`;
+  try { await api('POST', `/publications/${id}/partage`); } catch(_){}
+  const p = _publications.find(x => x.id === id);
+  if (p) p.partages = (p.partages||0) + 1;
+  if (navigator.share) {
+    navigator.share({ title: p ? p.titre : 'Publication', url }).catch(()=>{});
+  } else {
+    try { await navigator.clipboard.writeText(url); alert('🔗 Lien de la publication copié !'); }
+    catch(_) { prompt('Copiez le lien de la publication :', url); }
+  }
+}
+
+function pubContacter(ownerId, produitId) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  const q = produitId && produitId !== null ? `&produit=${produitId}` : '';
+  window.location.href = `messagerie.html?with=${ownerId}${q}`;
+}
+
+async function pubVoirProduit(pubId, produitId) {
+  try { await api('POST', `/publications/${pubId}/clic`); } catch(_){}
+  const p = _publications.find(x => x.id === pubId); if (p) p.clics_fiche = (p.clics_fiche||0)+1;
+  const box = document.getElementById('vt-boutique');
+  if (box) { box.scrollIntoView({ behavior:'smooth', block:'start' }); box.classList.add('vt-highlight'); setTimeout(()=>box.classList.remove('vt-highlight'), 1600); }
+}
+
+async function pubAcheter(pubId, produitId) {
+  try { await api('POST', `/publications/${pubId}/clic`); } catch(_){}
+  const p = _publications.find(x => x.id === pubId); if (p) p.clics_fiche = (p.clics_fiche||0)+1;
+  openCommanderModal(produitId, pubId);
+}
+
+/* ---- Modale création / édition d'une publication (propriétaire) ---- */
+let _pubPhotoData = [null, null];
+let _pubMediaBg = null;      // fond choisi (hex ou gradient CSS)
+let _pubPalette = null;      // couleurs extraites de la photo [[r,g,b], ...]
+
+function openPublicationModal(pubId) {
+  if (!_pubInit) return;
+  const editing = pubId != null;
+  const p = editing ? _publications.find(x => x.id === pubId) : null;
+  _pubPhotoData = [ (p && p.medias && p.medias[0]) || null, (p && p.medias && p.medias[1]) || null ];
+  _pubMediaBg = (p && p.media_bg) || null;
+  _pubPalette = null;
+  const produits = _produitsVitrine || [];
+  const overlay = document.createElement('div');
+  overlay.id = 'pub-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:24px;max-height:92vh;overflow:auto;">
+      <h2 style="margin:0 0 14px;font-size:18px;">${editing ? '✏️ Modifier la publication' : '📢 Nouvelle publication'}</h2>
+      <label class="vtp-lbl">Titre *</label>
+      <input type="text" id="pub-titre" value="${p?esc(p.titre):''}" class="vtp-input" placeholder="Ex : Nouvelle collection disponible !">
+      <label class="vtp-lbl">Description</label>
+      <textarea id="pub-description" class="vtp-input" style="min-height:70px;" placeholder="Décrivez votre offre…">${p?esc(p.description||''):''}</textarea>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;">
+          <label class="vtp-lbl">Prix (EUR, optionnel)</label>
+          <input type="number" step="0.01" min="0" id="pub-prix" value="${p&&p.prix!=null?p.prix:''}" class="vtp-input">
+        </div>
+        <div style="flex:1;">
+          <label class="vtp-lbl">Promotion (optionnel)</label>
+          <input type="text" id="pub-promo" value="${p?esc(p.promo||''):''}" class="vtp-input" placeholder="Ex : -20%">
+        </div>
+      </div>
+      <label class="vtp-lbl">Produit lié (optionnel)</label>
+      <select id="pub-produit" class="vtp-input">
+        <option value="">— Aucun —</option>
+        ${produits.map(pr => `<option value="${pr.id}" ${p&&p.produit_id===pr.id?'selected':''}>${esc(pr.nom)}${pr.reference?` (${esc(pr.reference)})`:''}</option>`).join('')}
+      </select>
+      <label class="vtp-lbl">Bouton d'action</label>
+      <select id="pub-cta" class="vtp-input">
+        <option value="aucun" ${!p||p.cta_type==='aucun'?'selected':''}>Aucun</option>
+        <option value="acheter" ${p&&p.cta_type==='acheter'?'selected':''}>🛒 Acheter maintenant</option>
+        <option value="voir" ${p&&p.cta_type==='voir'?'selected':''}>🔎 Voir le produit</option>
+      </select>
+      <p style="font-size:11.5px;color:var(--muted);margin:4px 0 0;">Le bouton d'action nécessite un produit lié.</p>
+      <label class="vtp-lbl">Photos (jusqu'à 2, grand format)</label>
+      <div class="vtp-photo-slots" id="pub-photo-slots" style="margin-bottom:12px;"></div>
+      <div id="pub-bg-picker" style="margin-bottom:12px;"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;margin-bottom:12px;cursor:pointer;">
+        <input type="checkbox" id="pub-brouillon" ${p&&p.statut==='brouillon'?'checked':''}> Enregistrer comme brouillon (non visible par les visiteurs)
+      </label>
+      <p id="pub-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('pub-modal-overlay').remove()" class="btn btn-outline">Annuler</button>
+        <button id="pub-save" class="btn btn-orange">${editing ? 'Enregistrer' : 'Publier'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  renderPubPhotoSlots();
+  // En édition : si une photo existe déjà, tenter d'extraire la palette (peut échouer si CORS → présélections seules)
+  if (_pubPhotoData[0]) extractColors(_pubPhotoData[0]).then(pal => { _pubPalette = pal; renderBgPicker(); });
+  renderBgPicker();
+  document.getElementById('pub-save').onclick = () => savePublication(pubId);
+}
+
+function renderPubPhotoSlots() {
+  const wrap = document.getElementById('pub-photo-slots');
+  if (!wrap) return;
+  wrap.innerHTML = [0,1].map(i => `
+    <div class="vtp-photo-slot" onclick="document.getElementById('pub-file-${i}').click()">
+      ${_pubPhotoData[i] ? `<img src="${esc(_pubPhotoData[i])}"><button class="slot-del" onclick="event.stopPropagation();clearPubPhoto(${i})">✕</button>` : '＋'}
+      <input type="file" id="pub-file-${i}" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handlePubPhoto(${i}, this)">
+    </div>`).join('');
+}
+
+async function handlePubPhoto(i, input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const compressed = await compressImageFile(file, 1400, 1400, 0.85);
+    const url = await uploadMedia(compressed, 'publication');
+    _pubPhotoData[i] = url;
+    renderPubPhotoSlots();
+    // Extraction des couleurs depuis le blob local (pas de souci CORS) → propose les fonds
+    try { _pubPalette = await extractColors(URL.createObjectURL(compressed)); } catch(_) { _pubPalette = null; }
+    if (!_pubMediaBg) _pubMediaBg = 'auto'; // pré-sélection recommandée
+    renderBgPicker();
+  } catch (e) { alert('Erreur upload photo : ' + e.message); }
+}
+function clearPubPhoto(i) { _pubPhotoData[i] = null; renderPubPhotoSlots(); renderBgPicker(); }
+
+/* ===== Fond intelligent : extraction couleurs + sélecteur avec aperçus ===== */
+function extractColors(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const S = 40, c = document.createElement('canvas');
+        c.width = S; c.height = S;
+        const cx = c.getContext('2d');
+        cx.drawImage(img, 0, 0, S, S);
+        const data = cx.getImageData(0, 0, S, S).data;
+        const counts = {};
+        for (let k = 0; k < data.length; k += 4) {
+          if (data[k+3] < 125) continue;
+          const qr = Math.min(255, Math.round(data[k]/16)*16), qg = Math.min(255, Math.round(data[k+1]/16)*16), qb = Math.min(255, Math.round(data[k+2]/16)*16);
+          const key = qr+','+qg+','+qb;
+          counts[key] = (counts[key] || 0) + 1;
+        }
+        const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]).map(e => e[0].split(',').map(Number));
+        resolve(sorted.length ? sorted : null);
+      } catch (e) { resolve(null); } // canvas "tainted" (CORS) → null
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+function _rgbToHex(r,g,b){ return '#' + [r,g,b].map(x => Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join(''); }
+function _rgbToHsl(r,g,b){ r/=255;g/=255;b/=255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h,s,l=(mx+mn)/2; if(mx===mn){h=s=0;}else{const d=mx-mn; s=l>0.5?d/(2-mx-mn):d/(mx+mn); switch(mx){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;default:h=(r-g)/d+4;} h/=6;} return [h*360,s,l]; }
+function _hslToCss(h,s,l){ return `hsl(${Math.round(h)}, ${Math.round(s*100)}%, ${Math.round(l*100)}%)`; }
+/* Teinte douce et claire dérivée d'une couleur (fond harmonieux, pro) */
+function _softTint(rgb){ const [h,s] = _rgbToHsl(rgb[0],rgb[1],rgb[2]); return _hslToCss(h, Math.max(0.18, Math.min(s,0.5)), 0.90); }
+/* Version un peu plus soutenue (pour dégradé) sans être criarde */
+function _mediumTint(rgb){ const [h,s,l] = _rgbToHsl(rgb[0],rgb[1],rgb[2]); return _hslToCss(h, Math.min(s,0.72), Math.min(0.82, Math.max(0.6, l))); }
+function _clamp(x){ return Math.max(0, Math.min(255, Math.round(x))); }
+function _rgbCss(rgb){ return `rgb(${_clamp(rgb[0])}, ${_clamp(rgb[1])}, ${_clamp(rgb[2])})`; }
+function _isExtreme(rgb){ const mx=Math.max(rgb[0],rgb[1],rgb[2]), mn=Math.min(rgb[0],rgb[1],rgb[2]); return mx>248 || mn<8; } // quasi blanc / quasi noir purs
+function _colorDist(a,b){ return Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]) + Math.abs(a[2]-b[2]); }
+
+/* Sélectionne dominante + secondaire "parlantes" (on évite blanc/noir purs si possible) */
+function _pickDomSec(pal) {
+  const meaningful = pal.filter(c => !_isExtreme(c));
+  const list = meaningful.length ? meaningful : pal;
+  const dom = list[0];
+  const sec = list.find(c => _colorDist(c, dom) > 80) || pal.find(c => _colorDist(c, dom) > 80) || list[1] || dom;
+  return { dom, sec };
+}
+
+/* Construit la liste des fonds proposés (dynamiques depuis la photo + présélections) */
+function _buildBgOptions() {
+  const opts = [];
+  const pal = _pubPalette;
+  if (pal && pal.length) {
+    const { dom, sec } = _pickDomSec(pal);
+    // Auto : teinte douce claire de la dominante (lisible, premium)
+    opts.push({ key:'auto',  label:'Auto (recommandé)', bg:_softTint(dom) });
+    // Dominante / Secondaire : les VRAIES couleurs de la photo
+    opts.push({ key:'dom',   label:'Dominante',         bg:_rgbCss(dom) });
+    opts.push({ key:'sec',   label:'Secondaire',        bg:_rgbCss(sec) });
+    // Dégradé : basé sur les deux couleurs de la photo
+    opts.push({ key:'grad',  label:'Dégradé',           bg:`linear-gradient(135deg, ${_mediumTint(dom)}, ${_mediumTint(sec)})` });
+  } else {
+    opts.push({ key:'auto', label:'Auto (recommandé)', bg:'#f4f1ec' });
+  }
+  // Fonds VIFS (comblent l'espace avec du caractère)
+  opts.push({ key:'v_rouge',  label:'Rouge vif',   bg:'#e53935' });
+  opts.push({ key:'v_orange', label:'Orange vif',  bg:'#fb8c00' });
+  opts.push({ key:'v_jaune',  label:'Jaune or',    bg:'#fdd835' });
+  opts.push({ key:'v_vert',   label:'Vert vif',    bg:'#2e9e5b' });
+  opts.push({ key:'v_teal',   label:'Turquoise',   bg:'#00acc1' });
+  opts.push({ key:'v_bleu',   label:'Bleu vif',    bg:'#1e88e5' });
+  opts.push({ key:'v_indigo', label:'Indigo',      bg:'#3949ab' });
+  opts.push({ key:'v_violet', label:'Violet',      bg:'#8e24aa' });
+  opts.push({ key:'v_rose',   label:'Rose vif',    bg:'#e91e8c' });
+  opts.push({ key:'v_noir',   label:'Noir',        bg:'#1b1b1f' });
+  opts.push({ key:'v_grad1',  label:'Dégradé sunset', bg:'linear-gradient(135deg,#ff6a00,#ee0979)' });
+  opts.push({ key:'v_grad2',  label:'Dégradé océan',  bg:'linear-gradient(135deg,#2193b0,#6dd5ed)' });
+  opts.push({ key:'v_grad3',  label:'Dégradé violet', bg:'linear-gradient(135deg,#8e2de2,#4a00e0)' });
+  // Présélections douces/neutres
+  opts.push({ key:'beige',  label:'Beige clair',    bg:'#f3ead9' });
+  opts.push({ key:'blanc',  label:'Blanc cassé',    bg:'#faf8f4' });
+  opts.push({ key:'creme',  label:'Crème',          bg:'#fdf6e3' });
+  opts.push({ key:'gris',   label:'Gris très clair',bg:'#f1f3f5' });
+  opts.push({ key:'vert',   label:'Vert doux',      bg:'#e6f2ea' });
+  opts.push({ key:'marron', label:'Marron clair',   bg:'#e7dccc' });
+  opts.push({ key:'orange', label:'Orange léger',   bg:'#fdefe2' });
+  return opts;
+}
+/* Résout la valeur CSS effective pour le fond mémorisé (_pubMediaBg peut être 'auto' ou une valeur CSS directe) */
+function _resolveBg(val, opts) {
+  if (!val) return null;
+  if (val === 'auto') { const a = opts.find(o => o.key === 'auto'); return a ? a.bg : '#f4f1ec'; }
+  const match = opts.find(o => o.bg === val);
+  return val; // déjà une valeur CSS
+}
+
+function renderBgPicker() {
+  const box = document.getElementById('pub-bg-picker');
+  if (!box) return;
+  if (!_pubPhotoData[0]) { box.innerHTML = ''; return; }
+  const photo = _pubPhotoData[0];
+  const opts = _buildBgOptions();
+  const currentCss = _resolveBg(_pubMediaBg, opts) || '#f1f3f5';
+  const curLabel = (opts.find(o => (_pubMediaBg === o.key) || o.bg === currentCss) || {}).label || '';
+  box.innerHTML = `
+    <label class="vtp-lbl" style="margin-top:0;">🎨 Fond de l'image (remplit les côtés, sans recadrer)</label>
+    <div class="vtp-bg-live" style="background:${currentCss};">
+      <img src="${esc(photo)}" alt="">
+    </div>
+    <div class="vtp-bg-live-lbl">Aperçu — fond : <strong>${esc(curLabel||'—')}</strong></div>
+    <div class="vtp-bg-grid">
+      ${opts.map(o => {
+        const selected = (_pubMediaBg === o.key) || (currentCss === o.bg);
+        return `<button type="button" class="vtp-bg-thumb ${selected?'sel':''}" title="${o.label}" onclick="chooseBg('${o.key}', '${o.bg.replace(/'/g,"\\'")}')">
+          <span class="vtp-bg-prev" style="background:${o.bg};"><img src="${esc(photo)}" alt="">${selected?'<span class="vtp-bg-check">✓</span>':''}</span>
+          <span class="vtp-bg-lbl">${o.label}</span>
+        </button>`;
+      }).join('')}
+    </div>`;
+}
+function chooseBg(key, bg) {
+  // On mémorise la valeur CSS effective (pour 'auto' on garde le mot-clé pour rester dynamique à l'affichage)
+  _pubMediaBg = (key === 'auto') ? 'auto' : bg;
+  renderBgPicker();
+}
+
+async function savePublication(pubId) {
+  const titre = document.getElementById('pub-titre').value.trim();
+  const err = document.getElementById('pub-err');
+  if (!titre) { err.textContent = 'Le titre est requis.'; err.style.display = 'block'; return; }
+  const produitVal = document.getElementById('pub-produit').value;
+  const cta = document.getElementById('pub-cta').value;
+  if (cta !== 'aucun' && !produitVal) { err.textContent = 'Le bouton d\'action nécessite un produit lié.'; err.style.display = 'block'; return; }
+  const medias = _pubPhotoData.filter(Boolean);
+  const bgVal = medias.length ? _resolveBg(_pubMediaBg, _buildBgOptions()) : null;
+  const payload = {
+    titre,
+    description: document.getElementById('pub-description').value.trim() || null,
+    prix: document.getElementById('pub-prix').value !== '' ? Number(document.getElementById('pub-prix').value) : null,
+    promo: document.getElementById('pub-promo').value.trim() || null,
+    produit_id: produitVal ? Number(produitVal) : null,
+    cta_type: cta,
+    medias,
+    media_bg: bgVal,
+    statut: document.getElementById('pub-brouillon').checked ? 'brouillon' : 'publie',
+  };
+  const btn = document.getElementById('pub-save'); btn.disabled = true;
+  try {
+    if (pubId != null) await api('PUT', `/publications/${pubId}`, payload);
+    else await api('POST', `/initiatives/${_pubInit.id}/publications`, payload);
+    document.getElementById('pub-modal-overlay').remove();
+    renderPublications(_pubInit, _pubOwner);
+  } catch (e) {
+    err.textContent = e.message || 'Erreur.'; err.style.display = 'block'; btn.disabled = false;
+  }
+}
+
+async function deletePublication(id) {
+  if (!confirm('Supprimer définitivement cette publication ? Les statistiques associées seront perdues.')) return;
+  try {
+    await api('DELETE', `/publications/${id}`);
+    renderPublications(_pubInit, _pubOwner);
+  } catch (e) { alert('Erreur : ' + e.message); }
 }
 
 /* ======================================================

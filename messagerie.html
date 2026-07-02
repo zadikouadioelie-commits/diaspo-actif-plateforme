@@ -585,9 +585,11 @@ async function sendMessage(){
 
   const body={contenu,type:pendingAttach?.type||"text"};
   if(pendingAttach) body.fichier={nom:pendingAttach.nom,url:pendingAttach.url,type:pendingAttach.type};
+  if(_pendingProduitId) body.produit_id=_pendingProduitId;
 
   try{
     await api("POST",`/conversations/${activeConvId}/messages`,body);
+    _pendingProduitId=null;
     input.value="";
     pendingAttach=null;
     showAttachPreview();
@@ -995,13 +997,35 @@ document.getElementById("btn-back").addEventListener("click",()=>{
   document.getElementById("msg-empty").style.display="flex";
 });
 
-/* ---- Lien depuis d'autres pages : ?with=<userId> ---- */
-async function openConvWithUser(userId){
+/* ---- Lien depuis d'autres pages : ?with=<userId>[&produit=<id>] ---- */
+let _pendingProduitId = null;
+async function openConvWithUser(userId, produitId){
   try{
     const r=await api("POST","/conversations",{user_id:userId});
     await loadConvList();
     openConv(r.conversation_id);
+    if (produitId) await prefillProduitMessage(produitId);
   }catch(e){ alert(e.message); }
+}
+
+/* Préremplit le champ message avec les infos du produit (variante dispo/indispo) */
+async function prefillProduitMessage(produitId){
+  try{
+    const r = await api("GET", "/produits/"+produitId);
+    const p = r.produit;
+    if(!p) return;
+    _pendingProduitId = Number(produitId);
+    const lien = `${location.origin}/profil.html?id=${p.owner_user_id}#vitrine`;
+    const prix = p.prix != null ? `${Number(p.prix).toFixed(2)} ${p.devise||'EUR'}` : 'non précisé';
+    let txt;
+    if ((p.statut||'disponible') !== 'disponible'){
+      txt = `Bonjour,\n\nJe suis intéressé(e) par votre produit actuellement indiqué comme indisponible. Pouvez-vous me prévenir lorsqu'il sera de nouveau disponible ou me proposer une alternative ?\n\nProduit :\n- Nom : ${p.nom}\n- Référence : ${p.reference||'—'}\n- Prix : ${prix}\n- Lien : ${lien}\n\nMerci.`;
+    } else {
+      txt = `Bonjour,\n\nJe souhaite obtenir davantage d'informations concernant ce produit.\n\nProduit :\n- Nom : ${p.nom}\n- Référence : ${p.reference||'—'}\n- Prix : ${prix}\n- Lien : ${lien}\n\nMerci de me recontacter.`;
+    }
+    const inp = document.getElementById('msg-input');
+    if (inp){ inp.value = txt; inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,200)+'px'; inp.focus(); }
+  }catch(e){ /* silencieux : le message reste vide */ }
 }
 
 /* ---- Init ---- */
@@ -1047,7 +1071,8 @@ async function openConvWithUser(userId){
   // Vérifier ?with= dans l'URL pour ouvrir une conv directement
   const urlParams=new URLSearchParams(location.search);
   const withUser=urlParams.get("with");
-  if(withUser) openConvWithUser(Number(withUser));
+  const withProduit=urlParams.get("produit");
+  if(withUser) openConvWithUser(Number(withUser), withProduit?Number(withProduit):null);
 
   // Polling global pour le badge non-lus (topbar) — toutes les 30s
   setInterval(async()=>{
