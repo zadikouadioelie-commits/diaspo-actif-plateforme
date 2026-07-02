@@ -39,34 +39,47 @@ async function createMissingTables(pool) {
   }
 }
 
+/* Verrou consultatif Postgres — évite que plusieurs cold starts Vercel concurrents
+   (plusieurs instances serverless démarrant en même temps juste après un déploiement)
+   ne lancent leurs CREATE TABLE / ALTER TABLE en parallèle sur la même base Neon.
+   Cause identifiée des erreurs 500 transitoires observées juste après déploiement
+   (ex: 2026-07-02 sur /api/evenements, /api/users/:id/trust-score — stables au réessai). */
+const PG_INIT_LOCK_KEY = 84210001;
+
 async function pgInit() {
   if (_initialized) return;
 
   const { pool } = pg;
+  const client = await pool.connect();
+  try {
+    await client.query('SELECT pg_advisory_lock($1)', [PG_INIT_LOCK_KEY]);
+    try {
+      // Vérifie si les tables existent déjà
+      const { rows } = await client.query(
+        "SELECT COUNT(*)::int AS cnt FROM information_schema.tables WHERE table_schema = 'public'"
+      );
+      if (rows[0].cnt > 3) {
+        /* Schéma déjà en place — créer les tables manquantes (nouvelles depuis le dernier
+           déploiement) + migrations de colonnes + corriger les comptes démo */
+        await createMissingTables(pool);
+        await migratePg(pool);
+        await seedPg(pool);
+      } else {
+        console.log('[pg-init] Création du schéma Postgres...');
+        await createMissingTables(pool);
 
-  // Vérifie si les tables existent déjà
-  const { rows } = await pool.query(
-    "SELECT COUNT(*)::int AS cnt FROM information_schema.tables WHERE table_schema = 'public'"
-  );
-  if (rows[0].cnt > 3) {
-    /* Schéma déjà en place — créer les tables manquantes (nouvelles depuis le dernier
-       déploiement) + migrations de colonnes + corriger les comptes démo */
-    await createMissingTables(pool);
-    await migratePg(pool);
-    await seedPg(pool);
-    _initialized = true;
-    return;
+        console.log('[pg-init] Schéma créé. Migrations + seeding...');
+        await migratePg(pool);
+        await seedPg(pool);
+        console.log('[pg-init] ✅ Base de données Postgres prête.');
+      }
+    } finally {
+      await client.query('SELECT pg_advisory_unlock($1)', [PG_INIT_LOCK_KEY]);
+    }
+  } finally {
+    client.release();
   }
-
-  console.log('[pg-init] Création du schéma Postgres...');
-  await createMissingTables(pool);
-
-  console.log('[pg-init] Schéma créé. Migrations + seeding...');
-  await migratePg(pool);
-  await seedPg(pool);
-
   _initialized = true;
-  console.log('[pg-init] ✅ Base de données Postgres prête.');
 }
 
 /* Migrations de colonnes ajoutées via ALTER TABLE dans db.js
