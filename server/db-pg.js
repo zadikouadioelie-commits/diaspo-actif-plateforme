@@ -38,23 +38,73 @@ function translateJulianday(sql) {
   return out;
 }
 
-/* Convertit les placeholders ? en $1, $2... pour Postgres */
+/* Traduit date(X) SQLite (X ≠ 'now', déjà traité en amont) → to_char text PostgreSQL.
+   Nécessaire car en Postgres `date(col)` est interprété comme un CAST vers le type
+   `date`, qui ne se compare pas au texte produit par les traductions date('now')
+   (erreur "operator does not exist: date = text" — vue en prod le 2026-07-02).
+   Gère la forme à 2 args date(x,'unixepoch'). Parenthèses imbriquées respectées. */
+function translateDateFn(sql) {
+  const lower = sql.toLowerCase();
+  let out = "";
+  let i = 0;
+  while (i < sql.length) {
+    const idx = lower.indexOf("date(", i);
+    if (idx === -1) { out += sql.slice(i); break; }
+    // Vérifie la frontière de mot (exclut update(, date_trunc n'a pas de "date(")
+    const prev = idx > 0 ? sql[idx - 1] : "";
+    if (/[A-Za-z0-9_$]/.test(prev)) { out += sql.slice(i, idx + 5); i = idx + 5; continue; }
+    let depth = 1, j = idx + 5;
+    while (j < sql.length && depth > 0) {
+      if (sql[j] === "(") depth++;
+      else if (sql[j] === ")") depth--;
+      j++;
+    }
+    const inner = sql.slice(idx + 5, j - 1).trim();
+    out += sql.slice(i, idx);
+    const unixMatch = inner.match(/^([\s\S]+?),\s*'unixepoch'$/i);
+    if (unixMatch) {
+      out += `to_char(to_timestamp((${unixMatch[1].trim()})::double precision),'YYYY-MM-DD')`;
+    } else {
+      out += `to_char((${inner})::timestamptz,'YYYY-MM-DD')`;
+    }
+    i = j;
+  }
+  return out;
+}
+
+/* Convertit les placeholders ? en $1, $2... pour Postgres.
+   Domaine TEXTE partout pour les fonctions date/heure : en SQLite, datetime()/date()/
+   strftime() renvoient des chaînes et les colonnes *_at sont TEXT — les traductions
+   doivent donc produire du texte, sinon Postgres refuse les mélanges de types
+   (ex: COALESCE(created_at, NOW()) → "COALESCE types text and timestamptz cannot
+   be matched", cause du crash trust-score du 2026-07-02). */
 function toPg(sql) {
   let i = 0;
   const out = sql
     .replace(/\?/g, () => `$${++i}`)
     // datetime('now', modifier) SQLite → PostgreSQL (avant la forme sans modificateur)
-    .replace(/datetime\('now',\s*'-(\d+)\s*days?'\)/gi, (_, d) => `to_char(NOW() - INTERVAL '${d} days','YYYY-MM-DD HH24:MI:SS')`)
-    .replace(/datetime\('now',\s*'-(\d+)\s*hours?'\)/gi, (_, h) => `to_char(NOW() - INTERVAL '${h} hours','YYYY-MM-DD HH24:MI:SS')`)
-    .replace(/datetime\('now',\s*'-(\d+)\s*minutes?'\)/gi, (_, m) => `to_char(NOW() - INTERVAL '${m} minutes','YYYY-MM-DD HH24:MI:SS')`)
-    .replace(/datetime\('now'\)/gi, "NOW()")
+    .replace(/datetime\('now',\s*'-(\d+)\s*(day|hour|minute|month|year)s?'\)/gi,
+      (_, n, unit) => `to_char(NOW() - INTERVAL '${n} ${unit.toLowerCase()}s','YYYY-MM-DD HH24:MI:SS')`)
+    .replace(/datetime\('now',\s*'start of (day|month|year)'\)/gi,
+      (_, unit) => `to_char(date_trunc('${unit.toLowerCase()}',NOW()),'YYYY-MM-DD HH24:MI:SS')`)
+    // Forme dynamique : datetime('now','-'||expr||' days')
+    .replace(/datetime\('now',\s*'-'\s*\|\|\s*([\s\S]+?)\s*\|\|\s*'\s*days?'\)/gi,
+      (_, expr) => `to_char(NOW() - ((${expr})::int * INTERVAL '1 day'),'YYYY-MM-DD HH24:MI:SS')`)
+    .replace(/datetime\('now'\)/gi, "to_char(NOW(),'YYYY-MM-DD HH24:MI:SS')")
     // strftime SQLite → to_char PostgreSQL (ordre important: plus spécifique d'abord)
     .replace(/strftime\('%Y-%m',\s*'now',\s*'-1 month'\)/gi, "to_char(NOW() - INTERVAL '1 month','YYYY-MM')")
     .replace(/strftime\('%Y-%m',\s*'now'\)/gi, "to_char(NOW(),'YYYY-MM')")
     .replace(/strftime\('%Y',\s*'now'\)/gi, "to_char(NOW(),'YYYY')")
+    // strftime(fmt, colonne) — formats utilisés dans le code : %Y-%m, %Y, %m
+    .replace(/strftime\('%Y-%m',\s*([A-Za-z_][A-Za-z0-9_.]*)\)/gi, (_, col) => `to_char((${col})::timestamptz,'YYYY-MM')`)
+    .replace(/strftime\('%Y',\s*([A-Za-z_][A-Za-z0-9_.]*)\)/gi, (_, col) => `to_char((${col})::timestamptz,'YYYY')`)
+    .replace(/strftime\('%m',\s*([A-Za-z_][A-Za-z0-9_.]*)\)/gi, (_, col) => `to_char((${col})::timestamptz,'MM')`)
     // date('now', modifier) SQLite → PostgreSQL
-    .replace(/date\('now',\s*'-(\d+)\s*days?'\)/gi, (_, d) => `to_char(CURRENT_DATE - INTERVAL '${d} days','YYYY-MM-DD')`)
-    .replace(/date\('now',\s*'-(\d+)\s*months?'\)/gi, (_, m) => `to_char(CURRENT_DATE - INTERVAL '${m} months','YYYY-MM-DD')`)
+    .replace(/date\('now',\s*'-(\d+)\s*(day|month|year)s?'\)/gi,
+      (_, n, unit) => `to_char(CURRENT_DATE - INTERVAL '${n} ${unit.toLowerCase()}s','YYYY-MM-DD')`)
+    // Forme dynamique : date('now','-'||expr||' days')
+    .replace(/date\('now',\s*'-'\s*\|\|\s*([\s\S]+?)\s*\|\|\s*'\s*days?'\)/gi,
+      (_, expr) => `to_char(CURRENT_DATE - ((${expr})::int * INTERVAL '1 day'),'YYYY-MM-DD')`)
     .replace(/date\('now'\)/gi, "to_char(CURRENT_DATE,'YYYY-MM-DD')")
     // MIN(val, expr) SQLite (LEAST) → LEAST PostgreSQL (MIN() seul est un agrégat)
     .replace(/\bMIN\((\d+),/gi, "LEAST($1,")
@@ -63,7 +113,7 @@ function toPg(sql) {
     .replace(/\bINSERT OR IGNORE INTO\b/gi, "INSERT INTO")
     .replace(/\bINSERT OR REPLACE INTO\b/gi, "INSERT INTO")
     .replace(/ON CONFLICT\b/gi, "ON CONFLICT");
-  return translateJulianday(out);
+  return translateDateFn(translateJulianday(out));
 }
 
 /* Ajoute ON CONFLICT DO NOTHING aux INSERT qui venaient de INSERT OR IGNORE */

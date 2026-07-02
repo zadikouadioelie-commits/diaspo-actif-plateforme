@@ -2552,7 +2552,7 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
             SELECT 10 UNION SELECT 11 UNION SELECT 12 UNION SELECT 13)
     )
     SELECT j.jour,
-      COALESCE((SELECT COUNT(*) FROM fil_reactions r WHERE date(r.rowid, 'unixepoch') = j.jour), 0) +
+      COALESCE((SELECT COUNT(*) FROM fil_reactions r WHERE date(r.id, 'unixepoch') = j.jour), 0) +
       COALESCE((SELECT COUNT(*) FROM fil_commentaires c WHERE date(c.created_at) = j.jour), 0) AS interactions,
       COALESCE((SELECT COUNT(*) FROM fil_posts p WHERE date(p.created_at) = j.jour), 0) AS publications
     FROM jours j
