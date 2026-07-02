@@ -9914,7 +9914,7 @@ async function handleRequest(req, res) {
 
     /* ── Calcul du Trust Score (fonction partagée) ── */
     async function computeTrustScore(userId) {
-      const user = db.prepare(`SELECT *,
+      const user = await db.prepare(`SELECT *,
         CAST((julianday('now') - julianday(COALESCE(created_at,datetime('now')))) / 30 AS INTEGER) AS months_old
         FROM users WHERE id=?`).get(userId);
       if (!user) return { score: 0, detail: [], label: 'Inconnu' };
@@ -10043,22 +10043,30 @@ async function handleRequest(req, res) {
 
     /* ── GET /api/users/:id/trust-score ── */
     if (req.method === 'GET' && /^\/api\/users\/\d+\/trust-score$/.test(pathname)) {
-      const uid = parseInt(pathname.split('/')[3]);
-      // Check cache (5 minutes)
-      const cached = await db.prepare(`SELECT * FROM trust_cache WHERE user_id=? AND computed_at >= datetime('now','-5 minutes')`).get(uid);
-      if (cached) {
-        return sendJSON(res, 200, { score: cached.score, detail: JSON.parse(cached.detail_json||'[]'), label: cached.label });
+      try {
+        const uid = parseInt(pathname.split('/')[3]);
+        // Check cache (5 minutes)
+        const cached = await db.prepare(`SELECT * FROM trust_cache WHERE user_id=? AND computed_at >= datetime('now','-5 minutes')`).get(uid);
+        if (cached) {
+          return sendJSON(res, 200, { score: cached.score, detail: JSON.parse(cached.detail_json||'[]'), label: cached.label });
+        }
+        const result = await computeTrustScore(uid);
+        const reactivity = await computeReactivity(uid);
+        return sendJSON(res, 200, { ...result, reactivity });
+      } catch (e) {
+        return sendJSON(res, 500, SEC.safeError(e, "trust-score"));
       }
-      const result = await computeTrustScore(uid);
-      const reactivity = await computeReactivity(uid);
-      return sendJSON(res, 200, { ...result, reactivity });
     }
 
     /* ── GET /api/users/:id/absence — mode absence public ── */
     if (req.method === 'GET' && /^\/api\/users\/\d+\/absence$/.test(pathname)) {
-      const uid = parseInt(pathname.split('/')[3]);
-      const absence = await db.prepare(`SELECT * FROM user_absence WHERE user_id=? AND (fin IS NULL OR fin >= date('now'))`).get(uid);
-      return sendJSON(res, 200, { absence: absence || null });
+      try {
+        const uid = parseInt(pathname.split('/')[3]);
+        const absence = await db.prepare(`SELECT * FROM user_absence WHERE user_id=? AND (fin IS NULL OR fin >= date('now'))`).get(uid);
+        return sendJSON(res, 200, { absence: absence || null });
+      } catch (e) {
+        return sendJSON(res, 500, SEC.safeError(e, "absence"));
+      }
     }
 
     /* ── PUT /api/users/me/absence — activer mode absence ── */

@@ -13,10 +13,35 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
+/* Traduit julianday(X) SQLite → équivalent PostgreSQL, en respectant les parenthèses
+   imbriquées (X peut contenir COALESCE(...), etc.). Le code n'utilise julianday()
+   que pour des SOUSTRACTIONS (julianday(a) - julianday(b)) : seul l'écart entre deux
+   appels doit être correct, l'origine (epoch) choisie s'annule dans la différence. */
+function translateJulianday(sql) {
+  const marker = "julianday(";
+  let out = "";
+  let i = 0;
+  while (i < sql.length) {
+    const idx = sql.indexOf(marker, i);
+    if (idx === -1) { out += sql.slice(i); break; }
+    out += sql.slice(i, idx);
+    let depth = 1, j = idx + marker.length;
+    while (j < sql.length && depth > 0) {
+      if (sql[j] === "(") depth++;
+      else if (sql[j] === ")") depth--;
+      j++;
+    }
+    const inner = sql.slice(idx + marker.length, j - 1);
+    out += `(EXTRACT(EPOCH FROM (${inner})::timestamptz) / 86400.0)`;
+    i = j;
+  }
+  return out;
+}
+
 /* Convertit les placeholders ? en $1, $2... pour Postgres */
 function toPg(sql) {
   let i = 0;
-  return sql
+  const out = sql
     .replace(/\?/g, () => `$${++i}`)
     // datetime('now', modifier) SQLite → PostgreSQL (avant la forme sans modificateur)
     .replace(/datetime\('now',\s*'-(\d+)\s*days?'\)/gi, (_, d) => `to_char(NOW() - INTERVAL '${d} days','YYYY-MM-DD HH24:MI:SS')`)
@@ -38,6 +63,7 @@ function toPg(sql) {
     .replace(/\bINSERT OR IGNORE INTO\b/gi, "INSERT INTO")
     .replace(/\bINSERT OR REPLACE INTO\b/gi, "INSERT INTO")
     .replace(/ON CONFLICT\b/gi, "ON CONFLICT");
+  return translateJulianday(out);
 }
 
 /* Ajoute ON CONFLICT DO NOTHING aux INSERT qui venaient de INSERT OR IGNORE */
