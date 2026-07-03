@@ -45,7 +45,19 @@ async function createMissingTables(pool) {
    (plusieurs instances serverless démarrant en même temps juste après un déploiement)
    ne lancent leurs CREATE TABLE / ALTER TABLE en parallèle sur la même base Neon.
    Cause identifiée des erreurs 500 transitoires observées juste après déploiement
-   (ex: 2026-07-02 sur /api/evenements, /api/users/:id/trust-score — stables au réessai). */
+   (ex: 2026-07-02 sur /api/evenements, /api/users/:id/trust-score — stables au réessai).
+
+   IMPORTANT — verrou NON BLOQUANT (pg_try_advisory_lock, pas pg_advisory_lock) :
+   incident du 2026-07-03 — une instance Vercel figée en plein milieu de sa migration
+   (sans jamais libérer le verrou bloquant) a mis TOUT le site hors service pendant
+   plusieurs minutes : chaque nouvelle requête/instance attendait ce verrou indéfiniment.
+   Avec un verrou non bloquant, une seule instance fait la migration ; toutes les
+   autres démarrent immédiatement sans jamais attendre (le schéma est quasi toujours
+   déjà à jour — ce n'est qu'à la toute première seconde après un déploiement modifiant
+   le schéma que ça a un intérêt, et même alors une requête concurrente sert simplement
+   avec l'ancien schéma le temps que l'instance qui a le verrou termine, au lieu de
+   bloquer). Le statement_timeout ajouté dans db-pg.js reste un filet de sécurité
+   supplémentaire si jamais la migration elle-même se grippe. */
 const PG_INIT_LOCK_KEY = 84210001;
 
 async function pgInit() {
@@ -54,7 +66,14 @@ async function pgInit() {
   const { pool } = pg;
   const client = await pool.connect();
   try {
-    await client.query('SELECT pg_advisory_lock($1)', [PG_INIT_LOCK_KEY]);
+    const { rows: lockRows } = await client.query('SELECT pg_try_advisory_lock($1) AS got', [PG_INIT_LOCK_KEY]);
+    if (!lockRows[0].got) {
+      // Une autre instance migre déjà — ne jamais attendre, servir la requête tout de suite.
+      // _initialized reste false : cette instance retentera au prochain cold start éventuel,
+      // mais initPromise (api/index.js) est déjà résolue donc cette requête n'est pas bloquée.
+      console.log('[pg-init] Verrou déjà pris par une autre instance — migration ignorée pour ce démarrage.');
+      return;
+    }
     try {
       // Vérifie si les tables existent déjà
       const { rows } = await client.query(
@@ -78,10 +97,10 @@ async function pgInit() {
     } finally {
       await client.query('SELECT pg_advisory_unlock($1)', [PG_INIT_LOCK_KEY]);
     }
+    _initialized = true;
   } finally {
     client.release();
   }
-  _initialized = true;
 }
 
 /* Migrations de colonnes ajoutées via ALTER TABLE dans db.js
