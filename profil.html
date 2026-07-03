@@ -717,8 +717,8 @@
 /* ---- Carte identité hi-fi ---- */
 .pvz-hero { background:#fff; border:1px solid rgba(18,32,56,.07); border-radius:18px; box-shadow:0 2px 10px rgba(18,32,56,.05); padding:0 26px 22px; margin-top:16px; }
 .pvz-hero-top { display:flex; gap:22px; align-items:flex-start; }
-.pvz-avatar { width:132px; height:132px; flex:none; margin-top:-58px; border:5px solid #fff; border-radius:50%; box-shadow:0 8px 24px -10px rgba(18,32,56,.45); background:#EEF1F5 center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-size:40px; font-weight:700; color:#8794A7; overflow:hidden; }
-.pvz-avatar img { width:100%; height:100%; object-fit:cover; }
+.pvz-avatar { width:132px; height:132px; flex:none; margin-top:-58px; border:5px solid #fff; border-radius:50%; box-shadow:0 8px 24px -10px rgba(18,32,56,.45); background:#EEF1F5 center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-size:40px; font-weight:700; color:#8794A7; overflow:visible; position:relative; }
+.pvz-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
 .pvz-hero-info { flex:1; min-width:0; padding-top:20px; }
 .pvz-hero-row { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap; }
 .pvz-name-row { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
@@ -1142,7 +1142,7 @@ function editAvatar() {
       const url = await uploadMedia(cropped, 'avatar');
       await api('PUT', '/profil', { photo_url: url });
       profil.photo_url = url;
-      renderAvatar();
+      renderVisitorProfile();
     } catch(err) { alert('Erreur lors du chargement de la photo : ' + err.message); }
   };
   input.click();
@@ -1162,32 +1162,23 @@ function fmtDate(str) {
    ====================================================== */
 function render() {
   renderBanner();
-  if (isOwn) {
-    // ---- Vue PROPRIÉTAIRE : parcours existant inchangé (widget-board éditable) ----
-    document.getElementById('p-card').style.display = '';
-    document.getElementById('pvz-visitor').style.display = 'none';
-    renderAvatar();
-    renderIdentity();
-    renderActions();
-    document.getElementById('theme-row-wrap').style.display = 'block';
-    renderThemeSwatches(profil.theme_couleur || 'ocean');
-    renderStats();
-    initWidgetBoard();
-    initVitrineSwitch();
-  } else {
-    // ---- Vue VISITEUR : nouveau rendu hi-fi 3 colonnes ----
-    document.getElementById('p-card').style.display = 'none';
-    document.getElementById('p-view-switch').style.display = 'none';
-    document.getElementById('p-board').style.display = 'none';
-    document.getElementById('pvz-visitor').style.display = '';
-    renderVisitorProfile();
-  }
+  // ---- Vue hi-fi unifiée (propriétaire ET visiteur) : le propriétaire voit le même
+  // design que ses visiteurs, avec des contrôles de modification en plus. L'ancien
+  // tableau de widgets déplaçables (#p-board) n'est plus utilisé pour l'affichage
+  // principal ; seul le panneau Confidentialité/Sécurité reste rendu séparément
+  // (bloc dédié en bas de grille, voir renderVisitorProfile()). ----
+  document.getElementById('p-card').style.display = 'none';
+  document.getElementById('p-view-switch').style.display = 'none';
+  document.getElementById('p-board').style.display = 'none';
+  document.getElementById('wb-toolbar-slot').style.display = 'none';
+  document.getElementById('pvz-visitor').style.display = '';
+  renderVisitorProfile();
 
-  // Retour depuis Stripe Identity (?identity=retour) : faire défiler jusqu'au widget Confidentialité et rafraîchir le statut
+  // Retour depuis Stripe Identity (?identity=retour) : faire défiler jusqu'au bloc Confidentialité et rafraîchir le statut
   if (isOwn && new URLSearchParams(location.search).get('identity') === 'retour') {
     history.replaceState(null, '', location.pathname + location.hash);
     setTimeout(() => {
-      const card = document.querySelector('[data-wid="confidentialite"]');
+      const card = document.getElementById('pvz-confidentialite-card');
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (typeof renderIdentityCard === 'function') renderIdentityCard();
     }, 600);
@@ -1240,6 +1231,7 @@ function renderVisitorProfile() {
     : `<button class="pvz-btn ${following?'following':'primary'}" id="pvz-follow" onclick="pvzToggleFollow()">${following?'✓ Abonné':'＋ Suivre'}</button>`;
   const msgBtn = `<a href="messagerie.html?user=${profil.id}" class="pvz-btn">✉️ Message</a>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
+  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button>${shareBtn}`;
 
   // Onglets + stats
   const seg = `<div class="pvz-segmented">
@@ -1255,7 +1247,7 @@ function renderVisitorProfile() {
 
   const hero = `<div class="pvz-hero">
     <div class="pvz-hero-top">
-      <div class="pvz-avatar">${avInner}</div>
+      <div class="pvz-avatar"${isOwn?' onclick="editAvatar()" style="cursor:pointer;" title="Changer la photo de profil"':''}>${avInner}${isOwn?'<span style="position:absolute;bottom:4px;right:4px;background:rgba(18,32,56,.75);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;">📷</span>':''}</div>
       <div class="pvz-hero-info">
         <div class="pvz-hero-row">
           <div style="min-width:0;">
@@ -1266,10 +1258,11 @@ function renderVisitorProfile() {
             <div class="pvz-sub">${esc(sub)}</div>
             ${chips.length ? `<div class="pvz-chips">${chips.join('')}</div>` : ''}
           </div>
-          <div class="pvz-actions">${followBtn}${msgBtn}${shareBtn}</div>
+          <div class="pvz-actions">${isOwn ? ownerActionsRow : followBtn+msgBtn+shareBtn}</div>
         </div>
       </div>
     </div>
+    <div id="pvz-identity-edit-slot"></div>
     <div class="pvz-tabrow">${seg}${stats}</div>
   </div>`;
 
@@ -1282,22 +1275,26 @@ function renderVisitorProfile() {
   const rsIcons = { linkedin:'💼', facebook:'📘', instagram:'📷', x:'🐦', youtube:'▶️', tiktok:'🎵', site_web:'🔗', github:'🐙', autre1:'🔗', autre2:'🔗' };
   const rsLabels = { linkedin:'LinkedIn', facebook:'Facebook', instagram:'Instagram', x:'X / Twitter', youtube:'YouTube', tiktok:'TikTok', site_web:'Site web', github:'GitHub', autre1:'Lien', autre2:'Lien' };
   const rsLinks = Object.entries(rs).filter(([k,v]) => v);
-  const reseauxCard = rsLinks.length ? `<section class="pvz-card">
-      <h3 class="pvz-card-title">🌐 Réseaux &amp; liens</h3>
-      <div style="display:flex;flex-direction:column;gap:9px;">
-        ${rsLinks.map(([k,v]) => `<a href="${esc(v.startsWith('http')?v:'https://'+v)}" target="_blank" rel="noopener" class="pvz-link-row"><span class="pvz-link-ico">${rsIcons[k]||'🔗'}</span>${esc(rsLabels[k]||k)}</a>`).join('')}
-      </div>
+  const reseauxBody = rsLinks.length
+    ? `<div style="display:flex;flex-direction:column;gap:9px;">${rsLinks.map(([k,v]) => `<a href="${esc(v.startsWith('http')?v:'https://'+v)}" target="_blank" rel="noopener" class="pvz-link-row"><span class="pvz-link-ico">${rsIcons[k]||'🔗'}</span>${esc(rsLabels[k]||k)}</a>`).join('')}</div>`
+    : `<span class="pvz-empty">${isOwn?'Ajoutez vos réseaux sociaux pour être facilement trouvé.':'Aucun réseau renseigné.'}</span>`;
+  const reseauxCard = (rsLinks.length || isOwn) ? `<section class="pvz-card">
+      <h3 class="pvz-card-title">🌐 Réseaux &amp; liens ${isOwn?`<span class="more" onclick="pvzEditReseaux()">✏️ Modifier</span>`:''}</h3>
+      <div class="pvz-reseaux-body">${reseauxBody}</div>
     </section>` : '';
 
   const ci = Array.isArray(profil.centres_interet) ? profil.centres_interet : [];
-  const interetsCard = ci.length ? `<section class="pvz-card">
-      <h3 class="pvz-card-title">🎯 Centres d'intérêt</h3>
-      <div style="display:flex;flex-wrap:wrap;gap:7px;">${ci.map(c=>`<span class="pvz-interest-chip">${esc(c)}</span>`).join('')}</div>
+  const interetsBody = ci.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:7px;">${ci.map(c=>`<span class="pvz-interest-chip">${esc(c)}</span>`).join('')}</div>`
+    : `<span class="pvz-empty">${isOwn?'Ajoutez vos centres d\'intérêt.':'Aucun centre d\'intérêt renseigné.'}</span>`;
+  const interetsCard = (ci.length || isOwn) ? `<section class="pvz-card">
+      <h3 class="pvz-card-title">🎯 Centres d'intérêt ${isOwn?`<span class="more" onclick="openEditIdentity()">✏️ Modifier</span>`:''}</h3>
+      ${interetsBody}
     </section>` : '';
 
   const leftCol = `<aside class="pvz-aside">
     <section class="pvz-card">
-      <h3 class="pvz-card-title">📝 À propos</h3>
+      <h3 class="pvz-card-title">📝 À propos ${isOwn?`<span class="more" onclick="openEditIdentity()">✏️ Modifier</span>`:''}</h3>
       <div style="font-size:13.5px;line-height:1.6;color:#3B4658;">${bio}</div>
     </section>
     ${reseauxCard}
@@ -1362,9 +1359,24 @@ function renderVisitorProfile() {
     </section>
   </aside>`;
 
-  const grid = `<div id="pvz-profil-body"><div class="pvz-grid">${leftCol}${centerCol}${rightCol}</div></div>`;
+  const confidentialiteCard = isOwn ? `<section class="pvz-card" id="pvz-confidentialite-card" style="margin-top:22px;">
+      <div style="display:flex;gap:0;border-bottom:2px solid rgba(18,32,56,.08);margin-bottom:18px;">
+        <button id="conf-sub-privacy" onclick="switchConfTab('privacy')" style="padding:10px 20px;font-size:13px;font-weight:700;background:none;border:none;border-bottom:2.5px solid #2F6BED;color:#2F6BED;cursor:pointer;margin-bottom:-2px;">🔒 Confidentialité &amp; Sécurité</button>
+        <button id="conf-sub-codes" onclick="switchConfTab('codes')" style="padding:10px 20px;font-size:13px;font-weight:700;background:none;border:none;border-bottom:2.5px solid transparent;color:#8794A7;cursor:pointer;margin-bottom:-2px;">🔑 Codes</button>
+      </div>
+      <div id="conf-panel-privacy"></div>
+      <div id="conf-panel-codes" style="display:none;"></div>
+    </section>` : '';
+
+  const grid = `<div id="pvz-profil-body"><div class="pvz-grid">${leftCol}${centerCol}${rightCol}</div>${confidentialiteCard}</div>`;
 
   root.innerHTML = hero + grid;
+
+  if (isOwn) {
+    const privacyPanel = document.getElementById('conf-panel-privacy');
+    if (privacyPanel && typeof buildPrivacyPanel === 'function') privacyPanel.appendChild(buildPrivacyPanel());
+    if (typeof renderIdentityCard === 'function') renderIdentityCard();
+  }
 
   // QR code (composant partagé)
   const qrEl = document.getElementById('pvz-qr');
@@ -1416,6 +1428,33 @@ async function pvzToggleFollow() {
     if (typeof r.nbAbonnes === 'number') profil.nbAbonnes = r.nbAbonnes;
     renderVisitorProfile();
   } catch(e) { alert(e.message||'Erreur.'); if (btn) btn.disabled = false; }
+}
+
+/* Édition rapide des réseaux sociaux depuis la carte hi-fi (titulaire uniquement) */
+function pvzEditReseaux() {
+  const card = document.querySelector('.pvz-reseaux-body');
+  if (!card) return;
+  const r = profil.reseaux_sociaux || {};
+  const fields = [['site_web','Site web'],['linkedin','LinkedIn'],['instagram','Instagram'],['facebook','Facebook'],['x','X / Twitter'],['youtube','YouTube']];
+  card.innerHTML = fields.map(([k,l]) => `
+    <div style="margin-bottom:8px;">
+      <label style="font-size:11px;font-weight:700;color:#8794A7;text-transform:uppercase;display:block;margin-bottom:3px;">${l}</label>
+      <input id="pvz-rs-${k}" value="${esc(r[k]||'')}" placeholder="https://…" style="width:100%;box-sizing:border-box;border:1px solid rgba(18,32,56,.16);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;">
+    </div>`).join('')
+    + `<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+        <button onclick="renderVisitorProfile()" style="padding:7px 14px;border:1px solid rgba(18,32,56,.16);border-radius:8px;background:none;cursor:pointer;font-size:12.5px;">Annuler</button>
+        <button onclick="pvzSaveReseaux()" style="padding:7px 16px;border:none;border-radius:8px;background:#2F6BED;color:#fff;font-weight:700;cursor:pointer;font-size:12.5px;">💾 Enregistrer</button>
+      </div>`;
+}
+async function pvzSaveReseaux() {
+  const fields = ['site_web','linkedin','instagram','facebook','x','youtube'];
+  const reseaux = {};
+  fields.forEach(k => { const v = document.getElementById('pvz-rs-'+k)?.value.trim(); if (v) reseaux[k] = v; });
+  try {
+    await api('PUT', '/profil/reseaux-sociaux', { reseaux });
+    profil.reseaux_sociaux = reseaux;
+    renderVisitorProfile();
+  } catch(e) { alert('Erreur : ' + (e.message||'')); }
 }
 
 /* Partager le profil (Web Share API + repli presse-papiers) */
@@ -1683,9 +1722,12 @@ async function renderVitrine() {
   }
   _vitrineInit = init;
 
-  // Vue VISITEUR : vitrine publique restylée (design hi-fi, thème couleur).
-  // Vue PROPRIÉTAIRE : conserve l'interface de gestion existante (édition bannière/textes/produits).
-  if (!isOwn) { renderVitrineVisitor(init); return; }
+  // Vue hi-fi unifiée (propriétaire ET visiteur) — le propriétaire voit la même vitrine
+  // restylée que ses visiteurs, avec des contrôles de modification en plus (voir
+  // renderVitrineVisitor()). Le code de gestion "ancien style" ci-dessous n'est plus
+  // exécuté (conservé tel quel comme référence pour les fonctions qu'il définit).
+  renderVitrineVisitor(init);
+  return;
 
   const banniere = init.vitrine_banniere_url || '';
   const galerie = safeParseJson(init.galerie_json, []);
@@ -1806,16 +1848,16 @@ async function renderVitrineVisitor(init) {
 
   // Sous-nav : uniquement les sections présentes
   const navItems = [];
-  if (init.description)      navItems.push(['presentation','Présentation']);
-  if (collections.length)    navItems.push(['collections','Collections']);
-  if (produits.length)       navItems.push(['produits','Produits']);
-  if (init.vitrine_services) navItems.push(['services','Services']);
-  if (galerie.length)        navItems.push(['galerie','Galerie']);
+  if (init.description || isOwn)      navItems.push(['presentation','Présentation']);
+  if (collections.length)             navItems.push(['collections','Collections']);
+  if (produits.length || isOwn)       navItems.push(['produits','Produits']);
+  if (init.vitrine_services || isOwn) navItems.push(['services','Services']);
+  if (galerie.length)                 navItems.push(['galerie','Galerie']);
   navItems.push(['contact','Contact']);
 
   const subnav = `<div class="pvt-subnav">${navItems.map((n,i)=>`<a href="#pv-${n[0]}"${i===0?' class="active"':''}>${n[1]}</a>`).join('')}</div>`;
 
-  const hero = `<section class="pvt-hero">
+  const hero = `<section class="pvt-hero" style="position:relative;">
     ${banniere ? `<img loading="lazy" src="${esc(banniere)}" alt="">` : ''}
     <div class="pvt-hero-overlay"></div>
     <div class="pvt-hero-content">
@@ -1823,7 +1865,13 @@ async function renderVitrineVisitor(init) {
       ${slogan ? `<div class="pvt-hero-sub">${slogan}</div>` : ''}
       ${produits.length ? `<a href="#pv-produits" class="pvt-hero-cta">VOIR NOS PRODUITS</a>` : ''}
     </div>
+    ${isOwn ? `<button onclick="editVitrineBanner()" style="position:absolute;top:14px;right:14px;z-index:5;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;">📷 ${banniere?'Changer':'Ajouter'} la bannière</button>` : ''}
   </section>`;
+
+  const themeSwatchesHtml = isOwn ? `<div style="display:flex;align-items:center;gap:8px;padding-left:12px;border-left:1px solid var(--vsoftbd);">
+      <span style="font-size:11.5px;font-weight:700;color:#6B7686;">🎨 Thème :</span>
+      ${PVT_THEMES.map(t=>`<button class="vt-theme-sw" data-theme="${t.id}" title="${t.label}" onclick="ownerSetVitrineTheme('${t.id}')" style="width:24px;height:24px;border-radius:50%;cursor:pointer;background:${t.color};border:2px solid ${((init.vitrine_theme||'bordeaux')===t.id)?'#16233D':'#fff'};box-shadow:0 1px 4px rgba(0,0,0,.2);"></button>`).join('')}
+    </div>` : '';
 
   const actionbar = `<section class="pvt-actionbar">
     <div class="pvt-rating"><span style="font-size:12.5px;color:#6B7686;">${esc(init.domaine||'Boutique de la diaspora')}</span></div>
@@ -1832,12 +1880,13 @@ async function renderVitrineVisitor(init) {
       ${tel ? `<a class="pvt-btn grey" href="tel:${esc(telClean)}">📞 Appeler</a>` : ''}
       ${telClean ? `<a class="pvt-btn wa" href="https://wa.me/${esc(telClean.replace('+',''))}" target="_blank" rel="noopener">🟢 WhatsApp</a>` : ''}
       <span id="pvt-subscribe"></span>
+      ${themeSwatchesHtml}
     </div>
   </section>`;
 
-  const presentation = init.description ? `<section id="pv-presentation" class="pvt-section">
-    <div class="pvt-section-head"><h3>Présentation de la boutique</h3></div>
-    <div class="pvt-section-body"><p style="margin:0;font-size:14px;line-height:1.7;color:#3B4658;">${esc(init.description).replace(/\n/g,'<br>')}</p></div>
+  const presentation = (init.description || isOwn) ? `<section id="pv-presentation" class="pvt-section">
+    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Présentation de la vitrine</h3>${isOwn?`<button onclick="editVitrineText('description','Présentation','Décrivez votre activité…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div class="pvt-section-body"><p style="margin:0;font-size:14px;line-height:1.7;color:#3B4658;">${init.description ? esc(init.description).replace(/\n/g,'<br>') : `<span style="color:#94a3b8;font-style:italic;">Aucune présentation. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</p></div>
   </section>` : '';
 
   const collEmoji = { miels:'🍯', épices:'🌶️', epices:'🌶️', cafés:'☕', cafes:'☕', coffrets:'🎁', artisanat:'🌿' };
@@ -1846,14 +1895,14 @@ async function renderVitrineVisitor(init) {
     <div class="pvt-collections">${collections.map(c=>`<a href="#pv-produits" class="pvt-coll-tile" style="text-decoration:none;"><div class="pvt-coll-emoji">${collEmoji[c.toLowerCase()]||'🛍️'}</div><div class="pvt-coll-label">${esc(c)} <span style="color:#8794A7;font-weight:500;">(${cats[c]})</span></div></a>`).join('')}</div>
   </section>` : '';
 
-  const produitsSec = produits.length ? `<section id="pv-produits" class="pvt-section">
-    <div class="pvt-section-head"><h3>Nos produits</h3></div>
-    <div class="pvt-section-body"><div class="pvt-prodgrid" id="pvt-prodgrid"></div></div>
+  const produitsSec = (produits.length || isOwn) ? `<section id="pv-produits" class="pvt-section">
+    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Nos produits</h3>${isOwn?`<button onclick="openProductModal()" ${produits.length>=MAX_PRODUITS_VITRINE?'disabled':''} style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un produit (${produits.length}/${MAX_PRODUITS_VITRINE})</button>`:''}</div>
+    <div class="pvt-section-body"><div class="pvt-prodgrid" id="pvt-prodgrid">${!produits.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun produit pour le moment.${isOwn?' Cliquez sur « Ajouter un produit » pour commencer.':''}</div>`:''}</div></div>
   </section>` : '';
 
-  const services = init.vitrine_services ? `<section id="pv-services" class="pvt-section">
-    <div class="pvt-section-head sm"><h3>🛠 Services</h3></div>
-    <div class="pvt-services-list">${init.vitrine_services.split('\n').filter(Boolean).map(s=>`<div class="pvt-service-row"><span class="pvt-service-ico">✔</span>${esc(s)}</div>`).join('') || `<div class="pvt-service-row">${esc(init.vitrine_services)}</div>`}</div>
+  const services = (init.vitrine_services || isOwn) ? `<section id="pv-services" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🛠 Services</h3>${isOwn?`<button onclick="editVitrineText('vitrine_services','Services','Décrivez vos services…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div class="pvt-services-list">${init.vitrine_services ? (init.vitrine_services.split('\n').filter(Boolean).map(s=>`<div class="pvt-service-row"><span class="pvt-service-ico">✔</span>${esc(s)}</div>`).join('') || `<div class="pvt-service-row">${esc(init.vitrine_services)}</div>`) : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">Aucun service renseigné.</span>`}</div>
   </section>` : '';
 
   const galerieSec = galerie.length ? `<section id="pv-galerie" class="pvt-section">
@@ -1863,14 +1912,15 @@ async function renderVitrineVisitor(init) {
 
   const contactSec = `<section id="pv-contact" class="pvt-contact">
     <div>
-      <h4>Coordonnées</h4>
+      <h4>Coordonnées${isOwn?` <button onclick="editVitrineText('vitrine_horaires','Horaires','Ex : Lun-Ven 9h-18h…')" style="background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:10.5px;font-weight:600;cursor:pointer;margin-left:6px;">✏️ Horaires</button>`:''}</h4>
       <div class="pvt-contact-line">
         ${init.adresse?`📍 ${esc(init.adresse)}<br>`:''}
         ${tel?`📞 ${esc(tel)}<br>`:''}
         ${init.email_responsable?`✉️ ${esc(init.email_responsable)}<br>`:''}
-        ${init.vitrine_horaires?`🕒 ${esc(init.vitrine_horaires)}`:''}
+        ${init.vitrine_horaires?`🕒 ${esc(init.vitrine_horaires)}`:(isOwn?'<span style="opacity:.7;">🕒 Horaires non renseignés.</span>':'')}
         ${(!init.adresse&&!tel&&!init.email_responsable&&!init.vitrine_horaires)?'<span style="opacity:.8;">Coordonnées non renseignées.</span>':''}
       </div>
+      ${isOwn?`<div style="font-size:11.5px;opacity:.75;margin-top:8px;">Adresse/téléphone/email : modifiez-les depuis votre tableau de bord Initiative.</div>`:''}
     </div>
     <div>
       <h4>Commander en un clic</h4>
@@ -1924,8 +1974,9 @@ async function renderVitrineVisitor(init) {
 function renderPvtProducts(produits, ownerId) {
   const grid = document.getElementById('pvt-prodgrid');
   if (!grid) return;
-  const visibles = produits.filter(p => (p.statut||'disponible') !== 'masque');
-  if (!visibles.length) { grid.innerHTML = `<div class="pvz-empty" style="grid-column:1/-1;">Aucun produit pour le moment.</div>`; return; }
+  // Le propriétaire voit aussi ses produits masqués (pour pouvoir les réactiver)
+  const visibles = isOwn ? produits : produits.filter(p => (p.statut||'disponible') !== 'masque');
+  if (!visibles.length) { grid.innerHTML = `<div class="pvz-empty" style="grid-column:1/-1;">Aucun produit pour le moment.${isOwn?' Cliquez sur « Ajouter un produit » pour commencer.':''}</div>`; return; }
   grid.innerHTML = visibles.map(p => {
     const photos = p.photos || [];
     const cover = photos[0];
@@ -1934,8 +1985,20 @@ function renderPvtProducts(produits, ownerId) {
     let badge = '';
     if (statut === 'epuise') badge = `<span class="pvt-badge stock">Épuisé</span>`;
     else if (statut === 'indisponible') badge = `<span class="pvt-badge stock">Indisponible</span>`;
+    else if (statut === 'masque') badge = `<span class="pvt-badge stock">Masqué</span>`;
     const prix = p.prix != null ? Number(p.prix).toFixed(2) + ' ' + (p.devise||'EUR') : 'Prix sur demande';
-    return `<div class="pvt-prod-card">
+    const ownerRow = isOwn ? `<div style="display:flex;gap:6px;margin-top:6px;">
+        <button class="pvt-btn soft" style="flex:1;font-size:12px;padding:7px 10px;" onclick="openProductModal(${p.id})">✏️ Modifier</button>
+        <button class="pvt-btn" style="flex:1;font-size:12px;padding:7px 10px;background:#FEF2F2;color:#B91C1C;" onclick="deleteProduct(${p.id})">🗑️ Supprimer</button>
+      </div>` : '';
+    const visitorRow = !isOwn ? `<div class="pvt-prod-foot">
+          <span class="pvt-prod-price">${prix}</span>
+          ${dispo
+            ? `<button class="pvt-prod-buy" onclick="openCommanderModal(${p.id})">🛒 Commander</button>`
+            : `<button class="pvt-prod-buy" style="background:#8794A7;" onclick="alerteProduit(${p.id})">🔔 M'avertir</button>`}
+        </div>
+        <button class="pvt-btn soft" style="margin-top:2px;font-size:12px;padding:7px 10px;" onclick="contacterVendeur(${ownerId},${p.id})">💬 Contacter le vendeur</button>` : `<div class="pvt-prod-foot"><span class="pvt-prod-price">${prix}</span></div>`;
+    return `<div class="pvt-prod-card"${statut==='masque'?' style="opacity:.55;"':''}>
       <div class="pvt-prod-imgwrap">
         ${cover ? `<img loading="lazy" src="${esc(cover)}" alt="">` : `<div class="noimg">🛍️</div>`}
         ${p.categorie ? `<span class="pvt-ribbon">${esc((p.categorie||'').toUpperCase())}</span>` : ''}
@@ -1945,13 +2008,8 @@ function renderPvtProducts(produits, ownerId) {
         <div class="pvt-prod-title">${esc(p.nom)}</div>
         ${p.description ? `<div class="pvt-prod-desc">${esc(p.description).slice(0,80)}${p.description.length>80?'…':''}</div>` : ''}
         ${!dispo && p.date_retour ? `<div style="font-size:11.5px;color:var(--v1);font-weight:600;">↩️ Retour : ${fmtDateRetour(p.date_retour)}</div>` : ''}
-        <div class="pvt-prod-foot">
-          <span class="pvt-prod-price">${prix}</span>
-          ${dispo
-            ? `<button class="pvt-prod-buy" onclick="openCommanderModal(${p.id})">🛒 Commander</button>`
-            : `<button class="pvt-prod-buy" style="background:#8794A7;" onclick="alerteProduit(${p.id})">🔔 M'avertir</button>`}
-        </div>
-        <button class="pvt-btn soft" style="margin-top:2px;font-size:12px;padding:7px 10px;" onclick="contacterVendeur(${ownerId},${p.id})">💬 Contacter le vendeur</button>
+        ${visitorRow}
+        ${ownerRow}
       </div>
     </div>`;
   }).join('');
@@ -1967,6 +2025,8 @@ async function ownerSetVitrineTheme(theme) {
     document.querySelectorAll('.vt-theme-sw').forEach(b => {
       b.style.border = '2px solid ' + (b.dataset.theme === theme ? '#16233D' : '#fff');
     });
+    const scope = document.getElementById('pvt-scope');
+    if (scope) scope.setAttribute('data-theme', theme === 'bordeaux' ? '' : theme);
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
@@ -2031,7 +2091,7 @@ async function editVitrineBanner() {
       const url = await uploadMedia(cropped, 'banner');
       await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_banniere_url: url });
       _vitrineInit.vitrine_banniere_url = url;
-      document.getElementById('vt-banner').style.backgroundImage = `url('${url}')`;
+      renderVitrineVisitor(_vitrineInit);
     } catch (err) { alert('Erreur : ' + err.message); }
   };
   input.click();
@@ -2045,8 +2105,7 @@ async function editVitrineText(field, label, placeholder) {
   try {
     await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { [field]: val });
     _vitrineInit[field] = val;
-    const targetId = field === 'description' ? 'vt-description' : field === 'vitrine_services' ? 'vt-services' : field === 'vitrine_horaires' ? 'vt-horaires' : null;
-    if (targetId) document.getElementById(targetId).innerHTML = val ? esc(val).replace(/\n/g,'<br>') : `<span style="color:#94a3b8;">${placeholder}</span>`;
+    renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + e.message); }
 }
 
@@ -2313,7 +2372,7 @@ async function saveProduct(productId) {
     if (productId) await api('PUT', `/produits/${productId}`, payload);
     else await api('POST', `/initiatives/${_vitrineInit.id}/produits`, payload);
     document.getElementById('prod-modal-overlay').remove();
-    renderBoutique(_vitrineInit, isOwn);
+    renderVitrineVisitor(_vitrineInit);
   } catch (e) {
     err.textContent = e.message || 'Erreur.';
     err.style.display = 'block';
@@ -2324,7 +2383,7 @@ async function deleteProduct(id) {
   if (!confirm('Supprimer ce produit ?')) return;
   try {
     await api('DELETE', `/produits/${id}`);
-    renderBoutique(_vitrineInit, isOwn);
+    renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + e.message); }
 }
 
@@ -4788,7 +4847,8 @@ function openEditIdentity() {
     </div>
     <p class="e-msg err" id="id-err"></p><p class="e-msg ok" id="id-ok"></p>`;
 
-  document.getElementById('p-identity').appendChild(form);
+  const slot = document.getElementById('pvz-identity-edit-slot') || document.getElementById('p-identity');
+  slot.appendChild(form);
   form.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
@@ -4811,7 +4871,7 @@ async function saveIdentity() {
     const r = await api('PUT', '/profil', body);
     Object.assign(profil, body);
     ok.style.display='block'; ok.textContent='Profil mis à jour ✓';
-    setTimeout(()=>{ document.getElementById('identity-edit-form')?.remove(); renderIdentity(); renderStats(); }, 800);
+    setTimeout(()=>{ renderVisitorProfile(); }, 800);
   } catch(e) { err.style.display='block'; err.textContent=e.message||'Erreur.'; }
 }
 
