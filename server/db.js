@@ -3700,6 +3700,10 @@ db.exec(`
   if (cmdCols.length && !cmdCols.includes('publication_id')) db.exec("ALTER TABLE commandes_vitrine ADD COLUMN publication_id INTEGER");
   const pubCols = db.prepare('PRAGMA table_info(vitrine_publications)').all().map(c=>c.name);
   if (pubCols.length && !pubCols.includes('media_bg')) db.exec("ALTER TABLE vitrine_publications ADD COLUMN media_bg TEXT");
+
+  // ── Refonte visuelle profil/vitrine : thème couleur de la boutique ──
+  const initCols4 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
+  if (!initCols4.includes('vitrine_theme')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_theme TEXT DEFAULT 'bordeaux'");
 }
 
 /* ── Boutique de la Vitrine (produits/services, max 20 par initiative) ── */

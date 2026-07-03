@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diaspo'Actif — Aperçu Profil & Vitrine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+
+  *{box-sizing:border-box}
+  body{margin:0;background:#EEF1F5;font-family:'Public Sans',system-ui,sans-serif;color:#16233D;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:'Bricolage Grotesque','Public Sans',sans-serif;margin:0}
+body{--v1:#8E1B2E;--v2:#5E0E1C;--v3:#B5262E;--v4:#3A1116;--vsoft:#F5EBEC;--vsoftbd:rgba(94,14,28,.12)}
+body[data-theme="ocean"]{--v1:#1B4F8E;--v2:#0E2C5E;--v3:#2670C5;--v4:#0B1E40;--vsoft:#EAF1FB;--vsoftbd:rgba(14,44,94,.14)}
+body[data-theme="emeraude"]{--v1:#1F6B4A;--v2:#0E3D2A;--v3:#2A9163;--v4:#0A2D1F;--vsoft:#E6F3EC;--vsoftbd:rgba(14,61,42,.14)}
+body[data-theme="prune"]{--v1:#4A2E6B;--v2:#2C1A46;--v3:#6B49A6;--v4:#1E1233;--vsoft:#F0EAF7;--vsoftbd:rgba(44,26,70,.14)}
+body[data-theme="or"]{--v1:#8A5E1A;--v2:#5E3F0E;--v3:#B5872A;--v4:#3D2907;--vsoft:#F6EFE0;--vsoftbd:rgba(94,63,14,.14)}
+  image-slot{display:block}
+  a{text-decoration:none;color:inherit}
+  section[id]{scroll-margin-top:134px}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#c7ced9;border-radius:8px;border:2px solid #EEF1F5}
+
+html{scroll-behavior:smooth}
+/* Placeholders d'images (remplacent <image-slot>) */
+.imgslot{background:#e8ecf1;border:1px dashed #c7ced9;display:flex;align-items:center;justify-content:center;color:#9aa6b4;font-size:12px;text-align:center;padding:6px;box-sizing:border-box}
+/* Onglets segmentés */
+.dc-seg{font-size:13px;font-weight:600;padding:8px 18px;border-radius:8px;cursor:pointer;transition:all .15s;color:#6B7686;background:transparent}
+.dc-seg.active[data-seg="profil"]{color:#fff;background:#1F8A5B}
+.dc-seg.active[data-seg="vitrine"]{color:#fff;background:var(--v1)}
+/* Pastilles de thème */
+.dc-swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.2)}
+.dc-swatch.active{box-shadow:0 0 0 3px #16233D}
+.dc-pswatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.2)}
+.dc-pswatch.active{box-shadow:0 0 0 3px #16233D}
+.dc-photo-btn{position:absolute;z-index:6;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:8px;padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px}
+/* Éléments réservés au titulaire du compte (cachés en vue visiteur) */
+.dc-owner{display:none!important}
+body[data-owner="1"] .dc-owner{display:inline-flex!important}
+.dc-owner-btn{font-size:13px;font-weight:600;padding:10px 16px;border-radius:10px;border:1px solid #E5C46B;background:#FFF7E0;color:#92620E;cursor:pointer;align-items:center;gap:6px}
+.dc-owner-toggle{position:fixed;left:18px;bottom:18px;z-index:70;background:#122A4D;color:#fff;border:none;border-radius:12px;padding:11px 16px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 8px 24px -8px rgba(0,0,0,.5)}
+</style>
+</head>
+<body>
+
+
+
+<div style="min-height:100vh">
+
+<!-- ========================= NAV ========================= -->
+<nav style="position:sticky;top:0;z-index:40;height:60px;background:#122A4D;display:flex;align-items:center;gap:26px;padding:0 26px;box-shadow:0 1px 0 rgba(0,0,0,.15)">
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="index.html"><img src="assets/logo.svg" alt="Diaspo'Actif" style="height:40px;width:40px;display:block;background:#fff;border-radius:9px;padding:2px"></a>
+    <span style="font-family:'Bricolage Grotesque';font-weight:700;font-size:18px;color:#fff;letter-spacing:.01em">DIASPO<span style="color:#E8974F">'</span>ACTIF</span>
+  </div>
+  <div style="display:flex;gap:24px;font-size:14px;color:rgba(255,255,255,.72)">
+    <a href="index.html" style="color:#fff;font-weight:600;text-decoration:none">Accueil</a><a href="annuaire.html" style="color:inherit;text-decoration:none">Annuaire</a><a href="fil-actualite.html" style="color:inherit;text-decoration:none">Fil d'actualité</a><a href="formations.html" style="color:inherit;text-decoration:none">Formations</a>
+  </div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:16px">
+    <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.22);border-radius:8px;padding:5px 9px">FR</span>
+    <div style="position:relative;font-size:17px">🔔<span style="position:absolute;top:-6px;right:-8px;background:#E5484D;color:#fff;font-size:9px;font-weight:700;min-width:15px;height:15px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px">6</span></div>
+    <span style="font-size:17px">💬</span>
+    <div style="display:flex;align-items:center;gap:8px;padding-left:6px;border-left:1px solid rgba(255,255,255,.16)">
+      <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#2F6BED,#1a3f8a);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">FB</div>
+      <span style="font-size:13.5px;color:#fff;font-weight:500">Bah</span>
+    </div>
+    <span style="font-size:13px;font-weight:600;color:#fff;background:rgba(255,255,255,.1);border-radius:8px;padding:7px 13px">Déconnexion</span>
+  </div>
+</nav>
+
+<!-- ========================= COVER ========================= -->
+<div style="position:relative">
+  <div id="da-cover" class="imgslot" style="width:100%;height:250px;">Photo de couverture (1600×400)</div>
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),transparent 30%,transparent 60%,rgba(0,0,0,.28));pointer-events:none"></div>
+  <div style="position:absolute;top:16px;left:22px;font-size:13px;font-weight:600;color:#fff;background:rgba(0,0,0,.32);backdrop-filter:blur(4px);padding:7px 14px;border-radius:9px">← Retour</div>
+</div>
+
+<!-- ========================= CONTAINER ========================= -->
+<div style="max-width:1360px;margin:0 auto;padding:0 22px 40px">
+
+  <!-- HERO CARD -->
+  <div style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:18px;box-shadow:0 2px 10px rgba(18,32,56,.05);padding:0 26px 22px;margin-top:16px">
+    <div style="display:flex;gap:22px;align-items:flex-start">
+      <div id="da-avatar" class="imgslot" style="width:132px;height:132px;flex:none;margin-top:-58px;border:5px solid #fff;border-radius:50%;box-shadow:0 8px 24px -10px rgba(18,32,56,.45);border-radius:50%;">Photo de profil</div>
+      <div style="flex:1;min-width:0;padding-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap">
+          <div style="min-width:0">
+            <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+              <h1 style="font-size:28px;font-weight:700;color:#122A4D;line-height:1.1">Fatoumata Bah</h1>
+              <span style="display:inline-flex;align-items:center;gap:5px;background:#E4F0FB;color:#2F6BED;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:999px"><span style="width:15px;height:15px;border-radius:50%;background:#2F6BED;color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px">✓</span>Identité vérifiée</span>
+            </div>
+            <div style="font-size:13.5px;color:#6B7686;margin-top:5px">@fatou.saveurs · Membre depuis mars 2024</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#F2F5FA;font-size:12.5px;color:#3B4658;font-weight:500">💼 Entrepreneure agroalimentaire</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#F2F5FA;font-size:12.5px;color:#3B4658;font-weight:500">🌍 Guinée</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#F2F5FA;font-size:12.5px;color:#3B4658;font-weight:500">📍 Lyon, France</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:9px;flex:none;padding-top:20px">
+            <span style="font-size:13px;font-weight:600;color:#fff;background:#2F6BED;padding:10px 20px;border-radius:10px">＋ Suivre</span>
+            <span style="font-size:13px;font-weight:600;color:#3B4658;background:#fff;border:1px solid rgba(18,32,56,.16);padding:10px 16px;border-radius:10px">✉️ Message</span>
+            <span style="font-size:13px;font-weight:600;color:#3B4658;background:#fff;border:1px solid rgba(18,32,56,.16);padding:10px 16px;border-radius:10px">↗ Partager</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(18,32,56,.07)">
+      <div style="display:inline-flex;background:#F2F5FA;border-radius:11px;padding:4px">
+        <span class="dc-seg" data-seg="profil" onclick="dcTab('profil')">🪪 Profil</span>
+        <span class="dc-seg" data-seg="vitrine" onclick="dcTab('vitrine')">🏬 Vitrine</span>
+      </div>
+      <div style="display:flex;gap:30px">
+        <div style="text-align:center"><div style="font-family:'Bricolage Grotesque';font-size:20px;font-weight:700;color:#F4A62A">4,9</div><div style="font-size:11.5px;color:#8794A7">note</div></div>
+        <div style="text-align:center"><div style="font-family:'Bricolage Grotesque';font-size:20px;font-weight:700;color:#1F8A5B">356</div><div style="font-size:11.5px;color:#8794A7">ventes</div></div>
+        <div style="text-align:center"><div style="font-family:'Bricolage Grotesque';font-size:20px;font-weight:700;color:#E5484D">420</div><div style="font-size:11.5px;color:#8794A7">abonnés</div></div>
+        <div style="text-align:center"><div style="font-family:'Bricolage Grotesque';font-size:20px;font-weight:700;color:#2F6BED">12</div><div style="font-size:11.5px;color:#8794A7">produits</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PROFIL : 3 colonnes ===================== -->
+  <div class="dc-view" data-view="profil">
+  <div style="display:grid;grid-template-columns:300px minmax(0,1fr) 322px;gap:22px;margin-top:22px;align-items:start">
+    <aside style="position:sticky;top:76px;height:calc(100vh - 92px);overflow-y:auto;display:flex;flex-direction:column;gap:18px;padding-right:3px">
+      <section style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:16px;box-shadow:0 1px 2px rgba(18,32,56,.04);padding:18px 20px">
+        <h3 style="font-size:14px;font-weight:700;color:#122A4D;margin-bottom:12px">📝 À propos</h3>
+        <p style="margin:0;font-size:13.5px;line-height:1.6;color:#3B4658;text-wrap:pretty">Fondatrice de <b style="font-weight:600;color:#122A4D">Sahel Saveurs</b>, j'accompagne les producteurs de la Fouta-Djalon vers la transformation et l'export. Circuits courts, terroir guinéen et fierté partagée.</p>
+      </section>
+      <section style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:16px;box-shadow:0 1px 2px rgba(18,32,56,.04);padding:18px 20px">
+        <h3 style="font-size:14px;font-weight:700;color:#122A4D;margin-bottom:12px">🌐 Réseaux &amp; liens</h3>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#3B4658"><span style="width:30px;height:30px;border-radius:8px;background:#F2F5FA;display:flex;align-items:center;justify-content:center">🔗</span>sahelsaveurs.com</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#3B4658"><span style="width:30px;height:30px;border-radius:8px;background:#F2F5FA;display:flex;align-items:center;justify-content:center">💼</span>linkedin.com/in/fatou-bah</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#3B4658"><span style="width:30px;height:30px;border-radius:8px;background:#F2F5FA;display:flex;align-items:center;justify-content:center">📸</span>@sahel.saveurs</div>
+        </div>
+      </section>
+      <section style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:16px;box-shadow:0 1px 2px rgba(18,32,56,.04);padding:18px 20px">
+        <h3 style="font-size:14px;font-weight:700;color:#122A4D;margin-bottom:12px">🎯 Centres d'intérêt</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:7px">
+          <span style="padding:6px 11px;border-radius:8px;background:#EAF1FE;color:#2F6BED;font-size:12px;font-weight:500">Agroalimentaire</span>
+          <span style="padding:6px 11px;border-radius:8px;background:#EAF1FE;color:#2F6BED;font-size:12px;font-weight:500">Entrepreneuriat</span>
+          <span style="padding:6px 11px;border-radius:8px;background:#EAF1FE;color:#2F6BED;font-size:12px;font-weight:500">Innovation</span>
+          <span style="padding:6px 11px;border-radius:8px;background:#EAF1FE;color:#2F6BED;font-size:12px;font-weight:500">Produits locaux</span>
+          <span style="padding:6px 11px;border-radius:8px;background:#EAF1FE;color:#2F6BED;font-size:12px;font-weight:500">Exportation</span>
+        </div>
+      </section>
+      <section style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:16px;box-shadow:0 1px 2px rgba(18,32,56,.04);padding:18px 20px;text-align:center">
+        <h3 style="font-size:12px;font-weight:700;color:#8794A7;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">📱 QR code profil</h3>
+        <div id="dc-profil-qr" style="width:150px;margin:0 auto;display:flex;align-items:center;justify-content:center;"></div>
+        <div style="font:11px ui-monospace,monospace;color:#8794A7;margin-top:12px">diaspo-actif.org/fatou.saveurs</div>
+        <div style="display:flex;justify-content:center;gap:7px;margin-top:12px">
+          <span style="font-size:12px;font-weight:600;color:#fff;background:#E07B39;padding:7px 13px;border-radius:8px">🪪 Carte</span>
+          <span style="font-size:12px;font-weight:600;color:#3B4658;background:#F2F5FA;padding:7px 11px;border-radius:8px">PNG</span>
+          <span style="font-size:12px;font-weight:600;color:#3B4658;background:#F2F5FA;padding:7px 11px;border-radius:8px">SVG</span>
+        </div>
+      </section>
+    </aside>
+
+    <main style="display:flex;flex-direction:column;gap:18px;min-width:0">
+      <section style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:16px;box-shadow:0 1px 2px rgba(18,32,56,.04);padding:18px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="font-size:15px;font-weight:700;color:#122A4D">🗞️ Publications</h3><span style="font-size:12.5px;color:#2F6BED;font-weight:600">Voir tout</span></div>
+        <article style="padding:16px 0;border-top:1px solid rgba(18,32,56,.07)">
+          <div style="display:flex;align-items:center;gap:11px;margin-bottom:11px"><div style="width:40px;height:40px;border-radius:50%;flex:none;background:linear-gradient(135deg,#2F6BED,#1a3f8a);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">FB</div><div style="flex:1"><div style="font-size:13.5px;font-weight:600;color:#122A4D">Fatoumata Bah <span style="color:#1F8A5B;font-size:11px;font-weight:600;background:#E4F3EC;padding:2px 7px;border-radius:999px;margin-left:4px">Annonce</span></div><div style="font-size:11.5px;color:#8794A7">il y a 2 jours</div></div></div>
+          <p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#3B4658">Nos nouvelles saveurs artisanales sont enfin prêtes 🎉 Merci aux productrices de la Fouta.</p>
+          <div id="da-pub1" class="imgslot" style="width:100%;height:240px;border-radius:12px;border-radius:12px;">Photo de la publication</div>
+          <div style="display:flex;gap:20px;margin-top:12px;font-size:13px;color:#6B7686"><span style="color:#E5484D;font-weight:600">♥ 42</span><span>💬 8 commentaires</span><span>↗ 5 partages</span></div>
+        </article>
+        <article style="padding:16px 0 0;border-top:1px solid rgba(18,32,56,.07)">
+          <div style="display:flex;align-items:center;gap:11px;margin-bottom:11px"><div style="width:40px;height:40px;border-radius:50%;flex:none;background:linear-gradient(135deg,#2F6BED,#1a3f8a);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">FB</div><div style="flex:1"><div style="font-size:13.5px;font-weight:600;color:#122A4D">Fatoumata Bah <span style="color:#2F6BED;font-size:11px;font-weight:600;background:#EAF1FE;padding:2px 7px;border-radius:999px;margin-left:4px">Article</span></div><div style="font-size:11.5px;color:#8794A7">il y a 5 jours</div></div></div>
+          <p style="margin:0;font-size:14px;line-height:1.55;color:#3B4658">Investir dans la diaspora, c'est investir dans des circuits courts durables. Retour sur notre atelier. 🌱</p>
+          <div style="display:flex;gap:20px;margin-top:12px;font-size:13px;color:#6B7686"><span style="color:#E5484D;font-weight:600">♥ 31</span><span>💬 6 commentaires</span><span>↗ 3 partages</span></div>
+        </article>
+      </section>
+      <section style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:16px;box-shadow:0 1px 2px rgba(18,32,56,.04);padding:18px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 style="font-size:15px;font-weight:700;color:#122A4D">📅 Événements recommandés</h3><span style="font-size:12.5px;color:#2F6BED;font-weight:600">Voir tout</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="border:1px solid rgba(18,32,56,.08);border-radius:13px;overflow:hidden"><div id="da-evt1" class="imgslot" style="width:100%;height:120px;">Visuel événement</div><div style="padding:12px 13px"><div style="font-size:13.5px;font-weight:600;color:#122A4D;line-height:1.3">Forum Diaspora &amp; Investissement 2025</div><div style="font-size:11.5px;color:#8794A7;margin:5px 0 10px">📍 Lyon · 15–17 août 2025</div><span style="display:inline-block;font-size:12px;font-weight:600;color:#2F6BED;background:#EAF1FE;padding:6px 13px;border-radius:8px">Intéressé</span></div></div>
+          <div style="border:1px solid rgba(18,32,56,.08);border-radius:13px;overflow:hidden"><div id="da-evt2" class="imgslot" style="width:100%;height:120px;">Visuel événement</div><div style="padding:12px 13px"><div style="font-size:13.5px;font-weight:600;color:#122A4D;line-height:1.3">Atelier Marketing Digital &amp; Export</div><div style="font-size:11.5px;color:#8794A7;margin:5px 0 10px">📍 En ligne · 5 juillet 2025</div><span style="display:inline-block;font-size:12px;font-weight:600;color:#2F6BED;background:#EAF1FE;padding:6px 13px;border-radius:8px">Intéressé</span></div></div>
+        </div>
+      </section>
+      <section style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:16px;box-shadow:0 1px 2px rgba(18,32,56,.04);padding:18px 20px">
+        <h3 style="font-size:15px;font-weight:700;color:#122A4D;margin-bottom:4px">📣 Fil d'actualité de la communauté</h3>
+        <div style="display:flex;gap:12px;padding:14px 0;border-top:1px solid rgba(18,32,56,.07)"><div style="width:38px;height:38px;border-radius:50%;flex:none;background:#2F6BED;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">AD</div><div style="flex:1"><div style="font-size:13px"><b>Amadou Diallo</b> <span style="color:#8794A7">a publié une initiative · il y a 2 h</span></div><div style="font-size:12.5px;color:#3B4658;margin-top:3px">Lancement du projet d'agriculture durable à Korhogo 🌾</div></div></div>
+        <div style="display:flex;gap:12px;padding:14px 0 0;border-top:1px solid rgba(18,32,56,.07)"><div style="width:38px;height:38px;border-radius:50%;flex:none;background:#1F8A5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">SK</div><div style="flex:1"><div style="font-size:13px"><b>Sophie Kouadio</b> <span style="color:#8794A7">a commenté · il y a 3 h</span></div><div style="font-size:12.5px;color:#3B4658;font-style:italic;margin-top:3px">« Très belle initiative, hâte de voir les résultats. »</div></div></div>
+      </section>
+      <section style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:16px;box-shadow:0 1px 2px rgba(18,32,56,.04);padding:18px 20px">
+        <h3 style="font-size:15px;font-weight:700;color:#122A4D;margin-bottom:14px">⭐ Recommandations <span style="color:#8794A7;font-weight:500">(3)</span></h3>
+        <div style="display:flex;gap:12px;padding:0 0 14px;border-bottom:1px solid rgba(18,32,56,.07)"><div style="width:40px;height:40px;border-radius:50%;flex:none;background:#E07B39;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">JK</div><div><div style="font-size:13.5px;color:#3B4658;line-height:1.55">« Fatoumata a transformé notre coopérative. Une vision claire et un vrai sens du collectif. »</div><div style="font-size:12px;color:#8794A7;margin-top:5px"><b style="color:#122A4D">Jean-Paul Kouassi</b> · Entrepreneur</div></div></div>
+        <div style="display:flex;gap:12px;padding:14px 0 0"><div style="width:40px;height:40px;border-radius:50%;flex:none;background:#2F6BED;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">ND</div><div><div style="font-size:13.5px;color:#3B4658;line-height:1.55">« Partenaire fiable et engagée. Ses produits ont ouvert de nouveaux marchés. »</div><div style="font-size:12px;color:#8794A7;margin-top:5px"><b style="color:#122A4D">Nadia Diaby</b> · Investisseuse</div></div></div>
+      </section>
+    </main>
+
+    <aside style="position:sticky;top:76px;height:calc(100vh - 92px);overflow-y:auto;display:flex;flex-direction:column;gap:18px;padding-right:3px">
+      <section style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:16px;box-shadow:0 1px 2px rgba(18,32,56,.04);padding:18px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="font-size:14px;font-weight:700;color:#122A4D">🚀 Projets en cours</h3><span style="font-size:12px;color:#2F6BED;font-weight:600">Voir tout</span></div>
+        <div style="padding:9px 0"><div style="display:flex;align-items:center;gap:10px;margin-bottom:7px"><div style="width:34px;height:34px;border-radius:9px;flex:none;background:#E4F3EC;display:flex;align-items:center;justify-content:center;font-size:16px">🌾</div><div style="flex:1"><div style="font-size:12.5px;font-weight:600;color:#122A4D">Programme Agri-Diaspora</div><div style="font-size:11px;color:#8794A7">En cours · Phase 2</div></div><span style="font-size:9.5px;font-weight:700;color:#1F8A5B;background:#E4F3EC;padding:2px 7px;border-radius:6px">Active</span></div><div style="height:7px;border-radius:4px;background:#EEF1F5;overflow:hidden"><div style="width:72%;height:100%;background:#1F8A5B;border-radius:4px"></div></div></div>
+        <div style="padding:9px 0 0;border-top:1px solid rgba(18,32,56,.06)"><div style="display:flex;align-items:center;gap:10px;margin-bottom:7px"><div style="width:34px;height:34px;border-radius:9px;flex:none;background:#EAF1FE;display:flex;align-items:center;justify-content:center;font-size:16px">🎓</div><div style="flex:1"><div style="font-size:12.5px;font-weight:600;color:#122A4D">Bourse Éducation 2026</div><div style="font-size:11px;color:#8794A7">En cours · Collecte</div></div><span style="font-size:9.5px;font-weight:700;color:#1F8A5B;background:#E4F3EC;padding:2px 7px;border-radius:6px">Active</span></div><div style="height:7px;border-radius:4px;background:#EEF1F5;overflow:hidden"><div style="width:48%;height:100%;background:#1F8A5B;border-radius:4px"></div></div></div>
+      </section>
+      <section style="background:#fff;border:1px solid rgba(18,32,56,.07);border-radius:16px;box-shadow:0 1px 2px rgba(18,32,56,.04);padding:18px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="font-size:14px;font-weight:700;color:#122A4D">✨ Suggestions</h3><span style="font-size:12px;color:#2F6BED;font-weight:600">Voir tout</span></div>
+        <div style="display:flex;align-items:center;gap:11px;padding:9px 0"><div style="width:36px;height:36px;border-radius:50%;flex:none;background:#7C5CE0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">AK</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#122A4D">Awa Koné</div><div style="font-size:11px;color:#8794A7">Entrepreneure</div></div><span style="font-size:12px;font-weight:600;color:#1F8A5B;border:1px solid rgba(31,138,91,.4);padding:5px 12px;border-radius:8px">Suivre</span></div>
+        <div style="display:flex;align-items:center;gap:11px;padding:9px 0 0;border-top:1px solid rgba(18,32,56,.06)"><div style="width:36px;height:36px;border-radius:50%;flex:none;background:#2F6BED;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">IC</div><div style="flex:1"><div style="font-size:13px;font-weight:600;color:#122A4D">Ibrahim Camara</div><div style="font-size:11px;color:#8794A7">Investisseur</div></div><span style="font-size:12px;font-weight:600;color:#1F8A5B;border:1px solid rgba(31,138,91,.4);padding:5px 12px;border-radius:8px">Suivre</span></div>
+      </section>
+    </aside>
+  </div>
+  </div>
+
+  <!-- ===================== VITRINE : boutique élégante ===================== -->
+  <div class="dc-view" data-view="vitrine" style="display:none"><div style="display:flex;flex-direction:column;gap:20px;margin-top:22px">
+
+    <!-- Sous-nav ancrée -->
+    <div style="position:sticky;top:70px;z-index:20;background:#fff;border:1px solid rgba(94,14,28,.14);border-radius:12px;box-shadow:0 2px 8px rgba(94,14,28,.08);padding:9px 12px;display:flex;gap:7px;overflow-x:auto">
+      <a href="#v-presentation" style="white-space:nowrap;font-size:12.5px;font-weight:600;color:#fff;background:var(--v1);padding:8px 14px;border-radius:999px">Présentation</a>
+      <a href="#v-produits" style="white-space:nowrap;font-size:12.5px;font-weight:500;color:#6B4A4E;background:var(--vsoft);padding:8px 14px;border-radius:999px">Produits</a>
+      <a href="#v-promos" style="white-space:nowrap;font-size:12.5px;font-weight:500;color:#6B4A4E;background:var(--vsoft);padding:8px 14px;border-radius:999px">Promotions</a>
+      <a href="#v-services" style="white-space:nowrap;font-size:12.5px;font-weight:500;color:#6B4A4E;background:var(--vsoft);padding:8px 14px;border-radius:999px">Services</a>
+      <a href="#v-galerie" style="white-space:nowrap;font-size:12.5px;font-weight:500;color:#6B4A4E;background:var(--vsoft);padding:8px 14px;border-radius:999px">Galerie</a>
+      <a href="#v-actu" style="white-space:nowrap;font-size:12.5px;font-weight:500;color:#6B4A4E;background:var(--vsoft);padding:8px 14px;border-radius:999px">Actualités</a>
+      <a href="#v-avis" style="white-space:nowrap;font-size:12.5px;font-weight:500;color:#6B4A4E;background:var(--vsoft);padding:8px 14px;border-radius:999px">Avis</a>
+      <a href="#v-contact" style="white-space:nowrap;font-size:12.5px;font-weight:500;color:#6B4A4E;background:var(--vsoft);padding:8px 14px;border-radius:999px">Contact</a>
+    </div>
+
+    <!-- HERO bannière -->
+    <section style="position:relative;border-radius:18px;overflow:hidden;box-shadow:0 6px 20px -8px rgba(94,14,28,.35)">
+      <div id="da-ad" class="imgslot" style="width:100%;height:340px;">Bannière de la boutique (1600×640)</div>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(60,10,18,.35),rgba(60,10,18,.62));pointer-events:none"></div>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;pointer-events:none">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:52px;font-weight:600;color:#fff;line-height:1;text-shadow:0 2px 14px rgba(0,0,0,.4)">Sahel Saveurs</div>
+        <div style="font-size:15px;color:rgba(255,255,255,.9);margin-top:10px;letter-spacing:.02em">Saveurs authentiques du terroir guinéen · Livraison en France</div>
+        <span style="margin-top:20px;font-size:13.5px;font-weight:700;letter-spacing:.04em;color:#fff;background:var(--v3);padding:13px 30px;border-radius:8px;box-shadow:0 4px 14px -4px rgba(0,0,0,.5)">VOIR NOS PRODUITS</span>
+      </div>
+    </section>
+
+    <!-- Barre actions + note -->
+    <section style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.05);padding:16px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px;display:flex;align-items:center;gap:10px">
+        <span style="color:#F4A62A;font-size:16px;letter-spacing:2px">★★★★★</span>
+        <span style="font-size:13.5px;font-weight:700;color:#122A4D">4,9</span>
+        <span style="font-size:12.5px;color:#8794A7">(120 avis) · 356 ventes</span>
+      </div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600;color:var(--v1);background:var(--vsoft);padding:10px 15px;border-radius:10px">✉️ Contacter</span>
+        <span style="font-size:13px;font-weight:600;color:#3B4658;background:#F2F5FA;padding:10px 15px;border-radius:10px">📞 Appeler</span>
+        <span style="font-size:13px;font-weight:600;color:#fff;background:#25A366;padding:10px 15px;border-radius:10px">🟢 WhatsApp</span>
+        <span style="font-size:13px;font-weight:600;color:#fff;background:var(--v1);padding:10px 18px;border-radius:10px">＋ Suivre</span>
+      </div>
+    </section>
+
+    <!-- PRÉSENTATION -->
+    <section id="v-presentation" style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+      <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:14px 24px"><h3 style="font-size:17px;font-weight:700;color:#fff">Présentation de la vitrine</h3></div>
+      <div style="padding:20px 24px">
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#3B4658;text-wrap:pretty">Sahel Saveurs valorise le terroir guinéen : miels, épices, cafés et céréales issus des coopératives de la Fouta-Djalon. Transformation locale, circuits courts et savoir-faire artisanal, au service d'une diaspora qui investit chez elle. Chaque produit est sélectionné avec soin auprès de productrices et producteurs partenaires.</p>
+        <span style="display:inline-block;font-size:12.5px;font-weight:700;letter-spacing:.03em;color:var(--v1);border:1px solid var(--v1);padding:9px 18px;border-radius:8px">EN SAVOIR PLUS</span>
+      </div>
+    </section>
+
+    <!-- À LA UNE -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px">
+      <div style="border-radius:15px;overflow:hidden;background:linear-gradient(140deg,var(--v3),var(--v2));color:#fff;padding:20px;display:flex;flex-direction:column;min-height:180px">
+        <span style="align-self:flex-start;font-size:11px;font-weight:700;background:rgba(255,255,255,.22);padding:4px 10px;border-radius:999px">🔥 PROMOTION</span>
+        <div style="font-family:'Bricolage Grotesque';font-size:40px;font-weight:700;margin:10px 0 2px">−50%</div>
+        <div style="font-size:14px;font-weight:600">Coffret Miel &amp; Café</div>
+        <div style="font-size:13px;margin-top:4px"><span style="text-decoration:line-through;opacity:.75">40 €</span> &nbsp;<b>20 €</b></div>
+        <span style="margin-top:auto;align-self:flex-start;font-size:12.5px;font-weight:600;color:var(--v1);background:#fff;padding:8px 16px;border-radius:8px">Voir</span>
+      </div>
+      <div style="border-radius:15px;overflow:hidden;background:#fff;border:1px solid var(--vsoftbd);display:flex;flex-direction:column;min-height:180px">
+        <div style="position:relative"><div id="da-vedette" class="imgslot" style="width:100%;height:104px;">Produit vedette</div><span style="position:absolute;top:9px;left:9px;font-size:10px;font-weight:700;color:#fff;background:var(--v1);padding:3px 9px;border-radius:999px">⭐ Vedette</span></div>
+        <div style="padding:13px;display:flex;flex-direction:column;flex:1"><div style="font-size:14px;font-weight:600;color:#122A4D">Miel de la Fouta 500 g</div><div style="font-size:12px;color:#8794A7;margin-top:2px">Notre meilleure vente</div><span style="margin-top:auto;align-self:flex-start;font-size:12.5px;font-weight:600;color:#fff;background:var(--v1);padding:8px 16px;border-radius:8px">Acheter</span></div>
+      </div>
+      <div style="border-radius:15px;background:linear-gradient(140deg,#1F8A5B,#146b45);color:#fff;padding:20px;display:flex;flex-direction:column;min-height:180px">
+        <span style="align-self:flex-start;font-size:11px;font-weight:700;background:rgba(255,255,255,.22);padding:4px 10px;border-radius:999px">🎁 OFFRE SPÉCIALE</span>
+        <div style="font-family:'Bricolage Grotesque';font-size:24px;font-weight:700;margin:12px 0 4px;line-height:1.15">Livraison offerte</div>
+        <div style="font-size:13px;opacity:.9">Jusqu'au 30 juillet · dès 45 €</div>
+        <span style="margin-top:auto;align-self:flex-start;font-size:12.5px;font-weight:600;color:#146b45;background:#fff;padding:8px 16px;border-radius:8px">En profiter</span>
+      </div>
+      <div style="border-radius:15px;background:var(--v4);color:#fff;padding:20px;display:flex;flex-direction:column;min-height:180px">
+        <span style="align-self:flex-start;font-size:11px;font-weight:700;background:rgba(255,255,255,.16);padding:4px 10px;border-radius:999px">⚡ OFFRE FLASH</span>
+        <div style="display:flex;gap:6px;margin:14px 0 6px">
+          <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:6px 9px;text-align:center;min-width:44px"><div style="font-family:'Bricolage Grotesque';font-size:19px;font-weight:700;line-height:1">02</div><div style="font-size:8px;opacity:.75">H</div></div>
+          <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:6px 9px;text-align:center;min-width:44px"><div style="font-family:'Bricolage Grotesque';font-size:19px;font-weight:700;line-height:1">14</div><div style="font-size:8px;opacity:.75">MIN</div></div>
+          <div style="background:rgba(255,255,255,.12);border-radius:8px;padding:6px 9px;text-align:center;min-width:44px"><div style="font-family:'Bricolage Grotesque';font-size:19px;font-weight:700;line-height:1">37</div><div style="font-size:8px;opacity:.75">SEC</div></div>
+        </div>
+        <span style="margin-top:auto;align-self:flex-start;font-size:12.5px;font-weight:600;color:var(--v4);background:#fff;padding:8px 16px;border-radius:8px">Acheter vite</span>
+      </div>
+    </div>
+
+    <!-- COLLECTIONS -->
+    <section style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+      <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:14px 24px"><h3 style="font-size:17px;font-weight:700;color:#fff">Catalogue</h3></div>
+      <div style="padding:18px 22px;display:flex;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:110px;text-align:center;background:#FBF6F2;border:1px solid rgba(94,14,28,.08);border-radius:12px;padding:16px"><div style="font-size:26px">🍯</div><div style="font-size:12.5px;font-weight:600;color:#122A4D;margin-top:6px">Miels</div></div>
+        <div style="flex:1;min-width:110px;text-align:center;background:#FBF6F2;border:1px solid rgba(94,14,28,.08);border-radius:12px;padding:16px"><div style="font-size:26px">🌶️</div><div style="font-size:12.5px;font-weight:600;color:#122A4D;margin-top:6px">Épices</div></div>
+        <div style="flex:1;min-width:110px;text-align:center;background:#FBF6F2;border:1px solid rgba(94,14,28,.08);border-radius:12px;padding:16px"><div style="font-size:26px">☕</div><div style="font-size:12.5px;font-weight:600;color:#122A4D;margin-top:6px">Cafés</div></div>
+        <div style="flex:1;min-width:110px;text-align:center;background:#FBF6F2;border:1px solid rgba(94,14,28,.08);border-radius:12px;padding:16px"><div style="font-size:26px">🎁</div><div style="font-size:12.5px;font-weight:600;color:#122A4D;margin-top:6px">Coffrets</div></div>
+        <div style="flex:1;min-width:110px;text-align:center;background:#FBF6F2;border:1px solid rgba(94,14,28,.08);border-radius:12px;padding:16px"><div style="font-size:26px">🌿</div><div style="font-size:12.5px;font-weight:600;color:#122A4D;margin-top:6px">Artisanat</div></div>
+      </div>
+    </section>
+
+    <!-- BOUTIQUE -->
+    <section id="v-produits" style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+      <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:14px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h3 style="font-size:17px;font-weight:700;color:#fff">Nos produits</h3><div style="min-width:200px;flex:1;max-width:320px;height:36px;border-radius:9px;background:rgba(255,255,255,.15);display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:rgba(255,255,255,.8)">🔍 Rechercher un produit…</div></div>
+      <div style="padding:16px 22px 22px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px">
+          <span style="padding:7px 14px;border-radius:999px;background:var(--v1);color:#fff;font-size:12.5px;font-weight:600">Tous</span>
+          <span style="padding:7px 14px;border-radius:999px;background:var(--vsoft);color:#6B4A4E;font-size:12.5px;font-weight:500">Promotions</span>
+          <span style="padding:7px 14px;border-radius:999px;background:var(--vsoft);color:#6B4A4E;font-size:12.5px;font-weight:500">Nouveautés</span>
+          <span style="padding:7px 14px;border-radius:999px;background:var(--vsoft);color:#6B4A4E;font-size:12.5px;font-weight:500">Populaires</span>
+          <span style="padding:7px 14px;border-radius:999px;background:var(--vsoft);color:#6B4A4E;font-size:12.5px;font-weight:500">Disponible</span>
+          <span style="padding:7px 14px;border-radius:999px;background:var(--vsoft);color:#6B4A4E;font-size:12.5px;font-weight:500">Précommande</span>
+          <div style="margin-left:auto;font-size:12.5px;color:#8794A7">Trier : <b style="color:#3B4658">Prix ▾</b></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px">
+
+          <div style="border:1px solid rgba(94,14,28,.1);border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
+            <div style="position:relative"><div id="da-prod1" class="imgslot" style="width:100%;height:160px;">Photo produit</div><span style="position:absolute;left:0;bottom:0;font-size:10.5px;font-weight:700;letter-spacing:.05em;color:#fff;background:var(--v1);padding:5px 12px;border-radius:0 8px 0 0">MIELS</span><span style="position:absolute;top:9px;right:9px;font-size:10px;font-weight:700;color:#fff;background:#E07B39;padding:3px 9px;border-radius:999px">Nouveau</span></div>
+            <div style="padding:13px;display:flex;flex-direction:column;gap:5px;flex:1"><div style="font-size:14px;font-weight:600;color:#122A4D">Miel de la Fouta · 500 g</div><div style="font-size:12px;color:#6B7686;line-height:1.4">Miel brut multifleurs récolté à Labé.</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:8px"><span style="font-family:'Bricolage Grotesque';font-size:17px;font-weight:700;color:var(--v1)">12,90 €</span><span style="font-size:12px;font-weight:600;color:#fff;background:var(--v1);padding:8px 13px;border-radius:9px">🛒 Commander</span></div></div>
+          </div>
+          <div style="border:1px solid rgba(94,14,28,.1);border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
+            <div style="position:relative"><div id="da-prod2" class="imgslot" style="width:100%;height:160px;">Photo produit</div><span style="position:absolute;left:0;bottom:0;font-size:10.5px;font-weight:700;letter-spacing:.05em;color:#fff;background:var(--v1);padding:5px 12px;border-radius:0 8px 0 0">CAFÉS</span><span style="position:absolute;top:9px;right:9px;font-size:10px;font-weight:700;color:#fff;background:#F4A62A;padding:3px 9px;border-radius:999px">🏆 Top vente</span></div>
+            <div style="padding:13px;display:flex;flex-direction:column;gap:5px;flex:1"><div style="font-size:14px;font-weight:600;color:#122A4D">Café Diallo torréfié · 250 g</div><div style="font-size:12px;color:#6B7686;line-height:1.4">Arabica torréfié artisanalement.</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:8px"><span style="font-family:'Bricolage Grotesque';font-size:17px;font-weight:700;color:var(--v1)">9,50 €</span><span style="font-size:12px;font-weight:600;color:#fff;background:var(--v1);padding:8px 13px;border-radius:9px">🛒 Commander</span></div></div>
+          </div>
+          <div style="border:1px solid rgba(94,14,28,.1);border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
+            <div style="position:relative"><div id="da-prod3" class="imgslot" style="width:100%;height:160px;">Photo produit</div><span style="position:absolute;left:0;bottom:0;font-size:10.5px;font-weight:700;letter-spacing:.05em;color:#fff;background:var(--v1);padding:5px 12px;border-radius:0 8px 0 0">ÉPICES</span><span style="position:absolute;top:9px;right:9px;font-size:10px;font-weight:700;color:#fff;background:#E5484D;padding:3px 9px;border-radius:999px">−15%</span></div>
+            <div style="padding:13px;display:flex;flex-direction:column;gap:5px;flex:1"><div style="font-size:14px;font-weight:600;color:#122A4D">Coffret Épices Sahel · 6 pots</div><div style="font-size:12px;color:#6B7686;line-height:1.4">Gingembre, piment, poivre de Penja…</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:8px"><span style="display:flex;align-items:baseline;gap:5px"><span style="font-family:'Bricolage Grotesque';font-size:17px;font-weight:700;color:var(--v1)">24,90 €</span><span style="font-size:11px;color:#8794A7;text-decoration:line-through">29,90 €</span></span><span style="font-size:12px;font-weight:600;color:#fff;background:var(--v1);padding:8px 13px;border-radius:9px">🛒 Commander</span></div></div>
+          </div>
+          <div style="border:1px solid rgba(94,14,28,.1);border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
+            <div style="position:relative"><div id="da-prod4" class="imgslot" style="width:100%;height:160px;">Photo produit</div><span style="position:absolute;left:0;bottom:0;font-size:10.5px;font-weight:700;letter-spacing:.05em;color:#fff;background:var(--v1);padding:5px 12px;border-radius:0 8px 0 0">CÉRÉALES</span><span style="position:absolute;top:9px;right:9px;font-size:10px;font-weight:700;color:#fff;background:#1F8A5B;padding:3px 9px;border-radius:999px">🌿 Bio</span></div>
+            <div style="padding:13px;display:flex;flex-direction:column;gap:5px;flex:1"><div style="font-size:14px;font-weight:600;color:#122A4D">Fonio bio · 1 kg</div><div style="font-size:12px;color:#6B7686;line-height:1.4">Céréale sans gluten, agriculture familiale.</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:8px"><span style="font-family:'Bricolage Grotesque';font-size:17px;font-weight:700;color:var(--v1)">11,00 €</span><span style="font-size:12px;font-weight:600;color:#fff;background:var(--v1);padding:8px 13px;border-radius:9px">🛒 Commander</span></div></div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- PROMOTIONS + MEILLEURES VENTES -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <section id="v-promos" style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:13px 22px"><h3 style="font-size:15px;font-weight:700;color:#fff">🔥 Promotions du mois</h3></div>
+        <div style="padding:16px 20px">
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid rgba(94,14,28,.08)"><div id="da-promo1" class="imgslot" style="width:52px;height:52px;flex:none;border-radius:10px;border-radius:10px;">•</div><div style="flex:1"><div style="font-size:13.5px;font-weight:600;color:#122A4D">Coffret découverte</div><div style="font-size:11.5px;color:#8794A7"><span style="text-decoration:line-through">39,90 €</span> · −30%</div></div><span style="font-family:'Bricolage Grotesque';font-size:15px;font-weight:700;color:var(--v1)">27,90 €</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 0 0"><div id="da-promo2" class="imgslot" style="width:52px;height:52px;flex:none;border-radius:10px;border-radius:10px;">•</div><div style="flex:1"><div style="font-size:13.5px;font-weight:600;color:#122A4D">Épices en gros · 1 kg</div><div style="font-size:11.5px;color:#8794A7"><span style="text-decoration:line-through">40,00 €</span> · −20%</div></div><span style="font-family:'Bricolage Grotesque';font-size:15px;font-weight:700;color:var(--v1)">32,00 €</span></div>
+        </div>
+      </section>
+      <section id="v-best" style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:13px 22px"><h3 style="font-size:15px;font-weight:700;color:#fff">🏆 Meilleures ventes</h3></div>
+        <div style="padding:16px 20px">
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid rgba(94,14,28,.08)"><div style="font-family:'Bricolage Grotesque';font-size:18px;font-weight:700;color:#F4A62A;width:20px">1</div><div style="flex:1"><div style="font-size:13.5px;font-weight:600;color:#122A4D">Café Diallo torréfié</div><div style="font-size:11px;color:#8794A7">312 vendus</div></div><span style="font-size:9.5px;font-weight:700;color:#fff;background:#F4A62A;padding:2px 8px;border-radius:999px">Best Seller</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid rgba(94,14,28,.08)"><div style="font-family:'Bricolage Grotesque';font-size:18px;font-weight:700;color:#8794A7;width:20px">2</div><div style="flex:1"><div style="font-size:13.5px;font-weight:600;color:#122A4D">Miel de la Fouta</div><div style="font-size:11px;color:#8794A7">248 vendus</div></div></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 0 0"><div style="font-family:'Bricolage Grotesque';font-size:18px;font-weight:700;color:#8794A7;width:20px">3</div><div style="flex:1"><div style="font-size:13.5px;font-weight:600;color:#122A4D">Coffret Épices Sahel</div><div style="font-size:11px;color:#8794A7">190 vendus</div></div></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- SERVICES + POURQUOI -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <section id="v-services" style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:13px 22px"><h3 style="font-size:15px;font-weight:700;color:#fff">🛠 Services</h3></div>
+        <div style="padding:16px 20px;display:flex;flex-direction:column;gap:11px">
+          <div style="display:flex;align-items:center;gap:11px;font-size:13px;color:#3B4658"><span style="width:34px;height:34px;border-radius:9px;flex:none;background:var(--vsoft);display:flex;align-items:center;justify-content:center;font-size:16px">🚚</span>Livraison &amp; expédition France</div>
+          <div style="display:flex;align-items:center;gap:11px;font-size:13px;color:#3B4658"><span style="width:34px;height:34px;border-radius:9px;flex:none;background:var(--vsoft);display:flex;align-items:center;justify-content:center;font-size:16px">🎁</span>Coffrets personnalisés</div>
+          <div style="display:flex;align-items:center;gap:11px;font-size:13px;color:#3B4658"><span style="width:34px;height:34px;border-radius:9px;flex:none;background:var(--vsoft);display:flex;align-items:center;justify-content:center;font-size:16px">📦</span>Vente en gros / revendeurs</div>
+        </div>
+      </section>
+      <section style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:13px 22px"><h3 style="font-size:15px;font-weight:700;color:#fff">✔ Pourquoi nous choisir</h3></div>
+        <div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px;color:#3B4658">
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#1F8A5B;font-weight:700">✔</span>Paiement sécurisé</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#1F8A5B;font-weight:700">✔</span>Livraison rapide</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#1F8A5B;font-weight:700">✔</span>Produit local</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#1F8A5B;font-weight:700">✔</span>Service après-vente</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#1F8A5B;font-weight:700">✔</span>Satisfait ou remboursé</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="color:#1F8A5B;font-weight:700">✔</span>Artisanal &amp; équitable</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- GALERIE -->
+    <section id="v-galerie" style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+      <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:14px 24px"><h3 style="font-size:16px;font-weight:700;color:#fff">📸 Galerie — atelier, clients &amp; réalisations</h3></div>
+      <div style="padding:18px 22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
+        <div id="da-gal1" class="imgslot" style="width:100%;height:130px;border-radius:12px;">Atelier</div>
+        <div id="da-gal2" class="imgslot" style="width:100%;height:130px;border-radius:12px;">Clients</div>
+        <div id="da-gal3" class="imgslot" style="width:100%;height:130px;border-radius:12px;">Réalisation</div>
+        <div id="da-gal4" class="imgslot" style="width:100%;height:130px;border-radius:12px;">Événement</div>
+        <div style="position:relative"><div id="da-gal5" class="imgslot" style="width:100%;height:130px;border-radius:12px;">Vidéo</div><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:30px;color:#fff;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,.5)">▶</span></div>
+      </div>
+    </section>
+
+    <!-- ACTUALITÉS + AVIS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <section id="v-actu" style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:13px 22px"><h3 style="font-size:15px;font-weight:700;color:#fff">📰 Actualités</h3></div>
+        <div style="padding:18px 22px"><div style="display:flex;flex-direction:column;border-left:2px solid #E7D7D9;padding-left:18px">
+          <div style="position:relative;padding-bottom:15px"><span style="position:absolute;left:-25px;top:2px;width:12px;height:12px;border-radius:50%;background:var(--v1);border:2px solid #fff"></span><div style="font-size:11px;font-weight:700;color:var(--v1)">AUJOURD'HUI</div><div style="font-size:13.5px;font-weight:600;color:#122A4D;margin-top:2px">Lancement de la nouvelle collection Fouta</div></div>
+          <div style="position:relative;padding-bottom:15px"><span style="position:absolute;left:-25px;top:2px;width:12px;height:12px;border-radius:50%;background:#C58089;border:2px solid #fff"></span><div style="font-size:11px;font-weight:700;color:#8794A7">HIER</div><div style="font-size:13.5px;font-weight:600;color:#122A4D;margin-top:2px">Participation au Salon des Saveurs de Lyon</div></div>
+          <div style="position:relative"><span style="position:absolute;left:-25px;top:2px;width:12px;height:12px;border-radius:50%;background:#E7D7D9;border:2px solid #fff"></span><div style="font-size:11px;font-weight:700;color:#8794A7">SEMAINE DERNIÈRE</div><div style="font-size:13.5px;font-weight:600;color:#122A4D;margin-top:2px">Promotion spéciale −20% sur les coffrets</div></div>
+        </div></div>
+      </section>
+      <section id="v-avis" style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:13px 22px"><h3 style="font-size:15px;font-weight:700;color:#fff">⭐ Avis clients</h3></div>
+        <div style="padding:18px 22px">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><div style="font-family:'Bricolage Grotesque';font-size:34px;font-weight:700;color:#122A4D;line-height:1">4,9</div><div><div style="color:#F4A62A;font-size:15px;letter-spacing:2px">★★★★★</div><div style="font-size:11.5px;color:#8794A7;margin-top:2px">120 avis vérifiés</div></div></div>
+          <div style="border-top:1px solid rgba(94,14,28,.08);padding:12px 0;font-size:12.5px;color:#3B4658;line-height:1.5">« Livraison rapide, produits d'une qualité rare. »<div style="font-size:11.5px;color:#8794A7;margin-top:4px">★★★★★ — Marie</div></div>
+          <div style="border-top:1px solid rgba(94,14,28,.08);padding:12px 0 0;font-size:12.5px;color:#3B4658;line-height:1.5">« Excellent vendeur, emballage soigné. »<div style="font-size:11.5px;color:#8794A7;margin-top:4px">★★★★★ — Jean</div></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- PARTENAIRES + OBJECTIF + TÉLÉCHARGEMENTS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <section style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:13px 22px"><h3 style="font-size:15px;font-weight:700;color:#fff">🤝 Ils nous font confiance</h3></div>
+        <div style="padding:18px 22px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:80px;height:52px;border-radius:10px;background:#F6F1EE;display:flex;align-items:center;justify-content:center;font:11px ui-monospace,monospace;color:#b09aa0">logo</div>
+          <div style="flex:1;min-width:80px;height:52px;border-radius:10px;background:#F6F1EE;display:flex;align-items:center;justify-content:center;font:11px ui-monospace,monospace;color:#b09aa0">logo</div>
+          <div style="flex:1;min-width:80px;height:52px;border-radius:10px;background:#F6F1EE;display:flex;align-items:center;justify-content:center;font:11px ui-monospace,monospace;color:#b09aa0">logo</div>
+          <div style="flex:1;min-width:80px;height:52px;border-radius:10px;background:#F6F1EE;display:flex;align-items:center;justify-content:center;font:11px ui-monospace,monospace;color:#b09aa0">logo</div>
+        </div>
+        <div style="padding:0 22px 18px">
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px"><span style="color:#6B7686">🎯 Objectif : 1 000 commandes</span><b style="color:var(--v1)">630 / 1000</b></div>
+          <div style="height:9px;border-radius:5px;background:#F1E4E6;overflow:hidden"><div style="width:63%;height:100%;background:linear-gradient(90deg,var(--v1),var(--v3));border-radius:5px"></div></div>
+        </div>
+      </section>
+      <section style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+        <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:13px 22px"><h3 style="font-size:15px;font-weight:700;color:#fff">📥 Téléchargements</h3></div>
+        <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:11px;font-size:13px;color:#3B4658;padding:9px 12px;border:1px solid rgba(94,14,28,.1);border-radius:10px"><span style="font-size:17px">📄</span><span style="flex:1">Catalogue produits (PDF)</span><span style="font-size:12px;font-weight:600;color:var(--v1)">Télécharger</span></div>
+          <div style="display:flex;align-items:center;gap:11px;font-size:13px;color:#3B4658;padding:9px 12px;border:1px solid rgba(94,14,28,.1);border-radius:10px"><span style="font-size:17px">💶</span><span style="flex:1">Grille tarifaire revendeurs</span><span style="font-size:12px;font-weight:600;color:var(--v1)">Télécharger</span></div>
+          <div style="display:flex;align-items:center;gap:11px;font-size:13px;color:#3B4658;padding:9px 12px;border:1px solid rgba(94,14,28,.1);border-radius:10px"><span style="font-size:17px">📘</span><span style="flex:1">Brochure de présentation</span><span style="font-size:12px;font-weight:600;color:var(--v1)">Télécharger</span></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- CONTACT (footer bordeaux) -->
+    <section id="v-contact" style="border-radius:16px;overflow:hidden;background:linear-gradient(135deg,var(--v2),var(--v4));color:#fff;padding:26px 28px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px">
+        <div>
+          <h3 style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;margin-bottom:12px">Sahel Saveurs</h3>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:rgba(255,255,255,.85)">
+            <div>📍 12 rue de la République, 69002 Lyon</div>
+            <div>📞 +33 6 12 34 56 78</div>
+            <div>✉️ contact@sahelsaveurs.com</div>
+            <div>🕐 Lun–Ven 9h–18h · Sam 10h–14h</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:12px">Commander en un clic</div>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <span style="display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;background:#25A366;padding:11px 15px;border-radius:10px">🟢 WhatsApp</span>
+            <span style="display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;background:rgba(255,255,255,.14);padding:11px 15px;border-radius:10px">📞 Téléphone</span>
+            <span style="display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;background:rgba(255,255,255,.14);padding:11px 15px;border-radius:10px">✉️ Email</span>
+          </div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:12px">Partager la vitrine</div>
+          <div id="dc-vitrine-qr" style="width:140px;margin:0 auto;display:flex;align-items:center;justify-content:center;"></div>
+          <div style="display:flex;justify-content:center;gap:7px;margin-top:12px"><span style="font-size:12px;font-weight:600;color:var(--v4);background:#fff;padding:7px 12px;border-radius:8px">🔗 Copier</span><span style="font-size:12px;font-weight:600;background:rgba(255,255,255,.14);padding:7px 12px;border-radius:8px">↗ Partager</span></div>
+        </div>
+      </div>
+    </section>
+
+  <div style="position:fixed;right:18px;bottom:18px;z-index:60;background:#fff;border:1px solid rgba(18,32,56,.12);border-radius:14px;box-shadow:0 8px 24px -8px rgba(18,32,56,.4);padding:10px 14px;display:flex;align-items:center;gap:9px"><span style="font-size:12px;font-weight:700;color:#122A4D">🎨 Thème</span><span class="dc-swatch" data-theme="bordeaux" title="Bordeaux" onclick="dcTheme('bordeaux')" style="background:#8E1B2E"></span><span class="dc-swatch" data-theme="ocean" title="Ocean" onclick="dcTheme('ocean')" style="background:#1B4F8E"></span><span class="dc-swatch" data-theme="emeraude" title="Emeraude" onclick="dcTheme('emeraude')" style="background:#1F6B4A"></span><span class="dc-swatch" data-theme="prune" title="Prune" onclick="dcTheme('prune')" style="background:#4A2E6B"></span><span class="dc-swatch" data-theme="or" title="Or" onclick="dcTheme('or')" style="background:#8A5E1A"></span></div>
+  </div></div>
+
+</div>
+</div>
+
+<script src="assets/profile-qr.js"></script>
+<script>
+/* ===== Onglets Profil / Vitrine ===== */
+function dcTab(view){
+  document.querySelectorAll('.dc-view').forEach(v=>{ v.style.display = (v.dataset.view===view)?'':'none'; });
+  document.querySelectorAll('.dc-seg').forEach(s=>{ s.classList.toggle('active', s.dataset.seg===view); });
+  const pfab = document.getElementById('dc-profil-fab');
+  if(pfab) pfab.style.display = (view==='profil') ? 'flex' : 'none';
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+/* ===== Upload photo (bannière / avatar / héro) — démo côté client ===== */
+function dcUploadable(id, label){
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(getComputedStyle(el).position === 'static') el.style.position = 'relative';
+  const input = document.createElement('input');
+  input.type='file'; input.accept='image/*'; input.style.display='none';
+  input.onchange = () => {
+    const f = input.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      el.style.backgroundImage = 'url('+r.result+')';
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+      el.style.border = 'none';
+      [...el.childNodes].forEach(n=>{ if(n.nodeType===3) n.textContent=''; });
+      el.style.color = 'transparent';
+      dcToast('📷 '+label+' mise à jour (démo)');
+    };
+    r.readAsDataURL(f);
+  };
+  const btn = document.createElement('button');
+  btn.className = 'dc-photo-btn dc-owner';
+  btn.innerHTML = '📷 '+label;
+  // position : coin bas-droite, sauf avatar (petit → centré en bas)
+  if(id==='da-avatar' || id==='da-vitrine-avatar'){ btn.style.left='50%'; btn.style.bottom='2px'; btn.style.transform='translateX(-50%)'; btn.style.padding='4px 8px'; btn.style.fontSize='11px'; btn.innerHTML='📷'; }
+  else { btn.style.right='12px'; btn.style.bottom='12px'; }
+  btn.onclick = (e)=>{ e.stopPropagation(); input.click(); };
+  el.appendChild(btn); el.appendChild(input);
+}
+
+/* ===== Avatar/logo propre à la VITRINE (photo distincte du profil) ===== */
+function dcAddVitrineAvatar(){
+  const hero = document.getElementById('da-ad');
+  if(!hero) return;
+  const sec = hero.parentElement;
+  if(!sec || document.getElementById('da-vitrine-avatar')) return;
+  sec.style.position = 'relative';
+  const av = document.createElement('div');
+  av.id = 'da-vitrine-avatar';
+  av.className = 'imgslot';
+  av.style.cssText = 'position:absolute;left:22px;bottom:16px;width:92px;height:92px;border-radius:50%;border:4px solid #fff;box-shadow:0 6px 18px -6px rgba(0,0,0,.5);z-index:3;font-size:10px;background:#e8ecf1';
+  av.textContent = 'Logo vitrine';
+  sec.appendChild(av);
+}
+
+/* ===== Liens du profil cliquables (réseaux) ===== */
+function dcWireProfilLinks(){
+  const pv = document.querySelector('.dc-view[data-view="profil"]');
+  if(!pv) return;
+  const h = [...pv.querySelectorAll('h3')].find(x=>/Réseaux/.test(x.textContent));
+  if(h){
+    const card = h.parentElement;
+    [...card.querySelectorAll('div')].forEach(row=>{
+      const t = (row.textContent||'').replace(/\s+/g,' ').trim();
+      if(row.querySelector('span') && !row.querySelector('div') && /(.com|@|linkedin|instagram)/i.test(t) && t.length<44){
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', (e)=>{ e.stopPropagation(); dcToast('🔗 ' + t + ' — ouverture du lien (démo)'); });
+      }
+    });
+  }
+}
+
+/* ===== Thème du PROFIL public (recolore l'accent bleu) ===== */
+const DC_PROFIL_THEMES = [
+  { id:'bleu',   color:'#2F6BED', soft:'#EAF1FE', soft2:'#E4F0FB' },
+  { id:'vert',   color:'#1F8A5B', soft:'#E4F3EC', soft2:'#E4F3EC' },
+  { id:'violet', color:'#7C3AED', soft:'#EFE7FE', soft2:'#EDE4FE' },
+  { id:'orange', color:'#E07B39', soft:'#FCEDE1', soft2:'#FBE8DA' },
+  { id:'marine', color:'#12448D', soft:'#E2ECFA', soft2:'#DCE6F5' },
+];
+let dcProfilScope = null;
+function dcProfilSnapshot(){
+  const roots = [];
+  const pv = document.querySelector('.dc-view[data-view="profil"]');
+  if(pv) roots.push(pv);
+  const hero = document.getElementById('da-avatar');
+  const heroCard = hero ? hero.closest('div[style*="border-radius:18px"]') : null;
+  if(heroCard) roots.push(heroCard);
+  const set = new Set();
+  roots.forEach(r=>{ set.add(r); r.querySelectorAll('*').forEach(x=>set.add(x)); });
+  dcProfilScope = [...set]
+    .filter(e => !(e.classList && e.classList.contains('imgslot')) && e.tagName!=='INPUT' && e.tagName!=='BUTTON')
+    .map(e => ({ e, style: e.getAttribute('style')||'' }));
+}
+function dcProfilTheme(name){
+  if(!dcProfilScope) dcProfilSnapshot();
+  const t = DC_PROFIL_THEMES.find(x=>x.id===name) || DC_PROFIL_THEMES[0];
+  dcProfilScope.forEach(({e, style})=>{
+    if(!style) return;
+    const s = style.split('#2F6BED').join(t.color).split('#EAF1FE').join(t.soft).split('#E4F0FB').join(t.soft2);
+    if(s!==style) e.setAttribute('style', s);
+  });
+  document.querySelectorAll('.dc-pswatch').forEach(b=>b.classList.toggle('active', b.dataset.theme===name));
+}
+function dcBuildProfilFab(){
+  if(document.getElementById('dc-profil-fab')) return;
+  const fab = document.createElement('div');
+  fab.id = 'dc-profil-fab';
+  fab.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:60;background:#fff;border:1px solid rgba(18,32,56,.12);border-radius:14px;box-shadow:0 8px 24px -8px rgba(18,32,56,.4);padding:10px 14px;display:flex;align-items:center;gap:9px';
+  fab.innerHTML = '<span style="font-size:12px;font-weight:700;color:#122A4D">🎨 Thème profil</span>' +
+    DC_PROFIL_THEMES.map(t=>'<span class="dc-pswatch'+(t.id==='bleu'?' active':'')+'" data-theme="'+t.id+'" title="'+t.id+'" onclick="dcProfilTheme(\''+t.id+'\')" style="background:'+t.color+'"></span>').join('');
+  document.body.appendChild(fab);
+}
+
+/* ===== Onglets Profil / Vitrine ===== */
+
+/* ===== Thème couleur de la Vitrine ===== */
+function dcTheme(name){
+  if(name==='bordeaux') document.body.removeAttribute('data-theme');
+  else document.body.setAttribute('data-theme', name);
+  document.querySelectorAll('.dc-swatch').forEach(s=>{ s.classList.toggle('active', s.dataset.theme===name); });
+}
+
+/* ===== Toast (retour visuel des actions de démo) ===== */
+function dcToast(msg){
+  let t = document.getElementById('dc-toast');
+  if(!t){ t = document.createElement('div'); t.id='dc-toast';
+    t.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#122A4D;color:#fff;font-size:13.5px;font-weight:600;padding:12px 20px;border-radius:12px;box-shadow:0 10px 30px -8px rgba(0,0,0,.5);z-index:200;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;max-width:80vw;text-align:center';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(-4px)';
+  clearTimeout(t._h); t._h = setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(-50%)'; }, 2200);
+}
+
+/* ===== Défilement doux vers une section ===== */
+function dcScrollTo(id){
+  const el = document.getElementById(id);
+  if(el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+/* ===== Compte à rebours "Offre flash" ===== */
+function dcCountdown(){
+  const flash = [...document.querySelectorAll('div')].find(d => d.textContent.trim().startsWith('⚡ OFFRE FLASH'));
+  if(!flash) return;
+  const boxes = flash.querySelectorAll('div[style*="font-family:\'Bricolage Grotesque\'"]');
+  if(boxes.length < 3) return;
+  let end = Date.now() + (2*3600 + 14*60 + 37)*1000;
+  const tick = () => {
+    let s = Math.max(0, Math.floor((end - Date.now())/1000));
+    const h = String(Math.floor(s/3600)).padStart(2,'0');
+    const m = String(Math.floor((s%3600)/60)).padStart(2,'0');
+    const sec = String(s%60).padStart(2,'0');
+    boxes[0].textContent = h; boxes[1].textContent = m; boxes[2].textContent = sec;
+    if(s<=0) end = Date.now() + (2*3600 + 14*60 + 37)*1000; // reboucle
+  };
+  tick(); setInterval(tick, 1000);
+}
+
+/* ===== Scrollspy de la sous-nav Vitrine ===== */
+function dcScrollSpy(){
+  const links = [...document.querySelectorAll('a[href^="#v-"]')];
+  if(!links.length) return;
+  const onScroll = () => {
+    let cur = null, best = 1e9;
+    links.forEach(a=>{
+      const sec = document.getElementById(a.getAttribute('href').slice(1));
+      if(!sec) return;
+      const d = Math.abs(sec.getBoundingClientRect().top - 140);
+      if(d < best){ best = d; cur = a; }
+    });
+    links.forEach(a=>{
+      const on = a===cur;
+      a.style.background = on ? 'var(--v1)' : 'var(--vsoft)';
+      a.style.color = on ? '#fff' : '#6B4A4E';
+      a.style.fontWeight = on ? '600' : '500';
+    });
+  };
+  window.addEventListener('scroll', onScroll, { passive:true });
+  onScroll();
+}
+
+/* ===== Wiring générique de tous les boutons (délégation) ===== */
+const DC_FILTERS = ['Tous','Promotions','Nouveautés','Populaires','Disponible','Précommande'];
+document.addEventListener('click', (e) => {
+  // Remonter jusqu'à un élément cliquable "bouton"
+  let el = e.target;
+  for(let i=0; i<4 && el && el!==document.body; i++){
+    if(el.classList && (el.classList.contains('dc-seg')||el.classList.contains('dc-swatch'))) return; // gérés ailleurs
+    const txt = (el.textContent||'').trim();
+    const short = txt.replace(/\s+/g,' ');
+
+    // Sous-nav : liens d'ancre (comportement natif + smooth déjà géré par CSS)
+    if(el.tagName==='A' && (el.getAttribute('href')||'').startsWith('#v-')) return;
+
+    // Retour
+    if(short==='← Retour'){ e.preventDefault(); history.length>1?history.back():dcToast('↩ Retour (démo)'); return; }
+
+    // Suivre / S'abonner (bascule)
+    if(/^＋?\s*Suivre$/.test(short) || short==='+ Suivre'){
+      e.preventDefault();
+      const abonne = el.dataset.on==='1';
+      el.dataset.on = abonne?'0':'1';
+      el.textContent = abonne?'＋ Suivre':'✓ Abonné';
+      dcToast(abonne?'Vous ne suivez plus ce profil':'✓ Vous suivez ce profil');
+      return;
+    }
+    // Intéressé (événements)
+    if(short==='Intéressé' || short==='✓ Intéressé'){
+      e.preventDefault();
+      const on = el.dataset.on==='1'; el.dataset.on = on?'0':'1';
+      el.textContent = on?'Intéressé':'✓ Intéressé'; dcToast(on?'Retiré':'✓ Ajouté à vos intérêts'); return;
+    }
+    // Partager
+    if(short.includes('Partager')){
+      e.preventDefault();
+      if(navigator.share) navigator.share({ title:'Diaspo\'Actif', url:location.href }).catch(()=>{});
+      else if(navigator.clipboard) navigator.clipboard.writeText(location.href).then(()=>dcToast('🔗 Lien copié'));
+      else dcToast('🔗 '+location.href);
+      return;
+    }
+    // Copier
+    if(short.includes('Copier')){ e.preventDefault(); (navigator.clipboard?navigator.clipboard.writeText(location.href):0); dcToast('🔗 Lien copié'); return; }
+
+    // Contact / message / téléphone / whatsapp / email
+    if(short.includes('Message')||short.includes('Contacter')){ e.preventDefault(); dcToast('✉️ Ouverture de la messagerie (démo)'); return; }
+    if(short.includes('Appeler')||short.includes('Téléphone')){ e.preventDefault(); dcToast('📞 +33 6 12 34 56 78 (démo)'); return; }
+    if(short.includes('WhatsApp')){ e.preventDefault(); dcToast('🟢 Ouverture de WhatsApp (démo)'); return; }
+    if(short==='✉️ Email'||short==='Email'){ e.preventDefault(); dcToast('✉️ contact@sahelsaveurs.com (démo)'); return; }
+
+    // Appels à l'action → défilement
+    if(short.includes('VOIR NOS PRODUITS')){ e.preventDefault(); dcScrollTo('v-produits'); return; }
+    if(short==='EN SAVOIR PLUS'){ e.preventDefault(); dcScrollTo('v-presentation'); dcToast('En savoir plus (démo)'); return; }
+    if(short==='Voir tout'){ e.preventDefault(); dcToast('Voir tout (démo)'); return; }
+
+    // Achat / commande / offres
+    if(short.includes('Commander')||short==='Acheter'||short==='Acheter vite'||short==='En profiter'||short==='Voir'){
+      e.preventDefault(); dcToast('🛒 Ajouté au panier (démo)'); return;
+    }
+    // Téléchargements
+    if(short==='Télécharger'){ e.preventDefault(); dcToast('📥 Téléchargement (démo)'); return; }
+    // QR code du profil : Carte / PNG / SVG
+    if(short==='🪪 Carte'||short==='Carte'||short==='PNG'||short==='SVG'){ e.preventDefault(); dcToast('📱 QR — '+short.replace(/^[^\w]+/,'')+' (démo)'); return; }
+
+    // Filtres produits
+    if(DC_FILTERS.includes(short)){
+      e.preventDefault();
+      const parent = el.parentElement;
+      if(parent) [...parent.children].forEach(c=>{
+        const ct=(c.textContent||'').trim();
+        if(DC_FILTERS.includes(ct)){
+          const on = c===el;
+          c.style.background = on ? 'var(--v1)' : 'var(--vsoft)';
+          c.style.color = on ? '#fff' : '#6B4A4E';
+          c.style.fontWeight = on ? '600' : '500';
+        }
+      });
+      dcToast('Filtre : '+short+' (démo)');
+      return;
+    }
+
+    el = el.parentElement;
+  }
+});
+
+/* ===== Badges produit sélectionnables par le vendeur (mode propriétaire) ===== */
+const DC_BADGES = [
+  { k:'nouveau',  t:'Nouveau',          bg:'#E07B39' },
+  { k:'top',      t:'🏆 Top vente',      bg:'#F4A62A' },
+  { k:'bio',      t:'🌿 Bio',            bg:'#1F8A5B' },
+  { k:'promo',    t:'🔥 Promotion',      bg:'#E5484D' },
+  { k:'vedette',  t:'⭐ Vedette',        bg:'var(--v1)' },
+  { k:'speciale', t:'🎁 Offre spéciale', bg:'#2A9163' },
+  { k:'flash',    t:'⚡ Offre flash',     bg:'#122A4D' },
+  { k:'-10',      t:'−10%',             bg:'#E5484D' },
+  { k:'-20',      t:'−20%',             bg:'#E5484D' },
+  { k:'-x',       t:'−X% (perso)',      bg:'#E5484D' },
+];
+function dcApplyBadge(imgWrap, o){
+  const old = imgWrap.querySelector('.dc-prod-badge, span[style*="top:9px;right:9px"]');
+  if(old) old.remove();
+  if(o.k==='none'){ dcToast('Badge retiré'); return; }
+  let txt = o.t;
+  if(o.k==='-x'){ const p = prompt('Pourcentage de réduction (ex : 15) :','15'); if(!p) return; txt = '−'+String(p).replace(/[^0-9]/g,'')+'%'; }
+  const span = document.createElement('span');
+  span.className = 'dc-prod-badge';
+  span.style.cssText = 'position:absolute;top:9px;right:9px;font-size:10px;font-weight:700;color:#fff;padding:3px 9px;border-radius:999px;background:'+o.bg;
+  span.textContent = txt;
+  imgWrap.appendChild(span);
+  dcToast('Badge « '+txt+' » appliqué');
+}
+function dcOpenBadgeMenu(btn, imgWrap){
+  document.querySelectorAll('.dc-badge-menu').forEach(m=>m.remove());
+  const menu = document.createElement('div');
+  menu.className = 'dc-badge-menu';
+  menu.style.cssText = 'position:absolute;z-index:80;background:#fff;border:1px solid rgba(18,32,56,.15);border-radius:10px;box-shadow:0 12px 30px -8px rgba(0,0,0,.35);padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;min-width:230px';
+  [...DC_BADGES, { k:'none', t:'✖ Aucun', bg:'#8794A7' }].forEach(o=>{
+    const b = document.createElement('button');
+    b.textContent = o.t;
+    b.style.cssText = 'font-size:11px;font-weight:700;color:#fff;background:'+o.bg+';border:none;border-radius:999px;padding:6px 8px;cursor:pointer;white-space:nowrap';
+    b.onclick = (e)=>{ e.stopPropagation(); dcApplyBadge(imgWrap, o); menu.remove(); };
+    menu.appendChild(b);
+  });
+  const holder = btn.parentElement;
+  holder.style.position = 'relative';
+  holder.appendChild(menu);
+  menu.style.left = '0';
+  menu.style.top = (btn.offsetTop + btn.offsetHeight + 4) + 'px';
+  setTimeout(()=>{ document.addEventListener('click', function h(){ menu.remove(); document.removeEventListener('click', h); }, { once:true }); }, 0);
+}
+
+/* ===== Produits : bouton "Contacter le vendeur" contextualisé ===== */
+const dcMessaged = new Set();
+function dcProductCards(){
+  const grid = [...document.querySelectorAll('#v-produits div')].find(d => (d.getAttribute('style')||'').includes('minmax(210px,1fr)'));
+  return grid ? [...grid.children] : [];
+}
+function dcEnhanceProducts(){
+  dcProductCards().forEach(card => {
+    if(card.querySelector('.dc-prod-msg')) return;
+    const titleEl = card.querySelector('div[style*="font-size:14px;font-weight:600"]');
+    const name = titleEl ? titleEl.textContent.trim() : 'ce produit';
+    const body = [...card.children].find(c => (c.getAttribute('style')||'').includes('padding:13px')) || card;
+    const btn = document.createElement('button');
+    btn.className = 'dc-prod-msg';
+    btn.textContent = '💬 Contacter le vendeur';
+    btn.style.cssText = 'width:100%;margin-top:10px;font-size:12px;font-weight:600;color:var(--v1);background:var(--vsoft);border:1px solid var(--vsoftbd);border-radius:9px;padding:9px 10px;cursor:pointer';
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      dcMessaged.add(name);
+      dcToast('✉️ Message au vendeur — au sujet de « ' + name + ' » (démo)');
+      dcOfferReview(name);
+    });
+    body.appendChild(btn);
+
+    const imgWrap = card.querySelector('div[style*="position:relative"]');
+    // Bouton "Badge" réservé au vendeur (titulaire) : applique une étiquette sur le produit
+    if(imgWrap){
+      const bBtn = document.createElement('button');
+      bBtn.className = 'dc-owner dc-badge-btn';
+      bBtn.textContent = '🏷️ Badge';
+      bBtn.style.cssText = 'width:100%;margin-top:8px;font-size:12px;font-weight:600;color:#92620E;background:#FFF7E0;border:1px solid #E5C46B;border-radius:9px;padding:8px 10px;cursor:pointer';
+      bBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); dcOpenBadgeMenu(bBtn, imgWrap); });
+      body.appendChild(bBtn);
+    }
+
+    // Bouton visiteur "M'avertir quand dispo" (visible seulement en rupture)
+    const cmd = [...card.querySelectorAll('span')].find(s=>/Commander|Acheter/.test(s.textContent));
+    // Achat → tunnel de paiement (adresse + PayPal / Carte)
+    if(cmd){
+      cmd.style.cursor = 'pointer';
+      cmd.addEventListener('click', (ev)=>{
+        if(card.dataset.rupture==='1') return;
+        ev.stopPropagation();
+        const pe = [...card.querySelectorAll('span')].find(s=>(s.getAttribute('style')||'').includes('Bricolage Grotesque'));
+        dcCheckout(name, pe ? pe.textContent.trim() : '');
+      });
+    }
+    const alertBtn = document.createElement('button');
+    alertBtn.className = 'dc-alert-btn';
+    alertBtn.textContent = '🔔 M\'avertir quand dispo';
+    alertBtn.style.cssText = 'display:none;width:100%;margin-top:8px;font-size:12px;font-weight:600;color:#C2410C;background:#FFF7ED;border:1px solid #FDBA74;border-radius:9px;padding:8px 10px;cursor:pointer';
+    alertBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); dcToast('🔔 Vous serez averti dès que « ' + name + ' » sera de nouveau disponible (démo)'); });
+    body.appendChild(alertBtn);
+
+    // Bouton vendeur "Rupture de stock" (grise le produit sans le retirer)
+    const rBtn = document.createElement('button');
+    rBtn.className = 'dc-owner dc-rupture-btn';
+    rBtn.textContent = '📦 Rupture de stock';
+    rBtn.style.cssText = 'width:100%;margin-top:8px;font-size:12px;font-weight:600;color:#7F1D1D;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:9px;padding:8px 10px;cursor:pointer';
+    rBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); dcToggleRupture(card, rBtn, alertBtn, cmd, imgWrap, name); });
+    body.appendChild(rBtn);
+  });
+}
+
+/* Bascule "rupture de stock" d'un produit (grise la carte, sans le retirer) */
+function dcToggleRupture(card, rBtn, alertBtn, cmd, imgWrap, name){
+  const on = card.dataset.rupture === '1';
+  card.dataset.rupture = on ? '0' : '1';
+  if(!on){
+    card.style.opacity = '.6';
+    card.style.filter = 'grayscale(.65)';
+    rBtn.style.filter = 'none'; rBtn.style.opacity = '1';           // le bouton reste net/cliquable
+    alertBtn.style.filter = 'none'; alertBtn.style.opacity = '1';
+    rBtn.textContent = '✅ Remettre en stock';
+    alertBtn.style.display = '';
+    if(cmd){ cmd.dataset.bg = cmd.style.background; cmd.style.background = '#B0B7C3'; cmd.style.pointerEvents = 'none'; }
+    if(imgWrap && !imgWrap.querySelector('.dc-rupture-tag')){
+      const t = document.createElement('span'); t.className = 'dc-rupture-tag';
+      t.style.cssText = 'position:absolute;top:9px;left:9px;font-size:10px;font-weight:700;color:#fff;background:#8794A7;padding:3px 9px;border-radius:6px';
+      t.textContent = 'Rupture de stock'; imgWrap.appendChild(t);
+    }
+    dcToast('« ' + name + ' » marqué en rupture de stock');
+  } else {
+    card.style.opacity = ''; card.style.filter = '';
+    rBtn.textContent = '📦 Rupture de stock';
+    alertBtn.style.display = 'none';
+    if(cmd){ cmd.style.background = cmd.dataset.bg || 'var(--v1)'; cmd.style.pointerEvents = ''; }
+    const tag = imgWrap && imgWrap.querySelector('.dc-rupture-tag'); if(tag) tag.remove();
+    dcToast('« ' + name + ' » de nouveau disponible');
+  }
+}
+
+/* ===== Avis : bouton utilisable, débloqué après un message ===== */
+function dcReviewsBody(){
+  const avis = document.getElementById('v-avis');
+  if(!avis) return null;
+  return [...avis.querySelectorAll('div')].find(d => (d.getAttribute('style')||'').includes('padding:18px 22px')) || avis;
+}
+function dcEnhanceReviews(){
+  const body = dcReviewsBody();
+  if(!body || document.getElementById('dc-review-btn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'dc-review-btn';
+  btn.textContent = '✍️ Écrire un avis';
+  btn.style.cssText = 'margin-top:14px;width:100%;font-size:13px;font-weight:700;color:#fff;background:var(--v1);border:none;border-radius:10px;padding:11px;cursor:pointer';
+  btn.onclick = () => {
+    if(dcMessaged.size === 0){ dcToast('Contactez d\'abord un vendeur pour pouvoir laisser un avis.'); return; }
+    dcWriteReview([...dcMessaged].slice(-1)[0]);
+  };
+  body.appendChild(btn);
+}
+function dcOfferReview(productName){
+  const body = dcReviewsBody();
+  if(!body) return;
+  let cta = document.getElementById('dc-review-cta');
+  if(!cta){ cta = document.createElement('div'); cta.id='dc-review-cta';
+    cta.style.cssText='margin-top:14px;padding:14px;border:1px dashed var(--v1);border-radius:12px;background:var(--vsoft)';
+    const btn = document.getElementById('dc-review-btn');
+    if(btn) body.insertBefore(cta, btn); else body.appendChild(cta);
+  }
+  cta.innerHTML = '<div style="font-size:13px;font-weight:700;color:var(--v1);margin-bottom:8px;">✍️ Vous avez contacté le vendeur pour « ' + productName + ' » — partagez votre avis !</div>' +
+    '<button style="font-size:12.5px;font-weight:700;color:#fff;background:var(--v1);border:none;border-radius:8px;padding:9px 16px;cursor:pointer;">Écrire mon avis</button>';
+  cta.querySelector('button').onclick = () => dcWriteReview(productName);
+}
+function dcWriteReview(productName){
+  const txt = prompt('Votre avis sur « ' + productName + ' » :');
+  if(!txt) return;
+  const body = dcReviewsBody();
+  if(!body) return;
+  const el = document.createElement('div');
+  el.style.cssText='border-top:1px solid rgba(94,14,28,.08);padding:12px 0;font-size:12.5px;color:#3B4658;line-height:1.5';
+  el.innerHTML = '« ' + txt.replace(/[<>]/g,'') + ' »<div style="font-size:11.5px;color:#8794A7;margin-top:4px;">★★★★★ — Vous · à l\'instant · sur ' + productName + '</div>';
+  const btn = document.getElementById('dc-review-btn');
+  if(btn) body.insertBefore(el, btn); else body.appendChild(el);
+  const cta = document.getElementById('dc-review-cta'); if(cta) cta.remove();
+  dcToast('⭐ Merci pour votre avis !');
+}
+
+/* ===== QR codes réels (scannables) ===== */
+function dcRenderQR(){
+  if(!window.ProfileQR) return;
+  const base = location.origin + location.pathname;
+  const vq = document.getElementById('dc-vitrine-qr');
+  if(vq && !vq.dataset.done){ vq.dataset.done='1'; ProfileQR.render(vq, { url: base + '#vitrine', userName:'Sahel Saveurs', userRole:'Vitrine', size:130, showActions:false }); }
+  const pq = document.getElementById('dc-profil-qr');
+  if(pq && !pq.dataset.done){ pq.dataset.done='1'; ProfileQR.render(pq, { url: base, userName:'Fatoumata Bah', userRole:'Profil', size:140, showActions:false }); }
+}
+
+/* ===== Édition libre des textes/catégories de la vitrine (mode propriétaire) ===== */
+function dcEditableEls(){
+  const v = document.querySelector('.dc-view[data-view="vitrine"]');
+  if(!v) return [];
+  const els = new Set();
+  v.querySelectorAll('h3').forEach(h=>els.add(h));               // titres de section
+  const pres = document.querySelector('#v-presentation p'); if(pres) els.add(pres);
+  dcProductCards().forEach(card=>{
+    card.querySelectorAll('div,span').forEach(e=>{
+      const st = e.getAttribute('style') || '';
+      if(st.includes('font-size:14px;font-weight:600')) els.add(e);          // titre produit
+      if(st.includes('font-size:12px') && st.includes('#6B7686')) els.add(e); // description
+      if(st.includes('Bricolage Grotesque') && st.includes('var(--v1)')) els.add(e); // prix
+      if(st.includes('position:absolute;left:0;bottom:0')) els.add(e);        // catégorie / type (ruban)
+    });
+  });
+  return [...els];
+}
+function dcSetEditable(on){
+  dcEditableEls().forEach(e=>{
+    e.contentEditable = on ? 'true' : 'false';
+    e.style.outline = on ? '1px dashed rgba(142,27,46,.55)' : '';
+    e.style.outlineOffset = on ? '2px' : '';
+    if(on){ e.style.cursor = 'text'; e.title = 'Cliquez pour modifier'; }
+    else { e.title = ''; }
+  });
+}
+
+/* ===== Mode propriétaire (boutons réservés au titulaire) ===== */
+function dcOwnerBtn(label, cls){
+  const b = document.createElement('button');
+  b.className = 'dc-owner ' + (cls||'dc-owner-btn');
+  b.innerHTML = label;
+  b.onclick = (e)=>{ e.stopPropagation(); dcToast(label.replace(/<[^>]*>/g,'') + ' — action propriétaire (démo)'); };
+  return b;
+}
+function dcBuildOwnerUI(){
+  // Bouton "Modifier mon profil" dans la carte d'identité
+  const suivre = [...document.querySelectorAll('span')].find(s=>s.textContent.trim()==='＋ Suivre');
+  const heroActions = suivre ? suivre.parentElement : null;
+  if(heroActions && !heroActions.querySelector('.dc-owner')){
+    heroActions.appendChild(dcOwnerBtn('✏️ Modifier mon profil'));
+  }
+  // Boutons de gestion de la Vitrine (barre d'actions + note)
+  const noteCands = [...document.querySelectorAll('div,section')].filter(d=>(d.textContent||'').includes('120 avis') && (d.getAttribute('style')||'').includes('display:flex'));
+  const noteBar = noteCands.sort((a,b)=>a.textContent.length-b.textContent.length)[0];
+  if(noteBar && !noteBar.querySelector('.dc-owner')){
+    noteBar.appendChild(dcOwnerBtn('✏️ Gérer la vitrine'));
+    const dash = dcOwnerBtn('📊 Tableau de bord'); dash.onclick = (e)=>{ e.stopPropagation(); dcDashboard(); }; noteBar.appendChild(dash);
+    const pay = dcOwnerBtn('💳 Encaissement'); pay.onclick = (e)=>{ e.stopPropagation(); dcPayoutForm(); }; noteBar.appendChild(pay);
+  }
+  // Bouton "Ajouter un produit" en tête du Catalogue / des produits
+  const prodHead = document.querySelector('#v-produits');
+  if(prodHead && !prodHead.querySelector('.dc-owner')){
+    const headBar = prodHead.querySelector('div');
+    if(headBar) headBar.appendChild(dcOwnerBtn('➕ Ajouter un produit'));
+  }
+  // Bascule flottante visiteur / propriétaire
+  if(!document.getElementById('dc-owner-toggle')){
+    const t = document.createElement('button');
+    t.id = 'dc-owner-toggle';
+    t.className = 'dc-owner-toggle';
+    t.textContent = '🔧 Mode propriétaire';
+    t.onclick = () => {
+      const on = document.body.getAttribute('data-owner')==='1';
+      document.body.setAttribute('data-owner', on?'0':'1');
+      t.textContent = on ? '🔧 Mode propriétaire' : '👁️ Repasser en visiteur';
+      dcSetEditable(!on);
+      dcToast(on ? 'Vue visiteur' : 'Vue propriétaire : textes modifiables + boutons de gestion');
+    };
+    document.body.appendChild(t);
+  }
+}
+
+/* ===== Paiement, encaissement & tableau de bord vendeur (démo) ===== */
+var DC_INP = 'border:1px solid #DCE4EF;border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;box-sizing:border-box;width:100%';
+var DC_WARN = '<div style="font-size:11.5px;color:#B91C1C;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:8px 10px;margin-top:14px;">⚠️ Démonstration — n\'entrez aucune vraie coordonnée bancaire. En production, la saisie passe par un prestataire sécurisé (Stripe / PayPal), jamais stockée en clair.</div>';
+
+var dcOrders = [
+  { produit:'Café Diallo torréfié · 250 g', client:'Marie Diop',  adresse:'14 rue Voltaire, 75011 Paris',  montant:'9,50 €',  methode:'Carte',  date:'Aujourd\'hui', statut:'À expédier' },
+  { produit:'Miel de la Fouta · 500 g',      client:'Jean Martin', adresse:'8 av. des Fleurs, 69003 Lyon',  montant:'12,90 €', methode:'PayPal', date:'Hier',       statut:'Expédié' },
+  { produit:'Coffret Épices Sahel',          client:'Awa Koné',    adresse:'2 rue du Port, 44000 Nantes',   montant:'24,90 €', methode:'Carte',  date:'Il y a 3 j',  statut:'Expédié' }
+];
+var dcBestSellers = [ ['Café Diallo torréfié','312 vendus'], ['Miel de la Fouta','248 vendus'], ['Coffret Épices Sahel','190 vendus'] ];
+var dcSellerMessages = [ ['Marie Diop','Le miel est-il dispo en 1 kg ?','2 h'], ['Jean Martin','Merci pour la livraison rapide !','1 j'] ];
+
+function dcModal(title, html, width){
+  const ov = document.createElement('div');
+  ov.className = 'dc-modal-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(9,18,35,.55);z-index:120;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto';
+  ov.innerHTML = '<div style="background:#fff;border-radius:16px;max-width:'+(width||520)+'px;width:100%;box-shadow:0 24px 60px -12px rgba(0,0,0,.5);overflow:hidden">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #eef1f5"><h3 style="margin:0;font-size:16px;font-weight:800;color:#122A4D">'+title+'</h3><button class="dc-modal-x" style="background:none;border:none;font-size:22px;line-height:1;cursor:pointer;color:#8794A7">×</button></div>'
+    + '<div style="padding:20px">'+html+'</div></div>';
+  ov.querySelector('.dc-modal-x').onclick = ()=>ov.remove();
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+  return ov;
+}
+
+/* Tunnel d'achat : adresse de livraison + paiement PayPal / Carte */
+function dcCheckout(name, price){
+  const html =
+    '<div style="font-size:13px;color:#6B7686;margin-bottom:14px;">Produit : <b style="color:#122A4D">'+name+'</b>'+(price?' — <b>'+price+'</b>':'')+'</div>'
+    + '<div style="font-weight:800;font-size:12px;color:#8794A7;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Livraison</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><input id="ck-prenom" placeholder="Prénom" style="'+DC_INP+'"><input id="ck-nom" placeholder="Nom" style="'+DC_INP+'"></div>'
+    + '<input id="ck-adr" placeholder="Adresse de livraison" style="'+DC_INP+';margin-top:10px">'
+    + '<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:10px;"><input id="ck-cp" placeholder="Code postal" style="'+DC_INP+'"><input id="ck-ville" placeholder="Ville" style="'+DC_INP+'"></div>'
+    + '<div style="font-weight:800;font-size:12px;color:#8794A7;text-transform:uppercase;letter-spacing:.05em;margin:18px 0 8px;">Paiement</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:12px;"><button class="ck-pm" data-pm="carte" style="flex:1;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;background:#122A4D;color:#fff">💳 Carte bleue</button><button class="ck-pm" data-pm="paypal" style="flex:1;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;background:#F2F5FA;color:#3B4658">🅿️ PayPal</button></div>'
+    + '<div id="ck-carte"><input placeholder="Numéro de carte" style="'+DC_INP+'"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;"><input placeholder="MM / AA" style="'+DC_INP+'"><input placeholder="CVC" style="'+DC_INP+'"></div></div>'
+    + '<div id="ck-paypal" style="display:none;text-align:center;padding:6px;"><button style="background:#FFC439;color:#111;border:none;border-radius:8px;padding:12px 26px;font-weight:800;cursor:pointer;">Payer avec PayPal</button></div>'
+    + DC_WARN
+    + '<button id="ck-valider" style="margin-top:14px;width:100%;background:var(--v1,#8E1B2E);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;">Valider la commande</button>';
+  const ov = dcModal('🛒 Finaliser l\'achat', html);
+  let method = 'carte';
+  ov.querySelectorAll('.ck-pm').forEach(b=>{ b.onclick = ()=>{
+    method = b.dataset.pm;
+    ov.querySelectorAll('.ck-pm').forEach(x=>{ const on=x===b; x.style.background=on?'#122A4D':'#F2F5FA'; x.style.color=on?'#fff':'#3B4658'; });
+    ov.querySelector('#ck-carte').style.display = method==='carte'?'':'none';
+    ov.querySelector('#ck-paypal').style.display = method==='paypal'?'':'none';
+  }; });
+  ov.querySelector('#ck-valider').onclick = ()=>{
+    const g = id=>ov.querySelector(id).value.trim();
+    const prenom=g('#ck-prenom'), nom=g('#ck-nom'), adr=g('#ck-adr'), cp=g('#ck-cp'), ville=g('#ck-ville');
+    if(!prenom||!nom||!adr){ dcToast('Renseignez au moins prénom, nom et adresse de livraison.'); return; }
+    dcOrders.unshift({ produit:name, client:prenom+' '+nom, adresse:adr+(cp?', '+cp:'')+(ville?' '+ville:''), montant:price||'—', methode:(method==='paypal'?'PayPal':'Carte'), date:'À l\'instant', statut:'À expédier' });
+    ov.remove();
+    dcToast('✅ Commande validée — paiement '+(method==='paypal'?'PayPal':'carte')+' (démo)');
+  };
+}
+
+/* Compte bancaire d'encaissement du vendeur */
+function dcPayoutForm(){
+  const html =
+    '<div style="font-size:13px;color:#6B7686;margin-bottom:14px;">Compte bancaire sur lequel vous recevrez le montant de vos ventes (après commission de la plateforme).</div>'
+    + '<input placeholder="Titulaire du compte" style="'+DC_INP+'"><input placeholder="IBAN" style="'+DC_INP+';margin-top:10px"><input placeholder="BIC / SWIFT" style="'+DC_INP+';margin-top:10px">'
+    + DC_WARN
+    + '<button id="pay-save" style="margin-top:14px;width:100%;background:#122A4D;color:#fff;border:none;border-radius:10px;padding:12px;font-weight:800;cursor:pointer;">Enregistrer le compte d\'encaissement</button>';
+  const ov = dcModal('💳 Compte d\'encaissement (recevoir les paiements)', html);
+  ov.querySelector('#pay-save').onclick = ()=>{ ov.remove(); dcToast('💳 Compte d\'encaissement enregistré (démo)'); };
+}
+
+/* Tableau de bord vendeur (propriétaire) */
+function dcStatCard(label, val){
+  return '<div style="background:#F7F9FC;border:1px solid #E6ECF5;border-radius:12px;padding:12px 14px;text-align:center;"><div style="font-family:\'Bricolage Grotesque\';font-size:22px;font-weight:700;color:#122A4D">'+val+'</div><div style="font-size:11px;color:#8794A7;margin-top:2px">'+label+'</div></div>';
+}
+function dcBlock(title, inner){
+  return '<div style="border:1px solid #E6ECF5;border-radius:12px;overflow:hidden;"><div style="background:#F7F9FC;padding:10px 14px;font-size:13px;font-weight:800;color:#122A4D">'+title+'</div><div style="padding:12px 14px;">'+inner+'</div></div>';
+}
+function dcDashboard(){
+  document.querySelectorAll('.dc-modal-ov').forEach(m=>m.remove());
+  const aExpedier = dcOrders.filter(o=>o.statut==='À expédier').length;
+  const expediees = dcOrders.filter(o=>o.statut==='Expédié').length;
+  const stats = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">'
+    + dcStatCard('Visites (mois)','1 248') + dcStatCard('Ventes (mois)', String(dcOrders.length+37)) + dcStatCard('Ventes (jour)','6') + dcStatCard('À expédier', String(aExpedier)) + '</div>';
+  const best = dcBestSellers.map((b,i)=>'<div style="display:flex;align-items:center;gap:10px;padding:6px 0;'+(i?'border-top:1px solid #eef1f5':'')+'"><b style="font-family:\'Bricolage Grotesque\';color:'+(i===0?'#F4A62A':'#8794A7')+';width:16px">'+(i+1)+'</b><div style="flex:1;font-size:13px;color:#122A4D">'+b[0]+'</div><span style="font-size:11.5px;color:#8794A7">'+b[1]+'</span></div>').join('');
+  const msgs = dcSellerMessages.map((m,i)=>'<div style="padding:6px 0;'+(i?'border-top:1px solid #eef1f5':'')+'"><div style="font-size:12.5px;color:#122A4D"><b>'+m[0]+'</b> <span style="color:#8794A7;font-weight:400">· '+m[2]+'</span></div><div style="font-size:12px;color:#3B4658;margin-top:2px">'+m[1]+'</div></div>').join('');
+  const orders = dcOrders.map((o,i)=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;'+(i?'border-top:1px solid #eef1f5':'')+'"><div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600;color:#122A4D">'+o.produit+'</div><div style="font-size:11.5px;color:#8794A7">'+o.client+' · '+o.adresse+' · '+o.methode+' · '+o.date+'</div></div><b style="font-size:12.5px;color:#122A4D;white-space:nowrap">'+o.montant+'</b>'
+    + (o.statut==='À expédier'
+        ? '<button class="dc-ship" data-i="'+i+'" style="font-size:11px;font-weight:700;color:#fff;background:#1F8A5B;border:none;border-radius:7px;padding:6px 10px;cursor:pointer">Marquer expédié</button>'
+        : '<span style="font-size:10.5px;font-weight:700;color:#1F8A5B;background:#E4F3EC;border-radius:999px;padding:3px 9px">✓ Expédié</span>')
+    + '</div>').join('');
+  const html = stats
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">' + '<div>'+dcBlock('🏆 Produits les plus vendus', best)+'</div>' + '<div>'+dcBlock('💬 Messages', msgs)+'</div>' + '</div>'
+    + '<div style="margin-top:14px;">'+dcBlock('🧾 Dernières commandes ('+aExpedier+' à expédier · '+expediees+' expédiées)', orders)+'</div>';
+  const ov = dcModal('📊 Tableau de bord vendeur', html, 760);
+  ov.querySelectorAll('.dc-ship').forEach(b=>{ b.onclick = ()=>{ const i=+b.dataset.i; if(dcOrders[i]){ dcOrders[i].statut='Expédié'; dcToast('📦 Commande marquée expédiée'); dcDashboard(); } }; });
+}
+
+/* ===== Init ===== */
+dcProfilSnapshot();       // capture des styles d'origine avant tout thème
+dcBuildProfilFab();       // sélecteur de thème du profil
+dcAddVitrineAvatar();
+dcUploadable('da-cover', 'Bannière profil');
+dcUploadable('da-avatar', 'Photo profil');
+dcUploadable('da-ad', 'Bannière vitrine');
+dcUploadable('da-vitrine-avatar', 'Photo vitrine');
+dcWireProfilLinks();
+dcTab('profil');
+dcTheme('bordeaux');
+dcProfilTheme('bleu');
+dcCountdown();
+dcScrollSpy();
+dcEnhanceProducts();
+dcEnhanceReviews();
+dcBuildOwnerUI();
+dcRenderQR();
+setTimeout(dcRenderQR, 800); // au cas où profile-qr.js charge la lib après coup
+</script>
+</body>
+</html>

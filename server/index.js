@@ -809,11 +809,12 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
 
-  const { vitrine_active, vitrine_banniere_url, vitrine_horaires, vitrine_services, description, mission, galerie_json, vitrine_pub_onglet } = body;
+  const { vitrine_active, vitrine_banniere_url, vitrine_horaires, vitrine_services, description, mission, galerie_json, vitrine_pub_onglet, vitrine_theme } = body;
+  const THEMES_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
   await db.prepare(`
     UPDATE initiatives SET
       vitrine_active=?, vitrine_banniere_url=?, vitrine_horaires=?, vitrine_services=?,
-      description=?, mission=?, galerie_json=?, vitrine_pub_onglet=?
+      description=?, mission=?, galerie_json=?, vitrine_pub_onglet=?, vitrine_theme=?
     WHERE id=?
   `).run(
     vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
@@ -824,6 +825,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     mission !== undefined ? mission : init.mission,
     galerie_json !== undefined ? JSON.stringify(galerie_json) : init.galerie_json,
     vitrine_pub_onglet !== undefined ? vitrine_pub_onglet : (init.vitrine_pub_onglet || 'À la une'),
+    THEMES_VALIDES.includes(vitrine_theme) ? vitrine_theme : (init.vitrine_theme || 'bordeaux'),
     params.id
   );
   sendJSON(res, 200, { ok: true });
@@ -2668,7 +2670,7 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
 
 /* ---------- Profil (lecture enrichie) ---------- */
 route("GET", "/api/profil/:id", async (req, res, params) => {
-  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id FROM users WHERE id=?").get(params.id);
+  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie FROM users WHERE id=?").get(params.id);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
   const me = await getCurrentUser(req);
   const nbAbonnes    = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(u.id))?.n;
@@ -2698,6 +2700,8 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     competences: safeParse(u.competences || "[]"),
     experiences: safeParse(u.experiences || "[]"),
     theme_couleur: u.theme_couleur || "ocean",
+    reseaux_sociaux: safeParse(u.reseaux_sociaux || "{}"),
+    email_verifie: !!u.email_verifie,
     situation_pro: u.situation_pro, created_at: u.created_at,
     privacy: safeParse(u.privacy_json || "{}"),
     nbAbonnes, nbSuivis, isFollowing,

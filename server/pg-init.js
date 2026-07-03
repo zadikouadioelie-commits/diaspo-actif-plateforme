@@ -167,6 +167,8 @@ async function migratePg(pool) {
     ['initiatives', 'organisation_verifiee_le', 'TEXT'],
     ['initiatives', 'organisation_expire_le', 'TEXT'],
     ['initiatives', 'stripe_identity_session_id', 'TEXT'],
+    // Refonte visuelle profil/vitrine : thème couleur de la boutique
+    ['initiatives', 'vitrine_theme', "TEXT DEFAULT 'bordeaux'"],
   ];
   for (const [table, col, type] of cols) {
     try {
