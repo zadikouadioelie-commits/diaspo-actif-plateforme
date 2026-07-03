@@ -11,6 +11,20 @@ const pool = new Pool({
   max: 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+  /* Filet de sécurité : une fonction serverless qui se fige/meurt en plein milieu
+     d'une requête (ou en attente du verrou pg_advisory_lock de pg-init.js) ne doit
+     jamais laisser une session Postgres bloquée indéfiniment — ça a déjà provoqué
+     une panne totale du site (verrou jamais libéré → toutes les requêtes suivantes
+     en attente pour toujours). Ces timeouts forcent Postgres à couper lui-même. */
+  statement_timeout: 20000,
+  query_timeout: 20000,
+  idle_in_transaction_session_timeout: 20000,
+});
+
+/* Ne jamais laisser une erreur sur une connexion inactive du pool (ex: coupure réseau
+   côté Neon) faire planter tout le process serverless avec une exception non gérée. */
+pool.on('error', (err) => {
+  console.error('[pg pool] erreur sur connexion inactive :', err.message);
 });
 
 /* Traduit julianday(X) SQLite → équivalent PostgreSQL, en respectant les parenthèses
