@@ -188,6 +188,13 @@ async function migratePg(pool) {
     ['initiatives', 'stripe_identity_session_id', 'TEXT'],
     // Refonte visuelle profil/vitrine : thème couleur de la boutique
     ['initiatives', 'vitrine_theme', "TEXT DEFAULT 'bordeaux'"],
+    // Rubriques Vitrine complémentaires : téléchargements, partenaires, objectif, offre flash
+    ['initiatives', 'vitrine_documents_json', 'TEXT'],
+    ['initiatives', 'vitrine_partenaires_json', 'TEXT'],
+    ['initiatives', 'vitrine_objectif_cible', 'INTEGER'],
+    ['initiatives', 'vitrine_objectif_libelle', 'TEXT'],
+    ['initiatives', 'vitrine_offre_flash_titre', 'TEXT'],
+    ['initiatives', 'vitrine_offre_flash_fin', 'TEXT'],
   ];
   for (const [table, col, type] of cols) {
     try {

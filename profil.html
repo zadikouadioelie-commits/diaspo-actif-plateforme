@@ -1853,6 +1853,9 @@ async function renderVitrineVisitor(init) {
   if (produits.length || isOwn)       navItems.push(['produits','Produits']);
   if (init.vitrine_services || isOwn) navItems.push(['services','Services']);
   if (galerie.length)                 navItems.push(['galerie','Galerie']);
+  navItems.push(['avis','Avis']);
+  if (init.vitrine_partenaires_json || init.vitrine_objectif_cible || isOwn) navItems.push(['partenaires','Partenaires']);
+  if (init.vitrine_documents_json || isOwn) navItems.push(['telechargements','Téléchargements']);
   navItems.push(['contact','Contact']);
 
   const subnav = `<div class="pvt-subnav">${navItems.map((n,i)=>`<a href="#pv-${n[0]}"${i===0?' class="active"':''}>${n[1]}</a>`).join('')}</div>`;
@@ -1895,6 +1898,15 @@ async function renderVitrineVisitor(init) {
     <div class="pvt-collections">${collections.map(c=>`<a href="#pv-produits" class="pvt-coll-tile" style="text-decoration:none;"><div class="pvt-coll-emoji">${collEmoji[c.toLowerCase()]||'🛍️'}</div><div class="pvt-coll-label">${esc(c)} <span style="color:#8794A7;font-weight:500;">(${cats[c]})</span></div></a>`).join('')}</div>
   </section>` : '';
 
+  // Offre flash : titre + date de fin définis par le titulaire, compte à rebours réel
+  const flashActive = init.vitrine_offre_flash_titre && init.vitrine_offre_flash_fin && new Date(init.vitrine_offre_flash_fin) > new Date();
+  const offreFlashSec = (flashActive || isOwn) ? `<section id="pv-flash" style="border-radius:15px;background:var(--v4);color:#fff;padding:20px;position:relative;">
+    <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,.16);padding:4px 10px;border-radius:999px;">⚡ OFFRE FLASH</span>
+    <div style="font-size:18px;font-weight:700;margin:12px 0 4px;">${flashActive ? esc(init.vitrine_offre_flash_titre) : (isOwn?'Aucune offre flash active':'')}</div>
+    ${flashActive ? `<div id="pvt-flash-countdown" style="display:flex;gap:8px;margin:12px 0;font-family:'Bricolage Grotesque';font-size:20px;font-weight:700;"></div>` : ''}
+    ${isOwn ? `<button onclick="editOffreFlash()" style="margin-top:8px;background:#fff;color:var(--v4);border:none;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;">✏️ ${flashActive?'Modifier':'Créer'} l'offre flash</button>` : ''}
+  </section>` : '';
+
   const produitsSec = (produits.length || isOwn) ? `<section id="pv-produits" class="pvt-section">
     <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Nos produits</h3>${isOwn?`<button onclick="openProductModal()" ${produits.length>=MAX_PRODUITS_VITRINE?'disabled':''} style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un produit (${produits.length}/${MAX_PRODUITS_VITRINE})</button>`:''}</div>
     <div class="pvt-section-body"><div class="pvt-prodgrid" id="pvt-prodgrid">${!produits.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun produit pour le moment.${isOwn?' Cliquez sur « Ajouter un produit » pour commencer.':''}</div>`:''}</div></div>
@@ -1908,6 +1920,44 @@ async function renderVitrineVisitor(init) {
   const galerieSec = galerie.length ? `<section id="pv-galerie" class="pvt-section">
     <div class="pvt-section-head sm"><h3>📸 Galerie</h3></div>
     <div class="pvt-gallery">${galerie.map(u=>`<img loading="lazy" src="${esc(u)}" alt="">`).join('')}</div>
+  </section>` : '';
+
+  // Meilleures ventes — chargées de façon asynchrone (nécessite une requête réseau)
+  const meilleuresVentesSec = `<section id="pv-bestsellers" class="pvt-section">
+    <div class="pvt-section-head sm"><h3>🏆 Meilleures ventes</h3></div>
+    <div id="pvt-bestsellers-body" style="padding:16px 20px;"><div class="pvz-empty">Chargement…</div></div>
+  </section>`;
+
+  // Avis clients
+  const avisSec = `<section id="pv-avis" class="pvt-section">
+    <div class="pvt-section-head sm"><h3>⭐ Avis clients</h3></div>
+    <div id="pvt-avis-body" style="padding:16px 20px;"><div class="pvz-empty">Chargement…</div></div>
+  </section>`;
+
+  // Partenaires + Objectif
+  const partenaires = safeParseJson(init.vitrine_partenaires_json, []);
+  const partenairesObjectifSec = (partenaires.length || init.vitrine_objectif_cible || isOwn) ? `<section id="pv-partenaires" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🤝 Ils nous font confiance</h3>${isOwn?`<button onclick="pvtAddPartenaire()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un logo</button>`:''}</div>
+    <div style="padding:18px 22px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+      ${partenaires.length ? partenaires.map((p,i)=>`<div style="position:relative;flex:1;min-width:80px;"><img src="${esc(p.logo_url)}" alt="${esc(p.nom||'')}" style="width:100%;height:52px;object-fit:contain;border-radius:10px;background:#F6F1EE;">${isOwn?`<button onclick="pvtRemovePartenaire(${i})" style="position:absolute;top:-6px;right:-6px;background:#B91C1C;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;">✕</button>`:''}</div>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun partenaire ajouté.':''}</span>`}
+    </div>
+    ${(init.vitrine_objectif_cible || isOwn) ? `<div style="padding:0 22px 18px;">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px;align-items:center;">
+        <span style="color:#6B7686;">🎯 Objectif${init.vitrine_objectif_libelle?` : ${esc(init.vitrine_objectif_libelle)}`:''}</span>
+        <b style="color:var(--v1);">${init.vitrine_objectif_cible ? `<span id="pvt-objectif-actuel">…</span> / ${init.vitrine_objectif_cible}` : '—'}</b>
+        ${isOwn?`<button onclick="editObjectif()" style="background:none;border:none;color:var(--v1);font-size:11.5px;font-weight:600;cursor:pointer;">✏️</button>`:''}
+      </div>
+      <div style="height:9px;border-radius:5px;background:#F1E4E6;overflow:hidden;"><div id="pvt-objectif-bar" style="width:0%;height:100%;background:linear-gradient(90deg,var(--v1),var(--v3));border-radius:5px;transition:width .4s;"></div></div>
+    </div>` : ''}
+  </section>` : '';
+
+  // Téléchargements
+  const documents = safeParseJson(init.vitrine_documents_json, []);
+  const telechargementsSec = (documents.length || isOwn) ? `<section id="pv-telechargements" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>📥 Téléchargements</h3>${isOwn?`<button onclick="pvtAddDocument()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter</button>`:''}</div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
+      ${documents.length ? documents.map((d,i)=>`<div style="display:flex;align-items:center;gap:11px;font-size:13px;color:#3B4658;padding:9px 12px;border:1px solid var(--vsoftbd);border-radius:10px;"><span style="font-size:17px;">📄</span><span style="flex:1;">${esc(d.titre)}</span><a href="${esc(d.url)}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--v1);">Télécharger</a>${isOwn?`<button onclick="pvtRemoveDocument(${i})" style="background:none;border:none;color:#B91C1C;cursor:pointer;font-size:13px;">✕</button>`:''}</div>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">Aucun document.</span>`}
+    </div>
   </section>` : '';
 
   const contactSec = `<section id="pv-contact" class="pvt-contact">
@@ -1940,12 +1990,17 @@ async function renderVitrineVisitor(init) {
       ${subnav}
       ${hero}
       ${actionbar}
+      ${offreFlashSec}
       ${presentation}
       ${collectionsSec}
       ${produitsSec}
       <div id="pvt-publications"></div>
+      ${meilleuresVentesSec}
       ${services}
       ${galerieSec}
+      ${avisSec}
+      ${partenairesObjectifSec}
+      ${telechargementsSec}
       ${contactSec}
     </div>
   </div>`;
@@ -1969,6 +2024,159 @@ async function renderVitrineVisitor(init) {
     const pubWrap = document.getElementById('pvt-publications');
     if (pubWrap) { pubWrap.id = 'vt-publications'; renderPublications(init, false); }
   }
+
+  // Meilleures ventes + objectif (même requête, réutilisée)
+  try {
+    const bv = await api('GET', `/initiatives/${init.id}/meilleures-ventes`);
+    const bvBody = document.getElementById('pvt-bestsellers-body');
+    if (bvBody) {
+      bvBody.innerHTML = (bv.produits && bv.produits.length)
+        ? bv.produits.map((p,i)=>`<div class="pvt-best-row"><div class="pvt-best-rank${i===0?' gold':''}">${i+1}</div><div style="flex:1;"><div style="font-size:13.5px;font-weight:600;color:#122A4D;">${esc(p.nom)}</div><div style="font-size:11px;color:#8794A7;">${p.ventes} vendu${p.ventes>1?'s':''}</div></div>${i===0?`<span style="font-size:9.5px;font-weight:700;color:#fff;background:#F4A62A;padding:2px 8px;border-radius:999px;">Best Seller</span>`:''}</div>`).join('')
+        : `<div class="pvz-empty">Pas encore de ventes enregistrées.</div>`;
+    }
+    const objActuel = document.getElementById('pvt-objectif-actuel');
+    const objBar = document.getElementById('pvt-objectif-bar');
+    if (objActuel && init.vitrine_objectif_cible) {
+      const n = bv.total_commandes || 0;
+      objActuel.textContent = n;
+      if (objBar) objBar.style.width = Math.min(100, Math.round(n / init.vitrine_objectif_cible * 100)) + '%';
+    }
+  } catch (e) {}
+
+  // Compte à rebours offre flash (réel, basé sur vitrine_offre_flash_fin)
+  const cdEl = document.getElementById('pvt-flash-countdown');
+  if (cdEl && init.vitrine_offre_flash_fin) {
+    const endDate = new Date(init.vitrine_offre_flash_fin);
+    const tick = () => {
+      const s = Math.max(0, Math.floor((endDate - new Date()) / 1000));
+      const h = String(Math.floor(s/3600)).padStart(2,'0');
+      const m = String(Math.floor((s%3600)/60)).padStart(2,'0');
+      const sec = String(s%60).padStart(2,'0');
+      cdEl.innerHTML = [[h,'H'],[m,'MIN'],[sec,'SEC']].map(([v,l])=>`<div style="background:rgba(255,255,255,.12);border-radius:8px;padding:6px 9px;text-align:center;min-width:44px;"><div>${v}</div><div style="font-size:8px;opacity:.75;">${l}</div></div>`).join('');
+      if (s <= 0) clearInterval(_pvtFlashTimer);
+    };
+    tick();
+    if (_pvtFlashTimer) clearInterval(_pvtFlashTimer);
+    _pvtFlashTimer = setInterval(tick, 1000);
+  }
+
+  // Avis clients
+  try {
+    const av = await api('GET', `/initiatives/${init.id}/avis`);
+    const avBody = document.getElementById('pvt-avis-body');
+    if (avBody) {
+      const canReview = !isOwn && CU;
+      avBody.innerHTML = `
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+          ${av.moyenne ? `<div style="font-family:'Bricolage Grotesque';font-size:34px;font-weight:700;color:#122A4D;line-height:1;">${av.moyenne}</div><div><div style="color:#F4A62A;font-size:15px;letter-spacing:2px;">${'★'.repeat(Math.round(av.moyenne))}${'☆'.repeat(5-Math.round(av.moyenne))}</div><div style="font-size:11.5px;color:#8794A7;margin-top:2px;">${av.total} avis</div></div>` : `<span class="pvz-empty">Aucun avis pour le moment.</span>`}
+        </div>
+        ${(av.avis||[]).slice(0,5).map((a,i)=>`<div style="border-top:1px solid var(--vsoftbd);padding:12px 0${i===0?';border-top:none':''};font-size:12.5px;color:#3B4658;line-height:1.5;">${a.commentaire?`« ${esc(a.commentaire)} »`:''}<div style="font-size:11.5px;color:#8794A7;margin-top:4px;">${'★'.repeat(a.note)}${'☆'.repeat(5-a.note)} — ${esc([a.prenom,a.nom].filter(Boolean).join(' ')||'Client')}</div></div>`).join('')}
+        ${canReview ? `<button onclick="pvtWriteAvis(${init.id})" style="margin-top:14px;width:100%;font-size:13px;font-weight:700;color:#fff;background:var(--v1);border:none;border-radius:10px;padding:11px;cursor:pointer;">✍️ Écrire un avis</button>` : (!CU ? `<a href="login.html" style="display:block;margin-top:14px;text-align:center;font-size:12.5px;color:var(--v1);">Connectez-vous pour laisser un avis</a>` : '')}
+      `;
+    }
+  } catch (e) {}
+}
+let _pvtFlashTimer = null;
+
+/* Titulaire : créer/modifier l'offre flash */
+async function editOffreFlash() {
+  if (!isOwn || !_vitrineInit) return;
+  const titre = prompt("Titre de l'offre flash :", _vitrineInit.vitrine_offre_flash_titre || '');
+  if (titre === null) return;
+  const finActuelle = _vitrineInit.vitrine_offre_flash_fin ? new Date(_vitrineInit.vitrine_offre_flash_fin).toISOString().slice(0,16) : '';
+  const fin = prompt('Date et heure de fin (AAAA-MM-JJTHH:MM) :', finActuelle);
+  if (fin === null) return;
+  try {
+    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_offre_flash_titre: titre || null, vitrine_offre_flash_fin: fin ? new Date(fin).toISOString() : null });
+    _vitrineInit.vitrine_offre_flash_titre = titre || null;
+    _vitrineInit.vitrine_offre_flash_fin = fin ? new Date(fin).toISOString() : null;
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* Titulaire : objectif (cible + libellé) */
+async function editObjectif() {
+  if (!isOwn || !_vitrineInit) return;
+  const cible = prompt('Objectif à atteindre (nombre) :', _vitrineInit.vitrine_objectif_cible || '');
+  if (cible === null) return;
+  const libelle = prompt('Libellé (ex : commandes, clients…) :', _vitrineInit.vitrine_objectif_libelle || 'commandes');
+  if (libelle === null) return;
+  try {
+    const cibleNum = cible ? Number(cible) : null;
+    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_objectif_cible: cibleNum, vitrine_objectif_libelle: libelle || null });
+    _vitrineInit.vitrine_objectif_cible = cibleNum;
+    _vitrineInit.vitrine_objectif_libelle = libelle || null;
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* Titulaire : partenaires (logos) */
+async function pvtAddPartenaire() {
+  if (!isOwn || !_vitrineInit) return;
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/jpeg,image/png,image/webp,image/svg+xml';
+  input.onchange = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const url = await uploadMedia(file, 'logo');
+      const list = safeParseJson(_vitrineInit.vitrine_partenaires_json, []);
+      list.push({ nom: file.name.replace(/\.[^.]+$/,''), logo_url: url });
+      await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_partenaires_json: list });
+      _vitrineInit.vitrine_partenaires_json = JSON.stringify(list);
+      renderVitrineVisitor(_vitrineInit);
+    } catch (err) { alert('Erreur : ' + err.message); }
+  };
+  input.click();
+}
+async function pvtRemovePartenaire(i) {
+  if (!isOwn || !_vitrineInit) return;
+  const list = safeParseJson(_vitrineInit.vitrine_partenaires_json, []);
+  list.splice(i, 1);
+  try {
+    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_partenaires_json: list });
+    _vitrineInit.vitrine_partenaires_json = JSON.stringify(list);
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* Titulaire : téléchargements (documents externes, saisie d'URL) */
+async function pvtAddDocument() {
+  if (!isOwn || !_vitrineInit) return;
+  const titre = prompt('Titre du document (ex : Catalogue produits) :');
+  if (!titre) return;
+  const url = prompt('Lien du document (URL publique — Google Drive, PDF hébergé…) :');
+  if (!url) return;
+  const list = safeParseJson(_vitrineInit.vitrine_documents_json, []);
+  list.push({ titre, url });
+  try {
+    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_documents_json: list });
+    _vitrineInit.vitrine_documents_json = JSON.stringify(list);
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+async function pvtRemoveDocument(i) {
+  if (!isOwn || !_vitrineInit) return;
+  const list = safeParseJson(_vitrineInit.vitrine_documents_json, []);
+  list.splice(i, 1);
+  try {
+    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_documents_json: list });
+    _vitrineInit.vitrine_documents_json = JSON.stringify(list);
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* Visiteur : écrire un avis (note + commentaire) */
+async function pvtWriteAvis(initId) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  const note = prompt('Votre note (1 à 5) :', '5');
+  if (note === null) return;
+  const n = Number(note);
+  if (!Number.isInteger(n) || n < 1 || n > 5) { alert('Note invalide (1 à 5).'); return; }
+  const commentaire = prompt('Votre commentaire (facultatif) :', '') || '';
+  try {
+    await api('POST', `/initiatives/${initId}/avis`, { note: n, commentaire });
+    if (_vitrineInit) renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
 function renderPvtProducts(produits, ownerId) {

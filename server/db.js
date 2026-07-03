@@ -3704,6 +3704,15 @@ db.exec(`
   // ── Refonte visuelle profil/vitrine : thème couleur de la boutique ──
   const initCols4 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
   if (!initCols4.includes('vitrine_theme')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_theme TEXT DEFAULT 'bordeaux'");
+
+  // ── Rubriques Vitrine complémentaires : téléchargements, partenaires, objectif, offre flash ──
+  const initCols5 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
+  if (!initCols5.includes('vitrine_documents_json'))    db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_documents_json TEXT");
+  if (!initCols5.includes('vitrine_partenaires_json'))  db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_partenaires_json TEXT");
+  if (!initCols5.includes('vitrine_objectif_cible'))    db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_objectif_cible INTEGER");
+  if (!initCols5.includes('vitrine_objectif_libelle'))  db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_objectif_libelle TEXT");
+  if (!initCols5.includes('vitrine_offre_flash_titre')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_offre_flash_titre TEXT");
+  if (!initCols5.includes('vitrine_offre_flash_fin'))   db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_offre_flash_fin TEXT");
 }
 
 /* ── Boutique de la Vitrine (produits/services, max 20 par initiative) ── */
@@ -3750,6 +3759,19 @@ db.exec(`
     FOREIGN KEY(produit_id) REFERENCES produits_vitrine(id),
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
     FOREIGN KEY(acheteur_id) REFERENCES users(id)
+  );
+
+  -- Avis clients sur une vitrine (un avis par utilisateur et par initiative)
+  CREATE TABLE IF NOT EXISTS vitrine_avis (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    note INTEGER NOT NULL CHECK(note BETWEEN 1 AND 5),
+    commentaire TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(initiative_id, user_id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS vitrine_publications (

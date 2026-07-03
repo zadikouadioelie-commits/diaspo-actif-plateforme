@@ -809,12 +809,18 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
 
-  const { vitrine_active, vitrine_banniere_url, vitrine_horaires, vitrine_services, description, mission, galerie_json, vitrine_pub_onglet, vitrine_theme } = body;
+  const {
+    vitrine_active, vitrine_banniere_url, vitrine_horaires, vitrine_services, description, mission, galerie_json,
+    vitrine_pub_onglet, vitrine_theme, vitrine_documents_json, vitrine_partenaires_json,
+    vitrine_objectif_cible, vitrine_objectif_libelle, vitrine_offre_flash_titre, vitrine_offre_flash_fin,
+  } = body;
   const THEMES_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
   await db.prepare(`
     UPDATE initiatives SET
       vitrine_active=?, vitrine_banniere_url=?, vitrine_horaires=?, vitrine_services=?,
-      description=?, mission=?, galerie_json=?, vitrine_pub_onglet=?, vitrine_theme=?
+      description=?, mission=?, galerie_json=?, vitrine_pub_onglet=?, vitrine_theme=?,
+      vitrine_documents_json=?, vitrine_partenaires_json=?, vitrine_objectif_cible=?,
+      vitrine_objectif_libelle=?, vitrine_offre_flash_titre=?, vitrine_offre_flash_fin=?
     WHERE id=?
   `).run(
     vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
@@ -826,9 +832,55 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     galerie_json !== undefined ? JSON.stringify(galerie_json) : init.galerie_json,
     vitrine_pub_onglet !== undefined ? vitrine_pub_onglet : (init.vitrine_pub_onglet || 'À la une'),
     THEMES_VALIDES.includes(vitrine_theme) ? vitrine_theme : (init.vitrine_theme || 'bordeaux'),
+    vitrine_documents_json !== undefined ? JSON.stringify(vitrine_documents_json) : init.vitrine_documents_json,
+    vitrine_partenaires_json !== undefined ? JSON.stringify(vitrine_partenaires_json) : init.vitrine_partenaires_json,
+    vitrine_objectif_cible !== undefined ? (vitrine_objectif_cible === null ? null : Number(vitrine_objectif_cible)) : init.vitrine_objectif_cible,
+    vitrine_objectif_libelle !== undefined ? vitrine_objectif_libelle : init.vitrine_objectif_libelle,
+    vitrine_offre_flash_titre !== undefined ? vitrine_offre_flash_titre : init.vitrine_offre_flash_titre,
+    vitrine_offre_flash_fin !== undefined ? vitrine_offre_flash_fin : init.vitrine_offre_flash_fin,
     params.id
   );
   sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/initiatives/:id/avis — public, liste des avis + moyenne */
+route("GET", "/api/initiatives/:id/avis", async (req, res, params) => {
+  const avis = await db.prepare(`
+    SELECT va.id, va.note, va.commentaire, va.created_at, u.nom, u.prenom
+    FROM vitrine_avis va JOIN users u ON u.id = va.user_id
+    WHERE va.initiative_id=? ORDER BY va.created_at DESC LIMIT 50
+  `).all(params.id);
+  const stats = await db.prepare(`SELECT COUNT(*) AS n, AVG(note) AS moyenne FROM vitrine_avis WHERE initiative_id=?`).get(params.id);
+  sendJSON(res, 200, { avis, total: stats?.n || 0, moyenne: stats?.n ? Number(stats.moyenne).toFixed(1) : null });
+});
+
+/* POST /api/initiatives/:id/avis — visiteur connecté (non propriétaire), un avis par personne */
+route("POST", "/api/initiatives/:id/avis", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) === Number(user.id)) return sendJSON(res, 403, { error: "Vous ne pouvez pas laisser d'avis sur votre propre vitrine." });
+  const note = Number(body.note);
+  if (!Number.isInteger(note) || note < 1 || note > 5) return sendJSON(res, 400, { error: "Note invalide (1 à 5)." });
+  try {
+    await db.prepare(`
+      INSERT INTO vitrine_avis (initiative_id, user_id, note, commentaire) VALUES (?,?,?,?)
+      ON CONFLICT(initiative_id, user_id) DO UPDATE SET note=excluded.note, commentaire=excluded.commentaire, created_at=datetime('now')
+    `).run(params.id, user.id, note, (body.commentaire || '').trim() || null);
+    sendJSON(res, 200, { ok: true });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "avis")); }
+});
+
+/* GET /api/initiatives/:id/meilleures-ventes — top 3 produits par nombre de commandes + total (objectif) */
+route("GET", "/api/initiatives/:id/meilleures-ventes", async (req, res, params) => {
+  const rows = await db.prepare(`
+    SELECT p.id, p.nom, COUNT(c.id) AS ventes
+    FROM produits_vitrine p JOIN commandes_vitrine c ON c.produit_id = p.id
+    WHERE p.initiative_id=? GROUP BY p.id, p.nom ORDER BY ventes DESC LIMIT 3
+  `).all(params.id);
+  const total = await db.prepare(`SELECT COUNT(*) AS n FROM commandes_vitrine WHERE initiative_id=?`).get(params.id);
+  sendJSON(res, 200, { produits: rows, total_commandes: total?.n || 0 });
 });
 
 /* POST /api/produits/:id/commander — visiteur connecté, demande de contact (PAS de paiement réel) */
