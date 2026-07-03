@@ -691,7 +691,7 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   const count = (await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.n || 0;
   if (Number(count) >= MAX_PRODUITS_VITRINE) return sendJSON(res, 400, { error: `Limite de ${MAX_PRODUITS_VITRINE} produits atteinte. Supprimez-en un pour en ajouter un nouveau.` });
 
-  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference } = body;
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo } = body;
   if (!nom) return sendJSON(res, 400, { error: "Nom du produit requis." });
   const photosArr = Array.isArray(photos) ? photos.slice(0, 4) : [];
   const st = ['disponible','indisponible','epuise','masque'].includes(statut) ? statut : 'disponible';
@@ -699,9 +699,9 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   const maxOrdre = (await db.prepare("SELECT MAX(ordre) m FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.m;
   const ref = (reference && reference.trim()) || ('REF-' + Date.now().toString(36).toUpperCase().slice(-6));
   const id = (await db.prepare(`
-    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1)).lastInsertRowid;
+    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre, prix_promo)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1, prix_promo != null && prix_promo !== '' ? Number(prix_promo) : null)).lastInsertRowid;
   // Notifie les abonnés de la vitrine (sauf produit masqué)
   if (st !== 'masque') {
     notifierAbonnes(params.id, "vitrine_produit", "Nouveau produit en boutique",
@@ -719,19 +719,21 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(prod.initiative_id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
 
-  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference } = body;
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo } = body;
   const photosArr = Array.isArray(photos) ? photos.slice(0, 4) : safeParse(prod.photos_json || "[]");
   const ancienStatut = prod.statut || 'disponible';
   const nouveauStatut = ['disponible','indisponible','epuise','masque'].includes(statut) ? statut : ancienStatut;
   const dispo = nouveauStatut === 'disponible' ? 1 : 0;
   await db.prepare(`
-    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=? WHERE id=?
+    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=?, prix_promo=? WHERE id=?
   `).run(
     nom || prod.nom, description !== undefined ? description : prod.description,
     prix != null ? Number(prix) : prod.prix, devise || prod.devise, dispo,
     nouveauStatut, date_retour !== undefined ? date_retour : prod.date_retour,
     reference !== undefined ? reference : prod.reference,
-    categorie !== undefined ? categorie : prod.categorie, JSON.stringify(photosArr), params.id
+    categorie !== undefined ? categorie : prod.categorie, JSON.stringify(photosArr),
+    prix_promo !== undefined ? (prix_promo === null || prix_promo === '' ? null : Number(prix_promo)) : prod.prix_promo,
+    params.id
   );
 
   // Retour en stock : notifier les personnes en liste d'attente (in-app)
@@ -813,6 +815,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_active, vitrine_banniere_url, vitrine_horaires, vitrine_services, description, mission, galerie_json,
     vitrine_pub_onglet, vitrine_theme, vitrine_documents_json, vitrine_partenaires_json,
     vitrine_objectif_cible, vitrine_objectif_libelle, vitrine_offre_flash_titre, vitrine_offre_flash_fin,
+    vitrine_pourquoi_choisir,
   } = body;
   const THEMES_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
   await db.prepare(`
@@ -820,7 +823,8 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
       vitrine_active=?, vitrine_banniere_url=?, vitrine_horaires=?, vitrine_services=?,
       description=?, mission=?, galerie_json=?, vitrine_pub_onglet=?, vitrine_theme=?,
       vitrine_documents_json=?, vitrine_partenaires_json=?, vitrine_objectif_cible=?,
-      vitrine_objectif_libelle=?, vitrine_offre_flash_titre=?, vitrine_offre_flash_fin=?
+      vitrine_objectif_libelle=?, vitrine_offre_flash_titre=?, vitrine_offre_flash_fin=?,
+      vitrine_pourquoi_choisir=?
     WHERE id=?
   `).run(
     vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
@@ -838,6 +842,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_objectif_libelle !== undefined ? vitrine_objectif_libelle : init.vitrine_objectif_libelle,
     vitrine_offre_flash_titre !== undefined ? vitrine_offre_flash_titre : init.vitrine_offre_flash_titre,
     vitrine_offre_flash_fin !== undefined ? vitrine_offre_flash_fin : init.vitrine_offre_flash_fin,
+    vitrine_pourquoi_choisir !== undefined ? vitrine_pourquoi_choisir : init.vitrine_pourquoi_choisir,
     params.id
   );
   sendJSON(res, 200, { ok: true });

@@ -1851,7 +1851,9 @@ async function renderVitrineVisitor(init) {
   if (init.description || isOwn)      navItems.push(['presentation','Présentation']);
   if (collections.length)             navItems.push(['collections','Collections']);
   if (produits.length || isOwn)       navItems.push(['produits','Produits']);
+  if (produits.some(p => p.prix_promo != null) || isOwn) navItems.push(['promos','Promotions']);
   if (init.vitrine_services || isOwn) navItems.push(['services','Services']);
+  if (init.vitrine_pourquoi_choisir || isOwn) navItems.push(['pourquoi','Pourquoi nous']);
   if (galerie.length)                 navItems.push(['galerie','Galerie']);
   navItems.push(['avis','Avis']);
   if (init.vitrine_partenaires_json || init.vitrine_objectif_cible || isOwn) navItems.push(['partenaires','Partenaires']);
@@ -1928,6 +1930,31 @@ async function renderVitrineVisitor(init) {
     <div id="pvt-bestsellers-body" style="padding:16px 20px;"><div class="pvz-empty">Chargement…</div></div>
   </section>`;
 
+  // Promotions du mois — produits avec un prix promo réel défini par le titulaire
+  const produitsPromo = produits.filter(p => p.prix_promo != null && p.prix != null && p.prix_promo < p.prix && (p.statut||'disponible') !== 'masque');
+  const promosSec = (produitsPromo.length || isOwn) ? `<section id="pv-promos" class="pvt-section">
+    <div class="pvt-section-head sm"><h3>🔥 Promotions du mois</h3></div>
+    <div style="padding:16px 20px;">
+      ${produitsPromo.length ? produitsPromo.map((p,i)=>{
+        const photos = p.photos||[]; const reduc = Math.round((1 - p.prix_promo/p.prix)*100);
+        return `<div class="pvt-promo-row"${i?'':' style="border-top:none;"'}>
+          ${photos[0]?`<img class="pvt-promo-img" src="${esc(photos[0])}" alt="">`:`<div class="pvt-promo-img" style="display:flex;align-items:center;justify-content:center;">🛍️</div>`}
+          <div style="flex:1;"><div style="font-size:13.5px;font-weight:600;color:#122A4D;">${esc(p.nom)}</div><div style="font-size:11.5px;color:#8794A7;"><span style="text-decoration:line-through;">${Number(p.prix).toFixed(2)} ${p.devise||'EUR'}</span> · −${reduc}%</div></div>
+          <span style="font-family:'Bricolage Grotesque';font-size:15px;font-weight:700;color:var(--v1);">${Number(p.prix_promo).toFixed(2)} ${p.devise||'EUR'}</span>
+        </div>`;
+      }).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucune promotion active. Ajoutez un prix promo à un produit pour qu\'il apparaisse ici.':''}</span>`}
+    </div>
+  </section>` : '';
+
+  // Pourquoi nous choisir — points forts éditables par le titulaire
+  const pourquoiPoints = (init.vitrine_pourquoi_choisir || '').split('\n').map(s=>s.trim()).filter(Boolean);
+  const pourquoiSec = (pourquoiPoints.length || isOwn) ? `<section id="pv-pourquoi" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>✔ Pourquoi nous choisir</h3>${isOwn?`<button onclick="editVitrineText('vitrine_pourquoi_choisir','Pourquoi nous choisir','Un point par ligne : Paiement sécurisé, Livraison rapide…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px;color:#3B4658;">
+      ${pourquoiPoints.length ? pourquoiPoints.map(p=>`<div style="display:flex;align-items:center;gap:8px;"><span style="color:#1F8A5B;font-weight:700;">✔</span>${esc(p)}</div>`).join('') : `<span style="color:#94a3b8;font-style:italic;">Aucun point renseigné.</span>`}
+    </div>
+  </section>` : '';
+
   // Avis clients
   const avisSec = `<section id="pv-avis" class="pvt-section">
     <div class="pvt-section-head sm"><h3>⭐ Avis clients</h3></div>
@@ -1995,12 +2022,11 @@ async function renderVitrineVisitor(init) {
       ${collectionsSec}
       ${produitsSec}
       <div id="pvt-publications"></div>
-      ${meilleuresVentesSec}
-      ${services}
+      <div class="pvt-grid2">${promosSec}${meilleuresVentesSec}</div>
+      <div class="pvt-grid2">${services}${pourquoiSec}</div>
       ${galerieSec}
       ${avisSec}
-      ${partenairesObjectifSec}
-      ${telechargementsSec}
+      <div class="pvt-grid2">${partenairesObjectifSec}${telechargementsSec}</div>
       ${contactSec}
     </div>
   </div>`;
@@ -2499,10 +2525,12 @@ function openProductModal(productId) {
           <input type="number" step="0.01" id="pf-prix" value="${prod&&prod.prix!=null?prod.prix:''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
         </div>
         <div style="flex:1;">
-          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Catégorie</label>
-          <input type="text" id="pf-categorie" value="${prod?esc(prod.categorie||''):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+          <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Prix promo (optionnel)</label>
+          <input type="number" step="0.01" id="pf-prix-promo" placeholder="Ex : Promotions du mois" value="${prod&&prod.prix_promo!=null?prod.prix_promo:''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
         </div>
       </div>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Catégorie</label>
+      <input type="text" id="pf-categorie" value="${prod?esc(prod.categorie||''):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
       <div style="display:flex;gap:10px;margin-bottom:12px;">
         <div style="flex:1;">
           <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Référence</label>
@@ -2570,6 +2598,7 @@ async function saveProduct(productId) {
     nom,
     description: document.getElementById('pf-description').value.trim() || null,
     prix: document.getElementById('pf-prix').value ? Number(document.getElementById('pf-prix').value) : null,
+    prix_promo: document.getElementById('pf-prix-promo').value ? Number(document.getElementById('pf-prix-promo').value) : null,
     categorie: document.getElementById('pf-categorie').value.trim() || null,
     reference: document.getElementById('pf-reference').value.trim() || null,
     statut,

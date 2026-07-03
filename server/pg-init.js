@@ -195,6 +195,8 @@ async function migratePg(pool) {
     ['initiatives', 'vitrine_objectif_libelle', 'TEXT'],
     ['initiatives', 'vitrine_offre_flash_titre', 'TEXT'],
     ['initiatives', 'vitrine_offre_flash_fin', 'TEXT'],
+    ['initiatives', 'vitrine_pourquoi_choisir', 'TEXT'],
+    ['produits_vitrine', 'prix_promo', 'REAL'],
   ];
   for (const [table, col, type] of cols) {
     try {

@@ -3713,6 +3713,11 @@ db.exec(`
   if (!initCols5.includes('vitrine_objectif_libelle'))  db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_objectif_libelle TEXT");
   if (!initCols5.includes('vitrine_offre_flash_titre')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_offre_flash_titre TEXT");
   if (!initCols5.includes('vitrine_offre_flash_fin'))   db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_offre_flash_fin TEXT");
+  if (!initCols5.includes('vitrine_pourquoi_choisir'))  db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_pourquoi_choisir TEXT");
+
+  // ── Promotions produit (prix barré) ──
+  const prodCols2 = db.prepare('PRAGMA table_info(produits_vitrine)').all().map(c=>c.name);
+  if (prodCols2.length && !prodCols2.includes('prix_promo')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN prix_promo REAL");
 }
 
 /* ── Boutique de la Vitrine (produits/services, max 20 par initiative) ── */
