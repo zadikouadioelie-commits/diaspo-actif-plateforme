@@ -40,6 +40,7 @@ process.on("uncaughtException", (err) => { logError(err, "uncaughtException"); }
 
 const PORT = process.env.PORT || 3000;
 const ROOT = path.join(__dirname, ".."); // dossier diaspoactif-site (fichiers statiques)
+let _sitemapCache = { xml: null, at: 0 }; // cache en mémoire (survit tant que l'instance serverless reste chaude)
 const SEUIL_CONFIDENTIALITE = 10;
 
 const MIME = {
@@ -8359,6 +8360,12 @@ async function handleRequest(req, res) {
 
   /* ── SEO : sitemap.xml (vitrines actives + pages principales) ── */
   if (pathname === '/sitemap.xml') {
+    const now = Date.now();
+    if (_sitemapCache.xml && (now - _sitemapCache.at) < 15 * 60 * 1000) {
+      res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+      res.end(_sitemapCache.xml);
+      return;
+    }
     try {
       const base = 'https://diaspoactif.com';
       const vitrines = await db.prepare("SELECT owner_user_id FROM initiatives WHERE vitrine_active=1 AND owner_user_id IS NOT NULL").all();
@@ -8368,11 +8375,20 @@ async function handleRequest(req, res) {
         ...vitrines.map(v => `<url><loc>${base}/profil.html?id=${v.owner_user_id}</loc><changefreq>weekly</changefreq></url>`),
       ];
       const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>`;
+      _sitemapCache = { xml, at: now };
       res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
       res.end(xml);
     } catch (e) {
-      res.writeHead(500, { 'Content-Type': 'text/plain' });
-      res.end('Sitemap error');
+      console.error('[sitemap]', e.message);
+      // En cas d'échec (ex. démarrage à froid de la base), sert la dernière version connue
+      // plutôt qu'une 500 — Googlebot ne doit jamais essuyer d'échec de récupération du sitemap.
+      if (_sitemapCache.xml) {
+        res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+        res.end(_sitemapCache.xml);
+      } else {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Sitemap error');
+      }
     }
     return;
   }
