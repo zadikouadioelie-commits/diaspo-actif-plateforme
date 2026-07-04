@@ -8377,17 +8377,26 @@ async function handleRequest(req, res) {
     return;
   }
 
-  /* ── SEO : profil.html?id=X — injection dynamique du titre/meta/JSON-LD pour les vitrines actives ── */
-  if (pathname === '/profil.html' && parsed.query.id) {
+  /* ── profil.html est servi depuis profil-app.html (fichier renommé) — voir SEO ci-dessous.
+     Le rewrite vercel.json cible "/profil.html" ; comme aucun fichier physique de ce nom
+     n'existe plus, Vercel ne peut pas le servir en statique et passe systématiquement par
+     cette fonction, ce qui permet l'injection de méta dynamiques par vitrine. ── */
+  if (pathname === '/profil.html') {
     try {
       const uid = parsed.query.id;
-      const u = await db.prepare("SELECT id, nom, prenom, role FROM users WHERE id=?").get(uid);
+      const u = uid ? await db.prepare("SELECT id, nom, prenom, role FROM users WHERE id=?").get(uid) : null;
       const init = u ? await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(u.id) : null;
-      const filePath = path.join(ROOT, 'profil.html');
+      const filePath = path.join(ROOT, 'profil-app.html');
       let html = await fs.promises.readFile(filePath, 'utf8');
       const escAttr = s => String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const base = 'https://diaspoactif.com';
-      const pageUrl = `${base}/profil.html?id=${uid}`;
+      const pageUrl = uid ? `${base}/profil.html?id=${uid}` : `${base}/profil.html`;
+
+      if (!uid) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+        res.end(html);
+        return;
+      }
 
       let title, description, image, noindex = false, jsonLd = '';
       if (init && init.vitrine_active === 1) {
@@ -8434,7 +8443,17 @@ ${jsonLd}
       return;
     } catch (e) {
       console.error('[SEO profil.html]', e.stack || e.message);
-      if (parsed.query.debug_seo) { res.writeHead(500, {'Content-Type':'text/plain'}); res.end('SEO_ERROR: ' + (e.stack || e.message)); return; }
+      // profil.html n'existe plus en tant que fichier statique (renommé profil-app.html) :
+      // en cas d'erreur d'injection, on sert quand même l'app sans méta dynamiques plutôt que 404.
+      try {
+        const fallback = await fs.promises.readFile(path.join(ROOT, 'profil-app.html'), 'utf8');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+        res.end(fallback);
+      } catch (e2) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Erreur serveur.');
+      }
+      return;
     }
   }
 
