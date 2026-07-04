@@ -8368,7 +8368,14 @@ async function handleRequest(req, res) {
     }
     try {
       const base = 'https://diaspoactif.com';
-      const vitrines = await db.prepare("SELECT owner_user_id FROM initiatives WHERE vitrine_active=1 AND owner_user_id IS NOT NULL").all();
+      // Une nouvelle tentative avant d'abandonner : un conteneur serverless froid peut faire
+      // échouer la première connexion Neon, la seconde réussit presque toujours.
+      let vitrines;
+      try {
+        vitrines = await db.prepare("SELECT owner_user_id FROM initiatives WHERE vitrine_active=1 AND owner_user_id IS NOT NULL").all();
+      } catch (e1) {
+        vitrines = await db.prepare("SELECT owner_user_id FROM initiatives WHERE vitrine_active=1 AND owner_user_id IS NOT NULL").all();
+      }
       const staticUrls = ['/', '/annuaire.html', '/fil-actualite.html', '/evenements.html', '/actualites.html'];
       const urls = [
         ...staticUrls.map(u => `<url><loc>${base}${u}</loc><changefreq>daily</changefreq></url>`),
