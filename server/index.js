@@ -3,6 +3,7 @@
    Build: 2026-06-28-b
    =========================================================== */
 const http = require("node:http");
+const https = require("node:https");
 const fs = require("node:fs");
 const path = require("node:path");
 const url = require("node:url");
@@ -8357,6 +8358,88 @@ async function handleRequest(req, res) {
 
   const parsed = url.parse(req.url, true);
   const pathname = decodeURIComponent(parsed.pathname);
+
+  /* ── Sauvegarde automatique quotidienne (Vercel Cron → zone Bunny privée dédiée) ──
+     Filet de sécurité en complément du PITR Neon. Le fichier n'est jamais public :
+     zone Bunny distincte de celle des médias, sans CDN/Pull Zone associée. */
+  if (pathname === '/api/cron/backup') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const zone = process.env.BACKUP_BUNNY_ZONE;
+      const key = process.env.BACKUP_BUNNY_KEY;
+      const region = process.env.BACKUP_BUNNY_REGION || 'storage.bunnycdn.com';
+      if (!zone || !key) return sendJSON(res, 500, { error: "BACKUP_BUNNY_ZONE / BACKUP_BUNNY_KEY manquants." });
+
+      const tables = await db.prepare(`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema='public' AND table_type='BASE TABLE'
+        ORDER BY table_name
+      `).all();
+
+      const dump = { exported_at: new Date().toISOString(), tables: {} };
+      let totalRows = 0;
+      for (const { table_name } of tables) {
+        try {
+          const rows = await db.prepare(`SELECT * FROM "${table_name}"`).all();
+          dump.tables[table_name] = rows;
+          totalRows += rows.length;
+        } catch (e) {
+          dump.tables[table_name] = { _error: e.message };
+        }
+      }
+
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `diaspoactif-backup-${stamp}.json`;
+      const buffer = Buffer.from(JSON.stringify(dump));
+
+      await new Promise((resolve, reject) => {
+        const options = {
+          hostname: region,
+          path: `/${zone}/${filename}`,
+          method: 'PUT',
+          headers: { 'AccessKey': key, 'Content-Type': 'application/octet-stream', 'Content-Length': buffer.length },
+        };
+        const bunnyReq = https.request(options, (bunnyRes) => {
+          let data = '';
+          bunnyRes.on('data', d => data += d);
+          bunnyRes.on('end', () => bunnyRes.statusCode === 201 ? resolve() : reject(new Error(`Bunny ${bunnyRes.statusCode}: ${data}`)));
+        });
+        bunnyReq.on('error', reject);
+        bunnyReq.write(buffer);
+        bunnyReq.end();
+      });
+
+      // Nettoyage : ne garder que les 14 dernières sauvegardes sur la zone Bunny
+      try {
+        const listData = await new Promise((resolve, reject) => {
+          https.get({ hostname: region, path: `/${zone}/`, headers: { 'AccessKey': key, 'Accept': 'application/json' } }, (r) => {
+            let d = ''; r.on('data', c => d += c); r.on('end', () => resolve(JSON.parse(d || '[]')));
+          }).on('error', reject);
+        });
+        const backups = (listData || [])
+          .filter(f => f.ObjectName && f.ObjectName.startsWith('diaspoactif-backup-') && f.ObjectName.endsWith('.json'))
+          .sort((a, b) => new Date(b.LastChanged) - new Date(a.LastChanged));
+        const toDelete = backups.slice(14);
+        for (const f of toDelete) {
+          await new Promise((resolve) => {
+            const delReq = https.request({ hostname: region, path: `/${zone}/${f.ObjectName}`, method: 'DELETE', headers: { 'AccessKey': key } }, () => resolve());
+            delReq.on('error', () => resolve());
+            delReq.end();
+          });
+        }
+      } catch (e) { console.error('[backup] cleanup error:', e.message); }
+
+      sendJSON(res, 200, { ok: true, filename, tables: tables.length, rows: totalRows });
+    } catch (e) {
+      console.error('[backup]', e.stack || e.message);
+      sendJSON(res, 500, { error: 'Backup failed', detail: e.message });
+    }
+    return;
+  }
 
   /* ── SEO : sitemap.xml (vitrines actives + pages principales) ── */
   if (pathname === '/sitemap.xml') {
