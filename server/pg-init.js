@@ -197,6 +197,21 @@ async function migratePg(pool) {
     ['initiatives', 'vitrine_offre_flash_fin', 'TEXT'],
     ['initiatives', 'vitrine_pourquoi_choisir', 'TEXT'],
     ['produits_vitrine', 'prix_promo', 'REAL'],
+    // Vitrine "fiche professionnelle complète" : avis étendus, coordonnées, services, RDV
+    ['vitrine_avis', 'titre', 'TEXT'],
+    ['vitrine_avis', 'reponse_texte', 'TEXT'],
+    ['vitrine_avis', 'reponse_date', 'TEXT'],
+    ['initiatives', 'vitrine_services_categories_json', 'TEXT'],
+    ['initiatives', 'vitrine_ville', 'TEXT'],
+    ['initiatives', 'vitrine_region', 'TEXT'],
+    ['initiatives', 'vitrine_pays', 'TEXT'],
+    ['initiatives', 'vitrine_whatsapp', 'TEXT'],
+    ['initiatives', 'vitrine_tel_pro', 'TEXT'],
+    ['initiatives', 'vitrine_email_pro', 'TEXT'],
+    ['initiatives', 'vitrine_google_maps_url', 'TEXT'],
+    ['initiatives', 'vitrine_rdv_active', 'INTEGER DEFAULT 0'],
+    ['users', 'compte_masque', 'INTEGER DEFAULT 0'],
+    ['produits_vitrine', 'catalogue_id', 'INTEGER'],
   ];
   for (const [table, col, type] of cols) {
     try {

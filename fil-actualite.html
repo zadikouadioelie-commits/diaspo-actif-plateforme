@@ -70,6 +70,9 @@
       <button class="posts-feed-filter" data-cat="Culture">Culture</button>
     </div>
 
+    <!-- Meilleures ventes du moment -->
+    <div id="meilleures-ventes-widget" style="margin-bottom:20px;"></div>
+
     <!-- Publicité -->
     <div id="ad-fil" data-pub-format="banniere" style="margin-bottom:16px;"></div>
 
@@ -173,7 +176,37 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     loadFeed();
   }
+
+  loadMeilleuresVentes();
 });
+
+/* ── Widget "🔥 Les meilleures ventes du moment" ── */
+async function loadMeilleuresVentes() {
+  const box = document.getElementById('meilleures-ventes-widget');
+  if (!box) return;
+  try {
+    const r = await fetch('/api/fil/meilleures-ventes', { credentials: 'include' }).then(r => r.json());
+    const produits = r.produits || [];
+    if (!produits.length) { box.innerHTML = ''; return; }
+    box.innerHTML = `
+      <div style="font-weight:700;font-size:15px;margin-bottom:10px;">🔥 Les meilleures ventes du moment</div>
+      <div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;">
+        ${produits.map(p => {
+          const loc = [p.vitrine_ville, p.vitrine_region, p.vitrine_pays].filter(Boolean).join(', ');
+          return `<div style="flex:none;width:150px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;">
+            ${p.photo ? `<img loading="lazy" src="${p.photo}" style="width:100%;height:100px;object-fit:cover;">` : `<div style="width:100%;height:100px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:24px;">🛍️</div>`}
+            <div style="padding:8px;">
+              <div style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.nom}</div>
+              <div style="font-size:11px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.initiative_nom||''}</div>
+              ${loc ? `<div style="font-size:10.5px;color:#94a3b8;">📍 ${loc}</div>` : ''}
+              <div style="font-size:12.5px;font-weight:700;margin:4px 0;">${p.prix!=null ? Number(p.prix).toFixed(2)+' '+(p.devise||'EUR') : 'Prix sur demande'}</div>
+              <button class="btn btn-sm btn-outline" style="width:100%;" onclick="voirVitrineDepuisFil(${p.initiative_id}, 'meilleure_vente', ${p.owner_user_id})">Voir la vitrine</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  } catch (e) { box.innerHTML = ''; }
+}
 
 /* ── Charger le fil ── */
 async function loadFeed() {

@@ -435,10 +435,9 @@ route("DELETE", "/api/admin/error-logs", async (req, res) => {
   sendJSON(res, 200, { ok: true });
 });
 
-/* DELETE /api/auth/account — suppression du compte par son propriétaire (droit à l'oubli RGPD).
-   Anonymise les données personnelles plutôt qu'un DELETE brut : 122 tables référencent
-   users(id) et seule la moitié a ON DELETE CASCADE — un vrai DELETE casserait l'intégrité
-   (posts, commentaires, conversations d'autres utilisateurs, etc.). */
+/* DELETE /api/auth/account — masque le compte par son propriétaire (ne touche que le profil
+   public visible aux autres). Les données restent intactes en base ; l'utilisateur peut se
+   reconnecter à tout moment pour démasquer son compte (PUT /api/auth/account/demasquer). */
 route("DELETE", "/api/auth/account", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -448,9 +447,28 @@ route("DELETE", "/api/auth/account", async (req, res, params, body) => {
     return sendJSON(res, 401, { error: "Mot de passe incorrect." });
   }
 
-  const anonEmail = `compte-supprime-${user.id}-${Date.now()}@diaspoactif.invalid`;
-  const { hash, salt } = hashPassword(crypto.randomBytes(32).toString("hex")); // mot de passe aléatoire = connexion impossible
+  await db.prepare("UPDATE users SET compte_masque=1 WHERE id=?").run(user.id);
+  SEC.logSecurity("account_hidden", { uid: user.id });
 
+  const cookies = parseCookies(req);
+  if (cookies.sid) destroySession(cookies.sid);
+  sendJSON(res, 200, { ok: true }, { "Set-Cookie": ["sid=; HttpOnly; Path=/; Max-Age=0", "auth=; HttpOnly; Path=/; Max-Age=0"] });
+});
+
+/* PUT /api/auth/account/demasquer — réaffiche le profil public (l'utilisateur doit se reconnecter d'abord). */
+route("PUT", "/api/auth/account/demasquer", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("UPDATE users SET compte_masque=0 WHERE id=?").run(user.id);
+  SEC.logSecurity("account_unhidden", { uid: user.id });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════ Demandes de suppression définitive de compte (RGPD, workflow admin) ═══════════ */
+
+async function executerSuppressionCompte(userId, drId) {
+  const anonEmail = `compte-supprime-${userId}-${Date.now()}@diaspoactif.invalid`;
+  const { hash, salt } = hashPassword(crypto.randomBytes(32).toString("hex"));
   await db.prepare(`
     UPDATE users SET
       nom='Compte supprimé', prenom=NULL, email=?, password_hash=?, password_salt=?,
@@ -460,15 +478,172 @@ route("DELETE", "/api/auth/account", async (req, res, params, body) => {
       centres_interet='[]', competences='[]', experiences='[]',
       reseaux_sociaux='{}', disponibilites='{}', profil_json='{}', privacy_json='{}',
       reset_token=NULL, reset_expires=NULL, email_verif_token=NULL, email_verif_expires=NULL,
-      email_verifie=0
+      email_verifie=0, compte_masque=0
     WHERE id=?
-  `).run(anonEmail, hash, salt, user.id);
+  `).run(anonEmail, hash, salt, userId);
 
-  SEC.logSecurity("account_self_deleted", { uid: user.id });
+  const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(userId);
+  if (init) {
+    await db.prepare(`
+      UPDATE initiatives SET vitrine_active=0, adresse=NULL, code_postal=NULL, vitrine_ville=NULL,
+        vitrine_region=NULL, vitrine_pays=NULL, tel_responsable=NULL, vitrine_tel_pro=NULL,
+        vitrine_whatsapp=NULL, email_responsable=NULL, vitrine_email_pro=NULL, site_web=NULL,
+        vitrine_google_maps_url=NULL, vitrine_rdv_active=0
+      WHERE id=?
+    `).run(init.id);
+  }
 
-  const cookies = parseCookies(req);
-  if (cookies.sid) destroySession(cookies.sid);
-  sendJSON(res, 200, { ok: true }, { "Set-Cookie": ["sid=; HttpOnly; Path=/; Max-Age=0", "auth=; HttpOnly; Path=/; Max-Age=0"] });
+  await db.prepare("DELETE FROM sessions WHERE user_id=?").run(userId);
+
+  await db.prepare(`INSERT INTO deletion_request_history (deletion_request_id,action,note) VALUES (?,?,?)`)
+    .run(drId, "suppression_effective", null);
+
+  SEC.logSecurity("account_deletion_executed", { uid: userId, deletion_request_id: drId });
+}
+
+/* POST /api/deletion-requests — soumet une demande de suppression définitive */
+route("POST", "/api/deletion-requests", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  const existing = await db.prepare(
+    "SELECT id FROM deletion_requests WHERE user_id=? AND statut NOT IN ('refusee','compte_supprime')"
+  ).get(user.id);
+  if (existing) return sendJSON(res, 400, { error: "Une demande est déjà en cours.", deletion_request_id: existing.id });
+
+  const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+  const motif = (body.motif || "").trim() || null;
+
+  const id = (await db.prepare(
+    "INSERT INTO deletion_requests (user_id, type_compte, initiative_id, motif) VALUES (?,?,?,?)"
+  ).run(user.id, user.role, init ? init.id : null, motif)).lastInsertRowid;
+
+  const numeroDossier = "DEL-" + String(id).padStart(6, "0");
+  await db.prepare("UPDATE deletion_requests SET numero_dossier=? WHERE id=?").run(numeroDossier, id);
+
+  await db.prepare(`INSERT INTO deletion_request_history (deletion_request_id,action,note) VALUES (?,?,?)`)
+    .run(id, "creation", motif);
+
+  const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+  for (const a of admins) {
+    creerNotif(a.id, "demande_suppression",
+      `🔔 Nouvelle demande de suppression de compte`,
+      `${user.nom} (${user.role}) — dossier ${numeroDossier} — ${new Date().toLocaleString('fr-FR')}${motif ? ' — Motif : ' + motif : ''}`,
+      { deletion_request_id: id }
+    );
+  }
+
+  sendJSON(res, 201, { id, numero_dossier: numeroDossier });
+});
+
+/* GET /api/deletion-requests/mine — dossier(s) + messages de l'utilisateur courant */
+route("GET", "/api/deletion-requests/mine", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const requests = await db.prepare("SELECT * FROM deletion_requests WHERE user_id=? ORDER BY id DESC").all(user.id);
+  for (const r of requests) {
+    r.messages = await db.prepare("SELECT m.*, u.nom AS sender_nom, u.role AS sender_role FROM deletion_request_messages m LEFT JOIN users u ON u.id=m.sender_id WHERE m.deletion_request_id=? ORDER BY m.id ASC").all(r.id);
+  }
+  sendJSON(res, 200, { requests });
+});
+
+/* POST /api/deletion-requests/:id/messages — message dans le dossier (demandeur ou admin en charge) */
+route("POST", "/api/deletion-requests/:id/messages", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const dr = await db.prepare("SELECT * FROM deletion_requests WHERE id=?").get(params.id);
+  if (!dr) return sendJSON(res, 404, { error: "Dossier introuvable." });
+  const isOwner = Number(dr.user_id) === Number(user.id);
+  const isAdmin = user.role === "administrateur";
+  if (!isOwner && !isAdmin) return sendJSON(res, 403, { error: "Accès refusé." });
+
+  const contenu = (body.contenu || "").trim();
+  if (!contenu) return sendJSON(res, 400, { error: "Message vide." });
+
+  await db.prepare("INSERT INTO deletion_request_messages (deletion_request_id, sender_id, contenu, fichier_json) VALUES (?,?,?,?)")
+    .run(params.id, user.id, contenu, body.fichier ? JSON.stringify(body.fichier) : null);
+  await db.prepare("UPDATE deletion_requests SET updated_at=datetime('now') WHERE id=?").run(params.id);
+  await db.prepare(`INSERT INTO deletion_request_history (deletion_request_id,admin_id,admin_nom,action,note) VALUES (?,?,?,?,?)`)
+    .run(params.id, isAdmin ? user.id : null, isAdmin ? user.nom : null, "message", null);
+
+  if (isAdmin) {
+    creerNotif(dr.user_id, "demande_suppression", `💬 Réponse de l'administration — ${dr.numero_dossier}`, contenu, { deletion_request_id: dr.id });
+  } else if (dr.admin_id) {
+    creerNotif(dr.admin_id, "demande_suppression", `💬 Nouveau message — ${dr.numero_dossier}`, contenu, { deletion_request_id: dr.id });
+  }
+
+  sendJSON(res, 201, { ok: true });
+});
+
+/* GET /api/admin/deletion-requests — liste filtrable (admin) */
+route("GET", "/api/admin/deletion-requests", async (req, res, params, body, query) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = await db.prepare(`
+    SELECT dr.*, u.nom AS user_nom, u.email AS user_email, a.nom AS admin_nom
+    FROM deletion_requests dr
+    LEFT JOIN users u ON u.id=dr.user_id
+    LEFT JOIN users a ON a.id=dr.admin_id
+    ORDER BY dr.created_at DESC LIMIT 200
+  `).all();
+  for (const r of rows) {
+    const last = await db.prepare("SELECT contenu, created_at FROM deletion_request_messages WHERE deletion_request_id=? ORDER BY id DESC LIMIT 1").get(r.id);
+    r.dernier_echange = last ? last.created_at : null;
+  }
+  sendJSON(res, 200, { requests: rows });
+});
+
+/* GET /api/admin/deletion-requests/:id — dossier complet (admin) */
+route("GET", "/api/admin/deletion-requests/:id", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const dr = await db.prepare(`
+    SELECT dr.*, u.nom AS user_nom, u.email AS user_email, u.role AS user_role
+    FROM deletion_requests dr LEFT JOIN users u ON u.id=dr.user_id WHERE dr.id=?
+  `).get(params.id);
+  if (!dr) return sendJSON(res, 404, { error: "Dossier introuvable." });
+  dr.messages = await db.prepare("SELECT m.*, u.nom AS sender_nom FROM deletion_request_messages m LEFT JOIN users u ON u.id=m.sender_id WHERE m.deletion_request_id=? ORDER BY m.id ASC").all(dr.id);
+  dr.historique = await db.prepare("SELECT * FROM deletion_request_history WHERE deletion_request_id=? ORDER BY id ASC").all(dr.id);
+  sendJSON(res, 200, { request: dr });
+});
+
+/* PATCH /api/admin/deletion-requests/:id — change le statut (admin) */
+route("PATCH", "/api/admin/deletion-requests/:id", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const dr = await db.prepare("SELECT * FROM deletion_requests WHERE id=?").get(params.id);
+  if (!dr) return sendJSON(res, 404, { error: "Dossier introuvable." });
+
+  const STATUTS = ['en_discussion', 'en_cours_analyse', 'validee', 'refusee'];
+  const { statut, justification } = body;
+  if (!STATUTS.includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  if (statut === 'refusee' && !(justification || '').trim()) return sendJSON(res, 400, { error: "Justification requise en cas de refus." });
+
+  const adminId = dr.admin_id || me.id;
+  await db.prepare("UPDATE deletion_requests SET statut=?, admin_id=?, admin_justification=?, updated_at=datetime('now') WHERE id=?")
+    .run(statut, adminId, justification || dr.admin_justification, params.id);
+  await db.prepare(`INSERT INTO deletion_request_history (deletion_request_id,admin_id,admin_nom,action,note) VALUES (?,?,?,?,?)`)
+    .run(params.id, me.id, me.nom, "statut:" + statut, justification || null);
+
+  if (statut === 'validee') {
+    const userAvant = await db.prepare("SELECT email, prenom, nom FROM users WHERE id=?").get(dr.user_id);
+    await executerSuppressionCompte(dr.user_id, dr.id);
+    await db.prepare("UPDATE deletion_requests SET statut='compte_supprime', deleted_at=datetime('now') WHERE id=?").run(params.id);
+    await db.prepare(`INSERT INTO deletion_request_history (deletion_request_id,admin_id,admin_nom,action,note) VALUES (?,?,?,?,?)`)
+      .run(params.id, me.id, me.nom, "statut:compte_supprime", null);
+    try {
+      const { emailDeletionConfirmee } = require("./mailer");
+      if (userAvant?.email) {
+        await emailDeletionConfirmee({ email: userAvant.email, prenom: userAvant.prenom || userAvant.nom, numeroDossier: dr.numero_dossier, dateSuppression: new Date().toLocaleDateString('fr-FR') });
+      }
+    } catch (e) { console.error("[deletion-email]", e.message); }
+  } else {
+    creerNotif(dr.user_id, "demande_suppression", `Mise à jour de votre demande — ${dr.numero_dossier}`,
+      statut === 'refusee' ? `Votre demande a été refusée. Motif : ${justification}` : `Statut mis à jour : ${statut}`,
+      { deletion_request_id: dr.id });
+  }
+
+  sendJSON(res, 200, { ok: true });
 });
 
 /* POST /api/auth/resend-verification — renvoie l'email de confirmation (utilisateur connecté) */
@@ -646,6 +821,80 @@ route("POST", "/api/upload/produit", async (req, res) => {
 
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
 const MAX_PRODUITS_VITRINE = 20;
+const MAX_ARTICLES_PAR_CATALOGUE = 5;
+
+/* ── Catalogues (regroupement des articles de la Vitrine) ── */
+route("GET", "/api/initiatives/:id/catalogues", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  const isOwner = me && init && Number(init.owner_user_id) === Number(me.id);
+  let rows = await db.prepare("SELECT * FROM catalogues_vitrine WHERE initiative_id=? ORDER BY ordre ASC, id ASC").all(params.id);
+  if (!isOwner) rows = rows.filter(c => c.statut !== 'masque');
+  for (const c of rows) {
+    c.nb_articles = Number((await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE catalogue_id=?").get(c.id))?.n) || 0;
+  }
+  sendJSON(res, 200, { catalogues: rows });
+});
+
+route("POST", "/api/initiatives/:id/catalogues", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const nom = (body.nom || "").trim();
+  if (!nom) return sendJSON(res, 400, { error: "Nom du catalogue requis." });
+  const statut = body.statut === 'masque' ? 'masque' : 'visible';
+  const maxOrdre = (await db.prepare("SELECT MAX(ordre) m FROM catalogues_vitrine WHERE initiative_id=?").get(params.id))?.m;
+  const id = (await db.prepare(`
+    INSERT INTO catalogues_vitrine (initiative_id, nom, description, image_url, categorie, statut, ordre)
+    VALUES (?,?,?,?,?,?,?)
+  `).run(params.id, nom, (body.description || "").trim() || null, body.image_url || null, body.categorie || null, statut, (Number(maxOrdre) || 0) + 1)).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/catalogues/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const cat = await db.prepare("SELECT * FROM catalogues_vitrine WHERE id=?").get(params.id);
+  if (!cat) return sendJSON(res, 404, { error: "Catalogue introuvable." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(cat.initiative_id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const statut = body.statut !== undefined ? (body.statut === 'masque' ? 'masque' : 'visible') : cat.statut;
+  await db.prepare(`
+    UPDATE catalogues_vitrine SET nom=?, description=?, image_url=?, categorie=?, statut=? WHERE id=?
+  `).run(
+    (body.nom !== undefined ? body.nom.trim() : cat.nom) || cat.nom,
+    body.description !== undefined ? ((body.description || "").trim() || null) : cat.description,
+    body.image_url !== undefined ? body.image_url : cat.image_url,
+    body.categorie !== undefined ? body.categorie : cat.categorie,
+    statut, params.id
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/catalogues/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const cat = await db.prepare("SELECT * FROM catalogues_vitrine WHERE id=?").get(params.id);
+  if (!cat) return sendJSON(res, 404, { error: "Catalogue introuvable." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(cat.initiative_id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  await db.prepare("UPDATE produits_vitrine SET catalogue_id=NULL WHERE catalogue_id=?").run(params.id);
+  await db.prepare("DELETE FROM catalogues_vitrine WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("PATCH", "/api/initiatives/:id/catalogues/reorder", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const order = Array.isArray(body.order) ? body.order : [];
+  for (let i = 0; i < order.length; i++) {
+    await db.prepare("UPDATE catalogues_vitrine SET ordre=? WHERE id=? AND initiative_id=?").run(i, order[i], params.id);
+  }
+  sendJSON(res, 200, { ok: true });
+});
 
 /* GET /api/initiatives/:id/produits — public, catalogue trié */
 route("GET", "/api/initiatives/:id/produits", async (req, res, params) => {
@@ -691,17 +940,25 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   const count = (await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.n || 0;
   if (Number(count) >= MAX_PRODUITS_VITRINE) return sendJSON(res, 400, { error: `Limite de ${MAX_PRODUITS_VITRINE} produits atteinte. Supprimez-en un pour en ajouter un nouveau.` });
 
-  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo } = body;
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id } = body;
   if (!nom) return sendJSON(res, 400, { error: "Nom du produit requis." });
+  let catId = null;
+  if (catalogue_id != null && catalogue_id !== '') {
+    const cat = await db.prepare("SELECT id FROM catalogues_vitrine WHERE id=? AND initiative_id=?").get(catalogue_id, params.id);
+    if (!cat) return sendJSON(res, 400, { error: "Catalogue introuvable." });
+    const nbArticles = (await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE catalogue_id=?").get(catalogue_id))?.n || 0;
+    if (Number(nbArticles) >= MAX_ARTICLES_PAR_CATALOGUE) return sendJSON(res, 400, { error: `Limite de ${MAX_ARTICLES_PAR_CATALOGUE} articles par catalogue atteinte.` });
+    catId = Number(catalogue_id);
+  }
   const photosArr = Array.isArray(photos) ? photos.slice(0, 4) : [];
   const st = ['disponible','indisponible','epuise','masque'].includes(statut) ? statut : 'disponible';
   const dispo = st === 'disponible' ? 1 : 0;
   const maxOrdre = (await db.prepare("SELECT MAX(ordre) m FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.m;
   const ref = (reference && reference.trim()) || ('REF-' + Date.now().toString(36).toUpperCase().slice(-6));
   const id = (await db.prepare(`
-    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre, prix_promo)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1, prix_promo != null && prix_promo !== '' ? Number(prix_promo) : null)).lastInsertRowid;
+    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre, prix_promo, catalogue_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1, prix_promo != null && prix_promo !== '' ? Number(prix_promo) : null, catId)).lastInsertRowid;
   // Notifie les abonnés de la vitrine (sauf produit masqué)
   if (st !== 'masque') {
     notifierAbonnes(params.id, "vitrine_produit", "Nouveau produit en boutique",
@@ -719,13 +976,27 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(prod.initiative_id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
 
-  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo } = body;
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id } = body;
   const photosArr = Array.isArray(photos) ? photos.slice(0, 4) : safeParse(prod.photos_json || "[]");
   const ancienStatut = prod.statut || 'disponible';
   const nouveauStatut = ['disponible','indisponible','epuise','masque'].includes(statut) ? statut : ancienStatut;
   const dispo = nouveauStatut === 'disponible' ? 1 : 0;
+
+  let catId = prod.catalogue_id;
+  if (catalogue_id !== undefined) {
+    if (catalogue_id === null || catalogue_id === '') {
+      catId = null;
+    } else if (Number(catalogue_id) !== Number(prod.catalogue_id)) {
+      const cat = await db.prepare("SELECT id FROM catalogues_vitrine WHERE id=? AND initiative_id=?").get(catalogue_id, prod.initiative_id);
+      if (!cat) return sendJSON(res, 400, { error: "Catalogue introuvable." });
+      const nbArticles = (await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE catalogue_id=?").get(catalogue_id))?.n || 0;
+      if (Number(nbArticles) >= MAX_ARTICLES_PAR_CATALOGUE) return sendJSON(res, 400, { error: `Limite de ${MAX_ARTICLES_PAR_CATALOGUE} articles par catalogue atteinte.` });
+      catId = Number(catalogue_id);
+    }
+  }
+
   await db.prepare(`
-    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=?, prix_promo=? WHERE id=?
+    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=?, prix_promo=?, catalogue_id=? WHERE id=?
   `).run(
     nom || prod.nom, description !== undefined ? description : prod.description,
     prix != null ? Number(prix) : prod.prix, devise || prod.devise, dispo,
@@ -733,6 +1004,7 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
     reference !== undefined ? reference : prod.reference,
     categorie !== undefined ? categorie : prod.categorie, JSON.stringify(photosArr),
     prix_promo !== undefined ? (prix_promo === null || prix_promo === '' ? null : Number(prix_promo)) : prod.prix_promo,
+    catId,
     params.id
   );
 
@@ -790,15 +1062,21 @@ route("DELETE", "/api/produits/:id", async (req, res, params) => {
   }
 });
 
-/* PATCH /api/initiatives/:id/produits/reorder — owner only, tableau d'IDs dans le nouvel ordre */
+/* PATCH /api/initiatives/:id/produits/reorder — owner only, tableau d'IDs dans le nouvel ordre.
+   Si catalogue_id est fourni, ne réordonne que les articles de ce catalogue (isolation entre catalogues). */
 route("PATCH", "/api/initiatives/:id/produits/reorder", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   const order = Array.isArray(body.order) ? body.order : [];
+  const catFilter = body.catalogue_id != null && body.catalogue_id !== '' ? Number(body.catalogue_id) : null;
   for (let i = 0; i < order.length; i++) {
-    await db.prepare("UPDATE produits_vitrine SET ordre=? WHERE id=? AND initiative_id=?").run(i, order[i], params.id);
+    if (catFilter != null) {
+      await db.prepare("UPDATE produits_vitrine SET ordre=? WHERE id=? AND initiative_id=? AND catalogue_id=?").run(i, order[i], params.id, catFilter);
+    } else {
+      await db.prepare("UPDATE produits_vitrine SET ordre=? WHERE id=? AND initiative_id=?").run(i, order[i], params.id);
+    }
   }
   sendJSON(res, 200, { ok: true });
 });
@@ -815,7 +1093,11 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_active, vitrine_banniere_url, vitrine_horaires, vitrine_services, description, mission, galerie_json,
     vitrine_pub_onglet, vitrine_theme, vitrine_documents_json, vitrine_partenaires_json,
     vitrine_objectif_cible, vitrine_objectif_libelle, vitrine_offre_flash_titre, vitrine_offre_flash_fin,
-    vitrine_pourquoi_choisir,
+    vitrine_pourquoi_choisir, vitrine_services_categories_json,
+    // Coordonnées (éditables directement depuis la Vitrine, sauvegarde immédiate champ par champ)
+    adresse, code_postal, vitrine_ville, vitrine_region, vitrine_pays,
+    tel_responsable, vitrine_tel_pro, vitrine_whatsapp, email_responsable, vitrine_email_pro,
+    site_web, vitrine_google_maps_url, vitrine_rdv_active,
   } = body;
   const THEMES_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
   await db.prepare(`
@@ -824,7 +1106,10 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
       description=?, mission=?, galerie_json=?, vitrine_pub_onglet=?, vitrine_theme=?,
       vitrine_documents_json=?, vitrine_partenaires_json=?, vitrine_objectif_cible=?,
       vitrine_objectif_libelle=?, vitrine_offre_flash_titre=?, vitrine_offre_flash_fin=?,
-      vitrine_pourquoi_choisir=?
+      vitrine_pourquoi_choisir=?, vitrine_services_categories_json=?,
+      adresse=?, code_postal=?, vitrine_ville=?, vitrine_region=?, vitrine_pays=?,
+      tel_responsable=?, vitrine_tel_pro=?, vitrine_whatsapp=?, email_responsable=?, vitrine_email_pro=?,
+      site_web=?, vitrine_google_maps_url=?, vitrine_rdv_active=?
     WHERE id=?
   `).run(
     vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
@@ -843,6 +1128,20 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_offre_flash_titre !== undefined ? vitrine_offre_flash_titre : init.vitrine_offre_flash_titre,
     vitrine_offre_flash_fin !== undefined ? vitrine_offre_flash_fin : init.vitrine_offre_flash_fin,
     vitrine_pourquoi_choisir !== undefined ? vitrine_pourquoi_choisir : init.vitrine_pourquoi_choisir,
+    vitrine_services_categories_json !== undefined ? JSON.stringify(vitrine_services_categories_json) : init.vitrine_services_categories_json,
+    adresse !== undefined ? adresse : init.adresse,
+    code_postal !== undefined ? code_postal : init.code_postal,
+    vitrine_ville !== undefined ? vitrine_ville : init.vitrine_ville,
+    vitrine_region !== undefined ? vitrine_region : init.vitrine_region,
+    vitrine_pays !== undefined ? vitrine_pays : init.vitrine_pays,
+    tel_responsable !== undefined ? tel_responsable : init.tel_responsable,
+    vitrine_tel_pro !== undefined ? vitrine_tel_pro : init.vitrine_tel_pro,
+    vitrine_whatsapp !== undefined ? vitrine_whatsapp : init.vitrine_whatsapp,
+    email_responsable !== undefined ? email_responsable : init.email_responsable,
+    vitrine_email_pro !== undefined ? vitrine_email_pro : init.vitrine_email_pro,
+    site_web !== undefined ? site_web : init.site_web,
+    vitrine_google_maps_url !== undefined ? vitrine_google_maps_url : init.vitrine_google_maps_url,
+    vitrine_rdv_active !== undefined ? (vitrine_rdv_active ? 1 : 0) : init.vitrine_rdv_active,
     params.id
   );
   sendJSON(res, 200, { ok: true });
@@ -850,13 +1149,21 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
 
 /* GET /api/initiatives/:id/avis — public, liste des avis + moyenne */
 route("GET", "/api/initiatives/:id/avis", async (req, res, params) => {
+  const me = await getCurrentUser(req).catch(() => null);
   const avis = await db.prepare(`
-    SELECT va.id, va.note, va.commentaire, va.created_at, u.nom, u.prenom
+    SELECT va.id, va.note, va.titre, va.commentaire, va.created_at, va.reponse_texte, va.reponse_date, va.user_id, u.nom, u.prenom
     FROM vitrine_avis va JOIN users u ON u.id = va.user_id
     WHERE va.initiative_id=? ORDER BY va.created_at DESC LIMIT 50
   `).all(params.id);
+  // Ne pas exposer l'identifiant interne de l'auteur (sauf au propriétaire, utile pour modération)
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  const isOwner = me && init && Number(init.owner_user_id) === Number(me.id);
+  const avisPublic = avis.map(a => isOwner ? a : { ...a, user_id: undefined });
   const stats = await db.prepare(`SELECT COUNT(*) AS n, AVG(note) AS moyenne FROM vitrine_avis WHERE initiative_id=?`).get(params.id);
-  sendJSON(res, 200, { avis, total: stats?.n || 0, moyenne: stats?.n ? Number(stats.moyenne).toFixed(1) : null });
+  const repartitionRows = await db.prepare(`SELECT note, COUNT(*) AS n FROM vitrine_avis WHERE initiative_id=? GROUP BY note`).all(params.id);
+  const repartition = { 1:0, 2:0, 3:0, 4:0, 5:0 };
+  repartitionRows.forEach(r => { repartition[r.note] = r.n; });
+  sendJSON(res, 200, { avis: avisPublic, total: stats?.n || 0, moyenne: stats?.n ? Number(stats.moyenne).toFixed(1) : null, repartition });
 });
 
 /* POST /api/initiatives/:id/avis — visiteur connecté (non propriétaire), un avis par personne */
@@ -870,11 +1177,164 @@ route("POST", "/api/initiatives/:id/avis", async (req, res, params, body) => {
   if (!Number.isInteger(note) || note < 1 || note > 5) return sendJSON(res, 400, { error: "Note invalide (1 à 5)." });
   try {
     await db.prepare(`
-      INSERT INTO vitrine_avis (initiative_id, user_id, note, commentaire) VALUES (?,?,?,?)
-      ON CONFLICT(initiative_id, user_id) DO UPDATE SET note=excluded.note, commentaire=excluded.commentaire, created_at=datetime('now')
-    `).run(params.id, user.id, note, (body.commentaire || '').trim() || null);
+      INSERT INTO vitrine_avis (initiative_id, user_id, note, titre, commentaire) VALUES (?,?,?,?,?)
+      ON CONFLICT(initiative_id, user_id) DO UPDATE SET note=excluded.note, titre=excluded.titre, commentaire=excluded.commentaire, created_at=datetime('now')
+    `).run(params.id, user.id, note, (body.titre || '').trim() || null, (body.commentaire || '').trim() || null);
     sendJSON(res, 200, { ok: true });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "avis")); }
+});
+
+/* PUT /api/initiatives/:id/avis/:avisId/reponse — propriétaire répond (ou modifie/supprime sa réponse) */
+route("PUT", "/api/initiatives/:id/avis/:avisId/reponse", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const avis = await db.prepare("SELECT id FROM vitrine_avis WHERE id=? AND initiative_id=?").get(params.avisId, params.id);
+  if (!avis) return sendJSON(res, 404, { error: "Avis introuvable." });
+  const texte = (body.reponse_texte || '').trim() || null;
+  await db.prepare("UPDATE vitrine_avis SET reponse_texte=?, reponse_date=? WHERE id=?")
+    .run(texte, texte ? new Date().toISOString() : null, params.avisId);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/initiatives/:id/avis/:avisId/signaler — visiteur connecté signale un avis abusif */
+route("POST", "/api/initiatives/:id/avis/:avisId/signaler", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const motif = (body.motif || "").trim();
+  if (!motif) return sendJSON(res, 400, { error: "Motif requis." });
+  const avis = await db.prepare("SELECT id FROM vitrine_avis WHERE id=? AND initiative_id=?").get(params.avisId, params.id);
+  if (!avis) return sendJSON(res, 404, { error: "Avis introuvable." });
+  try {
+    await db.prepare("INSERT INTO vitrine_avis_signalements (avis_id, reporter_id, motif) VALUES (?,?,?)").run(params.avisId, user.id, motif);
+    creerNotif(
+      (await db.prepare("SELECT id FROM users WHERE role='administrateur' LIMIT 1").get())?.id || 1,
+      "signalement", `Avis client signalé par ${user.nom}`,
+      `Avis #${params.avisId} (vitrine #${params.id}) — motif : ${motif}`, { avis_id: Number(params.avisId) }
+    );
+    sendJSON(res, 200, { ok: true });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "signaler-avis")); }
+});
+
+/* ══════════ Arguments "Pourquoi nous choisir" (CRUD + réordonnancement) ══════════ */
+route("GET", "/api/initiatives/:id/arguments", async (req, res, params) => {
+  const rows = await db.prepare("SELECT * FROM vitrine_arguments WHERE initiative_id=? ORDER BY ordre ASC, id ASC").all(params.id);
+  sendJSON(res, 200, { arguments: rows });
+});
+
+route("POST", "/api/initiatives/:id/arguments", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const titre = (body.titre || "").trim();
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  const maxOrdre = (await db.prepare("SELECT MAX(ordre) m FROM vitrine_arguments WHERE initiative_id=?").get(params.id))?.m;
+  const id = (await db.prepare("INSERT INTO vitrine_arguments (initiative_id, icone, titre, description, ordre) VALUES (?,?,?,?,?)")
+    .run(params.id, body.icone || '✔️', titre, (body.description || '').trim() || null, (Number(maxOrdre) || 0) + 1)).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/initiatives/:id/arguments/:argId", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const arg = await db.prepare("SELECT * FROM vitrine_arguments WHERE id=? AND initiative_id=?").get(params.argId, params.id);
+  if (!arg) return sendJSON(res, 404, { error: "Argument introuvable." });
+  await db.prepare("UPDATE vitrine_arguments SET icone=?, titre=?, description=? WHERE id=?").run(
+    body.icone !== undefined ? body.icone : arg.icone,
+    (body.titre !== undefined ? body.titre.trim() : arg.titre) || arg.titre,
+    body.description !== undefined ? ((body.description || '').trim() || null) : arg.description,
+    params.argId
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/initiatives/:id/arguments/:argId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  await db.prepare("DELETE FROM vitrine_arguments WHERE id=? AND initiative_id=?").run(params.argId, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("PATCH", "/api/initiatives/:id/arguments/reorder", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const order = Array.isArray(body.order) ? body.order : [];
+  for (let i = 0; i < order.length; i++) {
+    await db.prepare("UPDATE vitrine_arguments SET ordre=? WHERE id=? AND initiative_id=?").run(i, order[i], params.id);
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ══════════ Promotions du mois (max 3 actives simultanément, expiration par date) ══════════ */
+route("GET", "/api/initiatives/:id/promotions", async (req, res, params) => {
+  const me = await getCurrentUser(req).catch(() => null);
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  const isOwner = me && init && Number(init.owner_user_id) === Number(me.id);
+  let rows = await db.prepare("SELECT * FROM vitrine_promotions WHERE initiative_id=? ORDER BY date_fin ASC").all(params.id);
+  if (!isOwner) {
+    const now = new Date().toISOString();
+    rows = rows.filter(p => (!p.date_debut || p.date_debut <= now) && p.date_fin >= now);
+  }
+  sendJSON(res, 200, { promotions: rows });
+});
+
+route("POST", "/api/initiatives/:id/promotions", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { titre, description, photo_url, prix_initial, prix_promo, date_debut, date_fin, produit_id } = body;
+  if (!titre || prix_promo == null || !date_fin) return sendJSON(res, 400, { error: "Titre, prix promo et date de fin requis." });
+  const now = new Date().toISOString();
+  const actives = (await db.prepare("SELECT * FROM vitrine_promotions WHERE initiative_id=? AND date_fin>=?").all(params.id, now)).length;
+  if (actives >= 3) return sendJSON(res, 400, { error: "Limite de 3 promotions actives atteinte. Supprimez-en une ou attendez son expiration." });
+  const id = (await db.prepare(`
+    INSERT INTO vitrine_promotions (initiative_id, produit_id, titre, description, photo_url, prix_initial, prix_promo, date_debut, date_fin)
+    VALUES (?,?,?,?,?,?,?,?,?)
+  `).run(params.id, produit_id || null, titre.trim(), (description||'').trim() || null, photo_url || null,
+      prix_initial != null ? Number(prix_initial) : null, Number(prix_promo), date_debut || null, date_fin)).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/initiatives/:id/promotions/:promoId", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const promo = await db.prepare("SELECT * FROM vitrine_promotions WHERE id=? AND initiative_id=?").get(params.promoId, params.id);
+  if (!promo) return sendJSON(res, 404, { error: "Promotion introuvable." });
+  const { titre, description, photo_url, prix_initial, prix_promo, date_debut, date_fin, produit_id } = body;
+  await db.prepare(`
+    UPDATE vitrine_promotions SET titre=?, description=?, photo_url=?, prix_initial=?, prix_promo=?, date_debut=?, date_fin=?, produit_id=? WHERE id=?
+  `).run(
+    titre !== undefined ? titre.trim() : promo.titre,
+    description !== undefined ? ((description||'').trim() || null) : promo.description,
+    photo_url !== undefined ? photo_url : promo.photo_url,
+    prix_initial !== undefined ? (prix_initial != null ? Number(prix_initial) : null) : promo.prix_initial,
+    prix_promo !== undefined ? Number(prix_promo) : promo.prix_promo,
+    date_debut !== undefined ? date_debut : promo.date_debut,
+    date_fin !== undefined ? date_fin : promo.date_fin,
+    produit_id !== undefined ? (produit_id || null) : promo.produit_id,
+    params.promoId
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/initiatives/:id/promotions/:promoId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  await db.prepare("DELETE FROM vitrine_promotions WHERE id=? AND initiative_id=?").run(params.promoId, params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* GET /api/initiatives/:id/meilleures-ventes — top 3 produits par nombre de commandes + total (objectif) */
@@ -1178,6 +1638,17 @@ route("POST", "/api/publications/:id/clic", async (req, res, params) => {
 async function getCertif(initiativeId) {
   return await db.prepare("SELECT niveau, statut, date_attribution FROM certifications WHERE initiative_id=? AND statut='actif'").get(initiativeId) || null;
 }
+
+/* GET /api/annuaire/utilisateurs — liste publique des comptes Utilisateur (annuaire), filtrable par nom/prénom/ville */
+route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query) => {
+  let rows = await db.prepare(
+    "SELECT id, nom, prenom, ville, pays, photo_url, titre_pro FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' ORDER BY nom ASC LIMIT 200"
+  ).all();
+  if (query.nom) { const q = query.nom.toLowerCase(); rows = rows.filter(r => (r.nom||"").toLowerCase().includes(q)); }
+  if (query.prenom) { const q = query.prenom.toLowerCase(); rows = rows.filter(r => (r.prenom||"").toLowerCase().includes(q)); }
+  if (query.ville) { const q = query.ville.toLowerCase(); rows = rows.filter(r => (r.ville||"").toLowerCase().includes(q)); }
+  sendJSON(res, 200, { users: rows });
+});
 
 route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   let rows = await db.prepare("SELECT * FROM initiatives ORDER BY created_at DESC").all();
@@ -1737,6 +2208,34 @@ route("GET", "/api/fil/profiles", async (req, res, params, body, query) => {
     LIMIT 8
   `).all();
   sendJSON(res, 200, { profiles: users });
+});
+
+/* GET /api/fil/meilleures-ventes — widget "🔥 Les meilleures ventes du moment"
+   (déclarée avant /api/fil/:id pour éviter que le routeur ne l'interprète comme un id de post) */
+route("GET", "/api/fil/meilleures-ventes", async (req, res) => {
+  const rows = await db.prepare(`
+    SELECT p.id, p.nom, p.prix, p.devise, p.photos_json,
+      i.id AS initiative_id, i.owner_user_id, i.nom AS initiative_nom, i.vitrine_ville, i.vitrine_region, i.vitrine_pays,
+      COUNT(c.id) AS nb_ventes
+    FROM produits_vitrine p JOIN commandes_vitrine c ON c.produit_id=p.id JOIN initiatives i ON i.id=p.initiative_id
+    WHERE (p.statut IS NULL OR p.statut != 'masque') AND i.vitrine_active=1
+    GROUP BY p.id ORDER BY nb_ventes DESC LIMIT 10
+  `).all();
+  const produits = rows.map(r => ({ ...r, photo: (safeParse(r.photos_json||"[]"))[0] || null }));
+  sendJSON(res, 200, { produits });
+});
+
+/* POST /api/fil/vitrine-clic — clic "Voir la vitrine" depuis le fil (best-effort, jamais bloquant) */
+route("POST", "/api/fil/vitrine-clic", async (req, res, params, body) => {
+  const cu = await getCurrentUser(req).catch(() => null);
+  const initiativeId = Number(body.initiative_id);
+  const typeCarte = ['vitrine','catalogue','promotion','meilleure_vente'].includes(body.type_carte) ? body.type_carte : 'vitrine';
+  if (!initiativeId) return sendJSON(res, 400, { error: "initiative_id requis." });
+  try {
+    await db.prepare("UPDATE initiatives SET vues=vues+1 WHERE id=?").run(initiativeId);
+    await db.prepare("INSERT INTO fil_vitrine_clics (initiative_id, type_carte, user_id) VALUES (?,?,?)").run(initiativeId, typeCarte, cu ? cu.id : null);
+  } catch (e) { /* silencieux */ }
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ---------- GET post unique ---------- */
@@ -2727,9 +3226,10 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
 
 /* ---------- Profil (lecture enrichie) ---------- */
 route("GET", "/api/profil/:id", async (req, res, params) => {
-  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie FROM users WHERE id=?").get(params.id);
+  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie,compte_masque FROM users WHERE id=?").get(params.id);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
   const me = await getCurrentUser(req);
+  if (u.compte_masque && (!me || Number(me.id) !== Number(u.id))) return sendJSON(res, 404, { error: "Profil introuvable." });
   const nbAbonnes    = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(u.id))?.n;
   const nbSuivis     = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE follower_id=?").get(u.id))?.n;
   const isFollowing  = me ? !!await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, u.id) : false;
@@ -3832,6 +4332,96 @@ async function enrichPost(p, cu) {
 }
 
 /* ---------- Fil intelligent ---------- */
+/* ── Cartes Vitrine dans le fil (vitrines/catalogues/promotions/meilleures ventes) ──
+   Calculées à la volée (pas stockées dans fil_posts). Score = localisation + nouveauté + popularité. */
+function filNorm(s) { return String(s||"").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+
+async function buildVitrineCards(cu, capCount) {
+  const cards = [];
+  const now = Date.now();
+
+  const vitrines = await db.prepare(`
+    SELECT id, nom, owner_user_id, vitrine_ville, vitrine_region, vitrine_pays, vitrine_banniere_url, created_at, vues
+    FROM initiatives WHERE vitrine_active=1 AND owner_user_id IS NOT NULL ORDER BY created_at DESC LIMIT 20
+  `).all();
+  vitrines.forEach(v => cards.push({
+    sous_type: 'vitrine', initiative_id: v.id, owner_user_id: v.owner_user_id, initiative_nom: v.nom,
+    ville: v.vitrine_ville, region: v.vitrine_region, pays: v.vitrine_pays, image_url: v.vitrine_banniere_url,
+    titre: v.nom, description: null, created_at: v.created_at, pop: Number(v.vues)||0,
+  }));
+
+  const catalogues = await db.prepare(`
+    SELECT c.id, c.nom, c.description, c.image_url, c.created_at, i.id AS initiative_id, i.owner_user_id, i.nom AS initiative_nom,
+      i.vitrine_ville, i.vitrine_region, i.vitrine_pays
+    FROM catalogues_vitrine c JOIN initiatives i ON i.id=c.initiative_id
+    WHERE c.statut='visible' AND i.vitrine_active=1 ORDER BY c.created_at DESC LIMIT 20
+  `).all();
+  catalogues.forEach(c => cards.push({
+    sous_type: 'catalogue', initiative_id: c.initiative_id, owner_user_id: c.owner_user_id, initiative_nom: c.initiative_nom,
+    ville: c.vitrine_ville, region: c.vitrine_region, pays: c.vitrine_pays, image_url: c.image_url,
+    titre: c.nom, description: c.description, created_at: c.created_at, pop: 0,
+  }));
+
+  const promotions = await db.prepare(`
+    SELECT pr.id, pr.titre, pr.description, pr.photo_url, pr.prix_initial, pr.prix_promo, pr.date_fin, pr.created_at,
+      i.id AS initiative_id, i.owner_user_id, i.nom AS initiative_nom, i.vitrine_ville, i.vitrine_region, i.vitrine_pays
+    FROM vitrine_promotions pr JOIN initiatives i ON i.id=pr.initiative_id
+    WHERE pr.date_fin >= datetime('now') AND i.vitrine_active=1 ORDER BY pr.created_at DESC LIMIT 20
+  `).all();
+  promotions.forEach(p => cards.push({
+    sous_type: 'promotion', initiative_id: p.initiative_id, owner_user_id: p.owner_user_id, initiative_nom: p.initiative_nom,
+    ville: p.vitrine_ville, region: p.vitrine_region, pays: p.vitrine_pays, image_url: p.photo_url,
+    titre: p.titre, description: p.description, prix_initial: p.prix_initial, prix_promo: p.prix_promo,
+    date_fin: p.date_fin, created_at: p.created_at, pop: 0,
+  }));
+
+  const meilleuresVentes = await db.prepare(`
+    SELECT p.id, p.nom, p.description, p.prix, p.devise, p.photos_json, p.created_at,
+      i.id AS initiative_id, i.owner_user_id, i.nom AS initiative_nom, i.vitrine_ville, i.vitrine_region, i.vitrine_pays,
+      COUNT(c.id) AS nb_ventes
+    FROM produits_vitrine p JOIN commandes_vitrine c ON c.produit_id=p.id JOIN initiatives i ON i.id=p.initiative_id
+    WHERE (p.statut IS NULL OR p.statut != 'masque') AND i.vitrine_active=1
+    GROUP BY p.id ORDER BY nb_ventes DESC LIMIT 3
+  `).all();
+  meilleuresVentes.forEach(m => {
+    const photos = safeParse(m.photos_json || "[]");
+    cards.push({
+      sous_type: 'meilleure_vente', initiative_id: m.initiative_id, owner_user_id: m.owner_user_id, initiative_nom: m.initiative_nom,
+      ville: m.vitrine_ville, region: m.vitrine_region, pays: m.vitrine_pays, image_url: photos[0] || null,
+      titre: m.nom, description: m.description, prix: m.prix, devise: m.devise, nb_ventes: m.nb_ventes,
+      created_at: m.created_at, pop: Number(m.nb_ventes)||0,
+    });
+  });
+
+  // Score = localisation + nouveauté (dégressif 14j) + popularité
+  const cuVille = cu ? filNorm(cu.ville) : "", cuRegion = cu ? filNorm(cu.region) : "", cuPays = cu ? filNorm(cu.pays) : "";
+  cards.forEach(c => {
+    let locBonus = 0;
+    if (cuVille && filNorm(c.ville).includes(cuVille)) locBonus = 30;
+    else if (cuRegion && filNorm(c.region).includes(cuRegion)) locBonus = 15;
+    else if (cuPays && filNorm(c.pays).includes(cuPays)) locBonus = 5;
+    const ageDays = (now - new Date(c.created_at).getTime()) / (24*3600*1000);
+    const recencyBonus = Math.max(0, 14 - ageDays);
+    c.score = locBonus + recencyBonus + Math.min(20, c.pop);
+  });
+
+  // Anti-répétition : au plus 1 carte par initiative (garde la mieux notée)
+  const parInitiative = new Map();
+  cards.forEach(c => {
+    const existing = parInitiative.get(c.initiative_id);
+    if (!existing || c.score > existing.score) parInitiative.set(c.initiative_id, c);
+  });
+
+  const finalCards = [...parInitiative.values()].sort((a,b) => b.score - a.score).slice(0, capCount);
+  return finalCards.map(c => ({
+    id: `vc-${c.sous_type}-${c.initiative_id}-${c.titre ? filNorm(c.titre).slice(0,8) : ''}`,
+    type: 'carte_vitrine', sous_type: c.sous_type, initiative_id: c.initiative_id, owner_user_id: c.owner_user_id,
+    initiative_nom: c.initiative_nom, ville: c.ville, region: c.region, pays: c.pays, image_url: c.image_url,
+    titre: c.titre, description: c.description, prix: c.prix, prix_initial: c.prix_initial, prix_promo: c.prix_promo,
+    devise: c.devise, nb_ventes: c.nb_ventes, date_fin: c.date_fin, created_at: c.created_at, source: 'vitrine',
+  }));
+}
+
 route("GET", "/api/fil", async (req, res, params, body, query) => {
   const cu = await getCurrentUser(req);
   const mode  = query.mode  || "tous";   // suivis | populaires | articles | tous
@@ -3932,10 +4522,28 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   (await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE 1=1 ${excludeClause} AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 30`).all(...excludeArgs))
     .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"global" }); } });
 
+  // 5) Cartes vitrine (vitrines/catalogues/promotions/meilleures ventes) — intercalées, plafonnées à ~30%
+  try {
+    const capCount = Math.max(1, Math.floor(allPosts.length * 0.3));
+    const vitrineCards = await buildVitrineCards(cu, capCount);
+    const merged = [];
+    let vi = 0;
+    allPosts.forEach((p, idx) => {
+      merged.push(p);
+      if ((idx + 1) % 4 === 0 && vi < vitrineCards.length) merged.push(vitrineCards[vi++]);
+    });
+    while (vi < vitrineCards.length) merged.push(vitrineCards[vi++]);
+    allPosts.length = 0;
+    allPosts.push(...merged);
+  } catch (e) { /* le fil classique doit toujours fonctionner même si les cartes vitrine échouent */ }
+
   // Pagination sur le résultat fusionné
   const total = allPosts.length;
   const paginated = allPosts.slice(offset, offset + limit);
-  sendJSON(res, 200, { posts: await Promise.all(paginated.map(p => enrichPost(p, cu))), total, page, pages: Math.ceil(total/limit), mode });
+  sendJSON(res, 200, {
+    posts: await Promise.all(paginated.map(p => p.type === 'carte_vitrine' ? p : enrichPost(p, cu))),
+    total, page, pages: Math.ceil(total/limit), mode
+  });
 });
 
 /* ---------- Follow / Unfollow utilisateur ---------- */
@@ -7748,6 +8356,84 @@ async function handleRequest(req, res) {
 
   const parsed = url.parse(req.url, true);
   const pathname = decodeURIComponent(parsed.pathname);
+
+  /* ── SEO : sitemap.xml (vitrines actives + pages principales) ── */
+  if (pathname === '/sitemap.xml') {
+    try {
+      const base = 'https://diaspoactif.com';
+      const vitrines = await db.prepare("SELECT owner_user_id FROM initiatives WHERE vitrine_active=1 AND owner_user_id IS NOT NULL").all();
+      const staticUrls = ['/', '/annuaire.html', '/fil-actualite.html', '/evenements.html', '/actualites.html'];
+      const urls = [
+        ...staticUrls.map(u => `<url><loc>${base}${u}</loc><changefreq>daily</changefreq></url>`),
+        ...vitrines.map(v => `<url><loc>${base}/profil.html?id=${v.owner_user_id}</loc><changefreq>weekly</changefreq></url>`),
+      ];
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>`;
+      res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+      res.end(xml);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Sitemap error');
+    }
+    return;
+  }
+
+  /* ── SEO : profil.html?id=X — injection dynamique du titre/meta/JSON-LD pour les vitrines actives ── */
+  if (pathname === '/profil.html' && parsed.query.id) {
+    try {
+      const uid = parsed.query.id;
+      const u = await db.prepare("SELECT id, nom, prenom, role FROM users WHERE id=?").get(uid);
+      const init = u ? await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(u.id) : null;
+      const filePath = path.join(ROOT, 'profil.html');
+      let html = await fs.promises.readFile(filePath, 'utf8');
+      const escAttr = s => String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const base = 'https://diaspoactif.com';
+      const pageUrl = `${base}/profil.html?id=${uid}`;
+
+      let title, description, image, noindex = false, jsonLd = '';
+      if (init && init.vitrine_active === 1) {
+        title = `${init.nom} — Vitrine | Diaspo'Actif`;
+        description = (init.description || `Découvrez ${init.nom} et ses produits sur Diaspo'Actif.`).slice(0, 160);
+        image = init.vitrine_banniere_url || `${base}/assets/logo.svg`;
+        const adresseParts = [init.vitrine_ville, init.vitrine_region, init.vitrine_pays].filter(Boolean);
+        jsonLd = `<script type="application/ld+json">${JSON.stringify({
+          "@context": "https://schema.org", "@type": "LocalBusiness",
+          name: init.nom, description: description, image: image, url: pageUrl,
+          address: adresseParts.length ? { "@type": "PostalAddress", addressLocality: init.vitrine_ville||undefined, addressRegion: init.vitrine_region||undefined, addressCountry: init.vitrine_pays||undefined } : undefined,
+        })}</script>`;
+      } else if (init && init.vitrine_active !== 1) {
+        title = `Diaspo'Actif — Profil`;
+        description = `Rejoignez Diaspo'Actif, la plateforme de la diaspora.`;
+        image = `${base}/assets/logo.svg`;
+        noindex = true;
+      } else if (u) {
+        title = `${[u.prenom, u.nom].filter(Boolean).join(' ')} — Diaspo'Actif`;
+        description = `Profil de ${[u.prenom, u.nom].filter(Boolean).join(' ')} sur Diaspo'Actif.`;
+        image = `${base}/assets/logo.svg`;
+      } else {
+        title = `Diaspo'Actif — Profil`;
+        description = `Rejoignez Diaspo'Actif, la plateforme de la diaspora.`;
+        image = `${base}/assets/logo.svg`;
+        noindex = true;
+      }
+
+      const metaBlock = `
+<meta name="description" content="${escAttr(description)}">
+${noindex ? '<meta name="robots" content="noindex, nofollow">' : `<link rel="canonical" href="${escAttr(pageUrl)}">`}
+<meta property="og:title" content="${escAttr(title)}">
+<meta property="og:description" content="${escAttr(description)}">
+<meta property="og:image" content="${escAttr(image)}">
+<meta property="og:url" content="${escAttr(pageUrl)}">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+${jsonLd}
+</head>`;
+
+      html = html.replace(/<title>.*?<\/title>/, `<title>${escAttr(title)}</title>`).replace('</head>', metaBlock);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      res.end(html);
+      return;
+    } catch (e) { /* en cas d'erreur, laisser tomber vers le fichier statique normal */ }
+  }
 
   /* ── Servir les vidéos uploadées ── */
   if (pathname.startsWith('/uploads/')) {

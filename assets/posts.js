@@ -157,7 +157,42 @@ function renderMedias(post) {
 }
 
 /* ── Carte de post ── */
+const VITRINE_CARD_BADGES = {
+  vitrine:         { emoji: '🛍️', label: 'Vitrine' },
+  catalogue:       { emoji: '📢', label: 'Nouveau catalogue' },
+  promotion:       { emoji: '🎉', label: 'Promotion' },
+  meilleure_vente: { emoji: '🔥', label: 'Meilleure vente' },
+};
+
+function renderVitrineCard(card) {
+  const badge = VITRINE_CARD_BADGES[card.sous_type] || VITRINE_CARD_BADGES.vitrine;
+  const loc = [card.ville, card.pays].filter(Boolean).join(', ');
+  const prixHtml = card.sous_type === 'promotion'
+    ? `<span style="text-decoration:line-through;color:#94a3b8;font-size:12.5px;">${card.prix_initial!=null?Number(card.prix_initial).toFixed(2)+' €':''}</span> <strong style="color:#dc2626;">${card.prix_promo!=null?Number(card.prix_promo).toFixed(2)+' €':''}</strong>`
+    : card.sous_type === 'meilleure_vente'
+      ? `<strong>${card.prix!=null?Number(card.prix).toFixed(2)+' '+(card.devise||'EUR'):''}</strong>${card.nb_ventes?` · ${card.nb_ventes} vente${card.nb_ventes>1?'s':''}`:''}`
+      : '';
+  return `
+  <div class="post-card vitrine-card" data-initiative="${card.initiative_id}">
+    <div class="post-header" style="display:flex;align-items:center;gap:8px;">
+      <span class="post-badge" style="background:#FEF3C7;color:#92400E;">${badge.emoji} ${escHtml(badge.label)}</span>
+      ${loc ? `<span class="post-badge post-badge-loc">📍 ${escHtml(loc)}</span>` : ''}
+    </div>
+    <div style="display:flex;gap:14px;padding:10px 0;">
+      ${card.image_url ? `<img loading="lazy" src="${escHtml(card.image_url)}" style="width:96px;height:96px;object-fit:cover;border-radius:10px;flex:none;">` : `<div style="width:96px;height:96px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:28px;flex:none;">${badge.emoji}</div>`}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:14.5px;">${escHtml(card.titre||card.initiative_nom||'')}</div>
+        <div style="font-size:12.5px;color:#6B7686;margin:2px 0 4px;">${escHtml(card.initiative_nom||'')}</div>
+        ${card.description ? `<div style="font-size:12.5px;color:#374151;margin-bottom:4px;">${escHtml((card.description||'').slice(0,90))}${(card.description||'').length>90?'…':''}</div>` : ''}
+        ${prixHtml ? `<div style="font-size:13px;margin-bottom:6px;">${prixHtml}</div>` : ''}
+        <button class="btn btn-sm btn-outline" onclick="voirVitrineDepuisFil(${card.initiative_id}, '${card.sous_type}', ${card.owner_user_id})">Voir la vitrine →</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderPostCard(post, options = {}) {
+  if (post.type === 'carte_vitrine') return renderVitrineCard(post);
   const { currentUserId, showStats } = options;
   const isAuteur = currentUserId && post.auteur_id === currentUserId;
   const reactions = post.reactions || {};
@@ -962,5 +997,11 @@ const Posts = {
 };
 
 window.Posts = Posts;
+
+/* Clic "Voir la vitrine" depuis une carte du fil : trace le clic (best-effort) puis redirige */
+window.voirVitrineDepuisFil = function(initiativeId, sousType, ownerUserId) {
+  apiRequest('POST', '/api/fil/vitrine-clic', { initiative_id: initiativeId, type_carte: sousType }).catch(() => {});
+  window.location.href = `profil.html?id=${ownerUserId}#vitrine`;
+};
 
 })();

@@ -61,6 +61,7 @@
       <div class="sb-group-lbl">05 — COMMUNICATION</div>
       <a href="messagerie.html">🟥 Messages <span class="pill" id="msg-count">—</span></a>
       <a href="#messages-vitrine" data-section="messages-vitrine">🛍️ Messages de la vitrine <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
+      <a href="#parametres-vitrine" data-section="parametres-vitrine">⭐ Paramètres Vitrine</a>
       <a href="#recrutement" data-section="recrutement">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
       <a href="agenda.html">📅 Mon Agenda</a>
       <a href="reseau.html">🌐 Mon Réseau Pro <span class="pill" id="reseau-badge" style="display:none;"></span></a>
@@ -154,6 +155,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
   /* Vitrine : id initiative exposé + badge messages vitrine */
   window.__vitrineInitId = init ? init.id : null;
+  window.__vitrineActive = init ? Number(init.vitrine_active) : 0;
   if (init) { try { updateVitrineBadge(); } catch(e){} }
 
   /* Pas encore d'initiative liée → formulaire de création multi-étapes */
@@ -883,6 +885,21 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>
       <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Conversations issues de votre boutique. Chaque message peut être lié à un produit précis.</p>
       <div id="messages-vitrine-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <!-- ══ SECTION ⭐ PARAMÈTRES VITRINE ══ -->
+    <div style="display:none;" id="parametres-vitrine">
+      <h2 style="margin:0 0 16px;">⭐ Paramètres Vitrine</h2>
+
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 12px;font-size:15px;">👁️ Statut de la vitrine</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Choisissez si votre vitrine est visible par les visiteurs, ou masquée le temps de la préparer.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn" id="btn-statut-visible" onclick="definirStatutVitrine(1)" style="flex:1;min-width:180px;justify-content:center;">🟢 Visible</button>
+          <button class="btn" id="btn-statut-masque" onclick="definirStatutVitrine(0)" style="flex:1;min-width:180px;justify-content:center;">🔒 Non visible</button>
+        </div>
+        <div id="parametres-vitrine-statut" style="margin-top:12px;font-size:13px;font-weight:700;"></div>
+      </div>
     </div>
 
     <!-- ══ SECTIONS GESTION ASSOCIATION ══ -->
@@ -2275,6 +2292,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </a>
       </div>
       <div class="card" style="margin-top:16px;">
+        <h3 style="margin:0 0 12px;font-size:15px;">👁️ Visibilité de la vitrine</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div id="vitrine-visibilite-statut" style="font-size:14px;font-weight:700;"></div>
+          <button class="btn btn-outline" onclick="initShowSection('parametres-vitrine')">⭐ Paramètres Vitrine</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
         <h3 style="margin:0 0 12px;font-size:15px;">📱 QR code de ma vitrine</h3>
         <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
           <div id="cockpit-vitrine-qr" style="flex-shrink:0;"></div>
@@ -2296,6 +2320,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         });
       }
     } catch(e) {}
+
+    renderVisibiliteVitrineStatut(init.vitrine_active);
 
     /* Section mes-projets */
     const projetsSec = document.createElement('div');
@@ -2489,7 +2515,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals','messages-vitrine','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
+  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals','messages-vitrine','parametres-vitrine','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -2502,6 +2528,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'deals') renderDealsSection();
     if (name === 'messages-vitrine') renderMessagesVitrine();
+    if (name === 'parametres-vitrine') renderStatutVitrineSection();
     if (name === 'paiement') renderPaiementMarketplace();
     if (name === 'asso-accreditation') renderAssoAccreditation();
     if (name === 'asso-cockpit') renderAssoCockpit();
@@ -3423,6 +3450,65 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
 })();
+
+/* ══════════════════════════════════════════════
+   VISIBILITÉ DE LA VITRINE (masquée/publique) — Dashboard Initiative
+══════════════════════════════════════════════ */
+function renderVisibiliteVitrineStatut(vitrineActive) {
+  const el = document.getElementById('vitrine-visibilite-statut');
+  const btn = document.getElementById('btn-visibilite-vitrine');
+  if (!el) return;
+  const actif = Number(vitrineActive) === 1;
+  el.innerHTML = actif
+    ? '<span style="color:#16a34a;">🟢 Vitrine publique</span>'
+    : '<span style="color:#dc2626;">🔒 Vitrine masquée</span>';
+  if (btn) btn.textContent = actif ? '👁️ Visibilité de la vitrine' : '👁️‍🗨️ Rendre la vitrine publique';
+}
+
+function renderStatutVitrineSection() {
+  const actif = Number(window.__vitrineActive) === 1;
+  const elStatut = document.getElementById('parametres-vitrine-statut');
+  if (elStatut) elStatut.innerHTML = actif
+    ? '<span style="color:#16a34a;">🟢 Vitrine publique — visible par les visiteurs</span>'
+    : '<span style="color:#dc2626;">🔒 Vitrine non visible — masquée aux visiteurs</span>';
+  const btnVisible = document.getElementById('btn-statut-visible');
+  const btnMasque = document.getElementById('btn-statut-masque');
+  if (btnVisible) { btnVisible.classList.toggle('btn-orange', actif); btnVisible.classList.toggle('btn-outline', !actif); }
+  if (btnMasque) { btnMasque.classList.toggle('btn-orange', !actif); btnMasque.classList.toggle('btn-outline', actif); }
+}
+
+function definirStatutVitrine(nouvelEtat) {
+  if (Number(nouvelEtat) === Number(window.__vitrineActive)) return;
+  if (Number(nouvelEtat) === 1) { toggleVisibiliteVitrine(1); return; }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'visibilite-vitrine-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:26px;">
+      <h2 style="margin:0 0 12px;font-size:17px;">Masquer votre vitrine ?</h2>
+      <p style="font-size:13.5px;color:#475569;line-height:1.7;margin:0 0 16px;">
+        Votre vitrine ne sera plus visible par les visiteurs, ne sera plus affichée dans Vitrine Market, les recherches, les recommandations et le fil d'actualité.<br><br>
+        Vos données seront conservées et vous pourrez la rendre publique à tout moment.
+      </p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('visibilite-vitrine-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
+        <button onclick="toggleVisibiliteVitrine(0)" style="padding:9px 16px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;">Masquer la vitrine</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function toggleVisibiliteVitrine(nouvelEtat) {
+  try {
+    await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine`, { vitrine_active: !!nouvelEtat });
+    window.__vitrineActive = nouvelEtat;
+    renderVisibiliteVitrineStatut(nouvelEtat);
+    renderStatutVitrineSection();
+    document.getElementById('visibilite-vitrine-modal')?.remove();
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
 
 /* ══════════════════════════════════════════════
    MODULE GÉRER UN DEAL — Dashboard Initiative

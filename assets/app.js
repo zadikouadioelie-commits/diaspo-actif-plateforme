@@ -537,10 +537,28 @@ async function initAnnuaire(){
   }
 
   /* État des filtres */
-  const state = { typeOrg: "", paysRes: "", paysOrig: "", ville: "" };
+  const state = { typeOrg: "", paysRes: "", paysOrig: "", ville: "", nom: "", prenom: "" };
+  let USERS_CACHE = null;
 
   /* Normalisation */
   const norm = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g,"");
+
+  function renderPersonCard(u) {
+    const loc = [u.ville, u.pays].filter(Boolean).join(', ') || '—';
+    return `
+    <a class="ann-card" href="profil.html?id=${encodeURIComponent(u.id)}">
+      <div class="ann-card-photo" style="position:relative;display:flex;align-items:center;justify-content:center;background:#f1f5f9;">
+        ${photoAvatar([u.prenom,u.nom].filter(Boolean).join(' ')||u.nom, 96, 'user')}
+        <span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>
+      </div>
+      <div class="ann-card-body">
+        <div class="ann-card-title">${[u.prenom, u.nom].filter(Boolean).join(' ')}</div>
+        <div class="ann-card-meta-row"><span class="ann-card-loc">📍 ${loc}</span></div>
+        ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
+        <div class="ann-card-foot"><span class="ann-arrow">→</span></div>
+      </div>
+    </a>`;
+  }
 
   /* ── Rendu des chips filtres actifs ── */
   function renderChips() {
@@ -551,6 +569,8 @@ async function initAnnuaire(){
       paysRes:  "Résidence",
       paysOrig: "Origine",
       ville:    "Ville",
+      nom:      "Nom",
+      prenom:   "Prénom",
     };
     const active = Object.entries(state).filter(([,v]) => v);
     bar.style.display = active.length ? "flex" : "none";
@@ -567,7 +587,34 @@ async function initAnnuaire(){
   let filtered_count = ALL.length;
 
   /* ── Appliquer les filtres ── */
-  function apply() {
+  async function apply() {
+    const prenomGroup = document.getElementById("f-prenom-group");
+    if (prenomGroup) prenomGroup.style.display = state.typeOrg === "Utilisateurs" ? "" : "none";
+
+    if (state.typeOrg === "Utilisateurs") {
+      if (!USERS_CACHE) {
+        try { const r = await api("GET", "/annuaire/utilisateurs"); USERS_CACHE = r.users || []; }
+        catch(e) { USERS_CACHE = []; }
+      }
+      const filtered = USERS_CACHE.filter(u => {
+        if (state.nom && !norm(u.nom||"").includes(norm(state.nom))) return false;
+        if (state.prenom && !norm(u.prenom||"").includes(norm(state.prenom))) return false;
+        if (state.ville && !norm(u.ville||"").includes(norm(state.ville))) return false;
+        return true;
+      });
+      filtered_count = filtered.length;
+      document.getElementById("result-count").textContent = filtered.length;
+      list.innerHTML = filtered.length
+        ? filtered.map(renderPersonCard).join("")
+        : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
+            <div style="font-size:2rem;margin-bottom:12px;">🔍</div>
+            <p style="font-weight:700;margin-bottom:6px;">Aucun utilisateur trouvé</p>
+            <p style="font-size:.88rem;">Essayez avec d'autres filtres ou <button onclick="annResetFilters()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:700;text-decoration:underline;">réinitialisez la recherche</button>.</p>
+          </div>`;
+      renderChips();
+      return;
+    }
+
     const filtered = ALL.filter(it => {
       const villeParts = (it.ville||"").split(",");
       const itVille    = norm(villeParts[0]);
@@ -581,6 +628,7 @@ async function initAnnuaire(){
           && !norm(it.origine1||"").includes(norm(state.paysOrig))
           && !norm(it.origine2||"").includes(norm(state.paysOrig))) return false;
       if (state.ville && !itVille.includes(norm(state.ville))) return false;
+      if (state.nom && !norm(it.nom||"").includes(norm(state.nom))) return false;
       return true;
     });
 
@@ -598,11 +646,15 @@ async function initAnnuaire(){
 
   /* ── Exposer reset et removeFilter globalement ── */
   window.annResetFilters = function() {
-    state.typeOrg = state.paysRes = state.paysOrig = state.ville = "";
+    state.typeOrg = state.paysRes = state.paysOrig = state.ville = state.nom = state.prenom = "";
     const typeEl = document.getElementById("f-type-org");
     if (typeEl) typeEl.value = "";
     const villeEl = document.getElementById("f-ville-simple");
     if (villeEl) villeEl.value = "";
+    const nomEl = document.getElementById("f-nom-simple");
+    if (nomEl) nomEl.value = "";
+    const prenomEl = document.getElementById("f-prenom-simple");
+    if (prenomEl) prenomEl.value = "";
     // Reset GeoAutocomplete (vider le champ input visible)
     ["f-pays-res","f-pays-orig"].forEach(id => {
       const wrap = document.getElementById(id);
@@ -615,6 +667,8 @@ async function initAnnuaire(){
     state[key] = "";
     if (key === "typeOrg") { const el = document.getElementById("f-type-org"); if(el) el.value = ""; }
     if (key === "ville")   { const el = document.getElementById("f-ville-simple"); if(el) el.value = ""; }
+    if (key === "nom")     { const el = document.getElementById("f-nom-simple"); if(el) el.value = ""; }
+    if (key === "prenom")  { const el = document.getElementById("f-prenom-simple"); if(el) el.value = ""; }
     if (key === "paysRes") {
       const wrap = document.getElementById("f-pays-res");
       if (wrap) { const inp = wrap.querySelector("input"); if(inp) inp.value = ""; }
@@ -636,6 +690,22 @@ async function initAnnuaire(){
   if (villeEl) villeEl.addEventListener("input", () => {
     clearTimeout(_villeTimer);
     _villeTimer = setTimeout(() => { state.ville = villeEl.value.trim(); apply(); }, 300);
+  });
+
+  /* ── Nom (texte libre, debounce) ── */
+  let _nomTimer;
+  const nomEl = document.getElementById("f-nom-simple");
+  if (nomEl) nomEl.addEventListener("input", () => {
+    clearTimeout(_nomTimer);
+    _nomTimer = setTimeout(() => { state.nom = nomEl.value.trim(); apply(); }, 300);
+  });
+
+  /* ── Prénom (texte libre, debounce, uniquement visible en mode Utilisateurs) ── */
+  let _prenomTimer;
+  const prenomEl = document.getElementById("f-prenom-simple");
+  if (prenomEl) prenomEl.addEventListener("input", () => {
+    clearTimeout(_prenomTimer);
+    _prenomTimer = setTimeout(() => { state.prenom = prenomEl.value.trim(); apply(); }, 300);
   });
 
   /* ── Bouton reset ── */

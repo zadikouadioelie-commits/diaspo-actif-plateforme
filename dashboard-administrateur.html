@@ -67,6 +67,7 @@
       <a href="#communication" data-section="communication">✉ Communication</a>
       <a href="#publications" data-section="publications">📢 Publications</a>
       <a href="#moderation" data-section="moderation">🛡 Modération</a>
+      <a href="#suppression-comptes" data-section="suppression-comptes" style="display:flex;justify-content:space-between;align-items:center;">🗑 Demandes de suppression <span id="delreq-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="#publicites" data-section="publicites">📣 Publicités</a>
       <a href="audiovisuel.html">📺 Audiovisuel</a>
 
@@ -4480,6 +4481,30 @@
         </div>
       </section>
 
+      <!-- DEMANDES DE SUPPRESSION DE COMPTE (RGPD) -->
+      <section id="section-suppression-comptes" style="display:none;">
+        <h2>🗑 Demandes de suppression de compte</h2>
+        <div class="notice" style="margin-bottom:16px;">Chaque demande génère un dossier avec historique et messagerie privée. La suppression n'est jamais automatique : elle nécessite une validation explicite après échange avec le demandeur.</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" data-delf="type" data-val="" onclick="setDelReqFilter('type','')">Tous types</button>
+          <button class="btn btn-sm btn-outline" data-delf="type" data-val="utilisateur" onclick="setDelReqFilter('type','utilisateur')">Utilisateurs</button>
+          <button class="btn btn-sm btn-outline" data-delf="type" data-val="initiative" onclick="setDelReqFilter('type','initiative')">Initiatives</button>
+          <button class="btn btn-sm btn-outline" data-delf="type" data-val="collectivite" onclick="setDelReqFilter('type','collectivite')">Institutions</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-orange" data-delf="statut" data-val="" onclick="setDelReqFilter('statut','')">Tous statuts</button>
+          <button class="btn btn-sm btn-outline" data-delf="statut" data-val="demande_recue" onclick="setDelReqFilter('statut','demande_recue')">🟡 En attente</button>
+          <button class="btn btn-sm btn-outline" data-delf="statut" data-val="en_discussion" onclick="setDelReqFilter('statut','en_discussion')">🔵 En discussion</button>
+          <button class="btn btn-sm btn-outline" data-delf="statut" data-val="validee" onclick="setDelReqFilter('statut','validee')">🟢 Validées</button>
+          <button class="btn btn-sm btn-outline" data-delf="statut" data-val="refusee" onclick="setDelReqFilter('statut','refusee')">🔴 Refusées</button>
+          <button class="btn btn-sm btn-outline" data-delf="statut" data-val="compte_supprime" onclick="setDelReqFilter('statut','compte_supprime')">⚫ Supprimées</button>
+        </div>
+        <div class="card">
+          <div id="delreq-list"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+        <div id="delreq-dossier" style="display:none;margin-top:16px;"></div>
+      </section>
+
       <!-- JOURNAL D'ERREURS (monitoring maison) -->
       <section id="section-error-logs" style="display:none;">
         <h2>🩺 Journal d'erreurs serveur</h2>
@@ -4890,6 +4915,112 @@ document.querySelectorAll(".sidebar a[data-section='moderation']").forEach(a => 
       if (badge) { badge.textContent = total; badge.style.display = total ? '' : 'none'; }
     }).catch(()=>{});
   }, 100));
+});
+
+/* ---- Demandes de suppression de compte (RGPD) ---- */
+let _delReqFilterType = '', _delReqFilterStatut = '';
+const DELREQ_STATUT_LABELS = {
+  demande_recue: '🟡 Demande reçue', en_discussion: '🔵 En discussion', en_cours_analyse: '🟠 En cours d\'analyse',
+  validee: '🟢 Validée', refusee: '🔴 Refusée', compte_supprime: '⚫ Compte supprimé',
+};
+function setDelReqFilter(kind, val) {
+  if (kind === 'type') _delReqFilterType = val; else _delReqFilterStatut = val;
+  document.querySelectorAll(`[data-delf="${kind}"]`).forEach(b => b.classList.toggle('btn-orange', b.dataset.val === val) || b.classList.toggle('btn-outline', b.dataset.val !== val));
+  loadDelReqList();
+}
+async function loadDelReqList() {
+  const el = document.getElementById('delreq-list');
+  document.getElementById('delreq-dossier').style.display = 'none';
+  try {
+    const r = await api('GET', '/admin/deletion-requests');
+    let rows = r.requests || [];
+    if (_delReqFilterType) rows = rows.filter(x => x.type_compte === _delReqFilterType);
+    if (_delReqFilterStatut) rows = rows.filter(x => x.statut === _delReqFilterStatut);
+    const enAttente = (r.requests||[]).filter(x => x.statut === 'demande_recue').length;
+    const badge = document.getElementById('delreq-badge');
+    if (badge) { badge.textContent = enAttente; badge.style.display = enAttente ? '' : 'none'; }
+    if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune demande.</p>'; return; }
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="text-align:left;border-bottom:1.5px solid var(--border);">
+        <th style="padding:8px;">Nom</th><th style="padding:8px;">Type</th><th style="padding:8px;">Date</th>
+        <th style="padding:8px;">Statut</th><th style="padding:8px;">Dernier échange</th><th style="padding:8px;">Admin</th><th></th>
+      </tr></thead><tbody>
+      ${rows.map(x => `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px;">${x.user_nom||'—'}</td>
+        <td style="padding:8px;">${x.type_compte}</td>
+        <td style="padding:8px;">${new Date(x.created_at).toLocaleDateString('fr-FR')}</td>
+        <td style="padding:8px;">${DELREQ_STATUT_LABELS[x.statut]||x.statut}</td>
+        <td style="padding:8px;">${x.dernier_echange ? new Date(x.dernier_echange).toLocaleDateString('fr-FR') : '—'}</td>
+        <td style="padding:8px;">${x.admin_nom||'—'}</td>
+        <td style="padding:8px;"><button class="btn btn-sm btn-outline" onclick="openDelReqDossier(${x.id})">📂 Ouvrir</button></td>
+      </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) { el.innerHTML = '<p style="color:red;font-size:13px;">Erreur de chargement.</p>'; }
+}
+async function openDelReqDossier(id) {
+  const panel = document.getElementById('delreq-dossier');
+  panel.style.display = '';
+  panel.innerHTML = '<p style="color:var(--muted);font-size:13px;">Chargement…</p>';
+  try {
+    const r = await api('GET', `/admin/deletion-requests/${id}`);
+    const dr = r.request;
+    const terminal = ['refusee','compte_supprime'].includes(dr.statut);
+    panel.innerHTML = `
+      <div class="card">
+        <h3 style="margin:0 0 8px;">Dossier ${dr.numero_dossier} — ${dr.user_nom} (${dr.user_role})</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 4px;">Email : ${dr.user_email||'—'} · Statut : ${DELREQ_STATUT_LABELS[dr.statut]||dr.statut}</p>
+        ${dr.motif ? `<p style="font-size:13px;margin:0 0 4px;">Motif initial : ${dr.motif}</p>` : ''}
+        ${dr.admin_justification ? `<p style="font-size:13px;color:#dc2626;margin:0 0 8px;">Justification : ${dr.admin_justification}</p>` : ''}
+
+        <h4 style="margin:14px 0 6px;">Historique</h4>
+        <div style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:12px;color:var(--muted);margin-bottom:14px;">
+          ${dr.historique.map(h => `<div>${new Date(h.created_at).toLocaleString('fr-FR')} — ${h.action}${h.admin_nom ? ' par ' + h.admin_nom : ''}${h.note ? ' — ' + h.note : ''}</div>`).join('')}
+        </div>
+
+        <h4 style="margin:14px 0 6px;">Messagerie privée</h4>
+        <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;">
+          ${(dr.messages||[]).map(m => `<div style="margin-bottom:8px;"><div style="font-size:11px;font-weight:700;">${m.sender_nom||'—'} · ${new Date(m.created_at).toLocaleString('fr-FR')}</div><div style="font-size:13px;">${m.contenu}</div></div>`).join('') || '<p style="font-size:12px;color:var(--muted);">Aucun message.</p>'}
+        </div>
+        ${!terminal ? `<div style="display:flex;gap:8px;margin-bottom:16px;">
+          <input type="text" id="delreq-msg-input" placeholder="Répondre au demandeur…" style="flex:1;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;">
+          <button class="btn btn-sm btn-outline" onclick="sendDelReqMsg(${dr.id})">Envoyer</button>
+        </div>` : ''}
+
+        ${!terminal ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" onclick="patchDelReqStatut(${dr.id},'en_discussion')">🔵 En discussion</button>
+          <button class="btn btn-sm btn-outline" onclick="patchDelReqStatut(${dr.id},'en_cours_analyse')">🟠 En cours d'analyse</button>
+          <button class="btn btn-sm" style="background:#16a34a;color:#fff;" onclick="confirmerValidationDelReq(${dr.id})">✅ Valider la suppression</button>
+          <button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="refuserDelReq(${dr.id})">❌ Refuser</button>
+        </div>` : '<p style="font-size:12px;color:var(--muted);">Dossier clos.</p>'}
+      </div>`;
+  } catch(e) { panel.innerHTML = '<p style="color:red;font-size:13px;">Erreur de chargement du dossier.</p>'; }
+}
+async function sendDelReqMsg(id) {
+  const input = document.getElementById('delreq-msg-input');
+  const contenu = input.value.trim();
+  if (!contenu) return;
+  await api('POST', `/deletion-requests/${id}/messages`, { contenu });
+  input.value = '';
+  openDelReqDossier(id);
+}
+async function patchDelReqStatut(id, statut, justification) {
+  try {
+    await api('PATCH', `/admin/deletion-requests/${id}`, { statut, justification });
+    openDelReqDossier(id);
+    loadDelReqList();
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+function confirmerValidationDelReq(id) {
+  if (!confirm('Valider la suppression définitive ? Cette action est irréversible : les données personnelles seront anonymisées immédiatement.')) return;
+  patchDelReqStatut(id, 'validee');
+}
+function refuserDelReq(id) {
+  const justification = prompt('Motif du refus (obligatoire) :');
+  if (!justification || !justification.trim()) return;
+  patchDelReqStatut(id, 'refusee', justification.trim());
+}
+document.querySelectorAll(".sidebar a[data-section='suppression-comptes']").forEach(a => {
+  a.addEventListener('click', () => setTimeout(loadDelReqList, 100));
 });
 
 let _comptesStatut = 'en_attente';

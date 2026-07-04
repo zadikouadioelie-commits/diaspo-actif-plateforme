@@ -1722,6 +1722,13 @@ async function renderVitrine() {
   }
   _vitrineInit = init;
 
+  // Vitrine masquée par son propriétaire : invisible aux visiteurs (sauf admin), le propriétaire garde accès complet
+  const isAdmin = CU && CU.role === 'administrateur';
+  if (init.vitrine_active === 0 && !isOwn && !isAdmin) {
+    el.innerHTML = `<div class="empty-p" style="padding:40px 0;"><div class="ei">🔒</div>Cette vitrine n'est pas disponible pour le moment.</div>`;
+    return;
+  }
+
   // Vue hi-fi unifiée (propriétaire ET visiteur) — le propriétaire voit la même vitrine
   // restylée que ses visiteurs, avec des contrôles de modification en plus (voir
   // renderVitrineVisitor()). Le code de gestion "ancien style" ci-dessous n'est plus
@@ -1824,6 +1831,44 @@ const PVT_THEMES = [
   { id:'or',       color:'#8A5E1A', label:'Or' },
 ];
 
+/* Bibliothèque de catégories de services — évolutive : ajouter une ligne suffit. */
+const VITRINE_CATEGORIES = [
+  ['restauration','🍽️','Restauration'],['boulangerie','🥖','Boulangerie'],['patisserie','🍰','Pâtisserie'],
+  ['cafe','☕','Café'],['bar','🍹','Bar'],['hotellerie','🏨','Hôtellerie'],
+  ['transport','🚚','Transport'],['taxi','🚖','Taxi'],['logistique','🚛','Logistique'],
+  ['btp','🏗️','BTP'],['immobilier','🏠','Immobilier'],['juridique','⚖️','Juridique'],
+  ['comptabilite','💼','Comptabilité'],['conseil','📈','Conseil'],['formation','📚','Formation'],
+  ['coaching','🎓','Coaching'],['informatique','💻','Informatique'],['dev_web','📱','Développement Web'],
+  ['graphisme','🎨','Graphisme'],['audiovisuel','🎬','Audiovisuel'],['photographie','📸','Photographie'],
+  ['musique','🎵','Musique'],['spectacle','🎭','Arts du spectacle'],['artisanat','🖌️','Artisanat'],
+  ['mode','👗','Mode'],['beaute','💄','Beauté'],['coiffure','💇','Coiffure'],
+  ['bien_etre','💆','Bien-être'],['sante','🏥','Santé'],['cabinet_medical','🩺','Cabinet médical'],
+  ['agriculture','🌾','Agriculture'],['peche','🐟','Pêche'],['industrie','🏭','Industrie'],
+  ['textile','🧵','Textile'],['commerce','🛒','Commerce'],['ecommerce','📦','E-commerce'],
+  ['reparation','🛠️','Réparation'],['maintenance','🔧','Maintenance'],['electricite','🔌','Électricité'],
+  ['plomberie','🚰','Plomberie'],['menuiserie','🪵','Menuiserie'],['espaces_verts','🌳','Espaces verts'],
+  ['nettoyage','🧹','Nettoyage'],['services_personne','🧒','Services à la personne'],['animalier','🐶','Services animaliers'],
+  ['association','🏛️','Association'],['ong','🌍','ONG'],
+  ['education','🏫','Éducation'],['traduction','🈺','Traduction & interprétariat'],['securite','🛡️','Sécurité & gardiennage'],
+  ['assurance','📄','Assurance'],['import_export','🚢','Import-Export'],['tourisme','🧳','Tourisme & voyage'],
+  ['evenementiel','🎪','Événementiel'],['demenagement','📦','Déménagement'],['location_vehicules','🚗','Location de véhicules'],
+  ['recrutement','🧑‍💼','Recrutement & RH'],['marketing','📣','Marketing & publicité'],['blanchisserie','🧺','Blanchisserie'],
+  ['funeraire','🕊️','Services funéraires'],['veterinaire','🐾','Vétérinaire'],['pharmacie','💊','Pharmacie'],
+  ['optique','👓','Optique'],['dentaire','🦷','Dentaire'],['sport','🏋️','Sport & fitness'],
+  ['decoration','🖼️','Décoration d\'intérieur'],['jardinerie','🌻','Jardinerie'],['elevage','🐄','Élevage'],
+  ['distribution','🚛','Vente en gros & distribution'],['transit_douane','🛃','Transit & douane'],['notariat','🖋️','Notariat'],
+  ['traiteur','🍱','Traiteur'],['livraison_repas','🛵','Livraison de repas'],['cybersecurite','🔐','Cybersécurité'],
+  ['energie_solaire','☀️','Énergie & solaire'],['eau_assainissement','🚿','Eau & assainissement'],['recyclage','♻️','Recyclage'],
+  ['imprimerie','🖨️','Imprimerie & papeterie'],['gestion_locative','🏢','Gestion locative & syndic'],['microfinance','🏦','Microfinance'],
+  ['transfert_argent','💸','Transfert d\'argent'],['crypto','🪙','Crypto & blockchain'],['centre_appel','☎️','Centre d\'appel'],
+  ['location_materiel','🧰','Location de matériel'],['agence_voyage','🛫','Agence de voyage'],['guide_touristique','🗺️','Guide touristique'],
+  ['autre','➕','Autre…'],
+];
+function vitrineCategorieLabel(cle) { const c = VITRINE_CATEGORIES.find(x=>x[0]===cle); return c ? c[1]+' '+c[2] : cle; }
+
+/* Palette d'émojis pour les arguments "Pourquoi nous choisir" */
+const VITRINE_ICONES = ['✔️','⭐','🏆','🚚','🎁','🏭','🌍','🔒','❄️','💯','🤝','💳','🛡️','⏱️','📦','🌱','♻️','👍','🔧','💎','🎯','✨','📍','☎️','💬','🏅','🧾','🔥','🧊','🌟','🚀','🧰','🧑‍🔧','🏷️','✅'];
+
 async function renderVitrineVisitor(init) {
   const el = document.getElementById('p-vitrine');
   const theme = PVT_THEMES.some(t => t.id === init.vitrine_theme) ? init.vitrine_theme : 'bordeaux';
@@ -1837,10 +1882,11 @@ async function renderVitrineVisitor(init) {
   _produitsVitrine = produits;
   _boutiqueInit = init;
 
-  // Regroupement par catégorie (Collections)
-  const cats = {};
-  produits.forEach(p => { const c = (p.categorie||'').trim(); if (c) cats[c] = (cats[c]||0)+1; });
-  const collections = Object.keys(cats);
+  // Charger les catalogues (regroupement des articles par univers, max 5 articles/catalogue)
+  let catalogues = [];
+  try { const rc = await api('GET', `/initiatives/${init.id}/catalogues`); catalogues = rc.catalogues || []; } catch (e) { catalogues = []; }
+  _cataloguesVitrine = catalogues;
+  const articlesNonClasses = produits.filter(p => p.catalogue_id == null);
 
   const tel = init.tel_responsable || '';
   const telClean = tel.replace(/[^0-9+]/g,'');
@@ -1849,16 +1895,17 @@ async function renderVitrineVisitor(init) {
   // Sous-nav : uniquement les sections présentes
   const navItems = [];
   if (init.description || isOwn)      navItems.push(['presentation','Présentation']);
-  if (collections.length)             navItems.push(['collections','Collections']);
-  if (produits.length || isOwn)       navItems.push(['produits','Produits']);
-  if (produits.some(p => p.prix_promo != null) || isOwn) navItems.push(['promos','Promotions']);
-  if (init.vitrine_services || isOwn) navItems.push(['services','Services']);
-  if (init.vitrine_pourquoi_choisir || isOwn) navItems.push(['pourquoi','Pourquoi nous']);
+  if (catalogues.length || isOwn)     navItems.push(['collections','Catalogue']);
+  if (articlesNonClasses.length || isOwn) navItems.push(['produits','Non classé']);
+  navItems.push(['promos','Promotions']);
+  if (init.vitrine_services_categories_json || init.vitrine_services || isOwn) navItems.push(['services','Services']);
+  navItems.push(['pourquoi','Pourquoi nous']);
   if (galerie.length)                 navItems.push(['galerie','Galerie']);
   navItems.push(['avis','Avis']);
   if (init.vitrine_partenaires_json || init.vitrine_objectif_cible || isOwn) navItems.push(['partenaires','Partenaires']);
   if (init.vitrine_documents_json || isOwn) navItems.push(['telechargements','Téléchargements']);
   navItems.push(['contact','Contact']);
+  if (init.vitrine_google_maps_url || init.adresse || isOwn) navItems.push(['carte','Carte']);
 
   const subnav = `<div class="pvt-subnav">${navItems.map((n,i)=>`<a href="#pv-${n[0]}"${i===0?' class="active"':''}>${n[1]}</a>`).join('')}</div>`;
 
@@ -1868,7 +1915,7 @@ async function renderVitrineVisitor(init) {
     <div class="pvt-hero-content">
       <div class="pvt-hero-title">${esc(init.nom||'Vitrine')}</div>
       ${slogan ? `<div class="pvt-hero-sub">${slogan}</div>` : ''}
-      ${produits.length ? `<a href="#pv-produits" class="pvt-hero-cta">VOIR NOS PRODUITS</a>` : ''}
+      ${(catalogues.length || produits.length) ? `<a href="${catalogues.length?'#pv-collections':'#pv-produits'}" class="pvt-hero-cta">VOIR NOS PRODUITS</a>` : ''}
     </div>
     ${isOwn ? `<button onclick="editVitrineBanner()" style="position:absolute;top:14px;right:14px;z-index:5;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;">📷 ${banniere?'Changer':'Ajouter'} la bannière</button>` : ''}
   </section>`;
@@ -1894,10 +1941,9 @@ async function renderVitrineVisitor(init) {
     <div class="pvt-section-body"><p style="margin:0;font-size:14px;line-height:1.7;color:#3B4658;">${init.description ? esc(init.description).replace(/\n/g,'<br>') : `<span style="color:#94a3b8;font-style:italic;">Aucune présentation. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</p></div>
   </section>` : '';
 
-  const collEmoji = { miels:'🍯', épices:'🌶️', epices:'🌶️', cafés:'☕', cafes:'☕', coffrets:'🎁', artisanat:'🌿' };
-  const collectionsSec = collections.length ? `<section id="pv-collections" class="pvt-section">
-    <div class="pvt-section-head"><h3>Nos collections</h3></div>
-    <div class="pvt-collections">${collections.map(c=>`<a href="#pv-produits" class="pvt-coll-tile" style="text-decoration:none;"><div class="pvt-coll-emoji">${collEmoji[c.toLowerCase()]||'🛍️'}</div><div class="pvt-coll-label">${esc(c)} <span style="color:#8794A7;font-weight:500;">(${cats[c]})</span></div></a>`).join('')}</div>
+  const collectionsSec = (catalogues.length || isOwn) ? `<section id="pv-collections" class="pvt-section">
+    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Catalogue</h3>${isOwn?`<button onclick="openCatalogueModal()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Créer un catalogue</button>`:''}</div>
+    <div class="pvt-section-body"><div id="pvt-cataloguesgrid">${!catalogues.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun catalogue pour le moment.${isOwn?' Cliquez sur « Créer un catalogue » pour commencer.':''}</div>`:''}</div></div>
   </section>` : '';
 
   // Offre flash : titre + date de fin définis par le titulaire, compte à rebours réel
@@ -1909,14 +1955,24 @@ async function renderVitrineVisitor(init) {
     ${isOwn ? `<button onclick="editOffreFlash()" style="margin-top:8px;background:#fff;color:var(--v4);border:none;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;">✏️ ${flashActive?'Modifier':'Créer'} l'offre flash</button>` : ''}
   </section>` : '';
 
-  const produitsSec = (produits.length || isOwn) ? `<section id="pv-produits" class="pvt-section">
-    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Nos produits</h3>${isOwn?`<button onclick="openProductModal()" ${produits.length>=MAX_PRODUITS_VITRINE?'disabled':''} style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un produit (${produits.length}/${MAX_PRODUITS_VITRINE})</button>`:''}</div>
-    <div class="pvt-section-body"><div class="pvt-prodgrid" id="pvt-prodgrid">${!produits.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun produit pour le moment.${isOwn?' Cliquez sur « Ajouter un produit » pour commencer.':''}</div>`:''}</div></div>
+  const produitsSec = (articlesNonClasses.length || isOwn) ? `<section id="pv-produits" class="pvt-section">
+    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Articles non classés</h3>${isOwn?`<button onclick="openProductModal()" ${produits.length>=MAX_PRODUITS_VITRINE?'disabled':''} style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un article (${produits.length}/${MAX_PRODUITS_VITRINE})</button>`:''}</div>
+    <div class="pvt-section-body"><div class="pvt-prodgrid" id="pvt-prodgrid">${!articlesNonClasses.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun article non classé.${isOwn?' Ajoutez un article et rangez-le dans un catalogue depuis « Modifier ».':''}</div>`:''}</div></div>
   </section>` : '';
 
-  const services = (init.vitrine_services || isOwn) ? `<section id="pv-services" class="pvt-section">
-    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🛠 Services</h3>${isOwn?`<button onclick="editVitrineText('vitrine_services','Services','Décrivez vos services…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
-    <div class="pvt-services-list">${init.vitrine_services ? (init.vitrine_services.split('\n').filter(Boolean).map(s=>`<div class="pvt-service-row"><span class="pvt-service-ico">✔</span>${esc(s)}</div>`).join('') || `<div class="pvt-service-row">${esc(init.vitrine_services)}</div>`) : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">Aucun service renseigné.</span>`}</div>
+  const servicesCats = safeParseJson(init.vitrine_services_categories_json, null);
+  const hasServices = (servicesCats && servicesCats.length) || init.vitrine_services;
+  const services = (hasServices || isOwn) ? `<section id="pv-services" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🛠 Services</h3>${isOwn?`<button onclick="pvtEditServices()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div id="pvt-services-body" class="pvt-services-list">${
+      servicesCats && servicesCats.length
+        ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${servicesCats.map(c=>`<span class="pvz-interest-chip">${vitrineCategorieLabel(c)}</span>`).join('')}${servicesCats.length<3 && isOwn ? Array.from({length:3-servicesCats.length}).map(()=>`<span onclick="pvtEditServices()" style="cursor:pointer;border:1.5px dashed #cbd5e1;border-radius:99px;padding:6px 14px;font-size:12.5px;color:#94a3b8;">+ Catégorie</span>`).join('') : ''}</div>`
+        : (init.vitrine_services
+            ? init.vitrine_services.split('\n').filter(Boolean).map(s=>`<div class="pvt-service-row"><span class="pvt-service-ico">✔</span>${esc(s)}</div>`).join('')
+            : isOwn
+              ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${Array.from({length:3}).map(()=>`<span onclick="pvtEditServices()" style="cursor:pointer;border:1.5px dashed #cbd5e1;border-radius:99px;padding:6px 14px;font-size:12.5px;color:#94a3b8;">+ Catégorie</span>`).join('')}</div>`
+              : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">Aucun service renseigné.</span>`)
+    }</div>
   </section>` : '';
 
   const galerieSec = galerie.length ? `<section id="pv-galerie" class="pvt-section">
@@ -1930,30 +1986,17 @@ async function renderVitrineVisitor(init) {
     <div id="pvt-bestsellers-body" style="padding:16px 20px;"><div class="pvz-empty">Chargement…</div></div>
   </section>`;
 
-  // Promotions du mois — produits avec un prix promo réel défini par le titulaire
-  const produitsPromo = produits.filter(p => p.prix_promo != null && p.prix != null && p.prix_promo < p.prix && (p.statut||'disponible') !== 'masque');
-  const promosSec = (produitsPromo.length || isOwn) ? `<section id="pv-promos" class="pvt-section">
-    <div class="pvt-section-head sm"><h3>🔥 Promotions du mois</h3></div>
-    <div style="padding:16px 20px;">
-      ${produitsPromo.length ? produitsPromo.map((p,i)=>{
-        const photos = p.photos||[]; const reduc = Math.round((1 - p.prix_promo/p.prix)*100);
-        return `<div class="pvt-promo-row"${i?'':' style="border-top:none;"'}>
-          ${photos[0]?`<img class="pvt-promo-img" src="${esc(photos[0])}" alt="">`:`<div class="pvt-promo-img" style="display:flex;align-items:center;justify-content:center;">🛍️</div>`}
-          <div style="flex:1;"><div style="font-size:13.5px;font-weight:600;color:#122A4D;">${esc(p.nom)}</div><div style="font-size:11.5px;color:#8794A7;"><span style="text-decoration:line-through;">${Number(p.prix).toFixed(2)} ${p.devise||'EUR'}</span> · −${reduc}%</div></div>
-          <span style="font-family:'Bricolage Grotesque';font-size:15px;font-weight:700;color:var(--v1);">${Number(p.prix_promo).toFixed(2)} ${p.devise||'EUR'}</span>
-        </div>`;
-      }).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucune promotion active. Ajoutez un prix promo à un produit pour qu\'il apparaisse ici.':''}</span>`}
-    </div>
-  </section>` : '';
+  // Promotions du mois — chargées de façon asynchrone (table dédiée, jusqu'à 3 actives)
+  const promosSec = `<section id="pv-promos" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🔥 Promotions du mois</h3>${isOwn?`<button id="pvt-add-promo-btn" onclick="pvtOpenPromoModal()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter</button>`:''}</div>
+    <div id="pvt-promos-body" style="padding:16px 20px;"><div class="pvz-empty">Chargement…</div></div>
+  </section>`;
 
-  // Pourquoi nous choisir — points forts éditables par le titulaire
-  const pourquoiPoints = (init.vitrine_pourquoi_choisir || '').split('\n').map(s=>s.trim()).filter(Boolean);
-  const pourquoiSec = (pourquoiPoints.length || isOwn) ? `<section id="pv-pourquoi" class="pvt-section">
-    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>✔ Pourquoi nous choisir</h3>${isOwn?`<button onclick="editVitrineText('vitrine_pourquoi_choisir','Pourquoi nous choisir','Un point par ligne : Paiement sécurisé, Livraison rapide…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
-    <div style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px;color:#3B4658;">
-      ${pourquoiPoints.length ? pourquoiPoints.map(p=>`<div style="display:flex;align-items:center;gap:8px;"><span style="color:#1F8A5B;font-weight:700;">✔</span>${esc(p)}</div>`).join('') : `<span style="color:#94a3b8;font-style:italic;">Aucun point renseigné.</span>`}
-    </div>
-  </section>` : '';
+  // Pourquoi nous choisir — chargé de façon asynchrone (table dédiée, CRUD + glisser-déposer)
+  const pourquoiSec = `<section id="pv-pourquoi" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>✔ Pourquoi nous choisir</h3>${isOwn?`<button onclick="pvtOpenArgumentModal()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un argument</button>`:''}</div>
+    <div id="pvt-pourquoi-body" style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px;color:#3B4658;"><div class="pvz-empty">Chargement…</div></div>
+  </section>`;
 
   // Avis clients
   const avisSec = `<section id="pv-avis" class="pvt-section">
@@ -1987,24 +2030,55 @@ async function renderVitrineVisitor(init) {
     </div>
   </section>` : '';
 
+  // ── Coordonnées : édition directe (sauvegarde immédiate) pour le titulaire, lecture pour le visiteur ──
+  const COORD_FIELDS = [
+    ['adresse','Adresse'], ['code_postal','Code postal'], ['vitrine_ville','Ville'], ['vitrine_region','Région'], ['vitrine_pays','Pays'],
+    ['vitrine_tel_pro','Téléphone pro'], ['vitrine_whatsapp','WhatsApp'],
+    ['vitrine_email_pro','Email pro'], ['site_web','Site internet'],
+    ['vitrine_horaires','Horaires'],
+  ];
+  const whatsappNum = (init.vitrine_whatsapp || init.vitrine_tel_pro || '').replace(/[^0-9+]/g,'').replace('+','');
+  const telAny = init.vitrine_tel_pro || '';
+  const telAnyClean = telAny.replace(/[^0-9+]/g,'');
+  const adresseComplete = [init.adresse, init.code_postal, init.vitrine_ville, init.vitrine_region, init.vitrine_pays].filter(Boolean).join(', ');
+  // Localisation auto-remplie depuis les champs de coordonnées ci-dessus (plus de saisie manuelle d'un lien Google Maps séparé)
+  const mapsQuery = adresseComplete || init.vitrine_google_maps_url || '';
+  const hasMap = !!mapsQuery;
+
+  const coordsBody = isOwn
+    ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${COORD_FIELDS.map(([k,l])=>`
+        <div><label style="font-size:10.5px;font-weight:800;color:#FFD98E !important;text-transform:uppercase;display:block;margin-bottom:2px;letter-spacing:.03em;">${l}</label>
+        <input value="${esc(init[k]||'')}" onchange="pvtSaveCoordField('${k}', this.value)" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:7px 9px;font-size:12.5px;color:#111827 !important;"></div>`).join('')}
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:12.5px;cursor:pointer;">
+        <input type="checkbox" ${init.vitrine_rdv_active?'checked':''} onchange="pvtSaveCoordField('vitrine_rdv_active', this.checked?1:0)"> Activer « Prendre rendez-vous » (via l'agenda Diaspo'Actif)
+      </label>`
+    : `<div class="pvt-contact-line">
+        ${adresseComplete?`📍 ${esc(adresseComplete)}<br>`:''}
+        ${telAny?`📞 ${esc(telAny)}<br>`:''}
+        ${init.vitrine_email_pro?`✉️ ${esc(init.vitrine_email_pro)}<br>`:''}
+        ${init.vitrine_horaires?`🕒 ${esc(init.vitrine_horaires)}`:''}
+        ${(!adresseComplete&&!telAny&&!init.vitrine_email_pro&&!init.vitrine_horaires)?'<span style="opacity:.8;">Coordonnées non renseignées.</span>':''}
+      </div>`;
+
+  // Boutons de contact dynamiques — uniquement ceux dont l'information est réellement renseignée
+  const dynBtns = [];
+  if (whatsappNum) dynBtns.push(`<a class="pvt-contact-btn" href="https://wa.me/${esc(whatsappNum)}" target="_blank" rel="noopener">🟢 WhatsApp</a>`);
+  if (telAnyClean) dynBtns.push(`<a class="pvt-contact-btn" href="tel:${esc(telAnyClean)}">📞 Téléphone</a>`);
+  if (init.vitrine_email_pro) dynBtns.push(`<a class="pvt-contact-btn" href="mailto:${esc(init.vitrine_email_pro)}">✉️ Email</a>`);
+  if (init.site_web) dynBtns.push(`<a class="pvt-contact-btn" href="${esc(init.site_web.startsWith('http')?init.site_web:'https://'+init.site_web)}" target="_blank" rel="noopener">🌍 Site internet</a>`);
+  if (hasMap) dynBtns.push(`<a class="pvt-contact-btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapsQuery)}" target="_blank" rel="noopener">📍 Itinéraire</a>`);
+  if (!isOwn && init.vitrine_rdv_active) dynBtns.push(`<a class="pvt-contact-btn" href="javascript:void(0)" onclick="pvtOpenRdvModal(${ownerId},'${esc(init.nom||'')}')">📅 Prendre rendez-vous</a>`);
+  dynBtns.push(`<a class="pvt-contact-btn" href="javascript:void(0)" onclick="contacterBoutique(${ownerId})">💬 Message</a>`);
+
   const contactSec = `<section id="pv-contact" class="pvt-contact">
     <div>
-      <h4>Coordonnées${isOwn?` <button onclick="editVitrineText('vitrine_horaires','Horaires','Ex : Lun-Ven 9h-18h…')" style="background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:10.5px;font-weight:600;cursor:pointer;margin-left:6px;">✏️ Horaires</button>`:''}</h4>
-      <div class="pvt-contact-line">
-        ${init.adresse?`📍 ${esc(init.adresse)}<br>`:''}
-        ${tel?`📞 ${esc(tel)}<br>`:''}
-        ${init.email_responsable?`✉️ ${esc(init.email_responsable)}<br>`:''}
-        ${init.vitrine_horaires?`🕒 ${esc(init.vitrine_horaires)}`:(isOwn?'<span style="opacity:.7;">🕒 Horaires non renseignés.</span>':'')}
-        ${(!init.adresse&&!tel&&!init.email_responsable&&!init.vitrine_horaires)?'<span style="opacity:.8;">Coordonnées non renseignées.</span>':''}
-      </div>
-      ${isOwn?`<div style="font-size:11.5px;opacity:.75;margin-top:8px;">Adresse/téléphone/email : modifiez-les depuis votre tableau de bord Initiative.</div>`:''}
+      <h4>Coordonnées</h4>
+      ${coordsBody}
     </div>
     <div>
       <h4>Commander en un clic</h4>
-      ${telClean?`<a class="pvt-contact-btn" href="https://wa.me/${esc(telClean.replace('+',''))}" target="_blank" rel="noopener">🟢 WhatsApp</a>`:''}
-      ${tel?`<a class="pvt-contact-btn" href="tel:${esc(telClean)}">📞 Téléphone</a>`:''}
-      ${init.email_responsable?`<a class="pvt-contact-btn" href="mailto:${esc(init.email_responsable)}">✉️ Email</a>`:''}
-      <a class="pvt-contact-btn" href="javascript:void(0)" onclick="contacterBoutique(${ownerId})">💬 Message</a>
+      <div style="display:flex;flex-direction:column;gap:9px;">${dynBtns.join('')}</div>
     </div>
     <div style="text-align:center;">
       <h4 style="text-align:center;">Partager la vitrine</h4>
@@ -2012,8 +2086,13 @@ async function renderVitrineVisitor(init) {
     </div>
   </section>`;
 
+  const masqueeBanner = (isOwn && init.vitrine_active === 0) ? `<div style="background:#1F2937;color:#FBBF24;padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+    🔒 Votre vitrine est actuellement masquée. Elle n'est visible que par vous et les administrateurs de Diaspo'Actif.
+  </div>` : '';
+
   el.innerHTML = `<div class="pvt-scope" id="pvt-scope" data-theme="${theme==='bordeaux'?'':theme}">
     <div class="pvt-flow">
+      ${masqueeBanner}
       ${subnav}
       ${hero}
       ${actionbar}
@@ -2031,8 +2110,11 @@ async function renderVitrineVisitor(init) {
     </div>
   </div>`;
 
-  // Produits (cartes stylées)
-  renderPvtProducts(produits, ownerId);
+  // Catalogues → Articles (hiérarchie à deux niveaux)
+  renderPvtCatalogues(catalogues, produits, ownerId);
+
+  // Articles non classés (cartes stylées)
+  renderPvtProducts(articlesNonClasses, ownerId);
 
   // QR de partage
   if (window.ProfileQR) {
@@ -2086,23 +2168,54 @@ async function renderVitrineVisitor(init) {
     _pvtFlashTimer = setInterval(tick, 1000);
   }
 
-  // Avis clients
+  // Avis clients (note + titre + commentaire + réponse du propriétaire + signalement + répartition)
   try {
     const av = await api('GET', `/initiatives/${init.id}/avis`);
     const avBody = document.getElementById('pvt-avis-body');
     if (avBody) {
       const canReview = !isOwn && CU;
+      const maxN = Math.max(1, ...Object.values(av.repartition||{1:0,2:0,3:0,4:0,5:0}));
+      const breakdown = av.total ? `<div style="flex:1;min-width:140px;display:flex;flex-direction:column;gap:3px;">
+        ${[5,4,3,2,1].map(n=>{ const c=(av.repartition||{})[n]||0; const pct = Math.round(c/maxN*100); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8794A7;"><span style="width:14px;">${n}★</span><div style="flex:1;height:6px;background:#F1E4E6;border-radius:3px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:#F4A62A;"></div></div><span style="width:18px;text-align:right;">${c}</span></div>`; }).join('')}
+      </div>` : '';
       avBody.innerHTML = `
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
-          ${av.moyenne ? `<div style="font-family:'Bricolage Grotesque';font-size:34px;font-weight:700;color:#122A4D;line-height:1;">${av.moyenne}</div><div><div style="color:#F4A62A;font-size:15px;letter-spacing:2px;">${'★'.repeat(Math.round(av.moyenne))}${'☆'.repeat(5-Math.round(av.moyenne))}</div><div style="font-size:11.5px;color:#8794A7;margin-top:2px;">${av.total} avis</div></div>` : `<span class="pvz-empty">Aucun avis pour le moment.</span>`}
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap;">
+          ${av.moyenne ? `<div style="font-family:'Bricolage Grotesque';font-size:34px;font-weight:700;color:#122A4D;line-height:1;">${av.moyenne}</div><div><div style="color:#F4A62A;font-size:15px;letter-spacing:2px;">${'★'.repeat(Math.round(av.moyenne))}${'☆'.repeat(5-Math.round(av.moyenne))}</div><div style="font-size:11.5px;color:#8794A7;margin-top:2px;">${av.total} avis</div></div>${breakdown}` : `<span class="pvz-empty">Aucun avis pour le moment.</span>`}
         </div>
-        ${(av.avis||[]).slice(0,5).map((a,i)=>`<div style="border-top:1px solid var(--vsoftbd);padding:12px 0${i===0?';border-top:none':''};font-size:12.5px;color:#3B4658;line-height:1.5;">${a.commentaire?`« ${esc(a.commentaire)} »`:''}<div style="font-size:11.5px;color:#8794A7;margin-top:4px;">${'★'.repeat(a.note)}${'☆'.repeat(5-a.note)} — ${esc([a.prenom,a.nom].filter(Boolean).join(' ')||'Client')}</div></div>`).join('')}
+        ${(av.avis||[]).slice(0,10).map((a,i)=>`<div style="border-top:1px solid var(--vsoftbd);padding:12px 0${i===0?';border-top:none':''};font-size:12.5px;color:#3B4658;line-height:1.5;" id="pvt-avis-${a.id}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div>
+              <div style="color:#F4A62A;font-size:12px;letter-spacing:1px;">${'★'.repeat(a.note)}${'☆'.repeat(5-a.note)}</div>
+              ${a.titre?`<div style="font-weight:700;color:#122A4D;margin-top:3px;">${esc(a.titre)}</div>`:''}
+              ${a.commentaire?`<div style="margin-top:3px;">${esc(a.commentaire)}</div>`:''}
+              <div style="font-size:11.5px;color:#8794A7;margin-top:4px;">— ${esc([a.prenom,a.nom].filter(Boolean).join(' ')||'Client')} · ${fmtDateFrCourt(a.created_at)}</div>
+            </div>
+            ${(!isOwn && CU) ? `<button onclick="pvtSignalerAvis(${init.id},${a.id})" title="Signaler cet avis" style="background:none;border:none;color:#8794A7;font-size:11px;cursor:pointer;white-space:nowrap;">🚩 Signaler</button>` : ''}
+          </div>
+          ${a.reponse_texte ? `<div style="margin:10px 0 0 16px;padding:9px 12px;background:var(--vsoft);border-radius:9px;border-left:3px solid var(--v1);">
+              <div style="font-size:11px;font-weight:700;color:var(--v1);">Réponse de ${esc(init.nom||'la boutique')}</div>
+              <div style="margin-top:3px;">${esc(a.reponse_texte)}</div>
+              ${isOwn?`<div style="margin-top:6px;display:flex;gap:10px;"><span onclick="pvtReplyAvis(${init.id},${a.id})" style="font-size:11px;color:var(--v1);font-weight:600;cursor:pointer;">✏️ Modifier</span><span onclick="pvtDeleteReplyAvis(${init.id},${a.id})" style="font-size:11px;color:#B91C1C;font-weight:600;cursor:pointer;">🗑️ Supprimer</span></div>`:''}
+            </div>`
+            : (isOwn ? `<button onclick="pvtReplyAvis(${init.id},${a.id})" style="margin:8px 0 0 16px;font-size:11.5px;font-weight:600;color:var(--v1);background:none;border:1px solid var(--v1);border-radius:7px;padding:5px 10px;cursor:pointer;">💬 Répondre</button>` : '')}
+        </div>`).join('')}
         ${canReview ? `<button onclick="pvtWriteAvis(${init.id})" style="margin-top:14px;width:100%;font-size:13px;font-weight:700;color:#fff;background:var(--v1);border:none;border-radius:10px;padding:11px;cursor:pointer;">✍️ Écrire un avis</button>` : (!CU ? `<a href="login.html" style="display:block;margin-top:14px;text-align:center;font-size:12.5px;color:var(--v1);">Connectez-vous pour laisser un avis</a>` : '')}
       `;
     }
   } catch (e) {}
+
+  // Pourquoi nous choisir (arguments — CRUD + glisser-déposer pour le titulaire)
+  await renderPvtArguments(init);
+
+  // Promotions du mois (table dédiée, jusqu'à 3 actives)
+  await renderPvtPromos(init);
 }
 let _pvtFlashTimer = null;
+
+function fmtDateFrCourt(iso) {
+  if (!iso) return '';
+  try { const d = new Date((iso||'').replace(' ','T')); return isNaN(d) ? '' : `${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`; } catch(e) { return ''; }
+}
 
 /* Titulaire : créer/modifier l'offre flash */
 async function editOffreFlash() {
@@ -2198,11 +2311,512 @@ async function pvtWriteAvis(initId) {
   if (note === null) return;
   const n = Number(note);
   if (!Number.isInteger(n) || n < 1 || n > 5) { alert('Note invalide (1 à 5).'); return; }
+  const titre = prompt('Titre de votre avis (facultatif) :', '') || '';
   const commentaire = prompt('Votre commentaire (facultatif) :', '') || '';
   try {
-    await api('POST', `/initiatives/${initId}/avis`, { note: n, commentaire });
+    await api('POST', `/initiatives/${initId}/avis`, { note: n, titre, commentaire });
     if (_vitrineInit) renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* Titulaire : répondre / modifier sa réponse à un avis */
+async function pvtReplyAvis(initId, avisId) {
+  if (!isOwn) return;
+  const texte = prompt('Votre réponse à cet avis :', '');
+  if (texte === null) return;
+  try {
+    await api('PUT', `/initiatives/${initId}/avis/${avisId}/reponse`, { reponse_texte: texte });
+    if (_vitrineInit) renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+async function pvtDeleteReplyAvis(initId, avisId) {
+  if (!isOwn || !confirm('Supprimer votre réponse ?')) return;
+  try {
+    await api('PUT', `/initiatives/${initId}/avis/${avisId}/reponse`, { reponse_texte: null });
+    if (_vitrineInit) renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* Visiteur : signaler un avis abusif */
+async function pvtSignalerAvis(initId, avisId) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  const motif = prompt('Pourquoi signalez-vous cet avis ?');
+  if (!motif) return;
+  try {
+    await api('POST', `/initiatives/${initId}/avis/${avisId}/signaler`, { motif });
+    alert('Merci, cet avis a été signalé à la modération.');
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* ══════════ Pourquoi nous choisir — arguments (CRUD + glisser-déposer + icônes) ══════════ */
+let _pvtArguments = [];
+async function renderPvtArguments(init) {
+  const body = document.getElementById('pvt-pourquoi-body');
+  if (!body) return;
+  let args = [];
+  try { args = (await api('GET', `/initiatives/${init.id}/arguments`)).arguments || []; } catch (e) {}
+  _pvtArguments = args;
+  if (!args.length) {
+    body.innerHTML = `<span style="color:#94a3b8;font-style:italic;grid-column:1/-1;">${isOwn?'Aucun argument. Cliquez sur « Ajouter un argument » pour commencer.':'Aucun point renseigné.'}</span>`;
+    return;
+  }
+  body.innerHTML = args.map(a => `<div class="pvt-arg-card" data-argid="${a.id}" ${isOwn?'draggable="true"':''} style="display:flex;align-items:flex-start;gap:9px;background:#fff;border:1px solid var(--vsoftbd);border-radius:10px;padding:10px 12px;${isOwn?'cursor:grab;':''}">
+      <span style="font-size:18px;flex:none;">${esc(a.icone||'✔️')}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;color:#122A4D;">${esc(a.titre)}</div>
+        ${a.description?`<div style="color:#6B7686;font-size:11.5px;margin-top:2px;">${esc(a.description)}</div>`:''}
+      </div>
+      ${isOwn?`<div style="display:flex;flex-direction:column;gap:4px;flex:none;">
+        <button onclick="pvtOpenArgumentModal(${a.id})" style="background:none;border:none;cursor:pointer;font-size:12px;">✏️</button>
+        <button onclick="pvtDeleteArgument(${init.id},${a.id})" style="background:none;border:none;cursor:pointer;font-size:12px;color:#B91C1C;">🗑️</button>
+      </div>`:''}
+    </div>`).join('');
+  if (isOwn) wireArgumentDrag(body, init.id);
+}
+
+function wireArgumentDrag(container, initId) {
+  let dragId = null;
+  container.querySelectorAll('.pvt-arg-card').forEach(card => {
+    card.addEventListener('dragstart', () => { dragId = card.dataset.argid; card.style.opacity = '.5'; });
+    card.addEventListener('dragend', () => { card.style.opacity = ''; });
+    card.addEventListener('dragover', (e) => e.preventDefault());
+    card.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const targetId = card.dataset.argid;
+      if (!dragId || dragId === targetId) return;
+      const ids = [...container.querySelectorAll('.pvt-arg-card')].map(c => c.dataset.argid);
+      const from = ids.indexOf(dragId); ids.splice(from, 1);
+      const to = ids.indexOf(targetId); ids.splice(to, 0, dragId);
+      const dragCard = container.querySelector(`[data-argid="${dragId}"]`);
+      container.insertBefore(dragCard, card);
+      try { await api('PATCH', `/initiatives/${initId}/arguments/reorder`, { order: ids.map(Number) }); } catch (e) {}
+    });
+  });
+}
+
+function pvtOpenArgumentModal(argId) {
+  if (!isOwn || !_vitrineInit) return;
+  const arg = argId ? _pvtArguments.find(a => a.id === argId) : null;
+  document.getElementById('pvt-arg-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'pvt-arg-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:22px;max-height:90vh;overflow-y:auto;">
+    <h2 style="margin:0 0 14px;font-size:16px;">${arg?'✏️ Modifier':'➕ Ajouter'} un argument</h2>
+    <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Icône</label>
+    <div id="pvt-icon-grid" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;max-height:110px;overflow-y:auto;">
+      ${VITRINE_ICONES.map(ic=>`<button type="button" data-icon="${ic}" onclick="document.querySelectorAll('#pvt-icon-grid button').forEach(b=>b.style.background='');this.style.background='#EAF1FE';document.getElementById('pvt-arg-icone').value='${ic}';" style="font-size:17px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:8px;background:${(arg?arg.icone:'✔️')===ic?'#EAF1FE':'#fff'};cursor:pointer;">${ic}</button>`).join('')}
+    </div>
+    <input type="hidden" id="pvt-arg-icone" value="${esc(arg?arg.icone:'✔️')}">
+    <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Titre *</label>
+    <input id="pvt-arg-titre" value="${esc(arg?arg.titre:'')}" placeholder="Ex : Livraison rapide" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+    <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Description (facultatif)</label>
+    <textarea id="pvt-arg-desc" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:16px;min-height:60px;">${esc(arg?arg.description||'':'')}</textarea>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="document.getElementById('pvt-arg-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;">Annuler</button>
+      <button onclick="pvtSaveArgument(${arg?arg.id:'null'})" style="padding:9px 16px;border-radius:8px;border:none;background:var(--v1,#8E1B2E);color:#fff;font-weight:700;cursor:pointer;">Enregistrer</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function pvtSaveArgument(argId) {
+  const titre = document.getElementById('pvt-arg-titre').value.trim();
+  if (!titre) { alert('Le titre est requis.'); return; }
+  const payload = { icone: document.getElementById('pvt-arg-icone').value, titre, description: document.getElementById('pvt-arg-desc').value.trim() };
+  try {
+    if (argId) await api('PUT', `/initiatives/${_vitrineInit.id}/arguments/${argId}`, payload);
+    else await api('POST', `/initiatives/${_vitrineInit.id}/arguments`, payload);
+    document.getElementById('pvt-arg-modal')?.remove();
+    renderPvtArguments(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+async function pvtDeleteArgument(initId, argId) {
+  if (!confirm('Supprimer cet argument ?')) return;
+  try { await api('DELETE', `/initiatives/${initId}/arguments/${argId}`); renderPvtArguments(_vitrineInit); }
+  catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* ══════════ Promotions du mois (table dédiée, jusqu'à 3 actives, expiration automatique) ══════════ */
+let _pvtPromos = [];
+async function renderPvtPromos(init) {
+  const body = document.getElementById('pvt-promos-body');
+  if (!body) return;
+  let promos = [];
+  try { promos = (await api('GET', `/initiatives/${init.id}/promotions`)).promotions || []; } catch (e) {}
+  _pvtPromos = promos;
+  const addBtn = document.getElementById('pvt-add-promo-btn');
+  if (addBtn) addBtn.style.opacity = promos.length >= 3 ? '.5' : '1';
+  if (!promos.length) {
+    body.innerHTML = `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucune promotion active. Cliquez sur « Ajouter » pour en créer une (limite : 3 actives simultanément).':''}</span>`;
+    return;
+  }
+  const now = new Date().toISOString();
+  body.innerHTML = promos.map((p,i) => {
+    const active = (!p.date_debut || p.date_debut <= now) && p.date_fin >= now;
+    const reduc = p.prix_initial ? Math.round((1 - p.prix_promo/p.prix_initial)*100) : null;
+    return `<div class="pvt-promo-row"${i?'':' style="border-top:none;"'}>
+      ${p.photo_url?`<img class="pvt-promo-img" src="${esc(p.photo_url)}" alt="">`:`<div class="pvt-promo-img" style="display:flex;align-items:center;justify-content:center;">🛍️</div>`}
+      <div style="flex:1;">
+        <div style="font-size:13.5px;font-weight:600;color:#122A4D;">${esc(p.titre)} ${!active?'<span style="color:#B91C1C;font-size:10.5px;font-weight:700;">(expirée)</span>':''}</div>
+        ${p.description?`<div style="font-size:11px;color:#6B7686;">${esc(p.description)}</div>`:''}
+        <div style="font-size:11.5px;color:#8794A7;">${p.prix_initial?`<span style="text-decoration:line-through;">${Number(p.prix_initial).toFixed(2)} €</span> · `:''}${reduc!=null?`−${reduc}% · `:''}jusqu'au ${fmtDateFrCourt(p.date_fin)}</div>
+      </div>
+      <span style="font-family:'Bricolage Grotesque';font-size:15px;font-weight:700;color:var(--v1);">${Number(p.prix_promo).toFixed(2)} €</span>
+      ${isOwn?`<div style="display:flex;flex-direction:column;gap:3px;"><button onclick="pvtOpenPromoModal(${p.id})" style="background:none;border:none;cursor:pointer;font-size:12px;">✏️</button><button onclick="pvtDeletePromo(${init.id},${p.id})" style="background:none;border:none;cursor:pointer;font-size:12px;color:#B91C1C;">🗑️</button></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function pvtOpenPromoModal(promoId) {
+  if (!isOwn || !_vitrineInit) return;
+  if (!promoId && _pvtPromos.length >= 3) { alert('Limite de 3 promotions actives atteinte. Supprimez-en une pour en ajouter une nouvelle.'); return; }
+  const promo = promoId ? _pvtPromos.find(p => p.id === promoId) : null;
+  document.getElementById('pvt-promo-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'pvt-promo-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:460px;width:100%;padding:22px;max-height:90vh;overflow-y:auto;">
+    <h2 style="margin:0 0 14px;font-size:16px;">${promo?'✏️ Modifier':'➕ Ajouter'} une promotion</h2>
+    <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Photo</label>
+    <div id="pvt-promo-photo-slot" onclick="document.getElementById('pvt-promo-photo-input').click()" style="width:90px;height:90px;border-radius:10px;border:1.5px dashed #E2E8F0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#F8FAFC;margin-bottom:14px;overflow:hidden;">${promo&&promo.photo_url?`<img src="${esc(promo.photo_url)}" style="width:100%;height:100%;object-fit:cover;">`:'<span style="font-size:24px;color:#94a3b8;">＋</span>'}</div>
+    <input type="file" id="pvt-promo-photo-input" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="pvtHandlePromoPhoto(this)">
+    <input type="hidden" id="pvt-promo-photo-url" value="${esc(promo?promo.photo_url||'':'')}">
+    <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Nom du produit *</label>
+    <input id="pvt-promo-titre" value="${esc(promo?promo.titre:'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+    <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Description</label>
+    <textarea id="pvt-promo-desc" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;min-height:50px;">${esc(promo?promo.description||'':'')}</textarea>
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Prix initial (optionnel)</label><input type="number" step="0.01" id="pvt-promo-prix-init" value="${promo&&promo.prix_initial!=null?promo.prix_initial:''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;"></div>
+      <div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Prix promo *</label><input type="number" step="0.01" id="pvt-promo-prix-promo" value="${promo&&promo.prix_promo!=null?promo.prix_promo:''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;">
+      <div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Début (optionnel)</label><input type="date" id="pvt-promo-debut" value="${promo&&promo.date_debut?promo.date_debut.slice(0,10):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;"></div>
+      <div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Fin *</label><input type="date" id="pvt-promo-fin" value="${promo&&promo.date_fin?promo.date_fin.slice(0,10):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;"></div>
+    </div>
+    <p id="pvt-promo-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="document.getElementById('pvt-promo-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;">Annuler</button>
+      <button onclick="pvtSavePromo(${promo?promo.id:'null'})" style="padding:9px 16px;border-radius:8px;border:none;background:var(--v1,#8E1B2E);color:#fff;font-weight:700;cursor:pointer;">Enregistrer</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function pvtHandlePromoPhoto(input) {
+  const file = input.files[0]; if (!file) return;
+  try {
+    const compressed = await compressImageFile(file, 800, 800, 0.82);
+    const url = await uploadMedia(compressed, 'produit');
+    document.getElementById('pvt-promo-photo-url').value = url;
+    document.getElementById('pvt-promo-photo-slot').innerHTML = `<img src="${esc(url)}" style="width:100%;height:100%;object-fit:cover;">`;
+  } catch (e) { alert('Erreur upload photo : ' + e.message); }
+}
+
+async function pvtSavePromo(promoId) {
+  const titre = document.getElementById('pvt-promo-titre').value.trim();
+  const prixPromo = document.getElementById('pvt-promo-prix-promo').value;
+  const dateFin = document.getElementById('pvt-promo-fin').value;
+  const err = document.getElementById('pvt-promo-err');
+  if (!titre || !prixPromo || !dateFin) { err.textContent = 'Nom, prix promo et date de fin sont requis.'; err.style.display = 'block'; return; }
+  const payload = {
+    titre, description: document.getElementById('pvt-promo-desc').value.trim(),
+    photo_url: document.getElementById('pvt-promo-photo-url').value || null,
+    prix_initial: document.getElementById('pvt-promo-prix-init').value || null,
+    prix_promo: Number(prixPromo),
+    date_debut: document.getElementById('pvt-promo-debut').value || null,
+    date_fin: dateFin,
+  };
+  try {
+    if (promoId) await api('PUT', `/initiatives/${_vitrineInit.id}/promotions/${promoId}`, payload);
+    else await api('POST', `/initiatives/${_vitrineInit.id}/promotions`, payload);
+    document.getElementById('pvt-promo-modal')?.remove();
+    renderPvtPromos(_vitrineInit);
+  } catch (e) { err.textContent = e.message || 'Erreur.'; err.style.display = 'block'; }
+}
+
+async function pvtDeletePromo(initId, promoId) {
+  if (!confirm('Supprimer cette promotion ?')) return;
+  try { await api('DELETE', `/initiatives/${initId}/promotions/${promoId}`); renderPvtPromos(_vitrineInit); }
+  catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* ══════════ Services : sélection de catégories (max 3) ══════════ */
+function pvtEditServices() {
+  if (!isOwn || !_vitrineInit) return;
+  const current = safeParseJson(_vitrineInit.vitrine_services_categories_json, []);
+  document.getElementById('pvt-services-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'pvt-services-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:22px;max-height:85vh;overflow-y:auto;">
+    <h2 style="margin:0 0 6px;font-size:16px;">🛠 Services proposés</h2>
+    <p style="font-size:12.5px;color:#6B7686;margin:0 0 14px;">Sélectionnez jusqu'à 3 catégories principales.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;">
+      ${VITRINE_CATEGORIES.map(([k,e,l])=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12.5px;padding:5px 10px;border:1px solid #E2E8F0;border-radius:99px;${current.includes(k)?'background:#EAF1FE;border-color:#2F6BED;color:#2F6BED;font-weight:600;':''}">
+        <input type="checkbox" value="${k}" ${current.includes(k)?'checked':''} onchange="pvtToggleServiceCat(this)" style="accent-color:#2F6BED;"> ${e} ${l}
+      </label>`).join('')}
+    </div>
+    <p id="pvt-services-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="document.getElementById('pvt-services-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;">Annuler</button>
+      <button onclick="pvtSaveServices()" style="padding:9px 16px;border-radius:8px;border:none;background:var(--v1,#8E1B2E);color:#fff;font-weight:700;cursor:pointer;">Enregistrer</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+function pvtToggleServiceCat(input) {
+  const checked = [...document.querySelectorAll('#pvt-services-modal input[type=checkbox]:checked')];
+  if (checked.length > 3) { input.checked = false; document.getElementById('pvt-services-err').textContent = 'Maximum 3 catégories.'; document.getElementById('pvt-services-err').style.display = 'block'; }
+  else document.getElementById('pvt-services-err').style.display = 'none';
+}
+async function pvtSaveServices() {
+  const cats = [...document.querySelectorAll('#pvt-services-modal input[type=checkbox]:checked')].map(c => c.value);
+  try {
+    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_services_categories_json: cats });
+    _vitrineInit.vitrine_services_categories_json = JSON.stringify(cats);
+    document.getElementById('pvt-services-modal')?.remove();
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* ══════════ Coordonnées : sauvegarde immédiate au changement d'un champ ══════════ */
+async function pvtSaveCoordField(field, value) {
+  if (!isOwn || !_vitrineInit) return;
+  try {
+    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { [field]: value });
+    _vitrineInit[field] = value;
+    // Les champs affectant les boutons/la carte nécessitent un nouveau rendu complet
+    if (['adresse','code_postal','vitrine_ville','vitrine_region','vitrine_pays','vitrine_google_maps_url','tel_responsable','vitrine_tel_pro','vitrine_whatsapp','site_web','vitrine_email_pro','email_responsable','vitrine_rdv_active'].includes(field)) {
+      renderVitrineVisitor(_vitrineInit);
+    }
+  } catch (e) { alert('Erreur lors de la sauvegarde : ' + (e.message||'')); }
+}
+
+/* ══════════ Prendre rendez-vous (réutilise l'agenda existant, POST /api/rdv) ══════════ */
+function pvtOpenRdvModal(ownerId, ownerName) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  document.getElementById('pvt-rdv-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'pvt-rdv-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const today = new Date().toISOString().slice(0,10);
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:400px;width:100%;padding:22px;">
+    <h2 style="margin:0 0 14px;font-size:16px;">📅 Prendre rendez-vous avec ${esc(ownerName||'')}</h2>
+    <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Objet *</label>
+    <input id="pvt-rdv-titre" placeholder="Ex : Discuter d'une commande" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Date *</label><input type="date" id="pvt-rdv-date" min="${today}" value="${today}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;"></div>
+      <div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Heure *</label><input type="time" id="pvt-rdv-heure" value="10:00" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;"></div>
+    </div>
+    <p id="pvt-rdv-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="document.getElementById('pvt-rdv-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;">Annuler</button>
+      <button onclick="pvtSendRdv(${ownerId})" style="padding:9px 16px;border-radius:8px;border:none;background:var(--v1,#8E1B2E);color:#fff;font-weight:700;cursor:pointer;">Envoyer la demande</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+async function pvtSendRdv(ownerId) {
+  const titre = document.getElementById('pvt-rdv-titre').value.trim();
+  const date = document.getElementById('pvt-rdv-date').value;
+  const heure = document.getElementById('pvt-rdv-heure').value;
+  const err = document.getElementById('pvt-rdv-err');
+  if (!titre || !date || !heure) { err.textContent = 'Tous les champs sont requis.'; err.style.display = 'block'; return; }
+  const heureFin = String(Math.min(23, Number(heure.split(':')[0])+1)).padStart(2,'0') + ':' + heure.split(':')[1];
+  try {
+    await api('POST', '/rdv', { destinataire_id: ownerId, titre, date_proposee: date, heure_debut: heure, heure_fin: heureFin, duree_minutes: 60, lieu_type: 'virtuel' });
+    document.getElementById('pvt-rdv-modal')?.remove();
+    alert('✅ Votre demande de rendez-vous a été envoyée. Vous recevrez une notification dès qu\'elle sera acceptée.');
+  } catch (e) { err.textContent = e.message || 'Erreur.'; err.style.display = 'block'; }
+}
+
+function pvtProductCardHtml(p, ownerId) {
+  const photos = p.photos || [];
+  const cover = photos[0];
+  const statut = p.statut || 'disponible';
+  const dispo = statut === 'disponible';
+  let badge = '';
+  if (statut === 'epuise') badge = `<span class="pvt-badge stock">Épuisé</span>`;
+  else if (statut === 'indisponible') badge = `<span class="pvt-badge stock">Indisponible</span>`;
+  else if (statut === 'masque') badge = `<span class="pvt-badge stock">Masqué</span>`;
+  const prix = p.prix != null ? Number(p.prix).toFixed(2) + ' ' + (p.devise||'EUR') : 'Prix sur demande';
+  const ownerRow = isOwn ? `<div style="display:flex;gap:6px;margin-top:6px;">
+      <button class="pvt-btn soft" style="flex:1;font-size:12px;padding:7px 10px;" onclick="openProductModal(${p.id})">✏️ Modifier</button>
+      <button class="pvt-btn" style="flex:1;font-size:12px;padding:7px 10px;background:#FEF2F2;color:#B91C1C;" onclick="deleteProduct(${p.id})">🗑️ Supprimer</button>
+    </div>` : '';
+  const visitorRow = !isOwn ? `<div class="pvt-prod-foot">
+        <span class="pvt-prod-price">${prix}</span>
+        ${dispo
+          ? `<button class="pvt-prod-buy" onclick="openCommanderModal(${p.id})">🛒 Commander</button>`
+          : `<button class="pvt-prod-buy" style="background:#8794A7;" onclick="alerteProduit(${p.id})">🔔 M'avertir</button>`}
+      </div>
+      <button class="pvt-btn soft" style="margin-top:2px;font-size:12px;padding:7px 10px;" onclick="contacterVendeur(${ownerId},${p.id})">💬 Contacter le vendeur</button>` : `<div class="pvt-prod-foot"><span class="pvt-prod-price">${prix}</span></div>`;
+  return `<div class="pvt-prod-card" data-pid="${p.id}"${statut==='masque'?' style="opacity:.55;"':''}>
+    <div class="pvt-prod-imgwrap">
+      ${cover ? `<img loading="lazy" src="${esc(cover)}" alt="">` : `<div class="noimg">🛍️</div>`}
+      ${p.categorie ? `<span class="pvt-ribbon">${esc((p.categorie||'').toUpperCase())}</span>` : ''}
+      ${badge}
+    </div>
+    <div class="pvt-prod-body">
+      <div class="pvt-prod-title">${esc(p.nom)}</div>
+      ${p.description ? `<div class="pvt-prod-desc">${esc(p.description).slice(0,80)}${p.description.length>80?'…':''}</div>` : ''}
+      ${!dispo && p.date_retour ? `<div style="font-size:11.5px;color:var(--v1);font-weight:600;">↩️ Retour : ${fmtDateRetour(p.date_retour)}</div>` : ''}
+      ${visitorRow}
+      ${ownerRow}
+    </div>
+  </div>`;
+}
+
+/* ══════════ Catalogues (regroupement des articles, max 5 articles/catalogue) ══════════ */
+function renderPvtCatalogues(catalogues, produits, ownerId) {
+  const grid = document.getElementById('pvt-cataloguesgrid');
+  if (!grid) return;
+  const visibles = isOwn ? catalogues : catalogues.filter(c => c.statut !== 'masque');
+  if (!visibles.length) return;
+  grid.innerHTML = visibles.map(cat => {
+    const articles = produits.filter(p => p.catalogue_id === cat.id);
+    const articlesVisibles = isOwn ? articles : articles.filter(p => (p.statut||'disponible') !== 'masque');
+    const plein = articles.length >= MAX_ARTICLES_PAR_CATALOGUE;
+    return `<div class="pvt-catalogue-block" data-catid="${cat.id}" style="margin-bottom:22px;${cat.statut==='masque'?'opacity:.55;':''}">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+        ${cat.image_url ? `<img loading="lazy" src="${esc(cat.image_url)}" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex:none;">` : `<div style="width:52px;height:52px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none;">📁</div>`}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:15px;">${esc(cat.nom)}${cat.statut==='masque'?' <span style="font-size:11px;font-weight:600;opacity:.8;">(masqué)</span>':''}</div>
+          ${cat.description ? `<div style="font-size:12px;opacity:.85;">${esc(cat.description)}</div>` : ''}
+          <div style="font-size:11px;opacity:.75;">${articles.length}/${MAX_ARTICLES_PAR_CATALOGUE} articles</div>
+        </div>
+        ${isOwn ? `<div style="display:flex;gap:6px;flex:none;">
+          <button class="pvt-btn soft" style="font-size:12px;padding:6px 10px;" onclick="openCatalogueModal(${cat.id})">✏️</button>
+          <button class="pvt-btn" style="font-size:12px;padding:6px 10px;background:#FEF2F2;color:#B91C1C;" onclick="deleteCatalogue(${cat.id})">🗑️</button>
+          <button class="pvt-btn soft" style="font-size:12px;padding:6px 10px;" ${plein?'disabled':''} onclick="openProductModal(null, ${cat.id})">➕ Article</button>
+        </div>` : ''}
+      </div>
+      <div class="pvt-prodgrid" id="pvt-cat-articles-${cat.id}">${!articlesVisibles.length ? `<div class="pvz-empty" style="grid-column:1/-1;">Aucun article dans ce catalogue.${isOwn?' Cliquez sur « ➕ Article » pour en ajouter.':''}</div>` : articlesVisibles.map(p => pvtProductCardHtml(p, ownerId)).join('')}</div>
+    </div>`;
+  }).join('');
+  if (isOwn) {
+    wireCatalogueDrag(grid, _vitrineInit.id);
+    visibles.forEach(cat => {
+      const catGrid = document.getElementById('pvt-cat-articles-' + cat.id);
+      if (catGrid) wireProductDrag(catGrid, _vitrineInit.id, cat.id);
+    });
+  }
+}
+
+function wireCatalogueDrag(grid, initiativeId) {
+  grid.querySelectorAll('.pvt-catalogue-block').forEach(block => {
+    block.setAttribute('draggable', 'true');
+    block.addEventListener('dragstart', () => { _catalogueDragId = block.dataset.catid; block.classList.add('dragging'); });
+    block.addEventListener('dragend', () => block.classList.remove('dragging'));
+    block.addEventListener('dragover', (e) => e.preventDefault());
+    block.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const targetId = block.dataset.catid;
+      if (!_catalogueDragId || _catalogueDragId === targetId) return;
+      const ids = [...grid.querySelectorAll('.pvt-catalogue-block')].map(b => b.dataset.catid);
+      const from = ids.indexOf(_catalogueDragId);
+      ids.splice(from, 1);
+      const to = ids.indexOf(targetId);
+      ids.splice(to, 0, _catalogueDragId);
+      const dragBlock = grid.querySelector(`[data-catid="${_catalogueDragId}"]`);
+      grid.insertBefore(dragBlock, block);
+      try { await api('PATCH', `/initiatives/${initiativeId}/catalogues/reorder`, { order: ids.map(Number) }); } catch (e) {}
+    });
+  });
+}
+
+let _catalogueCoverUrl = null;
+function openCatalogueModal(catalogueId) {
+  const editing = !!catalogueId;
+  const cat = editing ? _cataloguesVitrine.find(c => c.id === catalogueId) : null;
+  _catalogueCoverUrl = cat ? cat.image_url : null;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cat-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:24px;max-height:90vh;overflow-y:auto;">
+      <h2 style="margin:0 0 16px;font-size:17px;">${editing?'✏️ Modifier':'📁 Créer'} un catalogue</h2>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Nom *</label>
+      <input type="text" id="cf-nom" value="${cat?esc(cat.nom):''}" placeholder="Ex : Catalogue Restauration" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Description</label>
+      <textarea id="cf-description" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;min-height:60px;">${cat?esc(cat.description||''):''}</textarea>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Catégorie</label>
+      <select id="cf-categorie" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;background:#fff;">
+        <option value="">—</option>
+        ${VITRINE_CATEGORIES.map(([k,e,l]) => `<option value="${k}" ${cat&&cat.categorie===k?'selected':''}>${e} ${l}</option>`).join('')}
+      </select>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Image de couverture</label>
+      <div id="cf-cover-slot" style="width:100%;height:120px;border:1.5px dashed #E2E8F0;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:12px;overflow:hidden;position:relative;" onclick="document.getElementById('cf-cover-file').click()"></div>
+      <input type="file" id="cf-cover-file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handleCatalogueCover(this)">
+      <label style="display:flex;align-items:center;gap:7px;margin-bottom:14px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="cf-visible" ${!cat||cat.statut!=='masque'?'checked':''}> Visible sur la vitrine publique
+      </label>
+      <p id="cf-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('cat-modal-overlay').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
+        <button id="cf-save" style="padding:9px 16px;border-radius:8px;border:none;background:var(--tp);color:#fff;font-weight:700;cursor:pointer;">${editing?'Enregistrer':'Créer'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  renderCatalogueCoverSlot();
+  document.getElementById('cf-save').onclick = () => saveCatalogue(catalogueId);
+}
+
+function renderCatalogueCoverSlot() {
+  const slot = document.getElementById('cf-cover-slot');
+  if (!slot) return;
+  slot.innerHTML = _catalogueCoverUrl
+    ? `<img src="${esc(_catalogueCoverUrl)}" style="width:100%;height:100%;object-fit:cover;"><button onclick="event.stopPropagation();_catalogueCoverUrl=null;renderCatalogueCoverSlot();" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;">✕</button>`
+    : `<span style="color:#94a3b8;font-size:13px;">＋ Ajouter une image</span>`;
+}
+
+async function handleCatalogueCover(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const compressed = await compressImageFile(file, 800, 800, 0.82);
+    const url = await uploadMedia(compressed, 'produit');
+    _catalogueCoverUrl = url;
+    renderCatalogueCoverSlot();
+  } catch (e) { alert('Erreur upload image : ' + e.message); }
+}
+
+async function saveCatalogue(catalogueId) {
+  const nom = document.getElementById('cf-nom').value.trim();
+  const err = document.getElementById('cf-err');
+  if (!nom) { err.textContent = 'Le nom est requis.'; err.style.display = 'block'; return; }
+  const payload = {
+    nom,
+    description: document.getElementById('cf-description').value.trim() || null,
+    categorie: document.getElementById('cf-categorie').value || null,
+    image_url: _catalogueCoverUrl,
+    statut: document.getElementById('cf-visible').checked ? 'visible' : 'masque',
+  };
+  try {
+    if (catalogueId) await api('PUT', `/catalogues/${catalogueId}`, payload);
+    else await api('POST', `/initiatives/${_vitrineInit.id}/catalogues`, payload);
+    document.getElementById('cat-modal-overlay').remove();
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) {
+    err.textContent = e.message || 'Erreur.';
+    err.style.display = 'block';
+  }
+}
+
+async function deleteCatalogue(id) {
+  if (!confirm('Supprimer ce catalogue ? Ses articles resteront disponibles en « Non classé ».')) return;
+  try {
+    await api('DELETE', `/catalogues/${id}`);
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + e.message); }
 }
 
 function renderPvtProducts(produits, ownerId) {
@@ -2210,43 +2824,9 @@ function renderPvtProducts(produits, ownerId) {
   if (!grid) return;
   // Le propriétaire voit aussi ses produits masqués (pour pouvoir les réactiver)
   const visibles = isOwn ? produits : produits.filter(p => (p.statut||'disponible') !== 'masque');
-  if (!visibles.length) { grid.innerHTML = `<div class="pvz-empty" style="grid-column:1/-1;">Aucun produit pour le moment.${isOwn?' Cliquez sur « Ajouter un produit » pour commencer.':''}</div>`; return; }
-  grid.innerHTML = visibles.map(p => {
-    const photos = p.photos || [];
-    const cover = photos[0];
-    const statut = p.statut || 'disponible';
-    const dispo = statut === 'disponible';
-    let badge = '';
-    if (statut === 'epuise') badge = `<span class="pvt-badge stock">Épuisé</span>`;
-    else if (statut === 'indisponible') badge = `<span class="pvt-badge stock">Indisponible</span>`;
-    else if (statut === 'masque') badge = `<span class="pvt-badge stock">Masqué</span>`;
-    const prix = p.prix != null ? Number(p.prix).toFixed(2) + ' ' + (p.devise||'EUR') : 'Prix sur demande';
-    const ownerRow = isOwn ? `<div style="display:flex;gap:6px;margin-top:6px;">
-        <button class="pvt-btn soft" style="flex:1;font-size:12px;padding:7px 10px;" onclick="openProductModal(${p.id})">✏️ Modifier</button>
-        <button class="pvt-btn" style="flex:1;font-size:12px;padding:7px 10px;background:#FEF2F2;color:#B91C1C;" onclick="deleteProduct(${p.id})">🗑️ Supprimer</button>
-      </div>` : '';
-    const visitorRow = !isOwn ? `<div class="pvt-prod-foot">
-          <span class="pvt-prod-price">${prix}</span>
-          ${dispo
-            ? `<button class="pvt-prod-buy" onclick="openCommanderModal(${p.id})">🛒 Commander</button>`
-            : `<button class="pvt-prod-buy" style="background:#8794A7;" onclick="alerteProduit(${p.id})">🔔 M'avertir</button>`}
-        </div>
-        <button class="pvt-btn soft" style="margin-top:2px;font-size:12px;padding:7px 10px;" onclick="contacterVendeur(${ownerId},${p.id})">💬 Contacter le vendeur</button>` : `<div class="pvt-prod-foot"><span class="pvt-prod-price">${prix}</span></div>`;
-    return `<div class="pvt-prod-card"${statut==='masque'?' style="opacity:.55;"':''}>
-      <div class="pvt-prod-imgwrap">
-        ${cover ? `<img loading="lazy" src="${esc(cover)}" alt="">` : `<div class="noimg">🛍️</div>`}
-        ${p.categorie ? `<span class="pvt-ribbon">${esc((p.categorie||'').toUpperCase())}</span>` : ''}
-        ${badge}
-      </div>
-      <div class="pvt-prod-body">
-        <div class="pvt-prod-title">${esc(p.nom)}</div>
-        ${p.description ? `<div class="pvt-prod-desc">${esc(p.description).slice(0,80)}${p.description.length>80?'…':''}</div>` : ''}
-        ${!dispo && p.date_retour ? `<div style="font-size:11.5px;color:var(--v1);font-weight:600;">↩️ Retour : ${fmtDateRetour(p.date_retour)}</div>` : ''}
-        ${visitorRow}
-        ${ownerRow}
-      </div>
-    </div>`;
-  }).join('');
+  if (!visibles.length) { grid.innerHTML = `<div class="pvz-empty" style="grid-column:1/-1;">Aucun article non classé.</div>`; return; }
+  grid.innerHTML = visibles.map(p => pvtProductCardHtml(p, ownerId)).join('');
+  if (isOwn) wireProductDrag(grid, _vitrineInit.id, null);
 }
 
 /* Changer le thème de la vitrine (propriétaire uniquement — persistance) */
@@ -2347,8 +2927,11 @@ async function editVitrineText(field, label, placeholder) {
    BOUTIQUE (produits de la Vitrine, max 20)
    ====================================================== */
 const MAX_PRODUITS_VITRINE = 20;
+const MAX_ARTICLES_PAR_CATALOGUE = 5;
 let _produitsVitrine = [];
+let _cataloguesVitrine = [];
 let _boutiqueDragId = null;
+let _catalogueDragId = null;
 
 async function renderBoutique(init, ownerFlag) {
   const box = document.getElementById('vt-boutique');
@@ -2478,9 +3061,12 @@ async function alerteProduit(produitId) {
   } catch (e) { alert('Erreur : ' + e.message); }
 }
 
-/* ---- Drag & drop réorganisation (pattern simplifié inspiré de widget-board.js) ---- */
-function wireProductDrag(grid, initiativeId) {
-  grid.querySelectorAll('.prod-card').forEach(card => {
+/* ---- Drag & drop réorganisation (pattern simplifié inspiré de widget-board.js) ----
+   catalogueId optionnel : si fourni, le reorder n'affecte que les articles de ce catalogue. */
+function wireProductDrag(grid, initiativeId, catalogueId) {
+  const cardSel = grid.classList.contains('pvt-catalogue-articles') || grid.id === 'pvt-prodgrid' ? '.pvt-prod-card' : '.prod-card';
+  grid.querySelectorAll(cardSel).forEach(card => {
+    card.setAttribute('draggable', 'true');
     card.addEventListener('dragstart', () => { _boutiqueDragId = card.dataset.pid; card.classList.add('dragging'); });
     card.addEventListener('dragend', () => card.classList.remove('dragging'));
     card.addEventListener('dragover', (e) => e.preventDefault());
@@ -2488,14 +3074,16 @@ function wireProductDrag(grid, initiativeId) {
       e.preventDefault();
       const targetId = card.dataset.pid;
       if (!_boutiqueDragId || _boutiqueDragId === targetId) return;
-      const ids = [...grid.querySelectorAll('.prod-card')].map(c => c.dataset.pid);
+      const ids = [...grid.querySelectorAll(cardSel)].map(c => c.dataset.pid);
       const from = ids.indexOf(_boutiqueDragId);
       ids.splice(from, 1);
       const to = ids.indexOf(targetId);
       ids.splice(to, 0, _boutiqueDragId);
       const dragCard = grid.querySelector(`[data-pid="${_boutiqueDragId}"]`);
       grid.insertBefore(dragCard, card);
-      try { await api('PATCH', `/initiatives/${initiativeId}/produits/reorder`, { order: ids.map(Number) }); } catch (e) {}
+      const payload = { order: ids.map(Number) };
+      if (catalogueId != null) payload.catalogue_id = catalogueId;
+      try { await api('PATCH', `/initiatives/${initiativeId}/produits/reorder`, payload); } catch (e) {}
     });
   });
 }
@@ -2503,17 +3091,23 @@ function wireProductDrag(grid, initiativeId) {
 /* ---- Modale ajout/édition produit (jusqu'à 4 photos, pattern evenements.html) ---- */
 let _prodPhotoData = [null, null, null, null];
 
-function openProductModal(productId) {
+function openProductModal(productId, presetCatalogueId) {
   const editing = !!productId;
   const prod = editing ? _produitsVitrine.find(p => p.id === productId) : null;
   _prodPhotoData = [null, null, null, null];
   if (prod && prod.photos) prod.photos.forEach((u, i) => { if (i < 4) _prodPhotoData[i] = u; });
+  const currentCatId = prod ? prod.catalogue_id : (presetCatalogueId != null ? presetCatalogueId : null);
 
   const overlay = document.createElement('div');
   overlay.id = 'prod-modal-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:24px;max-height:90vh;overflow-y:auto;">
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Catalogue</label>
+      <select id="pf-catalogue" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;background:#fff;">
+        <option value="">— Non classé —</option>
+        ${(_cataloguesVitrine||[]).map(c => `<option value="${c.id}" ${Number(currentCatId)===c.id?'selected':''}>${esc(c.nom)}</option>`).join('')}
+      </select>
       <h2 style="margin:0 0 16px;font-size:17px;">${editing?'✏️ Modifier':'➕ Ajouter'} un produit</h2>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Nom *</label>
       <input type="text" id="pf-nom" value="${prod?esc(prod.nom):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
@@ -2594,6 +3188,7 @@ async function saveProduct(productId) {
   const err = document.getElementById('pf-err');
   if (!nom) { err.textContent = 'Le nom est requis.'; err.style.display = 'block'; return; }
   const statut = document.getElementById('pf-statut').value;
+  const catSel = document.getElementById('pf-catalogue').value;
   const payload = {
     nom,
     description: document.getElementById('pf-description').value.trim() || null,
@@ -2604,6 +3199,7 @@ async function saveProduct(productId) {
     statut,
     date_retour: statut === 'indisponible' ? (document.getElementById('pf-date-retour').value || null) : null,
     photos: _prodPhotoData.filter(Boolean),
+    catalogue_id: catSel ? Number(catSel) : null,
   };
   try {
     if (productId) await api('PUT', `/produits/${productId}`, payload);
@@ -3986,28 +4582,125 @@ function buildPrivacyPanel() {
     </div>
     <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
       <h3 style="color:#dc2626;font-size:14px;margin:0 0 6px;">⚠️ Zone de danger</h3>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Supprimer votre compte est <strong>définitif</strong>. Vos informations personnelles (nom, photo, coordonnées) seront effacées. Vos publications resteront visibles sous "Compte supprimé" pour préserver l'historique des échanges.</p>
-      <button class="btn-ico" style="background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;padding:8px 16px;" onclick="openDeleteAccountModal()">🗑️ Supprimer mon compte</button>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Masquer votre compte rend votre profil public invisible aux autres utilisateurs. Vos données restent intactes : reconnectez-vous à tout moment pour le réafficher.</p>
+      <button class="btn-ico" style="background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;padding:8px 16px;" onclick="openDeleteAccountModal()">🙈 Masquer mon compte</button>
+      <div id="del-req-zone" style="margin-top:16px;"><p style="font-size:13px;color:var(--muted);">Chargement…</p></div>
     </div>`;
+  setTimeout(loadDeletionRequestStatus, 0);
   return div;
 }
 
-/* ---- Suppression de compte (RGPD) ---- */
+/* ---- Demande de suppression définitive (workflow admin) ---- */
+async function loadDeletionRequestStatus() {
+  const zone = document.getElementById('del-req-zone');
+  if (!zone) return;
+  try {
+    const r = await api('GET', '/deletion-requests/mine');
+    const active = (r.requests || []).find(x => !['refusee', 'compte_supprime'].includes(x.statut));
+    if (active) { renderDeletionRequestDossier(active); return; }
+    zone.innerHTML = `
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Demander la suppression définitive transmet votre dossier à l'administration, qui pourra échanger avec vous avant toute suppression irréversible.</p>
+      <button class="btn-ico" style="background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;padding:8px 16px;" onclick="openDeletionRequestModal()">🗑️ Demander la suppression de mon compte</button>`;
+  } catch (e) { zone.innerHTML = ''; }
+}
+
+const DEL_STATUT_LABELS = {
+  demande_recue: '🟡 Demande reçue', en_discussion: '🔵 En discussion', en_cours_analyse: '🟠 En cours d\'analyse',
+  validee: '🟢 Validée', refusee: '🔴 Refusée', compte_supprime: '⚫ Compte supprimé',
+};
+
+function renderDeletionRequestDossier(dr) {
+  const zone = document.getElementById('del-req-zone');
+  if (!zone) return;
+  zone.innerHTML = `
+    <p style="font-size:13px;font-weight:700;color:#374151;margin:0 0 4px;">Dossier ${dr.numero_dossier} — ${DEL_STATUT_LABELS[dr.statut] || dr.statut}</p>
+    ${dr.admin_justification && dr.statut === 'refusee' ? `<p style="font-size:12.5px;color:#dc2626;margin:0 0 8px;">Motif du refus : ${esc(dr.admin_justification)}</p>` : ''}
+    <div id="del-req-messages" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:10px;margin:10px 0;background:#fafbfc;">
+      ${(dr.messages||[]).map(m => `
+        <div style="margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:700;color:${m.sender_role==='administrateur'?'#2563eb':'#374151'};">${m.sender_role==='administrateur' ? 'Administration' : 'Vous'} · ${fmtDateFrCourt(m.created_at)}</div>
+          <div style="font-size:13px;color:#1f2937;">${esc(m.contenu)}</div>
+        </div>`).join('') || '<p style="font-size:12.5px;color:var(--muted);">Aucun message pour le moment.</p>'}
+    </div>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="del-req-msg-input" placeholder="Écrire un message…" style="flex:1;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;">
+      <button onclick="sendDeletionRequestMessage(${dr.id})" style="padding:8px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;">Envoyer</button>
+    </div>`;
+}
+
+async function sendDeletionRequestMessage(id) {
+  const input = document.getElementById('del-req-msg-input');
+  const contenu = input.value.trim();
+  if (!contenu) return;
+  try {
+    await api('POST', `/deletion-requests/${id}/messages`, { contenu });
+    input.value = '';
+    await loadDeletionRequestStatus();
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+function openDeletionRequestModal() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <h2 style="margin:0 0 10px;font-size:18px;color:#dc2626;">Attention :</h2>
+      <p style="font-size:13px;color:#475569;line-height:1.7;margin:0 0 10px;">
+        Vous êtes sur le point de demander la suppression définitive de votre compte Diaspo'Actif.<br><br>
+        Cette demande sera transmise à l'administration.<br><br>
+        Un administrateur pourra échanger avec vous avant de procéder à la suppression définitive.<br><br>
+        Une fois la suppression validée, votre profil, vos publications, vos messages, vos documents, vos fichiers et toutes vos données personnelles seront supprimés conformément à notre politique de confidentialité, sauf celles dont la conservation est imposée par la loi.
+      </p>
+      <textarea id="del-req-motif" placeholder="Motif (facultatif)" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;min-height:60px;margin-bottom:12px;"></textarea>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#374151;margin-bottom:14px;cursor:pointer;">
+        <input type="checkbox" id="del-req-ack" style="margin-top:2px;"> Je comprends les conséquences de cette demande.
+      </label>
+      <p id="del-req-err" style="color:#dc2626;font-size:12px;margin:0 0 12px;display:none;"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
+        <button id="del-req-confirm" disabled style="padding:9px 16px;border-radius:8px;border:none;background:#94a3b8;color:#fff;font-weight:700;cursor:not-allowed;">📨 Envoyer ma demande</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  const ack = document.getElementById('del-req-ack');
+  const confirmBtn = document.getElementById('del-req-confirm');
+  ack.addEventListener('change', () => {
+    confirmBtn.disabled = !ack.checked;
+    confirmBtn.style.background = ack.checked ? '#dc2626' : '#94a3b8';
+    confirmBtn.style.cursor = ack.checked ? 'pointer' : 'not-allowed';
+  });
+  confirmBtn.onclick = async () => {
+    if (!ack.checked) return;
+    const motif = document.getElementById('del-req-motif').value.trim();
+    const err = document.getElementById('del-req-err');
+    try {
+      await api('POST', '/deletion-requests', { motif });
+      overlay.remove();
+      await loadDeletionRequestStatus();
+    } catch (e) {
+      err.textContent = e.message || 'Erreur lors de l\'envoi.';
+      err.style.display = 'block';
+    }
+  };
+}
+
+/* ---- Masquage de compte (remplace l'ancienne suppression RGPD) ---- */
 function openDeleteAccountModal() {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.3);">
-      <h2 style="margin:0 0 10px;font-size:18px;color:#dc2626;">⚠️ Supprimer définitivement votre compte ?</h2>
+      <h2 style="margin:0 0 10px;font-size:18px;color:#dc2626;">🙈 Masquer votre profil public ?</h2>
       <p style="font-size:13px;color:#475569;line-height:1.6;margin:0 0 16px;">
-        Cette action est <strong>irréversible</strong>. Vos données personnelles seront effacées et vous serez déconnecté immédiatement.
+        Votre profil ne sera plus visible par les autres utilisateurs. Vos données restent intactes : reconnectez-vous à tout moment pour le réafficher.
       </p>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Confirmez avec votre mot de passe</label>
       <input type="password" id="del-acc-pw" placeholder="Votre mot de passe" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:8px;">
       <p id="del-acc-err" style="color:#dc2626;font-size:12px;margin:0 0 12px;display:none;"></p>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button onclick="this.closest('div[style*=fixed]').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
-        <button id="del-acc-confirm" style="padding:9px 16px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;">Supprimer définitivement</button>
+        <button id="del-acc-confirm" style="padding:9px 16px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;">Masquer mon compte</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);

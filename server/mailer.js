@@ -336,4 +336,39 @@ function emailAccreditation({ email, prenom, typeAccred, statut }) {
   });
 }
 
-module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation };
+function emailDeletionConfirmee({ email, prenom, numeroDossier, dateSuppression }) {
+  return sendEmail({
+    to: email,
+    subject: `Confirmation de suppression de votre compte — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;">DIASPO'ACTIF</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:20px;font-weight:900;color:#0D1B2A;">
+        ${prenom ? `Bonjour ${prenom},` : "Bonjour,"}<br>votre compte a été définitivement supprimé
+      </h1>
+      <p style="color:#475569;line-height:1.7;">
+        Conformément à votre demande, votre compte Diaspo'Actif et vos données personnelles ont été supprimés
+        le <strong>${dateSuppression}</strong>, à l'exception des informations dont la conservation est imposée par la loi
+        (le cas échéant, archivées de façon sécurisée pendant la durée légale applicable).
+      </p>
+      <p style="color:#475569;line-height:1.7;">
+        Numéro de dossier : <strong>${numeroDossier}</strong>
+      </p>
+      <p style="color:#94A3B8;font-size:12px;line-height:1.6;margin-top:24px;">
+        Si vous n'êtes pas à l'origine de cette demande, contactez-nous immédiatement.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee };

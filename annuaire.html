@@ -227,6 +227,7 @@
         <label>🏛 Type d'organisme</label>
         <select id="f-type-org">
           <option value="">Tous les types</option>
+          <option value="Utilisateurs">Utilisateurs</option>
           <option value="Association">Association</option>
           <option value="Entreprise">Entreprise</option>
           <option value="Institution">Institution</option>
@@ -238,6 +239,18 @@
           <option value="Particulier">Particulier</option>
           <option value="Autre">Autre</option>
         </select>
+      </div>
+
+      <!-- Nom -->
+      <div class="ann-filter-group">
+        <label>🔤 Nom</label>
+        <input type="text" id="f-nom-simple" placeholder="Rechercher par nom…">
+      </div>
+
+      <!-- Prénom (uniquement si Utilisateurs) -->
+      <div class="ann-filter-group" id="f-prenom-group" style="display:none;">
+        <label>🔤 Prénom</label>
+        <input type="text" id="f-prenom-simple" placeholder="Rechercher par prénom…">
       </div>
 
       <!-- Pays de résidence -->

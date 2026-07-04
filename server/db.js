@@ -205,6 +205,15 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS fil_vitrine_clics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    type_carte TEXT NOT NULL,
+    user_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
   CREATE TABLE IF NOT EXISTS fil_reactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL,
@@ -1831,6 +1840,48 @@ db.exec(`
     action      TEXT NOT NULL,
     note        TEXT,
     created_at  TEXT DEFAULT (datetime('now'))
+  );
+
+  /* ── Demandes de suppression définitive de compte (RGPD, workflow admin) ── */
+  CREATE TABLE IF NOT EXISTS deletion_requests (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id           INTEGER NOT NULL,
+    type_compte       TEXT NOT NULL,
+    initiative_id     INTEGER,
+    motif             TEXT,
+    statut            TEXT NOT NULL DEFAULT 'demande_recue'
+                        CHECK(statut IN ('demande_recue','en_discussion','en_cours_analyse','validee','refusee','compte_supprime')),
+    admin_id          INTEGER,
+    admin_justification TEXT,
+    documents_json    TEXT DEFAULT '[]',
+    numero_dossier    TEXT,
+    created_at        TEXT DEFAULT (datetime('now')),
+    updated_at        TEXT DEFAULT (datetime('now')),
+    deleted_at        TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS deletion_request_messages (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    deletion_request_id  INTEGER NOT NULL,
+    sender_id             INTEGER NOT NULL,
+    contenu               TEXT NOT NULL,
+    fichier_json          TEXT,
+    lu                    INTEGER DEFAULT 0,
+    created_at            TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(deletion_request_id) REFERENCES deletion_requests(id),
+    FOREIGN KEY(sender_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS deletion_request_history (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    deletion_request_id  INTEGER NOT NULL,
+    admin_id              INTEGER,
+    admin_nom             TEXT,
+    action                TEXT NOT NULL,
+    note                  TEXT,
+    created_at            TEXT DEFAULT (datetime('now'))
   );
 
   /* ── Cache du score de confiance ── */
@@ -3718,6 +3769,32 @@ db.exec(`
   // ── Promotions produit (prix barré) ──
   const prodCols2 = db.prepare('PRAGMA table_info(produits_vitrine)').all().map(c=>c.name);
   if (prodCols2.length && !prodCols2.includes('prix_promo')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN prix_promo REAL");
+
+  // ── Vitrine "fiche professionnelle complète" : avis étendus, coordonnées, services par catégories, RDV ──
+  const avisCols = db.prepare('PRAGMA table_info(vitrine_avis)').all().map(c=>c.name);
+  if (avisCols.length) {
+    if (!avisCols.includes('titre'))          db.exec("ALTER TABLE vitrine_avis ADD COLUMN titre TEXT");
+    if (!avisCols.includes('reponse_texte'))  db.exec("ALTER TABLE vitrine_avis ADD COLUMN reponse_texte TEXT");
+    if (!avisCols.includes('reponse_date'))   db.exec("ALTER TABLE vitrine_avis ADD COLUMN reponse_date TEXT");
+  }
+  const initCols6 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
+  if (!initCols6.includes('vitrine_services_categories_json')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_services_categories_json TEXT");
+  if (!initCols6.includes('vitrine_ville'))            db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_ville TEXT");
+  if (!initCols6.includes('vitrine_region'))           db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_region TEXT");
+  if (!initCols6.includes('vitrine_pays'))             db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_pays TEXT");
+  if (!initCols6.includes('vitrine_whatsapp'))         db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_whatsapp TEXT");
+  if (!initCols6.includes('vitrine_tel_pro'))          db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_tel_pro TEXT");
+  if (!initCols6.includes('vitrine_email_pro'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_email_pro TEXT");
+  if (!initCols6.includes('vitrine_google_maps_url'))  db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_google_maps_url TEXT");
+  if (!initCols6.includes('vitrine_rdv_active'))       db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_rdv_active INTEGER DEFAULT 0");
+
+  // ── Masquage de compte (remplace la suppression : profil public caché, données conservées) ──
+  const userCols3 = db.prepare('PRAGMA table_info(users)').all().map(c=>c.name);
+  if (!userCols3.includes('compte_masque')) db.exec("ALTER TABLE users ADD COLUMN compte_masque INTEGER DEFAULT 0");
+
+  // ── Catalogues (regroupement des articles de la Vitrine) ──
+  const prodCols3 = db.prepare('PRAGMA table_info(produits_vitrine)').all().map(c=>c.name);
+  if (prodCols3.length && !prodCols3.includes('catalogue_id')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN catalogue_id INTEGER");
 }
 
 /* ── Boutique de la Vitrine (produits/services, max 20 par initiative) ── */
@@ -3735,6 +3812,19 @@ db.exec(`
     reference TEXT,
     categorie TEXT,
     photos_json TEXT DEFAULT '[]',
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS catalogues_vitrine (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    categorie TEXT,
+    statut TEXT DEFAULT 'visible' CHECK(statut IN ('visible','masque')),
     ordre INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
@@ -3777,6 +3867,45 @@ db.exec(`
     UNIQUE(initiative_id, user_id),
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
     FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  -- Signalement d'un avis client (motif + notification à l'admin, comme pour les publications)
+  CREATE TABLE IF NOT EXISTS vitrine_avis_signalements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    avis_id INTEGER NOT NULL,
+    reporter_id INTEGER NOT NULL,
+    motif TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(avis_id) REFERENCES vitrine_avis(id),
+    FOREIGN KEY(reporter_id) REFERENCES users(id)
+  );
+
+  -- Arguments "Pourquoi nous choisir" (icône + titre + description, réordonnables)
+  CREATE TABLE IF NOT EXISTS vitrine_arguments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    icone TEXT DEFAULT '✔️',
+    titre TEXT NOT NULL,
+    description TEXT,
+    ordre INTEGER DEFAULT 0,
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
+  -- Promotions du mois (jusqu'à 3 actives simultanément, expiration automatique par date)
+  CREATE TABLE IF NOT EXISTS vitrine_promotions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    produit_id INTEGER,
+    titre TEXT NOT NULL,
+    description TEXT,
+    photo_url TEXT,
+    prix_initial REAL,
+    prix_promo REAL NOT NULL,
+    date_debut TEXT,
+    date_fin TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(produit_id) REFERENCES produits_vitrine(id)
   );
 
   CREATE TABLE IF NOT EXISTS vitrine_publications (
