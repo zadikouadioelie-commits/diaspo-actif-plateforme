@@ -8432,7 +8432,10 @@ ${jsonLd}
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
       res.end(html);
       return;
-    } catch (e) { /* en cas d'erreur, laisser tomber vers le fichier statique normal */ }
+    } catch (e) {
+      console.error('[SEO profil.html]', e.stack || e.message);
+      if (parsed.query.debug_seo) { res.writeHead(500, {'Content-Type':'text/plain'}); res.end('SEO_ERROR: ' + (e.stack || e.message)); return; }
+    }
   }
 
   /* ── Servir les vidéos uploadées ── */
