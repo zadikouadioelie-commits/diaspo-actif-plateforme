@@ -8374,6 +8374,16 @@ async function handleRequest(req, res) {
       const region = process.env.BACKUP_BUNNY_REGION || 'storage.bunnycdn.com';
       if (!zone || !key) return sendJSON(res, 500, { error: "BACKUP_BUNNY_ZONE / BACKUP_BUNNY_KEY manquants." });
 
+      if (parsed.query.debug === '1') {
+        return sendJSON(res, 200, {
+          zone_len: zone.length, zone_preview: JSON.stringify(zone),
+          region_len: region.length, region_preview: JSON.stringify(region),
+          key_len: key.length, key_preview: key.slice(0,4) + '...' + key.slice(-4),
+          key_has_whitespace: /\s/.test(key),
+          zone_has_whitespace: /\s/.test(zone),
+        });
+      }
+
       const tables = await db.prepare(`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema='public' AND table_type='BASE TABLE'
