@@ -53,9 +53,37 @@
         <div id="admin-login-err" style="display: none; font-size: 13px; color: #C0392B; background: #FBE9E7; border-radius: 10px; padding: 10px 14px;"></div>
 
         <button type="submit" id="admin-login-btn" style="display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14.5px; font-weight: 600; letter-spacing: .02em; color: #fff; background: linear-gradient(135deg, #0E2E5A, #16457E); padding: 16px; border-radius: 12px; box-shadow: 0 12px 30px rgba(14,46,90,.28); margin-top: 4px; border: none; cursor: pointer; font-family: inherit;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Se connecter en toute sécurité</button>
+
+        <div style="text-align: center;">
+          <a href="#" onclick="return openForgot(event)" style="font-size: 12.5px; color: #5B6472;">Mot de passe oublié ?</a>
+        </div>
       </form>
 
-      <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 22px;">
+      <!-- Étape 2FA -->
+      <form id="admin-2fa-form" onsubmit="return submitAdmin2FA(event)" style="display: none; flex-direction: column; gap: 16px;">
+        <p style="font-size: 13px; color: #5B6472; margin: 0;">Un code à 6 chiffres a été envoyé à <strong id="admin-2fa-email"></strong>. Il expire dans 10 minutes.</p>
+        <label style="display: block;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; color: #5B6472;">CODE DE VÉRIFICATION</span>
+          <input id="admin-2fa-code" type="text" inputmode="numeric" maxlength="6" required placeholder="000000" style="width: 100%; margin-top: 8px; background: #F6F9FD; border: 1px solid #E2E8F1; border-radius: 11px; padding: 14px 15px; font-size: 20px; letter-spacing: .3em; text-align: center; color: #1B2430; outline: none; box-sizing: border-box;">
+        </label>
+        <div id="admin-2fa-err" style="display: none; font-size: 13px; color: #C0392B; background: #FBE9E7; border-radius: 10px; padding: 10px 14px;"></div>
+        <button type="submit" id="admin-2fa-btn" style="font-size: 14.5px; font-weight: 600; letter-spacing: .02em; color: #fff; background: linear-gradient(135deg, #0E2E5A, #16457E); padding: 16px; border-radius: 12px; box-shadow: 0 12px 30px rgba(14,46,90,.28); border: none; cursor: pointer; font-family: inherit;">Vérifier le code</button>
+        <a href="#" onclick="return backToLogin(event)" style="font-size: 12.5px; color: #5B6472; text-align: center;">← Revenir à la connexion</a>
+      </form>
+
+      <!-- Mot de passe oublié -->
+      <form id="admin-forgot-form" onsubmit="return submitForgot(event)" style="display: none; flex-direction: column; gap: 16px;">
+        <p style="font-size: 13px; color: #5B6472; margin: 0;">Indiquez votre adresse e-mail administrateur, un lien de réinitialisation vous sera envoyé.</p>
+        <label style="display: block;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; color: #5B6472;">ADRESSE E-MAIL</span>
+          <input id="admin-forgot-email" type="email" required placeholder="admin@diaspo-actif.com" style="width: 100%; margin-top: 8px; background: #F6F9FD; border: 1px solid #E2E8F1; border-radius: 11px; padding: 14px 15px; font-size: 15px; color: #1B2430; outline: none; box-sizing: border-box;">
+        </label>
+        <div id="admin-forgot-msg" style="display: none; font-size: 13px; color: #1B8A5B; background: #E9F7EF; border-radius: 10px; padding: 10px 14px;"></div>
+        <button type="submit" id="admin-forgot-btn" style="font-size: 14.5px; font-weight: 600; letter-spacing: .02em; color: #fff; background: linear-gradient(135deg, #0E2E5A, #16457E); padding: 16px; border-radius: 12px; box-shadow: 0 12px 30px rgba(14,46,90,.28); border: none; cursor: pointer; font-family: inherit;">Envoyer le lien de réinitialisation</button>
+        <a href="#" onclick="return backToLogin(event)" style="font-size: 12.5px; color: #5B6472; text-align: center;">← Revenir à la connexion</a>
+      </form>
+
+      <div id="admin-security-badges" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 22px;">
         <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #6B7686; background: #F6F9FD; border: 1px solid #EAEFF6; border-radius: 999px; padding: 6px 11px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #1B8A5B;"></span>Chiffrement TLS</span>
         <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #6B7686; background: #F6F9FD; border: 1px solid #EAEFF6; border-radius: 999px; padding: 6px 11px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #1B8A5B;"></span>Connexions journalisées</span>
         <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #6B7686; background: #F6F9FD; border: 1px solid #EAEFF6; border-radius: 999px; padding: 6px 11px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #E2711D;"></span>Rôle ADMIN requis</span>
@@ -69,6 +97,18 @@
 </div>
 
 <script>
+  let pendingAdminEmail = '';
+
+  function showForm(id) {
+    ['admin-login-form', 'admin-2fa-form', 'admin-forgot-form'].forEach(f => {
+      document.getElementById(f).style.display = (f === id) ? 'flex' : 'none';
+    });
+    document.getElementById('admin-security-badges').style.display = (id === 'admin-login-form') ? 'flex' : 'none';
+  }
+
+  function backToLogin(e) { e.preventDefault(); showForm('admin-login-form'); return false; }
+  function openForgot(e) { e.preventDefault(); showForm('admin-forgot-form'); return false; }
+
   async function submitAdminLogin(e) {
     e.preventDefault();
     const email = document.getElementById('admin-email').value.trim();
@@ -83,18 +123,66 @@
         body: JSON.stringify({ email, password })
       });
       const data = await r.json();
-      if (r.ok) {
-        window.location.href = 'vitrine-admin-dashboard.html';
+      if (r.ok && data.step === '2fa') {
+        pendingAdminEmail = data.email;
+        document.getElementById('admin-2fa-email').textContent = data.email;
+        document.getElementById('admin-2fa-code').value = '';
+        document.getElementById('admin-2fa-err').style.display = 'none';
+        showForm('admin-2fa-form');
       } else {
         errBox.textContent = data.error || 'Erreur de connexion.';
         errBox.style.display = 'block';
-        btn.disabled = false;
       }
     } catch (err) {
       errBox.textContent = 'Connexion impossible. Réessayez.';
       errBox.style.display = 'block';
-      btn.disabled = false;
     }
+    btn.disabled = false;
+    return false;
+  }
+
+  async function submitAdmin2FA(e) {
+    e.preventDefault();
+    const code = document.getElementById('admin-2fa-code').value.trim();
+    const errBox = document.getElementById('admin-2fa-err');
+    const btn = document.getElementById('admin-2fa-btn');
+    errBox.style.display = 'none';
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/vitrine-site/admin/verify-2fa', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ email: pendingAdminEmail, code })
+      });
+      const data = await r.json();
+      if (r.ok) {
+        window.location.href = 'vitrine-admin-dashboard.html';
+        return false;
+      }
+      errBox.textContent = data.error || 'Code incorrect.';
+      errBox.style.display = 'block';
+    } catch (err) {
+      errBox.textContent = 'Vérification impossible. Réessayez.';
+      errBox.style.display = 'block';
+    }
+    btn.disabled = false;
+    return false;
+  }
+
+  async function submitForgot(e) {
+    e.preventDefault();
+    const email = document.getElementById('admin-forgot-email').value.trim();
+    const msg = document.getElementById('admin-forgot-msg');
+    const btn = document.getElementById('admin-forgot-btn');
+    btn.disabled = true;
+    try {
+      await fetch('/api/vitrine-site/admin/forgot-password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+    } catch (err) {}
+    msg.textContent = "Si cette adresse existe, un e-mail de réinitialisation vient d'être envoyé.";
+    msg.style.display = 'block';
+    btn.disabled = false;
     return false;
   }
 </script>

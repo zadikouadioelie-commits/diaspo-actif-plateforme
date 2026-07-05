@@ -531,7 +531,11 @@ db.exec(`
     password_hash TEXT NOT NULL,
     password_salt TEXT NOT NULL,
     created_at TEXT DEFAULT (datetime('now')),
-    last_login_at TEXT
+    last_login_at TEXT,
+    reset_token TEXT,
+    reset_expires INTEGER,
+    twofa_code TEXT,
+    twofa_expires INTEGER
   );
 
   /* ===== RAPPORTS DIASPO IMPACT — bibliothèque publique protégée par code d'accès ===== */
@@ -917,6 +921,9 @@ const _ldCols = db.prepare("PRAGMA table_info(listes_diffusion)").all().map(c=>c
 const _ldcCols = db.prepare("PRAGMA table_info(listes_diffusion_contacts)").all().map(c=>c.name);
 if(!_ldcCols.includes('user_id')) try{db.prepare("ALTER TABLE listes_diffusion_contacts ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL").run();}catch(e){}
 if(!_ldcCols.includes('email') && _ldcCols.includes('email')) {} // email already exists
+const _vsaCols = db.prepare("PRAGMA table_info(vitrine_site_admins)").all().map(c=>c.name);
+[["reset_token TEXT","reset_token"],["reset_expires INTEGER","reset_expires"],["twofa_code TEXT","twofa_code"],["twofa_expires INTEGER","twofa_expires"]]
+  .forEach(([def,col])=>{ if(!_vsaCols.includes(col)) try{db.prepare(`ALTER TABLE vitrine_site_admins ADD COLUMN ${def}`).run();}catch(e){} });
 
 /* ══ WALLET SYSTÈME ══ */
 db.exec(`

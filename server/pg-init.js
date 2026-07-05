@@ -212,6 +212,11 @@ async function migratePg(pool) {
     ['initiatives', 'vitrine_rdv_active', 'INTEGER DEFAULT 0'],
     ['users', 'compte_masque', 'INTEGER DEFAULT 0'],
     ['produits_vitrine', 'catalogue_id', 'INTEGER'],
+    // Sécurité renforcée du compte administrateur du site institutionnel
+    ['vitrine_site_admins', 'reset_token', 'TEXT'],
+    ['vitrine_site_admins', 'reset_expires', 'BIGINT'],
+    ['vitrine_site_admins', 'twofa_code', 'TEXT'],
+    ['vitrine_site_admins', 'twofa_expires', 'BIGINT'],
   ];
   for (const [table, col, type] of cols) {
     try {

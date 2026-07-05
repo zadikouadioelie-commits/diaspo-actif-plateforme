@@ -10627,7 +10627,7 @@ ${jsonLd}
       return sendJSON(res, 200, { ok: true, message: "Inscription confirmée. Vous recevrez un e-mail à chaque nouvelle actualité." });
     }
 
-    /* ── POST /api/vitrine-site/admin/login — compte administrateur du site institutionnel (distinct de la plateforme) ── */
+    /* ── POST /api/vitrine-site/admin/login — étape 1 : email + mot de passe, déclenche l'envoi du code 2FA ── */
     if (req.method === 'POST' && pathname === '/api/vitrine-site/admin/login') {
       const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
       const rl = SEC.rateLimit(`vitrine-admin-login:${ip}`, 8, 15 * 60 * 1000);
@@ -10639,9 +10639,90 @@ ${jsonLd}
       if (!admin || !verifyPassword(password, admin.password_salt, admin.password_hash)) {
         return sendJSON(res, 401, { error: "Identifiants incorrects." });
       }
-      await db.prepare(`UPDATE vitrine_site_admins SET last_login_at=datetime('now') WHERE id=?`).run(admin.id);
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const expires = Date.now() + 10 * 60 * 1000;
+      await db.prepare(`UPDATE vitrine_site_admins SET twofa_code=?, twofa_expires=? WHERE id=?`).run(code, expires, admin.id);
+      try {
+        const { sendEmail } = require('./mailer');
+        await sendEmail({
+          to: admin.email,
+          subject: `Votre code de connexion Diaspo'Actif — ${code}`,
+          html: `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F4F1EA;font-family:Arial,sans-serif;">
+  <div style="max-width:480px;margin:40px auto;background:#fff;border:1.5px solid #26292C;">
+    <div style="background:#26292C;padding:26px 30px;"><span style="color:#F4F1EA;font-weight:700;font-size:18px;">DIASPO'ACTIF — ADMINISTRATION</span></div>
+    <div style="padding:30px;text-align:center;">
+      <p style="color:#4A4E52;font-size:14px;margin:0 0 18px;">Voici votre code de connexion à la console d'administration du site :</p>
+      <div style="font-family:monospace;font-size:36px;font-weight:700;letter-spacing:.2em;color:#26292C;margin:0 0 18px;">${code}</div>
+      <p style="color:#8A857C;font-size:12.5px;margin:0;">Ce code expire dans 10 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.</p>
+    </div>
+  </div>
+</body></html>`
+        });
+      } catch (e) { console.error('[admin/login 2FA email]', e.message); }
+      return sendJSON(res, 200, { ok: true, step: '2fa', email: admin.email });
+    }
+
+    /* ── POST /api/vitrine-site/admin/verify-2fa — étape 2 : vérifie le code reçu par e-mail, ouvre la session ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/admin/verify-2fa') {
+      const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+      const rl = SEC.rateLimit(`vitrine-admin-2fa:${ip}`, 10, 15 * 60 * 1000);
+      if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+      const email = String(body.email || '').trim().toLowerCase();
+      const code = String(body.code || '').trim();
+      const admin = await db.prepare(`SELECT * FROM vitrine_site_admins WHERE email=?`).get(email);
+      if (!admin || !admin.twofa_code || admin.twofa_code !== code) return sendJSON(res, 401, { error: "Code incorrect." });
+      if (Number(admin.twofa_expires) < Date.now()) return sendJSON(res, 401, { error: "Code expiré, reconnectez-vous." });
+      await db.prepare(`UPDATE vitrine_site_admins SET last_login_at=datetime('now'), twofa_code=NULL, twofa_expires=NULL WHERE id=?`).run(admin.id);
       const token = signAuthToken({ vitrineAdminId: admin.id, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL });
       return sendJSON(res, 200, { ok: true, email: admin.email }, { "Set-Cookie": [`vitrine_admin_auth=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
+    }
+
+    /* ── POST /api/vitrine-site/admin/forgot-password ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/admin/forgot-password') {
+      const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+      const rl = SEC.rateLimit(`vitrine-admin-forgot:${ip}`, 5, 15 * 60 * 1000);
+      if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+      const email = String(body.email || '').trim().toLowerCase();
+      const admin = await db.prepare(`SELECT id, email FROM vitrine_site_admins WHERE email=?`).get(email);
+      if (admin) {
+        const token = require('node:crypto').randomBytes(32).toString('hex');
+        const expires = Date.now() + 3600000;
+        await db.prepare(`UPDATE vitrine_site_admins SET reset_token=?, reset_expires=? WHERE id=?`).run(token, expires, admin.id);
+        try {
+          const { sendEmail } = require('./mailer');
+          const lien = `https://diaspoactif.com/vitrine-admin-reset-password.html?token=${token}`;
+          await sendEmail({
+            to: admin.email,
+            subject: "Réinitialisation du mot de passe — Administration Diaspo'Actif",
+            html: `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F4F1EA;font-family:Arial,sans-serif;">
+  <div style="max-width:480px;margin:40px auto;background:#fff;border:1.5px solid #26292C;">
+    <div style="background:#26292C;padding:26px 30px;"><span style="color:#F4F1EA;font-weight:700;font-size:18px;">DIASPO'ACTIF — ADMINISTRATION</span></div>
+    <div style="padding:30px;">
+      <p style="color:#4A4E52;font-size:14px;line-height:1.6;margin:0 0 20px;">Vous avez demandé à réinitialiser le mot de passe de la console d'administration du site. Ce lien est valable 1 heure.</p>
+      <a href="${lien}" style="display:inline-block;background:#26292C;color:#F4F1EA;text-decoration:none;font-weight:700;font-size:13px;padding:14px 24px;">Réinitialiser mon mot de passe →</a>
+      <p style="color:#8A857C;font-size:12px;margin:20px 0 0;">Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.</p>
+    </div>
+  </div>
+</body></html>`
+          });
+        } catch (e) { console.error('[admin/forgot-password email]', e.message); }
+      }
+      return sendJSON(res, 200, { ok: true }); // toujours OK, ne révèle jamais si l'email existe
+    }
+
+    /* ── POST /api/vitrine-site/admin/reset-password ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/admin/reset-password') {
+      const { token, password } = body;
+      if (!token || !password) return sendJSON(res, 400, { error: "Token et mot de passe requis." });
+      if (password.length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit comporter au moins 8 caractères." });
+      const admin = await db.prepare(`SELECT id, reset_token, reset_expires FROM vitrine_site_admins WHERE reset_token=?`).get(token);
+      if (!admin) return sendJSON(res, 400, { error: "Lien invalide ou expiré." });
+      if (Number(admin.reset_expires) < Date.now()) return sendJSON(res, 400, { error: "Lien expiré, veuillez faire une nouvelle demande." });
+      const { hash, salt } = hashPassword(password);
+      await db.prepare(`UPDATE vitrine_site_admins SET password_hash=?, password_salt=?, reset_token=NULL, reset_expires=NULL WHERE id=?`).run(hash, salt, admin.id);
+      return sendJSON(res, 200, { ok: true });
     }
 
     /* ── GET /api/vitrine-site/admin/me — vérifie la session admin du site ── */
