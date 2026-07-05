@@ -517,6 +517,56 @@ db.exec(`
     UNIQUE(user_id, institution_id)
   );
 
+  /* ===== ABONNÉS ACTUALITÉS — site institutionnel Diaspo'Actif ===== */
+  CREATE TABLE IF NOT EXISTS vitrine_actualites_abonnes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  /* ===== COMPTE ADMINISTRATEUR DU SITE INSTITUTIONNEL — distinct des comptes de la plateforme ===== */
+  CREATE TABLE IF NOT EXISTS vitrine_site_admins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    password_salt TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    last_login_at TEXT
+  );
+
+  /* ===== RAPPORTS DIASPO IMPACT — bibliothèque publique protégée par code d'accès ===== */
+  CREATE TABLE IF NOT EXISTS vitrine_rapports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titre TEXT NOT NULL,
+    sous_titre TEXT,
+    categorie TEXT NOT NULL DEFAULT 'Autres',
+    type TEXT NOT NULL DEFAULT 'Rapport PDF',
+    pays TEXT,
+    date_publication TEXT,
+    resume TEXT,
+    lien TEXT,
+    cover_image TEXT,
+    statut TEXT NOT NULL DEFAULT 'brouillon',
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  /* ===== ACTUALITÉS DU SITE INSTITUTIONNEL ===== */
+  CREATE TABLE IF NOT EXISTS vitrine_articles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titre TEXT NOT NULL,
+    resume TEXT,
+    contenu TEXT,
+    categorie TEXT,
+    cover_image TEXT,
+    statut TEXT NOT NULL DEFAULT 'brouillon',
+    date_publication TEXT,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
   /* ===== MODULE AMBASSADE / COLLECTIVITÉ ===== */
 
   CREATE TABLE IF NOT EXISTS ambassade_profil (

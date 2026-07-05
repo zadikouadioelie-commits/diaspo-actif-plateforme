@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F4F1EA; font-family: 'Space Grotesk', system-ui, sans-serif; color: #26292C; }
+  a { text-decoration: none; color: inherit; }
+  input, select { font-family: inherit; }
+  input::placeholder { color: #9A958B; }
+  .rep-card { transition: transform .25s, box-shadow .25s; }
+  .rep-card:hover { transform: translateY(-5px); box-shadow: 0 22px 48px rgba(38,41,44,.14); }
+</style>
+</head>
+<body>
+<div style="width: 100%; background: #F4F1EA;">
+
+  <!-- LOCK OVERLAY -->
+  <div id="rep-lock" style="position: fixed; inset: 0; z-index: 10000; background: #26292C; display: none; align-items: center; justify-content: center; padding: 24px;">
+    <div style="width: 100%; max-width: 420px; background: #F4F1EA; border: 1.5px solid #000; box-shadow: 0 30px 80px rgba(0,0,0,.5);">
+      <div style="background: #C13527; color: #FFF3EE; padding: 22px 26px; display: flex; align-items: center; gap: 13px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <div><div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px;">Accès protégé</div><div style="font-size: 12.5px; color: #FBD5C7;">Rapports Diaspo Impact</div></div>
+      </div>
+      <div style="padding: 26px;">
+        <p style="font-size: 14px; line-height: 1.55; color: #4A4E52; margin: 0 0 18px;">Cette rubrique est réservée. Saisissez le code d'accès pour consulter les rapports.</p>
+        <label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .12em; color: #8A857C;">CODE D'ACCÈS</label>
+        <input id="rep-code" type="password" placeholder="••••••" style="width: 100%; margin-top: 8px; border: 1.5px solid #26292C; background: #fff; padding: 13px 15px; font-size: 16px; letter-spacing: .1em; color: #26292C; outline: none; font-family: inherit;">
+        <div id="rep-code-err" style="display: none; font-size: 12.5px; color: #C0392B; margin-top: 8px;">Code incorrect. Réessayez.</div>
+        <button id="rep-code-go" style="width: 100%; margin-top: 16px; font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: .03em; color: #FFF3EE; background: #26292C; border: none; padding: 15px; cursor: pointer;">Déverrouiller</button>
+        <button id="rep-request" style="width: 100%; margin-top: 10px; font-family: 'Space Grotesk', sans-serif; font-size: 13.5px; font-weight: 600; letter-spacing: .02em; color: #C13527; background: #fff; border: 1.5px solid #C13527; padding: 13px; cursor: pointer;">Demander l'accès aux rapports</button>
+        <a href="site-vitrine.html" style="display: block; text-align: center; margin-top: 12px; font-size: 13px; font-weight: 600; color: #8A857C;">← Retour à l'accueil</a>
+      </div>
+    </div>
+
+    <!-- REQUEST FORM -->
+    <div id="rep-request-panel" style="display: none; width: 100%; max-width: 520px; background: #F4F1EA; border: 1.5px solid #000; box-shadow: 0 30px 80px rgba(0,0,0,.5); max-height: 92vh; overflow: auto;">
+      <div style="background: #26292C; color: #F4F1EA; padding: 22px 26px; display: flex; align-items: center; gap: 13px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H5.2L4 17.2z"/></svg>
+        <div><div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px;">Demande d'accès</div><div style="font-size: 12.5px; color: #B7B2A8;">Rapports Diaspo Impact</div></div>
+      </div>
+      <div style="padding: 24px 26px;">
+        <p style="font-size: 13.5px; line-height: 1.55; color: #4A4E52; margin: 0 0 18px;">Remplissez cette fiche : notre équipe étudie votre demande et vous transmet un code d'accès.</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div><label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8A857C;">PRÉNOM</label><input class="rq" data-k="prenom" style="width: 100%; margin-top: 6px; border: 1.5px solid #26292C; background: #fff; padding: 11px 13px; font-size: 14px; color: #26292C; outline: none; font-family: inherit;"></div>
+          <div><label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8A857C;">NOM</label><input class="rq" data-k="nom" style="width: 100%; margin-top: 6px; border: 1.5px solid #26292C; background: #fff; padding: 11px 13px; font-size: 14px; color: #26292C; outline: none; font-family: inherit;"></div>
+          <div><label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8A857C;">VILLE</label><input class="rq" data-k="ville" style="width: 100%; margin-top: 6px; border: 1.5px solid #26292C; background: #fff; padding: 11px 13px; font-size: 14px; color: #26292C; outline: none; font-family: inherit;"></div>
+          <div><label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8A857C;">PAYS</label><input class="rq" data-k="pays" style="width: 100%; margin-top: 6px; border: 1.5px solid #26292C; background: #fff; padding: 11px 13px; font-size: 14px; color: #26292C; outline: none; font-family: inherit;"></div>
+          <div style="grid-column: 1 / -1;"><label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8A857C;">PROFESSION</label><input class="rq" data-k="profession" style="width: 100%; margin-top: 6px; border: 1.5px solid #26292C; background: #fff; padding: 11px 13px; font-size: 14px; color: #26292C; outline: none; font-family: inherit;"></div>
+          <div style="grid-column: 1 / -1;"><label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8A857C;">E-MAIL</label><input class="rq" data-k="email" type="email" placeholder="vous@exemple.com" style="width: 100%; margin-top: 6px; border: 1.5px solid #26292C; background: #fff; padding: 11px 13px; font-size: 14px; color: #26292C; outline: none; font-family: inherit;"></div>
+          <div style="grid-column: 1 / -1;"><label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8A857C;">MOTIF DE LA DEMANDE</label><textarea class="rq" data-k="motif" rows="3" placeholder="Précisez pourquoi vous souhaitez accéder aux rapports…" style="width: 100%; margin-top: 6px; border: 1.5px solid #26292C; background: #fff; padding: 11px 13px; font-size: 14px; color: #26292C; outline: none; font-family: inherit; resize: vertical;"></textarea></div>
+        </div>
+        <div id="rep-request-err" style="display: none; font-size: 12.5px; color: #C0392B; margin-top: 10px;">Veuillez renseigner au moins votre nom, votre e-mail et le motif.</div>
+        <button id="rep-request-send" style="width: 100%; margin-top: 16px; font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: .03em; color: #FFF3EE; background: #C13527; border: none; padding: 15px; cursor: pointer;">Envoyer ma demande</button>
+        <button id="rep-request-back" style="width: 100%; margin-top: 10px; font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 600; color: #8A857C; background: none; border: none; cursor: pointer;">← Retour au code d'accès</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <header style="position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 40px; background: rgba(244,241,234,.92); backdrop-filter: blur(8px); border-bottom: 1.5px solid #26292C;">
+    <a href="site-vitrine.html" style="display: flex; align-items: center; gap: 12px;">
+      <img src="assets/vitrine/logo-diaspo-actif-transparent.png" alt="Diaspo'Actif" style="height: 46px; width: auto; display: block;">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: -.01em;">DIASPO'ACTIF</span>
+    </a>
+    <nav style="display: flex; align-items: center; gap: 12px; font-size: 11px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; color: #4A4E52;">
+      <a href="site-vitrine.html">Accueil</a>
+      <a href="vitrine-qui-sommes-nous.html">Qui sommes-nous</a>
+      <a href="vitrine-plateforme.html">Plateforme Diaspo'Actif</a>
+      <a href="vitrine-nos-actions.html">Nos actions</a>
+      <a href="vitrine-diaspo-impact.html">Diaspo Impact</a>
+      <a href="vitrine-rapports.html" style="color: #C13527; font-weight: 700;">Rapports</a>
+      <a href="vitrine-faq.html">FAQ</a>
+      <a href="vitrine-partenaires.html">Partenaires</a>
+      <a href="vitrine-actualites.html">Actualités</a>
+    </nav>
+    <a href="vitrine-contact.html" style="font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #F4F1EA; background: #26292C; padding: 10px 14px; white-space: nowrap;">Contact</a>
+  </header>
+
+  <!-- HERO -->
+  <section style="border-bottom: 1.5px solid #26292C;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 56px 40px 46px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 26px; flex-wrap: wrap; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #C13527;">[ LA BIBLIOTHÈQUE OFFICIELLE DE NOS ACTIONS ]</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #8A857C;">ACCUEIL → RAPPORTS</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap;">
+        <div>
+          <h1 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 74px; line-height: .96; letter-spacing: -.03em; margin: 0 0 18px;">Rapports<br><span style="color: #C13527;">Diaspo Impact</span></h1>
+          <p style="font-size: 18px; line-height: 1.5; color: #4A4E52; margin: 0; max-width: 620px;">Projets, missions de terrain, résultats et impacts — publiés en toute transparence. Rapports PDF, vidéos, albums photos, articles et communiqués officiels.</p>
+        </div>
+        <button id="notify-btn" style="display: inline-flex; align-items: center; gap: 11px; font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: .02em; color: #FFF3EE; background: #C13527; border: none; padding: 16px 24px; cursor: pointer; white-space: nowrap;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          M'informer
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FILTERS -->
+  <section style="border-bottom: 1.5px solid #26292C; background: #EFE9DE;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 20px 40px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 9px; background: #F4F1EA; border: 1.5px solid #26292C; padding: 10px 15px; flex: 1; min-width: 220px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8A857C" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        <input id="rep-search" placeholder="Rechercher un rapport…" style="border: none; outline: none; background: transparent; font-size: 14px; width: 100%; color: #26292C;">
+      </div>
+      <select id="rep-cat" style="border: 1.5px solid #26292C; background: #F4F1EA; padding: 11px 14px; font-size: 13px; color: #26292C; outline: none; cursor: pointer;"><option value="">Toutes catégories</option></select>
+      <select id="rep-type" style="border: 1.5px solid #26292C; background: #F4F1EA; padding: 11px 14px; font-size: 13px; color: #26292C; outline: none; cursor: pointer;"><option value="">Tous types</option></select>
+      <select id="rep-year" style="border: 1.5px solid #26292C; background: #F4F1EA; padding: 11px 14px; font-size: 13px; color: #26292C; outline: none; cursor: pointer;"><option value="">Toutes années</option></select>
+    </div>
+  </section>
+
+  <!-- GRID -->
+  <section>
+    <div style="max-width: 1200px; margin: 0 auto; padding: 40px 40px 70px;">
+      <div id="rep-count" style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .12em; color: #8A857C; margin-bottom: 24px;"></div>
+      <div id="rep-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px;"></div>
+    </div>
+  </section>
+
+  <a href="index.html" style="position: fixed; left: 22px; bottom: 22px; z-index: 9999; display: inline-flex; align-items: center; gap: 9px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: #FFFFFF; background: #1B5AA6; padding: 13px 20px; border-radius: 999px; box-shadow: 0 10px 28px rgba(27,90,166,.42);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Retour à la plateforme</a>
+  <a href="vitrine-admin-connexion.html" title="Accès administration" style="position: fixed; bottom: 22px; right: 22px; width: 46px; height: 46px; border-radius: 50%; background: #0D2B4E; color: #fff; display: flex; align-items: center; justify-content: center; z-index: 9999; opacity: .4; transition: opacity .3s, transform .3s; box-shadow: 0 8px 22px rgba(13,43,78,.42);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></a>
+
+
+  <!-- FOOTER -->
+  <footer style="padding: 56px 40px 38px; background: #26292C; color: #B7B2A8;">
+    <div style="max-width: 1200px; margin: 0 auto;">
+      <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 40px; padding-bottom: 36px; border-bottom: 1px solid rgba(183,178,168,.16);">
+        <div>
+          <div style="display: flex; align-items: center; gap: 11px; margin-bottom: 16px;"><img src="assets/vitrine/logo-diaspo-actif-transparent.png" alt="" style="height: 44px; width: auto;"><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px; color: #F4F1EA;">DIASPO'ACTIF</span></div>
+          <p style="font-size: 13.5px; line-height: 1.6; margin: 0; max-width: 300px;">La bibliothèque officielle de nos actions, résultats et impacts. Du Sud au Nord.</p>
+        </div>
+        <div><div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #E8933A; margin-bottom: 14px;">MOUVEMENT</div><div style="display: flex; flex-direction: column; gap: 10px; font-size: 13.5px;"><a href="vitrine-qui-sommes-nous.html">Qui sommes-nous</a><a href="vitrine-plateforme.html">Plateforme Diaspo'Actif</a><a href="vitrine-nos-actions.html">Nos actions</a><a href="vitrine-actualites.html">Actualités</a></div></div>
+        <div><div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #E8933A; margin-bottom: 14px;">RAPPORTS</div><div style="display: flex; flex-direction: column; gap: 10px; font-size: 13.5px;"><a href="vitrine-rapports.html">Tous les rapports</a><a href="vitrine-diaspo-impact.html">Diaspo Impact</a><a href="vitrine-partenaires.html">Partenaires</a></div></div>
+        <div><div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #E8933A; margin-bottom: 14px;">CONTACT</div><div style="display: flex; flex-direction: column; gap: 10px; font-size: 13.5px;"><a href="vitrine-contact.html">contact@diaspo-actif.com</a><a href="vitrine-contact.html">Nous écrire</a></div></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #7E7A72;">
+        <span>© 2025–2026 DIASPO'ACTIF — TOUS DROITS RÉSERVÉS</span>
+        <span>DU SUD AU NORD.</span>
+      </div>
+    </div>
+  </footer>
+
+</div>
+<script>
+class Component {
+  async componentDidMount() {
+    this.ACCESS_CODE = 'DIASPO2026';
+    this.initGate();
+    this.reports = await this.load();
+    this.fillFilters();
+    this.wireFilters();
+    this.render();
+    document.getElementById('notify-btn').addEventListener('click', () => this.openModal());
+  }
+
+  initGate() {
+    const lock = document.getElementById('rep-lock');
+    const unlocked = (() => { try { return localStorage.getItem('diaspo-rapports-access') === '1'; } catch(e){ return false; } })();
+    if (unlocked) { lock.style.display = 'none'; return; }
+    lock.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const inp = document.getElementById('rep-code');
+    const err = document.getElementById('rep-code-err');
+    const go = document.getElementById('rep-code-go');
+    const tryCode = () => {
+      if ((inp.value || '').trim().toUpperCase() === this.ACCESS_CODE) {
+        try { localStorage.setItem('diaspo-rapports-access','1'); } catch(e){}
+        lock.style.display = 'none';
+        document.body.style.overflow = '';
+      } else {
+        err.style.display = 'block';
+        inp.value = '';
+        inp.focus();
+      }
+    };
+    go.addEventListener('click', tryCode);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryCode(); });
+    setTimeout(() => inp.focus(), 100);
+
+    // request-access form
+    const codeCard = lock.querySelector('div');
+    const panel = document.getElementById('rep-request-panel');
+    document.getElementById('rep-request').addEventListener('click', () => { codeCard.style.display='none'; panel.style.display='block'; });
+    document.getElementById('rep-request-back').addEventListener('click', () => { panel.style.display='none'; codeCard.style.display='block'; });
+    document.getElementById('rep-request-send').addEventListener('click', async () => {
+      const data = {};
+      panel.querySelectorAll('.rq').forEach(f => { data[f.getAttribute('data-k')] = (f.value||'').trim(); });
+      const err = document.getElementById('rep-request-err');
+      if (!data.nom || !data.email || !/.+@.+\..+/.test(data.email) || !data.motif) { err.style.display='block'; return; }
+      err.style.display='none';
+      try {
+        await fetch('/api/vitrine-site/rapports/demande-acces', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      } catch (e) {}
+      panel.innerHTML = '<div style="padding:44px 30px;text-align:center;"><div style="width:60px;height:60px;border-radius:50%;background:#E6F6EE;color:#1B8A5B;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><h3 style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:22px;margin:0 0 8px;color:#26292C;">Demande envoyée</h3><p style="font-size:14px;line-height:1.55;color:#4A4E52;margin:0 0 22px;">Merci ' + this.esc(data.prenom||data.nom) + '. Notre équipe étudie votre demande et vous transmettra un code d\u2019accès par e-mail.</p><a href="site-vitrine.html" style="font-family:inherit;font-size:13px;font-weight:600;color:#FFF3EE;background:#26292C;padding:12px 26px;display:inline-block;">Retour à l\u2019accueil</a></div>';
+    });
+  }
+
+  async load() {
+    this.CATEGORIES = ['Bilan', 'Accords', 'Processus', 'Autres'];
+    let rapports = [];
+    try {
+      const r = await fetch('/api/vitrine-site/rapports');
+      const d = await r.json();
+      rapports = d.rapports || [];
+    } catch (e) {}
+    const norm = rapports.map(r => ({
+      title: r.titre, subtitle: r.resume || r.sous_titre || '', date: r.date_publication || '',
+      category: r.categorie || 'Autres', country: r.pays || '', link: r.lien || '#',
+      type: r.type || 'Rapport PDF', cover: r.cover_image || ''
+    }));
+    norm.sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    return norm;
+  }
+
+  fillFilters() {
+    const cats = this.CATEGORIES.slice();
+    const types = [...new Set(this.reports.map(r=>r.type).filter(Boolean))].sort();
+    const years = [...new Set(this.reports.map(r=>(r.date||'').slice(0,4)).filter(Boolean))].sort().reverse();
+    const add = (id, arr) => { const s=document.getElementById(id); arr.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; s.appendChild(o); }); };
+    add('rep-cat', cats); add('rep-type', types); add('rep-year', years);
+  }
+
+  wireFilters() {
+    ['rep-search','rep-cat','rep-type','rep-year'].forEach(id => {
+      const el = document.getElementById(id);
+      el.addEventListener('input', () => this.render());
+      el.addEventListener('change', () => this.render());
+    });
+  }
+
+  filtered() {
+    const q = document.getElementById('rep-search').value.toLowerCase().trim();
+    const cat = document.getElementById('rep-cat').value;
+    const type = document.getElementById('rep-type').value;
+    const year = document.getElementById('rep-year').value;
+    return this.reports.filter(r => {
+      if (cat && r.category !== cat) return false;
+      if (type && r.type !== type) return false;
+      if (year && (r.date||'').slice(0,4) !== year) return false;
+      if (q && !((r.title+' '+r.subtitle+' '+r.project+' '+r.country).toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }
+
+  typeIcon(t) {
+    const map = { 'Rapport PDF':'📄','Vidéo':'🎥','Album photos':'📸','Compte rendu':'📰','Communiqué':'📢','Bilan':'📊','Rapport':'📈' };
+    return map[t] || '📄';
+  }
+
+  render() {
+    const grid = document.getElementById('rep-grid');
+    grid.style.display = 'block';
+    const list = this.filtered();
+    const total = this.reports.length;
+    document.getElementById('rep-count').textContent = total === 0
+      ? 'AUCUN RAPPORT PUBLIÉ POUR LE MOMENT · RUBRIQUES PRÊTES'
+      : list.length + ' PUBLICATION' + (list.length>1?'S':'');
+    grid.innerHTML = '';
+    // Which categories to show (respect the category filter if set)
+    const selCat = document.getElementById('rep-cat').value;
+    const cats = selCat ? [selCat] : this.CATEGORIES;
+    const bucket = (r) => this.CATEGORIES.indexOf(r.category) !== -1 ? r.category : 'Autres';
+    cats.forEach(cat => {
+      const items = list.filter(r => bucket(r) === cat);
+      const sec = document.createElement('div');
+      sec.style.cssText = 'margin-bottom:30px;';
+      sec.innerHTML = '<div style="display:flex;align-items:baseline;gap:12px;border-bottom:1.5px solid #26292C;padding-bottom:12px;margin-bottom:20px;">'+
+        '<h2 style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:26px;letter-spacing:-.02em;margin:0;color:#26292C;">'+cat+'</h2>'+
+        '<span style="font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:.1em;color:#8A857C;">'+items.length+' RAPPORT'+(items.length>1?'S':'')+'</span></div>';
+      if (items.length) {
+        const g = document.createElement('div');
+        g.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:26px;';
+        items.forEach(r => g.appendChild(this.card(r)));
+        sec.appendChild(g);
+      } else {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'padding:36px;text-align:center;color:#8A857C;border:1.5px dashed #C9BFAD;background:#FBF8F2;';
+        empty.innerHTML = '<div style="font-size:14.5px;font-weight:600;color:#5C5951;margin-bottom:4px;">Aucun rapport pour le moment</div><div style="font-size:13px;">Cette rubrique sera alimentée dès la publication des premiers rapports.</div>';
+        sec.appendChild(empty);
+      }
+      grid.appendChild(sec);
+    });
+  }
+
+  card(r) {
+    const t = document.createElement('a');
+    t.href = r.link || '#'; t.target = '_blank'; t.rel = 'noopener'; t.className = 'rep-card';
+    t.style.cssText = 'display:flex;flex-direction:column;background:#fff;border:1.5px solid #26292C;text-decoration:none;';
+    const cover = document.createElement('div');
+    cover.style.cssText = 'height:200px;position:relative;background:#E3DED2 center/cover;';
+    if (r.cover) { cover.style.backgroundImage = 'url(\''+r.cover+'\')'; if (r.coverPos) cover.style.backgroundPosition=r.coverPos; }
+    else { cover.style.background = 'repeating-linear-gradient(135deg,#ECE3D5 0 13px,#F3EBDD 13px 26px)'; }
+    cover.innerHTML = '<span style="position:absolute;top:12px;left:12px;font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:600;letter-spacing:.06em;color:#fff;background:rgba(38,41,44,.8);padding:6px 11px;">'+this.typeIcon(r.type)+' '+r.type.toUpperCase()+'</span>';
+    t.appendChild(cover);
+    const body = document.createElement('div');
+    body.style.cssText = 'padding:22px 24px 24px;display:flex;flex-direction:column;flex:1;';
+    const meta = [r.category, r.country, this.fmtDate(r.date)].filter(Boolean).join(' · ');
+    body.innerHTML =
+      '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#C13527;margin-bottom:10px;">'+meta.toUpperCase()+'</div>'+
+      '<h3 style="font-family:\'Space Grotesk\',sans-serif;font-weight:600;font-size:20px;line-height:1.22;margin:0 0 8px;color:#26292C;">'+this.esc(r.title)+'</h3>'+
+      (r.subtitle?'<p style="font-size:13.5px;line-height:1.5;color:#5C5951;margin:0 0 16px;">'+this.esc(r.subtitle)+'</p>':'');
+    const foot = document.createElement('div');
+    foot.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:14px;border-top:1px solid #EBE1D1;';
+    foot.innerHTML = '<span style="font-size:13px;font-weight:600;color:#C13527;">Consulter le rapport →</span>'+
+      '<span style="display:flex;gap:8px;align-items:center;">'+
+        '<span title="Partager" style="width:28px;height:28px;border:1px solid #EBE1D1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#8A857C;">'+
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>'+
+        '</span>'+
+      '</span>';
+    body.appendChild(foot);
+    t.appendChild(body);
+    return t;
+  }
+
+  fmtDate(d) { if(!d) return ''; const p=d.split('-'); return p.length===3 ? (p[2]+'.'+p[1]+'.'+p[0].slice(2)) : d; }
+  esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  openModal() {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(38,41,44,.55);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:24px;';
+    ov.addEventListener('click', e => { if (e.target===ov) ov.remove(); });
+    const m = document.createElement('div');
+    m.style.cssText = 'background:#F4F1EA;max-width:480px;width:100%;border:1.5px solid #26292C;box-shadow:0 30px 80px rgba(0,0,0,.4);max-height:92vh;overflow:auto;';
+    m.innerHTML =
+      '<div style="background:#C13527;color:#FFF3EE;padding:22px 26px;display:flex;align-items:center;gap:12px;">'+
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>'+
+        '<div><div style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:20px;">M\'informer</div><div style="font-size:12.5px;color:#FBD5C7;">Recevez automatiquement les nouveaux rapports</div></div>'+
+      '</div>'+
+      '<div style="padding:24px 26px;">'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">'+
+          '<div><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#8A857C;">PRÉNOM</label><input class="sub-in" style="width:100%;margin-top:6px;border:1.5px solid #26292C;background:#fff;padding:11px 13px;font-size:14px;outline:none;"></div>'+
+          '<div><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#8A857C;">NOM</label><input class="sub-in" style="width:100%;margin-top:6px;border:1.5px solid #26292C;background:#fff;padding:11px 13px;font-size:14px;outline:none;"></div>'+
+        '</div>'+
+        '<div style="margin-bottom:12px;"><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#8A857C;">ADRESSE E-MAIL</label><input class="sub-in" type="email" placeholder="vous@exemple.com" style="width:100%;margin-top:6px;border:1.5px solid #26292C;background:#fff;padding:11px 13px;font-size:14px;outline:none;"></div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'+
+          '<div><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#8A857C;">PAYS</label><input class="sub-in" style="width:100%;margin-top:6px;border:1.5px solid #26292C;background:#fff;padding:11px 13px;font-size:14px;outline:none;"></div>'+
+          '<div><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#8A857C;">ORGANISATION</label><input class="sub-in" placeholder="facultatif" style="width:100%;margin-top:6px;border:1.5px solid #26292C;background:#fff;padding:11px 13px;font-size:14px;outline:none;"></div>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;font-size:13.5px;color:#3A3E42;">'+
+          '<label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;"><input type="checkbox" checked style="margin-top:2px;accent-color:#C13527;">Je souhaite recevoir les nouveaux rapports Diaspo Impact.</label>'+
+          '<label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;accent-color:#C13527;">Je souhaite recevoir les communiqués officiels.</label>'+
+          '<label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;"><input type="checkbox" style="margin-top:2px;accent-color:#C13527;">Je souhaite recevoir les invitations aux événements.</label>'+
+          '<label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;"><input type="checkbox" class="sub-consent" style="margin-top:2px;accent-color:#C13527;">J\'accepte la politique de confidentialité.</label>'+
+        '</div>'+
+        '<button class="sub-go" style="width:100%;font-family:\'Space Grotesk\',sans-serif;font-size:14px;font-weight:600;letter-spacing:.03em;color:#FFF3EE;background:#C13527;border:none;padding:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:10px;">'+
+          '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>S\'abonner</button>'+
+        '<button class="sub-cancel" style="width:100%;margin-top:8px;font-family:inherit;font-size:13px;font-weight:600;color:#5C5951;background:none;border:none;padding:10px;cursor:pointer;">Annuler</button>'+
+      '</div>';
+    ov.appendChild(m);
+    document.body.appendChild(ov);
+    m.querySelector('.sub-cancel').addEventListener('click', () => ov.remove());
+    m.querySelector('.sub-go').addEventListener('click', async () => {
+      const ins = [...m.querySelectorAll('.sub-in')];
+      const prenom = ins[0] ? ins[0].value.trim() : '';
+      const nom = ins[1] ? ins[1].value.trim() : '';
+      const email = ins[2] ? ins[2].value.trim() : '';
+      const pays = ins[3] ? ins[3].value.trim() : '';
+      const organisation = ins[4] ? ins[4].value.trim() : '';
+      const consent = m.querySelector('.sub-consent').checked;
+      if (!email || !/.+@.+\..+/.test(email)) { alert('Veuillez saisir une adresse e-mail valide.'); return; }
+      if (!consent) { alert('Veuillez accepter la politique de confidentialité.'); return; }
+      try {
+        await fetch('/api/vitrine-site/rapports/abonnement', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prenom, nom, email, pays, organisation })
+        });
+      } catch (e) {}
+      m.innerHTML = '<div style="padding:44px 30px;text-align:center;"><div style="width:60px;height:60px;border-radius:50%;background:#E6F6EE;color:#1B8A5B;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div><h3 style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:22px;margin:0 0 8px;color:#26292C;">Inscription confirmée</h3><p style="font-size:14px;color:#5C5951;margin:0 0 22px;">Vous recevrez un e-mail à chaque nouveau rapport Diaspo Impact.</p><button class="sub-close2" style="font-family:inherit;font-size:13px;font-weight:600;color:#FFF3EE;background:#26292C;border:none;padding:12px 26px;cursor:pointer;">Fermer</button></div>';
+      m.querySelector('.sub-close2').addEventListener('click', () => ov.remove());
+    });
+  }
+
+}
+new Component().componentDidMount();
+</script>
+</body>
+</html>

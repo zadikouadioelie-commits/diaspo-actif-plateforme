@@ -8593,7 +8593,7 @@ ${jsonLd}
     // Exception : multipart/form-data (uploads) — ces routes lisent le flux brut elles-mêmes,
     // donc on NE DOIT PAS le consommer ici sous peine de bloquer indéfiniment l'upload.
     const isMultipart = (req.headers["content-type"] || "").startsWith("multipart/form-data");
-    if (!isMultipart && (req.method === "POST" || req.method === "PUT" || req.method === "PATCH")) {
+    if (!isMultipart && (req.method === "POST" || req.method === "PUT" || req.method === "PATCH" || req.method === "DELETE")) {
       await readBody(req);
     }
 
@@ -8642,7 +8642,7 @@ ${jsonLd}
        MODULE CV & LETTRES DE MOTIVATION
     ============================================================ */
     let body = {};
-    if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") {
+    if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH" || req.method === "DELETE") {
       try { body = await readBody(req); } catch(e) {}
     }
 
@@ -10573,6 +10573,219 @@ ${jsonLd}
 
     /* ── GET /api/recrutement/:id/stats enrichi ── */
     /* (déjà géré plus haut) */
+
+    /* ── POST /api/vitrine-site/rapports/demande-acces — site institutionnel public ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/rapports/demande-acces') {
+      const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+      const rl = SEC.rateLimit(`vitrine-rapports-demande:${ip}`, 5, 15 * 60 * 1000);
+      if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+      const { prenom = '', nom = '', ville = '', pays = '', profession = '', email = '', motif = '' } = body;
+      if (!nom || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !motif) {
+        return sendJSON(res, 400, { error: "Nom, e-mail et motif sont requis." });
+      }
+      const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const { sendEmail } = require('./mailer');
+      await sendEmail({
+        to: 'contact@diaspoactif.com',
+        subject: `Demande d'accès aux rapports — ${prenom} ${nom}`,
+        html: `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F4F1EA;font-family:Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border:1.5px solid #26292C;">
+    <div style="background:#26292C;padding:28px 32px;"><span style="color:#F4F1EA;font-weight:700;font-size:19px;">DIASPO'ACTIF</span></div>
+    <div style="padding:32px;">
+      <h1 style="margin:0 0 18px;font-size:20px;color:#26292C;">Nouvelle demande d'accès aux rapports</h1>
+      <table style="width:100%;font-size:14px;color:#4A4E52;border-collapse:collapse;">
+        <tr><td style="padding:6px 0;font-weight:700;">Nom</td><td>${esc(prenom)} ${esc(nom)}</td></tr>
+        <tr><td style="padding:6px 0;font-weight:700;">E-mail</td><td>${esc(email)}</td></tr>
+        <tr><td style="padding:6px 0;font-weight:700;">Ville</td><td>${esc(ville)}</td></tr>
+        <tr><td style="padding:6px 0;font-weight:700;">Pays</td><td>${esc(pays)}</td></tr>
+        <tr><td style="padding:6px 0;font-weight:700;">Profession</td><td>${esc(profession)}</td></tr>
+      </table>
+      <p style="margin-top:18px;font-weight:700;color:#26292C;">Motif :</p>
+      <p style="color:#4A4E52;line-height:1.6;">${esc(motif)}</p>
+    </div>
+  </div>
+</body></html>`
+      });
+      return sendJSON(res, 200, { ok: true, message: "Demande envoyée." });
+    }
+
+    /* ── POST /api/vitrine-site/actualites/abonnement — site institutionnel public ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/actualites/abonnement') {
+      const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+      const rl = SEC.rateLimit(`vitrine-actu-abo:${ip}`, 5, 15 * 60 * 1000);
+      if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+      const email = String(body.email || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+      }
+      try {
+        await db.prepare(`INSERT INTO vitrine_actualites_abonnes (email) VALUES (?) ON CONFLICT (email) DO NOTHING`).run(email);
+      } catch (e) {
+        try { await db.prepare(`INSERT OR IGNORE INTO vitrine_actualites_abonnes (email) VALUES (?)`).run(email); } catch(_) {}
+      }
+      return sendJSON(res, 200, { ok: true, message: "Inscription confirmée. Vous recevrez un e-mail à chaque nouvelle actualité." });
+    }
+
+    /* ── POST /api/vitrine-site/admin/login — compte administrateur du site institutionnel (distinct de la plateforme) ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/admin/login') {
+      const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+      const rl = SEC.rateLimit(`vitrine-admin-login:${ip}`, 8, 15 * 60 * 1000);
+      if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+      const email = String(body.email || '').trim().toLowerCase();
+      const password = String(body.password || '');
+      if (!email || !password) return sendJSON(res, 400, { error: "E-mail et mot de passe requis." });
+      const admin = await db.prepare(`SELECT * FROM vitrine_site_admins WHERE email=?`).get(email);
+      if (!admin || !verifyPassword(password, admin.password_salt, admin.password_hash)) {
+        return sendJSON(res, 401, { error: "Identifiants incorrects." });
+      }
+      await db.prepare(`UPDATE vitrine_site_admins SET last_login_at=datetime('now') WHERE id=?`).run(admin.id);
+      const token = signAuthToken({ vitrineAdminId: admin.id, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL });
+      return sendJSON(res, 200, { ok: true, email: admin.email }, { "Set-Cookie": [`vitrine_admin_auth=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
+    }
+
+    /* ── GET /api/vitrine-site/admin/me — vérifie la session admin du site ── */
+    if (req.method === 'GET' && pathname === '/api/vitrine-site/admin/me') {
+      const cookies = parseCookies(req);
+      const payload = verifyAuthToken(cookies.vitrine_admin_auth);
+      if (!payload || !payload.vitrineAdminId) return sendJSON(res, 401, { error: "Non connecté." });
+      const admin = await db.prepare(`SELECT id, email FROM vitrine_site_admins WHERE id=?`).get(payload.vitrineAdminId);
+      if (!admin) return sendJSON(res, 401, { error: "Non connecté." });
+      return sendJSON(res, 200, { email: admin.email });
+    }
+
+    /* ── POST /api/vitrine-site/admin/logout ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/admin/logout') {
+      return sendJSON(res, 200, { ok: true }, { "Set-Cookie": ["vitrine_admin_auth=; HttpOnly; Path=/; Max-Age=0"] });
+    }
+
+    /* ── Helper local : vérifie la session admin du site institutionnel ── */
+    async function requireVitrineAdmin(req) {
+      const cookies = parseCookies(req);
+      const payload = verifyAuthToken(cookies.vitrine_admin_auth);
+      if (!payload || !payload.vitrineAdminId) return null;
+      const admin = await db.prepare(`SELECT id, email FROM vitrine_site_admins WHERE id=?`).get(payload.vitrineAdminId);
+      return admin || null;
+    }
+
+    /* ── GET /api/vitrine-site/rapports — rapports publiés (public) ── */
+    if (req.method === 'GET' && pathname === '/api/vitrine-site/rapports') {
+      const rows = await db.prepare(`SELECT * FROM vitrine_rapports WHERE statut='publie' ORDER BY date_publication DESC, id DESC`).all();
+      return sendJSON(res, 200, { rapports: rows });
+    }
+
+    /* ── GET /api/vitrine-site/admin/rapports — tous statuts confondus (admin site) ── */
+    if (req.method === 'GET' && pathname === '/api/vitrine-site/admin/rapports') {
+      const admin = await requireVitrineAdmin(req);
+      if (!admin) return sendJSON(res, 403, { error: "Accès réservé à l'administrateur du site." });
+      const rows = await db.prepare(`SELECT * FROM vitrine_rapports ORDER BY id DESC`).all();
+      return sendJSON(res, 200, { rapports: rows });
+    }
+
+    /* ── POST /api/vitrine-site/admin/rapports — créer un rapport ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/admin/rapports') {
+      const admin = await requireVitrineAdmin(req);
+      if (!admin) return sendJSON(res, 403, { error: "Accès réservé à l'administrateur du site." });
+      const { titre, sous_titre = '', categorie = 'Autres', type = 'Rapport PDF', pays = '', date_publication = '', resume = '', lien = '', cover_image = '', statut = 'brouillon' } = body;
+      if (!titre) return sendJSON(res, 400, { error: "Le titre est requis." });
+      const r = await db.prepare(`
+        INSERT INTO vitrine_rapports (titre, sous_titre, categorie, type, pays, date_publication, resume, lien, cover_image, statut, created_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+      `).run(titre, sous_titre, categorie, type, pays, date_publication, resume, lien, cover_image, statut, admin.id);
+      return sendJSON(res, 200, { ok: true, id: r.lastInsertRowid });
+    }
+
+    /* ── PUT /api/vitrine-site/admin/rapports/:id — modifier un rapport ── */
+    if (req.method === 'PUT' && /^\/api\/vitrine-site\/admin\/rapports\/\d+$/.test(pathname)) {
+      const admin = await requireVitrineAdmin(req);
+      if (!admin) return sendJSON(res, 403, { error: "Accès réservé à l'administrateur du site." });
+      const id = parseInt(pathname.split('/').pop());
+      const { titre, sous_titre = '', categorie = 'Autres', type = 'Rapport PDF', pays = '', date_publication = '', resume = '', lien = '', cover_image = '', statut = 'brouillon' } = body;
+      if (!titre) return sendJSON(res, 400, { error: "Le titre est requis." });
+      await db.prepare(`
+        UPDATE vitrine_rapports SET titre=?, sous_titre=?, categorie=?, type=?, pays=?, date_publication=?, resume=?, lien=?, cover_image=?, statut=?, updated_at=datetime('now')
+        WHERE id=?
+      `).run(titre, sous_titre, categorie, type, pays, date_publication, resume, lien, cover_image, statut, id);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── DELETE /api/vitrine-site/admin/rapports/:id ── */
+    if (req.method === 'DELETE' && /^\/api\/vitrine-site\/admin\/rapports\/\d+$/.test(pathname)) {
+      const admin = await requireVitrineAdmin(req);
+      if (!admin) return sendJSON(res, 403, { error: "Accès réservé à l'administrateur du site." });
+      const id = parseInt(pathname.split('/').pop());
+      await db.prepare(`DELETE FROM vitrine_rapports WHERE id=?`).run(id);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── GET /api/vitrine-site/articles — articles publiés (public) ── */
+    if (req.method === 'GET' && pathname === '/api/vitrine-site/articles') {
+      const rows = await db.prepare(`SELECT * FROM vitrine_articles WHERE statut='publie' ORDER BY date_publication DESC, id DESC`).all();
+      return sendJSON(res, 200, { articles: rows });
+    }
+
+    /* ── GET /api/vitrine-site/admin/articles — tous statuts (admin site) ── */
+    if (req.method === 'GET' && pathname === '/api/vitrine-site/admin/articles') {
+      const admin = await requireVitrineAdmin(req);
+      if (!admin) return sendJSON(res, 403, { error: "Accès réservé à l'administrateur du site." });
+      const rows = await db.prepare(`SELECT * FROM vitrine_articles ORDER BY id DESC`).all();
+      return sendJSON(res, 200, { articles: rows });
+    }
+
+    /* ── POST /api/vitrine-site/admin/articles ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/admin/articles') {
+      const admin = await requireVitrineAdmin(req);
+      if (!admin) return sendJSON(res, 403, { error: "Accès réservé à l'administrateur du site." });
+      const { titre, resume = '', contenu = '', categorie = '', cover_image = '', statut = 'brouillon', date_publication = '' } = body;
+      if (!titre) return sendJSON(res, 400, { error: "Le titre est requis." });
+      const r = await db.prepare(`
+        INSERT INTO vitrine_articles (titre, resume, contenu, categorie, cover_image, statut, date_publication, created_by)
+        VALUES (?,?,?,?,?,?,?,?)
+      `).run(titre, resume, contenu, categorie, cover_image, statut, date_publication, admin.id);
+      return sendJSON(res, 200, { ok: true, id: r.lastInsertRowid });
+    }
+
+    /* ── PUT /api/vitrine-site/admin/articles/:id ── */
+    if (req.method === 'PUT' && /^\/api\/vitrine-site\/admin\/articles\/\d+$/.test(pathname)) {
+      const admin = await requireVitrineAdmin(req);
+      if (!admin) return sendJSON(res, 403, { error: "Accès réservé à l'administrateur du site." });
+      const id = parseInt(pathname.split('/').pop());
+      const { titre, resume = '', contenu = '', categorie = '', cover_image = '', statut = 'brouillon', date_publication = '' } = body;
+      if (!titre) return sendJSON(res, 400, { error: "Le titre est requis." });
+      await db.prepare(`
+        UPDATE vitrine_articles SET titre=?, resume=?, contenu=?, categorie=?, cover_image=?, statut=?, date_publication=?, updated_at=datetime('now')
+        WHERE id=?
+      `).run(titre, resume, contenu, categorie, cover_image, statut, date_publication, id);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── DELETE /api/vitrine-site/admin/articles/:id ── */
+    if (req.method === 'DELETE' && /^\/api\/vitrine-site\/admin\/articles\/\d+$/.test(pathname)) {
+      const admin = await requireVitrineAdmin(req);
+      if (!admin) return sendJSON(res, 403, { error: "Accès réservé à l'administrateur du site." });
+      const id = parseInt(pathname.split('/').pop());
+      await db.prepare(`DELETE FROM vitrine_articles WHERE id=?`).run(id);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/vitrine-site/rapports/abonnement — site institutionnel public ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/rapports/abonnement') {
+      const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+      const rl = SEC.rateLimit(`vitrine-rapports-abo:${ip}`, 5, 15 * 60 * 1000);
+      if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+      const { prenom = '', nom = '', email = '', pays = '', organisation = '' } = body;
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+      }
+      const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const { sendEmail } = require('./mailer');
+      await sendEmail({
+        to: 'contact@diaspoactif.com',
+        subject: `Nouvel abonné — Rapports Diaspo Impact (${email})`,
+        html: `<p>Nouvel abonné aux notifications de rapports :</p><ul><li>${esc(prenom)} ${esc(nom)}</li><li>${esc(email)}</li><li>${esc(pays)}</li><li>${esc(organisation)}</li></ul>`
+      });
+      return sendJSON(res, 200, { ok: true, message: "Inscription confirmée." });
+    }
 
     /* ══════════════════════════════════════════════════════════════
        PROFIL EMPLOI / ESPACE CANDIDAT

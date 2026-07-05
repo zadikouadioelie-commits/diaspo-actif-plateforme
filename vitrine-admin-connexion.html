@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion Administration — Diaspo'Actif</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Instrument Sans', system-ui, sans-serif; color: #1B2430; }
+  a { text-decoration: none; color: inherit; }
+  input { font-family: inherit; }
+  input::placeholder { color: #9AA4B2; }
+</style>
+</head>
+<body>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; background: radial-gradient(1200px 600px at 20% 0%, #16457E 0%, #0E2E5A 45%, #091C3C 100%); position: relative; overflow: hidden;">
+  <div style="position: absolute; top: -120px; right: -80px; width: 380px; height: 380px; border-radius: 50%; background: radial-gradient(circle, rgba(226,113,29,.22), transparent 70%);"></div>
+  <div style="position: absolute; bottom: -140px; left: -100px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(46,125,209,.18), transparent 70%);"></div>
+
+  <div style="position: relative; width: 100%; max-width: 440px;">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="display: inline-flex; align-items: center; gap: 11px;">
+        <img src="assets/vitrine/logo-diaspo-actif-transparent.png" alt="Diaspo'Actif" style="height: 52px; width: auto; filter: brightness(0) invert(1);">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; color: #fff; letter-spacing: -.01em;">DIASPO'ACTIF</span>
+      </div>
+    </div>
+
+    <div style="background: #FFFFFF; border-radius: 22px; padding: 40px 38px; box-shadow: 0 40px 90px rgba(5,16,38,.5);">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+        <span style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, #0E2E5A, #16457E); color: #fff; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+        <div>
+          <h1 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; margin: 0; color: #0E2E5A; letter-spacing: -.01em;">Connexion Administration</h1>
+          <div style="font-size: 12.5px; color: #8A93A3;">Accès réservé au site Diaspo'Actif</div>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: #EDF1F6; margin: 22px 0;"></div>
+
+      <form id="admin-login-form" onsubmit="return submitAdminLogin(event)" style="display: flex; flex-direction: column; gap: 16px;">
+        <label style="display: block;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; color: #5B6472;">ADRESSE E-MAIL</span>
+          <input id="admin-email" type="email" required placeholder="admin@diaspo-actif.com" style="width: 100%; margin-top: 8px; background: #F6F9FD; border: 1px solid #E2E8F1; border-radius: 11px; padding: 14px 15px; font-size: 15px; color: #1B2430; outline: none; box-sizing: border-box;">
+        </label>
+        <label style="display: block;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; color: #5B6472;">MOT DE PASSE</span>
+          <input id="admin-password" type="password" required placeholder="••••••••••" style="width: 100%; margin-top: 8px; background: #F6F9FD; border: 1px solid #E2E8F1; border-radius: 11px; padding: 14px 15px; font-size: 15px; color: #1B2430; outline: none; box-sizing: border-box;">
+        </label>
+
+        <div id="admin-login-err" style="display: none; font-size: 13px; color: #C0392B; background: #FBE9E7; border-radius: 10px; padding: 10px 14px;"></div>
+
+        <button type="submit" id="admin-login-btn" style="display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14.5px; font-weight: 600; letter-spacing: .02em; color: #fff; background: linear-gradient(135deg, #0E2E5A, #16457E); padding: 16px; border-radius: 12px; box-shadow: 0 12px 30px rgba(14,46,90,.28); margin-top: 4px; border: none; cursor: pointer; font-family: inherit;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Se connecter en toute sécurité</button>
+      </form>
+
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 22px;">
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #6B7686; background: #F6F9FD; border: 1px solid #EAEFF6; border-radius: 999px; padding: 6px 11px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #1B8A5B;"></span>Chiffrement TLS</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #6B7686; background: #F6F9FD; border: 1px solid #EAEFF6; border-radius: 999px; padding: 6px 11px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #1B8A5B;"></span>Connexions journalisées</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #6B7686; background: #F6F9FD; border: 1px solid #EAEFF6; border-radius: 999px; padding: 6px 11px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #E2711D;"></span>Rôle ADMIN requis</span>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 22px;">
+      <a href="site-vitrine.html" style="font-size: 13px; color: #A9BAD4;">← Retour au site Diaspo'Actif</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function submitAdminLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('admin-email').value.trim();
+    const password = document.getElementById('admin-password').value;
+    const errBox = document.getElementById('admin-login-err');
+    const btn = document.getElementById('admin-login-btn');
+    errBox.style.display = 'none';
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/vitrine-site/admin/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ email, password })
+      });
+      const data = await r.json();
+      if (r.ok) {
+        window.location.href = 'vitrine-admin-dashboard.html';
+      } else {
+        errBox.textContent = data.error || 'Erreur de connexion.';
+        errBox.style.display = 'block';
+        btn.disabled = false;
+      }
+    } catch (err) {
+      errBox.textContent = 'Connexion impossible. Réessayez.';
+      errBox.style.display = 'block';
+      btn.disabled = false;
+    }
+    return false;
+  }
+</script>
+</body>
+</html>

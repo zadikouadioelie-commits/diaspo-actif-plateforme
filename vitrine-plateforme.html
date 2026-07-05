@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F4F1EA; font-family: 'Space Grotesk', system-ui, sans-serif; color: #26292C; }
+  a { text-decoration: none; color: inherit; }
+</style>
+</head>
+<body>
+<div style="width: 100%; background: #F4F1EA;">
+
+  <header style="position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 40px; background: rgba(244,241,234,.92); backdrop-filter: blur(8px); border-bottom: 1.5px solid #26292C;">
+    <a href="site-vitrine.html" style="display: flex; align-items: center; gap: 12px;">
+      <img src="assets/vitrine/logo-diaspo-actif-transparent.png" alt="Diaspo'Actif" style="height: 46px; width: auto; display: block;">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: -.01em;">DIASPO'ACTIF</span>
+    </a>
+    <nav style="display: flex; align-items: center; gap: 20px; font-size: 11.5px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: #4A4E52;">
+      <a href="site-vitrine.html">Accueil</a>
+      <a href="vitrine-qui-sommes-nous.html">Qui sommes-nous</a>
+      <a href="vitrine-plateforme.html">Plateforme Diaspo'Actif</a>
+      <a href="vitrine-nos-actions.html">Nos actions</a>
+      <a href="vitrine-diaspo-impact.html">Diaspo Impact</a>
+      <a href="vitrine-rapports.html">Rapports</a>
+      <a href="vitrine-partenaires.html">Nos partenaires</a>
+      <a href="vitrine-actualites.html">Actualités</a>
+    </nav>
+    <a href="vitrine-contact.html" style="font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #F4F1EA; background: #26292C; padding: 10px 14px; white-space: nowrap;">Contact</a>
+  </header>
+
+  <!-- HERO -->
+  <section style="border-bottom: 1.5px solid #26292C;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 60px 54px 52px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 30px; flex-wrap: wrap; gap: 12px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #C13527;">[ LA PLATEFORME ]</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #8A857C;">ACCUEIL → PLATEFORME DIASPO'ACTIF</span>
+      </div>
+      <h1 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 92px; line-height: .94; letter-spacing: -.03em; margin: 0 0 28px;">Plateforme <span style="color: #C13527;">Diaspo'Actif</span></h1>
+      <p style="font-size: 20px; line-height: 1.5; color: #4A4E52; margin: 0; max-width: 720px;">La plateforme internationale de collaboration et de mobilisation des diasporas. Un espace sécurisé où les projets, les idées et les opportunités se partagent, se développent et se concrétisent.</p>
+    </div>
+  </section>
+
+  <!-- CARTE MONDE ANIMÉE (reprise de la plateforme) -->
+  <div style="position: relative; height: 420px; border-bottom: 1.5px solid #26292C; display: flex; align-items: center; justify-content: center;">
+    <canvas id="pf-world-canvas" width="1400" height="420" style="width: 100%; height: 100%; display: block;"></canvas>
+    <div style="position: absolute; bottom: 16px; left: 16px; display: flex; gap: 16px; z-index: 3;">
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,.85); font-weight: 600;">
+        <div style="width: 10px; height: 10px; border-radius: 50%; background:#F59E0B; box-shadow:0 0 6px #F59E0B;"></div>
+        Pays d'origine
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,.85); font-weight: 600;">
+        <div style="width: 10px; height: 10px; border-radius: 50%; background:#4A90D9; box-shadow:0 0 6px #4A90D9;"></div>
+        Pays de résidence
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTEURS -->
+  <div style="border-bottom: 1.5px solid #26292C;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 30px 54px 0;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #C13527;">01 / UN ÉCOSYSTÈME COMPLET</span></div>
+    <div style="max-width: 1200px; margin: 0 auto; padding: 14px 54px 34px;"><h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -.02em; margin: 0; max-width: 640px;">La plateforme met en relation tous les acteurs du développement</h2></div>
+    <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5px; background: #26292C; border-top: 1.5px solid #26292C; border-bottom: 1.5px solid #26292C;">
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Membres de la diaspora</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Entreprises & initiatives</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Institutions publiques</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Associations & ONG</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Investisseurs</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Business angels</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Organismes de financement</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Incubateurs & accélérateurs</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Structures de formation</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Partenaires juridiques</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Partenaires techniques</div>
+      <div style="background: #F4F1EA; padding: 24px; font-size: 15px; font-weight: 500;">Collectivités territoriales</div>
+    </div>
+  </div>
+
+  <!-- MISSION -->
+  <div style="border-bottom: 1.5px solid #26292C;">
+    <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: .85fr 1.15fr;">
+      <img src="assets/vitrine/photos/7263556-64bd0e.jpeg" alt="" style="min-height: 460px; border-right: 1.5px solid #26292C; display: block; width: 100%; height: 100%; object-fit:cover;">
+      <div style="padding: 54px;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #C13527;">02 / NOTRE MISSION</span>
+        <h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 34px; letter-spacing: -.02em; margin: 14px 0 26px;">Faire de chaque investissement un levier de développement</h3>
+        <div style="display: flex; flex-direction: column;">
+          <div style="display: flex; gap: 18px; padding: 16px 0; border-top: 1.5px solid #E0DACE; align-items: baseline;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C13527;">01</span><span style="font-size: 15.5px; line-height: 1.45;">Faciliter les investissements de la diaspora.</span></div>
+          <div style="display: flex; gap: 18px; padding: 16px 0; border-top: 1.5px solid #E0DACE; align-items: baseline;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C13527;">02</span><span style="font-size: 15.5px; line-height: 1.45;">Sécuriser les projets grâce à des partenariats institutionnels.</span></div>
+          <div style="display: flex; gap: 18px; padding: 16px 0; border-top: 1.5px solid #E0DACE; align-items: baseline;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C13527;">03</span><span style="font-size: 15.5px; line-height: 1.45;">Mettre en relation les investisseurs avec les collectivités et les porteurs de projets.</span></div>
+          <div style="display: flex; gap: 18px; padding: 16px 0; border-top: 1.5px solid #E0DACE; align-items: baseline;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C13527;">04</span><span style="font-size: 15.5px; line-height: 1.45;">Encourager un développement économique durable des territoires.</span></div>
+          <div style="display: flex; gap: 18px; padding: 16px 0; border-top: 1.5px solid #E0DACE; border-bottom: 1.5px solid #E0DACE; align-items: baseline;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C13527;">05</span><span style="font-size: 15.5px; line-height: 1.45;">Générer un impact mesurable pour les populations locales tout en créant de la valeur pour les investisseurs.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISION + AMBITION -->
+  <div style="border-bottom: 1.5px solid #26292C;">
+    <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr;">
+      <div style="padding: 54px; border-right: 1.5px solid #26292C;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #C13527;">03 / NOTRE VISION</span>
+        <img src="assets/vitrine/photos/7421766-f1a753.jpeg" alt="" style="height: 190px; margin: 20px 0 24px; border: 1.5px solid #26292C; display: block; width: 100%; object-fit:cover;">
+        <div style="display: flex; flex-direction: column; gap: 14px; font-size: 15px; line-height: 1.64; color: #4A4E52;">
+          <p style="margin: 0;">Le développement durable d'un territoire ne peut reposer uniquement sur les financements publics ou privés. Il doit s'appuyer sur une coopération forte entre les collectivités, les entrepreneurs, les citoyens et la diaspora.</p>
+          <p style="margin: 0;">Plateforme Diaspo'Actif souhaite devenir cette passerelle de confiance qui transforme l'attachement à son pays d'origine en investissements structurés, sécurisés et créateurs de prospérité.</p>
+        </div>
+      </div>
+      <div style="padding: 54px; background: #26292C; color: #F4F1EA;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #E8933A;">04 / NOTRE AMBITION</span>
+        <h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 32px; line-height: 1.1; letter-spacing: -.02em; margin: 18px 0 22px;">Le premier réseau international de coopération de la diaspora</h3>
+        <p style="font-size: 16px; line-height: 1.66; color: #D8D3C9; margin: 0 0 30px;">Construire le premier réseau international de coopération entre la diaspora, les collectivités territoriales et les partenaires économiques — afin de faire de chaque investissement un levier de développement local, de création d'emplois et de croissance durable.</p>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <a href="vitrine-contact.html" style="font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #FFFFFF; background: #1B5AA6; padding: 15px 24px;">Rejoindre la plateforme</a>
+          <a href="vitrine-contact.html" style="font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #F4F1EA; padding: 15px 22px; border: 1.5px solid rgba(244,241,234,.5);">Nous contacter</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer style="padding: 56px 54px 38px; background: #26292C; color: #B7B2A8;">
+    <div style="max-width: 1200px; margin: 0 auto;">
+      <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 40px; padding-bottom: 36px; border-bottom: 1px solid rgba(183,178,168,.16);">
+        <div>
+          <div style="display: flex; align-items: center; gap: 11px; margin-bottom: 16px;"><img src="assets/vitrine/logo-diaspo-actif-transparent.png" alt="" style="height: 44px; width: auto;"><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px; color: #F4F1EA;">DIASPO'ACTIF</span></div>
+          <p style="font-size: 13.5px; line-height: 1.6; margin: 0; max-width: 300px;">Le mouvement international de la diaspora active. Du Sud au Nord.</p>
+        </div>
+        <div><div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #E8933A; margin-bottom: 14px;">MOUVEMENT</div><div style="display: flex; flex-direction: column; gap: 10px; font-size: 13.5px;"><a href="vitrine-qui-sommes-nous.html">Qui sommes-nous</a><a href="vitrine-plateforme.html">Plateforme Diaspo'Actif</a><a href="vitrine-nos-actions.html">Nos actions</a><a href="vitrine-actualites.html">Actualités</a></div></div>
+        <div><div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #E8933A; margin-bottom: 14px;">PLATEFORME</div><div style="display: flex; flex-direction: column; gap: 10px; font-size: 13.5px;"><a href="vitrine-contact.html">Rejoindre</a><a href="vitrine-partenaires.html">Nos partenaires</a><a href="vitrine-plateforme.html">Financement</a><a href="vitrine-plateforme.html">Formation</a></div></div>
+        <div><div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #E8933A; margin-bottom: 14px;">CONTACT</div><div style="display: flex; flex-direction: column; gap: 10px; font-size: 13.5px;"><a href="vitrine-contact.html">contact@diaspo-actif.com</a><a href="vitrine-contact.html">Nous écrire</a><a href="#">LinkedIn</a><a href="#">Instagram</a></div></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #7E7A72;">
+        <span>© 2025–2026 DIASPO'ACTIF — TOUS DROITS RÉSERVÉS</span>
+        <span>DU SUD AU NORD.</span>
+      </div>
+    </div>
+  </footer>
+
+  <a href="index.html" style="position: fixed; left: 22px; bottom: 22px; z-index: 9999; display: inline-flex; align-items: center; gap: 9px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: #FFFFFF; background: #1B5AA6; padding: 13px 20px; border-radius: 999px; box-shadow: 0 10px 28px rgba(27,90,166,.42);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Retour à la plateforme</a>
+  <a href="vitrine-admin-connexion.html" title="Accès administration" style="position: fixed; bottom: 22px; right: 22px; width: 46px; height: 46px; border-radius: 50%; background: #0D2B4E; color: #fff; display: flex; align-items: center; justify-content: center; z-index: 9999; opacity: .4; transition: opacity .3s, transform .3s; box-shadow: 0 8px 22px rgba(13,43,78,.42);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></a>
+
+</div>
+<script>
+(function() {
+  const canvas = document.getElementById('pf-world-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const VP = { lonMin: -95, lonMax: 60, latMax: 72, latMin: -42 };
+  function proj(lat, lon) {
+    const x = ((lon - VP.lonMin) / (VP.lonMax - VP.lonMin)) * canvas.width;
+    const y = ((VP.latMax - lat) / (VP.latMax - VP.latMin)) * canvas.height;
+    return [x, y];
+  }
+
+  const CITIES = [
+    { lat:48.8, lon:2.3,   name:'Paris',       type:'dest', r:10 },
+    { lat:51.5, lon:-0.1,  name:'Londres',     type:'dest', r:9  },
+    { lat:50.8, lon:4.4,   name:'Bruxelles',   type:'dest', r:7  },
+    { lat:52.5, lon:13.4,  name:'Berlin',      type:'dest', r:6  },
+    { lat:46.2, lon:6.1,   name:'Genève',      type:'dest', r:6  },
+    { lat:41.9, lon:12.5,  name:'Rome',        type:'dest', r:6  },
+    { lat:40.4, lon:-3.7,  name:'Madrid',      type:'dest', r:7  },
+    { lat:40.7, lon:-74.0, name:'New York',    type:'dest', r:9  },
+    { lat:45.5, lon:-73.6, name:'Montréal',    type:'dest', r:7  },
+    { lat:43.7, lon:-79.4, name:'Toronto',     type:'dest', r:6  },
+    { lat:5.3,  lon:-4.0,  name:'Abidjan',     type:'orig', r:7  },
+    { lat:14.7, lon:-17.4, name:'Dakar',       type:'orig', r:8  },
+    { lat:3.8,  lon:11.5,  name:'Douala',      type:'orig', r:6  },
+    { lat:12.6, lon:-8.0,  name:'Bamako',      type:'orig', r:6  },
+    { lat:-4.3, lon:15.3,  name:'Kinshasa',    type:'orig', r:7  },
+    { lat:33.6, lon:-7.6,  name:'Casablanca',  type:'orig', r:7  },
+    { lat:36.8, lon:10.2,  name:'Tunis',       type:'orig', r:6  },
+    { lat:6.4,  lon:2.4,   name:'Cotonou',     type:'orig', r:5  },
+    { lat:9.5,  lon:-13.7, name:'Conakry',     type:'orig', r:5  },
+    { lat:6.1,  lon:1.2,   name:'Lomé',        type:'orig', r:5  },
+    { lat:12.4, lon:-1.5,  name:'Ouagadougou', type:'orig', r:5  },
+    { lat:-1.3, lon:36.8,  name:'Nairobi',     type:'orig', r:6  },
+  ];
+  CITIES.forEach(c => { c.pos = proj(c.lat, c.lon); });
+
+  const CONNS = [
+    {f:10,t:0,c:'#4A90D9'},{f:11,t:0,c:'#4A90D9'},{f:11,t:6,c:'#7B61FF'},
+    {f:12,t:1,c:'#4A90D9'},{f:12,t:2,c:'#4ACFD9'},{f:13,t:0,c:'#4A90D9'},
+    {f:14,t:2,c:'#4ACFD9'},{f:15,t:0,c:'#4A90D9'},{f:15,t:6,c:'#7B61FF'},
+    {f:16,t:0,c:'#4A90D9'},{f:16,t:5,c:'#4ACFD9'},{f:17,t:0,c:'#4A90D9'},
+    {f:10,t:7,c:'#F59E0B'},{f:11,t:8,c:'#F59E0B'},{f:18,t:6,c:'#7B61FF'},
+    {f:20,t:0,c:'#4A90D9'},{f:14,t:7,c:'#F59E0B'},{f:21,t:1,c:'#4A90D9'},
+  ];
+  const arcProg = CONNS.map((_,i) => ({
+    p: i / CONNS.length,
+    spd: 0.0015 + (i % 5) * 0.0003,
+    trail: [],
+  }));
+
+  const BG_PTS = [
+    [16,26],[17,24],[18,26],[19,24],[20,25],[21,24],[22,25],[23,24],[22,27],[21,29],
+    [18,28],[17,30],[19,29],[20,31],[16,32],[17,34],[21,32],[23,30],
+    [25,35],[26,36],[27,35],[27,38],
+    [29,40],[30,39],[31,41],[30,43],[29,45],[31,47],[30,49],[31,51],[30,53],
+    [29,55],[30,57],[31,59],[30,61],[29,63],
+    [47,19],[48,18],[49,19],[50,18],[51,20],[52,19],[53,18],[54,19],[55,18],
+    [48,21],[50,21],[52,22],[47,23],[49,23],[51,23],[53,23],[48,25],[50,25],
+    [52,25],[49,27],[51,27],[50,29],[52,28],[47,29],[48,27],
+    [50,15],[51,16],[52,15],[53,16],[54,15],[55,14],[54,17],[56,16],
+    [47,29],[49,28],[51,28],[53,27],[55,25],[56,27],
+    [46,31],[48,31],[50,31],[52,31],[54,31],[56,31],[58,31],
+    [46,33],[48,33],[50,33],[52,33],[54,33],[56,33],[58,33],
+    [44,35],[45,37],[44,39],[45,41],[44,43],[45,45],[46,47],[45,49],[44,51],
+    [47,35],[48,37],[47,39],[48,41],[47,43],[48,45],[47,47],[48,49],[47,51],
+    [50,37],[51,39],[50,41],[51,43],[50,45],[51,47],[50,49],
+    [53,37],[54,39],[53,41],[54,43],[53,45],[55,43],[56,45],[57,47],[56,49],[55,51],[54,53],
+    [51,53],[52,55],[51,57],[52,59],[51,61],[52,63],[51,65],
+    [53,55],[54,57],[53,59],[54,61],[53,63],[52,65],[51,67],
+    [57,25],[58,27],[59,29],[60,27],[61,25],[62,27],[63,29],[64,27],
+    [60,31],[61,29],[62,31],[63,33],[64,31],
+  ].map(([xPct,yPct]) => [xPct / 100 * canvas.width, yPct / 100 * canvas.height]);
+
+  function draw(ts) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const bg = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    bg.addColorStop(0, '#0D1B2A');
+    bg.addColorStop(1, '#1B3A6B');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = 'rgba(74,144,217,0.05)';
+    ctx.lineWidth = 0.5;
+    for (let lat = VP.latMin; lat <= VP.latMax; lat += 15) {
+      const [, y] = proj(lat, VP.lonMin);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+    for (let lon = VP.lonMin; lon <= VP.lonMax; lon += 15) {
+      const [x] = proj(0, lon);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+
+    ctx.fillStyle = 'rgba(74,144,217,0.2)';
+    BG_PTS.forEach(([x, y]) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    CONNS.forEach((conn, i) => {
+      const from = CITIES[conn.f].pos;
+      const to   = CITIES[conn.t].pos;
+      const t    = arcProg[i].p;
+
+      const mx = (from[0] + to[0]) / 2;
+      const dy = Math.abs(to[0] - from[0]) * 0.35;
+      const my = Math.min(from[1], to[1]) - dy;
+
+      ctx.beginPath();
+      ctx.moveTo(from[0], from[1]);
+      ctx.quadraticCurveTo(mx, my, to[0], to[1]);
+      ctx.strokeStyle = conn.c + '28';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const bx = (1-t)*(1-t)*from[0] + 2*(1-t)*t*mx + t*t*to[0];
+      const by = (1-t)*(1-t)*from[1] + 2*(1-t)*t*my + t*t*to[1];
+
+      const trail = arcProg[i].trail;
+      trail.forEach((pos, ti) => {
+        const ratio = (ti + 1) / trail.length;
+        const alpha = Math.floor(ratio * 140).toString(16).padStart(2,'0');
+        const r = 1.2 + ratio * 1.4;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = conn.c + alpha;
+        ctx.fill();
+      });
+
+      ctx.shadowColor = conn.c;
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(bx, by, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(bx, by, 2, 0, Math.PI * 2);
+      ctx.fillStyle = conn.c;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      const nextP = (arcProg[i].p + arcProg[i].spd) % 1;
+      if (nextP < arcProg[i].p) trail.length = 0;
+      trail.push({x: bx, y: by});
+      if (trail.length > 8) trail.shift();
+      arcProg[i].p = nextP;
+    });
+
+    const now = Date.now();
+    CITIES.forEach((city, i) => {
+      const [x, y] = city.pos;
+      const pulse = 0.65 + 0.35 * Math.sin(now * 0.0018 + i * 0.8);
+
+      const isDest = city.type === 'dest';
+      const col = isDest ? '#4A90D9' : '#F59E0B';
+
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.arc(x, y, city.r * 0.5 * pulse, 0, Math.PI * 2);
+      ctx.fillStyle = col + (isDest ? 'cc' : 'dd');
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.beginPath();
+      ctx.arc(x, y, city.r * pulse, 0, Math.PI * 2);
+      ctx.strokeStyle = col + '55';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      if (city.r >= 7) {
+        ctx.font = '10px Inter, system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fillText(city.name, x + city.r + 4, y + 4);
+      }
+    });
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>

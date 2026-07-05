@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Console Administration — Diaspo'Actif</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Instrument Sans', system-ui, sans-serif; color: #1B2430; background: #F6F9FD; }
+  a { text-decoration: none; color: inherit; }
+  input, select, textarea { font-family: inherit; }
+  .navlink { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 11px; font-size: 13.5px; font-weight: 500; color: #A9BAD4; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; }
+  .navlink.active { color: #fff; background: rgba(255,255,255,.1); font-weight: 600; }
+  .tab { display: none; }
+  .tab.active { display: block; }
+  .field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #5B6472; margin: 14px 0 6px; text-transform: uppercase; }
+  .field input, .field select, .field textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #E2E8F1; border-radius: 9px; font-size: 14px; background: #F6F9FD; }
+  .field textarea { min-height: 80px; resize: vertical; }
+  table.admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.admin-table th { text-align: left; padding: 10px 14px; background: #F6F9FD; color: #5B6472; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+  table.admin-table td { padding: 10px 14px; border-top: 1px solid #EEF2F7; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; border: none; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-family: inherit; }
+  .btn-primary { color: #fff; background: linear-gradient(135deg, #0E2E5A, #16457E); }
+  .btn-outline { color: #0E2E5A; background: #fff; border: 1px solid #E2E8F1; }
+  .btn-danger { color: #C0392B; background: #FBE9E7; }
+  .badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px; }
+  .badge-publie { background: #E6F6EE; color: #1B8A5B; }
+  .badge-brouillon { background: #EEF2F7; color: #6B7686; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(14,46,90,.4); z-index: 9999; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: #fff; border-radius: 16px; padding: 26px; width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<div id="admin-app" style="display: none; min-height: 100vh; background: #F6F9FD;">
+<div style="display: flex; min-height: 100vh;">
+
+  <!-- SIDEBAR -->
+  <aside style="position: sticky; top: 0; align-self: flex-start; width: 256px; height: 100vh; background: linear-gradient(180deg, #0E2E5A, #0B2247); color: #C6D5EC; display: flex; flex-direction: column; padding: 22px 18px; flex: none;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 6px 8px 22px;">
+      <img src="assets/vitrine/logo-diaspo-actif-transparent.png" alt="" style="height: 38px; width: auto; filter: brightness(0) invert(1);">
+      <div style="line-height: 1;"><div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; color: #fff;">DIASPO'ACTIF</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .12em; color: #7FB0EE; margin-top: 3px;">ADMINISTRATION</div></div>
+    </div>
+
+    <nav style="display: flex; flex-direction: column; gap: 4px; margin-top: 8px;">
+      <button class="navlink active" data-tab="stats" onclick="switchTab('stats')"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="4" y2="12"/><line x1="10" y1="20" x2="10" y2="6"/><line x1="16" y1="20" x2="16" y2="14"/><line x1="20" y1="20" x2="20" y2="9"/></svg>Statistiques</button>
+      <button class="navlink" data-tab="rapports" onclick="switchTab('rapports')"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>Rapports Diaspo Impact</button>
+      <button class="navlink" data-tab="articles" onclick="switchTab('articles')"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/></svg>Actualités</button>
+    </nav>
+
+    <div style="margin-top: auto; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.1);">
+      <div style="display: flex; align-items: center; gap: 11px; padding: 8px 6px 14px;">
+        <span style="width: 38px; height: 38px; border-radius: 50%; background: #E2711D; color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px;">DA</span>
+        <div style="line-height: 1.2;"><div id="admin-email-label" style="font-size: 13px; font-weight: 600; color: #fff;">—</div><div style="font-size: 11px; color: #7FB0EE;">Rôle · ADMIN SITE</div></div>
+      </div>
+      <button onclick="adminLogout()" style="width:100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 11px; font-size: 13px; font-weight: 600; color: #FFC7A6; background: rgba(226,113,29,.14); border:none; cursor:pointer; font-family: inherit;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Déconnexion</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div style="flex: 1; min-width: 0;">
+    <header style="position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 32px; background: rgba(246,249,253,.9); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(14,46,90,.08);">
+      <div>
+        <h1 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; margin: 0; color: #0E2E5A; letter-spacing: -.01em;">Console Administration Diaspo'Actif</h1>
+        <div style="font-size: 12.5px; color: #8A93A3;">Centre de contrôle du site institutionnel</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <span style="width: 40px; height: 40px; border-radius: 50%; background: #0E2E5A; color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px;">DA</span>
+        <a href="site-vitrine.html" style="display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: #0E2E5A; background: #fff; border: 1px solid #E6ECF4; border-radius: 999px; padding: 9px 15px; white-space: nowrap;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>Voir le site</a>
+      </div>
+    </header>
+
+    <div style="padding: 28px 32px 60px;">
+
+      <!-- TAB: STATISTIQUES -->
+      <div id="tab-stats" class="tab active">
+        <section style="margin-bottom: 34px;">
+          <div style="margin-bottom: 16px;"><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #E2711D;">RÉSUMÉ</span></div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+            <div style="background: #fff; border: 1px solid rgba(14,46,90,.07); border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(14,46,90,.05);"><div style="font-size: 12px; color: #8A93A3; margin-bottom: 10px;">Rapports publiés</div><div id="stat-rapports" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px; color: #0E2E5A; line-height: 1;">—</div></div>
+            <div style="background: #fff; border: 1px solid rgba(14,46,90,.07); border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(14,46,90,.05);"><div style="font-size: 12px; color: #8A93A3; margin-bottom: 10px;">Actualités publiées</div><div id="stat-articles" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px; color: #0E2E5A; line-height: 1;">—</div></div>
+            <div style="background: #fff; border: 1px solid rgba(14,46,90,.07); border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(14,46,90,.05);"><div style="font-size: 12px; color: #8A93A3; margin-bottom: 10px;">Pages publiques</div><div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px; color: #0E2E5A; line-height: 1;">10</div></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- TAB: RAPPORTS -->
+      <div id="tab-rapports" class="tab">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+          <h2 style="margin:0; flex:1; font-family:'Space Grotesk', sans-serif; color:#0E2E5A;">Rapports Diaspo Impact</h2>
+          <button class="btn btn-primary" onclick="openRapportForm()">+ Nouveau rapport</button>
+        </div>
+        <div style="background:#fff; border-radius:16px; overflow:hidden; box-shadow: 0 8px 24px rgba(14,46,90,.05);">
+          <table class="admin-table">
+            <thead><tr><th>Titre</th><th>Catégorie</th><th>Statut</th><th>Date</th><th></th></tr></thead>
+            <tbody id="rapports-tbody"><tr><td colspan="5" style="text-align:center;color:#8A93A3;">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB: ARTICLES -->
+      <div id="tab-articles" class="tab">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+          <h2 style="margin:0; flex:1; font-family:'Space Grotesk', sans-serif; color:#0E2E5A;">Actualités</h2>
+          <button class="btn btn-primary" onclick="openArticleForm()">+ Nouvelle actualité</button>
+        </div>
+        <div style="background:#fff; border-radius:16px; overflow:hidden; box-shadow: 0 8px 24px rgba(14,46,90,.05);">
+          <table class="admin-table">
+            <thead><tr><th>Titre</th><th>Catégorie</th><th>Statut</th><th>Date</th><th></th></tr></thead>
+            <tbody id="articles-tbody"><tr><td colspan="5" style="text-align:center;color:#8A93A3;">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- MODALE RAPPORT -->
+<div class="modal-overlay" id="rapport-modal">
+  <div class="modal-box">
+    <h3 style="margin:0 0 4px; font-family:'Space Grotesk', sans-serif;" id="rapport-modal-title">Nouveau rapport</h3>
+    <input type="hidden" id="rap-id">
+    <div class="field"><label>Titre *</label><input id="rap-titre"></div>
+    <div class="field"><label>Résumé</label><textarea id="rap-resume"></textarea></div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="field"><label>Catégorie</label><select id="rap-categorie"><option>Bilan</option><option>Accords</option><option>Processus</option><option>Autres</option></select></div>
+      <div class="field"><label>Type</label><select id="rap-type"><option>Rapport PDF</option><option>Vidéo</option><option>Album photos</option><option>Compte rendu</option><option>Communiqué</option><option>Bilan</option></select></div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="field"><label>Pays</label><input id="rap-pays"></div>
+      <div class="field"><label>Date</label><input type="date" id="rap-date"></div>
+    </div>
+    <div class="field"><label>Lien du document / vidéo</label><input id="rap-lien" placeholder="https://..."></div>
+    <div class="field"><label>Statut</label><select id="rap-statut"><option value="brouillon">📄 Brouillon</option><option value="publie">🚀 Publié</option></select></div>
+    <div style="display:flex; gap:10px; margin-top:20px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="saveRapport()">Enregistrer</button>
+      <button class="btn btn-outline" onclick="closeModal('rapport-modal')">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALE ARTICLE -->
+<div class="modal-overlay" id="article-modal">
+  <div class="modal-box">
+    <h3 style="margin:0 0 4px; font-family:'Space Grotesk', sans-serif;" id="article-modal-title">Nouvelle actualité</h3>
+    <input type="hidden" id="art-id">
+    <div class="field"><label>Titre *</label><input id="art-titre"></div>
+    <div class="field"><label>Résumé</label><textarea id="art-resume"></textarea></div>
+    <div class="field"><label>Contenu complet</label><textarea id="art-contenu" style="min-height:140px;"></textarea></div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="field"><label>Catégorie</label><input id="art-categorie" placeholder="Ex: Forum, Partenariat…"></div>
+      <div class="field"><label>Date</label><input type="date" id="art-date"></div>
+    </div>
+    <div class="field"><label>Statut</label><select id="art-statut"><option value="brouillon">📄 Brouillon</option><option value="publie">🚀 Publié</option></select></div>
+    <div style="display:flex; gap:10px; margin-top:20px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="saveArticle()">Enregistrer</button>
+      <button class="btn btn-outline" onclick="closeModal('article-modal')">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (async function () {
+    try {
+      const r = await fetch('/api/vitrine-site/admin/me', { credentials: 'include' });
+      if (!r.ok) { window.location.href = 'vitrine-admin-connexion.html'; return; }
+      const data = await r.json();
+      document.getElementById('admin-email-label').textContent = data.email;
+      document.getElementById('admin-app').style.display = 'block';
+      loadStats(); loadRapports(); loadArticles();
+    } catch (e) {
+      window.location.href = 'vitrine-admin-connexion.html';
+    }
+  })();
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.navlink').forEach(n => n.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    document.querySelector('[data-tab="' + name + '"]').classList.add('active');
+  }
+
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  async function loadStats() {
+    try {
+      const r1 = await fetch('/api/vitrine-site/admin/rapports', { credentials: 'include' });
+      const d1 = await r1.json();
+      document.getElementById('stat-rapports').textContent = (d1.rapports || []).filter(r => r.statut === 'publie').length;
+      const r2 = await fetch('/api/vitrine-site/admin/articles', { credentials: 'include' });
+      const d2 = await r2.json();
+      document.getElementById('stat-articles').textContent = (d2.articles || []).filter(a => a.statut === 'publie').length;
+    } catch (e) {}
+  }
+
+  /* ── RAPPORTS ── */
+  async function loadRapports() {
+    const tbody = document.getElementById('rapports-tbody');
+    const r = await fetch('/api/vitrine-site/admin/rapports', { credentials: 'include' });
+    const d = await r.json();
+    const list = d.rapports || [];
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8A93A3;padding:20px;">Aucun rapport.</td></tr>'; return; }
+    tbody.innerHTML = list.map(rp => `
+      <tr>
+        <td>${esc(rp.titre)}</td>
+        <td>${esc(rp.categorie)}</td>
+        <td><span class="badge badge-${rp.statut === 'publie' ? 'publie' : 'brouillon'}">${rp.statut === 'publie' ? '🚀 Publié' : '📄 Brouillon'}</span></td>
+        <td>${rp.date_publication || '—'}</td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="btn btn-outline" style="padding:5px 10px;" onclick='editRapport(${JSON.stringify(rp).replace(/'/g, "&apos;")})'>✏️</button>
+          <button class="btn btn-danger" style="padding:5px 10px;" onclick="deleteRapport(${rp.id})">🗑</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openRapportForm() {
+    document.getElementById('rapport-modal-title').textContent = 'Nouveau rapport';
+    ['rap-id','rap-titre','rap-resume','rap-pays','rap-date','rap-lien'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('rap-categorie').value = 'Bilan';
+    document.getElementById('rap-type').value = 'Rapport PDF';
+    document.getElementById('rap-statut').value = 'brouillon';
+    document.getElementById('rapport-modal').classList.add('open');
+  }
+
+  function editRapport(rp) {
+    document.getElementById('rapport-modal-title').textContent = 'Modifier le rapport';
+    document.getElementById('rap-id').value = rp.id;
+    document.getElementById('rap-titre').value = rp.titre || '';
+    document.getElementById('rap-resume').value = rp.resume || '';
+    document.getElementById('rap-categorie').value = rp.categorie || 'Bilan';
+    document.getElementById('rap-type').value = rp.type || 'Rapport PDF';
+    document.getElementById('rap-pays').value = rp.pays || '';
+    document.getElementById('rap-date').value = rp.date_publication || '';
+    document.getElementById('rap-lien').value = rp.lien || '';
+    document.getElementById('rap-statut').value = rp.statut || 'brouillon';
+    document.getElementById('rapport-modal').classList.add('open');
+  }
+
+  async function saveRapport() {
+    const id = document.getElementById('rap-id').value;
+    const titre = document.getElementById('rap-titre').value.trim();
+    if (!titre) { alert('Le titre est requis.'); return; }
+    const payload = {
+      titre,
+      resume: document.getElementById('rap-resume').value,
+      categorie: document.getElementById('rap-categorie').value,
+      type: document.getElementById('rap-type').value,
+      pays: document.getElementById('rap-pays').value,
+      date_publication: document.getElementById('rap-date').value,
+      lien: document.getElementById('rap-lien').value,
+      statut: document.getElementById('rap-statut').value,
+    };
+    const url = id ? `/api/vitrine-site/admin/rapports/${id}` : '/api/vitrine-site/admin/rapports';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) });
+    if (r.ok) { closeModal('rapport-modal'); loadRapports(); loadStats(); } else { const d = await r.json(); alert(d.error || 'Erreur.'); }
+  }
+
+  async function deleteRapport(id) {
+    if (!confirm('Supprimer ce rapport ?')) return;
+    await fetch(`/api/vitrine-site/admin/rapports/${id}`, { method: 'DELETE', credentials: 'include' });
+    loadRapports(); loadStats();
+  }
+
+  /* ── ARTICLES ── */
+  async function loadArticles() {
+    const tbody = document.getElementById('articles-tbody');
+    const r = await fetch('/api/vitrine-site/admin/articles', { credentials: 'include' });
+    const d = await r.json();
+    const list = d.articles || [];
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8A93A3;padding:20px;">Aucune actualité.</td></tr>'; return; }
+    tbody.innerHTML = list.map(a => `
+      <tr>
+        <td>${esc(a.titre)}</td>
+        <td>${esc(a.categorie || '—')}</td>
+        <td><span class="badge badge-${a.statut === 'publie' ? 'publie' : 'brouillon'}">${a.statut === 'publie' ? '🚀 Publié' : '📄 Brouillon'}</span></td>
+        <td>${a.date_publication || '—'}</td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="btn btn-outline" style="padding:5px 10px;" onclick='editArticle(${JSON.stringify(a).replace(/'/g, "&apos;")})'>✏️</button>
+          <button class="btn btn-danger" style="padding:5px 10px;" onclick="deleteArticle(${a.id})">🗑</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openArticleForm() {
+    document.getElementById('article-modal-title').textContent = 'Nouvelle actualité';
+    ['art-id','art-titre','art-resume','art-contenu','art-categorie','art-date'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('art-statut').value = 'brouillon';
+    document.getElementById('article-modal').classList.add('open');
+  }
+
+  function editArticle(a) {
+    document.getElementById('article-modal-title').textContent = 'Modifier l\'actualité';
+    document.getElementById('art-id').value = a.id;
+    document.getElementById('art-titre').value = a.titre || '';
+    document.getElementById('art-resume').value = a.resume || '';
+    document.getElementById('art-contenu').value = a.contenu || '';
+    document.getElementById('art-categorie').value = a.categorie || '';
+    document.getElementById('art-date').value = a.date_publication || '';
+    document.getElementById('art-statut').value = a.statut || 'brouillon';
+    document.getElementById('article-modal').classList.add('open');
+  }
+
+  async function saveArticle() {
+    const id = document.getElementById('art-id').value;
+    const titre = document.getElementById('art-titre').value.trim();
+    if (!titre) { alert('Le titre est requis.'); return; }
+    const payload = {
+      titre,
+      resume: document.getElementById('art-resume').value,
+      contenu: document.getElementById('art-contenu').value,
+      categorie: document.getElementById('art-categorie').value,
+      date_publication: document.getElementById('art-date').value,
+      statut: document.getElementById('art-statut').value,
+    };
+    const url = id ? `/api/vitrine-site/admin/articles/${id}` : '/api/vitrine-site/admin/articles';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) });
+    if (r.ok) { closeModal('article-modal'); loadArticles(); loadStats(); } else { const d = await r.json(); alert(d.error || 'Erreur.'); }
+  }
+
+  async function deleteArticle(id) {
+    if (!confirm('Supprimer cette actualité ?')) return;
+    await fetch(`/api/vitrine-site/admin/articles/${id}`, { method: 'DELETE', credentials: 'include' });
+    loadArticles(); loadStats();
+  }
+
+  function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  async function adminLogout() {
+    await fetch('/api/vitrine-site/admin/logout', { method: 'POST', credentials: 'include' });
+    window.location.href = 'vitrine-admin-connexion.html';
+  }
+</script>
+</body>
+</html>
