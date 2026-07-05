@@ -648,35 +648,6 @@ function seed() {
     });
   }
 
-  /* ===== PUBLICITÉS DÉMO ===== */
-  const insPub = db.prepare(`
-    INSERT OR IGNORE INTO publicites
-      (titre,description,image_url,lien_url,lien_texte,annonceur,format,statut,date_debut,date_fin,priorite,
-       cible_pays,cible_roles,cible_nationalites,created_by)
-    VALUES (?,?,?,?,?,?,?,?,date('now','-5 days'),date('now','+60 days'),?,?,?,?,?)
-  `);
-  // Bannière universelle
-  insPub.run(
-    "Salon de la Diaspora 2025 — Paris","Retrouvez les acteurs de la diaspora africaine pour 3 jours d'échanges, networking et opportunités.",
-    "https://picsum.photos/seed/salon2025/800/200","https://diaspoactif.fr","Découvrir le programme",
-    "Diaspo'Actif","banniere","active",3,
-    "[]","[]","[]",adminId
-  );
-  // Post natif — ciblé Sénégalais en France
-  insPub.run(
-    "Ouvrir une entreprise au Sénégal : guide pratique","APIX vous accompagne dans vos démarches d'investissement. Découvrez les opportunités et avantages fiscaux.",
-    "https://picsum.photos/seed/apix/600/400","https://apix.sn","En savoir plus",
-    "APIX Sénégal","native","active",2,
-    '["France"]','["utilisateur","initiative"]','["Sénégalaise"]',adminId
-  );
-  // Annuaire — toutes nationalités
-  insPub.run(
-    "AssurDiaspora — Assurance rapatriement & famille","Protégez votre famille où qu'elle soit. Offres dédiées aux membres de la diaspora.",
-    "https://picsum.photos/seed/assur/400/300","https://assurdiaspora.com","Obtenir un devis",
-    "AssurDiaspora","annuaire","active",1,
-    "[]","[]","[]",adminId
-  );
-
   /* ===== PLANS D'ABONNEMENT ===== */
   const insPlan = db.prepare(`
     INSERT OR IGNORE INTO plans_abonnement (nom, description, prix_mensuel, prix_annuel, cible, avantages, actif, ordre)
@@ -697,7 +668,7 @@ function seed() {
     INSERT INTO transactions (user_id, plan_id, montant, type, statut, reference, date_transaction, periode_debut, periode_fin)
     VALUES (?, ?, ?, ?, ?, ?, datetime('now', ? || ' days', ? || ' hours'), date('now', ? || ' days'), date('now', ? || ' days', '+30 days'))
   `);
-  const txTypes = ["abonnement","abonnement","abonnement","abonnement","publicite","boost"];
+  const txTypes = ["abonnement","abonnement","abonnement","abonnement","boost"];
   const txStatuts = ["reussi","reussi","reussi","reussi","reussi","echoue","rembourse"];
   let txCount = 0;
   for (let d = 29; d >= 0; d--) {
@@ -714,16 +685,6 @@ function seed() {
       txCount++;
     }
   }
-  // Publicités (revenus pub)
-  for (let d = 14; d >= 0; d--) {
-    if (Math.random() > 0.4) {
-      const montant = [25, 50, 75, 100, 150][Math.floor(Math.random() * 5)];
-      const ref = "PUB-" + Date.now().toString(36).toUpperCase() + "-" + d;
-      const h = -(Math.floor(Math.random() * 18) + 1);
-      insTx.run(null, null, montant, "publicite", "reussi", ref, -d, h, -d, -d);
-    }
-  }
-
   /* ===== CODES PROMO ===== */
   const insPromo = db.prepare(`
     INSERT OR IGNORE INTO codes_promo (nom, code, type, valeur, date_debut, date_fin, nb_max_utilisations, nb_utilisations, cible, actif, created_by)
@@ -738,7 +699,6 @@ function seed() {
   const insParam = db.prepare(`
     INSERT OR IGNORE INTO parametres_plateforme (cle, valeur, type, description) VALUES (?, ?, ?, ?)
   `);
-  insParam.run("publicite_active",        "true",  "booleen", "Afficher les publicités sur la plateforme");
   insParam.run("limite_publications",      "50",    "nombre",  "Nombre max de publications par utilisateur par jour");
   insParam.run("moderation_auto",          "false", "booleen", "Activer la modération automatique du contenu");
   insParam.run("validation_initiatives",   "true",  "booleen", "Valider manuellement les nouvelles initiatives avant publication");

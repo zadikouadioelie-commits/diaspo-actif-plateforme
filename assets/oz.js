@@ -208,9 +208,6 @@
 
     // ── Profil public — onglets
     { re: /mes?\s+publications?\s*(profil|publiques?)?|affiche?\s+(mes?\s+)?publications?\s*profil/i, id: 'profil_publications' },
-    { re: /mes?\s+publicit[eé]s?\s*(profil)?|affiche?\s+(mes?\s+)?publicit[eé]s?/i, id: 'profil_publicites' },
-    { re: /(ouvr[ei]r?|acc[eé]der?|activer?|lancer?)\s+(les?\s+|aux?\s+)?publicit[eé]s?/i, id: 'open_publicites' },
-    { re: /\bpublicit[eé]s?\b/i, id: 'open_publicites' },
     { re: /mon\s+activit[eé]\s*(r[eé]cente|publique)?|affiche?\s+(mon\s+)?activit[eé]|activit[eé]\s+r[eé]cente/i, id: 'profil_activite' },
     { re: /modifier?\s+(ma\s+)?banni[eè]re|changer?\s+(ma\s+)?banni[eè]re|uploader?\s+(ma\s+)?banni[eè]re/i, id: 'profil_banner' },
     { re: /confidentialit[eé]\s*(profil)?|privacy\s*(profil)?|param[eè]tres?\s+confidentialit[eé]/i, id: 'profil_privacy' },
@@ -344,7 +341,7 @@
       bye:       ["À bientôt !"],
       confused:  ["Je suis un agent d'action, pas de réponses. Pour les questions, utilisez le **chatbot**.",
                   "Je n'exécute que des commandes. Pour une réponse, ouvrez le **chatbot**."],
-      capabilities: "Je suis **O-Z**, votre assistant d'action Diaspo'Actif. Je **fais** — je ne réponds pas aux questions (le chatbot est là pour ça).\n\n• « **Ouvre les accréditations** » → j'ouvre\n• « **Ouvre les habilitations** » → j'ouvre\n• « **Ouvre les publicités** » → j'ouvre\n• « **Ouvre la messagerie** » → j'ouvre\n• « **Crée un événement** » → je lance le formulaire\n• « **Va dans l'annuaire** » → j'y vais\n• « **Ouvre mon agenda** » → j'ouvre\n\nDites une commande, j'exécute immédiatement.",
+      capabilities: "Je suis **O-Z**, votre assistant d'action Diaspo'Actif. Je **fais** — je ne réponds pas aux questions (le chatbot est là pour ça).\n\n• « **Ouvre les accréditations** » → j'ouvre\n• « **Ouvre les habilitations** » → j'ouvre\n• « **Ouvre la messagerie** » → j'ouvre\n• « **Crée un événement** » → je lance le formulaire\n• « **Va dans l'annuaire** » → j'y vais\n• « **Ouvre mon agenda** » → j'ouvre\n\nDites une commande, j'exécute immédiatement.",
     },
     en: {
       greet_day: ["Hello! I'm **O-Z**, your intelligent Diaspo'Actif assistant. How can I help you today?"],
@@ -424,7 +421,6 @@
       { label: 'Certifications Admin',   icon: '🛡️', keywords: ['certifications','certification'],                     section: 'certifications' },
       { label: 'Paramètres Plateforme',  icon: '⚙️', keywords: ['parametres plateforme','configuration','settings'],   section: 'parametres' },
       { label: 'O-Z Admin',              icon: '🤖', keywords: ['oz admin','assistant admin','chatbot admin'],          section: 'oz' },
-      { label: 'Publicités Admin',       icon: '📣', keywords: ['publicites admin','ads','annonces'],                   section: 'publicites' },
       { label: 'Contenu Diaspora',       icon: '📄', keywords: ['contenu diaspora','articles','publications admin'],    section: 'contenu' },
     ];
     adminSections.forEach((s, i) => {
@@ -973,7 +969,7 @@
       case 'capabilities':  addMsg('oz', L.capabilities); break;
       case 'my_permissions':addMsg('oz', getPermsText()); break;
       case 'help':
-        addMsg('oz', "Je suis **O-Z** — j'exécute vos commandes, je n'réponds pas aux questions.\n\n• « **Ouvre les accréditations** »\n• « **Ouvre les habilitations** »\n• « **Ouvre les publicités** »\n• « **Ouvre mes messages** »\n• « **Crée un événement** »\n• « **Va dans l'annuaire** »\n\nPour des questions, utilisez le **chatbot**. Moi j'agis !");
+        addMsg('oz', "Je suis **O-Z** — j'exécute vos commandes, je n'réponds pas aux questions.\n\n• « **Ouvre les accréditations** »\n• « **Ouvre les habilitations** »\n• « **Ouvre mes messages** »\n• « **Crée un événement** »\n• « **Va dans l'annuaire** »\n\nPour des questions, utilisez le **chatbot**. Moi j'agis !");
         break;
       case 'tutorial':
         addMsg('oz', '🎓 J\'ouvre le Centre des tutos...');
@@ -1221,23 +1217,6 @@
       case 'profil_publications':
         addMsg('oz', '📝 J\'ouvre l\'onglet Publications de votre profil…');
         setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-publications`; }, 400); break;
-      case 'open_publicites':
-      case 'profil_publicites': {
-        // Tenter d'abord d'ouvrir/activer la section publicités sur la page courante
-        const pubOpened = tryOpenPageSection(['publicite','pub-section','onglet-publicites','tab-publicites','btn-publicites','section-publicites']);
-        if (!pubOpened) {
-          addMsg('oz', '📣 J\'ouvre les publicités…');
-          await audit('navigate', 'publicites');
-          const u = window._CU;
-          const path = window.location.pathname;
-          if (path.includes('dashboard-initiative')) {
-            setTimeout(() => { if (window.initShowSection) window.initShowSection('publicites'); else window.location.hash = '#publicites'; }, 300);
-          } else {
-            setTimeout(() => { window.location.href = `/profil.html?id=${u?.id||''}#tab-publicites`; }, 400);
-          }
-        }
-        break;
-      }
       case 'profil_activite':
         addMsg('oz', '⚡ J\'ouvre votre fil d\'activité publique…');
         setTimeout(() => { const u = window._CU; window.location.href = `/profil.html?id=${u?.id||''}#tab-activite`; }, 400); break;

@@ -267,26 +267,6 @@ const REGLE_ACCREDITATIONS_DA = "Les accréditations Diaspo'Actif ne constituent
 
 const ACCREDITATIONS_DA = [
   {
-    type: 'creation_publicite',
-    label: 'Création de Publicité',
-    emoji: '📣',
-    couleur: '#dc2626',
-    couleurBg: '#fef2f2',
-    couleurBorder: '#dc2626',
-    couleurText: '#991b1b',
-    description: 'Autorisation de créer et soumettre des publicités sur la plateforme Diaspo\'Actif. Chaque publicité est soumise à validation par l\'équipe avant diffusion.',
-    droits: [
-      'Créer des campagnes publicitaires complètes (6 paramètres)',
-      'Définir le ciblage géographique et démographique',
-      'Choisir les emplacements de diffusion',
-      'Définir les périodes et fréquences d\'affichage',
-      'Suivre les statistiques d\'impressions et de clics',
-      'Soumettre des publicités à validation administrative'
-    ],
-    eligible: ['initiative'],
-    prix: { initiative: 49 }
-  },
-  {
     type: 'gestion_associations',
     label: 'Gestion des Associations',
     emoji: '🏅',
@@ -340,16 +320,6 @@ const TYPES_DIFFUSION_INSTITUTION = [
   "Message privé", "Newsletter", "Invitation à un événement", "Appel à projets",
   "Consultation citoyenne", "Information consulaire", "Communiqué officiel",
   "Convocation", "Appel à contribution", "Alerte administrative", "Campagne d'information"
-];
-
-/* ---------- Publicités fictives (démo monétisation, géolocalisées) ---------- */
-const PUBLICITES = [
-  { marque: "AfriTransfer", accroche: "Envoyez de l'argent à votre famille en 3 minutes, frais réduits pour la diaspora.", cta: "Découvrir l'offre", icone: "💸", couleur: "#1FA971" },
-  { marque: "Air Sahel", accroche: "Vols directs Paris–Dakar–Abidjan dès 399 €. Réservez votre billet retour au pays.", cta: "Voir les vols", icone: "✈️", couleur: "#3457D5" },
-  { marque: "Banque Diaspora+", accroche: "Ouvrez un compte multi-devises pensé pour les investisseurs de la diaspora.", cta: "Ouvrir un compte", icone: "🏦", couleur: "#8138C2" },
-  { marque: "ConnectPro Formations", accroche: "Formez-vous à distance aux métiers du numérique avec des mentors de la diaspora.", cta: "Voir les formations", icone: "🎓", couleur: "#F2761F" },
-  { marque: "AssurDiaspora", accroche: "Protégez votre famille au pays avec une assurance santé pensée pour la diaspora.", cta: "Comparer les offres", icone: "🛡️", couleur: "#B68900" },
-  { marque: "Toulouse Job Diaspora", accroche: "15 offres d'emploi locales près de chez vous, ouvertes aux profils biculturels.", cta: "Voir les offres", icone: "📍", couleur: "#3457D5" }
 ];
 
 /* ---------- Profil utilisateur (démo) : nationalités + localisation ---------- */

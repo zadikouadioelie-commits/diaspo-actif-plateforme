@@ -369,100 +369,6 @@ db.exec(`
     updated_by INTEGER
   );
 
-  /* ===== MODULE PUBLICITÉS ===== */
-
-  CREATE TABLE IF NOT EXISTS publicites (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    -- Identification campagne
-    nom_campagne TEXT,
-    reference_interne TEXT,
-    annonceur TEXT NOT NULL,
-    categorie TEXT DEFAULT 'general',
-    type_sponsor TEXT DEFAULT 'partenaire',
-    sponsor_id INTEGER,
-    -- Format & statut
-    format TEXT NOT NULL DEFAULT 'banniere',
-    statut TEXT NOT NULL DEFAULT 'brouillon',
-    priorite INTEGER DEFAULT 2,
-    -- Contenu textuel
-    titre TEXT NOT NULL,
-    sous_titre TEXT,
-    description_courte TEXT,
-    description_detaillee TEXT,
-    description TEXT,
-    -- Médias
-    logo_annonceur TEXT,
-    image_url TEXT,
-    galerie_images TEXT DEFAULT '[]',
-    video_url TEXT,
-    -- CTA
-    bouton_action TEXT DEFAULT 'En savoir plus',
-    lien_url TEXT,
-    lien_texte TEXT DEFAULT 'En savoir plus',
-    lien_type TEXT DEFAULT 'externe',
-    lien_interne_id INTEGER,
-    -- Liens contextuels (site, page DA…)
-    lien_site TEXT,
-    -- Contacts
-    contact_telephone TEXT,
-    contact_whatsapp TEXT,
-    contact_email TEXT,
-    contact_adresse TEXT,
-    reseaux_sociaux TEXT DEFAULT '{}',
-    moyens_paiement TEXT DEFAULT '[]',
-    -- Ciblage géographique
-    zone_geo TEXT DEFAULT 'monde',
-    cible_continents TEXT DEFAULT '[]',
-    cible_pays TEXT DEFAULT '[]',
-    cible_regions TEXT DEFAULT '[]',
-    cible_villes TEXT DEFAULT '[]',
-    cible_pays_residence TEXT DEFAULT '[]',
-    -- Ciblage Diaspo'Actif
-    cible_roles TEXT DEFAULT '[]',
-    cible_nationalites TEXT DEFAULT '[]',
-    cible_origines TEXT DEFAULT '[]',
-    cible_interets TEXT DEFAULT '[]',
-    -- Paramètres d'affichage
-    emplacements TEXT DEFAULT '["fil"]',
-    max_affichages_user INTEGER DEFAULT 0,
-    max_affichages_jour INTEGER DEFAULT 0,
-    max_clics INTEGER DEFAULT 0,
-    -- Période
-    date_debut TEXT,
-    date_fin TEXT,
-    heure_debut TEXT,
-    heure_fin TEXT,
-    -- Compteurs
-    nb_impressions INTEGER DEFAULT 0,
-    nb_clics INTEGER DEFAULT 0,
-    nb_portee INTEGER DEFAULT 0,
-    nb_partages INTEGER DEFAULT 0,
-    nb_enregistrements INTEGER DEFAULT 0,
-    nb_contacts INTEGER DEFAULT 0,
-    nb_messages INTEGER DEFAULT 0,
-    -- Validation
-    validated_by INTEGER,
-    validated_at TEXT,
-    refus_motif TEXT,
-    -- Admin
-    created_by INTEGER,
-    notes_admin TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS publicite_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    publicite_id INTEGER NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('impression','clic','partage','enregistrement','contact','message')),
-    user_id INTEGER,
-    user_pays TEXT,
-    user_ville TEXT,
-    user_nationalite TEXT,
-    user_role TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(publicite_id) REFERENCES publicites(id)
-  );
 
   /* ===== MODULE INSTITUTIONS & OBSERVATOIRE DIASPORA ===== */
 
@@ -1099,49 +1005,6 @@ const MIGRATIONS = [
   ["fil_reactions", "created_at TEXT DEFAULT (datetime('now'))"],
   // Vues initiatives
   ["initiatives", "nb_vues INTEGER DEFAULT 0"],
-  // Publicités — extension module complet
-  ["publicites", "nom_campagne TEXT"],
-  ["publicites", "reference_interne TEXT"],
-  ["publicites", "categorie TEXT DEFAULT 'general'"],
-  ["publicites", "type_sponsor TEXT DEFAULT 'partenaire'"],
-  ["publicites", "sponsor_id INTEGER"],
-  ["publicites", "sous_titre TEXT"],
-  ["publicites", "description_courte TEXT"],
-  ["publicites", "description_detaillee TEXT"],
-  ["publicites", "logo_annonceur TEXT"],
-  ["publicites", "galerie_images TEXT DEFAULT '[]'"],
-  ["publicites", "video_url TEXT"],
-  ["publicites", "bouton_action TEXT DEFAULT 'En savoir plus'"],
-  ["publicites", "lien_type TEXT DEFAULT 'externe'"],
-  ["publicites", "lien_interne_id INTEGER"],
-  ["publicites", "lien_site TEXT"],
-  ["publicites", "contact_telephone TEXT"],
-  ["publicites", "contact_whatsapp TEXT"],
-  ["publicites", "contact_email TEXT"],
-  ["publicites", "contact_adresse TEXT"],
-  ["publicites", "reseaux_sociaux TEXT DEFAULT '{}'"],
-  ["publicites", "moyens_paiement TEXT DEFAULT '[]'"],
-  ["publicites", "zone_geo TEXT DEFAULT 'monde'"],
-  ["publicites", "cible_continents TEXT DEFAULT '[]'"],
-  ["publicites", "cible_pays_residence TEXT DEFAULT '[]'"],
-  ["publicites", "cible_interets TEXT DEFAULT '[]'"],
-  ["publicites", "emplacements TEXT DEFAULT '[\"fil\"]'"],
-  ["publicites", "max_affichages_user INTEGER DEFAULT 0"],
-  ["publicites", "max_affichages_jour INTEGER DEFAULT 0"],
-  ["publicites", "max_clics INTEGER DEFAULT 0"],
-  ["publicites", "heure_debut TEXT"],
-  ["publicites", "heure_fin TEXT"],
-  ["publicites", "nb_portee INTEGER DEFAULT 0"],
-  ["publicites", "nb_partages INTEGER DEFAULT 0"],
-  ["publicites", "nb_enregistrements INTEGER DEFAULT 0"],
-  ["publicites", "nb_contacts INTEGER DEFAULT 0"],
-  ["publicites", "nb_messages INTEGER DEFAULT 0"],
-  ["publicites", "validated_by INTEGER"],
-  ["publicites", "validated_at TEXT"],
-  ["publicites", "refus_motif TEXT"],
-  // Publicité events — champs supplémentaires
-  ["publicite_events", "user_nationalite TEXT"],
-  ["publicite_events", "user_role TEXT"],
   // CV & Lettres de motivation
   ["offres_candidatures", "cv_profile_id INTEGER"],
   ["offres_candidatures", "lettre_id INTEGER"],
@@ -2837,14 +2700,6 @@ db.exec(`
       tarifs:[{role:'collectivite',type:'gratuit',montant:0}]
     },
     {
-      type:'creation_publicite', label:'Création de Publicité', emoji:'📣',
-      description:"Autorisation de créer et soumettre des publicités sur la plateforme Diaspo'Actif.",
-      droits:JSON.stringify(['Créer des campagnes publicitaires complètes (6 paramètres)','Définir le ciblage géographique et démographique','Suivre les statistiques d\'impressions et de clics']),
-      couleur:'#dc2626',bg:'#fef2f2',border:'#dc2626',text:'#991b1b', module:null, ordre:5,
-      regles:[{role:'initiative',mode:'sur_demande'}],
-      tarifs:[{role:'initiative',type:'paiement_unique',montant:49}]
-    },
-    {
       type:'gestion_associations', label:'Gestion des Associations', emoji:'🏅',
       description:"Accréditation premium pour gérer entièrement votre association : adhérents, cotisations, trésorerie, comptabilité intelligente, assemblées générales et votes électroniques.",
       droits:JSON.stringify(['Gérer les adhérents et cartes de membre (QR Code)','Encaisser les cotisations et relances automatiques','Tenir la trésorerie et la comptabilité (OCR des factures)','Organiser des assemblées générales et des votes électroniques','Consulter les statistiques avancées','Assistant IA : analyses financières, prédictions, rapports']),
@@ -3213,8 +3068,6 @@ try { db.exec("ALTER TABLE user_accreditations ADD COLUMN feature_slug TEXT"); }
     /* Publication */
     ['fil_actualite','Fil d\'actualité','Publication sur le fil de la communauté',
      'publication','visible',0,null,'["utilisateur","initiative","collectivite"]','📰','#f97316',50],
-    ['publicites','Publicités','Créer et diffuser des publicités ciblées',
-     'publication','hidden',1,'creation_publicite','["initiative","collectivite"]','📣','#f97316',51],
     ['cv_builder','CV Builder','Création et partage de CV professionnel',
      'publication','hidden',1,null,'["utilisateur"]','📄','#64748b',52],
 

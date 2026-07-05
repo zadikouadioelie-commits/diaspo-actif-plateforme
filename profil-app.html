@@ -544,34 +544,6 @@
 .post-btn.liked { color:#dc2626; }
 .post-stats { padding:0 16px 6px; font-size:11px; color:var(--muted); display:flex; gap:12px; }
 
-/* ===== PUBLICITÉS ===== */
-.ad-card {
-  background:#fff; border:1px solid var(--border); border-radius:10px;
-  overflow:hidden; margin-bottom:12px;
-}
-.ad-label {
-  font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
-  padding:6px 12px 0; display:flex; align-items:center; gap:4px;
-}
-.ad-img { width:100%; height:110px; object-fit:cover; display:block; }
-.ad-body { padding:10px 12px 14px; }
-.ad-body h4 { margin:0 0 4px; font-size:13px; font-weight:800; color:#0D1B2A; line-height:1.35; }
-.ad-body p  { margin:0 0 10px; font-size:11.5px; color:var(--muted); line-height:1.5; }
-.ad-btn {
-  display:inline-block; background:var(--tp); color:#fff; border-radius:6px;
-  padding:6px 14px; font-size:11px; font-weight:700; text-decoration:none; cursor:pointer;
-  border:none;
-}
-.ad-btn:hover { background:var(--tp-dark); }
-.ad-inline {
-  background:linear-gradient(135deg,#F8FAFF,#EEF3FB);
-  border:1px solid var(--border); border-radius:10px;
-  padding:14px 16px; margin-bottom:12px; display:flex; gap:14px; align-items:center;
-}
-.ad-inline-img { width:80px; height:80px; border-radius:8px; object-fit:cover; flex-shrink:0; }
-.ad-inline-body h4 { margin:0 0 4px; font-size:13px; font-weight:800; color:#0D1B2A; }
-.ad-inline-body p  { margin:0 0 8px; font-size:12px; color:var(--muted); }
-
 /* SIDEBAR extras */
 .side-card {
   background:#fff; border:1px solid var(--border); border-radius:10px;
@@ -624,17 +596,6 @@
 .banner-crop-overlay { position:absolute; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; gap:8px; opacity:0; transition:opacity .2s; }
 .p-banner:hover .banner-crop-overlay { opacity:1; }
 .banner-btn { background:rgba(255,255,255,.92); color:#0D1B2A; border:none; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; }
-
-/* ===== PUBLICITÉS PROFIL ===== */
-.pub-ad-card { background:#fff; border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:12px; }
-.pub-ad-img { width:100%; height:180px; object-fit:cover; display:block; }
-.pub-ad-body { padding:14px 16px; }
-.pub-ad-title { font-size:14px; font-weight:800; color:#0D1B2A; margin-bottom:4px; }
-.pub-ad-desc { font-size:13px; color:var(--muted); margin-bottom:10px; line-height:1.5; }
-.pub-ad-meta { font-size:11px; color:var(--muted); margin-bottom:8px; }
-.pub-ad-statut { display:inline-flex; padding:2px 8px; border-radius:99px; font-size:10px; font-weight:800; }
-.pub-ad-statut.active { background:#dcfce7; color:#16a34a; }
-.pub-ad-statut.terminee { background:#f1f5f9; color:#64748b; }
 
 /* ===== BADGE PARTENAIRE OFFICIEL ===== */
 .badge-partenaire-officiel {
@@ -4137,7 +4098,6 @@ function renderSections() {
   tabs.push({ id:'activite',         label:'⚡ Activité' });
   if (org) tabs.push({ id:'partenaires', label:'🤝 Partenaires' });
   if (org) tabs.push({ id:'documents',   label:'📄 Documents' });
-  if (org && isOwn) tabs.push({ id:'publicites', label:'📣 Publicités' });
   tabs.push({ id:'suivis',           label:'👥 Suivis' });
   tabs.push({ id:'abonnes',          label:'❤️ Abonnés' });
   if (!isOwn && CU) tabs.push({ id:'communs', label:'🤝 En commun' });
@@ -4195,13 +4155,6 @@ function renderSections() {
   publications.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement des publications…</div>';
   wrap.appendChild(publications);
 
-  // Panel Publicités (lazy-loaded)
-  const publicites = document.createElement('div');
-  publicites.id = 'ptab-publicites';
-  publicites.className = 'p-tab-panel';
-  publicites.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">Chargement des publicités…</div>';
-  wrap.appendChild(publicites);
-
   // Panel Suivis (lazy-loaded)
   const suivis = document.createElement('div');
   suivis.id = 'ptab-suivis'; suivis.className = 'p-tab-panel';
@@ -4257,7 +4210,7 @@ function renderSections() {
 
   // Vérifier si un onglet est demandé via URL hash
   const hash = location.hash.replace('#tab-','');
-  if (['activite','publications','publicites','suivis','abonnes','communs','confidentialite'].includes(hash)) {
+  if (['activite','publications','suivis','abonnes','communs','confidentialite'].includes(hash)) {
     switchProfileTab(hash);
   }
 }
@@ -4270,7 +4223,6 @@ function switchProfileTab(id) {
   panel.dataset.loaded = '1';
   if (id === 'activite') loadActiviteTab();
   if (id === 'publications') loadPublicationsTab();
-  if (id === 'publicites') loadPublicitesTab();
   if (id === 'suivis') loadSuivisTab();
   if (id === 'abonnes') loadAbonnesTab();
   if (id === 'communs') loadCommunsTab();
@@ -4514,36 +4466,6 @@ let _pubTimer=null;
 function debPub(v){clearTimeout(_pubTimer);_pubTimer=setTimeout(()=>{_pubQ=v;loadPublicationsTab(true);},400);}
 function setPubCat(c){_pubCat=c;document.querySelectorAll('#ptab-publications .act-filter-btn').forEach(b=>b.classList.toggle('active',b.textContent===(c==='all'?'Tout':c)));loadPublicationsTab(true);}
 
-/* ======================================================
-   ONGLET — PUBLICITÉS
-   ====================================================== */
-async function loadPublicitesTab() {
-  const panel = document.getElementById('ptab-publicites');
-  try {
-    const r = await api('GET', `/profil/${profil.id}/publicites`);
-    if (!r.publicites.length) {
-      panel.innerHTML = '<div class="p-section"><div class="empty-p"><div class="ei">📣</div>Aucune publicité publiée pour l\'instant.</div></div>';
-      return;
-    }
-    panel.innerHTML = r.publicites.map(p => `
-      <div class="pub-ad-card">
-        ${p.image_url ? `<img class="pub-ad-img" src="${esc(p.image_url)}" alt="${esc(p.titre||'')}">` : ''}
-        <div class="pub-ad-body">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <div class="pub-ad-title">${esc(p.titre||p.nom_campagne||'Campagne')}</div>
-            <span class="pub-ad-statut ${p.statut}">${p.statut==='active'?'Active':'Terminée'}</span>
-          </div>
-          ${p.description ? `<div class="pub-ad-desc">${esc(p.description)}</div>` : ''}
-          <div class="pub-ad-meta">
-            ${p.date_debut?'Du '+fmtDate(p.date_debut):''}${p.date_fin?' au '+fmtDate(p.date_fin):''}
-          </div>
-          ${p.lien_cible ? `<a class="ad-btn" href="${esc(p.lien_cible)}" target="_blank" rel="noopener">En savoir plus →</a>` : ''}
-        </div>
-      </div>`).join('');
-  } catch(e) {
-    panel.innerHTML = '<div class="p-section"><div class="empty-p">Aucune publicité disponible.</div></div>';
-  }
-}
 
 /* ======================================================
    ONGLET — CONFIDENTIALITÉ

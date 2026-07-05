@@ -3395,14 +3395,6 @@ route("GET", "/api/profil/:id/publications", async (req, res, params) => {
   sendJSON(res, 200, { publications: rows, total, page, pages: Math.ceil(total/LIMIT) });
 });
 
-/* ---------- Profil — Publicités actives/passées ---------- */
-route("GET", "/api/profil/:id/publicites", async (req, res, params) => {
-  const uid = parseInt(params.id);
-  try {
-    const rows = await db.prepare(`SELECT id,nom_campagne,titre,format,statut,date_debut,date_fin,image_url,description,lien_cible FROM publicites WHERE created_by=? AND statut IN ('active','terminee') ORDER BY created_at DESC LIMIT 20`).all(uid);
-    sendJSON(res, 200, { publicites: rows });
-  } catch(e) { sendJSON(res, 200, { publicites: [] }); }
-});
 
 /* ---------- Profil — Comptes suivis ---------- */
 route("GET", "/api/profil/:id/suivis", async (req, res, params) => {
@@ -5257,320 +5249,6 @@ route("POST", "/api/session/heartbeat", async (req, res, params, body) => {
   sendJSON(res, 200, { ok: true });
 });
 
-/* ===== MODULE PUBLICITÉS ===== */
-
-/* Helper : vérifie si un tableau de ciblage accepte une valeur (vide = tous) */
-async function pubCibleMatch(cibleJson, valeurs) {
-  const cible = safeParse(cibleJson);
-  if (!Array.isArray(cible) || cible.length === 0) return true;
-  if (!valeurs) return false;
-  const vals = Array.isArray(valeurs) ? valeurs : [valeurs];
-  return cible.some(c => vals.some(v => v && v.toLowerCase() === c.toLowerCase()));
-}
-
-/* Servir une publicité adaptée à l'utilisateur courant */
-/* GET /api/publicites/mes — publicités soumises par l'initiative connectée */
-route("GET", "/api/publicites/mes", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const rows = await db.prepare("SELECT id,nom_campagne,titre,statut,format,created_at,updated_at,nb_impressions,nb_clics,date_debut,date_fin FROM publicites WHERE created_by=? ORDER BY created_at DESC").all(user.id);
-  sendJSON(res, 200, { publicites: rows });
-});
-
-/* POST /api/publicites — soumettre une publicité (requiert accréditation creation_publicite) */
-route("POST", "/api/publicites", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!hasAccred(user.id, "creation_publicite")) return sendJSON(res, 403, { error: "Accréditation « Création de Publicité » requise pour soumettre une publicité." });
-  const b = _pubBody(body);
-  b.statut = "en_attente"; // toujours en attente de validation admin
-  b.type_sponsor = "initiative";
-  b.priorite = 2;
-  if (!b.titre && !b.nom_campagne) return sendJSON(res, 400, { error: "Titre requis." });
-  if (!b.annonceur) b.annonceur = user.nom;
-  const id = db.prepare(`
-    INSERT INTO publicites (
-      nom_campagne,reference_interne,annonceur,categorie,type_sponsor,sponsor_id,
-      format,statut,priorite,
-      titre,sous_titre,description_courte,description_detaillee,description,
-      logo_annonceur,image_url,galerie_images,video_url,
-      bouton_action,lien_url,lien_texte,lien_type,lien_interne_id,lien_site,
-      contact_telephone,contact_whatsapp,contact_email,contact_adresse,
-      reseaux_sociaux,moyens_paiement,
-      zone_geo,cible_continents,cible_pays,cible_regions,cible_villes,cible_pays_residence,
-      cible_roles,cible_nationalites,cible_origines,cible_interets,
-      emplacements,max_affichages_user,max_affichages_jour,max_clics,
-      date_debut,date_fin,heure_debut,heure_fin,
-      notes_admin,created_by
-    ) VALUES (${",?".repeat(50).slice(1)})
-  `).run(
-    b.nom_campagne,b.reference_interne,b.annonceur,b.categorie,b.type_sponsor,b.sponsor_id,
-    b.format,b.statut,b.priorite,
-    b.titre,b.sous_titre,b.description_courte,b.description_detaillee,b.description,
-    b.logo_annonceur,b.image_url,b.galerie_images,b.video_url,
-    b.bouton_action,b.lien_url,b.lien_texte,b.lien_type,b.lien_interne_id,b.lien_site,
-    b.contact_telephone,b.contact_whatsapp,b.contact_email,b.contact_adresse,
-    b.reseaux_sociaux,b.moyens_paiement,
-    b.zone_geo,b.cible_continents,b.cible_pays,b.cible_regions,b.cible_villes,b.cible_pays_residence,
-    b.cible_roles,b.cible_nationalites,b.cible_origines,b.cible_interets,
-    b.emplacements,b.max_affichages_user,b.max_affichages_jour,b.max_clics,
-    b.date_debut,b.date_fin,b.heure_debut,b.heure_fin,
-    null,user.id
-  ).lastInsertRowid;
-  // Notifier les admins
-  const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
-  admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle publicité soumise", `${user.nom} a soumis une publicité « ${b.titre||b.nom_campagne} » en attente de validation.`, { publicite_id: Number(id) }));
-  sendJSON(res, 201, { id, ok: true });
-});
-
-route("GET", "/api/publicites/servir", async (req, res, params, body, query) => {
-  const format = query.format || "banniere";
-  const user = await getCurrentUser(req);
-  const now = new Date().toISOString().slice(0, 10);
-
-  const candidates = await db.prepare(`
-    SELECT * FROM publicites
-    WHERE statut = 'active'
-      AND format = ?
-      AND (date_debut IS NULL OR date_debut <= ?)
-      AND (date_fin IS NULL OR date_fin >= ?)
-    ORDER BY priorite DESC, RANDOM()
-  `).all(format, now, now);
-
-  let pub = null;
-  for (const p of candidates) {
-    if (user) {
-      if (!pubCibleMatch(p.cible_pays, user.pays)) continue;
-      if (!pubCibleMatch(p.cible_roles, user.role)) continue;
-      const profil = safeParse(user.profil_json || "{}");
-      const nats = [user.nationalite1, user.nationalite2].filter(Boolean);
-      if (!pubCibleMatch(p.cible_nationalites, nats.length ? nats : null)) continue;
-    } else {
-      if (!pubCibleMatch(p.cible_roles, null)) continue;
-    }
-    pub = p;
-    break;
-  }
-
-  if (!pub) return sendJSON(res, 200, { pub: null });
-
-  // Enregistrer l'impression
-  db.prepare("INSERT INTO publicite_events (publicite_id,type,user_id,user_pays,user_ville) VALUES (?,?,?,?,?)")
-    .run(pub.id, "impression", user?.id || null, user?.pays || null, user?.ville || null);
-  db.prepare("UPDATE publicites SET nb_impressions=nb_impressions+1,updated_at=datetime('now') WHERE id=?").run(pub.id);
-
-  sendJSON(res, 200, { pub: {
-    id: pub.id, titre: pub.titre, description: pub.description,
-    image_url: pub.image_url, lien_url: pub.lien_url, lien_texte: pub.lien_texte,
-    annonceur: pub.annonceur, format: pub.format, priorite: pub.priorite
-  }});
-});
-
-/* Enregistrer un clic */
-route("POST", "/api/publicites/:id/clic", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  db.prepare("INSERT INTO publicite_events (publicite_id,type,user_id,user_pays,user_ville) VALUES (?,?,?,?,?)")
-    .run(params.id, "clic", user?.id || null, user?.pays || null, user?.ville || null);
-  db.prepare("UPDATE publicites SET nb_clics=nb_clics+1,updated_at=datetime('now') WHERE id=?").run(params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* ---- Admin : CRUD publicités ---- */
-route("GET", "/api/admin/publicites", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  const rows = await db.prepare("SELECT * FROM publicites ORDER BY created_at DESC").all();
-  sendJSON(res, 200, { publicites: rows });
-});
-
-async function _pubBody(body) {
-  const j = (v, def="[]") => { try { return JSON.stringify(Array.isArray(v) ? v : JSON.parse(v||def)); } catch { return def; } };
-  const jo = (v) => { try { return JSON.stringify(typeof v==="object"&&!Array.isArray(v) ? v : JSON.parse(v||"{}")); } catch { return "{}"; } };
-  return {
-    nom_campagne: body.nom_campagne||null,
-    reference_interne: body.reference_interne||null,
-    annonceur: body.annonceur,
-    categorie: body.categorie||"general",
-    type_sponsor: body.type_sponsor||"partenaire",
-    sponsor_id: body.sponsor_id||null,
-    format: body.format||"banniere",
-    statut: body.statut||"brouillon",
-    priorite: parseInt(body.priorite)||2,
-    titre: body.titre,
-    sous_titre: body.sous_titre||null,
-    description_courte: body.description_courte||null,
-    description_detaillee: body.description_detaillee||null,
-    description: body.description||body.description_courte||null,
-    logo_annonceur: body.logo_annonceur||null,
-    image_url: body.image_url||null,
-    galerie_images: j(body.galerie_images),
-    video_url: body.video_url||null,
-    bouton_action: body.bouton_action||body.lien_texte||"En savoir plus",
-    lien_url: body.lien_url||body.lien_site||null,
-    lien_texte: body.lien_texte||body.bouton_action||"En savoir plus",
-    lien_type: body.lien_type||"externe",
-    lien_interne_id: body.lien_interne_id||null,
-    lien_site: body.lien_site||null,
-    contact_telephone: body.contact_telephone||null,
-    contact_whatsapp: body.contact_whatsapp||null,
-    contact_email: body.contact_email||null,
-    contact_adresse: body.contact_adresse||null,
-    reseaux_sociaux: jo(body.reseaux_sociaux),
-    moyens_paiement: j(body.moyens_paiement),
-    zone_geo: body.zone_geo||"monde",
-    cible_continents: j(body.cible_continents),
-    cible_pays: j(body.cible_pays),
-    cible_regions: j(body.cible_regions),
-    cible_villes: j(body.cible_villes),
-    cible_pays_residence: j(body.cible_pays_residence),
-    cible_roles: j(body.cible_roles),
-    cible_nationalites: j(body.cible_nationalites),
-    cible_origines: j(body.cible_origines),
-    cible_interets: j(body.cible_interets),
-    emplacements: j(body.emplacements, '["fil"]'),
-    max_affichages_user: parseInt(body.max_affichages_user)||0,
-    max_affichages_jour: parseInt(body.max_affichages_jour)||0,
-    max_clics: parseInt(body.max_clics)||0,
-    date_debut: body.date_debut||null,
-    date_fin: body.date_fin||null,
-    heure_debut: body.heure_debut||null,
-    heure_fin: body.heure_fin||null,
-    notes_admin: body.notes_admin||null,
-  };
-}
-
-route("POST", "/api/admin/publicites", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  const b = _pubBody(body);
-  if (!b.titre || !b.annonceur) return sendJSON(res, 400, { error: "titre et annonceur requis." });
-  const id = db.prepare(`
-    INSERT INTO publicites (
-      nom_campagne,reference_interne,annonceur,categorie,type_sponsor,sponsor_id,
-      format,statut,priorite,
-      titre,sous_titre,description_courte,description_detaillee,description,
-      logo_annonceur,image_url,galerie_images,video_url,
-      bouton_action,lien_url,lien_texte,lien_type,lien_interne_id,lien_site,
-      contact_telephone,contact_whatsapp,contact_email,contact_adresse,
-      reseaux_sociaux,moyens_paiement,
-      zone_geo,cible_continents,cible_pays,cible_regions,cible_villes,cible_pays_residence,
-      cible_roles,cible_nationalites,cible_origines,cible_interets,
-      emplacements,max_affichages_user,max_affichages_jour,max_clics,
-      date_debut,date_fin,heure_debut,heure_fin,
-      notes_admin,created_by
-    ) VALUES (${",?".repeat(50).slice(1)})
-  `).run(
-    b.nom_campagne,b.reference_interne,b.annonceur,b.categorie,b.type_sponsor,b.sponsor_id,
-    b.format,b.statut,b.priorite,
-    b.titre,b.sous_titre,b.description_courte,b.description_detaillee,b.description,
-    b.logo_annonceur,b.image_url,b.galerie_images,b.video_url,
-    b.bouton_action,b.lien_url,b.lien_texte,b.lien_type,b.lien_interne_id,b.lien_site,
-    b.contact_telephone,b.contact_whatsapp,b.contact_email,b.contact_adresse,
-    b.reseaux_sociaux,b.moyens_paiement,
-    b.zone_geo,b.cible_continents,b.cible_pays,b.cible_regions,b.cible_villes,b.cible_pays_residence,
-    b.cible_roles,b.cible_nationalites,b.cible_origines,b.cible_interets,
-    b.emplacements,b.max_affichages_user,b.max_affichages_jour,b.max_clics,
-    b.date_debut,b.date_fin,b.heure_debut,b.heure_fin,
-    b.notes_admin,user.id
-  ).lastInsertRowid;
-  sendJSON(res, 201, { id });
-});
-
-route("PUT", "/api/admin/publicites/:id", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  const b = _pubBody(body);
-  db.prepare(`
-    UPDATE publicites SET
-      nom_campagne=?,reference_interne=?,annonceur=?,categorie=?,type_sponsor=?,sponsor_id=?,
-      format=?,statut=?,priorite=?,
-      titre=?,sous_titre=?,description_courte=?,description_detaillee=?,description=?,
-      logo_annonceur=?,image_url=?,galerie_images=?,video_url=?,
-      bouton_action=?,lien_url=?,lien_texte=?,lien_type=?,lien_interne_id=?,lien_site=?,
-      contact_telephone=?,contact_whatsapp=?,contact_email=?,contact_adresse=?,
-      reseaux_sociaux=?,moyens_paiement=?,
-      zone_geo=?,cible_continents=?,cible_pays=?,cible_regions=?,cible_villes=?,cible_pays_residence=?,
-      cible_roles=?,cible_nationalites=?,cible_origines=?,cible_interets=?,
-      emplacements=?,max_affichages_user=?,max_affichages_jour=?,max_clics=?,
-      date_debut=?,date_fin=?,heure_debut=?,heure_fin=?,
-      notes_admin=?,updated_at=datetime('now')
-    WHERE id=?
-  `).run(
-    b.nom_campagne,b.reference_interne,b.annonceur,b.categorie,b.type_sponsor,b.sponsor_id,
-    b.format,b.statut,b.priorite,
-    b.titre,b.sous_titre,b.description_courte,b.description_detaillee,b.description,
-    b.logo_annonceur,b.image_url,b.galerie_images,b.video_url,
-    b.bouton_action,b.lien_url,b.lien_texte,b.lien_type,b.lien_interne_id,b.lien_site,
-    b.contact_telephone,b.contact_whatsapp,b.contact_email,b.contact_adresse,
-    b.reseaux_sociaux,b.moyens_paiement,
-    b.zone_geo,b.cible_continents,b.cible_pays,b.cible_regions,b.cible_villes,b.cible_pays_residence,
-    b.cible_roles,b.cible_nationalites,b.cible_origines,b.cible_interets,
-    b.emplacements,b.max_affichages_user,b.max_affichages_jour,b.max_clics,
-    b.date_debut,b.date_fin,b.heure_debut,b.heure_fin,
-    b.notes_admin, params.id
-  );
-  sendJSON(res, 200, { ok: true });
-});
-
-route("POST", "/api/admin/publicites/:id/statut", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  const { statut, refus_motif } = body;
-  const valides = ["brouillon","en_attente","active","suspendue","terminee","refusee","pausee","expiree"];
-  if (!valides.includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
-  const extra = statut === "active"
-    ? ", validated_by=?, validated_at=datetime('now')"
-    : statut === "refusee" ? ", refus_motif=?" : "";
-  const args = [statut];
-  if (statut === "active") args.push(user.id);
-  else if (statut === "refusee") args.push(refus_motif||null);
-  args.push(params.id);
-  db.prepare(`UPDATE publicites SET statut=?,updated_at=datetime('now')${extra} WHERE id=?`).run(...args);
-  sendJSON(res, 200, { ok: true });
-});
-
-route("DELETE", "/api/admin/publicites/:id", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  await db.prepare("DELETE FROM publicite_events WHERE publicite_id=?").run(params.id);
-  await db.prepare("DELETE FROM publicites WHERE id=?").run(params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-route("GET", "/api/admin/publicites/:id/stats", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  const pub = await db.prepare(`
-    SELECT id,titre,annonceur,statut,nb_impressions,nb_clics,nb_portee,nb_partages,nb_enregistrements,nb_contacts,nb_messages
-    FROM publicites WHERE id=?
-  `).get(params.id);
-  if (!pub) return sendJSON(res, 404, { error: "Publicité introuvable." });
-  const parPays = await db.prepare(`
-    SELECT user_pays AS pays, COUNT(*) AS n FROM publicite_events
-    WHERE publicite_id=? AND type='impression' AND user_pays IS NOT NULL
-    GROUP BY user_pays ORDER BY n DESC LIMIT 10
-  `).all(params.id);
-  const parJour = await db.prepare(`
-    SELECT date(created_at) AS jour,
-      SUM(CASE WHEN type='impression' THEN 1 ELSE 0 END) AS impressions,
-      SUM(CASE WHEN type='clic' THEN 1 ELSE 0 END) AS clics
-    FROM publicite_events WHERE publicite_id=?
-    GROUP BY jour ORDER BY jour DESC LIMIT 30
-  `).all(params.id);
-  const parNationalite = await db.prepare(`
-    SELECT user_nationalite AS nationalite, COUNT(*) AS n FROM publicite_events
-    WHERE publicite_id=? AND type='impression' AND user_nationalite IS NOT NULL
-    GROUP BY user_nationalite ORDER BY n DESC LIMIT 10
-  `).all(params.id);
-  const parRole = await db.prepare(`
-    SELECT user_role AS role, COUNT(*) AS n FROM publicite_events
-    WHERE publicite_id=? AND type='impression' AND user_role IS NOT NULL
-    GROUP BY user_role ORDER BY n DESC
-  `).all(params.id);
-  const ctr = pub.nb_impressions > 0 ? ((pub.nb_clics / pub.nb_impressions) * 100).toFixed(2) : "0.00";
-  sendJSON(res, 200, { pub, ctr, par_pays: parPays, par_jour: parJour, par_nationalite: parNationalite, par_role: parRole });
-});
-
 /* ===== MODULE INSTITUTIONS & OBSERVATOIRE ===== */
 
 /* Helper : accréditation active d'une institution */
@@ -6321,7 +5999,7 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
   }
 
   /* Fallback : ancien système pour les types hardcodés */
-  const TYPES_ACCRED_VALIDES = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle","creation_publicite"];
+  const TYPES_ACCRED_VALIDES = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle"];
   if (!TYPES_ACCRED_VALIDES.includes(type)) return sendJSON(res, 400, { error: "Type ou accréditation invalide." });
   const existing = await db.prepare("SELECT id,statut FROM demandes_accreditation WHERE user_id=? AND type=? ORDER BY created_at DESC LIMIT 1").get(user.id, type);
   if (existing && existing.statut === "en_attente") return sendJSON(res, 409, { error: "Une demande est déjà en cours pour ce type." });
@@ -6365,7 +6043,7 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/accorder", async (req, r
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
-  const TYPES_DA = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle","creation_publicite"];
+  const TYPES_DA = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle"];
   if (!TYPES_DA.includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
   db.prepare(`INSERT INTO compte_accreditations (user_id,type,statut,admin_id,frais_acces,notes,date_expiration)
     VALUES (?,?,'active',?,?,?,?)
@@ -6375,7 +6053,7 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/accorder", async (req, r
   // Mettre à jour la demande si elle existe
   await db.prepare("UPDATE demandes_accreditation SET statut='approuvee' WHERE user_id=? AND type=? AND statut='en_attente'").run(userId, type);
   db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif,frais_acces) VALUES (?,?,?,?,?,?,?)").run(userId, type, "accorde", admin.id, admin.nom, body.motif||null, body.frais_acces||0);
-  const DA_LBL = { mobilisation_active:"Mobilisation Active 📢", createur_opportunites:"Créateur d'Opportunités 💼", observatoire_diaspora:"Observatoire Diaspora 📊", institutionnelle:"Institutionnelle 🏛️", creation_publicite:"Création de Publicité 📣" };
+  const DA_LBL = { mobilisation_active:"Mobilisation Active 📢", createur_opportunites:"Créateur d'Opportunités 💼", observatoire_diaspora:"Observatoire Diaspora 📊", institutionnelle:"Institutionnelle 🏛️" };
   const label = DA_LBL[type] || type;
   creerNotif(Number(userId), "validation", "Accréditation accordée !", `Félicitations ! Votre accréditation « ${label} » vient d'être validée par l'équipe Diaspo'Actif.`, { type });
   sendJSON(res, 200, { ok: true });
@@ -15369,7 +15047,6 @@ async function _generateRecommendations(userId, userRole) {
       if (userRole === 'initiative') {
         if (f.slug === 'createur_formations') { raison = 'Partagez votre expertise en créant des formations pour la diaspora'; score = 0.9; }
         else if (f.slug === 'billetterie') { raison = 'Vous organisez des événements — la billetterie vous permettra de les monétiser'; score = 0.8; }
-        else if (f.slug === 'publicites') { raison = 'Augmentez votre visibilité avec des publicités ciblées'; score = 0.7; }
         else if (f.slug === 'reunions') { raison = 'Organisez vos réunions directement sur la plateforme'; score = 0.75; }
       } else if (userRole === 'collectivite') {
         if (f.slug === 'observatoire') { raison = 'Accédez aux données statistiques de la diaspora'; score = 0.95; }
