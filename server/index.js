@@ -10702,8 +10702,13 @@ ${jsonLd}
 
     /* ── GET /api/vitrine-site/rapports — rapports publiés (public) ── */
     if (req.method === 'GET' && pathname === '/api/vitrine-site/rapports') {
-      const rows = await db.prepare(`SELECT * FROM vitrine_rapports WHERE statut='publie' ORDER BY date_publication DESC, id DESC`).all();
-      return sendJSON(res, 200, { rapports: rows });
+      try {
+        const rows = await db.prepare(`SELECT * FROM vitrine_rapports WHERE statut='publie' ORDER BY date_publication DESC, id DESC`).all();
+        return sendJSON(res, 200, { rapports: rows });
+      } catch (e) {
+        console.error('[vitrine-site/rapports]', e.message);
+        return sendJSON(res, 200, { rapports: [] });
+      }
     }
 
     /* ── GET /api/vitrine-site/admin/rapports — tous statuts confondus (admin site) ── */
@@ -10752,8 +10757,13 @@ ${jsonLd}
 
     /* ── GET /api/vitrine-site/articles — articles publiés (public) ── */
     if (req.method === 'GET' && pathname === '/api/vitrine-site/articles') {
-      const rows = await db.prepare(`SELECT * FROM vitrine_articles WHERE statut='publie' ORDER BY date_publication DESC, id DESC`).all();
-      return sendJSON(res, 200, { articles: rows });
+      try {
+        const rows = await db.prepare(`SELECT * FROM vitrine_articles WHERE statut='publie' ORDER BY date_publication DESC, id DESC`).all();
+        return sendJSON(res, 200, { articles: rows });
+      } catch (e) {
+        console.error('[vitrine-site/articles]', e.message);
+        return sendJSON(res, 200, { articles: [] });
+      }
     }
 
     /* ── GET /api/vitrine-site/admin/articles — tous statuts (admin site) ── */
