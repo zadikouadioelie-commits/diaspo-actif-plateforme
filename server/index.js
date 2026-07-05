@@ -10627,6 +10627,21 @@ ${jsonLd}
       return sendJSON(res, 200, { ok: true, message: "Inscription confirmée. Vous recevrez un e-mail à chaque nouvelle actualité." });
     }
 
+    /* ── POST /api/vitrine-site/admin/bootstrap — crée le tout premier compte admin du site (temporaire, à retirer après usage) ── */
+    if (req.method === 'POST' && pathname === '/api/vitrine-site/admin/bootstrap') {
+      const secret = process.env.BOOTSTRAP_SECRET;
+      const authHeader = req.headers['authorization'] || '';
+      if (!secret || authHeader !== `Bearer ${secret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+      const existing = await db.prepare(`SELECT COUNT(*) n FROM vitrine_site_admins`).get();
+      if (existing && existing.n > 0) return sendJSON(res, 403, { error: "Un compte administrateur existe déjà." });
+      const email = String(body.email || '').trim().toLowerCase();
+      const password = String(body.password || '');
+      if (!email || password.length < 8) return sendJSON(res, 400, { error: "E-mail requis, mot de passe de 8 caractères minimum." });
+      const { hash, salt } = hashPassword(password);
+      await db.prepare(`INSERT INTO vitrine_site_admins (email, password_hash, password_salt) VALUES (?,?,?)`).run(email, hash, salt);
+      return sendJSON(res, 200, { ok: true, email });
+    }
+
     /* ── POST /api/vitrine-site/admin/login — compte administrateur du site institutionnel (distinct de la plateforme) ── */
     if (req.method === 'POST' && pathname === '/api/vitrine-site/admin/login') {
       const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
