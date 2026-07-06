@@ -229,6 +229,8 @@ async function migratePg(pool) {
     ['publicites', 'motif_rejet', 'TEXT'],
     ['publicites', 'nb_video_views', 'INTEGER DEFAULT 0'],
     ['publicites', 'nb_full_video_views', 'INTEGER DEFAULT 0'],
+    // Synchronisation des réseaux sociaux — badge "Importé depuis X" sur les posts du fil
+    ['fil_posts', 'source_import', 'TEXT'],
   ];
   for (const [table, col, type] of cols) {
     try {

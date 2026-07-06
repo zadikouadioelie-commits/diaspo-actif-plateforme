@@ -70,6 +70,7 @@
       <a href="#suppression-comptes" data-section="suppression-comptes" style="display:flex;justify-content:space-between;align-items:center;">🗑 Demandes de suppression <span id="delreq-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="audiovisuel.html">📺 Audiovisuel</a>
       <a href="#ads" data-section="ads">📣 Publicités <span id="ads-pending-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
+      <a href="#social-sync" data-section="social-sync">🔄 Synchro réseaux sociaux</a>
 
       <span class="sb-group-lbl">🟧 Outils</span>
       <a href="#error-logs" data-section="error-logs" style="display:flex;justify-content:space-between;align-items:center;">🩺 Journal d'erreurs <span id="errlog-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
@@ -1478,6 +1479,10 @@
           <div style="margin-top:16px;">
             <h4 style="margin:0 0 10px;font-size:13px;">📋 Historique des commissions (100 dernières)</h4>
             <div id="admin-wallet-historique" style="max-height:250px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
+          </div>
+          <div style="margin-top:16px;">
+            <h4 style="margin:0 0 10px;font-size:13px;">💸 Historique des retraits (Centre Financier)</h4>
+            <div id="admin-wallet-retraits" style="max-height:250px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
           </div>
         </div>
 
@@ -3823,6 +3828,19 @@
       </div>
 
       <!-- PUBLICITÉS -->
+      <section id="section-social-sync" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <h2 style="margin:0;">🔄 Synchronisation des réseaux sociaux</h2>
+          <button class="btn btn-outline" onclick="loadSocialSyncAdmin()">↺ Actualiser</button>
+        </div>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 16px;font-size:12.5px;color:#92400e;margin-bottom:18px;">
+          ℹ️ Mode démonstration — aucune clé API officielle n'est encore configurée pour les réseaux ci-dessous. La connexion et la détection de publications sont simulées côté utilisateur.
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;" id="social-stats-cards"></div>
+        <h3 style="font-size:15px;">Réseaux disponibles</h3>
+        <div id="social-networks-admin" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:20px;"></div>
+      </section>
+
       <section id="section-ads" style="display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
           <h2 style="margin:0;">📣 Régie Publicitaire</h2>
@@ -6050,6 +6068,7 @@ async function submitAccordDirect(){
     onboarding:  () => loadObAdmin(),
     'error-logs': () => loadErrorLogs(),
     ads: () => loadAdsAdmin(),
+    'social-sync': () => loadSocialSyncAdmin(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
@@ -8274,6 +8293,39 @@ async function submitAccordDirect(){
     });
   });
 
+  /* ===== Synchronisation des réseaux sociaux ===== */
+  async function loadSocialSyncAdmin() {
+    try {
+      const [stats, reseauxRes] = await Promise.all([
+        api('GET', '/admin/social/stats'),
+        api('GET', '/admin/social/reseaux'),
+      ]);
+      const reseaux = reseauxRes.reseaux;
+      document.getElementById('social-stats-cards').innerHTML = `
+        <div class="card" style="text-align:center;padding:14px;"><div style="font-size:24px;font-weight:800;color:#2563EB;">${stats.comptesConnectes}</div><div style="font-size:12px;color:var(--muted);">Comptes connectés</div></div>
+        <div class="card" style="text-align:center;padding:14px;"><div style="font-size:24px;font-weight:800;color:#8b5cf6;">${stats.detectees}</div><div style="font-size:12px;color:var(--muted);">Publications détectées</div></div>
+        <div class="card" style="text-align:center;padding:14px;"><div style="font-size:24px;font-weight:800;color:#10b981;">${stats.tauxRepublication}%</div><div style="font-size:12px;color:var(--muted);">Taux de republication</div></div>
+        <div class="card" style="text-align:center;padding:14px;"><div style="font-size:20px;font-weight:800;">${stats.reseauTop ? (reseaux.find(r=>r.reseau===stats.reseauTop)?.icon||'') + ' ' + (reseaux.find(r=>r.reseau===stats.reseauTop)?.label||stats.reseauTop) : '—'}</div><div style="font-size:12px;color:var(--muted);">Réseau le plus utilisé</div></div>
+      `;
+      document.getElementById('social-networks-admin').innerHTML = reseaux.map(n => `
+        <div class="card" style="padding:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <strong>${n.icon} ${n.label}</strong>
+            <label style="position:relative;width:38px;height:21px;display:inline-block;">
+              <input type="checkbox" ${n.actif?'checked':''} onchange="toggleSocialNetworkAdmin('${n.reseau}', this.checked)" style="opacity:0;width:0;height:0;">
+              <span style="position:absolute;inset:0;background:${n.actif?'#10b981':'#d1d5db'};border-radius:99px;cursor:pointer;" onclick="this.previousElementSibling.click()"></span>
+            </label>
+          </div>
+          <div style="font-size:11.5px;color:var(--muted);">${n.actif ? 'Activé' : 'Désactivé'} · limite ${n.limite_freq_min} min entre synchros</div>
+        </div>
+      `).join('');
+    } catch(e) { console.error(e); }
+  }
+  window.toggleSocialNetworkAdmin = async (reseau, actif) => {
+    try { await api('PUT', `/admin/social/reseaux/${reseau}`, { actif }); loadSocialSyncAdmin(); }
+    catch(e) { alert(e.message || 'Erreur'); }
+  };
+
   /* ===== Publicités (régie) ===== */
   const ADS_STATUT_LBL = { pending_admin:'⏳ En attente', approved:'✅ Active', rejected:'❌ Refusée', need_modification:'✏️ Modif. demandée', paused:'⏸ En pause' };
   let _adsFilter = '';
@@ -9668,7 +9720,28 @@ async function loadAdminBilletterie() {
         <div class="card" style="padding:14px;text-align:center;background:#fff3e0;">
           <div style="font-size:22px;font-weight:800;color:#e65100;">5%</div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;">Taux fixe · Non modifiable</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:#10b981;">${rWallet.nb_comptes_verifies||0}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Comptes Stripe Connect vérifiés</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;">${rWallet.nb_comptes_connectes||0}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Comptes connectés (total)</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;">${rWallet.nb_retraits||0}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Retraits effectués</div>
         </div>`;
+
+      const retraits = rWallet.retraits_historique || [];
+      const elRetraits = document.getElementById('admin-wallet-retraits');
+      if (elRetraits) elRetraits.innerHTML = retraits.length
+        ? retraits.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);font-size:12px;">
+            <span>${r.user_nom||'—'} · ${fmtTs(r.created_at)}</span>
+            <span><strong>${(r.montant||0).toFixed(2)} €</strong> — <span style="color:${r.statut==='traite'?'#10b981':r.statut==='echoue'?'#ef4444':'#f59e0b'};">${r.statut}</span></span>
+          </div>`).join('')
+        : '<div style="color:var(--muted);font-size:12px;padding:8px;">Aucun retrait pour l\'instant.</div>';
 
       const evts = rWallet.par_event || [];
       document.getElementById('admin-wallet-events').innerHTML = evts.length

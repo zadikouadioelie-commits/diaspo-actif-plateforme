@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Synchronisation des réseaux sociaux</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+.rs-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0;border-bottom:1px solid var(--border,#e5e7eb);padding-bottom:0;}
+.rs-tab{border:none;background:none;padding:9px 14px;font-size:13.5px;font-weight:700;color:var(--muted,#6b7280);cursor:pointer;border-bottom:3px solid transparent;}
+.rs-tab.active{color:var(--orange,#ff6b00);border-bottom-color:var(--orange,#ff6b00);}
+.rs-card{background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+.rs-net-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;}
+.rs-net-card{background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:14px 16px;}
+.rs-net-card .rs-net-head{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:6px;}
+.rs-net-status{font-size:11.5px;padding:2px 8px;border-radius:99px;font-weight:700;}
+.rs-net-status.on{background:#d1fae5;color:#065f46;}
+.rs-net-status.off{background:#f3f4f6;color:#6b7280;}
+.rs-net-meta{font-size:11.5px;color:var(--muted,#6b7280);margin:6px 0 10px;}
+.rs-detected-card{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--border,#e5e7eb);border-radius:10px;margin-bottom:10px;background:var(--card,#fff);}
+.rs-detected-icon{font-size:22px;flex-shrink:0;}
+.rs-detected-body{flex:1;min-width:0;}
+.rs-detected-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.rs-badge-status{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;text-transform:uppercase;}
+.rs-badge-status.detecte{background:#fef3c7;color:#92400e;}
+.rs-badge-status.importe{background:#d1fae5;color:#065f46;}
+.rs-badge-status.ignore{background:#f3f4f6;color:#6b7280;}
+.rs-badge-status.programme{background:#dbeafe;color:#1e40af;}
+.rs-badge-status.erreur{background:#fee2e2;color:#991b1b;}
+.rs-empty{text-align:center;padding:40px 20px;color:#9ca3af;}
+.rs-widget-mini{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.rs-settings-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border,#f0f0f0);}
+.rs-settings-row:last-child{border-bottom:none;}
+.rs-switch{position:relative;width:40px;height:22px;flex-shrink:0;}
+.rs-switch input{opacity:0;width:0;height:0;}
+.rs-switch .slider{position:absolute;inset:0;background:#d1d5db;border-radius:99px;cursor:pointer;transition:.2s;}
+.rs-switch .slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+.rs-switch input:checked + .slider{background:#10b981;}
+.rs-switch input:checked + .slider:before{transform:translateX(18px);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="max-width:900px;padding-top:24px;padding-bottom:60px;">
+
+    <div style="margin-bottom:6px;">
+      <h2 style="margin:0 0 2px;">🔄 Synchronisation des réseaux sociaux</h2>
+      <p style="margin:0;color:var(--muted,#6b7280);font-size:.88rem;">Connectez vos réseaux, détectez vos publications et republiez-les sur Diaspo'Actif en un clic — rien n'est jamais publié sans votre confirmation.</p>
+    </div>
+
+    <div class="rs-card" style="background:#fffbeb;border-color:#fde68a;font-size:12.5px;color:#92400e;">
+      ℹ️ <strong>Mode démonstration :</strong> aucune clé API officielle (LinkedIn, Meta, X, YouTube, TikTok) n'est encore configurée. La connexion et la détection de publications sont simulées, sans jamais accéder à un vrai compte social. L'architecture est prête à brancher les vrais connecteurs dès que les accès seront disponibles.
+    </div>
+
+    <div class="rs-tabs" id="rs-tabs">
+      <button class="rs-tab active" data-tab="reseaux">📡 Réseaux connectés</button>
+      <button class="rs-tab" data-tab="sync">🔔 Centre de synchronisation</button>
+      <button class="rs-tab" data-tab="historique">🕓 Historique</button>
+      <button class="rs-tab" data-tab="parametres">⚙️ Paramètres</button>
+    </div>
+
+    <div id="rs-content"><div class="rs-empty">Chargement…</div></div>
+
+  </main>
+
+  <footer class="footer">
+    <span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span>
+  </footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+
+<script>
+let RS_TAB = 'reseaux';
+let RS_NETWORKS = [];
+
+function rsToast(msg, type='ok') {
+  let t = document.getElementById('rs-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'rs-toast';
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;max-width:340px;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.18);opacity:0;transition:opacity .25s;';
+    document.body.appendChild(t);
+  }
+  t.style.background = type === 'error' ? '#fee2e2' : '#d1fae5';
+  t.style.color = type === 'error' ? '#991b1b' : '#065f46';
+  t.textContent = msg;
+  requestAnimationFrame(()=>{ t.style.opacity = '1'; });
+  clearTimeout(t._rsTimer);
+  t._rsTimer = setTimeout(()=>{ t.style.opacity = '0'; }, 4500);
+}
+
+async function rsInit() {
+  document.querySelectorAll('.rs-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.rs-tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      RS_TAB = btn.dataset.tab;
+      rsRenderTab();
+    });
+  });
+  try { const r = await api('GET', '/social/connections'); RS_NETWORKS = r.reseaux; } catch(e) {}
+  await rsRenderTab();
+}
+
+async function rsRenderTab() {
+  const el = document.getElementById('rs-content');
+  el.innerHTML = '<div class="rs-empty">Chargement…</div>';
+  try {
+    if (RS_TAB === 'reseaux') await rsRenderReseaux();
+    else if (RS_TAB === 'sync') await rsRenderSync();
+    else if (RS_TAB === 'historique') await rsRenderHistorique();
+    else if (RS_TAB === 'parametres') await rsRenderParametres();
+  } catch (e) {
+    el.innerHTML = `<div class="rs-empty">Erreur de chargement : ${e.message || 'connexion requise'}</div>`;
+  }
+}
+
+function rsEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function rsDate(iso) { if (!iso) return '—'; try { return new Date(iso.replace(' ','T')+'Z').toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); } catch { return iso; } }
+
+/* ── Onglet 1 : Réseaux connectés ── */
+async function rsRenderReseaux() {
+  const { reseaux } = await api('GET', '/social/connections');
+  RS_NETWORKS = reseaux;
+  const el = document.getElementById('rs-content');
+  el.innerHTML = `<div class="rs-net-grid">${reseaux.map(n => `
+    <div class="rs-net-card">
+      <div class="rs-net-head"><span>${n.icon}</span> ${rsEsc(n.label)}
+        <span class="rs-net-status ${n.connecte?'on':'off'}" style="margin-left:auto;">${n.connecte?'Connecté':'Non connecté'}</span>
+      </div>
+      <div class="rs-net-meta">
+        Dernière synchro : ${rsDate(n.derniere_sync)}<br>
+        ${n.connecte ? `Autorisations : ${n.permissions.join(', ')||'—'}` : (n.actif_plateforme ? '' : '⚠️ Désactivé par l\'administration')}
+      </div>
+      ${n.connecte
+        ? `<button class="btn-outline btn-sm" onclick="rsDisconnect('${n.reseau}')" style="width:100%;">Déconnecter</button>
+           <button class="btn-outline btn-sm" onclick="rsSimulateDetection('${n.reseau}')" style="width:100%;margin-top:6px;">🧪 Simuler une détection</button>`
+        : `<button class="btn-primary btn-sm" onclick="rsConnect('${n.reseau}')" style="width:100%;" ${n.actif_plateforme?'':'disabled'}>Connecter</button>`}
+    </div>`).join('')}</div>`;
+}
+async function rsConnect(reseau) {
+  try { await api('POST', `/social/connections/${reseau}/connect`); await rsRenderReseaux(); rsToast('Réseau connecté (simulation).'); }
+  catch(e) { rsToast(e.message || 'Erreur', 'error'); }
+}
+async function rsDisconnect(reseau) {
+  await api('POST', `/social/connections/${reseau}/disconnect`);
+  await rsRenderReseaux();
+}
+async function rsSimulateDetection(reseau) {
+  try {
+    await api('POST', '/social/simulate-detection', { reseau });
+    rsToast('Nouvelle publication simulée détectée — consultez le "Centre de synchronisation".');
+  } catch(e) { rsToast(e.message || 'Erreur', 'error'); }
+}
+
+/* ── Onglet 2 : Centre de synchronisation ── */
+let RS_SYNC_FILTER = 'detecte';
+async function rsRenderSync() {
+  const { posts } = await api('GET', `/social/detected?statut=${RS_SYNC_FILTER}`);
+  const el = document.getElementById('rs-content');
+  const filters = [
+    ['detecte','🔔 Détectées'], ['importe','✅ Importées'], ['ignore','❌ Ignorées'],
+    ['programme','📅 Programmées'], ['erreur','⚠️ Erreurs'],
+  ];
+  el.innerHTML = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+      ${filters.map(([v,l])=>`<button class="btn-outline btn-sm ${RS_SYNC_FILTER===v?'active':''}" style="${RS_SYNC_FILTER===v?'background:var(--orange,#ff6b00);color:#fff;':''}" onclick="rsSyncFilter('${v}')">${l}</button>`).join('')}
+    </div>
+    <div id="rs-sync-list">${posts.length ? posts.map(rsRenderDetectedCard).join('') : '<div class="rs-empty">Aucune publication dans cette catégorie.</div>'}</div>
+  `;
+}
+function rsSyncFilter(v) { RS_SYNC_FILTER = v; rsRenderSync(); }
+
+function rsRenderDetectedCard(p) {
+  const meta = RS_NETWORKS.find(n=>n.reseau===p.reseau) || {};
+  return `
+  <div class="rs-detected-card" id="rs-post-${p.id}">
+    <div class="rs-detected-icon">${meta.icon||'📡'}</div>
+    <div class="rs-detected-body">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <strong style="font-size:13px;">${rsEsc(meta.label||p.reseau)}</strong>
+        <span class="rs-badge-status ${p.statut}">${p.statut}</span>
+        <span style="font-size:11px;color:#9ca3af;margin-left:auto;">${rsDate(p.detected_at)}</span>
+      </div>
+      <textarea id="rs-text-${p.id}" style="width:100%;min-height:60px;padding:8px;border:1px solid var(--border,#e5e7eb);border-radius:8px;font-family:inherit;font-size:13px;" ${p.statut!=='detecte'?'readonly':''}>${rsEsc(p.contenu_brut)}</textarea>
+      ${p.categorie_suggeree ? `<div style="font-size:11.5px;color:#6b7280;margin-top:6px;">Catégorie suggérée : <strong>${rsEsc(p.categorie_suggeree)}</strong> · Hashtags : ${(p.hashtags_suggeres||[]).map(h=>rsEsc(h)).join(' ')}</div>` : ''}
+      ${p.statut==='detecte' ? `
+      <div class="rs-detected-actions">
+        <button class="btn-primary btn-sm" onclick="rsPublish(${p.id})">✅ Publier</button>
+        <button class="btn-outline btn-sm" onclick="rsAdaptIA(${p.id})">🤖 Adapter avec l'IA</button>
+        <button class="btn-outline btn-sm" onclick="rsToggleSchedule(${p.id})">📅 Programmer</button>
+        <button class="btn-outline btn-sm" onclick="rsIgnore(${p.id})">❌ Ignorer</button>
+      </div>
+      <div id="rs-sched-${p.id}" style="display:none;margin-top:8px;align-items:center;gap:8px;">
+        <input type="datetime-local" id="rs-sched-input-${p.id}" style="padding:6px 10px;border:1px solid var(--border,#e5e7eb);border-radius:8px;font-family:inherit;">
+        <button class="btn-primary btn-sm" onclick="rsSchedule(${p.id})">Confirmer</button>
+      </div>` : ''}
+      ${p.statut==='importe' ? `<div style="font-size:11.5px;color:#065f46;margin-top:6px;">✅ Publiée sur Diaspo'Actif le ${rsDate(p.imported_at)}</div>` : ''}
+      ${p.statut==='programme' ? `<div style="font-size:11.5px;color:#1e40af;margin-top:6px;">📅 Programmée pour le ${rsDate(p.programmed_at)}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+async function rsPublish(id) {
+  const contenu = document.getElementById(`rs-text-${id}`)?.value;
+  try {
+    await api('POST', `/social/detected/${id}/publish`, { contenu });
+    rsToast('Publication republiée sur Diaspo\'Actif !');
+    await rsRenderSync();
+  } catch(e) { rsToast(e.message || 'Erreur', 'error'); }
+}
+async function rsAdaptIA(id) {
+  try {
+    const r = await api('POST', `/social/detected/${id}/adapt-ia`);
+    rsToast(`Suggestion : catégorie "${r.categorie}", hashtags ${r.hashtags.join(' ')}`);
+    await rsRenderSync();
+  } catch(e) { rsToast(e.message || 'Erreur', 'error'); }
+}
+function rsToggleSchedule(id) {
+  const el = document.getElementById(`rs-sched-${id}`);
+  if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+async function rsSchedule(id) {
+  const when = document.getElementById(`rs-sched-input-${id}`)?.value;
+  if (!when) { rsToast('Choisissez une date et une heure.', 'error'); return; }
+  try { await api('POST', `/social/detected/${id}/schedule`, { programmed_at: when.replace('T',' ') }); rsToast('Publication programmée.'); await rsRenderSync(); }
+  catch(e) { rsToast(e.message || 'Erreur', 'error'); }
+}
+async function rsIgnore(id) {
+  await api('POST', `/social/detected/${id}/ignore`);
+  await rsRenderSync();
+}
+
+/* ── Onglet 3 : Historique ── */
+async function rsRenderHistorique() {
+  const { history } = await api('GET', '/social/history');
+  const el = document.getElementById('rs-content');
+  if (!history.length) { el.innerHTML = '<div class="rs-empty">Aucun historique pour l\'instant.</div>'; return; }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="text-align:left;border-bottom:2px solid var(--border,#e5e7eb);">
+      <th style="padding:8px;">Détection</th><th>Réseau</th><th>Statut</th><th>Republication</th>
+    </tr></thead>
+    <tbody>${history.map(h => {
+      const meta = RS_NETWORKS.find(n=>n.reseau===h.reseau) || {};
+      return `<tr style="border-bottom:1px solid var(--border,#f0f0f0);">
+        <td style="padding:8px;">${rsDate(h.detected_at)}</td>
+        <td>${meta.icon||''} ${rsEsc(meta.label||h.reseau)}</td>
+        <td><span class="rs-badge-status ${h.statut}">${h.statut}</span></td>
+        <td>${h.imported_at ? rsDate(h.imported_at) : '—'}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+/* ── Onglet 4 : Paramètres ── */
+async function rsRenderParametres() {
+  const s = await api('GET', '/social/settings');
+  const el = document.getElementById('rs-content');
+  const surveilles = s.reseaux_surveilles || [];
+  el.innerHTML = `
+    <div class="rs-card">
+      <h4 style="margin-top:0;">Réseaux surveillés</h4>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${(RS_NETWORKS.length?RS_NETWORKS:[]).map(n=>`
+          <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;border:1px solid var(--border,#e5e7eb);border-radius:99px;padding:5px 12px;cursor:pointer;">
+            <input type="checkbox" data-rsn="${n.reseau}" ${surveilles.includes(n.reseau)?'checked':''}> ${n.icon} ${rsEsc(n.label)}
+          </label>`).join('')}
+      </div>
+    </div>
+    <div class="rs-card">
+      <div class="rs-settings-row">
+        <div><strong>Fréquence de détection</strong></div>
+        <select id="rs-frequence" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border,#e5e7eb);">
+          <option value="temps_reel" ${s.frequence==='temps_reel'?'selected':''}>Temps réel (si l'API le permet)</option>
+          <option value="quotidienne" ${s.frequence==='quotidienne'?'selected':''}>Quotidienne</option>
+          <option value="hebdomadaire" ${s.frequence==='hebdomadaire'?'selected':''}>Hebdomadaire</option>
+        </select>
+      </div>
+      <div class="rs-settings-row">
+        <div><strong>Recevoir les notifications</strong><div style="font-size:11.5px;color:#6b7280;">Être alerté à chaque nouvelle publication détectée</div></div>
+        <label class="rs-switch"><input type="checkbox" id="rs-notif" ${s.notifications?'checked':''}><span class="slider"></span></label>
+      </div>
+      <div class="rs-settings-row">
+        <div><strong>Suggestions de l'IA</strong><div style="font-size:11.5px;color:#6b7280;">Proposer catégorie et hashtags automatiquement</div></div>
+        <label class="rs-switch"><input type="checkbox" id="rs-ia" ${s.ia_suggestions?'checked':''}><span class="slider"></span></label>
+      </div>
+      <div class="rs-settings-row">
+        <div><strong>Programmation automatique</strong><div style="font-size:11.5px;color:#6b7280;">Étaler les republications dans le temps (toujours avec confirmation préalable)</div></div>
+        <label class="rs-switch"><input type="checkbox" id="rs-prog-auto" ${s.programmation_auto?'checked':''}><span class="slider"></span></label>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="rsSaveSettings()">💾 Enregistrer</button>
+  `;
+}
+async function rsSaveSettings() {
+  const reseaux_surveilles = Array.from(document.querySelectorAll('[data-rsn]:checked')).map(c=>c.dataset.rsn);
+  const body = {
+    reseaux_surveilles,
+    frequence: document.getElementById('rs-frequence').value,
+    notifications: document.getElementById('rs-notif').checked,
+    ia_suggestions: document.getElementById('rs-ia').checked,
+    programmation_auto: document.getElementById('rs-prog-auto').checked,
+  };
+  await api('PUT', '/social/settings', body);
+  rsToast('Préférences enregistrées.');
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await fetchCurrentUser?.();
+  if (!CURRENT_USER) { window.location.href = 'login.html'; return; }
+  await rsInit();
+});
+</script>
+</body>
+</html>

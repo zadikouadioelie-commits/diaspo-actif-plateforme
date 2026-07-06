@@ -72,6 +72,39 @@ html,body{height:100%;overflow:hidden;}
 .bmc-cell.partenaires{grid-row:span 2;}
 .bmc-cell.activites{grid-column:2;}
 .bmc-cell.proposition{grid-column:3;grid-row:span 2;}
+
+/* Aide contextuelle (?) */
+.bp-help{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#cbd5e1;color:#334155;font-size:10px;font-weight:800;cursor:help;margin-left:6px;position:relative;vertical-align:middle;flex-shrink:0;text-transform:none;}
+.bp-help:hover,.bp-help.active{background:#F39C12;color:#fff;}
+.bp-help .bp-help-tip{display:none;position:absolute;left:0;bottom:135%;background:#1f2937;color:#fff;font-size:12px;font-weight:400;line-height:1.4;padding:8px 10px;border-radius:6px;width:230px;white-space:normal;z-index:80;box-shadow:0 4px 12px rgba(0,0,0,.25);text-transform:none;}
+.bp-help:hover .bp-help-tip,.bp-help.active .bp-help-tip{display:block;}
+
+/* Tableau de bord financier */
+.fin-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:10px;}
+.fin-dash-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.fin-dash-card .fdc-label{font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;}
+.fin-dash-card .fdc-value{font-size:18px;font-weight:800;margin-top:4px;}
+
+/* Plan de financement (Ressources / Emplois) */
+.pf-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:10px;}
+.pf-col h4{margin:0 0 10px;font-size:13px;text-transform:uppercase;color:var(--muted);}
+.pf-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.pf-row label{font-size:12.5px;flex:1;}
+.pf-row input{width:120px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;text-align:right;box-sizing:border-box;}
+.pf-total{display:flex;justify-content:space-between;font-weight:800;margin-top:8px;padding-top:8px;border-top:2px solid var(--border);}
+.pf-balance{margin-top:14px;padding:10px 12px;border-radius:8px;font-weight:700;text-align:center;}
+.pf-balance.ok{background:#d1fae5;color:#065f46;}
+.pf-balance.ko{background:#fee2e2;color:#991b1b;}
+
+/* Ratios financiers */
+.ratio-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;flex-shrink:0;}
+.ratio-dot.green{background:#10b981;}
+.ratio-dot.orange{background:#f59e0b;}
+.ratio-dot.red{background:#dc2626;}
+.ratio-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:10px;}
+.ratio-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;}
+.ratio-card .r-label{font-size:12.5px;color:var(--muted);}
+.ratio-card .r-value{font-weight:800;font-size:14px;display:flex;align-items:center;}
 .bmc-cell.relations{grid-column:4;}
 .bmc-cell.segments{grid-column:5;grid-row:span 2;}
 .bmc-cell.ressources{grid-column:2;grid-row:2;}
@@ -172,6 +205,54 @@ html,body{height:100%;overflow:hidden;}
 .bpa-prog-mini{background:#f5f3ff;border-radius:10px;padding:10px 12px;margin-bottom:4px;}
 .bpa-prog-mini .bar{height:6px;border-radius:99px;background:#e0d4fd;overflow:hidden;margin:4px 0;}
 .bpa-prog-mini .bar .fill{height:100%;border-radius:99px;background:#6d28d9;transition:width .5s;}
+
+/* ═══ Dossier final (rapport multimédia) ═══ */
+#fr-overlay{display:none;position:fixed;inset:0;background:#f1f5f9;z-index:2000;overflow-y:auto;}
+#fr-overlay.open{display:block;}
+#fr-toolbar{position:sticky;top:0;z-index:10;background:#1f2937;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+#fr-toolbar h3{margin:0;font-size:15px;}
+.fr-theme-btn{border:2px solid transparent;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:700;}
+.fr-theme-btn.active{border-color:#fff;}
+#fr-doc{max-width:900px;margin:24px auto;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.12);padding:50px 60px;
+  --fr-primary:#1E3A8A; --fr-secondary:#F3F4F6; --fr-accent:#2563EB; --fr-text:#111827; --fr-on-secondary:#111827; --fr-muted:#6b7280;
+  color:var(--fr-text);}
+#fr-doc.theme-moderne{--fr-primary:#065f46; --fr-secondary:#0a0a0a; --fr-accent:#10b981; --fr-text:#111827; --fr-on-secondary:#f9fafb; --fr-muted:#9ca3af;}
+#fr-doc.theme-premium{--fr-primary:#111827; --fr-secondary:#1a1a1a; --fr-accent:#B8860B; --fr-text:#111827; --fr-on-secondary:#f9fafb; --fr-muted:#9ca3af;}
+.fr-cover{text-align:center;padding:60px 0 40px;border-bottom:4px solid var(--fr-primary);margin-bottom:30px;}
+.fr-cover h1{font-size:32px;color:var(--fr-primary);margin:0 0 8px;}
+.fr-cover .fr-slogan{font-size:16px;color:#6b7280;font-style:italic;}
+.fr-cover .fr-brand{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--fr-accent);font-weight:800;margin-bottom:16px;}
+.fr-toc{background:var(--fr-secondary);border-radius:10px;padding:20px 24px;margin-bottom:30px;}
+.fr-toc h3{margin:0 0 10px;color:var(--fr-primary);}
+.fr-toc a{display:block;padding:3px 0;color:var(--fr-accent);text-decoration:none;font-size:13.5px;}
+.fr-section{margin-bottom:36px;page-break-inside:avoid;}
+.fr-section h2{color:var(--fr-primary);border-bottom:2px solid var(--fr-accent);padding-bottom:6px;font-size:20px;}
+.fr-section h4{color:var(--fr-primary);font-size:14px;text-transform:uppercase;margin-bottom:4px;}
+.fr-section p{font-size:13.5px;line-height:1.6;}
+.fr-grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.fr-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0;}
+.fr-table th,.fr-table td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;}
+.fr-table th{background:var(--fr-secondary);color:var(--fr-on-secondary);}
+.fr-score-card{display:flex;gap:20px;flex-wrap:wrap;margin:16px 0;}
+.fr-score-box{background:var(--fr-secondary);border-radius:10px;padding:16px 22px;text-align:center;min-width:140px;}
+.fr-score-box .fr-score-num{font-size:30px;font-weight:800;color:var(--fr-accent);}
+.fr-score-box .fr-score-label{font-size:11px;text-transform:uppercase;color:var(--fr-on-secondary);opacity:.75;}
+.fr-chart-bar{display:flex;align-items:flex-end;gap:10px;height:140px;margin:16px 0;}
+.fr-chart-bar .fr-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+.fr-chart-bar .fr-bar{width:100%;background:var(--fr-accent);border-radius:4px 4px 0 0;min-height:2px;}
+.fr-chart-bar .fr-bar-label{font-size:10.5px;margin-top:4px;color:#6b7280;}
+.fr-pie{width:130px;height:130px;border-radius:50%;flex-shrink:0;}
+.fr-pie-legend{display:flex;flex-direction:column;gap:5px;justify-content:center;font-size:12px;}
+.fr-pie-legend span.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;}
+.fr-footer{text-align:center;font-size:11px;color:#9ca3af;padding-top:20px;border-top:1px solid #e5e7eb;margin-top:40px;}
+@media print{
+  body *{visibility:hidden;}
+  #fr-overlay, #fr-overlay *{visibility:visible;}
+  #fr-overlay{position:absolute;inset:0;background:#fff;}
+  #fr-toolbar{display:none;}
+  #fr-doc{box-shadow:none;margin:0;max-width:100%;}
+  .fr-section{page-break-after:auto;}
+}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
@@ -204,7 +285,7 @@ html,body{height:100%;overflow:hidden;}
       <div class="bp-sidebar-foot">
         <button class="btn btn-outline btn-sm" onclick="saveVersion()">💾 Sauvegarder version</button>
         <button class="btn btn-outline btn-sm" onclick="showVersions()">🕓 Historique</button>
-        <button class="btn btn-orange btn-sm" onclick="exportPDF()">📄 Exporter PDF</button>
+        <button class="btn btn-orange btn-sm" onclick="openFinalReport()">📦 Dossier final</button>
       </div>
     </div>
 
@@ -288,6 +369,22 @@ html,body{height:100%;overflow:hidden;}
 
 </div>
 
+<!-- ═══════════ DOSSIER FINAL (rapport multimédia) ═══════════ -->
+<div id="fr-overlay">
+  <div id="fr-toolbar">
+    <h3>📦 Dossier final — <span id="fr-title"></span></h3>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="fr-theme-btn active" id="fr-theme-corporate" style="background:#1E3A8A;color:#fff;" onclick="setReportTheme('corporate')">🟦 Corporate</button>
+      <button class="fr-theme-btn" id="fr-theme-moderne" style="background:#065f46;color:#fff;" onclick="setReportTheme('moderne')">🟢 Moderne</button>
+      <button class="fr-theme-btn" id="fr-theme-premium" style="background:#111827;color:#B8860B;" onclick="setReportTheme('premium')">🟣 Premium</button>
+      <button class="btn btn-orange btn-sm" onclick="window.print()">🖨️ Imprimer / PDF</button>
+      <button class="btn btn-outline btn-sm" onclick="downloadReportHTML()" style="background:#fff;">🌐 Télécharger HTML</button>
+      <button class="btn btn-outline btn-sm" onclick="closeFinalReport()" style="background:#fff;">✕ Fermer</button>
+    </div>
+  </div>
+  <div id="fr-doc"></div>
+</div>
+
 <!-- ═══════════ ASSISTANT BP ═══════════ -->
 <div id="bpa-widget">
   <div id="bpa-panel">
@@ -357,6 +454,233 @@ const SECTIONS = [
   { key:'completude', icon:'✅', label:'Vérification complétude', noSave:true },
 ];
 
+/* ---- Textes d'aide contextuelle (icône ?) ---- */
+const HELP = {
+  // Informations générales
+  'nom_projet':"Le nom officiel de votre projet ou de votre entreprise, tel que vous voulez qu'il apparaisse partout.",
+  'slogan':"Une phrase courte (5-10 mots) qui résume l'esprit de votre projet.",
+  'type_initiative':"La forme de votre structure : association, PME, start-up, coopérative, etc.",
+  'stade':"Où en êtes-vous aujourd'hui : simple idée, projet en préparation, déjà lancé, en croissance ?",
+  'secteur':"Le domaine principal de votre activité (ex : agriculture, éducation, commerce...).",
+  'sous_secteur':"Une précision plus fine à l'intérieur de votre secteur (ex : agroalimentaire bio dans 'Agriculture').",
+  'date_creation':"La date de création officielle (ou prévue) de votre structure.",
+  'pays':"Le pays où votre activité est (ou sera) basée.",
+  'region':"La région, province ou état où se trouve votre activité.",
+  'ville':"La ville où se trouve votre activité.",
+  'adresse':"L'adresse postale complète de votre siège ou lieu d'activité.",
+  'email':"L'adresse email à utiliser pour contacter le projet professionnellement.",
+  'telephone':"Un numéro de téléphone joignable pour le projet.",
+  'site_web':"L'adresse de votre site internet, s'il existe déjà.",
+  'linkedin':"Le lien vers votre page LinkedIn professionnelle, si vous en avez une.",
+  'facebook':"Le lien vers votre page Facebook, si vous en avez une.",
+  'instagram':"Le lien vers votre compte Instagram, si vous en avez un.",
+  'responsable':"Le nom de la personne qui porte principalement ce projet.",
+  'responsable_poste':"Le rôle ou titre de cette personne dans le projet (ex : fondateur, gérant, directeur).",
+  'nb_collaborateurs':"Le nombre total de personnes qui travaillent actuellement sur le projet, vous compris.",
+  'equipe_fondatrice':"Listez les personnes qui ont créé le projet avec vous, avec leur rôle à chacune.",
+  'organigramme':"Expliquez qui dirige quoi : qui décide, qui supervise, comment l'équipe est organisée.",
+  // Résumé exécutif
+  'projet':"En 2 à 3 phrases simples, expliquez ce que vous faites et pour qui.",
+  'probleme':"Quel souci concret rencontrent vos futurs clients, que vous voulez résoudre ?",
+  'solution':"Comment votre projet règle ce problème, en une phrase claire.",
+  'marche':"À qui vendez-vous ? Combien de personnes ou d'entreprises sont concernées ?",
+  'besoins':"De combien d'argent avez-vous besoin, et pour financer quoi exactement ?",
+  'objectifs':"Ce que vous espérez atteindre grâce à ce projet (chiffre d'affaires, impact, croissance...).",
+  // Présentation détaillée
+  'vision':"Où voyez-vous votre projet dans plusieurs années ? Le grand rêve derrière l'idée.",
+  'mission':"En une phrase, pourquoi votre projet existe-t-il et à qui rend-il service ?",
+  'valeurs':"Les principes importants qui guident vos décisions (ex : honnêteté, écologie, entraide...).",
+  'obj_court':"Ce que vous voulez avoir réalisé dans les 12 prochains mois.",
+  'obj_moyen':"Ce que vous visez d'ici 1 à 3 ans.",
+  'obj_long':"Votre ambition à 3-5 ans ou plus.",
+  'historique':"Comment le projet est né et ce qui s'est passé jusqu'à aujourd'hui.",
+  'motivations':"Pourquoi vous (et votre équipe) avez décidé de lancer ce projet précis.",
+  // Analyse du problème
+  'presentation|description':"Décrivez le problème que rencontrent vos futurs clients avec vos mots à vous, simplement.",
+  'pourquoi':"Selon vous, quelle est la cause de ce problème ?",
+  'qui_concerne':"Qui souffre de ce problème : quel type de personnes, dans quelle situation ?",
+  'ampleur':"Ce problème touche-t-il beaucoup de monde ? Est-il fréquent, grave, coûteux ?",
+  'consequences':"Que se passe-t-il aujourd'hui, concrètement, à cause de ce problème non résolu ?",
+  'pourquoi_pas_resolu':"Pourquoi personne (ou pas assez) ne résout déjà ce problème correctement ?",
+  'preuves':"Avez-vous des chiffres, témoignages ou exemples qui montrent que ce problème est réel ?",
+  // Solution proposée
+  'produits|description':"Décrivez simplement ce que vous vendez ou proposez : à quoi ça ressemble, à quoi ça sert.",
+  'fonctionnement':"Expliquez étape par étape comment le client utilise votre produit ou service.",
+  'innovation':"Qu'est-ce qui rend votre solution nouvelle ou différente de ce qui existe déjà ?",
+  'avantages':"Qu'est-ce que le client gagne concrètement en utilisant votre solution (temps, argent, confort...) ?",
+  'valeur_ajoutee':"En quoi votre solution apporte-t-elle plus qu'une solution basique ou existante ?",
+  'differenciants':"Les 2-3 points qui vous distinguent clairement de vos concurrents.",
+  // Étude de marché
+  'taille_marche':"Une estimation du nombre de clients potentiels ou du volume d'argent dépensé sur ce marché.",
+  'evolution':"Ce marché est-il en train de grandir, de stagner ou de diminuer ?",
+  'potentiel':"Quelle part de ce marché pensez-vous pouvoir toucher avec votre projet ?",
+  'tendances':"Les évolutions récentes ou à venir qui influencent ce secteur (habitudes, technologie, réglementation...).",
+  'profil_client':"Qui est votre client idéal : âge, situation, besoins, habitudes d'achat ?",
+  'segmentation':"Si vous avez plusieurs types de clients différents, décrivez chaque groupe.",
+  'besoins_clients':"Ce que vos clients recherchent vraiment quand ils achètent ce type de produit/service.",
+  'localisation_clients':"Où se trouvent géographiquement vos clients : quartier, ville, région, pays ?",
+  'opportunites':"Des éléments extérieurs qui pourraient favoriser votre développement (mode, aide publique, demande croissante...).",
+  'menaces_marche':"Des éléments extérieurs qui pourraient freiner votre projet (nouvelle loi, concurrence, crise...).",
+  'positionnement':"Comment voulez-vous être perçu par vos clients par rapport aux autres (ex : le moins cher, le plus qualitatif...).",
+  'avantage_concurrentiel':"Ce que vous avez et que vos concurrents n'ont pas (ou moins bien).",
+  // Concurrents (tableau)
+  'concurrent_nom':"Le nom de l'entreprise ou de la structure concurrente.",
+  'concurrent_localisation':"Où se trouve ce concurrent par rapport à vous.",
+  'concurrent_produits':"Ce que propose ce concurrent à ses clients.",
+  'concurrent_prix':"Est-il plus cher, moins cher, ou similaire à vous ?",
+  'concurrent_forces':"Ce que ce concurrent fait bien, mieux que vous éventuellement.",
+  'concurrent_faiblesses':"Ce que ce concurrent fait moins bien, une faille que vous pouvez exploiter.",
+  // SWOT
+  'swot_forces':"Ce que vous faites déjà bien, vos atouts internes (équipe, savoir-faire, moyens...).",
+  'swot_faiblesses':"Ce qui vous manque ou vous freine, en interne (manque de moyens, d'expérience...).",
+  'swot_opportunites':"Ce qui, à l'extérieur, pourrait vous aider (tendance, aide, marché qui s'ouvre...).",
+  'swot_menaces':"Ce qui, à l'extérieur, pourrait vous nuire (concurrence, loi, crise économique...).",
+  // Business Model Canvas
+  'bmc_partenaires':"Qui sont les personnes ou entreprises qui vous aident à faire fonctionner votre activité ?",
+  'bmc_activites':"Les actions essentielles que vous devez réaliser pour que votre projet fonctionne.",
+  'bmc_ressources':"Ce dont vous avez besoin pour fonctionner : argent, équipe, matériel, savoir-faire.",
+  'bmc_proposition':"En une phrase : qu'est-ce que vous apportez de précieux à vos clients ?",
+  'bmc_relations':"Comment restez-vous en contact avec vos clients (suivi, fidélité, service client...) ?",
+  'bmc_canaux':"Par quels moyens vos clients découvrent et achètent votre produit (boutique, internet, bouche à oreille...).",
+  'bmc_segments':"À qui s'adresse votre offre : quels types de clients précisément ?",
+  'bmc_couts':"Les principales dépenses nécessaires pour faire tourner votre activité.",
+  'bmc_revenus':"Comment gagnez-vous de l'argent : vente directe, abonnement, commission... ?",
+  // Produits & services (tableau)
+  'produit_nom':"Le nom du produit ou service que vous proposez.",
+  'produit_description':"Une courte description de ce produit ou service.",
+  'produit_cout':"Ce que ce produit vous coûte à fabriquer ou à fournir.",
+  'produit_prix':"Le prix auquel vous le vendez à vos clients.",
+  'produit_cycle':"La durée de vie ou de renouvellement de ce produit avant remplacement.",
+  // Stratégie marketing
+  'strategie_digitale':"Comment vous utilisez internet et les réseaux sociaux pour vous faire connaître.",
+  'communication':"Comment vous comptez faire parler de votre projet (affiches, réseaux, presse...).",
+  'publicite':"Vos actions publicitaires prévues et leur budget approximatif.",
+  'partenariats':"Avec qui vous pourriez vous associer pour vous faire connaître ensemble.",
+  'evenements':"Les événements ou salons où vous comptez être présent pour vous faire connaître.",
+  'fidelisation':"Ce que vous mettez en place pour que vos clients reviennent (carte fidélité, suivi...).",
+  // Plan commercial
+  'objectifs_vente':"Combien voulez-vous vendre, en nombre ou en euros, sur la période à venir ?",
+  'prospection':"Comment allez-vous trouver et contacter vos futurs clients ?",
+  'tunnel_vente':"Les étapes par lesquelles passe un client, de la découverte jusqu'à l'achat.",
+  'politique_tarifaire':"Comment vous fixez vos prix (coût + marge, prix du marché, positionnement...).",
+  'argumentaire':"Les arguments clés que vous utilisez pour convaincre un client d'acheter.",
+  'sav':"Ce que vous proposez si un client a un problème après l'achat.",
+  'kpi_commerciaux':"Les chiffres que vous allez suivre pour savoir si vos ventes vont bien (nb de ventes, panier moyen...).",
+  // Plan opérationnel
+  'plan_operationnel|production':"Comment votre produit ou service est concrètement fabriqué ou réalisé.",
+  'logistique':"Comment les produits circulent : stockage, transport, livraison.",
+  'fournisseurs':"Qui vous fournit les matières premières ou les outils nécessaires.",
+  'equipements':"Le matériel et les outils indispensables à votre activité.",
+  'technologies':"Les logiciels ou technologies que vous utilisez au quotidien.",
+  'qualite':"Comment vous vérifiez que ce que vous produisez est conforme et de bonne qualité.",
+  'securite':"Les mesures prises pour la sécurité (des personnes, des biens, des données).",
+  // Organisation & Gouvernance
+  'dirigeants':"Qui dirige la structure et comment les décisions importantes sont prises.",
+  'organisation|equipe':"Qui compose votre équipe actuellement et quel est le rôle de chacun.",
+  'responsabilites':"Qui est responsable de quoi dans l'organisation au quotidien.",
+  'consultants':"Les experts extérieurs qui vous accompagnent (comptable, avocat, coach...).",
+  'benevoles':"Si des bénévoles vous aident, précisez combien et sur quelles tâches.",
+  // Ressources humaines
+  'effectif_actuel':"Le nombre de personnes qui travaillent pour vous aujourd'hui.",
+  'effectif_prevu':"Le nombre de personnes que vous prévoyez d'employer dans 12 mois.",
+  'recrutements':"Les postes que vous comptez ouvrir prochainement.",
+  'competences':"Les savoir-faire dont vous aurez besoin chez les futures recrues.",
+  'formations':"Les formations que vous prévoyez pour vous ou votre équipe.",
+  'politique_rh':"Vos règles concernant les salaires, horaires, avantages, ambiance de travail...",
+  // Calendrier (phases)
+  'phase_nom':"Le nom de cette étape de votre projet (ex : 'Lancement', 'Phase test').",
+  'phase_debut':"La date à laquelle cette étape doit commencer.",
+  'phase_fin':"La date à laquelle cette étape doit se terminer.",
+  'phase_responsable':"La personne en charge de cette étape.",
+  'phase_statut':"Où en est cette étape aujourd'hui : pas commencée, en cours, ou terminée.",
+  'phase_taches':"Les actions concrètes à réaliser pendant cette étape.",
+  // Plan financier
+  'investissement_initial':"Le montant total dont vous avez besoin pour démarrer.",
+  'apport_personnel':"L'argent que vous (ou vos associés) mettez vous-même dans le projet.",
+  'financement_recherche':"Le montant que vous cherchez à obtenir auprès d'un tiers (prêt, subvention, investisseur...).",
+  'immobilisations':"Le détail des achats durables nécessaires (matériel, véhicule, local...).",
+  'bfr':"L'argent nécessaire pour faire face aux dépenses avant d'être payé par vos clients.",
+  'seuil_rentabilite':"Le montant de chiffre d'affaires à partir duquel vous ne perdez plus d'argent.",
+  'point_mort':"Le nombre de mois nécessaires pour atteindre ce seuil de rentabilité.",
+  'amortissements':"Comment le coût de vos gros achats est réparti dans le temps sur plusieurs années.",
+  'scenario_optimiste':"Ce qui pourrait arriver si tout se passe mieux que prévu.",
+  'scenario_realiste':"Le scénario le plus probable selon vous.",
+  'scenario_prudent':"Ce qui pourrait arriver si les choses sont plus difficiles que prévu.",
+  // Analyse des risques
+  'risque_description':"Décrivez précisément ce risque : qu'est-ce qui pourrait mal se passer ?",
+  'risque_probabilite':"À quel point ce risque a-t-il des chances de se produire réellement ?",
+  'risque_impact':"Si ce risque se produit, quelles conséquences cela aurait sur votre projet ?",
+  'risque_prevention':"Ce que vous pouvez faire dès maintenant pour éviter que ce risque arrive.",
+  'risque_urgence':"Ce que vous ferez si, malgré tout, ce risque se produit.",
+  // Impact
+  'economique':"Les retombées positives pour l'économie locale (emplois créés, argent généré...).",
+  'social':"Les bénéfices pour les personnes ou la communauté (accès à un service, lien social...).",
+  'environnemental':"Les effets sur l'environnement, positifs ou à surveiller.",
+  'territorial':"Les bénéfices pour le territoire, la région ou le quartier concerné.",
+  'kpi_impact':"Les indicateurs chiffrés qui permettront de mesurer votre impact réel.",
+  // Recherche de financement
+  'montant':"La somme précise que vous recherchez auprès d'un financeur.",
+  'calendrier_decaissement':"À quel moment vous aurez besoin que les fonds soient versés.",
+  'utilisation':"Ce que vous allez faire concrètement avec l'argent obtenu.",
+  'contreparties':"Ce que vous proposez en échange à la personne qui vous finance (parts, intérêts, avantages...).",
+  'roi':"Ce que le financeur peut espérer gagner en retour de son investissement.",
+  'strategie_sortie':"Comment un investisseur pourrait récupérer sa mise à terme (revente, rachat...).",
+  'recherche_active':"Les banques, investisseurs ou organismes que vous ciblez activement.",
+  // Annexes
+  'ann-nom':"Le titre du document que vous ajoutez (ex : 'Statuts', 'Devis fournisseur').",
+  'ann-url':"Le lien internet vers ce document (Google Drive, Dropbox...).",
+  'ann-desc':"Une courte explication de ce que contient ce document.",
+  // Plan de financement (Ressources)
+  'pf_apport':"L'argent que vous mettez vous-même dans le projet.",
+  'pf_associes':"L'argent apporté par vos associés.",
+  'pf_famille':"L'argent prêté ou donné par votre famille ou vos proches.",
+  'pf_business_angels':"L'argent apporté par des investisseurs privés qui soutiennent des projets naissants.",
+  'pf_banque':"Le montant d'un prêt bancaire.",
+  'pf_subvention':"Une aide financière publique non remboursable.",
+  'pf_investisseur':"L'argent apporté par un investisseur en échange d'une part de votre projet.",
+  'pf_crowdfunding':"L'argent collecté auprès du grand public via une plateforme de financement participatif.",
+  'pf_diaspo_invest':"L'argent apporté via le dispositif Diaspo'Invest.",
+  'pf_autres_ress':"Toute autre source de financement non listée ci-dessus.",
+  // Plan de financement (Emplois)
+  'pf_terrain':"Le montant nécessaire pour acheter un terrain.",
+  'pf_construction':"Le montant des travaux de construction ou d'aménagement.",
+  'pf_materiel':"Le montant pour acheter le matériel nécessaire à votre activité.",
+  'pf_vehicules':"Le montant pour acheter ou financer des véhicules.",
+  'pf_logiciels':"Le montant pour les logiciels ou outils numériques nécessaires.",
+  'pf_stocks':"Le montant pour constituer votre premier stock de marchandises.",
+  'pf_tresorerie':"Le montant mis de côté pour faire face aux premières dépenses avant d'être payé par vos clients.",
+  'pf_frais_admin':"Les frais liés à la création et à l'administration de votre structure.",
+  'pf_communication':"Le budget prévu pour vous faire connaître.",
+  'pf_recrutement':"Le montant nécessaire pour recruter vos premiers collaborateurs.",
+  // Étude de marché — ajouts
+  'barrieres_entree':"Ce qui rend difficile l'arrivée de nouveaux concurrents sur ce marché (coût, réglementation, expertise rare...).",
+  'reglementation':"Les lois, normes ou autorisations que vous devez respecter pour exercer cette activité.",
+  // Concurrence — ajouts
+  'concurrent_type':"Ce concurrent vend-il exactement la même chose que vous (direct), quelque chose de proche (indirect), ou une alternative différente (substitut) ?",
+  'concurrent_positionnement':"Ce concurrent se positionne-t-il plutôt sur les prix bas, le milieu de gamme, ou le haut de gamme ?",
+  'concurrent_parts_marche':"Une estimation de la place que ce concurrent occupe sur le marché total (en %).",
+  'concurrent_menace':"À quel point ce concurrent représente un danger réel pour votre projet, de 0 (aucun risque) à 100 (menace majeure).",
+  // Partenaires potentiels
+  'partenaire_nom':"Le nom de la structure ou personne qui pourrait vous soutenir, financer ou collaborer avec vous.",
+  'partenaire_type':"La nature de ce partenaire : institution publique, entreprise privée, banque, ONG, investisseur, association...",
+  'partenaire_pays':"Le pays ou la région où se trouve ce partenaire potentiel.",
+  'partenaire_secteur':"Le domaine d'activité de ce partenaire.",
+  'partenaire_role':"Ce que ce partenaire pourrait concrètement apporter à votre projet (financement, réseau, expertise, matériel...).",
+  'partenaire_niveau':"À quel point ce partenariat serait important pour votre projet : simple contact, collaboration régulière, ou allié stratégique indispensable.",
+  'partenaire_contact':"Un moyen de le contacter : email, téléphone ou site web.",
+  'partenaire_interet':"Votre estimation de l'intérêt que ce partenaire pourrait porter à votre projet, de 0 à 100.",
+  'partenaire_commentaire':"Toute information utile sur cette relation ou cette prise de contact.",
+  // Étude de prix
+  'ep_produit':"Le produit ou service pour lequel vous réalisez cette étude tarifaire.",
+  'ep_cout':"Ce que ce produit vous coûte réellement à fabriquer ou à fournir.",
+  'ep_prix_vente':"Le prix auquel vous envisagez de le vendre.",
+  'ep_prix_concurrents':"Les prix pratiqués par la concurrence pour un produit ou service comparable.",
+  'ep_positionnement':"Voulez-vous être perçu comme le moins cher, un choix standard, ou une option haut de gamme ?",
+  'ep_marge_souhaitee':"Le pourcentage de marge que vous visez sur ce produit.",
+  'ep_volume_estime':"Le nombre de ventes que vous espérez réaliser sur la période de référence.",
+  'ep_strategie':"Pénétration : prix bas pour gagner des parts de marché rapidement. Alignement : prix proche du marché. Différenciation premium : prix élevé justifié par une valeur perçue supérieure.",
+  'ep_seuil_psychologique':"Un prix qui paraît plus attractif psychologiquement pour le client (ex : 99€ plutôt que 100€).",
+};
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function g(id){ return sections[currentSection]?.[id]||''; }
 
@@ -399,7 +723,7 @@ function buildNav() {
   }).join('');
 }
 
-function navTo(key) {
+function navToBase(key) {
   saveCurrentSection();
   currentSection = key;
   buildNav();
@@ -442,12 +766,22 @@ async function patchMeta() {
   markDirty();
 }
 
+/* ---- Aide contextuelle ---- */
+function helpText(key) {
+  return HELP[currentSection+'|'+key] || HELP[key] || '';
+}
+function helpIcon(key) {
+  const t = helpText(key);
+  if (!t) return '';
+  return `<span class="bp-help" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('active')">?<span class="bp-help-tip">${esc(t)}</span></span>`;
+}
+
 /* ---- Helpers de saisie ---- */
 function field(key, label, placeholder='', type='text', full=false, required=false) {
   const val = sections[currentSection]?.[key]||'';
   const ro = monRole==='lecteur';
   return `<div class="${full?'full':''}">
-    <label>${label}${required?` <span style="color:#D33;">*</span>`:''}</label>
+    <label>${label}${required?` <span style="color:#D33;">*</span>`:''}${helpIcon(key)}</label>
     <input type="${type}" data-key="${key}" value="${esc(val)}" placeholder="${placeholder}" ${ro?'readonly':''} oninput="updateField('${key}',this.value)">
   </div>`;
 }
@@ -456,7 +790,7 @@ function textarea(key, label, placeholder='', rows=3, full=true) {
   const val = sections[currentSection]?.[key]||'';
   const ro = monRole==='lecteur';
   return `<div class="${full?'full':''}">
-    <label>${label}</label>
+    <label>${label}${helpIcon(key)}</label>
     <textarea data-key="${key}" rows="${rows}" placeholder="${placeholder}" ${ro?'readonly':''} oninput="updateField('${key}',this.value)">${esc(val)}</textarea>
   </div>`;
 }
@@ -465,7 +799,7 @@ function select(key, label, options, full=false) {
   const val = sections[currentSection]?.[key]||'';
   const ro = monRole==='lecteur';
   return `<div class="${full?'full':''}">
-    <label>${label}</label>
+    <label>${label}${helpIcon(key)}</label>
     <select data-key="${key}" ${ro?'disabled':''} onchange="updateField('${key}',this.value)">
       ${options.map(o=>typeof o==='string'?`<option value="${o}" ${val===o?'selected':''}>${o}</option>`:`<option value="${o.v}" ${val===o.v?'selected':''}>${o.l}</option>`).join('')}
     </select>
@@ -509,7 +843,31 @@ function renderSection(key) {
   };
   const fn = renderers[key] || (() => '<div class="bp-section"><div class="bp-card-inner"><p>Section en cours de développement.</p></div></div>');
   content.innerHTML = fn();
+  if (key === 'plan_financier') calcAllFinance();
+  if (key === 'produits') (sections.produits?.etude_prix||[]).forEach((_,i)=>calcMargeEtudePrix(i));
+  if (!def?.noSave && monRole !== 'lecteur') {
+    content.insertAdjacentHTML('beforeend', `
+      <div class="bp-section" style="padding-top:0;">
+        <div class="bp-card-inner" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <span id="valider-msg" style="font-size:12.5px;color:var(--muted);"></span>
+          <button class="btn btn-orange" onclick="validerSection()">✅ Valider cette étape</button>
+        </div>
+      </div>`);
+  }
   content.scrollTop = 0;
+}
+
+async function validerSection() {
+  hasUnsaved = true;
+  await saveCurrentSection();
+  const check = bp?.completude?.find(c=>c.key===currentSection);
+  if (check?.ok) {
+    const idx = SECTIONS.findIndex(s=>s.key===currentSection);
+    const next = SECTIONS.slice(idx+1).find(s=>!s.noSave);
+    if (next) { navTo(next.key); return; }
+  }
+  const msg = document.getElementById('valider-msg');
+  if (msg) msg.textContent = check?.ok ? '✅ Étape validée et complète. Dernière section atteinte.' : '💾 Enregistré — quelques champs restent à compléter pour la marquer complète.';
 }
 
 /* ---- 1. Informations générales ---- */
@@ -659,7 +1017,7 @@ function renderSolution() {
 /* ---- 6. Marché ---- */
 function renderMarche() {
   const s = sections.marche || {};
-  const concurrents = s.concurrents || [{ nom:'', produits:'', prix:'', forces:'', faiblesses:'' }];
+  const concurrents = s.concurrents || [{ nom:'', type:'direct', produits:'', prix:'', positionnement:'moyen', forces:'', faiblesses:'', parts_marche:'', menace:'' }];
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>📊 Étude de marché</h2></div>
     <div class="bp-card-inner"><h3>Le marché global</h3><div class="fg">
@@ -667,6 +1025,8 @@ function renderMarche() {
       ${field('evolution','Évolution / croissance','Ex : +12% par an')}
       ${field('potentiel','Potentiel pour votre projet','')}
       ${textarea('tendances','Tendances du marché','Quels sont les grands mouvements actuels ?',3,true)}
+      ${textarea('barrieres_entree','Barrières à l\'entrée','Ce qui complique l\'arrivée de nouveaux acteurs…',3,true)}
+      ${textarea('reglementation','Réglementation applicable','Lois, normes, autorisations nécessaires…',3,true)}
     </div></div>
     <div class="bp-card-inner"><h3>Clients cibles</h3><div class="fg">
       ${textarea('profil_client','Profil type du client','Age, situation, besoins…',3,true)}
@@ -676,9 +1036,10 @@ function renderMarche() {
     </div></div>
     <div class="bp-card-inner">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <h3 style="margin:0;">Concurrents</h3>
+        <h3 style="margin:0;">⚔️ Concurrence</h3>
         <button class="btn btn-outline btn-sm" onclick="addConcurrent()">+ Ajouter</button>
       </div>
+      <div id="concurrents-top"></div>
       <div id="concurrents-list">${renderConcurrents(concurrents)}</div>
     </div>
     <div class="bp-card-inner"><h3>Analyse stratégique</h3><div class="fg">
@@ -691,27 +1052,49 @@ function renderMarche() {
 }
 
 function renderConcurrents(list) {
-  return list.map((c,i) => `
+  const html = list.map((c,i) => `
     <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
         <strong style="font-size:13px;">Concurrent ${i+1}</strong>
         <button onclick="removeConcurrent(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
       </div>
       <div class="fg">
-        <div><label>Nom</label><input value="${esc(c.nom||'')}" oninput="updConcurrent(${i},'nom',this.value)"></div>
-        <div><label>Localisation</label><input value="${esc(c.localisation||'')}" oninput="updConcurrent(${i},'localisation',this.value)"></div>
-        <div><label>Produits / Services</label><input value="${esc(c.produits||'')}" oninput="updConcurrent(${i},'produits',this.value)"></div>
-        <div><label>Niveau de prix</label><input value="${esc(c.prix||'')}" oninput="updConcurrent(${i},'prix',this.value)"></div>
-        <div><label>Forces</label><input value="${esc(c.forces||'')}" oninput="updConcurrent(${i},'forces',this.value)"></div>
-        <div><label>Faiblesses</label><input value="${esc(c.faiblesses||'')}" oninput="updConcurrent(${i},'faiblesses',this.value)"></div>
+        <div><label>Nom${helpIcon('concurrent_nom')}</label><input value="${esc(c.nom||'')}" oninput="updConcurrent(${i},'nom',this.value)"></div>
+        <div><label>Type${helpIcon('concurrent_type')}</label><select onchange="updConcurrent(${i},'type',this.value)">
+          ${[['direct','Concurrent direct'],['indirect','Concurrent indirect'],['substitut','Substitut']].map(([v,l])=>`<option value="${v}" ${c.type===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div><label>Pays / zone d'activité${helpIcon('concurrent_localisation')}</label><input value="${esc(c.localisation||'')}" oninput="updConcurrent(${i},'localisation',this.value)"></div>
+        <div><label>Produit / service proposé${helpIcon('concurrent_produits')}</label><input value="${esc(c.produits||'')}" oninput="updConcurrent(${i},'produits',this.value)"></div>
+        <div><label>Prix pratiqués${helpIcon('concurrent_prix')}</label><input value="${esc(c.prix||'')}" oninput="updConcurrent(${i},'prix',this.value)"></div>
+        <div><label>Positionnement${helpIcon('concurrent_positionnement')}</label><select onchange="updConcurrent(${i},'positionnement',this.value)">
+          ${[['low_cost','Low cost'],['moyen','Moyen'],['premium','Premium']].map(([v,l])=>`<option value="${v}" ${c.positionnement===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div><label>Forces${helpIcon('concurrent_forces')}</label><input value="${esc(c.forces||'')}" oninput="updConcurrent(${i},'forces',this.value)"></div>
+        <div><label>Faiblesses${helpIcon('concurrent_faiblesses')}</label><input value="${esc(c.faiblesses||'')}" oninput="updConcurrent(${i},'faiblesses',this.value)"></div>
+        <div><label>Part de marché estimée${helpIcon('concurrent_parts_marche')}</label><input value="${esc(c.parts_marche||'')}" placeholder="Ex : 15%" oninput="updConcurrent(${i},'parts_marche',this.value)"></div>
+        <div><label>Niveau de menace (0-100)${helpIcon('concurrent_menace')}</label><input type="number" min="0" max="100" value="${esc(c.menace||'')}" oninput="updConcurrent(${i},'menace',this.value);renderConcurrentsTop()"></div>
       </div>
     </div>`).join('');
+  setTimeout(renderConcurrentsTop, 0);
+  return html;
+}
+
+function renderConcurrentsTop() {
+  const el = document.getElementById('concurrents-top');
+  if (!el) return;
+  const list = (sections.marche?.concurrents||[]).filter(c=>c.nom);
+  const top = [...list].sort((a,b)=>(parseFloat(b.menace)||0)-(parseFloat(a.menace)||0)).slice(0,3);
+  if (!top.length) { el.innerHTML=''; return; }
+  el.innerHTML = `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+    <strong style="font-size:12.5px;">🎯 Concurrents à surveiller en priorité :</strong>
+    <div style="margin-top:6px;font-size:13px;">${top.map((c,i)=>`${i+1}. <strong>${esc(c.nom)}</strong>${c.menace?` — menace ${esc(c.menace)}/100`:''}`).join('<br>')}</div>
+  </div>`;
 }
 
 function addConcurrent() {
   if (!sections.marche) sections.marche={};
   if (!sections.marche.concurrents) sections.marche.concurrents=[];
-  sections.marche.concurrents.push({nom:'',produits:'',prix:'',forces:'',faiblesses:''});
+  sections.marche.concurrents.push({nom:'',type:'direct',produits:'',prix:'',positionnement:'moyen',forces:'',faiblesses:'',parts_marche:'',menace:''});
   document.getElementById('concurrents-list').innerHTML = renderConcurrents(sections.marche.concurrents);
   markDirty();
 }
@@ -736,13 +1119,13 @@ function renderSWOT() {
     <div class="bp-section-head"><h2>⚡ Analyse SWOT</h2><p>Forces · Faiblesses · Opportunités · Menaces</p></div>
     <div class="bp-card-inner">
       <div class="swot-grid">
-        <div class="swot-cell forces"><label>💪 Forces (internes)</label>
+        <div class="swot-cell forces"><label>💪 Forces (internes)${helpIcon('swot_forces')}</label>
           <textarea data-swot="forces" placeholder="Vos atouts, ressources, compétences uniques…" ${ro?'readonly':''} oninput="updateSwot('forces',this.value)">${esc(s.forces||'')}</textarea></div>
-        <div class="swot-cell faiblesses"><label>🔻 Faiblesses (internes)</label>
+        <div class="swot-cell faiblesses"><label>🔻 Faiblesses (internes)${helpIcon('swot_faiblesses')}</label>
           <textarea data-swot="faiblesses" placeholder="Vos points faibles, manques à combler…" ${ro?'readonly':''} oninput="updateSwot('faiblesses',this.value)">${esc(s.faiblesses||'')}</textarea></div>
-        <div class="swot-cell opportunites"><label>🌟 Opportunités (externes)</label>
+        <div class="swot-cell opportunites"><label>🌟 Opportunités (externes)${helpIcon('swot_opportunites')}</label>
           <textarea data-swot="opportunites" placeholder="Tendances favorables, marchés ouverts…" ${ro?'readonly':''} oninput="updateSwot('opportunites',this.value)">${esc(s.opportunites||'')}</textarea></div>
-        <div class="swot-cell menaces"><label>⚠️ Menaces (externes)</label>
+        <div class="swot-cell menaces"><label>⚠️ Menaces (externes)${helpIcon('swot_menaces')}</label>
           <textarea data-swot="menaces" placeholder="Risques externes, concurrence, réglementation…" ${ro?'readonly':''} oninput="updateSwot('menaces',this.value)">${esc(s.menaces||'')}</textarea></div>
       </div>
     </div>
@@ -760,7 +1143,7 @@ function renderBMC() {
   const ro = monRole==='lecteur';
   const bmcField = (key, label, placeholder) =>
     `<div class="bmc-cell ${key}">
-       <label>${label}</label>
+       <label>${label}${helpIcon('bmc_'+key)}</label>
        <textarea placeholder="${placeholder}" ${ro?'readonly':''} oninput="updateBMC('${key}',this.value)">${esc(s[key]||'')}</textarea>
      </div>`;
   return `<div class="bp-section">
@@ -780,11 +1163,76 @@ function renderBMC() {
         ${bmcField('revenus','💰 Sources de revenus','Comment gagnez-vous de l\'argent ?')}
       </div>
     </div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">🤝 Partenaires potentiels</h3>
+        <button class="btn btn-outline btn-sm" onclick="addPartenaire()">+ Ajouter</button>
+      </div>
+      <div id="partenaires-top"></div>
+      <div id="partenaires-list">${renderPartenaires(s.partenaires_liste || [{ nom:'', type:'entreprise', pays:'', secteur:'', role:'', niveau:'moyen', contact:'', interet:'', commentaire:'' }])}</div>
+    </div>
   </div>`;
 }
 function updateBMC(key,val) {
   if (!sections.business_model) sections.business_model={};
   sections.business_model[key]=val;
+  markDirty();
+}
+
+function renderPartenaires(list) {
+  const html = list.map((p,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <strong style="font-size:13px;">Partenaire ${i+1}</strong>
+        <button onclick="removePartenaire(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Nom du partenaire${helpIcon('partenaire_nom')}</label><input value="${esc(p.nom||'')}" oninput="updPartenaire(${i},'nom',this.value)"></div>
+        <div><label>Type${helpIcon('partenaire_type')}</label><select onchange="updPartenaire(${i},'type',this.value)">
+          ${[['institution','Institution'],['entreprise','Entreprise'],['banque','Banque'],['ong','ONG'],['investisseur','Investisseur'],['association','Association'],['autre','Autre']].map(([v,l])=>`<option value="${v}" ${p.type===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div><label>Pays / localisation${helpIcon('partenaire_pays')}</label><input value="${esc(p.pays||'')}" oninput="updPartenaire(${i},'pays',this.value)"></div>
+        <div><label>Secteur d'activité${helpIcon('partenaire_secteur')}</label><input value="${esc(p.secteur||'')}" oninput="updPartenaire(${i},'secteur',this.value)"></div>
+        <div class="full"><label>Rôle potentiel dans le projet${helpIcon('partenaire_role')}</label><input value="${esc(p.role||'')}" oninput="updPartenaire(${i},'role',this.value)"></div>
+        <div><label>Niveau de partenariat${helpIcon('partenaire_niveau')}</label><select onchange="updPartenaire(${i},'niveau',this.value)">
+          ${[['faible','Faible'],['moyen','Moyen'],['strategique','Stratégique']].map(([v,l])=>`<option value="${v}" ${p.niveau===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div><label>Contact (email / tél / site)${helpIcon('partenaire_contact')}</label><input value="${esc(p.contact||'')}" oninput="updPartenaire(${i},'contact',this.value)"></div>
+        <div><label>Intérêt estimé (0-100)${helpIcon('partenaire_interet')}</label><input type="number" min="0" max="100" value="${esc(p.interet||'')}" oninput="updPartenaire(${i},'interet',this.value);renderPartenairesTop()"></div>
+        <div class="full"><label>Commentaire${helpIcon('partenaire_commentaire')}</label><input value="${esc(p.commentaire||'')}" oninput="updPartenaire(${i},'commentaire',this.value)"></div>
+      </div>
+    </div>`).join('');
+  setTimeout(renderPartenairesTop, 0);
+  return html;
+}
+function renderPartenairesTop() {
+  const el = document.getElementById('partenaires-top');
+  if (!el) return;
+  const list = (sections.business_model?.partenaires_liste||[]).filter(p=>p.nom);
+  const top = [...list].sort((a,b)=>(parseFloat(b.interet)||0)-(parseFloat(a.interet)||0)).slice(0,3);
+  if (!top.length) { el.innerHTML=''; return; }
+  el.innerHTML = `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+    <strong style="font-size:12.5px;">🎯 Partenaires prioritaires à contacter :</strong>
+    <div style="margin-top:6px;font-size:13px;">${top.map((p,i)=>`${i+1}. <strong>${esc(p.nom)}</strong>${p.interet?` — intérêt ${esc(p.interet)}/100`:''}`).join('<br>')}</div>
+  </div>`;
+}
+function addPartenaire() {
+  if (!sections.business_model) sections.business_model={};
+  if (!sections.business_model.partenaires_liste) sections.business_model.partenaires_liste=[];
+  sections.business_model.partenaires_liste.push({nom:'',type:'entreprise',pays:'',secteur:'',role:'',niveau:'moyen',contact:'',interet:'',commentaire:''});
+  document.getElementById('partenaires-list').innerHTML = renderPartenaires(sections.business_model.partenaires_liste);
+  markDirty();
+}
+function removePartenaire(i) {
+  sections.business_model.partenaires_liste.splice(i,1);
+  document.getElementById('partenaires-list').innerHTML = renderPartenaires(sections.business_model.partenaires_liste);
+  markDirty();
+}
+function updPartenaire(i,key,val) {
+  if (!sections.business_model) sections.business_model={};
+  if (!sections.business_model.partenaires_liste) sections.business_model.partenaires_liste=[];
+  if (!sections.business_model.partenaires_liste[i]) sections.business_model.partenaires_liste[i]={};
+  sections.business_model.partenaires_liste[i][key]=val;
   markDirty();
 }
 
@@ -802,17 +1250,25 @@ function renderProduits() {
       <div style="overflow-x:auto;">
         <table class="bp-table" id="produits-table">
           <thead><tr>
-            <th style="min-width:160px;">Nom</th>
-            <th style="min-width:200px;">Description</th>
-            <th style="min-width:100px;">Coût de revient</th>
-            <th style="min-width:100px;">Prix de vente</th>
+            <th style="min-width:160px;">Nom${helpIcon('produit_nom')}</th>
+            <th style="min-width:200px;">Description${helpIcon('produit_description')}</th>
+            <th style="min-width:100px;">Coût de revient${helpIcon('produit_cout')}</th>
+            <th style="min-width:100px;">Prix de vente${helpIcon('produit_prix')}</th>
             <th style="min-width:80px;">Marge %</th>
-            <th style="min-width:120px;">Cycle de vie</th>
+            <th style="min-width:120px;">Cycle de vie${helpIcon('produit_cycle')}</th>
             <th>Action</th>
           </tr></thead>
           <tbody id="produits-tbody">${renderProduitRows(items)}</tbody>
         </table>
       </div>
+    </div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">💰 Étude de prix</h3>
+        <button class="btn btn-outline btn-sm" onclick="addEtudePrix()">+ Ajouter</button>
+      </div>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-6px;">Définissez une stratégie tarifaire cohérente avec le marché et la concurrence, produit par produit.</p>
+      <div id="etude-prix-list">${renderEtudePrix(s.etude_prix || [{ produit:'', cout_revient:'', prix_vente:'', prix_concurrents:'', positionnement:'moyen', marge_souhaitee:'', volume_estime:'', strategie:'penetration', seuil_psychologique:'' }])}</div>
     </div>
   </div>`;
 }
@@ -837,6 +1293,75 @@ function calcMarge(i) {
   it.marge = marge;
   const el = document.getElementById('marge-'+i);
   if(el) el.value = marge;
+}
+
+function renderEtudePrix(list) {
+  const stratLabels = {penetration:'Pénétration',alignement:'Alignement marché',differenciation:'Différenciation premium'};
+  const posLabels = {bas:'Bas de gamme',moyen:'Moyen',premium:'Premium'};
+  return list.map((p,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <strong style="font-size:13px;">Étude ${i+1}</strong>
+        <button onclick="removeEtudePrix(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Produit / service concerné${helpIcon('ep_produit')}</label><input value="${esc(p.produit||'')}" oninput="updEtudePrix(${i},'produit',this.value)"></div>
+        <div><label>Coût de revient estimé${helpIcon('ep_cout')}</label><input type="number" value="${esc(p.cout_revient||'')}" oninput="updEtudePrix(${i},'cout_revient',this.value);calcMargeEtudePrix(${i})"></div>
+        <div><label>Prix de vente envisagé${helpIcon('ep_prix_vente')}</label><input type="number" value="${esc(p.prix_vente||'')}" oninput="updEtudePrix(${i},'prix_vente',this.value);calcMargeEtudePrix(${i})"></div>
+        <div><label>Prix des concurrents${helpIcon('ep_prix_concurrents')}</label><input value="${esc(p.prix_concurrents||'')}" oninput="updEtudePrix(${i},'prix_concurrents',this.value)"></div>
+        <div><label>Positionnement prix${helpIcon('ep_positionnement')}</label><select onchange="updEtudePrix(${i},'positionnement',this.value)">
+          ${Object.entries(posLabels).map(([v,l])=>`<option value="${v}" ${p.positionnement===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div><label>Marge souhaitée (%)${helpIcon('ep_marge_souhaitee')}</label><input type="number" value="${esc(p.marge_souhaitee||'')}" oninput="updEtudePrix(${i},'marge_souhaitee',this.value)"></div>
+        <div><label>Volume de ventes estimé${helpIcon('ep_volume_estime')}</label><input value="${esc(p.volume_estime||'')}" oninput="updEtudePrix(${i},'volume_estime',this.value)"></div>
+        <div><label>Stratégie tarifaire${helpIcon('ep_strategie')}</label><select onchange="updEtudePrix(${i},'strategie',this.value)">
+          ${Object.entries(stratLabels).map(([v,l])=>`<option value="${v}" ${p.strategie===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div><label>Seuil psychologique de prix${helpIcon('ep_seuil_psychologique')}</label><input value="${esc(p.seuil_psychologique||'')}" placeholder="Ex : 99€" oninput="updEtudePrix(${i},'seuil_psychologique',this.value)"></div>
+      </div>
+      <div id="ep-marge-${i}" style="margin-top:8px;font-size:12.5px;font-weight:700;"></div>
+    </div>`).join('');
+}
+function calcMargeEtudePrix(i) {
+  const p = sections.produits?.etude_prix?.[i];
+  if (!p) return;
+  const cout = parseFloat(p.cout_revient)||0;
+  const prix = parseFloat(p.prix_vente)||0;
+  const el = document.getElementById(`ep-marge-${i}`);
+  if (!el) return;
+  if (prix>0) {
+    const marge = Math.round((prix-cout)/prix*100);
+    el.style.color = marge>=0?'#10b981':'#dc2626';
+    el.textContent = `Marge nette estimée : ${marge}%`;
+  } else {
+    el.textContent = '';
+  }
+}
+function renderEtudePrixList() {
+  const el = document.getElementById('etude-prix-list');
+  if (el) {
+    el.innerHTML = renderEtudePrix(sections.produits?.etude_prix||[]);
+    (sections.produits?.etude_prix||[]).forEach((_,i)=>calcMargeEtudePrix(i));
+  }
+}
+function addEtudePrix() {
+  if(!sections.produits) sections.produits={};
+  if(!sections.produits.etude_prix) sections.produits.etude_prix=[];
+  sections.produits.etude_prix.push({produit:'',cout_revient:'',prix_vente:'',prix_concurrents:'',positionnement:'moyen',marge_souhaitee:'',volume_estime:'',strategie:'penetration',seuil_psychologique:''});
+  renderEtudePrixList();
+  markDirty();
+}
+function removeEtudePrix(i) {
+  sections.produits.etude_prix.splice(i,1);
+  renderEtudePrixList();
+  markDirty();
+}
+function updEtudePrix(i,key,val) {
+  if(!sections.produits) sections.produits={};
+  if(!sections.produits.etude_prix) sections.produits.etude_prix=[];
+  if(!sections.produits.etude_prix[i]) sections.produits.etude_prix[i]={};
+  sections.produits.etude_prix[i][key]=val;
+  markDirty();
 }
 function addProduit() {
   if(!sections.produits) sections.produits={};
@@ -951,13 +1476,13 @@ function renderPhases(phases) {
         <button onclick="delPhase(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
       </div>
       <div class="fg">
-        <div><label>Début</label><input type="date" value="${esc(p.debut||'')}" oninput="updPhase(${i},'debut',this.value)"></div>
-        <div><label>Fin prévue</label><input type="date" value="${esc(p.fin||'')}" oninput="updPhase(${i},'fin',this.value)"></div>
-        <div><label>Responsable</label><input value="${esc(p.responsable||'')}" placeholder="Prénom NOM" oninput="updPhase(${i},'responsable',this.value)"></div>
-        <div><label>Statut</label><select onchange="updPhase(${i},'statut',this.value)">
+        <div><label>Début${helpIcon('phase_debut')}</label><input type="date" value="${esc(p.debut||'')}" oninput="updPhase(${i},'debut',this.value)"></div>
+        <div><label>Fin prévue${helpIcon('phase_fin')}</label><input type="date" value="${esc(p.fin||'')}" oninput="updPhase(${i},'fin',this.value)"></div>
+        <div><label>Responsable${helpIcon('phase_responsable')}</label><input value="${esc(p.responsable||'')}" placeholder="Prénom NOM" oninput="updPhase(${i},'responsable',this.value)"></div>
+        <div><label>Statut${helpIcon('phase_statut')}</label><select onchange="updPhase(${i},'statut',this.value)">
           ${statuts.map(s=>`<option value="${s.v}" ${p.statut===s.v?'selected':''}>${s.l}</option>`).join('')}
         </select></div>
-        <div class="full"><label>Tâches</label><textarea rows="2" placeholder="Tâches de cette phase…" oninput="updPhase(${i},'taches',this.value)">${esc(p.taches||'')}</textarea></div>
+        <div class="full"><label>Tâches${helpIcon('phase_taches')}</label><textarea rows="2" placeholder="Tâches de cette phase…" oninput="updPhase(${i},'taches',this.value)">${esc(p.taches||'')}</textarea></div>
       </div>
     </div>`).join('');
 }
@@ -982,21 +1507,54 @@ function updPhase(i,key,val) {
 }
 
 /* ---- 16. Plan financier ---- */
+const PF_RESSOURCES = [['pf_apport',"Apport personnel"],['pf_associes',"Associés"],['pf_famille',"Famille"],['pf_business_angels',"Business Angels"],['pf_banque',"Banque"],['pf_subvention',"Subvention"],['pf_investisseur',"Investisseur"],['pf_crowdfunding',"Crowdfunding"],['pf_diaspo_invest',"Diaspo'Invest"],['pf_autres_ress',"Autres"]];
+const PF_EMPLOIS = [['pf_terrain',"Achat terrain"],['pf_construction',"Construction"],['pf_materiel',"Matériel"],['pf_vehicules',"Véhicules"],['pf_logiciels',"Logiciels"],['pf_stocks',"Stocks"],['pf_tresorerie',"Trésorerie"],['pf_frais_admin',"Frais administratifs"],['pf_communication',"Communication"],['pf_recrutement',"Recrutement"]];
+const CF_MOIS = Array.from({length:12},(_,i)=>`M${i+1}`);
+const CF_ENTREES = [['ventes',"Ventes"],['subventions',"Subventions"],['emprunts',"Emprunts"]];
+const CF_SORTIES = [['salaires',"Salaires"],['fournisseurs',"Fournisseurs"],['impots',"Impôts"],['charges_sociales',"Charges sociales"],['publicite',"Publicité"],['internet',"Internet"],['assurances',"Assurances"],['carburant',"Carburant"],['eau',"Eau"],['electricite',"Électricité"]];
+
 function renderFinancier() {
   const s = sections.plan_financier || {};
   const annees = ['An 1','An 2','An 3','An 4','An 5'];
   const fv = (key,an) => s[`${key}_${an}`]||'';
-  const finInput = (key,an) => `<input type="number" value="${esc(fv(key,an))}" placeholder="0" oninput="updFin('${key}_${an}',this.value);calcFinRow()">`;
+  const finInput = (key,an) => `<input type="number" value="${esc(fv(key,an))}" placeholder="0" oninput="updFin('${key}_${an}',this.value);calcAllFinance()">`;
+  const pfInput = (key) => {
+    const ro = monRole==='lecteur';
+    return `<input type="number" data-key="${key}" value="${esc(s[key]||'')}" placeholder="0" ${ro?'readonly':''} oninput="updFin('${key}',this.value);calcAllFinance()">`;
+  };
+  const cfInput = (key,mois) => {
+    const ro = monRole==='lecteur';
+    const k = `cf_${key}_${mois}`;
+    return `<input type="number" data-key="${k}" value="${esc(s[k]||'')}" placeholder="0" ${ro?'readonly':''} oninput="updFin('${k}',this.value);calcAllFinance()">`;
+  };
 
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>💰 Plan financier</h2><p>Prévisions sur 5 ans — toutes les valeurs en unité monétaire locale (€, XOF, MAD…)</p></div>
+
+    <div class="bp-card-inner">
+      <h3>1. Tableau de bord financier</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Calculé automatiquement à partir des données saisies ci-dessous.</p>
+      <div class="fin-dash-grid">
+        <div class="fin-dash-card"><div class="fdc-label">💰 Investissement total</div><div class="fdc-value" id="fd-invest">—</div></div>
+        <div class="fin-dash-card"><div class="fdc-label">💳 Apport personnel</div><div class="fdc-value" id="fd-apport">—</div></div>
+        <div class="fin-dash-card"><div class="fdc-label">🤝 Financement recherché</div><div class="fdc-value" id="fd-financement">—</div></div>
+        <div class="fin-dash-card"><div class="fdc-label">📈 CA prévisionnel (An 1)</div><div class="fdc-value" id="fd-ca">—</div></div>
+        <div class="fin-dash-card"><div class="fdc-label">📊 Résultat net prévisionnel</div><div class="fdc-value" id="fd-resultat">—</div></div>
+        <div class="fin-dash-card"><div class="fdc-label">💹 Rentabilité estimée</div><div class="fdc-value" id="fd-rentabilite">—</div></div>
+        <div class="fin-dash-card"><div class="fdc-label">📆 Retour sur investissement (ROI)</div><div class="fdc-value" id="fd-roi">—</div></div>
+        <div class="fin-dash-card"><div class="fdc-label">📉 Point mort</div><div class="fdc-value" id="fd-pointmort">—</div></div>
+        <div class="fin-dash-card"><div class="fdc-label">💵 Trésorerie disponible</div><div class="fdc-value" id="fd-tresorerie">—</div></div>
+      </div>
+    </div>
+
     <div class="bp-card-inner"><h3>Investissements initiaux</h3><div class="fg">
-      ${field('investissement_initial','Investissement total requis (€)','','number')}
-      ${field('apport_personnel','Apport personnel / fonds propres (€)','','number')}
-      ${field('financement_recherche','Financement externe recherché (€)','','number')}
+      ${field('investissement_initial','Investissement total requis (€)','','number').replace("oninput=\"updateField('investissement_initial',this.value)\"","oninput=\"updateField('investissement_initial',this.value);calcAllFinance()\"")}
+      ${field('apport_personnel','Apport personnel / fonds propres (€)','','number').replace("oninput=\"updateField('apport_personnel',this.value)\"","oninput=\"updateField('apport_personnel',this.value);calcAllFinance()\"")}
+      ${field('financement_recherche','Financement externe recherché (€)','','number').replace("oninput=\"updateField('financement_recherche',this.value)\"","oninput=\"updateField('financement_recherche',this.value);calcAllFinance()\"")}
       ${textarea('immobilisations','Détail des immobilisations','Équipements, locaux, brevets…',3,true)}
-      ${textarea('bfr','Besoin en fonds de roulement (BFR)','Explication et montant…',2,true)}
+      ${textarea('bfr','Besoin en fonds de roulement (BFR)','Explication et montant…',2,true).replace("oninput=\"updateField('bfr',this.value)\"","oninput=\"updateField('bfr',this.value);calcAllFinance()\"")}
     </div></div>
+
     <div class="bp-card-inner">
       <h3>Compte de résultat prévisionnel</h3>
       <div style="overflow-x:auto;">
@@ -1017,26 +1575,81 @@ function renderFinancier() {
         </table>
       </div>
       <div style="margin-top:8px;text-align:right;">
-        <button class="btn btn-outline btn-sm" onclick="calcFinRow()">🔄 Recalculer</button>
+        <button class="btn btn-outline btn-sm" onclick="calcAllFinance()">🔄 Recalculer</button>
         <button class="btn btn-outline btn-sm" onclick="exportFinancierCSV()">📥 Exporter CSV</button>
       </div>
     </div>
+
     <div class="bp-card-inner"><h3>Seuil de rentabilité</h3><div class="fg">
       ${field('seuil_rentabilite','Seuil de rentabilité (€ de CA)','','number')}
-      ${field('point_mort','Point mort (nb de mois)','','number')}
+      ${field('point_mort','Point mort (nb de mois)','','number').replace("oninput=\"updateField('point_mort',this.value)\"","oninput=\"updateField('point_mort',this.value);calcAllFinance()\"")}
       ${textarea('amortissements','Plan d\'amortissement','',3,true)}
     </div></div>
+
     <div class="bp-card-inner"><h3>Scénarios</h3><div class="fg">
       ${textarea('scenario_optimiste','Scénario optimiste','Meilleures hypothèses…',3,false)}
       ${textarea('scenario_realiste','Scénario réaliste','Hypothèses centrales…',3,false)}
       ${textarea('scenario_prudent','Scénario prudent','Hypothèses basses…',3,false)}
     </div></div>
+
+    <div class="bp-card-inner">
+      <h3>🏦 2. Plan de financement</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Le total des Ressources doit être égal au total des Emplois.</p>
+      <div class="pf-grid">
+        <div class="pf-col"><h4>Ressources</h4>
+          ${PF_RESSOURCES.map(([k,l])=>`<div class="pf-row"><label>${l}${helpIcon(k)}</label>${pfInput(k)}</div>`).join('')}
+          <div class="pf-total"><span>Total Ressources</span><span id="pf-total-ressources">0</span></div>
+        </div>
+        <div class="pf-col"><h4>Emplois</h4>
+          ${PF_EMPLOIS.map(([k,l])=>`<div class="pf-row"><label>${l}${helpIcon(k)}</label>${pfInput(k)}</div>`).join('')}
+          <div class="pf-total"><span>Total Emplois</span><span id="pf-total-emplois">0</span></div>
+        </div>
+      </div>
+      <div class="pf-balance" id="pf-balance">—</div>
+    </div>
+
+    <div class="bp-card-inner">
+      <h3>💵 3. Plan de trésorerie mensuel</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Sur 12 mois — très demandé par les banques.</p>
+      <div style="overflow-x:auto;">
+        <table class="fin-table">
+          <thead><tr><th style="min-width:140px;">Poste</th>${CF_MOIS.map(m=>`<th>${m}</th>`).join('')}</tr></thead>
+          <tbody>
+            <tr class="header-row"><td colspan="13">ENTRÉES</td></tr>
+            ${CF_ENTREES.map(([k,l])=>`<tr><td>${l}</td>${CF_MOIS.map(m=>`<td>${cfInput(k,m)}</td>`).join('')}</tr>`).join('')}
+            <tr class="header-row"><td colspan="13">SORTIES</td></tr>
+            ${CF_SORTIES.map(([k,l])=>`<tr><td>${l}</td>${CF_MOIS.map(m=>`<td>${cfInput(k,m)}</td>`).join('')}</tr>`).join('')}
+            <tr class="total-row"><td>Trésorerie finale</td>${CF_MOIS.map(m=>`<td id="cf-final-${m}">—</td>`).join('')}</tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bp-card-inner">
+      <h3>📈 4. Ratios financiers</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Calculés automatiquement à partir du compte de résultat (An 1 → An 2).</p>
+      <div class="ratio-grid">
+        <div class="ratio-card"><span class="r-label">Marge brute</span><span class="r-value" id="ratio-marge-brute">—</span></div>
+        <div class="ratio-card"><span class="r-label">Marge nette</span><span class="r-value" id="ratio-marge-nette">—</span></div>
+        <div class="ratio-card"><span class="r-label">ROI</span><span class="r-value" id="ratio-roi">—</span></div>
+        <div class="ratio-card"><span class="r-label">Taux de croissance (An1→An2)</span><span class="r-value" id="ratio-croissance">—</span></div>
+        <div class="ratio-card"><span class="r-label">Taux d'endettement</span><span class="r-value" id="ratio-endettement">—</span></div>
+        <div class="ratio-card"><span class="r-label">BFR / CA</span><span class="r-value" id="ratio-bfr">—</span></div>
+      </div>
+    </div>
   </div>`;
 }
 function updFin(key,val) {
   if(!sections.plan_financier) sections.plan_financier={};
   sections.plan_financier[key]=val;
   markDirty();
+}
+function fmtEuro(n){ return (Math.round(n*100)/100).toLocaleString('fr')+'€'; }
+function ratioDot(value, seuilVert, seuilOrange, inverse) {
+  let cls='red';
+  if (inverse) { if(value<=seuilVert) cls='green'; else if(value<=seuilOrange) cls='orange'; }
+  else { if(value>=seuilVert) cls='green'; else if(value>=seuilOrange) cls='orange'; }
+  return `<span class="ratio-dot ${cls}"></span>`;
 }
 function calcFinRow() {
   const s = sections.plan_financier||{};
@@ -1046,8 +1659,83 @@ function calcFinRow() {
       (parseFloat(s[`loyers_${i}`])||0)+(parseFloat(s[`marketing_charge_${i}`])||0)+(parseFloat(s[`autres_charges_${i}`])||0);
     const res=ca-charges;
     const el=document.getElementById(`fin-res-${i}`);
-    if(el){el.textContent=res.toLocaleString('fr')+'€';el.style.color=res>=0?'#10b981':'#dc2626';}
+    if(el){el.textContent=fmtEuro(res);el.style.color=res>=0?'#10b981':'#dc2626';}
   }
+}
+function calcPlanFinancement() {
+  const s = sections.plan_financier||{};
+  const totalRes = PF_RESSOURCES.reduce((sum,[k])=>sum+(parseFloat(s[k])||0),0);
+  const totalEmp = PF_EMPLOIS.reduce((sum,[k])=>sum+(parseFloat(s[k])||0),0);
+  const elRes=document.getElementById('pf-total-ressources'); if(elRes) elRes.textContent=fmtEuro(totalRes);
+  const elEmp=document.getElementById('pf-total-emplois'); if(elEmp) elEmp.textContent=fmtEuro(totalEmp);
+  const bal=document.getElementById('pf-balance');
+  if(bal){
+    const diff=totalRes-totalEmp;
+    if(Math.abs(diff)<0.01){ bal.className='pf-balance ok'; bal.textContent='✅ Équilibré — Ressources = Emplois'; }
+    else { bal.className='pf-balance ko'; bal.textContent=`⚠️ Écart de ${fmtEuro(Math.abs(diff))} (${diff>0?'Ressources > Emplois':'Emplois > Ressources'})`; }
+  }
+  return { totalRes, totalEmp };
+}
+function calcTresorerie() {
+  const s = sections.plan_financier||{};
+  let cumul = 0;
+  let dernier = 0;
+  for(const m of CF_MOIS){
+    const entrees = CF_ENTREES.reduce((sum,[k])=>sum+(parseFloat(s[`cf_${k}_${m}`])||0),0);
+    const sorties = CF_SORTIES.reduce((sum,[k])=>sum+(parseFloat(s[`cf_${k}_${m}`])||0),0);
+    cumul += entrees - sorties;
+    dernier = cumul;
+    const el=document.getElementById(`cf-final-${m}`);
+    if(el){ el.textContent=fmtEuro(cumul); el.style.color=cumul>=0?'#10b981':'#dc2626'; }
+  }
+  return dernier;
+}
+function calcRatios() {
+  const s = sections.plan_financier||{};
+  const ca1=(parseFloat(s.ca_1)||0)+(parseFloat(s.autres_produits_1)||0);
+  const ca2=(parseFloat(s.ca_2)||0)+(parseFloat(s.autres_produits_2)||0);
+  const achats1=parseFloat(s.achats_1)||0;
+  const charges1=achats1+(parseFloat(s.salaires_1)||0)+(parseFloat(s.loyers_1)||0)+(parseFloat(s.marketing_charge_1)||0)+(parseFloat(s.autres_charges_1)||0);
+  const resultat1=ca1-charges1;
+  const invest=parseFloat(s.investissement_initial)||0;
+  const financement=parseFloat(s.financement_recherche)||0;
+  const bfrMontant=parseFloat(s.bfr)||0;
+
+  const margeBrute = ca1>0 ? (ca1-achats1)/ca1*100 : 0;
+  const margeNette = ca1>0 ? resultat1/ca1*100 : 0;
+  const roi = invest>0 ? resultat1/invest*100 : 0;
+  const croissance = ca1>0 ? (ca2-ca1)/ca1*100 : 0;
+  const endettement = invest>0 ? financement/invest*100 : 0;
+  const bfrRatio = ca1>0 ? bfrMontant/ca1*100 : 0;
+
+  const set = (id, value, suffix, dot) => { const el=document.getElementById(id); if(el) el.innerHTML=`${dot}${value.toFixed(1)}${suffix}`; };
+  set('ratio-marge-brute', margeBrute, '%', ratioDot(margeBrute,30,15,false));
+  set('ratio-marge-nette', margeNette, '%', ratioDot(margeNette,15,5,false));
+  set('ratio-roi', roi, '%', ratioDot(roi,20,10,false));
+  set('ratio-croissance', croissance, '%', ratioDot(croissance,10,0,false));
+  set('ratio-endettement', endettement, '%', ratioDot(endettement,50,80,true));
+  set('ratio-bfr', bfrRatio, '%', ratioDot(bfrRatio,10,25,true));
+  return { margeBrute, margeNette, roi, resultat1, ca1 };
+}
+function calcDashboard(tresorerieDisponible, ratios) {
+  const s = sections.plan_financier||{};
+  const set = (id,val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
+  set('fd-invest', s.investissement_initial ? fmtEuro(parseFloat(s.investissement_initial)) : '—');
+  set('fd-apport', s.apport_personnel ? fmtEuro(parseFloat(s.apport_personnel)) : '—');
+  set('fd-financement', s.financement_recherche ? fmtEuro(parseFloat(s.financement_recherche)) : '—');
+  set('fd-ca', ratios.ca1 ? fmtEuro(ratios.ca1) : '—');
+  set('fd-resultat', fmtEuro(ratios.resultat1));
+  set('fd-rentabilite', ratios.margeNette.toFixed(1)+'%');
+  set('fd-roi', ratios.roi.toFixed(1)+'%');
+  set('fd-pointmort', s.point_mort ? s.point_mort+' mois' : '—');
+  set('fd-tresorerie', fmtEuro(tresorerieDisponible));
+}
+function calcAllFinance() {
+  calcFinRow();
+  calcPlanFinancement();
+  const tresorerieDisponible = calcTresorerie();
+  const ratios = calcRatios();
+  calcDashboard(tresorerieDisponible, ratios);
 }
 function exportFinancierCSV() {
   const s=sections.plan_financier||{};
@@ -1087,15 +1775,15 @@ function renderRisqueItems(items) {
         <button onclick="delRisque(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
       </div>
       <div class="fg">
-        <div class="full"><label>Description du risque</label><input value="${esc(r.description||'')}" placeholder="Décrivez ce risque…" oninput="updRisque(${i},'description',this.value)"></div>
-        <div><label>Probabilité</label><select onchange="updRisque(${i},'probabilite',this.value)">
+        <div class="full"><label>Description du risque${helpIcon('risque_description')}</label><input value="${esc(r.description||'')}" placeholder="Décrivez ce risque…" oninput="updRisque(${i},'description',this.value)"></div>
+        <div><label>Probabilité${helpIcon('risque_probabilite')}</label><select onchange="updRisque(${i},'probabilite',this.value)">
           ${opts.map(o=>`<option value="${o}" ${r.probabilite===o?'selected':''}>${{faible:'🟢 Faible',moyen:'🟡 Moyen',eleve:'🟠 Élevé',critique:'🔴 Critique'}[o]}</option>`).join('')}
         </select></div>
-        <div><label>Impact</label><select onchange="updRisque(${i},'impact',this.value)">
+        <div><label>Impact${helpIcon('risque_impact')}</label><select onchange="updRisque(${i},'impact',this.value)">
           ${opts.map(o=>`<option value="${o}" ${r.impact===o?'selected':''}>${{faible:'🟢 Faible',moyen:'🟡 Moyen',eleve:'🟠 Élevé',critique:'🔴 Critique'}[o]}</option>`).join('')}
         </select></div>
-        <div><label>Mesures préventives</label><input value="${esc(r.prevention||'')}" placeholder="Comment prévenir ce risque ?" oninput="updRisque(${i},'prevention',this.value)"></div>
-        <div><label>Plan d'urgence</label><input value="${esc(r.urgence||'')}" placeholder="Que faire si le risque survient ?" oninput="updRisque(${i},'urgence',this.value)"></div>
+        <div><label>Mesures préventives${helpIcon('risque_prevention')}</label><input value="${esc(r.prevention||'')}" placeholder="Comment prévenir ce risque ?" oninput="updRisque(${i},'prevention',this.value)"></div>
+        <div><label>Plan d'urgence${helpIcon('risque_urgence')}</label><input value="${esc(r.urgence||'')}" placeholder="Que faire si le risque survient ?" oninput="updRisque(${i},'urgence',this.value)"></div>
       </div>
     </div>`).join('');
 }
@@ -1166,12 +1854,12 @@ function renderAnnexes() {
       </div>
       <div id="annexes-form" style="display:none;border:1px dashed var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
         <div class="fg">
-          <div><label>Nom du document</label><input id="ann-nom" placeholder="Ex : Statuts de la société…"></div>
+          <div><label>Nom du document${helpIcon('ann-nom')}</label><input id="ann-nom" placeholder="Ex : Statuts de la société…"></div>
           <div><label>Type</label><select id="ann-type">
             ${types.map(t=>`<option value="${t.ext}">${t.icon} ${t.label}</option>`).join('')}
           </select></div>
-          <div class="full"><label>URL / Lien</label><input id="ann-url" placeholder="https://drive.google.com/…"></div>
-          <div class="full"><label>Description</label><input id="ann-desc" placeholder="Brève description du document…"></div>
+          <div class="full"><label>URL / Lien${helpIcon('ann-url')}</label><input id="ann-url" placeholder="https://drive.google.com/…"></div>
+          <div class="full"><label>Description${helpIcon('ann-desc')}</label><input id="ann-desc" placeholder="Brève description du document…"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;">
           <button class="btn btn-orange btn-sm" onclick="saveAnnexe()">Ajouter</button>
@@ -1246,7 +1934,7 @@ function renderCompletude() {
         </tbody>
       </table>
       <div class="export-btns" style="margin-top:20px;">
-        <button class="btn btn-orange" onclick="exportPDF()">📄 Exporter en PDF</button>
+        <button class="btn btn-orange" onclick="openFinalReport()">📦 Générer le dossier final</button>
         <button class="btn btn-outline" onclick="exportFinancierCSV()">📊 Exporter finances CSV</button>
       </div>
     </div>
@@ -1411,10 +2099,213 @@ async function showCompletude() {
 }
 
 /* ════════════════════════════════════════════════════
-   EXPORT PDF
+   DOSSIER FINAL — génération du document multimédia
    ════════════════════════════════════════════════════ */
-function exportPDF() {
-  window.print();
+function exportPDF() { window.print(); }
+
+const FR_COLORS = { corporate:'#2563EB', moderne:'#10b981', premium:'#B8860B' };
+
+function frTopList(list, sortKey, nameKey, extraLabel) {
+  const arr = (list||[]).filter(x=>x[nameKey]);
+  const top = [...arr].sort((a,b)=>(parseFloat(b[sortKey])||0)-(parseFloat(a[sortKey])||0)).slice(0,3);
+  if (!top.length) return '<p style="color:#9ca3af;font-style:italic;">Aucune donnée renseignée pour l\'instant.</p>';
+  return '<ul style="font-size:13px;">' + top.map(x=>`<li><strong>${esc(x[nameKey])}</strong>${x[sortKey]?` — ${extraLabel} ${esc(x[sortKey])}${sortKey!=='menace'&&sortKey!=='interet'?'':'/100'}`:''}</li>`).join('') + '</ul>';
+}
+
+function frTable(list, cols) {
+  const arr = (list||[]).filter(x=>x[cols[0].key]);
+  if (!arr.length) return '<p style="color:#9ca3af;font-style:italic;">Aucune donnée renseignée pour l\'instant.</p>';
+  return `<table class="fr-table"><thead><tr>${cols.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead>
+    <tbody>${arr.map(x=>`<tr>${cols.map(c=>`<td>${esc(x[c.key]||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+function frBarChart(values, labels) {
+  const max = Math.max(...values, 1);
+  if (values.every(v=>!v)) return '<p style="color:#9ca3af;font-style:italic;">Renseignez le compte de résultat prévisionnel pour générer ce graphique.</p>';
+  return `<div class="fr-chart-bar">${values.map((v,i)=>`
+    <div class="fr-bar-col">
+      <div class="fr-bar" style="height:${Math.max(2,Math.round(v/max*100))}%;" title="${v}"></div>
+      <div class="fr-bar-label">${labels[i]}<br>${Math.round(v).toLocaleString('fr')}€</div>
+    </div>`).join('')}</div>`;
+}
+
+function frPieChart(segments) {
+  const total = segments.reduce((s,x)=>s+x.value,0);
+  if (!total) return '<p style="color:#9ca3af;font-style:italic;">Renseignez les charges de l\'An 1 pour générer la répartition.</p>';
+  let acc = 0;
+  const stops = segments.map(seg => {
+    const start = acc/total*360; acc += seg.value; const end = acc/total*360;
+    return `${seg.color} ${start}deg ${end}deg`;
+  }).join(', ');
+  return `<div style="display:flex;gap:20px;align-items:center;">
+    <div class="fr-pie" style="background:conic-gradient(${stops});"></div>
+    <div class="fr-pie-legend">${segments.map(s=>`<div><span class="dot" style="background:${s.color};"></span>${s.label} — ${Math.round(s.value/total*100)}%</div>`).join('')}</div>
+  </div>`;
+}
+
+function computeReportScore() {
+  const fin = sections.plan_financier || {};
+  const ca1 = (parseFloat(fin.ca_1)||0) + (parseFloat(fin.autres_produits_1)||0);
+  const charges1 = (parseFloat(fin.achats_1)||0)+(parseFloat(fin.salaires_1)||0)+(parseFloat(fin.loyers_1)||0)+(parseFloat(fin.marketing_charge_1)||0)+(parseFloat(fin.autres_charges_1)||0);
+  const margeNette = ca1>0 ? (ca1-charges1)/ca1*100 : 0;
+  const invest = parseFloat(fin.investissement_initial)||0;
+  const roi = invest>0 ? (ca1-charges1)/invest*100 : 0;
+  const finHealth = Math.max(0, Math.min(100, margeNette*2*0.6 + roi*0.4));
+  const nbRisques = (sections.risques?.items||[]).filter(r=>r.description).length;
+  const riskCoverage = Math.min(100, nbRisques/5*100);
+  const marketSignals = ['taille_marche','profil_client','segmentation'].filter(k=>sections.marche?.[k]).length
+    + ((sections.marche?.concurrents||[]).filter(c=>c.nom).length>0?1:0)
+    + ((sections.business_model?.partenaires_liste||[]).filter(p=>p.nom).length>0?1:0);
+  const marketCoverage = Math.min(100, marketSignals/5*100);
+  const progression = bp?.progression || 0;
+  const score = Math.round(progression*0.4 + finHealth*0.25 + riskCoverage*0.15 + marketCoverage*0.2);
+  const niveauRisque = score>=70?'Faible':score>=40?'Moyen':'Élevé';
+  const potentiel = score>=70?'Élevé':score>=40?'Moyen':'À renforcer';
+  return { score, niveauRisque, potentiel };
+}
+
+async function buildFinalReportHTML() {
+  const nom = bp?.nom_projet || 'Sans titre';
+  const infos = sections.infos_generales || {};
+  const resume = sections.resume_executif || {};
+  const presentation = sections.presentation || {};
+  const marche = sections.marche || {};
+  const swot = sections.swot || {};
+  const fin = sections.plan_financier || {};
+  const { score, niveauRisque, potentiel } = computeReportScore();
+
+  let recommandations = 'Chargement des recommandations…';
+  try {
+    const r1 = await api('POST', `/business-plans/${bpId}/assistant`, { message:'Fais un audit complet de mon business plan', currentSection });
+    const r2 = await api('POST', `/business-plans/${bpId}/assistant`, { message:'Quels sont les risques prioritaires ?', currentSection });
+    recommandations = `${r1.response||''}\n\n${r2.response||''}`;
+  } catch(e) { recommandations = "Recommandations indisponibles pour le moment."; }
+
+  const annees=[1,2,3,4,5];
+  const caValues = annees.map(a=>(parseFloat(fin[`ca_${a}`])||0)+(parseFloat(fin[`autres_produits_${a}`])||0));
+  const charges1 = [
+    {label:'Achats & matières',value:parseFloat(fin.achats_1)||0,color:'#2563EB'},
+    {label:'Salaires & charges',value:parseFloat(fin.salaires_1)||0,color:'#10b981'},
+    {label:'Loyers & immobilier',value:parseFloat(fin.loyers_1)||0,color:'#f59e0b'},
+    {label:'Marketing & comm.',value:parseFloat(fin.marketing_charge_1)||0,color:'#8b5cf6'},
+    {label:'Autres charges',value:parseFloat(fin.autres_charges_1)||0,color:'#dc2626'},
+  ];
+
+  return `
+    <div class="fr-cover">
+      <div class="fr-brand">Diaspo'Actif</div>
+      <h1>${esc(nom)}</h1>
+      <div class="fr-slogan">${esc(infos.slogan||'')}</div>
+      <p style="margin-top:16px;font-size:12.5px;color:#6b7280;">Dossier généré le ${new Date().toLocaleDateString('fr-FR')}</p>
+    </div>
+
+    <div class="fr-toc">
+      <h3>Table des matières</h3>
+      <a href="#fr-a">A. Présentation du projet</a>
+      <a href="#fr-b">B. Analyse stratégique</a>
+      <a href="#fr-c">C. Plan financier</a>
+      <a href="#fr-d">D. Réseau stratégique</a>
+      <a href="#fr-e">E. Étude de marché & prix</a>
+      <a href="#fr-f">F. Analyse finale</a>
+    </div>
+
+    <div class="fr-section" id="fr-a">
+      <h2>A. Présentation du projet</h2>
+      <h4>Résumé exécutif</h4><p>${esc(resume.projet||'Non renseigné.')}</p>
+      <div class="fr-grid2">
+        <div><h4>Vision</h4><p>${esc(presentation.vision||'Non renseignée.')}</p></div>
+        <div><h4>Mission</h4><p>${esc(presentation.mission||'Non renseignée.')}</p></div>
+      </div>
+      <h4>Objectifs</h4><p>${esc(resume.objectifs||'Non renseignés.')}</p>
+      <h4>Porteur du projet</h4><p>${esc(infos.responsable||'—')}${infos.responsable_poste?` — ${esc(infos.responsable_poste)}`:''}</p>
+    </div>
+
+    <div class="fr-section" id="fr-b">
+      <h2>B. Analyse stratégique</h2>
+      <h4>Étude de marché</h4><p>${esc(marche.taille_marche||'—')} · ${esc(marche.evolution||'')}</p>
+      <h4>Positionnement</h4><p>${esc(marche.positionnement||'Non renseigné.')}</p>
+      <div class="fr-grid2">
+        <div><h4>Analyse SWOT — Forces</h4><p>${esc(swot.forces||'—')}</p><h4>Opportunités</h4><p>${esc(swot.opportunites||'—')}</p></div>
+        <div><h4>Faiblesses</h4><p>${esc(swot.faiblesses||'—')}</p><h4>Menaces</h4><p>${esc(swot.menaces||'—')}</p></div>
+      </div>
+      <h4>Concurrents à surveiller en priorité</h4>
+      ${frTopList(marche.concurrents,'menace','nom','menace')}
+      <h4>Partenaires à contacter en priorité</h4>
+      ${frTopList(sections.business_model?.partenaires_liste,'interet','nom','intérêt')}
+    </div>
+
+    <div class="fr-section" id="fr-c">
+      <h2>C. Plan financier</h2>
+      <div class="fr-score-card">
+        <div class="fr-score-box"><div class="fr-score-num">${fin.investissement_initial?Number(fin.investissement_initial).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">Investissement initial</div></div>
+        <div class="fr-score-box"><div class="fr-score-num">${fin.seuil_rentabilite?Number(fin.seuil_rentabilite).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">Seuil de rentabilité</div></div>
+        <div class="fr-score-box"><div class="fr-score-num">${fin.point_mort||'—'}</div><div class="fr-score-label">Point mort (mois)</div></div>
+      </div>
+      <h4>Chiffre d'affaires prévisionnel (5 ans)</h4>
+      ${frBarChart(caValues, annees.map(a=>'An '+a))}
+      <h4>Répartition des charges (An 1)</h4>
+      ${frPieChart(charges1)}
+    </div>
+
+    <div class="fr-section" id="fr-d">
+      <h2>D. Réseau stratégique</h2>
+      <h4>Partenaires identifiés</h4>
+      ${frTable(sections.business_model?.partenaires_liste, [{key:'nom',label:'Nom'},{key:'type',label:'Type'},{key:'niveau',label:'Niveau'},{key:'interet',label:'Intérêt (0-100)'}])}
+      <h4>Concurrents analysés</h4>
+      ${frTable(marche.concurrents, [{key:'nom',label:'Nom'},{key:'type',label:'Type'},{key:'positionnement',label:'Positionnement'},{key:'menace',label:'Menace (0-100)'}])}
+    </div>
+
+    <div class="fr-section" id="fr-e">
+      <h2>E. Étude de marché & prix</h2>
+      <h4>Segmentation client</h4><p>${esc(marche.segmentation||'Non renseignée.')}</p>
+      <h4>Stratégie tarifaire</h4>
+      ${frTable(sections.produits?.etude_prix, [{key:'produit',label:'Produit'},{key:'prix_vente',label:'Prix envisagé'},{key:'prix_concurrents',label:'Prix concurrents'},{key:'strategie',label:'Stratégie'}])}
+    </div>
+
+    <div class="fr-section" id="fr-f">
+      <h2>F. Analyse finale</h2>
+      <div class="fr-score-card">
+        <div class="fr-score-box"><div class="fr-score-num">${score}/100</div><div class="fr-score-label">Score global (indicateur interne)</div></div>
+        <div class="fr-score-box"><div class="fr-score-num">${niveauRisque}</div><div class="fr-score-label">Niveau de risque</div></div>
+        <div class="fr-score-box"><div class="fr-score-num">${potentiel}</div><div class="fr-score-label">Potentiel</div></div>
+      </div>
+      <h4>Recommandations</h4>
+      <div style="font-size:13px;line-height:1.6;">${renderMarkdown(recommandations)}</div>
+      <p style="font-size:11px;color:#9ca3af;margin-top:10px;">Score calculé automatiquement à partir des données saisies (avancement, ratios financiers, couverture des risques et du marché). Ce n'est pas une note certifiée par un tiers.</p>
+    </div>
+
+    <div class="fr-footer">Document généré automatiquement par Diaspo'Actif — ${esc(nom)}</div>
+  `;
+}
+
+async function openFinalReport() {
+  document.getElementById('fr-title').textContent = bp?.nom_projet || '';
+  document.getElementById('fr-doc').innerHTML = '<p style="text-align:center;padding:60px;color:#9ca3af;">Génération du dossier en cours…</p>';
+  document.getElementById('fr-overlay').classList.add('open');
+  const html = await buildFinalReportHTML();
+  document.getElementById('fr-doc').innerHTML = html;
+}
+function closeFinalReport() {
+  document.getElementById('fr-overlay').classList.remove('open');
+}
+function setReportTheme(theme) {
+  const doc = document.getElementById('fr-doc');
+  doc.className = theme==='corporate' ? '' : 'theme-'+theme;
+  document.querySelectorAll('.fr-theme-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('fr-theme-'+theme).classList.add('active');
+}
+function downloadReportHTML() {
+  const doc = document.getElementById('fr-doc');
+  const styles = Array.from(document.styleSheets).map(s=>{
+    try { return Array.from(s.cssRules).map(r=>r.cssText).join('\n'); } catch(e){ return ''; }
+  }).join('\n');
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(bp?.nom_projet||'Business Plan')} — Dossier final</title><style>${styles}</style></head>
+  <body style="background:#f1f5f9;"><div id="fr-doc" class="${doc.className}" style="max-width:900px;margin:24px auto;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.12);padding:50px 60px;">${doc.innerHTML}</div></body></html>`;
+  const blob = new Blob([html], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `dossier-final-${(bp?.nom_projet||'business-plan').toLowerCase().replace(/[^a-z0-9]+/g,'-')}.html`;
+  a.click();
 }
 
 /* ════════════════════════════════════════════════════
@@ -1438,8 +2329,21 @@ function bpaAddMsg(text, role) {
   const body = document.getElementById('bpa-body');
   const d = document.createElement('div');
   d.className = `bpa-msg ${role}`;
-  if (role === 'bot') d.innerHTML = renderMarkdown(text);
-  else d.textContent = text;
+  if (role === 'bot') {
+    const gotoMatch = text.match(/\[\[GOTO:([a-z_]+)\]\]/);
+    const cleanText = text.replace(/👉\s*\[\[GOTO:[a-z_]+\]\]/,'').replace(/\[\[GOTO:[a-z_]+\]\]/,'').trim();
+    d.innerHTML = renderMarkdown(cleanText);
+    if (gotoMatch) {
+      const sectionKey = gotoMatch[1];
+      const label = (SECTIONS.find(s=>s.key===sectionKey)||{}).label || sectionKey;
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-orange btn-sm';
+      btn.style.marginTop = '8px';
+      btn.textContent = `👉 Ouvrir "${label}"`;
+      btn.onclick = () => navTo(sectionKey);
+      d.appendChild(btn);
+    }
+  } else d.textContent = text;
   body.appendChild(d);
   body.scrollTop = body.scrollHeight;
   return d;
@@ -1543,9 +2447,8 @@ function openBPASimulation() {
 }
 
 // Mettre à jour l'assistant quand on change de section (hook dans navTo)
-const _origNavTo = navTo;
 function navTo(key) {
-  _origNavTo(key);
+  navToBase(key);
   if (bpaOpen) {
     bpaSetQuickBtns(key);
     document.getElementById('bpa-status').textContent = `● Section active : ${SECTIONS.find(s=>s.key===key)?.label||key}`;

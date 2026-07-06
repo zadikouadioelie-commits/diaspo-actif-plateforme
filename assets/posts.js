@@ -207,6 +207,10 @@ function renderPostCard(post, options = {}) {
   const locBadge = (post.localisation_pays || post.localisation_ville)
     ? `<span class="post-badge post-badge-loc">📍 ${escHtml([post.localisation_ville, post.localisation_pays].filter(Boolean).join(', '))}</span>` : '';
 
+  const SOCIAL_SRC_LABELS = { linkedin:'LinkedIn', facebook:'Facebook', instagram:'Instagram', x:'X', youtube:'YouTube', tiktok:'TikTok', threads:'Threads' };
+  const sourceImportBadge = post.source_import
+    ? `<span class="post-badge" style="opacity:.7;" title="Synchronisée depuis un réseau social">🔄 Importée depuis ${escHtml(SOCIAL_SRC_LABELS[post.source_import]||post.source_import)}</span>` : '';
+
   const certifBadge = post.auteur_certif
     ? `<span class="post-certif" title="${escHtml(post.auteur_certif.label||'Vérifié')}">✓</span>` : '';
 
@@ -257,7 +261,7 @@ function renderPostCard(post, options = {}) {
       </div>
     </a>
     <div class="post-header-right">
-      ${categorieBadge}${locBadge}
+      ${categorieBadge}${locBadge}${sourceImportBadge}
       <div class="post-menu-wrap">
         <button class="post-menu-btn" onclick="this.nextElementSibling.classList.toggle('open')" title="Plus d'options">⋯</button>
         <div class="post-menu-dropdown">

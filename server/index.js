@@ -2070,6 +2070,7 @@ route("POST", "/api/fil", async (req, res, params, body) => {
     body.localisation_pays || null,
     body.localisation_ville || null,
   ).lastInsertRowid;
+  if (body.source_import) db.prepare("UPDATE fil_posts SET source_import=? WHERE id=?").run(body.source_import, id);
 
   // Récupère le post complet pour le renvoyer
   const post = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(id);
@@ -3788,6 +3789,41 @@ async function handleStripeWebhook(req, res) {
         creerNotif(userId, "pub_abonnement_actif", "Abonnement Publicité actif 📣",
           `Votre abonnement « ${planDef.label} » est actif. Vous disposez de ${planDef.quota_mensuel} publicité(s)/mois.`, {});
       }
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_ticket_id) {
+      const session = event.data.object;
+      const ticketId = Number(session.metadata.diaspoactif_ticket_id);
+      const ticket = await db.prepare(`SELECT * FROM tickets WHERE id=? AND payment_status='pending'`).get(ticketId);
+      if (ticket) {
+        const ts = new Date().toISOString();
+        /* signé avec created_at (déjà fixé à l'insertion) : la vérification au scan recalcule
+           la signature à partir de ce même champ, il ne faut donc pas utiliser un nouvel horodatage ici */
+        const qrToken = await signTicket(ticket.id, ticket.event_id, ticket.created_at);
+        await db.prepare(`UPDATE tickets SET payment_status='paid', qr_token=? WHERE id=?`).run(qrToken, ticket.id);
+        await db.prepare(`UPDATE ticket_types SET quantite_vendue=quantite_vendue+1 WHERE id=?`).run(ticket.ticket_type_id);
+        await db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) SELECT ?,?,u.id,u.nom,u.pays FROM users u WHERE u.id=?`)
+          .run(ticket.id, ticket.event_id, ticket.user_id);
+
+        const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(ticket.event_id);
+        const COMMISSION_RATE = 0.05;
+        const platform_fee = parseFloat((ticket.prix_paye * COMMISSION_RATE).toFixed(2));
+        const organizer_amount = parseFloat((ticket.prix_paye - platform_fee).toFixed(2));
+        await db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,?,'platform_fee',NULL,?,?,?,?,?)`)
+          .run(ticket.id, ticket.event_id, platform_fee, COMMISSION_RATE, ticket.prix_paye, platform_fee, organizer_amount);
+        await db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,?,'organizer_credit',?,?,?,?,?,?)`)
+          .run(ticket.id, ticket.event_id, ev.organisateur_id, organizer_amount, COMMISSION_RATE, ticket.prix_paye, platform_fee, organizer_amount);
+        await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, ev.organisateur_id);
+        await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+        try {
+          db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'billet_evenement',?,'reussi',?,?)`)
+            .run(ticket.user_id, ticket.prix_paye, 'billet_evenement', ts);
+        } catch(e) { /* table transactions peut avoir schema différent */ }
+        creerNotif(ticket.user_id, "billet_paye", "Billet payé ✅", `Votre billet pour « ${ev.titre} » est confirmé.`, { event_id: ev.id });
+        if (ev.organisateur_id) creerNotif(ev.organisateur_id, "billet_vendu", "Nouveau billet vendu 🎟️", `Un billet vient d'être vendu pour « ${ev.titre} » (+${organizer_amount}€).`, { event_id: ev.id });
+      }
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_ticket_id) {
+      const session = event.data.object;
+      const ticketId = Number(session.metadata.diaspoactif_ticket_id);
+      await db.prepare(`UPDATE tickets SET payment_status='failed' WHERE id=? AND payment_status='pending'`).run(ticketId);
     } else if (event.type === "invoice.payment_succeeded" && event.data.object.subscription) {
       const invoice = event.data.object;
       const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);
@@ -9812,46 +9848,56 @@ ${jsonLd}
       const tt = await db.prepare(`SELECT * FROM ticket_types WHERE id=? AND event_id=? AND actif=1`).get(ticket_type_id, eid);
       if (!tt) return sendJSON(res, 400, { error: 'Type de billet introuvable.' });
       if (tt.quantite_totale > 0 && tt.quantite_vendue >= tt.quantite_totale) return sendJSON(res, 400, { error: 'Billets épuisés.' });
-      /* Anti-doublon : 1 billet par utilisateur par type */
-      const existing = await db.prepare(`SELECT id FROM tickets WHERE user_id=? AND ticket_type_id=? AND payment_status='paid' AND statut='valid'`).get(me.id, ticket_type_id);
-      if (existing) return sendJSON(res, 409, { error: 'Vous possédez déjà un billet pour ce type.' });
+      /* Anti-doublon : 1 billet par utilisateur par type (payé, ou en attente de paiement) */
+      const existing = await db.prepare(`SELECT id FROM tickets WHERE user_id=? AND ticket_type_id=? AND payment_status IN ('paid','pending') AND statut='valid'`).get(me.id, ticket_type_id);
+      if (existing) return sendJSON(res, 409, { error: 'Vous possédez déjà un billet (ou une commande en cours) pour ce type.' });
       const commission = parseFloat((tt.prix * ev.commission_pct / 100).toFixed(2));
       const ts = new Date().toISOString();
       const tempSig = crypto.randomBytes(8).toString('hex'); // placeholder pour l'ID
-      const tid = db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at) VALUES (?,?,?,?,?,'paid','valid',?,?)`)
+
+      /* Billet gratuit : validé immédiatement, aucun paiement réel à collecter */
+      if (!tt.prix || tt.prix <= 0) {
+        const tid = db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at) VALUES (?,?,?,?,?,'paid','valid',?,?)`)
+          .run(eid, me.id, tt.id, 0, 0, tempSig, ts).lastInsertRowid;
+        const qrToken = await signTicket(tid, eid, ts);
+        await db.prepare(`UPDATE tickets SET qr_token=? WHERE id=?`).run(qrToken, tid);
+        await db.prepare(`UPDATE ticket_types SET quantite_vendue=quantite_vendue+1 WHERE id=?`).run(tt.id);
+        db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) VALUES (?,?,?,?,?)`)
+          .run(tid, eid, me.id, me.nom, me.pays||null);
+        return sendJSON(res, 201, { ticket_id: tid, qr_token: qrToken, prix: 0, gratuit: true });
+      }
+
+      /* Billet payant : on ne valide RIEN tant que Stripe n'a pas confirmé le paiement.
+         Le ticket est créé en statut 'pending' ; le split commission/wallet ne se fait
+         que dans handleStripeWebhook() sur checkout.session.completed. */
+      const { stripe } = require('./stripe-client');
+      if (!stripe) return sendJSON(res, 503, { error: 'Paiements momentanément indisponibles.' });
+
+      const tid = db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at) VALUES (?,?,?,?,?,'pending','valid',?,?)`)
         .run(eid, me.id, tt.id, tt.prix, commission, tempSig, ts).lastInsertRowid;
-      /* Générer vrai QR token maintenant qu'on a l'ID */
-      const qrToken = signTicket(tid, eid, ts);
-      await db.prepare(`UPDATE tickets SET qr_token=? WHERE id=?`).run(qrToken, tid);
-      await db.prepare(`UPDATE ticket_types SET quantite_vendue=quantite_vendue+1 WHERE id=?`).run(tt.id);
-      /* Enregistrement participant (immuable) */
-      db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) VALUES (?,?,?,?,?)`)
-        .run(tid, eid, me.id, me.nom, me.pays||null);
-      /* ── SPLIT AUTOMATIQUE : 5% plateforme / 95% initiative ── */
-      const COMMISSION_RATE = 0.05;
-      const platform_fee    = parseFloat((tt.prix * COMMISSION_RATE).toFixed(2));
-      const organizer_amount = parseFloat((tt.prix - platform_fee).toFixed(2));
 
-      /* Ledger immuable — 2 lignes : une pour la plateforme, une pour l'initiative */
-      const walletBase = { ticket_id: tid, event_id: eid, commission_rate: COMMISSION_RATE, prix_billet: tt.prix, platform_fee, organizer_amount };
-      db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,?,'platform_fee',NULL,?,?,?,?,?)`)
-        .run(tid, eid, platform_fee, COMMISSION_RATE, tt.prix, platform_fee, organizer_amount);
-      db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,?,'organizer_credit',?,?,?,?,?,?)`)
-        .run(tid, eid, ev.organisateur_id, organizer_amount, COMMISSION_RATE, tt.prix, platform_fee, organizer_amount);
-
-      /* Créditer wallet initiative (+95%) */
-      db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, ev.organisateur_id);
-
-      /* Créditer platform_wallet (+5%) */
-      db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
-
-      /* Transaction financière (audit) */
       try {
-        db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'billet_evenement',?,?,'reussi',?)`)
-          .run(me.id, tt.prix, 'billet_evenement', ts);
-      } catch(e) { /* table transactions peut avoir schema différent */ }
-
-      return sendJSON(res, 201, { ticket_id: tid, qr_token: qrToken, prix: tt.prix, platform_fee, organizer_amount });
+        const origin = getOrigin(req);
+        const session = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          line_items: [{
+            price_data: {
+              currency: 'eur',
+              unit_amount: Math.round(tt.prix * 100),
+              product_data: { name: `${ev.titre} — ${tt.nom}` },
+            },
+            quantity: 1,
+          }],
+          metadata: { diaspoactif_ticket_id: String(tid) },
+          success_url: `${origin}/billetterie.html?paiement=succes&ticket=${tid}`,
+          cancel_url: `${origin}/billetterie.html?paiement=annule&ticket=${tid}`,
+        });
+        db.prepare(`UPDATE tickets SET transaction_ref=? WHERE id=?`).run(session.id, tid);
+        return sendJSON(res, 201, { ticket_id: tid, checkout_url: session.url, en_attente_paiement: true });
+      } catch (e) {
+        db.prepare(`DELETE FROM tickets WHERE id=?`).run(tid);
+        return sendJSON(res, 500, SEC.safeError(e, 'ticket-checkout'));
+      }
     }
 
     /* ── GET /api/tickets/mes — mes billets ── */
@@ -10207,7 +10253,7 @@ ${jsonLd}
       if (!ticket) return logRejection('Billet introuvable ou mauvais événement');
       if (ticket.qr_token === null) return logRejection('Billet archivé — accès expiré');
       if (ticket.organisateur_id !== me.id && !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Non autorisé pour cet événement.' });
-      const expectedSig = signTicket(tid, eid, ticket.created_at);
+      const expectedSig = await signTicket(tid, eid, ticket.created_at);
       if (sig !== expectedSig) return logRejection('Signature QR invalide — billet falsifié');
       if (ticket.payment_status !== 'paid') return logRejection('Paiement non confirmé');
       if (ticket.statut === 'cancelled') return logRejection('Billet annulé');
@@ -10238,6 +10284,110 @@ ${jsonLd}
       return sendJSON(res, 200, { balance: user?.wallet_balance || 0, commission_rate: 0.05, historique });
     }
 
+    /* ── GET /api/wallet/centre-financier — vue consolidée (Centre Financier) ── */
+    if (req.method === 'GET' && pathname === '/api/wallet/centre-financier') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const user = await db.prepare(`SELECT wallet_balance FROM users WHERE id=?`).get(me.id);
+      const balance = user?.wallet_balance || 0;
+
+      const fenetre = async (sql) => (await db.prepare(sql).get(me.id))?.total || 0;
+      const aujourdhui = await fenetre(`SELECT COALESCE(SUM(montant),0) total FROM wallet_transactions WHERE beneficiaire_id=? AND type='organizer_credit' AND date(timestamp)=date('now')`);
+      const semaine   = await fenetre(`SELECT COALESCE(SUM(montant),0) total FROM wallet_transactions WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp>=datetime('now','-7 days')`);
+      const mois      = await fenetre(`SELECT COALESCE(SUM(montant),0) total FROM wallet_transactions WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp>=datetime('now','-30 days')`);
+      const annee     = await fenetre(`SELECT COALESCE(SUM(montant),0) total FROM wallet_transactions WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp>=datetime('now','-365 days')`);
+      const cumule    = await fenetre(`SELECT COALESCE(SUM(montant),0) total FROM wallet_transactions WHERE beneficiaire_id=? AND type='organizer_credit'`);
+
+      // Historique unifié : billetterie (wallet_transactions) + autres modules (wallet_ledger, vide tant que non branchés)
+      const histBillets = await db.prepare(`
+        SELECT wt.timestamp AS date, 'billetterie' AS module, e.titre AS source_label, NULL AS payeur_nom,
+               wt.prix_billet AS montant_brut, wt.platform_fee AS commission, 0 AS frais_prestataire, wt.montant AS montant_net,
+               'valide' AS statut
+        FROM wallet_transactions wt LEFT JOIN events e ON e.id=wt.event_id
+        WHERE wt.beneficiaire_id=? AND wt.type='organizer_credit'
+        ORDER BY wt.timestamp DESC LIMIT 50
+      `).all(me.id);
+      const histLedger = await db.prepare(`
+        SELECT created_at AS date, module, source_label, payeur_nom, montant_brut, commission, frais_prestataire, montant_net, statut
+        FROM wallet_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 50
+      `).all(me.id);
+      const historique = [...histBillets, ...histLedger].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 80);
+
+      // Compte de réception : Stripe Connect via l'initiative possédée (architecture actuelle : pas de Connect au niveau utilisateur individuel)
+      const initiative = await db.prepare(`SELECT id, nom FROM initiatives WHERE owner_user_id=?`).get(me.id);
+      let connect = null;
+      if (initiative) {
+        const acc = await db.prepare(`SELECT statut, charges_enabled, payouts_enabled, details_submitted FROM stripe_connect_accounts WHERE initiative_id=?`).get(initiative.id);
+        connect = { initiative_id: initiative.id, initiative_nom: initiative.nom, connecte: !!acc, statut: acc?.statut || 'non_demarre', payouts_enabled: !!acc?.payouts_enabled };
+      }
+
+      const settings = await db.prepare(`SELECT * FROM wallet_settings WHERE user_id=?`).get(me.id);
+      const retraits = await db.prepare(`SELECT * FROM retraits WHERE user_id=? ORDER BY created_at DESC LIMIT 20`).all(me.id);
+
+      return sendJSON(res, 200, {
+        balance, commission_rate: 0.05,
+        revenus: { aujourdhui, semaine, mois, annee, cumule },
+        historique, connect,
+        settings: settings || { devise_preferee: 'EUR', frequence_auto: 'manuel', seuil_auto: 0, notifications: 1 },
+        retraits,
+      });
+    }
+
+    /* ── GET/PUT /api/wallet/settings — préférences financières ── */
+    if (req.method === 'GET' && pathname === '/api/wallet/settings') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const s = await db.prepare(`SELECT * FROM wallet_settings WHERE user_id=?`).get(me.id);
+      return sendJSON(res, 200, s || { devise_preferee: 'EUR', frequence_auto: 'manuel', seuil_auto: 0, notifications: 1 });
+    }
+    if (req.method === 'PUT' && pathname === '/api/wallet/settings') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const body = await readBody(req);
+      const devise = body.devise_preferee || 'EUR';
+      const freq = ['manuel','hebdomadaire','mensuel'].includes(body.frequence_auto) ? body.frequence_auto : 'manuel';
+      const seuil = parseFloat(body.seuil_auto) || 0;
+      const notif = body.notifications ? 1 : 0;
+      await db.prepare(`
+        INSERT INTO wallet_settings (user_id, devise_preferee, frequence_auto, seuil_auto, notifications) VALUES (?,?,?,?,?)
+        ON CONFLICT(user_id) DO UPDATE SET devise_preferee=excluded.devise_preferee, frequence_auto=excluded.frequence_auto, seuil_auto=excluded.seuil_auto, notifications=excluded.notifications
+      `).run(me.id, devise, freq, seuil, notif);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/wallet/withdraw — retrait réel via Stripe Transfer vers le compte Connect ── */
+    if (req.method === 'POST' && pathname === '/api/wallet/withdraw') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const body = await readBody(req);
+      const montantDemande = parseFloat(body.montant);
+      if (!montantDemande || montantDemande <= 0) return sendJSON(res, 400, { error: 'Montant invalide.' });
+
+      const user = await db.prepare(`SELECT wallet_balance FROM users WHERE id=?`).get(me.id);
+      const solde = user?.wallet_balance || 0;
+      if (montantDemande > solde) return sendJSON(res, 400, { error: `Montant supérieur au solde disponible (${solde.toFixed(2)}€).` });
+
+      const initiative = await db.prepare(`SELECT id FROM initiatives WHERE owner_user_id=?`).get(me.id);
+      if (!initiative) return sendJSON(res, 400, { error: "Aucun compte de réception : créez une Initiative et connectez Stripe Connect avant de retirer des fonds." });
+      const acc = await db.prepare(`SELECT * FROM stripe_connect_accounts WHERE initiative_id=?`).get(initiative.id);
+      if (!acc || !acc.payouts_enabled) return sendJSON(res, 400, { error: "Votre compte Stripe Connect n'est pas encore activé pour recevoir des virements (payouts_enabled=false)." });
+
+      const r = db.prepare(`INSERT INTO retraits (user_id, montant, statut) VALUES (?,?,'demande')`).run(me.id, montantDemande);
+      const retraitId = r.lastInsertRowid;
+
+      try {
+        const { stripe } = require('./stripe-client');
+        if (!stripe) throw new Error('Paiements momentanément indisponibles.');
+        const transfer = await stripe.transfers.create({
+          amount: Math.round(montantDemande * 100),
+          currency: 'eur',
+          destination: acc.stripe_account_id,
+        });
+        db.prepare(`UPDATE retraits SET statut='traite', stripe_transfer_id=?, traite_at=datetime('now') WHERE id=?`).run(transfer.id, retraitId);
+        db.prepare(`UPDATE users SET wallet_balance = wallet_balance - ? WHERE id=?`).run(montantDemande, me.id);
+        return sendJSON(res, 200, { ok: true, statut: 'traite', stripe_transfer_id: transfer.id });
+      } catch (e) {
+        db.prepare(`UPDATE retraits SET statut='echoue', erreur_msg=? WHERE id=?`).run(e.message || 'Erreur Stripe', retraitId);
+        return sendJSON(res, 502, { error: "Le virement Stripe a échoué : " + (e.message || 'erreur inconnue') + ". En mode test, cela signifie généralement qu'aucune charge réelle n'a encore alimenté le solde de la plateforme." });
+      }
+    }
+
     /* ── GET /api/admin/wallet — wallet plateforme (admin only) ── */
     if (req.method === 'GET' && pathname === '/api/admin/wallet') {
       const me = await getCurrentUser(req);
@@ -10246,7 +10396,11 @@ ${jsonLd}
       const par_event = await db.prepare(`SELECT e.titre, e.pays, COUNT(wt.id) nb_transactions, COALESCE(SUM(wt.montant),0) total_fees FROM wallet_transactions wt JOIN events e ON e.id=wt.event_id WHERE wt.type='platform_fee' GROUP BY wt.event_id ORDER BY total_fees DESC LIMIT 20`).all();
       const par_pays = await db.prepare(`SELECT e.pays, COUNT(wt.id) nb, COALESCE(SUM(wt.montant),0) total FROM wallet_transactions wt JOIN events e ON e.id=wt.event_id WHERE wt.type='platform_fee' AND e.pays IS NOT NULL GROUP BY e.pays ORDER BY total DESC LIMIT 10`).all();
       const historique = await db.prepare(`SELECT wt.*, e.titre AS event_titre, u.nom AS organisateur_nom FROM wallet_transactions wt LEFT JOIN events e ON e.id=wt.event_id LEFT JOIN users u ON u.id=wt.beneficiaire_id WHERE wt.type='platform_fee' ORDER BY wt.timestamp DESC LIMIT 100`).all();
-      return sendJSON(res, 200, { wallet: pw, par_event, par_pays, historique });
+      const nb_comptes_verifies = (await db.prepare(`SELECT COUNT(*) n FROM stripe_connect_accounts WHERE statut='active'`).get())?.n || 0;
+      const nb_comptes_connectes = (await db.prepare(`SELECT COUNT(*) n FROM stripe_connect_accounts`).get())?.n || 0;
+      const nb_retraits = (await db.prepare(`SELECT COUNT(*) n FROM retraits`).get())?.n || 0;
+      const retraits_historique = await db.prepare(`SELECT r.*, u.nom AS user_nom FROM retraits r LEFT JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC LIMIT 50`).all();
+      return sendJSON(res, 200, { wallet: pw, par_event, par_pays, historique, nb_comptes_verifies, nb_comptes_connectes, nb_retraits, retraits_historique });
     }
 
     /* ══════════════════════════════════════════════════════════════
@@ -16638,6 +16792,8 @@ async function requireAuth(req, res, next) {
   req.user = user;
   next();
 }
+/* req.body est déjà lu/parsé par _appRoute avant l'appel du handler — parseBody expose juste ce corps déjà disponible. */
+async function parseBody(req) { return req.body || {}; }
 const app = {
   get:    (path, ...h) => _appRoute('GET',    path, h),
   post:   (path, ...h) => _appRoute('POST',   path, h),
@@ -17096,7 +17252,7 @@ app.post('/api/oz/chat', requireAuth, async (req, res) => {
       msgs.push({ role: 'user', content: message, at: new Date().toISOString() });
       msgs.push({ role: 'oz', content: reply, at: new Date().toISOString() });
       if (msgs.length > 100) msgs.splice(0, msgs.length - 100);
-      db.prepare('UPDATE oz_conversations SET messages_json=?, updated_at=datetime("now") WHERE id=?').run(JSON.stringify(msgs), convId);
+      db.prepare(`UPDATE oz_conversations SET messages_json=?, updated_at=datetime('now') WHERE id=?`).run(JSON.stringify(msgs), convId);
     }
   } catch(e) {}
 
@@ -17120,6 +17276,25 @@ app.delete('/api/oz/history', requireAuth, async (req, res) => {
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Calcul de progression (nb de sections non vides / total) */
+/* Historise les champs modifiés (mémoire IA de l'assistant BP) — best-effort, jamais bloquant */
+async function recordFieldHistory(bpId, userId, oldSections, newSectionsPatch) {
+  try {
+    for (const [sectionKey, newFields] of Object.entries(newSectionsPatch || {})) {
+      if (!newFields || typeof newFields !== 'object') continue;
+      const oldFields = oldSections[sectionKey] || {};
+      for (const [fieldKey, newVal] of Object.entries(newFields)) {
+        const oldVal = oldFields[fieldKey];
+        const oldStr = oldVal==null ? '' : (typeof oldVal==='object' ? JSON.stringify(oldVal) : String(oldVal));
+        const newStr = newVal==null ? '' : (typeof newVal==='object' ? JSON.stringify(newVal) : String(newVal));
+        if (oldStr === newStr) continue;
+        if (!newStr.trim() && !oldStr.trim()) continue;
+        await db.prepare(`INSERT INTO bp_field_history (bp_id, user_id, section_key, field_key, old_value, new_value) VALUES (?,?,?,?,?,?)`)
+          .run(bpId, userId||null, sectionKey, fieldKey, oldStr.slice(0,2000), newStr.slice(0,2000));
+      }
+    }
+  } catch (e) { console.log('[recordFieldHistory]', e.message); }
+}
+
 async function calcBPProgression(sections) {
   const obligatoires = ['infos_generales','resume_executif','presentation','probleme','solution','marche','swot','business_model','produits','strategie_marketing','plan_commercial','plan_operationnel','organisation','rh','calendrier','plan_financier','risques','impact','financement'];
   const remplis = obligatoires.filter(k => {
@@ -17142,10 +17317,19 @@ async function checkBPCompletude(sections) {
     { key: 'solution', label: 'Solution proposée', champs: ['description'] },
     { key: 'marche', label: 'Étude de marché', champs: ['taille_marche'] },
     { key: 'swot', label: 'Analyse SWOT', champs: ['forces','faiblesses','opportunites','menaces'] },
-    { key: 'business_model', label: 'Business Model Canvas', champs: ['segments','proposition_valeur','sources_revenus'] },
+    { key: 'business_model', label: 'Business Model Canvas', champs: ['segments','proposition','revenus'] },
     { key: 'produits', label: 'Produits & services', champs: [] },
+    { key: 'strategie_marketing', label: 'Stratégie marketing', champs: ['identite_marque'] },
+    { key: 'plan_commercial', label: 'Plan commercial', champs: ['objectifs_vente'] },
+    { key: 'plan_operationnel', label: 'Plan opérationnel', champs: ['production'] },
+    { key: 'organisation', label: 'Organisation & Gouvernance', champs: ['dirigeants'] },
+    { key: 'rh', label: 'Ressources humaines', champs: [] },
+    { key: 'calendrier', label: 'Calendrier de mise en œuvre', champs: [] },
     { key: 'plan_financier', label: 'Plan financier', champs: ['investissement_initial'] },
     { key: 'risques', label: 'Analyse des risques', champs: [] },
+    { key: 'impact', label: 'Impact', champs: ['economique'] },
+    { key: 'financement', label: 'Recherche de financement', champs: ['montant'] },
+    { key: 'annexes', label: 'Annexes', champs: [] },
   ];
   return checks.map(c => {
     const s = sections[c.key] || {};
@@ -17198,8 +17382,8 @@ app.get('/api/business-plans/:id', requireAuth, async (req, res) => {
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
   if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
   const sections = safeJSON(bp.sections_json, {});
-  const completude = checkBPCompletude(sections);
-  const progression = calcBPProgression(sections);
+  const completude = await checkBPCompletude(sections);
+  const progression = await calcBPProgression(sections);
   sendJSON(res, 200, { ...bp, sections, completude, progression, mon_role: bp.user_id===req.user.id?'proprietaire':(collab?.role||'lecteur') });
 });
 
@@ -17216,7 +17400,9 @@ app.put('/api/business-plans/:id', requireAuth, async (req, res) => {
 
   const currentSections = safeJSON(bp.sections_json, {});
   const newSections = sections ? { ...currentSections, ...sections } : currentSections;
-  const progression = calcBPProgression(newSections);
+  const progression = await calcBPProgression(newSections);
+
+  if (sections) await recordFieldHistory(bp.id, req.user.id, currentSections, sections);
 
   db.prepare(`UPDATE business_plans SET
     sections_json=?, progression=?,
@@ -17280,7 +17466,7 @@ app.post('/api/business-plans/:id/versions', requireAuth, async (req, res) => {
   db.prepare('INSERT INTO bp_versions (bp_id, version, snapshot_json, saved_by, label) VALUES (?,?,?,?,?)').run(
     bp.id, bp.version, bp.sections_json, req.user.id, `Version ${bp.version}`
   );
-  db.prepare('UPDATE business_plans SET version=?, updated_at=datetime("now") WHERE id=?').run(newVer, bp.id);
+  db.prepare(`UPDATE business_plans SET version=?, updated_at=datetime('now') WHERE id=?`).run(newVer, bp.id);
   // Garder max 20 versions
   const oldVersions = await db.prepare('SELECT id FROM bp_versions WHERE bp_id=? ORDER BY version DESC LIMIT -1 OFFSET 20').all(bp.id);
   if (oldVersions.length) db.prepare(`DELETE FROM bp_versions WHERE id IN (${oldVersions.map(()=>'?').join(',')})`).run(...oldVersions.map(v=>v.id));
@@ -17307,7 +17493,7 @@ app.post('/api/business-plans/:id/versions/:v/restore', requireAuth, async (req,
   db.prepare('INSERT INTO bp_versions (bp_id, version, snapshot_json, saved_by, label) VALUES (?,?,?,?,?)').run(
     bp.id, bp.version, bp.sections_json, req.user.id, `Avant restauration v${ver.version}`
   );
-  db.prepare('UPDATE business_plans SET sections_json=?, version=version+1, updated_at=datetime("now") WHERE id=?').run(ver.snapshot_json, bp.id);
+  db.prepare(`UPDATE business_plans SET sections_json=?, version=version+1, updated_at=datetime('now') WHERE id=?`).run(ver.snapshot_json, bp.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -17318,7 +17504,7 @@ app.get('/api/business-plans/:id/completude', requireAuth, async (req, res) => {
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
   if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
   const sections = safeJSON(bp.sections_json, {});
-  sendJSON(res, 200, { completude: checkBPCompletude(sections), progression: calcBPProgression(sections) });
+  sendJSON(res, 200, { completude: await checkBPCompletude(sections), progression: await calcBPProgression(sections) });
 });
 
 /* ---- Collaborateurs ---- */
@@ -17379,10 +17565,189 @@ app.post('/api/business-plans/:id/commentaires/:section', requireAuth, async (re
 });
 
 /* ═══════════════════════════════════════════════════════════════════
+   ASSISTANT BP — Mémoire intelligente (recherche universelle dans les données)
+   ═══════════════════════════════════════════════════════════════════ */
+
+const BP_SECTION_LABELS = {
+  infos_generales:"Informations générales", resume_executif:"Résumé exécutif", presentation:"Présentation détaillée",
+  probleme:"Analyse du problème", solution:"Solution proposée", marche:"Étude de marché", swot:"Analyse SWOT",
+  business_model:"Business Model Canvas", produits:"Produits & Services", strategie_marketing:"Stratégie marketing",
+  plan_commercial:"Plan commercial", plan_operationnel:"Plan opérationnel", organisation:"Organisation & Gouvernance",
+  rh:"Ressources humaines", calendrier:"Calendrier de mise en œuvre", plan_financier:"Plan financier",
+  risques:"Analyse des risques", impact:"Impact", financement:"Recherche de financement", annexes:"Annexes",
+};
+
+const BP_FIELD_LABELS = {
+  infos_generales: { nom_projet:"Nom du projet", slogan:"Slogan", type_initiative:"Type d'initiative", stade:"Stade du projet", secteur:"Secteur d'activité", sous_secteur:"Sous-secteur", date_creation:"Date de création", pays:"Pays", region:"Région", ville:"Ville", adresse:"Adresse", email:"Email professionnel", telephone:"Téléphone", site_web:"Site internet", linkedin:"LinkedIn", facebook:"Facebook", instagram:"Instagram", responsable:"Responsable principal", responsable_poste:"Poste du responsable", nb_collaborateurs:"Nombre de collaborateurs", equipe_fondatrice:"Équipe fondatrice", organigramme:"Organigramme" },
+  resume_executif: { projet:"Description du projet", probleme:"Problème identifié", solution:"Solution proposée", marche:"Marché visé", besoins:"Besoins financiers", objectifs:"Objectifs" },
+  presentation: { vision:"Vision", mission:"Mission", valeurs:"Valeurs", obj_court:"Objectifs court terme", obj_moyen:"Objectifs moyen terme", obj_long:"Objectifs long terme", historique:"Historique", motivations:"Motivations" },
+  probleme: { description:"Description du problème", pourquoi:"Pourquoi ce problème existe", qui_concerne:"Qui est concerné", ampleur:"Ampleur du problème", consequences:"Conséquences", pourquoi_pas_resolu:"Pourquoi non résolu", preuves:"Preuves & sources" },
+  solution: { description:"Description de la solution", fonctionnement:"Fonctionnement", innovation:"Innovation", avantages:"Avantages client", valeur_ajoutee:"Valeur ajoutée", differenciants:"Éléments différenciants" },
+  marche: { taille_marche:"Taille du marché", evolution:"Évolution du marché", potentiel:"Potentiel pour le projet", tendances:"Tendances du marché", profil_client:"Profil client", segmentation:"Segmentation", besoins_clients:"Besoins des clients", localisation_clients:"Localisation des clients", opportunites:"Opportunités de marché", menaces_marche:"Menaces du marché", positionnement:"Positionnement", avantage_concurrentiel:"Avantage concurrentiel", barrieres_entree:"Barrières à l'entrée", reglementation:"Réglementation applicable" },
+  swot: { forces:"Forces (SWOT)", faiblesses:"Faiblesses (SWOT)", opportunites:"Opportunités (SWOT)", menaces:"Menaces (SWOT)" },
+  business_model: { partenaires:"Partenaires clés", activites:"Activités clés", proposition:"Proposition de valeur", relations:"Relations clients", segments:"Segments de clientèle", ressources:"Ressources clés", canaux:"Canaux", couts:"Structure des coûts", revenus:"Sources de revenus" },
+  strategie_marketing: { identite_marque:"Identité de marque", strategie_digitale:"Stratégie digitale", communication:"Plan de communication", publicite:"Publicité", partenariats:"Partenariats & co-marketing", evenements:"Événements", fidelisation:"Fidélisation" },
+  plan_commercial: { objectifs_vente:"Objectifs de vente", prospection:"Méthodes de prospection", tunnel_vente:"Tunnel de vente", politique_tarifaire:"Politique tarifaire", argumentaire:"Argumentaire commercial", sav:"Service après-vente", kpi_commerciaux:"KPI commerciaux" },
+  plan_operationnel: { production:"Processus de production", logistique:"Logistique", fournisseurs:"Fournisseurs", equipements:"Équipements & matériel", technologies:"Technologies utilisées", qualite:"Contrôle qualité", securite:"Sécurité" },
+  organisation: { dirigeants:"Direction & gouvernance", equipe:"Équipe actuelle", responsabilites:"Répartition des responsabilités", consultants:"Consultants & experts", benevoles:"Bénévoles" },
+  rh: { effectif_actuel:"Effectif actuel", effectif_prevu:"Effectif prévu", recrutements:"Recrutements prévus", competences:"Compétences recherchées", formations:"Formations prévues", politique_rh:"Politique RH" },
+  plan_financier: { investissement_initial:"Investissement total", apport_personnel:"Apport personnel", financement_recherche:"Financement recherché", immobilisations:"Immobilisations", bfr:"Besoin en fonds de roulement", seuil_rentabilite:"Seuil de rentabilité", point_mort:"Point mort", amortissements:"Plan d'amortissement", scenario_optimiste:"Scénario optimiste", scenario_realiste:"Scénario réaliste", scenario_prudent:"Scénario prudent",
+    pf_apport:"Apport personnel (plan de financement)", pf_associes:"Associés", pf_famille:"Famille", pf_business_angels:"Business Angels", pf_banque:"Banque", pf_subvention:"Subvention", pf_investisseur:"Investisseur", pf_crowdfunding:"Crowdfunding", pf_diaspo_invest:"Diaspo'Invest", pf_autres_ress:"Autres ressources",
+    pf_terrain:"Achat terrain", pf_construction:"Construction", pf_materiel:"Matériel", pf_vehicules:"Véhicules", pf_logiciels:"Logiciels", pf_stocks:"Stocks", pf_tresorerie:"Trésorerie (emploi)", pf_frais_admin:"Frais administratifs", pf_communication:"Communication (emploi)", pf_recrutement:"Recrutement (emploi)" },
+  impact: { economique:"Impact économique", social:"Impact social", environnemental:"Impact environnemental", territorial:"Impact territorial", kpi_impact:"KPI d'impact" },
+  financement: { montant:"Montant recherché", calendrier_decaissement:"Calendrier de décaissement", utilisation:"Utilisation des fonds", contreparties:"Contreparties proposées", roi:"ROI attendu", strategie_sortie:"Stratégie de sortie", recherche_active:"Financeurs ciblés" },
+};
+
+/* Résout dynamiquement le libellé d'un champ, y compris les clés suffixées (ca_1, cf_ventes_M3, pf_*) */
+function bpFieldLabel(sectionKey, fieldKey) {
+  const direct = BP_FIELD_LABELS[sectionKey]?.[fieldKey];
+  if (direct) return direct;
+  const finLabels = { ca:"Chiffre d'affaires", autres_produits:"Autres produits", achats:"Achats & matières", salaires:"Salaires & charges", loyers:"Loyers & immobilier", marketing_charge:"Marketing & comm.", autres_charges:"Autres charges" };
+  let m = fieldKey.match(/^(ca|autres_produits|achats|salaires|loyers|marketing_charge|autres_charges)_(\d)$/);
+  if (m) return `${finLabels[m[1]]} (An ${m[2]})`;
+  const cfLabels = { ventes:"Ventes", subventions:"Subventions", emprunts:"Emprunts", salaires:"Salaires", fournisseurs:"Fournisseurs", impots:"Impôts", charges_sociales:"Charges sociales", publicite:"Publicité", internet:"Internet", assurances:"Assurances", carburant:"Carburant", eau:"Eau", electricite:"Électricité" };
+  m = fieldKey.match(/^cf_([a-z_]+)_M(\d+)$/);
+  if (m) return `${cfLabels[m[1]]||m[1]} (Mois ${m[2]})`;
+  // Éléments de listes (concurrents, partenaires, étude de prix...) : "concurrents[0].menace" → "Niveau de menace (Concurrent 1)"
+  m = fieldKey.match(/^([a-z_]+)\[(\d+)\]\.([a-z_]+)$/);
+  if (m) {
+    const [, base, idx, sub] = m;
+    const n = Number(idx) + 1;
+    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase' };
+    const subLabels = {
+      nom:'Nom', type:'Type', pays:'Pays', localisation:'Localisation', secteur:'Secteur', role:'Rôle',
+      niveau:'Niveau', contact:'Contact', interet:'Intérêt estimé', commentaire:'Commentaire',
+      produits:'Produit / service', prix:'Prix', positionnement:'Positionnement', forces:'Forces', faiblesses:'Faiblesses',
+      parts_marche:'Part de marché', menace:'Niveau de menace',
+      produit:'Produit', cout_revient:'Coût de revient', prix_vente:'Prix de vente', prix_concurrents:'Prix des concurrents',
+      marge_souhaitee:'Marge souhaitée', volume_estime:'Volume estimé', strategie:'Stratégie tarifaire', seuil_psychologique:'Seuil psychologique',
+    };
+    const baseLabel = baseLabels[base] || base.replace(/_/g,' ');
+    const subLabel = subLabels[sub] || sub.replace(/_/g,' ');
+    return `${subLabel} (${baseLabel} ${n})`;
+  }
+  return fieldKey.replace(/_/g,' ');
+}
+
+function bpNormalize(s) {
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+/* Synonymes métier → mots-clés réels des champs (recherche sémantique simple, sans IA externe) */
+const BP_SYNONYMS = {
+  'cout du projet':'investissement total budget', 'argent prevu':'investissement budget financement apport',
+  'revenus':'ca chiffre affaires recettes revenus', 'chiffre affaires':'ca revenus', 'ca':'chiffre affaires revenus',
+  'machines':'materiel equipement equipements', 'machine':'materiel equipement', 'machines agricoles':'materiel equipements',
+  'employes':'effectif collaborateurs equipe personnel', 'salaries':'effectif collaborateurs salaires',
+  'argent':'investissement budget financement apport montant', 'budget':'investissement financement montant',
+  'benefice':'resultat rentabilite marge', 'profit':'resultat rentabilite marge',
+  'clients':'segments profil client marche', 'concurrents':'concurrence avantage positionnement',
+  'employes recrutement':'recrutements effectif', 'vehicules':'vehicule voiture camion',
+  'local':'adresse ville region pays localisation', 'siege':'adresse ville',
+  'argent recherche':'financement recherche montant investisseur banque subvention',
+  'dette':'endettement financement banque emprunt', 'pret':'emprunt banque financement',
+};
+
+function bpExpandQuery(query) {
+  const norm = bpNormalize(query);
+  let expanded = norm;
+  for (const [phrase, extra] of Object.entries(BP_SYNONYMS)) {
+    if (norm.includes(phrase)) expanded += ' ' + extra;
+  }
+  return expanded;
+}
+
+/* Construit un index plat { section_key, field_key, label, value, path } à partir des sections déjà saisies */
+function buildBPIndex(sections) {
+  const index = [];
+  const pushVal = (sectionKey, fieldKey, value, path) => {
+    if (value == null) return;
+    if (typeof value === 'object') return; // sous-tableaux gérés séparément ci-dessous
+    const str = String(value).trim();
+    if (!str) return;
+    index.push({ sectionKey, fieldKey, label: bpFieldLabel(sectionKey, fieldKey), value: str, path: path||fieldKey });
+  };
+  for (const [sectionKey, data] of Object.entries(sections || {})) {
+    if (!data || typeof data !== 'object') continue;
+    for (const [fieldKey, value] of Object.entries(data)) {
+      if (Array.isArray(value)) {
+        value.forEach((item, i) => {
+          if (item && typeof item === 'object') {
+            for (const [subKey, subVal] of Object.entries(item)) {
+              pushVal(sectionKey, `${fieldKey}[${i}].${subKey}`, subVal, `${fieldKey} #${i+1} → ${subKey}`);
+            }
+          }
+        });
+      } else {
+        pushVal(sectionKey, fieldKey, value);
+      }
+    }
+  }
+  return index;
+}
+
+/* Recherche universelle : retourne les meilleures correspondances pour une question utilisateur */
+function searchBPData(query, sections) {
+  const index = buildBPIndex(sections);
+  if (!index.length) return [];
+  const expandedQuery = bpExpandQuery(query);
+  const qTokens = expandedQuery.split(' ').filter(t => t.length > 2);
+  if (!qTokens.length) return [];
+
+  const scored = index.map(entry => {
+    const labelNorm = bpNormalize(entry.label);
+    const keyNorm = bpNormalize(entry.fieldKey.replace(/[\[\].]/g,' '));
+    const valueNorm = bpNormalize(entry.value);
+    let score = 0;
+    for (const t of qTokens) {
+      if (labelNorm.includes(t)) score += 3;
+      if (keyNorm.includes(t)) score += 2;
+      if (valueNorm.includes(t) && t.length > 3) score += 1;
+    }
+    return { ...entry, score };
+  }).filter(e => e.score > 0);
+
+  scored.sort((a,b) => b.score - a.score);
+  return scored.slice(0, 3);
+}
+
+function fmtBPDate(iso) {
+  if (!iso) return 'inconnue';
+  try { return new Date(iso.replace(' ','T')+'Z').toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' }); }
+  catch { return iso; }
+}
+
+/* Réponse structurée avec citation de source + marqueur de navigation [[GOTO:section]] pour le frontend */
+function formatBPMemoryAnswer(matches, bp) {
+  if (!matches.length) return null;
+  const best = matches[0];
+  const sectionLabel = BP_SECTION_LABELS[best.sectionKey] || best.sectionKey;
+  const dateStr = fmtBPDate(bp.updated_at);
+  let out = `**${best.value}**\n\n📍 **Source :**\n• Formulaire : ${sectionLabel}\n• Champ : ${best.label}\n• Dernière mise à jour : ${dateStr}\n\n👉 [[GOTO:${best.sectionKey}]]`;
+  if (matches.length > 1) {
+    out += `\n\n*Autres résultats possibles :*\n` + matches.slice(1).map(m => `• ${m.label} (${sectionLabel !== (BP_SECTION_LABELS[m.sectionKey]||m.sectionKey) ? BP_SECTION_LABELS[m.sectionKey]||m.sectionKey : sectionLabel}) : ${m.value}`).join('\n');
+  }
+  return out;
+}
+
+/* Historique d'activité récente (module "mémoire d'activité utilisateur") */
+async function getBPRecentActivity(bpId, userId) {
+  const rows = await db.prepare(`SELECT * FROM bp_field_history WHERE bp_id=? ORDER BY created_at DESC LIMIT 15`).all(bpId);
+  if (!rows || !rows.length) return `Je n'ai encore enregistré aucune modification pour ce Business Plan. Dès que vous modifiez un champ, je m'en souviendrai.`;
+  const lines = rows.map(r => {
+    const sectionLabel = BP_SECTION_LABELS[r.section_key] || r.section_key;
+    const fieldLabel = bpFieldLabel(r.section_key, r.field_key);
+    const val = (r.new_value||'').slice(0,60);
+    return `• **${sectionLabel}** → ${fieldLabel} : "${val}${(r.new_value||'').length>60?'…':''}" *(${fmtBPDate(r.created_at)})*`;
+  });
+  return `**🕓 Vos dernières modifications :**\n\n${lines.join('\n')}`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    ASSISTANT BP — Logique de réponse contextuelle
    ═══════════════════════════════════════════════════════════════════ */
 
-function getBPAssistantResponse(message, bp, currentSection, sections) {
+async function getBPAssistantResponse(message, bp, currentSection, sections, userId) {
   const msg = message.toLowerCase();
   const type = bp.type_initiative || 'startup';
   const secteur = bp.secteur || '';
@@ -17416,9 +17781,15 @@ function getBPAssistantResponse(message, bp, currentSection, sections) {
 
   // ── Détection des intentions ──
 
+  // Mémoire d'activité : "qu'est-ce que j'ai modifié récemment ?"
+  if ((msg.includes('modifi') || msg.includes('changé') || msg.includes('change') || msg.includes('ajouté') || msg.includes('ajoute')) &&
+      (msg.includes('récemment') || msg.includes('recemment') || msg.includes('aujourd') || msg.includes('dernièr') || msg.includes('dernier'))) {
+    return await getBPRecentActivity(bp.id, userId);
+  }
+
   // Génération de texte pour une section
   if (msg.includes('génère') || msg.includes('propose') || msg.includes('écris') || msg.includes('rédige') || msg.includes('aide') || msg.includes('example') || msg.includes('exemple')) {
-    return genTextForSection(currentSection, bp, sections);
+    return await genTextForSection(currentSection, bp, sections);
   }
 
   // Analyse qualité / audit
@@ -17442,6 +17813,12 @@ function getBPAssistantResponse(message, bp, currentSection, sections) {
 
   for (const [terme, def] of Object.entries(termes)) {
     if (msg.includes(terme)) return def;
+  }
+
+  // Mémoire universelle : recherche d'une donnée déjà saisie ailleurs dans le dossier
+  const matches = searchBPData(message, sections);
+  if (matches.length && matches[0].score >= 3) {
+    return formatBPMemoryAnswer(matches, bp);
   }
 
   // Conseils financiers
@@ -17605,7 +17982,7 @@ app.post('/api/business-plans/:id/assistant', requireAuth, async (req, res) => {
   const sections = safeJSON(bp.sections_json, {});
   const bpCtx = { ...bp, progression: bp.progression||0, completude: JSON.parse(require('./db').prepare?bp.sections_json:bp.sections_json||'{}') };
 
-  const response = getBPAssistantResponse(message, bp, currentSection, sections);
+  const response = await getBPAssistantResponse(message, bp, currentSection, sections, req.user.id);
 
   // Sauvegarder historique
   let conv = await db.prepare('SELECT * FROM bp_assistant_conv WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
@@ -17615,7 +17992,7 @@ app.post('/api/business-plans/:id/assistant', requireAuth, async (req, res) => {
   // Garder 50 derniers messages
   const trimmed = msgs.slice(-50);
   if (conv) {
-    db.prepare('UPDATE bp_assistant_conv SET messages_json=?, updated_at=datetime("now") WHERE id=?').run(JSON.stringify(trimmed), conv.id);
+    db.prepare(`UPDATE bp_assistant_conv SET messages_json=?, updated_at=datetime('now') WHERE id=?`).run(JSON.stringify(trimmed), conv.id);
   } else {
     db.prepare('INSERT INTO bp_assistant_conv (bp_id, user_id, messages_json) VALUES (?,?,?)').run(bp.id, req.user.id, JSON.stringify(trimmed));
   }
@@ -17947,7 +18324,7 @@ app.post('/api/bp-simulations/:id/finish', requireAuth, async (req, res) => {
   if (!sim) return sendJSON(res, 404, { error: 'Simulation introuvable' });
   const body = await parseBody(req);
   const sections = safeJSON(sim.sections_json, {});
-  const rapport = generateSimulationReport(sim, sim, sections);
+  const rapport = await generateSimulationReport(sim, sim, sections);
   db.prepare("UPDATE bp_simulations SET statut='termine', rapport_json=?, score=?, finished_at=datetime('now'), duree_seconds=? WHERE id=?").run(JSON.stringify(rapport), rapport.score, body.duree_seconds||sim.duree_seconds, sim.id);
   sendJSON(res, 200, { rapport });
 });
@@ -18239,6 +18616,235 @@ app.get('/api/audiovisuel/stats', requireAuth, async (req, res) => {
   const totalEcoutes = await db.prepare('SELECT COALESCE(SUM(nb_ecoutes),0) as n FROM av_episodes WHERE initiative_id=?').get(id).n;
   const totalSeries = (await db.prepare('SELECT COUNT(*) as n FROM av_series WHERE initiative_id=?').get(id))?.n;
   sendJSON(res, 200, { totalLives, totalVuesLive, livesEnCours, totalEpisodes, totalEcoutes, totalSeries });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   SYNCHRONISATION DES RÉSEAUX SOCIAUX
+   ═══════════════════════════════════════════════════════════════════
+   IMPORTANT — aucune clé API officielle (LinkedIn/Meta/X/YouTube/TikTok)
+   n'est configurée sur cette plateforme à ce stade. Ce module est donc
+   livré en mode DÉMONSTRATION : la "connexion" à un réseau et la
+   "détection de nouvelles publications" sont simulées côté serveur
+   (aucun appel réseau externe, aucune donnée d'un vrai compte social
+   n'est lue). L'architecture (tables, routes, statuts) est prête à
+   brancher de vrais connecteurs API dès que les clés seront obtenues,
+   sans changement de contrat côté frontend. */
+
+const SOCIAL_NETWORKS = [
+  { reseau:'linkedin', label:'LinkedIn', icon:'💼' },
+  { reseau:'facebook', label:'Facebook', icon:'📘' },
+  { reseau:'instagram', label:'Instagram', icon:'📸' },
+  { reseau:'x', label:'X (Twitter)', icon:'✖️' },
+  { reseau:'youtube', label:'YouTube', icon:'▶️' },
+  { reseau:'tiktok', label:'TikTok', icon:'🎵' },
+  { reseau:'threads', label:'Threads', icon:'🧵' },
+];
+
+/* S'assure que la config globale (admin) contient les 7 réseaux, une seule fois */
+async function ensureSocialNetworksSeeded() {
+  for (const n of SOCIAL_NETWORKS) {
+    await db.prepare("INSERT OR IGNORE INTO social_reseaux_config (reseau, actif) VALUES (?, 1)").run(n.reseau);
+  }
+}
+ensureSocialNetworksSeeded().catch(()=>{});
+
+function socialNetworkMeta(reseau) {
+  return SOCIAL_NETWORKS.find(n=>n.reseau===reseau);
+}
+
+/* ── Réseaux connectés (utilisateur) ── */
+app.get('/api/social/connections', requireAuth, async (req, res) => {
+  const config = await db.prepare("SELECT * FROM social_reseaux_config").all();
+  const mine = await db.prepare("SELECT * FROM social_connections WHERE user_id=?").all(req.user.id);
+  const list = SOCIAL_NETWORKS.map(n => {
+    const cfg = config.find(c=>c.reseau===n.reseau);
+    const conn = mine.find(c=>c.reseau===n.reseau);
+    return {
+      reseau: n.reseau, label: n.label, icon: n.icon,
+      actif_plateforme: cfg ? !!cfg.actif : true,
+      connecte: conn ? !!conn.connecte : false,
+      derniere_sync: conn?.derniere_sync || null,
+      permissions: conn ? safeJSON(conn.permissions_json, []) : [],
+    };
+  });
+  sendJSON(res, 200, { reseaux: list });
+});
+
+app.post('/api/social/connections/:reseau/connect', requireAuth, async (req, res) => {
+  const reseau = req.params.reseau;
+  const meta = socialNetworkMeta(reseau);
+  if (!meta) return sendJSON(res, 404, { error: 'Réseau inconnu.' });
+  const cfg = await db.prepare("SELECT actif FROM social_reseaux_config WHERE reseau=?").get(reseau);
+  if (cfg && !cfg.actif) return sendJSON(res, 403, { error: `${meta.label} est momentanément désactivé par l'administration.` });
+  const existing = await db.prepare("SELECT * FROM social_connections WHERE user_id=? AND reseau=?").get(req.user.id, reseau);
+  const permissions = JSON.stringify(['lecture_publications_publiques']);
+  if (existing) {
+    await db.prepare("UPDATE social_connections SET connecte=1, permissions_json=?, derniere_sync=datetime('now') WHERE id=?").run(permissions, existing.id);
+  } else {
+    await db.prepare("INSERT INTO social_connections (user_id, reseau, connecte, permissions_json, derniere_sync) VALUES (?,?,1,?,datetime('now'))").run(req.user.id, reseau, permissions);
+  }
+  sendJSON(res, 200, { ok: true, note: "Connexion simulée — aucune clé API officielle n'est configurée pour l'instant." });
+});
+
+app.post('/api/social/connections/:reseau/disconnect', requireAuth, async (req, res) => {
+  await db.prepare("UPDATE social_connections SET connecte=0 WHERE user_id=? AND reseau=?").run(req.user.id, req.params.reseau);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Détection (simulation locale — remplacer par un vrai connecteur API par réseau) ── */
+const SOCIAL_DEMO_CONTENUS = [
+  "Ravi d'annoncer le lancement de notre nouvelle initiative ! Merci à toute l'équipe pour ce travail.",
+  "Retour sur notre participation à l'événement de la semaine dernière — de belles rencontres et de nouveaux partenariats en vue.",
+  "Nous recrutons ! Rejoignez une équipe passionnée par l'impact dans la diaspora.",
+  "Un grand merci à nos partenaires pour leur confiance renouvelée cette année.",
+];
+app.post('/api/social/simulate-detection', requireAuth, async (req, res) => {
+  const body = await parseBody(req);
+  const reseau = body.reseau;
+  const meta = socialNetworkMeta(reseau);
+  if (!meta) return sendJSON(res, 404, { error: 'Réseau inconnu.' });
+  const conn = await db.prepare("SELECT * FROM social_connections WHERE user_id=? AND reseau=? AND connecte=1").get(req.user.id, reseau);
+  if (!conn) return sendJSON(res, 400, { error: `Connectez d'abord ${meta.label} pour simuler une détection.` });
+  const contenu = SOCIAL_DEMO_CONTENUS[Math.floor(Math.random()*SOCIAL_DEMO_CONTENUS.length)];
+  const r = await db.prepare(`INSERT INTO social_posts_detectes (user_id, connection_id, reseau, contenu_brut, statut) VALUES (?,?,?,?,'detecte')`)
+    .run(req.user.id, conn.id, reseau, contenu);
+  await db.prepare("UPDATE social_connections SET derniere_sync=datetime('now') WHERE id=?").run(conn.id);
+  sendJSON(res, 201, { ok: true, id: r.lastInsertRowid });
+});
+
+/* ── Publications détectées ── */
+app.get('/api/social/detected', requireAuth, async (req, res) => {
+  const statut = req.query?.statut;
+  const rows = statut
+    ? await db.prepare("SELECT * FROM social_posts_detectes WHERE user_id=? AND statut=? ORDER BY detected_at DESC").all(req.user.id, statut)
+    : await db.prepare("SELECT * FROM social_posts_detectes WHERE user_id=? ORDER BY detected_at DESC").all(req.user.id);
+  sendJSON(res, 200, { posts: rows.map(r => ({ ...r, medias_json: safeJSON(r.medias_json, []), hashtags_suggeres: safeJSON(r.hashtags_suggeres, []) })) });
+});
+
+/* Adaptation automatique du contenu (règles simples : catégorie + hashtags — pas de LLM externe connecté) */
+const SOCIAL_CATEGORIES_KEYWORDS = {
+  'Recrutement': ['recrut', 'poste', 'rejoign', 'embauch', 'cv'],
+  'Événement': ['événement', 'evenement', 'participat', 'rencontre', 'salon'],
+  'Partenariat': ['partenair', 'collaborat', 'partenariat'],
+  'Annonce': ['lanc', 'annonc', 'nouvel'],
+};
+function adaptSocialContent(contenu) {
+  const norm = bpNormalize(contenu);
+  let categorie = 'Actualité';
+  for (const [cat, kws] of Object.entries(SOCIAL_CATEGORIES_KEYWORDS)) {
+    if (kws.some(k=>norm.includes(k))) { categorie = cat; break; }
+  }
+  const mots = norm.split(' ').filter(w=>w.length>4);
+  const uniques = [...new Set(mots)].slice(0,3);
+  const hashtags = uniques.map(m=>'#'+m.charAt(0).toUpperCase()+m.slice(1)).concat('#DiaspoActif');
+  return { categorie, hashtags };
+}
+app.post('/api/social/detected/:id/adapt-ia', requireAuth, async (req, res) => {
+  const post = await db.prepare("SELECT * FROM social_posts_detectes WHERE id=? AND user_id=?").get(req.params.id, req.user.id);
+  if (!post) return sendJSON(res, 404, { error: 'Introuvable' });
+  const { categorie, hashtags } = adaptSocialContent(post.contenu_brut || '');
+  await db.prepare("UPDATE social_posts_detectes SET categorie_suggeree=?, hashtags_suggeres=? WHERE id=?").run(categorie, JSON.stringify(hashtags), post.id);
+  sendJSON(res, 200, { categorie, hashtags, note: "Suggestion générée par des règles simples (mots-clés) — pas de reformulation par un modèle de langage externe pour l'instant." });
+});
+
+app.post('/api/social/detected/:id/publish', requireAuth, async (req, res) => {
+  const post = await db.prepare("SELECT * FROM social_posts_detectes WHERE id=? AND user_id=?").get(req.params.id, req.user.id);
+  if (!post) return sendJSON(res, 404, { error: 'Introuvable' });
+  if (post.statut === 'importe') return sendJSON(res, 400, { error: 'Déjà publiée.' });
+  const body = await parseBody(req);
+  const contenu = (body.contenu || post.contenu_brut || '').trim();
+  if (!contenu) return sendJSON(res, 400, { error: 'Contenu vide.' });
+  const hashtags = body.hashtags || post.hashtags_suggeres || '[]';
+  const categorie = body.categorie || post.categorie_suggeree || 'Actualité';
+
+  const r = db.prepare(`
+    INSERT INTO fil_posts (auteur_id, auteur_nom, type, pub_type, categorie, contenu, visibilite, medias, hashtags, statut, source_import)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+  `).run(req.user.id, req.user.nom, 'texte', 'texte', categorie, contenu, 'public', '[]', typeof hashtags==='string'?hashtags:JSON.stringify(hashtags), 'publie', post.reseau);
+
+  await db.prepare("UPDATE social_posts_detectes SET statut='importe', diaspo_post_id=?, imported_at=datetime('now') WHERE id=?").run(r.lastInsertRowid, post.id);
+  sendJSON(res, 200, { ok: true, diaspo_post_id: r.lastInsertRowid });
+});
+
+app.post('/api/social/detected/:id/schedule', requireAuth, async (req, res) => {
+  const body = await parseBody(req);
+  if (!body.programmed_at) return sendJSON(res, 400, { error: 'Date requise.' });
+  const post = await db.prepare("SELECT * FROM social_posts_detectes WHERE id=? AND user_id=?").get(req.params.id, req.user.id);
+  if (!post) return sendJSON(res, 404, { error: 'Introuvable' });
+  await db.prepare("UPDATE social_posts_detectes SET statut='programme', programmed_at=? WHERE id=?").run(body.programmed_at, post.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+app.post('/api/social/detected/:id/ignore', requireAuth, async (req, res) => {
+  const post = await db.prepare("SELECT * FROM social_posts_detectes WHERE id=? AND user_id=?").get(req.params.id, req.user.id);
+  if (!post) return sendJSON(res, 404, { error: 'Introuvable' });
+  await db.prepare("UPDATE social_posts_detectes SET statut='ignore' WHERE id=?").run(post.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Historique ── */
+app.get('/api/social/history', requireAuth, async (req, res) => {
+  const rows = await db.prepare("SELECT * FROM social_posts_detectes WHERE user_id=? AND statut IN ('importe','ignore','erreur') ORDER BY detected_at DESC LIMIT 100").all(req.user.id);
+  sendJSON(res, 200, { history: rows });
+});
+
+/* ── Préférences utilisateur ── */
+app.get('/api/social/settings', requireAuth, async (req, res) => {
+  let s = await db.prepare("SELECT * FROM social_sync_settings WHERE user_id=?").get(req.user.id);
+  if (!s) {
+    await db.prepare("INSERT INTO social_sync_settings (user_id) VALUES (?)").run(req.user.id);
+    s = await db.prepare("SELECT * FROM social_sync_settings WHERE user_id=?").get(req.user.id);
+  }
+  sendJSON(res, 200, { ...s, reseaux_surveilles: safeJSON(s.reseaux_surveilles_json, []) });
+});
+app.put('/api/social/settings', requireAuth, async (req, res) => {
+  const body = await parseBody(req);
+  const reseaux = JSON.stringify(body.reseaux_surveilles || []);
+  await db.prepare(`
+    INSERT INTO social_sync_settings (user_id, reseaux_surveilles_json, frequence, notifications, ia_suggestions, programmation_auto)
+    VALUES (?,?,?,?,?,?)
+    ON CONFLICT(user_id) DO UPDATE SET reseaux_surveilles_json=excluded.reseaux_surveilles_json, frequence=excluded.frequence,
+      notifications=excluded.notifications, ia_suggestions=excluded.ia_suggestions, programmation_auto=excluded.programmation_auto
+  `).run(req.user.id, reseaux, body.frequence || 'quotidienne', body.notifications?1:0, body.ia_suggestions?1:0, body.programmation_auto?1:0);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Widget tableau de bord : compteur de publications détectées en attente ── */
+app.get('/api/social/dashboard-widget', requireAuth, async (req, res) => {
+  const pending = await db.prepare("SELECT reseau, COUNT(*) n FROM social_posts_detectes WHERE user_id=? AND statut='detecte' GROUP BY reseau").all(req.user.id);
+  const total = pending.reduce((s,p)=>s+p.n, 0);
+  sendJSON(res, 200, { total, par_reseau: pending });
+});
+
+/* ── Admin : gestion des réseaux, statistiques ── */
+app.get('/api/admin/social/reseaux', requireAuth, async (req, res) => {
+  if (req.user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès réservé.' });
+  const rows = await db.prepare("SELECT * FROM social_reseaux_config").all();
+  const list = SOCIAL_NETWORKS.map(n => {
+    const cfg = rows.find(r=>r.reseau===n.reseau);
+    return { ...n, actif: cfg ? !!cfg.actif : true, limite_freq_min: cfg?.limite_freq_min ?? 60 };
+  });
+  sendJSON(res, 200, { reseaux: list });
+});
+app.put('/api/admin/social/reseaux/:reseau', requireAuth, async (req, res) => {
+  if (req.user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès réservé.' });
+  const body = await parseBody(req);
+  await db.prepare(`
+    INSERT INTO social_reseaux_config (reseau, actif, limite_freq_min) VALUES (?,?,?)
+    ON CONFLICT(reseau) DO UPDATE SET actif=excluded.actif, limite_freq_min=excluded.limite_freq_min
+  `).run(req.params.reseau, body.actif?1:0, body.limite_freq_min || 60);
+  sendJSON(res, 200, { ok: true });
+});
+app.get('/api/admin/social/stats', requireAuth, async (req, res) => {
+  if (req.user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès réservé.' });
+  const comptesConnectes = (await db.prepare("SELECT COUNT(*) n FROM social_connections WHERE connecte=1").get())?.n || 0;
+  const detectees = (await db.prepare("SELECT COUNT(*) n FROM social_posts_detectes").get())?.n || 0;
+  const importees = (await db.prepare("SELECT COUNT(*) n FROM social_posts_detectes WHERE statut='importe'").get())?.n || 0;
+  const tauxRepublication = detectees > 0 ? Math.round(importees/detectees*100) : 0;
+  const parReseau = await db.prepare("SELECT reseau, COUNT(*) n FROM social_connections WHERE connecte=1 GROUP BY reseau ORDER BY n DESC").all();
+  const reseauTop = parReseau[0]?.reseau || null;
+  const parJour = await db.prepare("SELECT date(detected_at) jour, COUNT(*) n FROM social_posts_detectes WHERE detected_at >= datetime('now','-30 days') GROUP BY jour ORDER BY jour DESC").all();
+  sendJSON(res, 200, { comptesConnectes, detectees, importees, tauxRepublication, reseauTop, parReseau, parJour });
 });
 
 /* ═══════════════════════════════════════════════════════════════════ */

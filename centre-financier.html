@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Centre Financier</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+.cf-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0;border-bottom:1px solid var(--border,#e5e7eb);padding-bottom:0;}
+.cf-tab{border:none;background:none;padding:9px 14px;font-size:13.5px;font-weight:700;color:var(--muted,#6b7280);cursor:pointer;border-bottom:3px solid transparent;}
+.cf-tab.active{color:var(--orange,#ff6b00);border-bottom-color:var(--orange,#ff6b00);}
+.cf-card{background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+.cf-wallet-hero{background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:14px;padding:22px;color:#fff;margin-bottom:16px;}
+.cf-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:16px;}
+.cf-kpi{background:rgba(255,255,255,.08);border-radius:8px;padding:10px;text-align:center;}
+.cf-kpi .n{font-size:19px;font-weight:800;}
+.cf-kpi .l{font-size:10.5px;opacity:.65;margin-top:2px;text-transform:uppercase;}
+.cf-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.cf-table th,.cf-table td{border-bottom:1px solid var(--border,#e5e7eb);padding:8px;text-align:left;}
+.cf-table th{color:var(--muted,#6b7280);font-size:11px;text-transform:uppercase;}
+.cf-badge{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;text-transform:uppercase;}
+.cf-badge.valide,.cf-badge.traite,.cf-badge.active{background:#d1fae5;color:#065f46;}
+.cf-badge.en_attente,.cf-badge.demande,.cf-badge.pending{background:#fef3c7;color:#92400e;}
+.cf-badge.rembourse,.cf-badge.annule,.cf-badge.echoue,.cf-badge.rejected{background:#fee2e2;color:#991b1b;}
+.cf-provider-row{display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid var(--border,#e5e7eb);border-radius:10px;margin-bottom:8px;}
+.cf-empty{text-align:center;padding:30px;color:#9ca3af;}
+.cf-settings-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border,#f0f0f0);}
+.cf-settings-row:last-child{border-bottom:none;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="max-width:900px;padding-top:24px;padding-bottom:60px;">
+
+    <div style="margin-bottom:6px;">
+      <h2 style="margin:0 0 2px;">💰 Centre Financier</h2>
+      <p style="margin:0;color:var(--muted,#6b7280);font-size:.88rem;">Recevez vos paiements, suivez vos revenus et effectuez vos retraits — en toute sécurité via Stripe.</p>
+    </div>
+
+    <div class="cf-card" style="background:#fffbeb;border-color:#fde68a;font-size:12.5px;color:#92400e;">
+      🔒 <strong>Sécurité :</strong> Diaspo'Actif ne stocke jamais vos coordonnées bancaires. Toutes les connexions et tous les virements passent par Stripe (prestataire de paiement certifié). Seuls le statut et les montants transitent sur nos serveurs.
+    </div>
+
+    <div class="cf-tabs" id="cf-tabs">
+      <button class="cf-tab active" data-tab="revenus">📊 Mes revenus</button>
+      <button class="cf-tab" data-tab="comptes">🏦 Comptes de réception</button>
+      <button class="cf-tab" data-tab="retrait">💸 Effectuer un retrait</button>
+      <button class="cf-tab" data-tab="parametres">⚙️ Paramètres</button>
+    </div>
+
+    <div id="cf-content"><div class="cf-empty">Chargement…</div></div>
+
+  </main>
+
+  <footer class="footer">
+    <span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span>
+  </footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+
+<script>
+let CF_TAB = 'revenus';
+let CF_DATA = null;
+
+async function cfInit() {
+  document.querySelectorAll('.cf-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cf-tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      CF_TAB = btn.dataset.tab;
+      cfRenderTab();
+    });
+  });
+  try { CF_DATA = await api('GET', '/wallet/centre-financier'); }
+  catch(e) { document.getElementById('cf-content').innerHTML = `<div class="cf-empty">Erreur de chargement : ${e.message||'connexion requise'}</div>`; return; }
+  cfRenderTab();
+}
+
+function cfEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function cfDate(iso) { if (!iso) return '—'; try { return new Date(iso.replace(' ','T')+(iso.includes('Z')?'':'Z')).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); } catch { return iso; } }
+function cfMoney(n) { return (Number(n)||0).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €'; }
+
+function cfRenderTab() {
+  const el = document.getElementById('cf-content');
+  if (!CF_DATA) { el.innerHTML = '<div class="cf-empty">Aucune donnée.</div>'; return; }
+  if (CF_TAB === 'revenus') return cfRenderRevenus(el);
+  if (CF_TAB === 'comptes') return cfRenderComptes(el);
+  if (CF_TAB === 'retrait') return cfRenderRetrait(el);
+  if (CF_TAB === 'parametres') return cfRenderParametres(el);
+}
+
+/* ── Onglet 1 : Mes revenus ── */
+function cfRenderRevenus(el) {
+  const d = CF_DATA;
+  el.innerHTML = `
+    <div class="cf-wallet-hero">
+      <div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.05em;">Solde disponible</div>
+      <div style="font-size:38px;font-weight:800;margin-top:4px;">${cfMoney(d.balance)}</div>
+      <div style="font-size:11.5px;opacity:.6;margin-top:4px;">Commission Diaspo'Actif : ${Math.round(d.commission_rate*100)}% — prélevée automatiquement</div>
+      <div class="cf-kpi-grid">
+        <div class="cf-kpi"><div class="n">${cfMoney(d.revenus.aujourdhui)}</div><div class="l">Aujourd'hui</div></div>
+        <div class="cf-kpi"><div class="n">${cfMoney(d.revenus.semaine)}</div><div class="l">Cette semaine</div></div>
+        <div class="cf-kpi"><div class="n">${cfMoney(d.revenus.mois)}</div><div class="l">Ce mois</div></div>
+        <div class="cf-kpi"><div class="n">${cfMoney(d.revenus.annee)}</div><div class="l">Cette année</div></div>
+        <div class="cf-kpi"><div class="n">${cfMoney(d.revenus.cumule)}</div><div class="l">Total cumulé</div></div>
+      </div>
+    </div>
+    <div class="cf-card">
+      <h3 style="margin-top:0;">Historique des transactions</h3>
+      ${d.historique.length ? `
+      <div style="overflow-x:auto;">
+        <table class="cf-table">
+          <thead><tr><th>Date</th><th>Module</th><th>Source</th><th>Brut</th><th>Commission</th><th>Net</th><th>Statut</th></tr></thead>
+          <tbody>${d.historique.map(h => `
+            <tr>
+              <td>${cfDate(h.date)}</td>
+              <td>${cfEsc(h.module||'—')}</td>
+              <td>${cfEsc(h.source_label||'—')}${h.payeur_nom?` · ${cfEsc(h.payeur_nom)}`:''}</td>
+              <td>${cfMoney(h.montant_brut)}</td>
+              <td>−${cfMoney(h.commission)}</td>
+              <td><strong style="color:#10b981;">${cfMoney(h.montant_net)}</strong></td>
+              <td><span class="cf-badge ${h.statut}">${cfEsc(h.statut)}</span></td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>` : '<div class="cf-empty">Aucune transaction pour l\'instant.</div>'}
+    </div>
+  `;
+}
+
+/* ── Onglet 2 : Comptes de réception ── */
+function cfRenderComptes(el) {
+  const d = CF_DATA;
+  const autresProviders = [
+    { nom: 'PayPal', icon: '💳' }, { nom: 'Mobile Money (Orange/MTN/Moov/Wave)', icon: '📱' },
+    { nom: 'MangoPay', icon: '🥭' }, { nom: 'Lemonway', icon: '🍋' }, { nom: 'Flutterwave', icon: '🌊' },
+  ];
+  el.innerHTML = `
+    <div class="cf-card">
+      <h3 style="margin-top:0;">💼 Stripe Connect</h3>
+      ${d.connect ? `
+        <div class="cf-provider-row">
+          <div>
+            <strong>${cfEsc(d.connect.initiative_nom)}</strong>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Statut : <span class="cf-badge ${d.connect.statut}">${cfEsc(d.connect.statut)}</span>
+              ${d.connect.payouts_enabled ? ' · ✅ Virements activés' : ' · ⏳ Virements non encore activés'}</div>
+          </div>
+          <button class="btn-primary btn-sm" onclick="cfConnectOnboard(${d.connect.initiative_id})">${d.connect.connecte ? 'Gérer / Compléter' : 'Connecter Stripe'}</button>
+        </div>
+      ` : `
+        <div class="cf-empty">Vous devez posséder une Initiative pour connecter un compte de réception. <a href="dashboard-initiative.html">Créer mon initiative →</a></div>
+      `}
+    </div>
+    <div class="cf-card">
+      <h3 style="margin-top:0;">Autres prestataires</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-6px;">Non connectés pour l'instant — l'architecture est prête à les accueillir dès que les intégrations officielles seront disponibles.</p>
+      ${autresProviders.map(p => `
+        <div class="cf-provider-row" style="opacity:.6;">
+          <div>${p.icon} ${cfEsc(p.nom)}</div>
+          <span class="cf-badge pending">Bientôt disponible</span>
+        </div>`).join('')}
+    </div>
+  `;
+}
+async function cfConnectOnboard(initiativeId) {
+  try {
+    const r = await api('POST', `/initiatives/${initiativeId}/connect/onboard`);
+    if (r.url) window.location.href = r.url;
+  } catch(e) { cfToast(e.message || 'Erreur Stripe Connect', 'error'); }
+}
+
+/* ── Onglet 3 : Retrait ── */
+function cfRenderRetrait(el) {
+  const d = CF_DATA;
+  const peutRetirer = d.connect && d.connect.payouts_enabled;
+  el.innerHTML = `
+    <div class="cf-card">
+      <h3 style="margin-top:0;">Demander un retrait</h3>
+      <p style="font-size:12.5px;color:var(--muted);">Solde disponible : <strong>${cfMoney(d.balance)}</strong></p>
+      ${!peutRetirer ? `<div class="cf-empty" style="padding:16px;">${!d.connect ? 'Connectez d\'abord une Initiative avec Stripe Connect (onglet "Comptes de réception").' : 'Votre compte Stripe Connect doit être entièrement activé (virements) avant de pouvoir retirer des fonds.'}</div>` : `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Montant à retirer (€)</label>
+          <input type="number" id="cf-withdraw-amount" min="0" max="${d.balance}" step="0.01" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;width:160px;">
+        </div>
+        <button class="btn-primary" onclick="cfWithdrawAll()">Retirer tout le solde</button>
+        <button class="btn-outline" onclick="cfWithdraw()">Retirer ce montant</button>
+      </div>
+      <p style="font-size:11.5px;color:var(--muted);margin-top:10px;">Virement Stripe réel (mode test) — délai estimé : 2 à 7 jours ouvrés selon le pays. Aucuns frais Diaspo'Actif supplémentaires sur le retrait.</p>
+      `}
+    </div>
+    <div class="cf-card">
+      <h3 style="margin-top:0;">Historique des retraits</h3>
+      ${d.retraits.length ? `
+      <table class="cf-table">
+        <thead><tr><th>Date</th><th>Montant</th><th>Statut</th><th>Détail</th></tr></thead>
+        <tbody>${d.retraits.map(r => `
+          <tr>
+            <td>${cfDate(r.created_at)}</td>
+            <td>${cfMoney(r.montant)}</td>
+            <td><span class="cf-badge ${r.statut}">${cfEsc(r.statut)}</span></td>
+            <td style="font-size:11.5px;color:var(--muted);">${r.stripe_transfer_id ? cfEsc(r.stripe_transfer_id) : (r.erreur_msg ? cfEsc(r.erreur_msg) : '—')}</td>
+          </tr>`).join('')}</tbody>
+      </table>` : '<div class="cf-empty">Aucun retrait pour l\'instant.</div>'}
+    </div>
+  `;
+}
+function cfToast(msg, type) {
+  let t = document.getElementById('cf-toast');
+  if (!t) { t = document.createElement('div'); t.id='cf-toast'; t.style.cssText='position:fixed;bottom:24px;right:24px;z-index:9999;max-width:340px;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.18);opacity:0;transition:opacity .25s;'; document.body.appendChild(t); }
+  t.style.background = type==='error' ? '#fee2e2' : '#d1fae5';
+  t.style.color = type==='error' ? '#991b1b' : '#065f46';
+  t.textContent = msg;
+  requestAnimationFrame(()=>{ t.style.opacity='1'; });
+  clearTimeout(t._t); t._t = setTimeout(()=>{ t.style.opacity='0'; }, 4500);
+}
+async function cfWithdraw() {
+  const val = parseFloat(document.getElementById('cf-withdraw-amount').value);
+  if (!val || val <= 0) { cfToast('Indiquez un montant valide.', 'error'); return; }
+  await cfDoWithdraw(val);
+}
+async function cfWithdrawAll() { await cfDoWithdraw(CF_DATA.balance); }
+async function cfDoWithdraw(montant) {
+  try {
+    const r = await api('POST', '/wallet/withdraw', { montant });
+    cfToast('Retrait traité avec succès (réf. ' + r.stripe_transfer_id + ').', 'success');
+    CF_DATA = await api('GET', '/wallet/centre-financier');
+    cfRenderTab();
+  } catch(e) { cfToast(e.message || 'Erreur lors du retrait.', 'error'); }
+}
+
+/* ── Onglet 4 : Paramètres ── */
+function cfRenderParametres(el) {
+  const s = CF_DATA.settings;
+  el.innerHTML = `
+    <div class="cf-card">
+      <div class="cf-settings-row">
+        <div><strong>Devise préférée</strong></div>
+        <select id="cf-devise" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border,#e5e7eb);">
+          ${['EUR','USD','GBP','XOF','MAD','CAD'].map(c=>`<option value="${c}" ${s.devise_preferee===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="cf-settings-row">
+        <div><strong>Fréquence des virements automatiques</strong></div>
+        <select id="cf-frequence" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border,#e5e7eb);">
+          <option value="manuel" ${s.frequence_auto==='manuel'?'selected':''}>Manuel (je demande moi-même)</option>
+          <option value="hebdomadaire" ${s.frequence_auto==='hebdomadaire'?'selected':''}>Hebdomadaire</option>
+          <option value="mensuel" ${s.frequence_auto==='mensuel'?'selected':''}>Mensuel</option>
+        </select>
+      </div>
+      <div class="cf-settings-row">
+        <div><strong>Seuil minimum avant transfert automatique (€)</strong></div>
+        <input type="number" id="cf-seuil" value="${s.seuil_auto||0}" min="0" step="1" style="width:100px;padding:6px 10px;border-radius:8px;border:1px solid var(--border,#e5e7eb);">
+      </div>
+      <div class="cf-settings-row">
+        <div><strong>Notifications de paiement</strong></div>
+        <input type="checkbox" id="cf-notif" ${s.notifications?'checked':''} style="width:18px;height:18px;">
+      </div>
+    </div>
+    <button class="btn-primary" onclick="cfSaveSettings()">💾 Enregistrer</button>
+  `;
+}
+async function cfSaveSettings() {
+  const body = {
+    devise_preferee: document.getElementById('cf-devise').value,
+    frequence_auto: document.getElementById('cf-frequence').value,
+    seuil_auto: parseFloat(document.getElementById('cf-seuil').value) || 0,
+    notifications: document.getElementById('cf-notif').checked,
+  };
+  await api('PUT', '/wallet/settings', body);
+  cfToast('Préférences enregistrées.');
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await fetchCurrentUser?.();
+  if (!CURRENT_USER) { window.location.href = 'login.html'; return; }
+  await cfInit();
+});
+</script>
+</body>
+</html>

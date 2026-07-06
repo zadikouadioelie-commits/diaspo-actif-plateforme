@@ -8,3 +8,4 @@ server/diaspoactif.db
 backups/
 
 .vercel
+server/uploads/

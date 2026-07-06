@@ -47,7 +47,6 @@
 
       <div class="sb-group-lbl">02 — INITIATIVES</div>
       <a href="#presentation" data-section="presentation">📋 Ma fiche initiative</a>
-      <a href="#mes-projets" data-section="mes-projets">🟩 Mes projets <span class="pill" id="init-projets-badge" style="display:none;"></span></a>
       <a href="#publications" data-section="publications">📰 Publications</a>
       <a href="#evenements" data-section="evenements">📅 Événements</a>
       <a href="#billetterie-init" data-section="billetterie-init">🎟️ Billetterie <span class="pill" id="init-billets-badge" style="display:none;"></span></a>
@@ -66,9 +65,10 @@
       <a href="agenda.html">📅 Mon Agenda</a>
       <a href="reseau.html">🌐 Mon Réseau Pro <span class="pill" id="reseau-badge" style="display:none;"></span></a>
       <a href="reunions.html">📹 Visioconférence</a>
+      <a href="reseaux-sociaux.html">🔄 Synchro réseaux sociaux</a>
+      <a href="centre-financier.html">💰 Centre Financier</a>
 
       <div class="sb-group-lbl">06 — COLLABORATION</div>
-      <a href="#deals" data-section="deals">🤝 Mes Deals <span class="pill" id="deals-badge" style="display:none;"></span></a>
       <a href="business-plan.html">📋 Business Plans</a>
       <a href="audiovisuel.html">📺 Audiovisuel</a>
 
@@ -545,13 +545,31 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <!-- Catégorie -->
         <select id="pub-categorie" class="input-field" style="margin-bottom:10px;width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;">
           <option value="Actualité">📰 Actualité</option>
-          <option value="Appel à projets">🤝 Appel à projets</option>
           <option value="Événement">📅 Événement</option>
           <option value="Témoignage">💬 Témoignage</option>
           <option value="Vidéo">🎬 Vidéo (&lt;3 min)</option>
           <option value="Offre">💼 Offre d'emploi</option>
           <option value="Annonce">📢 Annonce</option>
         </select>
+
+        <!-- Upload vidéo (visible seulement si catégorie = Vidéo) -->
+        <div id="pub-video-zone" style="display:none;margin-bottom:10px;padding:12px;border:1px dashed var(--border);border-radius:10px;background:#F8FAFC;">
+          <label for="pub-video-file" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:700;color:#555;">
+            🎬 Déposer une vidéo (MP4 ou tout autre format vidéo)
+          </label>
+          <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted);">Les vidéos de plus de 3 minutes sont automatiquement découpées aux 3 premières minutes.</p>
+          <input type="file" id="pub-video-file" accept="video/*" style="margin-top:8px;font-size:12.5px;">
+          <input type="hidden" id="pub-video-url" value="">
+          <div id="pub-video-trim-wrap" style="display:none;margin-top:8px;">
+            <div style="height:6px;background:#e5e7eb;border-radius:99px;overflow:hidden;"><div id="pub-video-trim-bar" style="height:100%;width:0%;background:#8b5cf6;"></div></div>
+            <span id="pub-video-trim-label" style="font-size:11px;color:var(--muted);">✂️ Découpage automatique à 3 minutes en cours…</span>
+          </div>
+          <div id="pub-video-progress-wrap" style="display:none;margin-top:8px;">
+            <div style="height:6px;background:#e5e7eb;border-radius:99px;overflow:hidden;"><div id="pub-video-bar" style="height:100%;width:0%;background:var(--orange);"></div></div>
+            <span id="pub-video-pct" style="font-size:11px;color:var(--muted);">0%</span>
+          </div>
+          <div id="pub-video-name" style="margin-top:6px;font-size:12.5px;color:var(--muted);"></div>
+        </div>
 
         <!-- Contenu -->
         <textarea id="pub-contenu" style="width:100%;min-height:100px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;font-size:13px;resize:vertical;" placeholder="Partager une actualité, une opportunité, un appel à projets…"></textarea>
@@ -599,9 +617,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
         <!-- Actions -->
         <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <button class="btn btn-orange" id="pub-btn" ${abonneActif ? "" : "disabled"} style="min-width:160px;">🚀 Publier maintenant</button>
-          <button class="btn btn-outline" id="pub-preview-btn" ${abonneActif ? "" : "disabled"}>👁️ Aperçu</button>
-          ${!abonneActif ? `<span style="color:var(--muted);font-size:12px;">Abonnez-vous pour débloquer la publication.</span>` : ""}
+          <!-- Accès publication libéré temporairement (abonnement désactivé). Pour réactiver : reconditionner ces 2 boutons sur abonneActif (disabled) et réafficher l'avertissement. -->
+          <button class="btn btn-orange" id="pub-btn" style="min-width:160px;">🚀 Publier maintenant</button>
+          <button class="btn btn-outline" id="pub-preview-btn">👁️ Aperçu</button>
         </div>
       </div>
 
@@ -900,28 +918,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <button onclick="closeAdModal()" class="btn btn-outline">Annuler</button>
           <button id="ad-btn-save" class="btn btn-orange" onclick="saveAd()">📣 Soumettre pour validation</button>
         </div>
-      </div>
-    </div>
-
-    <!-- ── SECTION DEALS ── -->
-    <div class="card" style="margin-bottom:20px;display:none;" id="deals">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <h3 style="margin:0;">🤝 Mes Deals</h3>
-      </div>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Espaces de collaboration privés entre initiatives. Négociations, partenariats, projets communs.</p>
-      <div id="deals-gate" style="display:none;background:#fef2f2;border:1.5px solid #dc2626;border-radius:12px;padding:20px;text-align:center;margin-bottom:14px;">
-        <div style="font-size:36px;margin-bottom:8px;">🔒</div>
-        <div style="font-weight:700;color:#1e293b;margin-bottom:4px;">Accréditation requise</div>
-        <p style="font-size:13px;color:#64748b;margin:0 0 12px;">Le module « Gérer un Deal » est une accréditation officielle Diaspo'Actif. Contactez l'administration pour l'obtenir.</p>
-        <a href="#accreditations" class="btn btn-orange" onclick="window.initShowSection&&window.initShowSection('accreditations')">Voir mes accréditations →</a>
-      </div>
-      <div id="deals-content" style="display:none;">
-        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-          <button class="btn btn-sm" style="background:#2563eb;color:#fff;" onclick="openDealModal()">➕ Nouveau Deal</button>
-          <button class="btn btn-sm btn-outline" onclick="renderDealsSection()">↺ Actualiser</button>
-        </div>
-        <div id="deals-invites-list" style="margin-bottom:16px;"></div>
-        <div id="deals-list"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
       </div>
     </div>
 
@@ -1226,46 +1222,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>
     </div>
 
-    <!-- Modal Nouveau Deal -->
-    <div id="deal-create-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
-      <div style="max-width:560px;margin:40px auto;background:#1e293b;border-radius:14px;padding:24px;color:#e2e8f0;">
-        <h3 style="margin:0 0 16px;">🤝 Créer un nouveau Deal</h3>
-        <div style="margin-bottom:12px;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Titre *</label><input id="deal-titre" class="form-control" placeholder="Titre du deal" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;box-sizing:border-box;"/></div>
-        <div style="margin-bottom:12px;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Objectif</label><textarea id="deal-objectif" class="form-control" rows="2" placeholder="Objectif principal de ce deal" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;resize:none;box-sizing:border-box;"></textarea></div>
-        <div style="margin-bottom:12px;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Description</label><textarea id="deal-desc" class="form-control" rows="2" placeholder="Description" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;resize:none;box-sizing:border-box;"></textarea></div>
-        <div style="display:flex;gap:10px;margin-bottom:12px;">
-          <div style="flex:1;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Catégorie</label>
-            <select id="deal-cat" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;">
-              <option value="partenariat">Partenariat</option>
-              <option value="investissement">Investissement</option>
-              <option value="negociation">Négociation</option>
-              <option value="projet_commun">Projet commun</option>
-              <option value="autre">Autre</option>
-            </select>
-          </div>
-          <div style="flex:1;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Confidentialité</label>
-            <select id="deal-conf" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;">
-              <option value="prive">Privé</option>
-              <option value="confidentiel">Confidentiel</option>
-              <option value="ultra_confidentiel">Ultra confidentiel</option>
-            </select>
-          </div>
-        </div>
-        <div style="display:flex;gap:10px;margin-bottom:12px;">
-          <div style="flex:1;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Date de début</label><input type="date" id="deal-debut" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;box-sizing:border-box;"/></div>
-          <div style="flex:1;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Date de fin prévue</label><input type="date" id="deal-fin" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;box-sizing:border-box;"/></div>
-        </div>
-        <div style="margin-bottom:16px;"><label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Initiatives à inviter (optionnel)</label>
-          <select id="deal-invites" multiple style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-size:13px;height:100px;box-sizing:border-box;"><option disabled>Chargement…</option></select>
-          <div style="font-size:11px;color:#64748b;margin-top:4px;">Ctrl+clic pour sélectionner plusieurs</div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-sm" style="background:#2563eb;color:#fff;" onclick="createDeal()">Créer le Deal</button>
-          <button class="btn btn-sm btn-outline" onclick="document.getElementById('deal-create-modal').style.display='none'">Annuler</button>
-        </div>
-      </div>
-    </div>
-
     </div>`;
 
   /* Moyens de paiement */
@@ -1284,12 +1240,151 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       document.getElementById("sub-badge").outerHTML = subBadgeHTML();
       document.getElementById("sub-notice").innerHTML = subNoticeHTML();
       document.getElementById("btn-subscribe").textContent = abonneActif ? "Suspendre l'abonnement (simulation)" : "Activer mon abonnement (simulation)";
-      const pubBtn = document.getElementById("pub-btn");
-      if (pubBtn) pubBtn.disabled = !abonneActif;
+      // Publication non conditionnée à l'abonnement pour l'instant (accès libre, restriction prévue plus tard).
     } catch (e) { console.error(e); }
   });
 
   /* ══ MODULE PUBLICATION ══ */
+  // Catégorie → afficher la zone d'upload vidéo si "Vidéo" est choisi
+  let pubVideoDuree = null;
+  const pubCategorieSel = document.getElementById('pub-categorie');
+  if (pubCategorieSel) pubCategorieSel.addEventListener('change', () => {
+    const zone = document.getElementById('pub-video-zone');
+    if (zone) zone.style.display = pubCategorieSel.value === 'Vidéo' ? '' : 'none';
+  });
+
+  // Upload de la vidéo (MP4 ou tout autre format vidéo, max 3 minutes)
+  const pubVideoFile = document.getElementById('pub-video-file');
+  const PUB_VIDEO_MAX_S = 180;
+
+  /* Découpe une vidéo trop longue en la ré-enregistrant en temps réel (canvas + audio → MediaRecorder),
+     sans dépendance externe (pas de ffmpeg disponible côté client ni côté serveur ici). */
+  function trimVideoTo180s(file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.muted = false;
+      video.playsInline = true;
+      video.src = URL.createObjectURL(file);
+      video.style.position = 'fixed';
+      video.style.left = '-9999px';
+      document.body.appendChild(video);
+
+      video.onloadedmetadata = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        const ctx = canvas.getContext('2d');
+        const videoStream = canvas.captureStream(30);
+
+        let combinedStream = videoStream;
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const source = audioCtx.createMediaElementSource(video);
+          const dest = audioCtx.createMediaStreamDestination();
+          source.connect(dest);
+          dest.stream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
+        } catch (e) { /* pas de piste audio disponible, on continue en vidéo seule */ }
+
+        const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+          .find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || 'video/webm';
+        const recorder = new MediaRecorder(combinedStream, { mimeType });
+        const chunks = [];
+        recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+        recorder.onstop = () => {
+          document.body.removeChild(video);
+          const blob = new Blob(chunks, { type: mimeType });
+          const trimmedFile = new File([blob], (file.name || 'video').replace(/\.[^.]+$/, '') + '-3min.webm', { type: mimeType });
+          resolve({ file: trimmedFile, duree: PUB_VIDEO_MAX_S });
+        };
+
+        let raf;
+        const drawFrame = () => {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          if (onProgress) onProgress(Math.min(video.currentTime, PUB_VIDEO_MAX_S));
+          if (video.currentTime < PUB_VIDEO_MAX_S && !video.ended) raf = requestAnimationFrame(drawFrame);
+        };
+
+        video.onended = () => { cancelAnimationFrame(raf); if (recorder.state !== 'inactive') recorder.stop(); };
+        video.ontimeupdate = () => {
+          if (video.currentTime >= PUB_VIDEO_MAX_S && recorder.state === 'recording') {
+            video.pause();
+            cancelAnimationFrame(raf);
+            recorder.stop();
+          }
+        };
+
+        recorder.start();
+        video.currentTime = 0;
+        video.play().then(() => { drawFrame(); }).catch(err => { document.body.removeChild(video); reject(err); });
+      };
+      video.onerror = () => { try { document.body.removeChild(video); } catch(_){} reject(new Error('Fichier vidéo invalide.')); };
+    });
+  }
+
+  function uploadPubVideo(file, duree) {
+    pubVideoDuree = duree;
+    const pw = document.getElementById('pub-video-progress-wrap');
+    const bar = document.getElementById('pub-video-bar');
+    const pct = document.getElementById('pub-video-pct');
+    const nameEl = document.getElementById('pub-video-name');
+    if (pw) pw.style.display = '';
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload/video');
+    xhr.upload.onprogress = ev2 => {
+      if (ev2.lengthComputable) { const p = Math.round(ev2.loaded / ev2.total * 100); if (bar) bar.style.width = p + '%'; if (pct) pct.textContent = p + '%'; }
+    };
+    xhr.onload = () => {
+      if (pw) pw.style.display = 'none';
+      if (xhr.status === 200) {
+        const r = JSON.parse(xhr.responseText);
+        document.getElementById('pub-video-url').value = r.url;
+        if (nameEl) nameEl.textContent = '✅ ' + file.name + (duree === PUB_VIDEO_MAX_S ? ' (découpée à 3 min)' : '');
+        showToast(duree === PUB_VIDEO_MAX_S ? 'Vidéo découpée automatiquement à 3 minutes et téléversée.' : 'Vidéo téléversée.', 'success');
+      } else {
+        const err = JSON.parse(xhr.responseText || '{}');
+        showToast(err.error || 'Erreur upload vidéo.', 'error');
+      }
+    };
+    xhr.onerror = () => { if (pw) pw.style.display = 'none'; showToast('Erreur réseau upload vidéo.', 'error'); };
+    xhr.send(file);
+  }
+
+  if (pubVideoFile) pubVideoFile.addEventListener('change', ev => {
+    const file = ev.target.files[0]; if (!file) return;
+    if (!file.type.startsWith('video/')) { showToast('Merci de déposer un fichier vidéo.', 'warning'); return; }
+    const blobUrl = URL.createObjectURL(file);
+    const tmpVid = document.createElement('video');
+    tmpVid.src = blobUrl;
+    tmpVid.onloadedmetadata = async () => {
+      const duration = tmpVid.duration;
+      URL.revokeObjectURL(blobUrl);
+
+      if (duration > PUB_VIDEO_MAX_S) {
+        const trimWrap = document.getElementById('pub-video-trim-wrap');
+        const trimBar = document.getElementById('pub-video-trim-bar');
+        const trimLabel = document.getElementById('pub-video-trim-label');
+        if (trimWrap) trimWrap.style.display = '';
+        showToast(`Vidéo trop longue (${Math.round(duration)}s) — découpage automatique aux 3 premières minutes…`, 'info');
+        try {
+          const { file: trimmedFile, duree } = await trimVideoTo180s(file, elapsed => {
+            if (trimBar) trimBar.style.width = Math.round(elapsed / PUB_VIDEO_MAX_S * 100) + '%';
+            if (trimLabel) trimLabel.textContent = `✂️ Découpage en cours… ${Math.round(elapsed)}s / ${PUB_VIDEO_MAX_S}s`;
+          });
+          if (trimWrap) trimWrap.style.display = 'none';
+          uploadPubVideo(trimmedFile, duree);
+        } catch (e) {
+          if (trimWrap) trimWrap.style.display = 'none';
+          showToast('Impossible de découper cette vidéo automatiquement : ' + (e.message || 'erreur inconnue') + '. Essayez un autre fichier.', 'error');
+          pubVideoFile.value = '';
+        }
+        return;
+      }
+
+      uploadPubVideo(file, Math.round(duration));
+    };
+    tmpVid.onerror = () => { URL.revokeObjectURL(blobUrl); showToast('Fichier vidéo invalide.', 'warning'); };
+  });
+
   // Radio mode → UI
   document.querySelectorAll('input[name="pub-mode"]').forEach(r => {
     r.addEventListener('change', () => {
@@ -1317,13 +1412,21 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     const visibilite = document.querySelector('input[name="pub-visibilite"]:checked')?.value || 'public';
     const mode      = document.querySelector('input[name="pub-mode"]:checked')?.value || 'maintenant';
 
-    if (!contenu) { DA.toast?.('Le contenu ne peut pas être vide.', {type:'warning'}) || alert('Le contenu ne peut pas être vide.'); return; }
+    const notify = (msg, type) => { if (typeof showToast === 'function') showToast(msg, type); else alert(msg); };
+
+    if (!contenu) { notify('Le contenu ne peut pas être vide.', 'warning'); return; }
 
     if (mode === 'programme') {
       const dateVal = document.getElementById('pub-programmed-at').value;
-      if (!dateVal) { DA.toast?.('Choisissez une date de publication.', {type:'warning'}) || alert('Choisissez une date de publication.'); return; }
+      if (!dateVal) { notify('Choisissez une date de publication.', 'warning'); return; }
       const prog = new Date(dateVal);
-      if (prog <= new Date()) { DA.toast?.('La date programmée doit être dans le futur.', {type:'warning'}) || alert('La date programmée doit être dans le futur.'); return; }
+      if (prog <= new Date()) { notify('La date programmée doit être dans le futur.', 'warning'); return; }
+    }
+
+    const videoUrl = document.getElementById('pub-video-url')?.value || '';
+    if (categorie === 'Vidéo' && mode !== 'brouillon' && !videoUrl) {
+      notify('Déposez une vidéo (MP4 ou tout autre format vidéo, max 3 minutes) avant de publier.', 'warning');
+      return;
     }
 
     pubBtn.disabled = true;
@@ -1336,24 +1439,34 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         statut: mode === 'brouillon' ? 'brouillon' : 'publie',
         programmed_at: mode === 'programme' ? document.getElementById('pub-programmed-at').value : null
       };
+      if (videoUrl) {
+        payload.pub_type = 'video';
+        payload.media_url = videoUrl;
+        payload.video_duree = pubVideoDuree;
+      }
       await api("POST", "/fil", payload);
       document.getElementById("pub-contenu").value = "";
+      // Reset vidéo
+      document.getElementById('pub-video-url').value = '';
+      document.getElementById('pub-video-file').value = '';
+      document.getElementById('pub-video-name').textContent = '';
+      pubVideoDuree = null;
       // Reset mode → maintenant
       document.querySelector('input[name="pub-mode"][value="maintenant"]').checked = true;
       document.querySelector('input[name="pub-mode"]').dispatchEvent(new Event('change'));
 
       if (mode === 'brouillon') {
-        DA.toast?.('Brouillon enregistré.', {type:'success'}) || alert('Brouillon enregistré.');
+        notify('Brouillon enregistré.', 'success');
       } else if (mode === 'programme') {
         const d = new Date(document.getElementById('pub-programmed-at').value || '');
-        DA.toast?.('Publication programmée pour le ' + d.toLocaleString('fr-FR') + '.', {type:'success'}) || alert('Publication programmée !');
+        notify('Publication programmée pour le ' + d.toLocaleString('fr-FR') + '.', 'success');
         document.getElementById('pub-programmed-at').value = '';
       } else {
-        DA.toast?.('Publication envoyée ! Elle est visible sur le fil d\'actualité.', {type:'success'}) || alert('Publication envoyée !');
+        notify('Publication envoyée ! Elle est visible sur le fil d\'actualité.', 'success');
       }
       loadPubRecentes();
     } catch (e) {
-      DA.toast?.('Erreur : ' + (e.message || 'Impossible de publier.'), {type:'danger'}) || alert('Erreur : ' + e.message);
+      notify('Erreur : ' + (e.message || 'Impossible de publier.'), 'error');
     } finally {
       pubBtn.disabled = false;
       pubBtn.textContent = origText;
@@ -1404,7 +1517,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     } catch(e) { el.innerHTML = '<p style="color:#ef4444;font-size:13px;">Erreur de chargement.</p>'; }
   };
 
-  renderAllAds();
+  loadMyAds();
 
   /* ── Accréditations DA ── */
   async function loadInitAccred() {
@@ -1870,7 +1983,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Cockpit de pilotage — projets, performance et actions</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-orange" onclick="initShowSection('mes-projets')">+ Nouveau projet</button>
           <button class="btn btn-outline" onclick="if(window.Posts){Posts.openModal();}else{location.href='fil-actualite.html';}" style="border-color:#4338CA;color:#4338CA;">✍️ Créer un post</button>
           <a href="initiative.html?id=${init.slug||init.id}" class="btn btn-outline" target="_blank">Voir ma fiche →</a>
         </div>
@@ -1888,15 +2000,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div style="font-size:26px;font-weight:800;color:#10b981;" id="init-kpi-vues">${(init.vues||0).toLocaleString('fr-FR')}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;">Vues du profil</div>
         </div>
-        <div class="card" style="text-align:center;padding:14px;">
-          <div style="font-size:26px;font-weight:800;color:#8b5cf6;" id="init-kpi-projets">—</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Projets actifs</div>
-        </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:0;">
-        <button class="btn btn-orange" onclick="initShowSection('mes-projets')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
-          <span style="font-size:20px;">🟩</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Créer un projet</div><div style="font-size:11px;opacity:.8;">Déposer une initiative terrain</div></div>
-        </button>
         <button class="btn btn-outline" onclick="initShowSection('publications')" style="justify-content:flex-start;gap:10px;padding:12px 16px;">
           <span style="font-size:20px;">📰</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Nouvelle publication</div><div style="font-size:11px;color:var(--muted);">Fil d'actualité</div></div>
         </button>
@@ -1926,8 +2031,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>
         </div>
       </div>
+      <div class="card" style="margin-top:16px;" id="cockpit-social-sync-card">
+        <h3 style="margin:0 0 12px;font-size:15px;">🔄 Synchronisation des réseaux</h3>
+        <div id="cockpit-social-sync-body" style="font-size:13px;color:var(--muted);">Chargement…</div>
+      </div>
+      <div class="card" style="margin-top:16px;" id="cockpit-financier-card">
+        <h3 style="margin:0 0 12px;font-size:15px;">💰 Centre Financier</h3>
+        <div id="cockpit-financier-body" style="font-size:13px;color:var(--muted);">Chargement…</div>
+      </div>
     </div>`;
     content.insertAdjacentHTML('afterbegin', cockpitHTML);
+    loadCockpitSocialSyncWidget();
+    loadCockpitFinancierWidget();
 
     // QR code vers la vitrine publique (profil.html?id=<owner>#vitrine)
     try {
@@ -1941,28 +2056,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     } catch(e) {}
 
     renderVisibiliteVitrineStatut(init.vitrine_active);
-
-    /* Section mes-projets */
-    const projetsSec = document.createElement('div');
-    projetsSec.id = 'mes-projets';
-    projetsSec.innerHTML = `
-      <div class="card" style="margin-bottom:20px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-          <h2 style="margin:0;">🟩 Mes Projets</h2>
-          <button class="btn btn-orange btn-sm" onclick="initOpenProjet()">+ Nouveau projet</button>
-        </div>
-        <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:16px;">
-          <button class="u-proj-filter active" data-pf="" onclick="initFilterProjets(this,'')">Tous</button>
-          <button class="u-proj-filter" data-pf="brouillon" onclick="initFilterProjets(this,'brouillon')">📝 Brouillon</button>
-          <button class="u-proj-filter" data-pf="en_attente" onclick="initFilterProjets(this,'en_attente')">⏳ En attente</button>
-          <button class="u-proj-filter" data-pf="verification" onclick="initFilterProjets(this,'verification')">🔍 Vérification</button>
-          <button class="u-proj-filter" data-pf="validation" onclick="initFilterProjets(this,'validation')">🏛️ Validation</button>
-          <button class="u-proj-filter" data-pf="execution" onclick="initFilterProjets(this,'execution')">⚡ Exécution</button>
-          <button class="u-proj-filter" data-pf="termine" onclick="initFilterProjets(this,'termine')">✅ Terminé</button>
-        </div>
-        <div id="init-projets-list"><div style="color:var(--muted);font-size:13px;text-align:center;padding:20px;">Chargement…</div></div>
-      </div>`;
-    content.insertBefore(projetsSec, document.getElementById('presentation'));
 
     /* Section zones */
     const zonesSec = document.createElement('div');
@@ -1994,102 +2087,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div style="font-size:26px;font-weight:800;color:#10b981;">${(init.vues||0).toLocaleString('fr-FR')}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;">Vues profil</div>
         </div>
-        <div style="text-align:center;padding:14px;background:#f8fafc;border-radius:10px;">
-          <div style="font-size:26px;font-weight:800;color:#3b82f6;" id="init-stat-projets">—</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Projets créés</div>
-        </div>
-        <div style="text-align:center;padding:14px;background:#f8fafc;border-radius:10px;">
-          <div style="font-size:26px;font-weight:800;color:#8b5cf6;" id="init-stat-termines">—</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Projets terminés</div>
-        </div>
       </div>
     </div>`;
     content.appendChild(statsSec);
 
-    /* Charger projets */
-    let _initProjets = [];
-    const INIT_STATUT = {brouillon:'📝 Brouillon',en_attente:'⏳ En attente',verification:'🔍 Vérification',validation:'🏛️ Validation',execution:'⚡ Exécution',evaluation:'⭐ Évaluation',termine:'✅ Terminé',rejete:'❌ Rejeté'};
-    async function loadInitProjetsSection() {
-      try {
-        const r = await api('GET','/projets');
-        _initProjets = r.projets||[];
-        const actifs = _initProjets.filter(p=>!['termine','rejete','brouillon'].includes(p.statut)).length;
-        document.getElementById('init-kpi-projets').textContent = actifs||'0';
-        if(actifs>0){const b=document.getElementById('init-projets-badge');if(b){b.textContent=actifs;b.style.display='';}}
-        if(document.getElementById('init-stat-projets')) document.getElementById('init-stat-projets').textContent=_initProjets.length;
-        if(document.getElementById('init-stat-termines')) document.getElementById('init-stat-termines').textContent=_initProjets.filter(p=>p.statut==='termine').length;
-        renderInitProjets(_initProjets);
-      } catch(e){}
-    }
-    function renderInitProjets(rows) {
-      const el = document.getElementById('init-projets-list');
-      if(!el) return;
-      if(!rows.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted);">Aucun projet.<br><button class="btn btn-orange btn-sm" style="margin-top:10px;" onclick="initOpenProjet()">+ Créer</button></div>';return;}
-      el.innerHTML=rows.map(p=>`<div class="u-proj-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <strong style="font-size:13px;">${p.titre}</strong>
-          <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;background:#f1f5f9;color:#475569;">${INIT_STATUT[p.statut]||p.statut}</span>
-        </div>
-        ${p.description?`<p style="margin:0 0 8px;font-size:12px;color:var(--muted);">${p.description.slice(0,120)}${p.description.length>120?'…':''}</p>`:''}
-        <div style="display:flex;gap:8px;">
-          ${p.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="initSoumettreProjet(${p.id})">📤 Soumettre</button>`:''}
-          ${['brouillon','rejete'].includes(p.statut)?`<button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="initDeleteProjet(${p.id})">🗑</button>`:''}
-        </div>
-      </div>`).join('');
-    }
-    window.initFilterProjets = function(btn,f){
-      document.querySelectorAll('#mes-projets .u-proj-filter').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      renderInitProjets(f?_initProjets.filter(p=>p.statut===f):_initProjets);
-    };
-
-    /* Modal nouveau projet */
-    const mhtml=`<div id="init-modal-projet" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
-      <div style="background:var(--card);border-radius:18px;padding:28px;width:100%;max-width:560px;margin:auto;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-          <h3 style="margin:0;">🟩 Nouveau projet</h3>
-          <button onclick="document.getElementById('init-modal-projet').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;">✕</button>
-        </div>
-        <div style="margin-bottom:10px;"><label class="form-label">Titre *</label><input id="iproj-titre" class="input-field" style="width:100%;"></div>
-        <div class="grid grid-2" style="gap:10px;margin-bottom:10px;">
-          <div><label class="form-label">Catégorie</label>
-            <select id="iproj-cat" class="input-field" style="width:100%;">
-              <option>Général</option><option>Action sociale</option><option>Santé</option><option>Éducation</option><option>Agriculture</option><option>Technologie</option><option>Culture</option>
-            </select>
-          </div>
-          <div><label class="form-label">Pays</label><input id="iproj-pays" class="input-field" style="width:100%;" value="${init.pays||''}"></div>
-        </div>
-        <div style="margin-bottom:12px;"><label class="form-label">Description</label><textarea id="iproj-desc" class="input-field" rows="4" style="width:100%;resize:vertical;"></textarea></div>
-        <div id="iproj-err" style="display:none;background:#fef2f2;color:#B91C1C;border-radius:8px;padding:10px;font-size:13px;margin-bottom:10px;"></div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
-          <button class="btn btn-outline" onclick="document.getElementById('init-modal-projet').style.display='none'">Annuler</button>
-          <button class="btn btn-outline" onclick="initSaveProjet('brouillon')">💾 Brouillon</button>
-          <button class="btn btn-orange" onclick="initSaveProjet('en_attente')">📤 Soumettre</button>
-        </div>
-      </div>
-    </div>`;
-    document.body.insertAdjacentHTML('beforeend', mhtml);
-
-    window.initOpenProjet=()=>{document.getElementById('init-modal-projet').style.display='flex';};
-    window.initSaveProjet=async(statut)=>{
-      const titre=document.getElementById('iproj-titre').value.trim();
-      const err=document.getElementById('iproj-err');err.style.display='none';
-      if(!titre){err.textContent='Titre obligatoire';err.style.display='block';return;}
-      try{
-        await api('POST','/projets',{titre,statut,categorie:document.getElementById('iproj-cat').value,pays:document.getElementById('iproj-pays').value,description:document.getElementById('iproj-desc').value});
-        document.getElementById('init-modal-projet').style.display='none';
-        loadInitProjetsSection();
-      }catch(e){err.textContent=e.message;err.style.display='block';}
-    };
-    window.initSoumettreProjet=async(id)=>{
-      if(!confirm('Soumettre ce projet ?'))return;
-      try{await api('PUT','/projets/'+id+'/statut',{statut:'en_attente'});loadInitProjetsSection();}catch(e){alert(e.message);}
-    };
-    window.initDeleteProjet=async(id)=>{
-      if(!confirm('Supprimer ?'))return;
-      try{await api('DELETE','/projets/'+id);loadInitProjetsSection();}catch(e){alert(e.message);}
-    };
-    loadInitProjetsSection();
   }
 
   /* ══ QR CODE INITIATIVE ══ */
@@ -2134,7 +2135,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','mes-projets','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals','messages-vitrine','parametres-vitrine','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
+  const INIT_SECTIONS = ['cockpit','presentation','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals','messages-vitrine','parametres-vitrine','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -2145,7 +2146,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     });
     if (name === 'evenements') window.renderInitEvenements?.();
     if (name === 'billetterie-init') renderInitBilletterie();
-    if (name === 'deals') renderDealsSection();
     if (name === 'messages-vitrine') renderMessagesVitrine();
     if (name === 'parametres-vitrine') renderStatutVitrineSection();
     if (name === 'paiement') renderPaiementMarketplace();
@@ -2552,7 +2552,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     const pdfFile = document.getElementById('iev-pdf-file');
     if (pdfFile) pdfFile.addEventListener('change', ev => {
       const file = ev.target.files[0]; if(!file) return;
-      if(file.size>5*1024*1024){DA.toast('PDF trop lourd (max 5 Mo).',{type:'warning'});return;}
+      if(file.size>5*1024*1024){showToast('PDF trop lourd (max 5 Mo).','warning');return;}
       initEvtPdfNom=file.name;
       const reader=new FileReader();
       reader.onload=rv=>{initEvtPdfB64=rv.target.result;document.getElementById('iev-pdf-label').textContent='✅ '+file.name;};
@@ -2588,7 +2588,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     for(const n of [1,2]){
       document.getElementById(`iev-vf${n}`).addEventListener('change', ev => {
         const file = ev.target.files[0]; if(!file) return;
-        if(!file.type.includes('mp4') && !file.name.endsWith('.mp4')){DA.toast('Format MP4 uniquement.',{type:'warning'});return;}
+        if(!file.type.includes('mp4') && !file.name.endsWith('.mp4')){showToast('Format MP4 uniquement.','warning');return;}
         // Vérifier durée via HTMLVideoElement
         const blobUrl = URL.createObjectURL(file);
         const tmpVid = document.createElement('video');
@@ -2596,7 +2596,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         tmpVid.onloadedmetadata = async () => {
           if(tmpVid.duration > 62){
             URL.revokeObjectURL(blobUrl);
-            DA.toast(`Vidéo ${n} trop longue (max 1 minute, durée : ${Math.round(tmpVid.duration)}s).`,{type:'warning'});
+            showToast(`Vidéo ${n} trop longue (max 1 minute, durée : ${Math.round(tmpVid.duration)}s).`,'warning');
             return;
           }
           // Générer thumbnail à la 1ère seconde
@@ -2629,16 +2629,16 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               const r=JSON.parse(xhr.responseText);
               document.getElementById(`iev-video${n}-url`).value = r.url;
               if(nameEl) nameEl.textContent = '✅ '+file.name;
-              DA.toast(`Vidéo ${n} téléversée.`,{type:'success'});
+              showToast(`Vidéo ${n} téléversée.`,'success');
             } else {
               const err=JSON.parse(xhr.responseText||'{}');
-              DA.toast(err.error||'Erreur upload vidéo.',{type:'danger'});
+              showToast(err.error||'Erreur upload vidéo.','error');
             }
           };
-          xhr.onerror = () => { if(pw)pw.style.display='none'; DA.toast('Erreur réseau upload vidéo.',{type:'danger'}); };
+          xhr.onerror = () => { if(pw)pw.style.display='none'; showToast('Erreur réseau upload vidéo.','error'); };
           xhr.send(file);
         };
-        tmpVid.onerror = () => { URL.revokeObjectURL(blobUrl); DA.toast('Fichier vidéo invalide.',{type:'warning'}); };
+        tmpVid.onerror = () => { URL.revokeObjectURL(blobUrl); showToast('Fichier vidéo invalide.','warning'); };
       });
     }
 
@@ -2762,7 +2762,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   window.saveInitEvt = async function() {
     const titre = document.getElementById('iev-titre').value.trim();
     const debut = document.getElementById('iev-debut').value;
-    if(!titre||!debut){DA.toast('Titre et date de début requis.',{type:'warning'});return;}
+    if(!titre||!debut){showToast('Titre et date de début requis.','warning');return;}
 
     // Mode publication
     const modePub = document.querySelector('input[name="iev-mode-pub"]:checked')?.value||'publie';
@@ -2770,9 +2770,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if(modePub==='programme'){
       const d=document.getElementById('iev-prog-date').value;
       const h=document.getElementById('iev-prog-heure').value||'09:00';
-      if(!d){DA.toast('Choisissez une date de programmation.',{type:'warning'});return;}
+      if(!d){showToast('Choisissez une date de programmation.','warning');return;}
       programmed_at = `${d}T${h}:00`;
-      if(new Date(programmed_at)<=new Date()){DA.toast('La date programmée doit être dans le futur.',{type:'warning'});return;}
+      if(new Date(programmed_at)<=new Date()){showToast('La date programmée doit être dans le futur.','warning');return;}
     }
 
     const cibleType = document.querySelector('input[name="iev-cible"]:checked')?.value||'tous';
@@ -2826,15 +2826,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     try {
       if(initEvtEditingId) {
         await api('PUT','/events/'+initEvtEditingId, data);
-        DA.toast('Événement mis à jour !',{type:'success'});
+        showToast('Événement mis à jour !','success');
       } else {
         await api('POST','/events', data);
         const msgs = {publie:'🚀 Événement publié avec succès !', brouillon_programme:'⏰ Publication programmée !', brouillon:'💾 Brouillon enregistré.'};
-        DA.toast(msgs[data.statut]||'Événement créé !',{type:'success'});
+        showToast(msgs[data.statut]||'Événement créé !','success');
       }
       closeInitEvtModal();
       renderInitEvenements();
-    } catch(err){DA.toast('Erreur : '+err.message,{type:'danger'});}
+    } catch(err){showToast('Erreur : '+err.message,'error');}
     finally{btn.disabled=false; btn.textContent=origLabel;}
   };
 
@@ -3084,6 +3084,41 @@ function renderVisibiliteVitrineStatut(vitrineActive) {
   if (btn) btn.textContent = actif ? '👁️ Visibilité de la vitrine' : '👁️‍🗨️ Rendre la vitrine publique';
 }
 
+async function loadCockpitSocialSyncWidget() {
+  const body = document.getElementById('cockpit-social-sync-body');
+  if (!body) return;
+  try {
+    const r = await api('GET', '/social/dashboard-widget');
+    if (!r.total) {
+      body.innerHTML = `Aucune nouvelle publication détectée. <a href="reseaux-sociaux.html" style="color:var(--orange);font-weight:700;">Connecter un réseau →</a>`;
+      return;
+    }
+    const icons = { linkedin:'💼', facebook:'📘', instagram:'📸', x:'✖️', youtube:'▶️', tiktok:'🎵', threads:'🧵' };
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <strong style="font-size:14px;color:var(--text);">🔔 ${r.total} nouvelle${r.total>1?'s':''} publication${r.total>1?'s':''} détectée${r.total>1?'s':''}</strong>
+        <span>${r.par_reseau.map(p=>icons[p.reseau]||'').join(' ')}</span>
+        <a href="reseaux-sociaux.html" class="btn btn-outline btn-sm" style="margin-left:auto;">Voir le centre de synchronisation →</a>
+      </div>`;
+  } catch(e) { body.innerHTML = ''; }
+}
+
+async function loadCockpitFinancierWidget() {
+  const body = document.getElementById('cockpit-financier-body');
+  if (!body) return;
+  try {
+    const r = await api('GET', '/wallet/centre-financier');
+    const dernier = r.historique[0];
+    body.innerHTML = `
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+        <div><div style="font-size:22px;font-weight:800;color:var(--text);">${(r.balance||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Solde disponible</div></div>
+        <div><div style="font-size:18px;font-weight:700;color:var(--text);">${(r.revenus.mois||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Revenus du mois</div></div>
+        <div><div style="font-size:18px;font-weight:700;color:var(--text);">${dernier ? new Date(dernier.date.replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'}</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Dernière transaction</div></div>
+        <a href="centre-financier.html" class="btn btn-orange btn-sm" style="margin-left:auto;">💸 Effectuer un retrait</a>
+      </div>`;
+  } catch(e) { body.innerHTML = '<a href="centre-financier.html" style="color:var(--orange);font-weight:700;">Ouvrir le Centre Financier →</a>'; }
+}
+
 function renderStatutVitrineSection() {
   const actif = Number(window.__vitrineActive) === 1;
   const elStatut = document.getElementById('parametres-vitrine-statut');
@@ -3253,125 +3288,6 @@ async function startConnectOnboarding(){
   }
 }
 
-async function renderDealsSection() {
-  const gate = document.getElementById('deals-gate');
-  const content = document.getElementById('deals-content');
-  // Vérifier accréditation (on tentera de charger les deals, 403 = pas accréditée)
-  try {
-    const data = await api('GET', '/deals');
-    gate.style.display = 'none';
-    content.style.display = '';
-    renderDealsList(data.deals || []);
-  } catch(e) {
-    if (e && (e.status === 403 || (typeof e === 'string' && e.includes('403')))) {
-      gate.style.display = '';
-      content.style.display = 'none';
-    } else {
-      gate.style.display = 'none';
-      content.style.display = '';
-      document.getElementById('deals-list').innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun deal pour l\'instant.</p>';
-    }
-  }
-}
-
-function renderDealsList(deals) {
-  const listEl = document.getElementById('deals-list');
-  const invites = deals.filter(d => d.ma_participation === 'invite');
-  const actifs = deals.filter(d => d.ma_participation === 'accepte');
-
-  // Bannière invitations en attente
-  const invEl = document.getElementById('deals-invites-list');
-  if (invites.length) {
-    invEl.innerHTML = invites.map(d => `
-      <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <div>
-          <div style="font-weight:700;font-size:14px;color:#92400e;">🤝 Invitation : ${escDeal(d.titre)}</div>
-          <div style="font-size:12px;color:#78350f;">Par ${escDeal(d.createur_nom)} · ${fmtDealDate(d.created_at)}</div>
-        </div>
-        <div style="display:flex;gap:6px;">
-          <button class="btn btn-sm" style="background:#16a34a;color:#fff;" onclick="repondreDeal(${d.id},'accepter')">✅ Accepter</button>
-          <button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="repondreDeal(${d.id},'refuser')">✗ Décliner</button>
-          <a class="btn btn-sm btn-outline" href="deal.html?id=${d.id}">Voir →</a>
-        </div>
-      </div>`).join('');
-  } else { invEl.innerHTML = ''; }
-
-  if (!actifs.length && !invites.length) {
-    listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun deal actif. Créez votre premier Deal collaboratif !</p>';
-    return;
-  }
-  if (!actifs.length) { listEl.innerHTML = ''; return; }
-
-  const statutLabel = { brouillon:'Brouillon', en_attente:'En attente', actif:'Actif', cloture:'Clôturé', archive:'Archivé' };
-  const statutColor = { brouillon:'#64748b', en_attente:'#d97706', actif:'#16a34a', cloture:'#dc2626', archive:'#6b7280' };
-  listEl.innerHTML = actifs.map(d => `
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:200px;">
-        <div style="font-weight:700;font-size:14px;color:#1e293b;margin-bottom:4px;">${escDeal(d.titre)}</div>
-        <div style="font-size:12px;color:#64748b;">Par ${escDeal(d.createur_nom)} · ${d.nb_participants} participant(s) · ${fmtDealDate(d.updated_at)}</div>
-        ${d.objectif ? `<div style="font-size:12px;color:#475569;margin-top:4px;">${escDeal(d.objectif.substring(0,80))}${d.objectif.length>80?'…':''}</div>` : ''}
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:8px;background:${statutColor[d.statut]||'#64748b'}22;color:${statutColor[d.statut]||'#64748b'};">${statutLabel[d.statut]||d.statut}</span>
-        <a class="btn btn-sm" style="background:#2563eb;color:#fff;text-decoration:none;" href="deal.html?id=${d.id}">Ouvrir →</a>
-      </div>
-    </div>`).join('');
-
-  // Badge sidebar
-  const badge = document.getElementById('deals-badge');
-  if (badge) {
-    const pending = invites.length;
-    if (pending > 0) { badge.textContent = pending; badge.style.display = ''; }
-    else badge.style.display = 'none';
-  }
-}
-
-async function openDealModal() {
-  document.getElementById('deal-create-modal').style.display = '';
-  // Charger les initiatives disponibles
-  try {
-    const { initiatives } = await api('GET', '/initiatives?limit=100');
-    const sel = document.getElementById('deal-invites');
-    sel.innerHTML = initiatives.map(i => `<option value="${i.id}">${escDeal(i.nom)} (${i.pays||'—'})</option>`).join('');
-  } catch(e) {
-    document.getElementById('deal-invites').innerHTML = '<option disabled>Erreur chargement</option>';
-  }
-}
-
-async function createDeal() {
-  const titre = document.getElementById('deal-titre').value.trim();
-  if (!titre) { alert('Titre requis'); return; }
-  const sel = document.getElementById('deal-invites');
-  const invites = Array.from(sel.selectedOptions).map(o => Number(o.value));
-  try {
-    await api('POST', '/deals', {
-      titre,
-      objectif: document.getElementById('deal-objectif').value.trim()||undefined,
-      description: document.getElementById('deal-desc').value.trim()||undefined,
-      categorie: document.getElementById('deal-cat').value,
-      confidentialite: document.getElementById('deal-conf').value,
-      date_debut: document.getElementById('deal-debut').value||undefined,
-      date_fin_prev: document.getElementById('deal-fin').value||undefined,
-      invites
-    });
-    document.getElementById('deal-create-modal').style.display = 'none';
-    await renderDealsSection();
-  } catch(e) { alert((e && e.error) || e.message || 'Erreur'); }
-}
-
-async function repondreDeal(dealId, reponse) {
-  try {
-    await api('POST', `/deals/${dealId}/repondre`, { reponse });
-    await renderDealsSection();
-    if (reponse === 'accepter') location.href = `deal.html?id=${dealId}`;
-  } catch(e) { alert((e && e.error) || 'Erreur'); }
-}
-
-function escDeal(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtDealDate(s) {
-  if (!s) return '—';
-  try { return new Date(s).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}); } catch(e) { return s; }
-}
 
 /* ═══════════════════════════════════════════════════════════════
    MODULE GESTION DES ASSOCIATIONS — JS

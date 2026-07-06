@@ -3109,6 +3109,7 @@ const postsAlters = [
   "ALTER TABLE fil_posts ADD COLUMN localisation_pays TEXT",
   "ALTER TABLE fil_posts ADD COLUMN localisation_ville TEXT",
   "ALTER TABLE fil_posts ADD COLUMN vues INTEGER DEFAULT 0",
+  "ALTER TABLE fil_posts ADD COLUMN source_import TEXT",
 ];
 for (const sql of postsAlters) { try { db.prepare(sql).run(); } catch(e) { /* colonne déjà existante */ } }
 
@@ -3893,6 +3894,49 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
   );
+
+  -- Centre Financier : demandes de retrait (Stripe Transfer réel vers le compte Connect de l'utilisateur)
+  CREATE TABLE IF NOT EXISTS retraits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    montant REAL NOT NULL,
+    devise TEXT DEFAULT 'EUR',
+    statut TEXT DEFAULT 'demande' CHECK(statut IN ('demande','traite','echoue')),
+    stripe_transfer_id TEXT,
+    erreur_msg TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    traite_at TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  -- Centre Financier : préférences de l'utilisateur
+  CREATE TABLE IF NOT EXISTS wallet_settings (
+    user_id INTEGER PRIMARY KEY,
+    devise_preferee TEXT DEFAULT 'EUR',
+    frequence_auto TEXT DEFAULT 'manuel' CHECK(frequence_auto IN ('manuel','hebdomadaire','mensuel')),
+    seuil_auto REAL DEFAULT 0,
+    notifications INTEGER DEFAULT 1,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  -- Centre Financier : ledger générique multi-modules (boutique, cotisations, dons, services...)
+  -- Distinct de wallet_transactions (billetterie, historique déjà en production) pour ne jamais y toucher.
+  CREATE TABLE IF NOT EXISTS wallet_ledger (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    module TEXT NOT NULL,
+    source_id INTEGER,
+    source_label TEXT,
+    payeur_nom TEXT,
+    montant_brut REAL NOT NULL,
+    commission REAL DEFAULT 0,
+    frais_prestataire REAL DEFAULT 0,
+    montant_net REAL NOT NULL,
+    devise TEXT DEFAULT 'EUR',
+    statut TEXT DEFAULT 'valide' CHECK(statut IN ('en_attente','valide','rembourse','annule')),
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
 `);
 
 /* ═══════════════════════════════════════════════
@@ -4015,6 +4059,71 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Assistant BP — historique des modifications de champs (mémoire IA) ── */
+  CREATE TABLE IF NOT EXISTS bp_field_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bp_id INTEGER NOT NULL,
+    user_id INTEGER,
+    section_key TEXT NOT NULL,
+    field_key TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Synchronisation des réseaux sociaux — config globale (admin) ── */
+  CREATE TABLE IF NOT EXISTS social_reseaux_config (
+    reseau TEXT PRIMARY KEY,
+    actif INTEGER DEFAULT 1,
+    limite_freq_min INTEGER DEFAULT 60
+  );
+
+  /* ── Synchronisation des réseaux sociaux — comptes connectés par utilisateur ── */
+  CREATE TABLE IF NOT EXISTS social_connections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    reseau TEXT NOT NULL,
+    connecte INTEGER DEFAULT 1,
+    permissions_json TEXT DEFAULT '[]',
+    derniere_sync TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, reseau),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Synchronisation des réseaux sociaux — publications détectées ── */
+  CREATE TABLE IF NOT EXISTS social_posts_detectes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    connection_id INTEGER,
+    reseau TEXT NOT NULL,
+    contenu_brut TEXT,
+    medias_json TEXT DEFAULT '[]',
+    categorie_suggeree TEXT,
+    hashtags_suggeres TEXT DEFAULT '[]',
+    statut TEXT DEFAULT 'detecte',
+    diaspo_post_id INTEGER,
+    programmed_at TEXT,
+    erreur_msg TEXT,
+    detected_at TEXT DEFAULT (datetime('now')),
+    imported_at TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(connection_id) REFERENCES social_connections(id) ON DELETE SET NULL
+  );
+
+  /* ── Synchronisation des réseaux sociaux — préférences utilisateur ── */
+  CREATE TABLE IF NOT EXISTS social_sync_settings (
+    user_id INTEGER PRIMARY KEY,
+    reseaux_surveilles_json TEXT DEFAULT '[]',
+    frequence TEXT DEFAULT 'quotidienne',
+    notifications INTEGER DEFAULT 1,
+    ia_suggestions INTEGER DEFAULT 1,
+    programmation_auto INTEGER DEFAULT 0,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
   );
 

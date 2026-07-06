@@ -586,13 +586,19 @@ async function openEvent(eid) {
 /* ══ ACHAT BILLET ══ */
 async function buyTicket(eid, ttid, nom, prix) {
   if (!confirm(`Confirmer l'achat : "${nom}" — ${prix===0?'Gratuit':prix.toFixed(2)+' €'} ?`)) return;
+  const notify = (msg, type) => { if (typeof showToast === 'function') showToast(msg, type); else alert(msg); };
   try {
     const r = await api('POST', '/events/'+eid+'/buy', { ticket_type_id: ttid });
+    if (r.checkout_url) {
+      notify('Redirection vers le paiement sécurisé Stripe…', 'info');
+      window.location.href = r.checkout_url;
+      return;
+    }
     closeMod('modal-event-bg');
-    DA.toast(`Billet #${r.ticket_id} acheté ! Retrouvez votre QR dans "Mes Billets".`, {type:'success', duration:6000});
+    notify(`Billet #${r.ticket_id} confirmé ! Retrouvez votre QR dans "Mes Billets".`, 'success');
     loadEvents();
     switchTab('mes-billets');
-  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
 }
 
 /* ══ INSCRIPTION SÉCURISÉE (ID DA + DS-ID) ══ */
@@ -1639,6 +1645,16 @@ function escH(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,
   }
 
   loadEvents();
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('paiement') === 'succes') {
+    setTimeout(() => { if (typeof showToast === 'function') showToast('Paiement confirmé ! Votre billet apparaîtra sous quelques secondes dans "Mes Billets".', 'success', 6000); }, 300);
+    switchTab('mes-billets');
+    history.replaceState(null, '', window.location.pathname);
+  } else if (params.get('paiement') === 'annule') {
+    setTimeout(() => { if (typeof showToast === 'function') showToast('Paiement annulé — aucun billet n\'a été débité.', 'info'); }, 300);
+    history.replaceState(null, '', window.location.pathname);
+  }
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
