@@ -2298,6 +2298,37 @@ function initProjetsDiaspoActif(){
     </div>`).join("");
 }
 
+/* ---------- Régie publicitaire : diffusion d'une publicité approuvée sur un emplacement ---------- */
+function trackAdClic(id){ fetch(`/api/ads/${id}/clic`, { method:"POST" }).catch(()=>{}); }
+
+async function renderAdSlot(containerId, emplacement){
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  try {
+    const r = await fetch(`/api/ads/servir?emplacement=${emplacement}`).then(x => x.json());
+    if (!r.ad) { el.style.display = "none"; return; }
+    const ad = r.ad;
+    const clic = `onclick="trackAdClic(${ad.id})"`;
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+      ${ad.media_type === "video"
+        ? `<video src="${ad.media_url}" style="width:88px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;" muted autoplay loop playsinline></video>`
+        : `<img src="${ad.media_url}" alt="" style="width:88px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">`}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:10px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin-bottom:3px;">Sponsorisé</div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:2px;">${ad.titre}</div>
+        ${ad.description ? `<div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ad.description}</div>` : ""}
+      </div>
+      ${ad.lien_url ? `<a href="${ad.lien_url}" target="_blank" rel="noopener sponsored" class="btn btn-orange" style="flex-shrink:0;font-size:13px;" ${clic}>${ad.cta}</a>` : ""}
+    </div>`;
+    el.style.display = "";
+  } catch(e) { el.style.display = "none"; }
+}
+
+function renderAllAdSlots(){
+  document.querySelectorAll("[data-ad-emplacement]").forEach(el=>{
+    if (el.id) renderAdSlot(el.id, el.dataset.adEmplacement);
+  });
+}
 
 /* ---------- Niveaux de confidentialité des données ---------- */
 function initConfidentialite(){
@@ -2689,6 +2720,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   initApercuCiblage();
   initProfilUtilisateur();
   initFormations();
+  renderAllAdSlots();
   applyTranslations();
 
   // ── Sidebar mobile : hamburger toggle ──

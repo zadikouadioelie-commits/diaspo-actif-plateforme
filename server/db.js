@@ -831,6 +831,14 @@ const _vsaCols = db.prepare("PRAGMA table_info(vitrine_site_admins)").all().map(
 [["reset_token TEXT","reset_token"],["reset_expires INTEGER","reset_expires"],["twofa_code TEXT","twofa_code"],["twofa_expires INTEGER","twofa_expires"]]
   .forEach(([def,col])=>{ if(!_vsaCols.includes(col)) try{db.prepare(`ALTER TABLE vitrine_site_admins ADD COLUMN ${def}`).run();}catch(e){} });
 
+/* ── Table "publicites" ré-utilisée depuis l'ancien module ad-hoc : ajoute les colonnes du nouveau module régie publicitaire ── */
+const _pubCols = db.prepare("PRAGMA table_info(publicites)").all().map(c=>c.name);
+[["user_id INTEGER","user_id"],["media_type TEXT DEFAULT 'image'","media_type"],["media_url TEXT","media_url"],
+ ["thumbnail_url TEXT","thumbnail_url"],["cta TEXT DEFAULT 'En savoir plus'","cta"],["duree_jours INTEGER DEFAULT 7","duree_jours"],
+ ["cible_langue TEXT DEFAULT '[]'","cible_langue"],["cible_interet TEXT DEFAULT '[]'","cible_interet"],
+ ["motif_rejet TEXT","motif_rejet"],["nb_video_views INTEGER DEFAULT 0","nb_video_views"],["nb_full_video_views INTEGER DEFAULT 0","nb_full_video_views"]]
+  .forEach(([def,col])=>{ if(!_pubCols.includes(col)) try{db.prepare(`ALTER TABLE publicites ADD COLUMN ${def}`).run();}catch(e){} });
+
 /* ══ WALLET SYSTÈME ══ */
 db.exec(`
   /* ── WALLET LEDGER (IMMUABLE — INSERT ONLY) ── */
@@ -3884,6 +3892,55 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+`);
+
+/* ═══════════════════════════════════════════════
+   MODULE PUBLICITÉ (régie publicitaire) — Tables
+   ═══════════════════════════════════════════════ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS publicites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    media_type TEXT NOT NULL DEFAULT 'image',
+    media_url TEXT,
+    thumbnail_url TEXT,
+    titre TEXT NOT NULL,
+    description TEXT,
+    cta TEXT DEFAULT 'En savoir plus',
+    lien_url TEXT,
+    duree_jours INTEGER DEFAULT 7,
+    cible_pays TEXT DEFAULT '[]',
+    cible_langue TEXT DEFAULT '[]',
+    cible_interet TEXT DEFAULT '[]',
+    emplacements TEXT DEFAULT '["homepage_feed"]',
+    statut TEXT NOT NULL DEFAULT 'pending_admin',
+    motif_rejet TEXT,
+    nb_impressions INTEGER DEFAULT 0,
+    nb_clics INTEGER DEFAULT 0,
+    nb_video_views INTEGER DEFAULT 0,
+    nb_full_video_views INTEGER DEFAULT 0,
+    date_debut TEXT,
+    date_fin TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS pub_abonnements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    plan TEXT NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'en_attente_paiement',
+    payment_mode TEXT DEFAULT 'annuel',
+    credits_restants INTEGER DEFAULT 0,
+    credits_reset_le TEXT,
+    stripe_customer_id TEXT,
+    stripe_subscription_id TEXT,
+    grace_until TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
   );
 `);
 

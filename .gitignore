@@ -3,6 +3,7 @@ server/diaspoactif.db
 *.db
 .env
 .env.local
+.env.local.dev
 .vercel
 backups/
 

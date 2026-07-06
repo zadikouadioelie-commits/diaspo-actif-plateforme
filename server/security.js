@@ -126,6 +126,15 @@ function isSafeRasterImage(buffer) {
   return t && SAFE_RASTER.has(t) ? t : null;
 }
 
+/* Vérifie que le fichier est bien une vidéo MP4/WebM par ses magic bytes (pas juste l'extension). */
+function isSafeVideo(buffer) {
+  if (!buffer || buffer.length < 12) return null;
+  const b = buffer;
+  if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) return "video/mp4"; // ftyp
+  if (b[0] === 0x1A && b[1] === 0x45 && b[2] === 0xDF && b[3] === 0xA3) return "video/webm";
+  return null;
+}
+
 /* ---------------------------------------------------------------
    5. MESSAGES D'ERREUR SÛRS
    Renvoie un message générique au client, journalise le détail.
@@ -151,6 +160,6 @@ module.exports = {
   clientIp,
   isValidEmail, isValidUrl, isValidPhone, normalizeEmail,
   sanitizeString, escapeHtml,
-  sniffImageType, isSafeRasterImage,
+  sniffImageType, isSafeRasterImage, isSafeVideo,
   safeError, logSecurity,
 };

@@ -4,7 +4,7 @@
     {
       "name": "diaspoactif-server",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["server/index.js"],
+      "runtimeArgs": ["--env-file=.env.local.dev", "server/index.js"],
       "port": 3000
     }
   ]

@@ -69,6 +69,7 @@
       <a href="#moderation" data-section="moderation">🛡 Modération</a>
       <a href="#suppression-comptes" data-section="suppression-comptes" style="display:flex;justify-content:space-between;align-items:center;">🗑 Demandes de suppression <span id="delreq-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="audiovisuel.html">📺 Audiovisuel</a>
+      <a href="#ads" data-section="ads">📣 Publicités <span id="ads-pending-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
 
       <span class="sb-group-lbl">🟧 Outils</span>
       <a href="#error-logs" data-section="error-logs" style="display:flex;justify-content:space-between;align-items:center;">🩺 Journal d'erreurs <span id="errlog-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
@@ -3821,6 +3822,42 @@
         </div>
       </div>
 
+      <!-- PUBLICITÉS -->
+      <section id="section-ads" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <h2 style="margin:0;">📣 Régie Publicitaire</h2>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline" onclick="loadAdsAdmin()">↺ Actualiser</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;" id="ads-dashboard-cards">
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;" id="ads-filter-tabs">
+          <button class="btn btn-sm ads-filter active" data-statut="" onclick="filterAdsAdmin('')">Toutes</button>
+          <button class="btn btn-sm ads-filter" data-statut="pending_admin" onclick="filterAdsAdmin('pending_admin')">⏳ En attente</button>
+          <button class="btn btn-sm ads-filter" data-statut="approved" onclick="filterAdsAdmin('approved')">✅ Actives</button>
+          <button class="btn btn-sm ads-filter" data-statut="paused" onclick="filterAdsAdmin('paused')">⏸ En pause</button>
+          <button class="btn btn-sm ads-filter" data-statut="rejected" onclick="filterAdsAdmin('rejected')">❌ Refusées</button>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+              <th style="padding:10px 8px;">Média</th>
+              <th style="padding:10px 8px;">Titre</th>
+              <th style="padding:10px 8px;">Annonceur</th>
+              <th style="padding:10px 8px;">Statut</th>
+              <th style="padding:10px 8px;">Impressions</th>
+              <th style="padding:10px 8px;">Clics</th>
+              <th style="padding:10px 8px;">Actions</th>
+            </tr></thead>
+            <tbody id="ads-admin-body"><tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- MODÉRATION -->
       <section id="section-moderation" style="display:none;">
         <h2>Modération</h2>
@@ -6012,6 +6049,7 @@ async function submitAccordDirect(){
     'oz-admin':  () => loadOzAdmin(),
     onboarding:  () => loadObAdmin(),
     'error-logs': () => loadErrorLogs(),
+    ads: () => loadAdsAdmin(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
@@ -8235,6 +8273,78 @@ async function submitAccordDirect(){
       document.getElementById("nb-destinataires").textContent = label;
     });
   });
+
+  /* ===== Publicités (régie) ===== */
+  const ADS_STATUT_LBL = { pending_admin:'⏳ En attente', approved:'✅ Active', rejected:'❌ Refusée', need_modification:'✏️ Modif. demandée', paused:'⏸ En pause' };
+  let _adsFilter = '';
+
+  async function loadAdsAdmin() {
+    try {
+      const dash = await api('GET', '/admin/ads/dashboard');
+      document.getElementById('ads-dashboard-cards').innerHTML = `
+        <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:800;">${dash.total}</div><div style="font-size:11px;color:var(--muted);">Campagnes totales</div></div>
+        <div class="card" style="padding:14px;text-align:center;border-left:3px solid #f59e0b;"><div style="font-size:22px;font-weight:800;color:#92400e;">${dash.pending}</div><div style="font-size:11px;color:var(--muted);">En attente</div></div>
+        <div class="card" style="padding:14px;text-align:center;border-left:3px solid #16a34a;"><div style="font-size:22px;font-weight:800;color:#16a34a;">${dash.active}</div><div style="font-size:11px;color:var(--muted);">Actives</div></div>
+        <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:800;">${dash.impressions_totales}</div><div style="font-size:11px;color:var(--muted);">Impressions</div></div>
+        <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:800;">${dash.ctr_global}%</div><div style="font-size:11px;color:var(--muted);">CTR global</div></div>
+        <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:800;">${dash.abonnements_actifs}</div><div style="font-size:11px;color:var(--muted);">Abonnements actifs</div></div>
+      `;
+      const badge = document.getElementById('ads-pending-badge');
+      if (badge) { if (dash.pending > 0) { badge.textContent = dash.pending; badge.style.display = 'inline-block'; } else badge.style.display = 'none'; }
+    } catch (e) {}
+    await renderAdsAdminTable();
+  }
+
+  function filterAdsAdmin(statut) {
+    _adsFilter = statut;
+    document.querySelectorAll('.ads-filter').forEach(b => b.classList.toggle('active', b.dataset.statut === statut));
+    renderAdsAdminTable();
+  }
+
+  async function renderAdsAdminTable() {
+    const tbody = document.getElementById('ads-admin-body');
+    try {
+      const r = await api('GET', _adsFilter ? `/admin/ads?statut=${_adsFilter}` : '/admin/ads');
+      const rows = r.publicites || [];
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Aucune publicité.</td></tr>'; return; }
+      tbody.innerHTML = rows.map(a => `
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:8px;">${a.media_type === 'video' ? '🎥' : '🖼️'}</td>
+          <td style="padding:8px;font-weight:700;">${escDA(a.titre)}</td>
+          <td style="padding:8px;">${escDA(a.user_nom || '')}</td>
+          <td style="padding:8px;">${ADS_STATUT_LBL[a.statut] || a.statut}</td>
+          <td style="padding:8px;">${a.nb_impressions}</td>
+          <td style="padding:8px;">${a.nb_clics}</td>
+          <td style="padding:8px;white-space:nowrap;">
+            ${a.statut === 'pending_admin' ? `
+              <button class="btn btn-sm" style="background:#16a34a;color:#fff;" onclick="approveAdAdmin(${a.id})">✅</button>
+              <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;" onclick="rejectAdAdmin(${a.id})">❌</button>
+            ` : a.statut === 'approved' ? `
+              <button class="btn btn-sm btn-outline" onclick="pauseAdAdmin(${a.id})">⏸ Pause</button>
+            ` : a.statut === 'paused' ? `
+              <button class="btn btn-sm" style="background:#16a34a;color:#fff;" onclick="resumeAdAdmin(${a.id})">▶️ Reprendre</button>
+            ` : ''}
+            <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;" onclick="deleteAdAdmin(${a.id})">🗑️</button>
+          </td>
+        </tr>`).join('');
+    } catch (e) { tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Erreur de chargement.</td></tr>'; }
+  }
+
+  window.loadAdsAdmin = loadAdsAdmin;
+  window.filterAdsAdmin = filterAdsAdmin;
+  window.approveAdAdmin = async function(id) { await api('POST', `/admin/ads/${id}/approve`); renderAdsAdminTable(); loadAdsAdmin(); };
+  window.rejectAdAdmin = async function(id) {
+    const motif = prompt('Motif du refus (optionnel) :') || '';
+    await api('POST', `/admin/ads/${id}/reject`, { motif });
+    renderAdsAdminTable(); loadAdsAdmin();
+  };
+  window.pauseAdAdmin = async function(id) { await api('POST', `/admin/ads/${id}/pause`); renderAdsAdminTable(); };
+  window.resumeAdAdmin = async function(id) { await api('POST', `/admin/ads/${id}/resume`); renderAdsAdminTable(); };
+  window.deleteAdAdmin = async function(id) {
+    if (!confirm('Supprimer définitivement cette publicité et ses statistiques ?')) return;
+    await api('DELETE', `/admin/ads/${id}`);
+    renderAdsAdminTable(); loadAdsAdmin();
+  };
 
   /* ══════════════════════════════════════
      MÉMOIRE CHATBOT

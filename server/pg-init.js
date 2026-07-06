@@ -217,6 +217,18 @@ async function migratePg(pool) {
     ['vitrine_site_admins', 'reset_expires', 'BIGINT'],
     ['vitrine_site_admins', 'twofa_code', 'TEXT'],
     ['vitrine_site_admins', 'twofa_expires', 'BIGINT'],
+    // Régie publicitaire (nouveau module) — table "publicites" réutilisée depuis l'ancien module
+    ['publicites', 'user_id', 'INTEGER'],
+    ['publicites', 'media_type', "TEXT DEFAULT 'image'"],
+    ['publicites', 'media_url', 'TEXT'],
+    ['publicites', 'thumbnail_url', 'TEXT'],
+    ['publicites', 'cta', "TEXT DEFAULT 'En savoir plus'"],
+    ['publicites', 'duree_jours', 'INTEGER DEFAULT 7'],
+    ['publicites', 'cible_langue', "TEXT DEFAULT '[]'"],
+    ['publicites', 'cible_interet', "TEXT DEFAULT '[]'"],
+    ['publicites', 'motif_rejet', 'TEXT'],
+    ['publicites', 'nb_video_views', 'INTEGER DEFAULT 0'],
+    ['publicites', 'nb_full_video_views', 'INTEGER DEFAULT 0'],
   ];
   for (const [table, col, type] of cols) {
     try {

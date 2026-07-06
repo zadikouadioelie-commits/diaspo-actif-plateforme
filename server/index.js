@@ -3769,6 +3769,44 @@ async function handleStripeWebhook(req, res) {
         creerNotif(userId, "identite_echec", "Vérification d'identité incomplète",
           `La vérification n'a pas pu être finalisée : ${reason} Vous pouvez réessayer depuis votre profil.`, {});
       }
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.pub_abonnement_user_id) {
+      const session = event.data.object;
+      const userId = Number(session.metadata.pub_abonnement_user_id);
+      const plan = session.metadata.pub_abonnement_plan;
+      const paymentMode = session.metadata.pub_abonnement_payment_mode;
+      const planDef = PUB_PLANS.find(p => p.id === plan);
+      if (userId && planDef) {
+        await db.prepare(`
+          INSERT INTO pub_abonnements (user_id, plan, statut, payment_mode, credits_restants, credits_reset_le, stripe_customer_id, stripe_subscription_id)
+          VALUES (?,?,'active',?,?,datetime('now','+1 month'),?,?)
+          ON CONFLICT(user_id) DO UPDATE SET plan=?, statut='active', payment_mode=?, credits_restants=?, credits_reset_le=datetime('now','+1 month'),
+            stripe_customer_id=?, stripe_subscription_id=?, grace_until=NULL, updated_at=datetime('now')
+        `).run(
+          userId, plan, paymentMode, planDef.quota_mensuel, session.customer, session.subscription,
+          plan, paymentMode, planDef.quota_mensuel, session.customer, session.subscription
+        );
+        creerNotif(userId, "pub_abonnement_actif", "Abonnement Publicité actif 📣",
+          `Votre abonnement « ${planDef.label} » est actif. Vous disposez de ${planDef.quota_mensuel} publicité(s)/mois.`, {});
+      }
+    } else if (event.type === "invoice.payment_succeeded" && event.data.object.subscription) {
+      const invoice = event.data.object;
+      const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);
+      if (abo && invoice.billing_reason !== "subscription_create") {
+        const planDef = PUB_PLANS.find(p => p.id === abo.plan);
+        await db.prepare(`UPDATE pub_abonnements SET statut='active', credits_restants=?, credits_reset_le=datetime('now','+1 month'), grace_until=NULL, updated_at=datetime('now') WHERE id=?`)
+          .run(planDef?.quota_mensuel || 0, abo.id);
+      }
+    } else if (event.type === "invoice.payment_failed" && event.data.object.subscription) {
+      const invoice = event.data.object;
+      const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);
+      if (abo) {
+        await db.prepare(`UPDATE pub_abonnements SET statut='suspended', grace_until=datetime('now','+7 days'), updated_at=datetime('now') WHERE id=?`).run(abo.id);
+        creerNotif(abo.user_id, "pub_abonnement_suspendu", "Paiement échoué — Abonnement Publicité",
+          "Votre paiement n'a pas pu être traité. Vos publicités sont en pause. Vous avez 7 jours pour régulariser.", {});
+      }
+    } else if (event.type === "customer.subscription.deleted") {
+      const sub = event.data.object;
+      await db.prepare(`UPDATE pub_abonnements SET statut='canceled', updated_at=datetime('now') WHERE stripe_subscription_id=?`).run(sub.id);
     } else if (event.type === "account.updated") {
       const account = event.data.object;
       const row = await db.prepare("SELECT initiative_id FROM stripe_connect_accounts WHERE stripe_account_id=?").get(account.id);
@@ -3801,6 +3839,286 @@ async function handleStripeWebhook(req, res) {
     sendJSON(res, 200, { received: true }); // toujours 200 pour éviter les réessais infinis de Stripe sur une erreur interne
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MODULE PUBLICITÉ — régie publicitaire (campagnes + abonnements)
+   Mode Stripe TEST uniquement (voir stripe-client.js).
+   ═══════════════════════════════════════════════════════════════ */
+const PUB_PLANS = [
+  { id: "start",    label: "Start",    prix_annuel: 110, prix_mensuel_equiv: 9.17,  quota_mensuel: 1 },
+  { id: "business", label: "Business", prix_annuel: 150, prix_mensuel_equiv: 12.50, quota_mensuel: 2 },
+  { id: "premium",  label: "Premium",  prix_annuel: 200, prix_mensuel_equiv: 16.67, quota_mensuel: 4 },
+];
+const PUB_SLOTS = ["homepage_top", "homepage_feed", "between_posts", "between_videos",
+  "projects_page", "diaspora_impact", "calls_for_projects", "vitrine_section"];
+const PUB_AD_CTA = ["En savoir plus", "Acheter", "Contacter", "S'inscrire"];
+
+route("GET", "/api/ads/plans", async (req, res) => {
+  sendJSON(res, 200, { plans: PUB_PLANS, slots: PUB_SLOTS, cta: PUB_AD_CTA });
+});
+
+/* GET /api/pub-abonnements/mon — abonnement publicité de l'utilisateur connecté */
+route("GET", "/api/pub-abonnements/mon", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE user_id=?").get(user.id);
+  sendJSON(res, 200, { abonnement: abo || null });
+});
+
+/* POST /api/pub-abonnements/souscrire — crée une session Stripe Checkout (mode subscription) */
+route("POST", "/api/pub-abonnements/souscrire", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+
+  const planDef = PUB_PLANS.find(p => p.id === body.plan);
+  if (!planDef) return sendJSON(res, 400, { error: "Plan invalide." });
+  const paymentMode = body.payment_mode === "mensuel" ? "mensuel" : "annuel";
+  const montant = paymentMode === "mensuel"
+    ? Math.round(planDef.prix_mensuel_equiv * 100)
+    : Math.round(planDef.prix_annuel * 100);
+  const interval = paymentMode === "mensuel" ? "month" : "year";
+
+  try {
+    const origin = getOrigin(req);
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{
+        price_data: {
+          currency: "eur",
+          unit_amount: montant,
+          recurring: { interval },
+          product_data: { name: `Diaspo'Actif Publicité — Plan ${planDef.label}` },
+        },
+        quantity: 1,
+      }],
+      metadata: {
+        pub_abonnement_user_id: String(user.id),
+        pub_abonnement_plan: planDef.id,
+        pub_abonnement_payment_mode: paymentMode,
+      },
+      success_url: `${origin}/dashboard-initiative.html?pub_abonnement=retour#publicites-init`,
+      cancel_url: `${origin}/dashboard-initiative.html?pub_abonnement=annule#publicites-init`,
+    });
+    sendJSON(res, 200, { url: session.url });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "pub-abonnement-souscrire"));
+  }
+});
+
+/* GET /api/ads/mes — mes campagnes */
+route("GET", "/api/ads/mes", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare("SELECT * FROM publicites WHERE user_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { publicites: rows });
+});
+
+/* GET /api/ads/:id/stats */
+route("GET", "/api/ads/:id/stats", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
+  if (!ad || Number(ad.user_id) !== Number(user.id)) return sendJSON(res, 404, { error: "Publicité introuvable." });
+  const ctr = ad.nb_impressions > 0 ? ((ad.nb_clics / ad.nb_impressions) * 100).toFixed(2) : "0.00";
+  sendJSON(res, 200, {
+    impressions: ad.nb_impressions, clics: ad.nb_clics, ctr,
+    video_views: ad.nb_video_views, full_video_views: ad.nb_full_video_views,
+    statut: ad.statut, date_debut: ad.date_debut, date_fin: ad.date_fin,
+  });
+});
+
+/* POST /api/ads/create — crée une campagne (multipart: media image/vidéo) */
+route("POST", "/api/ads/create", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (user.role !== "initiative") return sendJSON(res, 403, { error: "Réservé aux comptes Initiative." });
+
+  /* Accréditation/abonnement Publicité désactivée temporairement (accès libre pour toute Initiative).
+     Pour réactiver : décommenter le bloc ci-dessous. */
+  const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE user_id=?").get(user.id);
+  // if (!abo || abo.statut !== "active") return sendJSON(res, 403, { error: "Un abonnement Publicité actif est requis pour créer une campagne." });
+  // if (Number(abo.credits_restants) <= 0) return sendJSON(res, 403, { error: "Vous n'avez plus de crédit publicité ce mois-ci." });
+
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = [];
+  req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { fields, files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["media"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun média reçu." });
+
+  const titre = String(fields.titre || "").trim();
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  const dureeSec = Number(fields.duree_sec || 0);
+
+  let mediaType = "image", checkedType = null;
+  if (SEC.isSafeVideo(file.buffer)) {
+    mediaType = "video";
+    checkedType = SEC.isSafeVideo(file.buffer);
+    if (dureeSec > 30) return sendJSON(res, 400, { error: "La vidéo doit durer 30 secondes maximum." });
+    if (file.buffer.length > 40 * 1024 * 1024) return sendJSON(res, 400, { error: "Vidéo trop volumineuse (max 40 Mo)." });
+  } else if (SEC.isSafeRasterImage(file.buffer)) {
+    mediaType = "image";
+    checkedType = SEC.isSafeRasterImage(file.buffer);
+    if (file.buffer.length > 8 * 1024 * 1024) return sendJSON(res, 400, { error: "Image trop volumineuse (max 8 Mo)." });
+  } else {
+    return sendJSON(res, 400, { error: "Format de média non valide (JPEG, PNG, GIF, WebP, MP4 ou WebM requis)." });
+  }
+
+  let emplacements = ["homepage_feed"];
+  try { const p = JSON.parse(fields.emplacements || "[]"); if (Array.isArray(p) && p.length) emplacements = p.filter(e => PUB_SLOTS.includes(e)); } catch (_) {}
+
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const url = await uploadToBunny(file.buffer, filename, "ads");
+    const id = db.prepare(`
+      INSERT INTO publicites (user_id, annonceur, media_type, media_url, titre, description, cta, lien_url, duree_jours,
+        cible_pays, cible_langue, cible_interet, emplacements, statut)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending_admin')
+    `).run(
+      user.id, user.nom || 'Diaspo\'Actif', mediaType, url, titre, fields.description || null,
+      PUB_AD_CTA.includes(fields.cta) ? fields.cta : "En savoir plus",
+      fields.lien_url || null, Math.min(Math.max(parseInt(fields.duree_jours) || 7, 1), 30),
+      JSON.stringify(fields.cible_pays ? [fields.cible_pays] : []),
+      JSON.stringify(fields.cible_langue ? [fields.cible_langue] : []),
+      JSON.stringify(fields.cible_interet ? [fields.cible_interet] : []),
+      JSON.stringify(emplacements)
+    ).lastInsertRowid;
+
+    if (abo) await db.prepare("UPDATE pub_abonnements SET credits_restants=credits_restants-1, updated_at=datetime('now') WHERE id=?").run(abo.id);
+
+    const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+    admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle campagne publicitaire",
+      `${user.nom} a soumis une publicité « ${titre} » en attente de validation.`, { publicite_id: Number(id) }));
+
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "ad", type: checkedType, size: file.buffer.length });
+    sendJSON(res, 201, { id, ok: true });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "ads-create"));
+  }
+});
+
+/* GET /api/ads/servir — diffusion publique d'une publicité approuvée pour un emplacement donné */
+route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
+  const emplacement = query.emplacement || "homepage_feed";
+  const user = await getCurrentUser(req);
+  const now = new Date().toISOString();
+
+  const candidates = await db.prepare(`
+    SELECT * FROM publicites
+    WHERE statut='approved' AND emplacements LIKE ?
+      AND (date_debut IS NULL OR date_debut <= ?)
+      AND (date_fin IS NULL OR date_fin >= ?)
+    ORDER BY RANDOM()
+  `).all(`%${emplacement}%`, now, now);
+
+  let ad = null;
+  for (const c of candidates) {
+    const cp = safeParse(c.cible_pays);
+    if (Array.isArray(cp) && cp.length && (!user || !cp.includes(user.pays))) continue;
+    ad = c;
+    break;
+  }
+  if (!ad) return sendJSON(res, 200, { ad: null });
+
+  db.prepare("UPDATE publicites SET nb_impressions=nb_impressions+1, updated_at=datetime('now') WHERE id=?").run(ad.id);
+  sendJSON(res, 200, { ad: {
+    id: ad.id, media_type: ad.media_type, media_url: ad.media_url,
+    titre: ad.titre, description: ad.description, cta: ad.cta, lien_url: ad.lien_url,
+  }});
+});
+
+route("POST", "/api/ads/:id/clic", async (req, res, params) => {
+  db.prepare("UPDATE publicites SET nb_clics=nb_clics+1, updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/ads/:id/video-view", async (req, res, params) => {
+  db.prepare("UPDATE publicites SET nb_video_views=nb_video_views+1, updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/ads/:id/video-full-view", async (req, res, params) => {
+  db.prepare("UPDATE publicites SET nb_full_video_views=nb_full_video_views+1, updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Admin : dashboard + modération des campagnes ── */
+route("GET", "/api/admin/ads/dashboard", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const total = await db.prepare("SELECT COUNT(*) n FROM publicites").get();
+  const pending = await db.prepare("SELECT COUNT(*) n FROM publicites WHERE statut='pending_admin'").get();
+  const active = await db.prepare("SELECT COUNT(*) n FROM publicites WHERE statut='approved'").get();
+  const agg = await db.prepare("SELECT SUM(nb_impressions) imp, SUM(nb_clics) clics FROM publicites").get();
+  const revenus = await db.prepare("SELECT COUNT(*) n FROM pub_abonnements WHERE statut='active'").get();
+  const ctr = agg.imp > 0 ? ((agg.clics / agg.imp) * 100).toFixed(2) : "0.00";
+  sendJSON(res, 200, {
+    total: total.n, pending: pending.n, active: active.n,
+    impressions_totales: agg.imp || 0, ctr_global: ctr, abonnements_actifs: revenus.n,
+  });
+});
+
+route("GET", "/api/admin/ads", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const statut = query.statut;
+  const rows = statut
+    ? await db.prepare("SELECT p.*, u.nom AS user_nom, u.email AS user_email FROM publicites p JOIN users u ON u.id=p.user_id WHERE p.statut=? ORDER BY p.created_at DESC").all(statut)
+    : await db.prepare("SELECT p.*, u.nom AS user_nom, u.email AS user_email FROM publicites p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC").all();
+  sendJSON(res, 200, { publicites: rows });
+});
+
+route("POST", "/api/admin/ads/:id/approve", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
+  if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
+  db.prepare(`UPDATE publicites SET statut='approved', date_debut=date('now'), date_fin=date('now','+${Number(ad.duree_jours) || 7} days'), updated_at=datetime('now') WHERE id=?`).run(ad.id);
+  creerNotif(ad.user_id, "pub_approuvee", "Publicité approuvée ✅", `Votre publicité « ${ad.titre} » est maintenant diffusée.`, { publicite_id: ad.id });
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/admin/ads/:id/reject", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
+  if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
+  db.prepare("UPDATE publicites SET statut='rejected', motif_rejet=?, updated_at=datetime('now') WHERE id=?").run(body.motif || null, ad.id);
+  creerNotif(ad.user_id, "pub_refusee", "Publicité refusée", `Votre publicité « ${ad.titre} » a été refusée. ${body.motif ? 'Motif : ' + body.motif : ''}`, { publicite_id: ad.id });
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/admin/ads/:id/need-modification", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
+  if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
+  db.prepare("UPDATE publicites SET statut='need_modification', motif_rejet=?, updated_at=datetime('now') WHERE id=?").run(body.commentaire || null, ad.id);
+  creerNotif(ad.user_id, "pub_modif", "Modification demandée", `L'équipe demande une modification sur « ${ad.titre} » : ${body.commentaire || ''}`, { publicite_id: ad.id });
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/admin/ads/:id/pause", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE publicites SET statut='paused', updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/admin/ads/:id/resume", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE publicites SET statut='approved', updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/admin/ads/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  await db.prepare("DELETE FROM publicites WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
 
 /* ═══════════════════════════════════════════════════════════════
    STRIPE CONNECT — comptes vendeurs marketplace (initiatives)
