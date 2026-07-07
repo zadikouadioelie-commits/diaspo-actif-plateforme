@@ -9646,12 +9646,19 @@ ${jsonLd}
              ELSE 'actif'
         END
       )`;
+      /* Agrégats en JOIN (une seule passe sur tickets/ticket_types) plutôt qu'en sous-requêtes corrélées
+         (une par ligne d'événement) — évite un ralentissement qui grandissait avec le nombre d'événements
+         et pouvait faire dépasser le timeout de la fonction serverless en production. */
       let sql = `SELECT e.*,
         u.nom AS organisateur_nom,
-        (SELECT COUNT(*) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') AS billets_vendus,
-        (SELECT COUNT(*) FROM ticket_types tt WHERE tt.event_id=e.id AND tt.actif=1) AS nb_types,
+        COALESCE(tkc.billets_vendus,0) AS billets_vendus,
+        COALESCE(ttc.nb_types,0) AS nb_types,
         ${expositionExpr} AS statut_exposition
-        FROM events e LEFT JOIN users u ON u.id=e.organisateur_id WHERE 1=1`;
+        FROM events e
+        LEFT JOIN users u ON u.id=e.organisateur_id
+        LEFT JOIN (SELECT event_id, COUNT(*) AS billets_vendus FROM tickets WHERE payment_status='paid' GROUP BY event_id) tkc ON tkc.event_id=e.id
+        LEFT JOIN (SELECT event_id, COUNT(*) AS nb_types FROM ticket_types WHERE actif=1 GROUP BY event_id) ttc ON ttc.event_id=e.id
+        WHERE 1=1`;
       const args = [];
       if (q.statut) { sql += ' AND e.statut=?'; args.push(q.statut); }
       else { sql += " AND e.statut IN ('publie','ferme')"; }
@@ -9679,10 +9686,10 @@ ${jsonLd}
       const total_events = (await db.prepare("SELECT COUNT(*) n FROM events").get())?.n;
       const publies = (await db.prepare("SELECT COUNT(*) n FROM events WHERE statut='publie'").get())?.n;
       const total_tickets = (await db.prepare("SELECT COUNT(*) n FROM tickets WHERE payment_status='paid'").get())?.n;
-      const revenu_total = await db.prepare("SELECT COALESCE(SUM(prix_paye),0) n FROM tickets WHERE payment_status='paid'").get().n;
-      const commission_total = await db.prepare("SELECT COALESCE(SUM(commission),0) n FROM tickets WHERE payment_status='paid'").get().n;
+      const revenu_total = (await db.prepare("SELECT COALESCE(SUM(prix_paye),0) n FROM tickets WHERE payment_status='paid'").get())?.n;
+      const commission_total = (await db.prepare("SELECT COALESCE(SUM(commission),0) n FROM tickets WHERE payment_status='paid'").get())?.n;
       const par_pays = await db.prepare(`SELECT pays, COUNT(*) n FROM events WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 10`).all();
-      const top_events = db.prepare(`SELECT e.titre, COUNT(t.id) nb_billets, COALESCE(SUM(t.prix_paye),0) revenu
+      const top_events = await db.prepare(`SELECT e.titre, COUNT(t.id) nb_billets, COALESCE(SUM(t.prix_paye),0) revenu
         FROM events e LEFT JOIN tickets t ON t.event_id=e.id AND t.payment_status='paid'
         GROUP BY e.id ORDER BY revenu DESC LIMIT 10`).all();
       return sendJSON(res, 200, { total_events, publies, total_tickets, revenu_total, commission_total, par_pays, top_events });
