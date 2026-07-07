@@ -1965,12 +1965,21 @@ async function renderVitrineVisitor(init) {
     <div id="pvt-avis-body" style="padding:16px 20px;"><div class="pvz-empty">Chargement…</div></div>
   </section>`;
 
-  // Partenaires + Objectif
-  const partenaires = safeParseJson(init.vitrine_partenaires_json, []);
+  // Partenaires (module dédié — /api/initiatives/:id/partenaires) + Objectif
+  let partenaires = [];
+  try { const pr = await api('GET', `/initiatives/${init.id}/partenaires`); partenaires = pr.partenaires || []; } catch(e) {}
   const partenairesObjectifSec = (partenaires.length || init.vitrine_objectif_cible || isOwn) ? `<section id="pv-partenaires" class="pvt-section">
-    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🤝 Ils nous font confiance</h3>${isOwn?`<button onclick="pvtAddPartenaire()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un logo</button>`:''}</div>
-    <div style="padding:18px 22px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-      ${partenaires.length ? partenaires.map((p,i)=>`<div style="position:relative;flex:1;min-width:80px;"><img src="${esc(p.logo_url)}" alt="${esc(p.nom||'')}" style="width:100%;height:52px;object-fit:contain;border-radius:10px;background:#F6F1EE;">${isOwn?`<button onclick="pvtRemovePartenaire(${i})" style="position:absolute;top:-6px;right:-6px;background:#B91C1C;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;">✕</button>`:''}</div>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun partenaire ajouté.':''}</span>`}
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🤝 Nos partenaires</h3>${isOwn?`<a href="dashboard-initiative.html#partenaires-liste" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;">⚙️ Gérer</a>`:''}</div>
+    <div style="padding:18px 22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;">
+      ${partenaires.length ? partenaires.map(p=>`
+        <div style="text-align:center;background:#F6F1EE;border-radius:12px;padding:12px;">
+          ${p.logo_url?`<img src="${esc(p.logo_url)}" alt="${esc(p.nom||'')}" style="width:100%;height:52px;object-fit:contain;margin-bottom:6px;">`:`<div style="height:52px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:6px;">🤝</div>`}
+          <div style="font-size:12.5px;font-weight:700;color:#122A4D;">${esc(p.nom)}</div>
+          ${p.type_partenaire?`<div style="font-size:10.5px;color:#8794A7;margin-top:1px;">${esc(p.type_partenaire)}</div>`:''}
+          ${p.description?`<div style="font-size:10.5px;color:#6B7686;margin-top:4px;">${esc(p.description)}</div>`:''}
+          ${p.profil_url?`<a href="${esc(p.profil_url)}" style="display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:var(--v1);">Voir le profil →</a>`:''}
+          ${(p.site_web||p.email||p.telephone)?`<div style="font-size:10px;color:#8794A7;margin-top:4px;">${[p.site_web,p.email,p.telephone].filter(Boolean).map(esc).join(' · ')}</div>`:''}
+        </div>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun partenaire ajouté.':''}</span>`}
     </div>
     ${(init.vitrine_objectif_cible || isOwn) ? `<div style="padding:0 22px 18px;">
       <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px;align-items:center;">
@@ -4778,7 +4787,7 @@ async function renderCodesPanel() {
   let _dsAction = 'reveal';
   window._showDsIdForm = function(action) {
     _dsAction = action;
-    document.getElementById('ds-pwd-form').style.display = '';
+    document.getElementById('ds-pwd-form').style.display = 'block';
     document.getElementById('ds-pwd-title').textContent = action === 'regen'
       ? '⚠️ Régénérer le DS-ID — entrez votre mot de passe (l\'ancien code sera invalidé)'
       : '🔑 Entrez votre mot de passe pour afficher votre DS-ID';
@@ -6156,6 +6165,7 @@ init();
 <script src="/assets/image-cropper.js"></script>
 <script src="/assets/widget-board.js"></script>
   <script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
 </body>
 </html>
 

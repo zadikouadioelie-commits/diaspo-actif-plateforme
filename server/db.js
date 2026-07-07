@@ -792,6 +792,56 @@ db.exec(`
     FOREIGN KEY(ticket_id) REFERENCES tickets(id),
     FOREIGN KEY(event_id) REFERENCES events(id)
   );
+
+  /* ── CONFIGURATION BILLETTERIE (1 ligne par événement) ── */
+  CREATE TABLE IF NOT EXISTS event_billetterie_config (
+    event_id INTEGER PRIMARY KEY,
+    billetterie_active INTEGER DEFAULT 0,
+    vente_ouverture TEXT,
+    vente_fermeture TEXT,
+    places_totales INTEGER,
+    max_billets_par_commande INTEGER DEFAULT 10,
+    vente_en_ligne INTEGER DEFAULT 1,
+    billets_nominatifs INTEGER DEFAULT 0,
+    billets_remboursables INTEGER DEFAULT 1,
+    validation_commande TEXT DEFAULT 'auto',    -- 'auto' | 'manuelle' (billets gratuits uniquement)
+    autoriser_partage_billet INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE
+  );
+
+  /* ── CODES PROMO BILLETTERIE (par événement, distinct de la table codes_promo générique plateforme) ── */
+  CREATE TABLE IF NOT EXISTS event_codes_promo (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    code TEXT NOT NULL,
+    nom TEXT,
+    description TEXT,
+    type TEXT NOT NULL DEFAULT 'pourcentage',   -- pourcentage|montant_fixe
+    valeur REAL NOT NULL DEFAULT 0,
+    date_debut TEXT,
+    date_fin TEXT,
+    nb_max_utilisations INTEGER,
+    nb_utilisations INTEGER DEFAULT 0,
+    nb_max_par_utilisateur INTEGER DEFAULT 1,
+    ticket_type_ids TEXT DEFAULT '[]',          -- JSON array, vide = tous les types de l'événement
+    actif INTEGER DEFAULT 1,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE,
+    UNIQUE(event_id, code)
+  );
+
+  /* ── UTILISATIONS DE CODES PROMO (IMMUABLE — INSERT ONLY, pour respecter nb_max_par_utilisateur) ── */
+  CREATE TABLE IF NOT EXISTS event_codes_promo_usages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    ticket_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(code_id) REFERENCES event_codes_promo(id) ON DELETE CASCADE
+  );
 `);
 
 /* ══ LISTES DE DIFFUSION ══ */
@@ -822,7 +872,8 @@ db.exec(`
 `);
 // Migrations listes_diffusion v2
 const _ldCols = db.prepare("PRAGMA table_info(listes_diffusion)").all().map(c=>c.name);
-[["couleur TEXT DEFAULT '#1B3A6B'","couleur"],["icone TEXT DEFAULT '📋'","icone"],["notes TEXT","notes"],["ordre INTEGER DEFAULT 0","ordre"]]
+[["couleur TEXT DEFAULT '#1B3A6B'","couleur"],["icone TEXT DEFAULT '📋'","icone"],["notes TEXT","notes"],["ordre INTEGER DEFAULT 0","ordre"],
+ ["visibilite TEXT DEFAULT 'privee'","visibilite"],["mode TEXT DEFAULT 'figee'","mode"],["filtres_json TEXT","filtres_json"],["archived INTEGER DEFAULT 0","archived"]]
   .forEach(([def,col])=>{ if(!_ldCols.includes(col)) try{db.prepare(`ALTER TABLE listes_diffusion ADD COLUMN ${def}`).run();}catch(e){} });
 const _ldcCols = db.prepare("PRAGMA table_info(listes_diffusion_contacts)").all().map(c=>c.name);
 if(!_ldcCols.includes('user_id')) try{db.prepare("ALTER TABLE listes_diffusion_contacts ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL").run();}catch(e){}
@@ -869,6 +920,24 @@ db.exec(`
 
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
 const MIGRATIONS = [
+  // Billetterie V1 — early-bird + attributs enrichis par type de billet
+  ["ticket_types", "avantages TEXT"],
+  ["ticket_types", "devise TEXT DEFAULT 'EUR'"],
+  ["ticket_types", "max_par_acheteur INTEGER"],
+  ["ticket_types", "date_vente_debut TEXT"],
+  ["ticket_types", "date_vente_fin TEXT"],
+  ["ticket_types", "couleur TEXT DEFAULT '#2563EB'"],
+  ["ticket_types", "prix_early_bird REAL"],
+  ["ticket_types", "early_bird_fin TEXT"],
+  // Billetterie V1 — commandes multi-billets, nominatif, code promo appliqué, validation manuelle
+  ["tickets", "commande_id TEXT"],
+  ["tickets", "titulaire_nom TEXT"],
+  ["tickets", "titulaire_prenom TEXT"],
+  ["tickets", "code_promo_id INTEGER"],
+  ["tickets", "montant_reduction REAL DEFAULT 0"],
+  ["tickets", "validation_manuelle_statut TEXT"],
+  // Billetterie V1 — lignes de compensation remboursement (sens='debit'), historique existant reste 'credit'
+  ["wallet_transactions", "sens TEXT DEFAULT 'credit'"],
   ["conversations", "sujet TEXT"],
   ["conversations", "archive_u1 INTEGER DEFAULT 0"],
   ["conversations", "archive_u2 INTEGER DEFAULT 0"],
@@ -2037,6 +2106,117 @@ db.exec(`
     ordre       INTEGER DEFAULT 0,
     created_at  TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(deal_id) REFERENCES deals(id)
+  );
+
+  /* ═══════════════════════════════════════════════════════════════
+     MODULE ÉVALUATION DE PROJET — envoi peer-to-peer d'un projet à un
+     ou plusieurs destinataires, évaluation totalement indépendante entre
+     destinataires (aucun ne voit le dossier des autres). Système PARALLÈLE
+     à la table "projets" existante (modération admin à validateur unique,
+     différent) — préfixe proj_eval_* pour éviter toute collision.
+     ═══════════════════════════════════════════════════════════════ */
+  CREATE TABLE IF NOT EXISTS proj_eval_projets (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    createur_id            INTEGER NOT NULL,
+    nom_projet             TEXT NOT NULL,
+    categorie              TEXT,
+    secteur                TEXT,
+    pays                   TEXT,
+    resume                 TEXT,
+    description            TEXT,
+    objectifs              TEXT,
+    budget_estime          REAL,
+    avancement             TEXT,
+    date_souhaitee         TEXT,
+    business_plan_id       INTEGER,
+    lettre_accompagnement  TEXT,
+    statut_global          TEXT DEFAULT 'brouillon' CHECK(statut_global IN ('brouillon','envoye','archive')),
+    created_at             TEXT DEFAULT (datetime('now')),
+    updated_at             TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(createur_id) REFERENCES users(id),
+    FOREIGN KEY(business_plan_id) REFERENCES business_plans(id)
+  );
+  /* Cœur du modèle : 1 ligne par destinataire = dossier indépendant (à la deal_participants) */
+  CREATE TABLE IF NOT EXISTS proj_eval_destinataires (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    projet_id          INTEGER NOT NULL,
+    destinataire_id    INTEGER NOT NULL,
+    type_destinataire  TEXT DEFAULT 'membre',
+    statut             TEXT DEFAULT 'recu' CHECK(statut IN ('recu','en_analyse','documents_demandes','entretien_propose','accepte','refuse','amelioration_demandee')),
+    note_qualite       INTEGER CHECK(note_qualite BETWEEN 1 AND 5),
+    note_faisabilite   INTEGER CHECK(note_faisabilite BETWEEN 1 AND 5),
+    note_impact        INTEGER CHECK(note_impact BETWEEN 1 AND 5),
+    commentaire_eval   TEXT,
+    motif_decision     TEXT,
+    pris_en_charge_at  TEXT,
+    decision_at        TEXT,
+    created_at         TEXT DEFAULT (datetime('now')),
+    updated_at         TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(projet_id) REFERENCES proj_eval_projets(id) ON DELETE CASCADE,
+    FOREIGN KEY(destinataire_id) REFERENCES users(id),
+    UNIQUE(projet_id, destinataire_id)
+  );
+  CREATE TABLE IF NOT EXISTS proj_eval_documents (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    projet_id        INTEGER NOT NULL,
+    destinataire_id  INTEGER,
+    nom              TEXT,
+    type_mime        TEXT,
+    categorie        TEXT DEFAULT 'autre' CHECK(categorie IN ('business_plan','devis','contrat','plan','audio','video','image','autre')),
+    taille           INTEGER,
+    url_bunny        TEXT,
+    contenu_b64      TEXT,
+    duree_secondes   INTEGER,
+    uploaded_by      INTEGER,
+    created_at       TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(projet_id) REFERENCES proj_eval_projets(id) ON DELETE CASCADE,
+    FOREIGN KEY(destinataire_id) REFERENCES proj_eval_destinataires(id) ON DELETE CASCADE
+  );
+  /* Checklist de documents complémentaires demandés, par dossier */
+  CREATE TABLE IF NOT EXISTS proj_eval_demandes_documents (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    destinataire_id  INTEGER NOT NULL,
+    items_json       TEXT DEFAULT '[]',
+    message          TEXT,
+    statut           TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','repondu')),
+    created_at       TEXT DEFAULT (datetime('now')),
+    repondu_at       TEXT,
+    FOREIGN KEY(destinataire_id) REFERENCES proj_eval_destinataires(id) ON DELETE CASCADE
+  );
+  /* Audit log immuable par dossier (pattern deal_history) */
+  CREATE TABLE IF NOT EXISTS proj_eval_historique (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    destinataire_id  INTEGER NOT NULL,
+    acteur_id        INTEGER,
+    acteur_nom       TEXT,
+    action           TEXT NOT NULL,
+    detail           TEXT,
+    created_at       TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(destinataire_id) REFERENCES proj_eval_destinataires(id) ON DELETE CASCADE
+  );
+  /* Messages liés à UN dossier précis — pas la messagerie 1-1 générique
+     (conversations/messages a une contrainte UNIQUE(user1_id,user2_id) qui empêcherait
+     plusieurs fils indépendants entre les deux mêmes comptes pour plusieurs projets/dossiers) */
+  CREATE TABLE IF NOT EXISTS proj_eval_messages (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    destinataire_id  INTEGER NOT NULL,
+    auteur_id        INTEGER NOT NULL,
+    contenu          TEXT,
+    fichier_json     TEXT,
+    created_at       TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(destinataire_id) REFERENCES proj_eval_destinataires(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS proj_eval_rendezvous (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    destinataire_id  INTEGER NOT NULL,
+    propose_par      INTEGER NOT NULL,
+    date_heure       TEXT NOT NULL,
+    lieu_ou_lien     TEXT,
+    note             TEXT,
+    statut           TEXT DEFAULT 'propose' CHECK(statut IN ('propose','accepte','refuse')),
+    created_at       TEXT DEFAULT (datetime('now')),
+    updated_at       TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(destinataire_id) REFERENCES proj_eval_destinataires(id) ON DELETE CASCADE
   );
 
   /* ───── Partenaires Officiels Diaspo'Actif ───── */
@@ -3674,6 +3854,7 @@ db.exec(`
   // ── Refonte visuelle profil/vitrine : thème couleur de la boutique ──
   const initCols4 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
   if (!initCols4.includes('vitrine_theme')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_theme TEXT DEFAULT 'bordeaux'");
+  if (!initCols4.includes('reseau_visibilite')) db.exec("ALTER TABLE initiatives ADD COLUMN reseau_visibilite TEXT DEFAULT 'prive'");
 
   // ── Rubriques Vitrine complémentaires : téléchargements, partenaires, objectif, offre flash ──
   const initCols5 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
@@ -3706,6 +3887,32 @@ db.exec(`
   if (!initCols6.includes('vitrine_email_pro'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_email_pro TEXT");
   if (!initCols6.includes('vitrine_google_maps_url'))  db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_google_maps_url TEXT");
   if (!initCols6.includes('vitrine_rdv_active'))       db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_rdv_active INTEGER DEFAULT 0");
+
+  // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS initiative_partenaires (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id     INTEGER NOT NULL,
+      type              TEXT DEFAULT 'externe' CHECK(type IN ('compte','externe')),
+      linked_user_id    INTEGER,
+      nom               TEXT NOT NULL,
+      logo_url          TEXT,
+      description       TEXT,
+      type_partenaire   TEXT,
+      site_web          TEXT,
+      email             TEXT,
+      telephone         TEXT,
+      pays              TEXT,
+      afficher_contact  INTEGER DEFAULT 0,
+      mis_en_avant      INTEGER DEFAULT 0,
+      actif             INTEGER DEFAULT 1,
+      ordre             INTEGER DEFAULT 0,
+      created_at        TEXT DEFAULT (datetime('now')),
+      updated_at        TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+      FOREIGN KEY(linked_user_id) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
 
   // ── Masquage de compte (remplace la suppression : profil public caché, données conservées) ──
   const userCols3 = db.prepare('PRAGMA table_info(users)').all().map(c=>c.name);

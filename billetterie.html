@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#ff6b00">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
 /* ── Layout ── */
 .billet-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
@@ -21,8 +22,8 @@
 .evt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:20px;}
 .evt-card{border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:box-shadow .15s;cursor:pointer;}
 .evt-card:hover{box-shadow:0 6px 24px rgba(0,0,0,.1);}
-.evt-cover{width:100%;height:150px;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:54px;background:linear-gradient(135deg,#ff6b00,#ff9f43);}
-.evt-cover img{width:100%;height:150px;object-fit:cover;}
+.evt-cover{width:100%;aspect-ratio:16/9;object-fit:cover;object-position:center;display:flex;align-items:center;justify-content:center;font-size:54px;background:linear-gradient(135deg,#ff6b00,#ff9f43);}
+.evt-cover img{width:100%;height:100%;aspect-ratio:16/9;object-fit:cover;object-position:center;display:block;}
 .evt-body{padding:16px;}
 .evt-date{font-size:11px;color:#2563EB;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
 .evt-title{font-size:15px;font-weight:700;margin:0 0 6px;line-height:1.3;}
@@ -242,7 +243,7 @@
       <div class="form-row">
         <label>🖼️ Image de couverture</label>
         <div id="blt-cover-drop" style="border:2px dashed var(--border);border-radius:8px;padding:14px;text-align:center;cursor:pointer;background:#FAFAFA;" onclick="document.getElementById('blt-cover-file').click()">
-          <div id="blt-cover-preview" style="display:none;margin-bottom:6px;"><img id="blt-cover-img" style="max-height:100px;border-radius:6px;max-width:100%;object-fit:cover;" alt=""></div>
+          <div id="blt-cover-preview" style="display:none;margin-bottom:6px;"><img id="blt-cover-img" style="width:100%;aspect-ratio:16/9;object-fit:cover;object-position:center;border-radius:6px;display:block;" alt=""></div>
           <span id="blt-cover-ph" style="font-size:13px;color:var(--muted);">📷 Cliquer pour choisir · JPG, PNG, WebP · max 2 Mo</span>
         </div>
         <input type="file" id="blt-cover-file" accept="image/jpeg,image/png,image/webp" style="display:none">
@@ -363,7 +364,7 @@
       <!-- Types de billets -->
       <div style="margin:18px 0 10px;"><strong style="font-size:14px;">🎟️ Types de billets</strong> <button onclick="addTicketTypeRow()" class="btn btn-sm btn-outline" style="margin-left:10px;font-size:12px;">＋ Ajouter</button></div>
       <div class="tt-list" id="tt-rows">
-        <div class="tt-row" data-idx="0">
+        <div class="tt-row" data-idx="0" style="flex-wrap:wrap;gap:6px;">
           <input placeholder="Nom (ex: Standard)" id="tt-nom-0">
           <input placeholder="Prix (€)" type="number" min="0" step="0.01" id="tt-prix-0" style="max-width:90px;">
           <input placeholder="Qté" type="number" min="1" id="tt-qte-0" style="max-width:70px;" value="100">
@@ -371,8 +372,46 @@
             <option value="standard">Standard</option><option value="vip">VIP</option>
             <option value="early">Early Access</option><option value="sponsor">Sponsor</option>
           </select>
+          <input placeholder="Avantages inclus" id="tt-avantages-0" style="min-width:140px;flex:1;">
+          <input type="color" id="tt-couleur-0" value="#2563EB" title="Couleur d'identification" style="width:32px;height:32px;padding:2px;border:1px solid var(--border);border-radius:6px;">
+          <input placeholder="Max/acheteur" type="number" min="1" id="tt-maxacheteur-0" style="max-width:100px;" title="Nombre maximum de billets de ce type par acheteur">
+          <span style="font-size:11px;color:var(--muted);width:100%;">Early-bird (optionnel) :</span>
+          <input placeholder="Prix early-bird (€)" type="number" min="0" step="0.01" id="tt-earlyprix-0" style="max-width:120px;">
+          <input type="datetime-local" id="tt-earlyfin-0" title="Fin du tarif early-bird" style="max-width:170px;">
         </div>
       </div>
+
+      <!-- Configuration billetterie -->
+      <div style="margin:18px 0 10px;"><strong style="font-size:14px;">⚙️ Configuration billetterie</strong></div>
+      <div style="display:flex;flex-direction:column;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;">
+          <input type="checkbox" id="cfg-active" checked> Billetterie active pour cet événement
+        </label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:180px;"><label style="font-size:11px;color:var(--muted);">Ouverture des ventes</label>
+            <input type="datetime-local" id="cfg-ouverture" style="width:100%;"></div>
+          <div style="flex:1;min-width:180px;"><label style="font-size:11px;color:var(--muted);">Fermeture des ventes</label>
+            <input type="datetime-local" id="cfg-fermeture" style="width:100%;"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;"><label style="font-size:11px;color:var(--muted);">Places totales</label>
+            <input type="number" min="1" id="cfg-places" style="width:100%;" placeholder="Illimité si vide"></div>
+          <div style="flex:1;min-width:140px;"><label style="font-size:11px;color:var(--muted);">Max billets/commande</label>
+            <input type="number" min="1" id="cfg-max-commande" style="width:100%;" value="10"></div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;">
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="cfg-nominatif"> Billets nominatifs</label>
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="cfg-remboursable" checked> Billets remboursables</label>
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="cfg-partage" checked> Partage du billet autorisé</label>
+        </div>
+        <div><label style="font-size:11px;color:var(--muted);">Validation des commandes gratuites</label>
+          <select id="cfg-validation" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+            <option value="auto">Automatique</option>
+            <option value="manuelle">Manuelle (approbation organisateur)</option>
+          </select>
+        </div>
+      </div>
+
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;flex-wrap:wrap;gap:10px;">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;">
           <input type="checkbox" id="ev-publier"> Publier immédiatement
@@ -536,14 +575,13 @@ async function openEvent(eid) {
         </div>
         <button onclick="closeMod('modal-event-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
       </div>
-      ${e.image_b64 ? `<img src="${e.image_b64}" style="width:100%;height:200px;object-fit:cover;border-radius:10px;margin-bottom:16px;">` : ''}
+      ${e.image_b64 ? `<img src="${e.image_b64}" style="width:100%;aspect-ratio:16/9;object-fit:cover;object-position:center;border-radius:10px;margin-bottom:16px;display:block;">` : ''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;font-size:13px;">
         <div>📅 <strong>Début :</strong> ${fmtDate(e.date_debut)}</div>
         ${e.date_fin ? `<div>⏰ <strong>Fin :</strong> ${fmtDate(e.date_fin)}</div>` : '<div></div>'}
         ${e.adresse ? `<div style="grid-column:1/-1">📍 ${escH(e.adresse)}</div>` : ''}
         ${e.capacite ? `<div>👥 Capacité : ${e.capacite}</div>` : ''}
-        <div>🎫 Billets vendus : ${stats.nb||0}</div>
-        ${e.rayon_publication ? `<div style="grid-column:1/-1">📡 <strong>Rayon :</strong> ${{ville:'🏙️ Ville',commune:'🏘️ Commune',departement:'🗺️ Département',region:'🌐 Région',national:'🇫🇷 National',international:'🌍 International'}[e.rayon_publication]||e.rayon_publication}${e.ville&&e.rayon_publication==='ville'?' ('+escH(e.ville)+')':''}</div>` : ''}
+        ${e.rayon_publication ?`<div style="grid-column:1/-1">📡 <strong>Rayon :</strong> ${{ville:'🏙️ Ville',commune:'🏘️ Commune',departement:'🗺️ Département',region:'🌐 Région',national:'🇫🇷 National',international:'🌍 International'}[e.rayon_publication]||e.rayon_publication}${e.ville&&e.rayon_publication==='ville'?' ('+escH(e.ville)+')':''}</div>` : ''}
         ${e.publie_at ? (()=>{
           const joursPublie = Math.floor((Date.now()-new Date(e.publie_at+'Z').getTime())/86400000);
           const duree = e.duree_exposition_jours||20;
@@ -572,15 +610,24 @@ async function openEvent(eid) {
       ${!ME ? '<div class="notice" style="margin-top:16px;">🔐 <a href="login.html">Connectez-vous</a> pour acheter des billets.</div>' : ''}
       ${ME && ME.role !== 'utilisateur' ? '<div class="notice" style="margin-top:16px;">ℹ️ Seuls les membres Diaspora peuvent acheter des billets.</div>' : ''}
       ${e.inscription_mode && e.inscription_mode !== 'libre' ? await renderInscriptionSecuriseeSection(e) : ''}
-      <div style="margin-top:18px;background:var(--surface-2,#f8f9fa);border-radius:12px;padding:14px 16px;border:1px solid var(--border);">
+      ${ME ? `<div style="margin-top:18px;background:var(--surface-2,#f8f9fa);border-radius:12px;padding:14px 16px;border:1px solid var(--border);">
         <div style="font-weight:700;font-size:13px;color:#2563EB;margin-bottom:10px;">💡 Vos deux codes Diaspo'Actif</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;line-height:1.5;">
-          <div><strong>🆔 Identifiant DA (ID DA)</strong><br>Votre identifiant public. Permet de vous identifier et relier votre compte à vos actions. Peut être communiqué sans risque.</div>
-          <div><strong>🔑 Code de Sécurité (DS-ID)</strong><br>Votre signature numérique privée. Confirme que vous approuvez personnellement une action engageante. Ne jamais le communiquer.</div>
+          <div>
+            <strong>🆔 Identifiant DA (ID DA)</strong><br>Votre identifiant public. Permet de vous identifier et relier votre compte à vos actions. Peut être communiqué sans risque.
+            <div style="margin-top:6px;">
+              <span id="blt-daid-value" style="display:none;font-weight:700;color:#2563EB;">${escH(ME.da_id||'—')}</span>
+              <button type="button" class="btn btn-sm btn-outline" style="font-size:11px;" onclick="document.getElementById('blt-daid-value').style.display='inline';this.style.display='none';">👁️ Révéler mon ID DA</button>
+            </div>
+          </div>
+          <div>
+            <strong>🔑 Code de Sécurité (DS-ID)</strong><br>Votre signature numérique privée. Confirme que vous approuvez personnellement une action engageante. Ne jamais le communiquer.
+            <div style="margin-top:6px;font-size:11px;color:var(--muted);">📍 Retrouvez votre DS-ID dans <a href="profil-app.html#confidentialite" style="color:#2563EB;font-weight:600;">votre profil → Confidentialité → Codes</a>.</div>
+          </div>
         </div>
-      </div>`;
+      </div>` : ''}`;
     document.getElementById('modal-event-bg').classList.add('open');
-  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
+  } catch(e) { showToast('Erreur : '+e.message,'error'); }
 }
 
 /* ══ ACHAT BILLET ══ */
@@ -732,7 +779,7 @@ async function submitStep2() {
     const msg = r.statut === 'liste_attente'
       ? '📋 Vous avez été ajouté en liste d\'attente. Vous serez notifié si une place se libère.'
       : '🎉 Inscription confirmée et ajoutée à votre agenda Diaspo\'Actif !';
-    DA.toast(msg, { type: r.statut === 'liste_attente' ? 'info' : 'success', duration: 7000 });
+    showToast(msg, r.statut === 'liste_attente' ? 'info' : 'success', 7000);
     loadEvents();
     // Re-open event detail to show updated status
     setTimeout(() => openEvent(_inscriptionCtx.eid), 500);
@@ -796,6 +843,7 @@ async function openDossierQR(eid) {
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-sm" style="border-color:#0369a1;color:#0369a1;" onclick="exportDossierQRCsv(${eid})">⬇️ Exporter CSV</button>
+          <button class="btn btn-sm" style="border-color:#7c3aed;color:#7c3aed;" onclick="exportDossierQRPdf(${eid})">⬇️ Exporter PDF</button>
           <button onclick="closeMod('modal-qr-folder-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
         </div>
       </div>
@@ -902,7 +950,33 @@ async function exportDossierQRCsv(eid) {
     a.href = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
     a.download = `QR-Participants-${ev.titre.replace(/\s+/g,'-')}.csv`;
     a.click();
-  } catch(e) { DA.toast('Erreur export : '+e.message, {type:'danger'}); }
+  } catch(e) { showToast('Erreur export : '+e.message,'error'); }
+}
+
+async function exportDossierQRPdf(eid) {
+  if (typeof window.jspdf === 'undefined') { showToast('Génération PDF momentanément indisponible.','error'); return; }
+  try {
+    const r = await api('GET', '/events/'+eid+'/qr-participants');
+    const { evenement: ev, inscriptions, tickets_payants } = r;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', orientation: 'landscape' });
+    doc.setFontSize(14); doc.text(`Participants — ${ev.titre}`, 10, 12);
+    doc.setFontSize(9);
+    const rows = [
+      ...inscriptions.map(i => [i.nom, i.prenom||'', i.da_id_utilise||'', 'Inscription DA', i.statut, i.nb_scans||0, i.created_at?.slice(0,10)||'']),
+      ...tickets_payants.map(t => [t.nom||t.nom_display||'', '', t.da_id||'', t.type_billet||'', t.statut, t.nb_scans||0, t.created_at?.slice(0,10)||'']),
+    ];
+    let y = 22;
+    doc.setFont(undefined,'bold');
+    ['Nom','Prénom','ID DA','Type','Statut','Scans','Date'].forEach((h,i) => doc.text(h, 10+i*40, y));
+    doc.setFont(undefined,'normal'); y += 6;
+    for (const row of rows) {
+      if (y > 195) { doc.addPage(); y = 15; }
+      row.forEach((c,i) => doc.text(String(c ?? '—').slice(0,25), 10+i*40, y));
+      y += 6;
+    }
+    doc.save(`Participants-${ev.titre.replace(/\s+/g,'-')}.pdf`);
+  } catch(e) { showToast('Erreur export PDF : '+e.message,'error'); }
 }
 
 /* ══ OBSERVATIONS (tableau de bord analytique) ══ */
@@ -1039,7 +1113,7 @@ async function openObservations(eid) {
 
 function exportObsCsv() {
   const parts = window._obsParticipants || [];
-  if (!parts.length) { DA.toast('Aucun participant à exporter.', {type:'info'}); return; }
+  if (!parts.length) { showToast('Aucun participant à exporter.','info'); return; }
   const headers = ['Nom','ID DA','Type de compte','Statut','Date inscription','Méthode','DS-ID signé'];
   const rows = parts.map(p=>[p.nom||'',p.da_id||'',p.type_compte||'',p.statut||'',p.created_at?.slice(0,10)||'',p.methode||'',p.ds_id_signe?'Oui':'Non'].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
   const csv = [headers.join(','),...rows].join('\n');
@@ -1050,6 +1124,25 @@ function exportObsCsv() {
 }
 
 /* ══ MES BILLETS ══ */
+/* ══ Statut calculé du billet (Billetterie V1) — jamais stocké en base, recalculé côté client à chaque affichage ══ */
+function calculerStatutBillet(t) {
+  if (t.payment_status === 'refunded') return { label: 'Remboursé', color: '#64748b' };
+  if (t.payment_status === 'failed') return { label: 'Paiement échoué', color: '#ef4444' };
+  if (t.statut === 'cancelled') return { label: 'Annulé', color: '#ef4444' };
+  if (t.validation_manuelle_statut === 'en_attente') return { label: "En attente d'approbation", color: '#f59e0b' };
+  if (t.validation_manuelle_statut === 'refuse') return { label: 'Refusé', color: '#ef4444' };
+  if (t.statut === 'used') return { label: 'Utilisé', color: '#94a3b8' };
+  if (t.payment_status === 'pending') return { label: 'Paiement en attente', color: '#f59e0b' };
+  const now = new Date();
+  const debut = new Date(t.date_debut);
+  const fin = t.date_fin ? new Date(t.date_fin) : new Date(debut.getTime() + 86400000);
+  if (fin < now) return { label: 'Expiré', color: '#94a3b8' };
+  const today0 = new Date(now); today0.setHours(0,0,0,0);
+  const debut0 = new Date(debut); debut0.setHours(0,0,0,0);
+  if (debut0.getTime() === today0.getTime()) return { label: "Aujourd'hui", color: '#22c55e' };
+  return { label: 'À venir', color: '#2563EB' };
+}
+
 async function loadMesBillets() {
   if (!ME) { document.getElementById('mes-billets-list').innerHTML='<div class="notice">🔐 <a href="login.html">Connectez-vous</a> pour voir vos billets.</div>'; return; }
   try {
@@ -1057,13 +1150,13 @@ async function loadMesBillets() {
     const list = document.getElementById('mes-billets-list');
     if (!r.tickets.length) { list.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);">Vous n\'avez aucun billet pour le moment.</div>'; return; }
     list.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">` +
-      r.tickets.map(t => `
+      r.tickets.map(t => { const st = calculerStatutBillet(t); return `
         <div class="ticket-card" style="max-width:none;cursor:pointer;" onclick="openTicket(${t.id})">
-          <div style="background:${t.statut==='valid'?'linear-gradient(135deg,var(--orange),#ff9f43)':t.statut==='used'?'#94a3b8':'#ef4444'};border-radius:10px;padding:14px;color:#fff;margin-bottom:14px;">
+          <div style="background:${st.color};border-radius:10px;padding:14px;color:#fff;margin-bottom:14px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
               <div><div style="font-weight:800;font-size:15px;">${escH(t.event_titre)}</div>
                 <div style="font-size:12px;opacity:.9;margin-top:2px;">${fmtDate(t.date_debut)}</div></div>
-              <span class="statut-pill statut-${t.statut}" style="font-size:10px;">${t.statut.toUpperCase()}</span>
+              <span class="statut-pill" style="font-size:10px;background:rgba(255,255,255,.25);">${escH(st.label).toUpperCase()}</span>
             </div>
           </div>
           <div style="font-size:13px;">
@@ -1072,17 +1165,22 @@ async function loadMesBillets() {
             <div class="ticket-info-row"><span class="lbl">💶 Prix</span><span class="val">${t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €'}</span></div>
           </div>
           <div style="text-align:center;margin-top:12px;">
-            <button class="btn btn-sm btn-orange" onclick="event.stopPropagation();openTicket(${t.id})">🔍 Voir QR code</button>
+            <button class="btn btn-sm btn-orange" onclick="event.stopPropagation();openTicket(${t.id})">🔍 Voir le billet</button>
           </div>
-        </div>`).join('') + '</div>';
+        </div>`; }).join('') + '</div>';
   } catch(e) { document.getElementById('mes-billets-list').innerHTML='<div class="notice">Erreur chargement billets.</div>'; }
 }
 
 /* ══ MODAL QR TICKET ══ */
+let _ticketDetail = null;
 async function openTicket(tid) {
   try {
     const r = await api('GET', '/tickets/'+tid);
     const t = r.ticket;
+    _ticketDetail = { t, qr_payload: r.qr_payload };
+    const st = calculerStatutBillet(t);
+    const qrOk = t.payment_status === 'paid' && t.statut !== 'cancelled' && !t.validation_manuelle_statut;
+    const titulaire = t.titulaire_nom ? `${escH(t.titulaire_prenom||'')} ${escH(t.titulaire_nom)}`.trim() : escH(t.user_nom);
     document.getElementById('modal-ticket-content').innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
         <h3 style="margin:0;">🎫 Mon Billet</h3>
@@ -1093,23 +1191,32 @@ async function openTicket(tid) {
         <div style="font-size:13px;opacity:.9;margin-top:4px;">${fmtDate(t.date_debut)} · ${escH(t.ville||'')}${t.pays?', '+escH(t.pays):''}</div>
       </div>
       <div style="text-align:center;margin-bottom:12px;">
-        <span class="statut-pill statut-${t.statut}" style="font-size:13px;">${t.statut==='valid'?'✅ VALIDE':t.statut==='used'?'✔️ UTILISÉ':'❌ ANNULÉ'}</span>
+        <span class="statut-pill" style="font-size:13px;background:${st.color};color:#fff;">${escH(st.label)}</span>
       </div>
-      ${t.statut === 'valid' ? `
+      ${qrOk ? `
         <div class="qr-box" id="qr-render-zone">
           <div id="qr-container-${tid}"></div>
         </div>
-        <p style="text-align:center;font-size:11px;color:var(--muted);margin:0 0 16px;">Présentez ce QR code à l'entrée de l'événement.</p>` : ''}
+        <p style="text-align:center;font-size:11px;color:var(--muted);margin:0 0 16px;">Présentez ce QR code à l'entrée de l'événement.</p>` :
+        t.validation_manuelle_statut === 'en_attente' ? `<p style="text-align:center;font-size:12px;color:#f59e0b;margin:0 0 16px;">⏳ QR code disponible dès l'approbation de votre commande par l'organisateur.</p>` : ''}
       <div style="font-size:13px;">
         <div class="ticket-info-row"><span class="lbl">🆔 Ticket #</span><span class="val">${t.id}</span></div>
         <div class="ticket-info-row"><span class="lbl">🎟️ Type</span><span class="val">${escH(t.type_nom)}</span></div>
         <div class="ticket-info-row"><span class="lbl">💶 Prix payé</span><span class="val">${t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €'}</span></div>
         <div class="ticket-info-row"><span class="lbl">📅 Acheté le</span><span class="val">${fmtDate(t.created_at)}</span></div>
-        <div class="ticket-info-row"><span class="lbl">👤 Titulaire</span><span class="val">${escH(t.user_nom)}</span></div>
+        <div class="ticket-info-row"><span class="lbl">👤 Titulaire</span><span class="val">${titulaire}</span></div>
+        <div class="ticket-info-row"><span class="lbl">🆔 Code DA</span><span class="val">${escH(ME?.da_id||'—')}</span></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">
+        <button class="btn btn-sm btn-outline" onclick="downloadTicketPdf()">⬇️ PDF</button>
+        <button class="btn btn-sm btn-outline" onclick="addTicketToGoogleCalendar()">📅 Google Agenda</button>
+        <a class="btn btn-sm btn-outline" href="messagerie.html?user=${t.organisateur_id}">💬 Contacter l'organisateur</a>
+        <a class="btn btn-sm btn-outline" href="billetterie.html">🎫 Voir l'événement</a>
+        ${t.autoriser_partage_billet ? `<button class="btn btn-sm btn-outline" onclick="shareTicket()">🔗 Partager</button>` : ''}
       </div>`;
     document.getElementById('modal-ticket-bg').classList.add('open');
-    /* Générer QR code si valide */
-    if (t.statut === 'valid' && r.qr_payload) {
+    /* Générer QR code si le billet est réellement scannable */
+    if (qrOk && r.qr_payload) {
       setTimeout(() => {
         const el = document.getElementById('qr-container-'+tid);
         if (el && typeof QRCode !== 'undefined') {
@@ -1117,7 +1224,62 @@ async function openTicket(tid) {
         }
       }, 100);
     }
-  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
+  } catch(e) { showToast('Erreur : '+e.message,'error'); }
+}
+
+/* ══ Téléchargement PDF, ajout calendrier, partage (Billetterie V1) ══ */
+function downloadTicketPdf() {
+  if (!_ticketDetail || typeof window.jspdf === 'undefined') { showToast('Génération PDF momentanément indisponible.','error'); return; }
+  const { t, qr_payload } = _ticketDetail;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a5' });
+  doc.setFillColor(37, 99, 235); doc.rect(0, 0, 148, 30, 'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(16); doc.text("Diaspo'Actif — Billet", 8, 12);
+  doc.setFontSize(11); doc.text(t.event_titre, 8, 22);
+  doc.setTextColor(20,20,20); doc.setFontSize(10);
+  let y = 40;
+  const line = (label, val) => { doc.setFont(undefined,'bold'); doc.text(label, 8, y); doc.setFont(undefined,'normal'); doc.text(String(val||'—'), 45, y); y += 7; };
+  line('Date :', fmtDate(t.date_debut));
+  line('Lieu :', [t.adresse, t.ville, t.pays].filter(Boolean).join(', '));
+  line('Type de billet :', t.type_nom);
+  line('Prix payé :', t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €');
+  line('Titulaire :', t.titulaire_nom ? `${t.titulaire_prenom||''} ${t.titulaire_nom}`.trim() : t.user_nom);
+  line('Numéro de billet :', '#'+t.id);
+  line('Code DA propriétaire :', ME?.da_id || '—');
+  y += 3;
+  const qrCanvas = document.querySelector('#qr-container-'+t.id+' canvas') || document.querySelector('#qr-container-'+t.id+' img');
+  try {
+    if (qrCanvas && qr_payload) {
+      const dataUrl = qrCanvas.tagName === 'CANVAS' ? qrCanvas.toDataURL('image/png') : qrCanvas.src;
+      doc.addImage(dataUrl, 'PNG', 8, y, 45, 45);
+    }
+  } catch(e) { /* QR non disponible pour ce statut, PDF généré sans image */ }
+  doc.setFontSize(8); doc.setTextColor(120,120,120);
+  doc.text('Ce billet est personnel et nominatif à usage unique. Présentez-le à l\'entrée de l\'événement.', 8, 130);
+  doc.save(`billet-${t.event_titre.replace(/[^a-z0-9]+/gi,'-')}-${t.id}.pdf`);
+}
+
+function addTicketToGoogleCalendar() {
+  if (!_ticketDetail) return;
+  const { t } = _ticketDetail;
+  const toGCal = d => d ? new Date(d).toISOString().replace(/[-:]/g,'').split('.')[0]+'Z' : '';
+  const dateFin = t.date_fin || new Date(new Date(t.date_debut).getTime()+2*3600000).toISOString();
+  const params = new URLSearchParams({
+    action: 'TEMPLATE', text: t.event_titre,
+    dates: `${toGCal(t.date_debut)}/${toGCal(dateFin)}`,
+    location: [t.adresse, t.ville, t.pays].filter(Boolean).join(', '),
+    details: `Billet Diaspo'Actif #${t.id} — ${t.type_nom}`,
+  });
+  window.open(`https://calendar.google.com/calendar/render?${params.toString()}`, '_blank');
+}
+
+async function shareTicket() {
+  if (!_ticketDetail) return;
+  const { t } = _ticketDetail;
+  const url = `${location.origin}/billetterie.html`;
+  const text = `Mon billet pour « ${t.event_titre} » sur Diaspo'Actif`;
+  if (navigator.share) { try { await navigator.share({ title: t.event_titre, text, url }); } catch(e) {} }
+  else { await navigator.clipboard.writeText(url); showToast('🔗 Lien copié !','success'); }
 }
 
 /* ══ SCANNER ══ */
@@ -1136,7 +1298,7 @@ async function startScanner() {
     document.getElementById('btn-stop-scan').style.display = '';
     video.onloadedmetadata = () => { video.play(); scanFrame(); };
   } catch(e) {
-    DA.toast('Impossible d\'accéder à la caméra : ' + e.message, {type:'danger'});
+    showToast('Impossible d\'accéder à la caméra : ' + e.message,'error');
   }
 }
 
@@ -1282,12 +1444,14 @@ async function closeEvent(id) {
 
 async function openOrgDetail(eid) {
   try {
-    const [rEv, rAtt, rCk] = await Promise.all([
+    const [rEv, rAtt, rCk, rPend] = await Promise.all([
       api('GET','/events/'+eid),
       api('GET','/events/'+eid+'/attendees'),
-      api('GET','/events/'+eid+'/checkins')
+      api('GET','/events/'+eid+'/checkins'),
+      api('GET','/events/'+eid+'/commandes-en-attente').catch(()=>({commandes:[]}))
     ]);
     const e = rEv.event; const att = rAtt.attendees||[]; const ck = rCk.checkins||[]; const tot = rCk.totaux||{};
+    const pend = rPend.commandes||[];
     const revenu = att.reduce((s,a)=>s+(a.prix_paye||0),0);
     document.getElementById('modal-org-detail-content').innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
@@ -1300,14 +1464,28 @@ async function openOrgDetail(eid) {
         <div class="stat-box"><div class="stat-num">${tot.accepted||0}</div><div class="stat-lbl">Check-ins</div></div>
         <div class="stat-box"><div class="stat-num" style="color:#8b5cf6;">${att.length>0?Math.round((tot.accepted||0)/att.length*100):0}%</div><div class="stat-lbl">Taux présence</div></div>
       </div>
+      ${pend.length ? `
+      <h4 style="margin:18px 0 10px;color:#f59e0b;">⏳ Commandes en attente d'approbation (${pend.length})</h4>
+      <div style="max-height:200px;overflow-y:auto;border:1px solid #f59e0b;border-radius:10px;margin-bottom:10px;">
+        ${pend.map(p=>`
+          <div style="padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border);">
+            <span>${escH(p.user_nom||'—')} <span style="color:var(--muted);font-size:11px;">(${escH(p.da_id||'')})</span></span>
+            <span class="tag-type">${escH(p.type_nom||'')}</span>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-outline" style="border-color:#22c55e;color:#22c55e;font-size:11px;padding:3px 8px;" onclick="approuverCommande(${p.id},${eid})">✅ Approuver</button>
+              <button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#ef4444;font-size:11px;padding:3px 8px;" onclick="refuserCommande(${p.id},${eid})">❌ Refuser</button>
+            </div>
+          </div>`).join('')}
+      </div>` : ''}
       <h4 style="margin:18px 0 10px;">👥 Participants (${att.length})</h4>
       <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;">
         ${att.length ? att.map(a=>`
-          <div class="attendee-row" style="padding:8px 14px;">
+          <div class="attendee-row" style="padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
             <span>${a.anonymise?'[Anonymisé]':escH(a.nom_display||'—')}</span>
             <span style="color:var(--muted);">${escH(a.pays||'')}</span>
             <span class="tag-type">${escH(a.type_nom||'')}</span>
-            <span style="color:var(--muted);font-size:11px;">${a.ticket_statut==='used'?'✅ Présent':'⏳ En attente'}</span>
+            <span style="color:var(--muted);font-size:11px;">${a.ticket_statut==='used'?'✅ Présent':a.payment_status==='refunded'?'💸 Remboursé':'⏳ En attente'}</span>
+            ${a.payment_status==='paid' && a.prix_paye>0 ? `<button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#ef4444;font-size:11px;padding:3px 8px;" onclick="refundTicket(${a.ticket_id},${eid})">💸 Rembourser</button>` : ''}
           </div>`).join('') : '<div style="padding:20px;text-align:center;color:var(--muted);">Aucun participant.</div>'}
       </div>
       <h4 style="margin:18px 0 10px;">📋 Derniers scans</h4>
@@ -1320,7 +1498,26 @@ async function openOrgDetail(eid) {
           </div>`).join('') : '<div style="padding:20px;text-align:center;color:var(--muted);">Aucun scan enregistré.</div>'}
       </div>`;
     document.getElementById('modal-org-detail-bg').classList.add('open');
-  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
+  } catch(e) { showToast('Erreur : '+e.message,'error'); }
+}
+
+async function approuverCommande(tid, eid) {
+  try { await api('POST', '/tickets/'+tid+'/approuver', {}); showToast('Commande approuvée.','success'); openOrgDetail(eid); }
+  catch(e) { showToast('Erreur : '+e.message,'error'); }
+}
+async function refuserCommande(tid, eid) {
+  const motif = prompt('Motif du refus (optionnel) :') || '';
+  try { await api('POST', '/tickets/'+tid+'/refuser', { motif }); showToast('Commande refusée.','info'); openOrgDetail(eid); }
+  catch(e) { showToast('Erreur : '+e.message,'error'); }
+}
+
+async function refundTicket(tid, eid) {
+  if (!confirm('Rembourser ce billet ? Le paiement Stripe sera annulé et le montant débité du solde de l\'organisateur.')) return;
+  try {
+    const r = await api('POST', '/tickets/'+tid+'/refund', {});
+    showToast(`Billet remboursé (${r.montant_rembourse.toFixed(2)}€).`,'success');
+    openOrgDetail(eid);
+  } catch(e) { showToast('Erreur remboursement : '+e.message,'error'); }
 }
 
 /* ══ CRÉER ÉVÉNEMENT ══ */
@@ -1372,7 +1569,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   document.getElementById('blt-pdf-file').addEventListener('change', e => {
     const f = e.target.files[0]; if (!f) return;
-    if (f.size > 5*1024*1024) { DA.toast('PDF trop lourd (max 5 Mo).', {type:'warning'}); return; }
+    if (f.size > 5*1024*1024) { showToast('PDF trop lourd (max 5 Mo).','warning'); return; }
     bltPdfNom = f.name;
     const prog = document.getElementById('blt-pdf-progress');
     prog.style.display = '';
@@ -1463,7 +1660,7 @@ window.openCreerListe = function() {
 
 window.saveNouvelListe = async function() {
   const nom = document.getElementById('nl-nom').value.trim();
-  if (!nom) { DA.toast('Nom de liste requis.', {type:'warning'}); return; }
+  if (!nom) { showToast('Nom de liste requis.','warning'); return; }
   const btn = document.getElementById('btn-save-liste');
   btn.disabled = true; btn.textContent = '⏳';
   try {
@@ -1476,14 +1673,14 @@ window.saveNouvelListe = async function() {
       if (contacts.length) await api('POST', '/listes-diffusion/'+lid+'/contacts', {contacts});
     }
     closeMod('modal-creer-liste-bg');
-    DA.toast('Liste créée !', {type:'success'});
+    showToast('Liste créée !','success');
     await chargerListesDiffusion();
     // Cocher la nouvelle liste automatiquement
     setTimeout(() => {
       const cb = document.querySelector(`.cible-liste-cb[value="${lid}"]`);
       if (cb) cb.checked = true;
     }, 100);
-  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
+  } catch(e) { showToast('Erreur : '+e.message,'error'); }
   finally { btn.disabled=false; btn.textContent='Créer la liste'; }
 };
 
@@ -1505,7 +1702,7 @@ function addTicketTypeRow() {
   const container = document.getElementById('tt-rows');
   const idx = ttIdx++;
   const row = document.createElement('div');
-  row.className = 'tt-row'; row.dataset.idx = idx;
+  row.className = 'tt-row'; row.dataset.idx = idx; row.style.flexWrap = 'wrap'; row.style.gap = '6px';
   row.innerHTML = `<input placeholder="Nom" id="tt-nom-${idx}">
     <input placeholder="Prix (€)" type="number" min="0" step="0.01" id="tt-prix-${idx}" style="max-width:90px;">
     <input placeholder="Qté" type="number" min="1" id="tt-qte-${idx}" style="max-width:70px;" value="100">
@@ -1513,6 +1710,11 @@ function addTicketTypeRow() {
       <option value="standard">Standard</option><option value="vip">VIP</option>
       <option value="early">Early Access</option><option value="sponsor">Sponsor</option>
     </select>
+    <input placeholder="Avantages inclus" id="tt-avantages-${idx}" style="min-width:140px;flex:1;">
+    <input type="color" id="tt-couleur-${idx}" value="#2563EB" title="Couleur d'identification" style="width:32px;height:32px;padding:2px;border:1px solid var(--border);border-radius:6px;">
+    <input placeholder="Max/acheteur" type="number" min="1" id="tt-maxacheteur-${idx}" style="max-width:100px;">
+    <input placeholder="Prix early-bird (€)" type="number" min="0" step="0.01" id="tt-earlyprix-${idx}" style="max-width:120px;">
+    <input type="datetime-local" id="tt-earlyfin-${idx}" title="Fin du tarif early-bird" style="max-width:170px;">
     <button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#ef4444;">×</button>`;
   container.appendChild(row);
 }
@@ -1529,7 +1731,7 @@ function bltSelectRayon(val) {
 async function saveEvent() {
   const titre = document.getElementById('ev-titre').value.trim();
   const date_debut = document.getElementById('ev-debut').value;
-  if (!titre || !date_debut) { DA.toast('Titre et date de début requis.', {type:'warning'}); return; }
+  if (!titre || !date_debut) { showToast('Titre et date de début requis.','warning'); return; }
   const ticket_types = [];
   document.querySelectorAll('#tt-rows .tt-row').forEach(row => {
     const i = row.dataset.idx;
@@ -1537,8 +1739,24 @@ async function saveEvent() {
     const prix = parseFloat(document.getElementById('tt-prix-'+i)?.value)||0;
     const quantite = parseInt(document.getElementById('tt-qte-'+i)?.value)||100;
     const type = document.getElementById('tt-type-'+i)?.value||'standard';
-    if (nom) ticket_types.push({ nom, prix, quantite, type });
+    const avantages = document.getElementById('tt-avantages-'+i)?.value?.trim()||null;
+    const couleur = document.getElementById('tt-couleur-'+i)?.value||'#2563EB';
+    const max_par_acheteur = parseInt(document.getElementById('tt-maxacheteur-'+i)?.value)||null;
+    const prix_early_bird = document.getElementById('tt-earlyprix-'+i)?.value ? parseFloat(document.getElementById('tt-earlyprix-'+i).value) : null;
+    const early_bird_fin = document.getElementById('tt-earlyfin-'+i)?.value||null;
+    if (nom) ticket_types.push({ nom, prix, quantite, type, avantages, couleur, max_par_acheteur, prix_early_bird, early_bird_fin });
   });
+  const billetterie_config = {
+    billetterie_active: document.getElementById('cfg-active').checked,
+    vente_ouverture: document.getElementById('cfg-ouverture').value||null,
+    vente_fermeture: document.getElementById('cfg-fermeture').value||null,
+    places_totales: document.getElementById('cfg-places').value ? parseInt(document.getElementById('cfg-places').value) : null,
+    max_billets_par_commande: parseInt(document.getElementById('cfg-max-commande').value)||10,
+    billets_nominatifs: document.getElementById('cfg-nominatif').checked,
+    billets_remboursables: document.getElementById('cfg-remboursable').checked,
+    autoriser_partage_billet: document.getElementById('cfg-partage').checked,
+    validation_commande: document.getElementById('cfg-validation').value,
+  };
   const galerieFiltree = bltGallery.filter(Boolean);
   const data = {
     titre, description: document.getElementById('ev-desc').value||null,
@@ -1560,6 +1778,7 @@ async function saveEvent() {
     pdf_nom: bltPdfNom||null,
     pdf_acces: document.getElementById('blt-pdf-acces').value||'public',
     rayon_publication: document.querySelector('#blt-rayon-grid input[name="blt-rayon"]:checked')?.value || 'international',
+    billetterie_config,
     ...getCibleData()
   };
   const btn = document.getElementById('btn-save-event');
@@ -1568,9 +1787,9 @@ async function saveEvent() {
     await api('POST', '/events', data);
     closeMod('modal-create-bg');
     bltResetMedia();
-    DA.toast('Événement créé avec succès !', {type:'success'});
+    showToast('Événement créé avec succès !','success');
     loadOrgEvents(); loadEvents();
-  } catch(e) { DA.toast('Erreur : '+e.message, {type:'danger'}); }
+  } catch(e) { showToast('Erreur : '+e.message,'error'); }
   finally { btn.disabled = false; btn.textContent = 'Créer l\'événement'; }
 }
 
@@ -1663,6 +1882,7 @@ function escH(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
 </body>
 </html>
 

@@ -371,4 +371,54 @@ function emailDeletionConfirmee({ email, prenom, numeroDossier, dateSuppression 
   });
 }
 
-module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee };
+function emailConfirmationBillets({ email, prenom, eventTitre, dateEvenement, lieu, billets, montantTotal }) {
+  const lignes = billets.map(b => `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #E2E8F0;color:#0D1B2A;font-size:14px;">${b.type_nom}${b.titulaire ? ` — ${b.titulaire}` : ''}</td>
+      <td style="padding:10px 0;border-bottom:1px solid #E2E8F0;color:#0D1B2A;font-size:14px;text-align:right;">${b.prix === 0 ? 'Gratuit' : b.prix.toFixed(2) + ' €'}</td>
+    </tr>`).join('');
+  return sendEmail({
+    to: email,
+    subject: `Confirmation de votre billet — ${eventTitre} — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;">DIASPO'ACTIF</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <div style="display:inline-block;background:#10B981;color:#fff;font-weight:800;font-size:13px;padding:6px 16px;border-radius:99px;margin-bottom:16px;">
+        Billet(s) confirmé(s) ✅
+      </div>
+      <h1 style="margin:0 0 12px;font-size:20px;font-weight:900;color:#0D1B2A;">
+        ${prenom ? `Bonjour ${prenom},` : "Bonjour,"}<br>votre commande pour « ${eventTitre} » est confirmée
+      </h1>
+      <p style="color:#475569;line-height:1.7;">
+        ${dateEvenement || ''}${lieu ? ' · ' + lieu : ''}
+      </p>
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+        ${lignes}
+        <tr>
+          <td style="padding:12px 0 0;font-weight:800;color:#0D1B2A;">Total</td>
+          <td style="padding:12px 0 0;font-weight:800;color:#0D1B2A;text-align:right;">${montantTotal === 0 ? 'Gratuit' : montantTotal.toFixed(2) + ' €'}</td>
+        </tr>
+      </table>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="https://diaspoactif.com/billetterie.html" style="display:inline-block;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;text-decoration:none;font-weight:800;padding:14px 32px;border-radius:12px;">
+          Voir mon/mes billet(s) →
+        </a>
+      </div>
+      <p style="color:#94A3B8;font-size:12px;line-height:1.6;margin-top:24px;">
+        Votre QR code d'entrée est disponible dans votre espace « Mes Billets » sur Diaspo'Actif.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailConfirmationBillets };

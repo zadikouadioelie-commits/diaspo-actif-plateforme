@@ -17,6 +17,104 @@ async function signTicket(ticketId, eventId, ts) {
   return crypto.createHmac("sha256", TICKET_SECRET)
     .update(`${ticketId}:${eventId}:${ts}`).digest("hex").slice(0, 40);
 }
+
+/* ── Codes promo billetterie (event_codes_promo) — validation en lecture seule, ne consomme jamais le quota.
+   La consommation réelle (nb_utilisations + event_codes_promo_usages) se fait uniquement au paiement confirmé
+   (webhook) ou à la validation immédiate d'une commande gratuite, jamais à la simple création d'un ticket 'pending'. */
+async function validerCodePromoEvenement(eventId, code, ticketTypeId, quantite, userId) {
+  if (!code) return { valide: false, motif: null };
+  const promo = await db.prepare(`SELECT * FROM event_codes_promo WHERE event_id=? AND code=? AND actif=1`).get(eventId, String(code).trim());
+  if (!promo) return { valide: false, motif: 'Code promo invalide.' };
+  const now = new Date();
+  if (promo.date_debut && new Date(promo.date_debut) > now) return { valide: false, motif: "Ce code n'est pas encore actif." };
+  if (promo.date_fin && new Date(promo.date_fin) < now) return { valide: false, motif: 'Ce code a expiré.' };
+  let ticketTypeIds = [];
+  try { ticketTypeIds = JSON.parse(promo.ticket_type_ids || '[]'); } catch (e) { /* format invalide, traité comme "tous" */ }
+  if (ticketTypeIds.length && !ticketTypeIds.map(Number).includes(Number(ticketTypeId))) {
+    return { valide: false, motif: "Ce code ne s'applique pas à ce type de billet." };
+  }
+  if (promo.nb_max_utilisations != null && promo.nb_utilisations + quantite > promo.nb_max_utilisations) {
+    return { valide: false, motif: "Ce code a atteint son nombre maximal d'utilisations." };
+  }
+  if (userId && promo.nb_max_par_utilisateur != null) {
+    const deja = await db.prepare(`SELECT COUNT(*) n FROM event_codes_promo_usages WHERE code_id=? AND user_id=?`).get(promo.id, userId);
+    if ((deja?.n || 0) + quantite > promo.nb_max_par_utilisateur) {
+      return { valide: false, motif: 'Vous avez déjà utilisé ce code le nombre maximal de fois autorisé.' };
+    }
+  }
+  return { valide: true, promo };
+}
+
+function sendErr(code, msg) { return { code, msg }; }
+/* Vérifie que l'utilisateur connecté est l'organisateur de l'événement (ou admin/collectivité) — réutilisé par les routes de gestion billetterie (config, promos, validation manuelle). */
+async function checkEventOwner(req, eid) {
+  const me = await getCurrentUser(req); if (!me) return { error: sendErr(401, 'Connexion requise.') };
+  const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
+  if (!ev) return { error: sendErr(404, 'Événement introuvable.') };
+  if (ev.organisateur_id !== me.id && !['administrateur','collectivite'].includes(me.role)) return { error: sendErr(403, 'Accès refusé.') };
+  return { me, ev };
+}
+
+/* ── Module Évaluation de Projet — helpers d'accès ── */
+async function checkProjEvalOwner(req, pid) {
+  const me = await getCurrentUser(req); if (!me) return { error: sendErr(401, 'Connexion requise.') };
+  const projet = await db.prepare(`SELECT * FROM proj_eval_projets WHERE id=?`).get(pid);
+  if (!projet) return { error: sendErr(404, 'Projet introuvable.') };
+  if (projet.createur_id !== me.id) return { error: sendErr(403, 'Accès refusé.') };
+  return { me, projet };
+}
+async function checkProjEvalDossier(req, did, { porteurAussi } = {}) {
+  const me = await getCurrentUser(req); if (!me) return { error: sendErr(401, 'Connexion requise.') };
+  const dossier = await db.prepare(`SELECT d.*, p.createur_id, p.nom_projet, p.id AS projet_id FROM proj_eval_destinataires d JOIN proj_eval_projets p ON p.id=d.projet_id WHERE d.id=?`).get(did);
+  if (!dossier) return { error: sendErr(404, 'Dossier introuvable.') };
+  const estDestinataire = dossier.destinataire_id === me.id;
+  const estPorteur = dossier.createur_id === me.id;
+  if (!estDestinataire && !(porteurAussi && estPorteur)) return { error: sendErr(403, 'Accès refusé.') };
+  return { me, dossier, estDestinataire, estPorteur };
+}
+
+/* Upsert de la configuration billetterie d'un événement (event_billetterie_config, 1 ligne par event_id). */
+function upsertBilletterieConfig(eid, c) {
+  db.prepare(`INSERT INTO event_billetterie_config
+    (event_id,billetterie_active,vente_ouverture,vente_fermeture,places_totales,max_billets_par_commande,
+     vente_en_ligne,billets_nominatifs,billets_remboursables,validation_commande,autoriser_partage_billet,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+    ON CONFLICT(event_id) DO UPDATE SET
+      billetterie_active=excluded.billetterie_active, vente_ouverture=excluded.vente_ouverture,
+      vente_fermeture=excluded.vente_fermeture, places_totales=excluded.places_totales,
+      max_billets_par_commande=excluded.max_billets_par_commande, vente_en_ligne=excluded.vente_en_ligne,
+      billets_nominatifs=excluded.billets_nominatifs, billets_remboursables=excluded.billets_remboursables,
+      validation_commande=excluded.validation_commande, autoriser_partage_billet=excluded.autoriser_partage_billet,
+      updated_at=datetime('now')`)
+    .run(eid, c.billetterie_active ? 1 : 0, c.vente_ouverture || null, c.vente_fermeture || null,
+         c.places_totales != null ? parseInt(c.places_totales) : null, c.max_billets_par_commande != null ? parseInt(c.max_billets_par_commande) : 10,
+         c.vente_en_ligne === false ? 0 : 1, c.billets_nominatifs ? 1 : 0, c.billets_remboursables === false ? 0 : 1,
+         c.validation_commande === 'manuelle' ? 'manuelle' : 'auto', c.autoriser_partage_billet === false ? 0 : 1);
+}
+
+/* Insertion d'un ticket_type avec les champs enrichis Billetterie V1 (avantages, devise, dates de vente, couleur, early-bird). */
+function insererTicketType(eid, tt) {
+  return db.prepare(`INSERT INTO ticket_types
+    (event_id,nom,description,prix,quantite_totale,type,avantages,devise,max_par_acheteur,date_vente_debut,date_vente_fin,couleur,prix_early_bird,early_bird_fin)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(eid, tt.nom, tt.description || null, parseFloat(tt.prix) || 0, parseInt(tt.quantite) || 100, tt.type || 'standard',
+         tt.avantages || null, tt.devise || 'EUR', tt.max_par_acheteur != null ? parseInt(tt.max_par_acheteur) : null,
+         tt.date_vente_debut || null, tt.date_vente_fin || null, tt.couleur || '#2563EB',
+         tt.prix_early_bird != null ? parseFloat(tt.prix_early_bird) : null, tt.early_bird_fin || null).lastInsertRowid;
+}
+
+/* Consomme le quota d'un code promo : +1 utilisation par billet acheté (décision produit validée),
+   update conditionnel atomique borné par nb_max_utilisations pour éviter un dépassement en cas de concurrence. */
+async function consommerCodePromo(codeId, userId, ticketIds, quantite) {
+  try {
+    await db.prepare(`UPDATE event_codes_promo SET nb_utilisations = nb_utilisations + ?
+      WHERE id=? AND (nb_max_utilisations IS NULL OR nb_utilisations + ? <= nb_max_utilisations)`)
+      .run(quantite, codeId, quantite);
+    for (const tid of ticketIds) {
+      db.prepare(`INSERT INTO event_codes_promo_usages (code_id,user_id,ticket_id) VALUES (?,?,?)`).run(codeId, userId, tid);
+    }
+  } catch (e) { /* best-effort : ne jamais bloquer un paiement déjà confirmé pour un souci de comptage promo */ }
+}
 const { hashPassword, verifyPassword, createSession, getSession, destroySession, parseCookies, signAuthToken, verifyAuthToken, TOKEN_TTL } = require("./auth");
 // verifyPassword(password, salt, expectedHash) → boolean
 const SEC = require("./security");
@@ -3824,6 +3922,71 @@ async function handleStripeWebhook(req, res) {
       const session = event.data.object;
       const ticketId = Number(session.metadata.diaspoactif_ticket_id);
       await db.prepare(`UPDATE tickets SET payment_status='failed' WHERE id=? AND payment_status='pending'`).run(ticketId);
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_commande_id) {
+      /* Achat multi-billets (Billetterie V1) — une session Stripe peut couvrir plusieurs lignes `tickets`
+         partageant le même transaction_ref. Idempotent comme la branche unitaire ci-dessus : si la commande
+         a déjà été traitée, le filtre payment_status='pending' ne trouve plus rien à mettre à jour. */
+      const session = event.data.object;
+      const commandeTickets = await db.prepare(`SELECT * FROM tickets WHERE transaction_ref=? AND payment_status='pending'`).all(session.id);
+      if (commandeTickets.length) {
+        const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(commandeTickets[0].event_id);
+        const COMMISSION_RATE = 0.05;
+        let totalOrganizer = 0, totalPlatform = 0;
+        const promoUsageParCode = new Map(); // code_promo_id -> [{ticketId, userId}]
+        for (const ticket of commandeTickets) {
+          const qrToken = await signTicket(ticket.id, ticket.event_id, ticket.created_at);
+          await db.prepare(`UPDATE tickets SET payment_status='paid', qr_token=? WHERE id=?`).run(qrToken, ticket.id);
+          await db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) SELECT ?,?,u.id,COALESCE(?,u.nom),u.pays FROM users u WHERE u.id=?`)
+            .run(ticket.id, ticket.event_id, ticket.titulaire_nom ? `${ticket.titulaire_prenom||''} ${ticket.titulaire_nom}`.trim() : null, ticket.user_id);
+
+          const platform_fee = parseFloat((ticket.prix_paye * COMMISSION_RATE).toFixed(2));
+          const organizer_amount = parseFloat((ticket.prix_paye - platform_fee).toFixed(2));
+          totalPlatform += platform_fee; totalOrganizer += organizer_amount;
+          await db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,?,'platform_fee',NULL,?,?,?,?,?)`)
+            .run(ticket.id, ticket.event_id, platform_fee, COMMISSION_RATE, ticket.prix_paye, platform_fee, organizer_amount);
+          await db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,?,'organizer_credit',?,?,?,?,?,?)`)
+            .run(ticket.id, ticket.event_id, ev.organisateur_id, organizer_amount, COMMISSION_RATE, ticket.prix_paye, platform_fee, organizer_amount);
+
+          if (ticket.code_promo_id) {
+            if (!promoUsageParCode.has(ticket.code_promo_id)) promoUsageParCode.set(ticket.code_promo_id, []);
+            promoUsageParCode.get(ticket.code_promo_id).push(ticket.id);
+          }
+          try {
+            db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'billet_evenement',?,'reussi',?,?)`)
+              .run(ticket.user_id, ticket.prix_paye, 'billet_evenement', new Date().toISOString());
+          } catch (e) { /* table transactions peut avoir schema différent */ }
+        }
+        await db.prepare(`UPDATE ticket_types SET quantite_vendue=quantite_vendue+? WHERE id=?`).run(commandeTickets.length, commandeTickets[0].ticket_type_id);
+        await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(totalOrganizer, ev.organisateur_id);
+        await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + ?, updated_at = datetime('now') WHERE id = 1`)
+          .run(totalPlatform, commandeTickets.length);
+        for (const [codeId, ticketIds] of promoUsageParCode) {
+          await consommerCodePromo(codeId, commandeTickets[0].user_id, ticketIds, ticketIds.length);
+        }
+        const acheteur = commandeTickets[0].user_id;
+        creerNotif(acheteur, "billet_paye", "Billet(s) payé(s) ✅",
+          `Votre commande de ${commandeTickets.length} billet(s) pour « ${ev.titre} » est confirmée.`, { event_id: ev.id });
+        if (ev.organisateur_id) creerNotif(ev.organisateur_id, "billet_vendu", "Nouveaux billets vendus 🎟️",
+          `${commandeTickets.length} billet(s) vendu(s) pour « ${ev.titre} » (+${totalOrganizer.toFixed(2)}€).`, { event_id: ev.id });
+        try {
+          const buyer = await db.prepare(`SELECT email, prenom, nom FROM users WHERE id=?`).get(acheteur);
+          const tt = await db.prepare(`SELECT nom FROM ticket_types WHERE id=?`).get(commandeTickets[0].ticket_type_id);
+          if (buyer?.email) {
+            const { emailConfirmationBillets } = require('./mailer');
+            const total = commandeTickets.reduce((s,t)=>s+t.prix_paye,0);
+            emailConfirmationBillets({
+              email: buyer.email, prenom: buyer.prenom || buyer.nom, eventTitre: ev.titre,
+              dateEvenement: ev.date_debut ? new Date(ev.date_debut).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '',
+              lieu: [ev.ville, ev.pays].filter(Boolean).join(', '),
+              billets: commandeTickets.map(t => ({ type_nom: tt?.nom || 'Billet', prix: t.prix_paye, titulaire: t.titulaire_nom ? `${t.titulaire_prenom||''} ${t.titulaire_nom}`.trim() : null })),
+              montantTotal: total,
+            }).catch(e => console.error('[email confirmation billets]', e.message));
+          }
+        } catch (e) { /* best-effort : ne jamais bloquer un paiement déjà confirmé pour un souci d'email */ }
+      }
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_commande_id) {
+      const session = event.data.object;
+      await db.prepare(`UPDATE tickets SET payment_status='failed' WHERE transaction_ref=? AND payment_status='pending'`).run(session.id);
     } else if (event.type === "invoice.payment_succeeded" && event.data.object.subscription) {
       const invoice = event.data.object;
       const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);
@@ -9470,25 +9633,70 @@ ${jsonLd}
     /* ── GET /api/listes-diffusion ── */
     if (req.method === 'GET' && pathname === '/api/listes-diffusion') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
-      const listes = await db.prepare(`
+      const q = parsed.query;
+      let sql = `
         SELECT l.*, COUNT(c.id) AS nb_contacts
         FROM listes_diffusion l
         LEFT JOIN listes_diffusion_contacts c ON c.liste_id = l.id
-        WHERE l.proprietaire_id = ?
-        GROUP BY l.id ORDER BY l.ordre ASC, l.created_at DESC
-      `).all(me.id);
+        WHERE l.proprietaire_id = ?`;
+      const args = [me.id];
+      if (q.archived === '1') sql += ' AND l.archived=1'; else sql += ' AND (l.archived IS NULL OR l.archived=0)';
+      sql += ' GROUP BY l.id ORDER BY l.ordre ASC, l.created_at DESC';
+      const listes = await db.prepare(sql).all(...args);
       return sendJSON(res, 200, { listes });
     }
 
-    /* ── POST /api/listes-diffusion — créer ── */
+    /* ── Applique un objet de filtres à une requête SQL sur `users` — utilisé par génération intelligente + refresh dynamique ── */
+    function appliquerFiltresListe(filtres) {
+      const f = filtres || {};
+      let sql = `SELECT id, nom, email, role, pays, ville, region, departement, nationalite1, type_institution, titre_pro, competences, centres_interet, is_verified, is_official, date_naissance, created_at FROM users WHERE 1=1`;
+      const args = [];
+      if (Array.isArray(f.role) && f.role.length) { sql += ` AND role IN (${f.role.map(()=>'?').join(',')})`; args.push(...f.role); }
+      if (Array.isArray(f.pays) && f.pays.length) { sql += ` AND pays IN (${f.pays.map(()=>'?').join(',')})`; args.push(...f.pays); }
+      if (Array.isArray(f.pays_origine) && f.pays_origine.length) { sql += ` AND nationalite1 IN (${f.pays_origine.map(()=>'?').join(',')})`; args.push(...f.pays_origine); }
+      if (Array.isArray(f.ville) && f.ville.length) { sql += ` AND ville IN (${f.ville.map(()=>'?').join(',')})`; args.push(...f.ville); }
+      if (Array.isArray(f.region) && f.region.length) { sql += ` AND region IN (${f.region.map(()=>'?').join(',')})`; args.push(...f.region); }
+      if (Array.isArray(f.departement) && f.departement.length) { sql += ` AND departement IN (${f.departement.map(()=>'?').join(',')})`; args.push(...f.departement); }
+      if (Array.isArray(f.domaine) && f.domaine.length) { sql += ` AND type_institution IN (${f.domaine.map(()=>'?').join(',')})`; args.push(...f.domaine); }
+      if (f.profession) { sql += ` AND titre_pro LIKE ?`; args.push(`%${f.profession}%`); }
+      if (f.competence) { sql += ` AND competences LIKE ?`; args.push(`%${f.competence}%`); }
+      if (f.interet) { sql += ` AND centres_interet LIKE ?`; args.push(`%${f.interet}%`); }
+      if (f.verifie === true) sql += ` AND is_verified=1`;
+      if (f.verifie === false) sql += ` AND (is_verified IS NULL OR is_verified=0)`;
+      if (f.partenaire === true) sql += ` AND is_official=1`;
+      if (f.partenaire === false) sql += ` AND (is_official IS NULL OR is_official=0)`;
+      if (f.age_min != null) { sql += ` AND date_naissance IS NOT NULL AND (strftime('%Y','now') - strftime('%Y',date_naissance)) >= ?`; args.push(parseInt(f.age_min)); }
+      if (f.age_max != null) { sql += ` AND date_naissance IS NOT NULL AND (strftime('%Y','now') - strftime('%Y',date_naissance)) <= ?`; args.push(parseInt(f.age_max)); }
+      if (f.inscrit_apres) { sql += ` AND created_at >= ?`; args.push(f.inscrit_apres); }
+      if (f.inscrit_avant) { sql += ` AND created_at <= ?`; args.push(f.inscrit_avant); }
+      sql += ' ORDER BY nom ASC LIMIT 2000';
+      return db.prepare(sql).all(...args);
+    }
+
+    /* ── POST /api/listes-diffusion/generer — aperçu (dry-run) des membres correspondant aux filtres ── */
+    if (req.method === 'POST' && pathname === '/api/listes-diffusion/generer') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const membres = appliquerFiltresListe(body.filtres || {});
+      return sendJSON(res, 200, { membres, total: membres.length });
+    }
+
+    /* ── POST /api/listes-diffusion — créer (manuelle ou intelligente) ── */
     if (req.method === 'POST' && pathname === '/api/listes-diffusion') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
-      const { nom, description, couleur, icone, notes } = body;
+      const { nom, description, couleur, icone, notes, mode, filtres } = body;
       if (!nom?.trim()) return sendJSON(res, 400, { error: 'Nom requis.' });
       const ts = new Date().toISOString();
+      const modeFinal = mode === 'dynamique' ? 'dynamique' : 'figee';
+      const filtresJson = filtres ? JSON.stringify(filtres) : null;
       const maxOrdre = await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
-      const id = db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,notes,ordre,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`)
-        .run(me.id, nom.trim(), description||null, couleur||'#1B3A6B', icone||'📋', notes||null, maxOrdre+1, ts, ts).lastInsertRowid;
+      const id = db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,notes,ordre,mode,filtres_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(me.id, nom.trim(), description||null, couleur||'#1B3A6B', icone||'📋', notes||null, maxOrdre+1, modeFinal, filtresJson, ts, ts).lastInsertRowid;
+      if (filtres) {
+        const membres = appliquerFiltresListe(filtres);
+        for (const m of membres) {
+          try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(id, m.id, m.email, m.nom, ts); } catch(e) {}
+        }
+      }
       return sendJSON(res, 201, { id });
     }
 
@@ -9502,6 +9710,122 @@ ${jsonLd}
       db.prepare(`UPDATE listes_diffusion SET nom=COALESCE(?,nom), description=COALESCE(?,description), couleur=COALESCE(?,couleur), icone=COALESCE(?,icone), notes=COALESCE(?,notes), updated_at=? WHERE id=?`)
         .run(nom?.trim()||null, description??null, couleur||null, icone||null, notes??null, new Date().toISOString(), lid);
       return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/listes-diffusion/:id/archive — archiver / désarchiver ── */
+    if (req.method === 'POST' && /^\/api\/listes-diffusion\/\d+\/archive$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const lid = parseInt(pathname.split('/')[3]);
+      const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
+      if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
+      const archived = body.archived ? 1 : 0;
+      await db.prepare(`UPDATE listes_diffusion SET archived=?, updated_at=? WHERE id=?`).run(archived, new Date().toISOString(), lid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/listes-diffusion/:id/refresh — recalcule une liste dynamique à partir de ses filtres ── */
+    if (req.method === 'POST' && /^\/api\/listes-diffusion\/\d+\/refresh$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const lid = parseInt(pathname.split('/')[3]);
+      const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
+      if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
+      if (liste.mode !== 'dynamique' || !liste.filtres_json) return sendJSON(res, 400, { error: 'Cette liste n\'est pas dynamique.' });
+      const filtres = JSON.parse(liste.filtres_json);
+      const membres = appliquerFiltresListe(filtres);
+      const ts = new Date().toISOString();
+      /* Ne retire que les membres ajoutés automatiquement (user_id renseigné) ; conserve les contacts externes ajoutés manuellement */
+      await db.prepare(`DELETE FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL`).run(lid);
+      for (const m of membres) {
+        try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(lid, m.id, m.email, m.nom, ts); } catch(e) {}
+      }
+      await db.prepare(`UPDATE listes_diffusion SET updated_at=? WHERE id=?`).run(ts, lid);
+      return sendJSON(res, 200, { ok: true, total: membres.length });
+    }
+
+    /* ── POST /api/listes-diffusion/merge — fusionner plusieurs listes en une nouvelle ── */
+    if (req.method === 'POST' && pathname === '/api/listes-diffusion/merge') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const { liste_ids, nom } = body;
+      if (!Array.isArray(liste_ids) || liste_ids.length < 2) return sendJSON(res, 400, { error: 'Sélectionnez au moins deux listes.' });
+      if (!nom?.trim()) return sendJSON(res, 400, { error: 'Nom de la liste fusionnée requis.' });
+      const listes = await db.prepare(`SELECT * FROM listes_diffusion WHERE id IN (${liste_ids.map(()=>'?').join(',')}) AND proprietaire_id=?`).all(...liste_ids, me.id);
+      if (listes.length !== liste_ids.length) return sendJSON(res, 403, { error: 'Accès refusé sur une des listes.' });
+      const ts = new Date().toISOString();
+      const maxOrdre = await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
+      const newId = db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,ordre,mode,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`)
+        .run(me.id, nom.trim(), `Fusion de : ${listes.map(l=>l.nom).join(', ')}`, listes[0].couleur, listes[0].icone, maxOrdre+1, 'figee', ts, ts).lastInsertRowid;
+      const seen = new Set();
+      for (const l of listes) {
+        const contacts = await db.prepare(`SELECT * FROM listes_diffusion_contacts WHERE liste_id=?`).all(l.id);
+        for (const c of contacts) {
+          const key = c.user_id ? `u${c.user_id}` : `e${(c.email||'').toLowerCase()}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(newId, c.user_id||null, c.email||null, c.nom||null, ts); } catch(e) {}
+        }
+      }
+      return sendJSON(res, 201, { id: newId });
+    }
+
+    /* ── POST /api/listes-diffusion/:id/deplacer-membre — déplace un contact vers une autre liste ── */
+    if (req.method === 'POST' && /^\/api\/listes-diffusion\/\d+\/deplacer-membre$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const lid = parseInt(pathname.split('/')[3]);
+      const { contact_id, vers_liste_id } = body;
+      const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
+      const cible = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(vers_liste_id, me.id);
+      if (!liste || !cible) return sendJSON(res, 404, { error: 'Liste introuvable.' });
+      const contact = await db.prepare(`SELECT * FROM listes_diffusion_contacts WHERE id=? AND liste_id=?`).get(contact_id, lid);
+      if (!contact) return sendJSON(res, 404, { error: 'Contact introuvable.' });
+      const ts = new Date().toISOString();
+      try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(vers_liste_id, contact.user_id, contact.email, contact.nom, ts); } catch(e) {}
+      await db.prepare(`DELETE FROM listes_diffusion_contacts WHERE id=?`).run(contact_id);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/listes-diffusion/:id/copier-membre — copie un contact vers une ou plusieurs autres listes ── */
+    if (req.method === 'POST' && /^\/api\/listes-diffusion\/\d+\/copier-membre$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const lid = parseInt(pathname.split('/')[3]);
+      const { contact_id, vers_liste_ids } = body;
+      const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
+      if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
+      const contact = await db.prepare(`SELECT * FROM listes_diffusion_contacts WHERE id=? AND liste_id=?`).get(contact_id, lid);
+      if (!contact) return sendJSON(res, 404, { error: 'Contact introuvable.' });
+      if (!Array.isArray(vers_liste_ids) || !vers_liste_ids.length) return sendJSON(res, 400, { error: 'Sélectionnez au moins une liste cible.' });
+      const cibles = await db.prepare(`SELECT id FROM listes_diffusion WHERE id IN (${vers_liste_ids.map(()=>'?').join(',')}) AND proprietaire_id=?`).all(...vers_liste_ids, me.id);
+      const ts = new Date().toISOString();
+      let copies = 0;
+      for (const c of cibles) {
+        try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(c.id, contact.user_id, contact.email, contact.nom, ts); copies++; } catch(e) {}
+      }
+      return sendJSON(res, 200, { ok: true, copies });
+    }
+
+    /* ── GET /api/listes-diffusion/:id/stats — statistiques de répartition ── */
+    if (req.method === 'GET' && /^\/api\/listes-diffusion\/\d+\/stats$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const lid = parseInt(pathname.split('/')[3]);
+      const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
+      if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
+      const rows = await db.prepare(`
+        SELECT u.role, u.pays, u.type_institution, u.titre_pro, c.created_at
+        FROM listes_diffusion_contacts c LEFT JOIN users u ON u.id = c.user_id
+        WHERE c.liste_id = ?`).all(lid);
+      const compte = (arr, key) => { const m = {}; for (const r of arr) { const v = r[key] || 'Non renseigné'; m[v] = (m[v]||0)+1; } return m; };
+      const stats = {
+        total: rows.length,
+        par_pays: compte(rows, 'pays'),
+        par_type_compte: compte(rows, 'role'),
+        par_secteur: compte(rows, 'type_institution'),
+        par_profession: compte(rows, 'titre_pro'),
+        evolution: (() => {
+          const m = {};
+          for (const r of rows) { const mois = (r.created_at||'').slice(0,7) || 'Inconnu'; m[mois] = (m[mois]||0)+1; }
+          return Object.entries(m).sort(([a],[b]) => a.localeCompare(b)).map(([mois,n]) => ({ mois, n }));
+        })()
+      };
+      return sendJSON(res, 200, { stats });
     }
 
     /* ── POST /api/listes-diffusion/:id/duplicate — dupliquer ── */
@@ -9560,6 +9884,15 @@ ${jsonLd}
       const lid = parseInt(pathname.split('/')[3]);
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
+      /* Liste dynamique : recalcul silencieux des membres automatiques (user_id) avant lecture — les contacts externes ajoutés à la main sont conservés */
+      if (liste.mode === 'dynamique' && liste.filtres_json) {
+        try {
+          const membres = appliquerFiltresListe(JSON.parse(liste.filtres_json));
+          const ts2 = new Date().toISOString();
+          await db.prepare(`DELETE FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL`).run(lid);
+          for (const m of membres) { try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(lid, m.id, m.email, m.nom, ts2); } catch(e) {} }
+        } catch (e) { /* filtres corrompus — on garde l'état existant */ }
+      }
       const contacts = await db.prepare(`
         SELECT c.id, c.user_id, c.email, c.nom, c.created_at,
           u.nom AS nom_plateforme, u.email AS email_plateforme, u.photo_url, u.role, u.pays, u.ville, u.bio
@@ -9707,7 +10040,7 @@ ${jsonLd}
         pdf_url, pdf_nom, pdf_acces,
         cible_type, cible_liste_ids,
         fc_resume, fc_objectifs, fc_public, fc_programme, fc_partenaires, fc_partenaires_ids, fc_contact, fc_notes,
-        programmed_at, timezone
+        programmed_at, timezone, billetterie_config
       } = body;
       if (!titre || !date_debut) return sendJSON(res, 400, { error: 'Titre et date_debut requis.' });
       const ts = new Date().toISOString();
@@ -9745,10 +10078,10 @@ ${jsonLd}
       if (Array.isArray(ticket_types)) {
         for (const tt of ticket_types) {
           if (!tt.nom || tt.prix == null) continue;
-          db.prepare(`INSERT INTO ticket_types (event_id,nom,description,prix,quantite_totale,type) VALUES (?,?,?,?,?,?)`)
-            .run(eid, tt.nom, tt.description||null, parseFloat(tt.prix)||0, parseInt(tt.quantite)||100, tt.type||'standard');
+          insererTicketType(eid, tt);
         }
       }
+      if (billetterie_config && typeof billetterie_config === 'object') upsertBilletterieConfig(eid, billetterie_config);
       return sendJSON(res, 201, { id: eid });
     }
 
@@ -9775,7 +10108,7 @@ ${jsonLd}
         video1_url, video1_titre, video1_thumb, video2_url, video2_titre, video2_thumb,
         pdf_url, pdf_nom, pdf_acces, cible_type, cible_liste_ids,
         fc_resume, fc_objectifs, fc_public, fc_programme, fc_partenaires, fc_partenaires_ids, fc_contact, fc_notes,
-        programmed_at, timezone, inscription_mode, nb_places, liste_attente, rayon_publication
+        programmed_at, timezone, inscription_mode, nb_places, liste_attente, rayon_publication, billetterie_config
       } = body;
       const coverUpd = image_couverture || image_b64 || null;
       const galerieUpd = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || null);
@@ -9827,6 +10160,7 @@ ${jsonLd}
           try { envoyerNotificationsEvenement(eid, me.id, titre||ev.titre, cibleListeUpd||ev.cible_liste_ids, partenairesUpd||ev.fc_partenaires_ids); } catch(_){}
         }
       }
+      if (billetterie_config && typeof billetterie_config === 'object') upsertBilletterieConfig(eid, billetterie_config);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -9839,49 +10173,248 @@ ${jsonLd}
       if (ev.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
       const { nom, description: desc, prix, quantite, type } = body;
       if (!nom || prix == null) return sendJSON(res, 400, { error: 'Nom et prix requis.' });
-      const id = db.prepare(`INSERT INTO ticket_types (event_id,nom,description,prix,quantite_totale,type) VALUES (?,?,?,?,?,?)`)
-        .run(eid, nom, desc||null, parseFloat(prix)||0, parseInt(quantite)||100, type||'standard').lastInsertRowid;
+      const id = insererTicketType(eid, { nom, description: desc, prix, quantite, type, ...body });
       return sendJSON(res, 201, { id });
     }
 
-    /* ── POST /api/events/:id/buy — achat billet ── */
+    /* ── PUT /api/events/:id/ticket-types/:ttId — modifiable uniquement si aucune vente ── */
+    if (req.method === 'PUT' && /^\/api\/events\/\d+\/ticket-types\/\d+$/.test(pathname)) {
+      const parts = pathname.split('/'); const eid = parseInt(parts[3]); const ttId = parseInt(parts[5]);
+      const check = await checkEventOwner(req, eid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const tt = await db.prepare(`SELECT * FROM ticket_types WHERE id=? AND event_id=?`).get(ttId, eid);
+      if (!tt) return sendJSON(res, 404, { error: 'Type de billet introuvable.' });
+      if (tt.quantite_vendue > 0) return sendJSON(res, 400, { error: 'Ce type de billet a déjà des ventes, il ne peut plus être modifié (seule la quantité totale peut être augmentée).' });
+      const { nom, description: desc, prix, quantite, type, avantages, devise, max_par_acheteur, date_vente_debut, date_vente_fin, couleur, prix_early_bird, early_bird_fin, actif } = body;
+      db.prepare(`UPDATE ticket_types SET nom=COALESCE(?,nom), description=COALESCE(?,description), prix=COALESCE(?,prix),
+        quantite_totale=COALESCE(?,quantite_totale), type=COALESCE(?,type), avantages=COALESCE(?,avantages), devise=COALESCE(?,devise),
+        max_par_acheteur=COALESCE(?,max_par_acheteur), date_vente_debut=COALESCE(?,date_vente_debut), date_vente_fin=COALESCE(?,date_vente_fin),
+        couleur=COALESCE(?,couleur), prix_early_bird=COALESCE(?,prix_early_bird), early_bird_fin=COALESCE(?,early_bird_fin),
+        actif=COALESCE(?,actif) WHERE id=?`)
+        .run(nom||null, desc||null, prix!=null?parseFloat(prix):null, quantite!=null?parseInt(quantite):null, type||null,
+             avantages||null, devise||null, max_par_acheteur!=null?parseInt(max_par_acheteur):null,
+             date_vente_debut||null, date_vente_fin||null, couleur||null,
+             prix_early_bird!=null?parseFloat(prix_early_bird):null, early_bird_fin||null,
+             actif!=null?(actif?1:0):null, ttId);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── GET/PUT /api/events/:id/billetterie-config — configuration billetterie globale de l'événement ── */
+    if (req.method === 'GET' && /^\/api\/events\/\d+\/billetterie-config$/.test(pathname)) {
+      const eid = parseInt(pathname.split('/')[3]);
+      const config = await db.prepare(`SELECT * FROM event_billetterie_config WHERE event_id=?`).get(eid);
+      return sendJSON(res, 200, { config: config || {
+        event_id: eid, billetterie_active: 0, vente_ouverture: null, vente_fermeture: null, places_totales: null,
+        max_billets_par_commande: 10, vente_en_ligne: 1, billets_nominatifs: 0, billets_remboursables: 1,
+        validation_commande: 'auto', autoriser_partage_billet: 1,
+      } });
+    }
+    if (req.method === 'PUT' && /^\/api\/events\/\d+\/billetterie-config$/.test(pathname)) {
+      const eid = parseInt(pathname.split('/')[3]);
+      const check = await checkEventOwner(req, eid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const existing = await db.prepare(`SELECT * FROM event_billetterie_config WHERE event_id=?`).get(eid) || {};
+      /* Fusion avec l'existant : un PUT partiel ne doit jamais réinitialiser les champs non transmis. */
+      const merged = {
+        billetterie_active: body.billetterie_active !== undefined ? body.billetterie_active : !!existing.billetterie_active,
+        vente_ouverture: body.vente_ouverture !== undefined ? body.vente_ouverture : existing.vente_ouverture,
+        vente_fermeture: body.vente_fermeture !== undefined ? body.vente_fermeture : existing.vente_fermeture,
+        places_totales: body.places_totales !== undefined ? body.places_totales : existing.places_totales,
+        max_billets_par_commande: body.max_billets_par_commande !== undefined ? body.max_billets_par_commande : (existing.max_billets_par_commande ?? 10),
+        vente_en_ligne: body.vente_en_ligne !== undefined ? body.vente_en_ligne : (existing.vente_en_ligne == null ? true : !!existing.vente_en_ligne),
+        billets_nominatifs: body.billets_nominatifs !== undefined ? body.billets_nominatifs : !!existing.billets_nominatifs,
+        billets_remboursables: body.billets_remboursables !== undefined ? body.billets_remboursables : (existing.billets_remboursables == null ? true : !!existing.billets_remboursables),
+        validation_commande: body.validation_commande !== undefined ? body.validation_commande : (existing.validation_commande || 'auto'),
+        autoriser_partage_billet: body.autoriser_partage_billet !== undefined ? body.autoriser_partage_billet : (existing.autoriser_partage_billet == null ? true : !!existing.autoriser_partage_billet),
+      };
+      upsertBilletterieConfig(eid, merged);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── Codes promo billetterie (event_codes_promo) — organisateur de l'événement ou admin ── */
+    /* GET /api/events/:id/promos — liste des codes promo de l'événement (organisateur/admin) */
+    if (req.method === 'GET' && /^\/api\/events\/\d+\/promos$/.test(pathname)) {
+      const eid = parseInt(pathname.split('/')[3]);
+      const check = await checkEventOwner(req, eid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const promos = await db.prepare(`SELECT * FROM event_codes_promo WHERE event_id=? ORDER BY created_at DESC`).all(eid);
+      return sendJSON(res, 200, { promos });
+    }
+
+    /* POST /api/events/:id/promos — créer un code promo */
+    if (req.method === 'POST' && /^\/api\/events\/\d+\/promos$/.test(pathname)) {
+      const eid = parseInt(pathname.split('/')[3]);
+      const check = await checkEventOwner(req, eid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { code, nom, description, type, valeur, date_debut, date_fin, nb_max_utilisations, nb_max_par_utilisateur, ticket_type_ids } = body;
+      if (!code || valeur == null) return sendJSON(res, 400, { error: 'Code et valeur requis.' });
+      try {
+        const id = db.prepare(`INSERT INTO event_codes_promo
+          (event_id,code,nom,description,type,valeur,date_debut,date_fin,nb_max_utilisations,nb_max_par_utilisateur,ticket_type_ids,created_by)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+          .run(eid, String(code).trim().toUpperCase(), nom||null, description||null, type==='montant_fixe'?'montant_fixe':'pourcentage',
+               parseFloat(valeur)||0, date_debut||null, date_fin||null,
+               nb_max_utilisations!=null?parseInt(nb_max_utilisations):null, nb_max_par_utilisateur!=null?parseInt(nb_max_par_utilisateur):1,
+               JSON.stringify(Array.isArray(ticket_type_ids)?ticket_type_ids:[]), check.me.id).lastInsertRowid;
+        return sendJSON(res, 201, { id });
+      } catch (e) {
+        if (String(e.message).includes('UNIQUE')) return sendJSON(res, 409, { error: 'Ce code existe déjà pour cet événement.' });
+        return sendJSON(res, 500, SEC.safeError(e, 'promo-create'));
+      }
+    }
+
+    /* PUT /api/events/:id/promos/:promoId — modifier un code promo */
+    if (req.method === 'PUT' && /^\/api\/events\/\d+\/promos\/\d+$/.test(pathname)) {
+      const parts = pathname.split('/'); const eid = parseInt(parts[3]); const promoId = parseInt(parts[5]);
+      const check = await checkEventOwner(req, eid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const promo = await db.prepare(`SELECT * FROM event_codes_promo WHERE id=? AND event_id=?`).get(promoId, eid);
+      if (!promo) return sendJSON(res, 404, { error: 'Code promo introuvable.' });
+      const { nom, description, type, valeur, date_debut, date_fin, nb_max_utilisations, nb_max_par_utilisateur, ticket_type_ids, actif } = body;
+      db.prepare(`UPDATE event_codes_promo SET nom=?, description=?, type=?, valeur=?, date_debut=?, date_fin=?,
+        nb_max_utilisations=?, nb_max_par_utilisateur=?, ticket_type_ids=?, actif=? WHERE id=?`)
+        .run(nom ?? promo.nom, description ?? promo.description, type==='montant_fixe'?'montant_fixe':(type==='pourcentage'?'pourcentage':promo.type),
+             valeur!=null?parseFloat(valeur):promo.valeur, date_debut ?? promo.date_debut, date_fin ?? promo.date_fin,
+             nb_max_utilisations!==undefined?(nb_max_utilisations!=null?parseInt(nb_max_utilisations):null):promo.nb_max_utilisations,
+             nb_max_par_utilisateur!=null?parseInt(nb_max_par_utilisateur):promo.nb_max_par_utilisateur,
+             Array.isArray(ticket_type_ids)?JSON.stringify(ticket_type_ids):promo.ticket_type_ids,
+             actif!=null?(actif?1:0):promo.actif, promoId);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* DELETE /api/events/:id/promos/:promoId — soft-delete (jamais de suppression physique si déjà utilisé) */
+    if (req.method === 'DELETE' && /^\/api\/events\/\d+\/promos\/\d+$/.test(pathname)) {
+      const parts = pathname.split('/'); const eid = parseInt(parts[3]); const promoId = parseInt(parts[5]);
+      const check = await checkEventOwner(req, eid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      db.prepare(`UPDATE event_codes_promo SET actif=0 WHERE id=? AND event_id=?`).run(promoId, eid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* POST /api/events/:id/promos/valider — validation temps réel côté achat (lecture seule, ne consomme rien) */
+    if (req.method === 'POST' && /^\/api\/events\/\d+\/promos\/valider$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const eid = parseInt(pathname.split('/')[3]);
+      const { code, ticket_type_id, quantite } = body;
+      const q = Math.max(1, parseInt(quantite) || 1);
+      const tt = await db.prepare(`SELECT * FROM ticket_types WHERE id=? AND event_id=? AND actif=1`).get(ticket_type_id, eid);
+      if (!tt) return sendJSON(res, 400, { error: 'Type de billet introuvable.' });
+      const now = new Date();
+      const prixBase = (tt.prix_early_bird != null && tt.early_bird_fin && new Date(tt.early_bird_fin) >= now) ? tt.prix_early_bird : tt.prix;
+      const v = await validerCodePromoEvenement(eid, code, tt.id, q, me.id);
+      if (!v.valide) return sendJSON(res, 200, { valide: false, motif_erreur: v.motif, prix_final: parseFloat((prixBase*q).toFixed(2)) });
+      const reductionUnitaire = v.promo.type === 'montant_fixe' ? Math.min(v.promo.valeur, prixBase) : parseFloat((prixBase * v.promo.valeur / 100).toFixed(2));
+      const prixNetUnitaire = Math.max(0, parseFloat((prixBase - reductionUnitaire).toFixed(2)));
+      return sendJSON(res, 200, {
+        valide: true,
+        reduction_totale: parseFloat((reductionUnitaire * q).toFixed(2)),
+        prix_final: parseFloat((prixNetUnitaire * q).toFixed(2)),
+        prix_unitaire_net: prixNetUnitaire,
+      });
+    }
+
+    // (fonctions validerCodePromoEvenement / consommerCodePromo définies plus haut dans le fichier)
+    /* ── POST /api/events/:id/buy — achat billet(s), quantité + code promo (Billetterie V1) ── */
     if (req.method === 'POST' && /^\/api\/events\/\d+\/buy$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const eid = parseInt(pathname.split('/')[3]);
-      const { ticket_type_id } = body;
+      const { ticket_type_id, code_promo, titulaires } = body;
+      const quantite = Math.max(1, parseInt(body.quantite) || 1);
       if (!ticket_type_id) return sendJSON(res, 400, { error: 'ticket_type_id requis.' });
       const ev = await db.prepare(`SELECT * FROM events WHERE id=? AND statut='publie'`).get(eid);
       if (!ev) return sendJSON(res, 400, { error: 'Événement non disponible.' });
       const tt = await db.prepare(`SELECT * FROM ticket_types WHERE id=? AND event_id=? AND actif=1`).get(ticket_type_id, eid);
       if (!tt) return sendJSON(res, 400, { error: 'Type de billet introuvable.' });
-      if (tt.quantite_totale > 0 && tt.quantite_vendue >= tt.quantite_totale) return sendJSON(res, 400, { error: 'Billets épuisés.' });
-      /* Anti-doublon : 1 billet par utilisateur par type (payé, ou en attente de paiement) */
-      const existing = await db.prepare(`SELECT id FROM tickets WHERE user_id=? AND ticket_type_id=? AND payment_status IN ('paid','pending') AND statut='valid'`).get(me.id, ticket_type_id);
-      if (existing) return sendJSON(res, 409, { error: 'Vous possédez déjà un billet (ou une commande en cours) pour ce type.' });
-      const commission = parseFloat((tt.prix * ev.commission_pct / 100).toFixed(2));
-      const ts = new Date().toISOString();
-      const tempSig = crypto.randomBytes(8).toString('hex'); // placeholder pour l'ID
-
-      /* Billet gratuit : validé immédiatement, aucun paiement réel à collecter */
-      if (!tt.prix || tt.prix <= 0) {
-        const tid = db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at) VALUES (?,?,?,?,?,'paid','valid',?,?)`)
-          .run(eid, me.id, tt.id, 0, 0, tempSig, ts).lastInsertRowid;
-        const qrToken = await signTicket(tid, eid, ts);
-        await db.prepare(`UPDATE tickets SET qr_token=? WHERE id=?`).run(qrToken, tid);
-        await db.prepare(`UPDATE ticket_types SET quantite_vendue=quantite_vendue+1 WHERE id=?`).run(tt.id);
-        db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) VALUES (?,?,?,?,?)`)
-          .run(tid, eid, me.id, me.nom, me.pays||null);
-        return sendJSON(res, 201, { ticket_id: tid, qr_token: qrToken, prix: 0, gratuit: true });
+      const config = await db.prepare(`SELECT * FROM event_billetterie_config WHERE event_id=?`).get(eid);
+      const now = new Date();
+      if (config && config.billetterie_active === 0) return sendJSON(res, 400, { error: 'La billetterie de cet événement est désactivée.' });
+      if (config?.vente_en_ligne === 0) return sendJSON(res, 400, { error: 'Vente en ligne désactivée pour cet événement.' });
+      if (config?.vente_ouverture && new Date(config.vente_ouverture) > now) return sendJSON(res, 400, { error: 'Les ventes ne sont pas encore ouvertes.' });
+      if (config?.vente_fermeture && new Date(config.vente_fermeture) < now) return sendJSON(res, 400, { error: 'Les ventes sont fermées.' });
+      if (tt.date_vente_debut && new Date(tt.date_vente_debut) > now) return sendJSON(res, 400, { error: 'Ce type de billet n\'est pas encore en vente.' });
+      if (tt.date_vente_fin && new Date(tt.date_vente_fin) < now) return sendJSON(res, 400, { error: 'La vente de ce type de billet est terminée.' });
+      const maxParCommande = config?.max_billets_par_commande || 10;
+      if (quantite > maxParCommande) return sendJSON(res, 400, { error: `Maximum ${maxParCommande} billet(s) par commande.` });
+      if (tt.quantite_totale > 0 && tt.quantite_vendue + quantite > tt.quantite_totale) return sendJSON(res, 400, { error: 'Stock insuffisant pour cette quantité.' });
+      if (tt.max_par_acheteur) {
+        const deja = await db.prepare(`SELECT COUNT(*) n FROM tickets WHERE user_id=? AND ticket_type_id=? AND payment_status IN ('paid','pending') AND statut='valid'`).get(me.id, ticket_type_id);
+        if ((deja?.n || 0) + quantite > tt.max_par_acheteur) return sendJSON(res, 400, { error: `Maximum ${tt.max_par_acheteur} billet(s) de ce type par acheteur.` });
+      }
+      const billetsNominatifs = config?.billets_nominatifs === 1;
+      if (billetsNominatifs) {
+        if (!Array.isArray(titulaires) || titulaires.length !== quantite || titulaires.some(t => !t?.nom || !t?.prenom)) {
+          return sendJSON(res, 400, { error: 'Nom et prénom du titulaire requis pour chaque billet.' });
+        }
       }
 
-      /* Billet payant : on ne valide RIEN tant que Stripe n'a pas confirmé le paiement.
-         Le ticket est créé en statut 'pending' ; le split commission/wallet ne se fait
-         que dans handleStripeWebhook() sur checkout.session.completed. */
+      /* Prix unitaire : early-bird si dans la fenêtre, sinon prix normal */
+      const prixBase = (tt.prix_early_bird != null && tt.early_bird_fin && new Date(tt.early_bird_fin) >= now) ? tt.prix_early_bird : tt.prix;
+
+      /* Code promo : revalidation serveur systématique, ne jamais faire confiance au prix client */
+      let promo = null, reductionUnitaire = 0;
+      if (code_promo) {
+        const v = await validerCodePromoEvenement(eid, code_promo, tt.id, quantite, me.id);
+        if (!v.valide) return sendJSON(res, 400, { error: v.motif || 'Code promo invalide.' });
+        promo = v.promo;
+        reductionUnitaire = promo.type === 'montant_fixe' ? Math.min(promo.valeur, prixBase) : parseFloat((prixBase * promo.valeur / 100).toFixed(2));
+      }
+      const prixNetUnitaire = Math.max(0, parseFloat((prixBase - reductionUnitaire).toFixed(2)));
+      const commissionUnitaire = parseFloat((prixNetUnitaire * ev.commission_pct / 100).toFixed(2));
+      const commandeId = crypto.randomUUID();
+
+      /* Commande gratuite (prix net = 0 pour tous les billets, même type/même réduction) */
+      if (prixNetUnitaire <= 0) {
+        const validationManuelle = config?.validation_commande === 'manuelle';
+        const tickets = [];
+        for (let i = 0; i < quantite; i++) {
+          const ts = new Date().toISOString();
+          const tempSig = crypto.randomBytes(8).toString('hex');
+          const titulaire = billetsNominatifs ? titulaires[i] : null;
+          const tid = db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at,commande_id,titulaire_nom,titulaire_prenom,code_promo_id,montant_reduction,validation_manuelle_statut) VALUES (?,?,?,?,?,'paid','valid',?,?,?,?,?,?,?,?)`)
+            .run(eid, me.id, tt.id, 0, 0, tempSig, ts, commandeId, titulaire?.nom || null, titulaire?.prenom || null, promo?.id || null, reductionUnitaire, validationManuelle ? 'en_attente' : null).lastInsertRowid;
+          if (!validationManuelle) {
+            const qrToken = await signTicket(tid, eid, ts);
+            await db.prepare(`UPDATE tickets SET qr_token=? WHERE id=?`).run(qrToken, tid);
+            db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) VALUES (?,?,?,?,?)`)
+              .run(tid, eid, me.id, me.nom, me.pays || null);
+          }
+          tickets.push(tid);
+        }
+        await db.prepare(`UPDATE ticket_types SET quantite_vendue=quantite_vendue+? WHERE id=?`).run(quantite, tt.id);
+        if (promo) await consommerCodePromo(promo.id, me.id, tickets, quantite);
+        if (validationManuelle) {
+          creerNotif(ev.organisateur_id, 'billetterie_validation', 'Commande en attente d\'approbation',
+            `${me.nom} a réservé ${quantite} billet(s) gratuit(s) pour « ${ev.titre} », en attente de votre validation.`, { event_id: eid });
+        } else if (me.email) {
+          try {
+            const { emailConfirmationBillets } = require('./mailer');
+            emailConfirmationBillets({
+              email: me.email, prenom: me.prenom || me.nom, eventTitre: ev.titre,
+              dateEvenement: ev.date_debut ? new Date(ev.date_debut).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '',
+              lieu: [ev.ville, ev.pays].filter(Boolean).join(', '),
+              billets: tickets.map(() => ({ type_nom: tt.nom, prix: 0, titulaire: null })),
+              montantTotal: 0,
+            }).catch(e => console.error('[email confirmation billets gratuits]', e.message));
+          } catch (e) { /* best-effort */ }
+        }
+        return sendJSON(res, 201, { ticket_ids: tickets, commande_id: commandeId, prix: 0, gratuit: true, en_attente_validation: validationManuelle });
+      }
+
+      /* Commande payante : rien n'est validé tant que Stripe n'a pas confirmé le paiement.
+         Les tickets sont créés en 'pending' (partageant commande_id) ; le split commission/wallet
+         et la consommation du code promo ne se font que dans handleStripeWebhook(). */
       const { stripe } = require('./stripe-client');
       if (!stripe) return sendJSON(res, 503, { error: 'Paiements momentanément indisponibles.' });
 
-      const tid = db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at) VALUES (?,?,?,?,?,'pending','valid',?,?)`)
-        .run(eid, me.id, tt.id, tt.prix, commission, tempSig, ts).lastInsertRowid;
+      const tempTicketIds = [];
+      for (let i = 0; i < quantite; i++) {
+        const ts = new Date().toISOString();
+        const tempSig = crypto.randomBytes(8).toString('hex');
+        const titulaire = billetsNominatifs ? titulaires[i] : null;
+        const tid = db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at,commande_id,titulaire_nom,titulaire_prenom,code_promo_id,montant_reduction) VALUES (?,?,?,?,?,'pending','valid',?,?,?,?,?,?,?)`)
+          .run(eid, me.id, tt.id, prixNetUnitaire, commissionUnitaire, tempSig, ts, commandeId, titulaire?.nom || null, titulaire?.prenom || null, promo?.id || null, reductionUnitaire).lastInsertRowid;
+        tempTicketIds.push(tid);
+      }
 
       try {
         const origin = getOrigin(req);
@@ -9889,20 +10422,20 @@ ${jsonLd}
           mode: 'payment',
           line_items: [{
             price_data: {
-              currency: 'eur',
-              unit_amount: Math.round(tt.prix * 100),
+              currency: (tt.devise || 'EUR').toLowerCase(),
+              unit_amount: Math.round(prixNetUnitaire * 100),
               product_data: { name: `${ev.titre} — ${tt.nom}` },
             },
-            quantity: 1,
+            quantity: quantite,
           }],
-          metadata: { diaspoactif_ticket_id: String(tid) },
-          success_url: `${origin}/billetterie.html?paiement=succes&ticket=${tid}`,
-          cancel_url: `${origin}/billetterie.html?paiement=annule&ticket=${tid}`,
+          metadata: { diaspoactif_commande_id: commandeId },
+          success_url: `${origin}/billetterie.html?paiement=succes&commande=${commandeId}`,
+          cancel_url: `${origin}/billetterie.html?paiement=annule&commande=${commandeId}`,
         });
-        db.prepare(`UPDATE tickets SET transaction_ref=? WHERE id=?`).run(session.id, tid);
-        return sendJSON(res, 201, { ticket_id: tid, checkout_url: session.url, en_attente_paiement: true });
+        db.prepare(`UPDATE tickets SET transaction_ref=? WHERE commande_id=?`).run(session.id, commandeId);
+        return sendJSON(res, 201, { ticket_ids: tempTicketIds, commande_id: commandeId, checkout_url: session.url, en_attente_paiement: true });
       } catch (e) {
-        db.prepare(`DELETE FROM tickets WHERE id=?`).run(tid);
+        db.prepare(`DELETE FROM tickets WHERE commande_id=?`).run(commandeId);
         return sendJSON(res, 500, SEC.safeError(e, 'ticket-checkout'));
       }
     }
@@ -9910,9 +10443,11 @@ ${jsonLd}
     /* ── GET /api/tickets/mes — mes billets ── */
     if (req.method === 'GET' && pathname === '/api/tickets/mes') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
-      const tickets = await db.prepare(`SELECT t.*, e.titre AS event_titre, e.date_debut, e.ville, e.pays, e.image_b64,
-        tt.nom AS type_nom, tt.type AS type_cat
+      const tickets = await db.prepare(`SELECT t.*, e.titre AS event_titre, e.date_debut, e.date_fin, e.ville, e.pays, e.adresse, e.image_b64, e.organisateur_id,
+        tt.nom AS type_nom, tt.type AS type_cat, tt.couleur AS type_couleur,
+        COALESCE(c.autoriser_partage_billet,1) AS autoriser_partage_billet
         FROM tickets t JOIN events e ON e.id=t.event_id JOIN ticket_types tt ON tt.id=t.ticket_type_id
+        LEFT JOIN event_billetterie_config c ON c.event_id=e.id
         WHERE t.user_id=? ORDER BY t.created_at DESC`).all(me.id);
       return sendJSON(res, 200, { tickets });
     }
@@ -9921,13 +10456,113 @@ ${jsonLd}
     if (req.method === 'GET' && /^\/api\/tickets\/\d+$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const tid = parseInt(pathname.split('/')[3]);
-      const t = await db.prepare(`SELECT t.*, e.titre AS event_titre, e.date_debut, e.date_fin, e.ville, e.pays, e.adresse, u.nom AS user_nom, tt.nom AS type_nom, tt.type AS type_cat
-        FROM tickets t JOIN events e ON e.id=t.event_id JOIN ticket_types tt ON tt.id=t.ticket_type_id JOIN users u ON u.id=t.user_id WHERE t.id=?`).get(tid);
+      const t = await db.prepare(`SELECT t.*, e.titre AS event_titre, e.description AS event_description, e.date_debut, e.date_fin, e.ville, e.pays, e.adresse,
+        e.organisateur_id, u.nom AS user_nom, uo.nom AS organisateur_nom, tt.nom AS type_nom, tt.type AS type_cat, tt.couleur AS type_couleur,
+        COALESCE(c.autoriser_partage_billet,1) AS autoriser_partage_billet
+        FROM tickets t JOIN events e ON e.id=t.event_id JOIN ticket_types tt ON tt.id=t.ticket_type_id JOIN users u ON u.id=t.user_id
+        LEFT JOIN users uo ON uo.id=e.organisateur_id
+        LEFT JOIN event_billetterie_config c ON c.event_id=e.id
+        WHERE t.id=?`).get(tid);
       if (!t) return sendJSON(res, 404, { error: 'Billet introuvable.' });
       if (t.user_id !== me.id && !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Accès refusé.' });
       /* Payload QR encodé en base64 pour le frontend */
       const qrPayload = Buffer.from(JSON.stringify({ tid, eid: t.event_id, sig: t.qr_token })).toString('base64');
       return sendJSON(res, 200, { ticket: t, qr_payload: qrPayload });
+    }
+
+    /* ── POST /api/tickets/:id/refund — remboursement Stripe réel (organisateur de l'événement ou admin) ──
+       Décision produit validée : autorisé même si le billet a déjà été scanné (statut='used').
+       Le montant/prix_paye original n'est JAMAIS modifié rétroactivement (immuabilité de `tickets`) ;
+       seul payment_status passe à 'refunded'. La réversion wallet se fait via 2 lignes de COMPENSATION
+       (sens='debit') dans wallet_transactions, jamais en réécrivant les lignes historiques. */
+    if (req.method === 'POST' && /^\/api\/tickets\/\d+\/refund$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const tid = parseInt(pathname.split('/')[3]);
+      const ticket = await db.prepare(`SELECT * FROM tickets WHERE id=?`).get(tid);
+      if (!ticket) return sendJSON(res, 404, { error: 'Billet introuvable.' });
+      const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(ticket.event_id);
+      if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
+      if (ev.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
+      if (ticket.payment_status !== 'paid') return sendJSON(res, 400, { error: 'Seul un billet payé peut être remboursé.' });
+      const config = await db.prepare(`SELECT billets_remboursables FROM event_billetterie_config WHERE event_id=?`).get(ticket.event_id);
+      if (config && config.billets_remboursables === 0) return sendJSON(res, 400, { error: "Les billets de cet événement ne sont pas remboursables." });
+      if (!ticket.transaction_ref) return sendJSON(res, 400, { error: 'Aucune référence de paiement Stripe associée à ce billet (probablement un billet gratuit).' });
+
+      const { stripe } = require('./stripe-client');
+      if (!stripe) return sendJSON(res, 503, { error: 'Remboursement momentanément indisponible.' });
+
+      try {
+        const session = await stripe.checkout.sessions.retrieve(ticket.transaction_ref, { expand: ['payment_intent'] });
+        const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+        if (!paymentIntentId) return sendJSON(res, 400, { error: "Impossible de retrouver le paiement Stripe pour ce billet." });
+        await stripe.refunds.create({ payment_intent: paymentIntentId, reason: 'requested_by_customer' });
+      } catch (e) {
+        return sendJSON(res, 502, SEC.safeError(e, 'ticket-refund'));
+      }
+
+      await db.prepare(`UPDATE tickets SET payment_status='refunded' WHERE id=?`).run(tid);
+
+      /* Compensation wallet : on retrouve les lignes originales pour rembourser exactement les mêmes montants */
+      const original = await db.prepare(`SELECT * FROM wallet_transactions WHERE ticket_id=? ORDER BY id ASC`).all(tid);
+      const platformLine = original.find(l => l.type === 'platform_fee');
+      const organizerLine = original.find(l => l.type === 'organizer_credit');
+      const platformFee = platformLine?.montant ?? parseFloat((ticket.prix_paye * 0.05).toFixed(2));
+      const organizerAmount = organizerLine?.montant ?? parseFloat((ticket.prix_paye - platformFee).toFixed(2));
+
+      db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount,sens) VALUES (?,?,'refund_platform_fee',NULL,?,?,?,?,?,'debit')`)
+        .run(tid, ticket.event_id, platformFee, 0.05, ticket.prix_paye, platformFee, organizerAmount);
+      db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount,sens) VALUES (?,?,'refund_organizer_debit',?,?,?,?,?,?,'debit')`)
+        .run(tid, ticket.event_id, ev.organisateur_id, organizerAmount, 0.05, ticket.prix_paye, platformFee, organizerAmount);
+
+      /* Solde négatif toléré si l'organisateur a déjà retiré les fonds — choix produit assumé pour le MVP */
+      await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) - ? WHERE id = ?`).run(organizerAmount, ev.organisateur_id);
+      await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions - ?, updated_at = datetime('now') WHERE id = 1`).run(platformFee);
+
+      creerNotif(ticket.user_id, 'billet_rembourse', 'Billet remboursé', `Votre billet pour « ${ev.titre} » a été remboursé (${ticket.prix_paye.toFixed(2)}€).`, { event_id: ev.id });
+      return sendJSON(res, 200, { ok: true, montant_rembourse: ticket.prix_paye });
+    }
+
+    /* ── Validation manuelle des commandes gratuites (event_billetterie_config.validation_commande='manuelle') ── */
+    /* GET /api/events/:id/commandes-en-attente — liste des billets gratuits en attente d'approbation */
+    if (req.method === 'GET' && /^\/api\/events\/\d+\/commandes-en-attente$/.test(pathname)) {
+      const eid = parseInt(pathname.split('/')[3]);
+      const check = await checkEventOwner(req, eid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const commandes = await db.prepare(`SELECT t.*, u.nom AS user_nom, u.da_id, tt.nom AS type_nom
+        FROM tickets t JOIN users u ON u.id=t.user_id JOIN ticket_types tt ON tt.id=t.ticket_type_id
+        WHERE t.event_id=? AND t.validation_manuelle_statut='en_attente' ORDER BY t.created_at ASC`).all(eid);
+      return sendJSON(res, 200, { commandes });
+    }
+
+    /* POST /api/tickets/:id/approuver — approuve un billet gratuit en attente, génère le QR réel */
+    if (req.method === 'POST' && /^\/api\/tickets\/\d+\/approuver$/.test(pathname)) {
+      const tid = parseInt(pathname.split('/')[3]);
+      const ticket = await db.prepare(`SELECT * FROM tickets WHERE id=?`).get(tid);
+      if (!ticket) return sendJSON(res, 404, { error: 'Billet introuvable.' });
+      if (ticket.validation_manuelle_statut !== 'en_attente') return sendJSON(res, 400, { error: "Ce billet n'est pas en attente d'approbation." });
+      const check = await checkEventOwner(req, ticket.event_id);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const qrToken = await signTicket(ticket.id, ticket.event_id, ticket.created_at);
+      await db.prepare(`UPDATE tickets SET validation_manuelle_statut='approuve', qr_token=? WHERE id=?`).run(qrToken, tid);
+      db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) SELECT ?,?,u.id,COALESCE(?,u.nom),u.pays FROM users u WHERE u.id=?`)
+        .run(tid, ticket.event_id, ticket.titulaire_nom ? `${ticket.titulaire_prenom||''} ${ticket.titulaire_nom}`.trim() : null, ticket.user_id);
+      creerNotif(ticket.user_id, 'billetterie_validation', 'Commande approuvée ✅', `Votre billet pour « ${check.ev.titre} » a été approuvé, il est maintenant scannable.`, { event_id: ticket.event_id });
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* POST /api/tickets/:id/refuser — refuse un billet gratuit en attente, libère le stock */
+    if (req.method === 'POST' && /^\/api\/tickets\/\d+\/refuser$/.test(pathname)) {
+      const tid = parseInt(pathname.split('/')[3]);
+      const ticket = await db.prepare(`SELECT * FROM tickets WHERE id=?`).get(tid);
+      if (!ticket) return sendJSON(res, 404, { error: 'Billet introuvable.' });
+      if (ticket.validation_manuelle_statut !== 'en_attente') return sendJSON(res, 400, { error: "Ce billet n'est pas en attente d'approbation." });
+      const check = await checkEventOwner(req, ticket.event_id);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { motif } = body || {};
+      await db.prepare(`UPDATE tickets SET validation_manuelle_statut='refuse', statut='cancelled' WHERE id=?`).run(tid);
+      await db.prepare(`UPDATE ticket_types SET quantite_vendue=MAX(0,quantite_vendue-1) WHERE id=?`).run(ticket.ticket_type_id);
+      creerNotif(ticket.user_id, 'billetterie_validation', 'Commande refusée', `Votre demande de billet pour « ${check.ev.titre} » n'a pas été retenue${motif ? ' : '+motif : '.'}`, { event_id: ticket.event_id });
+      return sendJSON(res, 200, { ok: true });
     }
 
     /* ── GET /api/events/:id/attendees ── */
@@ -9937,7 +10572,7 @@ ${jsonLd}
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
       if (ev.organisateur_id !== me.id && !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Accès refusé.' });
-      const attendees = await db.prepare(`SELECT a.*, t.prix_paye, t.statut AS ticket_statut, t.created_at AS achat_date, tt.nom AS type_nom
+      const attendees = await db.prepare(`SELECT a.*, t.prix_paye, t.statut AS ticket_statut, t.payment_status, t.created_at AS achat_date, tt.nom AS type_nom
         FROM event_attendees a JOIN tickets t ON t.id=a.ticket_id JOIN ticket_types tt ON tt.id=t.ticket_type_id
         WHERE a.event_id=? ORDER BY a.created_at DESC`).all(eid);
       return sendJSON(res, 200, { attendees });
@@ -11407,27 +12042,28 @@ ${jsonLd}
       if (ev.organisateur_id !== me.id && !['administrateur','collectivite'].includes(me.role))
         return sendJSON(res, 403, { error: 'Accès refusé.' });
 
-      const kpis = db.prepare(`SELECT
+      const kpis = await db.prepare(`SELECT
         COUNT(*) AS nb_billets,
         COALESCE(SUM(prix_paye),0) AS ca_brut,
         COALESCE(SUM(commission),0) AS total_commission,
         COALESCE(SUM(prix_paye - commission),0) AS revenu_net,
         SUM(CASE WHEN statut='valid' THEN 1 ELSE 0 END) AS billets_valides,
         SUM(CASE WHEN statut='used'  THEN 1 ELSE 0 END) AS billets_utilises,
-        SUM(CASE WHEN statut='cancelled' THEN 1 ELSE 0 END) AS billets_annules
+        SUM(CASE WHEN statut='cancelled' THEN 1 ELSE 0 END) AS billets_annules,
+        SUM(CASE WHEN prix_paye=0 THEN 1 ELSE 0 END) AS billets_gratuits
         FROM tickets WHERE event_id=? AND payment_status='paid'`).get(eid);
 
-      const par_type = db.prepare(`SELECT tt.nom, tt.type, COUNT(t.id) AS nb_vendus,
-        COALESCE(SUM(t.prix_paye),0) AS ca, tt.prix, tt.quantite, tt.quantite_vendue
+      const par_type = await db.prepare(`SELECT tt.nom, tt.type, COUNT(t.id) AS nb_vendus,
+        COALESCE(SUM(t.prix_paye),0) AS ca, tt.prix, tt.quantite_totale AS quantite, tt.quantite_vendue
         FROM ticket_types tt LEFT JOIN tickets t ON t.ticket_type_id=tt.id AND t.payment_status='paid'
         WHERE tt.event_id=? GROUP BY tt.id ORDER BY ca DESC`).all(eid);
 
-      const par_jour = db.prepare(`SELECT DATE(created_at) AS jour, COUNT(*) AS nb,
+      const par_jour = await db.prepare(`SELECT DATE(created_at) AS jour, COUNT(*) AS nb,
         COALESCE(SUM(prix_paye),0) AS ca
         FROM tickets WHERE event_id=? AND payment_status='paid'
         GROUP BY DATE(created_at) ORDER BY jour ASC`).all(eid);
 
-      const checkins = db.prepare(`SELECT COUNT(*) total,
+      const checkins = await db.prepare(`SELECT COUNT(*) total,
         SUM(CASE WHEN resultat='accepted' THEN 1 ELSE 0 END) accepted
         FROM event_checkins WHERE event_id=?`).get(eid);
 
@@ -11436,7 +12072,18 @@ ${jsonLd}
         FROM tickets t JOIN users u ON u.id=t.user_id JOIN ticket_types tt ON tt.id=t.ticket_type_id
         WHERE t.event_id=? AND t.payment_status='paid' ORDER BY t.created_at DESC LIMIT 20`).all(eid);
 
-      return sendJSON(res, 200, { event: ev, kpis, par_type, par_jour, checkins, derniers_achats });
+      /* Billetterie V1 : places totales (config si définie, sinon capacité générique événement), promos utilisés */
+      const config = await db.prepare(`SELECT places_totales FROM event_billetterie_config WHERE event_id=?`).get(eid);
+      const placesTotales = config?.places_totales || ev.capacite || 0;
+      const tauxRemplissage = placesTotales > 0 ? Math.round((kpis.nb_billets / placesTotales) * 100) : null;
+      const codesPromoUtilises = (await db.prepare(`
+        SELECT COUNT(*) n FROM event_codes_promo_usages u
+        JOIN event_codes_promo c ON c.id=u.code_id WHERE c.event_id=?`).get(eid))?.n || 0;
+
+      return sendJSON(res, 200, {
+        event: ev, kpis, par_type, par_jour, checkins, derniers_achats,
+        taux_remplissage: tauxRemplissage, places_totales: placesTotales, codes_promo_utilises: codesPromoUtilises,
+      });
     }
 
     /* ── GET /api/dashboard/financier — tableau de bord global billetterie (initiative) ── */
@@ -12177,8 +12824,8 @@ ${jsonLd}
         services: safeParse(row.services) || [],
         langues: safeParse(row.langues) || [],
         nationalites_concernees: safeParse(row.nationalites_concernees) || [],
-        accreditations: initAccreds(row.id),
-        nb_recommandations: countRecos(row.id),
+        accreditations: await initAccreds(row.id),
+        nb_recommandations: await countRecos(row.id),
         nb_affiliations: (await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(row.id))?.c || 0,
       };
     }
@@ -12200,15 +12847,16 @@ ${jsonLd}
       if (langue) rows = rows.filter(r => { try{return JSON.parse(r.langues||'[]').includes(langue);}catch{return false;} });
       if (services) rows = rows.filter(r => { try{return JSON.parse(r.services||'[]').some(s=>s.toLowerCase().includes(services.toLowerCase()));}catch{return false;} });
       if (accreditation) {
-        rows = rows.filter(r => initAccreds(r.id).includes(accreditation));
+        const accredsByRow = await Promise.all(rows.map(r => initAccreds(r.id)));
+        rows = rows.filter((r, i) => accredsByRow[i].includes(accreditation));
       }
-      return sendJSON(res, 200, { initiatives: rows.map(enrichInit) });
+      return sendJSON(res, 200, { initiatives: await Promise.all(rows.map(enrichInit)) });
     }
 
     /* GET /api/reseau/me — mon réseau (initiative connectée) */
     if (req.method === "GET" && pathname === "/api/reseau/me") {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const myInit = getMyInit(me.id);
+      const myInit = await getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative associée à ce compte." });
       // Affiliations acceptées (réseaux où je suis membre)
       const affilies = await db.prepare(`
@@ -12225,16 +12873,16 @@ ${jsonLd}
         ORDER BY i.nom ASC
       `).all(myInit.id);
       return sendJSON(res, 200, {
-        moi: enrichInit(myInit),
-        mon_reseau: affilies.map(r => ({ ...enrichInit(r), mise_en_avant: r.mise_en_avant })),
-        membre_de: membrede.map(enrichInit),
+        moi: await enrichInit(myInit),
+        mon_reseau: await Promise.all(affilies.map(async r => ({ ...(await enrichInit(r)), mise_en_avant: r.mise_en_avant }))),
+        membre_de: await Promise.all(membrede.map(enrichInit)),
       });
     }
 
     /* GET /api/reseau/me/demandes — demandes reçues */
     if (req.method === "GET" && pathname === "/api/reseau/me/demandes") {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const myInit = getMyInit(me.id);
+      const myInit = await getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
       const rows = await db.prepare(`
         SELECT ra.*, i.nom, i.logo_url, i.type, i.domaine, i.ville, i.pays, i.numero_immatriculation, i.description
@@ -12248,7 +12896,7 @@ ${jsonLd}
     /* GET /api/reseau/me/envoyees — mes demandes envoyées */
     if (req.method === "GET" && pathname === "/api/reseau/me/envoyees") {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const myInit = getMyInit(me.id);
+      const myInit = await getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
       const rows = await db.prepare(`
         SELECT ra.*, i.nom, i.logo_url, i.type, i.domaine, i.ville, i.pays
@@ -12261,11 +12909,11 @@ ${jsonLd}
     /* GET /api/reseau/me/stats — statistiques de mon réseau */
     if (req.method === "GET" && pathname === "/api/reseau/me/stats") {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const myInit = getMyInit(me.id);
+      const myInit = await getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
       const total = (await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(myInit.id))?.c || 0;
       const enAttente = (await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='en_attente'`).get(myInit.id))?.c || 0;
-      const recos = countRecos(myInit.id);
+      const recos = await countRecos(myInit.id);
       const membreDe = (await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE demandeur_id=? AND statut='accepte'`).get(myInit.id))?.c || 0;
       const parPays = await db.prepare(`
         SELECT i.pays, COUNT(*) as nb FROM reseau_affiliations ra
@@ -12295,30 +12943,54 @@ ${jsonLd}
         JOIN initiatives i ON i.id=rr.auteur_initiative_id
         WHERE rr.initiative_id=? ORDER BY rr.created_at DESC LIMIT 5
       `).all(initId);
-      return sendJSON(res, 200, { initiative: enrichInit(row), en_avant: affilies, recommandations: recos });
+      return sendJSON(res, 200, { initiative: await enrichInit(row), en_avant: affilies, recommandations: recos });
     }
 
-    /* GET /api/reseau/:id/membres — membres du réseau d'une initiative */
+    /* GET /api/reseau/:id/membres — membres du réseau d'une initiative (visibilité selon reseau_visibilite) */
     if (req.method === "GET" && /^\/api\/reseau\/\d+\/membres$/.test(pathname)) {
       const initId = parseInt(pathname.split('/')[3]);
+      const init = await db.prepare(`SELECT id, owner_user_id, reseau_visibilite FROM initiatives WHERE id=?`).get(initId);
+      if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+      const me = await getCurrentUser(req);
+      const isOwner = me && Number(init.owner_user_id) === Number(me.id);
+      const visibilite = init.reseau_visibilite || 'prive';
+      let autorise = isOwner || visibilite === 'public';
+      if (!autorise && visibilite === 'abonnes' && me) {
+        const abo = await db.prepare(`SELECT 1 FROM abonnements WHERE user_id=? AND initiative_id=?`).get(me.id, initId);
+        autorise = !!abo;
+      }
+      if (!autorise) return sendJSON(res, 403, { error: "Réseau professionnel non public.", visibilite });
       const rows = await db.prepare(`
         SELECT i.*, ra.mise_en_avant FROM reseau_affiliations ra
         JOIN initiatives i ON i.id=ra.demandeur_id
         WHERE ra.destinataire_id=? AND ra.statut='accepte'
         ORDER BY ra.mise_en_avant DESC, i.nom ASC
       `).all(initId);
-      return sendJSON(res, 200, { membres: rows.map(r => ({ ...enrichInit(r), mise_en_avant: r.mise_en_avant })) });
+      return sendJSON(res, 200, { membres: await Promise.all(rows.map(async r => ({ ...(await enrichInit(r)), mise_en_avant: r.mise_en_avant }))), visibilite });
+    }
+
+    /* PUT /api/reseau/:id/visibilite — owner only, choisit qui peut voir la liste des membres du réseau */
+    if (req.method === "PUT" && /^\/api\/reseau\/\d+\/visibilite$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const initId = parseInt(pathname.split('/')[3]);
+      const init = await db.prepare(`SELECT owner_user_id FROM initiatives WHERE id=?`).get(initId);
+      if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+      if (Number(init.owner_user_id) !== Number(me.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+      const { visibilite } = body;
+      if (!['prive', 'abonnes', 'public'].includes(visibilite)) return sendJSON(res, 400, { error: "Valeur de visibilité invalide." });
+      await db.prepare(`UPDATE initiatives SET reseau_visibilite=? WHERE id=?`).run(visibilite, initId);
+      return sendJSON(res, 200, { ok: true, visibilite });
     }
 
     /* POST /api/reseau/:id/affiliation — demander une affiliation */
     if (req.method === "POST" && /^\/api\/reseau\/\d+\/affiliation$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const destId = parseInt(pathname.split('/')[3]);
-      const myInit = getMyInit(me.id);
+      const myInit = await getMyInit(me.id);
       if (!myInit) return sendJSON(res, 400, { error: "Vous devez avoir une initiative pour faire une demande." });
       if (!myInit.numero_immatriculation) return sendJSON(res, 400, { error: "Votre initiative doit avoir un numéro d'immatriculation pour rejoindre un réseau." });
       if (myInit.id === destId) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous affilier à votre propre réseau." });
-      const dest = initImmat(destId);
+      const dest = await initImmat(destId);
       if (!dest) return sendJSON(res, 404, { error: "Initiative destinataire introuvable ou non immatriculée." });
       const { message } = body;
       try {
@@ -12373,7 +13045,7 @@ ${jsonLd}
     if (req.method === "POST" && /^\/api\/reseau\/\d+\/recommander$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const targetId = parseInt(pathname.split('/')[3]);
-      const myInit = getMyInit(me.id);
+      const myInit = await getMyInit(me.id);
       if (!myInit?.numero_immatriculation) return sendJSON(res, 400, { error: "Votre initiative doit être immatriculée pour recommander." });
       if (myInit.id === targetId) return sendJSON(res, 400, { error: "Impossible de se recommander soi-même." });
       const { contenu } = body;
@@ -12392,7 +13064,7 @@ ${jsonLd}
     if (req.method === "DELETE" && /^\/api\/reseau\/\d+\/recommander$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const targetId = parseInt(pathname.split('/')[3]);
-      const myInit = getMyInit(me.id);
+      const myInit = await getMyInit(me.id);
       if (!myInit) return sendJSON(res, 400, { error: "Aucune initiative." });
       await db.prepare(`DELETE FROM reseau_recommandations WHERE initiative_id=? AND auteur_initiative_id=?`).run(targetId, myInit.id);
       return sendJSON(res, 200, { ok: true });
@@ -12401,7 +13073,7 @@ ${jsonLd}
     /* PATCH /api/reseau/me/profil — enrichir le profil réseau */
     if (req.method === "PATCH" && pathname === "/api/reseau/me/profil") {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const myInit = getMyInit(me.id);
+      const myInit = await getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
       const { numero_immatriculation, pays_immatriculation, taille_structure, annee_creation, services, langues, reseau_visible, accepte_messages } = body;
       db.prepare(`UPDATE initiatives SET
@@ -14099,6 +14771,467 @@ ${jsonLd}
         .run(po.user_id, statut, me.id, me.nom, motif||null);
       const msgs = { suspendue:'Votre statut de Partenaire Officiel a été suspendu.', retiree:'Votre statut de Partenaire Officiel a été retiré.', active:'Votre statut de Partenaire Officiel a été réactivé.' };
       creerNotif(po.user_id, "accreditation", "Partenaire Officiel — Mise à jour", msgs[statut]||'', {});
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       MODULE ÉVALUATION DE PROJET — /api/proj-eval/*
+       Système parallèle à /api/projets (modération admin), voir server/db.js.
+       ══════════════════════════════════════════════════════════════ */
+
+    /* ── GET /api/proj-eval/mes-projets — projets créés par l'utilisateur connecté ── */
+    if (req.method === 'GET' && pathname === '/api/proj-eval/mes-projets') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const projets = await db.prepare(`SELECT * FROM proj_eval_projets WHERE createur_id=? ORDER BY updated_at DESC`).all(me.id);
+      for (const p of projets) {
+        p.destinataires = await db.prepare(`SELECT id, destinataire_id, type_destinataire, statut, created_at,
+          (SELECT nom FROM users WHERE id=destinataire_id) AS destinataire_nom
+          FROM proj_eval_destinataires WHERE projet_id=? ORDER BY created_at ASC`).all(p.id);
+      }
+      return sendJSON(res, 200, { projets });
+    }
+
+    /* ── POST /api/proj-eval/projets — créer (brouillon) ── */
+    if (req.method === 'POST' && pathname === '/api/proj-eval/projets') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const { nom_projet, categorie, secteur, pays, resume, description, objectifs, budget_estime, avancement, date_souhaitee, business_plan_id, lettre_accompagnement } = body;
+      if (!nom_projet) return sendJSON(res, 400, { error: 'Nom du projet requis.' });
+      const id = db.prepare(`INSERT INTO proj_eval_projets
+        (createur_id,nom_projet,categorie,secteur,pays,resume,description,objectifs,budget_estime,avancement,date_souhaitee,business_plan_id,lettre_accompagnement)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(me.id, nom_projet, categorie||null, secteur||null, pays||null, resume||null, description||null, objectifs||null,
+             budget_estime!=null?parseFloat(budget_estime):null, avancement||null, date_souhaitee||null, business_plan_id||null, lettre_accompagnement||null).lastInsertRowid;
+      return sendJSON(res, 201, { id });
+    }
+
+    /* ── PUT /api/proj-eval/projets/:id — modifier (créateur seulement) ── */
+    if (req.method === 'PUT' && /^\/api\/proj-eval\/projets\/\d+$/.test(pathname)) {
+      const pid = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalOwner(req, pid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { nom_projet, categorie, secteur, pays, resume, description, objectifs, budget_estime, avancement, date_souhaitee, business_plan_id, lettre_accompagnement } = body;
+      db.prepare(`UPDATE proj_eval_projets SET
+        nom_projet=COALESCE(?,nom_projet), categorie=COALESCE(?,categorie), secteur=COALESCE(?,secteur), pays=COALESCE(?,pays),
+        resume=COALESCE(?,resume), description=COALESCE(?,description), objectifs=COALESCE(?,objectifs),
+        budget_estime=COALESCE(?,budget_estime), avancement=COALESCE(?,avancement), date_souhaitee=COALESCE(?,date_souhaitee),
+        business_plan_id=COALESCE(?,business_plan_id), lettre_accompagnement=COALESCE(?,lettre_accompagnement), updated_at=datetime('now')
+        WHERE id=?`)
+        .run(nom_projet||null, categorie||null, secteur||null, pays||null, resume||null, description||null, objectifs||null,
+             budget_estime!=null?parseFloat(budget_estime):null, avancement||null, date_souhaitee||null, business_plan_id||null, lettre_accompagnement||null, pid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── GET /api/proj-eval/projets/:id — détail complet côté porteur ── */
+    if (req.method === 'GET' && /^\/api\/proj-eval\/projets\/\d+$/.test(pathname)) {
+      const pid = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalOwner(req, pid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const destinataires = await db.prepare(`SELECT d.*, u.nom AS destinataire_nom, u.da_id AS destinataire_da_id
+        FROM proj_eval_destinataires d JOIN users u ON u.id=d.destinataire_id WHERE d.projet_id=? ORDER BY d.created_at ASC`).all(pid);
+      const documents = await db.prepare(`SELECT id,projet_id,destinataire_id,nom,type_mime,categorie,taille,duree_secondes,uploaded_by,created_at
+        FROM proj_eval_documents WHERE projet_id=? ORDER BY created_at ASC`).all(pid);
+      return sendJSON(res, 200, { projet: check.projet, destinataires, documents });
+    }
+
+    /* ── POST /api/proj-eval/projets/:id/envoyer — envoi à un ou plusieurs destinataires ── */
+    if (req.method === 'POST' && /^\/api\/proj-eval\/projets\/\d+\/envoyer$/.test(pathname)) {
+      const pid = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalOwner(req, pid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { destinataires } = body;
+      if (!Array.isArray(destinataires) || !destinataires.length) return sendJSON(res, 400, { error: 'Au moins un destinataire requis.' });
+      const dossiers = [];
+      for (const d of destinataires) {
+        if (!d.user_id) continue;
+        try {
+          const did = db.prepare(`INSERT INTO proj_eval_destinataires (projet_id,destinataire_id,type_destinataire) VALUES (?,?,?)`)
+            .run(pid, d.user_id, d.type_destinataire || 'membre').lastInsertRowid;
+          dossiers.push(did);
+          db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+            .run(did, check.me.id, check.me.nom, 'projet_recu', `Projet « ${check.projet.nom_projet} » reçu.`);
+          creerNotif(d.user_id, 'projet_recu', 'Nouveau projet reçu 📁',
+            `${check.me.nom} vous a transmis le projet « ${check.projet.nom_projet} » pour évaluation.`, { destinataire_id: did, projet_id: pid });
+        } catch (e) { /* déjà envoyé à ce destinataire (UNIQUE), on ignore silencieusement */ }
+      }
+      db.prepare(`UPDATE proj_eval_projets SET statut_global='envoye', updated_at=datetime('now') WHERE id=?`).run(pid);
+      return sendJSON(res, 200, { ok: true, dossiers_crees: dossiers.length });
+    }
+
+    /* ── POST /api/proj-eval/destinataires/:id/documents — ajouter un document à un dossier (porteur ou destinataire) ── */
+    if (req.method === 'POST' && /^\/api\/proj-eval\/destinataires\/\d+\/documents$/.test(pathname)) {
+      const did = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalDossier(req, did, { porteurAussi: true });
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { nom, type_mime, categorie, taille, url_bunny, contenu_b64, duree_secondes } = body;
+      if (!nom) return sendJSON(res, 400, { error: 'Nom du document requis.' });
+      const docId = db.prepare(`INSERT INTO proj_eval_documents (projet_id,destinataire_id,nom,type_mime,categorie,taille,url_bunny,contenu_b64,duree_secondes,uploaded_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?)`)
+        .run(check.dossier.projet_id, did, nom, type_mime||null, categorie||'autre', taille||null, url_bunny||null, contenu_b64||null, duree_secondes||null, check.me.id).lastInsertRowid;
+      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+        .run(did, check.me.id, check.me.nom, 'document_ajoute', nom);
+      const notifCible = check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id;
+      creerNotif(notifCible, 'projet_document', 'Document ajouté 📎',
+        `${check.me.nom} a ajouté « ${nom} » au dossier « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
+      return sendJSON(res, 201, { id: docId });
+    }
+
+    /* ── GET/POST /api/proj-eval/destinataires/:id/messages — fil de messages du dossier (porteur + destinataire) ── */
+    if (req.method === 'GET' && /^\/api\/proj-eval\/destinataires\/\d+\/messages$/.test(pathname)) {
+      const did = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalDossier(req, did, { porteurAussi: true });
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const messages = await db.prepare(`SELECT m.*, u.nom AS auteur_nom FROM proj_eval_messages m JOIN users u ON u.id=m.auteur_id WHERE m.destinataire_id=? ORDER BY m.created_at ASC`).all(did);
+      return sendJSON(res, 200, { messages });
+    }
+    if (req.method === 'POST' && /^\/api\/proj-eval\/destinataires\/\d+\/messages$/.test(pathname)) {
+      const did = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalDossier(req, did, { porteurAussi: true });
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { contenu, fichier } = body;
+      if (!contenu && !fichier) return sendJSON(res, 400, { error: 'Message vide.' });
+      const msgId = db.prepare(`INSERT INTO proj_eval_messages (destinataire_id,auteur_id,contenu,fichier_json) VALUES (?,?,?,?)`)
+        .run(did, check.me.id, contenu||null, fichier ? JSON.stringify(fichier) : null).lastInsertRowid;
+      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+        .run(did, check.me.id, check.me.nom, 'message', (contenu||'').slice(0,140));
+      const notifCible = check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id;
+      creerNotif(notifCible, 'projet_message', 'Nouveau message 💬',
+        `${check.me.nom} vous a envoyé un message concernant « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
+      return sendJSON(res, 201, { id: msgId });
+    }
+
+    /* ── GET /api/proj-eval/recus — dossiers reçus par l'utilisateur connecté (destinataire) ── */
+    if (req.method === 'GET' && pathname === '/api/proj-eval/recus') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const q = parsed.query;
+      let sql = `SELECT d.*, p.nom_projet, p.categorie, p.secteur, p.pays, p.budget_estime, u.nom AS porteur_nom, u.da_id AS porteur_da_id
+        FROM proj_eval_destinataires d JOIN proj_eval_projets p ON p.id=d.projet_id JOIN users u ON u.id=p.createur_id
+        WHERE d.destinataire_id=?`;
+      const args = [me.id];
+      if (q.statut) { sql += ' AND d.statut=?'; args.push(q.statut); }
+      sql += ' ORDER BY d.created_at DESC';
+      const recus = await db.prepare(sql).all(...args);
+      return sendJSON(res, 200, { recus });
+    }
+
+    /* ── GET /api/proj-eval/recus/stats — compteurs pour le bandeau stats ── */
+    if (req.method === 'GET' && pathname === '/api/proj-eval/recus/stats') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const rows = await db.prepare(`SELECT statut, COUNT(*) AS n FROM proj_eval_destinataires WHERE destinataire_id=? GROUP BY statut`).all(me.id);
+      const stats = { nouveaux: 0, en_analyse: 0, documents_demandes: 0, discussions_ouvertes: 0, acceptes: 0, refuses: 0, a_revoir: 0 };
+      for (const r of rows) {
+        if (r.statut === 'recu') stats.nouveaux = r.n;
+        else if (r.statut === 'en_analyse' || r.statut === 'entretien_propose') stats.en_analyse += r.n;
+        else if (r.statut === 'documents_demandes') stats.documents_demandes = r.n;
+        else if (r.statut === 'accepte') stats.acceptes = r.n;
+        else if (r.statut === 'refuse') stats.refuses = r.n;
+        else if (r.statut === 'amelioration_demandee') stats.a_revoir = r.n;
+      }
+      const discu = await db.prepare(`SELECT COUNT(DISTINCT m.destinataire_id) AS n FROM proj_eval_messages m JOIN proj_eval_destinataires d ON d.id=m.destinataire_id WHERE d.destinataire_id=?`).get(me.id);
+      stats.discussions_ouvertes = discu?.n || 0;
+      return sendJSON(res, 200, { stats });
+    }
+
+    /* ── GET /api/proj-eval/destinataires/:id — détail complet d'un dossier (destinataire) ── */
+    if (req.method === 'GET' && /^\/api\/proj-eval\/destinataires\/\d+$/.test(pathname)) {
+      const did = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalDossier(req, did, { porteurAussi: true });
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const projet = await db.prepare(`SELECT p.*, u.nom AS porteur_nom, u.da_id AS porteur_da_id FROM proj_eval_projets p JOIN users u ON u.id=p.createur_id WHERE p.id=?`).get(check.dossier.projet_id);
+      const documents = await db.prepare(`SELECT * FROM proj_eval_documents WHERE projet_id=? AND (destinataire_id IS NULL OR destinataire_id=?) ORDER BY created_at ASC`).all(check.dossier.projet_id, did);
+      const demandes = await db.prepare(`SELECT * FROM proj_eval_demandes_documents WHERE destinataire_id=? ORDER BY created_at DESC`).all(did);
+      const historique = await db.prepare(`SELECT * FROM proj_eval_historique WHERE destinataire_id=? ORDER BY created_at ASC`).all(did);
+      return sendJSON(res, 200, { dossier: check.dossier, projet, documents, demandes, historique });
+    }
+
+    /* ── POST /api/proj-eval/destinataires/:id/prendre-en-charge ── */
+    if (req.method === 'POST' && /^\/api\/proj-eval\/destinataires\/\d+\/prendre-en-charge$/.test(pathname)) {
+      const did = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalDossier(req, did);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      if (check.dossier.statut !== 'recu') return sendJSON(res, 400, { error: 'Ce dossier a déjà été pris en charge.' });
+      await db.prepare(`UPDATE proj_eval_destinataires SET statut='en_analyse', pris_en_charge_at=datetime('now'), updated_at=datetime('now') WHERE id=?`).run(did);
+      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+        .run(did, check.me.id, check.me.nom, 'statut_change', 'Projet pris en charge — en cours d\'évaluation.');
+      creerNotif(check.dossier.createur_id, 'projet_maj', 'Projet pris en charge ✅',
+        `${check.me.nom} a pris en charge votre projet « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/proj-eval/destinataires/:id/demander-documents ── */
+    if (req.method === 'POST' && /^\/api\/proj-eval\/destinataires\/\d+\/demander-documents$/.test(pathname)) {
+      const did = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalDossier(req, did);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { items, message } = body;
+      if (!Array.isArray(items) || !items.length) return sendJSON(res, 400, { error: 'Sélectionnez au moins un document.' });
+      const reqId = db.prepare(`INSERT INTO proj_eval_demandes_documents (destinataire_id,items_json,message) VALUES (?,?,?)`)
+        .run(did, JSON.stringify(items), message || null).lastInsertRowid;
+      await db.prepare(`UPDATE proj_eval_destinataires SET statut='documents_demandes', updated_at=datetime('now') WHERE id=?`).run(did);
+      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+        .run(did, check.me.id, check.me.nom, 'statut_change', `Documents complémentaires demandés : ${items.join(', ')}.`);
+      creerNotif(check.dossier.createur_id, 'projet_documents_demandes', 'Documents complémentaires demandés 📋',
+        `${check.me.nom} demande des documents complémentaires pour « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
+      return sendJSON(res, 201, { id: reqId });
+    }
+
+    /* ── POST /api/proj-eval/destinataires/:id/evaluer — notes étoiles + commentaire (pas de changement de statut) ── */
+    if (req.method === 'POST' && /^\/api\/proj-eval\/destinataires\/\d+\/evaluer$/.test(pathname)) {
+      const did = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalDossier(req, did);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { note_qualite, note_faisabilite, note_impact, commentaire_eval } = body;
+      const clamp = v => v != null ? Math.min(5, Math.max(1, parseInt(v))) : null;
+      await db.prepare(`UPDATE proj_eval_destinataires SET note_qualite=?, note_faisabilite=?, note_impact=?, commentaire_eval=?, updated_at=datetime('now') WHERE id=?`)
+        .run(clamp(note_qualite), clamp(note_faisabilite), clamp(note_impact), commentaire_eval || null, did);
+      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+        .run(did, check.me.id, check.me.nom, 'evaluation', `Qualité ${note_qualite||'—'}/5, Faisabilité ${note_faisabilite||'—'}/5, Impact ${note_impact||'—'}/5.`);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/proj-eval/destinataires/:id/decision — accepte / refuse / amelioration_demandee ── */
+    if (req.method === 'POST' && /^\/api\/proj-eval\/destinataires\/\d+\/decision$/.test(pathname)) {
+      const did = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalDossier(req, did);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { decision, motif } = body;
+      if (!['accepte','refuse','amelioration_demandee'].includes(decision)) return sendJSON(res, 400, { error: 'Décision invalide.' });
+      if ((decision === 'refuse' || decision === 'amelioration_demandee') && !motif) return sendJSON(res, 400, { error: 'Un motif est obligatoire pour ce choix.' });
+      await db.prepare(`UPDATE proj_eval_destinataires SET statut=?, motif_decision=?, decision_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
+        .run(decision, motif || null, did);
+      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+        .run(did, check.me.id, check.me.nom, 'decision', `${decision}${motif ? ' — ' + motif : ''}`);
+      const labels = { accepte: 'Projet accepté ✅', refuse: 'Projet refusé ❌', amelioration_demandee: 'Amélioration demandée 🔄' };
+      creerNotif(check.dossier.createur_id, 'projet_decision', labels[decision],
+        `${check.me.nom} a statué sur votre projet « ${check.dossier.nom_projet} »${motif ? ' : ' + motif : '.'}`, { destinataire_id: did });
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── GET /api/proj-eval/documents/:id/fichier — contenu d'un document (aperçu image/audio/vidéo) ── */
+    if (req.method === 'GET' && /^\/api\/proj-eval\/documents\/\d+\/fichier$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const docId = parseInt(pathname.split('/')[4]);
+      const doc = await db.prepare(`SELECT * FROM proj_eval_documents WHERE id=?`).get(docId);
+      if (!doc) return sendJSON(res, 404, { error: 'Document introuvable.' });
+      const projet = await db.prepare(`SELECT * FROM proj_eval_projets WHERE id=?`).get(doc.projet_id);
+      let autorise = projet && projet.createur_id === me.id;
+      if (!autorise && doc.destinataire_id) {
+        const d = await db.prepare(`SELECT destinataire_id FROM proj_eval_destinataires WHERE id=?`).get(doc.destinataire_id);
+        autorise = d && d.destinataire_id === me.id;
+      } else if (!autorise) {
+        const d = await db.prepare(`SELECT destinataire_id FROM proj_eval_destinataires WHERE projet_id=? AND destinataire_id=?`).get(doc.projet_id, me.id);
+        autorise = !!d;
+      }
+      if (!autorise) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      return sendJSON(res, 200, { nom: doc.nom, type_mime: doc.type_mime, url_bunny: doc.url_bunny, contenu_b64: doc.contenu_b64 });
+    }
+
+    /* ── GET/POST /api/proj-eval/destinataires/:id/rendezvous — espace rendez-vous du dossier ── */
+    if (req.method === 'GET' && /^\/api\/proj-eval\/destinataires\/\d+\/rendezvous$/.test(pathname)) {
+      const did = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalDossier(req, did, { porteurAussi: true });
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const rdvs = await db.prepare(`SELECT r.*, u.nom AS propose_par_nom FROM proj_eval_rendezvous r JOIN users u ON u.id=r.propose_par WHERE r.destinataire_id=? ORDER BY r.date_heure ASC`).all(did);
+      return sendJSON(res, 200, { rendezvous: rdvs });
+    }
+    if (req.method === 'POST' && /^\/api\/proj-eval\/destinataires\/\d+\/rendezvous$/.test(pathname)) {
+      const did = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalDossier(req, did, { porteurAussi: true });
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { date_heure, lieu_ou_lien, note } = body;
+      if (!date_heure) return sendJSON(res, 400, { error: 'Date et heure requises.' });
+      const rid = db.prepare(`INSERT INTO proj_eval_rendezvous (destinataire_id,propose_par,date_heure,lieu_ou_lien,note) VALUES (?,?,?,?,?)`)
+        .run(did, check.me.id, date_heure, lieu_ou_lien || null, note || null).lastInsertRowid;
+      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+        .run(did, check.me.id, check.me.nom, 'rendezvous_propose', `Rendez-vous proposé le ${date_heure}.`);
+      const notifCible = check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id;
+      creerNotif(notifCible, 'projet_rendezvous', 'Rendez-vous proposé 📅',
+        `${check.me.nom} propose un rendez-vous pour « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
+      return sendJSON(res, 201, { id: rid });
+    }
+    /* ── POST /api/proj-eval/rendezvous/:rid/repondre — accepter/refuser un rendez-vous proposé ── */
+    if (req.method === 'POST' && /^\/api\/proj-eval\/rendezvous\/\d+\/repondre$/.test(pathname)) {
+      const rid = parseInt(pathname.split('/')[4]);
+      const rdv = await db.prepare(`SELECT * FROM proj_eval_rendezvous WHERE id=?`).get(rid);
+      if (!rdv) return sendJSON(res, 404, { error: 'Rendez-vous introuvable.' });
+      const check = await checkProjEvalDossier(req, rdv.destinataire_id, { porteurAussi: true });
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+      const { statut } = body;
+      if (!['accepte','refuse'].includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide.' });
+      await db.prepare(`UPDATE proj_eval_rendezvous SET statut=?, updated_at=datetime('now') WHERE id=?`).run(statut, rid);
+      const notifCible = rdv.propose_par === check.me.id ? (check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id) : rdv.propose_par;
+      creerNotif(notifCible, 'projet_rendezvous', statut === 'accepte' ? 'Rendez-vous accepté ✅' : 'Rendez-vous refusé ❌',
+        `${check.me.nom} a ${statut === 'accepte' ? 'accepté' : 'refusé'} le rendez-vous du ${rdv.date_heure}.`, { destinataire_id: rdv.destinataire_id });
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/proj-eval/upload — upload multi-format (PDF/Word/Excel/PowerPoint/image/audio/vidéo ≤3min/autre) ──
+       Petit fichier (≤2 Mo) → contenu_b64 (pattern deal_documents). Gros fichier → Bunny.net si configuré,
+       sinon repli sur contenu_b64 quelle que soit la taille (dégradation propre, cohérent avec stripe-client.js). */
+    if (req.method === 'POST' && pathname === '/api/proj-eval/upload') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const { projet_id, destinataire_id, nom, type_mime, categorie, data_base64, duree_secondes } = body;
+      if (!projet_id) return sendJSON(res, 400, { error: 'projet_id requis.' });
+      if (!nom || !data_base64) return sendJSON(res, 400, { error: 'Fichier requis.' });
+      if (duree_secondes != null && duree_secondes > 180) return sendJSON(res, 400, { error: 'La vidéo/audio ne doit pas dépasser 3 minutes.' });
+      /* Vérifie l'accès : créateur du projet, ou destinataire du dossier ciblé */
+      const projet = await db.prepare(`SELECT * FROM proj_eval_projets WHERE id=?`).get(projet_id);
+      if (!projet) return sendJSON(res, 404, { error: 'Projet introuvable.' });
+      let autorise = projet.createur_id === me.id;
+      if (!autorise && destinataire_id) {
+        const d = await db.prepare(`SELECT destinataire_id FROM proj_eval_destinataires WHERE id=? AND projet_id=?`).get(destinataire_id, projet_id);
+        autorise = d && d.destinataire_id === me.id;
+      }
+      if (!autorise) return sendJSON(res, 403, { error: 'Accès refusé.' });
+
+      const buffer = Buffer.from(data_base64, 'base64');
+      const taille = buffer.length;
+      let url_bunny = null, contenu_b64 = null;
+      try {
+        if (taille > 2 * 1024 * 1024) {
+          const { uploadToBunny } = require('./upload');
+          const filename = `${Date.now()}-${nom.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+          url_bunny = await uploadToBunny(buffer, filename, 'proj-eval');
+        } else {
+          contenu_b64 = data_base64;
+        }
+      } catch (e) {
+        contenu_b64 = data_base64; // Bunny indisponible → repli base64
+      }
+      const docId = db.prepare(`INSERT INTO proj_eval_documents (projet_id,destinataire_id,nom,type_mime,categorie,taille,url_bunny,contenu_b64,duree_secondes,uploaded_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?)`)
+        .run(projet_id, destinataire_id || null, nom, type_mime || null, categorie || 'autre', taille, url_bunny, contenu_b64, duree_secondes || null, me.id).lastInsertRowid;
+      return sendJSON(res, 201, { id: docId, url: url_bunny });
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       MODULE LISTE DES PARTENAIRES — /api/initiatives/:id/partenaires*
+       ══════════════════════════════════════════════════════════════ */
+
+    /* Enrichit un partenaire "compte" avec les données live du compte lié (auto-sync nom/logo/lien profil) */
+    async function enrichPartenaire(p) {
+      if (p.type !== 'compte' || !p.linked_user_id) return { ...p, profil_url: null };
+      const u = await db.prepare(`SELECT nom, photo_url FROM users WHERE id=?`).get(p.linked_user_id);
+      if (!u) return { ...p, profil_url: null };
+      return { ...p, nom: u.nom || p.nom, logo_url: u.photo_url || p.logo_url, profil_url: `/profil.html?id=${p.linked_user_id}` };
+    }
+
+    /* ── GET /api/initiatives/:id/partenaires — liste publique (actifs uniquement) ── */
+    if (req.method === 'GET' && /^\/api\/initiatives\/\d+\/partenaires$/.test(pathname)) {
+      const initId = parseInt(pathname.split('/')[3]);
+      const rows = await db.prepare(`SELECT * FROM initiative_partenaires WHERE initiative_id=? AND actif=1 ORDER BY mis_en_avant DESC, ordre ASC, id ASC`).all(initId);
+      const partenaires = await Promise.all(rows.map(enrichPartenaire));
+      return sendJSON(res, 200, { partenaires: partenaires.map(p => ({
+        id: p.id, nom: p.nom, logo_url: p.logo_url, description: p.description, type_partenaire: p.type_partenaire,
+        profil_url: p.profil_url, mis_en_avant: !!p.mis_en_avant,
+        site_web: p.afficher_contact ? p.site_web : null,
+        email: p.afficher_contact ? p.email : null,
+        telephone: p.afficher_contact ? p.telephone : null,
+        pays: p.pays,
+      })) });
+    }
+
+    /* ── GET /api/initiatives/:id/partenaires/gestion — liste complète (owner) ── */
+    if (req.method === 'GET' && /^\/api\/initiatives\/\d+\/partenaires\/gestion$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const initId = parseInt(pathname.split('/')[3]);
+      const init = await db.prepare(`SELECT owner_user_id FROM initiatives WHERE id=?`).get(initId);
+      if (!init) return sendJSON(res, 404, { error: 'Initiative introuvable.' });
+      if (Number(init.owner_user_id) !== Number(me.id)) return sendJSON(res, 403, { error: 'Réservé au propriétaire.' });
+      const rows = await db.prepare(`SELECT * FROM initiative_partenaires WHERE initiative_id=? ORDER BY ordre ASC, id ASC`).all(initId);
+      const partenaires = await Promise.all(rows.map(enrichPartenaire));
+      return sendJSON(res, 200, { partenaires });
+    }
+
+    /* ── POST /api/initiatives/:id/partenaires — créer (compte lié ou externe) ── */
+    if (req.method === 'POST' && /^\/api\/initiatives\/\d+\/partenaires$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const initId = parseInt(pathname.split('/')[3]);
+      const init = await db.prepare(`SELECT owner_user_id FROM initiatives WHERE id=?`).get(initId);
+      if (!init) return sendJSON(res, 404, { error: 'Initiative introuvable.' });
+      if (Number(init.owner_user_id) !== Number(me.id)) return sendJSON(res, 403, { error: 'Réservé au propriétaire.' });
+      const { type, linked_user_id, nom, logo_url, description, type_partenaire, site_web, email, telephone, pays, afficher_contact } = body;
+      if (type === 'compte') {
+        if (!linked_user_id) return sendJSON(res, 400, { error: 'Compte partenaire requis.' });
+        const u = await db.prepare(`SELECT nom, photo_url FROM users WHERE id=?`).get(linked_user_id);
+        if (!u) return sendJSON(res, 404, { error: 'Compte introuvable.' });
+      } else if (!nom?.trim()) {
+        return sendJSON(res, 400, { error: 'Nom du partenaire requis.' });
+      }
+      const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM initiative_partenaires WHERE initiative_id=?`).get(initId)).m;
+      const id = db.prepare(`INSERT INTO initiative_partenaires
+        (initiative_id,type,linked_user_id,nom,logo_url,description,type_partenaire,site_web,email,telephone,pays,afficher_contact,ordre)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(initId, type === 'compte' ? 'compte' : 'externe', type === 'compte' ? linked_user_id : null,
+             nom || '', logo_url || null, description || null, type_partenaire || null, site_web || null,
+             email || null, telephone || null, pays || null, afficher_contact ? 1 : 0, maxOrdre + 1).lastInsertRowid;
+      return sendJSON(res, 201, { id });
+    }
+
+    /* ── PUT /api/partenaires/:id — modifier ── */
+    if (req.method === 'PUT' && /^\/api\/partenaires\/\d+$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const pid = parseInt(pathname.split('/')[3]);
+      const p = await db.prepare(`SELECT p.*, i.owner_user_id FROM initiative_partenaires p JOIN initiatives i ON i.id=p.initiative_id WHERE p.id=?`).get(pid);
+      if (!p) return sendJSON(res, 404, { error: 'Partenaire introuvable.' });
+      if (Number(p.owner_user_id) !== Number(me.id)) return sendJSON(res, 403, { error: 'Réservé au propriétaire.' });
+      const { nom, logo_url, description, type_partenaire, site_web, email, telephone, pays, afficher_contact } = body;
+      db.prepare(`UPDATE initiative_partenaires SET
+        nom=COALESCE(?,nom), logo_url=COALESCE(?,logo_url), description=COALESCE(?,description),
+        type_partenaire=COALESCE(?,type_partenaire), site_web=COALESCE(?,site_web), email=COALESCE(?,email),
+        telephone=COALESCE(?,telephone), pays=COALESCE(?,pays),
+        afficher_contact=?, updated_at=datetime('now') WHERE id=?`)
+        .run(nom || null, logo_url || null, description ?? null, type_partenaire ?? null, site_web ?? null,
+             email ?? null, telephone ?? null, pays ?? null, afficher_contact !== undefined ? (afficher_contact ? 1 : 0) : p.afficher_contact, pid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── DELETE /api/partenaires/:id ── */
+    if (req.method === 'DELETE' && /^\/api\/partenaires\/\d+$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const pid = parseInt(pathname.split('/')[3]);
+      const p = await db.prepare(`SELECT p.*, i.owner_user_id FROM initiative_partenaires p JOIN initiatives i ON i.id=p.initiative_id WHERE p.id=?`).get(pid);
+      if (!p) return sendJSON(res, 404, { error: 'Partenaire introuvable.' });
+      if (Number(p.owner_user_id) !== Number(me.id)) return sendJSON(res, 403, { error: 'Réservé au propriétaire.' });
+      await db.prepare(`DELETE FROM initiative_partenaires WHERE id=?`).run(pid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── PUT /api/partenaires/:id/toggle-actif — afficher/masquer sans supprimer ── */
+    if (req.method === 'PUT' && /^\/api\/partenaires\/\d+\/toggle-actif$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const pid = parseInt(pathname.split('/')[3]);
+      const p = await db.prepare(`SELECT p.*, i.owner_user_id FROM initiative_partenaires p JOIN initiatives i ON i.id=p.initiative_id WHERE p.id=?`).get(pid);
+      if (!p) return sendJSON(res, 404, { error: 'Partenaire introuvable.' });
+      if (Number(p.owner_user_id) !== Number(me.id)) return sendJSON(res, 403, { error: 'Réservé au propriétaire.' });
+      const actif = body.actif !== undefined ? (body.actif ? 1 : 0) : (p.actif ? 0 : 1);
+      await db.prepare(`UPDATE initiative_partenaires SET actif=?, updated_at=datetime('now') WHERE id=?`).run(actif, pid);
+      return sendJSON(res, 200, { ok: true, actif: !!actif });
+    }
+
+    /* ── PUT /api/partenaires/:id/mise-en-avant ── */
+    if (req.method === 'PUT' && /^\/api\/partenaires\/\d+\/mise-en-avant$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const pid = parseInt(pathname.split('/')[3]);
+      const p = await db.prepare(`SELECT p.*, i.owner_user_id FROM initiative_partenaires p JOIN initiatives i ON i.id=p.initiative_id WHERE p.id=?`).get(pid);
+      if (!p) return sendJSON(res, 404, { error: 'Partenaire introuvable.' });
+      if (Number(p.owner_user_id) !== Number(me.id)) return sendJSON(res, 403, { error: 'Réservé au propriétaire.' });
+      const mis_en_avant = body.mis_en_avant !== undefined ? (body.mis_en_avant ? 1 : 0) : (p.mis_en_avant ? 0 : 1);
+      await db.prepare(`UPDATE initiative_partenaires SET mis_en_avant=?, updated_at=datetime('now') WHERE id=?`).run(mis_en_avant, pid);
+      return sendJSON(res, 200, { ok: true, mis_en_avant: !!mis_en_avant });
+    }
+
+    /* ── PUT /api/initiatives/:id/partenaires/reorder — glisser-déposer ── */
+    if (req.method === 'PUT' && /^\/api\/initiatives\/\d+\/partenaires\/reorder$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const initId = parseInt(pathname.split('/')[3]);
+      const init = await db.prepare(`SELECT owner_user_id FROM initiatives WHERE id=?`).get(initId);
+      if (!init) return sendJSON(res, 404, { error: 'Initiative introuvable.' });
+      if (Number(init.owner_user_id) !== Number(me.id)) return sendJSON(res, 403, { error: 'Réservé au propriétaire.' });
+      const { ordre } = body;
+      if (!Array.isArray(ordre)) return sendJSON(res, 400, { error: 'ordre[] requis.' });
+      for (const { id, ordre: o } of ordre) {
+        await db.prepare(`UPDATE initiative_partenaires SET ordre=? WHERE id=? AND initiative_id=?`).run(o, id, initId);
+      }
       return sendJSON(res, 200, { ok: true });
     }
 

@@ -72,6 +72,15 @@ function _sigWidget(url) {
   if (!url) return '';
   return `<img src="${url}" style="max-height:50px;margin-top:8px;display:block;" alt="Signature">`;
 }
+function _qrWidget(qr, dark = false) {
+  if (!qr?.enabled || !qr?.url) return '';
+  const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qr.url)}`;
+  const c = dark ? 'rgba(255,255,255,.75)' : '#888';
+  return `<div style="text-align:center;margin-top:14px;">
+    <img src="${apiUrl}" style="width:52px;height:52px;border-radius:4px;" alt="QR profil">
+    <div style="font-size:6.5pt;color:${c};margin-top:2px;max-width:70px;">Scanner pour voir mon profil complet</div>
+  </div>`;
+}
 
 /* ══════════════════════════════════
    TEMPLATE 1 — MODERNE (sidebar)
@@ -116,6 +125,7 @@ CV_TEMPLATES['moderne'] = {
       <div style="display:flex;flex-wrap:wrap;gap:3px;">${d.interests.map(i=>`<span style="background:rgba(255,255,255,.15);padding:2px 8px;border-radius:10px;font-size:8pt;">${_e(i)}</span>`).join('')}</div>
     ` : ''}
     ${inf.nationalite ? `<div style="margin-top:12px;font-size:8.5pt;opacity:.7;">🌍 ${_e(inf.nationalite)}</div>` : ''}
+    ${_qrWidget(d.media?.qr, true)}
   </div>
   <!-- MAIN -->
   <div style="padding:24px 20px;background:#fff;">
@@ -165,7 +175,10 @@ CV_TEMPLATES['classique'] = {
       ${d.interests?.length ? `${_sectionTitle("Centres d'intérêt", s)}<div>${_tags(d.interests, s.couleur3||'#f0f7ff', s.couleur1)}</div>` : ''}
     </div>
   </div>
-  ${d.media?.signature ? `<div style="margin-top:20px;text-align:right;">${_sigWidget(d.media.signature)}</div>` : ''}
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:20px;">
+    <div>${_qrWidget(d.media?.qr)}</div>
+    ${d.media?.signature ? _sigWidget(d.media.signature) : ''}
+  </div>
 </div>`;
   }
 };
@@ -215,6 +228,7 @@ CV_TEMPLATES['elegant'] = {
       ${d.certifications?.length ? `${_sectionTitle('Certifications', s)}${d.certifications.map(c=>`<div style="margin-bottom:6px;font-size:8.5pt;"><strong style="color:${s.couleur1};">${_e(c.nom)}</strong><br>${c.organisme?`<span style="color:#666;">${_e(c.organisme)}</span>`:''}</div>`).join('')}` : ''}
       ${d.interests?.length ? `${_sectionTitle("Intérêts", s)}<div>${_tags(d.interests, s.couleur2+'18', '#333')}</div>` : ''}
       ${inf.nationalite ? `${_sectionTitle('Nationalité', s)}<div style="font-size:9pt;">🌍 ${_e(inf.nationalite)}</div>` : ''}
+      ${_qrWidget(d.media?.qr)}
     </div>
   </div>
 </div>`;
@@ -257,7 +271,10 @@ CV_TEMPLATES['minimaliste'] = {
       ${d.interests?.length ? `${_sectionTitle("Intérêts", s)}<div style="font-size:9pt;color:#555;">${d.interests.join(' · ')}</div>` : ''}
     </div>
   </div>
-  ${d.media?.signature ? `<div style="margin-top:24px;border-top:1px solid #eee;padding-top:12px;">${_sigWidget(d.media.signature)}</div>` : ''}
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:24px;border-top:1px solid #eee;padding-top:12px;">
+    ${_qrWidget(d.media?.qr)}
+    ${d.media?.signature ? _sigWidget(d.media.signature) : ''}
+  </div>
 </div>`;
   }
 };
@@ -303,6 +320,7 @@ CV_TEMPLATES['diaspora'] = {
         <div style="font-size:8pt;font-weight:800;color:${ac};text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid ${ac};padding-bottom:2px;margin:12px 0 6px;">Intérêts</div>
         <div>${d.interests.map(i=>`<span style="display:inline-block;background:${ac}22;color:${ac};padding:2px 7px;border-radius:10px;font-size:8pt;margin:2px;">${_e(i)}</span>`).join('')}</div>
       ` : ''}
+      ${_qrWidget(d.media?.qr)}
     </div>
     <div style="padding:16px 20px;">
       ${d.experiences?.length ? `
@@ -315,6 +333,125 @@ CV_TEMPLATES['diaspora'] = {
       ` : ''}
       ${d.media?.signature ? `<div style="margin-top:20px;">${_sigWidget(d.media.signature)}</div>` : ''}
     </div>
+  </div>
+</div>`;
+  }
+};
+
+/* ══════════════════════════════════
+   TEMPLATE 6 — CORPORATE (sobre, entreprise)
+══════════════════════════════════ */
+CV_TEMPLATES['corporate'] = {
+  name: 'Corporate', category: 'Entreprise',
+  preview: 'linear-gradient(180deg,#22314a 60px,#fff 60px)',
+  render(d, s) {
+    const inf = d.infos || {};
+    const allComps = [...(d.competences?.tech||[]),...(d.competences?.metier||[]),...(d.competences?.num||[])];
+    return `
+<div style="font-family:${s.font||'Arial'};font-size:${s.fontSize||10.5}pt;background:#fff;min-height:297mm;">
+  <div style="background:${s.couleur1};color:#fff;padding:16px 28px;display:flex;justify-content:space-between;align-items:center;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      ${_photoHTML(d.photo, {...s, couleur2:'#fff'})}
+      <div>
+        <div style="font-size:17pt;font-weight:700;">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Votre Nom')}</div>
+        ${inf.titre_pro ? `<div style="font-size:9.5pt;color:${s.couleur2};font-weight:600;">${_e(inf.titre_pro)}</div>` : ''}
+      </div>
+    </div>
+    <div style="text-align:right;font-size:8pt;opacity:.85;line-height:1.7;">
+      ${inf.email?`${_e(inf.email)}<br>`:''}${inf.telephone?`${_e(inf.telephone)}<br>`:''}${(inf.ville||inf.pays_residence)?_e([inf.ville,inf.pays_residence].filter(Boolean).join(', ')):''}
+    </div>
+  </div>
+  <div style="padding:20px 28px;">
+    ${d.resume ? `<div style="font-size:9.5pt;color:#333;line-height:1.6;padding:10px 14px;background:#f5f6f9;border-radius:4px;margin-bottom:16px;">${_e(d.resume).replace(/\n/g,'<br>')}</div>` : ''}
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:24px;">
+      <div>
+        ${d.experiences?.length ? `${_sectionTitle('Expérience professionnelle', s)}${d.experiences.map(_expBlock).join('')}` : ''}
+        ${d.formations?.length ? `${_sectionTitle('Formation', s)}${d.formations.map(_eduBlock).join('')}` : ''}
+      </div>
+      <div>
+        ${allComps.length ? `${_sectionTitle('Compétences clés', s)}${allComps.map(c=>`<div style="font-size:8.5pt;padding:4px 0;border-bottom:1px solid #eee;">${_e(c)}</div>`).join('')}` : ''}
+        ${d.langues?.length ? `${_sectionTitle('Langues', s)}${d.langues.map(l=>`<div style="display:flex;justify-content:space-between;font-size:9pt;margin-bottom:4px;"><span>${_e(l.langue)}</span><span style="color:#999;font-size:8pt;">${_e(l.niveau)}</span></div>`).join('')}` : ''}
+        ${d.certifications?.length ? `${_sectionTitle('Certifications', s)}${d.certifications.map(c=>`<div style="font-size:8.5pt;margin-bottom:5px;"><strong>${_e(c.nom)}</strong></div>`).join('')}` : ''}
+        ${_qrWidget(d.media?.qr)}
+      </div>
+    </div>
+    ${d.media?.signature ? `<div style="margin-top:20px;">${_sigWidget(d.media.signature)}</div>` : ''}
+  </div>
+</div>`;
+  }
+};
+
+/* ══════════════════════════════════
+   TEMPLATE 7 — CRÉATIF (formes, couleurs vives)
+══════════════════════════════════ */
+CV_TEMPLATES['creatif'] = {
+  name: 'Créatif', category: 'Design',
+  preview: 'linear-gradient(135deg,#ff6b6b 0%,#4ecdc4 50%,#ffe66d 100%)',
+  render(d, s) {
+    const inf = d.infos || {};
+    return `
+<div style="font-family:${s.font||'Poppins,Segoe UI'};font-size:${s.fontSize||11}pt;background:#fff;min-height:297mm;position:relative;overflow:hidden;">
+  <div style="position:absolute;top:-60px;right:-60px;width:220px;height:220px;border-radius:50%;background:${s.couleur2}22;"></div>
+  <div style="position:absolute;top:100px;right:-30px;width:100px;height:100px;border-radius:50%;background:${s.couleur1}18;"></div>
+  <div style="position:relative;padding:28px;display:flex;align-items:center;gap:18px;">
+    ${_photoHTML({...d.photo, shape:'round'}, s)}
+    <div>
+      <div style="font-size:24pt;font-weight:900;color:${s.couleur1};line-height:1;">${_e(inf.prenom||'Votre')}</div>
+      <div style="font-size:24pt;font-weight:900;color:${s.couleur2};line-height:1.1;">${_e(inf.nom||'Nom')}</div>
+      ${inf.titre_pro ? `<div style="display:inline-block;margin-top:8px;background:${s.couleur1};color:#fff;padding:4px 12px;border-radius:20px;font-size:9pt;font-weight:700;">${_e(inf.titre_pro)}</div>` : ''}
+    </div>
+  </div>
+  <div style="position:relative;padding:0 28px 28px;font-size:8.5pt;color:#666;display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px;">
+    ${inf.email?_contactLine('✉',inf.email):''}${inf.telephone?_contactLine('📞',inf.telephone):''}${(inf.ville||inf.pays_residence)?_contactLine('📍',[inf.ville,inf.pays_residence].filter(Boolean).join(', ')):''}
+  </div>
+  <div style="position:relative;padding:0 28px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <div>
+      ${d.resume ? `<div style="background:${s.couleur3||'#fef9e7'};border-radius:14px;padding:12px 16px;font-size:9.5pt;color:#333;line-height:1.6;margin-bottom:14px;">${_e(d.resume).replace(/\n/g,'<br>')}</div>` : ''}
+      ${d.experiences?.length ? `${_sectionTitle('Expériences', s)}${d.experiences.map(_expBlock).join('')}` : ''}
+    </div>
+    <div>
+      ${d.formations?.length ? `${_sectionTitle('Formations', s)}${d.formations.map(_eduBlock).join('')}` : ''}
+      ${[...(d.competences?.tech||[]),...(d.competences?.metier||[]),...(d.competences?.num||[])].length ? `${_sectionTitle('Compétences', s)}<div>${_tags([...(d.competences?.tech||[]),...(d.competences?.metier||[]),...(d.competences?.num||[])], s.couleur2+'22', s.couleur1)}</div>` : ''}
+      ${d.interests?.length ? `${_sectionTitle("Passions", s)}<div>${_tags(d.interests, s.couleur1+'18', s.couleur2)}</div>` : ''}
+      ${_qrWidget(d.media?.qr)}
+    </div>
+  </div>
+  ${d.media?.signature ? `<div style="position:relative;padding:16px 28px;">${_sigWidget(d.media.signature)}</div>` : ''}
+</div>`;
+  }
+};
+
+/* ══════════════════════════════════
+   TEMPLATE 8 — INTERNATIONAL (bilingue, format universel)
+══════════════════════════════════ */
+CV_TEMPLATES['international'] = {
+  name: 'International', category: 'Universel',
+  preview: 'linear-gradient(90deg,#fff 0%,#fff 70%,#0a3d62 70%,#0a3d62 100%)',
+  render(d, s) {
+    const inf = d.infos || {};
+    return `
+<div style="font-family:${s.font||'Arial'};font-size:${s.fontSize||10}pt;background:#fff;min-height:297mm;display:grid;grid-template-columns:1fr 200px;">
+  <div style="padding:26px 24px;">
+    <div style="border-bottom:3px solid ${s.couleur1};padding-bottom:12px;margin-bottom:14px;">
+      <div style="font-size:20pt;font-weight:800;color:${s.couleur1};">${_e([inf.prenom,inf.nom].filter(Boolean).join(' ')||'Full Name')}</div>
+      ${inf.titre_pro ? `<div style="font-size:11pt;color:#555;margin-top:2px;">${_e(inf.titre_pro)}</div>` : ''}
+    </div>
+    ${d.resume ? `${_sectionTitle('Profile / Profil', s)}<p style="font-size:9.5pt;color:#333;line-height:1.6;">${_e(d.resume).replace(/\n/g,'<br>')}</p>` : ''}
+    ${d.experiences?.length ? `${_sectionTitle('Work Experience / Expériences', s)}${d.experiences.map(_expBlock).join('')}` : ''}
+    ${d.formations?.length ? `${_sectionTitle('Education / Formations', s)}${d.formations.map(_eduBlock).join('')}` : ''}
+    ${d.media?.signature ? `<div style="margin-top:20px;">${_sigWidget(d.media.signature)}</div>` : ''}
+  </div>
+  <div style="background:${s.couleur1};color:#fff;padding:26px 16px;">
+    ${_photoHTML(d.photo, {...s, couleur2:'#fff'})}
+    ${_sectionTitle('Contact', s, true)}
+    <div style="font-size:8.5pt;line-height:1.9;">
+      ${inf.email?`✉ ${_e(inf.email)}<br>`:''}${inf.telephone?`📞 ${_e(inf.telephone)}<br>`:''}${(inf.ville||inf.pays_residence)?`📍 ${_e([inf.ville,inf.pays_residence].filter(Boolean).join(', '))}<br>`:''}${inf.linkedin?`🔗 ${_e(inf.linkedin)}`:''}
+    </div>
+    ${inf.nationalite ? `${_sectionTitle('Nationality / Nationalité', s, true)}<div style="font-size:9pt;">${_e(inf.nationalite)}</div>` : ''}
+    ${d.langues?.length ? `${_sectionTitle('Languages / Langues', s, true)}${d.langues.map(l=>`<div style="display:flex;justify-content:space-between;font-size:8.5pt;margin-bottom:4px;"><span>${_e(l.langue)}</span><span style="opacity:.7;">${_e(l.niveau)}</span></div>`).join('')}` : ''}
+    ${[...(d.competences?.tech||[]),...(d.competences?.metier||[]),...(d.competences?.num||[])].length ? `${_sectionTitle('Skills / Compétences', s, true)}${[...(d.competences?.tech||[]),...(d.competences?.metier||[]),...(d.competences?.num||[])].map(c=>`<div style="font-size:8pt;margin-bottom:3px;">• ${_e(c)}</div>`).join('')}` : ''}
+    ${d.certifications?.length ? `${_sectionTitle('Certifications', s, true)}${d.certifications.map(c=>`<div style="font-size:8pt;margin-bottom:4px;">${_e(c.nom)}</div>`).join('')}` : ''}
+    ${_qrWidget(d.media?.qr, true)}
   </div>
 </div>`;
   }

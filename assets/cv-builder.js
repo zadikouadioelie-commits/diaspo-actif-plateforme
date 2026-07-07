@@ -8,6 +8,7 @@
 ═══════════════════════════════════════════ */
 let CVB = {
   id: null,
+  userId: null,
   dirty: false,
   saving: false,
   autoSaveTimer: null,
@@ -32,7 +33,7 @@ let CVB = {
     langues: [],
     certifications: [],
     interests: [],
-    media: { audio: null, video: null, signature: null, qr: { enabled: false } }
+    media: { audio: null, video: null, signature: null, qr: { enabled: true } }
   }
 };
 
@@ -44,6 +45,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   const id = params.get('id');
   const num = parseInt(params.get('numero') || '1');
 
+  try {
+    const r = await fetch('/api/auth/me', { credentials: 'include' });
+    if (r.ok) { const j = await r.json(); CVB.userId = j.user?.id || null; }
+  } catch (e) { /* non connecté — QR désactivé silencieusement */ }
+
   if (id) {
     await loadCV(id);
   } else {
@@ -51,6 +57,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('cv-numero').value = num;
     render();
   }
+  generateQR();
   setupAutoSave();
   renderTemplateGallery();
   setupDesignListeners();
@@ -214,6 +221,35 @@ function setThemeBtn(id) {
 }
 
 /* ═══════════════════════════════════════════
+   THÈMES DE COULEURS PRÉDÉFINIS
+═══════════════════════════════════════════ */
+const COLOR_THEMES = [
+  { name: 'Bleu professionnel', couleur1: '#1a3a5c', couleur2: '#4a90d9', couleur3: '#e8f0fe' },
+  { name: 'Vert', couleur1: '#1b5e3a', couleur2: '#27ae60', couleur3: '#e8f8ee' },
+  { name: 'Bordeaux', couleur1: '#5c1a2e', couleur2: '#a03050', couleur3: '#fbe9ee' },
+  { name: 'Noir & Blanc', couleur1: '#111111', couleur2: '#555555', couleur3: '#f2f2f2' },
+  { name: 'Gris', couleur1: '#37474f', couleur2: '#78909c', couleur3: '#eceff1' },
+  { name: 'Orange', couleur1: '#c1440e', couleur2: '#f5a623', couleur3: '#fff3e6' },
+  { name: 'Violet', couleur1: '#4a2e6f', couleur2: '#8e5fd9', couleur3: '#f1eafc' },
+  { name: 'Turquoise', couleur1: '#0e6e6e', couleur2: '#26c6c6', couleur3: '#e6fbfb' },
+];
+function renderThemePresets() {
+  const el = document.getElementById('theme-presets');
+  if (!el) return;
+  el.innerHTML = COLOR_THEMES.map((t, i) => `
+    <button type="button" title="${t.name}" onclick="applyColorTheme(${i})" style="height:32px;border-radius:6px;border:2px solid #e0e8f0;cursor:pointer;background:linear-gradient(135deg,${t.couleur1} 50%,${t.couleur2} 50%);"></button>
+  `).join('');
+}
+window.applyColorTheme = function(i) {
+  const t = COLOR_THEMES[i]; if (!t) return;
+  CVB.data.style.couleur1 = t.couleur1;
+  CVB.data.style.couleur2 = t.couleur2;
+  CVB.data.style.couleur3 = t.couleur3;
+  renderDesignPanel();
+  render(); CVB.dirty = true;
+};
+
+/* ═══════════════════════════════════════════
    DESIGN PANEL
 ═══════════════════════════════════════════ */
 function renderDesignPanel() {
@@ -224,6 +260,7 @@ function renderDesignPanel() {
   g('spacing', s.spacing);
 }
 function setupDesignListeners() {
+  renderThemePresets();
   ['color1','color2','color3'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', e => {
       const map = { color1:'couleur1', color2:'couleur2', color3:'couleur3' };
@@ -689,14 +726,18 @@ window.removeVideo = function() {
    QR CODE
 ═══════════════════════════════════════════ */
 window.generateQR = function() {
-  const url = CVB.id
-    ? `${location.origin}/cv-view.html?id=${CVB.id}`
-    : location.href;
+  if (!CVB.userId) {
+    const el = document.getElementById('qr-url');
+    if (el) el.textContent = 'Connectez-vous pour lier le QR à votre profil public.';
+    return;
+  }
+  const url = `${location.origin}/profil.html?id=${CVB.userId}`;
   const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
-  document.getElementById('qr-img').src = apiUrl;
-  document.getElementById('qr-img').style.display = 'block';
-  document.getElementById('qr-url').textContent = url;
-  CVB.data.media.qr = { enabled: true, url };
+  const img = document.getElementById('qr-img');
+  if (img) { img.src = apiUrl; img.style.display = 'block'; }
+  const urlEl = document.getElementById('qr-url');
+  if (urlEl) urlEl.textContent = url;
+  CVB.data.media.qr = { enabled: CVB.data.media.qr?.enabled !== false, url };
   render(); CVB.dirty = true;
 };
 window.toggleQR = function(enabled) {
@@ -744,14 +785,39 @@ window.closeHistory = function() {
 /* ═══════════════════════════════════════════
    EXPORT PDF
 ═══════════════════════════════════════════ */
-window.exportPDF = function() {
-  const sheet = document.getElementById('cv-sheet');
-  const clone = sheet.cloneNode(true);
-  clone.id = 'cv-print-target';
-  clone.style.cssText = 'position:fixed;top:0;left:0;width:210mm;z-index:99999;display:block;box-shadow:none;';
-  document.body.appendChild(clone);
-  window.print();
-  document.body.removeChild(clone);
+window.exportPDF = async function() {
+  collectFormData();
+  const btn = document.getElementById('btn-export-pdf');
+  if (typeof html2pdf === 'undefined') {
+    // Repli si le CDN html2pdf est indisponible : impression navigateur classique
+    const sheet = document.getElementById('cv-sheet');
+    const clone = sheet.cloneNode(true);
+    clone.id = 'cv-print-target';
+    clone.style.cssText = 'position:fixed;top:0;left:0;width:210mm;z-index:99999;display:block;box-shadow:none;';
+    document.body.appendChild(clone);
+    window.print();
+    document.body.removeChild(clone);
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Génération…'; }
+  try {
+    const sheet = document.getElementById('cv-sheet');
+    const clone = sheet.cloneNode(true);
+    clone.style.cssText = 'width:210mm;box-shadow:none;';
+    const filename = `${(CVB.data.meta.titre || 'CV').replace(/[^a-zA-Z0-9À-ÿ_-]+/g, '_')}.pdf`;
+    await html2pdf().set({
+      margin: 0,
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] }
+    }).from(clone).save();
+  } catch (e) {
+    alert('Erreur lors de la génération du PDF : ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📄 Générer le document PDF'; }
+  }
 };
 
 /* ═══════════════════════════════════════════

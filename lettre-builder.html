@@ -51,6 +51,21 @@ textarea{resize:vertical}
 .lettre-signature{margin-top:30pt;font-size:10.5pt}
 .sig-image{max-height:60px;margin-top:8px;display:block}
 
+/* Templates & design */
+.tmpl-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:6px}
+.tmpl-card{border:2px solid #e0e0e0;border-radius:8px;cursor:pointer;overflow:hidden;transition:.15s}
+.tmpl-card:hover{border-color:#4a90d9}
+.tmpl-card.active{border-color:#1a3a5c;box-shadow:0 0 0 2px #1a3a5c22}
+.tmpl-preview{height:50px}
+.tmpl-label{padding:5px 8px;font-size:.75rem;font-weight:700;background:#fff}
+.theme-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.theme-swatch{height:28px;border-radius:6px;border:2px solid #e0e0e0;cursor:pointer}
+.color-row-lm{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.color-row-lm label{font-size:.72rem}
+.color-row-lm input[type=color]{width:100%;height:32px;border:1px solid #ddd;border-radius:5px;cursor:pointer;padding:2px}
+.qr-block{text-align:center;padding:10px;background:#f8f9ff;border-radius:8px;margin-bottom:8px}
+#qr-img-lm{width:90px;height:90px;display:none;margin:0 auto 4px;}
+
 @media print{
   .lmb-header,.lmb-form{display:none!important}
   body{background:#fff}
@@ -72,7 +87,8 @@ textarea{resize:vertical}
 <div class="lmb-header">
   <h1>✉️ Lettre de <span>motivation</span></h1>
   <div class="lmb-actions">
-    <button class="btn btn-outline btn-sm" onclick="printLettre()">🖨 Imprimer / PDF</button>
+    <button class="btn btn-outline btn-sm" onclick="printLettre()">🖨 Imprimer</button>
+    <button class="btn btn-outline btn-sm" id="btn-export-pdf-lm" onclick="exportPDFLettre()">📄 Générer le document PDF</button>
     <button class="btn btn-primary btn-sm" onclick="saveLettre()">💾 Enregistrer</button>
     <a href="dashboard-utilisateur.html#cv" class="btn btn-outline btn-sm">← Retour</a>
   </div>
@@ -80,6 +96,37 @@ textarea{resize:vertical}
 
 <div class="lmb-layout">
   <div class="lmb-form">
+    <h2>🎨 Modèle de présentation</h2>
+    <div class="tmpl-grid" id="lm-template-list"></div>
+
+    <h2>Personnalisation</h2>
+    <label>Thèmes prédéfinis</label>
+    <div class="theme-presets" id="lm-theme-presets"></div>
+    <div class="color-row-lm">
+      <div><label>Couleur principale</label><input type="color" id="lm-color1" value="#1a3a5c" oninput="updateStyle()"></div>
+      <div><label>Couleur secondaire</label><input type="color" id="lm-color2" value="#4a90d9" oninput="updateStyle()"></div>
+    </div>
+    <label>Police</label>
+    <select id="lm-font" onchange="updateStyle()" style="margin-bottom:8px;">
+      <option value="Georgia, serif">Georgia</option>
+      <option value="Segoe UI, sans-serif">Segoe UI</option>
+      <option value="Arial, sans-serif">Arial</option>
+      <option value="Times New Roman, serif">Times New Roman</option>
+      <option value="Calibri, sans-serif">Calibri</option>
+    </select>
+    <label>Taille police : <span id="lm-fontsize-val">11pt</span></label>
+    <input type="range" id="lm-fontsize" min="9" max="13" value="11" oninput="document.getElementById('lm-fontsize-val').textContent=this.value+'pt';updateStyle()">
+
+    <h2>📷 QR Code — profil public</h2>
+    <div class="qr-block">
+      <img id="qr-img-lm" alt="QR Code">
+      <div id="qr-url-lm" style="font-size:.7rem;color:#888;word-break:break-all;"></div>
+      <div style="display:flex;gap:6px;justify-content:center;margin-top:6px;">
+        <button class="btn btn-sm btn-outline" onclick="toggleQRLettre(true)">✅ Inclure</button>
+        <button class="btn btn-sm btn-outline" onclick="toggleQRLettre(false)">❌ Retirer</button>
+      </div>
+    </div>
+
     <h2>Configuration</h2>
     <div class="form-row">
       <div>
@@ -156,16 +203,84 @@ Dans l'attente d'un entretien que vous voudrez bien m'accorder, je vous adresse 
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="/assets/lettre-templates.js"></script>
 <script>
 let lettreId = null;
 let sigData = '';
+let lmUserId = null;
+let lmTemplate = 'classique';
+let lmStyle = { couleur1: '#1a3a5c', couleur2: '#4a90d9', couleur3: '#eef4fb', font: 'Georgia, serif', fontSize: 11 };
+let lmQr = { enabled: true, url: '' };
 const params = new URLSearchParams(location.search);
 
+const LM_COLOR_THEMES = [
+  { name: 'Bleu professionnel', couleur1: '#1a3a5c', couleur2: '#4a90d9', couleur3: '#e8f0fe' },
+  { name: 'Vert', couleur1: '#1b5e3a', couleur2: '#27ae60', couleur3: '#e8f8ee' },
+  { name: 'Bordeaux', couleur1: '#5c1a2e', couleur2: '#a03050', couleur3: '#fbe9ee' },
+  { name: 'Noir & Blanc', couleur1: '#111111', couleur2: '#555555', couleur3: '#f2f2f2' },
+  { name: 'Gris', couleur1: '#37474f', couleur2: '#78909c', couleur3: '#eceff1' },
+  { name: 'Orange', couleur1: '#c1440e', couleur2: '#f5a623', couleur3: '#fff3e6' },
+  { name: 'Violet', couleur1: '#4a2e6f', couleur2: '#8e5fd9', couleur3: '#f1eafc' },
+  { name: 'Turquoise', couleur1: '#0e6e6e', couleur2: '#26c6c6', couleur3: '#e6fbfb' },
+];
+
 window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const r = await fetch('/api/auth/me', { credentials: 'include' });
+    if (r.ok) { const j = await r.json(); lmUserId = j.user?.id || null; }
+  } catch(e) {}
+  generateQRLettre();
+  renderTemplateGalleryLettre();
+  renderThemePresetsLettre();
+
   const id = params.get('id');
   if (id) await loadLettre(id);
   else render();
 });
+
+function renderTemplateGalleryLettre() {
+  const el = document.getElementById('lm-template-list');
+  if (!el) return;
+  el.innerHTML = Object.entries(LETTRE_TEMPLATES).map(([id, t]) => `
+    <div class="tmpl-card ${lmTemplate===id?'active':''}" data-id="${id}" onclick="selectLettreTemplate('${id}')">
+      <div class="tmpl-preview" style="background:${t.preview};"></div>
+      <div class="tmpl-label">${t.name}</div>
+    </div>`).join('');
+}
+function selectLettreTemplate(id) {
+  lmTemplate = id;
+  document.querySelectorAll('#lm-template-list .tmpl-card').forEach(c => c.classList.toggle('active', c.dataset.id === id));
+  render();
+}
+function renderThemePresetsLettre() {
+  const el = document.getElementById('lm-theme-presets');
+  if (!el) return;
+  el.innerHTML = LM_COLOR_THEMES.map((t,i) => `<button type="button" title="${t.name}" class="theme-swatch" style="background:linear-gradient(135deg,${t.couleur1} 50%,${t.couleur2} 50%);" onclick="applyLettreTheme(${i})"></button>`).join('');
+}
+function applyLettreTheme(i) {
+  const t = LM_COLOR_THEMES[i]; if (!t) return;
+  lmStyle.couleur1 = t.couleur1; lmStyle.couleur2 = t.couleur2; lmStyle.couleur3 = t.couleur3;
+  document.getElementById('lm-color1').value = t.couleur1;
+  document.getElementById('lm-color2').value = t.couleur2;
+  render();
+}
+function updateStyle() {
+  lmStyle.couleur1 = document.getElementById('lm-color1').value;
+  lmStyle.couleur2 = document.getElementById('lm-color2').value;
+  lmStyle.font = document.getElementById('lm-font').value;
+  lmStyle.fontSize = parseFloat(document.getElementById('lm-fontsize').value);
+  render();
+}
+function generateQRLettre() {
+  if (!lmUserId) { document.getElementById('qr-url-lm').textContent = 'Connectez-vous pour lier le QR à votre profil public.'; return; }
+  lmQr.url = `${location.origin}/profil.html?id=${lmUserId}`;
+  const img = document.getElementById('qr-img-lm');
+  if (img) { img.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(lmQr.url)}`; img.style.display = 'block'; }
+  document.getElementById('qr-url-lm').textContent = lmQr.url;
+  render();
+}
+function toggleQRLettre(enabled) { lmQr.enabled = enabled; render(); }
 
 async function loadLettre(id) {
   try {
@@ -185,6 +300,16 @@ async function loadLettre(id) {
     });
     if (d.corps) document.getElementById('corps-lettre').innerText = d.corps;
     if (d.sig_image) sigData = d.sig_image;
+    if (d.template) { lmTemplate = d.template; renderTemplateGalleryLettre(); }
+    if (d.style) {
+      lmStyle = { ...lmStyle, ...d.style };
+      document.getElementById('lm-color1').value = lmStyle.couleur1;
+      document.getElementById('lm-color2').value = lmStyle.couleur2;
+      document.getElementById('lm-font').value = lmStyle.font;
+      document.getElementById('lm-fontsize').value = lmStyle.fontSize;
+      document.getElementById('lm-fontsize-val').textContent = lmStyle.fontSize + 'pt';
+    }
+    if (d.qr && d.qr.enabled === false) lmQr.enabled = false;
     render();
   } catch(e) { render(); }
 }
@@ -210,44 +335,25 @@ function loadSig(input) {
 function g(id) { return (document.getElementById(id)||{}).value || ''; }
 
 function render() {
-  const prenom = g('exp-prenom'), nom = g('exp-nom');
-  const adresse = g('exp-adresse'), ville = g('exp-ville');
-  const tel = g('exp-tel'), email = g('exp-email');
-  const destNom = g('dest-nom'), destFonction = g('dest-fonction');
-  const destEntreprise = g('dest-entreprise'), destAdresse = g('dest-adresse');
-  const lieuDate = g('lieu-date');
-  const objet = g('objet');
-  const corps = document.getElementById('corps-lettre')?.innerText || '';
-  const sigTexte = g('sig-texte');
-
+  const d = {
+    prenom: g('exp-prenom'), nom: g('exp-nom'),
+    adresse: g('exp-adresse'), ville: g('exp-ville'),
+    tel: g('exp-tel'), email: g('exp-email'),
+    destNom: g('dest-nom'), destFonction: g('dest-fonction'),
+    destEntreprise: g('dest-entreprise'), destAdresse: g('dest-adresse'),
+    lieuDate: g('lieu-date'), objet: g('objet'),
+    corps: document.getElementById('corps-lettre')?.innerText || '',
+    sigTexte: g('sig-texte'), sigData,
+    qr: lmQr
+  };
+  const tmpl = (typeof LETTRE_TEMPLATES !== 'undefined' && LETTRE_TEMPLATES[lmTemplate]) || null;
   const sheet = document.getElementById('lettre-sheet');
-  sheet.innerHTML = `
-    <div class="lettre-expediteur">
-      <strong>${_esc(prenom)} ${_esc(nom)}</strong><br>
-      ${adresse ? _esc(adresse)+'<br>' : ''}
-      ${ville ? _esc(ville)+'<br>' : ''}
-      ${tel ? _esc(tel)+'<br>' : ''}
-      ${email ? _esc(email) : ''}
-    </div>
-
-    ${destNom||destEntreprise ? `<div class="lettre-destinataire">
-      ${destNom ? _esc(destNom)+'<br>' : ''}
-      ${destFonction ? _esc(destFonction)+'<br>' : ''}
-      ${destEntreprise ? '<strong>'+_esc(destEntreprise)+'</strong><br>' : ''}
-      ${destAdresse ? _esc(destAdresse) : ''}
-    </div>` : ''}
-
-    ${lieuDate ? `<div class="lettre-date">${_esc(lieuDate)}</div>` : ''}
-
-    ${objet ? `<div class="lettre-objet"><strong>Objet :</strong> ${_esc(objet)}</div>` : ''}
-
-    <div class="lettre-corps">${_esc(corps)}</div>
-
-    <div class="lettre-signature">
-      ${sigTexte ? _esc(sigTexte) : (prenom||nom ? _esc(prenom+' '+nom).trim() : '')}
-      ${sigData ? `<img loading="lazy" src="${sigData}" class="sig-image" alt="Signature">` : ''}
-    </div>
-  `;
+  if (tmpl) {
+    sheet.innerHTML = tmpl.render(d, lmStyle);
+  } else {
+    // Repli si le moteur de templates n'a pas chargé
+    sheet.innerHTML = `<div class="lettre-corps">${_esc(d.corps)}</div>`;
+  }
 }
 
 async function saveLettre() {
@@ -259,7 +365,8 @@ async function saveLettre() {
     dest_nom: g('dest-nom'), dest_fonction: g('dest-fonction'),
     dest_entreprise: g('dest-entreprise'), dest_adresse: g('dest-adresse'),
     lieu_date: g('lieu-date'), objet: g('objet'),
-    corps, sig_texte: g('sig-texte'), sig_image: sigData
+    corps, sig_texte: g('sig-texte'), sig_image: sigData,
+    template: lmTemplate, style: lmStyle, qr: lmQr
   };
   const payload = {
     numero: parseInt(g('lm-numero')),
@@ -281,6 +388,30 @@ async function saveLettre() {
 
 function printLettre() { window.print(); }
 
+async function exportPDFLettre() {
+  const btn = document.getElementById('btn-export-pdf-lm');
+  if (typeof html2pdf === 'undefined') { printLettre(); return; }
+  const sheet = document.getElementById('lettre-sheet');
+  const clone = sheet.cloneNode(true);
+  clone.style.cssText = 'width:210mm;min-height:297mm;background:#fff;padding:30mm 25mm;box-shadow:none;font-family:'+(lmStyle.font||'Georgia,serif')+';font-size:'+(lmStyle.fontSize||11)+'pt;line-height:1.7;';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Génération…'; }
+  try {
+    const filename = `${(g('lm-titre') || 'Lettre_de_motivation').replace(/[^a-zA-Z0-9À-ÿ_-]+/g, '_')}.pdf`;
+    await html2pdf().set({
+      margin: 0,
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] }
+    }).from(clone).save();
+  } catch (e) {
+    alert('Erreur lors de la génération du PDF : ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📄 Générer le document PDF'; }
+  }
+}
+
 function showToast(msg, type='info') {
   const t = document.createElement('div');
   t.style.cssText = `position:fixed;bottom:20px;right:20px;background:${type==='success'?'#27ae60':'#e74c3c'};color:#fff;padding:12px 20px;border-radius:8px;z-index:9999;font-size:.85rem;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.2)`;
@@ -301,6 +432,7 @@ function _esc(s) {
 <script src="/assets/cookies-banner.js"></script>
 <script src="/assets/upload-media.js"></script>
   <script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
 </body>
 </html>
 

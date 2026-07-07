@@ -210,9 +210,9 @@
     <!-- TABS -->
     <div class="rtab-bar">
       <button class="rtab active" data-tab="annuaire">🔍 Annuaire</button>
-      <button class="rtab" data-tab="mon-reseau" id="tab-mon-reseau">🏢 Mon Réseau</button>
-      <button class="rtab" data-tab="demandes" id="tab-demandes">📬 Demandes <span class="rtab-badge" id="badge-demandes" style="display:none;"></span></button>
-      <button class="rtab" data-tab="listes" id="tab-listes">📋 Mes Listes</button>
+      <button class="rtab" data-tab="mon-reseau" id="rtabbtn-mon-reseau">🏢 Mon Réseau</button>
+      <button class="rtab" data-tab="demandes" id="rtabbtn-demandes">📬 Demandes <span class="rtab-badge" id="badge-demandes" style="display:none;"></span></button>
+      <button class="rtab" data-tab="listes" id="rtabbtn-listes">📋 Mes Listes</button>
       <button class="rtab" data-tab="stats">📊 Statistiques</button>
       <button class="rtab" data-tab="profil-reseau">⚙️ Mon profil réseau</button>
     </div>
@@ -300,6 +300,10 @@
       <h2 style="margin:0;font-size:1.05rem;" id="modal-liste-titre">📋 Nouvelle liste</h2>
       <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-liste-form').classList.remove('open')">✕</button>
     </div>
+    <div id="lf-methode-row" style="display:flex;gap:8px;margin-bottom:16px;">
+      <button type="button" class="lf-methode-btn sel" id="lf-methode-manuelle" onclick="choisirMethodeListe('manuelle')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #1B3A6B;background:#1B3A6B;color:#fff;font-size:.82rem;font-weight:700;cursor:pointer;">✋ Manuelle</button>
+      <button type="button" class="lf-methode-btn" id="lf-methode-filtres" onclick="choisirMethodeListe('filtres')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--muted);font-size:.82rem;font-weight:700;cursor:pointer;">🧠 Filtres intelligents</button>
+    </div>
     <div style="margin-bottom:12px;">
       <label style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:5px;">Nom *</label>
       <input type="text" id="lf-nom" placeholder="Ex : Investisseurs prioritaires" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:.9rem;font-family:inherit;">
@@ -307,6 +311,59 @@
     <div style="margin-bottom:12px;">
       <label style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:5px;">Description</label>
       <textarea id="lf-desc" rows="2" placeholder="À quoi sert cette liste ?" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:.87rem;font-family:inherit;resize:vertical;"></textarea>
+    </div>
+    <div id="lf-filtres-panel" style="display:none;margin-bottom:14px;border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <strong style="font-size:.82rem;">🧠 Critères de recherche</strong>
+        <label style="display:flex;align-items:center;gap:6px;font-size:.78rem;cursor:pointer;">
+          <input type="checkbox" id="lf-dynamique"> Liste dynamique (mise à jour auto)
+        </label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <label style="font-size:.72rem;color:var(--muted);">Type de compte</label>
+          <select id="lf-f-role" multiple size="4" style="width:100%;font-size:.8rem;border:1px solid var(--border);border-radius:6px;">
+            <option value="utilisateur">Particulier / Utilisateur</option>
+            <option value="initiative">Initiative</option>
+            <option value="collectivite">Collectivité</option>
+            <option value="administrateur">Administrateur</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--muted);">Domaine / Secteur</label>
+          <input id="lf-f-domaine" placeholder="Ex : Agriculture, BTP…" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--muted);">Pays de résidence</label>
+          <input id="lf-f-pays" placeholder="Ex : France, Canada…" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--muted);">Pays d'origine</label>
+          <input id="lf-f-pays-origine" placeholder="Ex : Côte d'Ivoire…" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--muted);">Ville</label>
+          <input id="lf-f-ville" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--muted);">Région</label>
+          <input id="lf-f-region" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--muted);">Profession</label>
+          <input id="lf-f-profession" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--muted);">Compétence</label>
+          <input id="lf-f-competence" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-size:.8rem;">
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;margin-bottom:10px;flex-wrap:wrap;">
+        <label style="font-size:.78rem;display:flex;align-items:center;gap:5px;"><input type="checkbox" id="lf-f-verifie"> Membre vérifié uniquement</label>
+        <label style="font-size:.78rem;display:flex;align-items:center;gap:5px;"><input type="checkbox" id="lf-f-partenaire"> Partenaire Diaspo'Actif uniquement</label>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline" style="width:100%;" onclick="previsualiserFiltres()">🔍 Prévisualiser les membres correspondants</button>
+      <div id="lf-preview-result" style="margin-top:8px;font-size:.8rem;color:var(--muted);"></div>
     </div>
     <div style="margin-bottom:12px;">
       <label style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Icône</label>
@@ -375,14 +432,35 @@
     </div>
     <div id="mdl-desc" style="font-size:.85rem;color:var(--muted);margin-bottom:14px;"></div>
     <div id="mdl-notes" style="font-size:.82rem;background:#fef9c3;border-radius:8px;padding:10px 12px;margin-bottom:14px;display:none;"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-      <strong style="font-size:.87rem;" id="mdl-contacts-titre">Contacts</strong>
-      <div style="display:flex;gap:6px;">
-        <button class="ld-btn" onclick="exporterListe(currentListeId)">⬇️ Export CSV</button>
-        <button class="ld-btn" onclick="editerListe(currentListeId)">✏️ Modifier</button>
-      </div>
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:12px;">
+      <button class="mdl-subtab sel" id="mdl-subtab-contacts" onclick="mdlSwitchTab('contacts')" style="padding:8px 14px;border:none;background:none;font-size:.82rem;font-weight:700;cursor:pointer;border-bottom:2px solid #1B3A6B;">👥 Contacts</button>
+      <button class="mdl-subtab" id="mdl-subtab-stats" onclick="mdlSwitchTab('stats')" style="padding:8px 14px;border:none;background:none;font-size:.82rem;font-weight:700;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;">📊 Statistiques</button>
     </div>
-    <div id="mdl-contacts-list" style="max-height:320px;overflow-y:auto;"></div>
+    <div id="mdl-pane-contacts">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+        <input id="mdl-recherche" placeholder="🔍 Rechercher dans cette liste…" oninput="mdlFiltrerContacts()" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:.83rem;">
+        <div style="display:flex;gap:6px;">
+          <button class="ld-btn" onclick="exporterListe(currentListeId)">⬇️ CSV</button>
+          <button class="ld-btn" onclick="editerListe(currentListeId)">✏️ Modifier</button>
+        </div>
+      </div>
+      <strong style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:8px;" id="mdl-contacts-titre">Contacts</strong>
+      <div id="mdl-contacts-list" style="max-height:320px;overflow-y:auto;"></div>
+    </div>
+    <div id="mdl-pane-stats" style="display:none;">
+      <div id="mdl-stats-content" style="max-height:380px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Déplacer / Copier un contact -->
+<div class="modal-back" id="modal-deplacer-contact">
+  <div class="modal-box" style="max-width:420px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;font-size:1rem;" id="mdc-titre">Déplacer vers…</h2>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-deplacer-contact').classList.remove('open')">✕</button>
+    </div>
+    <div id="mdc-listes" style="display:flex;flex-direction:column;gap:7px;max-height:300px;overflow-y:auto;"></div>
   </div>
 </div>
 
@@ -396,7 +474,7 @@ function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function safeParse(v,def=[]){try{return v?JSON.parse(v):def;}catch{return def;}}
 
 const apiCall=(m,p,b)=>fetch('/api'+p,{method:m,credentials:'include',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined})
-  .then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+  .then(async r=>{const d=await r.json();if(!r.ok)throw Object.assign(new Error(d.error||r.statusText),{data:d});return d;});
 
 /* ── ÉTAT ── */
 let ME=null, MY_INIT=null, MY_AFFIL_IDS=new Set(), MY_SENT_IDS=new Set();
@@ -565,13 +643,31 @@ async function voirFiche(id){
           ${recommandations.map(r=>`<div style="font-size:.8rem;background:var(--bg);padding:8px 10px;border-radius:8px;"><span style="font-weight:700;">${escH(r.nom)}</span>${r.contenu?` — "${escH(r.contenu)}"`:''}</div>`).join('')}
         </div>
       </div>`:''}
+      <div id="fiche-reseau-membres" style="margin-bottom:8px;"><div style="font-size:.78rem;color:var(--muted);">Chargement du réseau professionnel…</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;padding-top:14px;border-top:1px solid var(--border);">
         ${ME&&!isMe?`<button class="btn-contact" onclick="contacter(${i.owner_user_id||0},'${escH(i.nom||'')}',document.getElementById('modal-fiche'))">💬 Contacter</button>`:''}
         ${ME&&!isMe&&MY_INIT?.numero_immatriculation&&!MY_AFFIL_IDS.has(i.id)&&!MY_SENT_IDS.has(i.id)?`<button class="btn-affil" onclick="demanderAffil(${i.id},'${escH(i.nom||'')}')">+ Rejoindre le réseau</button>`:''}
         ${ME&&!isMe&&MY_INIT?.numero_immatriculation?`<button class="btn-affil" style="border-color:#f97316;color:#f97316;" onclick="recommander(${i.id},'${escH(i.nom||'')}')">👍 Recommander</button>`:''}
         ${ME&&!isMe&&i.owner_user_id?`<button class="btn-affil" style="border-color:#8b5cf6;color:#8b5cf6;" onclick="ajouterAListe(${i.owner_user_id},'${escH(i.nom||'')}')">📋 Ajouter à une liste</button>`:''}
       </div>`;
+    chargerMembresReseau(id);
   }catch(e){content.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+async function chargerMembresReseau(initId){
+  const el=document.getElementById('fiche-reseau-membres');
+  if(!el)return;
+  try{
+    const{membres}=await apiCall('GET',`/reseau/${initId}/membres`);
+    if(!membres.length){el.innerHTML='';return;}
+    el.innerHTML=`<b style="font-size:.8rem;">🌐 Réseau professionnel (${membres.length}) :</b>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+        ${membres.map(m=>`<span class="init-tag" style="cursor:pointer;" onclick="voirFiche(${m.id})">${escH(m.nom)}</span>`).join('')}
+      </div>`;
+  }catch(e){
+    const restreint=e.data?.visibilite==='abonnes'?"Réseau visible aux abonnés uniquement — abonnez-vous à cette initiative pour le consulter.":'Réseau professionnel privé.';
+    el.innerHTML=`<div style="font-size:.78rem;color:var(--muted);">🔒 ${restreint}</div>`;
+  }
 }
 
 /* ── CONTACTER (ouvre messagerie) ── */
@@ -790,6 +886,25 @@ async function loadProfilReseauTab(){
       <h2 style="margin:0 0 6px;">⚙️ Profil réseau de <strong>${escH(moi.nom)}</strong></h2>
       <p style="color:var(--muted);font-size:.85rem;margin:0 0 20px;">Ces informations sont visibles dans les annuaires des réseaux professionnels. Aucun téléphone ni e-mail n'est jamais affiché.</p>
       ${!moi.numero_immatriculation?`<div class="immat-banner"><strong>⚠️ Immatriculation obligatoire</strong>Sans numéro officiel, votre initiative ne peut pas rejoindre un réseau ni apparaître dans les annuaires.</div>`:''}
+      <div class="card" style="margin-bottom:20px;padding:16px 18px;">
+        <h3 style="margin:0 0 4px;font-size:.9rem;">🔓 Rendre mon réseau professionnel public</h3>
+        <p style="font-size:.8rem;color:var(--muted);margin:0 0 12px;">Choisissez qui peut consulter la liste des membres de votre réseau (partenaires affiliés) depuis votre fiche publique. Par défaut, cette liste reste privée — seul le nombre total de membres est visible de tous.</p>
+        <div style="display:flex;flex-direction:column;gap:8px;" id="pr-visibilite-options">
+          <label style="display:flex;align-items:flex-start;gap:8px;font-size:.85rem;cursor:pointer;">
+            <input type="radio" name="pr-visibilite" value="prive" ${(moi.reseau_visibilite||'prive')==='prive'?'checked':''}>
+            <span><strong>🔒 Privé</strong><br><span style="color:var(--muted);font-size:.78rem;">Personne d'autre que vous ne voit la liste des membres.</span></span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;font-size:.85rem;cursor:pointer;">
+            <input type="radio" name="pr-visibilite" value="abonnes" ${moi.reseau_visibilite==='abonnes'?'checked':''}>
+            <span><strong>⭐ Abonnés uniquement</strong><br><span style="color:var(--muted);font-size:.78rem;">Visible uniquement par les utilisateurs abonnés à votre vitrine.</span></span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;font-size:.85rem;cursor:pointer;">
+            <input type="radio" name="pr-visibilite" value="public" ${moi.reseau_visibilite==='public'?'checked':''}>
+            <span><strong>🌐 Tout utilisateur Diaspo'Actif</strong><br><span style="color:var(--muted);font-size:.78rem;">Visible par n'importe quel membre connecté de la plateforme.</span></span>
+          </label>
+        </div>
+        <button class="btn btn-sm btn-primary" style="background:#1B3A6B;border-color:#1B3A6B;margin-top:12px;" onclick="saveReseauVisibilite(${moi.id})">Enregistrer</button>
+      </div>
       <div class="profil-grid" style="gap:14px;">
         <div class="form-field">
           <label>Pays d'immatriculation</label>
@@ -885,6 +1000,14 @@ async function sauvegarderProfil(){
   }catch(e){DA.toast(e.message,{type:'danger'});}
 }
 
+async function saveReseauVisibilite(initId){
+  const val=document.querySelector('input[name="pr-visibilite"]:checked')?.value||'prive';
+  try{
+    await apiCall('PUT',`/reseau/${initId}/visibilite`,{visibilite:val});
+    DA.toast('Visibilité du réseau mise à jour !',{type:'success'});
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
 /* ── TABS ── */
 document.querySelectorAll('.rtab').forEach(btn=>{
   btn.addEventListener('click',()=>{
@@ -911,13 +1034,17 @@ document.querySelectorAll('.rtab').forEach(btn=>{
 const ICONES_LISTE=['📋','⭐','🏆','💼','🌍','🤝','💎','🎯','📢','🏛','✈️','🌱','💡','🔑','📰','👥','🎓','🏥','🌐','❤️'];
 const COULEURS_LISTE=['#1B3A6B','#e0760a','#10b981','#ef4444','#8b5cf6','#f59e0b','#06b6d4','#64748b','#ec4899','#84cc16'];
 
+let vueListesArchivees=false;
+let modeFusion=false;
+let listesSelectionnees=new Set();
+
 async function loadListesTab(){
   if(!ME){
     document.getElementById('listes-content').innerHTML=`<div class="rnet-empty"><div class="e-icon">🔒</div><div class="e-title">Connexion requise</div><div class="e-sub">Connectez-vous pour gérer vos listes de diffusion.</div></div>`;
     return;
   }
   try{
-    const{listes}=await apiCall('GET','/listes-diffusion');
+    const{listes}=await apiCall('GET',`/listes-diffusion${vueListesArchivees?'?archived=1':''}`);
     mesListes=listes||[];
     renderListesTab();
   }catch(e){
@@ -925,30 +1052,77 @@ async function loadListesTab(){
   }
 }
 
+function basculerVueArchives(){
+  vueListesArchivees=!vueListesArchivees;
+  modeFusion=false; listesSelectionnees.clear();
+  loadListesTab();
+}
+
+function basculerModeFusion(){
+  modeFusion=!modeFusion;
+  listesSelectionnees.clear();
+  renderListesTab();
+}
+
+function toggleSelectionListe(id){
+  if(listesSelectionnees.has(id)) listesSelectionnees.delete(id); else listesSelectionnees.add(id);
+  renderListesTab();
+}
+
+async function lancerFusion(){
+  if(listesSelectionnees.size<2){DA.toast('Sélectionnez au moins deux listes à fusionner.',{type:'warning'});return;}
+  const nom=prompt('Nom de la nouvelle liste fusionnée :');
+  if(!nom||!nom.trim())return;
+  try{
+    await apiCall('POST','/listes-diffusion/merge',{liste_ids:[...listesSelectionnees],nom:nom.trim()});
+    DA.toast('Listes fusionnées.',{type:'success'});
+    modeFusion=false; listesSelectionnees.clear();
+    await loadListesTab();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+async function toggleArchive(id,archiver){
+  try{
+    await apiCall('POST',`/listes-diffusion/${id}/archive`,{archived:archiver});
+    DA.toast(archiver?'Liste archivée.':'Liste désarchivée.',{type:'success'});
+    await loadListesTab();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+async function actualiserListeDynamique(id){
+  try{
+    const r=await apiCall('POST',`/listes-diffusion/${id}/refresh`);
+    DA.toast(`Liste actualisée : ${r.total} membre(s).`,{type:'success'});
+    await loadListesTab();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
 function renderListesTab(){
   const el=document.getElementById('listes-content');
   if(!el) return;
-  if(!mesListes.length){
-    el.innerHTML=`
-      <div class="ld-header">
-        <div><h2 style="margin:0;font-size:1.1rem;">📋 Mes listes de diffusion</h2><p style="margin:4px 0 0;font-size:.83rem;color:var(--muted);">Organisez vos contacts en groupes personnalisés et réutilisez-les partout.</p></div>
-        <button class="btn btn-primary" style="background:#1B3A6B;border-color:#1B3A6B;" onclick="ouvrirCreerListe()">＋ Nouvelle liste</button>
+  const toolbar=`
+    <div class="ld-header">
+      <div><h2 style="margin:0;font-size:1.1rem;">📋 Mes listes de diffusion${vueListesArchivees?' — Archivées':''}</h2><p style="margin:4px 0 0;font-size:.83rem;color:var(--muted);">${mesListes.length} liste(s) · ${mesListes.reduce((s,l)=>s+(l.nb_contacts||0),0)} contact(s) au total</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-outline" onclick="basculerVueArchives()">${vueListesArchivees?'📋 Voir les listes actives':'🗄️ Voir les archives'}</button>
+        ${!vueListesArchivees?`<button class="btn btn-sm btn-outline" onclick="basculerModeFusion()">${modeFusion?'✕ Annuler la fusion':'🔀 Fusionner des listes'}</button>`:''}
+        ${modeFusion?`<button class="btn btn-sm btn-primary" style="background:#8b5cf6;border-color:#8b5cf6;" onclick="lancerFusion()">Fusionner (${listesSelectionnees.size})</button>`:''}
+        ${!vueListesArchivees?`<button class="btn btn-primary" style="background:#1B3A6B;border-color:#1B3A6B;" onclick="ouvrirCreerListe()">＋ Nouvelle liste</button>`:''}
       </div>
-      <div class="rnet-empty"><div class="e-icon">📋</div><div class="e-title">Aucune liste</div><div class="e-sub">Créez votre première liste pour organiser vos contacts.</div></div>`;
+    </div>`;
+  if(!mesListes.length){
+    el.innerHTML=toolbar+`<div class="rnet-empty"><div class="e-icon">📋</div><div class="e-title">${vueListesArchivees?'Aucune liste archivée':'Aucune liste'}</div><div class="e-sub">${vueListesArchivees?'':'Créez votre première liste pour organiser vos contacts.'}</div></div>`;
     return;
   }
-  el.innerHTML=`
-    <div class="ld-header">
-      <div><h2 style="margin:0;font-size:1.1rem;">📋 Mes listes de diffusion</h2><p style="margin:4px 0 0;font-size:.83rem;color:var(--muted);">${mesListes.length} liste(s) · ${mesListes.reduce((s,l)=>s+(l.nb_contacts||0),0)} contact(s) au total</p></div>
-      <button class="btn btn-primary" style="background:#1B3A6B;border-color:#1B3A6B;" onclick="ouvrirCreerListe()">＋ Nouvelle liste</button>
-    </div>
+  el.innerHTML=toolbar+`
     <div class="ld-grid">
       ${mesListes.map(l=>`
-        <div class="ld-card" onclick="voirDetailListe(${l.id})">
+        <div class="ld-card" style="${modeFusion&&listesSelectionnees.has(l.id)?'outline:2px solid #8b5cf6;':''}" onclick="${modeFusion?`toggleSelectionListe(${l.id})`:`voirDetailListe(${l.id})`}">
           <div class="ld-card-top">
+            ${modeFusion?`<input type="checkbox" ${listesSelectionnees.has(l.id)?'checked':''} style="margin-right:6px;" onclick="event.stopPropagation();toggleSelectionListe(${l.id})">`:''}
             <div class="ld-icon" style="background:${l.couleur||'#1B3A6B'}22;color:${l.couleur||'#1B3A6B'}">${l.icone||'📋'}</div>
             <div style="flex:1;min-width:0;">
-              <div class="ld-card-nom">${escH(l.nom)}</div>
+              <div class="ld-card-nom">${escH(l.nom)} ${l.mode==='dynamique'?'<span style="font-size:.68rem;background:#dbeafe;color:#1e3a8a;padding:1px 6px;border-radius:99px;font-weight:700;">🔄 Dynamique</span>':'<span style="font-size:.68rem;background:#f1f5f9;color:#475569;padding:1px 6px;border-radius:99px;font-weight:700;">📌 Figée</span>'}</div>
               ${l.description?`<p class="ld-card-desc">${escH(l.description)}</p>`:''}
             </div>
           </div>
@@ -957,22 +1131,65 @@ function renderListesTab(){
             <span>👥 ${l.nb_contacts||0} contact(s)</span>
             <span>Mise à jour ${new Date(l.updated_at).toLocaleDateString('fr-FR')}</span>
           </div>
-          <div class="ld-card-actions" onclick="event.stopPropagation()">
+          ${!modeFusion?`<div class="ld-card-actions" onclick="event.stopPropagation()">
             <button class="ld-btn" onclick="editerListe(${l.id})">✏️ Modifier</button>
+            ${l.mode==='dynamique'?`<button class="ld-btn" onclick="actualiserListeDynamique(${l.id})">🔄 Actualiser</button>`:''}
             <button class="ld-btn" onclick="dupliquerListe(${l.id})">📑 Dupliquer</button>
             <button class="ld-btn" onclick="exporterListe(${l.id})">⬇️ CSV</button>
+            <button class="ld-btn" onclick="toggleArchive(${l.id},${!vueListesArchivees})">${vueListesArchivees?'♻️ Désarchiver':'🗄️ Archiver'}</button>
             <button class="ld-btn danger" onclick="supprimerListe(${l.id},'${escH(l.nom)}')">🗑️</button>
-          </div>
+          </div>`:''}
         </div>`).join('')}
     </div>`;
+}
+
+function choisirMethodeListe(m){
+  const isManuelle=m==='manuelle';
+  document.getElementById('lf-methode-manuelle').classList.toggle('sel',isManuelle);
+  document.getElementById('lf-methode-filtres').classList.toggle('sel',!isManuelle);
+  document.getElementById('lf-methode-manuelle').style.cssText=isManuelle?'flex:1;padding:10px;border-radius:8px;border:1.5px solid #1B3A6B;background:#1B3A6B;color:#fff;font-size:.82rem;font-weight:700;cursor:pointer;':'flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--muted);font-size:.82rem;font-weight:700;cursor:pointer;';
+  document.getElementById('lf-methode-filtres').style.cssText=!isManuelle?'flex:1;padding:10px;border-radius:8px;border:1.5px solid #1B3A6B;background:#1B3A6B;color:#fff;font-size:.82rem;font-weight:700;cursor:pointer;':'flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--muted);font-size:.82rem;font-weight:700;cursor:pointer;';
+  document.getElementById('lf-filtres-panel').style.display=isManuelle?'none':'block';
+  window._listeMethode=m;
+}
+
+function lireFiltresForm(){
+  const roles=[...document.getElementById('lf-f-role').selectedOptions].map(o=>o.value);
+  const filtres={};
+  if(roles.length) filtres.role=roles;
+  const pays=document.getElementById('lf-f-pays').value.trim(); if(pays) filtres.pays=[pays];
+  const paysOrigine=document.getElementById('lf-f-pays-origine').value.trim(); if(paysOrigine) filtres.pays_origine=[paysOrigine];
+  const ville=document.getElementById('lf-f-ville').value.trim(); if(ville) filtres.ville=[ville];
+  const region=document.getElementById('lf-f-region').value.trim(); if(region) filtres.region=[region];
+  const domaine=document.getElementById('lf-f-domaine').value.trim(); if(domaine) filtres.domaine=[domaine];
+  const profession=document.getElementById('lf-f-profession').value.trim(); if(profession) filtres.profession=profession;
+  const competence=document.getElementById('lf-f-competence').value.trim(); if(competence) filtres.competence=competence;
+  if(document.getElementById('lf-f-verifie').checked) filtres.verifie=true;
+  if(document.getElementById('lf-f-partenaire').checked) filtres.partenaire=true;
+  return filtres;
+}
+
+async function previsualiserFiltres(){
+  const el=document.getElementById('lf-preview-result');
+  el.textContent='Recherche en cours…';
+  try{
+    const r=await apiCall('POST','/listes-diffusion/generer',{filtres:lireFiltresForm()});
+    el.innerHTML=`✅ <strong>${r.total}</strong> membre(s) correspondent à ces critères.`;
+  }catch(e){el.textContent='Erreur : '+e.message;}
 }
 
 function ouvrirCreerListe(callback){
   editingListeId=null;
   document.getElementById('modal-liste-titre').textContent='📋 Nouvelle liste';
   document.getElementById('btn-save-liste-r').textContent='Créer';
-  ['lf-nom','lf-desc','lf-notes'].forEach(id=>document.getElementById(id).value='');
+  ['lf-nom','lf-desc','lf-notes','lf-f-domaine','lf-f-pays','lf-f-pays-origine','lf-f-ville','lf-f-region','lf-f-profession','lf-f-competence'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('lf-f-verifie').checked=false;
+  document.getElementById('lf-f-partenaire').checked=false;
+  document.getElementById('lf-dynamique').checked=false;
+  document.getElementById('lf-preview-result').innerHTML='';
+  document.getElementById('lf-methode-row').style.display='flex';
   selectIcone('📋'); selectCouleur('#1B3A6B');
+  choisirMethodeListe('manuelle');
   window._listeCallback=callback||null;
   document.getElementById('modal-liste-form').classList.add('open');
 }
@@ -985,6 +1202,8 @@ function editerListe(id){
   document.getElementById('lf-nom').value=l.nom||'';
   document.getElementById('lf-desc').value=l.description||'';
   document.getElementById('lf-notes').value=l.notes||'';
+  document.getElementById('lf-methode-row').style.display='none';
+  document.getElementById('lf-filtres-panel').style.display='none';
   selectIcone(l.icone||'📋'); selectCouleur(l.couleur||'#1B3A6B');
   document.getElementById('modal-liste-form').classList.add('open');
 }
@@ -1004,6 +1223,12 @@ async function saveListe(){
   const nom=document.getElementById('lf-nom').value.trim();
   if(!nom){DA.toast('Nom requis.',{type:'warning'});return;}
   const data={nom, description:document.getElementById('lf-desc').value||null, icone:document.getElementById('lf-icone').value||'📋', couleur:document.getElementById('lf-couleur').value||'#1B3A6B', notes:document.getElementById('lf-notes').value||null};
+  if(!editingListeId && window._listeMethode==='filtres'){
+    const filtres=lireFiltresForm();
+    if(!Object.keys(filtres).length){DA.toast('Renseignez au moins un critère.',{type:'warning'});return;}
+    data.filtres=filtres;
+    data.mode=document.getElementById('lf-dynamique').checked?'dynamique':'figee';
+  }
   const btn=document.getElementById('btn-save-liste-r');
   btn.disabled=true; btn.textContent='⏳';
   try{
@@ -1045,6 +1270,8 @@ function exporterListe(id){
   window.open(`/api/listes-diffusion/${id}/export`,'_blank');
 }
 
+let mdlContactsCache=[];
+
 async function voirDetailListe(id){
   currentListeId=id;
   const l=mesListes.find(x=>x.id===id); if(!l) return;
@@ -1057,29 +1284,121 @@ async function voirDetailListe(id){
   const desc=document.getElementById('mdl-desc'); desc.textContent=l.description||'';
   const notes=document.getElementById('mdl-notes');
   if(l.notes){notes.style.display=''; notes.textContent='📝 '+l.notes;}else{notes.style.display='none';}
+  document.getElementById('mdl-recherche').value='';
+  mdlSwitchTab('contacts');
   document.getElementById('mdl-contacts-list').innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);">Chargement…</div>';
   modal.classList.add('open');
   try{
     const{contacts}=await apiCall('GET',`/listes-diffusion/${id}/contacts`);
-    document.getElementById('mdl-contacts-titre').textContent=`${contacts.length} contact(s)`;
-    if(!contacts.length){
-      document.getElementById('mdl-contacts-list').innerHTML='<div class="ld-empty">Aucun contact dans cette liste.<br><span style="font-size:.8rem;">Ajoutez des contacts depuis l\'annuaire ou les fiches du réseau.</span></div>';
-      return;
-    }
-    document.getElementById('mdl-contacts-list').innerHTML=contacts.map(c=>{
-      const nom=c.nom_plateforme||c.nom||'Contact';
-      const email=c.email_plateforme||c.email||'';
-      const initiales=nom.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      return `<div class="ld-contact-row">
-        <div class="ld-contact-avatar">${c.photo_url?`<img src="${escH(c.photo_url)}" alt="">`:(initiales||'?')}</div>
-        <div class="ld-contact-info">
-          <div class="ld-contact-nom">${escH(nom)}</div>
-          <div class="ld-contact-sub">${escH(email)}${c.pays?` · ${escH(c.pays)}`:''}${c.role?` · ${escH(c.role)}`:''}</div>
-        </div>
-        <button class="ld-btn danger" style="flex-shrink:0;" onclick="retirerContact(${id},${c.id},'${escH(nom)}')">✕</button>
-      </div>`;
-    }).join('');
+    mdlContactsCache=contacts||[];
+    mdlFiltrerContacts();
   }catch(e){document.getElementById('mdl-contacts-list').innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+function mdlSwitchTab(tab){
+  const isContacts=tab==='contacts';
+  document.getElementById('mdl-pane-contacts').style.display=isContacts?'block':'none';
+  document.getElementById('mdl-pane-stats').style.display=isContacts?'none':'block';
+  document.getElementById('mdl-subtab-contacts').style.borderBottomColor=isContacts?'#1B3A6B':'transparent';
+  document.getElementById('mdl-subtab-contacts').style.color=isContacts?'':'var(--muted)';
+  document.getElementById('mdl-subtab-stats').style.borderBottomColor=!isContacts?'#1B3A6B':'transparent';
+  document.getElementById('mdl-subtab-stats').style.color=!isContacts?'':'var(--muted)';
+  if(!isContacts) mdlChargerStats();
+}
+
+function mdlFiltrerContacts(){
+  const q=document.getElementById('mdl-recherche').value.trim().toLowerCase();
+  const contacts=q?mdlContactsCache.filter(c=>{
+    const nom=(c.nom_plateforme||c.nom||'').toLowerCase();
+    const email=(c.email_plateforme||c.email||'').toLowerCase();
+    const pays=(c.pays||'').toLowerCase();
+    return nom.includes(q)||email.includes(q)||pays.includes(q);
+  }):mdlContactsCache;
+  document.getElementById('mdl-contacts-titre').textContent=`${contacts.length} contact(s)${q?` sur ${mdlContactsCache.length}`:''}`;
+  if(!contacts.length){
+    document.getElementById('mdl-contacts-list').innerHTML='<div class="ld-empty">Aucun contact dans cette liste.<br><span style="font-size:.8rem;">Ajoutez des contacts depuis l\'annuaire ou les fiches du réseau.</span></div>';
+    return;
+  }
+  document.getElementById('mdl-contacts-list').innerHTML=contacts.map(c=>{
+    const nom=c.nom_plateforme||c.nom||'Contact';
+    const email=c.email_plateforme||c.email||'';
+    const initiales=nom.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+    return `<div class="ld-contact-row">
+      <div class="ld-contact-avatar">${c.photo_url?`<img src="${escH(c.photo_url)}" alt="">`:(initiales||'?')}</div>
+      <div class="ld-contact-info">
+        <div class="ld-contact-nom">${escH(nom)}</div>
+        <div class="ld-contact-sub">${escH(email)}${c.pays?` · ${escH(c.pays)}`:''}${c.role?` · ${escH(c.role)}`:''}</div>
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0;">
+        ${c.user_id?`<button class="ld-btn" title="Déplacer / copier vers une autre liste" onclick="ouvrirDeplacerContact(${c.id})">↔️</button>`:''}
+        <button class="ld-btn danger" onclick="retirerContact(${currentListeId},${c.id},'${escH(nom)}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function mdlChargerStats(){
+  const el=document.getElementById('mdl-stats-content');
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);">Chargement…</div>';
+  try{
+    const{stats}=await apiCall('GET',`/listes-diffusion/${currentListeId}/stats`);
+    const bloc=(titre,obj)=>{
+      const entries=Object.entries(obj).sort(([,a],[,b])=>b-a);
+      if(!entries.length) return '';
+      return `<div style="margin-bottom:14px;">
+        <strong style="font-size:.82rem;display:block;margin-bottom:6px;">${titre}</strong>
+        ${entries.map(([k,v])=>`<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:4px 0;border-bottom:1px solid var(--border);">
+          <span>${escH(k)}</span><span style="font-weight:700;">${v}</span>
+        </div>`).join('')}
+      </div>`;
+    };
+    el.innerHTML=`
+      <div style="font-size:1.4rem;font-weight:800;margin-bottom:14px;">${stats.total} membre(s) au total</div>
+      ${bloc('🌍 Répartition par pays',stats.par_pays)}
+      ${bloc('🏷️ Répartition par type de compte',stats.par_type_compte)}
+      ${bloc('🏭 Répartition par secteur',stats.par_secteur)}
+      ${bloc('💼 Répartition par profession',stats.par_profession)}
+      ${stats.evolution.length?`<div><strong style="font-size:.82rem;display:block;margin-bottom:6px;">📈 Évolution dans le temps</strong>
+        ${stats.evolution.map(e=>`<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:4px 0;border-bottom:1px solid var(--border);"><span>${e.mois}</span><span style="font-weight:700;">+${e.n}</span></div>`).join('')}
+      </div>`:''}
+    `;
+  }catch(e){el.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+
+let pendingDeplacerContactId=null;
+async function ouvrirDeplacerContact(contactId){
+  pendingDeplacerContactId=contactId;
+  const autresListes=mesListes.filter(l=>l.id!==currentListeId);
+  document.getElementById('mdc-titre').textContent='Déplacer / copier ce contact';
+  const el=document.getElementById('mdc-listes');
+  if(!autresListes.length){ el.innerHTML='<div class="ld-empty">Créez une autre liste pour pouvoir y déplacer ce contact.</div>'; }
+  else {
+    el.innerHTML=autresListes.map(l=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);">
+        <span style="font-size:1.1rem;">${l.icone||'📋'}</span>
+        <div style="flex:1;font-size:.87rem;font-weight:700;">${escH(l.nom)}</div>
+        <button class="btn btn-sm btn-outline" style="font-size:.75rem;padding:4px 10px;" onclick="deplacerContactVers(${l.id})">↪️ Déplacer</button>
+        <button class="btn btn-sm btn-outline" style="font-size:.75rem;padding:4px 10px;" onclick="copierContactVers(${l.id})">📑 Copier</button>
+      </div>`).join('');
+  }
+  document.getElementById('modal-deplacer-contact').classList.add('open');
+}
+async function deplacerContactVers(versListeId){
+  try{
+    await apiCall('POST',`/listes-diffusion/${currentListeId}/deplacer-membre`,{contact_id:pendingDeplacerContactId,vers_liste_id:versListeId});
+    DA.toast('Contact déplacé.',{type:'success'});
+    document.getElementById('modal-deplacer-contact').classList.remove('open');
+    await voirDetailListe(currentListeId);
+    await loadListesTab();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+async function copierContactVers(versListeId){
+  try{
+    await apiCall('POST',`/listes-diffusion/${currentListeId}/copier-membre`,{contact_id:pendingDeplacerContactId,vers_liste_ids:[versListeId]});
+    DA.toast('Contact copié.',{type:'success'});
+    document.getElementById('modal-deplacer-contact').classList.remove('open');
+    await loadListesTab();
+  }catch(e){DA.toast(e.message,{type:'danger'});}
 }
 
 async function retirerContact(listeId,contactId,nom){
@@ -1148,6 +1467,7 @@ init();
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
 </body>
 </html>
 

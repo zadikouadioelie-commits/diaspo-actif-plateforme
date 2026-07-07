@@ -108,6 +108,24 @@ async function pgInit() {
    Idempotent grâce à ADD COLUMN IF NOT EXISTS. */
 async function migratePg(pool) {
   const cols = [
+    // Billetterie V1 — early-bird + attributs enrichis par type de billet
+    ['ticket_types', 'avantages', 'TEXT'],
+    ['ticket_types', 'devise', "TEXT DEFAULT 'EUR'"],
+    ['ticket_types', 'max_par_acheteur', 'INTEGER'],
+    ['ticket_types', 'date_vente_debut', 'TEXT'],
+    ['ticket_types', 'date_vente_fin', 'TEXT'],
+    ['ticket_types', 'couleur', "TEXT DEFAULT '#2563EB'"],
+    ['ticket_types', 'prix_early_bird', 'REAL'],
+    ['ticket_types', 'early_bird_fin', 'TEXT'],
+    // Billetterie V1 — commandes multi-billets, nominatif, code promo appliqué, validation manuelle
+    ['tickets', 'commande_id', 'TEXT'],
+    ['tickets', 'titulaire_nom', 'TEXT'],
+    ['tickets', 'titulaire_prenom', 'TEXT'],
+    ['tickets', 'code_promo_id', 'INTEGER'],
+    ['tickets', 'montant_reduction', 'REAL DEFAULT 0'],
+    ['tickets', 'validation_manuelle_statut', 'TEXT'],
+    // Billetterie V1 — lignes de compensation remboursement (sens='debit'), historique existant reste 'credit'
+    ['wallet_transactions', 'sens', "TEXT DEFAULT 'credit'"],
     // users
     ['users', 'da_id', 'TEXT'],
     ['users', 'ds_id', 'TEXT'],

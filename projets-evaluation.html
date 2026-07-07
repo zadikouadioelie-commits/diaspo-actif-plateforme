@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Évaluation de Projet</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#F26422">
+<style>
+.pe-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
+.pe-tab{padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);}
+.pe-tab.active{color:#2563EB;border-bottom-color:#2563EB;}
+.pe-section{display:none;}.pe-section.active{display:block;}
+.pe-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px;}
+.pe-stat-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;}
+.pe-stat-num{font-size:22px;font-weight:800;color:#2563EB;}
+.pe-stat-lbl{font-size:11px;color:var(--muted);margin-top:2px;}
+.pe-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+.pe-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:box-shadow .15s;}
+.pe-card:hover{box-shadow:0 6px 24px rgba(0,0,0,.08);}
+.pe-card-title{font-size:15px;font-weight:800;margin:0 0 4px;}
+.pe-card-meta{font-size:12px;color:var(--muted);margin-bottom:8px;}
+.pe-pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:800;text-transform:uppercase;}
+.pe-pill-recu{background:#dbeafe;color:#1e3a8a;}
+.pe-pill-en_analyse{background:#fef3c7;color:#92400e;}
+.pe-pill-documents_demandes{background:#fde68a;color:#78350f;}
+.pe-pill-entretien_propose{background:#e0e7ff;color:#3730a3;}
+.pe-pill-accepte{background:#d1fae5;color:#065f46;}
+.pe-pill-refuse{background:#fee2e2;color:#991b1b;}
+.pe-pill-amelioration_demandee{background:#fed7aa;color:#9a3412;}
+.pe-pill-brouillon{background:#f1f5f9;color:#475569;}
+.pe-pill-envoye{background:#dbeafe;color:#1e3a8a;}
+.pe-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;}
+.pe-modal-bg.open{display:flex;}
+.pe-modal{background:#fff;border-radius:16px;padding:24px;max-width:640px;width:100%;margin:auto;}
+.pe-field{margin-bottom:12px;}
+.pe-field label{display:block;font-size:12px;font-weight:700;margin-bottom:4px;color:var(--muted);}
+.pe-field input,.pe-field select,.pe-field textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;}
+.pe-field textarea{min-height:70px;}
+.pe-star-row{display:flex;gap:4px;font-size:22px;cursor:pointer;}
+.pe-star{color:#e2e8f0;}
+.pe-star.on{color:#f59e0b;}
+.pe-msg{padding:8px 12px;border-radius:10px;margin-bottom:8px;font-size:13px;max-width:80%;}
+.pe-msg.mine{background:#dbeafe;margin-left:auto;}
+.pe-msg.theirs{background:var(--bg);}
+.pe-timeline{border-left:2px solid var(--border);padding-left:14px;margin-left:6px;}
+.pe-timeline-item{position:relative;padding-bottom:14px;font-size:12px;}
+.pe-timeline-item::before{content:'';position:absolute;left:-19px;top:2px;width:8px;height:8px;border-radius:50%;background:#2563EB;}
+.pe-check-row{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px;}
+.pe-doc-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+</style>
+</head>
+<body>
+<div id="header-container"></div>
+
+<div class="container" style="max-width:1100px;margin:0 auto;padding:24px 16px 60px;">
+  <h1 style="font-size:26px;font-weight:800;margin:0 0 4px;">📁 Évaluation de Projet</h1>
+  <p style="color:var(--muted);font-size:13px;margin:0 0 20px;">Transmettez vos projets à des interlocuteurs, ou évaluez ceux que vous recevez.</p>
+
+  <div class="pe-nav">
+    <button class="pe-tab active" onclick="peSwitchTab('mes-projets')">🟩 Mes Projets</button>
+    <button class="pe-tab" onclick="peSwitchTab('a-evaluer')">📋 Projets à Évaluer</button>
+  </div>
+
+  <!-- ══ MES PROJETS ══ -->
+  <div class="pe-section active" id="pe-sec-mes-projets">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+      <button class="btn btn-orange" onclick="peOpenCreate()">➕ Nouveau projet</button>
+    </div>
+    <div id="pe-mes-projets-list"><div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div></div>
+  </div>
+
+  <!-- ══ PROJETS À ÉVALUER ══ -->
+  <div class="pe-section" id="pe-sec-a-evaluer">
+    <div class="pe-stats" id="pe-stats"></div>
+    <div id="pe-recus-list"><div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- ══ MODAL CRÉER/ÉDITER PROJET ══ -->
+<div class="pe-modal-bg" id="pe-modal-create-bg" onclick="if(event.target===this)peCloseMod('pe-modal-create-bg')">
+  <div class="pe-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;">➕ Nouveau projet</h3>
+      <button onclick="peCloseMod('pe-modal-create-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+    </div>
+    <div class="pe-field"><label>Nom du projet *</label><input id="pe-c-nom"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="pe-field"><label>Catégorie</label><input id="pe-c-categorie"></div>
+      <div class="pe-field"><label>Secteur d'activité</label><input id="pe-c-secteur"></div>
+      <div class="pe-field"><label>Pays concerné</label><input id="pe-c-pays"></div>
+      <div class="pe-field"><label>Budget estimatif (€)</label><input type="number" id="pe-c-budget"></div>
+      <div class="pe-field"><label>Niveau d'avancement</label><input id="pe-c-avancement" placeholder="Idée, prototype, en activité…"></div>
+      <div class="pe-field"><label>Date souhaitée</label><input type="date" id="pe-c-date"></div>
+    </div>
+    <div class="pe-field"><label>Résumé</label><textarea id="pe-c-resume"></textarea></div>
+    <div class="pe-field"><label>Description détaillée</label><textarea id="pe-c-description"></textarea></div>
+    <div class="pe-field"><label>Objectifs</label><textarea id="pe-c-objectifs"></textarea></div>
+    <div class="pe-field"><label>Lettre d'accompagnement</label><textarea id="pe-c-lettre" placeholder="Expliquez l'objet de votre demande, vos attentes, le type de partenariat recherché…"></textarea></div>
+    <div class="pe-field">
+      <label>📎 Documents (PDF, Word, Excel, PowerPoint, image, audio, vidéo ≤3min…)</label>
+      <input type="file" id="pe-c-docs" multiple>
+      <div id="pe-c-docs-list" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+    </div>
+    <div style="text-align:right;margin-top:16px;">
+      <button class="btn btn-outline" onclick="peCloseMod('pe-modal-create-bg')">Annuler</button>
+      <button class="btn btn-orange" onclick="peSaveProjet()">Enregistrer le brouillon</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL FICHE PROJET (porteur) ══ -->
+<div class="pe-modal-bg" id="pe-modal-projet-bg" onclick="if(event.target===this)peCloseMod('pe-modal-projet-bg')">
+  <div class="pe-modal" style="max-width:720px;" id="pe-modal-projet-content"></div>
+</div>
+
+<!-- ══ MODAL ENVOYER ══ -->
+<div class="pe-modal-bg" id="pe-modal-envoyer-bg" onclick="if(event.target===this)peCloseMod('pe-modal-envoyer-bg')">
+  <div class="pe-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;">📤 Envoyer le projet</h3>
+      <button onclick="peCloseMod('pe-modal-envoyer-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+    </div>
+    <div class="pe-field"><label>Rechercher un destinataire (nom ou ID DA)</label><input id="pe-env-search" oninput="peSearchDestinataire()"></div>
+    <div id="pe-env-results" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;"></div>
+    <div id="pe-env-selected"></div>
+    <div style="text-align:right;margin-top:16px;">
+      <button class="btn btn-outline" onclick="peCloseMod('pe-modal-envoyer-bg')">Annuler</button>
+      <button class="btn btn-orange" onclick="peConfirmerEnvoi()">Envoyer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL FICHE DOSSIER (destinataire) ══ -->
+<div class="pe-modal-bg" id="pe-modal-dossier-bg" onclick="if(event.target===this)peCloseMod('pe-modal-dossier-bg')">
+  <div class="pe-modal" style="max-width:760px;" id="pe-modal-dossier-content"></div>
+</div>
+
+<!-- ══ MODAL DEMANDE DOCUMENTS (checklist) ══ -->
+<div class="pe-modal-bg" id="pe-modal-demdoc-bg" onclick="if(event.target===this)peCloseMod('pe-modal-demdoc-bg')">
+  <div class="pe-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;">📋 Documents complémentaires</h3>
+      <button onclick="peCloseMod('pe-modal-demdoc-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+    </div>
+    <div id="pe-demdoc-checklist"></div>
+    <div class="pe-field" style="margin-top:10px;"><label>Message (optionnel)</label><textarea id="pe-demdoc-message" placeholder="Merci de compléter votre dossier."></textarea></div>
+    <div style="text-align:right;margin-top:16px;">
+      <button class="btn btn-outline" onclick="peCloseMod('pe-modal-demdoc-bg')">Annuler</button>
+      <button class="btn btn-orange" onclick="peConfirmerDemandeDocs()">Envoyer la demande</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script src="assets/header.js"></script>
+<script>
+let ME = null;
+let peSelectedDestinataires = [];
+let peUploadedDocsBuffer = []; // fichiers en attente d'upload avant création
+let peCurrentProjetId = null;
+let peCurrentDossierId = null;
+
+function peCloseMod(id) { document.getElementById(id).classList.remove('open'); }
+function escH(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  const M=['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
+  return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`;
+}
+const notify = (msg, type) => { if (typeof showToast === 'function') showToast(msg, type); else alert(msg); };
+
+const STATUT_LABELS = {
+  recu: 'Reçu', en_analyse: 'En analyse', documents_demandes: 'Documents demandés',
+  entretien_propose: 'Entretien proposé', accepte: 'Accepté ✅', refuse: 'Refusé ❌', amelioration_demandee: 'Amélioration demandée',
+  brouillon: 'Brouillon', envoye: 'Envoyé', archive: 'Archivé',
+};
+const DOC_ITEMS = [
+  ['business_plan','Business Plan'], ['budget_previsionnel','Budget prévisionnel'], ['etude_marche','Étude de marché'],
+  ['documents_administratifs','Documents administratifs'], ['video','Présentation vidéo'], ['autre','Autres documents'],
+];
+
+function peSwitchTab(name) {
+  document.querySelectorAll('.pe-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.pe-section').forEach(s=>s.classList.remove('active'));
+  document.querySelector(`.pe-tab[onclick*="${name}"]`)?.classList.add('active');
+  document.getElementById('pe-sec-'+name)?.classList.add('active');
+  if (name === 'mes-projets') peLoadMesProjets();
+  if (name === 'a-evaluer') { peLoadStats(); peLoadRecus(); }
+}
+
+/* ══ MES PROJETS ══ */
+async function peLoadMesProjets() {
+  const el = document.getElementById('pe-mes-projets-list');
+  try {
+    const r = await api('GET', '/proj-eval/mes-projets');
+    const projets = r.projets || [];
+    if (!projets.length) { el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Aucun projet créé pour le moment.</div>'; return; }
+    el.innerHTML = `<div class="pe-grid">` + projets.map(p => `
+      <div class="pe-card" onclick="peOpenProjet(${p.id})">
+        <div class="pe-card-title">${escH(p.nom_projet)}</div>
+        <div class="pe-card-meta">${escH(p.categorie||'—')} · ${escH(p.pays||'—')}</div>
+        <span class="pe-pill pe-pill-${p.statut_global}">${STATUT_LABELS[p.statut_global]}</span>
+        ${p.destinataires.length ? `<div style="margin-top:10px;font-size:12px;">
+          ${p.destinataires.map(d=>`<div style="display:flex;justify-content:space-between;padding:2px 0;">
+            <span>${escH(d.destinataire_nom)}</span><span class="pe-pill pe-pill-${d.statut}" style="font-size:9px;">${STATUT_LABELS[d.statut]}</span>
+          </div>`).join('')}
+        </div>` : `<div style="margin-top:10px;font-size:12px;color:var(--muted);">Pas encore envoyé.</div>`}
+      </div>`).join('') + '</div>';
+  } catch(e) { el.innerHTML = '<div class="notice">Erreur chargement.</div>'; }
+}
+
+function peOpenCreate() {
+  ['nom','categorie','secteur','pays','budget','avancement','date','resume','description','objectifs','lettre'].forEach(f => {
+    const el = document.getElementById('pe-c-'+f); if (el) el.value = '';
+  });
+  peUploadedDocsBuffer = [];
+  document.getElementById('pe-c-docs-list').innerHTML = '';
+  document.getElementById('pe-modal-create-bg').classList.add('open');
+}
+
+document.getElementById('pe-c-docs')?.addEventListener('change', async (ev) => {
+  const files = [...ev.target.files];
+  const list = document.getElementById('pe-c-docs-list');
+  for (const f of files) {
+    if (f.size > 8*1024*1024) { notify(`« ${f.name} » dépasse 8 Mo.`, 'warning'); continue; }
+    const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(f); });
+    let duree = null;
+    if (f.type.startsWith('video/') || f.type.startsWith('audio/')) {
+      duree = await new Promise(res => {
+        const el = document.createElement(f.type.startsWith('video/') ? 'video' : 'audio');
+        el.preload = 'metadata'; el.src = URL.createObjectURL(f);
+        el.onloadedmetadata = () => { URL.revokeObjectURL(el.src); res(el.duration); };
+        el.onerror = () => res(null);
+      });
+      if (duree && duree > 180) { notify(`« ${f.name} » dépasse 3 minutes (${Math.round(duree)}s) — non ajouté.`, 'warning'); continue; }
+    }
+    peUploadedDocsBuffer.push({ nom: f.name, type_mime: f.type, data_base64: b64, duree_secondes: duree ? Math.round(duree) : null });
+  }
+  list.innerHTML = peUploadedDocsBuffer.map(d => `✅ ${escH(d.nom)}`).join('<br>');
+});
+
+async function peSaveProjet() {
+  const nom_projet = document.getElementById('pe-c-nom').value.trim();
+  if (!nom_projet) { notify('Le nom du projet est requis.', 'warning'); return; }
+  const data = {
+    nom_projet,
+    categorie: document.getElementById('pe-c-categorie').value || null,
+    secteur: document.getElementById('pe-c-secteur').value || null,
+    pays: document.getElementById('pe-c-pays').value || null,
+    budget_estime: document.getElementById('pe-c-budget').value || null,
+    avancement: document.getElementById('pe-c-avancement').value || null,
+    date_souhaitee: document.getElementById('pe-c-date').value || null,
+    resume: document.getElementById('pe-c-resume').value || null,
+    description: document.getElementById('pe-c-description').value || null,
+    objectifs: document.getElementById('pe-c-objectifs').value || null,
+    lettre_accompagnement: document.getElementById('pe-c-lettre').value || null,
+  };
+  try {
+    const r = await api('POST', '/proj-eval/projets', data);
+    for (const doc of peUploadedDocsBuffer) {
+      await api('POST', '/proj-eval/upload', { projet_id: r.id, categorie: 'autre', ...doc });
+    }
+    peCloseMod('pe-modal-create-bg');
+    notify('Projet enregistré en brouillon.', 'success');
+    peLoadMesProjets();
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+async function peOpenProjet(pid) {
+  peCurrentProjetId = pid;
+  try {
+    const r = await api('GET', '/proj-eval/projets/'+pid);
+    const p = r.projet;
+    document.getElementById('pe-modal-projet-content').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;">${escH(p.nom_projet)}</h3>
+        <button onclick="peCloseMod('pe-modal-projet-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);">${escH(p.categorie||'')} · ${escH(p.secteur||'')} · ${escH(p.pays||'')} ${p.budget_estime?'· '+p.budget_estime+' €':''}</p>
+      <p style="font-size:13px;">${escH(p.resume||'')}</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;">
+        <h4 style="margin:0;">📬 Destinataires (${r.destinataires.length})</h4>
+        <button class="btn btn-sm btn-orange" onclick="peOpenEnvoyer(${pid})">📤 Envoyer à…</button>
+      </div>
+      ${r.destinataires.length ? r.destinataires.map(d => `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong>${escH(d.destinataire_nom)}</strong>
+            <span class="pe-pill pe-pill-${d.statut}">${STATUT_LABELS[d.statut]}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${escH(d.type_destinataire)} · reçu le ${fmtDate(d.created_at)}</div>
+          ${d.motif_decision ? `<div style="font-size:12px;margin-top:6px;"><strong>Motif :</strong> ${escH(d.motif_decision)}</div>` : ''}
+          <div style="margin-top:8px;display:flex;gap:6px;">
+            <button class="btn btn-sm btn-outline" onclick="peOpenDossierPorteur(${d.id})">💬 Voir / Répondre</button>
+          </div>
+        </div>`).join('') : '<p style="color:var(--muted);font-size:13px;">Pas encore envoyé à un destinataire.</p>'}
+      <h4 style="margin:16px 0 8px;">📎 Documents (${r.documents.length})</h4>
+      ${r.documents.length ? r.documents.map(doc => `<div class="pe-doc-row"><span>${escH(doc.nom)}</span><span style="color:var(--muted);">${doc.categorie}</span></div>`).join('') : '<p style="color:var(--muted);font-size:13px;">Aucun document.</p>'}
+    `;
+    document.getElementById('pe-modal-projet-bg').classList.add('open');
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+function peOpenEnvoyer(pid) {
+  peCurrentProjetId = pid;
+  peSelectedDestinataires = [];
+  document.getElementById('pe-env-search').value = '';
+  document.getElementById('pe-env-results').innerHTML = '';
+  document.getElementById('pe-env-selected').innerHTML = '';
+  document.getElementById('pe-modal-envoyer-bg').classList.add('open');
+}
+let peSearchTimer;
+function peSearchDestinataire() {
+  clearTimeout(peSearchTimer);
+  const q = document.getElementById('pe-env-search').value.trim();
+  if (q.length < 2) { document.getElementById('pe-env-results').innerHTML = ''; return; }
+  peSearchTimer = setTimeout(async () => {
+    try {
+      const r = await api('GET', '/search/comptes?q='+encodeURIComponent(q));
+      document.getElementById('pe-env-results').innerHTML = (r.comptes||[]).map(c => `
+        <div style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;" onclick='peAddDestinataire(${JSON.stringify(c)})'>
+          <span>${escH(c.nom)} <span style="color:var(--muted);font-size:11px;">(${escH(c.role||'')})</span></span>
+          <span style="color:#2563EB;font-size:12px;">＋ Ajouter</span>
+        </div>`).join('') || '<div style="padding:8px 12px;color:var(--muted);font-size:12px;">Aucun résultat.</div>';
+    } catch(e) {}
+  }, 300);
+}
+function peAddDestinataire(c) {
+  if (peSelectedDestinataires.some(d => d.user_id === c.id)) return;
+  peSelectedDestinataires.push({ user_id: c.id, nom: c.nom, type_destinataire: 'membre' });
+  peRenderSelected();
+}
+function peRenderSelected() {
+  document.getElementById('pe-env-selected').innerHTML = peSelectedDestinataires.map((d,i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+      <span style="flex:1;">${escH(d.nom)}</span>
+      <select onchange="peSelectedDestinataires[${i}].type_destinataire=this.value" style="font-size:12px;padding:4px;border:1px solid var(--border);border-radius:6px;">
+        ${['membre','entreprise','institution','investisseur','banque','association','collectivite','universite','incubateur','expert'].map(t=>`<option value="${t}">${t}</option>`).join('')}
+      </select>
+      <button onclick="peSelectedDestinataires.splice(${i},1);peRenderSelected();" style="background:none;border:none;color:#ef4444;cursor:pointer;">×</button>
+    </div>`).join('');
+}
+async function peConfirmerEnvoi() {
+  if (!peSelectedDestinataires.length) { notify('Sélectionnez au moins un destinataire.', 'warning'); return; }
+  try {
+    await api('POST', '/proj-eval/projets/'+peCurrentProjetId+'/envoyer', { destinataires: peSelectedDestinataires });
+    peCloseMod('pe-modal-envoyer-bg');
+    peCloseMod('pe-modal-projet-bg');
+    notify('Projet envoyé avec succès.', 'success');
+    peLoadMesProjets();
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+async function peOpenDossierPorteur(did) {
+  peCurrentDossierId = did;
+  try {
+    const r = await api('GET', '/proj-eval/destinataires/'+did);
+    document.getElementById('pe-modal-dossier-content').innerHTML = peRenderDossier(r, false);
+    document.getElementById('pe-modal-dossier-bg').classList.add('open');
+    peLoadMessages(did);
+    peLoadRendezvous(did);
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+/* ══ PROJETS À ÉVALUER ══ */
+async function peLoadStats() {
+  try {
+    const r = await api('GET', '/proj-eval/recus/stats');
+    const s = r.stats;
+    const labels = { nouveaux:'Nouveaux', en_analyse:'En analyse', documents_demandes:'Docs demandés', discussions_ouvertes:'Discussions', acceptes:'Acceptés', refuses:'Refusés', a_revoir:'À revoir' };
+    document.getElementById('pe-stats').innerHTML = Object.entries(labels).map(([k,l]) => `
+      <div class="pe-stat-box"><div class="pe-stat-num">${s[k]||0}</div><div class="pe-stat-lbl">${l}</div></div>`).join('');
+  } catch(e) {}
+}
+async function peLoadRecus() {
+  const el = document.getElementById('pe-recus-list');
+  try {
+    const r = await api('GET', '/proj-eval/recus');
+    const recus = r.recus || [];
+    if (!recus.length) { el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Aucun projet reçu pour le moment.</div>'; return; }
+    el.innerHTML = `<div class="pe-grid">` + recus.map(d => `
+      <div class="pe-card">
+        <div onclick="peOpenDossierDestinataire(${d.id})" style="cursor:pointer;">
+          <div class="pe-card-title">${escH(d.nom_projet)}</div>
+          <div class="pe-card-meta">👤 ${escH(d.porteur_nom)} · 📅 ${fmtDate(d.created_at)}</div>
+          <div class="pe-card-meta">${escH(d.categorie||'—')} · ${escH(d.pays||'—')}</div>
+          <span class="pe-pill pe-pill-${d.statut}">${STATUT_LABELS[d.statut]}</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();peOpenDossierDestinataire(${d.id})">➡️ Ouvrir</button>
+          <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();peOpenDossierDestinataire(${d.id},'docs')">📎 Documents</button>
+          <select onclick="event.stopPropagation()" onchange="event.stopPropagation();peQuickStatut(${d.id},this.value)" style="font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;">
+            <option value="">🔄 Statut…</option>
+            ${d.statut==='recu'?'<option value="prendre-en-charge">Prendre en charge</option>':''}
+            <option value="accepte">Accepter</option>
+            <option value="refuse">Refuser</option>
+            <option value="amelioration_demandee">Demander amélioration</option>
+          </select>
+          <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();peContacterPorteur(${d.id})">💬 Contacter</button>
+        </div>
+      </div>`).join('') + '</div>';
+  } catch(e) { el.innerHTML = '<div class="notice">Erreur chargement.</div>'; }
+}
+
+function peRenderDossier(r, isDestinataire) {
+  const d = r.dossier, p = r.projet;
+  const star = (field, val) => [1,2,3,4,5].map(i => `<span class="pe-star ${i<=(val||0)?'on':''}" onclick="peSetStar('${field}',${i})">★</span>`).join('');
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;">${escH(p.nom_projet)}</h3>
+      <button onclick="peCloseMod('pe-modal-dossier-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+    </div>
+    <span class="pe-pill pe-pill-${d.statut}">${STATUT_LABELS[d.statut]}</span>
+    <p style="font-size:13px;margin-top:10px;">👤 Porteur : ${escH(p.porteur_nom)} (${escH(p.porteur_da_id||'')})</p>
+    <p style="font-size:13px;color:var(--muted);">${escH(p.categorie||'')} · ${escH(p.secteur||'')} · ${escH(p.pays||'')} ${p.budget_estime?'· '+p.budget_estime+' €':''}</p>
+    <p style="font-size:13px;">${escH(p.resume||'')}</p>
+    ${p.description ? `<details style="font-size:13px;margin-top:8px;"><summary style="cursor:pointer;font-weight:700;">Description complète</summary><p>${escH(p.description)}</p></details>` : ''}
+    ${p.lettre_accompagnement ? `<div style="background:var(--bg);border-radius:10px;padding:10px;margin-top:8px;font-size:13px;"><strong>Lettre d'accompagnement :</strong><br>${escH(p.lettre_accompagnement)}</div>` : ''}
+
+    <h4 style="margin:16px 0 8px;" id="pe-docs-anchor">📎 Documents (${r.documents.length})</h4>
+    ${r.documents.length ? r.documents.map(doc => peRenderDocRow(doc)).join('') : '<p style="color:var(--muted);font-size:13px;">Aucun document.</p>'}
+    ${(r.demandes||[]).filter(dm=>dm.statut==='en_attente').length ? `
+      <div style="background:var(--orange-light);border-radius:10px;padding:10px;margin-top:8px;font-size:12px;">
+        <strong>📋 Documents demandés :</strong>
+        ${r.demandes.filter(dm=>dm.statut==='en_attente').map(dm => JSON.parse(dm.items_json||'[]').map(it => DOC_ITEMS.find(x=>x[0]===it)?.[1]||it).join(', ')).join(' · ')}
+      </div>` : ''}
+    <div class="pe-field" style="margin-top:8px;"><input type="file" id="pe-dossier-doc-input" multiple></div>
+    <button class="btn btn-sm btn-outline" onclick="peUploadDossierDoc(${d.id})">⬆️ Ajouter un document</button>
+
+    ${isDestinataire ? `
+    <h4 style="margin:16px 0 8px;">⚙️ Actions</h4>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      ${d.statut === 'recu' ? `<button class="btn btn-sm btn-orange" onclick="peAction(${d.id},'prendre-en-charge')">📥 Prendre en charge</button>` : ''}
+      <button class="btn btn-sm btn-outline" onclick="peOpenDemandeDocs(${d.id})">📋 Demander documents</button>
+    </div>
+    <h4 style="margin:16px 0 4px;">⭐ Évaluation</h4>
+    <div style="font-size:12px;color:var(--muted);">Qualité ${star('note_qualite', d.note_qualite)}</div>
+    <div style="font-size:12px;color:var(--muted);">Faisabilité ${star('note_faisabilite', d.note_faisabilite)}</div>
+    <div style="font-size:12px;color:var(--muted);">Impact ${star('note_impact', d.note_impact)}</div>
+    <textarea id="pe-eval-comment" placeholder="Commentaire d'évaluation…" style="width:100%;min-height:50px;margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:6px;">${escH(d.commentaire_eval||'')}</textarea>
+    <button class="btn btn-sm btn-outline" onclick="peSaveEval(${d.id})" style="margin-top:6px;">Enregistrer l'évaluation</button>
+
+    <h4 style="margin:16px 0 8px;">✅ Décision finale</h4>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-sm" style="background:#d1fae5;color:#065f46;border:none;" onclick="peDecision(${d.id},'accepte')">✅ Accepter</button>
+      <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:none;" onclick="peDecision(${d.id},'refuse')">❌ Refuser</button>
+      <button class="btn btn-sm" style="background:#fed7aa;color:#9a3412;border:none;" onclick="peDecision(${d.id},'amelioration_demandee')">🔄 Demander amélioration</button>
+    </div>
+    ` : ''}
+
+    <h4 style="margin:16px 0 8px;">💬 Messages</h4>
+    <div id="pe-messages-list" style="max-height:200px;overflow-y:auto;margin-bottom:8px;"></div>
+    <div style="display:flex;gap:6px;">
+      <input id="pe-msg-input" placeholder="Écrire un message…" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:8px;">
+      <button class="btn btn-sm btn-orange" onclick="peSendMessage(${d.id})">Envoyer</button>
+    </div>
+
+    <h4 style="margin:16px 0 8px;">📅 Rendez-vous</h4>
+    <div id="pe-rdv-list" style="margin-bottom:8px;"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <input type="datetime-local" id="pe-rdv-date" style="padding:6px;border:1px solid var(--border);border-radius:8px;font-size:12px;">
+      <input id="pe-rdv-lieu" placeholder="Lieu ou lien visio" style="flex:1;min-width:140px;padding:6px;border:1px solid var(--border);border-radius:8px;font-size:12px;">
+      <button class="btn btn-sm btn-orange" onclick="peProposerRendezvous(${d.id})">Proposer</button>
+    </div>
+
+    <h4 style="margin:16px 0 8px;">🕓 Frise chronologique</h4>
+    <div class="pe-timeline">
+      ${r.historique.map(h => `<div class="pe-timeline-item"><strong>${escH(h.acteur_nom||'')}</strong> — ${escH(h.detail||h.action)}<br><span style="color:var(--muted);">${fmtDate(h.created_at)}</span></div>`).join('') || '<p style="color:var(--muted);font-size:13px;">Aucune action encore.</p>'}
+    </div>
+  `;
+}
+
+function peRenderDocRow(doc) {
+  const mime = doc.type_mime || '';
+  const src = doc.url_bunny ? doc.url_bunny : (doc.contenu_b64 ? `data:${mime};base64,${doc.contenu_b64}` : null);
+  let preview = '';
+  if (src && mime.startsWith('image/')) preview = `<img src="${src}" style="max-width:100%;border-radius:8px;margin:6px 0;display:block;">`;
+  else if (src && mime.startsWith('video/')) preview = `<video src="${src}" controls style="max-width:100%;border-radius:8px;margin:6px 0;display:block;"></video>`;
+  else if (src && mime.startsWith('audio/')) preview = `<audio src="${src}" controls style="width:100%;margin:6px 0;display:block;"></audio>`;
+  else if (!src) preview = `<button class="btn btn-sm btn-outline" style="margin:4px 0;" onclick="peChargerApercu(${doc.id},this)">👁️ Voir</button>`;
+  return `<div class="pe-doc-row" style="display:block;">
+    <div style="display:flex;justify-content:space-between;align-items:center;"><span>${escH(doc.nom)}</span><span style="color:var(--muted);">${doc.categorie}</span></div>
+    ${preview}
+  </div>`;
+}
+async function peChargerApercu(docId, btn) {
+  try {
+    const r = await api('GET', '/proj-eval/documents/'+docId+'/fichier');
+    const src = r.url_bunny || (r.contenu_b64 ? `data:${r.type_mime};base64,${r.contenu_b64}` : null);
+    if (!src) { notify('Aperçu indisponible.', 'warning'); return; }
+    const mime = r.type_mime || '';
+    let el;
+    if (mime.startsWith('image/')) el = `<img src="${src}" style="max-width:100%;border-radius:8px;margin-top:6px;display:block;">`;
+    else if (mime.startsWith('video/')) el = `<video src="${src}" controls style="max-width:100%;border-radius:8px;margin-top:6px;display:block;"></video>`;
+    else if (mime.startsWith('audio/')) el = `<audio src="${src}" controls style="width:100%;margin-top:6px;display:block;"></audio>`;
+    else { window.open(src, '_blank'); return; }
+    btn.insertAdjacentHTML('afterend', el);
+    btn.remove();
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+async function peLoadRendezvous(did) {
+  const el = document.getElementById('pe-rdv-list');
+  if (!el) return;
+  try {
+    const r = await api('GET', '/proj-eval/destinataires/'+did+'/rendezvous');
+    const rdvs = r.rendezvous || [];
+    el.innerHTML = rdvs.length ? rdvs.map(rv => `
+      <div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span>📅 ${fmtDate(rv.date_heure)} ${rv.lieu_ou_lien ? '· '+escH(rv.lieu_ou_lien) : ''}</span>
+          <span class="pe-pill pe-pill-${rv.statut==='accepte'?'accepte':rv.statut==='refuse'?'refuse':'recu'}" style="font-size:9px;">${rv.statut==='propose'?'Proposé':rv.statut==='accepte'?'Accepté':'Refusé'}</span>
+        </div>
+        <div style="color:var(--muted);margin-top:2px;">Proposé par ${escH(rv.propose_par_nom)}</div>
+        ${rv.statut==='propose' && rv.propose_par!==ME?.id ? `
+        <div style="margin-top:6px;display:flex;gap:6px;">
+          <button class="btn btn-sm btn-outline" onclick="peRepondreRendezvous(${rv.id},'accepte',${did})">✅ Accepter</button>
+          <button class="btn btn-sm btn-outline" onclick="peRepondreRendezvous(${rv.id},'refuse',${did})">❌ Refuser</button>
+        </div>` : ''}
+      </div>`).join('') : '<p style="color:var(--muted);font-size:12px;">Aucun rendez-vous proposé.</p>';
+  } catch(e) {}
+}
+async function peProposerRendezvous(did) {
+  const date_heure = document.getElementById('pe-rdv-date').value;
+  const lieu_ou_lien = document.getElementById('pe-rdv-lieu').value;
+  if (!date_heure) { notify('Choisissez une date.', 'warning'); return; }
+  try {
+    await api('POST', '/proj-eval/destinataires/'+did+'/rendezvous', { date_heure, lieu_ou_lien });
+    notify('Rendez-vous proposé.', 'success');
+    peLoadRendezvous(did);
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+async function peRepondreRendezvous(rid, statut, did) {
+  try {
+    await api('POST', '/proj-eval/rendezvous/'+rid+'/repondre', { statut });
+    peLoadRendezvous(did);
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+async function peOpenDossierDestinataire(did, focus) {
+  peCurrentDossierId = did;
+  try {
+    const r = await api('GET', '/proj-eval/destinataires/'+did);
+    document.getElementById('pe-modal-dossier-content').innerHTML = peRenderDossier(r, true);
+    document.getElementById('pe-modal-dossier-bg').classList.add('open');
+    peLoadMessages(did);
+    peLoadRendezvous(did);
+    if (focus === 'docs') {
+      setTimeout(() => document.getElementById('pe-docs-anchor')?.scrollIntoView({behavior:'smooth'}), 100);
+    }
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+async function peQuickStatut(did, action) {
+  if (!action) return;
+  try {
+    if (action === 'prendre-en-charge') {
+      await api('POST', '/proj-eval/destinataires/'+did+'/prendre-en-charge', {});
+      notify('Projet pris en charge.', 'success');
+    } else {
+      let motif = null;
+      if (action !== 'accepte') {
+        motif = prompt(action === 'refuse' ? 'Motif du refus (obligatoire) :' : 'Recommandations pour améliorer le projet (obligatoire) :');
+        if (!motif) { notify('Un motif est requis.', 'warning'); peLoadRecus(); return; }
+      }
+      await api('POST', '/proj-eval/destinataires/'+did+'/decision', { decision: action, motif });
+      notify('Décision enregistrée.', 'success');
+    }
+    peLoadRecus(); peLoadStats();
+  } catch(e) { notify('Erreur : '+e.message, 'error'); peLoadRecus(); }
+}
+
+function peContacterPorteur(did) {
+  peOpenDossierDestinataire(did);
+  setTimeout(() => document.getElementById('pe-msg-input')?.focus(), 200);
+}
+
+async function peLoadMessages(did) {
+  try {
+    const r = await api('GET', '/proj-eval/destinataires/'+did+'/messages');
+    const el = document.getElementById('pe-messages-list');
+    if (!el) return;
+    el.innerHTML = (r.messages||[]).map(m => `<div class="pe-msg ${m.auteur_id===ME?.id?'mine':'theirs'}"><strong>${escH(m.auteur_nom)}</strong><br>${escH(m.contenu||'')}</div>`).join('') || '<p style="color:var(--muted);font-size:12px;">Aucun message.</p>';
+  } catch(e) {}
+}
+async function peSendMessage(did) {
+  const input = document.getElementById('pe-msg-input');
+  const contenu = input.value.trim();
+  if (!contenu) return;
+  try {
+    await api('POST', '/proj-eval/destinataires/'+did+'/messages', { contenu });
+    input.value = '';
+    peLoadMessages(did);
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+async function peUploadDossierDoc(did) {
+  const input = document.getElementById('pe-dossier-doc-input');
+  const files = [...(input?.files||[])];
+  if (!files.length) { notify('Choisissez un fichier.', 'warning'); return; }
+  try {
+    for (const f of files) {
+      const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(f); });
+      const r = await api('GET', '/proj-eval/destinataires/'+did);
+      await api('POST', '/proj-eval/upload', { projet_id: r.dossier.projet_id, destinataire_id: did, nom: f.name, type_mime: f.type, categorie: 'autre', data_base64: b64 });
+    }
+    notify('Document(s) ajouté(s).', 'success');
+    const isDestinataire = document.getElementById('pe-modal-dossier-content').innerHTML.includes('Actions');
+    isDestinataire ? peOpenDossierDestinataire(did) : peOpenDossierPorteur(did);
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+let peStarValues = {};
+function peSetStar(field, val) {
+  peStarValues[field] = val;
+  document.querySelectorAll(`[onclick^="peSetStar('${field}'"]`).forEach((el,i) => el.classList.toggle('on', i < val));
+}
+async function peSaveEval(did) {
+  const commentaire_eval = document.getElementById('pe-eval-comment').value;
+  try {
+    await api('POST', '/proj-eval/destinataires/'+did+'/evaluer', { ...peStarValues, commentaire_eval });
+    notify('Évaluation enregistrée.', 'success');
+    peOpenDossierDestinataire(did);
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+async function peAction(did, action) {
+  try {
+    await api('POST', '/proj-eval/destinataires/'+did+'/'+action, {});
+    notify('Action effectuée.', 'success');
+    peOpenDossierDestinataire(did);
+    peLoadStats();
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+function peOpenDemandeDocs(did) {
+  document.getElementById('pe-demdoc-checklist').innerHTML = DOC_ITEMS.map(([k,l]) => `
+    <div class="pe-check-row"><input type="checkbox" id="pe-dd-${k}" value="${k}"><label for="pe-dd-${k}">${escH(l)}</label></div>`).join('');
+  document.getElementById('pe-demdoc-message').value = '';
+  document.getElementById('pe-modal-demdoc-bg').dataset.did = did;
+  document.getElementById('pe-modal-demdoc-bg').classList.add('open');
+}
+function peConfirmerDemandeDocs() {
+  const did = document.getElementById('pe-modal-demdoc-bg').dataset.did;
+  const items = DOC_ITEMS.map(([k]) => k).filter(k => document.getElementById('pe-dd-'+k)?.checked);
+  if (!items.length) { notify('Sélectionnez au moins un document.', 'warning'); return; }
+  const message = document.getElementById('pe-demdoc-message').value || 'Merci de compléter votre dossier.';
+  api('POST', '/proj-eval/destinataires/'+did+'/demander-documents', { items, message })
+    .then(() => { notify('Demande envoyée.', 'success'); peCloseMod('pe-modal-demdoc-bg'); peOpenDossierDestinataire(did); peLoadStats(); })
+    .catch(e => notify('Erreur : '+e.message, 'error'));
+}
+
+async function peDecision(did, decision) {
+  let motif = null;
+  if (decision !== 'accepte') {
+    motif = prompt(decision === 'refuse' ? 'Motif du refus (obligatoire) :' : 'Recommandations pour améliorer le projet (obligatoire) :');
+    if (!motif) { notify('Un motif est requis.', 'warning'); return; }
+  }
+  try {
+    await api('POST', '/proj-eval/destinataires/'+did+'/decision', { decision, motif });
+    notify('Décision enregistrée.', 'success');
+    peCloseMod('pe-modal-dossier-bg');
+    peLoadRecus(); peLoadStats();
+  } catch(e) { notify('Erreur : '+e.message, 'error'); }
+}
+
+(async () => {
+  try { ME = await fetchCurrentUser(); } catch(e) { ME = null; }
+  if (!ME) { document.querySelector('.container').innerHTML = '<div class="notice">🔐 <a href="login.html">Connectez-vous</a> pour accéder à ce module.</div>'; return; }
+  peLoadMesProjets();
+})();
+</script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

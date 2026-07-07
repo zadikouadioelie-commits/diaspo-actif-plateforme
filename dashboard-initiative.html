@@ -61,16 +61,18 @@
       <a href="messagerie.html">🟥 Messages <span class="pill" id="msg-count">—</span></a>
       <a href="#messages-vitrine" data-section="messages-vitrine">🛍️ Messages de la vitrine <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
       <a href="#parametres-vitrine" data-section="parametres-vitrine">⭐ Paramètres Vitrine</a>
+      <a href="#partenaires-liste" data-section="partenaires-liste">🤝 Liste des partenaires</a>
       <a href="#recrutement" data-section="recrutement">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
       <a href="agenda.html">📅 Mon Agenda</a>
       <a href="reseau.html">🌐 Mon Réseau Pro <span class="pill" id="reseau-badge" style="display:none;"></span></a>
       <a href="reunions.html">📹 Visioconférence</a>
-      <a href="reseaux-sociaux.html">🔄 Synchro réseaux sociaux</a>
+      <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a>
       <a href="centre-financier.html">💰 Centre Financier</a>
 
       <div class="sb-group-lbl">06 — COLLABORATION</div>
       <a href="business-plan.html">📋 Business Plans</a>
       <a href="audiovisuel.html">📺 Audiovisuel</a>
+      <a href="projets-evaluation.html">📁 Évaluation de Projet</a>
 
       <div class="sb-group-lbl" id="sb-asso-lbl" style="display:none;">08 — GESTION ASSOCIATION</div>
       <a href="#asso-cockpit" data-section="asso-cockpit" id="sb-asso-cockpit" style="display:none;">🏛️ Cockpit Association</a>
@@ -929,6 +931,61 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>
       <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Conversations issues de votre boutique. Chaque message peut être lié à un produit précis.</p>
       <div id="messages-vitrine-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <!-- ══ SECTION 🤝 LISTE DES PARTENAIRES ══ -->
+    <div style="display:none;" id="partenaires-liste">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+        <div>
+          <h2 style="margin:0;">🤝 Liste des partenaires</h2>
+          <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">Valorisez votre réseau de collaboration sur votre profil public.</p>
+        </div>
+        <button class="btn btn-orange" onclick="ptOuvrirCreation()">➕ Ajouter un partenaire</button>
+      </div>
+      <div id="partenaires-liste-content"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <!-- ══ MODAL AJOUTER/MODIFIER PARTENAIRE ══ -->
+    <div class="modal-back" id="modal-partenaire-form" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;">
+      <div class="card" style="max-width:520px;width:100%;margin:auto;background:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3 style="margin:0;" id="pt-modal-titre">➕ Ajouter un partenaire</h3>
+          <button class="btn btn-sm btn-outline" onclick="ptFermerModal()">✕</button>
+        </div>
+        <div id="pt-methode-row" style="display:flex;gap:8px;margin-bottom:16px;">
+          <button type="button" id="pt-methode-compte" onclick="ptChoisirMethode('compte')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;">🔎 Compte Diaspo'Actif</button>
+          <button type="button" id="pt-methode-externe" onclick="ptChoisirMethode('externe')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--orange);background:var(--orange);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">✏️ Partenaire externe</button>
+        </div>
+        <div id="pt-bloc-compte" style="display:none;margin-bottom:12px;">
+          <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Rechercher un compte (nom ou ID DA)</label>
+          <input id="pt-recherche-compte" placeholder="Ex : Jean Kouassi ou DA-12345" oninput="ptRechercherCompte()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;">
+          <div id="pt-resultats-compte" style="max-height:180px;overflow-y:auto;margin-top:8px;"></div>
+          <div id="pt-compte-selectionne" style="margin-top:8px;font-size:13px;"></div>
+        </div>
+        <div class="pe-field" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Nom du partenaire *</label><input id="pt-nom" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div class="pe-field" style="margin-bottom:12px;">
+          <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Logo / Photo</label>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <img id="pt-logo-preview" src="" style="width:48px;height:48px;border-radius:8px;object-fit:contain;background:#f5f5f5;display:none;">
+            <input type="file" id="pt-logo-file" accept="image/jpeg,image/png,image/webp,image/svg+xml" onchange="ptUploadLogo(this)">
+          </div>
+        </div>
+        <div class="pe-field" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Type de partenaire (facultatif)</label><input id="pt-type" placeholder="Ex : Sponsor, Institution, Fournisseur…" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div class="pe-field" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Description (facultative)</label><textarea id="pt-description" style="width:100%;min-height:60px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;"></textarea></div>
+        <div id="pt-champs-externes">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div><label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Site internet</label><input id="pt-site" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;"></div>
+            <div><label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Pays</label><input id="pt-pays" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;"></div>
+            <div><label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">E-mail</label><input id="pt-email" type="email" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;"></div>
+            <div><label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Téléphone</label><input id="pt-tel" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;"></div>
+          </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:16px;"><input type="checkbox" id="pt-afficher-contact"> Rendre les coordonnées visibles publiquement</label>
+        <div style="text-align:right;">
+          <button class="btn btn-outline" onclick="ptFermerModal()">Annuler</button>
+          <button class="btn btn-orange" onclick="ptEnregistrer()">Enregistrer</button>
+        </div>
+      </div>
     </div>
 
     <!-- ══ SECTION ⭐ PARAMÈTRES VITRINE ══ -->
@@ -2032,7 +2089,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
       </div>
       <div class="card" style="margin-top:16px;" id="cockpit-social-sync-card">
-        <h3 style="margin:0 0 12px;font-size:15px;">🔄 Synchronisation des réseaux</h3>
+        <h3 style="margin:0 0 12px;font-size:15px;">🔄 Synchronisation réseaux sociaux</h3>
         <div id="cockpit-social-sync-body" style="font-size:13px;color:var(--muted);">Chargement…</div>
       </div>
       <div class="card" style="margin-top:16px;" id="cockpit-financier-card">
@@ -2135,7 +2192,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals','messages-vitrine','parametres-vitrine','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
+  const INIT_SECTIONS = ['cockpit','presentation','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -2148,6 +2205,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'messages-vitrine') renderMessagesVitrine();
     if (name === 'parametres-vitrine') renderStatutVitrineSection();
+    if (name === 'partenaires-liste') renderPartenairesListe();
     if (name === 'paiement') renderPaiementMarketplace();
     if (name === 'asso-accreditation') renderAssoAccreditation();
     if (name === 'asso-cockpit') renderAssoCockpit();
@@ -3004,6 +3062,22 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <div style="font-size:20px;font-weight:800;color:#7c3aed;">${ch.accepted||0} / ${ch.total||0}</div>
               <div style="font-size:10px;color:var(--muted);">Entrées / Scans</div>
             </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:20px;font-weight:800;">${k.billets_gratuits||0}</div>
+              <div style="font-size:10px;color:var(--muted);">Billets gratuits</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:20px;font-weight:800;color:#ef4444;">${k.billets_annules||0}</div>
+              <div style="font-size:10px;color:var(--muted);">Billets annulés</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:20px;font-weight:800;color:#f59e0b;">${r.taux_remplissage!=null ? r.taux_remplissage+'%' : '—'}</div>
+              <div style="font-size:10px;color:var(--muted);">Taux de remplissage</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:20px;font-weight:800;color:#16a34a;">${r.codes_promo_utilises||0}</div>
+              <div style="font-size:10px;color:var(--muted);">Codes promo utilisés</div>
+            </div>
           </div>
           ${pt.length ? `
           <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">PAR TYPE DE BILLET</div>
@@ -3286,6 +3360,202 @@ async function startConnectOnboarding(){
     if(err){ err.textContent = e.message || 'Erreur lors du lancement.'; err.style.display = 'block'; }
     if(btn) btn.disabled = false;
   }
+}
+
+
+/* ══════════════════════════════════════════════
+   MODULE LISTE DES PARTENAIRES — JS
+══════════════════════════════════════════════ */
+let PT_LISTE = [];
+let PT_EDIT_ID = null;
+let PT_METHODE = 'externe';
+let PT_COMPTE_SELECTIONNE = null;
+let PT_LOGO_URL = null;
+
+async function renderPartenairesListe(){
+  const el = document.getElementById('partenaires-liste-content');
+  const initId = window.__vitrineInitId;
+  if(!initId){ el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune initiative liée.</p>'; return; }
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+  try{
+    const r = await api('GET', `/initiatives/${initId}/partenaires/gestion`);
+    PT_LISTE = r.partenaires || [];
+    ptRenderGrid();
+  }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+}
+
+function ptRenderGrid(){
+  const el = document.getElementById('partenaires-liste-content');
+  if(!PT_LISTE.length){
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Aucun partenaire pour le moment. Cliquez sur « Ajouter un partenaire » pour commencer.</div>';
+    return;
+  }
+  el.innerHTML = `<div id="pt-sortable-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
+    ${PT_LISTE.map((p,i) => `
+      <div class="card" draggable="true" data-id="${p.id}" data-idx="${i}"
+        ondragstart="ptDragStart(event)" ondragover="ptDragOver(event)" ondrop="ptDrop(event)"
+        style="padding:14px;${p.actif?'':'opacity:.5;'}cursor:grab;">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+          <div style="width:44px;height:44px;border-radius:8px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+            ${p.logo_url?`<img src="${escH(p.logo_url)}" style="width:100%;height:100%;object-fit:contain;">`:'🤝'}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:14px;">${escH(p.nom)} ${p.mis_en_avant?'⭐':''}</div>
+            <div style="font-size:11px;color:var(--muted);">${p.type==='compte'?'🔗 Compte lié':'✏️ Externe'}${p.type_partenaire?' · '+escH(p.type_partenaire):''}</div>
+          </div>
+        </div>
+        ${p.description?`<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">${escH(p.description)}</p>`:''}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" onclick="ptOuvrirEdition(${p.id})">✏️ Modifier</button>
+          <button class="btn btn-sm btn-outline" onclick="ptToggleMisEnAvant(${p.id})">${p.mis_en_avant?'⭐ Retirer':'☆ Mettre en avant'}</button>
+          <button class="btn btn-sm btn-outline" onclick="ptToggleActif(${p.id})">${p.actif?'🙈 Masquer':'👁️ Afficher'}</button>
+          <button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="ptSupprimer(${p.id},'${escH(p.nom).replace(/'/g,"\\'")}')">🗑️</button>
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+/* Drag & drop réorganisation */
+let ptDragIdx = null;
+function ptDragStart(e){ ptDragIdx = parseInt(e.currentTarget.dataset.idx); }
+function ptDragOver(e){ e.preventDefault(); }
+async function ptDrop(e){
+  e.preventDefault();
+  const targetIdx = parseInt(e.currentTarget.dataset.idx);
+  if(ptDragIdx === null || targetIdx === ptDragIdx) return;
+  const moved = PT_LISTE.splice(ptDragIdx, 1)[0];
+  PT_LISTE.splice(targetIdx, 0, moved);
+  ptDragIdx = null;
+  ptRenderGrid();
+  try{
+    await api('PUT', `/initiatives/${window.__vitrineInitId}/partenaires/reorder`, { ordre: PT_LISTE.map((p,i)=>({id:p.id, ordre:i})) });
+  }catch(e){ DA?.toast?.(e.message,{type:'danger'}); }
+}
+
+function ptOuvrirCreation(){
+  PT_EDIT_ID = null; PT_COMPTE_SELECTIONNE = null; PT_LOGO_URL = null;
+  document.getElementById('pt-modal-titre').textContent = '➕ Ajouter un partenaire';
+  ['pt-nom','pt-type','pt-description','pt-site','pt-pays','pt-email','pt-tel','pt-recherche-compte'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pt-afficher-contact').checked = false;
+  document.getElementById('pt-logo-preview').style.display = 'none';
+  document.getElementById('pt-compte-selectionne').innerHTML = '';
+  document.getElementById('pt-resultats-compte').innerHTML = '';
+  ptChoisirMethode('externe');
+  document.getElementById('modal-partenaire-form').style.display = 'flex';
+}
+
+function ptOuvrirEdition(id){
+  const p = PT_LISTE.find(x=>x.id===id); if(!p) return;
+  PT_EDIT_ID = id; PT_COMPTE_SELECTIONNE = null; PT_LOGO_URL = p.logo_url || null;
+  document.getElementById('pt-modal-titre').textContent = '✏️ Modifier le partenaire';
+  document.getElementById('pt-nom').value = p.nom || '';
+  document.getElementById('pt-type').value = p.type_partenaire || '';
+  document.getElementById('pt-description').value = p.description || '';
+  document.getElementById('pt-site').value = p.site_web || '';
+  document.getElementById('pt-pays').value = p.pays || '';
+  document.getElementById('pt-email').value = p.email || '';
+  document.getElementById('pt-tel').value = p.telephone || '';
+  document.getElementById('pt-afficher-contact').checked = !!p.afficher_contact;
+  const preview = document.getElementById('pt-logo-preview');
+  if(p.logo_url){ preview.src = p.logo_url; preview.style.display = 'block'; } else preview.style.display = 'none';
+  document.getElementById('pt-methode-row').style.display = 'none';
+  document.getElementById('pt-bloc-compte').style.display = 'none';
+  document.getElementById('pt-champs-externes').style.display = p.type==='compte' ? 'none' : 'block';
+  document.getElementById('modal-partenaire-form').style.display = 'flex';
+}
+
+function ptFermerModal(){ document.getElementById('modal-partenaire-form').style.display = 'none'; }
+
+function ptChoisirMethode(m){
+  PT_METHODE = m;
+  document.getElementById('pt-methode-row').style.display = 'flex';
+  const isCompte = m === 'compte';
+  document.getElementById('pt-methode-compte').style.cssText = `flex:1;padding:10px;border-radius:8px;border:1.5px solid ${isCompte?'var(--orange)':'var(--border)'};background:${isCompte?'var(--orange)':'#fff'};color:${isCompte?'#fff':'var(--muted)'};font-size:13px;font-weight:700;cursor:pointer;`;
+  document.getElementById('pt-methode-externe').style.cssText = `flex:1;padding:10px;border-radius:8px;border:1.5px solid ${!isCompte?'var(--orange)':'var(--border)'};background:${!isCompte?'var(--orange)':'#fff'};color:${!isCompte?'#fff':'var(--muted)'};font-size:13px;font-weight:700;cursor:pointer;`;
+  document.getElementById('pt-bloc-compte').style.display = isCompte ? 'block' : 'none';
+  document.getElementById('pt-champs-externes').style.display = isCompte ? 'none' : 'block';
+}
+
+let ptSearchTimer;
+function ptRechercherCompte(){
+  clearTimeout(ptSearchTimer);
+  const q = document.getElementById('pt-recherche-compte').value.trim();
+  if(q.length < 2){ document.getElementById('pt-resultats-compte').innerHTML = ''; return; }
+  ptSearchTimer = setTimeout(async () => {
+    try{
+      const r = await api('GET', '/search/comptes?q='+encodeURIComponent(q));
+      document.getElementById('pt-resultats-compte').innerHTML = (r.comptes||[]).map(c => `
+        <div style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick='ptSelectionnerCompte(${JSON.stringify(c)})'>
+          <span>${escH(c.nom)} <span style="color:var(--muted);font-size:11px;">(${escH(c.role||c.source||'')})</span></span>
+          <span style="color:var(--orange);font-size:12px;font-weight:700;">Choisir</span>
+        </div>`).join('') || '<div style="padding:8px;color:var(--muted);font-size:12px;">Aucun résultat.</div>';
+    }catch(e){}
+  }, 300);
+}
+function ptSelectionnerCompte(c){
+  PT_COMPTE_SELECTIONNE = c;
+  document.getElementById('pt-nom').value = c.nom;
+  if(c.avatar_url) PT_LOGO_URL = c.avatar_url;
+  document.getElementById('pt-compte-selectionne').innerHTML = `<div style="background:var(--bg);padding:8px 10px;border-radius:8px;">✅ Sélectionné : <strong>${escH(c.nom)}</strong></div>`;
+  document.getElementById('pt-resultats-compte').innerHTML = '';
+}
+
+async function ptUploadLogo(input){
+  const file = input.files[0]; if(!file) return;
+  try{
+    const url = await uploadMedia(file, 'logo');
+    PT_LOGO_URL = url;
+    const preview = document.getElementById('pt-logo-preview');
+    preview.src = url; preview.style.display = 'block';
+  }catch(e){ DA?.toast?.('Erreur upload : '+e.message,{type:'danger'}); }
+}
+
+async function ptEnregistrer(){
+  const nom = document.getElementById('pt-nom').value.trim();
+  if(!nom && !(PT_METHODE==='compte' && PT_COMPTE_SELECTIONNE)){ DA?.toast?.('Nom du partenaire requis.',{type:'warning'}); return; }
+  const payload = {
+    nom, logo_url: PT_LOGO_URL,
+    type_partenaire: document.getElementById('pt-type').value || null,
+    description: document.getElementById('pt-description').value || null,
+    site_web: document.getElementById('pt-site').value || null,
+    pays: document.getElementById('pt-pays').value || null,
+    email: document.getElementById('pt-email').value || null,
+    telephone: document.getElementById('pt-tel').value || null,
+    afficher_contact: document.getElementById('pt-afficher-contact').checked,
+  };
+  try{
+    if(PT_EDIT_ID){
+      await api('PUT', `/partenaires/${PT_EDIT_ID}`, payload);
+    } else {
+      if(PT_METHODE === 'compte' && PT_COMPTE_SELECTIONNE){
+        payload.type = 'compte';
+        payload.linked_user_id = PT_COMPTE_SELECTIONNE.id;
+      } else {
+        payload.type = 'externe';
+      }
+      await api('POST', `/initiatives/${window.__vitrineInitId}/partenaires`, payload);
+    }
+    ptFermerModal();
+    DA?.toast?.('Partenaire enregistré !',{type:'success'});
+    renderPartenairesListe();
+  }catch(e){ DA?.toast?.('Erreur : '+e.message,{type:'danger'}); }
+}
+
+async function ptSupprimer(id, nom){
+  if(!confirm(`Supprimer le partenaire "${nom}" ?`)) return;
+  try{
+    await api('DELETE', `/partenaires/${id}`);
+    DA?.toast?.('Partenaire supprimé.',{type:'success'});
+    renderPartenairesListe();
+  }catch(e){ DA?.toast?.('Erreur : '+e.message,{type:'danger'}); }
+}
+async function ptToggleActif(id){
+  try{ await api('PUT', `/partenaires/${id}/toggle-actif`, {}); renderPartenairesListe(); }
+  catch(e){ DA?.toast?.('Erreur : '+e.message,{type:'danger'}); }
+}
+async function ptToggleMisEnAvant(id){
+  try{ await api('PUT', `/partenaires/${id}/mise-en-avant`, {}); renderPartenairesListe(); }
+  catch(e){ DA?.toast?.('Erreur : '+e.message,{type:'danger'}); }
 }
 
 

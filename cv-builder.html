@@ -158,7 +158,7 @@ textarea { resize: vertical; }
   <span id="save-status">✅ Prêt</span>
   <div class="hdr-spacer"></div>
   <button class="hdr-btn" onclick="openHistory()" title="Historique">🕐</button>
-  <button class="hdr-btn" onclick="exportPDF()">⬇ PDF</button>
+  <button class="hdr-btn" id="btn-export-pdf" onclick="exportPDF()">📄 Générer le document PDF</button>
   <button class="hdr-btn" onclick="exportWord()">⬇ Word</button>
   <button class="hdr-btn primary" onclick="saveCV(true)">💾 Sauvegarder</button>
 </header>
@@ -283,7 +283,11 @@ textarea { resize: vertical; }
     <div class="tab-content" id="tab-design">
       <div style="margin-bottom:10px;font-size:.75rem;color:#888;">Personnalisation en temps réel.</div>
       <div class="design-row">
-        <label>Couleurs</label>
+        <label>Thèmes prédéfinis</label>
+        <div id="theme-presets" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:4px;"></div>
+      </div>
+      <div class="design-row">
+        <label>Couleurs personnalisées</label>
         <div class="color-row">
           <div class="color-swatch"><label>Principale</label><input type="color" id="color1" value="#1a3a5c"></div>
           <div class="color-swatch"><label>Secondaire</label><input type="color" id="color2" value="#4a90d9"></div>
@@ -358,12 +362,13 @@ textarea { resize: vertical; }
     <!-- TAB OPTIONS -->
     <div class="tab-content" id="tab-options">
       <div class="media-block">
-        <h4>🔲 QR Code CV numérique</h4>
-        <div style="font-size:.75rem;color:#888;margin-bottom:8px;">Lien vers votre CV interactif (photo, audio, vidéo).</div>
+        <h4>🔲 QR Code vers mon profil public</h4>
+        <div style="font-size:.75rem;color:#888;margin-bottom:8px;">Intégré automatiquement à chaque PDF généré. Le recruteur qui le scanne accède à votre profil public Diaspo'Actif (parcours, compétences, portfolio…), toujours à jour même après modification.</div>
         <div style="text-align:center;"><img loading="lazy" id="qr-img" alt="QR Code"><div id="qr-url"></div></div>
         <div class="media-actions">
-          <button onclick="generateQR()">🔲 Générer</button>
-          <button onclick="toggleQR(false)" style="color:var(--red);">❌ Désactiver</button>
+          <button onclick="generateQR()">🔄 Actualiser</button>
+          <button onclick="toggleQR(false)" style="color:var(--red);">❌ Retirer du PDF</button>
+          <button onclick="toggleQR(true)">✅ Inclure dans le PDF</button>
         </div>
       </div>
       <div class="media-block">
@@ -435,6 +440,7 @@ textarea { resize: vertical; }
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="/assets/cv-templates.js"></script>
 <script src="/assets/cv-builder.js"></script>
 <script>
@@ -489,6 +495,7 @@ document.addEventListener('click', e => {
 <script src="/assets/cookies-banner.js"></script>
 <script src="/assets/upload-media.js"></script>
   <script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
 </body>
 </html>
 
