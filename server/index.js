@@ -1448,7 +1448,11 @@ route("GET", "/api/initiatives/:id/meilleures-ventes", async (req, res, params) 
   sendJSON(res, 200, { produits: rows, total_commandes: total?.n || 0 });
 });
 
-/* POST /api/produits/:id/commander — visiteur connecté, demande de contact (PAS de paiement réel) */
+/* POST /api/produits/:id/commander — visiteur connecté.
+   Si le produit a un prix (prod.prix > 0) : vraie session Stripe Checkout (même modèle que la Billetterie —
+   paiement encaissé sur le compte plateforme, crédité en wallet_balance à l'initiative moins 5% de commission,
+   retiré ensuite via le Centre Financier). Sinon (produit "sur devis"/service sans prix) : ancien flux de
+   demande de contact inchangé. */
 route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -1458,8 +1462,45 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) === Number(user.id)) return sendJSON(res, 400, { error: "Vous ne pouvez pas commander votre propre produit." });
 
-  const quantite = Number(body.quantite) || 1;
+  const quantite = Math.max(1, Number(body.quantite) || 1);
   const publicationId = body.publication_id != null ? Number(body.publication_id) : null;
+
+  /* ── Produit payant : vraie session Stripe Checkout ── */
+  if (prod.prix != null && Number(prod.prix) > 0) {
+    const { stripe } = require("./stripe-client");
+    if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+
+    const montantTotal = parseFloat((Number(prod.prix) * quantite).toFixed(2));
+    const id = (await db.prepare(`
+      INSERT INTO commandes_vitrine (produit_id, initiative_id, acheteur_id, publication_id, message, quantite, paiement_statut, montant_total)
+      VALUES (?,?,?,?,?,?,'en_attente',?)
+    `).run(params.id, prod.initiative_id, user.id, publicationId, body.message || null, quantite, montantTotal)).lastInsertRowid;
+
+    try {
+      const origin = getOrigin(req);
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        line_items: [{
+          price_data: {
+            currency: (prod.devise || "EUR").toLowerCase(),
+            unit_amount: Math.round(Number(prod.prix) * 100),
+            product_data: { name: prod.nom },
+          },
+          quantity: quantite,
+        }],
+        metadata: { diaspoactif_commande_vitrine_id: String(id) },
+        success_url: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=succes&commande=${id}`,
+        cancel_url: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=annule&commande=${id}`,
+      });
+      await db.prepare(`UPDATE commandes_vitrine SET stripe_session_id=? WHERE id=?`).run(session.id, id);
+      return sendJSON(res, 201, { ok: true, id, checkout_url: session.url });
+    } catch (e) {
+      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id=?`).run(id);
+      return sendJSON(res, 500, SEC.safeError(e, "commander-produit-checkout"));
+    }
+  }
+
+  /* ── Produit sans prix (sur devis / service) : demande de contact classique ── */
   const id = (await db.prepare(`
     INSERT INTO commandes_vitrine (produit_id, initiative_id, acheteur_id, publication_id, message, quantite) VALUES (?,?,?,?,?,?)
   `).run(params.id, prod.initiative_id, user.id, publicationId, body.message || null, quantite)).lastInsertRowid;
@@ -3987,6 +4028,37 @@ async function handleStripeWebhook(req, res) {
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_commande_id) {
       const session = event.data.object;
       await db.prepare(`UPDATE tickets SET payment_status='failed' WHERE transaction_ref=? AND payment_status='pending'`).run(session.id);
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_commande_vitrine_id) {
+      /* Paiement Boutique confirmé — même modèle que la Billetterie (commission 5%, crédit wallet_balance
+         à l'initiative, retrait ultérieur via le Centre Financier). Idempotent : ne traite que si encore 'en_attente'. */
+      const commandeId = Number(event.data.object.metadata.diaspoactif_commande_vitrine_id);
+      const cmd = await db.prepare(`SELECT * FROM commandes_vitrine WHERE id=? AND paiement_statut='en_attente'`).get(commandeId);
+      if (cmd) {
+        const [prod, init] = await Promise.all([
+          db.prepare(`SELECT * FROM produits_vitrine WHERE id=?`).get(cmd.produit_id),
+          db.prepare(`SELECT * FROM initiatives WHERE id=?`).get(cmd.initiative_id),
+        ]);
+        const COMMISSION_RATE = 0.05;
+        const montant = Number(cmd.montant_total) || 0;
+        const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
+        const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
+        await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='paye', statut='traitee' WHERE id=?`).run(commandeId);
+        await db.prepare(`INSERT INTO wallet_transactions (commande_vitrine_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
+          .run(commandeId, platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+        await db.prepare(`INSERT INTO wallet_transactions (commande_vitrine_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'organizer_credit',?,?,?,?,?,?)`)
+          .run(commandeId, init.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+        await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, init.owner_user_id);
+        await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+        try {
+          db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'commande_boutique',?,'reussi',?,?)`)
+            .run(cmd.acheteur_id, montant, 'commande_boutique', new Date().toISOString());
+        } catch (e) { /* table transactions peut avoir schema différent */ }
+        creerNotif(cmd.acheteur_id, "commande_payee", "Commande payée ✅", `Votre commande « ${prod?.nom || ''} » (x${cmd.quantite}) est confirmée.`, { commande_id: commandeId });
+        creerNotif(init.owner_user_id, "commande_vendue", "Nouvelle vente 🛍️", `« ${prod?.nom || ''} » vendu (x${cmd.quantite}, +${organizer_amount}€).`, { commande_id: commandeId });
+      }
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_commande_vitrine_id) {
+      const commandeId = Number(event.data.object.metadata.diaspoactif_commande_vitrine_id);
+      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id=? AND paiement_statut='en_attente'`).run(commandeId);
     } else if (event.type === "invoice.payment_succeeded" && event.data.object.subscription) {
       const invoice = event.data.object;
       const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);

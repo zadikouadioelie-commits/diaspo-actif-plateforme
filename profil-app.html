@@ -1001,6 +1001,19 @@ async function init() {
     document.getElementById('p-sections').innerHTML =
       '<div class="p-section"><p style="color:red">Profil introuvable ou erreur serveur.</p></div>';
   }
+
+  /* Retour depuis Stripe Checkout (commande boutique) */
+  const paiement = new URLSearchParams(location.search).get('paiement');
+  if (paiement === 'succes') {
+    showToast?.('✅ Paiement confirmé ! Votre commande est en cours de traitement.', 'success');
+  } else if (paiement === 'annule') {
+    showToast?.('❌ Paiement annulé — aucune somme n\'a été débitée.', 'warning');
+  }
+  if (paiement) {
+    const url = new URL(location.href);
+    url.searchParams.delete('paiement'); url.searchParams.delete('commande');
+    history.replaceState({}, '', url);
+  }
 }
 
 /* ---- thème ---- */
@@ -3199,30 +3212,35 @@ function openCommanderModal(productId, publicationId) {
   const overlay = document.createElement('div');
   overlay.id = 'cmd-modal-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const payant = prod.prix != null && Number(prod.prix) > 0;
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:24px;">
       <h2 style="margin:0 0 6px;font-size:17px;">📦 Commander « ${esc(prod.nom)} »</h2>
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">Ceci envoie une demande de contact à l'initiative — aucun paiement n'est effectué ici.</p>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${payant ? `Paiement sécurisé par Stripe — ${Number(prod.prix).toFixed(2)} ${esc(prod.devise||'EUR')} / unité.` : "Ceci envoie une demande de contact à l'initiative — aucun paiement n'est effectué ici."}</p>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Quantité</label>
-      <input type="number" min="1" id="cmd-qte" value="1" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+      <input type="number" min="1" id="cmd-qte" value="1" oninput="cmdUpdateTotal(${Number(prod.prix)||0})" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+      ${payant ? `<p style="font-size:13px;font-weight:700;margin:0 0 12px;">Total : <span id="cmd-total">${Number(prod.prix).toFixed(2)}</span> ${esc(prod.devise||'EUR')}</p>` : ''}
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Message (optionnel)</label>
       <textarea id="cmd-msg" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;min-height:70px;margin-bottom:8px;"></textarea>
       <p id="cmd-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button onclick="document.getElementById('cmd-modal-overlay').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
-        <button id="cmd-send" style="padding:9px 16px;border-radius:8px;border:none;background:var(--tp);color:#fff;font-weight:700;cursor:pointer;">Envoyer la demande</button>
+        <button id="cmd-send" style="padding:9px 16px;border-radius:8px;border:none;background:var(--tp);color:#fff;font-weight:700;cursor:pointer;">${payant ? '💳 Payer maintenant' : 'Envoyer la demande'}</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.getElementById('cmd-send').onclick = async () => {
     const err = document.getElementById('cmd-err');
+    const btn = document.getElementById('cmd-send');
+    btn.disabled = true;
     try {
-      await api('POST', `/produits/${productId}/commander`, {
+      const r = await api('POST', `/produits/${productId}/commander`, {
         quantite: Number(document.getElementById('cmd-qte').value) || 1,
         message: document.getElementById('cmd-msg').value.trim() || null,
         publication_id: publicationId != null ? publicationId : null,
       });
+      if (r.checkout_url) { window.location.href = r.checkout_url; return; }
       overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:32px;text-align:center;">
         <div style="font-size:40px;margin-bottom:10px;">✅</div>
         <h2 style="margin:0 0 8px;font-size:17px;">Demande envoyée !</h2>
@@ -3232,8 +3250,15 @@ function openCommanderModal(productId, publicationId) {
     } catch (e) {
       err.textContent = e.message || 'Erreur.';
       err.style.display = 'block';
+      btn.disabled = false;
     }
   };
+}
+function cmdUpdateTotal(prixUnitaire) {
+  const el = document.getElementById('cmd-total');
+  if (!el) return;
+  const qte = Number(document.getElementById('cmd-qte').value) || 1;
+  el.textContent = (prixUnitaire * qte).toFixed(2);
 }
 
 /* ---- "Mes commandes" (owner) ---- */

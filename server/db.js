@@ -3921,6 +3921,18 @@ db.exec(`
   // ── Catalogues (regroupement des articles de la Vitrine) ──
   const prodCols3 = db.prepare('PRAGMA table_info(produits_vitrine)').all().map(c=>c.name);
   if (prodCols3.length && !prodCols3.includes('catalogue_id')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN catalogue_id INTEGER");
+
+  // ── Paiement réel Boutique (Stripe Checkout, même modèle que la Billetterie) ──
+  // Colonne séparée `paiement_statut` (sans CHECK) plutôt que d'élargir le CHECK de `statut`,
+  // pour ne jamais avoir à recréer la table (SQLite ne supporte pas ALTER d'un CHECK existant).
+  const cmdCols2 = db.prepare('PRAGMA table_info(commandes_vitrine)').all().map(c=>c.name);
+  if (cmdCols2.length) {
+    if (!cmdCols2.includes('paiement_statut'))  db.exec("ALTER TABLE commandes_vitrine ADD COLUMN paiement_statut TEXT DEFAULT 'aucun'");
+    if (!cmdCols2.includes('montant_total'))    db.exec("ALTER TABLE commandes_vitrine ADD COLUMN montant_total REAL");
+    if (!cmdCols2.includes('stripe_session_id')) db.exec("ALTER TABLE commandes_vitrine ADD COLUMN stripe_session_id TEXT");
+  }
+  const wtCols = db.prepare('PRAGMA table_info(wallet_transactions)').all().map(c=>c.name);
+  if (wtCols.length && !wtCols.includes('commande_vitrine_id')) db.exec("ALTER TABLE wallet_transactions ADD COLUMN commande_vitrine_id INTEGER");
 }
 
 /* ── Boutique de la Vitrine (produits/services, max 20 par initiative) ── */

@@ -496,6 +496,11 @@ async function migratePg(pool) {
     ['listes_diffusion', 'mode', "TEXT DEFAULT 'figee'"],
     ['listes_diffusion', 'filtres_json', "TEXT"],
     ['listes_diffusion', 'archived', "INTEGER DEFAULT 0"],
+    // Paiement réel Boutique (Stripe Checkout, même modèle que la Billetterie)
+    ['commandes_vitrine', 'paiement_statut', "TEXT DEFAULT 'aucun'"],
+    ['commandes_vitrine', 'montant_total', 'REAL'],
+    ['commandes_vitrine', 'stripe_session_id', 'TEXT'],
+    ['wallet_transactions', 'commande_vitrine_id', 'INTEGER'],
   ];
   for (const [table, col, type] of cols) {
     try {
