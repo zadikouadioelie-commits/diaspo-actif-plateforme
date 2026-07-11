@@ -210,6 +210,7 @@ const NOTIF_ICONS = {
   evenement:  "📅",
   validation: "✅",
   abonnement: "⭐",
+  reunion_invite: "📹",
 };
 
 function notifUrl(n) {
@@ -217,6 +218,7 @@ function notifUrl(n) {
   if (d.post_id)          return `fil-actualite.html#fp-${d.post_id}`;
   if (d.conversation_id)  return `messagerie.html?conv=${d.conversation_id}`;
   if (d.evenement_id)     return `evenements.html#evt-${d.evenement_id}`;
+  if (d.reunion_id)       return `reunions.html?reunion=${d.reunion_id}`;
   return "#";
 }
 

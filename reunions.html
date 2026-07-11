@@ -331,6 +331,8 @@ async function init(){
   if(!ME){window.location.href='login.html?r='+encodeURIComponent(location.pathname);return;}
   await Promise.all([loadReunions(),loadDecisions()]);
   updateStats();
+  const rid=new URLSearchParams(location.search).get('reunion');
+  if(rid) voirDetail(parseInt(rid));
 }
 
 // ========= LOAD =========
