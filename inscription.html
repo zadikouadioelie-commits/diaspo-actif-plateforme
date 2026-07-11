@@ -184,6 +184,27 @@
           <label><input type="radio" name="sitpro" value="autre"> Autre</label>
         </div>
       </div>
+      <div class="form-section"><h4>Profil public (facultatif)</h4>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">🎯 Public / secteurs qui vous concernent</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-public" value="Diaspora"> Diaspora</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-public" value="Entrepreneurs"> Entrepreneurs</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-public" value="Étudiants"> Étudiants</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-public" value="Associations"> Associations</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-public" value="Jeunes"> Jeunes</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-public" value="Femmes"> Femmes</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-public" value="Professionnels"> Professionnels</label>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">🤝 Vous recherchez actuellement</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-besoin" value="un emploi"> Un emploi</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-besoin" value="des partenaires"> Des partenaires</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-besoin" value="des investisseurs"> Des investisseurs</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-besoin" value="des clients"> Des clients</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-besoin" value="une mission"> Une mission</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-besoin" value="du mentorat"> Du mentorat</label>
+        </div>
+      </div>
       <div class="form-section"><h4>Securite</h4>
         <div class="grid-2">
           <div>
@@ -267,6 +288,30 @@
           <div id="i-territoires-list"></div>
           <button type="button" class="btn" id="i-add-territoire" style="margin-top:8px;font-size:13px;">+ Ajouter un territoire</button>
         </div>
+      </div>
+      <div class="form-section"><h4>Profil public (facultatif)</h4>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">🎯 Public concerné — à qui s'adresse votre initiative ?</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Diaspora"> Diaspora</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Entrepreneurs"> Entrepreneurs</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Étudiants"> Étudiants</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Associations"> Associations</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Collectivités"> Collectivités</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Jeunes"> Jeunes</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Femmes"> Femmes</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Agriculteurs"> Agriculteurs</label>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">🤝 Vous recherchez actuellement</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="partenaires"> Partenaires</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="bénévoles"> Bénévoles</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="investisseurs"> Investisseurs</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="sponsors"> Sponsors</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="experts"> Experts</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="membres"> Membres</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="fournisseurs"> Fournisseurs</label>
+        </div>
+        <div style="max-width:220px;"><label>Année de création</label><input type="number" id="i-annee-creation" min="1900" max="2100" placeholder="2020"></div>
       </div>
       <div class="form-section"><h4>Localisation</h4>
         <div class="grid-2">
@@ -583,7 +628,9 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
       ville,
       code_postal:document.getElementById("u-cp").value.trim()||null,
       telephone:document.getElementById("u-tel").value.trim()||null,
-      centres_interet:interests,situation_pro:sitpro
+      centres_interet:interests,situation_pro:sitpro,
+      publics:[...document.querySelectorAll('.u-public:checked')].map(c=>c.value),
+      besoins:[...document.querySelectorAll('.u-besoin:checked')].map(c=>c.value)
     });
   }catch(e){const eb=document.getElementById("u-error");eb.textContent=e.message;eb.style.display="block";}
 });
@@ -627,7 +674,10 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       fonction_responsable:document.getElementById("i-rfct").value.trim()||null,
       email_responsable:email,tel_responsable:document.getElementById("i-tel").value.trim()||null,
       site_web:document.getElementById("i-site").value.trim()||null,
-      reseaux_sociaux:rs?{lien:rs}:{}
+      reseaux_sociaux:rs?{lien:rs}:{},
+      publics:[...document.querySelectorAll('.i-public:checked')].map(c=>c.value),
+      besoins:[...document.querySelectorAll('.i-besoin:checked')].map(c=>c.value),
+      annee_creation:document.getElementById("i-annee-creation").value||null
     });
   }catch(e){const eb=document.getElementById("i-error");eb.textContent=e.message;eb.style.display="block";}
 });

@@ -233,6 +233,28 @@ db.exec(`
     FOREIGN KEY(post_id) REFERENCES fil_posts(id)
   );
 
+  /* Réactions/commentaires par photo de galerie (comptes utilisateur ou initiative) */
+  CREATE TABLE IF NOT EXISTS galerie_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_type TEXT NOT NULL,   -- 'user' | 'initiative'
+    owner_id INTEGER NOT NULL,
+    photo_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL DEFAULT 'jaime',
+    UNIQUE(owner_type, owner_id, photo_id, user_id, type)
+  );
+
+  CREATE TABLE IF NOT EXISTS galerie_commentaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_type TEXT NOT NULL,
+    owner_id INTEGER NOT NULL,
+    photo_id TEXT NOT NULL,
+    auteur_id INTEGER,
+    auteur_nom TEXT NOT NULL,
+    contenu TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS financements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -286,6 +308,20 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(evenement_id, user_id),
     FOREIGN KEY(evenement_id) REFERENCES evenements(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  -- Atelier audiovisuel : médias importés et rendus produits par ffmpeg
+  CREATE TABLE IF NOT EXISTS av_media (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    folder TEXT DEFAULT 'videos',
+    nom TEXT NOT NULL,
+    type TEXT,
+    chemin TEXT NOT NULL,
+    duree REAL,
+    source TEXT DEFAULT 'upload',
+    created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
@@ -592,6 +628,39 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(consultation_id) REFERENCES consultations(id),
     FOREIGN KEY(question_id) REFERENCES consultation_questions(id)
+  );
+
+  /* ===== OPPORTUNITÉS STRATÉGIQUES (pont entre Observatoire Mondial et action) ===== */
+  CREATE TABLE IF NOT EXISTS opportunites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    collectivite_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    pays TEXT,
+    ville TEXT,
+    origine TEXT,
+    secteur TEXT,
+    priorite TEXT DEFAULT 'moyenne' CHECK(priorite IN ('basse','moyenne','haute','critique')),
+    responsable TEXT,
+    echeance TEXT,
+    etat TEXT DEFAULT 'detectee' CHECK(etat IN ('detectee','en_analyse','planifiee','en_action','realisee','abandonnee')),
+    notes TEXT,
+    pieces_json TEXT DEFAULT '[]',
+    source_json TEXT DEFAULT '{}',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(collectivite_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS opportunite_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    opportunite_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT,
+    action_type TEXT,
+    action_ref_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(opportunite_id) REFERENCES opportunites(id)
   );
 
   /* ===== SYSTÈME DE CERTIFICATION ===== */
@@ -996,6 +1065,13 @@ const MIGRATIONS = [
   ["evenements", "type_evt TEXT DEFAULT 'evenement'"],
   ["evenements", "pays TEXT"],
   ["evenements", "ville TEXT"],
+  ["evenements", "origine TEXT"],
+  // Formulaire d'inscription à un événement
+  ["evenements_participants", "nom_complet TEXT"],
+  ["evenements_participants", "email TEXT"],
+  ["evenements_participants", "telephone TEXT"],
+  ["evenements_participants", "nb_personnes INTEGER DEFAULT 1"],
+  ["evenements_participants", "message TEXT"],
   ["evenements", "inscription_ouverte INTEGER DEFAULT 1"],
   ["evenements", "lien_inscription TEXT"],
   // Événements v2 — champs complémentaires
@@ -1133,6 +1209,11 @@ const MIGRATIONS = [
   ["users", "identite_verifiee_le TEXT"],
   ["users", "identite_expire_le TEXT"],
   ["users", "identite_renouvellement_notifie INTEGER DEFAULT 0"],
+  // ── Cohérence origine/nationalité déclarée vs document Stripe Identity ──
+  ["users", "identite_pays_document TEXT"],
+  ["users", "identite_mismatch INTEGER DEFAULT 0"],
+  // ── Galerie photo personnelle (miroir de initiatives.galerie_json) ──
+  ["users", "galerie_json TEXT"],
   // ── Vérification d'organisation (initiatives) — 🏢 "Organisation vérifiée" ──
   ["initiatives", "organisation_verifiee INTEGER DEFAULT 0"],
   ["initiatives", "organisation_verifiee_le TEXT"],
@@ -1720,6 +1801,7 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(organisateur_id) REFERENCES users(id)
   );
+  CREATE INDEX IF NOT EXISTS idx_reunions_organisateur ON reunions(organisateur_id);
 
   CREATE TABLE IF NOT EXISTS reunion_invites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1735,6 +1817,7 @@ db.exec(`
     FOREIGN KEY(reunion_id) REFERENCES reunions(id),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+  CREATE INDEX IF NOT EXISTS idx_reunion_invites_user ON reunion_invites(user_id);
 
   CREATE TABLE IF NOT EXISTS reunion_resumes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3840,6 +3923,10 @@ db.exec(`
   }
   const msgCols3 = db.prepare('PRAGMA table_info(messages)').all().map(c=>c.name);
   if (!msgCols3.includes('produit_id')) db.exec("ALTER TABLE messages ADD COLUMN produit_id INTEGER");
+  if (!msgCols3.includes('edited')) db.exec("ALTER TABLE messages ADD COLUMN edited INTEGER DEFAULT 0");
+  if (!msgCols3.includes('edited_at')) db.exec("ALTER TABLE messages ADD COLUMN edited_at TEXT");
+  if (!msgCols3.includes('deleted')) db.exec("ALTER TABLE messages ADD COLUMN deleted INTEGER DEFAULT 0");
+  if (!msgCols3.includes('deleted_at')) db.exec("ALTER TABLE messages ADD COLUMN deleted_at TEXT");
   const convCols3 = db.prepare('PRAGMA table_info(conversations)').all().map(c=>c.name);
   if (!convCols3.includes('contexte')) db.exec("ALTER TABLE conversations ADD COLUMN contexte TEXT");
 
@@ -3888,6 +3975,14 @@ db.exec(`
   if (!initCols6.includes('vitrine_google_maps_url'))  db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_google_maps_url TEXT");
   if (!initCols6.includes('vitrine_rdv_active'))       db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_rdv_active INTEGER DEFAULT 0");
 
+  // ── Profil public enrichi (colonnes gauche/droite d'initiative.html) ──
+  if (!initCols6.includes('publics_json'))      db.exec("ALTER TABLE initiatives ADD COLUMN publics_json TEXT");
+  if (!initCols6.includes('besoins_json'))      db.exec("ALTER TABLE initiatives ADD COLUMN besoins_json TEXT");
+  if (!initCols6.includes('realisations_json')) db.exec("ALTER TABLE initiatives ADD COLUMN realisations_json TEXT");
+  if (!initCols6.includes('stats_perso_json'))  db.exec("ALTER TABLE initiatives ADD COLUMN stats_perso_json TEXT");
+  if (!initCols6.includes('annee_creation'))    db.exec("ALTER TABLE initiatives ADD COLUMN annee_creation INTEGER");
+  if (!initCols6.includes('assistant_actif'))   db.exec("ALTER TABLE initiatives ADD COLUMN assistant_actif INTEGER DEFAULT 1");
+
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
   db.exec(`
     CREATE TABLE IF NOT EXISTS initiative_partenaires (
@@ -3914,9 +4009,219 @@ db.exec(`
     )
   `);
 
+  /* ── Module Cotisations & Adhésions (indépendant du système asso_* premium existant,
+     ouvert à toute Initiative — même logique d'ouverture que la Boutique) ── */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS adhesion_formules (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id       INTEGER NOT NULL,
+      nom                 TEXT NOT NULL,
+      description         TEXT,
+      couleur             TEXT DEFAULT '#f97316',
+      icone               TEXT DEFAULT '🎫',
+      type_contribution    TEXT NOT NULL DEFAULT 'cotisation_annuelle'
+                          CHECK(type_contribution IN ('don_libre','don_ponctuel','cotisation_mensuelle',
+                            'cotisation_trimestrielle','cotisation_semestrielle','cotisation_annuelle',
+                            'adhesion_unique','participation_projet','contribution_exceptionnelle','autre')),
+      montant_type        TEXT NOT NULL DEFAULT 'fixe' CHECK(montant_type IN ('fixe','libre','minimum')),
+      montant_fixe        REAL,
+      montant_min         REAL,
+      montant_max         REAL,
+      devise              TEXT DEFAULT 'EUR',
+      modes_paiement_json TEXT DEFAULT '["carte"]',
+      actif               INTEGER DEFAULT 1,
+      ordre               INTEGER DEFAULT 0,
+      created_at          TEXT DEFAULT (datetime('now')),
+      updated_at          TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS adhesion_membres (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      formule_id          INTEGER NOT NULL,
+      initiative_id       INTEGER NOT NULL,
+      linked_user_id      INTEGER,
+      nom                 TEXT NOT NULL,
+      prenom              TEXT,
+      email               TEXT,
+      telephone           TEXT,
+      photo_url           TEXT,
+      statut              TEXT NOT NULL DEFAULT 'en_attente'
+                          CHECK(statut IN ('en_attente','a_jour','non_a_jour','suspendu')),
+      date_adhesion       TEXT,
+      date_expiration     TEXT,
+      montant_paye        REAL,
+      mode_paiement       TEXT,
+      numero_recu         TEXT,
+      stripe_customer_id  TEXT,
+      stripe_subscription_id TEXT,
+      badges_json         TEXT DEFAULT '[]',
+      created_at          TEXT DEFAULT (datetime('now')),
+      updated_at          TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(formule_id) REFERENCES adhesion_formules(id) ON DELETE CASCADE,
+      FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+      FOREIGN KEY(linked_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS adhesion_paiements (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      membre_id           INTEGER NOT NULL,
+      formule_id          INTEGER,
+      initiative_id       INTEGER,
+      montant             REAL NOT NULL,
+      devise              TEXT DEFAULT 'EUR',
+      mode_paiement       TEXT,
+      statut              TEXT NOT NULL DEFAULT 'en_attente'
+                          CHECK(statut IN ('en_attente','paye','echoue','rembourse')),
+      stripe_session_id   TEXT,
+      stripe_subscription_id TEXT,
+      numero_recu         TEXT,
+      date_paiement       TEXT,
+      created_at          TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(membre_id) REFERENCES adhesion_membres(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS adhesion_relances (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      membre_id           INTEGER NOT NULL,
+      niveau              TEXT NOT NULL CHECK(niveau IN ('avant_30j','avant_7j','jour_j','apres_expiration')),
+      canal               TEXT NOT NULL DEFAULT 'app' CHECK(canal IN ('app','email')),
+      message             TEXT,
+      created_at          TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(membre_id) REFERENCES adhesion_membres(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS adhesion_campagnes (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id       INTEGER NOT NULL,
+      nom                 TEXT NOT NULL,
+      objectif_membres    INTEGER DEFAULT 0,
+      date_debut          TEXT,
+      date_fin            TEXT,
+      statut              TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','terminee','archivee')),
+      created_at          TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+    );
+  `);
+
+  /* ── Module Votes sécurisés (indépendant du système asso_votes premium existant,
+     ouvert à toute Initiative — même logique d'ouverture que Cotisations & Adhésions).
+     Anonymisation par séparation structurelle : vote_bulletins n'a AUCUNE colonne
+     d'identité ni FK vers vote_electeurs — garantie technique, pas juste applicative. ── */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vote_scrutins (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id     INTEGER NOT NULL,
+      nom               TEXT NOT NULL,
+      type_scrutin      TEXT NOT NULL DEFAULT 'ag_ordinaire'
+                        CHECK(type_scrutin IN ('ag_ordinaire','ag_extraordinaire','consultation','election')),
+      description       TEXT,
+      responsable_id    INTEGER,
+      date_ouverture    TEXT,
+      date_fermeture    TEXT,
+      fermeture_mode    TEXT DEFAULT 'auto' CHECK(fermeture_mode IN ('auto','manuelle')),
+      vote_secret       INTEGER DEFAULT 1,
+      vote_nominatif    INTEGER DEFAULT 0,
+      resultats_direct  INTEGER DEFAULT 0,
+      pv_auto           INTEGER DEFAULT 1,
+      statut            TEXT NOT NULL DEFAULT 'brouillon' CHECK(statut IN ('brouillon','ouvert','clos','annule')),
+      quorum_requis     INTEGER DEFAULT 0,
+      created_at        TEXT DEFAULT (datetime('now')),
+      updated_at        TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+      FOREIGN KEY(responsable_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS vote_resolutions (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      scrutin_id        INTEGER NOT NULL,
+      ordre             INTEGER DEFAULT 0,
+      titre             TEXT NOT NULL,
+      description       TEXT,
+      type_reponse      TEXT NOT NULL DEFAULT 'oui_non_abstention'
+                        CHECK(type_reponse IN ('oui_non_abstention','choix_multiple','classement','election_personnes')),
+      options_json      TEXT DEFAULT '[]',
+      created_at        TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(scrutin_id) REFERENCES vote_scrutins(id) ON DELETE CASCADE
+    );
+
+    /* Base identité : qui a le droit de vote + a-t-il voté — JAMAIS le choix */
+    CREATE TABLE IF NOT EXISTS vote_electeurs (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      scrutin_id        INTEGER NOT NULL,
+      user_id           INTEGER NOT NULL,
+      source            TEXT NOT NULL DEFAULT 'liste_perso'
+                        CHECK(source IN ('tous_actifs','abonnes','adhesion','cotisation','liste_perso','reseau_pro')),
+      code_acces        TEXT NOT NULL,
+      a_vote            INTEGER DEFAULT 0,
+      notif_envoyee_at  TEXT,
+      notif_ouverte_at  TEXT,
+      vote_le           TEXT,
+      created_at        TEXT DEFAULT (datetime('now')),
+      UNIQUE(scrutin_id, user_id),
+      FOREIGN KEY(scrutin_id) REFERENCES vote_scrutins(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    /* Base bulletin : ANONYME — aucune colonne d'identité, aucune FK vers vote_electeurs */
+    CREATE TABLE IF NOT EXISTS vote_bulletins (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      scrutin_id        INTEGER NOT NULL,
+      resolution_id     INTEGER NOT NULL,
+      choix             TEXT NOT NULL,
+      created_at        TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS vote_tentatives (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      scrutin_id        INTEGER,
+      ip                TEXT,
+      raison            TEXT CHECK(raison IN ('code_invalide','deja_vote','non_autorise')),
+      created_at        TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS vote_documents (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      scrutin_id        INTEGER NOT NULL,
+      type              TEXT NOT NULL CHECK(type IN ('pv','resultats','resolutions_adoptees','certificat')),
+      contenu_html      TEXT,
+      hash_integrite    TEXT,
+      created_at        TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(scrutin_id) REFERENCES vote_scrutins(id) ON DELETE CASCADE
+    );
+  `);
+
+  // ── Archivage des scrutins (préserve électeurs/bulletins/documents, masque juste de la liste active) ──
+  const voteScrutinsCols = db.prepare('PRAGMA table_info(vote_scrutins)').all().map(c=>c.name);
+  if (voteScrutinsCols.length && !voteScrutinsCols.includes('archived')) {
+    db.exec("ALTER TABLE vote_scrutins ADD COLUMN archived INTEGER DEFAULT 0");
+  }
+
   // ── Masquage de compte (remplace la suppression : profil public caché, données conservées) ──
   const userCols3 = db.prepare('PRAGMA table_info(users)').all().map(c=>c.name);
   if (!userCols3.includes('compte_masque')) db.exec("ALTER TABLE users ADD COLUMN compte_masque INTEGER DEFAULT 0");
+
+  // ── Profil public enrichi (colonnes gauche/droite du profil personnel — miroir des initiatives) ──
+  if (!userCols3.includes('publics_json'))      db.exec("ALTER TABLE users ADD COLUMN publics_json TEXT");
+  if (!userCols3.includes('besoins_json'))      db.exec("ALTER TABLE users ADD COLUMN besoins_json TEXT");
+  if (!userCols3.includes('realisations_json')) db.exec("ALTER TABLE users ADD COLUMN realisations_json TEXT");
+  if (!userCols3.includes('stats_perso_json'))  db.exec("ALTER TABLE users ADD COLUMN stats_perso_json TEXT");
+  if (!userCols3.includes('services_perso'))    db.exec("ALTER TABLE users ADD COLUMN services_perso TEXT");
+  if (!userCols3.includes('zones_json'))        db.exec("ALTER TABLE users ADD COLUMN zones_json TEXT");
+  if (!userCols3.includes('reseaux_json'))      db.exec("ALTER TABLE users ADD COLUMN reseaux_json TEXT");
+  if (!userCols3.includes('annee_debut'))       db.exec("ALTER TABLE users ADD COLUMN annee_debut INTEGER");
+  if (!userCols3.includes('assistant_actif'))   db.exec("ALTER TABLE users ADD COLUMN assistant_actif INTEGER DEFAULT 1");
+
+  // ── Registre unique des collectivités : identité territoriale ──
+  if (!userCols3.includes('identifiant_territorial')) db.exec("ALTER TABLE users ADD COLUMN identifiant_territorial TEXT");
+  db.exec(`CREATE TABLE IF NOT EXISTS collectivite_journal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    collectivite_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(collectivite_id) REFERENCES users(id)
+  )`);
 
   // ── Catalogues (regroupement des articles de la Vitrine) ──
   const prodCols3 = db.prepare('PRAGMA table_info(produits_vitrine)').all().map(c=>c.name);
@@ -3933,6 +4238,18 @@ db.exec(`
   }
   const wtCols = db.prepare('PRAGMA table_info(wallet_transactions)').all().map(c=>c.name);
   if (wtCols.length && !wtCols.includes('commande_vitrine_id')) db.exec("ALTER TABLE wallet_transactions ADD COLUMN commande_vitrine_id INTEGER");
+  if (wtCols.length && !wtCols.includes('adhesion_paiement_id')) db.exec("ALTER TABLE wallet_transactions ADD COLUMN adhesion_paiement_id INTEGER");
+
+  // ── Média de présentation (photo ou courte vidéo ≤60s) pour une formule d'adhésion ──
+  const adhFCols = db.prepare('PRAGMA table_info(adhesion_formules)').all().map(c=>c.name);
+  if (adhFCols.length) {
+    if (!adhFCols.includes('media_type'))            db.exec("ALTER TABLE adhesion_formules ADD COLUMN media_type TEXT");
+    if (!adhFCols.includes('media_url'))             db.exec("ALTER TABLE adhesion_formules ADD COLUMN media_url TEXT");
+    if (!adhFCols.includes('media_duree_secondes'))  db.exec("ALTER TABLE adhesion_formules ADD COLUMN media_duree_secondes INTEGER");
+    /* Liste de stockage des participants (module Réseau professionnel) : à chaque adhésion/cotisation
+       validée, le participant est automatiquement ajouté à cette liste (registre officiel réutilisable). */
+    if (!adhFCols.includes('liste_stockage_id'))     db.exec("ALTER TABLE adhesion_formules ADD COLUMN liste_stockage_id INTEGER REFERENCES listes_diffusion(id) ON DELETE SET NULL");
+  }
 }
 
 /* ── Boutique de la Vitrine (produits/services, max 20 par initiative) ── */

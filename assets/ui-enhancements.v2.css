@@ -433,3 +433,101 @@ input[type="checkbox"], input[type="radio"] {
   .sidebar, .topbar, .mobile-bottom-nav, .toast { display: none !important; }
   .content { padding: 0; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   BOUTONS DE SÉLECTION — pills (checkbox/radio/toggle) réutilisables
+   Zone cliquable large, contraste fort, état actif/inactif immédiat,
+   confortable au doigt sur mobile (min 44px de hauteur).
+   Usage : <label class="da-pill"><input type="checkbox"><span>Label</span></label>
+   ══════════════════════════════════════════════════════════════════ */
+.da-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.da-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text, #333);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--transition-fast, .15s), background var(--transition-fast, .15s),
+              color var(--transition-fast, .15s), box-shadow var(--transition-fast, .15s);
+}
+.da-pill input[type="checkbox"],
+.da-pill input[type="radio"] {
+  /* input natif conservé pour l'accessibilité/clavier mais visuellement masqué —
+     l'état visuel est porté par .da-pill via :has() */
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.da-pill span { pointer-events: none; }
+.da-pill:hover {
+  border-color: var(--orange);
+}
+.da-pill:has(input:checked) {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255,107,0,.35);
+}
+.da-pill:has(input:focus-visible) {
+  outline: 3px solid rgba(255,107,0,.4);
+  outline-offset: 2px;
+}
+/* Fallback pour navigateurs sans :has() — bascule via classe JS .checked */
+.da-pill.checked {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255,107,0,.35);
+}
+
+/* Variante "switch" (on/off unique, ex: activer/désactiver une option) */
+.da-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.da-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.da-switch .track {
+  width: 48px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--border);
+  position: relative;
+  transition: background var(--transition-fast, .15s);
+  flex-shrink: 0;
+}
+.da-switch .track::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  transition: transform var(--transition-fast, .15s);
+}
+.da-switch:has(input:checked) .track { background: var(--orange); }
+.da-switch:has(input:checked) .track::after { transform: translateX(20px); }
+.da-switch.checked .track { background: var(--orange); }
+.da-switch.checked .track::after { transform: translateX(20px); }
+.da-switch:has(input:focus-visible) .track { outline: 3px solid rgba(255,107,0,.4); outline-offset: 2px; }

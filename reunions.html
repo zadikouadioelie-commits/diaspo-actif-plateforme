@@ -817,8 +817,6 @@ ${decs.length?`<h2>Décisions prises</h2><ul>${decs.map(s=>`<li>${escH(s)}</li>`
 ${actions.length?`<h2>Actions</h2><table><tr><th>Action</th><th>Responsable</th><th>Échéance</th></tr>${actions.map(a=>`<tr><td>${escH(a.titre||a)}</td><td>${escH(a.responsable||'—')}</td><td>${escH(a.echeance||'—')}</td></tr>`).join('')}</table>`:''}
 ${resume.notes?`<h2>Notes</h2><p style="white-space:pre-wrap;">${escH(resume.notes)}</p>`:''}
 ${decisions.length?`<h2>Suivi des décisions</h2><table><tr><th>Décision</th><th>Type</th><th>Statut</th><th>Échéance</th></tr>${decisions.map(d=>`<tr><td>${escH(d.titre)}</td><td>${escH(d.type_suivi)}</td><td>${escH(d.statut)}</td><td>${escH(d.echeance||'—')}</td></tr>`).join('')}</table>`:''}
-<script src="/assets/cookies-banner.js"></script>
-  <script src="/assets/theme-manager.js"></script>
 </body></html>`;
     const w=window.open('','_blank');
     w.document.write(html);
@@ -844,7 +842,6 @@ ${sujets.length?`<h2>Sujets abordés</h2><ul>${sujets.map(s=>`<li>${escH(s)}</li
 ${decs.length?`<h2>Décisions</h2><ul>${decs.map(s=>`<li>${escH(s)}</li>`).join('')}</ul>`:''}
 ${actions.length?`<h2>Actions</h2><table border="1" cellpadding="4"><tr><th>Action</th><th>Responsable</th><th>Échéance</th></tr>${actions.map(a=>`<tr><td>${escH(a.titre||a)}</td><td>${escH(a.responsable||'')}</td><td>${escH(a.echeance||'')}</td></tr>`).join('')}</table>`:''}
 ${resume.notes?`<h2>Notes</h2><p>${escH(resume.notes).replace(/\n/g,'<br>')}</p>`:''}
-  <script src="/assets/theme-manager.js"></script>
 </body></html>`;
     const blob=new Blob(['﻿'+html],{type:'application/msword'});
     const a=document.createElement('a');

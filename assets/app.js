@@ -486,8 +486,14 @@ function renderInitiativeCard(it){
       : '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:#dbeafe;color:#1e40af;border:1px solid #3b82f6;">💼 Opportunités</span>'
   ).join(' ');
 
+  const initHref = `initiative.html?id=${encodeURIComponent(it.slug || it.id)}`;
+  const profilHref = it.owner_user_id ? `profil.html?id=${encodeURIComponent(it.owner_user_id)}` : initHref;
+  const vitrineHref = it.owner_user_id ? `profil.html?id=${encodeURIComponent(it.owner_user_id)}&vitrine=1` : null;
+  const vitrineBtn = (it.vitrine_active && vitrineHref)
+    ? `<a href="${vitrineHref}" class="ann-card-btn ann-card-btn-vitrine" onclick="event.stopPropagation()">🏬 Voir la vitrine</a>` : '';
+
   return `
-  <a class="ann-card" href="initiative.html?id=${encodeURIComponent(it.slug || it.id)}">
+  <div class="ann-card" onclick="window.location.href='${initHref}'" style="cursor:pointer;">
     <div class="ann-card-photo" style="position:relative;">
       <img src="${photo}" alt="${it.nom}" loading="lazy" onerror="this.src='https://picsum.photos/seed/${it.id||0}/400/240'">
       <span class="ann-cat-badge" style="background:${badge.bg};">${badge.label}</span>
@@ -505,12 +511,84 @@ function renderInitiativeCard(it){
       ${partenaireOfficielBadge}
       ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
       ${accredBadges ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${accredBadges}</div>` : ''}
-      <div class="ann-card-foot">
+      <div class="ann-card-foot" style="flex-wrap:wrap;gap:6px;">
         ${membres}
-        <span class="ann-arrow">→</span>
+        <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
+        ${vitrineBtn}
+        ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 S'inscrire à un événement</button>` : ''}
       </div>
     </div>
-  </a>`;
+  </div>`;
+}
+
+/* ══ Inscription à un événement depuis l'annuaire (simulation complète) ══ */
+async function openAnnuaireEvents(ownerId, initNom){
+  if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href = 'login.html'; return; }
+
+  // Overlay
+  let ov = document.getElementById('ann-evt-overlay');
+  if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'ann-evt-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 14px;';
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+    <div style="background:#0D1B2A;color:#fff;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;">
+      <div><div style="font-size:16px;font-weight:800;">📅 Événements ${initNom ? '· '+initNom : ''}</div>
+      <div style="font-size:12px;opacity:.8;margin-top:2px;">Inscrivez-vous en un clic</div></div>
+      <button onclick="document.getElementById('ann-evt-overlay').remove()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div id="ann-evt-body" style="padding:18px 22px;max-height:60vh;overflow-y:auto;">
+      <div style="text-align:center;color:#6B7280;padding:24px;">Chargement des événements…</div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+
+  const body = ov.querySelector('#ann-evt-body');
+  try {
+    const [evR, mesR] = await Promise.all([ api('GET','/evenements'), api('GET','/mes-evenements').catch(()=>({evenements:[]})) ]);
+    const inscrits = new Set((mesR.evenements||[]).map(e=>e.id));
+    const evts = (evR.evenements||[]).filter(e => Number(e.owner_user_id) === Number(ownerId) && e.date_evt >= new Date().toISOString().slice(0,10));
+    if (!evts.length) {
+      body.innerHTML = `<div style="text-align:center;color:#6B7280;padding:24px;">Aucun événement à venir pour cette initiative.</div>`;
+      return;
+    }
+    body.innerHTML = evts.map(e => annEvtRow(e, inscrits.has(e.id))).join('');
+  } catch (e) {
+    body.innerHTML = `<div style="color:#D33;padding:16px;">Erreur : ${e.message}</div>`;
+  }
+}
+
+function annEvtRow(e, inscrit){
+  const dt = e.date_evt ? new Date(e.date_evt).toLocaleDateString('fr',{weekday:'short',day:'2-digit',month:'long',year:'numeric'}) : '';
+  const lieu = [e.ville, e.pays].filter(Boolean).join(', ');
+  const btn = inscrit
+    ? `<button disabled style="background:#DCFCE7;color:#166534;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;">✓ Inscrit</button>`
+    : `<button onclick="annInscrire(${e.id}, this)" style="background:#FF6B00;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;">S'inscrire</button>`;
+  return `<div id="ann-evt-${e.id}" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #F1F5F9;">
+    <div style="min-width:0;">
+      <div style="font-size:14px;font-weight:700;color:#0D1B2A;">${(e.titre||'').replace(/</g,'&lt;')}</div>
+      <div style="font-size:12px;color:#6B7280;margin-top:3px;">📆 ${dt}${lieu ? ' · 📍 '+lieu.replace(/</g,'&lt;') : ''}${e.heure_debut ? ' · '+e.heure_debut : ''}</div>
+    </div>
+    <div style="flex-shrink:0;">${btn}</div>
+  </div>`;
+}
+
+async function annInscrire(id, btn){
+  // Validation par le Code de Sécurité Diaspo'Actif (DS-ID)
+  const dsId = prompt("🔐 Pour valider votre inscription, saisissez votre Code de Sécurité Diaspo'Actif (DS-ID).\n(À générer/retrouver dans Confidentialité.)");
+  if (dsId === null) return;               // annulé
+  if (!dsId.trim()) { alert('Le Code de Sécurité (DS-ID) est requis.'); return; }
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await api('POST', '/evenements/'+id+'/rejoindre', { ds_id: dsId.trim() });
+    const cell = btn.parentElement;
+    cell.innerHTML = `<button disabled style="background:#DCFCE7;color:#166534;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;">✓ Inscrit</button>`;
+    if (typeof showToast === 'function') showToast('✅ Inscription confirmée !');
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "S'inscrire";
+    alert(e.message || 'Erreur lors de l\'inscription.');
+  }
 }
 
 function populateSelect(id, values){
@@ -545,8 +623,9 @@ async function initAnnuaire(){
 
   function renderPersonCard(u) {
     const loc = [u.ville, u.pays].filter(Boolean).join(', ') || '—';
+    const profilHref = `profil.html?id=${encodeURIComponent(u.id)}`;
     return `
-    <a class="ann-card" href="profil.html?id=${encodeURIComponent(u.id)}">
+    <div class="ann-card" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
       <div class="ann-card-photo" style="position:relative;display:flex;align-items:center;justify-content:center;background:#f1f5f9;">
         ${photoAvatar([u.prenom,u.nom].filter(Boolean).join(' ')||u.nom, 96, 'user')}
         <span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>
@@ -555,9 +634,11 @@ async function initAnnuaire(){
         <div class="ann-card-title">${[u.prenom, u.nom].filter(Boolean).join(' ')}</div>
         <div class="ann-card-meta-row"><span class="ann-card-loc">📍 ${loc}</span></div>
         ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
-        <div class="ann-card-foot"><span class="ann-arrow">→</span></div>
+        <div class="ann-card-foot">
+          <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
+        </div>
       </div>
-    </a>`;
+    </div>`;
   }
 
   /* ── Rendu des chips filtres actifs ── */
@@ -2830,3 +2911,25 @@ document.addEventListener("DOMContentLoaded", ()=>{
   setTimeout(_moveToSlots, 900);
   setTimeout(_moveToSlots, 1800);
 });
+
+/* ── Bouton « Trouvez la perle rare » — inséré dans la barre de navigation de toutes les pages
+   (accueil public + bandeau après connexion), à côté du bouton Formations. ── */
+(function insertPerleRare(){
+  function run(){
+    document.querySelectorAll('nav.nav').forEach(function(nav){
+      if(nav.querySelector('.nav-perle')) return;
+      var a=document.createElement('a');
+      a.href='annuaire.html';
+      a.className='nav-perle';
+      a.textContent='💎 Trouvez la perle rare';
+      a.title='Découvrez les talents et initiatives de la diaspora';
+      a.style.cssText='background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff !important;padding:5px 12px;border-radius:8px;font-weight:700;';
+      var form=nav.querySelector('a[href="formations.html"]');
+      if(form) form.insertAdjacentElement('afterend', a);
+      else nav.appendChild(a);
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+  setTimeout(run, 600);
+})();

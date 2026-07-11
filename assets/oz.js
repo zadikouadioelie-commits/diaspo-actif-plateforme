@@ -752,9 +752,10 @@
       const btn = e.target.closest('[data-oz]');
       if (btn) handleBtn(btn.dataset.oz, btn.dataset.p);
 
-      // Close on outside click
+      // Close on outside click (le panel est détaché de #oz-root et rattaché à document.body, il faut donc aussi le vérifier)
       const root = document.getElementById('oz-root');
-      if (root && !root.contains(e.target)) closeAll();
+      const panelEl = document.getElementById('oz-panel');
+      if (root && !root.contains(e.target) && !(panelEl && panelEl.contains(e.target))) closeAll();
     });
 
     // Enter to send

@@ -58,6 +58,7 @@
       <a href="#obs-eco" data-section="obs-eco">💶 Observatoire Économique</a>
       <a href="#obs-coop" data-section="obs-coop">🌍 Observatoire Coopération</a>
       <a href="#obs-instit" data-section="obs-instit">🏛️ Observatoire Institutionnel</a>
+      <a href="#revenus-diaspora" data-section="revenus-diaspora">🗺️ Revenus par diaspora</a>
       <a href="#finances" data-section="finances">💰 Finances</a>
       <a href="#ventes" data-section="ventes">🛒 Ventes & Transactions</a>
       <a href="#plans" data-section="plans">📋 Plans & Abonnements</a>
@@ -68,7 +69,7 @@
       <a href="#publications" data-section="publications">📢 Publications</a>
       <a href="#moderation" data-section="moderation">🛡 Modération</a>
       <a href="#suppression-comptes" data-section="suppression-comptes" style="display:flex;justify-content:space-between;align-items:center;">🗑 Demandes de suppression <span id="delreq-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
-      <a href="audiovisuel.html">📺 Audiovisuel</a>
+      <a href="audiovisuel.html">🎬 Atelier audiovisuel</a>
       <a href="#ads" data-section="ads">📣 Publicités <span id="ads-pending-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="#social-sync" data-section="social-sync">🔄 Synchronisation réseaux sociaux (vue admin)</a>
 
@@ -82,9 +83,9 @@
       <a href="#faq-sr" data-section="faq-sr">❓ Questions sans réponse</a>
       <a href="#oz-admin" data-section="oz-admin">🤖 O-Z Intelligence</a>
       <a href="#onboarding" data-section="onboarding">🎓 Tutoriels d'accueil</a>
-      <a href="#packages" data-section="packages">📦 Package Diaspo'Actif</a>
-      <a href="#deals-admin" data-section="deals-admin">🎖 Attribution de Deal</a>
-      <a href="#diaspoactif-deals" data-section="diaspoactif-deals">🤝 Deals Diaspo'Actif</a>
+      <a href="#packages" data-section="packages" style="display:none;">📦 Package Diaspo'Actif</a>
+      <a href="#deals-admin" data-section="deals-admin" style="display:none;">🎖 Attribution de Deal</a>
+      <a href="#diaspoactif-deals" data-section="diaspoactif-deals" style="display:none;">🤝 Deals Diaspo'Actif</a>
       <a href="#partenaires-admin" data-section="partenaires-admin">🏅 Partenaires Officiels</a>
       <a href="#deal-master-admin" data-section="deal-master-admin">⭐ Deal Master</a>
       <a href="#temoignages-admin" data-section="temoignages-admin">💬 Témoignages</a>
@@ -1320,6 +1321,48 @@
             </div>
             <div id="oeg-export-msg" style="display:none;margin-top:14px;" class="notice"></div>
           </div>
+        </div>
+      </section>
+
+      <section id="section-revenus-diaspora" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:240px;">
+            <h2 style="margin:0;">🗺️ Revenus par diaspora</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Cartographie financière : gains cumulés des membres, ventilés par origine, pays de résidence, ville et secteur.</p>
+          </div>
+          <button class="btn btn-outline" style="font-size:13px;" onclick="loadRevenusDiaspora()">↺ Actualiser</button>
+          <button class="btn btn-outline" style="font-size:13px;border-color:#059669;color:#059669;" onclick="rdExportCSV()">⬇️ Export CSV</button>
+        </div>
+
+        <!-- Filtres croisés -->
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end;">
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Origine
+              <select id="rd-f-origine" onchange="loadRevenusDiaspora()" style="width:100%;margin-top:4px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px;"><option value="">Toutes origines</option></select>
+            </label>
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Pays de résidence
+              <select id="rd-f-pays" onchange="loadRevenusDiaspora()" style="width:100%;margin-top:4px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px;"><option value="">Tous pays</option></select>
+            </label>
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Ville
+              <select id="rd-f-ville" onchange="loadRevenusDiaspora()" style="width:100%;margin-top:4px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px;"><option value="">Toutes villes</option></select>
+            </label>
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Secteur
+              <select id="rd-f-secteur" onchange="loadRevenusDiaspora()" style="width:100%;margin-top:4px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px;"><option value="">Tous secteurs</option></select>
+            </label>
+            <button class="btn btn-outline" style="font-size:13px;" onclick="rdReset()">✕ Réinitialiser</button>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:16px;" id="rd-kpis"></div>
+
+        <!-- Ventilations -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
+          <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">🌍 Par origine (nationalité)</h3><div id="rd-par-origine"></div></div>
+          <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">🗺️ Par pays de résidence</h3><div id="rd-par-pays"></div></div>
+          <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">📍 Par ville</h3><div id="rd-par-ville"></div></div>
+          <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">💼 Par secteur d'activité</h3><div id="rd-par-secteur"></div></div>
+          <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">🧾 Par type de revenu</h3><div id="rd-par-type"></div></div>
         </div>
       </section>
 
@@ -6040,6 +6083,7 @@ async function submitAccordDirect(){
   const me = await fetchCurrentUser();
   if (!me) { window.location.href = "login.html"; return; }
   if (me.role !== "administrateur") { window.location.href = ROLE_DASHBOARD[me.role] || "index.html"; return; }
+  if (window.Posts) Posts.init(me.id);
 
   // Navigation sections — lazy-load les modules à la demande
   const SECTION_LOADERS = {
@@ -6049,6 +6093,7 @@ async function submitAccordDirect(){
     'obs-eco':   () => loadObsEco(),
     'obs-coop':  () => loadObsCoop(),
     'obs-instit': () => loadObsInstit(),
+    'revenus-diaspora': () => loadRevenusDiaspora(),
     finances:    () => loadFinances(),
     plans:       () => loadPlans(),
     promotions:  () => loadPromos(),
@@ -7601,6 +7646,106 @@ async function submitAccordDirect(){
   }
 
   // ══ FINANCES ═══════════════════════════════════════════════
+  /* ======================= Revenus par diaspora ======================= */
+  let RD_DATA = null;
+  const rdMoney = (n) => (Number(n)||0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+  function rdFillSelect(id, values, current) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const first = el.querySelector('option'); // conserve "Toutes/Tous …"
+    el.innerHTML = '';
+    el.appendChild(first);
+    values.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      if (v === current) o.selected = true;
+      el.appendChild(o);
+    });
+  }
+
+  function rdRenderBars(containerId, rows) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (!rows || !rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;margin:0;">Aucun revenu pour ces critères.</p>'; return; }
+    const max = Math.max(...rows.map(r => r.montant), 1);
+    el.innerHTML = rows.map(r => `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;">
+          <span style="font-weight:600;">${esc(r.cle)}</span>
+          <span style="font-weight:700;color:#1d4ed8;white-space:nowrap;">${rdMoney(r.montant)} <span style="color:var(--muted);font-weight:500;">· ${r.pct}%</span></span>
+        </div>
+        <div style="background:#eef2ff;border-radius:6px;height:10px;overflow:hidden;">
+          <div style="width:${Math.max(r.montant/max*100,2)}%;height:100%;background:linear-gradient(90deg,#2563EB,#1d4ed8);"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${r.nb_tx} transaction${r.nb_tx>1?'s':''}</div>
+      </div>`).join('');
+  }
+
+  async function loadRevenusDiaspora() {
+    const qs = new URLSearchParams();
+    ['origine','pays','ville','secteur'].forEach(k => {
+      const v = document.getElementById('rd-f-'+k)?.value;
+      if (v) qs.set(k, v);
+    });
+    const r = await api("GET", "/admin/revenus-diaspora" + (qs.toString() ? '?'+qs.toString() : '')).catch(() => null);
+    if (!r) { document.getElementById('rd-kpis').innerHTML = '<p style="color:#dc2626;">Erreur de chargement.</p>'; return; }
+    RD_DATA = r;
+
+    // Listes déroulantes (valeurs globales, sélection conservée)
+    rdFillSelect('rd-f-origine', r.filtres.origines, r.filtres_actifs.origine);
+    rdFillSelect('rd-f-pays',    r.filtres.pays,     r.filtres_actifs.pays);
+    rdFillSelect('rd-f-ville',   r.filtres.villes,   r.filtres_actifs.ville);
+    rdFillSelect('rd-f-secteur', r.filtres.secteurs, r.filtres_actifs.secteur);
+
+    const nbBenef = r.par_origine.length; // approximation: distinct origines actives
+    const moyTx = r.nb_transactions ? r.total / r.nb_transactions : 0;
+    document.getElementById('rd-kpis').innerHTML = [
+      ['💶 Revenu total cumulé', rdMoney(r.total), '#2563EB'],
+      ['🧾 Transactions', r.nb_transactions, '#059669'],
+      ['🌍 Origines représentées', r.par_origine.length, '#7c3aed'],
+      ['📈 Revenu moyen / transaction', rdMoney(moyTx), '#d97706'],
+    ].map(([lbl,val,col]) => `
+      <div class="card" style="border-left:4px solid ${col};padding:14px 16px;">
+        <div style="font-size:12px;color:var(--muted);font-weight:700;">${lbl}</div>
+        <div style="font-size:22px;font-weight:800;margin-top:4px;">${val}</div>
+      </div>`).join('');
+
+    rdRenderBars('rd-par-origine', r.par_origine);
+    rdRenderBars('rd-par-pays',    r.par_pays);
+    rdRenderBars('rd-par-ville',   r.par_ville);
+    rdRenderBars('rd-par-secteur', r.par_secteur);
+    rdRenderBars('rd-par-type',    r.par_type);
+  }
+
+  function rdReset() {
+    ['origine','pays','ville','secteur'].forEach(k => { const el = document.getElementById('rd-f-'+k); if (el) el.value = ''; });
+    loadRevenusDiaspora();
+  }
+
+  function rdExportCSV() {
+    if (!RD_DATA) return;
+    const lines = ['Dimension;Valeur;Montant (EUR);Part (%);Transactions'];
+    const push = (dim, rows) => rows.forEach(r => lines.push(`${dim};"${String(r.cle).replace(/"/g,'""')}";${r.montant};${r.pct};${r.nb_tx}`));
+    push('Origine', RD_DATA.par_origine);
+    push('Pays', RD_DATA.par_pays);
+    push('Ville', RD_DATA.par_ville);
+    push('Secteur', RD_DATA.par_secteur);
+    push('Type de revenu', RD_DATA.par_type);
+    const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'revenus-diaspora.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // Exposition globale : les gestionnaires inline (onchange/onclick) de la section
+  // s'exécutent en portée globale et doivent pouvoir atteindre ces fonctions.
+  window.loadRevenusDiaspora = loadRevenusDiaspora;
+  window.rdReset = rdReset;
+  window.rdExportCSV = rdExportCSV;
+
   async function loadFinances() {
     const r = await api("GET", "/admin/finances").catch(() => ({}));
     document.getElementById("fin-mrr").textContent       = (r.mrr||0).toFixed(2) + " €";

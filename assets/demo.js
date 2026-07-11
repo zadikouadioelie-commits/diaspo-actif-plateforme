@@ -577,6 +577,344 @@
       ]
     },
 
+    /* ── MES BILLETS (utilisateur) ── */
+    'f-mes-billets': {
+      badge:'🎟 Mes Billets', couleur:'#7c3aed',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Consulter mes billets",
+          voice:"Retrouvez tous les billets que vous avez achetés pour des événements sur Diaspo'Actif.",
+          desc:"Chaque billet acheté sur un événement d'initiative est automatiquement rangé ici, avec son statut à jour." },
+        { el:null, pos:'center',
+          titre:"🔍 Voir le détail d'un billet",
+          voice:"Ouvrez un billet pour afficher son QR Code, le lieu, l'heure et le titulaire.",
+          desc:"• QR Code à présenter à l'entrée\n• Statut (à venir, aujourd'hui, utilisé, remboursé…)\n• Type de billet (Standard / VIP / Gratuit)",
+          lien:{href:'mes-billets.html', label:'Voir mes billets'} },
+        { el:null, pos:'center',
+          titre:"⬇️ Emporter votre billet",
+          voice:"Téléchargez votre billet en PDF ou ajoutez l'événement à votre agenda Google.",
+          desc:"Le bouton PDF génère un billet imprimable avec QR Code ; le bouton Agenda ajoute l'événement à votre calendrier." },
+        { el:null, pos:'center',
+          titre:"✅ Vous êtes prêt !",
+          voice:"Ce module ne sert qu'à consulter et conserver vos billets — la création d'événements reste réservée aux comptes Initiative.",
+          desc:"Un souci avec un billet ? Contactez directement l'organisateur depuis le détail du billet." }
+      ]
+    },
+
+    /* ── BUSINESS PLAN ── */
+    'f-business-plan': {
+      badge:'📋 Business Plan', couleur:'#1e3a8a',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"Créer un Business Plan",
+          voice:"L'outil Business Plan vous aide à structurer votre projet étape par étape, pour convaincre partenaires et investisseurs.",
+          desc:"Startup, PME, association, ONG, coopérative… choisissez un modèle adapté à votre projet." },
+        { el:null, pos:'center',
+          titre:"📝 Remplir les sections",
+          voice:"Présentation, marché, offre, stratégie, finances — chaque section vous guide avec des exemples.",
+          desc:"• Résumé et présentation du projet\n• Étude de marché et positionnement\n• Stratégie et plan d'action\n• Simulation financière intégrée",
+          lien:{href:'business-plan.html', label:'Mes Business Plans'} },
+        { el:null, pos:'center',
+          titre:"🔗 Partager et suivre",
+          voice:"Suivez la progression de complétude et partagez votre business plan avec vos partenaires.",
+          desc:"Barre de progression automatique, duplication en un clic, partage collaboratif avec droits d'accès." },
+        { el:null, pos:'center', cta:'entrepreneur',
+          titre:"✅ Votre projet est structuré !",
+          voice:"Revenez à tout moment modifier votre business plan à mesure que votre projet évolue.",
+          desc:"Tableau de bord → Business Plans → créez, dupliquez ou archivez vos plans." }
+      ]
+    },
+
+    /* ── CV ET LETTRE DE MOTIVATION ── */
+    'f-cv-lettre': {
+      badge:'🟧 CV & Lettre', couleur:'#b45309',
+      steps:[
+        { el:null, pos:'center', badge:true,
+          titre:"CV et lettre de motivation",
+          voice:"Générez un CV et une lettre de motivation professionnels directement depuis votre profil.",
+          desc:"Plusieurs modèles (Classique, Corporate, Créatif, International) et thèmes de couleur au choix." },
+        { el:null, pos:'center',
+          titre:"🧩 Construire votre CV",
+          voice:"Reprenez les informations de votre profil ou complétez-les, puis choisissez votre modèle.",
+          desc:"• Expériences, formations, compétences\n• QR Code intégré pointant vers votre profil public\n• Export PDF téléchargeable",
+          lien:{href:'cv-builder.html', label:'Créer mon CV'} },
+        { el:null, pos:'center',
+          titre:"✉️ Rédiger votre lettre",
+          voice:"La lettre de motivation reprend le même style visuel que votre CV pour un dossier cohérent.",
+          desc:"Modèles et thèmes assortis à votre CV, QR Code, export PDF prêt à l'envoi.",
+          lien:{href:'lettre-builder.html', label:'Créer ma lettre'} },
+        { el:null, pos:'center',
+          titre:"✅ Votre dossier de candidature est prêt !",
+          voice:"Téléchargez vos documents ou envoyez-les directement depuis la plateforme.",
+          desc:"CV, lettre de motivation et profil vérifié — tout est réuni pour candidater en confiance." }
+      ]
+    },
+
+    /* ── COMPTE INITIATIVE — modules du dashboard ── */
+    'f-init-presentation': { badge:'📋 Ma fiche initiative', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Ma fiche initiative", voice:"Complétez la présentation publique de votre initiative pour inspirer confiance.", desc:"Mission, historique, équipe, réseaux sociaux, infos pratiques — tout ce qui donne envie de vous rejoindre." },
+      { el:null, pos:'center', titre:"✏️ Éditez chaque section", voice:"Cliquez sur le crayon à côté de chaque rubrique pour la modifier directement.", desc:"Chaque section (mission, équipe, zones d'action...) s'édite en ligne, sans quitter la page.", lien:{href:'dashboard-initiative.html', label:'Ma fiche initiative'} },
+      { el:null, pos:'center', cta:'initiative', titre:"✅ Une fiche complète, plus de confiance", voice:"Une fiche bien remplie augmente votre score d'activité et votre crédibilité.", desc:"Revenez régulièrement mettre à jour vos informations." }
+    ]},
+    'f-init-publications': { badge:'📰 Publications vitrine', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Publier sur votre vitrine", voice:"Annoncez vos actualités, offres et nouveautés directement sur votre vitrine publique.", desc:"Vos publications apparaissent dans l'onglet Vitrine de votre profil, visibles par tous vos abonnés." },
+      { el:null, pos:'center', titre:"🖼️ Texte, image, promotion", voice:"Ajoutez une image, un prix promotionnel ou un appel à l'action à chaque publication.", desc:"• Titre et description\n• Image de mise en avant\n• Prix / promotion optionnels\n• Bouton d'action (contacter, commander...)", lien:{href:'dashboard-initiative.html', label:'Publications'} },
+      { el:null, pos:'center', titre:"✅ Suivez l'engagement", voice:"Vues, partages, réactions et commentaires sont mesurés sur chaque publication.", desc:"Utilisez ces statistiques pour savoir ce qui intéresse le plus votre communauté." }
+    ]},
+    'f-init-zones': { badge:'🗺️ Zones d\'action', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Zones d'action", voice:"Indiquez les pays et régions où votre initiative intervient concrètement.", desc:"Ces zones apparaissent sur votre profil public et alimentent les observatoires territoriaux." },
+      { el:null, pos:'center', titre:"🌍 Ajoutez vos zones", voice:"Sélectionnez un ou plusieurs pays/régions d'intervention.", desc:"Plus vos zones sont précises, plus votre initiative sera visible auprès des membres concernés.", lien:{href:'dashboard-initiative.html', label:'Zones d\'action'} },
+      { el:null, pos:'center', titre:"✅ Visibilité ciblée", voice:"Les collectivités et membres de ces zones vous retrouveront plus facilement.", desc:"Mettez à jour vos zones dès que votre périmètre d'action évolue." }
+    ]},
+    'f-init-stats': { badge:'📊 Statistiques & Impact', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Statistiques & Impact", voice:"Suivez en temps réel les indicateurs clés de votre initiative.", desc:"Vues du profil, nombre de membres, abonnés, publications — tout en un coup d'œil." },
+      { el:null, pos:'center', titre:"📈 Comprendre votre impact", voice:"Ajoutez aussi des statistiques déclaratives : projets menés, bénéficiaires, pays couverts.", desc:"Ces chiffres renforcent la crédibilité de votre fiche auprès des visiteurs.", lien:{href:'dashboard-initiative.html', label:'Stats & Impact'} },
+      { el:null, pos:'center', titre:"✅ Un tableau de bord clair", voice:"Revenez régulièrement pour suivre votre progression.", desc:"Le score d'activité se calcule automatiquement à partir de ces données." }
+    ]},
+    'f-init-messages-vitrine': { badge:'🛍️ Messages de la vitrine', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Messages de la vitrine", voice:"Les visiteurs de votre vitrine peuvent vous écrire directement — retrouvez leurs messages ici.", desc:"Un espace dédié, séparé de votre messagerie personnelle, pour les demandes commerciales." },
+      { el:null, pos:'center', titre:"💬 Répondre rapidement", voice:"Chaque message affiche le produit ou la publication concernée pour répondre avec le bon contexte.", desc:"Un badge signale les messages non lus.", lien:{href:'dashboard-initiative.html', label:'Messages de la vitrine'} },
+      { el:null, pos:'center', titre:"✅ Ne manquez aucune opportunité", voice:"Une réponse rapide augmente vos chances de convertir un visiteur en client ou en membre.", desc:"Activez les notifications pour être alerté en temps réel." }
+    ]},
+    'f-init-vitrine': { badge:'⭐ Paramètres de la vitrine', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Paramètres de la vitrine", voice:"Personnalisez l'apparence de votre vitrine publique pour qu'elle vous ressemble.", desc:"Thème de couleur, bannière, sections mises en avant — votre vitrine, votre identité." },
+      { el:null, pos:'center', titre:"🎨 Choisissez votre thème", voice:"Un sélecteur de thème flottant vous permet de prévisualiser instantanément le rendu.", desc:"Le choix est sauvegardé automatiquement pour tous vos visiteurs.", lien:{href:'dashboard-initiative.html', label:'Paramètres Vitrine'} },
+      { el:null, pos:'center', titre:"✅ Une vitrine professionnelle", voice:"Une belle vitrine inspire confiance et encourage les abonnements.", desc:"Mettez régulièrement à jour votre bannière et vos sections mises en avant." }
+    ]},
+    'f-init-partenaires': { badge:'🤝 Liste des partenaires', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Liste des partenaires", voice:"Mettez en avant les organisations qui soutiennent ou collaborent avec votre initiative.", desc:"Logos cliquables affichés sur votre profil public, dans l'ordre de votre choix." },
+      { el:null, pos:'center', titre:"➕ Ajouter un partenaire", voice:"Recherchez un compte existant sur la plateforme ou ajoutez un partenaire externe.", desc:"Réorganisez l'ordre d'affichage par glisser-déposer, activez/désactivez un partenaire sans le supprimer.", lien:{href:'dashboard-initiative.html', label:'Liste des partenaires'} },
+      { el:null, pos:'center', titre:"✅ Crédibilité renforcée", voice:"Des partenariats visibles rassurent les nouveaux visiteurs.", desc:"Chaque logo renvoie vers le profil du partenaire." }
+    ]},
+    'f-init-adhesions': { badge:'🎫 Cotisations & Adhésions', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Cotisations & Adhésions", voice:"Créez des formules d'adhésion payantes ou gratuites et gérez votre registre de membres.", desc:"Carte membre numérique avec QR Code, relances automatiques, encaissement en ligne." },
+      { el:null, pos:'center', titre:"💳 Créer une formule", voice:"Définissez le montant, la périodicité et les moyens de paiement acceptés (carte, virement, Mobile Money).", desc:"• Nom et description de la formule\n• Montant et périodicité\n• Modes de paiement\n• Liste de stockage des adhérents", lien:{href:'dashboard-initiative.html', label:'Cotisations & Adhésions'} },
+      { el:null, pos:'center', titre:"🔔 Relances automatiques", voice:"Les adhérents en retard reçoivent automatiquement des rappels par email.", desc:"Suivez vos encaissements et exportez votre registre en CSV." },
+      { el:null, pos:'center', cta:'initiative', titre:"✅ Une gestion simplifiée", voice:"Toute votre trésorerie d'adhésion centralisée en un seul endroit.", desc:"Tableau de bord → Cotisations & Adhésions → suivez vos campagnes." }
+    ]},
+    'f-init-votes': { badge:'🗳️ Votes sécurisés', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Votes sécurisés", voice:"Organisez des scrutins et assemblées générales avec vote électronique sécurisé.", desc:"Authentification par DS-ID, bulletins anonymes, résultats certifiés." },
+      { el:null, pos:'center', titre:"🗳️ Créer un scrutin", voice:"Définissez les résolutions à voter et la liste des électeurs autorisés.", desc:"• Résolutions à voter\n• Électeurs (adhérents à jour, liste réseau pro...)\n• Dates d'ouverture/fermeture", lien:{href:'dashboard-initiative.html', label:'Votes sécurisés'} },
+      { el:null, pos:'center', titre:"📊 Résultats certifiés", voice:"À la clôture, un compte rendu automatique est généré avec le taux de participation.", desc:"Les électeurs sont relancés automatiquement s'ils n'ont pas encore voté." },
+      { el:null, pos:'center', cta:'initiative', titre:"✅ Une gouvernance transparente", voice:"Vos assemblées générales gagnent en légitimité et en traçabilité.", desc:"Tableau de bord → Votes sécurisés → consultez l'historique des scrutins." }
+    ]},
+    'f-init-recrutement': { badge:'📋 Candidatures', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Candidatures", voice:"Publiez des appels à candidatures et centralisez les postulants.", desc:"Bénévoles, stagiaires, membres d'équipe — gérez tout le processus de recrutement." },
+      { el:null, pos:'center', titre:"📝 Publier une offre", voice:"Décrivez le profil recherché et les conditions.", desc:"Les candidatures reçues sont classées et consultables depuis votre tableau de bord.", lien:{href:'dashboard-initiative.html', label:'Candidatures'} },
+      { el:null, pos:'center', titre:"✅ Suivez vos recrutements", voice:"Contactez directement les candidats intéressants depuis la messagerie.", desc:"Clôturez une offre une fois le poste pourvu." }
+    ]},
+    'f-init-paiement': { badge:'💳 Module paiement', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Module paiement", voice:"Connectez votre compte Stripe pour recevoir directement les paiements de vos activités.", desc:"Boutique, adhésions, billetterie — tous les paiements transitent par ce module." },
+      { el:null, pos:'center', titre:"🔗 Connecter Stripe", voice:"Créez ou reliez votre compte Stripe Connect en quelques clics.", desc:"Diaspo'Actif prélève une commission automatique sur chaque transaction, le reste est reversé sur votre compte.", lien:{href:'dashboard-initiative.html', label:'Module paiement'} },
+      { el:null, pos:'center', titre:"✅ Paiements sécurisés", voice:"Toutes les transactions sont traitées par Stripe, aucune donnée bancaire ne transite par nos serveurs.", desc:"Suivez vos encaissements depuis votre tableau de bord Stripe." }
+    ]},
+    'f-init-publicites': { badge:'📣 Publicités', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Publicités", voice:"Créez des campagnes publicitaires pour gagner en visibilité sur la plateforme.", desc:"Ciblez une zone géographique, une audience, et suivez les performances de votre campagne." },
+      { el:null, pos:'center', titre:"🎯 Créer une campagne", voice:"Choisissez une image ou une courte vidéo, définissez votre budget et votre audience cible.", desc:"Chaque campagne est soumise à validation par l'équipe Diaspo'Actif avant diffusion.", lien:{href:'dashboard-initiative.html', label:'Publicités'} },
+      { el:null, pos:'center', titre:"✅ Mesurez les résultats", voice:"Impressions, clics et conversions sont suivis en temps réel.", desc:"Ajustez votre campagne selon les performances observées." }
+    ]},
+
+    /* ── COMPTE COLLECTIVITÉ — modules du dashboard ── */
+    'f-coll-cockpit': { badge:'📊 Tableau de bord collectivité', couleur:'#0369a1', steps:[
+      { el:null, pos:'center', badge:true, titre:"Tableau de bord collectivité", voice:"Votre cockpit centralise tous les indicateurs clés de votre territoire.", desc:"Diaspora connectée, initiatives rattachées, activité récente — la vue d'ensemble de votre compétence." },
+      { el:null, pos:'center', titre:"📌 Accès rapide aux modules", voice:"Depuis le cockpit, accédez en un clic aux initiatives à valider, aux observatoires et aux communications.", desc:"Le menu latéral regroupe tous les modules disponibles pour votre compte.", lien:{href:'dashboard-collectivite.html', label:'Cockpit'} },
+      { el:null, pos:'center', titre:"✅ Pilotez votre territoire", voice:"Revenez régulièrement pour suivre l'évolution de votre diaspora et de vos initiatives.", desc:"Chaque module approfondit une dimension de votre action territoriale." }
+    ]},
+    'f-coll-initiatives': { badge:'✅ Valider les initiatives', couleur:'#0369a1', steps:[
+      { el:null, pos:'center', badge:true, titre:"Valider les initiatives", voice:"Examinez les initiatives qui se rattachent à votre territoire de compétence.", desc:"Chaque nouvelle initiative liée à votre périmètre attend votre validation avant d'être pleinement active." },
+      { el:null, pos:'center', titre:"🔍 Examiner un dossier", voice:"Consultez la fiche complète de l'initiative avant de vous prononcer.", desc:"Mission, responsable, zones d'action — toutes les informations nécessaires à votre décision.", lien:{href:'dashboard-collectivite.html', label:'Initiatives à valider'} },
+      { el:null, pos:'center', titre:"✅ Valider ou refuser", voice:"Une fois validée, l'initiative apparaît dans votre liste d'initiatives validées et gagne en visibilité.", desc:"Vous pouvez motiver un refus pour guider le porteur de projet." }
+    ]},
+    'f-coll-identite': { badge:'🔐 Identité Territoriale', couleur:'#0369a1', steps:[
+      { el:null, pos:'center', badge:true, titre:"Identité Territoriale", voice:"Obtenez un identifiant territorial officiel unique, gage d'authenticité pour votre collectivité.", desc:"Un badge de confiance qui protège votre compte contre l'usurpation par de faux comptes institutionnels." },
+      { el:null, pos:'center', titre:"🪪 Générer votre identifiant", voice:"Votre identifiant est généré automatiquement à partir de votre pays, ville et type d'organisme.", desc:"Un vérificateur de doublon détecte les collectivités similaires déjà enregistrées.", lien:{href:'dashboard-collectivite.html', label:'Identité Territoriale'} },
+      { el:null, pos:'center', titre:"✅ Un badge de confiance", voice:"Le journal d'activité trace toutes les actions liées à votre identité territoriale.", desc:"Les administrateurs rattachés à votre institution apparaissent également sur cette page." }
+    ]},
+    'f-coll-partenariats': { badge:'🟨 Partenariats', couleur:'#0369a1', steps:[
+      { el:null, pos:'center', badge:true, titre:"Partenariats", voice:"Suivez et développez vos partenariats institutionnels avec d'autres acteurs de la plateforme.", desc:"Une vue centralisée de toutes vos relations partenariales." },
+      { el:null, pos:'center', titre:"🤝 Développer votre réseau", voice:"Identifiez de nouveaux partenaires potentiels parmi les initiatives et institutions actives.", desc:"Chaque partenariat renforce votre rayonnement territorial.", lien:{href:'dashboard-collectivite.html', label:'Partenariats'} },
+      { el:null, pos:'center', titre:"✅ Un écosystème renforcé", voice:"Des partenariats actifs et visibles valorisent votre action auprès de la diaspora.", desc:"Mettez à jour régulièrement l'état de vos partenariats." }
+    ]},
+    'f-coll-oz': { badge:'🧠 OZ Collectivité', couleur:'#0369a1', steps:[
+      { el:null, pos:'center', badge:true, titre:"OZ Collectivité", voice:"OZ est votre assistant IA territorial, le Directeur Intelligence Diaspora de votre collectivité.", desc:"Posez-lui des questions sur votre diaspora, vos compétences disponibles, vos opportunités d'investissement." },
+      { el:null, pos:'center', titre:"💬 Poser une question", voice:"Demandez par exemple : « Quelles compétences ont mes membres en informatique ? » ou « Qui souhaite investir ? ».", desc:"OZ répond à partir des données réelles de votre diaspora connectée, bornées à votre périmètre.", lien:{href:'dashboard-collectivite.html', label:'OZ Collectivité'} },
+      { el:null, pos:'center', titre:"💡 Transformer en action", voice:"Les suggestions d'OZ peuvent être converties en un clic en Opportunité stratégique.", desc:"Un pont direct entre l'observation et l'action concrète sur le terrain." },
+      { el:null, pos:'center', titre:"✅ Une intelligence territoriale", voice:"OZ Collectivité vous aide à prendre des décisions éclairées sur votre territoire.", desc:"Toutes les données respectent le seuil de confidentialité (minimum 10 membres, aucune donnée nominative)." }
+    ]},
+    'f-coll-observatoire': { badge:'🌍 Observatoires', couleur:'#0369a1', steps:[
+      { el:null, pos:'center', badge:true, titre:"Observatoires Mondial & Territorial", voice:"Deux observatoires vous donnent une vision statistique complète de la diaspora.", desc:"Observatoire Mondial : vision globale anonymisée. Observatoire Territorial : bornée à votre périmètre de compétence." },
+      { el:null, pos:'center', titre:"📊 Explorer les données", voice:"Nationalités, origines, résidence, compétences, secteurs, initiatives, entreprises — tout est représenté visuellement.", desc:"Un seuil de confidentialité de 10 membres minimum garantit qu'aucune donnée nominative n'est exposée.", lien:{href:'dashboard-collectivite.html', label:'Observatoires'} },
+      { el:null, pos:'center', titre:"⚠️ Observer ne veut pas dire contacter", voice:"Accéder à une statistique n'autorise jamais à contacter individuellement les membres hors de votre juridiction.", desc:"Le premier contact appartient toujours au membre — la diffusion collective reste le seul canal." },
+      { el:null, pos:'center', titre:"✅ Une vision stratégique", voice:"Utilisez ces observatoires pour orienter vos politiques territoriales envers la diaspora.", desc:"Enregistrez une donnée intéressante comme Opportunité stratégique pour la transformer en action." }
+    ]},
+    'f-coll-opportunites': { badge:'💡 Opportunités stratégiques', couleur:'#0369a1', steps:[
+      { el:null, pos:'center', badge:true, titre:"Opportunités stratégiques", voice:"Le pont entre l'observation et l'action : transformez une donnée en projet concret.", desc:"Depuis l'Observatoire Mondial, enregistrez une observation comme opportunité à traiter." },
+      { el:null, pos:'center', titre:"🎯 Passer à l'action", voice:"Chaque opportunité peut être transformée en communication, appel à projets ou consultation.", desc:"L'action est automatiquement bornée à votre juridiction — jamais de contact individuel hors périmètre.", lien:{href:'dashboard-collectivite.html', label:'Opportunités stratégiques'} },
+      { el:null, pos:'center', titre:"✅ Historique tracé", voice:"Chaque opportunité conserve un historique complet de son évolution jusqu'à l'action.", desc:"Suivez l'état de chaque opportunité : nouvelle, en cours d'action, traitée." }
+    ]},
+    'f-coll-communications': { badge:'🟥 Communications', couleur:'#0369a1', steps:[
+      { el:null, pos:'center', badge:true, titre:"Communications", voice:"Diffusez des communications officielles aux membres relevant de votre compétence territoriale.", desc:"Actualités, alertes, informations pratiques — un canal de diffusion collective vers votre diaspora." },
+      { el:null, pos:'center', titre:"📤 Rédiger et diffuser", voice:"Votre communication est automatiquement limitée aux membres de votre juridiction.", desc:"Un encart rappelle le périmètre exact de diffusion avant l'envoi.", lien:{href:'dashboard-collectivite.html', label:'Communications'} },
+      { el:null, pos:'center', titre:"✅ Un canal officiel", voice:"Vos communications apparaissent identifiées comme provenant d'une institution vérifiée.", desc:"Consultez le taux de lecture de vos communications passées." }
+    ]},
+    'f-coll-consultations': { badge:'📋 Consultations', couleur:'#0369a1', steps:[
+      { el:null, pos:'center', badge:true, titre:"Consultations", voice:"Lancez des consultations publiques pour recueillir l'avis de votre communauté.", desc:"Idéal pour associer la diaspora à vos décisions territoriales." },
+      { el:null, pos:'center', titre:"📝 Créer une consultation", voice:"Rédigez votre question et les options de réponse, puis diffusez-la à votre périmètre.", desc:"Les résultats sont agrégés en temps réel.", lien:{href:'dashboard-collectivite.html', label:'Consultations'} },
+      { el:null, pos:'center', titre:"✅ Une démocratie participative", voice:"Utilisez les résultats pour orienter vos décisions et communiquer sur les suites données.", desc:"Une consultation active renforce le lien entre votre collectivité et sa diaspora." }
+    ]},
+
+    /* ── ADMINISTRATION — modules avancés ── */
+    'f-adm-reseau': { badge:'🌍 Réseau & Diaspora', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Réseau & Diaspora", voice:"Explorez la cartographie globale du réseau et de la diaspora inscrite sur la plateforme.", desc:"Une vue d'ensemble de tous les membres, toutes origines et résidences confondues." },
+      { el:null, pos:'center', titre:"📊 Analyser la répartition", voice:"Filtrez par pays d'origine, de résidence, secteur d'activité.", desc:"Ces données alimentent aussi les observatoires proposés aux collectivités.", lien:{href:'dashboard-administrateur.html', label:'Réseau & Diaspora'} },
+      { el:null, pos:'center', titre:"✅ Piloter la croissance", voice:"Identifiez les zones à fort potentiel de développement.", desc:"Croisez ces données avec les statistiques d'acquisition." }
+    ]},
+    'f-adm-acquisition': { badge:'👥 Acquisition Membres', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Acquisition Membres", voice:"Suivez les indicateurs d'acquisition et de rétention de nouveaux membres.", desc:"Inscriptions, taux d'activation, rétention — la santé de la croissance de la plateforme." },
+      { el:null, pos:'center', titre:"📈 Comprendre les tendances", voice:"Identifiez les canaux d'acquisition les plus performants.", desc:"Ajustez vos actions de communication en fonction des résultats observés.", lien:{href:'dashboard-administrateur.html', label:'Acquisition Membres'} },
+      { el:null, pos:'center', titre:"✅ Optimiser la croissance", voice:"Ces indicateurs guident les décisions produit et marketing.", desc:"Suivez l'évolution mois après mois." }
+    ]},
+    'f-adm-init-projets': { badge:'🌐 Initiatives & Projets', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Initiatives & Projets", voice:"Supervisez l'ensemble des initiatives et projets créés sur la plateforme.", desc:"Une vue globale, tous territoires confondus, complémentaire à la validation par les collectivités." },
+      { el:null, pos:'center', titre:"🔍 Superviser et intervenir", voice:"Consultez le détail de chaque initiative et intervenez en cas de besoin.", desc:"Cette vue croise les données de toutes les collectivités validatrices.", lien:{href:'dashboard-administrateur.html', label:'Initiatives & Projets'} },
+      { el:null, pos:'center', titre:"✅ Une vision plateforme", voice:"Identifiez les initiatives les plus actives et les tendances par secteur.", desc:"Utile pour la mise en avant éditoriale ou les partenariats stratégiques." }
+    ]},
+    'f-adm-accreditations': { badge:'🏛️ Accréditations', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Accréditations", voice:"Traitez les demandes d'accréditation premium soumises par les comptes.", desc:"Gestion des Associations, Créateur de formations, et autres accréditations spécialisées." },
+      { el:null, pos:'center', titre:"✅ Examiner une demande", voice:"Consultez le dossier soumis et validez ou refusez la demande.", desc:"Une fois accordée, l'accréditation débloque les modules premium correspondants.", lien:{href:'dashboard-administrateur.html', label:'Accréditations'} },
+      { el:null, pos:'center', titre:"✅ Un contrôle qualité", voice:"Les accréditations garantissent que les comptes premium respectent les standards de la plateforme.", desc:"Vous pouvez révoquer une accréditation en cas de manquement." }
+    ]},
+    'f-adm-certifications': { badge:'🛡️ Certifications', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Certifications", voice:"Gérez les certifications délivrées aux comptes et organisations de la plateforme.", desc:"Un gage de confiance supplémentaire, distinct des accréditations premium." },
+      { el:null, pos:'center', titre:"✅ Délivrer ou retirer", voice:"Attribuez une certification après vérification, ou retirez-la si nécessaire.", desc:"Les certifications sont visibles publiquement sur le profil concerné.", lien:{href:'dashboard-administrateur.html', label:'Certifications'} },
+      { el:null, pos:'center', titre:"✅ Renforcer la confiance", voice:"Un écosystème certifié inspire davantage confiance aux nouveaux membres.", desc:"Documentez vos critères de certification pour rester cohérent." }
+    ]},
+    'f-adm-membres': { badge:'👥 Registre des membres', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Registre des membres", voice:"Consultez et administrez le registre complet des membres de la plateforme.", desc:"Complémentaire à « Gérer les utilisateurs », avec une vue registre/export." },
+      { el:null, pos:'center', titre:"🔍 Rechercher et filtrer", voice:"Filtrez par type de compte, statut, date d'inscription.", desc:"Exportez le registre pour vos analyses ou obligations de reporting.", lien:{href:'dashboard-administrateur.html', label:'Membres'} },
+      { el:null, pos:'center', titre:"✅ Une base fiable", voice:"Un registre à jour est essentiel pour le pilotage de la plateforme.", desc:"Croisez avec les statistiques Diaspora Données pour une vue enrichie." }
+    ]},
+    'f-adm-reseau-pro': { badge:'💼 Réseau Professionnel', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Réseau Professionnel", voice:"Supervisez les connexions et échanges du réseau professionnel de la plateforme.", desc:"Une vue d'ensemble des mises en relation entre membres." },
+      { el:null, pos:'center', titre:"🔍 Surveiller l'activité", voice:"Identifiez les connexions actives et les éventuels abus à modérer.", desc:"Ce module alimente aussi les listes de diffusion « Réseau professionnel ».", lien:{href:'dashboard-administrateur.html', label:'Réseau Professionnel'} },
+      { el:null, pos:'center', titre:"✅ Un réseau sain", voice:"Un réseau professionnel actif est un indicateur clé d'engagement.", desc:"Suivez son évolution dans le temps." }
+    ]},
+    'f-adm-diaspora-stats': { badge:'📊 Diaspora Données', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Diaspora Données", voice:"Analysez les données démographiques et professionnelles de la diaspora inscrite.", desc:"Origines, résidences, secteurs d'activité, compétences — la donnée brute derrière les observatoires." },
+      { el:null, pos:'center', titre:"📈 Explorer en profondeur", voice:"Croisez plusieurs dimensions pour dégager des tendances.", desc:"Ces données alimentent l'Observatoire Mondial mis à disposition des collectivités.", lien:{href:'dashboard-administrateur.html', label:'Diaspora Données'} },
+      { el:null, pos:'center', titre:"✅ Une intelligence data", voice:"Utilisez ces analyses pour orienter la stratégie éditoriale et produit.", desc:"Le seuil de confidentialité s'applique aussi en interne." }
+    ]},
+    'f-adm-contenu': { badge:'📄 Contenu diaspora', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Contenu diaspora", voice:"Gérez le contenu éditorial dédié à la diaspora sur la plateforme.", desc:"Articles, ressources, contenus mis en avant auprès des membres diaspora." },
+      { el:null, pos:'center', titre:"✏️ Publier du contenu", voice:"Créez ou modérez le contenu éditorial diffusé.", desc:"Assurez la cohérence avec la ligne éditoriale de la plateforme.", lien:{href:'dashboard-administrateur.html', label:'Contenu diaspora'} },
+      { el:null, pos:'center', titre:"✅ Une ligne éditoriale forte", voice:"Un contenu de qualité fidélise les membres diaspora.", desc:"Planifiez vos publications à l'avance." }
+    ]},
+    'f-adm-observatoires': { badge:'📈 Observatoires (Éco/Coop/Instit.)', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Observatoires Économique, Coopération & Institutionnel", voice:"Trois tableaux de bord globaux pour piloter la plateforme à haut niveau.", desc:"Économique : flux et investissements. Coopération : partenariats inter-acteurs. Institutionnel : activité des collectivités." },
+      { el:null, pos:'center', titre:"📊 Explorer chaque observatoire", voice:"Chaque observatoire propose ses propres indicateurs et filtres.", desc:"Utilisez-les pour des rapports internes ou des présentations stratégiques.", lien:{href:'dashboard-administrateur.html', label:'Observatoires'} },
+      { el:null, pos:'center', titre:"✅ Une vision 360°", voice:"Complémentaires aux observatoires collectivité, ces vues sont réservées à l'administration.", desc:"Croisez-les avec les données Finances et Revenus par diaspora." }
+    ]},
+    'f-adm-revenus': { badge:'🗺️ Revenus par diaspora', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Revenus par diaspora", voice:"Visualisez la répartition géographique des revenus générés par la plateforme.", desc:"Quelles zones de diaspora génèrent le plus d'activité économique ?" },
+      { el:null, pos:'center', titre:"🗺️ Cartographie des revenus", voice:"Une carte interactive répartit les revenus par pays et région.", desc:"Croisez avec Finances pour une vue complète.", lien:{href:'dashboard-administrateur.html', label:'Revenus par diaspora'} },
+      { el:null, pos:'center', titre:"✅ Orienter la stratégie", voice:"Identifiez les zones prioritaires pour vos investissements marketing.", desc:"Suivez l'évolution trimestre après trimestre." }
+    ]},
+    'f-adm-finances': { badge:'💰 Finances', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Finances", voice:"Suivez les finances globales de la plateforme : commissions, wallet, flux Stripe.", desc:"Le tableau de bord financier consolidé de Diaspo'Actif." },
+      { el:null, pos:'center', titre:"💳 Commissions et wallet", voice:"Chaque transaction (boutique, adhésions, billetterie) génère une commission suivie ici.", desc:"Le wallet de chaque compte Initiative retrace ses transactions entrantes et sortantes.", lien:{href:'dashboard-administrateur.html', label:'Finances'} },
+      { el:null, pos:'center', titre:"✅ Une trésorerie maîtrisée", voice:"Un suivi rigoureux garantit la santé financière de la plateforme.", desc:"Exportez vos rapports pour la comptabilité." }
+    ]},
+    'f-adm-ventes': { badge:'🛒 Ventes & Transactions', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Ventes & Transactions", voice:"Consultez l'historique complet de toutes les ventes et transactions Stripe de la plateforme.", desc:"Boutique, billetterie, adhésions — chaque transaction est tracée." },
+      { el:null, pos:'center', titre:"🔍 Rechercher une transaction", voice:"Filtrez par compte, date, statut de paiement.", desc:"Utile pour le support client en cas de litige ou de remboursement.", lien:{href:'dashboard-administrateur.html', label:'Ventes & Transactions'} },
+      { el:null, pos:'center', titre:"✅ Une traçabilité complète", voice:"Chaque euro qui transite par la plateforme est traçable.", desc:"Croisez avec le module Finances pour la vue consolidée." }
+    ]},
+    'f-adm-plans': { badge:'📋 Plans & Abonnements', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Plans & Abonnements", voice:"Configurez les plans et abonnements proposés aux différents types de comptes.", desc:"Gratuit, premium, accréditations — définissez la grille tarifaire de la plateforme." },
+      { el:null, pos:'center', titre:"⚙️ Créer ou modifier un plan", voice:"Ajustez les fonctionnalités incluses et le tarif de chaque plan.", desc:"Les changements s'appliquent aux nouveaux abonnements.", lien:{href:'dashboard-administrateur.html', label:'Plans & Abonnements'} },
+      { el:null, pos:'center', titre:"✅ Une offre claire", voice:"Une grille tarifaire cohérente facilite la conversion des comptes gratuits.", desc:"Suivez le taux d'adoption de chaque plan." }
+    ]},
+    'f-adm-promotions': { badge:'🎯 Promotions', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Promotions", voice:"Créez et pilotez des campagnes promotionnelles à l'échelle de la plateforme.", desc:"Codes promo, offres limitées dans le temps, mise en avant de contenus." },
+      { el:null, pos:'center', titre:"🎁 Lancer une promotion", voice:"Définissez la durée, le périmètre et l'avantage accordé.", desc:"Suivez le taux d'utilisation en temps réel.", lien:{href:'dashboard-administrateur.html', label:'Promotions'} },
+      { el:null, pos:'center', titre:"✅ Stimuler l'engagement", voice:"Les promotions bien ciblées augmentent l'activité sur la plateforme.", desc:"Analysez les résultats après chaque campagne." }
+    ]},
+    'f-adm-communication': { badge:'✉️ Communication', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Communication", voice:"Envoyez des communications globales à l'ensemble ou à des segments de membres.", desc:"Newsletters, annonces importantes, alertes plateforme." },
+      { el:null, pos:'center', titre:"📤 Rédiger et cibler", voice:"Segmentez votre audience par rôle, pays ou activité.", desc:"Prévisualisez avant l'envoi pour éviter toute erreur.", lien:{href:'dashboard-administrateur.html', label:'Communication'} },
+      { el:null, pos:'center', titre:"✅ Un canal maîtrisé", voice:"Suivez les taux d'ouverture et ajustez votre stratégie de communication.", desc:"Espacez vos envois pour ne pas lasser vos membres." }
+    ]},
+    'f-adm-publications': { badge:'📢 Publications (modération)', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Publications (modération)", voice:"Supervisez et modérez l'ensemble des publications diffusées sur la plateforme.", desc:"Fil d'actualité, vitrines, publications d'événements — une vue centralisée." },
+      { el:null, pos:'center', titre:"🛡️ Modérer un contenu", voice:"Retirez ou signalez un contenu qui ne respecte pas les règles de la plateforme.", desc:"Les publications signalées par les membres apparaissent en priorité.", lien:{href:'dashboard-administrateur.html', label:'Publications'} },
+      { el:null, pos:'center', titre:"✅ Un espace sain", voice:"Une modération réactive préserve la qualité de la plateforme.", desc:"Documentez vos décisions pour rester cohérent dans le temps." }
+    ]},
+    'f-adm-moderation': { badge:'🛡️ Modération', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Modération", voice:"Traitez les signalements et modérez les contenus problématiques de la plateforme.", desc:"Le centre de modération centralise tous les signalements reçus." },
+      { el:null, pos:'center', titre:"🚩 Traiter un signalement", voice:"Examinez le contenu signalé et prenez une décision : ignorer, avertir, ou suspendre.", desc:"Chaque décision est tracée pour garder un historique de modération.", lien:{href:'dashboard-administrateur.html', label:'Modération'} },
+      { el:null, pos:'center', titre:"✅ Une communauté protégée", voice:"Une modération cohérente et réactive protège tous les membres.", desc:"Croisez avec le Journal d'erreurs pour détecter les abus techniques." }
+    ]},
+    'f-adm-suppression': { badge:'🗑️ Suppressions de comptes', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Demandes de suppression de comptes", voice:"Traitez les demandes de suppression définitive de compte, conformément au RGPD.", desc:"Chaque demande transite par l'administration avant toute suppression irréversible." },
+      { el:null, pos:'center', titre:"📋 Examiner une demande", voice:"Échangez si besoin avec le membre avant de finaliser la suppression.", desc:"La suppression anonymise les données conformément à la réglementation.", lien:{href:'dashboard-administrateur.html', label:'Demandes de suppression'} },
+      { el:null, pos:'center', titre:"✅ Conformité RGPD", voice:"Un traitement rigoureux de ces demandes protège la plateforme juridiquement.", desc:"Conservez une trace de chaque traitement effectué." }
+    ]},
+    'f-adm-publicites': { badge:'📣 Publicités (Ads)', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Publicités (Ads)", voice:"Validez et pilotez les campagnes publicitaires soumises par les comptes Initiative.", desc:"Chaque publicité est vérifiée avant diffusion sur la plateforme." },
+      { el:null, pos:'center', titre:"✅ Valider une campagne", voice:"Vérifiez le contenu, le budget et le ciblage avant d'approuver.", desc:"Suivez les performances globales des campagnes actives.", lien:{href:'dashboard-administrateur.html', label:'Publicités'} },
+      { el:null, pos:'center', titre:"✅ Un espace publicitaire sain", voice:"Un contrôle qualité rigoureux préserve la confiance des membres.", desc:"Refusez toute publicité non conforme à la charte." }
+    ]},
+    'f-adm-social-sync': { badge:'🔄 Sync réseaux sociaux', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Synchronisation réseaux sociaux", voice:"Configurez la synchronisation automatique avec les réseaux sociaux externes.", desc:"Facebook, LinkedIn, Instagram — diffusez automatiquement du contenu croisé." },
+      { el:null, pos:'center', titre:"🔗 Connecter un réseau", voice:"Autorisez la connexion et définissez les règles de synchronisation.", desc:"Les membres peuvent aussi synchroniser leur propre compte depuis leur tableau de bord.", lien:{href:'dashboard-administrateur.html', label:'Synchronisation réseaux sociaux'} },
+      { el:null, pos:'center', titre:"✅ Plus de portée", voice:"La synchronisation étend la visibilité du contenu Diaspo'Actif au-delà de la plateforme.", desc:"Surveillez les erreurs de synchronisation régulièrement." }
+    ]},
+    'f-adm-error-logs': { badge:'🩺 Journal d\'erreurs', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Journal d'erreurs", voice:"Le monitoring maison remplace un outil externe type Sentry pour suivre les erreurs applicatives.", desc:"Chaque erreur serveur ou client significative est journalisée ici." },
+      { el:null, pos:'center', titre:"🔍 Diagnostiquer un incident", voice:"Consultez le détail technique de chaque erreur pour en identifier la cause.", desc:"Filtrez par gravité, page ou date pour prioriser les correctifs.", lien:{href:'dashboard-administrateur.html', label:'Journal d\'erreurs'} },
+      { el:null, pos:'center', titre:"✅ Une plateforme fiable", voice:"Un suivi régulier permet de corriger les problèmes avant qu'ils n'impactent trop d'utilisateurs.", desc:"Croisez avec les retours du support pour prioriser." }
+    ]},
+    'f-adm-formations': { badge:'📚 Formations', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Formations", voice:"Gérez le catalogue de formations proposées sur la plateforme.", desc:"Validez les formations créées par les comptes accrédités « Créateur de formations »." },
+      { el:null, pos:'center', titre:"✅ Modérer le catalogue", voice:"Vérifiez la qualité et la pertinence de chaque formation avant publication.", desc:"Retirez les formations obsolètes ou non conformes.", lien:{href:'dashboard-administrateur.html', label:'Formations'} },
+      { el:null, pos:'center', titre:"✅ Un catalogue de qualité", voice:"Des formations pertinentes renforcent la valeur ajoutée de la plateforme.", desc:"Suivez les inscriptions par formation." }
+    ]},
+    'f-adm-chatbot': { badge:'🧠 Mémoire Chatbot', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Mémoire Chatbot", voice:"Alimentez la base de connaissances utilisée par les assistants IA de la plateforme.", desc:"Plus la mémoire est riche, plus les réponses du chatbot sont pertinentes." },
+      { el:null, pos:'center', titre:"➕ Enrichir la base", voice:"Ajoutez des questions/réponses fréquentes ou des connaissances métier.", desc:"Les questions sans réponse remontées par les utilisateurs peuvent être intégrées ici.", lien:{href:'dashboard-administrateur.html', label:'Mémoire Chatbot'} },
+      { el:null, pos:'center', titre:"✅ Un assistant plus performant", voice:"Une base de connaissances à jour améliore l'expérience de tous les membres.", desc:"Révisez régulièrement les réponses générées." }
+    ]},
+    'f-adm-oz-intel': { badge:'🤖 O-Z Intelligence', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"O-Z Intelligence", voice:"Pilotez et affinez le comportement de l'assistant IA O-Z présent sur toute la plateforme.", desc:"O-Z répond aux questions des membres par un moteur de règles, sans dépendre d'un LLM externe." },
+      { el:null, pos:'center', titre:"⚙️ Ajuster les intentions", voice:"Configurez les intentions reconnues par O-Z et leurs réponses associées.", desc:"Surveillez les questions non comprises pour enrichir le moteur.", lien:{href:'dashboard-administrateur.html', label:'O-Z Intelligence'} },
+      { el:null, pos:'center', titre:"✅ Un assistant cohérent partout", voice:"O-Z Intelligence garantit une expérience homogène sur tous les comptes.", desc:"Un seul réglage impacte instantanément toute la plateforme." }
+    ]},
+    'f-adm-onboarding': { badge:'🎓 Tutoriels d\'accueil', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Tutoriels d'accueil", voice:"Configurez les tutoriels de bienvenue proposés aux nouveaux comptes.", desc:"Le premier contact d'un nouveau membre avec la plateforme passe souvent par ces tutoriels." },
+      { el:null, pos:'center', titre:"✏️ Adapter le parcours", voice:"Personnalisez le message et les étapes selon le type de compte créé.", desc:"C'est ici que sont configurés les tutoriels « Prise en main » par rôle du Centre des tutos.", lien:{href:'dashboard-administrateur.html', label:'Tutoriels d\'accueil'} },
+      { el:null, pos:'center', titre:"✅ Un accueil réussi", voice:"Un bon onboarding réduit le taux d'abandon des nouveaux comptes.", desc:"Testez régulièrement le parcours du point de vue d'un nouvel utilisateur." }
+    ]},
+    'f-adm-packages': { badge:'📦 Package Diaspo\'Actif', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Package Diaspo'Actif", voice:"Gérez les packages d'offres groupées proposés sur la plateforme.", desc:"Des bouquets de fonctionnalités combinées, vendus comme une offre unique." },
+      { el:null, pos:'center', titre:"⚙️ Composer un package", voice:"Associez plusieurs modules ou avantages dans une offre packagée.", desc:"Définissez le tarif global du package.", lien:{href:'dashboard-administrateur.html', label:'Package Diaspo\'Actif'} },
+      { el:null, pos:'center', titre:"✅ Une offre différenciante", voice:"Les packages simplifient le choix pour les comptes hésitants.", desc:"Suivez leur taux d'adoption." }
+    ]},
+    'f-adm-deals-attrib': { badge:'🎖️ Attribution & Deals', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Attribution de Deal & Deals Diaspo'Actif", voice:"Attribuez des deals spéciaux et supervisez la marketplace Deals Diaspo'Actif.", desc:"Un dispositif complémentaire au module Deals classique, pour des offres pilotées par l'administration." },
+      { el:null, pos:'center', titre:"🎁 Attribuer un deal", voice:"Sélectionnez le compte bénéficiaire et les conditions du deal accordé.", desc:"Suivez l'utilisation des deals attribués.", lien:{href:'dashboard-administrateur.html', label:'Attribution de Deal'} },
+      { el:null, pos:'center', titre:"✅ Une marketplace dynamique", voice:"Des deals attractifs stimulent l'engagement des comptes Initiative.", desc:"Analysez régulièrement les deals les plus performants." }
+    ]},
+    'f-adm-deal-master': { badge:'⭐ Deal Master', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Deal Master", voice:"Gérez le statut et les privilèges du badge Deal Master, réservé aux comptes les plus actifs en collaboration.", desc:"Un badge de reconnaissance visible publiquement sur le profil." },
+      { el:null, pos:'center', titre:"🏅 Attribuer le badge", voice:"Sélectionnez les comptes méritant le statut Deal Master selon leur activité.", desc:"Le badge peut être retiré en cas d'inactivité ou de manquement.", lien:{href:'dashboard-administrateur.html', label:'Deal Master'} },
+      { el:null, pos:'center', titre:"✅ Valoriser l'excellence", voice:"Ce badge encourage une collaboration active et de qualité sur la plateforme.", desc:"Communiquez sur les nouveaux Deal Master pour valoriser la reconnaissance." }
+    ]},
+    'f-adm-parametres': { badge:'⚙️ Paramètres plateforme', couleur:'#374151', steps:[
+      { el:null, pos:'center', badge:true, titre:"Paramètres plateforme", voice:"Configurez les paramètres généraux de la plateforme Diaspo'Actif.", desc:"Réglages globaux qui impactent l'ensemble des comptes." },
+      { el:null, pos:'center', titre:"⚙️ Ajuster les réglages", voice:"Modifiez avec précaution : ces paramètres ont un impact plateforme entière.", desc:"Testez chaque changement important avant de le généraliser.", lien:{href:'dashboard-administrateur.html', label:'Paramètres'} },
+      { el:null, pos:'center', titre:"✅ Une configuration maîtrisée", voice:"Documentez chaque changement de paramètre important.", desc:"Revenez ici pour tout réglage global de la plateforme." }
+    ]},
+
     /* ── GESTION DES ASSOCIATIONS ── */
     'f-asso-accreditation': {
       badge:'🏅 Accréditation Asso', couleur:'#7c3aed',

@@ -23,7 +23,8 @@
 .evt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:20px}
 .evt-card{border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow .15s}
 .evt-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
-.evt-img{width:100%;height:140px;background:linear-gradient(135deg,#ff6b00 0%,#ff9f43 100%);display:flex;align-items:center;justify-content:center;font-size:48px}
+.evt-img{width:100%;height:140px;background:linear-gradient(135deg,#ff6b00 0%,#ff9f43 100%);display:flex;align-items:center;justify-content:center;font-size:48px;overflow:hidden}
+.evt-img img{width:100%;height:100%;object-fit:cover;display:block}
 .evt-body{padding:16px}
 .evt-date{font-size:12px;color:#2563EB;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
 .evt-title{font-size:16px;font-weight:700;margin:0 0 8px;line-height:1.3}
@@ -115,6 +116,10 @@
     <select id="f-domaine"><option value="">Tous les domaines</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Autre</option></select>
     <select id="f-type"><option value="">Tous types</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="autre">Autre</option></select>
     <select id="f-pays"><option value="">Tous pays</option></select>
+    <input type="text" id="f-ville" placeholder="Ville..." style="min-width:140px">
+    <select id="f-origine"><option value="">Toutes origines</option></select>
+    <button class="btn btn-orange" id="btn-search" style="font-size:12px;padding:0 14px">🔍 Rechercher</button>
+    <button class="btn" id="btn-search-global" style="font-size:12px;padding:0 14px">🌍 Rechercher sur tout Diaspo'Actif</button>
     <button class="btn" id="btn-reset" style="font-size:12px;padding:0 12px">Réinitialiser</button>
   </div>
   <div id="evt-count" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
@@ -135,6 +140,7 @@
       <div><label>Heure de début</label><input type="time" id="e-heure" value="09:00"></div>
       <div><label>Pays</label><input type="text" id="e-pays" placeholder="France"></div>
       <div><label>Ville / Lieu</label><input type="text" id="e-lieu" placeholder="Paris, salle X"></div>
+      <div><label>Origine (diaspora ciblée)</label><select id="e-origine"><option value="">-- Origine --</option></select></div>
     </div>
     <div style="margin-bottom:10px;"><label>Description <span style="color:#2563EB">*</span></label><textarea id="e-desc" rows="3" style="width:100%;resize:vertical;box-sizing:border-box" placeholder="Décrivez l'événement : programme, objectifs, public cible…"></textarea></div>
 
@@ -293,12 +299,16 @@ async function loadEvts() {
   const domaine= document.getElementById('f-domaine').value;
   const type   = document.getElementById('f-type').value;
   const pays   = document.getElementById('f-pays').value;
+  const ville  = document.getElementById('f-ville').value.trim();
+  const origine= document.getElementById('f-origine').value;
   try {
     const params = new URLSearchParams();
     if(q)      params.set('q',q);
     if(domaine)params.set('domaine',domaine);
     if(type)   params.set('type',type);
     if(pays)   params.set('pays',pays);
+    if(ville)  params.set('ville',ville);
+    if(origine)params.set('origine',origine);
     const r = await api('GET', '/evenements?' + params);
     allEvts = r.evenements || [];
     renderEvts();
@@ -325,14 +335,18 @@ function renderEvts() {
     const plein   = evt.places_max && evt.nb_participants >= evt.places_max;
     const visiBadge = evt.visibilite === 'prive' ? '<span class="evt-tag" style="color:#e74c3c;">🔒 Privé</span>' :
                       evt.visibilite === 'abonnes' ? '<span class="evt-tag" style="color:#9b59b6;">⭐ Abonnés</span>' : '';
+    let galerieCard = [];
+    try { galerieCard = Array.isArray(evt.galerie_photos) ? evt.galerie_photos : JSON.parse(evt.galerie_photos||'[]'); } catch(e) {}
+    const cover = evt.image_couverture || evt.image_url || (galerieCard.filter(Boolean)[0]) || null;
     return `<div class="evt-card">
-      <div class="evt-img">${icon}</div>
+      <div class="evt-img">${cover ? `<img src="${esc(cover)}" alt="${esc(evt.titre)}" loading="lazy" onerror="this.parentNode.innerHTML='${icon}'">` : icon}</div>
       <div class="evt-body">
         <div class="evt-date">${fmtDate(evt.date_evt)}${evt.heure_debut?' · '+evt.heure_debut:''}</div>
         <div class="evt-title">${esc(evt.titre)}</div>
         <div class="evt-meta">
           ${evt.lieu ? '<span>📍 '+esc(evt.lieu)+'</span>' : ''}
           ${evt.pays ? '<span>🌍 '+esc(evt.pays)+'</span>' : ''}
+          ${evt.origine ? '<span>👥 Origine : '+esc(evt.origine)+'</span>' : ''}
           ${evt.type_evt ? '<span class="evt-tag">'+esc(evt.type_evt)+'</span>' : ''}
           ${evt.domaine ? '<span class="evt-tag">'+esc(evt.domaine)+'</span>' : ''}
           ${visiBadge}
@@ -356,11 +370,79 @@ function renderEvts() {
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-async function rejoindre(id, btn) {
+/* Ouvre le formulaire d'inscription à un événement */
+function rejoindre(id, btn) {
   if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href='login.html'; return; }
-  btn.disabled=true; btn.textContent='…';
-  try { await api('POST','/evenements/'+id+'/rejoindre'); inscritSet.add(id); renderEvts(); }
-  catch(e) { alert(e.message||'Erreur'); btn.disabled=false; btn.textContent="S'inscrire"; }
+  const evt = allEvts.find(e => e.id === id) || {};
+  const nom = [CURRENT_USER.prenom, CURRENT_USER.nom].filter(Boolean).join(' ') || CURRENT_USER.nom || '';
+  const email = CURRENT_USER.email || '';
+  let ov = document.getElementById('evt-inscr-overlay'); if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'evt-inscr-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 14px;';
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+    <div style="background:#2563EB;color:#fff;padding:18px 22px;">
+      <div style="font-size:16px;font-weight:800;">📝 Inscription à l'événement</div>
+      <div style="font-size:12.5px;opacity:.9;margin-top:2px;">${esc(evt.titre||'')}</div>
+    </div>
+    <form id="evt-inscr-form" style="padding:20px 22px;display:flex;flex-direction:column;gap:12px;">
+      <label style="font-size:12.5px;font-weight:700;color:#374151;">Nom complet *
+        <input required id="ins-nom" value="${esc(nom)}" style="width:100%;box-sizing:border-box;margin-top:4px;padding:10px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px;">
+      </label>
+      <label style="font-size:12.5px;font-weight:700;color:#374151;">E-mail *
+        <input required type="email" id="ins-email" value="${esc(email)}" style="width:100%;box-sizing:border-box;margin-top:4px;padding:10px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px;">
+      </label>
+      <div style="display:flex;gap:12px;">
+        <label style="flex:2;font-size:12.5px;font-weight:700;color:#374151;">Téléphone
+          <input id="ins-tel" placeholder="+33…" style="width:100%;box-sizing:border-box;margin-top:4px;padding:10px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px;">
+        </label>
+        <label style="flex:1;font-size:12.5px;font-weight:700;color:#374151;">Personnes
+          <input type="number" id="ins-nb" value="1" min="1" max="20" style="width:100%;box-sizing:border-box;margin-top:4px;padding:10px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px;">
+        </label>
+      </div>
+      <label style="font-size:12.5px;font-weight:700;color:#374151;">Message (facultatif)
+        <textarea id="ins-msg" rows="2" placeholder="Une question, un besoin particulier…" style="width:100%;box-sizing:border-box;margin-top:4px;padding:10px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px;resize:vertical;"></textarea>
+      </label>
+      <label style="font-size:12.5px;font-weight:700;color:#16233D;">🔐 Code de Sécurité Diaspo'Actif (DS-ID) *
+        <input required id="ins-dsid" placeholder="Ex : DS-XXXXXX" autocomplete="off" style="width:100%;box-sizing:border-box;margin-top:4px;padding:10px;border:1.5px solid #2563EB;border-radius:8px;font-size:14px;letter-spacing:1px;text-transform:uppercase;">
+        <span style="display:block;font-weight:400;font-size:11px;color:#6B7280;margin-top:4px;">Votre signature personnelle qui valide l'inscription. Vous pouvez le générer/retrouver dans <a href="confidentialite.html" target="_blank" style="color:#2563EB;">Confidentialité</a>.</span>
+      </label>
+      <div id="ins-err" style="display:none;color:#D33;font-size:12.5px;"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+        <button type="button" onclick="document.getElementById('evt-inscr-overlay').remove()" class="btn" style="font-size:13px;padding:0 16px;">Annuler</button>
+        <button type="submit" class="btn btn-orange" style="font-size:13px;padding:0 18px;">✅ Confirmer l'inscription</button>
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(ov);
+  document.getElementById('evt-inscr-form').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const errBox = document.getElementById('ins-err');
+    const payload = {
+      nom_complet: document.getElementById('ins-nom').value.trim(),
+      email: document.getElementById('ins-email').value.trim(),
+      telephone: document.getElementById('ins-tel').value.trim(),
+      nb_personnes: parseInt(document.getElementById('ins-nb').value) || 1,
+      message: document.getElementById('ins-msg').value.trim(),
+      ds_id: document.getElementById('ins-dsid').value.trim(),
+    };
+    if (!payload.ds_id) {
+      const eb = document.getElementById('ins-err'); eb.textContent = 'Le Code de Sécurité Diaspo\'Actif (DS-ID) est requis.'; eb.style.display = 'block'; return;
+    }
+    const submitBtn = ev.target.querySelector('button[type=submit]');
+    submitBtn.disabled = true; submitBtn.textContent = '…';
+    try {
+      await api('POST', '/evenements/'+id+'/rejoindre', payload);
+      inscritSet.add(id);
+      ov.remove();
+      renderEvts();
+      if (typeof showToast === 'function') showToast('✅ Inscription confirmée !');
+    } catch(e) {
+      errBox.textContent = e.message || 'Erreur lors de l\'inscription.'; errBox.style.display = 'block';
+      submitBtn.disabled = false; submitBtn.textContent = "✅ Confirmer l'inscription";
+    }
+  });
 }
 async function quitter(id, btn) {
   btn.disabled=true;
@@ -368,19 +450,41 @@ async function quitter(id, btn) {
   catch(e) { btn.disabled=false; }
 }
 
-/* ─── Pays ─── */
+/* ─── Pays & Origines ─── */
 (function() {
-  const sel = document.getElementById('f-pays');
-  if (sel && typeof PAYS_DU_MONDE !== 'undefined') {
-    PAYS_DU_MONDE.forEach(p => { const o=document.createElement('option'); o.value=p; o.textContent=p; sel.appendChild(o); });
-  }
+  if (typeof PAYS_DU_MONDE === 'undefined') return;
+  const selPays = document.getElementById('f-pays');
+  const selOrig = document.getElementById('f-origine');
+  const selFormOrig = document.getElementById('e-origine');
+  PAYS_DU_MONDE.forEach(p => {
+    if (selPays)     { const o=document.createElement('option'); o.value=p; o.textContent=p; selPays.appendChild(o); }
+    if (selOrig)     { const o=document.createElement('option'); o.value=p; o.textContent=p; selOrig.appendChild(o); }
+    if (selFormOrig) { const o=document.createElement('option'); o.value=p; o.textContent=p; selFormOrig.appendChild(o); }
+  });
 })();
 
 /* ─── Filtres ─── */
-['q','f-domaine','f-type','f-pays'].forEach(id => document.getElementById(id).addEventListener('change', loadEvts));
+['f-domaine','f-type','f-pays','f-origine'].forEach(id => document.getElementById(id).addEventListener('change', loadEvts));
 document.getElementById('q').addEventListener('input', () => setTimeout(loadEvts, 300));
+document.getElementById('f-ville').addEventListener('input', () => setTimeout(loadEvts, 300));
+// Bouton « Rechercher » : lance la recherche locale (événements), même avec un seul filtre saisi
+document.getElementById('btn-search').addEventListener('click', loadEvts);
+document.getElementById('q').addEventListener('keydown', e => { if(e.key==='Enter') loadEvts(); });
+document.getElementById('f-ville').addEventListener('keydown', e => { if(e.key==='Enter') loadEvts(); });
+// Bouton « Rechercher sur tout Diaspo'Actif » : recherche globale à partir des termes saisis
+document.getElementById('btn-search-global').addEventListener('click', () => {
+  const termes = [
+    document.getElementById('q').value.trim(),
+    document.getElementById('f-ville').value.trim(),
+    document.getElementById('f-origine').value,
+    document.getElementById('f-pays').value,
+    document.getElementById('f-domaine').value,
+  ].filter(Boolean).join(' ').trim();
+  if (!termes) { alert('Saisissez au moins un mot-clé ou un filtre pour lancer la recherche globale.'); return; }
+  window.location.href = '/recherche.html?q=' + encodeURIComponent(termes);
+});
 document.getElementById('btn-reset').addEventListener('click', () => {
-  ['q','f-domaine','f-type','f-pays'].forEach(id => document.getElementById(id).value='');
+  ['q','f-domaine','f-type','f-pays','f-ville','f-origine'].forEach(id => document.getElementById(id).value='');
   loadEvts();
 });
 
@@ -492,6 +596,8 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       domaine:       document.getElementById('e-domaine').value,
       pays:          document.getElementById('e-pays').value,
       lieu:          document.getElementById('e-lieu').value,
+      ville:         document.getElementById('e-lieu').value,
+      origine:       document.getElementById('e-origine').value,
       description:   document.getElementById('e-desc').value,
       places_max:    document.getElementById('e-places').value || null,
       visibilite:    document.getElementById('e-visibilite').value,
@@ -570,7 +676,7 @@ function embedUrl(url) {
 function renderEventDetail(evt, isPreview) {
   const prefix = isPreview ? 'preview' : 'detail';
   const galerie = Array.isArray(evt.galerie_photos) ? evt.galerie_photos.filter(Boolean) : [];
-  const cover = evt.image_couverture || (galerie.length ? galerie[0] : null);
+  const cover = evt.image_couverture || evt.image_url || (galerie.length ? galerie[0] : null);
   const allSlides = cover ? [cover, ...galerie.filter(s => s !== cover)] : galerie;
   const uniqueSlides = [...new Set(allSlides)];
 

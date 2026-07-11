@@ -1,0 +1,210 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Cotisations & Adhésions</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+.adh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;margin-top:20px;}
+.adh-card{border:1px solid var(--border);border-radius:14px;padding:18px;border-top:5px solid var(--orange);transition:box-shadow .15s;}
+.adh-card:hover{box-shadow:0 6px 24px rgba(0,0,0,.1);}
+.adh-icon{font-size:32px;margin-bottom:8px;}
+.adh-media-photo{width:calc(100% + 36px);margin:-18px -18px 12px;border-radius:14px 14px 0 0;aspect-ratio:16/9;object-fit:cover;display:block;}
+.adh-media-video-wrap{position:relative;width:calc(100% + 36px);margin:-18px -18px 12px;border-radius:14px 14px 0 0;overflow:hidden;aspect-ratio:16/9;background:#000;}
+.adh-media-video{width:100%;height:100%;object-fit:cover;display:block;}
+.adh-media-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:52px;height:52px;font-size:20px;cursor:pointer;}
+.adh-nom{font-size:16px;font-weight:800;margin:0 0 4px;}
+.adh-type{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;}
+.adh-montant{font-size:20px;font-weight:800;color:#2563EB;margin-bottom:10px;}
+.adh-desc{font-size:13px;color:var(--muted);margin-bottom:14px;}
+.carte-membre{background:linear-gradient(135deg,#1e2761,#3a4a9e);border-radius:18px;padding:24px;color:#fff;max-width:400px;margin:0 auto;box-shadow:0 12px 32px rgba(0,0,0,.2);}
+.carte-membre .cm-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.carte-membre .cm-statut{font-size:11px;font-weight:800;padding:4px 10px;border-radius:99px;text-transform:uppercase;}
+.cm-statut.a_jour{background:#10b981;}
+.cm-statut.non_a_jour{background:#ef4444;}
+.cm-statut.en_attente{background:#94a3b8;}
+.carte-membre .cm-nom{font-size:20px;font-weight:800;margin:0 0 2px;}
+.carte-membre .cm-init{font-size:13px;opacity:.85;margin-bottom:16px;}
+.carte-membre .cm-qr{background:#fff;border-radius:12px;padding:14px;display:flex;justify-content:center;margin-bottom:14px;}
+.carte-membre .cm-meta{font-size:12px;opacity:.85;display:flex;justify-content:space-between;}
+.notice{background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:14px;}
+</style>
+</head>
+<body>
+<div id="app">
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="brand"><img src="assets/logo.svg" alt="DA" style="height:28px;"> Diaspo'Actif</a>
+    <div class="nav-links">
+      <a href="index.html">Accueil</a>
+      <a href="annuaire.html">Annuaire</a>
+    </div>
+    <div id="nav-user"></div>
+  </div>
+</nav>
+
+<div class="container" style="padding-top:20px;">
+  <div class="flex-between" style="margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+    <div>
+      <h1 style="margin:0;">🎫 Cotisations & Adhésions</h1>
+      <p id="adh-init-nom" style="margin:4px 0 0;color:var(--muted);font-size:13px;">Chargement…</p>
+    </div>
+    <button class="btn btn-outline" id="btn-ma-carte" style="display:none;" onclick="afficherMaCarte()">🪪 Ma carte de membre</button>
+  </div>
+
+  <div id="adh-alert-zone"></div>
+
+  <div id="adh-public-formules"><div style="text-align:center;padding:40px;color:var(--muted);">Chargement des formules…</div></div>
+
+  <div id="adh-carte-zone" style="display:none;margin-top:30px;"></div>
+</div>
+</div><!-- /app -->
+
+<script src="assets/ds.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/profile-qr.js"></script>
+<script>
+const ADH_TYPE_LABELS = {
+  don_libre: 'Don libre', don_ponctuel: 'Don ponctuel',
+  cotisation_mensuelle: 'Cotisation mensuelle', cotisation_trimestrielle: 'Cotisation trimestrielle',
+  cotisation_semestrielle: 'Cotisation semestrielle', cotisation_annuelle: 'Cotisation annuelle',
+  adhesion_unique: 'Adhésion unique', participation_projet: 'Participation à un projet',
+  contribution_exceptionnelle: 'Contribution exceptionnelle', autre: 'Autre',
+};
+
+const params = new URLSearchParams(location.search);
+const INIT_ID = params.get('initiative');
+let FORMULES = [];
+
+async function init(){
+  const paiement = params.get('paiement');
+  if (paiement === 'succes') {
+    document.getElementById('adh-alert-zone').innerHTML = '<div class="notice">✅ Paiement confirmé ! Votre adhésion est en cours de traitement.</div>';
+  } else if (paiement === 'annule') {
+    document.getElementById('adh-alert-zone').innerHTML = '<div class="notice">❌ Paiement annulé — aucune somme n\'a été débitée.</div>';
+  }
+  if (!INIT_ID) {
+    document.getElementById('adh-public-formules').innerHTML = '<div class="notice">Aucune initiative spécifiée. Utilisez le lien depuis le profil d\'une initiative.</div>';
+    return;
+  }
+  try {
+    const init = await api('GET', `/initiatives/${INIT_ID}`);
+    document.getElementById('adh-init-nom').textContent = `${init.initiative?.nom || init.nom || ''} — choisissez une formule et adhérez en ligne.`;
+  } catch(e){}
+  try {
+    const r = await api('GET', `/initiatives/${INIT_ID}/adhesion-formules`);
+    FORMULES = r.formules || [];
+    renderFormules();
+  } catch(e) {
+    document.getElementById('adh-public-formules').innerHTML = `<div class="notice">Erreur de chargement : ${e.message}</div>`;
+  }
+  document.getElementById('btn-ma-carte').style.display = 'inline-block';
+}
+
+function renderFormules(){
+  const el = document.getElementById('adh-public-formules');
+  if (!FORMULES.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Aucune formule d\'adhésion disponible pour le moment.</div>';
+    return;
+  }
+  el.innerHTML = `<div class="adh-grid">
+    ${FORMULES.map(f => `
+      <div class="adh-card" style="border-top-color:${f.couleur||'#ff6b00'};">
+        ${f.media_type==='photo' && f.media_url ? `<img src="${escHtml(f.media_url)}" class="adh-media-photo" alt="">` :
+          f.media_type==='video' && f.media_url ? `<div class="adh-media-video-wrap"><video src="${escHtml(f.media_url)}" class="adh-media-video" muted></video><button type="button" class="adh-media-play" onclick="this.previousElementSibling.play();this.style.display='none';">▶️</button></div>` :
+          `<div class="adh-icon">${f.icone||'🎫'}</div>`}
+        <div class="adh-nom">${escHtml(f.nom)}</div>
+        <div class="adh-type">${ADH_TYPE_LABELS[f.type_contribution]||f.type_contribution}</div>
+        <div class="adh-montant">${
+          f.montant_type==='fixe' ? `${f.montant_fixe} ${f.devise}` :
+          f.montant_type==='libre' ? `Montant libre${f.montant_max?' (max '+f.montant_max+' '+f.devise+')':''}` :
+          `À partir de ${f.montant_min} ${f.devise}`
+        }</div>
+        ${f.description?`<div class="adh-desc">${escHtml(f.description)}</div>`:''}
+        <button class="btn btn-orange" style="width:100%;" onclick="ouvrirPaiement(${f.id})">Adhérer / Contribuer</button>
+      </div>`).join('')}
+  </div>`;
+}
+
+function escHtml(s){ const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+async function ouvrirPaiement(formuleId){
+  try {
+    const me = await api('GET', '/auth/me');
+    if (!me.user) { location.href = `login.html?next=${encodeURIComponent(location.href)}`; return; }
+  } catch(e) { location.href = `login.html?next=${encodeURIComponent(location.href)}`; return; }
+  const formule = FORMULES.find(f=>f.id===formuleId);
+  let montant = null;
+  if (formule.montant_type !== 'fixe') {
+    const suggestion = formule.montant_type === 'minimum' ? formule.montant_min : (formule.montant_min || 10);
+    const saisie = prompt(`Montant à verser (${formule.devise})${formule.montant_type==='minimum'?' — minimum '+formule.montant_min:''}${formule.montant_max?' — maximum '+formule.montant_max:''} :`, suggestion);
+    if (saisie === null) return;
+    montant = Number(saisie);
+    if (!montant || montant <= 0) { showToast?.('Montant invalide.', 'warning'); return; }
+  }
+  try {
+    const r = await api('POST', `/adhesion-formules/${formuleId}/payer`, montant != null ? { montant } : {});
+    if (r.checkout_url) { location.href = r.checkout_url; return; }
+  } catch(e) {
+    showToast?.('Erreur : ' + e.message, 'danger');
+  }
+}
+
+async function afficherMaCarte(){
+  const zone = document.getElementById('adh-carte-zone');
+  zone.style.display = 'block';
+  zone.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement de votre carte…</div>';
+  zone.scrollIntoView({ behavior: 'smooth' });
+  try {
+    /* Trouve la fiche membre de l'utilisateur connecté pour cette initiative (via le registre des formules) */
+    const me = await api('GET', '/auth/me');
+    let membreId = null;
+    for (const f of FORMULES) {
+      try {
+        const r = await api('GET', `/initiatives/${INIT_ID}/adhesion-membres`);
+        const m = (r.membres||[]).find(x => x.linked_user_id === me.user.id);
+        if (m) { membreId = m.id; break; }
+      } catch(e) { break; }
+    }
+    if (!membreId) { zone.innerHTML = '<div class="notice">Vous n\'avez pas encore d\'adhésion pour cette initiative.</div>'; return; }
+    const carte = await api('GET', `/adhesion-membres/${membreId}/carte`);
+    zone.innerHTML = `
+      <div class="carte-membre">
+        <div class="cm-top">
+          <strong>🎫 Carte de membre</strong>
+          <span class="cm-statut ${carte.statut}">${carte.statut==='a_jour'?'À jour':carte.statut==='non_a_jour'?'Non à jour':'En attente'}</span>
+        </div>
+        <div class="cm-nom">${escHtml(carte.prenom||'')} ${escHtml(carte.nom||'')}</div>
+        <div class="cm-init">${escHtml(carte.initiative||'')} — ${escHtml(carte.formule||'')}</div>
+        <div class="cm-qr" id="cm-qr-box"></div>
+        <div class="cm-meta">
+          <span>N° ${carte.numero_adherent}</span>
+          <span>${carte.date_expiration ? 'Valide jusqu\'au ' + new Date(carte.date_expiration).toLocaleDateString('fr-FR') : 'Sans expiration'}</span>
+        </div>
+      </div>`;
+    if (window.ProfileQR) {
+      ProfileQR.render(document.getElementById('cm-qr-box'), {
+        url: `${location.origin}${carte.verify_url}`,
+        userName: `${carte.prenom||''} ${carte.nom||''}`.trim(),
+        userRole: carte.formule,
+        size: 140, showActions: true, compact: true,
+      });
+    }
+  } catch(e) {
+    zone.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`;
+  }
+}
+
+init();
+</script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

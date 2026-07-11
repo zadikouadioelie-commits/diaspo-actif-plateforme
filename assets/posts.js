@@ -8,8 +8,8 @@
 
 /* ── Constantes ── */
 const CATEGORIES = [
-  'Actualité','Projet','Opportunité','Investissement','Recherche de partenaires',
-  'Emploi','Formation','Événement','Succès','Témoignage','Appel à bénévoles',
+  'Actualité','Investissement',
+  'Emploi','Succès','Témoignage','Appel à bénévoles',
   'Culture','Diaspora','Innovation','Autre'
 ];
 const VISIBILITES = [
@@ -350,13 +350,15 @@ function buildCreateModal() {
     <!-- Médias -->
     <div class="posts-field">
       <div class="posts-media-toolbar">
-        <button type="button" class="posts-media-btn" onclick="Posts.addMediaUrl('image')" title="Ajouter une photo">🖼️ Photo</button>
-        <button type="button" class="posts-media-btn" onclick="Posts.addMediaUrl('video')" title="Ajouter une vidéo">🎥 Vidéo</button>
-        <button type="button" class="posts-media-btn" onclick="Posts.addMediaUrl('document')" title="Ajouter un document">📄 Document</button>
-        <button type="button" class="posts-media-btn" onclick="Posts.addMediaUrl('audio')" title="Ajouter un audio">🎵 Audio</button>
+        <button type="button" class="posts-media-btn" onclick="Posts.pickMediaFile('image')" title="Ajouter une photo">🖼️ Photo</button>
+        <button type="button" class="posts-media-btn" onclick="Posts.pickMediaFile('video')" title="Ajouter une vidéo (2 min max)">🎥 Vidéo</button>
+        <button type="button" class="posts-media-btn" onclick="Posts.pickMediaFile('document')" title="Ajouter un document">📄 Document</button>
+        <button type="button" class="posts-media-btn" onclick="Posts.addMediaUrl('audio')" title="Ajouter un audio (lien)">🎵 Audio</button>
         <button type="button" class="posts-media-btn" onclick="Posts.addMediaUrl('link')" title="Ajouter un lien">🔗 Lien</button>
       </div>
       <div id="post-medias-list" class="posts-medias-list"></div>
+      <input type="file" id="post-media-file-input" style="display:none;">
+      <div style="font-size:11px;color:var(--muted,#6b7280);margin-top:4px;">Vidéos : 2 minutes maximum, 60 Mo max.</div>
     </div>
 
     <!-- Options (catégorie, visibilité, localisation) -->
@@ -675,8 +677,63 @@ const Posts = {
 
   /* ── Médias ── */
   addMediaUrl(type) {
-    const labels = { image:'URL de la photo', video:'URL de la vidéo', document:'URL du document', audio:'URL du fichier audio', link:'URL du lien' };
     window._postMedias.push({ type, url: '', label: '', _id: Date.now() });
+    this.renderMediasList();
+  },
+
+  /* Sélection d'un vrai fichier (photo/vidéo/document) et upload vers le serveur */
+  pickMediaFile(type) {
+    const input = document.getElementById('post-media-file-input');
+    if (!input) return;
+    const accepts = { image: 'image/*', video: 'video/*', document: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx' };
+    input.accept = accepts[type] || '*';
+    input.onchange = () => {
+      const file = input.files[0];
+      input.value = '';
+      if (file) this.uploadMediaFile(file, type);
+    };
+    input.click();
+  },
+
+  /* Durée d'une vidéo (en secondes) via ses métadonnées, sans upload */
+  _getVideoDuration(file) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement('video');
+      v.preload = 'metadata';
+      v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(v.duration || 0); };
+      v.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+      v.src = url;
+    });
+  },
+
+  async uploadMediaFile(file, type) {
+    if (type === 'video') {
+      const duration = await this._getVideoDuration(file);
+      if (duration > 120) {
+        if (typeof showToast === 'function') showToast('Vidéo trop longue : 2 minutes maximum.', 'error');
+        else alert('Vidéo trop longue : 2 minutes maximum.');
+        return;
+      }
+    }
+    const item = { type, url: '', label: file.name, name: file.name, _id: Date.now(), _uploading: true };
+    window._postMedias.push(item);
+    this.renderMediasList();
+    const routes = { image: '/api/upload/post', video: '/api/upload/video', document: '/api/upload/document' };
+    const fieldNames = { image: 'image', video: 'video', document: 'document' };
+    try {
+      const fd = new FormData();
+      fd.append(fieldNames[type] || 'file', file);
+      const resp = await fetch(routes[type], { method: 'POST', credentials: 'include', body: fd });
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error(data.error || 'Échec de l\'envoi.');
+      item.url = data.url;
+      item._uploading = false;
+    } catch (e) {
+      window._postMedias.splice(window._postMedias.indexOf(item), 1);
+      if (typeof showToast === 'function') showToast(e.message || 'Échec de l\'envoi du fichier.', 'error');
+      else alert(e.message || 'Échec de l\'envoi du fichier.');
+    }
     this.renderMediasList();
   },
 
@@ -685,6 +742,17 @@ const Posts = {
     if (!container) return;
     container.innerHTML = (window._postMedias||[]).map((m, i) => {
       const icons = { image:'🖼️', video:'🎥', document:'📄', audio:'🎵', link:'🔗' };
+      if (m._uploading) {
+        return `<div class="posts-media-item"><span>${icons[m.type]||'📎'}</span><span style="flex:1;color:var(--muted,#6b7280);">Envoi de « ${escHtml(m.name||'')} »…</span></div>`;
+      }
+      if (m.type === 'image' || m.type === 'video' || m.type === 'document') {
+        return `
+          <div class="posts-media-item">
+            <span>${icons[m.type]}</span>
+            <span style="flex:1;">${escHtml(m.name || m.url)}</span>
+            <button class="posts-media-remove" onclick="Posts.removeMedia(${i})">✕</button>
+          </div>`;
+      }
       return `
         <div class="posts-media-item">
           <span>${icons[m.type]||'📎'}</span>
@@ -735,6 +803,11 @@ const Posts = {
     const editId = document.getElementById('post-edit-id')?.value;
     const programmedAt = mode === 'programme' ? document.getElementById('post-programmed-at')?.value : null;
 
+    if ((window._postMedias||[]).some(m => m._uploading)) {
+      if (typeof showToast === 'function') showToast('Envoi du fichier en cours, patientez…', 'error');
+      else alert('Envoi du fichier en cours, patientez…');
+      return;
+    }
     if (!contenu && !(window._postMedias||[]).some(m=>m.url)) {
       if (typeof showToast === 'function') showToast('Veuillez écrire quelque chose.', 'error');
       else alert('Veuillez écrire quelque chose.');

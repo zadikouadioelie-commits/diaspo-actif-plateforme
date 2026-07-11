@@ -1,0 +1,186 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Votes sécurisés</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+.vo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;margin-top:20px;}
+.vo-card{border:1px solid var(--border);border-radius:14px;padding:18px;}
+.vo-nom{font-size:16px;font-weight:800;margin:0 0 4px;}
+.vo-meta{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:12px;}
+.vo-resolution{border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;}
+.vo-choix-group{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
+.vo-choix-pill{padding:10px 20px;border:2px solid var(--border);border-radius:999px;cursor:pointer;font-weight:700;font-size:14px;min-height:44px;display:flex;align-items:center;}
+.vo-choix-pill.selected{border-color:var(--orange);background:var(--orange);color:#fff;}
+.notice{background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:14px;}
+</style>
+</head>
+<body>
+<div id="app">
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="brand"><img src="assets/logo.svg" alt="DA" style="height:28px;"> Diaspo'Actif</a>
+    <div class="nav-links">
+      <a href="index.html">Accueil</a>
+      <a href="annuaire.html">Annuaire</a>
+    </div>
+    <div id="nav-user"></div>
+  </div>
+</nav>
+
+<div class="container" style="padding-top:20px;">
+  <div class="flex-between" style="margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+    <div>
+      <h1 style="margin:0;">🗳️ Mes votes</h1>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Consultations, assemblées générales et élections auxquelles vous êtes invité(e). Chaque vote est signé avec votre <a href="confidentialite.html">Code de Sécurité Diaspo'Actif (DS-ID)</a>.</p>
+    </div>
+  </div>
+
+  <div id="vo-liste"><div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div></div>
+
+  <div id="vo-bulletin-zone" style="display:none;margin-top:30px;"></div>
+</div>
+</div><!-- /app -->
+
+<script src="assets/ds.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+const VOTE_TYPE_LABELS = { ag_ordinaire: 'AG ordinaire', ag_extraordinaire: 'AG extraordinaire', consultation: 'Consultation', election: 'Élection' };
+const VOTE_STATUT_LABELS = { brouillon: '⚪ Brouillon', ouvert: '🟢 Ouvert', clos: '🔴 Fermé', annule: '⛔ Annulé' };
+
+let MES_VOTES = [];
+
+async function init(){
+  try {
+    const me = await api('GET', '/auth/me');
+    if (!me.user) { location.href = `login.html?next=${encodeURIComponent(location.href)}`; return; }
+  } catch(e) { location.href = `login.html?next=${encodeURIComponent(location.href)}`; return; }
+
+  try {
+    const r = await api('GET', '/mes-votes');
+    MES_VOTES = r.votes || [];
+    renderListe();
+  } catch(e) {
+    document.getElementById('vo-liste').innerHTML = `<div class="notice">Erreur : ${e.message}</div>`;
+  }
+}
+
+function escHtml(s){ const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+function renderListe(){
+  const el = document.getElementById('vo-liste');
+  if (!MES_VOTES.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Aucun vote pour le moment.</div>';
+    return;
+  }
+  el.innerHTML = `<div class="vo-grid">
+    ${MES_VOTES.map(v => `
+      <div class="vo-card">
+        <div class="vo-nom">${escHtml(v.nom)}</div>
+        <div class="vo-meta">${escHtml(v.init_nom)} — ${VOTE_TYPE_LABELS[v.type_scrutin]||v.type_scrutin} — ${VOTE_STATUT_LABELS[v.statut]||v.statut}</div>
+        ${v.a_vote ? '<p style="color:#10b981;font-weight:700;">✅ Vous avez déjà voté</p>' :
+          v.statut === 'ouvert' ? `<button class="btn btn-orange" onclick="ouvrirAuth(${v.id})">Participer au vote</button>` :
+          '<p style="color:var(--muted);font-size:13px;">Non disponible pour le moment.</p>'}
+      </div>`).join('')}
+  </div>`;
+}
+
+let VOTE_SCRUTIN_ID = null;
+let VOTE_RESOLUTIONS = [];
+let VOTE_REPONSES = {};
+
+async function ouvrirAuth(scrutinId){
+  const code = prompt('Entrez votre Code de Sécurité Diaspo\'Actif (DS-ID) pour signer votre bulletin.\nVous ne l\'avez pas encore ? Générez-le dans Profil → Confidentialité :');
+  if (!code) return;
+  try {
+    const r = await api('POST', `/vote-scrutins/${scrutinId}/authentifier`, { code });
+    VOTE_SCRUTIN_ID = scrutinId;
+    VOTE_RESOLUTIONS = r.resolutions || [];
+    VOTE_REPONSES = {};
+    renderBulletin(r.scrutin, code);
+  } catch(e) {
+    showToast?.(e.message, 'danger') || alert(e.message);
+  }
+}
+
+function renderBulletin(scrutin, code){
+  const zone = document.getElementById('vo-bulletin-zone');
+  zone.style.display = 'block';
+  zone.innerHTML = `
+    <h2>🗳️ ${escHtml(scrutin.nom)}</h2>
+    ${VOTE_RESOLUTIONS.map(r => renderResolution(r)).join('')}
+    <button class="btn btn-orange" style="margin-top:10px;" onclick="soumettreBulletin('${code}')">✅ Valider mon vote</button>
+  `;
+  zone.scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderResolution(r){
+  let options = [];
+  try { options = JSON.parse(r.options_json || '[]'); } catch(e) {}
+  let choixHtml = '';
+  if (r.type_reponse === 'oui_non_abstention') {
+    choixHtml = `<div class="vo-choix-group">
+      ${['Pour','Contre','Abstention'].map(c => `<div class="vo-choix-pill" onclick="choisir(${r.id},'${c}',this)">${c==='Pour'?'🟢':c==='Contre'?'🔴':'⚪'} ${c}</div>`).join('')}
+    </div>`;
+  } else if (r.type_reponse === 'choix_multiple' || r.type_reponse === 'election_personnes') {
+    choixHtml = `<div class="vo-choix-group">
+      ${options.map(o => `<div class="vo-choix-pill" onclick="choisir(${r.id},'${escHtml(o)}',this)">${escHtml(o)}</div>`).join('')}
+    </div>`;
+  } else if (r.type_reponse === 'classement') {
+    choixHtml = `<p style="font-size:12px;color:var(--muted);">Cliquez les options dans l'ordre de préférence.</p>
+    <div class="vo-choix-group" id="vo-classement-${r.id}">
+      ${options.map(o => `<div class="vo-choix-pill" onclick="ajouterClassement(${r.id},'${escHtml(o)}',this)">${escHtml(o)}</div>`).join('')}
+    </div>
+    <p style="font-size:13px;margin-top:8px;">Ordre choisi : <span id="vo-ordre-${r.id}">—</span></p>`;
+  }
+  return `<div class="vo-resolution">
+    <strong>${escHtml(r.titre)}</strong>
+    ${r.description ? `<p style="font-size:13px;color:var(--muted);">${escHtml(r.description)}</p>` : ''}
+    ${choixHtml}
+  </div>`;
+}
+
+function choisir(resolutionId, choix, el){
+  VOTE_REPONSES[resolutionId] = choix;
+  el.parentElement.querySelectorAll('.vo-choix-pill').forEach(p => p.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function ajouterClassement(resolutionId, option, el){
+  if (!VOTE_REPONSES[resolutionId]) VOTE_REPONSES[resolutionId] = [];
+  if (VOTE_REPONSES[resolutionId].includes(option)) return;
+  VOTE_REPONSES[resolutionId].push(option);
+  el.classList.add('selected');
+  document.getElementById('vo-ordre-'+resolutionId).textContent = VOTE_REPONSES[resolutionId].join(' > ');
+}
+
+async function soumettreBulletin(code){
+  const reponses = Object.entries(VOTE_REPONSES).map(([resolution_id, choix]) => ({ resolution_id: Number(resolution_id), choix }));
+  if (reponses.length < VOTE_RESOLUTIONS.length) {
+    if (!confirm('Certaines résolutions n\'ont pas de réponse. Continuer quand même ?')) return;
+  }
+  try {
+    await api('POST', `/vote-scrutins/${VOTE_SCRUTIN_ID}/voter`, { code, reponses });
+    document.getElementById('vo-bulletin-zone').innerHTML = '<div class="notice" style="background:#d1fae5;border-color:#10b981;">✅ Votre vote a été enregistré. Merci pour votre participation.</div>';
+    const r = await api('GET', '/mes-votes');
+    MES_VOTES = r.votes || [];
+    renderListe();
+  } catch(e) {
+    showToast?.(e.message, 'danger') || alert(e.message);
+  }
+}
+
+init();
+</script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

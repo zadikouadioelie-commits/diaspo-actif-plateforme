@@ -14,7 +14,68 @@
 <link rel="apple-touch-icon" href="assets/logo.svg">
 <style>
 /* ===== Initiative profile card ===== */
-.init-profile-wrap{max-width:920px;margin:24px auto;padding:0 16px 48px;}
+/* overflow-x:hidden (CSS global) casse position:sticky — clip a le même effet anti-débordement
+   horizontal sans créer de conteneur de défilement, ce qui préserve le comportement sticky. */
+html, body{overflow-x:clip !important;}
+.init-profile-wrap{max-width:1380px;margin:24px auto;padding:0 16px 48px;}
+
+/* Layout 3 colonnes : gauche (identité/pratique) · centre · droite (action/preuve sociale) */
+.init-3col{display:grid;grid-template-columns:minmax(250px,300px) minmax(0,1fr) minmax(250px,300px);gap:16px;align-items:start;}
+
+/* Colonnes latérales statiques : elles restent visibles pendant le défilement du centre,
+   avec leur propre défilement interne si leur contenu dépasse la hauteur de l'écran. */
+#col-left, #col-right{
+  position:sticky;top:78px;
+  max-height:calc(100vh - 96px);overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+#col-left::-webkit-scrollbar, #col-right::-webkit-scrollbar{width:5px;}
+#col-left::-webkit-scrollbar-thumb, #col-right::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+/* Bannière/header statique : reste épinglée en haut pendant le défilement du contenu central. */
+.init-card-header{position:sticky;top:78px;z-index:20;}
+
+@media(max-width:1100px){
+  .init-3col{grid-template-columns:1fr;}
+  #col-left, #col-right{position:static;max-height:none;overflow:visible;}
+  .init-card-header{position:static;}
+}
+
+/* Cartes des colonnes latérales */
+.side-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:var(--shadow);}
+.side-card h4{margin:0 0 10px;font-size:13px;font-weight:800;color:var(--navy);display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.side-card h4 .edit-btn{background:none;border:none;cursor:pointer;font-size:13px;color:#2563EB;padding:2px;}
+.side-tag{display:inline-block;background:var(--orange-light);color:#1B3A6B;border-radius:20px;padding:4px 11px;font-size:12px;font-weight:700;margin:0 4px 6px 0;}
+.side-tag.clickable{cursor:pointer;background:#fef3c7;color:#92400e;transition:opacity .15s;}
+.side-tag.clickable:hover{opacity:.75;}
+.side-list-item{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:12.5px;border-bottom:1px solid var(--border);}
+.side-list-item:last-child{border-bottom:none;}
+.equipe-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;}
+.equipe-item:last-child{border-bottom:none;}
+.equipe-avatar{width:36px;height:36px;border-radius:50%;background:var(--orange-light);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#1B3A6B;flex-shrink:0;overflow:hidden;}
+.equipe-avatar img{width:100%;height:100%;object-fit:cover;}
+.rejoindre-btn{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;border-radius:9px;font-size:13px;font-weight:700;border:1.5px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;text-decoration:none;margin-bottom:8px;transition:border-color .15s;}
+.rejoindre-btn:hover{border-color:#2563EB;}
+.rejoindre-btn.primary{background:#2563EB;color:#fff;border-color:#2563EB;}
+.activite-gauge{height:10px;border-radius:6px;background:var(--bg);overflow:hidden;margin:8px 0 4px;}
+.activite-gauge > div{height:100%;border-radius:6px;background:linear-gradient(90deg,#f59e0b,#22c55e);transition:width .5s;}
+.avis-stars{color:#f59e0b;letter-spacing:1px;}
+
+/* Assistant IA de l'initiative */
+.ia-fab{position:fixed;bottom:88px;right:22px;z-index:800;background:#1B3A6B;color:#fff;border:none;border-radius:26px;padding:12px 18px;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25);display:flex;align-items:center;gap:8px;}
+.ia-panel{position:fixed;bottom:88px;right:22px;z-index:801;width:340px;max-width:calc(100vw - 32px);background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.28);display:none;flex-direction:column;overflow:hidden;}
+.ia-panel.open{display:flex;}
+.ia-head{background:#1B3A6B;color:#fff;padding:12px 16px;font-size:13.5px;font-weight:800;display:flex;justify-content:space-between;align-items:center;}
+.ia-head button{background:none;border:none;color:#fff;font-size:16px;cursor:pointer;}
+.ia-msgs{max-height:320px;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.ia-msg{font-size:13px;line-height:1.5;padding:9px 12px;border-radius:11px;max-width:88%;}
+.ia-msg.bot{background:var(--bg);align-self:flex-start;}
+.ia-msg.user{background:#2563EB;color:#fff;align-self:flex-end;}
+.ia-quick{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 10px;}
+.ia-quick button{font-size:11.5px;padding:5px 10px;border-radius:14px;border:1px solid var(--border);background:#fff;cursor:pointer;}
+.ia-input-row{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--border);}
+.ia-input-row input{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+.ia-input-row button{background:#2563EB;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:700;}
 
 /* Breadcrumb */
 .breadcrumb{font-size:13px;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:6px;}
@@ -183,6 +244,10 @@ const DOMAIN_GRAD = {
       <span>${init.nom}</span>
     </div>
 
+    <div class="init-3col">
+    <aside id="col-left"><div class="side-card" style="text-align:center;color:var(--muted);font-size:12px;">Chargement…</div></aside>
+    <div id="col-center">
+
     <!-- ===== HEADER CARD ===== -->
     <div class="init-card-header">
 
@@ -313,10 +378,14 @@ const DOMAIN_GRAD = {
     ${galerie.length ? `
     <div class="init-section">
       <h3>🖼 Galerie</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;">
-        ${galerie.map(img => `
-          <div style="border-radius:6px;height:120px;overflow:hidden;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:32px;">
-            ${img.url ? `<img loading="lazy" src="${img.url}" style="width:100%;height:100%;object-fit:cover;" alt="${img.caption||''}">` : '🖼'}
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;" id="init-galerie-grid">
+        ${galerie.map((img, idx) => `
+          <div class="ga-thumb" style="border-radius:6px;overflow:hidden;background:var(--bg);cursor:pointer;" onclick='openGaleriePhoto("initiative", ${init.id}, ${JSON.stringify(img.id || ('p'+idx))}, ${JSON.stringify(img.url||'')}, ${JSON.stringify(img.titre||'')}, ${JSON.stringify(img.caption||'')})'>
+            <div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:32px;">
+              ${img.url ? `<img loading="lazy" src="${img.url}" style="width:100%;height:100%;object-fit:cover;" alt="${(img.caption||'').replace(/"/g,'&quot;')}">` : '🖼'}
+            </div>
+            ${img.titre ? `<div style="font-size:11px;font-weight:700;padding:4px 6px;">${(img.titre||'').replace(/</g,'&lt;')}</div>` : ''}
+            <div id="ga-counts-${img.id || ('p'+idx)}" style="font-size:10px;color:var(--muted);padding:0 6px 6px;">♥ 0 · 💬 0</div>
           </div>
         `).join('')}
       </div>
@@ -339,6 +408,10 @@ const DOMAIN_GRAD = {
         ${reseaux.linkedin ? `<div style="display:flex;gap:10px;align-items:center;font-size:13.5px;"><span>💼</span><a href="${reseaux.linkedin}" target="_blank" style="color:#2563EB;">LinkedIn</a></div>` : ''}
       </div>
     </div>` : ''}
+
+    </div><!-- /col-center -->
+    <aside id="col-right"><div class="side-card" style="text-align:center;color:var(--muted);font-size:12px;">Chargement…</div></aside>
+    </div><!-- /init-3col -->
   `;
 
   /* ---- Partenaires ---- */
@@ -441,8 +514,369 @@ const DOMAIN_GRAD = {
   } catch(e) {
     document.getElementById('init-publications').innerHTML = `<div style="color:var(--muted);">Impossible de charger les publications.</div>`;
   }
+
+  /* ══════════════════════════════════════════════════════════
+     COLONNES GAUCHE / DROITE — PROFIL ENRICHI
+     ══════════════════════════════════════════════════════════ */
+  const isOwner = me && init.owner_user_id && Number(me.id) === Number(init.owner_user_id);
+  const esc2 = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  /* Masquage/démasquage d'un numéro de téléphone affiché publiquement (👁 afficher / masquer) */
+  window._iniPhoneN = 0;
+  window.renderMaskedPhone = function(tel) {
+    const t = String(tel || '');
+    if (!t) return '';
+    const visible = t.length > 2 ? t.slice(-2) : t;
+    const masked = '•'.repeat(Math.max(t.length - visible.length, 4)) + ' ' + visible;
+    const uid = 'phmask-' + (window._iniPhoneN++);
+    return `<span id="${uid}" data-tel="${t.replace(/"/g,'&quot;')}" data-visible="0">${masked}</span> <button type="button" onclick="ppTogglePhone('${uid}')" title="Afficher/masquer le numéro" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 2px;">👁</button>`;
+  };
+  window.ppTogglePhone = function(uid) {
+    const el = document.getElementById(uid);
+    if (!el) return;
+    const shown = el.getAttribute('data-visible') === '1';
+    const tel = el.getAttribute('data-tel') || '';
+    if (shown) {
+      const visible = tel.length > 2 ? tel.slice(-2) : tel;
+      el.textContent = '•'.repeat(Math.max(tel.length - visible.length, 4)) + ' ' + visible;
+      el.setAttribute('data-visible', '0');
+    } else {
+      el.textContent = tel;
+      el.setAttribute('data-visible', '1');
+    }
+  };
+
+  window.contacterBesoin = (sujet) => {
+    location.href = 'messagerie.html?init=' + init.id + '&sujet=' + encodeURIComponent(sujet);
+  };
+
+  let EQUIPE = [], SCOREACT = null, CAMPAGNES = [], AVIS = null, EVENTS = [], FORMULES = [];
+  try {
+    const [rEq, rSc, rCamp, rAvis, rEv, rForm] = await Promise.all([
+      api('GET', `/initiatives/${init.id}/equipe`).catch(() => ({ equipe: [] })),
+      api('GET', `/initiatives/${init.id}/score-activite`).catch(() => null),
+      api('GET', `/initiatives/${init.id}/campagnes-actives`).catch(() => ({ campagnes: [] })),
+      api('GET', `/initiatives/${init.id}/avis`).catch(() => null),
+      api('GET', `/events`).catch(() => ({ events: [] })),
+      api('GET', `/initiatives/${init.id}/adhesion-formules`).catch(() => ({ formules: [] })),
+    ]);
+    EQUIPE = rEq.equipe || []; SCOREACT = rSc; CAMPAGNES = rCamp.campagnes || [];
+    AVIS = rAvis; FORMULES = rForm.formules || [];
+    EVENTS = (rEv.events || [])
+      .filter(e => Number(e.organisateur_id) === Number(init.owner_user_id)
+                && (!e.date_debut || new Date(e.date_debut) >= new Date(Date.now() - 86400000)))
+      .slice(0, 4);
+  } catch (e) {}
+
+  const editBtn = section => isOwner ? `<button class="edit-btn" onclick="editSection('${section}')" title="Modifier">✏️</button>` : '';
+
+  function renderColLeft() {
+    const zones = Array.isArray(init.pays_intervention_arr) ? init.pays_intervention_arr : [];
+    const publics = init.publics || [];
+    const besoins = init.besoins || [];
+    const rs = init.reseaux_sociaux_obj || {};
+    const RS_ICONS = { site:'🌐', facebook:'📘', linkedin:'💼', instagram:'📸', youtube:'▶️', tiktok:'🎵', whatsapp:'💬', x:'✖️', twitter:'✖️' };
+    const infos = [
+      init.vitrine_horaires && ['🕒', esc2(init.vitrine_horaires)],
+      (init.vitrine_tel_pro || init.tel_responsable) && ['📞', renderMaskedPhone(init.vitrine_tel_pro || init.tel_responsable)],
+      (init.vitrine_email_pro || init.email_responsable) && ['✉️', esc2(init.vitrine_email_pro || init.email_responsable)],
+      init.site_web && ['🌐', `<a href="${esc2(init.site_web)}" target="_blank" style="color:#2563EB;">${esc2(init.site_web.replace(/^https?:\/\//,''))}</a>`],
+      (init.adresse || init.ville) && ['📍', esc2([init.adresse, init.ville, init.pays].filter(Boolean).join(', '))],
+    ].filter(Boolean);
+    const hasLatLon = init.lat != null && init.lon != null;
+    const mapSrc = hasLatLon
+      ? `https://www.openstreetmap.org/export/embed.html?bbox=${init.lon-0.02}%2C${init.lat-0.01}%2C${Number(init.lon)+0.02}%2C${Number(init.lat)+0.01}&layer=mapnik&marker=${init.lat}%2C${init.lon}`
+      : null;
+    const mapQuery = !hasLatLon && (init.adresse || init.ville)
+      ? encodeURIComponent([init.adresse, init.ville, init.pays].filter(Boolean).join(', ')) : null;
+
+    document.getElementById('col-left').innerHTML = `
+      <div class="side-card">
+        <h4>👥 Équipe</h4>
+        ${EQUIPE.length ? EQUIPE.map(m => `
+          <a class="equipe-item" href="profil.html?id=${m.user_id}">
+            <div class="equipe-avatar">${m.photo_url ? `<img loading="lazy" src="${esc2(m.photo_url)}">` : esc2((m.nom||'?')[0].toUpperCase())}</div>
+            <div><div style="font-size:13px;font-weight:700;">${esc2(m.nom)}</div><div style="font-size:11px;color:var(--muted);">${esc2(m.fonction)}</div></div>
+          </a>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Équipe non renseignée.</p>'}
+      </div>
+      <div class="side-card">
+        <h4><span>🌍 Zones d'intervention</span> ${editBtn('zones')}</h4>
+        ${zones.length ? zones.map(z => `<span class="side-tag">${esc2(z)}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
+      </div>
+      <div class="side-card">
+        <h4><span>🎯 Public concerné</span> ${editBtn('publics')}</h4>
+        ${publics.length ? publics.map(p => `<span class="side-tag">${esc2(p)}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
+      </div>
+      <div class="side-card">
+        <h4><span>🤝 Recherche actuellement</span> ${editBtn('besoins')}</h4>
+        ${besoins.length ? besoins.map(b => `<span class="side-tag clickable" onclick="contacterBesoin('${esc2('Proposition : ' + b).replace(/'/g, "\\'")}')" title="Cliquez pour proposer votre aide">${esc2(b)}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Aucun besoin exprimé.</p>'}
+      </div>
+      <div class="side-card">
+        <h4><span>💼 Services proposés</span> ${editBtn('services')}</h4>
+        ${init.vitrine_services ? `<p style="font-size:12.5px;margin:0;line-height:1.6;white-space:pre-line;">${esc2(init.vitrine_services)}</p>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
+      </div>
+      ${Object.keys(rs).filter(k => rs[k]).length ? `<div class="side-card">
+        <h4>🌐 Réseaux sociaux</h4>
+        ${Object.entries(rs).filter(([,v]) => v).map(([k,v]) => `<div class="side-list-item"><span>${RS_ICONS[k]||'🔗'}</span><a href="${esc2(v)}" target="_blank" style="color:#2563EB;">${esc2(k.charAt(0).toUpperCase()+k.slice(1))}</a></div>`).join('')}
+      </div>` : ''}
+      <div class="side-card">
+        <h4><span>📞 Informations pratiques</span> ${isOwner ? '<a href="dashboard-initiative.html#parametres-vitrine" style="font-size:12px;text-decoration:none;" title="Modifier dans Paramètres Vitrine">⚙️</a>' : ''}</h4>
+        ${infos.length ? infos.map(([ic,val]) => `<div class="side-list-item"><span>${ic}</span><span style="flex:1;word-break:break-word;">${val}</span></div>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
+      </div>
+      ${mapSrc ? `<div class="side-card" style="padding:0;overflow:hidden;">
+        <iframe src="${mapSrc}" style="width:100%;height:190px;border:0;display:block;" loading="lazy" title="Carte"></iframe>
+      </div>` : mapQuery ? `<div class="side-card">
+        <h4>📍 Carte</h4>
+        <a href="https://www.openstreetmap.org/search?query=${mapQuery}" target="_blank" style="font-size:12px;color:#2563EB;">Voir la localisation sur la carte →</a>
+      </div>` : ''}
+    `;
+  }
+
+  function renderColRight() {
+    const stats = init.stats_perso || {};
+    const STAT_LABELS = { projets:'Projets réalisés', evenements:'Événements', formations:'Formations', pays_couverts:'Pays couverts', partenaires:'Partenaires', benevoles:'Bénévoles actifs' };
+    const reals = init.realisations || [];
+    const labels = [];
+    if (init.certif) labels.push('🛡️ Initiative certifiée');
+    (init.accreditations || []).forEach(a => labels.push(a === 'mobilisation_active' ? '📢 Mobilisation active' : '💼 Opportunités'));
+
+    document.getElementById('col-right').innerHTML = `
+      <div class="side-card">
+        <h4>🚀 Rejoindre l'initiative</h4>
+        ${FORMULES.length ? `<a class="rejoindre-btn primary" href="adhesions.html?init=${init.id}">🎫 Adhérer / Cotiser</a>` : ''}
+        <button class="rejoindre-btn" onclick="contacterBesoin('Je souhaite devenir bénévole')">🙋 Devenir bénévole</button>
+        <button class="rejoindre-btn" onclick="contacterBesoin('Proposition de partenariat')">🤝 Devenir partenaire</button>
+        <a class="rejoindre-btn" href="messagerie.html?init=${init.id}">✉️ Contacter</a>
+      </div>
+      ${labels.length ? `<div class="side-card"><h4>🏆 Labels & accréditations</h4>${labels.map(l => `<div class="side-list-item">${l}</div>`).join('')}</div>` : ''}
+      ${SCOREACT ? `<div class="side-card">
+        <h4>⭐ Score d'activité</h4>
+        <div style="font-size:22px;font-weight:800;color:var(--navy);">${SCOREACT.score}<span style="font-size:13px;color:var(--muted);">/100</span></div>
+        <div class="activite-gauge"><div style="width:${SCOREACT.score}%;"></div></div>
+        <div style="font-size:11px;color:var(--muted);">Calculé sur les publications, événements, campagnes, membres et la complétude du profil.</div>
+      </div>` : ''}
+      <div class="side-card">
+        <h4><span>📈 Statistiques</span> ${editBtn('stats')}</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:17px;font-weight:800;">${init.membres ?? 0}</div><div style="font-size:10px;color:var(--muted);">Membres</div></div>
+          <div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:17px;font-weight:800;">${init.abonnes ?? 0}</div><div style="font-size:10px;color:var(--muted);">Abonnés</div></div>
+          ${init.annee_creation ? `<div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:17px;font-weight:800;">${init.annee_creation}</div><div style="font-size:10px;color:var(--muted);">Année de création</div></div>` : ''}
+          ${Object.entries(stats).filter(([,v]) => v).map(([k,v]) => `<div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:17px;font-weight:800;">${esc2(v)}</div><div style="font-size:10px;color:var(--muted);">${STAT_LABELS[k] || esc2(k)}</div></div>`).join('')}
+        </div>
+      </div>
+      ${EVENTS.length ? `<div class="side-card"><h4>📅 Événements à venir</h4>${EVENTS.map(e => `
+        <a class="side-list-item" href="evenements.html#evt-${e.id}" style="text-decoration:none;color:inherit;">
+          <span>🗓</span><div style="flex:1;"><div style="font-weight:700;font-size:12.5px;">${esc2(e.titre)}</div><div style="font-size:11px;color:var(--muted);">${(e.date_debut || '').slice(0,10)}</div></div>
+        </a>`).join('')}</div>` : ''}
+      ${CAMPAGNES.length ? `<div class="side-card"><h4>📢 Campagnes en cours</h4>${CAMPAGNES.map(c => `
+        <div style="padding:7px 0;border-bottom:1px solid var(--border);">
+          <div style="font-weight:700;font-size:12.5px;">${esc2(c.nom)}</div>
+          ${c.objectif_membres ? `<div style="font-size:11px;color:var(--muted);">Objectif : ${c.objectif_membres} membres</div>` : ''}
+          <a href="adhesions.html?init=${init.id}" class="btn btn-orange" style="font-size:11px;padding:5px 12px;margin-top:5px;display:inline-block;">Participer</a>
+        </div>`).join('')}</div>` : ''}
+      <div class="side-card">
+        <h4><span>📂 Réalisations</span> ${editBtn('realisations')}</h4>
+        ${reals.length ? reals.map(r => `<div class="side-list-item"><span>✔️</span><div style="flex:1;"><div style="font-weight:700;font-size:12.5px;">${esc2(r.titre)}</div>${r.annee ? `<div style="font-size:11px;color:var(--muted);">${esc2(r.annee)}</div>` : ''}</div></div>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Aucune réalisation renseignée.</p>'}
+      </div>
+      ${AVIS && (AVIS.avis || []).length ? `<div class="side-card"><h4>💬 Témoignages</h4>
+        ${AVIS.moyenne ? `<div style="font-size:12px;margin-bottom:6px;"><span class="avis-stars">${'★'.repeat(Math.round(AVIS.moyenne))}${'☆'.repeat(5 - Math.round(AVIS.moyenne))}</span> ${AVIS.moyenne}/5 (${AVIS.total})</div>` : ''}
+        ${AVIS.avis.slice(0,3).map(a => `<div style="padding:7px 0;border-bottom:1px solid var(--border);">
+          <div class="avis-stars" style="font-size:11px;">${'★'.repeat(a.note)}${'☆'.repeat(5 - a.note)}</div>
+          ${a.commentaire ? `<div style="font-size:12px;line-height:1.4;">« ${esc2(a.commentaire.slice(0,110))}${a.commentaire.length > 110 ? '…' : ''} »</div>` : ''}
+          <div style="font-size:10.5px;color:var(--muted);">${esc2([a.prenom, a.nom].filter(Boolean).join(' '))}</div>
+        </div>`).join('')}</div>` : ''}
+      ${(init.documents || []).length ? `<div class="side-card"><h4>📄 Documents</h4>${init.documents.map(d => `
+        <div class="side-list-item"><span>📄</span><span style="flex:1;">${esc2(d.titre)}</span><a href="${esc2(d.url)}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:#2563EB;">Télécharger</a></div>`).join('')}</div>` : ''}
+      ${isOwner ? `<div class="side-card">
+        <h4>🤖 Assistant IA</h4>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;">
+          <input type="checkbox" id="assistant-toggle" ${init.assistant_actif ? 'checked' : ''} onchange="toggleAssistant(this.checked)">
+          Activer l'assistant pour les visiteurs
+        </label>
+      </div>` : ''}
+    `;
+  }
+
+  renderColLeft();
+  renderColRight();
+  if (galerie.length && typeof loadGaleriePhotoCounts === 'function') loadGaleriePhotoCounts('initiative', init.id);
+
+  /* ══ ÉDITION INLINE (propriétaire) ══ */
+  const PUBLICS_PRESETS = ['Diaspora','Entrepreneurs','Étudiants','Associations','Collectivités','Jeunes','Femmes','Agriculteurs','Professionnels','Familles'];
+  const BESOINS_PRESETS = ['partenaires','bénévoles','investisseurs','sponsors','experts','membres','fournisseurs'];
+
+  async function saveProfil(payload) {
+    await api('PUT', `/initiatives/${init.id}/profil-public`, payload);
+    const r = await api('GET', `/initiatives/${init.id}`);
+    Object.assign(init, r.initiative);
+    renderColLeft(); renderColRight();
+  }
+
+  function openEditModal(titre, bodyHtml, onSave) {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 14px;';
+    ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:20px;">
+      <h3 style="margin:0 0 14px;font-size:15px;">${titre}</h3>
+      <div id="edit-modal-body">${bodyHtml}</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button class="btn btn-outline" id="edit-cancel">Annuler</button>
+        <button class="btn btn-orange" id="edit-save">Enregistrer</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#edit-cancel').onclick = () => ov.remove();
+    ov.querySelector('#edit-save').onclick = async () => {
+      try { await onSave(ov); ov.remove(); } catch (e) { alert(e.message || 'Erreur.'); }
+    };
+  }
+
+  function pillsHtml(presets, selected, cls) {
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;">${presets.map(p =>
+      `<label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid ${selected.includes(p) ? '#2563EB' : 'var(--border)'};border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;${selected.includes(p) ? 'background:#eff6ff;font-weight:700;' : ''}">
+        <input type="checkbox" class="${cls}" value="${esc2(p)}" ${selected.includes(p) ? 'checked' : ''} style="accent-color:#2563EB;"> ${esc2(p)}
+      </label>`).join('')}</div>
+      <input type="text" id="${cls}-autre" placeholder="Autres (séparés par des virgules)" style="width:100%;margin-top:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;"
+        value="${esc2(selected.filter(s => !presets.includes(s)).join(', '))}">`;
+  }
+
+  function readPills(ov, cls) {
+    const checked = [...ov.querySelectorAll('.' + cls + ':checked')].map(c => c.value);
+    const autres = (ov.querySelector('#' + cls + '-autre')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+    return [...checked, ...autres];
+  }
+
+  window.editSection = function (section) {
+    if (section === 'publics') {
+      openEditModal('🎯 Public concerné', pillsHtml(PUBLICS_PRESETS, init.publics || [], 'ep-pub'),
+        ov => saveProfil({ publics: readPills(ov, 'ep-pub') }));
+    } else if (section === 'besoins') {
+      openEditModal('🤝 Recherche actuellement', pillsHtml(BESOINS_PRESETS, init.besoins || [], 'ep-bes'),
+        ov => saveProfil({ besoins: readPills(ov, 'ep-bes') }));
+    } else if (section === 'zones') {
+      const zones = Array.isArray(init.pays_intervention_arr) ? init.pays_intervention_arr : [];
+      openEditModal("🌍 Zones d'intervention",
+        `<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">Pays, régions ou villes, séparés par des virgules.</p>
+         <input type="text" id="ez-zones" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${esc2(zones.join(', '))}" placeholder="France, Côte d'Ivoire, Sénégal…">`,
+        ov => saveProfil({ pays_intervention: ov.querySelector('#ez-zones').value.split(',').map(s => s.trim()).filter(Boolean) }));
+    } else if (section === 'services') {
+      openEditModal('💼 Services proposés',
+        `<textarea id="es-serv" rows="5" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" placeholder="Conseil, Formation, Accompagnement…">${esc2(init.vitrine_services || '')}</textarea>`,
+        ov => saveProfil({ vitrine_services: ov.querySelector('#es-serv').value }));
+    } else if (section === 'stats') {
+      const s = init.stats_perso || {};
+      const champs = [['projets','Projets réalisés'],['formations','Formations dispensées'],['pays_couverts','Pays couverts'],['partenaires','Partenaires'],['benevoles','Bénévoles actifs']];
+      openEditModal('📈 Statistiques',
+        champs.map(([k,l]) => `<label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">${l}</label>
+          <input type="number" min="0" id="est-${k}" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${s[k] ?? ''}">`).join('') +
+        `<label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">Année de création</label>
+         <input type="number" id="est-annee" min="1900" max="2100" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${init.annee_creation ?? ''}">`,
+        ov => {
+          const stats = {};
+          champs.forEach(([k]) => { const v = ov.querySelector('#est-' + k).value; if (v) stats[k] = parseInt(v); });
+          return saveProfil({ stats_perso: stats, annee_creation: ov.querySelector('#est-annee').value || undefined });
+        });
+    } else if (section === 'realisations') {
+      const reals = init.realisations || [];
+      openEditModal('📂 Réalisations',
+        `<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">Une réalisation par ligne, format : <em>Titre | Année</em> (année facultative).</p>
+         <textarea id="er-reals" rows="6" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" placeholder="Construction d'une école | 2024\nFormation de 500 entrepreneurs">${esc2(reals.map(r => r.titre + (r.annee ? ' | ' + r.annee : '')).join('\n'))}</textarea>`,
+        ov => saveProfil({
+          realisations: ov.querySelector('#er-reals').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+            const [titre, annee] = l.split('|').map(s => s.trim());
+            return annee ? { titre, annee } : { titre };
+          })
+        }));
+    }
+  };
+
+  window.toggleAssistant = async function (actif) {
+    try { await api('PUT', `/initiatives/${init.id}/profil-public`, { assistant_actif: actif }); init.assistant_actif = actif ? 1 : 0; renderAssistant(); }
+    catch (e) { alert(e.message); }
+  };
+
+  /* ══ ASSISTANT IA DE L'INITIATIVE (règles/intents, données du profil) ══ */
+  function assistantReponse(q) {
+    const t = q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const has = (...words) => words.some(w => t.includes(w));
+    if (has('que faites', 'quoi', 'presentation', 'mission', 'c est quoi', 'qui etes')) {
+      return init.description || init.mission || `${init.nom} est une initiative ${init.domaine ? 'dans le domaine ' + init.domaine : ''} basée à ${init.ville || init.pays || '—'}.`;
+    }
+    if (has('adher', 'cotis', 'membre', 'inscrire', 'rejoindre')) {
+      return FORMULES.length
+        ? `Nous proposons ${FORMULES.length} formule(s) d'adhésion : ${FORMULES.map(f => f.nom).join(', ')}. <a href="adhesions.html?init=${init.id}" style="color:#2563EB;font-weight:700;">Adhérer maintenant →</a>`
+        : `Pour rejoindre ${init.nom}, contactez-nous directement via la messagerie.`;
+    }
+    if (has('don', 'soutenir', 'aider financ')) {
+      const don = FORMULES.find(f => ['don_libre','don_ponctuel'].includes(f.type_contribution));
+      return don ? `Vous pouvez faire un don via notre formule « ${don.nom} ». <a href="adhesions.html?init=${init.id}" style="color:#2563EB;font-weight:700;">Faire un don →</a>`
+                 : `Contactez-nous via la messagerie pour soutenir ${init.nom}.`;
+    }
+    if (has('evenement', 'event', 'prochain', 'agenda')) {
+      return EVENTS.length
+        ? `Prochains événements : ${EVENTS.map(e => `${e.titre} (${(e.date_debut||'').slice(0,10)})`).join(' · ')}.`
+        : `Aucun événement à venir pour le moment — abonnez-vous pour être informé.`;
+    }
+    if (has('partenaire', 'partenariat', 'collabor', 'benevol', 'volontaire')) {
+      const b = init.besoins || [];
+      return (b.length ? `Nous recherchons actuellement : ${b.join(', ')}. ` : '') +
+        `<button onclick="contacterBesoin('Proposition de partenariat / bénévolat')" style="color:#2563EB;font-weight:700;background:none;border:none;cursor:pointer;padding:0;">Nous contacter →</button>`;
+    }
+    if (has('service', 'prestation', 'proposez', 'offre')) {
+      return init.vitrine_services ? `Nos services : ${init.vitrine_services}` : `Consultez notre profil ou contactez-nous pour découvrir nos services.`;
+    }
+    if (has('contact', 'joindre', 'telephone', 'mail', 'adresse', 'horaire', 'ou etes')) {
+      const parts = [
+        (init.vitrine_tel_pro || init.tel_responsable) && '📞 ' + (init.vitrine_tel_pro || init.tel_responsable),
+        (init.vitrine_email_pro || init.email_responsable) && '✉️ ' + (init.vitrine_email_pro || init.email_responsable),
+        init.vitrine_horaires && '🕒 ' + init.vitrine_horaires,
+        (init.adresse || init.ville) && '📍 ' + [init.adresse, init.ville, init.pays].filter(Boolean).join(', '),
+      ].filter(Boolean);
+      return parts.length ? parts.join('<br>') : `Contactez-nous via la <a href="messagerie.html?init=${init.id}" style="color:#2563EB;">messagerie Diaspo'Actif</a>.`;
+    }
+    return `Je n'ai pas trouvé de réponse précise à votre question. Vous pouvez <a href="messagerie.html?init=${init.id}" style="color:#2563EB;font-weight:700;">écrire directement à ${esc2(init.nom)}</a> — l'équipe vous répondra.`;
+  }
+
+  function renderAssistant() {
+    document.getElementById('ia-fab')?.remove();
+    document.getElementById('ia-panel')?.remove();
+    if (!init.assistant_actif) return;
+    const fab = document.createElement('button');
+    fab.id = 'ia-fab'; fab.className = 'ia-fab';
+    fab.innerHTML = `🤖 Poser une question`;
+    const panel = document.createElement('div');
+    panel.id = 'ia-panel'; panel.className = 'ia-panel';
+    panel.innerHTML = `
+      <div class="ia-head"><span>🤖 Assistant de ${esc2(init.nom)}</span><button id="ia-close">✕</button></div>
+      <div class="ia-msgs" id="ia-msgs">
+        <div class="ia-msg bot">Bonjour ! 👋 Je réponds à vos questions sur ${esc2(init.nom)}.</div>
+      </div>
+      <div class="ia-quick">
+        <button data-q="Que faites-vous ?">Que faites-vous ?</button>
+        <button data-q="Comment adhérer ?">Comment adhérer ?</button>
+        <button data-q="Quels sont vos prochains événements ?">Prochains événements</button>
+        <button data-q="Comment devenir partenaire ?">Devenir partenaire</button>
+      </div>
+      <div class="ia-input-row">
+        <input type="text" id="ia-input" placeholder="Votre question…">
+        <button id="ia-send">➤</button>
+      </div>`;
+    document.body.append(fab, panel);
+
+    const msgs = panel.querySelector('#ia-msgs');
+    function poser(q) {
+      if (!q.trim()) return;
+      msgs.insertAdjacentHTML('beforeend', `<div class="ia-msg user">${esc2(q)}</div>`);
+      msgs.insertAdjacentHTML('beforeend', `<div class="ia-msg bot">${assistantReponse(q)}</div>`);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+    fab.onclick = () => { panel.classList.add('open'); fab.style.display = 'none'; };
+    panel.querySelector('#ia-close').onclick = () => { panel.classList.remove('open'); fab.style.display = ''; };
+    panel.querySelectorAll('.ia-quick button').forEach(b => b.onclick = () => poser(b.dataset.q));
+    panel.querySelector('#ia-send').onclick = () => { const i = panel.querySelector('#ia-input'); poser(i.value); i.value = ''; };
+    panel.querySelector('#ia-input').addEventListener('keydown', e => { if (e.key === 'Enter') { poser(e.target.value); e.target.value = ''; } });
+  }
+  renderAssistant();
 })();
 </script>
+<script src="assets/galerie-lightbox.js"></script>
 <script src="assets/trust-score.js"></script>
 <script src="assets/profile-qr.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>

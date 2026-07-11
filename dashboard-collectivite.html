@@ -51,6 +51,7 @@
 .cible-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
 .cible-chip{background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer;transition:all .2s;}
 .cible-chip.active{background:#E0F2FE;border-color:#0369A1;color:#0369A1;font-weight:600;}
+.opp-lbl{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:0 0 4px;}
 
 /* ===== CONSULTATIONS ===== */
 .consult-card{border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;}
@@ -100,11 +101,15 @@
       <a href="#" data-section="initiatives-validees">✅ Initiatives validées</a>
 
       <div class="sb-group-lbl">03 — TERRITOIRES</div>
+      <a href="#" data-section="identite-territoriale">🔐 Identité Territoriale</a>
       <a href="#" data-section="partenariats">🟨 Partenariats</a>
-      <a href="#" data-section="accreditations-da" style="display:flex;justify-content:space-between;align-items:center;">🎖 Accréditations DA <span id="coll-accred-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
+      <a href="#" data-section="accreditations-da" style="display:none;">🎖 Accréditations DA <span id="coll-accred-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
 
       <div class="sb-group-lbl">04 — INTELLIGENCE</div>
-      <a href="#" data-section="observatoire">🟪 Observatoire Diaspora</a>
+      <a href="#" data-section="oz-collectivite">🧠 OZ Collectivité</a>
+      <a href="#" data-section="observatoire">🌍 Observatoire Mondial</a>
+      <a href="#" data-section="observatoire-territorial">🏛 Observatoire Territorial</a>
+      <a href="#" data-section="opportunites">💡 Opportunités stratégiques</a>
 
       <div class="sb-group-lbl">05 — COMMUNICATION</div>
       <a href="#" data-section="communications">🟥 Communications</a>
@@ -113,6 +118,9 @@
       <a href="agenda.html">📅 Mon Agenda</a>
 
       <div class="sb-group-lbl">06 — OUTILS</div>
+      <a href="reseau.html">🌐 Mon Réseau Pro</a>
+      <a href="reunions.html">📹 Visioconférence</a>
+      <a href="business-plan.html">📋 Business Plans</a>
       <a href="projets-evaluation.html">📁 Évaluation de Projet</a>
       <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a>
       <a href="confidentialite.html">🔐 Confidentialité</a>
@@ -151,10 +159,41 @@
           <a href="reunions.html" class="btn btn-outline" style="justify-content:flex-start;gap:10px;padding:12px 16px;text-decoration:none;border-color:#7c3aed;color:#7c3aed;">
             <span style="font-size:20px;">📹</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Visioconférence</div><div style="font-size:11px;color:#7c3aed;opacity:.8;">Réunions collaboratives</div></div>
           </a>
+          <button class="btn btn-outline" onclick="if(window.Posts){Posts.openModal();}else{location.href='fil-actualite.html';}" style="justify-content:flex-start;gap:10px;padding:12px 16px;border-color:#4338CA;color:#4338CA;">
+            <span style="font-size:20px;">✍️</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Créer une publication</div><div style="font-size:11px;color:#4338CA;opacity:.8;">Sur votre profil public</div></div>
+          </button>
         </div>
         <div id="cockpit-perimetre" class="card">
           <h3 style="margin:0 0 12px;font-size:15px;">Périmètre d'accréditation</h3>
           <div id="perimetre-content-ck"></div>
+        </div>
+
+        <!-- Charte : les deux droits d'une collectivité -->
+        <div class="card" style="margin-top:16px;border:1px solid #C7D2FE;background:linear-gradient(135deg,#EEF2FF,#F5F3FF);">
+          <h3 style="margin:0 0 6px;font-size:15px;">🧭 Observer largement, agir localement</h3>
+          <p style="margin:0 0 14px;font-size:13px;color:#4338CA;line-height:1.5;font-style:italic;">
+            Diaspo'Actif distingue volontairement deux droits différents : le droit d'observer et le droit d'interagir.
+            Une collectivité peut disposer d'une vision mondiale grâce à des données anonymisées, mais elle ne peut engager
+            un échange individuel qu'avec les membres relevant de sa compétence ou ayant choisi d'entrer en relation avec elle.
+          </p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+            <div style="background:#fff;border-radius:10px;padding:12px;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:4px;">🌍 1 · Observer largement</div>
+              <div style="font-size:12px;color:var(--muted);line-height:1.45;">Observatoire Territorial : statistiques mondiales anonymisées (nationalités, origines, compétences, secteurs, investissements, projets…).</div>
+            </div>
+            <div style="background:#fff;border-radius:10px;padding:12px;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:4px;">🚫 2 · Observer ≠ contacter</div>
+              <div style="font-size:12px;color:var(--muted);line-height:1.45;">Accéder à une statistique n'autorise jamais à contacter les membres concernés hors de votre juridiction.</div>
+            </div>
+            <div style="background:#fff;border-radius:10px;padding:12px;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:4px;">✋ 3 · Le 1<sup>er</sup> contact appartient au membre</div>
+              <div style="font-size:12px;color:var(--muted);line-height:1.45;">Vous pouvez répondre à un membre qui vous suit, candidate, vous soumet un projet ou un rendez-vous — jamais l'inverse.</div>
+            </div>
+            <div style="background:#fff;border-radius:10px;padding:12px;">
+              <div style="font-weight:700;font-size:13px;margin-bottom:4px;">📍 4 · Communication limitée à la juridiction</div>
+              <div style="font-size:12px;color:var(--muted);line-height:1.45;">Vos publications, consultations, événements et appels à projets ne sont diffusés qu'aux membres de votre périmètre de compétence.</div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -190,8 +229,8 @@
           <span class="badge badge-inst">Compte Étatique</span>
         </div>
         <div id="accred-banner" style="display:none;" class="obs-badge">
-          <span class="obs-icon">🏛️</span>
-          <span>Observateur Diaspora Accrédité — <span id="accred-expire"></span></span>
+          <span class="obs-icon">🌍</span>
+          <span>Observatoire Diaspora — <span id="accred-expire"></span></span>
         </div>
         <div id="no-accred-banner" style="display:none;" class="notice">
           🔒 Votre institution n'est pas encore accréditée pour l'Observatoire Diaspora.
@@ -228,11 +267,12 @@
       <!-- ===================== OBSERVATOIRE ===================== -->
       <section id="section-observatoire" style="display:none;">
         <div class="flex-between" style="margin-bottom:16px;">
-          <h2 style="margin:0;">📊 Observatoire Diaspora</h2>
-          <span class="obs-badge" style="margin:0;font-size:12px;">🏛️ Accrédité</span>
+          <h2 style="margin:0;">🌍 Observatoire Mondial</h2>
+          <span class="obs-badge" style="margin:0;font-size:12px;">Vision globale · aucun contact possible</span>
         </div>
         <div class="notice" style="margin-bottom:16px;">
-          🔒 Données agrégées uniquement. Seuil de confidentialité : 10 membres minimum. Aucune donnée nominative n'est accessible.
+          🔒 Données agrégées et anonymisées uniquement · seuil de confidentialité : 10 membres minimum · aucune donnée nominative n'est accessible.
+          <br><strong>Observer n'est pas contacter :</strong> vous disposez d'une vision mondiale grâce à ces statistiques, mais vous ne pouvez engager un échange individuel qu'avec les membres relevant de votre compétence ou ayant choisi d'entrer en relation avec vous.
         </div>
         <div id="obs-locked" style="display:none;" class="obs-locked">
           <div style="font-size:48px;">🔒</div>
@@ -255,6 +295,7 @@
             <div style="display:flex;gap:8px;">
               <button class="btn btn-sm btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
               <button class="btn btn-sm btn-outline" onclick="genererRapport('mensuel')">📄 Rapport mensuel</button>
+              <button class="btn btn-sm" style="background:#4338CA;color:#fff;" onclick="oppOpenForm({source:{libelle:'Observatoire Mondial'}})">💡 Enregistrer comme opportunité</button>
             </div>
           </div>
 
@@ -357,6 +398,196 @@
         </div>
       </section>
 
+      <!-- ===================== IDENTITÉ TERRITORIALE ===================== -->
+      <section id="section-identite-territoriale" style="display:none;">
+        <div class="flex-between" style="margin-bottom:8px;">
+          <h2 style="margin:0;">🔐 Identité Territoriale</h2>
+          <span class="obs-badge" style="margin:0;font-size:12px;">Registre unique Diaspo'Actif</span>
+        </div>
+        <div class="notice" style="margin-bottom:16px;">
+          Votre carte d'identité numérique territoriale. Chaque collectivité possède un identifiant officiel unique
+          qui garantit son unicité et prévient les doublons et l'usurpation.
+        </div>
+
+        <!-- Carte identité -->
+        <div class="card" style="background:linear-gradient(135deg,#0F172A,#1E3A8A);color:#fff;margin-bottom:16px;">
+          <div style="font-size:11px;letter-spacing:1px;opacity:.7;text-transform:uppercase;">Identifiant territorial unique</div>
+          <div id="it-identifiant" style="font-size:22px;font-weight:800;letter-spacing:1.5px;margin:6px 0 12px;font-family:monospace;">…</div>
+          <div id="it-meta" style="font-size:13px;opacity:.9;line-height:1.6;"></div>
+        </div>
+
+        <div class="grid grid-2" style="gap:16px;margin-bottom:16px;">
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:15px;">🏅 Badge de confiance</h3>
+            <div id="it-confiance"></div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:15px;">👤 Administrateurs officiels</h3>
+            <div id="it-admins"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="gap:16px;">
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:15px;">🕓 Journal administratif</h3>
+            <div id="it-journal"></div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 8px;font-size:15px;">🔎 Vérifier un doublon</h3>
+            <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Avant de créer ou revendiquer une collectivité, vérifiez qu'elle n'existe pas déjà.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+              <input id="it-dbl-nom" class="input-field" style="grid-column:1/-1;" placeholder="Nom officiel (ex. Conseil Régional du Bélier)">
+              <input id="it-dbl-pays" class="input-field" placeholder="Pays">
+              <input id="it-dbl-ville" class="input-field" placeholder="Ville">
+            </div>
+            <button class="btn btn-orange" style="font-size:13px;" onclick="itVerifierDoublon()">Vérifier</button>
+            <div id="it-dbl-result" style="margin-top:12px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== OZ COLLECTIVITÉ ===================== -->
+      <section id="section-oz-collectivite" style="display:none;">
+        <div class="flex-between" style="margin-bottom:8px;">
+          <h2 style="margin:0;">🧠 OZ Collectivité</h2>
+          <span class="obs-badge" style="margin:0;font-size:12px;" id="oz-perimetre-badge">Assistant territorial</span>
+        </div>
+        <div class="notice" style="margin-bottom:16px;">
+          Votre Directeur Intelligence Diaspora. OZ transforme les données de votre territoire en décisions et actions.
+          Toutes les analyses sont agrégées et anonymisées — aucun contact individuel n'est proposé.
+        </div>
+
+        <!-- Accueil synthétique -->
+        <div id="oz-accueil" class="grid grid-3" style="gap:12px;margin-bottom:16px;"></div>
+
+        <!-- Conversation -->
+        <div class="card">
+          <div id="oz-chat" style="max-height:320px;overflow-y:auto;margin-bottom:12px;display:flex;flex-direction:column;gap:10px;"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;" id="oz-suggestions-defaut">
+            <button class="cible-chip" onclick="ozAsk('Quelles sont les compétences de notre diaspora ?')">Compétences de la diaspora</button>
+            <button class="cible-chip" onclick="ozAsk('Quel est le potentiel d\'investissement ?')">Potentiel d'investissement</button>
+            <button class="cible-chip" onclick="ozAsk('Quels sont les besoins prioritaires ?')">Besoins prioritaires</button>
+            <button class="cible-chip" onclick="ozAsk('Où en sont nos projets ?')">Suivi des projets</button>
+            <button class="cible-chip" onclick="ozAsk('Prépare une annonce de rencontre diaspora')">Préparer une annonce</button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input id="oz-input" class="input-field" style="flex:1;" placeholder="Posez votre question à OZ…" onkeydown="if(event.key==='Enter')ozAsk()">
+            <button class="btn btn-orange" onclick="ozAsk()">Demander</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== OBSERVATOIRE TERRITORIAL ===================== -->
+      <section id="section-observatoire-territorial" style="display:none;">
+        <div class="flex-between" style="margin-bottom:8px;">
+          <h2 style="margin:0;">🏛 Observatoire Territorial</h2>
+          <span class="obs-badge" style="margin:0;font-size:12px;" id="ot-perimetre-badge">Votre juridiction</span>
+        </div>
+        <div class="notice" style="margin-bottom:16px;">
+          🎯 Cockpit de pilotage limité à votre périmètre de compétence. Données agrégées et anonymisées (seuil : 10 membres minimum).
+          Contrairement à l'Observatoire Mondial, vous pouvez ici <strong>communiquer avec les membres de votre territoire</strong> (diffusion collective).
+        </div>
+
+        <!-- KPIs -->
+        <div class="grid grid-3" style="gap:12px;margin-bottom:16px;" id="ot-kpis"></div>
+
+        <div class="grid grid-2" style="gap:16px;margin-bottom:16px;">
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:15px;">👥 Population du territoire</h3>
+            <div id="ot-population"></div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:15px;">🌍 Diaspora liée au territoire</h3>
+            <div id="ot-diaspora"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="gap:16px;margin-bottom:16px;">
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:15px;">🗳️ Vie citoyenne & communication</h3>
+            <div id="ot-civique"></div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 12px;font-size:15px;">🏭 Vie économique</h3>
+            <div id="ot-economie"></div>
+          </div>
+        </div>
+
+        <!-- Assistant IA territorial -->
+        <div class="card" style="border:1px solid #C7D2FE;background:linear-gradient(135deg,#EEF2FF,#F5F3FF);">
+          <h3 style="margin:0 0 6px;font-size:15px;">🤖 Assistant IA territorial</h3>
+          <p style="margin:0 0 12px;font-size:12.5px;color:#4338CA;">Posez une question sur votre territoire — réponses depuis les données agrégées, sans donnée nominative.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;" id="ot-ia-suggestions">
+            <button class="cible-chip" onclick="otAskIA('Quels secteurs sont les plus représentés ?')">Secteurs les plus représentés</button>
+            <button class="cible-chip" onclick="otAskIA('Quels métiers sont sous-représentés ?')">Métiers sous-représentés</button>
+            <button class="cible-chip" onclick="otAskIA('Dans quels pays réside notre diaspora ?')">Pays de résidence</button>
+            <button class="cible-chip" onclick="otAskIA('Profil des nouveaux inscrits ?')">Nouveaux inscrits</button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input id="ot-ia-input" class="input-field" style="flex:1;" placeholder="Votre question…" onkeydown="if(event.key==='Enter')otAskIA()">
+            <button class="btn btn-orange" onclick="otAskIA()">Demander</button>
+          </div>
+          <div id="ot-ia-reponse" style="margin-top:12px;font-size:14px;color:#312E81;line-height:1.5;"></div>
+        </div>
+      </section>
+
+      <!-- ===================== OPPORTUNITÉS STRATÉGIQUES ===================== -->
+      <section id="section-opportunites" style="display:none;">
+        <div class="flex-between" style="margin-bottom:8px;">
+          <h2 style="margin:0;">💡 Opportunités stratégiques</h2>
+          <button class="btn btn-orange" onclick="oppOpenForm()">➕ Nouvelle opportunité</button>
+        </div>
+        <div class="notice" style="margin-bottom:16px;">
+          🔄 Le pont entre l'observation et l'action. Enregistrez une tendance repérée dans l'Observatoire Mondial,
+          analysez-la, puis transformez-la en action publiée (appel à projets, campagne, consultation…) à laquelle
+          les membres répondent volontairement.
+        </div>
+        <div id="opp-list" class="grid grid-2" style="gap:14px;"></div>
+        <div id="opp-detail" style="display:none;margin-top:16px;"></div>
+      </section>
+
+      <!-- Modale création / édition d'opportunité -->
+      <div id="opp-modal" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:9999;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 14px;">
+        <div style="background:var(--card);border-radius:16px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:22px;">
+          <div class="flex-between" style="margin-bottom:14px;">
+            <h3 style="margin:0;" id="opp-modal-titre">Nouvelle opportunité</h3>
+            <button onclick="oppCloseForm()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+          </div>
+          <input type="hidden" id="opp-f-id">
+          <label class="opp-lbl">Titre *</label>
+          <input id="opp-f-titre" class="input-field" style="width:100%;margin-bottom:10px;" placeholder="Ex. 850 entrepreneurs ivoiriens en Île-de-France">
+          <label class="opp-lbl">Description</label>
+          <textarea id="opp-f-desc" style="width:100%;min-height:70px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-bottom:10px;resize:vertical;"></textarea>
+          <div class="grid grid-2" style="gap:10px;">
+            <div><label class="opp-lbl">Pays concerné</label><input id="opp-f-pays" class="input-field" style="width:100%;"></div>
+            <div><label class="opp-lbl">Ville concernée</label><input id="opp-f-ville" class="input-field" style="width:100%;"></div>
+            <div><label class="opp-lbl">Nationalité / origine</label><input id="opp-f-origine" class="input-field" style="width:100%;"></div>
+            <div><label class="opp-lbl">Secteur</label><input id="opp-f-secteur" class="input-field" style="width:100%;"></div>
+            <div><label class="opp-lbl">Priorité</label>
+              <select id="opp-f-priorite" class="input-field" style="width:100%;">
+                <option value="basse">🟢 Basse</option><option value="moyenne" selected>🟡 Moyenne</option>
+                <option value="haute">🟠 Haute</option><option value="critique">🔴 Critique</option>
+              </select>
+            </div>
+            <div><label class="opp-lbl">État</label>
+              <select id="opp-f-etat" class="input-field" style="width:100%;">
+                <option value="detectee">Détectée</option><option value="en_analyse">En analyse</option>
+                <option value="planifiee">Planifiée</option><option value="en_action">En action</option>
+                <option value="realisee">Réalisée</option><option value="abandonnee">Abandonnée</option>
+              </select>
+            </div>
+            <div><label class="opp-lbl">Responsable</label><input id="opp-f-responsable" class="input-field" style="width:100%;"></div>
+            <div><label class="opp-lbl">Échéance</label><input type="date" id="opp-f-echeance" class="input-field" style="width:100%;"></div>
+          </div>
+          <label class="opp-lbl">Notes internes</label>
+          <textarea id="opp-f-notes" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-bottom:14px;resize:vertical;"></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="oppCloseForm()">Annuler</button>
+            <button class="btn btn-orange" onclick="oppSave()">💾 Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ===================== COMMUNICATIONS ===================== -->
       <section id="section-communications" style="display:none;">
         <h2 style="margin:0 0 8px;">✉️ Communications institutionnelles</h2>
@@ -387,30 +618,14 @@
             <textarea id="comm-contenu" style="width:100%;min-height:120px;border-radius:10px;border:1px solid var(--border);padding:12px;font-family:inherit;resize:vertical;" placeholder="Rédigez votre message officiel…"></textarea>
           </div>
 
-          <div class="card" style="background:var(--surface2);border:none;margin-bottom:12px;">
-            <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Ciblage géographique</div>
-            <div style="font-size:12.5px;margin-bottom:6px;color:var(--muted);">Pays de résidence :</div>
-            <div class="cible-chips" id="cible-pays">
-              <span class="cible-chip active" data-val="tous">🌍 Tous pays</span>
-              <span class="cible-chip" data-val="France">🇫🇷 France</span>
-              <span class="cible-chip" data-val="Belgique">🇧🇪 Belgique</span>
-              <span class="cible-chip" data-val="Suisse">🇨🇭 Suisse</span>
-              <span class="cible-chip" data-val="Canada">🇨🇦 Canada</span>
-              <span class="cible-chip" data-val="États-Unis">🇺🇸 États-Unis</span>
-              <span class="cible-chip" data-val="Allemagne">🇩🇪 Allemagne</span>
-              <span class="cible-chip" data-val="Espagne">🇪🇸 Espagne</span>
-            </div>
-            <div style="font-size:12.5px;margin:10px 0 6px;color:var(--muted);">Nationalités :</div>
-            <div class="cible-chips" id="cible-nats">
-              <span class="cible-chip active" data-val="toutes">Toutes nationalités</span>
-              <span class="cible-chip" data-val="Sénégalaise">Sénégalaise</span>
-              <span class="cible-chip" data-val="Ivoirienne">Ivoirienne</span>
-              <span class="cible-chip" data-val="Malienne">Malienne</span>
-              <span class="cible-chip" data-val="Camerounaise">Camerounaise</span>
-              <span class="cible-chip" data-val="Congolaise">Congolaise</span>
-              <span class="cible-chip" data-val="Marocaine">Marocaine</span>
-              <span class="cible-chip" data-val="Guinéenne">Guinéenne</span>
-            </div>
+          <div class="card" style="background:#F0F9FF;border:1px solid #BAE6FD;margin-bottom:12px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:6px;">📍 Périmètre de diffusion</div>
+            <p style="font-size:12.5px;color:#0369A1;margin:0 0 8px;line-height:1.5;">
+              Conformément au principe <strong>« agir localement »</strong>, votre communication est
+              automatiquement diffusée à l'ensemble des membres relevant de votre périmètre de compétence.
+              Elle n'est jamais envoyée hors de votre juridiction.
+            </p>
+            <div id="comm-perimetre-info" style="font-size:13px;font-weight:600;color:#075985;">Chargement du périmètre…</div>
           </div>
 
           <!-- ── Médias joints ── -->
@@ -595,6 +810,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/posts.js"></script>
 <script>
 if (typeof ACCREDITATIONS_DA === 'undefined') {
   window.ACCREDITATIONS_DA = [
@@ -631,6 +847,312 @@ function switchObsTab(tab) {
   document.getElementById("obs-" + tab)?.classList.add("active");
 }
 
+/* ===== Observatoire Territorial (Module 2) ===== */
+let otLoaded = false;
+async function loadObservatoireTerritorial() {
+  if (otLoaded) return;
+  otLoaded = true;
+  const num = n => (n||0).toLocaleString("fr-FR");
+  try {
+    const r = await api("GET", "/observatoire-territorial/cockpit");
+    document.getElementById("ot-perimetre-badge").textContent = "📍 " + (r.libelle || "Périmètre");
+
+    const kpi = (lbl, val, col) => `<div class="card stat-card" style="border-left:4px solid ${col};"><div class="stat-number">${val}</div><div class="stat-label">${lbl}</div></div>`;
+    document.getElementById("ot-kpis").innerHTML =
+      kpi("Membres inscrits", num(r.population.inscrits), "#2563EB") +
+      kpi("Nouveaux (30 j)", num(r.population.nouveaux_30j), "#059669") +
+      kpi("Initiatives", num(r.economie.initiatives), "#7c3aed");
+
+    const line = (l, v) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13.5px;"><span>${l}</span><strong>${v}</strong></div>`;
+    const conf = '<span style="color:var(--muted);font-size:12px;">&lt; 10 (confidentiel)</span>';
+    document.getElementById("ot-population").innerHTML =
+      line("Membres inscrits", num(r.population.inscrits)) +
+      line("Âge moyen", r.repartition.age_moyen ? r.repartition.age_moyen + " ans" : conf) +
+      (r.repartition.par_profession.length
+        ? r.repartition.par_profession.slice(0,6).map(p => line(escH(p.label), num(p.n))).join("")
+        : line("Répartition par profession", conf));
+
+    document.getElementById("ot-diaspora").innerHTML = r.diaspora_liee.length
+      ? r.diaspora_liee.map(d => line("🌍 " + escH(d.label), num(d.n))).join("")
+      : `<div class="empty" style="font-size:13px;">Diaspora liée insuffisante pour affichage (seuil de confidentialité) ou origine non renseignée.</div>`;
+
+    document.getElementById("ot-civique").innerHTML =
+      line("Consultations lancées", num(r.vie_citoyenne.consultations)) +
+      line("Événements organisés", num(r.vie_citoyenne.evenements)) +
+      line("Abonnés à votre compte", num(r.communication.abonnes)) +
+      line("Campagnes diffusées", num(r.communication.campagnes)) +
+      line("Portée cumulée", num(r.communication.portee_totale));
+
+    document.getElementById("ot-economie").innerHTML =
+      line("Initiatives", num(r.economie.initiatives)) +
+      line("Entreprises", num(r.economie.entreprises)) +
+      line("Associations / ONG", num(r.economie.associations));
+  } catch(e) {
+    document.getElementById("ot-kpis").innerHTML = `<div class="notice">Erreur de chargement : ${escH(e.message)}</div>`;
+  }
+}
+
+async function otAskIA(question) {
+  const input = document.getElementById("ot-ia-input");
+  const q = question || input.value.trim();
+  if (!q) return;
+  if (question) input.value = q;
+  const out = document.getElementById("ot-ia-reponse");
+  out.innerHTML = "⏳ Analyse en cours…";
+  try {
+    const r = await api("GET", "/observatoire-territorial/ia?q=" + encodeURIComponent(q));
+    out.innerHTML = `💬 ${escH(r.reponse)}`;
+  } catch(e) { out.innerHTML = `<span style="color:#dc2626;">Erreur : ${escH(e.message)}</span>`; }
+}
+
+/* ===== Identité Territoriale (Registre unique) ===== */
+let itLoaded = false;
+async function loadIdentiteTerritoriale() {
+  if (itLoaded) return;
+  itLoaded = true;
+  try {
+    const r = await api("GET", "/collectivite/identite");
+    document.getElementById("it-identifiant").textContent = r.identifiant || "—";
+    document.getElementById("it-meta").innerHTML =
+      `${escH(r.nom||"")} · ${escH(r.type_organisme||"")}<br>📍 ${escH(r.localisation||"—")}`;
+
+    document.getElementById("it-confiance").innerHTML = `
+      <div style="font-size:15px;font-weight:700;margin-bottom:8px;">${r.verifiee ? "✅ Collectivité vérifiée" : "⏳ En attente de validation"}</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6;">
+        ${r.responsable ? `👤 Responsable : <strong>${escH(r.responsable)}</strong>${r.fonction_responsable?" — "+escH(r.fonction_responsable):""}<br>` : ""}
+        ${r.site_officiel ? `🌐 <a href="${escH(r.site_officiel.startsWith("http")?r.site_officiel:"https://"+r.site_officiel)}" target="_blank">${escH(r.site_officiel)}</a><br>` : ""}
+        🏛️ Autorité reconnue : Diaspo'Actif
+      </div>`;
+
+    const admins = r.administrateurs || [];
+    document.getElementById("it-admins").innerHTML =
+      `<div style="font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--border);">⭐ ${escH(r.responsable||r.nom)} <span style="color:var(--muted);font-size:12px;">(administrateur principal)</span></div>` +
+      (admins.length ? admins.map(a => `<div style="font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--border);">🏢 ${escH(a.nom)} <span style="color:var(--muted);font-size:12px;">(${escH(a.type_organisme||"structure rattachée")})</span></div>`).join("")
+                     : `<div style="font-size:12.5px;color:var(--muted);margin-top:6px;">Aucune structure rattachée (sous-espaces à venir).</div>`);
+
+    const J_LABELS = { creation:"Création du profil", validation:"Validation officielle", identifiant_genere:"Identifiant attribué", ajout_admin:"Ajout d'un administrateur", modif_representant:"Modification du représentant" };
+    document.getElementById("it-journal").innerHTML = (r.journal||[]).map(h =>
+      `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;"><span style="color:var(--muted);">${fmtDateGlobal(h.created_at)}</span><br>${escH(J_LABELS[h.action]||h.action)}${h.detail?` — <span style="color:var(--muted);">${escH(h.detail)}</span>`:""}</div>`
+    ).join("") || '<span style="color:var(--muted);font-size:13px;">Aucun événement.</span>';
+  } catch(e) {
+    document.getElementById("it-identifiant").textContent = "Erreur de chargement";
+  }
+}
+
+async function itVerifierDoublon() {
+  const nom = document.getElementById("it-dbl-nom").value.trim();
+  const pays = document.getElementById("it-dbl-pays").value.trim();
+  const ville = document.getElementById("it-dbl-ville").value.trim();
+  const out = document.getElementById("it-dbl-result");
+  if (!nom) { out.innerHTML = '<span style="color:#dc2626;font-size:13px;">Saisissez au moins le nom.</span>'; return; }
+  out.innerHTML = "⏳ Analyse…";
+  try {
+    const qs = new URLSearchParams({ nom }); if (pays) qs.set("pays", pays); if (ville) qs.set("ville", ville);
+    const r = await api("GET", "/collectivites/verifier-doublon?" + qs.toString());
+    if (!r.doublon_probable) { out.innerHTML = '<div style="color:#16a34a;font-size:13px;">✅ Aucune collectivité similaire trouvée.</div>'; return; }
+    out.innerHTML = `<div style="color:#b45309;font-size:13px;font-weight:700;margin-bottom:8px;">⚠️ Correspondance probable — vérifiez avant de continuer.</div>` +
+      r.matches.map(m => {
+        const col = m.similarite >= 85 ? "#dc2626" : m.similarite >= 70 ? "#d97706" : "#64748b";
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <span>${escH(m.nom)} <span style="color:var(--muted);font-size:11.5px;">${escH([m.ville,m.pays].filter(Boolean).join(", "))}${m.identifiant_territorial?" · "+escH(m.identifiant_territorial):""}</span></span>
+          <strong style="color:${col};white-space:nowrap;">${m.similarite}%</strong>
+        </div>`;
+      }).join("");
+  } catch(e) { out.innerHTML = `<span style="color:#dc2626;font-size:13px;">Erreur : ${escH(e.message)}</span>`; }
+}
+
+/* ===== OZ Collectivité (assistant territorial) ===== */
+let ozLoaded = false;
+async function loadOzCollectivite() {
+  if (!ozLoaded) {
+    ozLoaded = true;
+    const num = n => (n||0).toLocaleString("fr-FR");
+    try {
+      const r = await api("GET", "/oz-collectivite/accueil");
+      document.getElementById("oz-perimetre-badge").textContent = "📍 " + (r.libelle || "Territoire");
+      const kpi = (lbl, val, col) => `<div class="card stat-card" style="border-left:4px solid ${col};"><div class="stat-number">${val}</div><div class="stat-label">${lbl}</div></div>`;
+      const compTxt = r.competences.length ? r.competences.map(c => `${c.label} : ${num(c.n)}`).join(" · ") : "Compétences en cours d'agrégation (seuil de confidentialité).";
+      document.getElementById("oz-accueil").innerHTML =
+        kpi("Diaspora connectée", num(r.diaspora.connectee), "#2563EB") +
+        kpi("Pays représentés", num(r.diaspora.pays), "#7c3aed") +
+        kpi("Opportunités actives", num(r.opportunites.actives), "#f59e0b") +
+        `<div class="card" style="grid-column:1/-1;"><strong style="font-size:13px;">👥 Compétences disponibles</strong><div style="font-size:13px;color:var(--muted);margin-top:6px;">${escH(compTxt)}</div></div>`;
+      // Message d'accueil d'OZ
+      ozAddMsg("oz", `Bonjour, voici l'état de votre réseau diaspora pour <strong>${escH(r.libelle||"votre territoire")}</strong> : <strong>${num(r.diaspora.connectee)}</strong> membre(s) liés, présents dans <strong>${num(r.diaspora.pays)}</strong> pays. Comment puis-je vous aider ?`);
+    } catch(e) { document.getElementById("oz-accueil").innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+  }
+}
+
+function ozAddMsg(who, html, suggestions) {
+  const chat = document.getElementById("oz-chat");
+  const bubble = document.createElement("div");
+  const me = who === "user";
+  bubble.style.cssText = `align-self:${me?"flex-end":"flex-start"};max-width:85%;background:${me?"#2563EB":"var(--surface2)"};color:${me?"#fff":"var(--text)"};border-radius:14px;padding:10px 14px;font-size:14px;line-height:1.5;`;
+  bubble.innerHTML = (me?"":"🧠 ") + html;
+  chat.appendChild(bubble);
+  if (suggestions && suggestions.length) {
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "align-self:flex-start;display:flex;flex-wrap:wrap;gap:6px;max-width:90%;";
+    wrap.innerHTML = suggestions.map((s,i) => `<button class="btn btn-sm btn-outline" onclick='ozRunAction(${JSON.stringify(s).replace(/'/g,"&#39;")})'>${escH(s.label)}</button>`).join("");
+    chat.appendChild(wrap);
+  }
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function ozAsk(question) {
+  const input = document.getElementById("oz-input");
+  const q = question || input.value.trim();
+  if (!q) return;
+  ozAddMsg("user", escH(q));
+  input.value = "";
+  try {
+    const r = await api("GET", "/oz-collectivite/ask?q=" + encodeURIComponent(q));
+    ozAddMsg("oz", escH(r.reponse), r.suggestions);
+  } catch(e) { ozAddMsg("oz", `<span style="color:#dc2626;">Erreur : ${escH(e.message)}</span>`); }
+}
+
+function ozRunAction(s) {
+  // Une suggestion d'OZ se matérialise en fiche d'opportunité pré-remplie (le pont vers l'action).
+  if (s.action_type === "opportunite" || s.action_type === "consultation") {
+    const pre = Object.assign({ source: { libelle: "OZ Collectivité" } }, s.prefill || {});
+    if (s.action_type === "consultation") pre.notes = "Action suggérée par OZ : lancer une consultation citoyenne.";
+    oppOpenForm(pre);
+    // Bascule vers la section Opportunités pour finaliser
+    showSection("opportunites");
+    setTimeout(() => oppOpenForm(pre), 60);
+  }
+}
+
+/* ===== Opportunités stratégiques ===== */
+const OPP_PRIO = { basse:"🟢 Basse", moyenne:"🟡 Moyenne", haute:"🟠 Haute", critique:"🔴 Critique" };
+const OPP_ETAT = { detectee:"Détectée", en_analyse:"En analyse", planifiee:"Planifiée", en_action:"En action", realisee:"Réalisée", abandonnee:"Abandonnée" };
+const OPP_ACTIONS = [
+  ["campagne","📢 Campagne d'information"], ["appel_projets","🚀 Appel à projets"], ["consultation","📋 Consultation citoyenne"],
+  ["evenement","📅 Événement"], ["mission_eco","🤝 Mission économique"], ["levee_fonds","💰 Levée de fonds"],
+  ["cooperation","🌍 Mission de coopération"], ["mentorat","🎓 Programme de mentorat"], ["investisseurs","🏢 Rencontre investisseurs"],
+];
+
+async function loadOpportunites() {
+  const el = document.getElementById("opp-list");
+  document.getElementById("opp-detail").style.display = "none";
+  try {
+    const r = await api("GET", "/opportunites");
+    const list = r.opportunites || [];
+    if (!list.length) { el.innerHTML = `<div class="empty" style="grid-column:1/-1;">Aucune opportunité pour le moment. Cliquez sur « Nouvelle opportunité » ou enregistrez une tendance depuis l'Observatoire Mondial.</div>`; return; }
+    el.innerHTML = list.map(o => `
+      <div class="card" style="cursor:pointer;" onclick="oppOpenDetail(${o.id})">
+        <div class="flex-between" style="margin-bottom:6px;">
+          <strong style="font-size:14.5px;">${escH(o.titre)}</strong>
+          <span style="font-size:12px;white-space:nowrap;">${OPP_PRIO[o.priorite]||o.priorite}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">${escH((o.description||"").slice(0,90))}${(o.description||"").length>90?"…":""}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:11.5px;">
+          ${o.secteur?`<span class="cible-chip">${escH(o.secteur)}</span>`:""}
+          ${o.pays?`<span class="cible-chip">📍 ${escH([o.ville,o.pays].filter(Boolean).join(", "))}</span>`:""}
+          ${o.origine?`<span class="cible-chip">🌍 ${escH(o.origine)}</span>`:""}
+          <span class="cible-chip active">${OPP_ETAT[o.etat]||o.etat}</span>
+        </div>
+      </div>`).join("");
+  } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+}
+
+function oppOpenForm(prefill) {
+  const g = id => document.getElementById(id);
+  g("opp-modal-titre").textContent = prefill?.id ? "Modifier l'opportunité" : "Nouvelle opportunité";
+  g("opp-f-id").value = prefill?.id || "";
+  g("opp-f-titre").value = prefill?.titre || "";
+  g("opp-f-desc").value = prefill?.description || "";
+  g("opp-f-pays").value = prefill?.pays || "";
+  g("opp-f-ville").value = prefill?.ville || "";
+  g("opp-f-origine").value = prefill?.origine || "";
+  g("opp-f-secteur").value = prefill?.secteur || "";
+  g("opp-f-priorite").value = prefill?.priorite || "moyenne";
+  g("opp-f-etat").value = prefill?.etat || "detectee";
+  g("opp-f-responsable").value = prefill?.responsable || "";
+  g("opp-f-echeance").value = prefill?.echeance || "";
+  g("opp-f-notes").value = prefill?.notes || "";
+  g("opp-modal")._source = prefill?.source || null;
+  g("opp-modal").style.display = "flex";
+}
+function oppCloseForm() { document.getElementById("opp-modal").style.display = "none"; }
+
+async function oppSave() {
+  const g = id => document.getElementById(id).value.trim();
+  const titre = g("opp-f-titre");
+  if (!titre) { alert("Le titre est requis."); return; }
+  const payload = {
+    titre, description: g("opp-f-desc"), pays: g("opp-f-pays"), ville: g("opp-f-ville"),
+    origine: g("opp-f-origine"), secteur: g("opp-f-secteur"), priorite: g("opp-f-priorite"),
+    etat: g("opp-f-etat"), responsable: g("opp-f-responsable"), echeance: g("opp-f-echeance"), notes: g("opp-f-notes"),
+  };
+  const id = document.getElementById("opp-f-id").value;
+  const src = document.getElementById("opp-modal")._source;
+  if (src) payload.source = src;
+  try {
+    if (id) await api("PUT", "/opportunites/" + id, payload);
+    else await api("POST", "/opportunites", payload);
+    oppCloseForm();
+    loadOpportunites();
+  } catch(e) { alert("Erreur : " + e.message); }
+}
+
+async function oppOpenDetail(id) {
+  const panel = document.getElementById("opp-detail");
+  panel.style.display = "";
+  panel.innerHTML = `<div class="card">Chargement…</div>`;
+  try {
+    const r = await api("GET", "/opportunites/" + id);
+    const o = r.opportunite;
+    panel.innerHTML = `
+      <div class="card">
+        <div class="flex-between" style="margin-bottom:10px;">
+          <h3 style="margin:0;">${escH(o.titre)} <span style="font-size:12px;font-weight:400;">${OPP_PRIO[o.priorite]||""} · ${OPP_ETAT[o.etat]||o.etat}</span></h3>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm btn-outline" onclick='oppOpenForm(${JSON.stringify(o).replace(/'/g,"&#39;")})'>✏️ Modifier</button>
+            <button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="oppDelete(${o.id})">🗑</button>
+          </div>
+        </div>
+        ${o.description?`<p style="font-size:13.5px;margin:0 0 10px;">${escH(o.description)}</p>`:""}
+        <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px;margin-bottom:14px;">
+          ${o.pays?`<span class="cible-chip">📍 ${escH([o.ville,o.pays].filter(Boolean).join(", "))}</span>`:""}
+          ${o.origine?`<span class="cible-chip">🌍 ${escH(o.origine)}</span>`:""}
+          ${o.secteur?`<span class="cible-chip">${escH(o.secteur)}</span>`:""}
+          ${o.responsable?`<span class="cible-chip">👤 ${escH(o.responsable)}</span>`:""}
+          ${o.echeance?`<span class="cible-chip">📆 ${escH(o.echeance)}</span>`:""}
+        </div>
+        ${o.notes?`<div style="background:var(--surface2);border-radius:8px;padding:10px;font-size:13px;margin-bottom:14px;"><strong>Notes :</strong> ${escH(o.notes)}</div>`:""}
+
+        <h4 style="margin:10px 0 8px;">🚀 Transformer en action</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+          ${OPP_ACTIONS.map(([t,l])=>`<button class="cible-chip" onclick="oppAction(${o.id},'${t}')">${l}</button>`).join("")}
+        </div>
+
+        <h4 style="margin:10px 0 8px;">🕓 Historique</h4>
+        <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;">
+          ${(o.historique||[]).map(h=>`<div style="padding:4px 0;border-bottom:1px solid var(--border);"><span style="color:var(--muted);">${fmtDateGlobal(h.created_at)}</span> — ${escH(h.action)}${h.detail?" : "+escH(h.detail):""}</div>`).join("") || '<span style="color:var(--muted);">Aucune action.</span>'}
+        </div>
+      </div>`;
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch(e) { panel.innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+}
+
+async function oppAction(id, type) {
+  const label = (OPP_ACTIONS.find(a=>a[0]===type)||[])[1] || type;
+  if (!confirm(`Transformer cette opportunité en « ${label} » ?`)) return;
+  try {
+    const r = await api("POST", `/opportunites/${id}/action`, { type });
+    alert("✅ " + (r.message || "Action créée."));
+    oppOpenDetail(id);
+    loadOpportunites();
+  } catch(e) { alert("Erreur : " + e.message); }
+}
+
+async function oppDelete(id) {
+  if (!confirm("Supprimer définitivement cette opportunité ?")) return;
+  try { await api("DELETE", "/opportunites/" + id); document.getElementById("opp-detail").style.display="none"; loadOpportunites(); }
+  catch(e) { alert("Erreur : " + e.message); }
+}
+
 /* ===== Navigation ===== */
 function showSection(name) {
   document.querySelectorAll(".sidebar a[data-section]").forEach(a => a.classList.remove("active"));
@@ -641,6 +1163,10 @@ function showSection(name) {
   if (name === "cockpit") loadCockpit();
   if (name === "initiatives-valider" || name === "initiatives-validees") loadCollProjets();
   if (name === "observatoire") loadObservatoire();
+  if (name === "identite-territoriale") loadIdentiteTerritoriale();
+  if (name === "oz-collectivite") loadOzCollectivite();
+  if (name === "observatoire-territorial") loadObservatoireTerritorial();
+  if (name === "opportunites") loadOpportunites();
   if (name === "communications") loadCommHistorique();
   if (name === "consultations") loadConsultations();
   if (name === "publications") loadPublications();
@@ -996,7 +1522,17 @@ async function genererRapport(periode = "mensuel") {
 }
 
 /* ===== Communications ===== */
+async function loadCommPerimetre() {
+  const el = document.getElementById("comm-perimetre-info");
+  if (!el) return;
+  try {
+    const r = await api("GET", "/collectivite/perimetre");
+    el.innerHTML = `🎯 ${escH(r.libelle || "Périmètre non défini")} · <strong>${(r.nb_membres||0).toLocaleString("fr-FR")}</strong> membre(s) touché(s)`;
+  } catch(e) { el.textContent = "Périmètre indisponible."; }
+}
+
 async function loadCommHistorique() {
+  loadCommPerimetre();
   const el = document.getElementById("comm-historique");
   try {
     const r = await api("GET", "/communications");
@@ -1189,6 +1725,7 @@ async function loadPartenariats() {
   ME = await fetchCurrentUser();
   if (!ME) { window.location.href = "login.html"; return; }
   if (ME.role !== "collectivite") { window.location.href = ROLE_DASHBOARD[ME.role] || "index.html"; return; }
+  if (window.Posts) Posts.init(ME.id);
 
   document.getElementById("inst-nom").textContent = ME.nom;
   document.getElementById("inst-infos").textContent = [ME.ville, ME.pays].filter(Boolean).join(", ") + " · Compte Étatique";
@@ -1199,7 +1736,7 @@ async function loadPartenariats() {
     if (r.accreditee) {
       ACCRED = r.accreditation;
       const expEl = document.getElementById("accred-expire");
-      expEl.textContent = ACCRED.date_fin ? "Valide jusqu'au " + fmtDateGlobal(ACCRED.date_fin) : "Accréditation permanente";
+      expEl.textContent = ACCRED.date_fin ? "Valide jusqu'au " + fmtDateGlobal(ACCRED.date_fin) : "Accès ouvert à votre collectivité";
       document.getElementById("accred-banner").style.display = "";
 
       // Périmètre
@@ -1384,15 +1921,12 @@ async function loadPartenariats() {
     const titre = document.getElementById("comm-titre").value.trim();
     const contenu = document.getElementById("comm-contenu").value.trim();
     if (!titre || !contenu) { alert("L'objet et le contenu sont requis."); return; }
-    const pays = [...document.querySelectorAll("#cible-pays .cible-chip.active")].map(c=>c.dataset.val).filter(v=>v!=="tous");
-    const nats = [...document.querySelectorAll("#cible-nats .cible-chip.active")].map(c=>c.dataset.val).filter(v=>v!=="toutes");
     const photos = collPhotos.filter(Boolean);
     const btn = document.getElementById("btn-envoyer-comm");
     btn.disabled = true; btn.textContent = "⏳ Envoi…";
     try {
       const r = await api("POST", "/communications", {
         titre, contenu, type: COMM_TYPE,
-        cible: { pays, nationalites: nats },
         photos_json: photos,
         video_b64: collVideoB64 || null,
         audio_b64: collAudioB64 || null,

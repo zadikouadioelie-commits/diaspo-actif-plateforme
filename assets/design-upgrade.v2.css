@@ -93,10 +93,16 @@ a.btn-deconnexion,
   background: rgba(255,255,255,.2) !important;
 }
 
-/* Tous les textes dans la topbar en blanc */
-.topbar *:not(.btn-orange):not(.btn-primary):not(.pill):not(img) {
+/* Tous les textes dans la topbar en blanc — SAUF le contenu du menu déroulant des
+   notifications (fond clair), qui doit garder ses propres couleurs sombres lisibles. */
+.topbar *:not(.btn-orange):not(.btn-primary):not(.pill):not(img):not(.notif-dropdown):not(.notif-item):not(.notif-titre):not(.notif-contenu):not(.notif-date):not(.notif-dd-title):not(.notif-empty) {
   color: #fff !important;
 }
+.topbar .notif-dropdown, .topbar .notif-dropdown * { color: #0D1B2A !important; }
+.topbar .notif-dropdown .notif-titre, .topbar .notif-dropdown .notif-dd-title { color: #0D1B2A !important; }
+.topbar .notif-dropdown .notif-contenu { color: #4B5563 !important; }
+.topbar .notif-dropdown .notif-date { color: #8A94A6 !important; }
+.topbar .notif-dropdown .notif-empty { color: #9CA3AF !important; }
 /* Exceptions : bouton S'inscrire reste orange */
 .topbar .btn-orange,
 .topbar .btn-primary {
@@ -630,6 +636,13 @@ footer, .footer {
 }
 .notif-item:hover { background: #F8FAFF !important; }
 .notif-item.unread { border-left: 3px solid #2563EB !important; background: #EFF6FF !important; }
+/* La cloche de notifications est dans la topbar : `.topbar a{color:#fff}` teintait le
+   texte en blanc → invisible sur fond bleu clair. On force des couleurs lisibles. */
+.notif-dropdown .notif-item { color: #0D1B2A !important; }
+.notif-dropdown .notif-titre { color: #0D1B2A !important; }
+.notif-dropdown .notif-contenu { color: #4B5563 !important; }
+.notif-dropdown .notif-date { color: #8A94A6 !important; }
+.notif-dropdown .notif-dd-title { color: #0D1B2A !important; }
 
 /* ── Formulaires étendus ── */
 .form-label, label {

@@ -145,6 +145,10 @@ async function migratePg(pool) {
     ['produits_vitrine', 'date_retour', 'TEXT'],
     ['produits_vitrine', 'reference', 'TEXT'],
     ['messages', 'produit_id', 'INTEGER'],
+    ['messages', 'edited', 'INTEGER DEFAULT 0'],
+    ['messages', 'edited_at', 'TEXT'],
+    ['messages', 'deleted', 'INTEGER DEFAULT 0'],
+    ['messages', 'deleted_at', 'TEXT'],
     ['conversations', 'contexte', 'TEXT'],
     // vitrine v3 : publications promotionnelles
     ['initiatives', 'vitrine_pub_onglet', "TEXT DEFAULT 'À la une'"],
@@ -200,6 +204,9 @@ async function migratePg(pool) {
     ['users', 'identite_verifiee_le', 'TEXT'],
     ['users', 'identite_expire_le', 'TEXT'],
     ['users', 'identite_renouvellement_notifie', 'INTEGER DEFAULT 0'],
+    ['users', 'identite_pays_document', 'TEXT'],
+    ['users', 'identite_mismatch', 'INTEGER DEFAULT 0'],
+    ['users', 'galerie_json', 'TEXT'],
     ['initiatives', 'organisation_verifiee', 'INTEGER DEFAULT 0'],
     ['initiatives', 'organisation_verifiee_le', 'TEXT'],
     ['initiatives', 'organisation_expire_le', 'TEXT'],
@@ -299,6 +306,12 @@ async function migratePg(pool) {
     ['evenements', 'type_evt', "TEXT DEFAULT 'evenement'"],
     ['evenements', 'pays', "TEXT"],
     ['evenements', 'ville', "TEXT"],
+    ['evenements', 'origine', "TEXT"],
+    ['evenements_participants', 'nom_complet', "TEXT"],
+    ['evenements_participants', 'email', "TEXT"],
+    ['evenements_participants', 'telephone', "TEXT"],
+    ['evenements_participants', 'nb_personnes', "INTEGER DEFAULT 1"],
+    ['evenements_participants', 'message', "TEXT"],
     ['evenements', 'inscription_ouverte', "INTEGER DEFAULT 1"],
     ['evenements', 'lien_inscription', "TEXT"],
     ['evenements', 'heure_debut', "TEXT"],
@@ -501,6 +514,32 @@ async function migratePg(pool) {
     ['commandes_vitrine', 'montant_total', 'REAL'],
     ['commandes_vitrine', 'stripe_session_id', 'TEXT'],
     ['wallet_transactions', 'commande_vitrine_id', 'INTEGER'],
+    // Module Cotisations & Adhésions
+    ['wallet_transactions', 'adhesion_paiement_id', 'INTEGER'],
+    ['adhesion_formules', 'media_type', 'TEXT'],
+    ['adhesion_formules', 'media_url', 'TEXT'],
+    ['adhesion_formules', 'media_duree_secondes', 'INTEGER'],
+    // Module Votes sécurisés
+    ['vote_scrutins', 'archived', 'INTEGER DEFAULT 0'],
+    // Liste de stockage des participants (Cotisations & Adhésions ↔ Réseau professionnel)
+    ['adhesion_formules', 'liste_stockage_id', 'INTEGER'],
+    // Profil public enrichi des initiatives
+    ['initiatives', 'publics_json', 'TEXT'],
+    ['initiatives', 'besoins_json', 'TEXT'],
+    ['initiatives', 'realisations_json', 'TEXT'],
+    ['initiatives', 'stats_perso_json', 'TEXT'],
+    ['initiatives', 'annee_creation', 'INTEGER'],
+    ['initiatives', 'assistant_actif', 'INTEGER DEFAULT 1'],
+    // Profil public enrichi des comptes personnels (miroir)
+    ['users', 'publics_json', 'TEXT'],
+    ['users', 'besoins_json', 'TEXT'],
+    ['users', 'realisations_json', 'TEXT'],
+    ['users', 'stats_perso_json', 'TEXT'],
+    ['users', 'services_perso', 'TEXT'],
+    ['users', 'zones_json', 'TEXT'],
+    ['users', 'reseaux_json', 'TEXT'],
+    ['users', 'annee_debut', 'INTEGER'],
+    ['users', 'assistant_actif', 'INTEGER DEFAULT 1'],
   ];
   for (const [table, col, type] of cols) {
     try {

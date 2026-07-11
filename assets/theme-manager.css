@@ -133,6 +133,9 @@
 }
 .da-theme-dot-classique      { background: linear-gradient(135deg, #1B3A6B 50%, #F5F7FA 50%); }
 .da-theme-dot-institutionnel2 { background: linear-gradient(135deg, #0D2B4E 50%, #EEF2F8 50%); }
+.da-theme-dot-emeraude       { background: linear-gradient(135deg, #065F46 50%, #F0FBF6 50%); }
+.da-theme-dot-bordeaux       { background: linear-gradient(135deg, #7A1E32 50%, #FBF3F4 50%); }
+.da-theme-dot-ardoise        { background: linear-gradient(135deg, #1E293B 50%, #F59E0B 50%); }
 .da-theme-info { flex: 1; }
 .da-theme-info strong { font-size: 14px; color: var(--text, #102A43); display: block; }
 .da-theme-info span   { font-size: 12px; color: var(--muted, #6B7280); }

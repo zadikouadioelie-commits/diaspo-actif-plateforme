@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Mes Billets</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<style>
+.tag-type{background:#fff3e0;color:#e65100;border-radius:99px;padding:2px 8px;font-size:11px;font-weight:700;}
+.tag-type.vip{background:#f3e5f5;color:#6a1b9a;}
+.tag-type.early{background:#e8f5e9;color:#1b5e20;}
+.tag-type.sponsor{background:#e3f2fd;color:#0d47a1;}
+.ticket-card{background:#fff;border:2px dashed var(--border);border-radius:16px;padding:24px;max-width:420px;margin:0 auto;}
+.ticket-header{background:linear-gradient(135deg,var(--orange),#ff9f43);border-radius:10px;padding:16px;color:#fff;margin-bottom:20px;}
+.qr-box{display:flex;justify-content:center;margin:20px 0;padding:16px;background:#f8fafc;border-radius:12px;}
+.ticket-info-row{display:flex;gap:8px;margin-bottom:8px;font-size:13px;}
+.ticket-info-row .lbl{color:var(--muted);min-width:100px;}
+.ticket-info-row .val{font-weight:700;}
+.statut-pill{display:inline-block;padding:3px 12px;border-radius:99px;font-size:12px;font-weight:800;text-transform:uppercase;}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-bg.open{display:flex;}
+.modal-box{background:#fff;border-radius:16px;padding:24px;width:460px;max-width:100%;max-height:90vh;overflow-y:auto;}
+.notice{text-align:center;padding:30px;color:var(--muted);}
+</style>
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="dashboard-utilisateur.html">Mon espace</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:32px;padding-bottom:60px;">
+    <div style="margin-bottom:24px;">
+      <h1 style="margin:0;font-size:24px;">🎟 Mes Billets</h1>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Retrouvez ici tous les billets que vous avez achetés pour des événements sur Diaspo'Actif.</p>
+    </div>
+
+    <div id="mes-billets-list"><div class="notice">Chargement…</div></div>
+  </main>
+
+</div>
+
+<!-- MODAL TICKET -->
+<div class="modal-bg" id="modal-ticket-bg" onclick="if(event.target===this)closeMod('modal-ticket-bg')">
+  <div class="modal-box" id="modal-ticket-content"></div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+let ME = null;
+const TYPES_COLOR = { standard:'', vip:'vip', early:'early', sponsor:'sponsor' };
+function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(d){ return d ? new Date(d).toLocaleDateString('fr',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : ''; }
+function closeMod(id){ document.getElementById(id).classList.remove('open'); }
+
+/* Statut calculé du billet — jamais stocké en base, recalculé côté client à chaque affichage */
+function calculerStatutBillet(t) {
+  if (t.payment_status === 'refunded') return { label: 'Remboursé', color: '#64748b' };
+  if (t.payment_status === 'failed') return { label: 'Paiement échoué', color: '#ef4444' };
+  if (t.statut === 'cancelled') return { label: 'Annulé', color: '#ef4444' };
+  if (t.validation_manuelle_statut === 'en_attente') return { label: "En attente d'approbation", color: '#f59e0b' };
+  if (t.validation_manuelle_statut === 'refuse') return { label: 'Refusé', color: '#ef4444' };
+  if (t.statut === 'used') return { label: 'Utilisé', color: '#94a3b8' };
+  if (t.payment_status === 'pending') return { label: 'Paiement en attente', color: '#f59e0b' };
+  const now = new Date();
+  const debut = new Date(t.date_debut);
+  const fin = t.date_fin ? new Date(t.date_fin) : new Date(debut.getTime() + 86400000);
+  if (fin < now) return { label: 'Expiré', color: '#94a3b8' };
+  const today0 = new Date(now); today0.setHours(0,0,0,0);
+  const debut0 = new Date(debut); debut0.setHours(0,0,0,0);
+  if (debut0.getTime() === today0.getTime()) return { label: "Aujourd'hui", color: '#22c55e' };
+  return { label: 'À venir', color: '#2563EB' };
+}
+
+async function loadMesBillets() {
+  if (!ME) { document.getElementById('mes-billets-list').innerHTML='<div class="notice">🔐 <a href="login.html">Connectez-vous</a> pour voir vos billets.</div>'; return; }
+  try {
+    const r = await api('GET', '/tickets/mes');
+    const list = document.getElementById('mes-billets-list');
+    if (!r.tickets.length) {
+      list.innerHTML = `<div class="notice">
+        <div style="font-size:48px;margin-bottom:12px;">🎟</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text);">Aucun billet pour le moment</div>
+        <p style="font-size:13px;max-width:360px;margin:0 auto 16px;">Vos billets achetés sur des événements d'initiatives apparaîtront ici.</p>
+        <a class="btn btn-orange" href="agenda.html">📅 Découvrir les événements</a>
+      </div>`;
+      return;
+    }
+    list.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">` +
+      r.tickets.map(t => { const st = calculerStatutBillet(t); return `
+        <div class="ticket-card" style="max-width:none;cursor:pointer;" onclick="openTicket(${t.id})">
+          <div style="background:${st.color};border-radius:10px;padding:14px;color:#fff;margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div><div style="font-weight:800;font-size:15px;">${escH(t.event_titre)}</div>
+                <div style="font-size:12px;opacity:.9;margin-top:2px;">${fmtDate(t.date_debut)}</div></div>
+              <span class="statut-pill" style="font-size:10px;background:rgba(255,255,255,.25);">${escH(st.label).toUpperCase()}</span>
+            </div>
+          </div>
+          <div style="font-size:13px;">
+            <div class="ticket-info-row"><span class="lbl">📍 Lieu</span><span class="val">${escH(t.ville||'—')}${t.pays?', '+escH(t.pays):''}</span></div>
+            <div class="ticket-info-row"><span class="lbl">🎟️ Type</span><span class="val"><span class="tag-type ${TYPES_COLOR[t.type_cat]||''}">${t.type_cat?.toUpperCase()||'STANDARD'}</span> ${escH(t.type_nom)}</span></div>
+            <div class="ticket-info-row"><span class="lbl">💶 Prix</span><span class="val">${t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €'}</span></div>
+          </div>
+          <div style="text-align:center;margin-top:12px;">
+            <button class="btn btn-sm btn-orange" onclick="event.stopPropagation();openTicket(${t.id})">🔍 Voir le billet</button>
+          </div>
+        </div>`; }).join('') + '</div>';
+  } catch(e) { document.getElementById('mes-billets-list').innerHTML='<div class="notice">Erreur chargement billets.</div>'; }
+}
+
+/* ══ MODAL QR TICKET ══ */
+let _ticketDetail = null;
+async function openTicket(tid) {
+  try {
+    const r = await api('GET', '/tickets/'+tid);
+    const t = r.ticket;
+    _ticketDetail = { t, qr_payload: r.qr_payload };
+    const st = calculerStatutBillet(t);
+    const qrOk = t.payment_status === 'paid' && t.statut !== 'cancelled' && !t.validation_manuelle_statut;
+    const titulaire = t.titulaire_nom ? `${escH(t.titulaire_prenom||'')} ${escH(t.titulaire_nom)}`.trim() : escH(t.user_nom);
+    document.getElementById('modal-ticket-content').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+        <h3 style="margin:0;">🎫 Mon Billet</h3>
+        <button onclick="closeMod('modal-ticket-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div class="ticket-header">
+        <div style="font-size:17px;font-weight:800;">${escH(t.event_titre)}</div>
+        <div style="font-size:13px;opacity:.9;margin-top:4px;">${fmtDate(t.date_debut)} · ${escH(t.ville||'')}${t.pays?', '+escH(t.pays):''}</div>
+      </div>
+      <div style="text-align:center;margin-bottom:12px;">
+        <span class="statut-pill" style="font-size:13px;background:${st.color};color:#fff;">${escH(st.label)}</span>
+      </div>
+      ${qrOk ? `
+        <div class="qr-box" id="qr-render-zone">
+          <div id="qr-container-${tid}"></div>
+        </div>
+        <p style="text-align:center;font-size:11px;color:var(--muted);margin:0 0 16px;">Présentez ce QR code à l'entrée de l'événement.</p>` :
+        t.validation_manuelle_statut === 'en_attente' ? `<p style="text-align:center;font-size:12px;color:#f59e0b;margin:0 0 16px;">⏳ QR code disponible dès l'approbation de votre commande par l'organisateur.</p>` : ''}
+      <div style="font-size:13px;">
+        <div class="ticket-info-row"><span class="lbl">🆔 Ticket #</span><span class="val">${t.id}</span></div>
+        <div class="ticket-info-row"><span class="lbl">🎟️ Type</span><span class="val">${escH(t.type_nom)}</span></div>
+        <div class="ticket-info-row"><span class="lbl">💶 Prix payé</span><span class="val">${t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €'}</span></div>
+        <div class="ticket-info-row"><span class="lbl">📅 Acheté le</span><span class="val">${fmtDate(t.created_at)}</span></div>
+        <div class="ticket-info-row"><span class="lbl">👤 Titulaire</span><span class="val">${titulaire}</span></div>
+        <div class="ticket-info-row"><span class="lbl">🆔 Code DA</span><span class="val">${escH(ME?.da_id||'—')}</span></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">
+        <button class="btn btn-sm btn-outline" onclick="downloadTicketPdf()">⬇️ PDF</button>
+        <button class="btn btn-sm btn-outline" onclick="addTicketToGoogleCalendar()">📅 Google Agenda</button>
+        <a class="btn btn-sm btn-outline" href="messagerie.html?user=${t.organisateur_id}">💬 Contacter l'organisateur</a>
+        ${t.autoriser_partage_billet ? `<button class="btn btn-sm btn-outline" onclick="shareTicket()">🔗 Partager</button>` : ''}
+      </div>`;
+    document.getElementById('modal-ticket-bg').classList.add('open');
+    if (qrOk && r.qr_payload) {
+      setTimeout(() => {
+        const el = document.getElementById('qr-container-'+tid);
+        if (el && typeof QRCode !== 'undefined') {
+          new QRCode(el, { text: r.qr_payload, width: 220, height: 220, colorDark: '#1a1a2e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+        }
+      }, 100);
+    }
+  } catch(e) { showToast('Erreur : '+e.message,'error'); }
+}
+
+function downloadTicketPdf() {
+  if (!_ticketDetail || typeof window.jspdf === 'undefined') { showToast('Génération PDF momentanément indisponible.','error'); return; }
+  const { t, qr_payload } = _ticketDetail;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a5' });
+  doc.setFillColor(37, 99, 235); doc.rect(0, 0, 148, 30, 'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(16); doc.text("Diaspo'Actif — Billet", 8, 12);
+  doc.setFontSize(11); doc.text(t.event_titre, 8, 22);
+  doc.setTextColor(20,20,20); doc.setFontSize(10);
+  let y = 40;
+  const line = (label, val) => { doc.setFont(undefined,'bold'); doc.text(label, 8, y); doc.setFont(undefined,'normal'); doc.text(String(val||'—'), 45, y); y += 7; };
+  line('Date :', fmtDate(t.date_debut));
+  line('Lieu :', [t.adresse, t.ville, t.pays].filter(Boolean).join(', '));
+  line('Type de billet :', t.type_nom);
+  line('Prix payé :', t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €');
+  line('Titulaire :', t.titulaire_nom ? `${t.titulaire_prenom||''} ${t.titulaire_nom}`.trim() : t.user_nom);
+  line('Numéro de billet :', '#'+t.id);
+  line('Code DA propriétaire :', ME?.da_id || '—');
+  y += 3;
+  const qrCanvas = document.querySelector('#qr-container-'+t.id+' canvas') || document.querySelector('#qr-container-'+t.id+' img');
+  try {
+    if (qrCanvas && qr_payload) {
+      const dataUrl = qrCanvas.tagName === 'CANVAS' ? qrCanvas.toDataURL('image/png') : qrCanvas.src;
+      doc.addImage(dataUrl, 'PNG', 8, y, 45, 45);
+    }
+  } catch(e) { /* QR non disponible pour ce statut, PDF généré sans image */ }
+  doc.setFontSize(8); doc.setTextColor(120,120,120);
+  doc.text('Ce billet est personnel et nominatif à usage unique. Présentez-le à l\'entrée de l\'événement.', 8, 130);
+  doc.save(`billet-${t.event_titre.replace(/[^a-z0-9]+/gi,'-')}-${t.id}.pdf`);
+}
+
+function addTicketToGoogleCalendar() {
+  if (!_ticketDetail) return;
+  const { t } = _ticketDetail;
+  const toGCal = d => d ? new Date(d).toISOString().replace(/[-:]/g,'').split('.')[0]+'Z' : '';
+  const dateFin = t.date_fin || new Date(new Date(t.date_debut).getTime()+2*3600000).toISOString();
+  const params = new URLSearchParams({
+    action: 'TEMPLATE', text: t.event_titre,
+    dates: `${toGCal(t.date_debut)}/${toGCal(dateFin)}`,
+    location: [t.adresse, t.ville, t.pays].filter(Boolean).join(', '),
+    details: `Billet Diaspo'Actif #${t.id} — ${t.type_nom}`,
+  });
+  window.open(`https://calendar.google.com/calendar/render?${params.toString()}`, '_blank');
+}
+
+async function shareTicket() {
+  if (!_ticketDetail) return;
+  const { t } = _ticketDetail;
+  const url = `${location.origin}/billetterie.html`;
+  const text = `Mon billet pour « ${t.event_titre} » sur Diaspo'Actif`;
+  if (navigator.share) { try { await navigator.share({ title: t.event_titre, text, url }); } catch(e) {} }
+  else { await navigator.clipboard.writeText(url); showToast('🔗 Lien copié !','success'); }
+}
+
+(async()=>{
+  ME = await fetchCurrentUser();
+  loadMesBillets();
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+<script src="assets/gsap-animations.js" defer></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

@@ -203,6 +203,7 @@
             <div class="hd-sub" id="hd-sub">—</div>
           </div>
           <div class="hd-actions">
+            <button class="hd-btn" id="btn-video-call" title="Appel vidéo" style="border-color:#16a34a;color:#16a34a;" onclick="startVideoCall()">📹 Appel vidéo</button>
             <button class="hd-btn" id="btn-search-msg" title="Rechercher dans la conversation">🔍</button>
             <button class="hd-btn" id="btn-show-pins" title="Messages épinglés">📌</button>
             <button class="hd-btn" id="btn-show-favs" title="Mes favoris">⭐</button>
@@ -253,9 +254,11 @@
         <div class="msg-input-area">
           <div class="msg-input-row">
             <div class="msg-input-actions">
-              <button class="msg-action-btn" id="btn-attach" title="Pièce jointe">📎</button>
+              <button class="msg-action-btn" id="btn-attach-file" title="Joindre un fichier" onclick="document.getElementById('file-attach-input').click()">📎</button>
+              <button class="msg-action-btn" id="btn-voice" title="Message vocal (maintenir ou cliquer)" onclick="toggleVoiceRecord()">🎤</button>
               <button class="msg-action-btn" id="btn-emoji" title="Emoji">😊</button>
             </div>
+            <input type="file" id="file-attach-input" style="display:none" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.txt,.zip" onchange="attachFile(this)">
             <textarea class="msg-input-box" id="msg-input" placeholder="Écrire un message…" rows="1"></textarea>
             <button class="msg-send-btn" id="msg-send">Envoyer</button>
           </div>
@@ -373,6 +376,14 @@ function timeLabel(dt){
 function fullTime(dt){
   if(!dt) return "";
   return new Date(dt).toLocaleString("fr",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+/* Âge d'un message en ms — 'YYYY-MM-DD HH:MM:SS' est en UTC (aligné sur le serveur). */
+function msgAgeMs(dt){
+  if(!dt) return Infinity;
+  let s=String(dt);
+  if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) s=s.replace(' ','T')+'Z';
+  const t=new Date(s).getTime();
+  return isNaN(t)?Infinity:(Date.now()-t);
 }
 function avatarLetter(nom){return (nom||"?")[0].toUpperCase();}
 function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
@@ -604,6 +615,71 @@ document.getElementById("msg-send").addEventListener("click",sendMessage);
 document.getElementById("msg-input").addEventListener("keydown",e=>{
   if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();}
 });
+
+/* ══ Pièces jointes, messages vocaux et appel vidéo ══ */
+const MAX_MEDIA = 20 * 1024 * 1024; // 20 Mo
+/* Envoie directement un média (fichier / vocal) dans la conversation active */
+async function sendMedia(type, nom, dataUrl, mime){
+  if(!activeConvId){ alert("Ouvrez d'abord une conversation."); return; }
+  try{
+    await api("POST",`/conversations/${activeConvId}/messages`,{
+      contenu:"", type, fichier:{nom, url:dataUrl, type, mime}
+    });
+    await loadMessages(activeConvId);
+    await loadConvList();
+  }catch(e){ alert(e.message); }
+}
+
+/* Pièce jointe (image / audio / vidéo / document) */
+function attachFile(input){
+  const file = input.files[0]; if(!file) return;
+  if(file.size > MAX_MEDIA){ alert("Fichier trop volumineux (20 Mo max)."); input.value=""; return; }
+  const type = file.type.startsWith("image") ? "image" : file.type.startsWith("audio") ? "audio" : file.type.startsWith("video") ? "video" : "file";
+  const reader = new FileReader();
+  reader.onload = e => { sendMedia(type, file.name, e.target.result, file.type); input.value=""; };
+  reader.readAsDataURL(file);
+}
+
+/* Message vocal : enregistrement micro (MediaRecorder) */
+let _voiceRec = null, _voiceChunks = [];
+async function toggleVoiceRecord(){
+  const btn = document.getElementById("btn-voice");
+  if(_voiceRec && _voiceRec.state === "recording"){ _voiceRec.stop(); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ alert("Micro non disponible sur ce navigateur."); return; }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    _voiceChunks = [];
+    _voiceRec = new MediaRecorder(stream);
+    _voiceRec.ondataavailable = e => { if(e.data.size) _voiceChunks.push(e.data); };
+    _voiceRec.onstop = () => {
+      stream.getTracks().forEach(t=>t.stop());
+      btn.textContent = "🎤"; btn.style.color = "";
+      const blob = new Blob(_voiceChunks, { type: _voiceChunks[0]?.type || "audio/webm" });
+      if(blob.size > MAX_MEDIA){ alert("Message vocal trop long."); return; }
+      const reader = new FileReader();
+      reader.onload = e => sendMedia("audio", "Message vocal", e.target.result, blob.type);
+      reader.readAsDataURL(blob);
+    };
+    _voiceRec.start();
+    btn.textContent = "⏹"; btn.style.color = "#dc2626"; btn.title = "Arrêter et envoyer";
+  }catch(e){ alert("Autorisez l'accès au micro pour enregistrer un message vocal."); }
+}
+
+/* Appel vidéo : salle Jitsi Meet (gratuit, sans clé) partagée avec l'interlocuteur */
+async function startVideoCall(){
+  if(!activeConvId){ alert("Ouvrez d'abord une conversation."); return; }
+  const room = "DiaspoActif-" + activeConvId + "-" + Math.random().toString(36).slice(2,7);
+  const url = "https://meet.jit.si/" + room;
+  // Envoie le lien dans la conversation pour que l'autre puisse rejoindre
+  try{
+    await api("POST",`/conversations/${activeConvId}/messages`,{
+      contenu:"📹 Appel vidéo — cliquez pour rejoindre : " + url, type:"link",
+      fichier:{ nom:"Rejoindre l'appel vidéo", url, type:"link" }
+    });
+    await loadMessages(activeConvId);
+  }catch(e){}
+  window.open(url, "_blank");
+}
 document.getElementById("msg-input").addEventListener("input",function(){
   this.style.height="auto";
   this.style.height=Math.min(this.scrollHeight,120)+"px";
@@ -913,23 +989,43 @@ function renderMessages(msgs) {
       html+=`<div class="msg-day-sep"><span>${day}</span></div>`;
       lastDay=day;
     }
-    const isMe=m.expediteur_id===me.id;
-    const nom=m.expediteur_nom||"?";
+    const isMe=(m.sender_id!=null?m.sender_id:m.expediteur_id)===me.id;
+    const nom=m.sender_nom||m.expediteur_nom||"?";
+    const isDeleted=!!m.deleted;
+    const isEdited=!!m.edited;
     let inner="";
 
-    // Reply parent
-    if(m.parent_message_id && m.parent_contenu){
-      inner+=`<div class="bubble-reply"><div class="ra">${escHtml(m.parent_auteur||'')}</div>${escHtml((m.parent_contenu||'').substring(0,80))}</div>`;
-    }
+    if(isDeleted){
+      // Message supprimé : on laisse une trace visible (le contenu n'est plus affiché)
+      inner+=`<span style="font-style:italic;opacity:.7;">🚫 Message supprimé</span>`;
+      inner+=`<span class="bubble-time">${timeLabel(m.deleted_at||m.created_at)}</span>`;
+    } else {
+      // Reply parent
+      if(m.parent_message_id && m.parent_contenu){
+        inner+=`<div class="bubble-reply"><div class="ra">${escHtml(m.parent_auteur||'')}</div>${escHtml((m.parent_contenu||'').substring(0,80))}</div>`;
+      }
 
-    // Contenu
-    if(m.fichier_type&&m.fichier_url){
-      inner+=`<div class="bubble-file"><span>${m.fichier_icon||"📎"}</span><a href="${escHtml(m.fichier_url)}" class="bubble-link" target="_blank">${escHtml(m.fichier_nom||m.fichier_url)}</a></div>`;
-    } else if(m.contenu){
-      const linkified=escHtml(m.contenu).replace(/(https?:\/\/\S+)/g,'<a href="$1" target="_blank" class="bubble-link">$1</a>');
-      inner+=linkified;
+      // Pièce jointe / vocal / média (depuis fichier_json)
+      let fj=null; if(m.fichier_json){ try{ fj=JSON.parse(m.fichier_json); }catch(e){} }
+      if(fj && fj.url){
+        if(m.type==='audio'){
+          inner+=`<audio controls src="${escHtml(fj.url)}" style="max-width:230px;height:40px;margin:2px 0;"></audio>`;
+        } else if(m.type==='image'){
+          inner+=`<a href="${escHtml(fj.url)}" target="_blank"><img src="${escHtml(fj.url)}" style="max-width:230px;max-height:230px;border-radius:10px;display:block;margin:2px 0;"></a>`;
+        } else if(m.type==='video'){
+          inner+=`<video controls src="${escHtml(fj.url)}" style="max-width:240px;border-radius:10px;margin:2px 0;"></video>`;
+        } else if(m.type==='link'){
+          inner+=`<a href="${escHtml(fj.url)}" target="_blank" rel="noopener" class="bubble-link" style="font-weight:700;">📹 ${escHtml(fj.nom||fj.url)}</a>`;
+        } else {
+          inner+=`<a href="${escHtml(fj.url)}" download="${escHtml(fj.nom||'fichier')}" class="bubble-file" style="text-decoration:none;color:inherit;"><span>📎</span> ${escHtml(fj.nom||'Fichier')}</a>`;
+        }
+      }
+      if(m.contenu){
+        const linkified=escHtml(m.contenu).replace(/(https?:\/\/\S+)/g,'<a href="$1" target="_blank" class="bubble-link">$1</a>');
+        inner+=`<div>${linkified}</div>`;
+      }
+      inner+=`<span class="bubble-time">${isEdited?`<span title="Message modifié" style="font-style:italic;opacity:.85;">(modifié)</span> · `:''}${timeLabel(m.created_at)}</span>`;
     }
-    inner+=`<span class="bubble-time">${timeLabel(m.created_at)}</span>`;
 
     // Réactions
     const reactions = m.reactions || [];
@@ -943,15 +1039,23 @@ function renderMessages(msgs) {
       }).join('')}</div>`;
     }
 
-    // Actions au survol
-    const actions=`<div class="bubble-hover-actions" style="display:flex;gap:4px;opacity:0;transition:opacity .15s;position:absolute;${isMe?'left:-88px':'right:-88px'};bottom:4px;">
-      <button onclick="startReply(${m.id},${JSON.stringify(m.contenu||'')},${JSON.stringify(nom)})" title="Répondre" style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 6px;cursor:pointer;font-size:13px;">↩</button>
-      <button onclick="toggleFavori(${m.id})" title="Favori" style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 6px;cursor:pointer;font-size:13px;">⭐</button>
-      <button onclick="togglePin(${m.id})" title="Épingler" style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 6px;cursor:pointer;font-size:13px;">📌</button>
+    // Actions au survol (aucune sur un message supprimé)
+    // Modifier/Supprimer : seulement pendant 10 minutes après l'envoi
+    const ageMs = msgAgeMs(m.created_at);
+    const editable = isMe && !isDeleted && ageMs <= 10*60*1000;
+    const btnStyle="background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 6px;cursor:pointer;font-size:13px;";
+    const ownActions=editable?`
+      <button onclick="startEditMessage(${m.id},${JSON.stringify(m.contenu||'')})" title="Modifier" style="${btnStyle}">✏️</button>
+      <button onclick="deleteMessage(${m.id})" title="Supprimer" style="${btnStyle}">🗑️</button>`:"";
+    const actions=isDeleted?"":`<div class="bubble-hover-actions" style="display:flex;gap:4px;opacity:0;transition:opacity .15s;position:absolute;${isMe?`left:-${88+(ownActions?58:0)}px`:'right:-88px'};bottom:4px;">
+      <button onclick="startReply(${m.id},${JSON.stringify(m.contenu||'')},${JSON.stringify(nom)})" title="Répondre" style="${btnStyle}">↩</button>
+      <button onclick="toggleFavori(${m.id})" title="Favori" style="${btnStyle}">⭐</button>
+      <button onclick="togglePin(${m.id})" title="Épingler" style="${btnStyle}">📌</button>
+      ${ownActions}
     </div>`;
 
     html+=`
-      <div class="bubble-row ${isMe?"me":""}" id="msg-${m.id}" onmouseenter="this.querySelector('.bubble-hover-actions').style.opacity=1" onmouseleave="this.querySelector('.bubble-hover-actions').style.opacity=0" style="position:relative;">
+      <div class="bubble-row ${isMe?"me":""}" id="msg-${m.id}" onmouseenter="var a=this.querySelector('.bubble-hover-actions');if(a)a.style.opacity=1" onmouseleave="var a=this.querySelector('.bubble-hover-actions');if(a)a.style.opacity=0" style="position:relative;">
         ${!isMe?`<div class="bubble-avatar">${avatarLetter(nom)}</div>`:""}
         <div style="display:flex;flex-direction:column;gap:2px;${isMe?'align-items:flex-end':'align-items:flex-start'};">
           ${!isMe&&msgs.filter(x=>x.expediteur_id!==me.id).length>0?`<span style="font-size:11px;color:var(--muted);margin-left:4px;">${escHtml(nom)}</span>`:""}
@@ -968,6 +1072,38 @@ function renderMessages(msgs) {
   });
   body.innerHTML=html;
   body.scrollTop=body.scrollHeight;
+
+  // Planifie un re-rendu au moment où la fenêtre de 10 min du plus ancien message
+  // encore éditable expire, pour faire disparaître les boutons Modifier/Supprimer.
+  if(window._msgEditTimer) clearTimeout(window._msgEditTimer);
+  const restes=msgs.filter(m=>(m.sender_id!=null?m.sender_id:m.expediteur_id)===me.id && !m.deleted)
+                   .map(m=>10*60*1000 - msgAgeMs(m.created_at))
+                   .filter(r=>r>0);
+  if(restes.length){
+    const prochain=Math.min(...restes);
+    window._msgEditTimer=setTimeout(()=>{ if(activeConvId) renderMessages(msgs); }, prochain+500);
+  }
+}
+
+/* ---- Modifier / Supprimer un message (les siens uniquement) ---- */
+async function startEditMessage(id, ancien){
+  const nouveau = prompt("Modifier le message :", ancien || "");
+  if (nouveau === null) return;                       // annulé
+  const txt = nouveau.trim();
+  if (!txt) { alert("Le message ne peut pas être vide. Pour le retirer, utilisez Supprimer."); return; }
+  if (txt === (ancien||"").trim()) return;            // inchangé
+  try {
+    await api("PATCH", `/messages/${id}`, { contenu: txt });
+    if (activeConvId) await loadMessages(activeConvId);
+  } catch(e){ alert(e.message); }
+}
+
+async function deleteMessage(id){
+  if (!confirm("Supprimer ce message ? Une mention « Message supprimé » restera visible.")) return;
+  try {
+    await api("DELETE", `/messages/${id}`);
+    if (activeConvId) await loadMessages(activeConvId);
+  } catch(e){ alert(e.message); }
 }
 
 /* ---- Filtres ---- */
@@ -1036,6 +1172,22 @@ async function prefillProduitMessage(produitId){
     return;
   }
 
+  // PRIORITÉ : ouvrir directement la conversation demandée (?with= / ?init=) dès que possible
+  {
+    const up=new URLSearchParams(location.search);
+    const w=up.get("with"), ini=up.get("init"), prod=up.get("produit");
+    if(w){
+      openConvWithUser(Number(w), prod?Number(prod):null);
+    } else if(ini){
+      (async()=>{ try{
+        const r=await api("GET","/initiatives/"+encodeURIComponent(ini));
+        const it=r.initiative||r; const oid=Number(it.owner_user_id||it.user_id);
+        if(oid) openConvWithUser(oid, prod?Number(prod):null);
+        else alert("Impossible d'ouvrir la conversation : propriétaire introuvable.");
+      }catch(e){ alert(e.message); } })();
+    }
+  }
+
   // Charger la liste des conversations
   await loadConvList();
 
@@ -1067,12 +1219,6 @@ async function prefillProduitMessage(produitId){
       await loadConvList();
     }catch(e){ alert(e.message); }
   });
-
-  // Vérifier ?with= dans l'URL pour ouvrir une conv directement
-  const urlParams=new URLSearchParams(location.search);
-  const withUser=urlParams.get("with");
-  const withProduit=urlParams.get("produit");
-  if(withUser) openConvWithUser(Number(withUser), withProduit?Number(withProduit):null);
 
   // Polling global pour le badge non-lus (topbar) — toutes les 30s
   setInterval(async()=>{

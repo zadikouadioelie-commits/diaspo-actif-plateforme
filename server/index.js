@@ -149,7 +149,15 @@ const MIME = {
   ".svg": "image/svg+xml",
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
-  ".ico": "image/x-icon"
+  ".ico": "image/x-icon",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".mp3": "audio/mpeg",
+  ".woff2": "font/woff2"
 };
 
 async function send(res, status, data, headers = {}) {
@@ -164,11 +172,15 @@ async function sendJSON(res, status, obj, extraHeaders = {}) {
 async function readBody(req) {
   // Idempotent : si le corps a déjà été bufferisé (cold-start Vercel), on le retourne directement
   if (req._bodyPromise) return req._bodyPromise;
+  // Certains chemins envoient des médias en base64 (atelier, messages vocaux/pièces jointes) → plafond élargi
+  const u = req.url || "";
+  const bigPath = u.startsWith("/api/atelier/upload") || /^\/api\/conversations\/\d+\/messages$/.test(u);
+  const maxBody = bigPath ? (u.includes("/atelier/") ? 300e6 : 25e6) : 1e6;
   req._bodyPromise = new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1e6) req.destroy();
+      if (body.length > maxBody) req.destroy();
     });
     req.on("end", () => {
       if (!body) return resolve({});
@@ -315,6 +327,11 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   // Assigner le DA-ID à l'utilisateur
   try { await db.prepare('UPDATE users SET da_id=? WHERE id=?').run(generateDaId(), id); } catch (_) {}
+  // Profil public enrichi : publics/besoins facultatifs du formulaire d'inscription
+  try {
+    if (Array.isArray(body.publics) && body.publics.length) await db.prepare('UPDATE users SET publics_json=? WHERE id=?').run(JSON.stringify(body.publics), id);
+    if (Array.isArray(body.besoins) && body.besoins.length) await db.prepare('UPDATE users SET besoins_json=? WHERE id=?').run(JSON.stringify(body.besoins), id);
+  } catch (_) {}
 
   // Pour un compte Initiative : créer l'enregistrement d'initiative associé
   if (role === "initiative") {
@@ -341,6 +358,14 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     // Assigner DA-ID à l'initiative aussi
     const initRow = await db.prepare('SELECT id FROM initiatives WHERE owner_user_id=? ORDER BY id DESC LIMIT 1').get(id);
     if (initRow) try { await db.prepare('UPDATE initiatives SET da_id=? WHERE id=?').run(generateDaId(), initRow.id); } catch(_) {}
+    // Profil public enrichi : champs facultatifs du formulaire d'inscription
+    if (initRow) try {
+      await db.prepare('UPDATE initiatives SET publics_json=?, besoins_json=?, annee_creation=? WHERE id=?').run(
+        Array.isArray(body.publics) && body.publics.length ? JSON.stringify(body.publics) : null,
+        Array.isArray(body.besoins) && body.besoins.length ? JSON.stringify(body.besoins) : null,
+        body.annee_creation ? parseInt(body.annee_creation) || null : null,
+        initRow.id);
+    } catch(_) {}
   }
 
   // ── Champs étendus Compte Étatique (4 sections) ──
@@ -917,6 +942,49 @@ route("POST", "/api/upload/produit", async (req, res) => {
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "produit", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload produit")); }
+});
+
+/* POST /api/upload/document — document réel pour la vitrine (Téléchargements) :
+   PDF, Office (doc/docx/xls/xlsx/ppt/pptx) ou image. Vérification par signature (magic bytes)
+   pour PDF/images ; les formats Office modernes sont des archives ZIP (signature PK\x03\x04)
+   partagée avec beaucoup d'autres formats — on complète par un contrôle d'extension déclarée. */
+route("POST", "/api/upload/document", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["document"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  const MAX_DOC = 15 * 1024 * 1024;
+  if (file.buffer.length > MAX_DOC) return sendJSON(res, 400, { error: "Fichier trop volumineux (max 15 Mo)." });
+
+  const b = file.buffer;
+  const isPdf = b.length > 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46; // %PDF
+  const isZipBased = b.length > 4 && b[0] === 0x50 && b[1] === 0x4B && (b[2] === 0x03 || b[2] === 0x05 || b[2] === 0x07); // docx/xlsx/pptx (ZIP)
+  const isOle = b.length > 8 && b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0; // .doc/.xls/.ppt legacy
+  const imgType = SEC.isSafeRasterImage(b);
+  const ext = (file.filename || "").split(".").pop()?.toLowerCase();
+  const OFFICE_EXT = ["doc", "docx", "xls", "xlsx", "ppt", "pptx"];
+  const validOffice = (isZipBased || isOle) && OFFICE_EXT.includes(ext);
+
+  if (!isPdf && !validOffice && !imgType) {
+    return sendJSON(res, 400, { error: "Format non supporté (PDF, Word, Excel, PowerPoint ou image requis)." });
+  }
+  try {
+    /* uniqueFilename() force une extension image (jpg/png/gif/webp) — inadapté aux documents.
+       On construit ici un nom de fichier dédié qui préserve la véritable extension. */
+    const realExt = isPdf ? "pdf" : (imgType ? imgType.split("/")[1].replace("jpeg", "jpg") : ext);
+    const filename = `${user.id}-${Date.now()}.${realExt}`;
+    const url = await uploadToBunny(b, filename, "documents");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "document", type: imgType || (isPdf ? "pdf" : ext), size: b.length });
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload document")); }
 });
 
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
@@ -1512,6 +1580,1005 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
   sendJSON(res, 201, { ok: true, id });
 });
 
+/* ══════════════════════════════════════════════════════════════════════
+   MODULE COTISATIONS & ADHÉSIONS — indépendant du système asso_* premium,
+   ouvert à toute Initiative (même logique d'ouverture que la Boutique).
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Périodicités récurrentes gérées via Stripe subscription (mode "carte" + "prélèvement automatique").
+   Les autres types (dons, adhésion unique, participation projet, contribution exceptionnelle) sont
+   des paiements one-off (mode "payment"). */
+const ADHESION_RECURRING = {
+  cotisation_mensuelle:     { interval: "month", interval_count: 1, months: 1 },
+  cotisation_trimestrielle: { interval: "month", interval_count: 3, months: 3 },
+  cotisation_semestrielle:  { interval: "month", interval_count: 6, months: 6 },
+  cotisation_annuelle:      { interval: "year",  interval_count: 1, months: 12 },
+};
+/* Durée de validité en mois avant expiration (null = pas d'expiration, ex: dons/contributions) */
+function adhesionExpirationMonths(type) {
+  if (ADHESION_RECURRING[type]) return ADHESION_RECURRING[type].months;
+  if (type === "adhesion_unique") return 12;
+  return null;
+}
+/* Modes de paiement autorisés — chèque et espèces définitivement supprimés (non vérifiables, hors politique plateforme) */
+const ADHESION_PAYMENT_MODES = ['carte', 'paypal', 'virement', 'mobile_money', 'prelevement'];
+function sanitizeAdhesionModes(modes) {
+  const arr = Array.isArray(modes) ? modes.filter(m => ADHESION_PAYMENT_MODES.includes(m)) : [];
+  return arr.length ? arr : ['carte'];
+}
+/* Types de média acceptés pour la présentation d'une formule */
+const ADHESION_MEDIA_TYPES = ['photo', 'video'];
+const ADHESION_MEDIA_MAX_DUREE = 60; // secondes
+
+/* Ajoute automatiquement un adhérent/cotisant validé à la « liste de stockage des participants »
+   liée à sa formule (module Réseau professionnel) — registre officiel réutilisable pour campagnes,
+   convocations, votes, etc. Dédoublonne par compte lié, sinon par email ; met à jour le nom si déjà présent. */
+async function ajouterAListeStockage(formuleId, membre) {
+  const formule = await db.prepare("SELECT liste_stockage_id FROM adhesion_formules WHERE id=?").get(formuleId);
+  if (!formule?.liste_stockage_id) return;
+  const listeId = formule.liste_stockage_id;
+  const nomComplet = [membre.prenom, membre.nom].filter(Boolean).join(" ") || membre.nom;
+  if (membre.linked_user_id) {
+    const existe = await db.prepare("SELECT id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id=?").get(listeId, membre.linked_user_id);
+    if (existe) {
+      await db.prepare("UPDATE listes_diffusion_contacts SET nom=?, email=COALESCE(?,email) WHERE id=?").run(nomComplet, membre.email || null, existe.id);
+    } else {
+      await db.prepare("INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,datetime('now'))")
+        .run(listeId, membre.linked_user_id, membre.email || null, nomComplet);
+    }
+  } else if (membre.email) {
+    const existe = await db.prepare("SELECT id FROM listes_diffusion_contacts WHERE liste_id=? AND email=?").get(listeId, membre.email);
+    if (existe) {
+      await db.prepare("UPDATE listes_diffusion_contacts SET nom=? WHERE id=?").run(nomComplet, existe.id);
+    } else {
+      await db.prepare("INSERT INTO listes_diffusion_contacts (liste_id,email,nom,created_at) VALUES (?,?,?,datetime('now'))")
+        .run(listeId, membre.email, nomComplet);
+    }
+  }
+}
+
+/* Résout le montant réel à facturer selon montant_type (fixe/libre/minimum). Retourne null si invalide. */
+function resolveAdhesionMontant(formule, montantBody) {
+  if (formule.montant_type === "fixe") return Number(formule.montant_fixe) || 0;
+  const m = Number(montantBody);
+  if (!m || m <= 0) return null;
+  if (formule.montant_type === "libre") {
+    if (formule.montant_max && m > Number(formule.montant_max)) return null;
+    return m;
+  }
+  if (formule.montant_type === "minimum") {
+    const min = Number(formule.montant_min) || 0;
+    if (m < min) return null;
+    return m;
+  }
+  return null;
+}
+
+/* ── Formules : lecture publique (actives) ── */
+route("GET", "/api/initiatives/:id/adhesion-formules", async (req, res, params) => {
+  const rows = await db.prepare(`SELECT * FROM adhesion_formules WHERE initiative_id=? AND actif=1 ORDER BY ordre ASC, id ASC`).all(params.id);
+  sendJSON(res, 200, { formules: rows });
+});
+
+/* ── Formules : gestion complète (owner) ── */
+route("GET", "/api/initiatives/:id/adhesion-formules/gestion", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const rows = await db.prepare(`SELECT * FROM adhesion_formules WHERE initiative_id=? ORDER BY ordre ASC, id ASC`).all(params.id);
+  sendJSON(res, 200, { formules: rows });
+});
+
+/* ── Créer une formule ── */
+route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
+          media_type, media_url, media_duree_secondes, liste_stockage_id } = body;
+  if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom de la formule requis." });
+  if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
+  if (media_type && !media_url) return sendJSON(res, 400, { error: "Le fichier média n'a pas été téléversé — réessayez ou choisissez « Aucun »." });
+  if (media_type === 'video' && Number(media_duree_secondes) > ADHESION_MEDIA_MAX_DUREE) {
+    return sendJSON(res, 400, { error: `La vidéo dépasse la durée maximale de ${ADHESION_MEDIA_MAX_DUREE} secondes.` });
+  }
+  if (liste_stockage_id) {
+    const liste = await db.prepare("SELECT id FROM listes_diffusion WHERE id=? AND proprietaire_id=?").get(liste_stockage_id, user.id);
+    if (!liste) return sendJSON(res, 400, { error: "Liste de stockage introuvable." });
+  }
+  const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM adhesion_formules WHERE initiative_id=?`).get(params.id)).m;
+  const id = (await db.prepare(`
+    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(params.id, nom.trim(), description || null, couleur || '#f97316', icone || '🎫',
+       type_contribution || 'cotisation_annuelle', montant_type || 'fixe', montant_fixe ?? null, montant_min ?? null, montant_max ?? null,
+       devise || 'EUR', JSON.stringify(sanitizeAdhesionModes(modes_paiement)), maxOrdre + 1,
+       media_type || null, media_type ? (media_url || null) : null, media_type === 'video' ? (Number(media_duree_secondes) || null) : null,
+       liste_stockage_id || null)).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+/* ── Modifier une formule ── */
+route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare(`SELECT f.*, i.owner_user_id FROM adhesion_formules f JOIN initiatives i ON i.id=f.initiative_id WHERE f.id=?`).get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formule introuvable." });
+  if (Number(f.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
+          media_type, media_url, media_duree_secondes, liste_stockage_id } = body;
+  if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
+  if (media_type && !media_url) return sendJSON(res, 400, { error: "Le fichier média n'a pas été téléversé — réessayez ou choisissez « Aucun »." });
+  if (media_type === 'video' && Number(media_duree_secondes) > ADHESION_MEDIA_MAX_DUREE) {
+    return sendJSON(res, 400, { error: `La vidéo dépasse la durée maximale de ${ADHESION_MEDIA_MAX_DUREE} secondes.` });
+  }
+  if (liste_stockage_id) {
+    const liste = await db.prepare("SELECT id FROM listes_diffusion WHERE id=? AND proprietaire_id=?").get(liste_stockage_id, user.id);
+    if (!liste) return sendJSON(res, 400, { error: "Liste de stockage introuvable." });
+  }
+  await db.prepare(`UPDATE adhesion_formules SET
+      nom=COALESCE(?,nom), description=?, couleur=COALESCE(?,couleur), icone=COALESCE(?,icone),
+      type_contribution=COALESCE(?,type_contribution), montant_type=COALESCE(?,montant_type),
+      montant_fixe=?, montant_min=?, montant_max=?, devise=COALESCE(?,devise),
+      modes_paiement_json=COALESCE(?,modes_paiement_json),
+      media_type=?, media_url=?, media_duree_secondes=?, liste_stockage_id=COALESCE(?,liste_stockage_id), updated_at=datetime('now')
+    WHERE id=?`)
+    .run(nom || null, description ?? f.description, couleur || null, icone || null, type_contribution || null, montant_type || null,
+         montant_fixe ?? f.montant_fixe, montant_min ?? f.montant_min, montant_max ?? f.montant_max, devise || null,
+         modes_paiement !== undefined ? JSON.stringify(sanitizeAdhesionModes(modes_paiement)) : f.modes_paiement_json,
+         media_type !== undefined ? (media_type || null) : f.media_type,
+         media_type !== undefined ? (media_type ? (media_url || null) : null) : f.media_url,
+         media_type !== undefined ? (media_type === 'video' ? (Number(media_duree_secondes) || null) : null) : f.media_duree_secondes,
+         liste_stockage_id || null,
+         params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Supprimer une formule ── */
+route("DELETE", "/api/adhesion-formules/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare(`SELECT f.*, i.owner_user_id FROM adhesion_formules f JOIN initiatives i ON i.id=f.initiative_id WHERE f.id=?`).get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formule introuvable." });
+  if (Number(f.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  await db.prepare(`DELETE FROM adhesion_formules WHERE id=?`).run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Activer/désactiver une formule ── */
+route("PUT", "/api/adhesion-formules/:id/toggle-actif", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare(`SELECT f.*, i.owner_user_id FROM adhesion_formules f JOIN initiatives i ON i.id=f.initiative_id WHERE f.id=?`).get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formule introuvable." });
+  if (Number(f.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const actif = body.actif !== undefined ? (body.actif ? 1 : 0) : (f.actif ? 0 : 1);
+  await db.prepare(`UPDATE adhesion_formules SET actif=?, updated_at=datetime('now') WHERE id=?`).run(actif, params.id);
+  sendJSON(res, 200, { ok: true, actif: !!actif });
+});
+
+/* Calcule le statut effectif d'un membre (à_jour/non_à_jour) selon date_expiration.
+   Ne remonte JAMAIS un statut explicite (en_attente/suspendu/non_a_jour, ex: paiement échoué)
+   vers 'a_jour' — seul un nouveau paiement réussi peut le faire. Seule la transition
+   a_jour → non_a_jour est recalculée dynamiquement (détection d'expiration sans cron). */
+function computeAdhesionStatut(m) {
+  if (m.statut === 'en_attente' || m.statut === 'suspendu' || m.statut === 'non_a_jour') return m.statut;
+  if (!m.date_expiration) return 'a_jour'; // dons/contributions sans échéance
+  return new Date(m.date_expiration) >= new Date() ? 'a_jour' : 'non_a_jour';
+}
+
+/* ── Registre des membres (owner) ── */
+route("GET", "/api/initiatives/:id/adhesion-membres", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  let rows = await db.prepare(`SELECT * FROM adhesion_membres WHERE initiative_id=? ORDER BY created_at DESC`).all(params.id);
+  rows = rows.map(m => ({ ...m, statut: computeAdhesionStatut(m), badges_json: JSON.parse(m.badges_json || '[]') }));
+  const statutFiltre = query?.statut;
+  const formuleFiltre = query?.formule_id;
+  if (statutFiltre) rows = rows.filter(m => m.statut === statutFiltre);
+  if (formuleFiltre) rows = rows.filter(m => Number(m.formule_id) === Number(formuleFiltre));
+  sendJSON(res, 200, { membres: rows });
+});
+
+/* ── Ajouter un membre manuellement (sans compte plateforme) ── */
+route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { formule_id, nom, prenom, email, telephone } = body;
+  if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom requis." });
+  const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND initiative_id=?").get(formule_id, params.id);
+  if (!formule) return sendJSON(res, 400, { error: "Formule invalide." });
+  const id = (await db.prepare(`
+    INSERT INTO adhesion_membres (formule_id, initiative_id, nom, prenom, email, telephone, statut)
+    VALUES (?,?,?,?,?,?,'en_attente')
+  `).run(formule_id, params.id, nom.trim(), prenom || null, email || null, telephone || null)).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+/* ── Modifier la fiche d'un membre ── */
+route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const m = await db.prepare(`SELECT m.*, i.owner_user_id FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
+  if (!m) return sendJSON(res, 404, { error: "Membre introuvable." });
+  if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { nom, prenom, email, telephone, statut } = body;
+  await db.prepare(`UPDATE adhesion_membres SET
+      nom=COALESCE(?,nom), prenom=?, email=?, telephone=?, statut=COALESCE(?,statut), updated_at=datetime('now')
+    WHERE id=?`)
+    .run(nom || null, prenom ?? m.prenom, email ?? m.email, telephone ?? m.telephone, statut || null, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Marquer payé manuellement (virement / mobile money) — chèque et espèces retirés définitivement,
+     aucune commission plateforme puisque l'argent ne transite pas par Diaspo'Actif ── */
+route("POST", "/api/adhesion-membres/:id/marquer-paye", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const m = await db.prepare(`SELECT m.*, i.owner_user_id FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
+  if (!m) return sendJSON(res, 404, { error: "Membre introuvable." });
+  if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=?").get(m.formule_id);
+  const montant = Number(body.montant) || 0;
+  const MODES_MANUELS = ['virement', 'mobile_money'];
+  const modePaiement = MODES_MANUELS.includes(body.mode_paiement) ? body.mode_paiement : 'virement';
+  if (montant <= 0) return sendJSON(res, 400, { error: "Montant invalide." });
+
+  const paiementId = (await db.prepare(`
+    INSERT INTO adhesion_paiements (membre_id,formule_id,initiative_id,montant,devise,mode_paiement,statut,date_paiement)
+    VALUES (?,?,?,?,?,?,'paye',datetime('now'))
+  `).run(m.id, m.formule_id, m.initiative_id, montant, formule?.devise || 'EUR', modePaiement)).lastInsertRowid;
+  const numeroRecu = `REC-${m.initiative_id}-${paiementId}`;
+  await db.prepare(`UPDATE adhesion_paiements SET numero_recu=? WHERE id=?`).run(numeroRecu, paiementId);
+
+  const months = adhesionExpirationMonths(formule?.type_contribution);
+  await db.prepare(`UPDATE adhesion_membres SET statut='a_jour', mode_paiement=?, montant_paye=?, numero_recu=?,
+      date_adhesion=COALESCE(date_adhesion, datetime('now')),
+      date_expiration=${months ? `datetime('now','+${months} months')` : 'NULL'},
+      updated_at=datetime('now') WHERE id=?`)
+    .run(modePaiement, montant, numeroRecu, m.id);
+
+  if (m.linked_user_id) {
+    creerNotif(m.linked_user_id, "adhesion_payee", "Adhésion confirmée ✅",
+      `Votre « ${formule?.nom || 'adhésion'} » a été enregistrée comme payée. Reçu ${numeroRecu}.`, { paiement_id: paiementId });
+  }
+  await ajouterAListeStockage(m.formule_id, m);
+  sendJSON(res, 200, { ok: true, numero_recu: numeroRecu });
+});
+
+/* ── Toggle badges manuels ── */
+route("PUT", "/api/adhesion-membres/:id/badges", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const m = await db.prepare(`SELECT m.*, i.owner_user_id FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
+  if (!m) return sendJSON(res, 404, { error: "Membre introuvable." });
+  if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const VALID_BADGES = ['fondateur', 'bienfaiteur', 'donateur', 'ambassadeur', 'grand_mecene'];
+  const badges = Array.isArray(body.badges) ? body.badges.filter(b => VALID_BADGES.includes(b)) : [];
+  await db.prepare(`UPDATE adhesion_membres SET badges_json=?, updated_at=datetime('now') WHERE id=?`).run(JSON.stringify(badges), params.id);
+  sendJSON(res, 200, { ok: true, badges });
+});
+
+/* ── Statistiques dashboard ── */
+route("GET", "/api/initiatives/:id/adhesion-stats", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const rows = await db.prepare(`SELECT * FROM adhesion_membres WHERE initiative_id=?`).all(params.id);
+  const statuts = rows.map(computeAdhesionStatut);
+  const aJour = statuts.filter(s => s === 'a_jour').length;
+  const enRetard = statuts.filter(s => s === 'non_a_jour').length;
+  const paiements = await db.prepare(`SELECT COALESCE(SUM(montant),0) AS total FROM adhesion_paiements WHERE initiative_id=? AND statut='paye'`).get(params.id);
+  const enAttentePaiements = await db.prepare(`
+    SELECT COALESCE(SUM(f.montant_fixe),0) AS total FROM adhesion_membres m
+    JOIN adhesion_formules f ON f.id = m.formule_id
+    WHERE m.initiative_id=? AND m.statut IN ('non_a_jour','en_attente')
+  `).get(params.id);
+  const totalAnneePrec = rows.filter(m => m.date_adhesion && new Date(m.date_adhesion) < new Date(Date.now() - 365*86400000)).length;
+  const tauxRenouvellement = totalAnneePrec > 0 ? Math.round((aJour / totalAnneePrec) * 100) : (rows.length ? 100 : 0);
+  sendJSON(res, 200, {
+    adherents: rows.length, a_jour: aJour, en_retard: enRetard,
+    montant_collecte: paiements.total, paiements_attendus: enAttentePaiements.total,
+    taux_renouvellement: tauxRenouvellement,
+  });
+});
+
+/* ── Campagnes : liste + création ── */
+/* ── Campagnes actives — lecture publique (section "Campagnes en cours" du profil) ── */
+route("GET", "/api/initiatives/:id/campagnes-actives", async (req, res, params) => {
+  const init = await db.prepare("SELECT id FROM initiatives WHERE id = ? OR slug = ?").get(params.id, params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  const rows = await db.prepare(`SELECT id, nom, objectif_membres, date_debut, date_fin FROM adhesion_campagnes WHERE initiative_id=? AND statut='active' ORDER BY created_at DESC`).all(init.id);
+  sendJSON(res, 200, { campagnes: rows });
+});
+
+route("GET", "/api/initiatives/:id/adhesion-campagnes", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const rows = await db.prepare(`SELECT * FROM adhesion_campagnes WHERE initiative_id=? ORDER BY created_at DESC`).all(params.id);
+  sendJSON(res, 200, { campagnes: rows });
+});
+
+route("POST", "/api/initiatives/:id/adhesion-campagnes", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { nom, objectif_membres, date_debut, date_fin } = body;
+  if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom de campagne requis." });
+  const id = (await db.prepare(`
+    INSERT INTO adhesion_campagnes (initiative_id,nom,objectif_membres,date_debut,date_fin) VALUES (?,?,?,?,?)
+  `).run(params.id, nom.trim(), objectif_membres || 0, date_debut || null, date_fin || null)).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/adhesion-campagnes/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare(`SELECT c.*, i.owner_user_id FROM adhesion_campagnes c JOIN initiatives i ON i.id=c.initiative_id WHERE c.id=?`).get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Campagne introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { nom, objectif_membres, date_debut, date_fin, statut } = body;
+  await db.prepare(`UPDATE adhesion_campagnes SET nom=COALESCE(?,nom), objectif_membres=COALESCE(?,objectif_membres),
+      date_debut=COALESCE(?,date_debut), date_fin=COALESCE(?,date_fin), statut=COALESCE(?,statut) WHERE id=?`)
+    .run(nom || null, objectif_membres ?? null, date_debut || null, date_fin || null, statut || null, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Progression d'une campagne ── */
+route("GET", "/api/adhesion-campagnes/:id/progression", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare(`SELECT c.*, i.owner_user_id FROM adhesion_campagnes c JOIN initiatives i ON i.id=c.initiative_id WHERE c.id=?`).get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Campagne introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const debut = c.date_debut || '1970-01-01';
+  const fin = c.date_fin || '9999-12-31';
+  const renouveles = await db.prepare(`
+    SELECT COUNT(*) AS n FROM adhesion_membres WHERE initiative_id=? AND statut='a_jour' AND date_adhesion BETWEEN ? AND ?
+  `).get(c.initiative_id, debut, fin);
+  const enAttente = await db.prepare(`
+    SELECT COUNT(*) AS n FROM adhesion_membres WHERE initiative_id=? AND statut IN ('en_attente','non_a_jour')
+  `).get(c.initiative_id);
+  const montant = await db.prepare(`
+    SELECT COALESCE(SUM(montant),0) AS total FROM adhesion_paiements
+    WHERE initiative_id=? AND statut='paye' AND date_paiement BETWEEN ? AND ?
+  `).get(c.initiative_id, debut, fin);
+  const pct = c.objectif_membres > 0 ? Math.round((renouveles.n / c.objectif_membres) * 100) : 0;
+  sendJSON(res, 200, { renouveles: renouveles.n, en_attente: enAttente.n, montant_collecte: montant.total, objectif: c.objectif_membres, pourcentage: pct });
+});
+
+/* ── Export CSV du registre ── */
+route("GET", "/api/initiatives/:id/adhesion-export", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const rows = await db.prepare(`
+    SELECT m.*, f.nom AS formule_nom FROM adhesion_membres m JOIN adhesion_formules f ON f.id=m.formule_id
+    WHERE m.initiative_id=? ORDER BY m.nom
+  `).all(params.id);
+  const csvRows = [['Nom','Prénom','Email','Téléphone','Formule','Statut','Date adhésion','Date expiration','Montant payé','Mode paiement','N° reçu']];
+  for (const m of rows) {
+    csvRows.push([m.nom, m.prenom || '', m.email || '', m.telephone || '', m.formule_nom, computeAdhesionStatut(m),
+      m.date_adhesion || '', m.date_expiration || '', m.montant_paye ?? '', m.mode_paiement || '', m.numero_recu || '']);
+  }
+  const csv = csvRows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="adherents-${params.id}.csv"` });
+  res.end('﻿' + csv);
+});
+
+/* ── Paiement d'une formule (public/connecté) — one-off ou subscription selon le type ── */
+route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND actif=1").get(params.id);
+  if (!formule) return sendJSON(res, 404, { error: "Formule introuvable." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(formule.initiative_id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+
+  const montant = resolveAdhesionMontant(formule, body.montant);
+  if (montant == null) return sendJSON(res, 400, { error: "Montant invalide." });
+
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+
+  let membre = await db.prepare("SELECT * FROM adhesion_membres WHERE formule_id=? AND linked_user_id=?").get(formule.id, user.id);
+  if (!membre) {
+    const mid = (await db.prepare(`
+      INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, statut)
+      VALUES (?,?,?,?,?,?,'en_attente')
+    `).run(formule.id, formule.initiative_id, user.id, user.nom || '', user.prenom || null, user.email || null)).lastInsertRowid;
+    membre = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(mid);
+  }
+
+  const paiementId = (await db.prepare(`
+    INSERT INTO adhesion_paiements (membre_id, formule_id, initiative_id, montant, devise, mode_paiement, statut)
+    VALUES (?,?,?,?,?,'carte','en_attente')
+  `).run(membre.id, formule.id, formule.initiative_id, montant, formule.devise || 'EUR')).lastInsertRowid;
+
+  const origin = getOrigin(req);
+  const recurring = ADHESION_RECURRING[formule.type_contribution];
+  const productData = { name: `${init.nom} — ${formule.nom}` };
+  const priceData = {
+    currency: (formule.devise || "EUR").toLowerCase(),
+    unit_amount: Math.round(montant * 100),
+    product_data: productData,
+  };
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: recurring ? "subscription" : "payment",
+      line_items: [{
+        price_data: recurring ? { ...priceData, recurring: { interval: recurring.interval, interval_count: recurring.interval_count } } : priceData,
+        quantity: 1,
+      }],
+      metadata: { diaspoactif_adhesion_paiement_id: String(paiementId), diaspoactif_adhesion_membre_id: String(membre.id) },
+      success_url: `${origin}/adhesions.html?initiative=${formule.initiative_id}&paiement=succes&paiement_id=${paiementId}`,
+      cancel_url: `${origin}/adhesions.html?initiative=${formule.initiative_id}&paiement=annule&paiement_id=${paiementId}`,
+    });
+    await db.prepare(`UPDATE adhesion_paiements SET stripe_session_id=? WHERE id=?`).run(session.id, paiementId);
+    return sendJSON(res, 201, { ok: true, id: paiementId, checkout_url: session.url });
+  } catch (e) {
+    await db.prepare(`UPDATE adhesion_paiements SET statut='echoue' WHERE id=?`).run(paiementId);
+    return sendJSON(res, 500, SEC.safeError(e, "adhesion-payer"));
+  }
+});
+
+/* ── Carte de membre numérique (owner ou membre lui-même) ── */
+route("GET", "/api/adhesion-membres/:id/carte", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const m = await db.prepare(`SELECT m.*, i.owner_user_id, i.nom AS init_nom, i.logo_url AS init_logo FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
+  if (!m) return sendJSON(res, 404, { error: "Membre introuvable." });
+  const estOwner = Number(m.owner_user_id) === Number(user.id);
+  const estMembre = m.linked_user_id && Number(m.linked_user_id) === Number(user.id);
+  if (!estOwner && !estMembre) return sendJSON(res, 403, { error: "Accès refusé." });
+  const formule = await db.prepare("SELECT nom FROM adhesion_formules WHERE id=?").get(m.formule_id);
+  sendJSON(res, 200, {
+    nom: m.nom, prenom: m.prenom, photo_url: m.photo_url,
+    initiative: m.init_nom, initiative_logo: m.init_logo,
+    formule: formule?.nom, numero_adherent: `ADH-${m.initiative_id}-${m.id}`,
+    statut: computeAdhesionStatut(m), date_expiration: m.date_expiration,
+    verify_url: `/api/adhesion/verify/${m.id}`,
+  });
+});
+
+/* ── Vérification publique rapide (scan QR) — pas de données sensibles ── */
+route("GET", "/api/adhesion/verify/:id", async (req, res, params) => {
+  const m = await db.prepare(`SELECT m.*, i.nom AS init_nom FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
+  if (!m) return sendJSON(res, 404, { error: "Adhérent introuvable." });
+  const nomMasque = m.nom ? `${m.nom[0]}.` : '';
+  sendJSON(res, 200, {
+    initiative: m.init_nom, adherent: `${m.prenom || ''} ${nomMasque}`.trim(),
+    statut: computeAdhesionStatut(m), valide_jusquau: m.date_expiration,
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   MODULE VOTES SÉCURISÉS — indépendant du système asso_votes premium,
+   ouvert à toute Initiative. Anonymisation par séparation structurelle :
+   vote_bulletins n'a AUCUNE colonne d'identité ni FK vers vote_electeurs.
+   ══════════════════════════════════════════════════════════════════════ */
+/* Authentification du bulletin par le Code de Sécurité Diaspo'Actif (DS-ID) — la signature numérique
+   personnelle déjà utilisée pour les deals/partenariats (server/db.js "CODE DE SÉCURITÉ DIASPO'ACTIF"),
+   réutilisée ici comme clé de vote plutôt qu'un code généré à usage unique par scrutin. */
+async function verifyVoteDsId(userId, submittedCode) {
+  const u = await db.prepare("SELECT ds_id FROM users WHERE id=?").get(userId);
+  if (!u?.ds_id) {
+    return { ok: false, error: "Vous n'avez pas encore généré votre Code de Sécurité Diaspo'Actif (DS-ID). Rendez-vous dans Confidentialité pour le créer." };
+  }
+  if (String(submittedCode || "").trim().toUpperCase() !== u.ds_id.toUpperCase()) {
+    return { ok: false, error: "Code de Sécurité (DS-ID) invalide." };
+  }
+  return { ok: true };
+}
+
+/* Résout la liste des user_id éligibles pour un scrutin selon les sources choisies.
+   V2 (différé) : sources "conseil_admin"/"comite" — cette donnée vit dans le système
+   asso_* premium, hors périmètre du présent module ouvert à toute Initiative. */
+async function resolveVoteElecteurs(initiativeId, sources, criteresReseauPro) {
+  const userIds = new Set();
+  if (sources.includes("tous_actifs")) {
+    const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(initiativeId);
+    if (init?.owner_user_id) userIds.add(Number(init.owner_user_id));
+    const rows = await db.prepare("SELECT user_id FROM initiative_membres WHERE initiative_id=? AND statut='accepte'").all(initiativeId);
+    rows.forEach(r => userIds.add(Number(r.user_id)));
+  }
+  if (sources.includes("abonnes")) {
+    const rows = await db.prepare("SELECT user_id FROM abonnements WHERE initiative_id=?").all(initiativeId);
+    rows.forEach(r => userIds.add(Number(r.user_id)));
+  }
+  if (sources.includes("adhesion") || sources.includes("cotisation")) {
+    if (criteresReseauPro?.campagne_id) {
+      /* Lié à une campagne d'adhésion précise (module Cotisations & Adhésions) : seuls les comptes
+         ayant adhéré/renouvelé pendant la période de la campagne, et actuellement à jour, sont reconnus
+         automatiquement comme électeurs — même logique que le calcul de progression de la campagne. */
+      const camp = await db.prepare("SELECT * FROM adhesion_campagnes WHERE id=? AND initiative_id=?").get(criteresReseauPro.campagne_id, initiativeId);
+      if (camp) {
+        const debut = camp.date_debut || '1970-01-01';
+        const fin = camp.date_fin || '9999-12-31';
+        const rows = await db.prepare(`
+          SELECT linked_user_id FROM adhesion_membres
+          WHERE initiative_id=? AND statut='a_jour' AND linked_user_id IS NOT NULL
+            AND date_adhesion BETWEEN ? AND ?
+        `).all(initiativeId, debut, fin);
+        rows.forEach(r => userIds.add(Number(r.linked_user_id)));
+      }
+    } else {
+      const rows = await db.prepare("SELECT linked_user_id FROM adhesion_membres WHERE initiative_id=? AND statut='a_jour' AND linked_user_id IS NOT NULL").all(initiativeId);
+      rows.forEach(r => userIds.add(Number(r.linked_user_id)));
+    }
+  }
+  if (sources.includes("liste_perso") && criteresReseauPro?.liste_id) {
+    const rows = await db.prepare("SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL").all(criteresReseauPro.liste_id);
+    rows.forEach(r => userIds.add(Number(r.user_id)));
+  }
+  if (sources.includes("reseau_pro") && criteresReseauPro) {
+    if (criteresReseauPro.liste_id) {
+      /* Réutilise une liste existante du module Réseau professionnel / Mes Listes — tous les comptes
+         de cette liste reçoivent automatiquement l'invitation à voter. */
+      const rows = await db.prepare("SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL").all(criteresReseauPro.liste_id);
+      rows.forEach(r => userIds.add(Number(r.user_id)));
+    } else {
+      const clauses = []; const args = [];
+      if (criteresReseauPro.pays) { clauses.push("pays=?"); args.push(criteresReseauPro.pays); }
+      if (criteresReseauPro.region) { clauses.push("region=?"); args.push(criteresReseauPro.region); }
+      if (criteresReseauPro.ville) { clauses.push("ville=?"); args.push(criteresReseauPro.ville); }
+      if (criteresReseauPro.secteur) { clauses.push("domaine_utilisateur=?"); args.push(criteresReseauPro.secteur); }
+      if (criteresReseauPro.specialite) { clauses.push("situation_pro LIKE ?"); args.push(`%${criteresReseauPro.specialite}%`); }
+      if (clauses.length) {
+        const rows = await db.prepare(`SELECT id FROM users WHERE ${clauses.join(" AND ")}`).all(...args);
+        rows.forEach(r => userIds.add(Number(r.id)));
+      }
+    }
+  }
+  return Array.from(userIds);
+}
+
+/* ── Scrutins : liste + création (owner) ── */
+route("GET", "/api/initiatives/:id/vote-scrutins", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const archived = req.url.includes("archived=1") ? 1 : 0;
+  const rows = await db.prepare("SELECT * FROM vote_scrutins WHERE initiative_id=? AND archived=? ORDER BY created_at DESC").all(params.id, archived);
+  sendJSON(res, 200, { scrutins: rows });
+});
+
+/* ── Supprimer un scrutin — uniquement en brouillon (aucun électeur/bulletin n'a encore pu être créé) ── */
+route("DELETE", "/api/vote-scrutins/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (s.statut !== "brouillon") {
+    return sendJSON(res, 400, { error: "Seul un scrutin en brouillon peut être supprimé. Archivez plutôt ce scrutin pour conserver les votes." });
+  }
+  await db.prepare("DELETE FROM vote_scrutins WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Archiver / désarchiver — préserve intégralement électeurs, bulletins et documents ── */
+route("POST", "/api/vote-scrutins/:id/archiver", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  await db.prepare("UPDATE vote_scrutins SET archived=1, updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/vote-scrutins/:id/desarchiver", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  await db.prepare("UPDATE vote_scrutins SET archived=0, updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/initiatives/:id/vote-scrutins", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { nom, type_scrutin, description, date_ouverture, date_fermeture, fermeture_mode,
+          vote_secret, vote_nominatif, resultats_direct, pv_auto, quorum_requis } = body;
+  if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom du scrutin requis." });
+  const id = (await db.prepare(`
+    INSERT INTO vote_scrutins (initiative_id,nom,type_scrutin,description,responsable_id,date_ouverture,date_fermeture,
+      fermeture_mode,vote_secret,vote_nominatif,resultats_direct,pv_auto,quorum_requis)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(params.id, nom.trim(), type_scrutin || "ag_ordinaire", description || null, user.id,
+       date_ouverture || null, date_fermeture || null, fermeture_mode || "auto",
+       vote_secret !== undefined ? (vote_secret ? 1 : 0) : 1,
+       vote_nominatif ? 1 : 0, resultats_direct ? 1 : 0, pv_auto !== undefined ? (pv_auto ? 1 : 0) : 1,
+       quorum_requis || 0)).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/vote-scrutins/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (s.statut !== "brouillon") return sendJSON(res, 400, { error: "Seul un scrutin en brouillon peut être modifié." });
+  const { nom, type_scrutin, description, date_ouverture, date_fermeture, fermeture_mode,
+          vote_secret, vote_nominatif, resultats_direct, pv_auto, quorum_requis } = body;
+  await db.prepare(`UPDATE vote_scrutins SET
+      nom=COALESCE(?,nom), type_scrutin=COALESCE(?,type_scrutin), description=?, date_ouverture=COALESCE(?,date_ouverture),
+      date_fermeture=COALESCE(?,date_fermeture), fermeture_mode=COALESCE(?,fermeture_mode),
+      vote_secret=?, vote_nominatif=?, resultats_direct=?, pv_auto=?, quorum_requis=?, updated_at=datetime('now')
+    WHERE id=?`)
+    .run(nom || null, type_scrutin || null, description ?? s.description, date_ouverture || null, date_fermeture || null,
+         fermeture_mode || null, vote_secret !== undefined ? (vote_secret ? 1 : 0) : s.vote_secret,
+         vote_nominatif !== undefined ? (vote_nominatif ? 1 : 0) : s.vote_nominatif,
+         resultats_direct !== undefined ? (resultats_direct ? 1 : 0) : s.resultats_direct,
+         pv_auto !== undefined ? (pv_auto ? 1 : 0) : s.pv_auto, quorum_requis ?? s.quorum_requis, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Résolutions ── */
+route("POST", "/api/vote-scrutins/:id/resolutions", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { titre, description, type_reponse, options } = body;
+  if (!titre?.trim()) return sendJSON(res, 400, { error: "Titre de la résolution requis." });
+  const maxOrdre = (await db.prepare("SELECT COALESCE(MAX(ordre),0) AS m FROM vote_resolutions WHERE scrutin_id=?").get(params.id)).m;
+  const id = (await db.prepare(`
+    INSERT INTO vote_resolutions (scrutin_id,ordre,titre,description,type_reponse,options_json)
+    VALUES (?,?,?,?,?,?)
+  `).run(params.id, maxOrdre + 1, titre.trim(), description || null, type_reponse || "oui_non_abstention",
+       JSON.stringify(Array.isArray(options) ? options : []))).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/vote-resolutions/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const r = await db.prepare(`
+    SELECT vr.*, i.owner_user_id FROM vote_resolutions vr
+    JOIN vote_scrutins vs ON vs.id=vr.scrutin_id JOIN initiatives i ON i.id=vs.initiative_id WHERE vr.id=?
+  `).get(params.id);
+  if (!r) return sendJSON(res, 404, { error: "Résolution introuvable." });
+  if (Number(r.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { titre, description, type_reponse, options } = body;
+  await db.prepare(`UPDATE vote_resolutions SET titre=COALESCE(?,titre), description=?, type_reponse=COALESCE(?,type_reponse),
+      options_json=COALESCE(?,options_json) WHERE id=?`)
+    .run(titre || null, description ?? r.description, type_reponse || null,
+         Array.isArray(options) ? JSON.stringify(options) : null, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/vote-resolutions/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const r = await db.prepare(`
+    SELECT vr.*, i.owner_user_id FROM vote_resolutions vr
+    JOIN vote_scrutins vs ON vs.id=vr.scrutin_id JOIN initiatives i ON i.id=vs.initiative_id WHERE vr.id=?
+  `).get(params.id);
+  if (!r) return sendJSON(res, 404, { error: "Résolution introuvable." });
+  if (Number(r.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  await db.prepare("DELETE FROM vote_resolutions WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/vote-scrutins/:id/resolutions", async (req, res, params) => {
+  const rows = await db.prepare("SELECT * FROM vote_resolutions WHERE scrutin_id=? ORDER BY ordre ASC, id ASC").all(params.id);
+  sendJSON(res, 200, { resolutions: rows });
+});
+
+/* ── Résolution des électeurs (multi-sources) + notifications ── */
+route("POST", "/api/vote-scrutins/:id/electeurs/resoudre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id, i.nom AS init_nom FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const sources = Array.isArray(body.sources) ? body.sources : [];
+  if (!sources.length) return sendJSON(res, 400, { error: "Au moins une source d'électeurs requise." });
+  const userIds = await resolveVoteElecteurs(s.initiative_id, sources, body.criteres || {});
+  let ajoutes = 0;
+  for (const uid of userIds) {
+    if (Number(uid) === Number(user.id) && !sources.includes("tous_actifs")) continue;
+    const existe = await db.prepare("SELECT id FROM vote_electeurs WHERE scrutin_id=? AND user_id=?").get(params.id, uid);
+    if (existe) continue;
+    const source = sources.includes("tous_actifs") ? "tous_actifs" : sources[0];
+    /* code_acces conservé pour compatibilité de schéma mais n'est plus utilisé pour authentifier le
+       vote — la clé d'authentification est désormais le Code de Sécurité Diaspo'Actif (DS-ID) de
+       l'électeur (users.ds_id), signature numérique personnelle déjà existante sur la plateforme. */
+    await db.prepare(`INSERT INTO vote_electeurs (scrutin_id,user_id,source,code_acces) VALUES (?,?,?,'DS-ID')`).run(params.id, uid, source);
+    ajoutes++;
+    const electeurUser = await db.prepare("SELECT email, nom, ds_id FROM users WHERE id=?").get(uid);
+    creerNotif(uid, "vote_invitation", `Consultation : ${s.nom}`,
+      `Vous êtes invité à participer au vote « ${s.nom} » (${s.init_nom}). Votez avec votre Code de Sécurité Diaspo'Actif (DS-ID).`,
+      { scrutin_id: Number(params.id) });
+    await db.prepare("UPDATE vote_electeurs SET notif_envoyee_at=datetime('now') WHERE scrutin_id=? AND user_id=?").run(params.id, uid);
+    if (electeurUser?.email) {
+      try {
+        const { sendEmail } = require("./mailer");
+        await sendEmail({
+          to: electeurUser.email,
+          subject: `Invitation au vote — ${s.nom}`,
+          html: `<p>Bonjour ${electeurUser.nom || ""},</p><p>Vous êtes invité à participer au vote « ${s.nom} » organisé par ${s.init_nom}.</p>
+                 <p>Ouverture : ${s.date_ouverture || "à définir"}<br>Clôture : ${s.date_fermeture || "à définir"}</p>
+                 <p>Pour voter, connectez-vous puis signez votre bulletin avec votre <strong>Code de Sécurité Diaspo'Actif (DS-ID)</strong>
+                 ${electeurUser.ds_id ? '' : `(à générer dans <a href="${getOrigin(req)}/confidentialite.html">Confidentialité</a> si ce n'est pas déjà fait)`}.</p>`,
+        });
+      } catch (e) { /* email indisponible en local (RESEND_API_KEY absent) */ }
+    }
+  }
+  sendJSON(res, 200, { ok: true, electeurs_ajoutes: ajoutes });
+});
+
+route("GET", "/api/vote-scrutins/:id/electeurs", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const rows = await db.prepare(`
+    SELECT ve.id, ve.user_id, ve.source, ve.a_vote, ve.notif_envoyee_at, ve.notif_ouverte_at, ve.vote_le, u.nom, u.email
+    FROM vote_electeurs ve JOIN users u ON u.id=ve.user_id WHERE ve.scrutin_id=? ORDER BY u.nom
+  `).all(params.id);
+  sendJSON(res, 200, { electeurs: rows });
+});
+
+/* ── Ouverture / clôture ── */
+route("POST", "/api/vote-scrutins/:id/ouvrir", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const nbResolutions = (await db.prepare("SELECT COUNT(*) c FROM vote_resolutions WHERE scrutin_id=?").get(params.id)).c;
+  if (!nbResolutions) return sendJSON(res, 400, { error: "Ajoutez au moins une résolution avant d'ouvrir le scrutin." });
+  await db.prepare("UPDATE vote_scrutins SET statut='ouvert', updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/vote-scrutins/:id/clore", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id, i.nom AS init_nom FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (s.statut !== "ouvert") return sendJSON(res, 400, { error: "Seul un scrutin ouvert peut être clôturé." });
+
+  const resolutions = await db.prepare("SELECT * FROM vote_resolutions WHERE scrutin_id=? ORDER BY ordre ASC").all(params.id);
+  const nbElecteurs = (await db.prepare("SELECT COUNT(*) c FROM vote_electeurs WHERE scrutin_id=?").get(params.id)).c;
+  const nbVotants = (await db.prepare("SELECT COUNT(*) c FROM vote_electeurs WHERE scrutin_id=? AND a_vote=1").get(params.id)).c;
+  const participation = nbElecteurs > 0 ? Math.round((nbVotants / nbElecteurs) * 100) : 0;
+
+  const resultatsParResolution = [];
+  for (const r of resolutions) {
+    const bulletins = await db.prepare("SELECT choix FROM vote_bulletins WHERE resolution_id=?").all(r.id);
+    const compte = {};
+    for (const b of bulletins) {
+      let choix = b.choix;
+      try { const parsed = JSON.parse(b.choix); choix = Array.isArray(parsed) ? parsed.join(", ") : parsed; } catch (e) { /* texte brut */ }
+      compte[choix] = (compte[choix] || 0) + 1;
+    }
+    resultatsParResolution.push({ resolution_id: r.id, titre: r.titre, total: bulletins.length, compte });
+    await db.prepare("UPDATE vote_resolutions SET options_json=options_json WHERE id=?").run(r.id); // no-op placeholder pour cohérence future
+  }
+
+  await db.prepare(`UPDATE vote_scrutins SET statut='clos', updated_at=datetime('now') WHERE id=?`).run(params.id);
+
+  /* Génération des documents (PV, feuille de résultats, résolutions adoptées, certificat) */
+  const dateGen = new Date().toISOString();
+  const pvHtml = `<h1>Procès-verbal — ${escapeHtml(s.nom)}</h1><p>${escapeHtml(s.init_nom)} — ${dateGen}</p>
+    <p>Participation : ${nbVotants}/${nbElecteurs} (${participation}%)</p>
+    ${resultatsParResolution.map(r => `<h3>${escapeHtml(r.titre)}</h3><ul>${Object.entries(r.compte).map(([k,v])=>`<li>${escapeHtml(k)} : ${v} voix</li>`).join('')}</ul>`).join('')}`;
+  const resultatsHtml = `<h1>Feuille de résultats — ${escapeHtml(s.nom)}</h1>${resultatsParResolution.map(r =>
+    `<h3>${escapeHtml(r.titre)}</h3><p>Total exprimés : ${r.total}</p><ul>${Object.entries(r.compte).map(([k,v])=>`<li>${escapeHtml(k)} : ${v} (${r.total?Math.round(v/r.total*100):0}%)</li>`).join('')}</ul>`).join('')}`;
+  const adoptees = resultatsParResolution.filter(r => (r.compte["Pour"]||0) > (r.compte["Contre"]||0));
+  const resolutionsAdopteesHtml = `<h1>Résolutions adoptées — ${escapeHtml(s.nom)}</h1><ul>${adoptees.map(r=>`<li>${escapeHtml(r.titre)}</li>`).join('') || '<li>Aucune (scrutin sans résolutions binaires Pour/Contre)</li>'}</ul>`;
+
+  const docs = [
+    ["pv", pvHtml],
+    ["resultats", resultatsHtml],
+    ["resolutions_adoptees", resolutionsAdopteesHtml],
+  ];
+  for (const [type, html] of docs) {
+    const hash = crypto.createHash("sha256").update(html).digest("hex");
+    await db.prepare("INSERT INTO vote_documents (scrutin_id,type,contenu_html,hash_integrite) VALUES (?,?,?,?)").run(params.id, type, html, hash);
+  }
+  /* Certificat numérique : empreinte globale du scrutin (résultats + horodatage), garantit
+     l'absence de modification depuis la clôture — équivalent pragmatique sans blockchain (V2). */
+  const certificatContenu = JSON.stringify({ scrutin_id: Number(params.id), nom: s.nom, clos_le: dateGen, resultats: resultatsParResolution });
+  const certificatHash = crypto.createHash("sha256").update(certificatContenu).digest("hex");
+  const certificatHtml = `<h1>Certificat numérique du scrutin</h1><p>Scrutin « ${escapeHtml(s.nom)} » clos le ${dateGen}.</p><p>Empreinte SHA-256 : <code>${certificatHash}</code></p><p>Cette empreinte garantit qu'aucune modification n'a été apportée aux résultats depuis la clôture.</p>`;
+  await db.prepare("INSERT INTO vote_documents (scrutin_id,type,contenu_html,hash_integrite) VALUES (?,?,?,?)").run(params.id, "certificat", certificatHtml, certificatHash);
+
+  sendJSON(res, 200, { ok: true, participation, resultats: resultatsParResolution });
+});
+
+function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+/* ── Pilotage (participation + sécurité, pendant le scrutin) ── */
+route("GET", "/api/vote-scrutins/:id/pilotage", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const nbElecteurs = (await db.prepare("SELECT COUNT(*) c FROM vote_electeurs WHERE scrutin_id=?").get(params.id)).c;
+  const nbVotants = (await db.prepare("SELECT COUNT(*) c FROM vote_electeurs WHERE scrutin_id=? AND a_vote=1").get(params.id)).c;
+  const tentatives = await db.prepare("SELECT raison, COUNT(*) c FROM vote_tentatives WHERE scrutin_id=? GROUP BY raison").all(params.id);
+  sendJSON(res, 200, {
+    electeurs_inscrits: nbElecteurs, votants: nbVotants, restants: nbElecteurs - nbVotants,
+    participation: nbElecteurs > 0 ? Math.round((nbVotants / nbElecteurs) * 100) : 0,
+    statut: s.statut, tentatives_refusees: tentatives,
+  });
+});
+
+/* ── Compte rendu imprimable : participation (% par rapport aux électeurs inscrits) + résultats ── */
+route("GET", "/api/vote-scrutins/:id/compte-rendu", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT s.*, i.owner_user_id, i.nom AS init_nom FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  const nbElecteurs = (await db.prepare("SELECT COUNT(*) c FROM vote_electeurs WHERE scrutin_id=?").get(params.id)).c;
+  const nbVotants = (await db.prepare("SELECT COUNT(*) c FROM vote_electeurs WHERE scrutin_id=? AND a_vote=1").get(params.id)).c;
+  const participation = nbElecteurs > 0 ? Math.round((nbVotants / nbElecteurs) * 100) : 0;
+  const resolutions = await db.prepare("SELECT * FROM vote_resolutions WHERE scrutin_id=? ORDER BY ordre ASC").all(params.id);
+
+  const peutMontrerResultats = s.statut === "clos" || !!s.resultats_direct;
+  let resultatsHtml = `<p style="color:#94a3b8;font-style:italic;">Résultats disponibles après clôture du scrutin (ou en direct si l'organisateur l'a activé).</p>`;
+  if (peutMontrerResultats) {
+    const blocs = [];
+    for (const r of resolutions) {
+      const bulletins = await db.prepare("SELECT choix FROM vote_bulletins WHERE resolution_id=?").all(r.id);
+      const compte = {};
+      for (const b of bulletins) {
+        let choix = b.choix;
+        try { const parsed = JSON.parse(b.choix); choix = Array.isArray(parsed) ? parsed.join(", ") : parsed; } catch (e) { /* texte brut */ }
+        compte[choix] = (compte[choix] || 0) + 1;
+      }
+      const total = bulletins.length;
+      blocs.push(`<h3>${escapeHtml(r.titre)}</h3><p>Exprimés : ${total}</p><ul>${
+        Object.entries(compte).map(([k, v]) => `<li>${escapeHtml(k)} : ${v} voix (${total ? Math.round(v / total * 100) : 0}%)</li>`).join('')
+      }</ul>`);
+    }
+    resultatsHtml = blocs.join('') || '<p style="color:#94a3b8;">Aucune résolution.</p>';
+  }
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Compte rendu — ${escapeHtml(s.nom)}</title>
+    <style>body{font-family:Arial,sans-serif;max-width:760px;margin:30px auto;padding:0 20px;color:#1a1a1a;}
+    h1{font-size:22px;} h2{font-size:16px;margin-top:28px;border-bottom:2px solid #eee;padding-bottom:6px;}
+    h3{font-size:14px;margin-top:18px;} .meta{color:#666;font-size:13px;margin-bottom:20px;}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0;}
+    .stat{border:1px solid #ddd;border-radius:8px;padding:12px;text-align:center;}
+    .stat b{display:block;font-size:22px;} .stat span{font-size:11px;color:#666;}
+    @media print{ button{display:none;} }</style></head>
+    <body>
+    <button onclick="window.print()" style="float:right;padding:8px 16px;">🖨️ Imprimer</button>
+    <h1>📄 Compte rendu — ${escapeHtml(s.nom)}</h1>
+    <div class="meta">${escapeHtml(s.init_nom)} — ${VO_TYPE_LABELS_SRV[s.type_scrutin] || s.type_scrutin} — généré le ${new Date().toLocaleString('fr-FR')}</div>
+
+    <h2>Participation</h2>
+    <div class="stats">
+      <div class="stat"><b>${nbElecteurs}</b><span>Électeurs inscrits (public indiqué)</span></div>
+      <div class="stat"><b>${nbVotants}</b><span>Votants</span></div>
+      <div class="stat"><b>${nbElecteurs - nbVotants}</b><span>Restants</span></div>
+      <div class="stat"><b>${participation}%</b><span>Taux de participation</span></div>
+    </div>
+
+    <h2>Résultats par résolution</h2>
+    ${resultatsHtml}
+    </body></html>`;
+
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(html);
+});
+const VO_TYPE_LABELS_SRV = { ag_ordinaire: "AG ordinaire", ag_extraordinaire: "AG extraordinaire", consultation: "Consultation", election: "Élection" };
+
+route("GET", "/api/vote-scrutins/:id/documents/:type", async (req, res, params) => {
+  const doc = await db.prepare("SELECT * FROM vote_documents WHERE scrutin_id=? AND type=? ORDER BY id DESC LIMIT 1").get(params.id, params.type);
+  if (!doc) return sendJSON(res, 404, { error: "Document introuvable — le scrutin n'est peut-être pas encore clos." });
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(doc.contenu_html);
+});
+
+/* ── Votant : mes votes, authentification par code, cast bulletin ── */
+route("GET", "/api/mes-votes", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare(`
+    SELECT vs.id, vs.nom, vs.type_scrutin, vs.statut, vs.date_ouverture, vs.date_fermeture, ve.a_vote, i.nom AS init_nom
+    FROM vote_electeurs ve JOIN vote_scrutins vs ON vs.id=ve.scrutin_id JOIN initiatives i ON i.id=vs.initiative_id
+    WHERE ve.user_id=? ORDER BY vs.created_at DESC
+  `).all(user.id);
+  sendJSON(res, 200, { votes: rows });
+});
+
+route("POST", "/api/vote-scrutins/:id/authentifier", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ip = SEC.clientIp(req);
+  const s = await db.prepare("SELECT * FROM vote_scrutins WHERE id=?").get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (s.statut !== "ouvert") return sendJSON(res, 400, { error: "Ce scrutin n'est pas ouvert au vote." });
+  const electeur = await db.prepare("SELECT * FROM vote_electeurs WHERE scrutin_id=? AND user_id=?").get(params.id, user.id);
+  if (!electeur) {
+    await db.prepare("INSERT INTO vote_tentatives (scrutin_id,ip,raison) VALUES (?,?,'non_autorise')").run(params.id, ip);
+    return sendJSON(res, 403, { error: "Vous n'êtes pas autorisé à voter à ce scrutin." });
+  }
+  if (electeur.a_vote) {
+    await db.prepare("INSERT INTO vote_tentatives (scrutin_id,ip,raison) VALUES (?,?,'deja_vote')").run(params.id, ip);
+    return sendJSON(res, 400, { error: "Vous avez déjà voté à ce scrutin." });
+  }
+  const dsIdOk = await verifyVoteDsId(user.id, body.code);
+  if (!dsIdOk.ok) {
+    await db.prepare("INSERT INTO vote_tentatives (scrutin_id,ip,raison) VALUES (?,?,'code_invalide')").run(params.id, ip);
+    return sendJSON(res, 401, { error: dsIdOk.error });
+  }
+  if (!electeur.notif_ouverte_at) {
+    await db.prepare("UPDATE vote_electeurs SET notif_ouverte_at=datetime('now') WHERE id=?").run(electeur.id);
+  }
+  const resolutions = await db.prepare("SELECT id, ordre, titre, description, type_reponse, options_json FROM vote_resolutions WHERE scrutin_id=? ORDER BY ordre ASC").all(params.id);
+  sendJSON(res, 200, { ok: true, resolutions, scrutin: { nom: s.nom, vote_nominatif: !!s.vote_nominatif } });
+});
+
+route("POST", "/api/vote-scrutins/:id/voter", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ip = SEC.clientIp(req);
+  const s = await db.prepare("SELECT * FROM vote_scrutins WHERE id=?").get(params.id);
+  if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
+  if (s.statut !== "ouvert") return sendJSON(res, 400, { error: "Ce scrutin n'est pas ouvert au vote." });
+  const electeur = await db.prepare("SELECT * FROM vote_electeurs WHERE scrutin_id=? AND user_id=?").get(params.id, user.id);
+  if (!electeur) {
+    await db.prepare("INSERT INTO vote_tentatives (scrutin_id,ip,raison) VALUES (?,?,'non_autorise')").run(params.id, ip);
+    return sendJSON(res, 403, { error: "Vous n'êtes pas autorisé à voter à ce scrutin." });
+  }
+  if (electeur.a_vote) {
+    await db.prepare("INSERT INTO vote_tentatives (scrutin_id,ip,raison) VALUES (?,?,'deja_vote')").run(params.id, ip);
+    return sendJSON(res, 400, { error: "Vous avez déjà voté à ce scrutin." });
+  }
+  const dsIdOk = await verifyVoteDsId(user.id, body.code);
+  if (!dsIdOk.ok) {
+    await db.prepare("INSERT INTO vote_tentatives (scrutin_id,ip,raison) VALUES (?,?,'code_invalide')").run(params.id, ip);
+    return sendJSON(res, 401, { error: dsIdOk.error });
+  }
+  const reponses = Array.isArray(body.reponses) ? body.reponses : [];
+  const resolutions = await db.prepare("SELECT id FROM vote_resolutions WHERE scrutin_id=?").all(params.id);
+  const idsValides = new Set(resolutions.map(r => r.id));
+  if (!reponses.length || reponses.some(r => !idsValides.has(Number(r.resolution_id)))) {
+    return sendJSON(res, 400, { error: "Réponses invalides." });
+  }
+  /* Transaction anonyme : les bulletins n'ont AUCUN lien vers l'électeur — seule la ligne
+     vote_electeurs.a_vote est mise à jour, sans jamais y stocker le choix exprimé. */
+  for (const r of reponses) {
+    const choix = typeof r.choix === "string" ? r.choix : JSON.stringify(r.choix);
+    await db.prepare("INSERT INTO vote_bulletins (scrutin_id,resolution_id,choix) VALUES (?,?,?)").run(params.id, r.resolution_id, choix);
+  }
+  await db.prepare("UPDATE vote_electeurs SET a_vote=1, vote_le=datetime('now') WHERE id=?").run(electeur.id);
+  db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`)
+    .run(user.id, 'signature', ip, req.headers['user-agent'] || null);
+  sendJSON(res, 200, { ok: true });
+});
+
 /* GET /api/initiatives/:id/commandes — owner only, demandes reçues */
 route("GET", "/api/initiatives/:id/commandes", async (req, res, params) => {
   const user = await getCurrentUser(req);
@@ -1827,7 +2894,218 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
   row.accreditations = row.owner_user_id
     ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(row.owner_user_id)).map(a => a.type)
     : [];
+  /* Profil public enrichi : champs JSON parsés pour les colonnes gauche/droite d'initiative.html */
+  row.publics = safeParse(row.publics_json) || [];
+  row.besoins = safeParse(row.besoins_json) || [];
+  row.realisations = safeParse(row.realisations_json) || [];
+  row.stats_perso = safeParse(row.stats_perso_json) || {};
+  row.documents = safeParse(row.vitrine_documents_json) || [];
+  row.reseaux_sociaux_obj = safeParse(row.reseaux_sociaux) || {};
+  row.pays_intervention_arr = safeParse(row.pays_intervention) || (row.pays_intervention ? [row.pays_intervention] : []);
   sendJSON(res, 200, { initiative: row });
+});
+
+/* ── Équipe publique : responsable principal + membres acceptés (liens vers profils DA) ── */
+route("GET", "/api/initiatives/:id/equipe", async (req, res, params) => {
+  const init = await db.prepare("SELECT id, owner_user_id, nom_responsable, prenom_responsable, fonction_responsable FROM initiatives WHERE id = ? OR slug = ?").get(params.id, params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  const equipe = [];
+  if (init.owner_user_id) {
+    const owner = await db.prepare("SELECT id, nom, prenom, photo_url FROM users WHERE id=?").get(init.owner_user_id);
+    if (owner) equipe.push({
+      user_id: owner.id,
+      nom: [init.prenom_responsable || owner.prenom, init.nom_responsable || owner.nom].filter(Boolean).join(" "),
+      fonction: init.fonction_responsable || "Responsable",
+      photo_url: owner.photo_url,
+    });
+  }
+  const membres = await db.prepare(`
+    SELECT u.id AS user_id, u.nom, u.prenom, u.photo_url, m.fonction
+    FROM initiative_membres m JOIN users u ON u.id = m.user_id
+    WHERE m.initiative_id=? AND m.statut='accepte' AND u.id != COALESCE(?, -1)
+    ORDER BY m.created_at ASC
+  `).all(init.id, init.owner_user_id);
+  for (const m of membres) {
+    equipe.push({ user_id: m.user_id, nom: [m.prenom, m.nom].filter(Boolean).join(" "), fonction: m.fonction || "Membre", photo_url: m.photo_url });
+  }
+  sendJSON(res, 200, { equipe });
+});
+
+/* ── Score d'activité : dynamisme calculé (complément du score de confiance) ── */
+route("GET", "/api/initiatives/:id/score-activite", async (req, res, params) => {
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id = ? OR slug = ?").get(params.id, params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+
+  const pubs30j = init.owner_user_id
+    ? (await db.prepare("SELECT COUNT(*) c FROM fil_posts WHERE auteur_id=? AND created_at > datetime('now','-30 days')").get(init.owner_user_id)).c
+    : 0;
+  const nbEvents = init.owner_user_id
+    ? (await db.prepare("SELECT COUNT(*) c FROM events WHERE organisateur_id=?").get(init.owner_user_id)).c
+    : 0;
+  const nbCampagnes = (await db.prepare("SELECT COUNT(*) c FROM adhesion_campagnes WHERE initiative_id=? AND statut='active'").get(init.id)).c;
+  const nbMembres = (await db.prepare("SELECT COUNT(*) c FROM initiative_membres WHERE initiative_id=? AND statut='accepte'").get(init.id)).c;
+
+  /* Complétude du profil : proportion de champs de présentation remplis */
+  const champsProfil = ['description','mission','historique','logo_url','site_web','adresse','vitrine_horaires','vitrine_services',
+                        'publics_json','besoins_json','realisations_json','galerie_json','reseaux_sociaux','annee_creation'];
+  const remplis = champsProfil.filter(c => init[c] != null && String(init[c]).trim() !== '' && String(init[c]) !== '[]' && String(init[c]) !== '{}').length;
+  const completude = Math.round((remplis / champsProfil.length) * 100);
+
+  /* Pondération : publications 25 pts, événements 20, campagnes 15, membres 15, complétude 25 */
+  const score = Math.min(100, Math.round(
+    Math.min(pubs30j, 5) / 5 * 25 +
+    Math.min(nbEvents, 5) / 5 * 20 +
+    Math.min(nbCampagnes, 3) / 3 * 15 +
+    Math.min(nbMembres, 10) / 10 * 15 +
+    completude / 100 * 25
+  ));
+  sendJSON(res, 200, {
+    score,
+    details: { publications_30j: pubs30j, evenements: nbEvents, campagnes_actives: nbCampagnes, membres: nbMembres, completude },
+  });
+});
+
+/* ── Statistiques & Impact complètes d'une initiative (owner uniquement) ──
+   Chaque métrique est calculée dans un try/catch : si la source n'existe pas
+   encore, elle renvoie null (affiché « — » côté dashboard). */
+route("GET", "/api/initiatives/:id/stats-impact", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=? OR slug=?").get(params.id, params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id) && user.role !== "administrateur")
+    return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  const iid = init.id, oid = init.owner_user_id;
+  // Renvoie un nombre (1re colonne du résultat) ou null si la requête échoue.
+  const N = async (sql, ...a) => {
+    try { const r = await db.prepare(sql).get(...a); if (!r) return 0; const v = Object.values(r)[0]; return v == null ? 0 : Number(v); }
+    catch (e) { return null; }
+  };
+  const T = async (sql, ...a) => { try { const r = await db.prepare(sql).get(...a); return r ? Object.values(r)[0] : null; } catch (e) { return null; } };
+
+  let paysInterv = null;
+  try { const arr = JSON.parse(init.pays_intervention || "[]"); paysInterv = Array.isArray(arr) ? arr.length : null; } catch (e) {}
+
+  const ca = await N("SELECT COALESCE(SUM(p.prix*c.quantite),0) v FROM commandes_vitrine c JOIN produits_vitrine p ON p.id=c.produit_id WHERE c.initiative_id=? AND c.statut='traitee'", iid);
+
+  const stats = {
+    communaute: {
+      membres_reseau:   init.membres != null ? Number(init.membres) : await N("SELECT COUNT(*) c FROM initiative_membres WHERE initiative_id=? AND statut='accepte'", iid),
+      abonnes:          init.abonnes != null ? Number(init.abonnes) : await N("SELECT COUNT(*) c FROM abonnements WHERE initiative_id=?", iid),
+      adherents_actifs: await N("SELECT COUNT(*) c FROM adhesion_membres WHERE initiative_id=? AND statut='a_jour'", iid),
+      nouveaux_membres: await N("SELECT COUNT(*) c FROM adhesion_membres WHERE initiative_id=? AND date_adhesion > datetime('now','-30 days')", iid),
+      pays_representes: null,
+      villes_representees: null,
+    },
+    visibilite: {
+      vues_profil:       init.vues != null ? Number(init.vues) : null,
+      vues_vitrine:      null,
+      vues_produits:     null,
+      vues_publications: await N("SELECT COALESCE(SUM(vues),0) v FROM vitrine_publications WHERE initiative_id=?", iid),
+      qr_scans:          null,
+      partages:          await N("SELECT COALESCE(SUM(partages),0) v FROM vitrine_publications WHERE initiative_id=?", iid),
+    },
+    boutique: {
+      produits_publies:      await N("SELECT COUNT(*) c FROM produits_vitrine WHERE initiative_id=?", iid),
+      produits_disponibles:  await N("SELECT COUNT(*) c FROM produits_vitrine WHERE initiative_id=? AND statut='disponible'", iid),
+      produits_indisponibles:await N("SELECT COUNT(*) c FROM produits_vitrine WHERE initiative_id=? AND statut!='disponible'", iid),
+      commandes_recues:      await N("SELECT COUNT(*) c FROM commandes_vitrine WHERE initiative_id=?", iid),
+      chiffre_affaires:      ca,
+      produit_plus_vendu:    await T("SELECT p.nom FROM commandes_vitrine c JOIN produits_vitrine p ON p.id=c.produit_id WHERE c.initiative_id=? GROUP BY c.produit_id ORDER BY COUNT(*) DESC LIMIT 1", iid),
+    },
+    evenements: {
+      evenements_crees:    oid ? await N("SELECT COUNT(*) c FROM events WHERE organisateur_id=?", oid) : 0,
+      participants_inscrits: oid ? await N("SELECT COALESCE(SUM(tt.quantite_vendue),0) v FROM ticket_types tt JOIN events e ON e.id=tt.event_id WHERE e.organisateur_id=?", oid) : null,
+      presents:            null,
+      billets_vendus:      oid ? await N("SELECT COALESCE(SUM(tt.quantite_vendue),0) v FROM ticket_types tt JOIN events e ON e.id=tt.event_id WHERE e.organisateur_id=?", oid) : null,
+      taux_participation:  null,
+    },
+    reseau: {
+      relations_pro:     null,
+      partenaires:       await N("SELECT COUNT(*) c FROM initiative_partenaires WHERE initiative_id=?", iid),
+      demandes_contact:  null,
+      relations_validees:null,
+      messages_recus:    oid ? await N("SELECT COUNT(*) c FROM messages m JOIN conversations cv ON cv.id=m.conversation_id WHERE (cv.user1_id=? OR cv.user2_id=?) AND m.sender_id!=?", oid, oid, oid) : null,
+    },
+    gouvernance: {
+      votes_organises:      await N("SELECT COUNT(*) c FROM vote_scrutins WHERE initiative_id=?", iid),
+      taux_participation:   null,
+      resolutions_adoptees: null,
+      resolutions_rejetees: null,
+    },
+    cotisations: {
+      campagnes:              await N("SELECT COUNT(*) c FROM adhesion_campagnes WHERE initiative_id=?", iid),
+      cotisations_encaissees: await N("SELECT COALESCE(SUM(pa.montant),0) v FROM adhesion_paiements pa JOIN adhesion_membres m ON m.id=pa.membre_id WHERE m.initiative_id=? AND pa.statut='paye'", iid),
+      adhesions_attente:      await N("SELECT COUNT(*) c FROM adhesion_membres WHERE initiative_id=? AND statut='en_attente'", iid),
+      renouvellements_avenir: await N("SELECT COUNT(*) c FROM adhesion_membres WHERE initiative_id=? AND date_expiration IS NOT NULL AND date_expiration > datetime('now') AND date_expiration < datetime('now','+30 days')", iid),
+    },
+    communication: {
+      publications:    await N("SELECT COUNT(*) c FROM vitrine_publications WHERE initiative_id=?", iid),
+      reactions:       null,
+      commentaires:    null,
+      partages:        await N("SELECT COALESCE(SUM(partages),0) v FROM vitrine_publications WHERE initiative_id=?", iid),
+      taux_engagement: null,
+    },
+    formations: {
+      formations_publiees: null,
+      inscrits:            null,
+      certificats:         null,
+    },
+    impact: {
+      indice_impact:            null,
+      indice_croissance:        null,
+      indice_engagement:        null,
+      rayonnement_international: paysInterv,
+      classement:               null,
+      progression_mensuelle:    null,
+    },
+    paiements: {
+      revenus_boutique:  ca,
+      commissions:       ca != null ? Math.round(ca * 0.05 * 100) / 100 : null,
+      paiements_attente: await N("SELECT COUNT(*) c FROM commandes_vitrine WHERE initiative_id=? AND statut='en_attente'", iid),
+      paiements_valides: await N("SELECT COUNT(*) c FROM commandes_vitrine WHERE initiative_id=? AND statut='traitee'", iid),
+    },
+    identite: {
+      qr_scans:          null,
+      carte_numerique:   null,
+      lien_public:       init.vues != null ? Number(init.vues) : null,
+      copie_identifiant: null,
+    },
+  };
+
+  sendJSON(res, 200, { stats, devise: 'EUR' });
+});
+
+/* ── Mise à jour des champs du profil public enrichi (owner uniquement) ── */
+route("PUT", "/api/initiatives/:id/profil-public", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { publics, besoins, realisations, stats_perso, annee_creation, assistant_actif,
+          pays_intervention, vitrine_services, vitrine_horaires, mission, historique } = body;
+  await db.prepare(`UPDATE initiatives SET
+      publics_json=COALESCE(?,publics_json), besoins_json=COALESCE(?,besoins_json),
+      realisations_json=COALESCE(?,realisations_json), stats_perso_json=COALESCE(?,stats_perso_json),
+      annee_creation=COALESCE(?,annee_creation), assistant_actif=COALESCE(?,assistant_actif),
+      pays_intervention=COALESCE(?,pays_intervention), vitrine_services=COALESCE(?,vitrine_services),
+      vitrine_horaires=COALESCE(?,vitrine_horaires), mission=COALESCE(?,mission), historique=COALESCE(?,historique)
+    WHERE id=?`)
+    .run(Array.isArray(publics) ? JSON.stringify(publics) : null,
+         Array.isArray(besoins) ? JSON.stringify(besoins) : null,
+         Array.isArray(realisations) ? JSON.stringify(realisations) : null,
+         stats_perso && typeof stats_perso === 'object' ? JSON.stringify(stats_perso) : null,
+         annee_creation != null ? parseInt(annee_creation) || null : null,
+         assistant_actif !== undefined ? (assistant_actif ? 1 : 0) : null,
+         Array.isArray(pays_intervention) ? JSON.stringify(pays_intervention) : (typeof pays_intervention === 'string' ? pays_intervention : null),
+         vitrine_services !== undefined ? vitrine_services : null,
+         vitrine_horaires !== undefined ? vitrine_horaires : null,
+         mission !== undefined ? mission : null,
+         historique !== undefined ? historique : null,
+         params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 route("POST", "/api/initiatives", async (req, res, params, body) => {
@@ -2277,6 +3555,55 @@ route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
   sendJSON(res, 200, { reactions: counts });
 });
 
+/* ---------- Galerie photo (réactions/commentaires par photo, comptes utilisateur ou initiative) ---------- */
+
+function checkGalerieOwnerType(t) { return t === 'user' || t === 'initiative'; }
+
+/* Compteurs (réactions + commentaires) pour toutes les photos d'un propriétaire, en un seul appel */
+route("GET", "/api/galerie/:ownerType/:ownerId/stats", async (req, res, params) => {
+  if (!checkGalerieOwnerType(params.ownerType)) return sendJSON(res, 400, { error: "Type invalide." });
+  const reacts = await db.prepare("SELECT photo_id, COUNT(*) AS n FROM galerie_reactions WHERE owner_type=? AND owner_id=? GROUP BY photo_id").all(params.ownerType, params.ownerId);
+  const coms = await db.prepare("SELECT photo_id, COUNT(*) AS n FROM galerie_commentaires WHERE owner_type=? AND owner_id=? GROUP BY photo_id").all(params.ownerType, params.ownerId);
+  const stats = {};
+  reacts.forEach(r => { stats[r.photo_id] = stats[r.photo_id] || { reactions: 0, commentaires: 0 }; stats[r.photo_id].reactions = r.n; });
+  coms.forEach(c => { stats[c.photo_id] = stats[c.photo_id] || { reactions: 0, commentaires: 0 }; stats[c.photo_id].commentaires = c.n; });
+  sendJSON(res, 200, { stats });
+});
+
+route("POST", "/api/galerie/:ownerType/:ownerId/:photoId/react", async (req, res, params) => {
+  if (!checkGalerieOwnerType(params.ownerType)) return sendJSON(res, 400, { error: "Type invalide." });
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const already = await db.prepare("SELECT 1 FROM galerie_reactions WHERE owner_type=? AND owner_id=? AND photo_id=? AND user_id=? AND type='jaime'").get(params.ownerType, params.ownerId, params.photoId, user.id);
+  if (already) {
+    await db.prepare("DELETE FROM galerie_reactions WHERE owner_type=? AND owner_id=? AND photo_id=? AND user_id=? AND type='jaime'").run(params.ownerType, params.ownerId, params.photoId, user.id);
+  } else {
+    try { await db.prepare("INSERT INTO galerie_reactions (owner_type, owner_id, photo_id, user_id, type) VALUES (?,?,?,?,'jaime')").run(params.ownerType, params.ownerId, params.photoId, user.id); } catch (e) {}
+  }
+  const n = (await db.prepare("SELECT COUNT(*) AS n FROM galerie_reactions WHERE owner_type=? AND owner_id=? AND photo_id=?").get(params.ownerType, params.ownerId, params.photoId))?.n || 0;
+  sendJSON(res, 200, { reactions: n, jaime: !already });
+});
+
+route("GET", "/api/galerie/:ownerType/:ownerId/:photoId/commentaires", async (req, res, params) => {
+  if (!checkGalerieOwnerType(params.ownerType)) return sendJSON(res, 400, { error: "Type invalide." });
+  const commentaires = await db.prepare(
+    "SELECT id, contenu, created_at, auteur_id, auteur_nom FROM galerie_commentaires WHERE owner_type=? AND owner_id=? AND photo_id=? ORDER BY created_at ASC"
+  ).all(params.ownerType, params.ownerId, params.photoId);
+  sendJSON(res, 200, { commentaires });
+});
+
+route("POST", "/api/galerie/:ownerType/:ownerId/:photoId/commentaires", async (req, res, params, body) => {
+  if (!checkGalerieOwnerType(params.ownerType)) return sendJSON(res, 400, { error: "Type invalide." });
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const contenu = (body.contenu || "").trim();
+  if (!contenu) return sendJSON(res, 400, { error: "Le commentaire ne peut pas être vide." });
+  await db.prepare(
+    "INSERT INTO galerie_commentaires (owner_type, owner_id, photo_id, auteur_id, auteur_nom, contenu) VALUES (?,?,?,?,?,?)"
+  ).run(params.ownerType, params.ownerId, params.photoId, user.id, `${user.nom||''} ${user.prenom||''}`.trim() || user.nom, contenu);
+  sendJSON(res, 200, { ok: true });
+});
+
 /* ---------- Commentaires ---------- */
 
 route("GET", "/api/fil/:id/commentaires", async (req, res, params) => {
@@ -2600,6 +3927,167 @@ const PEUT_INITIER = {
 };
 const PEUT_CONTACTER = PEUT_INITIER;
 
+/* ===========================================================================
+   GOUVERNANCE DES COMPTES COLLECTIVITÉ — « Observer largement, agir localement »
+   Diaspo'Actif distingue deux droits : le droit d'OBSERVER (vision mondiale,
+   données anonymisées) et le droit d'INTERAGIR (uniquement les membres relevant
+   de la compétence de la collectivité ou ayant choisi d'entrer en relation).
+   Helpers de juridiction utilisés par la messagerie et la diffusion.
+=========================================================================== */
+
+/* Périmètre de compétence d'une collectivité, déduit de son type d'organisme et
+   de ses zones d'exercice (avec repli sur les champs de localisation du compte). */
+function getPerimetre(coll) {
+  const org = (coll.type_organisme || coll.type_institution || "").toLowerCase();
+  const pays = coll.pays_exercice || coll.pays || null;
+  const region = coll.region_exercice || coll.region || null;
+  const departement = coll.departement_exercice || coll.departement || null;
+  const ville = coll.ville_exercice || coll.ville || null;
+  let niveau;
+  if (/mairie|commune|municipal/.test(org)) niveau = "ville";
+  else if (/d[ée]partement/.test(org)) niveau = "departement";
+  else if (/r[ée]gion/.test(org)) niveau = "region";
+  else if (/ambassade|consulat|minist|nation|[ée]tat|gouvern/.test(org)) niveau = "pays";
+  else niveau = ville ? "ville" : region ? "region" : departement ? "departement" : "pays"; // repli : le plus précis disponible
+  return { niveau, pays, region, departement, ville };
+}
+
+/* Libellé lisible du périmètre (pour l'UI et les messages). */
+function libellePerimetre(p) {
+  if (p.niveau === "ville" && p.ville) return `${p.ville}${p.pays ? " (" + p.pays + ")" : ""}`;
+  if (p.niveau === "departement" && p.departement) return `${p.departement}${p.pays ? " (" + p.pays + ")" : ""}`;
+  if (p.niveau === "region" && p.region) return `${p.region}${p.pays ? " (" + p.pays + ")" : ""}`;
+  return p.pays || "Périmètre non défini";
+}
+
+/* Clause SQL bornant des `users` au périmètre de compétence de la collectivité.
+   Sert à limiter la DIFFUSION (principe 4) : on ne peut toucher que les membres
+   du territoire. Retourne { where, params }. */
+function perimetreWhere(p, alias = "u") {
+  const conds = [];
+  const params = [];
+  if (p.pays)  { conds.push(`${alias}.pays = ?`); params.push(p.pays); }
+  if (p.niveau === "region" && p.region) { conds.push(`${alias}.region = ?`); params.push(p.region); }
+  if (p.niveau === "departement" && p.departement) { conds.push(`${alias}.departement = ?`); params.push(p.departement); }
+  if (p.niveau === "ville" && p.ville) { conds.push(`${alias}.ville = ?`); params.push(p.ville); }
+  const where = conds.length ? conds.join(" AND ") : "1=0"; // périmètre indéfini ⇒ aucune diffusion
+  return { where, params };
+}
+
+/* Un membre relève-t-il du périmètre de compétence d'une collectivité ?
+   Utilisé pour la diffusion (principe 4) : un membre ne reçoit les contenus
+   poussés (communications, consultations) que des collectivités dont il dépend. */
+function membreDansPerimetre(coll, membre) {
+  const p = getPerimetre(coll);
+  if (!p.pays) return false;                                   // périmètre indéfini ⇒ aucune diffusion ciblée
+  if (membre.pays !== p.pays) return false;
+  if (p.niveau === "region" && p.region && membre.region !== p.region) return false;
+  if (p.niveau === "departement" && p.departement && membre.departement !== p.departement) return false;
+  if (p.niveau === "ville" && p.ville && membre.ville !== p.ville) return false;
+  return true;
+}
+
+/* Un membre a-t-il MANIFESTÉ sa volonté d'échanger avec cette collectivité ?
+   (principe 3 : le premier contact appartient au membre). Vrai si le membre :
+   suit la collectivité, a candidaté à une de ses offres, lui a soumis un projet,
+   ou lui a proposé un rendez-vous. */
+function aRelationEntrante(collId, membreId) {
+  const q = (sql, ...ps) => { try { return (db.prepare(sql).get(...ps)?.n || 0) > 0; } catch(e) { return false; } };
+  if (q("SELECT COUNT(*) n FROM user_follows WHERE follower_id=? AND followed_id=?", membreId, collId)) return true;
+  if (q("SELECT COUNT(*) n FROM offres_candidatures oc JOIN offres o ON o.id=oc.offre_id WHERE o.createur_id=? AND oc.candidat_id=?", collId, membreId)) return true;
+  if (q("SELECT COUNT(*) n FROM proj_eval_destinataires d JOIN proj_eval_projets p ON p.id=d.projet_id WHERE d.destinataire_id=? AND p.createur_id=?", collId, membreId)) return true;
+  if (q("SELECT COUNT(*) n FROM rdv_proposals WHERE destinataire_id=? AND proposeur_id=?", collId, membreId)) return true;
+  return false;
+}
+
+/* ===========================================================================
+   REGISTRE UNIQUE DES COLLECTIVITÉS — identité territoriale.
+   Identifiant unique + détection de doublons pour faire de Diaspo'Actif un
+   registre territorial fiable (carte d'identité numérique des institutions).
+=========================================================================== */
+const PAYS_ISO = {
+  "france": "FR", "côte d'ivoire": "CI", "cote d'ivoire": "CI", "sénégal": "SN", "senegal": "SN",
+  "cameroun": "CM", "mali": "ML", "canada": "CA", "belgique": "BE", "suisse": "CH", "maroc": "MA",
+  "congo": "CG", "royaume-uni": "UK", "états-unis": "US", "etats-unis": "US", "espagne": "ES",
+  "allemagne": "DE", "italie": "IT", "portugal": "PT", "bénin": "BJ", "benin": "BJ", "togo": "TG",
+  "guinée": "GN", "guinee": "GN", "burkina faso": "BF", "gabon": "GA", "niger": "NE", "tchad": "TD",
+};
+const TYPE_ORG_ABBR = {
+  "état": "ETAT", "etat": "ETAT", "ministère": "MIN", "ministere": "MIN", "ambassade": "AMB",
+  "consulat": "CONSULAT", "région": "REGION", "region": "REGION", "département": "DEP", "departement": "DEP",
+  "commune": "COMMUNE", "ville": "VILLE", "mairie": "MAIRIE", "district": "DISTRICT", "préfecture": "PREF",
+  "prefecture": "PREF", "chambre consulaire": "CCI", "collectivite territoriale": "CT", "organisation territoriale": "OT",
+};
+const sansAccents = s => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
+function abrevType(t) {
+  const k = sansAccents((t || "").toLowerCase()).trim();
+  for (const [key, val] of Object.entries(TYPE_ORG_ABBR)) if (sansAccents(key) === k) return val;
+  return sansAccents((t || "ORG").toUpperCase()).replace(/[^A-Z]/g, "").slice(0, 8) || "ORG";
+}
+function codePays(pays) {
+  const iso = PAYS_ISO[(pays || "").toLowerCase().trim()];
+  return iso || sansAccents((pays || "XX").toUpperCase()).replace(/[^A-Z]/g, "").slice(0, 2) || "XX";
+}
+function slugVille(ville) {
+  return sansAccents((ville || "").toUpperCase()).replace(/[^A-Z0-9]/g, "").slice(0, 10) || "NA";
+}
+/* Génère un identifiant territorial unique : COL-{PAYS}-{CP}-{VILLE}-{TYPE}-{NNN}. */
+function genererIdentifiantTerritorial(coll) {
+  const pays = codePays(coll.pays_exercice || coll.pays);
+  const cp = (coll.code_postal_exercice || coll.code_postal || "").replace(/[^0-9A-Za-z]/g, "").slice(0, 5);
+  const ville = slugVille(coll.ville_exercice || coll.ville);
+  const type = abrevType(coll.type_organisme || coll.type_institution);
+  const prefixe = ["COL", pays, cp, ville, type].filter(Boolean).join("-");
+  // Numéro séquentiel pour désambiguïser d'éventuelles collisions sur le même préfixe.
+  let n = 1, candidat;
+  do {
+    candidat = `${prefixe}-${String(n).padStart(3, "0")}`;
+    n++;
+  } while (db.prepare("SELECT COUNT(*) AS c FROM users WHERE identifiant_territorial=?").get(candidat)?.c > 0 && n < 1000);
+  return candidat;
+}
+/* Similarité de deux chaînes (0..1) — distance de Levenshtein normalisée. */
+function similariteChaine(a, b) {
+  a = sansAccents((a || "").toLowerCase()).replace(/\s+/g, " ").trim();
+  b = sansAccents((b || "").toLowerCase()).replace(/\s+/g, " ").trim();
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+    dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+  const lev = dp[m][n];
+  const distSim = 1 - lev / Math.max(m, n);
+  // Bonus : recouvrement de tokens (gère « Région Bélier » vs « Conseil Régional du Bélier »).
+  const ta = new Set(a.split(" ").filter(w => w.length > 2));
+  const tb = new Set(b.split(" ").filter(w => w.length > 2));
+  const inter = [...ta].filter(w => tb.has(w)).length;
+  const tokenSim = (ta.size && tb.size) ? inter / Math.min(ta.size, tb.size) : 0;
+  return Math.max(distSim, tokenSim);
+}
+function journalColl(collId, action, detail) {
+  try { db.prepare("INSERT INTO collectivite_journal (collectivite_id,action,detail) VALUES (?,?,?)").run(collId, action, detail || null); } catch(e) {}
+}
+
+/* Portée d'une requête Observatoire selon le paramètre ?scope=
+   - "territorial"  → bornée au périmètre de compétence de la collectivité (Module 2).
+   - défaut/mondial → vision globale, sans restriction (Module 1).
+   Retourne { where, params, territorial } où `where` est préfixé « AND … » (ou vide). */
+async function obsScope(user, req) {
+  let scope = null;
+  try { scope = new URL(req.url, "http://x").searchParams.get("scope"); } catch(e) {}
+  if (scope === "territorial") {
+    const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville FROM users WHERE id=?").get(user.id);
+    const p = getPerimetre(coll);
+    const { where, params } = perimetreWhere(p, "u");
+    return { where: where ? "AND " + where : "", params, territorial: true, perimetre: p };
+  }
+  // Mondial : réutilise le filtre d'accréditation (désormais accès complet ⇒ where vide).
+  const base = buildObsWhere(getAccred(user.id), "u");
+  return { ...base, territorial: false };
+}
+
 async function convAnonyme(conv, userId) {
   const isU1 = conv.user1_id === userId;
   return {
@@ -2663,9 +4151,13 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
   // Vérification d'initiation uniquement pour les NOUVELLES conversations
   if (!conv) {
     const allowed = PEUT_INITIER[user.role] || [];
-    if (!allowed.includes(other.role)) {
+    // Principe 3 : une collectivité peut initier un échange avec un utilisateur
+    // UNIQUEMENT si ce dernier a déjà manifesté sa volonté (suivi, candidature,
+    // projet soumis, demande de rendez-vous). Le premier contact reste au membre.
+    const exceptionRelation = user.role === "collectivite" && other.role === "utilisateur" && aRelationEntrante(user.id, otherId);
+    if (!allowed.includes(other.role) && !exceptionRelation) {
       const msg = user.role === "collectivite"
-        ? "Les comptes officiels ne peuvent pas initier un contact avec un utilisateur. L'utilisateur doit vous contacter en premier."
+        ? "Les comptes officiels ne peuvent pas initier un contact avec un utilisateur. L'utilisateur doit d'abord vous contacter, vous suivre, candidater à une de vos offres, vous soumettre un projet ou vous proposer un rendez-vous."
         : `Votre rôle (${user.role}) ne peut pas initier une conversation avec ce type de compte (${other.role}).`;
       return sendJSON(res, 403, { error: msg });
     }
@@ -2730,6 +4222,69 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
   const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
   creerNotif(otherId, "message", "Nouveau message", `${user.nom} vous a envoyé un message`, { conversation_id: conv.id, produit_id: produitId });
   sendJSON(res, 201, { message: msg });
+});
+
+/* Fenêtre d'édition/suppression d'un message : 10 minutes après l'envoi. */
+const MSG_EDIT_WINDOW_MS = 10 * 60 * 1000;
+function messageAgeMs(created_at) {
+  if (!created_at) return Infinity;
+  if (created_at instanceof Date) return Date.now() - created_at.getTime();
+  let s = String(created_at);
+  // SQLite renvoie 'YYYY-MM-DD HH:MM:SS' en UTC → on force l'interprétation UTC
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) s = s.replace(' ', 'T') + 'Z';
+  const t = new Date(s).getTime();
+  return Number.isNaN(t) ? Infinity : Date.now() - t;
+}
+
+/* PATCH /api/messages/:id — modifier son propre message (marqué « modifié »), dans les 10 min */
+route("PATCH", "/api/messages/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  const msg = await db.prepare("SELECT * FROM messages WHERE id=?").get(params.id);
+  if (!msg) return sendJSON(res, 404, { error: "Message introuvable." });
+  if (Number(msg.sender_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres messages." });
+  if (msg.deleted) return sendJSON(res, 400, { error: "Ce message a été supprimé." });
+  if (messageAgeMs(msg.created_at) > MSG_EDIT_WINDOW_MS) return sendJSON(res, 403, { error: "Le délai de modification (10 minutes) est dépassé." });
+
+  const contenu = (body.contenu || "").trim();
+  if (!contenu) return sendJSON(res, 400, { error: "Message vide." });
+
+  await db.prepare("UPDATE messages SET contenu=?, edited=1, edited_at=datetime('now') WHERE id=?").run(contenu, msg.id);
+
+  // Notifier l'autre participant qu'un message a été modifié
+  const conv = await db.prepare("SELECT * FROM conversations WHERE id=?").get(msg.conversation_id);
+  if (conv) {
+    const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
+    creerNotif(otherId, "message", "Message modifié", `${user.nom} a modifié un message`, { conversation_id: conv.id });
+  }
+
+  const updated = await db.prepare("SELECT m.*, u.nom AS sender_nom, u.role AS sender_role FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.id=?").get(msg.id);
+  sendJSON(res, 200, { message: updated });
+});
+
+/* DELETE /api/messages/:id — supprimer son propre message (soft-delete, marqué « supprimé ») */
+route("DELETE", "/api/messages/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  const msg = await db.prepare("SELECT * FROM messages WHERE id=?").get(params.id);
+  if (!msg) return sendJSON(res, 404, { error: "Message introuvable." });
+  if (Number(msg.sender_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Vous ne pouvez supprimer que vos propres messages." });
+  if (msg.deleted) return sendJSON(res, 200, { message: msg });
+  if (messageAgeMs(msg.created_at) > MSG_EDIT_WINDOW_MS) return sendJSON(res, 403, { error: "Le délai de suppression (10 minutes) est dépassé." });
+
+  await db.prepare("UPDATE messages SET deleted=1, deleted_at=datetime('now') WHERE id=?").run(msg.id);
+
+  // Notifier l'autre participant qu'un message a été supprimé
+  const conv = await db.prepare("SELECT * FROM conversations WHERE id=?").get(msg.conversation_id);
+  if (conv) {
+    const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
+    creerNotif(otherId, "message", "Message supprimé", `${user.nom} a supprimé un message`, { conversation_id: conv.id });
+  }
+
+  const updated = await db.prepare("SELECT m.*, u.nom AS sender_nom, u.role AS sender_role FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.id=?").get(msg.id);
+  sendJSON(res, 200, { message: updated });
 });
 
 /* PATCH /api/conversations/:id/archive — archiver/désarchiver */
@@ -3314,6 +4869,86 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   });
 });
 
+/* ---------- Cartographie financière de la diaspora ----------
+   Cumule tous les gains (crédits wallet) des bénéficiaires et les ventile par
+   origine (nationalité), pays de résidence, ville et secteur d'activité.       */
+route("GET", "/api/admin/revenus-diaspora", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+
+  // Toutes les transactions de gain (crédit) rattachées à leur bénéficiaire,
+  // enrichies de l'origine/résidence/secteur. Le secteur retombe sur le domaine
+  // de l'initiative détenue quand le compte n'a pas de secteur propre.
+  const rows = await db.prepare(`
+    SELECT
+      w.montant AS montant,
+      w.type    AS type_tx,
+      COALESCE(NULLIF(TRIM(u.nationalite1), ''), 'Non renseignée') AS origine,
+      COALESCE(NULLIF(TRIM(u.pays), ''), 'Non renseigné')          AS pays,
+      COALESCE(NULLIF(TRIM(u.ville), ''), 'Non renseignée')        AS ville,
+      COALESCE(
+        NULLIF(TRIM(u.domaine_utilisateur), ''),
+        NULLIF(TRIM(u.situation_pro), ''),
+        NULLIF(TRIM(u.type_institution), ''),
+        NULLIF(TRIM(i.domaine), ''),
+        'Non renseigné'
+      ) AS secteur
+    FROM wallet_transactions w
+    JOIN users u ON u.id = w.beneficiaire_id
+    LEFT JOIN initiatives i ON i.owner_user_id = u.id
+    WHERE w.sens = 'credit' AND w.montant IS NOT NULL
+    GROUP BY w.id
+  `).all();
+
+  // Valeurs distinctes (non filtrées) pour alimenter les listes déroulantes.
+  const uniq = (k) => [...new Set(rows.map(r => r[k]))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const filtres = { origines: uniq('origine'), pays: uniq('pays'), villes: uniq('ville'), secteurs: uniq('secteur') };
+
+  // Application des filtres croisés éventuels.
+  const f = { origine: query.origine, pays: query.pays, ville: query.ville, secteur: query.secteur };
+  const filtered = rows.filter(r =>
+    (!f.origine || r.origine === f.origine) &&
+    (!f.pays    || r.pays    === f.pays) &&
+    (!f.ville   || r.ville   === f.ville) &&
+    (!f.secteur || r.secteur === f.secteur)
+  );
+
+  const total = filtered.reduce((s, r) => s + r.montant, 0);
+  const nbTx = filtered.length;
+
+  const TYPE_LABELS = {
+    commande_vitrine: "Boutique", billet: "Billetterie", ticket: "Billetterie",
+    adhesion: "Adhésions", adhesion_paiement: "Adhésions", don: "Dons", platform_fee: "Commissions"
+  };
+
+  // Ventilation générique par clé, avec montant, part et nb de transactions.
+  const ventiler = (key, labelFn) => {
+    const map = new Map();
+    for (const r of filtered) {
+      const k = labelFn ? labelFn(r[key]) : r[key];
+      if (!map.has(k)) map.set(k, { cle: k, montant: 0, nb_tx: 0 });
+      const e = map.get(k); e.montant += r.montant; e.nb_tx += 1;
+    }
+    return [...map.values()]
+      .map(e => ({ ...e, montant: Math.round(e.montant * 100) / 100, pct: total > 0 ? Math.round(e.montant / total * 1000) / 10 : 0 }))
+      .sort((a, b) => b.montant - a.montant);
+  };
+
+  sendJSON(res, 200, {
+    total: Math.round(total * 100) / 100,
+    nb_transactions: nbTx,
+    nb_lignes: filtered.length,
+    filtres,
+    filtres_actifs: f,
+    par_origine: ventiler('origine'),
+    par_pays:    ventiler('pays'),
+    par_ville:   ventiler('ville'),
+    par_secteur: ventiler('secteur'),
+    par_type:    ventiler('type_tx', v => TYPE_LABELS[v] || v)
+  });
+});
+
 /* ---------- Dashboard Collectivité ---------- */
 route("GET", "/api/dashboard/collectivite", async (req, res) => {
   const user = await getCurrentUser(req);
@@ -3368,7 +5003,7 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
 
 /* ---------- Profil (lecture enrichie) ---------- */
 route("GET", "/api/profil/:id", async (req, res, params) => {
-  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie,compte_masque FROM users WHERE id=?").get(params.id);
+  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie,compte_masque,telephone,publics_json,besoins_json,realisations_json,stats_perso_json,services_perso,zones_json,reseaux_json,annee_debut,assistant_actif,galerie_json FROM users WHERE id=?").get(params.id);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
   const me = await getCurrentUser(req);
   if (u.compte_masque && (!me || Number(me.id) !== Number(u.id))) return sendJSON(res, 404, { error: "Profil introuvable." });
@@ -3417,7 +5052,63 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     } : null,
     is_deal_master: !!dmLaureat,
     deal_master: dmLaureat ? { ...dmLaureat, nb_editions: dmHistorique } : null,
+    /* Profil public enrichi (colonnes gauche/droite, miroir des initiatives) */
+    telephone: u.telephone,
+    publics: safeParse(u.publics_json) || [],
+    besoins: safeParse(u.besoins_json) || [],
+    realisations: safeParse(u.realisations_json) || [],
+    stats_perso: safeParse(u.stats_perso_json) || {},
+    services_perso: u.services_perso,
+    zones: safeParse(u.zones_json) || [],
+    reseaux_enrichis: safeParse(u.reseaux_json) || {},
+    annee_debut: u.annee_debut,
+    assistant_actif: u.assistant_actif == null ? 1 : u.assistant_actif,
+    galerie: safeParse(u.galerie_json) || [],
   }});
+});
+
+/* ── Score d'activité du compte personnel (miroir des initiatives) ── */
+route("GET", "/api/profil/:id/score-activite", async (req, res, params) => {
+  const u = await db.prepare("SELECT * FROM users WHERE id=?").get(params.id);
+  if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
+  const pubs30j = (await db.prepare("SELECT COUNT(*) c FROM fil_posts WHERE auteur_id=? AND created_at > datetime('now','-30 days')").get(u.id)).c;
+  const nbAbonnes = (await db.prepare("SELECT COUNT(*) c FROM user_follows WHERE followed_id=?").get(u.id)).c;
+  const nbSuivis = (await db.prepare("SELECT COUNT(*) c FROM user_follows WHERE follower_id=?").get(u.id)).c;
+  const champsProfil = ['bio','titre_pro','photo_url','competences','experiences','centres_interet',
+                        'publics_json','besoins_json','realisations_json','services_perso','reseaux_json','annee_debut'];
+  const remplis = champsProfil.filter(c => u[c] != null && String(u[c]).trim() !== '' && String(u[c]) !== '[]' && String(u[c]) !== '{}').length;
+  const completude = Math.round((remplis / champsProfil.length) * 100);
+  const score = Math.min(100, Math.round(
+    Math.min(pubs30j, 5) / 5 * 30 +
+    Math.min(nbAbonnes, 20) / 20 * 20 +
+    Math.min(nbSuivis, 20) / 20 * 10 +
+    completude / 100 * 40
+  ));
+  sendJSON(res, 200, { score, details: { publications_30j: pubs30j, abonnes: nbAbonnes, suivis: nbSuivis, completude } });
+});
+
+/* ── Mise à jour du profil public enrichi (propriétaire) ── */
+route("PUT", "/api/profil/profil-public", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { publics, besoins, realisations, stats_perso, services_perso, zones, reseaux, annee_debut, assistant_actif } = body;
+  await db.prepare(`UPDATE users SET
+      publics_json=COALESCE(?,publics_json), besoins_json=COALESCE(?,besoins_json),
+      realisations_json=COALESCE(?,realisations_json), stats_perso_json=COALESCE(?,stats_perso_json),
+      services_perso=COALESCE(?,services_perso), zones_json=COALESCE(?,zones_json),
+      reseaux_json=COALESCE(?,reseaux_json), annee_debut=COALESCE(?,annee_debut), assistant_actif=COALESCE(?,assistant_actif)
+    WHERE id=?`)
+    .run(Array.isArray(publics) ? JSON.stringify(publics) : null,
+         Array.isArray(besoins) ? JSON.stringify(besoins) : null,
+         Array.isArray(realisations) ? JSON.stringify(realisations) : null,
+         stats_perso && typeof stats_perso === 'object' ? JSON.stringify(stats_perso) : null,
+         services_perso !== undefined ? services_perso : null,
+         Array.isArray(zones) ? JSON.stringify(zones) : null,
+         reseaux && typeof reseaux === 'object' ? JSON.stringify(reseaux) : null,
+         annee_debut != null ? parseInt(annee_debut) || null : null,
+         assistant_actif !== undefined ? (assistant_actif ? 1 : 0) : null,
+         user.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ---------- Profil (mise à jour étendue) ---------- */
@@ -3441,6 +5132,7 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
   if (telephone !== undefined)       { fields.push("telephone=?");        vals.push(telephone); }
   if (competences !== undefined)     { fields.push("competences=?");      vals.push(JSON.stringify(Array.isArray(competences)?competences:[])); }
   if (experiences !== undefined)     { fields.push("experiences=?");      vals.push(JSON.stringify(Array.isArray(experiences)?experiences:[])); }
+  if (body.galerie !== undefined)    { fields.push("galerie_json=?");     vals.push(JSON.stringify(Array.isArray(body.galerie)?body.galerie:[])); }
   if (body.profil !== undefined) {
     const cur = await db.prepare("SELECT profil_json FROM users WHERE id=?").get(user.id);
     const merged = { ...safeParse(cur.profil_json), ...body.profil };
@@ -3519,6 +5211,7 @@ route("GET", "/api/profil/:id/activite", async (req, res, params) => {
 /* ---------- Profil — Publications complètes ---------- */
 route("GET", "/api/profil/:id/publications", async (req, res, params) => {
   const uid = parseInt(params.id);
+  const cu = await getCurrentUser(req);
   const query = new URL("http://x" + req.url).searchParams;
   const page = Math.max(1, parseInt(query.get('page') || '1'));
   const cat = query.get('categorie') || 'all';
@@ -3526,13 +5219,16 @@ route("GET", "/api/profil/:id/publications", async (req, res, params) => {
   const LIMIT = 15, OFFSET = (page-1)*LIMIT;
   let rows;
   if (cat === 'all') {
-    rows = await db.prepare(`SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, COUNT(DISTINCT r.id) AS nb_reactions, COUNT(DISTINCT c.id) AS nb_commentaires FROM fil_posts p LEFT JOIN fil_reactions r ON r.post_id=p.id LEFT JOIN fil_commentaires c ON c.post_id=p.id WHERE p.auteur_id=? GROUP BY p.id ORDER BY p.id DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
+    rows = await db.prepare(`SELECT * FROM fil_posts WHERE auteur_id=? ORDER BY id DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
   } else {
-    rows = await db.prepare(`SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, COUNT(DISTINCT r.id) AS nb_reactions, COUNT(DISTINCT c.id) AS nb_commentaires FROM fil_posts p LEFT JOIN fil_reactions r ON r.post_id=p.id LEFT JOIN fil_commentaires c ON c.post_id=p.id WHERE p.auteur_id=? AND (p.categorie=? OR p.type=?) GROUP BY p.id ORDER BY p.id DESC LIMIT ? OFFSET ?`).all(uid, cat, cat, LIMIT, OFFSET);
+    rows = await db.prepare(`SELECT * FROM fil_posts WHERE auteur_id=? AND (categorie=? OR type=?) ORDER BY id DESC LIMIT ? OFFSET ?`).all(uid, cat, cat, LIMIT, OFFSET);
   }
   if (q) rows = rows.filter(r => (r.contenu||'').toLowerCase().includes(q));
+  const isOwner = cu && Number(cu.id) === uid;
+  if (!isOwner) rows = rows.filter(r => !r.visibilite || r.visibilite === 'public');
+  const publications = await Promise.all(rows.map(p => enrichPost(p, cu)));
   const total = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts WHERE auteur_id=?").get(uid))?.n;
-  sendJSON(res, 200, { publications: rows, total, page, pages: Math.ceil(total/LIMIT) });
+  sendJSON(res, 200, { publications, total, page, pages: Math.ceil(total/LIMIT) });
 });
 
 
@@ -3708,6 +5404,174 @@ route("GET", "/api/uploads/:id", async (req, res, params) => {
   res.end(row.data);
 });
 
+/* ══════════════ ATELIER AUDIOVISUEL — traitement vidéo réel (ffmpeg) ══════════════ */
+const AV = require("./atelier");
+const AV_MIME = { mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg", m4a: "audio/mp4", jpg: "image/jpeg", png: "image/png" };
+function avFolderFor(type) {
+  if ((type||"").startsWith("video")) return "videos";
+  if ((type||"").startsWith("image")) return "images";
+  if ((type||"").startsWith("audio")) return "musiques";
+  return "videos";
+}
+function avMediaDto(m) {
+  return { id: m.id, folder: m.folder, nom: m.nom, type: m.type, duree: m.duree, source: m.source, url: "/api/atelier/file/" + m.id };
+}
+
+/* Import d'un média (data-URL base64) → fichier disque + ffprobe */
+route("POST", "/api/atelier/upload", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!AV.ffmpegAvailable()) return sendJSON(res, 503, { error: "Moteur vidéo (ffmpeg) indisponible sur le serveur." });
+  try {
+    const { file, mime } = AV.writeDataUrl(body.dataUrl);
+    const duree = mime.startsWith("image") ? null : await AV.probeDuration(file);
+    const folder = body.folder || avFolderFor(mime);
+    const id = db.prepare("INSERT INTO av_media (user_id,folder,nom,type,chemin,duree,source) VALUES (?,?,?,?,?,?, 'upload')")
+      .run(user.id, folder, (body.nom || "media").slice(0, 120), mime, file, duree).lastInsertRowid;
+    const m = await db.prepare("SELECT * FROM av_media WHERE id=?").get(id);
+    sendJSON(res, 201, { media: avMediaDto(m) });
+  } catch (e) { sendJSON(res, 400, { error: e.message }); }
+});
+
+/* Liste des médias de l'utilisateur */
+route("GET", "/api/atelier/media", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare("SELECT * FROM av_media WHERE user_id=? ORDER BY id DESC").all(user.id);
+  sendJSON(res, 200, { media: rows.map(avMediaDto) });
+});
+
+/* Bibliothèque musicale libre de droits (générée) */
+route("GET", "/api/atelier/musiques", async (req, res) => {
+  sendJSON(res, 200, { musiques: AV.listMusic() });
+});
+route("GET", "/api/atelier/musique/:id", async (req, res, params) => {
+  const p = AV.musicPath(params.id);
+  if (!p) return send(res, 404, "Not found");
+  res.writeHead(200, { "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=86400" });
+  require("fs").createReadStream(p).pipe(res);
+});
+
+/* Bibliothèques libres de droits : musiques, effets sonores, génériques, animations */
+route("GET", "/api/atelier/library", async (req, res) => {
+  sendJSON(res, 200, { library: AV.listLibrary() });
+});
+route("GET", "/api/atelier/asset/:folder/:id", async (req, res, params) => {
+  const p = AV.assetPath(params.folder, params.id);
+  if (!p) return send(res, 404, "Not found");
+  const ext = p.split(".").pop().toLowerCase();
+  res.writeHead(200, { "Content-Type": AV_MIME[ext] || "application/octet-stream", "Cache-Control": "public, max-age=86400" });
+  require("fs").createReadStream(p).pipe(res);
+});
+
+/* Sert un fichier média de l'utilisateur (propriétaire uniquement) */
+route("GET", "/api/atelier/file/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return send(res, 401, "Auth");
+  const m = await db.prepare("SELECT * FROM av_media WHERE id=?").get(params.id);
+  if (!m || Number(m.user_id) !== Number(user.id)) return send(res, 404, "Not found");
+  const fs2 = require("fs");
+  if (!fs2.existsSync(m.chemin)) return send(res, 404, "Fichier absent");
+  const ext = m.chemin.split(".").pop().toLowerCase();
+  res.writeHead(200, { "Content-Type": AV_MIME[ext] || "application/octet-stream" });
+  fs2.createReadStream(m.chemin).pipe(res);
+});
+
+/* Traitement : découpe / format / fusion / extraction audio / musique / export */
+route("POST", "/api/atelier/process", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!AV.ffmpegAvailable()) return sendJSON(res, 503, { error: "Moteur vidéo (ffmpeg) indisponible." });
+
+  const own = async (id) => {
+    const m = await db.prepare("SELECT * FROM av_media WHERE id=?").get(id);
+    if (!m || Number(m.user_id) !== Number(user.id)) throw new Error("Média introuvable.");
+    return m;
+  };
+  try {
+    const op = body.op;
+    let outFile, nom, folder = "videos", type = "video/mp4";
+    if (op === "trim") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opTrim(m.chemin, body.start, body.end);
+      nom = "Découpe · " + m.nom;
+    } else if (op === "format") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opFormat(m.chemin, body.ratio || "9/16");
+      nom = "Format " + (body.ratio || "9/16") + " · " + m.nom;
+    } else if (op === "concat") {
+      const ms = []; for (const id of (body.mediaIds || [])) ms.push(await own(id));
+      if (ms.length < 2) return sendJSON(res, 400, { error: "Sélectionnez au moins 2 séquences." });
+      outFile = await AV.opConcat(ms.map(m => m.chemin));
+      nom = "Fusion (" + ms.length + " séquences)";
+    } else if (op === "extract-audio") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opExtractAudio(m.chemin);
+      nom = "Audio · " + m.nom; folder = "musiques"; type = "audio/mpeg";
+    } else if (op === "add-music") {
+      const m = await own(body.mediaId);
+      const music = AV.musicPath(body.musique);
+      if (!music) return sendJSON(res, 400, { error: "Musique introuvable." });
+      outFile = await AV.opAddMusic(m.chemin, music, body.volVideo ?? 1, body.volMusic ?? 0.5);
+      nom = "Avec musique · " + m.nom;
+    } else if (op === "export") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opExport(m.chemin, body.format || "mp4");
+      nom = "Export " + (body.format || "mp4").toUpperCase() + " · " + m.nom;
+      type = body.format === "webm" ? "video/webm" : "video/mp4";
+    } else if (op === "enhance") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opEnhance(m.chemin); nom = "✨ Amélioré · " + m.nom;
+    } else if (op === "speed") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opSpeed(m.chemin, body.factor); nom = "Vitesse ×" + (body.factor || 1) + " · " + m.nom;
+    } else if (op === "blur") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opBlur(m.chemin); nom = "Flou · " + m.nom;
+    } else if (op === "filter") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opFilter(m.chemin, body.preset); nom = "Filtre " + (body.preset || "vif") + " · " + m.nom;
+    } else if (op === "color") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opColor(m.chemin, { brightness: body.brightness, contrast: body.contrast, saturation: body.saturation });
+      nom = "Colorimétrie · " + m.nom;
+    } else if (op === "replace-audio") {
+      const m = await own(body.mediaId); const music = AV.musicPath(body.musique);
+      if (!music) return sendJSON(res, 400, { error: "Musique introuvable." });
+      outFile = await AV.opReplaceAudio(m.chemin, music); nom = "Piste remplacée · " + m.nom;
+    } else if (op === "volume") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opVolume(m.chemin, body.vol); nom = "Volume ×" + (body.vol ?? 1) + " · " + m.nom;
+    } else if (op === "title") {
+      const m = await own(body.mediaId);
+      outFile = await AV.opTitle(m.chemin, body.texte, body.position); nom = "Titre · " + m.nom;
+    } else if (op === "generique") {
+      const m = await own(body.mediaId); const gen = AV.assetPath("generiques", body.generique);
+      if (!gen) return sendJSON(res, 400, { error: "Générique introuvable." });
+      const inputs = body.position === "fin" ? [m.chemin, gen] : [gen, m.chemin];
+      outFile = await AV.opConcat(inputs); nom = "Générique " + (body.position || "début") + " · " + m.nom;
+    } else {
+      return sendJSON(res, 400, { error: "Opération inconnue." });
+    }
+    const duree = type.startsWith("audio") || type.startsWith("video") ? await AV.probeDuration(outFile) : null;
+    const id = db.prepare("INSERT INTO av_media (user_id,folder,nom,type,chemin,duree,source) VALUES (?,?,?,?,?,?, 'render')")
+      .run(user.id, folder, nom.slice(0, 120), type, outFile, duree).lastInsertRowid;
+    const out = await db.prepare("SELECT * FROM av_media WHERE id=?").get(id);
+    sendJSON(res, 200, { media: avMediaDto(out) });
+  } catch (e) { logError(e, "atelier_process", req); sendJSON(res, 500, { error: e.message }); }
+});
+
+/* Suppression d'un média */
+route("DELETE", "/api/atelier/media/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const m = await db.prepare("SELECT * FROM av_media WHERE id=?").get(params.id);
+  if (!m || Number(m.user_id) !== Number(user.id)) return sendJSON(res, 404, { error: "Introuvable." });
+  try { require("fs").unlinkSync(m.chemin); } catch {}
+  await db.prepare("DELETE FROM av_media WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 /* ---------- Recherche globale ---------- */
 /* ---------- Autocomplete @mentions ---------- */
 route("GET", "/api/mentions", async (req, res, params, body, query) => {
@@ -3813,6 +5677,37 @@ function addMonths(dateStr, months) {
   return d.toISOString();
 }
 
+/* Correspondance nom de pays (texte libre, tel que déclaré par l'utilisateur) → code ISO2,
+   pour pouvoir comparer à l'issuing_country (ISO2) extrait du document par Stripe Identity. */
+const PAYS_NOM_VERS_ISO2 = {
+  france:"FR", francaise:"FR", "cote d ivoire":"CI", "cote divoire":"CI", ivoirienne:"CI", ivoirien:"CI",
+  senegal:"SN", senegalaise:"SN", senegalais:"SN", mali:"ML", malienne:"ML", malien:"ML",
+  cameroun:"CM", camerounaise:"CM", camerounais:"CM", benin:"BJ", beninoise:"BJ", beninois:"BJ",
+  togo:"TG", togolaise:"TG", togolais:"TG", "burkina faso":"BF", burkinabe:"BF",
+  guinee:"GN", guineenne:"GN", guineen:"GN", niger:"NE", nigerienne:"NE", nigerien:"NE",
+  nigeria:"NG", nigeriane:"NG", nigerian:"NG", gabon:"GA", gabonaise:"GA", gabonais:"GA",
+  congo:"CG", "republique democratique du congo":"CD", congolaise:"CG", congolais:"CG",
+  tchad:"TD", tchadienne:"TD", tchadien:"TD", maroc:"MA", marocaine:"MA", marocain:"MA",
+  algerie:"DZ", algerienne:"DZ", algerien:"DZ", tunisie:"TN", tunisienne:"TN", tunisien:"TN",
+  madagascar:"MG", malgache:"MG", "republique centrafricaine":"CF", centrafricaine:"CF", centrafricain:"CF",
+  mauritanie:"MR", mauritanienne:"MR", mauritanien:"MR", "guinee bissau":"GW",
+  "guinee equatoriale":"GQ", "cap vert":"CV", capverdienne:"CV", capverdien:"CV",
+  belgique:"BE", belge:"BE", suisse:"CH", allemagne:"DE", allemande:"DE", allemand:"DE",
+  "royaume uni":"GB", "royaume-uni":"GB", britannique:"GB", "etats unis":"US", "etats-unis":"US", americaine:"US", americain:"US",
+  canada:"CA", canadienne:"CA", canadien:"CA", italie:"IT", italienne:"IT", italien:"IT",
+  espagne:"ES", espagnole:"ES", espagnol:"ES", portugal:"PT", portugaise:"PT", portugais:"PT",
+};
+function normaliserTexte(s) {
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/['’]/g, " ").replace(/\s+/g, " ").trim();
+}
+function paysNomVersISO2(nom) {
+  if (!nom) return null;
+  const n = normaliserTexte(nom);
+  if (PAYS_NOM_VERS_ISO2[n]) return PAYS_NOM_VERS_ISO2[n];
+  if (/^[a-z]{2}$/.test(n)) return n.toUpperCase(); // déjà un code ISO2
+  return null;
+}
+
 /* POST /api/identity/verify — crée une session de vérification Stripe Identity, renvoie l'URL hébergée */
 route("POST", "/api/identity/verify", async (req, res) => {
   const user = await getCurrentUser(req);
@@ -3830,7 +5725,9 @@ route("POST", "/api/identity/verify", async (req, res) => {
     const origin = getOrigin(req);
     const session = await stripe.identity.verificationSessions.create({
       type: "document",
-      options: { document: { require_matching_selfie: true } },
+      // require_id_number pousse Stripe à extraire davantage de champs du document (dont le pays d'émission),
+      // utilisés ensuite pour comparer l'origine/nationalité déclarée à celle du document.
+      options: { document: { require_matching_selfie: true, require_id_number: true } },
       metadata: { diaspoactif_user_id: String(user.id) },
       return_url: `${origin}/profil.html?identity=retour`,
     });
@@ -3849,7 +5746,7 @@ route("GET", "/api/identity/status", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const row = await db.prepare(
-    "SELECT identite_verifiee, identite_verifiee_le, identite_expire_le, stripe_identity_session_id FROM users WHERE id=?"
+    "SELECT identite_verifiee, identite_verifiee_le, identite_expire_le, stripe_identity_session_id, identite_pays_document, identite_mismatch FROM users WHERE id=?"
   ).get(user.id);
   const verifie = !!row?.identite_verifiee && row.identite_expire_le && new Date(row.identite_expire_le) > new Date();
   sendJSON(res, 200, {
@@ -3857,6 +5754,8 @@ route("GET", "/api/identity/status", async (req, res) => {
     verifie_le: row?.identite_verifiee_le || null,
     expire_le: row?.identite_expire_le || null,
     session_en_cours: !verifie && !!row?.stripe_identity_session_id,
+    pays_document: row?.identite_pays_document || null,
+    mismatch: verifie && !!row?.identite_mismatch,
   });
 });
 
@@ -3889,14 +5788,25 @@ async function handleStripeWebhook(req, res) {
       if (userId) {
         const now = new Date().toISOString();
         const expire = addMonths(now, IDENTITY_VALIDITY_MONTHS);
+        // Pays d'émission du document (ISO2), extrait par Stripe Identity — comparé aux nationalités déclarées.
+        const vo = session.verified_outputs || {};
+        const paysDocument = vo.address?.country || vo.issuing_country || null;
+        const userDecl = await db.prepare("SELECT nationalite1, nationalite2, nationalite3, pays FROM users WHERE id=?").get(userId);
+        const declarees = [userDecl?.nationalite1, userDecl?.nationalite2, userDecl?.nationalite3, userDecl?.pays]
+          .map(paysNomVersISO2).filter(Boolean);
+        const mismatch = paysDocument && declarees.length && !declarees.includes(paysDocument) ? 1 : 0;
         await db.prepare(
-          "UPDATE users SET identite_verifiee=1, identite_verifiee_le=?, identite_expire_le=?, identite_renouvellement_notifie=0 WHERE id=?"
-        ).run(now, expire, userId);
+          "UPDATE users SET identite_verifiee=1, identite_verifiee_le=?, identite_expire_le=?, identite_renouvellement_notifie=0, identite_pays_document=?, identite_mismatch=? WHERE id=?"
+        ).run(now, expire, paysDocument, mismatch, userId);
         await db.prepare(
           "INSERT INTO identity_verifications_log (user_id, stripe_session_id, type, statut) VALUES (?,?,?,?)"
         ).run(userId, session.id, "personne", "verified");
         creerNotif(userId, "identite_verifiee", "Identité vérifiée ✔️",
           "Votre identité a été vérifiée avec succès. Le badge est maintenant visible sur votre profil.", {});
+        if (mismatch) {
+          creerNotif(userId, "identite_mismatch", "Origine à confirmer",
+            "Le pays associé à votre document d'identité ne correspond pas à la nationalité déclarée sur votre profil. Vérifiez vos informations dans Confidentialité, ou contactez le support si c'est une erreur.", {});
+        }
       }
     } else if (event.type === "identity.verification_session.requires_input") {
       const session = event.data.object;
@@ -4059,6 +5969,51 @@ async function handleStripeWebhook(req, res) {
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_commande_vitrine_id) {
       const commandeId = Number(event.data.object.metadata.diaspoactif_commande_vitrine_id);
       await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id=? AND paiement_statut='en_attente'`).run(commandeId);
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_adhesion_paiement_id) {
+      /* Paiement Cotisations & Adhésions confirmé (one-off ou 1ère facture d'une subscription).
+         Même modèle commission 5%/wallet_balance que Boutique/Billetterie. Idempotent : ne traite que si 'en_attente'. */
+      const paiementId = Number(event.data.object.metadata.diaspoactif_adhesion_paiement_id);
+      const session = event.data.object;
+      const pay = await db.prepare(`SELECT * FROM adhesion_paiements WHERE id=? AND statut='en_attente'`).get(paiementId);
+      if (pay) {
+        const [formule, init, membre] = await Promise.all([
+          db.prepare(`SELECT * FROM adhesion_formules WHERE id=?`).get(pay.formule_id),
+          db.prepare(`SELECT * FROM initiatives WHERE id=?`).get(pay.initiative_id),
+          db.prepare(`SELECT * FROM adhesion_membres WHERE id=?`).get(pay.membre_id),
+        ]);
+        const COMMISSION_RATE = 0.05;
+        const montant = Number(pay.montant) || 0;
+        const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
+        const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
+        const numeroRecu = `REC-${pay.initiative_id}-${paiementId}`;
+        const months = adhesionExpirationMonths(formule?.type_contribution);
+
+        await db.prepare(`UPDATE adhesion_paiements SET statut='paye', numero_recu=?, stripe_subscription_id=?, date_paiement=datetime('now') WHERE id=?`)
+          .run(numeroRecu, session.subscription || null, paiementId);
+        await db.prepare(`UPDATE adhesion_membres SET statut='a_jour', mode_paiement='carte', montant_paye=?, numero_recu=?,
+            date_adhesion=COALESCE(date_adhesion, datetime('now')),
+            date_expiration=${months ? `datetime('now','+${months} months')` : 'NULL'},
+            stripe_customer_id=?, stripe_subscription_id=?, updated_at=datetime('now') WHERE id=?`)
+          .run(montant, numeroRecu, session.customer || null, session.subscription || null, pay.membre_id);
+
+        await db.prepare(`INSERT INTO wallet_transactions (adhesion_paiement_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
+          .run(paiementId, platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+        await db.prepare(`INSERT INTO wallet_transactions (adhesion_paiement_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'organizer_credit',?,?,?,?,?,?)`)
+          .run(paiementId, init.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+        await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, init.owner_user_id);
+        await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+
+        if (membre.linked_user_id) {
+          creerNotif(membre.linked_user_id, "adhesion_payee", "Adhésion confirmée ✅",
+            `Votre « ${formule?.nom || 'adhésion'} » (${init.nom}) est confirmée. Reçu ${numeroRecu}.`, { paiement_id: paiementId });
+        }
+        creerNotif(init.owner_user_id, "adhesion_recue", "Nouvelle adhésion 🎫",
+          `« ${formule?.nom || ''} » réglée par ${membre.prenom || ''} ${membre.nom} (+${organizer_amount}€).`, { paiement_id: paiementId });
+        await ajouterAListeStockage(pay.formule_id, membre);
+      }
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_adhesion_paiement_id) {
+      const paiementId = Number(event.data.object.metadata.diaspoactif_adhesion_paiement_id);
+      await db.prepare(`UPDATE adhesion_paiements SET statut='echoue' WHERE id=? AND statut='en_attente'`).run(paiementId);
     } else if (event.type === "invoice.payment_succeeded" && event.data.object.subscription) {
       const invoice = event.data.object;
       const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);
@@ -4066,6 +6021,37 @@ async function handleStripeWebhook(req, res) {
         const planDef = PUB_PLANS.find(p => p.id === abo.plan);
         await db.prepare(`UPDATE pub_abonnements SET statut='active', credits_restants=?, credits_reset_le=datetime('now','+1 month'), grace_until=NULL, updated_at=datetime('now') WHERE id=?`)
           .run(planDef?.quota_mensuel || 0, abo.id);
+      }
+      /* Renouvellement d'une cotisation périodique Adhésions (hors 1ère facture, déjà traitée par checkout.session.completed) */
+      const adhMembre = await db.prepare("SELECT * FROM adhesion_membres WHERE stripe_subscription_id=?").get(invoice.subscription);
+      if (adhMembre && invoice.billing_reason !== "subscription_create") {
+        const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=?").get(adhMembre.formule_id);
+        const months = adhesionExpirationMonths(formule?.type_contribution) || 12;
+        const montant = (invoice.amount_paid || 0) / 100;
+        const paiementId = (await db.prepare(`
+          INSERT INTO adhesion_paiements (membre_id,formule_id,initiative_id,montant,devise,mode_paiement,statut,stripe_subscription_id,date_paiement)
+          VALUES (?,?,?,?,?,?,?,?,datetime('now'))
+        `).run(adhMembre.id, adhMembre.formule_id, adhMembre.initiative_id, montant, formule?.devise || 'EUR', 'carte', 'paye', invoice.subscription)).lastInsertRowid;
+        const numeroRecu = `REC-${adhMembre.initiative_id}-${paiementId}`;
+        await db.prepare(`UPDATE adhesion_paiements SET numero_recu=? WHERE id=?`).run(numeroRecu, paiementId);
+        await db.prepare(`UPDATE adhesion_membres SET statut='a_jour', montant_paye=?, numero_recu=?, date_expiration=datetime('now','+${months} months'), updated_at=datetime('now') WHERE id=?`)
+          .run(montant, numeroRecu, adhMembre.id);
+
+        const COMMISSION_RATE = 0.05;
+        const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
+        const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
+        const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(adhMembre.initiative_id);
+        await db.prepare(`INSERT INTO wallet_transactions (adhesion_paiement_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
+          .run(paiementId, platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+        await db.prepare(`INSERT INTO wallet_transactions (adhesion_paiement_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'organizer_credit',?,?,?,?,?,?)`)
+          .run(paiementId, init.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+        await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, init.owner_user_id);
+        await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+
+        if (adhMembre.linked_user_id) {
+          creerNotif(adhMembre.linked_user_id, "adhesion_renouvelee", "Adhésion renouvelée ✅",
+            `Votre cotisation a été renouvelée. Reçu ${numeroRecu}.`, { membre_id: adhMembre.id });
+        }
       }
     } else if (event.type === "invoice.payment_failed" && event.data.object.subscription) {
       const invoice = event.data.object;
@@ -4075,9 +6061,18 @@ async function handleStripeWebhook(req, res) {
         creerNotif(abo.user_id, "pub_abonnement_suspendu", "Paiement échoué — Abonnement Publicité",
           "Votre paiement n'a pas pu être traité. Vos publicités sont en pause. Vous avez 7 jours pour régulariser.", {});
       }
+      const adhMembre = await db.prepare("SELECT * FROM adhesion_membres WHERE stripe_subscription_id=?").get(invoice.subscription);
+      if (adhMembre) {
+        await db.prepare(`UPDATE adhesion_membres SET statut='non_a_jour', updated_at=datetime('now') WHERE id=?`).run(adhMembre.id);
+        if (adhMembre.linked_user_id) {
+          creerNotif(adhMembre.linked_user_id, "adhesion_paiement_echoue", "Paiement échoué — Adhésion",
+            "Votre paiement de cotisation n'a pas pu être traité.", {});
+        }
+      }
     } else if (event.type === "customer.subscription.deleted") {
       const sub = event.data.object;
       await db.prepare(`UPDATE pub_abonnements SET statut='canceled', updated_at=datetime('now') WHERE stripe_subscription_id=?`).run(sub.id);
+      await db.prepare(`UPDATE adhesion_membres SET statut='non_a_jour', updated_at=datetime('now') WHERE stripe_subscription_id=?`).run(sub.id);
     } else if (event.type === "account.updated") {
       const account = event.data.object;
       const row = await db.prepare("SELECT initiative_id FROM stripe_connect_accounts WHERE stripe_account_id=?").get(account.id);
@@ -4489,6 +6484,8 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   let rows = await db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.date_evt ASC").all();
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
   if (query.pays) rows = rows.filter(r => r.pays === query.pays);
+  if (query.origine) rows = rows.filter(r => r.origine === query.origine);
+  if (query.ville) { const v = query.ville.toLowerCase(); rows = rows.filter(r => (r.ville||"").toLowerCase().includes(v)); }
   if (query.type) rows = rows.filter(r => r.type_evt === query.type);
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.lieu+r.description||"").toLowerCase().includes(q)); }
   const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
@@ -4499,7 +6496,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || !["initiative","administrateur","collectivite"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative, Collectivité et Administrateur." });
   const {
-    titre, organisateur, date_evt, lieu, pays, ville, description, type_evt, domaine,
+    titre, organisateur, date_evt, lieu, pays, ville, origine, description, type_evt, domaine,
     places_max, inscription_ouverte, lien_inscription, image_url,
     heure_debut, heure_fin, date_fin, lien_visio, visibilite,
     image_couverture, galerie_photos, video1_url, video1_titre, video2_url, video2_titre,
@@ -4509,14 +6506,14 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   const coverImg = image_couverture || image_url || null;
   const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || '[]');
   const id = db.prepare(`INSERT INTO evenements
-    (titre,organisateur,date_evt,lieu,pays,ville,description,type_evt,domaine,places_max,
+    (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,places_max,
      inscription_ouverte,lien_inscription,image_url,statut,owner_user_id,
      heure_debut,heure_fin,date_fin,lien_visio,visibilite,
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
-      titre, organisateur || user.nom, date_evt, lieu||null, pays||null, ville||null,
+      titre, organisateur || user.nom, date_evt, lieu||null, pays||null, ville||null, origine||null,
       description||null, type_evt||"evenement", domaine||null, places_max||null,
       inscription_ouverte!==false?1:0, lien_inscription||null, coverImg, user.id,
       heure_debut||null, heure_fin||null, date_fin||null, lien_visio||null, visibilite||'public',
@@ -4540,21 +6537,37 @@ route("GET", "/api/evenements/:id", async (req, res, params) => {
   sendJSON(res, 200, { evenement: row, participants, nb_participants: participants.length });
 });
 
-route("POST", "/api/evenements/:id/rejoindre", async (req, res, params) => {
+route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (!evt.inscription_ouverte) return sendJSON(res, 400, { error: "Les inscriptions sont fermées." });
+  // Validation par le Code de Sécurité Diaspo'Actif (DS-ID) de l'inscrit
+  const dsOk = await verifyVoteDsId(user.id, body?.ds_id);
+  if (!dsOk.ok) return sendJSON(res, 401, { error: dsOk.error });
+  const nbPers = Math.max(1, Math.min(20, parseInt(body?.nb_personnes) || 1));
   if (evt.places_max) {
-    const nb = (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(params.id))?.n;
-    if (nb >= evt.places_max) return sendJSON(res, 400, { error: "Plus de places disponibles." });
+    const nb = (await db.prepare("SELECT COALESCE(SUM(nb_personnes),COUNT(*)) AS n FROM evenements_participants WHERE evenement_id=?").get(params.id))?.n || 0;
+    if (nb + nbPers > evt.places_max) return sendJSON(res, 400, { error: "Plus assez de places disponibles." });
   }
+  const nomComplet = (body?.nom_complet || user.nom || "").toString().trim().slice(0, 120);
+  const email = (body?.email || user.email || "").toString().trim().slice(0, 160);
+  const tel = (body?.telephone || "").toString().trim().slice(0, 40);
+  const message = (body?.message || "").toString().trim().slice(0, 500);
   try {
-    db.prepare("INSERT INTO evenements_participants (evenement_id,user_id) VALUES (?,?)").run(params.id, user.id);
-    if (evt.owner_user_id && evt.owner_user_id !== user.id) creerNotif(evt.owner_user_id, "evenement", "Nouvelle inscription", `${user.nom} s'est inscrit à « ${evt.titre} »`, { evenement_id: evt.id });
+    db.prepare("INSERT INTO evenements_participants (evenement_id,user_id,nom_complet,email,telephone,nb_personnes,message) VALUES (?,?,?,?,?,?,?)")
+      .run(params.id, user.id, nomComplet || null, email || null, tel || null, nbPers, message || null);
+    if (evt.owner_user_id && evt.owner_user_id !== user.id) creerNotif(evt.owner_user_id, "evenement", "Nouvelle inscription", `${nomComplet || user.nom} s'est inscrit à « ${evt.titre} »${nbPers > 1 ? ` (${nbPers} pers.)` : ''}`, { evenement_id: evt.id });
     sendJSON(res, 201, { ok: true, inscrit: true });
-  } catch(e) { sendJSON(res, 409, { ok: false, inscrit: true, message: "Déjà inscrit." }); }
+  } catch(e) {
+    // Déjà inscrit → on met à jour ses infos plutôt que d'échouer
+    try {
+      db.prepare("UPDATE evenements_participants SET nom_complet=?,email=?,telephone=?,nb_personnes=?,message=? WHERE evenement_id=? AND user_id=?")
+        .run(nomComplet || null, email || null, tel || null, nbPers, message || null, params.id, user.id);
+    } catch(_) {}
+    sendJSON(res, 200, { ok: true, inscrit: true, message: "Inscription mise à jour." });
+  }
 });
 
 route("DELETE", "/api/evenements/:id/quitter", async (req, res, params) => {
@@ -5841,12 +7854,18 @@ route("POST", "/api/session/heartbeat", async (req, res, params, body) => {
 /* ===== MODULE INSTITUTIONS & OBSERVATOIRE ===== */
 
 /* Helper : accréditation active d'une institution */
-async function getAccred(institutionId) {
-  return await db.prepare("SELECT * FROM accreditations_observatoire WHERE institution_id=? AND statut='actif'").get(institutionId) || null;
+/* Observatoire Diaspora : ouvert à toutes les collectivités, sans accréditation préalable.
+   Retourne systématiquement un accès complet (aucun périmètre restreint : toutes nationalités,
+   tous territoires). L'ancien système d'accréditation par institution est neutralisé. */
+function getAccred(_institutionId) {
+  return {
+    id: null, statut: 'actif', date_debut: null, date_fin: null,
+    nationalites_autorisees: '[]', territoires_autorises: '[]', droits: '[]', auto: true,
+  };
 }
 
 /* Helper : construit la clause WHERE pour filtrer users selon le périmètre de l'accréditation */
-async function buildObsWhere(accred, tableAlias = "u") {
+function buildObsWhere(accred, tableAlias = "u") {
   const nats = safeParse(accred.nationalites_autorisees);
   const terrs = safeParse(accred.territoires_autorises);
   const conds = [];
@@ -5984,7 +8003,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation Observatoire requise." });
-    const { where, params: p } = buildObsWhere(accred);
+    const { where, params: p } = await obsScope(user, req);
     const totalMembres = (await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE role='utilisateur' ${where}`).get(...p))?.n;
     const totalInitiatives = (await db.prepare(`SELECT COUNT(*) AS n FROM initiatives i WHERE 1=1 ${where.replace(/u\./g,"i.")}`).get(...p))?.n;
     const totalPays = (await db.prepare(`SELECT COUNT(DISTINCT u.pays) AS n FROM users u WHERE role='utilisateur' AND u.pays IS NOT NULL ${where}`).get(...p))?.n;
@@ -6003,7 +8022,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
-    const { where, params: p } = buildObsWhere(accred);
+    const { where, params: p } = await obsScope(user, req);
     const parPays = await db.prepare(`SELECT u.pays, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.pays IS NOT NULL ${where} GROUP BY u.pays ORDER BY n DESC LIMIT 30`).all(...p);
     const parRegion = await db.prepare(`SELECT u.region, u.pays, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.region IS NOT NULL ${where} GROUP BY u.region, u.pays ORDER BY n DESC LIMIT 20`).all(...p);
     const parVille = await db.prepare(`SELECT u.ville, u.pays, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.ville IS NOT NULL ${where} GROUP BY u.ville, u.pays ORDER BY n DESC LIMIT 20`).all(...p);
@@ -6020,7 +8039,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
-    const { where, params: p } = buildObsWhere(accred);
+    const { where, params: p } = await obsScope(user, req);
     const rows = await db.prepare(`SELECT u.situation_pro, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.situation_pro IS NOT NULL ${where} GROUP BY u.situation_pro ORDER BY n DESC`).all(...p);
     const mask = n => n >= SEUIL_CONFIDENTIALITE ? n : null;
     sendJSON(res, 200, { competences: rows.map(r => ({ label: r.situation_pro, n: mask(r.n) })).filter(r => r.n) });
@@ -6031,7 +8050,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
-    const { where, params: p } = buildObsWhere(accred);
+    const { where, params: p } = await obsScope(user, req);
     const rows = await db.prepare(`SELECT i.domaine, COUNT(*) AS n FROM initiatives i WHERE i.domaine IS NOT NULL GROUP BY i.domaine ORDER BY n DESC`).all();
     const mask = n => n >= SEUIL_CONFIDENTIALITE ? n : null;
     sendJSON(res, 200, { secteurs: rows.map(r => ({ label: r.domaine, n: r.n })) });
@@ -6040,14 +8059,8 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   route("GET", "/api/observatoire/initiatives-stats", async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
-    const accred = getAccred(user.id);
-    if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
-    const nats = safeParse(accred.nationalites_autorisees);
-    const terrs = safeParse(accred.territoires_autorises);
-    let conds = []; const p = [];
-    if (nats.length) { const ph = nats.map(()=>"?").join(","); conds.push(`(i.nationalite1 IN (${ph}) OR i.nationalite2 IN (${ph}))`); p.push(...nats,...nats); }
-    if (terrs.length) { const tc = terrs.map(t => { if(t.ville){p.push(t.pays,t.region,t.ville);return`(i.pays=? AND i.region=? AND i.ville=?)`;}if(t.region){p.push(t.pays,t.region);return`(i.pays=? AND i.region=?)`;}p.push(t.pays);return`(i.pays=?)`;});conds.push(`(${tc.join(" OR ")})`); }
-    const where = conds.length ? "AND "+conds.join(" AND ") : "";
+    const { where: whereU, params: p } = await obsScope(user, req);
+    const where = whereU.replace(/u\./g, "i.");
     const parDomaine = await db.prepare(`SELECT domaine, COUNT(*) AS n, SUM(membres) AS total_membres, SUM(vues) AS total_vues FROM initiatives i WHERE 1=1 ${where} GROUP BY domaine ORDER BY n DESC`).all(...p);
     const parPays = await db.prepare(`SELECT pays, COUNT(*) AS n FROM initiatives i WHERE pays IS NOT NULL ${where} GROUP BY pays ORDER BY n DESC LIMIT 15`).all(...p);
     const total = await db.prepare(`SELECT COUNT(*) AS n, SUM(membres) AS membres, SUM(abonnes) AS abonnes FROM initiatives i WHERE 1=1 ${where}`).get(...p);
@@ -6096,7 +8109,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
-    const { where, params: p } = buildObsWhere(accred);
+    const { where, params: p } = await obsScope(user, req);
     const parDomaine = await db.prepare(`SELECT i.domaine, COUNT(*) AS n FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') ${where.replace(/u\./g,"i.")} GROUP BY i.domaine ORDER BY n DESC LIMIT 15`).all(...p);
     const parPays = await db.prepare(`SELECT i.pays, COUNT(*) AS n FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') AND i.pays IS NOT NULL ${where.replace(/u\./g,"i.")} GROUP BY i.pays ORDER BY n DESC LIMIT 15`).all(...p);
     const total = await db.prepare(`SELECT COUNT(*) AS n, SUM(membres) AS membres FROM initiatives i WHERE i.type_structure IN ('association','fondation','collectif') ${where.replace(/u\./g,"i.")}`).get(...p);
@@ -6108,12 +8121,325 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     });
   });
 
+  /* ===========================================================================
+     MODULE 2 — OBSERVATOIRE TERRITORIAL (cockpit borné à la juridiction)
+  =========================================================================== */
+  route("GET", "/api/observatoire-territorial/cockpit", async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville FROM users WHERE id=?").get(user.id);
+    const p = getPerimetre(coll);
+    const { where: uw, params: up } = perimetreWhere(p, "u");
+    const { where: iw, params: ip } = perimetreWhere(p, "i");
+    const one = async (sql, ...ps) => { try { return (await db.prepare(sql).get(...ps)) || {}; } catch(e) { return {}; } };
+    const all = async (sql, ...ps) => { try { return (await db.prepare(sql).all(...ps)) || []; } catch(e) { return []; } };
+    const mask = n => (n != null && n >= SEUIL_CONFIDENTIALITE) ? n : null;
+
+    // Population inscrite + nouveaux (30j) dans le territoire
+    const pop = await one(`SELECT COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND ${uw}`, ...up);
+    const nouveaux = await one(`SELECT COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND u.created_at>=datetime('now','-30 days') AND ${uw}`, ...up);
+    // Vie économique
+    const init = await one(`SELECT COUNT(*) AS n FROM initiatives i WHERE ${iw}`, ...ip);
+    const entreprises = await one(`SELECT COUNT(*) AS n FROM initiatives i WHERE LOWER(i.type) IN ('entreprise','startup','société','societe','média','media') AND ${iw}`, ...ip);
+    const assos = await one(`SELECT COUNT(*) AS n FROM initiatives i WHERE LOWER(i.type) IN ('association','ong','fondation','collectif','coopérative','cooperative') AND ${iw}`, ...ip);
+    // Répartitions (âge/professions) — anonymisées
+    const ageRow = await one(`SELECT AVG((julianday('now')-julianday(u.date_naissance))/365.25) AS age FROM users u WHERE u.role='utilisateur' AND u.date_naissance IS NOT NULL AND ${uw}`, ...up);
+    const parProfession = await all(`SELECT u.situation_pro AS label, COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND u.situation_pro IS NOT NULL AND ${uw} GROUP BY u.situation_pro ORDER BY n DESC LIMIT 10`, ...up);
+    // Diaspora liée au territoire : membres ORIGINAIRES du territoire, où qu'ils résident
+    const origineConds = [];
+    const origineParams = [];
+    if (p.region) { origineConds.push("(u.region_origine=? OR u.region=?)"); origineParams.push(p.region, p.region); }
+    else if (p.pays) { origineConds.push("(u.pays_origine_institution=? OR u.nationalite1=?)"); origineParams.push(p.pays, p.pays); }
+    const diaspora = origineConds.length
+      ? await all(`SELECT u.pays AS label, COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND u.pays IS NOT NULL AND ${origineConds.join(" AND ")} GROUP BY u.pays ORDER BY n DESC LIMIT 12`, ...origineParams)
+      : [];
+    // Vie citoyenne / communication (propres à la collectivité)
+    const consultations = await one(`SELECT COUNT(*) AS n FROM consultations WHERE emetteur_id=?`, user.id);
+    const communications = await one(`SELECT COUNT(*) AS n, COALESCE(SUM(nb_destinataires),0) AS portee FROM communications_institutionnelles WHERE emetteur_id=?`, user.id);
+    const abonnes = await one(`SELECT COUNT(*) AS n FROM user_follows WHERE followed_id=?`, user.id);
+    const evenements = await one(`SELECT COUNT(*) AS n FROM evenements WHERE owner_user_id=?`, user.id);
+
+    sendJSON(res, 200, {
+      perimetre: p, libelle: libellePerimetre(p), seuil_confidentialite: SEUIL_CONFIDENTIALITE,
+      population: { inscrits: pop.n || 0, nouveaux_30j: nouveaux.n || 0 },
+      economie: { initiatives: init.n || 0, entreprises: entreprises.n || 0, associations: assos.n || 0 },
+      repartition: {
+        age_moyen: ageRow.age ? Math.round(ageRow.age * 10) / 10 : null,
+        par_profession: parProfession.map(r => ({ ...r, n: mask(r.n) })).filter(r => r.n != null),
+      },
+      diaspora_liee: diaspora.map(r => ({ ...r, n: mask(r.n) })).filter(r => r.n != null),
+      vie_citoyenne: { consultations: consultations.n || 0, evenements: evenements.n || 0 },
+      communication: { abonnes: abonnes.n || 0, campagnes: communications.n || 0, portee_totale: communications.portee || 0 },
+    });
+  });
+
+  /* Assistant IA territorial : moteur de règles (mots-clés) répondant depuis les
+     données agrégées du territoire — aucune donnée nominative, aucun LLM. */
+  route("GET", "/api/observatoire-territorial/ia", async (req, res, params, body, query) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const q = (query.q || "").toLowerCase().trim();
+    if (!q) return sendJSON(res, 400, { error: "Question requise." });
+    const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville FROM users WHERE id=?").get(user.id);
+    const p = getPerimetre(coll);
+    const { where: uw, params: up } = perimetreWhere(p, "u");
+    const all = async (sql, ...ps) => { try { return (await db.prepare(sql).all(...ps)) || []; } catch(e) { return []; } };
+    const fmtList = (rows, unite = "") => rows.length ? rows.map(r => `${r.label} (${r.n}${unite})`).join(", ") : "données insuffisantes (seuil de confidentialité)";
+    const mask = rows => rows.filter(r => r.n >= SEUIL_CONFIDENTIALITE);
+
+    let reponse, data = null;
+    if (/secteur|domaine|activit|repr[ée]sent/.test(q) && !/sous/.test(q)) {
+      data = mask(await all(`SELECT u.situation_pro AS label, COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND u.situation_pro IS NOT NULL AND ${uw} GROUP BY u.situation_pro ORDER BY n DESC LIMIT 5`, ...up));
+      reponse = `Les secteurs les plus représentés sur votre territoire (${libellePerimetre(p)}) : ${fmtList(data)}.`;
+    } else if (/sous-repr|manqu|rare|d[ée]ficit|p[ée]nurie|sous repr/.test(q)) {
+      data = mask(await all(`SELECT u.situation_pro AS label, COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND u.situation_pro IS NOT NULL AND ${uw} GROUP BY u.situation_pro ORDER BY n ASC LIMIT 5`, ...up));
+      reponse = `Les profils les moins représentés (potentiellement sous-dotés) : ${fmtList(data)}.`;
+    } else if (/pays|r[ée]sid|vivent|install|diaspora|[ée]tranger|monde/.test(q)) {
+      const conds = []; const ps = [];
+      if (p.region) { conds.push("(u.region_origine=? OR u.region=?)"); ps.push(p.region, p.region); }
+      else if (p.pays) { conds.push("(u.pays_origine_institution=? OR u.nationalite1=?)"); ps.push(p.pays, p.pays); }
+      data = conds.length ? mask(await all(`SELECT u.pays AS label, COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND u.pays IS NOT NULL AND ${conds.join(" AND ")} GROUP BY u.pays ORDER BY n DESC LIMIT 6`, ...ps)) : [];
+      reponse = `Répartition mondiale de la diaspora liée à votre territoire : ${fmtList(data)}.`;
+    } else if (/nouveau|inscri|r[ée]cent|profil moyen/.test(q)) {
+      const top = mask(await all(`SELECT u.situation_pro AS label, COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND u.created_at>=datetime('now','-30 days') AND u.situation_pro IS NOT NULL AND ${uw} GROUP BY u.situation_pro ORDER BY n DESC LIMIT 3`, ...up));
+      const nb = (await all(`SELECT COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND u.created_at>=datetime('now','-30 days') AND ${uw}`, ...up))[0]?.n || 0;
+      data = top;
+      reponse = `${nb} nouveau(x) membre(s) sur les 30 derniers jours. Secteurs dominants : ${fmtList(top)}.`;
+    } else {
+      reponse = "Je peux vous renseigner sur : les secteurs les plus représentés, les métiers sous-représentés, les pays de résidence de votre diaspora, ou le profil des nouveaux inscrits. Reformulez votre question autour de ces thèmes.";
+    }
+    sendJSON(res, 200, { reponse, data, perimetre: p, libelle: libellePerimetre(p) });
+  });
+
+  /* ===========================================================================
+     OZ COLLECTIVITÉ — assistant territorial (Directeur Intelligence Diaspora).
+     Synthèse d'accueil + questions en langage naturel, avec suggestions d'action
+     transformables en opportunité / consultation / campagne. Données agrégées et
+     anonymisées (seuil de confidentialité), bornées au périmètre + diaspora liée.
+  =========================================================================== */
+  // WHERE « diaspora liée au territoire » (membres ORIGINAIRES, où qu'ils résident)
+  function ozDiasporaWhere(p, alias = "u") {
+    if (p.region) return { where: `(${alias}.region_origine=? OR ${alias}.region=?)`, params: [p.region, p.region] };
+    if (p.pays)   return { where: `(${alias}.pays_origine_institution=? OR ${alias}.nationalite1=?)`, params: [p.pays, p.pays] };
+    return { where: "1=0", params: [] };
+  }
+  const OZ_CATS = [
+    ["entrepreneurs", "Entrepreneurs", "entrepreneur|entreprise|fondateur|dirigeant|ceo|gérant|gerant"],
+    ["ingenieurs", "Ingénieurs", "ingénieur|ingenieur"],
+    ["agronomes", "Agronomes / Agri", "agronom|agricole|agro|éleveur|eleveur"],
+    ["sante", "Professionnels santé", "médecin|medecin|infirmier|santé|sante|pharmac|soignant"],
+    ["investisseurs", "Investisseurs", "investisseur|invest|business angel"],
+    ["enseignants", "Enseignants / Formation", "enseignant|professeur|formateur|éducation|education"],
+    ["numerique", "Numérique / Tech", "développeur|developpeur|informatique|numérique|numerique|data|logiciel"],
+  ];
+
+  route("GET", "/api/oz-collectivite/accueil", async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville FROM users WHERE id=?").get(user.id);
+    const p = getPerimetre(coll);
+    const { where: dw, params: dp } = ozDiasporaWhere(p);
+    const one = async (sql, ...ps) => { try { return (await db.prepare(sql).get(...ps))?.n || 0; } catch(e) { return 0; } };
+    const mask = n => n >= SEUIL_CONFIDENTIALITE ? n : null;
+
+    const diasporaConnectee = await one(`SELECT COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND ${dw}`, ...dp);
+    const paysRepresentes = await one(`SELECT COUNT(DISTINCT u.pays) AS n FROM users u WHERE u.role='utilisateur' AND u.pays IS NOT NULL AND ${dw}`, ...dp);
+    const villes = await one(`SELECT COUNT(DISTINCT u.ville) AS n FROM users u WHERE u.role='utilisateur' AND u.ville IS NOT NULL AND ${dw}`, ...dp);
+
+    const competences = [];
+    for (const [key, label, kw] of OZ_CATS) {
+      const like = kw.split("|").map(() => `(LOWER(u.situation_pro) LIKE ? OR LOWER(u.domaine_utilisateur) LIKE ? OR LOWER(u.competences) LIKE ?)`).join(" OR ");
+      const params = kw.split("|").flatMap(w => [`%${w}%`, `%${w}%`, `%${w}%`]);
+      const n = await one(`SELECT COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND ${dw} AND (${like})`, ...dp, ...params);
+      if (n > 0) competences.push({ key, label, n: mask(n), brut: n });
+    }
+    competences.sort((a, b) => b.brut - a.brut);
+
+    const oppActives = await one(`SELECT COUNT(*) AS n FROM opportunites WHERE collectivite_id=? AND etat NOT IN ('realisee','abandonnee')`, user.id);
+    const projetsAccompagnes = await one(`SELECT COUNT(*) AS n FROM proj_eval_destinataires WHERE destinataire_id=?`, user.id);
+
+    sendJSON(res, 200, {
+      libelle: libellePerimetre(p), seuil_confidentialite: SEUIL_CONFIDENTIALITE,
+      diaspora: { connectee: diasporaConnectee, pays: paysRepresentes, villes },
+      competences: competences.map(c => ({ label: c.label, key: c.key, n: c.n })).filter(c => c.n != null),
+      opportunites: { actives: oppActives, projets_accompagnes: projetsAccompagnes },
+    });
+  });
+
+  route("GET", "/api/oz-collectivite/ask", async (req, res, params, body, query) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const q = (query.q || "").toLowerCase().trim();
+    if (!q) return sendJSON(res, 400, { error: "Question requise." });
+    const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville FROM users WHERE id=?").get(user.id);
+    const p = getPerimetre(coll);
+    const lib = libellePerimetre(p);
+    const { where: dw, params: dp } = ozDiasporaWhere(p);
+    const all = async (sql, ...ps) => { try { return (await db.prepare(sql).all(...ps)) || []; } catch(e) { return []; } };
+    const one = async (sql, ...ps) => { try { return (await db.prepare(sql).get(...ps))?.n || 0; } catch(e) { return 0; } };
+    const mask = rows => rows.filter(r => r.n >= SEUIL_CONFIDENTIALITE);
+    const fmt = rows => rows.length ? rows.map(r => `${r.label} (${r.n})`).join(", ") : "données insuffisantes (seuil de confidentialité)";
+
+    let reponse, suggestions = [];
+    if (/comp[ée]tence|secteur|savoir-faire|m[ée]tier/.test(q) && !/sous/.test(q)) {
+      const rows = mask(await all(`SELECT u.situation_pro AS label, COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND u.situation_pro IS NOT NULL AND ${dw} GROUP BY u.situation_pro ORDER BY n DESC LIMIT 5`, ...dp));
+      const top = rows[0]?.label;
+      reponse = `Votre diaspora (${lib}) possède principalement des compétences dans : ${fmt(rows)}.`;
+      if (top) suggestions = [
+        { label: `Créer un groupe de travail « ${top} »`, action_type: "opportunite", prefill: { titre: `Groupe de travail ${top}`, secteur: top, description: `Mobiliser les compétences de la diaspora en ${top}.`, priorite: "haute" } },
+        { label: "Lancer une consultation", action_type: "consultation", prefill: { titre: `Consultation diaspora — ${top}` } },
+      ];
+    } else if (/invest|financ|potentiel|capital/.test(q)) {
+      const inv = await one(`SELECT COUNT(*) AS n FROM users u WHERE u.role='utilisateur' AND ${dw} AND (LOWER(u.situation_pro) LIKE '%invest%' OR LOWER(u.centres_interet) LIKE '%invest%' OR LOWER(u.besoins_json) LIKE '%investiss%')`, ...dp);
+      reponse = inv >= SEUIL_CONFIDENTIALITE
+        ? `${inv} membre(s) de votre diaspora présentent un profil ou un intérêt d'investissement.`
+        : `Le nombre de profils investisseurs identifiés est inférieur au seuil de confidentialité (10). Encouragez les déclarations d'intérêt via une consultation.`;
+      suggestions = [
+        { label: "Créer une opportunité d'investissement", action_type: "opportunite", prefill: { titre: "Mobilisation des investisseurs de la diaspora", secteur: "Investissement", priorite: "haute" } },
+        { label: "Organiser une rencontre investisseurs", action_type: "opportunite", prefill: { titre: "Rencontre investisseurs diaspora", description: "Webinaire de présentation des projets du territoire.", priorite: "moyenne" } },
+      ];
+    } else if (/besoin|priorit|attente|pr[ée]occupation/.test(q)) {
+      const cons = await one(`SELECT COUNT(*) AS n FROM consultations WHERE emetteur_id=?`, user.id);
+      reponse = cons > 0
+        ? `Vous avez lancé ${cons} consultation(s). Analysez leurs réponses pour dégager les besoins prioritaires de votre diaspora.`
+        : `Aucune consultation active. Pour connaître les besoins prioritaires, lancez une consultation citoyenne auprès de votre diaspora.`;
+      suggestions = [{ label: "Lancer une consultation « besoins prioritaires »", action_type: "consultation", prefill: { titre: "Quels sont vos besoins prioritaires ?" } }];
+    } else if (/projet|accompagn|suivi|avancement/.test(q)) {
+      const nb = await one(`SELECT COUNT(*) AS n FROM proj_eval_destinataires WHERE destinataire_id=?`, user.id);
+      reponse = nb > 0 ? `${nb} projet(s) vous ont été soumis pour accompagnement. Consultez le module Évaluation de projet pour leur suivi.`
+                       : `Aucun projet ne vous a encore été soumis. Publiez un appel à projets pour en susciter.`;
+      suggestions = [{ label: "Publier un appel à projets", action_type: "opportunite", prefill: { titre: "Appel à projets territorial", priorite: "haute" } }];
+    } else if (/communiqu|annonce|invit|r[ée]dige|message|publier/.test(q)) {
+      reponse = `Voici une proposition d'annonce : « Nous invitons les membres originaires de ${lib} à participer à une rencontre dédiée aux opportunités de développement local. Votre expertise et votre engagement sont précieux pour l'avenir de notre territoire. » Vous pouvez la publier comme campagne, limitée à votre juridiction.`;
+      suggestions = [{ label: "Publier cette campagne", action_type: "opportunite", prefill: { titre: `Rencontre diaspora — ${lib}`, description: `Nous invitons les membres originaires de ${lib} à participer à une rencontre dédiée aux opportunités de développement local.`, priorite: "moyenne" } }];
+    } else {
+      reponse = `Je suis OZ, votre assistant territorial. Posez-moi des questions sur : les compétences de votre diaspora, le potentiel d'investissement, les besoins prioritaires, le suivi des projets, ou demandez-moi de préparer une annonce.`;
+    }
+    sendJSON(res, 200, { reponse, suggestions, libelle: lib });
+  });
+
+  /* ===========================================================================
+     OPPORTUNITÉS STRATÉGIQUES — pont entre l'Observatoire Mondial et l'action.
+     Une observation anonymisée est enregistrée comme fiche, puis transformée en
+     action publiée (à laquelle les membres répondent volontairement). Jamais de
+     contact individuel : l'observation éclaire la décision, l'action mobilise.
+  =========================================================================== */
+  const OPP_PRIORITES = ['basse','moyenne','haute','critique'];
+  const OPP_ETATS = ['detectee','en_analyse','planifiee','en_action','realisee','abandonnee'];
+
+  route("GET", "/api/opportunites", async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const rows = await db.prepare("SELECT * FROM opportunites WHERE collectivite_id=? ORDER BY CASE priorite WHEN 'critique' THEN 0 WHEN 'haute' THEN 1 WHEN 'moyenne' THEN 2 ELSE 3 END, updated_at DESC").all(user.id);
+    sendJSON(res, 200, { opportunites: rows });
+  });
+
+  route("GET", "/api/opportunites/:id", async (req, res, params) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const opp = await db.prepare("SELECT * FROM opportunites WHERE id=? AND collectivite_id=?").get(params.id, user.id);
+    if (!opp) return sendJSON(res, 404, { error: "Opportunité introuvable." });
+    opp.historique = await db.prepare("SELECT * FROM opportunite_historique WHERE opportunite_id=? ORDER BY id DESC").all(opp.id);
+    try { opp.pieces = JSON.parse(opp.pieces_json || "[]"); } catch(e) { opp.pieces = []; }
+    try { opp.source = JSON.parse(opp.source_json || "{}"); } catch(e) { opp.source = {}; }
+    sendJSON(res, 200, { opportunite: opp });
+  });
+
+  route("POST", "/api/opportunites", async (req, res, params, body) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const { titre, description, pays, ville, origine, secteur, priorite, responsable, echeance, notes, pieces_json, source } = body;
+    if (!titre || !titre.trim()) return sendJSON(res, 400, { error: "Titre requis." });
+    const prio = OPP_PRIORITES.includes(priorite) ? priorite : "moyenne";
+    const id = db.prepare(`INSERT INTO opportunites
+      (collectivite_id,titre,description,pays,ville,origine,secteur,priorite,responsable,echeance,notes,pieces_json,source_json)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      user.id, titre.trim(), description||null, pays||null, ville||null, origine||null, secteur||null,
+      prio, responsable||null, echeance||null, notes||null,
+      JSON.stringify(Array.isArray(pieces_json)?pieces_json:[]), JSON.stringify(source||{})
+    ).lastInsertRowid;
+    db.prepare("INSERT INTO opportunite_historique (opportunite_id,action,detail) VALUES (?,?,?)")
+      .run(id, "creation", source?.libelle ? "Détectée depuis l'Observatoire Mondial : " + source.libelle : "Fiche créée manuellement.");
+    sendJSON(res, 201, { id });
+  });
+
+  route("PUT", "/api/opportunites/:id", async (req, res, params, body) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const opp = await db.prepare("SELECT * FROM opportunites WHERE id=? AND collectivite_id=?").get(params.id, user.id);
+    if (!opp) return sendJSON(res, 404, { error: "Opportunité introuvable." });
+    const f = k => body[k] !== undefined ? body[k] : opp[k];
+    const prio = OPP_PRIORITES.includes(body.priorite) ? body.priorite : opp.priorite;
+    const etat = OPP_ETATS.includes(body.etat) ? body.etat : opp.etat;
+    db.prepare(`UPDATE opportunites SET titre=?,description=?,pays=?,ville=?,origine=?,secteur=?,priorite=?,responsable=?,echeance=?,etat=?,notes=?,pieces_json=?,updated_at=datetime('now') WHERE id=?`).run(
+      f("titre"), f("description"), f("pays"), f("ville"), f("origine"), f("secteur"), prio, f("responsable"), f("echeance"), etat, f("notes"),
+      JSON.stringify(Array.isArray(body.pieces_json)?body.pieces_json:(()=>{try{return JSON.parse(opp.pieces_json||"[]")}catch(e){return[]}})()),
+      opp.id
+    );
+    if (body.etat && body.etat !== opp.etat) db.prepare("INSERT INTO opportunite_historique (opportunite_id,action,detail) VALUES (?,?,?)").run(opp.id, "changement_etat", "Nouvel état : " + etat);
+    sendJSON(res, 200, { ok: true });
+  });
+
+  route("DELETE", "/api/opportunites/:id", async (req, res, params) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const opp = await db.prepare("SELECT id FROM opportunites WHERE id=? AND collectivite_id=?").get(params.id, user.id);
+    if (!opp) return sendJSON(res, 404, { error: "Opportunité introuvable." });
+    db.prepare("DELETE FROM opportunite_historique WHERE opportunite_id=?").run(opp.id);
+    db.prepare("DELETE FROM opportunites WHERE id=?").run(opp.id);
+    sendJSON(res, 200, { ok: true });
+  });
+
+  /* Transformer une opportunité en action publiée (bornée à la juridiction). */
+  route("POST", "/api/opportunites/:id/action", async (req, res, params, body) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const opp = await db.prepare("SELECT * FROM opportunites WHERE id=? AND collectivite_id=?").get(params.id, user.id);
+    if (!opp) return sendJSON(res, 404, { error: "Opportunité introuvable." });
+    const type = body.type;
+    const titre = (body.titre || opp.titre || "").trim();
+    const contenu = (body.contenu || opp.description || "").trim() || titre;
+    const LABELS = {
+      campagne: "Campagne d'information", appel_projets: "Appel à projets", consultation: "Consultation citoyenne",
+      evenement: "Événement", mission_eco: "Mission économique", levee_fonds: "Levée de fonds",
+      cooperation: "Mission de coopération", mentorat: "Programme de mentorat", investisseurs: "Rencontre investisseurs",
+    };
+    if (!LABELS[type]) return sendJSON(res, 400, { error: "Type d'action inconnu." });
+
+    let action_ref_id = null, lien = null, message;
+    // Actions disposant d'un backend : création réelle, bornée à la juridiction pour la diffusion.
+    if (type === "campagne" || type === "appel_projets") {
+      const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville FROM users WHERE id=?").get(user.id);
+      const p = getPerimetre(coll);
+      const { where: pw, params: pp } = perimetreWhere(p, "u");
+      let nb = 0; try { nb = (await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw})`).get(...pp))?.n || 0; } catch(e) {}
+      action_ref_id = db.prepare("INSERT INTO communications_institutionnelles (emetteur_id,titre,contenu,type,cible_json,nb_destinataires) VALUES (?,?,?,?,?,?)")
+        .run(user.id, titre, contenu, type === "appel_projets" ? "appel_projets" : "info", JSON.stringify({ perimetre: p, libelle: libellePerimetre(p) }), nb).lastInsertRowid;
+      try { db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)").run(user.id, user.nom, "institutionnel", type, `**${titre}**\n\n${contenu}`); } catch(e) {}
+      lien = "dashboard-collectivite.html#communications";
+      message = `${LABELS[type]} publiée à ${nb} membre(s) de votre juridiction.`;
+    } else if (type === "consultation") {
+      action_ref_id = db.prepare("INSERT INTO consultations (emetteur_id,titre,description,type,statut) VALUES (?,?,?,?,?)")
+        .run(user.id, titre, contenu, "consultation_citoyenne", "ouverte").lastInsertRowid;
+      lien = "dashboard-collectivite.html#consultations";
+      message = "Consultation citoyenne créée. Complétez ses questions dans le module Consultations.";
+    } else {
+      // Actions sans module dédié : on trace l'intention ; à finaliser hors plateforme ou module à venir.
+      message = `${LABELS[type]} planifiée. Cette action est enregistrée dans l'historique de l'opportunité.`;
+    }
+
+    db.prepare("INSERT INTO opportunite_historique (opportunite_id,action,detail,action_type,action_ref_id) VALUES (?,?,?,?,?)")
+      .run(opp.id, "action", `${LABELS[type]} — ${titre}`, type, action_ref_id);
+    db.prepare("UPDATE opportunites SET etat='en_action', updated_at=datetime('now') WHERE id=?").run(opp.id);
+    sendJSON(res, 201, { ok: true, action_type: type, action_ref_id, lien, message });
+  });
+
   route("GET", "/api/observatoire/export-csv", async (req, res) => {
     const user = await getCurrentUser(req);
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
-    const { where, params: p } = buildObsWhere(accred);
+    const { where, params: p } = await obsScope(user, req);
     const geo = await db.prepare(`SELECT u.pays, u.ville, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.pays IS NOT NULL ${where} GROUP BY u.pays, u.ville ORDER BY n DESC`).all(...p);
     const comp = await db.prepare(`SELECT u.situation_pro, COUNT(*) AS n FROM users u WHERE role='utilisateur' AND u.situation_pro IS NOT NULL ${where} GROUP BY u.situation_pro ORDER BY n DESC`).all(...p);
     // Build CSV
@@ -6136,7 +8462,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const accred = getAccred(user.id);
     if (!accred) return sendJSON(res, 403, { error: "Accréditation requise." });
-    const { where, params: p } = buildObsWhere(accred);
+    const { where, params: p } = await obsScope(user, req);
     const periode = query.periode || "mensuel";
     const dateRef = periodo => {
       if (periodo === "mensuel") return "datetime('now','-1 month')";
@@ -6168,6 +8494,75 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   /* ===========================
      COMMUNICATIONS INSTITUTIONNELLES
   =========================== */
+  /* Périmètre de compétence de la collectivité connectée (pour l'UI de diffusion). */
+  route("GET", "/api/collectivite/perimetre", async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville FROM users WHERE id=?").get(user.id);
+    const p = getPerimetre(coll);
+    const { where, params: pp } = perimetreWhere(p, "u");
+    let nb = 0;
+    try { nb = (await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${where})`).get(...pp))?.n || 0; } catch(e) {}
+    sendJSON(res, 200, { perimetre: p, libelle: libellePerimetre(p), nb_membres: nb });
+  });
+
+  /* Identité territoriale de la collectivité connectée (Registre unique). */
+  route("GET", "/api/collectivite/identite", async (req, res) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const coll = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
+    // Génère et persiste l'identifiant s'il n'existe pas encore.
+    let identifiant = coll.identifiant_territorial;
+    if (!identifiant) {
+      identifiant = genererIdentifiantTerritorial(coll);
+      db.prepare("UPDATE users SET identifiant_territorial=? WHERE id=?").run(identifiant, user.id);
+      journalColl(user.id, "identifiant_genere", "Identifiant territorial attribué : " + identifiant);
+    }
+    // Administrateurs officiels : responsable principal + comptes rattachés (parent_institution_id).
+    const rattaches = await db.prepare("SELECT id, nom, type_organisme, statut_etatique FROM users WHERE parent_institution_id=?").all(user.id);
+    // Journal : événements enregistrés + jalons dérivés (création, validation).
+    let journal = await db.prepare("SELECT action, detail, created_at FROM collectivite_journal WHERE collectivite_id=? ORDER BY id DESC").all(user.id);
+    if (!journal.length) {
+      journal = [{ action: "creation", detail: "Création du profil", created_at: coll.created_at }];
+      if (coll.statut_etatique === "verifie" || coll.is_verified) journal.unshift({ action: "validation", detail: "Validation officielle", created_at: coll.created_at });
+    }
+    sendJSON(res, 200, {
+      identifiant,
+      nom: coll.nom,
+      type_organisme: coll.type_organisme || coll.type_institution,
+      localisation: [coll.ville_exercice || coll.ville, coll.pays_exercice || coll.pays].filter(Boolean).join(", "),
+      verifiee: coll.statut_etatique === "verifie" || !!coll.is_verified,
+      statut: coll.statut_etatique || (coll.is_verified ? "verifie" : "en_attente"),
+      responsable: [coll.prenom_responsable_etatique, coll.nom_responsable_etatique].filter(Boolean).join(" ") || null,
+      fonction_responsable: coll.fonction_responsable_etatique || null,
+      site_officiel: coll.site_officiel || null,
+      administrateurs: rattaches,
+      journal,
+    });
+  });
+
+  /* Détection de doublons avant création (recherche de collectivités similaires). */
+  route("GET", "/api/collectivites/verifier-doublon", async (req, res, params, body, query) => {
+    const user = await getCurrentUser(req);
+    if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+    const nom = (query.nom || "").trim();
+    const pays = (query.pays || "").trim();
+    const ville = (query.ville || "").trim();
+    if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
+    // On restreint la comparaison aux collectivités (même pays si fourni).
+    let rows;
+    if (pays) rows = await db.prepare("SELECT id, nom, type_organisme, type_institution, pays, ville, statut_etatique, is_verified, identifiant_territorial FROM users WHERE role='collectivite' AND LOWER(pays)=LOWER(?)").all(pays);
+    else rows = await db.prepare("SELECT id, nom, type_organisme, type_institution, pays, ville, statut_etatique, is_verified, identifiant_territorial FROM users WHERE role='collectivite'").all();
+    const matches = rows.map(r => {
+      let sim = similariteChaine(nom, r.nom);
+      if (ville && r.ville && sansAccents(ville.toLowerCase()) === sansAccents(r.ville.toLowerCase())) sim = Math.min(1, sim + 0.1);
+      return { ...r, similarite: Math.round(sim * 100) };
+    }).filter(r => r.id !== user.id && r.similarite >= 55)
+      .sort((a, b) => b.similarite - a.similarite)
+      .slice(0, 8);
+    sendJSON(res, 200, { doublon_probable: matches.length > 0, matches });
+  });
+
   route("POST", "/api/communications", async (req, res, params, body) => {
     const user = await getCurrentUser(req);
     if (!user || !["collectivite","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux collectivités et administrateurs." });
@@ -6180,17 +8575,23 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     }
     if (video_b64 && !video_b64.startsWith("data:video/")) return sendJSON(res, 400, { error: "Format vidéo invalide." });
     if (audio_b64 && !audio_b64.startsWith("data:audio/")) return sendJSON(res, 400, { error: "Format audio invalide." });
-    // Compter les destinataires potentiels
+    // Principe 4 : la diffusion est AUTOMATIQUEMENT limitée au périmètre de compétence.
+    // Pas de ciblage individuel par nationalité/ville hors juridiction : le contenu
+    // touche l'ensemble des membres du territoire. La cible envoyée par le client est
+    // ignorée au profit du périmètre réel (on la remplace par le périmètre appliqué).
     let nb = 0;
-    try {
-      const c = cible || {};
-      let conds = [`role IN ('utilisateur','initiative')`];
-      const p = [];
-      if (c.pays?.length) { const ph = c.pays.map(()=>"?").join(","); conds.push(`pays IN (${ph})`); p.push(...c.pays); }
-      if (c.villes?.length) { const ph = c.villes.map(()=>"?").join(","); conds.push(`ville IN (${ph})`); p.push(...c.villes); }
-      if (c.nationalites?.length) { const ph = c.nationalites.map(()=>"?").join(","); conds.push(`(nationalite1 IN (${ph}) OR nationalite2 IN (${ph}))`); p.push(...c.nationalites,...c.nationalites); }
-      nb = (await db.prepare(`SELECT COUNT(*) AS n FROM users WHERE ${conds.join(" AND ")}`).get(...p))?.n;
-    } catch(e) { nb = 0; }
+    let perimetre = null;
+    if (user.role === "collectivite") {
+      const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville FROM users WHERE id=?").get(user.id);
+      perimetre = getPerimetre(coll);
+      const { where: pw, params: pp } = perimetreWhere(perimetre, "u");
+      try { nb = (await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw})`).get(...pp))?.n || 0; } catch(e) { nb = 0; }
+    } else {
+      // Administrateur : diffusion globale
+      try { nb = (await db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur','initiative')`).get())?.n || 0; } catch(e) { nb = 0; }
+    }
+    // La cible stockée reflète le périmètre réellement appliqué (transparence).
+    const cibleAppliquee = perimetre ? { perimetre, libelle: libellePerimetre(perimetre) } : { portee: "globale" };
     // Alter table si colonnes manquantes (migration SQLite)
     try {
       await db.prepare("ALTER TABLE communications_institutionnelles ADD COLUMN photos_json TEXT DEFAULT '[]'").run();
@@ -6199,7 +8600,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     } catch(e) {} // colonnes déjà présentes
     const id = db.prepare(
       "INSERT INTO communications_institutionnelles (emetteur_id,titre,contenu,type,cible_json,nb_destinataires,photos_json,video_b64,audio_b64) VALUES (?,?,?,?,?,?,?,?,?)"
-    ).run(user.id, titre, contenu, type||"info", JSON.stringify(cible||{}), nb,
+    ).run(user.id, titre, contenu, type||"info", JSON.stringify(cibleAppliquee), nb,
           JSON.stringify(photos), video_b64||null, audio_b64||null).lastInsertRowid;
     // Publication sur le fil (sans médias lourds)
     try {
@@ -6224,9 +8625,27 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     // Toutes communications qui ne sont pas bloquées par l'utilisateur
     const desabo = (await db.prepare("SELECT institution_id FROM comm_desabonnements WHERE user_id=?").all(user.id)).map(r=>r.institution_id);
-    let rows = await db.prepare("SELECT ci.*, u.nom AS emetteur_nom FROM communications_institutionnelles ci JOIN users u ON u.id=ci.emetteur_id ORDER BY ci.created_at DESC LIMIT 30").all();
+    let rows = await db.prepare(`
+      SELECT ci.*, u.nom AS emetteur_nom, u.role AS emetteur_role,
+             u.type_organisme, u.type_institution, u.pays_exercice, u.region_exercice,
+             u.departement_exercice, u.ville_exercice, u.pays AS e_pays, u.region AS e_region,
+             u.departement AS e_departement, u.ville AS e_ville
+      FROM communications_institutionnelles ci JOIN users u ON u.id=ci.emetteur_id
+      ORDER BY ci.created_at DESC LIMIT 100`).all();
+    // Principe 4 : diffusion limitée à la juridiction de l'émetteur.
+    // Les collectivités ne touchent que les membres de leur périmètre ; l'admin diffuse à tous.
+    rows = rows.filter(r => {
+      if (r.emetteur_role === "administrateur") return true;
+      const coll = {
+        type_organisme: r.type_organisme, type_institution: r.type_institution,
+        pays_exercice: r.pays_exercice, region_exercice: r.region_exercice,
+        departement_exercice: r.departement_exercice, ville_exercice: r.ville_exercice,
+        pays: r.e_pays, region: r.e_region, departement: r.e_departement, ville: r.e_ville,
+      };
+      return membreDansPerimetre(coll, user);
+    });
     if (desabo.length) rows = rows.filter(r => !desabo.includes(null) && !desabo.includes(r.emetteur_id));
-    sendJSON(res, 200, { communications: rows });
+    sendJSON(res, 200, { communications: rows.slice(0, 30) });
   });
 
   route("POST", "/api/communications/:id/desabonner", async (req, res, params) => {
@@ -6264,7 +8683,25 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (["collectivite","administrateur"].includes(user.role)) {
       rows = await db.prepare("SELECT c.*,(SELECT COUNT(*) FROM consultation_reponses WHERE consultation_id=c.id) AS nb_reponses FROM consultations c WHERE emetteur_id=? ORDER BY created_at DESC").all(user.id);
     } else {
-      rows = await db.prepare("SELECT c.*,u.nom AS emetteur_nom,(SELECT COUNT(*) FROM consultation_reponses WHERE consultation_id=c.id) AS nb_reponses FROM consultations c JOIN users u ON u.id=c.emetteur_id WHERE c.statut='ouverte' ORDER BY c.created_at DESC LIMIT 20").all();
+      rows = await db.prepare(`
+        SELECT c.*, u.nom AS emetteur_nom, u.role AS emetteur_role,
+               u.type_organisme, u.type_institution, u.pays_exercice, u.region_exercice,
+               u.departement_exercice, u.ville_exercice, u.pays AS e_pays, u.region AS e_region,
+               u.departement AS e_departement, u.ville AS e_ville,
+               (SELECT COUNT(*) FROM consultation_reponses WHERE consultation_id=c.id) AS nb_reponses
+        FROM consultations c JOIN users u ON u.id=c.emetteur_id
+        WHERE c.statut='ouverte' ORDER BY c.created_at DESC LIMIT 60`).all();
+      // Principe 4 : un membre ne voit que les consultations émanant de collectivités dont il relève.
+      rows = rows.filter(r => {
+        if (r.emetteur_role === "administrateur") return true;
+        const coll = {
+          type_organisme: r.type_organisme, type_institution: r.type_institution,
+          pays_exercice: r.pays_exercice, region_exercice: r.region_exercice,
+          departement_exercice: r.departement_exercice, ville_exercice: r.ville_exercice,
+          pays: r.e_pays, region: r.e_region, departement: r.e_departement, ville: r.e_ville,
+        };
+        return membreDansPerimetre(coll, user);
+      }).slice(0, 20);
     }
     sendJSON(res, 200, { consultations: rows });
   });
@@ -8704,6 +11141,132 @@ async function handleRequest(req, res) {
     } catch (e) {
       console.error('[backup]', e.stack || e.message);
       sendJSON(res, 500, { error: 'Backup failed', detail: e.message });
+    }
+    return;
+  }
+
+  /* ── Relances automatiques Cotisations & Adhésions (Vercel Cron, quotidien) ──
+     Vercel n'a pas de process persistant : pas de setInterval possible, la seule
+     option est un cron HTTP appelé par la plateforme (même pattern que /api/cron/backup). */
+  if (pathname === '/api/cron/adhesion-relances') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const { sendEmail } = require('./mailer');
+      const membres = await db.prepare(`
+        SELECT m.*, f.nom AS formule_nom, i.nom AS init_nom, u.email AS user_email
+        FROM adhesion_membres m
+        JOIN adhesion_formules f ON f.id = m.formule_id
+        JOIN initiatives i ON i.id = m.initiative_id
+        LEFT JOIN users u ON u.id = m.linked_user_id
+        WHERE m.date_expiration IS NOT NULL AND m.statut != 'suspendu'
+      `).all();
+
+      let envoyees = 0;
+      for (const m of membres) {
+        const expiration = new Date(m.date_expiration);
+        const joursRestants = Math.round((expiration - new Date()) / 86400000);
+        let niveau = null;
+        if (joursRestants === 30) niveau = 'avant_30j';
+        else if (joursRestants === 7) niveau = 'avant_7j';
+        else if (joursRestants === 0) niveau = 'jour_j';
+        else if (joursRestants < 0 && joursRestants >= -1) niveau = 'apres_expiration'; // fenêtre d'exécution quotidienne
+        if (!niveau) continue;
+
+        /* Une seule relance par niveau pour ce cycle d'expiration (le cycle change à chaque renouvellement,
+           donc on ne compare qu'aux relances postérieures à la dernière mise à jour du membre) */
+        const deja = await db.prepare(`
+          SELECT 1 FROM adhesion_relances WHERE membre_id=? AND niveau=? AND created_at >= ? LIMIT 1
+        `).get(m.id, niveau, m.updated_at);
+        if (deja) continue;
+
+        const messages = {
+          avant_30j: `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) arrive à expiration dans 30 jours.`,
+          avant_7j: `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) arrive à expiration dans 7 jours.`,
+          jour_j: `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) expire aujourd'hui.`,
+          apres_expiration: `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) est expirée. Renouvelez-la dès maintenant.`,
+        };
+        const message = messages[niveau];
+        const lienRenouvellement = `${process.env.PUBLIC_ORIGIN || 'https://diaspo-actif-plateforme.vercel.app'}/adhesions.html?initiative=${m.initiative_id}&formule=${m.formule_id}`;
+
+        await db.prepare(`INSERT INTO adhesion_relances (membre_id, niveau, canal, message) VALUES (?,?,?,?)`)
+          .run(m.id, niveau, 'app', message);
+
+        if (m.linked_user_id) {
+          creerNotif(m.linked_user_id, "adhesion_relance", "Rappel d'adhésion", message, { membre_id: m.id, lien: lienRenouvellement });
+        }
+        if (m.user_email || m.email) {
+          try {
+            await sendEmail({
+              to: m.user_email || m.email,
+              subject: `Rappel — ${message}`,
+              html: `<p>Bonjour ${m.prenom || ''},</p><p>${message}</p><p><a href="${lienRenouvellement}">Renouveler maintenant en un clic</a></p>`,
+            });
+            await db.prepare(`INSERT INTO adhesion_relances (membre_id, niveau, canal, message) VALUES (?,?,?,?)`)
+              .run(m.id, niveau, 'email', message);
+          } catch (e) { /* email indisponible (RESEND_API_KEY absent en local) — la relance app reste enregistrée */ }
+        }
+        envoyees++;
+      }
+      sendJSON(res, 200, { ok: true, relances_envoyees: envoyees });
+    } catch (e) {
+      console.error('[adhesion-relances]', e.stack || e.message);
+      sendJSON(res, 500, { error: 'Relances failed', detail: e.message });
+    }
+    return;
+  }
+
+  /* ── Relances automatiques Votes sécurisés (Vercel Cron, quotidien) ──
+     Rappels à J-ouverture, 50% du délai écoulé, J-24h avant clôture. */
+  if (pathname === '/api/cron/vote-relances') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const { sendEmail } = require('./mailer');
+      const scrutins = await db.prepare(`
+        SELECT vs.*, i.nom AS init_nom FROM vote_scrutins vs JOIN initiatives i ON i.id=vs.initiative_id
+        WHERE vs.statut='ouvert' AND vs.date_ouverture IS NOT NULL AND vs.date_fermeture IS NOT NULL
+      `).all();
+      let envoyees = 0;
+      for (const s of scrutins) {
+        const debut = new Date(s.date_ouverture), fin = new Date(s.date_fermeture), now = new Date();
+        const dureeTotale = fin - debut;
+        const ecoule = now - debut;
+        let niveau = null;
+        if (Math.abs(now - debut) < 43200000) niveau = 'ouverture'; // fenêtre de 12h autour de l'ouverture
+        else if (dureeTotale > 0 && Math.abs(ecoule / dureeTotale - 0.5) < 0.02) niveau = 'mi_parcours';
+        else if (fin - now > 0 && fin - now <= 86400000) niveau = 'derniere_relance';
+        if (!niveau) continue;
+
+        const electeursNonVotants = await db.prepare(`
+          SELECT ve.*, u.email, u.nom FROM vote_electeurs ve JOIN users u ON u.id=ve.user_id
+          WHERE ve.scrutin_id=? AND ve.a_vote=0
+        `).all(s.id);
+        const messages = {
+          ouverture: `Le vote « ${s.nom} » (${s.init_nom}) est ouvert.`,
+          mi_parcours: `Vous n'avez pas encore participé au vote « ${s.nom} » (${s.init_nom}).`,
+          derniere_relance: `Dernière possibilité de participer au scrutin « ${s.nom} » (${s.init_nom}) — clôture dans moins de 24h.`,
+        };
+        const message = messages[niveau];
+        for (const e of electeursNonVotants) {
+          creerNotif(e.user_id, "vote_relance", "Rappel de vote", message, { scrutin_id: s.id });
+          if (e.email) {
+            try { await sendEmail({ to: e.email, subject: `Rappel — ${s.nom}`, html: `<p>Bonjour ${e.nom || ''},</p><p>${message}</p>` }); }
+            catch (err) { /* email indisponible en local */ }
+          }
+          envoyees++;
+        }
+      }
+      sendJSON(res, 200, { ok: true, relances_envoyees: envoyees });
+    } catch (e) {
+      console.error('[vote-relances]', e.stack || e.message);
+      sendJSON(res, 500, { error: 'Relances failed', detail: e.message });
     }
     return;
   }
@@ -13192,23 +15755,29 @@ ${jsonLd}
     /* GET /api/reunions — liste des réunions */
     if (req.method === "GET" && pathname === "/api/reunions") {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const { statut, search, role } = qs;
-      let where = `WHERE (r.organisateur_id=? OR ri.user_id=?)`;
-      const params = [me.id, me.id];
+      const query = new URL("http://x" + req.url).searchParams;
+      const statut = query.get('statut');
+      const search = query.get('search');
+      // Note : ri sert uniquement à filtrer "suis-je invité", ri2 (jointure identique) fournit mon statut/rôle — fusionnés en une seule jointure pour éviter tout risque de requête lente.
+      let where = `WHERE (r.organisateur_id=? OR ri2.user_id IS NOT NULL)`;
+      const params = [me.id];
       if (statut) { where += ` AND r.statut=?`; params.push(statut); }
       if (search) { where += ` AND (r.titre LIKE ? OR r.description LIKE ?)`; params.push(`%${search}%`, `%${search}%`); }
-      const rows = await db.prepare(`
-        SELECT DISTINCT r.*, u.prenom AS org_prenom, u.nom AS org_nom, u.photo_url AS org_photo,
-          ri2.statut AS mon_statut, ri2.role AS mon_role,
-          (SELECT COUNT(*) FROM reunion_invites WHERE reunion_id=r.id AND statut='accepte') AS nb_participants
-        FROM reunions r
-        LEFT JOIN reunion_invites ri ON ri.reunion_id=r.id AND ri.user_id=?
-        LEFT JOIN reunion_invites ri2 ON ri2.reunion_id=r.id AND ri2.user_id=?
-        JOIN users u ON u.id=r.organisateur_id
-        ${where}
-        ORDER BY r.date_debut DESC LIMIT 100
-      `).all(me.id, me.id, ...params);
-      return sendJSON(res, 200, { reunions: rows });
+      try {
+        const rows = await db.prepare(`
+          SELECT r.*, u.prenom AS org_prenom, u.nom AS org_nom, u.photo_url AS org_photo,
+            ri2.statut AS mon_statut, ri2.role AS mon_role,
+            (SELECT COUNT(*) FROM reunion_invites WHERE reunion_id=r.id AND statut='accepte') AS nb_participants
+          FROM reunions r
+          LEFT JOIN reunion_invites ri2 ON ri2.reunion_id=r.id AND ri2.user_id=?
+          JOIN users u ON u.id=r.organisateur_id
+          ${where}
+          ORDER BY r.date_debut DESC LIMIT 100
+        `).all(me.id, ...params);
+        return sendJSON(res, 200, { reunions: rows });
+      } catch (e) {
+        return sendJSON(res, 500, SEC.safeError(e, "reunions-list"));
+      }
     }
 
     /* GET /api/reunions/decisions — toutes mes décisions */
@@ -19759,7 +22328,7 @@ app.post('/api/audiovisuel/episodes', requireAuth, async (req, res) => {
   const body = await parseBody(req);
   const { titre, description='', url_audio, serie_id=null, duree_secondes=0, intervenants=[], categorie='general', image_url='', is_public=1, published_at=null, tags=[], mots_cles=[] } = body;
   if (!titre || !url_audio) return sendJSON(res, 400, { error: 'Titre et URL audio requis' });
-  const resume = genResumeIA(titre, description, categorie);
+  const resume = await genResumeIA(titre, description, categorie);
   const chapitres = duree_secondes > 600 ? [{ time:'0:00', titre:'Introduction' }, { time:`${Math.floor(duree_secondes/3/60)}:${String(Math.floor((duree_secondes/3)%60)).padStart(2,'0')}`, titre:'Développement' }, { time:`${Math.floor(duree_secondes*2/3/60)}:${String(Math.floor((duree_secondes*2/3)%60)).padStart(2,'0')}`, titre:'Conclusion' }] : [];
   const r = db.prepare('INSERT INTO av_episodes (initiative_id, serie_id, titre, description, url_audio, duree_secondes, intervenants, categorie, image_url, is_public, published_at, resume_ia, chapitres, mots_cles) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(req.user.id, serie_id||null, titre, description, url_audio, duree_secondes, JSON.stringify(intervenants), categorie, image_url, is_public?1:0, published_at||new Date().toISOString().slice(0,10), resume, JSON.stringify(chapitres), JSON.stringify(mots_cles));
   sendJSON(res, 201, { id: r.lastInsertRowid });
@@ -20069,6 +22638,8 @@ if (require.main === module) {
   const server = http.createServer(handleRequest);
   server.listen(PORT, () => {
     console.log(`Diaspo'Actif — serveur démarré sur http://localhost:${PORT}`);
+    // Atelier audiovisuel : génère la bibliothèque musicale libre de droits si absente
+    try { require("./atelier").ensureLibraries().then(() => console.log("Atelier: bibliothèques (musiques/sons/génériques/animations) prêtes (ffmpeg " + (require("./atelier").ffmpegAvailable() ? "OK" : "absent") + ")")); } catch (e) { console.error("Atelier init:", e.message); }
   });
 }
 

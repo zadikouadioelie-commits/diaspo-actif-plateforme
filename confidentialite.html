@@ -9,6 +9,25 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+  .codes-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;max-width:520px;}
+  .codes-card h4{margin:0 0 6px;font-size:14px;font-weight:800;}
+  .codes-card .codes-sub{font-size:12px;color:var(--muted);margin:0 0 14px;}
+  .ds-masked{font-size:20px;letter-spacing:4px;color:var(--muted);margin-bottom:12px;font-family:monospace;}
+  .ds-revealed{font-family:monospace;font-size:16px;font-weight:800;letter-spacing:3px;color:#1e293b;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:8px;padding:8px 16px;margin-bottom:12px;word-break:break-all;}
+  .codes-btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .codes-btn{font-size:12px;padding:6px 14px;border-radius:7px;cursor:pointer;font-weight:700;border:1.5px solid;background:transparent;}
+  .codes-btn.orange{color:#2563EB;border-color:#2563EB;}
+  .codes-btn.red{color:#dc2626;border-color:#dc2626;}
+  .codes-btn.green{color:#16a34a;border-color:#16a34a;}
+  .ds-pwd-form{margin-top:14px;display:none;}
+  .ds-pwd-form input{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);margin-bottom:8px;}
+  .ds-err{color:#dc2626;font-size:12px;margin-top:4px;display:none;}
+  .history-list{display:flex;flex-direction:column;gap:8px;}
+  .history-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .history-action{font-weight:700;}
+  .history-meta{color:var(--muted);text-align:right;}
+</style>
 </head>
 <body>
 <div class="page">
@@ -32,6 +51,8 @@
   </header>
 
   <main class="container" style="padding-top:30px;padding-bottom:40px;">
+    <div id="ds-id-zone"></div>
+
     <h2 style="margin:0 0 4px;">Niveau de confidentialité des données</h2>
     <p class="sub">Dans Diaspo'Actif, les informations que vous partagez sont classées en trois catégories de visibilité.</p>
 
@@ -52,6 +73,113 @@
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
+<script>
+(async function initDsIdCard(){
+  try {
+    const me = await api('GET', '/auth/me');
+    if (!me.user) return;
+  } catch(e) { return; }
+
+  const zone = document.getElementById('ds-id-zone');
+  zone.innerHTML = `
+    <div class="codes-card">
+      <h4>🔐 Code de Sécurité Diaspo'Actif (DS-ID)</h4>
+      <p class="codes-sub">Votre signature numérique personnelle · strictement confidentielle · jamais visible publiquement · utilisée pour signer des deals, partenariats et <strong>votes sécurisés</strong>.</p>
+      <div id="ds-masked-view">
+        <div class="ds-masked">••••••••••••••••••••</div>
+        <div class="codes-btn-row">
+          <button class="codes-btn green" onclick="window._showDsIdForm('reveal')">👁 Afficher</button>
+        </div>
+      </div>
+      <div id="ds-revealed-view" style="display:none;">
+        <div class="ds-revealed" id="ds-value"></div>
+        <div class="codes-btn-row">
+          <button class="codes-btn green" onclick="window._copyDsId()">📋 Copier</button>
+          <button class="codes-btn red" onclick="window._showDsIdForm('regen')">🔄 Régénérer</button>
+          <button class="codes-btn orange" onclick="window._hideDsId()">🙈 Masquer</button>
+        </div>
+      </div>
+      <div class="ds-pwd-form" id="ds-pwd-form">
+        <div id="ds-pwd-title" style="font-size:13px;font-weight:700;margin-bottom:8px;">🔑 Entrez votre mot de passe pour continuer</div>
+        <input type="password" id="ds-pwd-input" placeholder="Votre mot de passe" autocomplete="current-password">
+        <div id="ds-pwd-err" class="ds-err"></div>
+        <div class="codes-btn-row" style="margin-top:4px;">
+          <button class="codes-btn green" onclick="window._submitDsId()" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;">Valider</button>
+          <button class="codes-btn orange" onclick="window._cancelDsId()">Annuler</button>
+        </div>
+      </div>
+    </div>
+    <div class="codes-card">
+      <h4>📋 Historique de sécurité</h4>
+      <div id="ds-history-list"><p style="font-size:13px;color:var(--muted);">Chargement…</p></div>
+    </div>
+  `;
+
+  let _dsAction = 'reveal';
+  window._showDsIdForm = function(action) {
+    _dsAction = action;
+    document.getElementById('ds-pwd-form').style.display = 'block';
+    document.getElementById('ds-pwd-title').textContent = action === 'regen'
+      ? '⚠️ Régénérer le DS-ID — entrez votre mot de passe (l\'ancien code sera invalidé)'
+      : '🔑 Entrez votre mot de passe pour afficher votre DS-ID';
+    document.getElementById('ds-pwd-input').value = '';
+    document.getElementById('ds-pwd-err').style.display = 'none';
+    document.getElementById('ds-pwd-input').focus();
+  };
+  window._cancelDsId = function() { document.getElementById('ds-pwd-form').style.display = 'none'; };
+  window._hideDsId = function() {
+    document.getElementById('ds-revealed-view').style.display = 'none';
+    document.getElementById('ds-masked-view').style.display = '';
+    document.getElementById('ds-value').textContent = '';
+  };
+  window._copyDsId = async function() {
+    const val = document.getElementById('ds-value').textContent;
+    if (!val) return;
+    await navigator.clipboard.writeText(val);
+    await api('POST', '/profil/ds-id/log-copy', {});
+    showToast?.('📋 DS-ID copié !');
+  };
+  window._submitDsId = async function() {
+    const pwd = document.getElementById('ds-pwd-input').value;
+    const err = document.getElementById('ds-pwd-err');
+    err.style.display = 'none';
+    if (!pwd) { err.textContent = 'Mot de passe requis.'; err.style.display = 'block'; return; }
+    try {
+      const endpoint = _dsAction === 'regen' ? '/profil/ds-id/regenerate' : '/profil/ds-id/reveal';
+      const r = await api('POST', endpoint, { password: pwd });
+      document.getElementById('ds-value').textContent = r.ds_id;
+      document.getElementById('ds-pwd-form').style.display = 'none';
+      document.getElementById('ds-masked-view').style.display = 'none';
+      document.getElementById('ds-revealed-view').style.display = '';
+      if (_dsAction === 'regen') showToast?.('✅ DS-ID régénéré avec succès.');
+      loadDsHistory();
+    } catch(e) {
+      err.textContent = e.message || 'Erreur de validation.';
+      err.style.display = 'block';
+    }
+  };
+  document.getElementById('ds-pwd-input').addEventListener('keydown', e => { if (e.key === 'Enter') window._submitDsId(); });
+
+  async function loadDsHistory() {
+    const el = document.getElementById('ds-history-list');
+    try {
+      const r = await api('GET', '/profil/ds-id/history');
+      if (!r.history.length) { el.innerHTML = '<p style="font-size:13px;color:var(--muted);">Aucune activité enregistrée.</p>'; return; }
+      const labels = { creation:'Création', consultation:'Consultation', copie:'Copie', regeneration:'Régénération', signature:'Signature numérique', echec_validation:'Tentative échouée' };
+      const colors = { creation:'#16a34a', consultation:'#2563eb', copie:'#7c3aed', regeneration:'#d97706', signature:'#0891b2', echec_validation:'#dc2626' };
+      el.innerHTML = '<div class="history-list">' + r.history.map(h => `
+        <div class="history-row">
+          <span class="history-action" style="color:${colors[h.action]||'var(--text)'}">${labels[h.action]||h.action}</span>
+          <div class="history-meta">
+            <div>${new Date(h.created_at).toLocaleString('fr-FR')}</div>
+            ${h.ip ? `<div>IP : ${h.ip}</div>` : ''}
+          </div>
+        </div>`).join('') + '</div>';
+    } catch(e) { el.innerHTML = '<p style="font-size:13px;color:var(--muted);">Historique indisponible.</p>'; }
+  }
+  loadDsHistory();
+})();
+</script>
 <script src="assets/back-button.js"></script>
 </body>
 </html>

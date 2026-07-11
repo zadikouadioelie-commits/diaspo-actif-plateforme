@@ -295,6 +295,8 @@
 .empty-p .ei { font-size:28px; margin-bottom:6px; }
 
 /* ===== CONTENEUR LARGE (immersif, occupe l'écran) ===== */
+/* overflow-x:clip (au lieu de hidden) préserve position:sticky des colonnes latérales enrichies */
+html, body { overflow-x:clip; }
 .p-container-wide { width:94%; max-width:1640px; margin:0 auto; }
 
 /* ===== LAYOUT 3 COLONNES (proportions ~23% / ~54% / ~23%) ===== */
@@ -693,6 +695,9 @@
 .pvz-btn { font-size:13px; font-weight:600; padding:10px 18px; border-radius:10px; border:1px solid rgba(18,32,56,.16); background:#fff; color:#3B4658; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
 .pvz-btn.primary { background:#2F6BED; border-color:#2F6BED; color:#fff; }
 .pvz-btn.following { background:#E4F3EC; border-color:#1F8A5B; color:#1F8A5B; }
+.pvz-btn.follow-main { font-size:14.5px; font-weight:800; padding:12px 24px; border-radius:11px; box-shadow:0 4px 14px rgba(47,107,237,.35); transition:transform .12s ease, box-shadow .12s ease; }
+.pvz-btn.follow-main:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(47,107,237,.45); }
+.pvz-btn.follow-main.following { box-shadow:0 4px 14px rgba(31,138,91,.25); }
 .pvz-tabrow { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-top:18px; padding-top:16px; border-top:1px solid rgba(18,32,56,.07); }
 .pvz-segmented { display:inline-flex; background:#F2F5FA; border-radius:11px; padding:4px; }
 .pvz-seg-btn { border:none; background:none; cursor:pointer; font-size:13px; font-weight:700; padding:9px 18px; border-radius:8px; color:#6B7686; }
@@ -705,6 +710,7 @@
 
 /* ---- Grille 3 colonnes Profil ---- */
 .pvz-grid { display:grid; grid-template-columns:300px minmax(0,1fr) 322px; gap:22px; margin-top:22px; align-items:start; }
+.pvz-grid-2col { grid-template-columns:300px minmax(0,1fr); }
 .pvz-aside { position:sticky; top:76px; height:calc(100vh - 92px); overflow-y:auto; display:flex; flex-direction:column; gap:18px; padding-right:3px; }
 .pvz-main { display:flex; flex-direction:column; gap:18px; min-width:0; }
 .pvz-card { background:#fff; border:1px solid rgba(18,32,56,.07); border-radius:16px; box-shadow:0 1px 2px rgba(18,32,56,.04); padding:18px 20px; }
@@ -766,8 +772,11 @@
 .pvt-subnav { position:sticky; top:70px; z-index:20; background:#fff; border:1px solid var(--vsoftbd); border-radius:12px; box-shadow:0 2px 8px rgba(94,14,28,.08); padding:9px 12px; display:flex; gap:7px; overflow-x:auto; }
 .pvt-subnav a { white-space:nowrap; font-size:12.5px; font-weight:500; color:#6B4A4E; background:var(--vsoft); padding:8px 14px; border-radius:999px; text-decoration:none; scroll-margin-top:134px; }
 .pvt-subnav a.active { color:#fff; background:var(--v1); font-weight:600; }
-.pvt-hero { position:relative; border-radius:18px; overflow:hidden; box-shadow:0 6px 20px -8px rgba(94,14,28,.35); height:340px; background:linear-gradient(135deg,var(--v1),var(--v4)) center/cover no-repeat; }
-.pvt-hero img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+/* aspect-ratio verrouillé sur 16/6 — doit rester identique à l'aspect utilisé par l'outil de recadrage
+   (openImageCropper(file,{aspect:16/6,...})) sur tous les écrans, pour un rendu WYSIWYG : ce que
+   l'utilisateur voit dans le recadrage est exactement ce qui s'affiche ici, sans zoom/recadrage additionnel. */
+.pvt-hero { position:relative; border-radius:18px; overflow:hidden; box-shadow:0 6px 20px -8px rgba(94,14,28,.35); aspect-ratio:16/6; background:linear-gradient(135deg,var(--v1),var(--v4)) center/cover no-repeat; }
+.pvt-hero img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:center; }
 .pvt-hero-overlay { position:absolute; inset:0; background:linear-gradient(180deg,rgba(60,10,18,.35),rgba(60,10,18,.62)); }
 .pvt-hero-content { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px; }
 .pvt-hero-title { font-family:'Cormorant Garamond',serif; font-size:52px; font-weight:600; color:#fff; line-height:1; text-shadow:0 2px 14px rgba(0,0,0,.4); }
@@ -842,7 +851,6 @@
   .pvt-contact { grid-template-columns:1fr; }
 }
 @media(max-width:600px){
-  .pvt-hero { height:220px; }
   .pvt-hero-title { font-size:28px; }
   .pvt-actionbar { flex-direction:column; align-items:stretch; }
 }
@@ -913,6 +921,37 @@
     <div class="p-stats" id="p-stats"></div>
   </div>
 
+  <style>
+    .p-view-btn { padding:9px 18px; border-radius:9px; border:none; background:none; font-size:13px; font-weight:700; color:var(--muted); cursor:pointer; transition:all .15s; }
+    .p-view-btn:hover { color:var(--tp); }
+    .p-view-btn.active { background:var(--tp); color:#fff; }
+    /* Colonnes latérales enrichies (miroir de initiative.html) */
+    .pp-3col { display:grid; grid-template-columns:minmax(230px,270px) minmax(0,1fr) minmax(230px,270px); gap:16px; align-items:start; }
+    #pp-col-left, #pp-col-right { position:sticky; top:78px; max-height:calc(100vh - 96px); overflow-y:auto; scrollbar-width:thin; }
+    #pp-col-left::-webkit-scrollbar, #pp-col-right::-webkit-scrollbar { width:5px; }
+    #pp-col-left::-webkit-scrollbar-thumb, #pp-col-right::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+    .pp-side-card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+    .pp-side-card h4 { margin:0 0 10px; font-size:13px; font-weight:800; color:var(--tp); display:flex; align-items:center; justify-content:space-between; gap:6px; }
+    .pp-side-card h4 .edit-btn { background:none; border:none; cursor:pointer; font-size:13px; color:var(--tp); padding:2px; }
+    .pp-tag { display:inline-block; background:#eef2ff; color:#1B3A6B; border-radius:20px; padding:4px 11px; font-size:12px; font-weight:700; margin:0 4px 6px 0; }
+    .pp-tag.clickable { cursor:pointer; background:#fef3c7; color:#92400e; }
+    .pp-tag.clickable:hover { opacity:.75; }
+    .pp-list-item { display:flex; align-items:center; gap:9px; padding:6px 0; font-size:12.5px; border-bottom:1px solid var(--border); }
+    .pp-list-item:last-child { border-bottom:none; }
+    .pp-gauge { height:10px; border-radius:6px; background:var(--bg); overflow:hidden; margin:8px 0 4px; }
+    .pp-gauge > div { height:100%; border-radius:6px; background:linear-gradient(90deg,#f59e0b,#22c55e); transition:width .5s; }
+    .pp-join-btn { display:flex; align-items:center; gap:8px; width:100%; padding:10px 14px; border-radius:9px; font-size:13px; font-weight:700; border:1.5px solid var(--border); background:var(--bg); color:var(--text); cursor:pointer; text-decoration:none; margin-bottom:8px; }
+    .pp-join-btn:hover { border-color:var(--tp); }
+    @media(max-width:1100px){
+      .pp-3col { grid-template-columns:1fr; }
+      #pp-col-left, #pp-col-right { position:static; max-height:none; overflow:visible; }
+    }
+  </style>
+
+  <div class="pp-3col">
+  <aside id="pp-col-left"></aside>
+  <div id="pp-center">
+
   <!-- SWITCH PROFIL / VITRINE (comptes Initiative uniquement) -->
   <div id="p-view-switch" style="display:none;margin-bottom:16px;">
     <div style="display:inline-flex;background:#fff;border:1px solid var(--border);border-radius:12px;padding:4px;gap:4px;">
@@ -920,11 +959,6 @@
       <button id="p-view-btn-vitrine" class="p-view-btn" onclick="switchProfileView('vitrine')">🏪 Vitrine</button>
     </div>
   </div>
-  <style>
-    .p-view-btn { padding:9px 18px; border-radius:9px; border:none; background:none; font-size:13px; font-weight:700; color:var(--muted); cursor:pointer; transition:all .15s; }
-    .p-view-btn:hover { color:var(--tp); }
-    .p-view-btn.active { background:var(--tp); color:#fff; }
-  </style>
 
   <!-- BARRE PERSONNALISATION (propriétaire) -->
   <div id="wb-toolbar-slot" style="margin:6px 0 14px;"></div>
@@ -938,6 +972,10 @@
   <!-- VUE VITRINE (comptes Initiative) -->
   <div id="p-vitrine" style="display:none;"></div>
 
+  </div><!-- /pp-center -->
+  <aside id="pp-col-right"></aside>
+  </div><!-- /pp-3col -->
+
 </main>
 
 <footer class="footer">
@@ -949,6 +987,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/galerie-lightbox.js"></script>
 <script>
 /* ===================================================
    PROFIL UTILISATEUR — logique complète
@@ -973,6 +1012,7 @@ let CU     = null; /* utilisateur connecté */
 async function init() {
   CU = await fetchCurrentUser();
   await applyAuthState();
+  if (window.Posts && CU) Posts.init(CU.id);
   const backLink = document.getElementById('back-link');
   if (CU) backLink.href = ROLE_DASHBOARD[CU.role] || 'index.html';
   else     backLink.href = 'index.html';
@@ -996,7 +1036,14 @@ async function init() {
       const rb = await api('GET', '/asso/badge/' + uid);
       profil._asso_badge = rb.badge || null;
     } catch(e) { profil._asso_badge = null; }
+    /* Lien direct "Voir la vitrine" (ex: depuis l'annuaire) : ouvre directement l'onglet Vitrine.
+       On positionne le hash AVANT render() pour que initVitrineSwitch() (appelé pendant le rendu)
+       détecte #vitrine et bascule dessus naturellement, sans risque d'être écrasé après coup. */
+    if (new URLSearchParams(location.search).get('vitrine') === '1') {
+      history.replaceState(null, '', window.location.pathname + window.location.search + '#vitrine');
+    }
     render();
+    try { await renderEnrichedColumns(); } catch(e) { console.warn('colonnes enrichies:', e); }
   } catch(e) {
     document.getElementById('p-sections').innerHTML =
       '<div class="p-section"><p style="color:red">Profil introuvable ou erreur serveur.</p></div>';
@@ -1014,6 +1061,329 @@ async function init() {
     url.searchParams.delete('paiement'); url.searchParams.delete('commande');
     history.replaceState({}, '', url);
   }
+}
+
+/* ══════════════════════════════════════════════════════════
+   COLONNES LATÉRALES ENRICHIES (miroir de initiative.html)
+   ══════════════════════════════════════════════════════════ */
+async function renderEnrichedColumns() {
+  const left = document.getElementById('pp-col-left');
+  const right = document.getElementById('pp-col-right');
+  if (!left || !right || !profil) return;
+  const esc2 = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const owner = !!isOwn;
+
+  window.ppContact = (sujet) => { location.href = `messagerie.html?user=${profil.id}&sujet=${encodeURIComponent(sujet)}`; };
+
+  let SCOREACT = null;
+  try { SCOREACT = await api('GET', `/profil/${profil.id}/score-activite`); } catch(e) {}
+
+  const editBtn = section => owner ? `<button class="edit-btn" onclick="ppEditSection('${section}')" title="Modifier">✏️</button>` : '';
+
+  /* Masquage/démasquage d'un numéro de téléphone affiché publiquement (👁 afficher / masquer) */
+  window._ppPhoneN = 0;
+  window.renderMaskedPhone = function(tel) {
+    const t = String(tel || '');
+    if (!t) return '';
+    const visible = t.length > 2 ? t.slice(-2) : t;
+    const masked = '•'.repeat(Math.max(t.length - visible.length, 4)) + ' ' + visible;
+    const uid = 'phmask-' + (window._ppPhoneN++);
+    return `<span id="${uid}" data-tel="${t.replace(/"/g,'&quot;')}" data-visible="0" style="word-break:break-word;">${masked}</span> <button type="button" onclick="ppTogglePhone('${uid}')" title="Afficher/masquer le numéro" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 2px;">👁</button>`;
+  };
+  window.ppTogglePhone = function(uid) {
+    const el = document.getElementById(uid);
+    if (!el) return;
+    const shown = el.getAttribute('data-visible') === '1';
+    const tel = el.getAttribute('data-tel') || '';
+    if (shown) {
+      const visible = tel.length > 2 ? tel.slice(-2) : tel;
+      el.textContent = '•'.repeat(Math.max(tel.length - visible.length, 4)) + ' ' + visible;
+      el.setAttribute('data-visible', '0');
+    } else {
+      el.textContent = tel;
+      el.setAttribute('data-visible', '1');
+    }
+  };
+
+  function renderLeft() {
+    const comps = Array.isArray(profil.competences) ? profil.competences : [];
+    const galerie = Array.isArray(profil.galerie) ? profil.galerie : [];
+    const zones = Array.isArray(profil.zones) ? profil.zones : [];
+    const publics = Array.isArray(profil.publics) ? profil.publics : [];
+    const besoins = Array.isArray(profil.besoins) ? profil.besoins : [];
+    const rs = Object.assign({}, profil.reseaux_sociaux || {}, profil.reseaux_enrichis || {});
+    const RS_ICONS = { site:'🌐', facebook:'📘', linkedin:'💼', instagram:'📸', youtube:'▶️', tiktok:'🎵', whatsapp:'💬', x:'✖️', twitter:'✖️', lien:'🔗' };
+    const infos = [
+      profil.telephone && ['📞', renderMaskedPhone(profil.telephone)],
+      (profil.ville || profil.pays) && ['📍', esc2([profil.ville, profil.pays].filter(Boolean).join(', '))],
+      profil.titre_pro && ['💼', esc2(profil.titre_pro)],
+      profil.situation_pro && ['🎓', esc2(profil.situation_pro)],
+    ].filter(Boolean);
+
+    left.innerHTML = `
+      <div class="pp-side-card">
+        <h4><span>💡 Compétences</span> ${owner ? '<button class="edit-btn" onclick="switchProfileTab(\'competences\')" title="Modifier dans l\'onglet Compétences">✏️</button>' : ''}</h4>
+        ${comps.length ? comps.map(c => `<span class="pp-tag">${esc2(typeof c === 'string' ? c : (c.nom || c.label || ''))}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
+      </div>
+      <div class="pp-side-card">
+        <h4><span>🌍 Zones d'intervention</span> ${editBtn('zones')}</h4>
+        ${zones.length ? zones.map(z => `<span class="pp-tag">${esc2(z)}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
+      </div>
+      <div class="pp-side-card">
+        <h4><span>🎯 Public concerné</span> ${editBtn('publics')}</h4>
+        ${publics.length ? publics.map(p => `<span class="pp-tag">${esc2(p)}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
+      </div>
+      <div class="pp-side-card">
+        <h4><span>🤝 Recherche actuellement</span> ${editBtn('besoins')}</h4>
+        ${besoins.length ? besoins.map(b => `<span class="pp-tag clickable" onclick="ppContact('${esc2('Au sujet de : ' + b).replace(/'/g, "\\'")}')" title="Cliquez pour en discuter">${esc2(b)}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Aucun besoin exprimé.</p>'}
+      </div>
+      <div class="pp-side-card">
+        <h4><span>💼 Services proposés</span> ${editBtn('services')}</h4>
+        ${profil.services_perso ? `<p style="font-size:12.5px;margin:0;line-height:1.6;white-space:pre-line;">${esc2(profil.services_perso)}</p>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
+      </div>
+      ${Object.keys(rs).filter(k => rs[k]).length ? `<div class="pp-side-card">
+        <h4>🌐 Réseaux sociaux</h4>
+        ${Object.entries(rs).filter(([,v]) => v).map(([k,v]) => `<div class="pp-list-item"><span>${RS_ICONS[k]||'🔗'}</span><a href="${esc2(v)}" target="_blank" style="color:var(--tp);">${esc2(k.charAt(0).toUpperCase()+k.slice(1))}</a></div>`).join('')}
+      </div>` : ''}
+      ${infos.length ? `<div class="pp-side-card">
+        <h4>📞 Informations pratiques</h4>
+        ${infos.map(([ic,val]) => `<div class="pp-list-item"><span>${ic}</span><span style="flex:1;word-break:break-word;">${val}</span></div>`).join('')}
+      </div>` : ''}
+      ${(galerie.length || owner) ? `<div class="pp-side-card">
+        <h4><span>🖼 Galerie</span> ${owner ? `<button class="edit-btn" onclick="ppAddGaleriePhoto()" title="Ajouter une photo">➕</button>` : ''}</h4>
+        ${galerie.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;">
+          ${galerie.map((img, idx) => `
+            <div style="border-radius:6px;overflow:hidden;background:var(--bg);cursor:pointer;" onclick='openGaleriePhoto("user", ${profil.id}, ${JSON.stringify(img.id || ('p'+idx))}, ${JSON.stringify(img.url||'')}, ${JSON.stringify(img.titre||'')}, ${JSON.stringify(img.caption||'')})'>
+              <div style="height:70px;display:flex;align-items:center;justify-content:center;font-size:22px;">
+                ${img.url ? `<img loading="lazy" src="${img.url}" style="width:100%;height:100%;object-fit:cover;" alt="${(img.caption||'').replace(/"/g,'&quot;')}">` : '🖼'}
+              </div>
+              <div id="ga-counts-${img.id || ('p'+idx)}" style="font-size:9px;color:var(--muted);text-align:center;padding:2px 0;">♥ 0 · 💬 0</div>
+            </div>
+          `).join('')}
+        </div>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Aucune photo pour l\'instant.</p>'}
+      </div>` : ''}
+    `;
+    if (galerie.length) loadGaleriePhotoCounts('user', profil.id);
+  }
+
+  window.ppAddGaleriePhoto = function() {
+    const url = prompt("URL de la photo (image) :");
+    if (!url) return;
+    const titre = prompt("Titre de la photo (optionnel) :") || '';
+    const caption = prompt("Légende (optionnel) :") || '';
+    const galerie = Array.isArray(profil.galerie) ? profil.galerie.slice() : [];
+    galerie.push({ id: 'p' + Date.now(), url, titre, caption });
+    api('PUT', '/profil', { galerie }).then(() => {
+      profil.galerie = galerie;
+      renderLeft();
+    }).catch(e => alert(e.message || 'Erreur.'));
+  };
+
+  function renderRight() {
+    const stats = profil.stats_perso || {};
+    const STAT_LABELS = { projets:'Projets', formations:'Formations', collaborations:'Collaborations', pays_couverts:'Pays couverts', clients:'Clients', missions:'Missions' };
+    const reals = Array.isArray(profil.realisations) ? profil.realisations : [];
+    const labels = [];
+    (profil._accreditations || []).forEach(a => labels.push('🎖 ' + a));
+    if (profil.partenaire_officiel) labels.push('🏅 Partenaire Officiel Diaspo\'Actif');
+    if (profil.is_deal_master) labels.push('🏆 Deal Master');
+    if (profil.email_verifie) labels.push('✔️ Email vérifié');
+
+    const ciRight = Array.isArray(profil.centres_interet) ? profil.centres_interet : [];
+    right.innerHTML = `
+      ${!owner ? `<div class="pp-side-card">
+        <h4>🚀 Entrer en relation</h4>
+        <a class="pp-join-btn" href="messagerie.html?user=${profil.id}">✉️ Contacter</a>
+        <button class="pp-join-btn" onclick="ppContact('Proposition de collaboration')">🤝 Proposer une collaboration</button>
+      </div>` : ''}
+      <div class="pp-side-card">
+        <h4><span>📝 À propos</span> ${owner ? `<button class="edit-btn" onclick="openEditIdentity()" title="Modifier">✏️</button>` : ''}</h4>
+        ${profil.bio ? `<div style="font-size:13px;line-height:1.6;color:var(--text);white-space:pre-line;">${esc2(profil.bio)}</div>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Ce membre n\'a pas encore ajouté de présentation.</p>'}
+      </div>
+      ${(ciRight.length || owner) ? `<div class="pp-side-card">
+        <h4><span>🎯 Centres d'intérêt</span> ${owner ? `<button class="edit-btn" onclick="openEditIdentity()" title="Modifier">✏️</button>` : ''}</h4>
+        ${ciRight.length ? ciRight.map(c => `<span class="pp-tag">${esc2(c)}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Aucun centre d\'intérêt renseigné.</p>'}
+      </div>` : ''}
+      ${labels.length ? `<div class="pp-side-card"><h4>🏆 Labels & accréditations</h4>${labels.map(l => `<div class="pp-list-item">${esc2(l)}</div>`).join('')}</div>` : ''}
+      ${SCOREACT ? `<div class="pp-side-card">
+        <h4>⭐ Score d'activité</h4>
+        <div style="font-size:22px;font-weight:800;color:var(--tp);">${SCOREACT.score}<span style="font-size:13px;color:var(--muted);">/100</span></div>
+        <div class="pp-gauge"><div style="width:${SCOREACT.score}%;"></div></div>
+        <div style="font-size:11px;color:var(--muted);">Calculé sur les publications, abonnés, relations et la complétude du profil.</div>
+      </div>` : ''}
+      <div class="pp-side-card">
+        <h4><span>📈 Statistiques</span> ${editBtn('stats')}</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:17px;font-weight:800;">${profil.nbAbonnes ?? 0}</div><div style="font-size:10px;color:var(--muted);">Abonnés</div></div>
+          <div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:17px;font-weight:800;">${(profil.publications||[]).length}</div><div style="font-size:10px;color:var(--muted);">Publications</div></div>
+          ${profil.annee_debut ? `<div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:17px;font-weight:800;">${profil.annee_debut}</div><div style="font-size:10px;color:var(--muted);">Depuis</div></div>` : ''}
+          ${Object.entries(stats).filter(([,v]) => v).map(([k,v]) => `<div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:17px;font-weight:800;">${esc2(v)}</div><div style="font-size:10px;color:var(--muted);">${STAT_LABELS[k] || esc2(k)}</div></div>`).join('')}
+        </div>
+      </div>
+      <div class="pp-side-card">
+        <h4>🚀 Initiatives suivies</h4>
+        ${(() => {
+          const inis = (profil.initiativesSuivies || []).slice(0, 5);
+          return inis.length ? inis.map(i => `<a href="initiative.html?id=${encodeURIComponent(i.slug||i.id)}" style="display:block;text-decoration:none;color:inherit;" class="pp-list-item"><span>🚀</span><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:12.5px;">${esc2(i.nom)}</div><div style="font-size:11px;color:var(--muted);">${esc2([i.domaine,i.pays].filter(Boolean).join(' · ')||'Initiative')}</div></div></a>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Aucune initiative suivie.</p>';
+        })()}
+      </div>
+      <div class="pp-side-card">
+        <h4>✨ Suggestions</h4>
+        <div id="psug-list"><div style="font-size:12px;color:var(--muted);">Chargement…</div></div>
+      </div>
+    `;
+    if (typeof loadProfileSuggestions === 'function') loadProfileSuggestions();
+  }
+
+  /* Exposé pour switchProfileView : restaure les colonnes du profil (quand on quitte la vitrine) */
+  window._ppRenderProfilCols = () => { renderLeft(); renderRight(); };
+  /* Ne pas écraser les colonnes vitrine si la vue vitrine est déjà active (lien direct ?vitrine=1) */
+  const vitrineActive = document.getElementById('p-vitrine') && document.getElementById('p-vitrine').style.display !== 'none';
+  if (!vitrineActive) { renderLeft(); renderRight(); }
+
+  /* ── Édition inline propriétaire ── */
+  const PUBLICS_PRESETS = ['Diaspora','Entrepreneurs','Étudiants','Associations','Collectivités','Jeunes','Femmes','Agriculteurs','Professionnels','Familles'];
+  const BESOINS_PRESETS = ['un emploi','des partenaires','des investisseurs','des clients','une mission','du mentorat','des collaborateurs','un stage'];
+
+  async function saveProfilPublic(payload) {
+    await api('PUT', `/profil/profil-public`, payload);
+    const r = await api('GET', `/profil/${profil.id}`);
+    Object.assign(profil, r.profil);
+    renderLeft(); renderRight();
+  }
+
+  function openEditModal(titre, bodyHtml, onSave) {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 14px;';
+    ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:20px;">
+      <h3 style="margin:0 0 14px;font-size:15px;">${titre}</h3>
+      <div>${bodyHtml}</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button class="btn btn-outline" id="ppe-cancel">Annuler</button>
+        <button class="btn btn-orange" id="ppe-save">Enregistrer</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#ppe-cancel').onclick = () => ov.remove();
+    ov.querySelector('#ppe-save').onclick = async () => { try { await onSave(ov); ov.remove(); } catch (e) { alert(e.message || 'Erreur.'); } };
+  }
+  function pillsHtml(presets, selected, cls) {
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;">${presets.map(p =>
+      `<label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid ${selected.includes(p) ? 'var(--tp)' : 'var(--border)'};border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;${selected.includes(p) ? 'background:#eef2ff;font-weight:700;' : ''}">
+        <input type="checkbox" class="${cls}" value="${esc2(p)}" ${selected.includes(p) ? 'checked' : ''}> ${esc2(p)}
+      </label>`).join('')}</div>
+      <input type="text" id="${cls}-autre" placeholder="Autres (séparés par des virgules)" style="width:100%;margin-top:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;"
+        value="${esc2(selected.filter(s => !presets.includes(s)).join(', '))}">`;
+  }
+  function readPills(ov, cls) {
+    const checked = [...ov.querySelectorAll('.' + cls + ':checked')].map(c => c.value);
+    const autres = (ov.querySelector('#' + cls + '-autre')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+    return [...checked, ...autres];
+  }
+  window.ppEditSection = function (section) {
+    if (section === 'publics') {
+      openEditModal('🎯 Public concerné', pillsHtml(PUBLICS_PRESETS, profil.publics || [], 'ppp'), ov => saveProfilPublic({ publics: readPills(ov, 'ppp') }));
+    } else if (section === 'besoins') {
+      openEditModal('🤝 Recherche actuellement', pillsHtml(BESOINS_PRESETS, profil.besoins || [], 'ppb'), ov => saveProfilPublic({ besoins: readPills(ov, 'ppb') }));
+    } else if (section === 'zones') {
+      const zones = Array.isArray(profil.zones) ? profil.zones : [];
+      openEditModal("🌍 Zones d'intervention",
+        `<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">Pays, régions ou villes, séparés par des virgules.</p>
+         <input type="text" id="ppz" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${esc2(zones.join(', '))}">`,
+        ov => saveProfilPublic({ zones: ov.querySelector('#ppz').value.split(',').map(s => s.trim()).filter(Boolean) }));
+    } else if (section === 'services') {
+      openEditModal('💼 Services proposés',
+        `<textarea id="pps" rows="5" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" placeholder="Conseil, Formation, Accompagnement…">${esc2(profil.services_perso || '')}</textarea>`,
+        ov => saveProfilPublic({ services_perso: ov.querySelector('#pps').value }));
+    } else if (section === 'stats') {
+      const s = profil.stats_perso || {};
+      const champs = [['projets','Projets'],['formations','Formations'],['collaborations','Collaborations'],['clients','Clients'],['pays_couverts','Pays couverts']];
+      openEditModal('📈 Statistiques',
+        champs.map(([k,l]) => `<label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">${l}</label>
+          <input type="number" min="0" id="pps-${k}" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${s[k] ?? ''}">`).join('') +
+        `<label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">Actif depuis (année)</label>
+         <input type="number" id="pps-annee" min="1950" max="2100" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${profil.annee_debut ?? ''}">`,
+        ov => {
+          const stats = {};
+          champs.forEach(([k]) => { const v = ov.querySelector('#pps-' + k).value; if (v) stats[k] = parseInt(v); });
+          return saveProfilPublic({ stats_perso: stats, annee_debut: ov.querySelector('#pps-annee').value || undefined });
+        });
+    } else if (section === 'realisations') {
+      const reals = profil.realisations || [];
+      openEditModal('📂 Réalisations',
+        `<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">Une par ligne, format : <em>Titre | Année</em> (année facultative).</p>
+         <textarea id="ppr" rows="6" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;">${esc2(reals.map(r => r.titre + (r.annee ? ' | ' + r.annee : '')).join('\n'))}</textarea>`,
+        ov => saveProfilPublic({
+          realisations: ov.querySelector('#ppr').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+            const [titre, annee] = l.split('|').map(s => s.trim());
+            return annee ? { titre, annee } : { titre };
+          })
+        }));
+    }
+  };
+  window.ppToggleAssistant = async function (actif) {
+    try { await api('PUT', `/profil/profil-public`, { assistant_actif: actif }); profil.assistant_actif = actif ? 1 : 0; ppRenderAssistant(); } catch (e) { alert(e.message); }
+  };
+
+  /* ── Assistant IA du compte (règles/intents, données du profil) ── */
+  function ppAssistantReponse(q) {
+    const t = q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const has = (...w) => w.some(x => t.includes(x));
+    const nomComplet = [profil.prenom, profil.nom].filter(Boolean).join(' ');
+    if (has('qui', 'presentation', 'bio', 'parcours', 'faites')) {
+      return profil.bio || profil.titre_pro || `${nomComplet}${profil.titre_pro ? ', ' + profil.titre_pro : ''}.`;
+    }
+    if (has('competence', 'savoir', 'expertise', 'skill')) {
+      const c = (profil.competences || []).map(x => typeof x === 'string' ? x : (x.nom || x.label)).filter(Boolean);
+      return c.length ? `Compétences : ${c.join(', ')}.` : `Consultez le profil pour découvrir mes compétences.`;
+    }
+    if (has('service', 'prestation', 'propose')) {
+      return profil.services_perso ? `Services proposés : ${profil.services_perso}` : `Contactez-moi pour en savoir plus sur mes services.`;
+    }
+    if (has('recherch', 'besoin', 'cherche', 'collabor', 'emploi', 'mission')) {
+      const b = profil.besoins || [];
+      return (b.length ? `Je recherche actuellement : ${b.join(', ')}. ` : '') + `<button onclick="ppContact('Proposition')" style="color:var(--tp);font-weight:700;background:none;border:none;cursor:pointer;padding:0;">Me contacter →</button>`;
+    }
+    if (has('contact', 'joindre', 'ecrire', 'message')) {
+      return `Écrivez-moi via la <a href="messagerie.html?user=${profil.id}" style="color:var(--tp);">messagerie Diaspo'Actif</a>.`;
+    }
+    return `Je n'ai pas de réponse précise. Vous pouvez <a href="messagerie.html?user=${profil.id}" style="color:var(--tp);font-weight:700;">écrire directement à ${esc2(nomComplet)}</a>.`;
+  }
+  function ppRenderAssistant() {
+    document.getElementById('pp-ia-fab')?.remove();
+    document.getElementById('pp-ia-panel')?.remove();
+    if (!profil.assistant_actif || isOwn) return;
+    const nomComplet = [profil.prenom, profil.nom].filter(Boolean).join(' ');
+    const fab = document.createElement('button');
+    fab.id = 'pp-ia-fab';
+    fab.style.cssText = 'position:fixed;bottom:88px;right:22px;z-index:800;background:var(--tp);color:#fff;border:none;border-radius:26px;padding:12px 18px;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25);';
+    fab.textContent = '🤖 Poser une question';
+    const panel = document.createElement('div');
+    panel.id = 'pp-ia-panel';
+    panel.style.cssText = 'position:fixed;bottom:88px;right:22px;z-index:801;width:340px;max-width:calc(100vw - 32px);background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.28);display:none;flex-direction:column;overflow:hidden;';
+    panel.innerHTML = `
+      <div style="background:var(--tp);color:#fff;padding:12px 16px;font-size:13.5px;font-weight:800;display:flex;justify-content:space-between;align-items:center;"><span>🤖 Assistant de ${esc2(nomComplet)}</span><button id="pp-ia-close" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;">✕</button></div>
+      <div style="max-height:320px;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;" id="pp-ia-msgs">
+        <div style="font-size:13px;line-height:1.5;padding:9px 12px;border-radius:11px;background:var(--bg);align-self:flex-start;max-width:88%;">Bonjour ! 👋 Posez-moi vos questions.</div>
+      </div>
+      <div style="display:flex;gap:8px;padding:0 12px 10px;">
+        <input type="text" id="pp-ia-input" placeholder="Votre question…" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;">
+        <button id="pp-ia-send" style="background:var(--tp);color:#fff;border:none;border-radius:8px;width:38px;cursor:pointer;">➤</button>
+      </div>`;
+    document.body.append(fab, panel);
+    const msgs = panel.querySelector('#pp-ia-msgs');
+    function poser(q) {
+      if (!q.trim()) return;
+      msgs.insertAdjacentHTML('beforeend', `<div style="font-size:13px;line-height:1.5;padding:9px 12px;border-radius:11px;background:var(--tp);color:#fff;align-self:flex-end;max-width:88%;">${esc2(q)}</div>`);
+      msgs.insertAdjacentHTML('beforeend', `<div style="font-size:13px;line-height:1.5;padding:9px 12px;border-radius:11px;background:var(--bg);align-self:flex-start;max-width:88%;">${ppAssistantReponse(q)}</div>`);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+    fab.onclick = () => { panel.style.display = 'flex'; fab.style.display = 'none'; };
+    panel.querySelector('#pp-ia-close').onclick = () => { panel.style.display = 'none'; fab.style.display = ''; };
+    panel.querySelector('#pp-ia-send').onclick = () => { const i = panel.querySelector('#pp-ia-input'); poser(i.value); i.value = ''; };
+    panel.querySelector('#pp-ia-input').addEventListener('keydown', e => { if (e.key === 'Enter') { poser(e.target.value); e.target.value = ''; } });
+  }
+  window.ppRenderAssistant = ppRenderAssistant;
+  ppRenderAssistant();
 }
 
 /* ---- thème ---- */
@@ -1201,8 +1571,8 @@ function renderVisitorProfile() {
   // Actions
   const following = profil.isFollowing;
   const followBtn = !CU
-    ? `<a href="login.html" class="pvz-btn primary">＋ Suivre</a>`
-    : `<button class="pvz-btn ${following?'following':'primary'}" id="pvz-follow" onclick="pvzToggleFollow()">${following?'✓ Abonné':'＋ Suivre'}</button>`;
+    ? `<a href="login.html" class="pvz-btn primary follow-main">🔔 S'abonner</a>`
+    : `<button class="pvz-btn follow-main ${following?'following':'primary'}" id="pvz-follow" onclick="pvzToggleFollow()">${following?'✓ Abonné':'🔔 S\'abonner'}</button>`;
   const msgBtn = `<a href="messagerie.html?user=${profil.id}" class="pvz-btn">✉️ Message</a>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
   const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button>${shareBtn}`;
@@ -1267,12 +1637,7 @@ function renderVisitorProfile() {
     </section>` : '';
 
   const leftCol = `<aside class="pvz-aside">
-    <section class="pvz-card">
-      <h3 class="pvz-card-title">📝 À propos ${isOwn?`<span class="more" onclick="openEditIdentity()">✏️ Modifier</span>`:''}</h3>
-      <div style="font-size:13.5px;line-height:1.6;color:#3B4658;">${bio}</div>
-    </section>
     ${reseauxCard}
-    ${interetsCard}
     <section class="pvz-card" style="text-align:center;">
       <h3 class="pvz-card-title" style="justify-content:center;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8794A7;">📱 QR code profil</h3>
       <div id="pvz-qr" style="display:flex;justify-content:center;"></div>
@@ -1312,27 +1677,6 @@ function renderVisitorProfile() {
     </section>
   </main>`;
 
-  // ── Colonne droite : initiatives suivies + suggestions ──
-  const inis = (profil.initiativesSuivies || []).slice(0, 5);
-  const inisInner = inis.length
-    ? inis.map(i => `<a class="pvz-ini-item" style="display:block;text-decoration:none;color:inherit;" href="initiative.html?id=${encodeURIComponent(i.slug||i.id)}">
-        <div class="pvz-ini-top">
-          <div class="pvz-ini-ico">🚀</div>
-          <div style="flex:1;min-width:0;"><div class="pvz-ini-titre">${esc(i.nom)}</div><div class="pvz-ini-sub">${esc([i.domaine,i.pays].filter(Boolean).join(' · ')||'Initiative')}</div></div>
-        </div>
-      </a>`).join('')
-    : `<div class="pvz-empty" style="padding:6px 0;">Aucune initiative suivie.</div>`;
-  const rightCol = `<aside class="pvz-aside">
-    <section class="pvz-card">
-      <h3 class="pvz-card-title">🚀 Initiatives suivies ${inis.length?`<a class="more" href="annuaire.html" style="text-decoration:none;">Voir tout</a>`:''}</h3>
-      ${inisInner}
-    </section>
-    <section class="pvz-card">
-      <h3 class="pvz-card-title">✨ Suggestions</h3>
-      <div id="pvz-suggestions"><div class="pvz-empty" style="padding:6px 0;">Chargement…</div></div>
-    </section>
-  </aside>`;
-
   const confidentialiteCard = isOwn ? `<section class="pvz-card" id="pvz-confidentialite-card" style="margin-top:22px;">
       <div style="display:flex;gap:0;border-bottom:2px solid rgba(18,32,56,.08);margin-bottom:18px;">
         <button id="conf-sub-privacy" onclick="switchConfTab('privacy')" style="padding:10px 20px;font-size:13px;font-weight:700;background:none;border:none;border-bottom:2.5px solid #2F6BED;color:#2F6BED;cursor:pointer;margin-bottom:-2px;">🔒 Confidentialité &amp; Sécurité</button>
@@ -1342,7 +1686,7 @@ function renderVisitorProfile() {
       <div id="conf-panel-codes" style="display:none;"></div>
     </section>` : '';
 
-  const grid = `<div id="pvz-profil-body"><div class="pvz-grid">${leftCol}${centerCol}${rightCol}</div>${confidentialiteCard}</div>`;
+  const grid = `<div id="pvz-profil-body"><div class="pvz-grid pvz-grid-2col">${leftCol}${centerCol}</div>${confidentialiteCard}</div>`;
 
   root.innerHTML = hero + grid;
 
@@ -1356,13 +1700,6 @@ function renderVisitorProfile() {
   const qrEl = document.getElementById('pvz-qr');
   if (qrEl && window.ProfileQR) {
     ProfileQR.render(qrEl, { userId:profil.id, userName:nom, userRole:profil.role_label||profil.role||'Membre', size:140 });
-  }
-
-  // Suggestions (réutilise le loader existant, ciblé sur #psug-list)
-  const sugBox = document.getElementById('pvz-suggestions');
-  if (sugBox) {
-    sugBox.id = 'psug-list';
-    if (typeof loadProfileSuggestions === 'function') loadProfileSuggestions();
   }
 
   // Bascule initiale selon le hash (#vitrine)
@@ -1382,6 +1719,13 @@ function pvzSwitchTab(view) {
   if (vitrine) vitrine.style.display = isVitrine ? '' : 'none';
   if (segP) segP.classList.toggle('active', !isVitrine);
   if (segV) segV.classList.toggle('active', isVitrine);
+
+  /* En vitrine : on retire la colonne de droite pour donner plus d'espace aux produits. */
+  const colRight = document.getElementById('pp-col-right');
+  const col3 = document.querySelector('.pp-3col');
+  if (colRight) colRight.style.display = isVitrine ? 'none' : '';
+  if (col3) col3.style.gridTemplateColumns = isVitrine ? 'minmax(230px,270px) minmax(0,1fr)' : '';
+
   if (isVitrine) {
     history.replaceState(null, '', '#vitrine');
     if (!_vitrineLoaded) { _vitrineLoaded = true; renderVitrine(); }
@@ -1669,13 +2013,146 @@ function switchProfileView(view) {
   btnProfil.classList.toggle('active', !isVitrine);
   btnVitrine.classList.toggle('active', isVitrine);
 
+  /* En mode Vitrine : l'espace devient un espace de vente — on masque la bannière du profil
+     personnel ; la vitrine affiche sa propre bannière (héro rouge pvt-hero « VOIR NOS PRODUITS »).
+     On garde la carte d'identité (photo de profil) visible. */
+  const pBanner = document.getElementById('p-banner');
+  if (pBanner) pBanner.style.display = isVitrine ? 'none' : '';
+
+  /* En vitrine : on retire la colonne de droite pour donner plus d'espace aux produits. */
+  const colRight = document.getElementById('pp-col-right');
+  const col3 = document.querySelector('.pp-3col');
+  if (colRight) colRight.style.display = isVitrine ? 'none' : '';
+  if (col3) col3.style.gridTemplateColumns = isVitrine ? 'minmax(230px,270px) minmax(0,1fr)' : '';
+
   if (isVitrine) {
     // Préserve un éventuel &pub=<id> pour le lien profond
     const pubMatch = (window.location.hash || '').match(/pub=(\d+)/);
     history.replaceState(null, '', pubMatch ? `#vitrine&pub=${pubMatch[1]}` : '#vitrine');
-    if (!_vitrineLoaded) { _vitrineLoaded = true; renderVitrine(); }
+    if (!_vitrineLoaded) { _vitrineLoaded = true; renderVitrine(); /* renderVitrine appellera renderVitrineCols() une fois _vitrineInit chargé */ }
+    else renderVitrineCols();
   } else {
     history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (window._ppRenderProfilCols) window._ppRenderProfilCols();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   COLONNES LATÉRALES ADAPTÉES À LA VITRINE (infos produit + incitation à l'achat)
+   ══════════════════════════════════════════════════════════ */
+async function renderVitrineCols() {
+  const left = document.getElementById('pp-col-left');
+  const right = document.getElementById('pp-col-right');
+  if (!left || !right) return;
+  const esc2 = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  left.innerHTML = '<div class="pp-side-card" style="text-align:center;color:var(--muted);font-size:12px;">Chargement…</div>';
+  right.innerHTML = '';
+
+  const initId = _vitrineInit ? _vitrineInit.id : null;
+  if (!initId) { left.innerHTML = ''; return; }
+
+  let produits = [], avis = null;
+  try { const r = await api('GET', `/initiatives/${initId}/produits`); produits = r.produits || []; } catch (e) {}
+  try { avis = await api('GET', `/initiatives/${initId}/avis`); } catch (e) {}
+
+  const dispo = produits.filter(p => (p.statut || 'disponible') === 'disponible');
+  const prix = dispo.map(p => Number(p.prix)).filter(v => v > 0);
+  const prixMin = prix.length ? Math.min(...prix) : null;
+  const devise = (dispo.find(p => p.devise)?.devise) || 'EUR';
+  const enAvant = dispo.filter(p => p.mis_en_avant).slice(0, 3);
+  const topProduits = (enAvant.length ? enAvant : dispo.slice(0, 3));
+  const offreFlashTitre = _vitrineInit.vitrine_offre_flash_titre;
+  const offreFlashFin = _vitrineInit.vitrine_offre_flash_fin;
+  const wa = (_vitrineInit.vitrine_whatsapp || '').replace(/[^0-9+]/g, '').replace('+', '');
+  const scrollTo = id => `document.getElementById('${id}')?.scrollIntoView({behavior:'smooth'})`;
+
+  /* ── COLONNE GAUCHE : réassurance + infos utiles ── */
+  left.innerHTML = `
+    <div class="pp-side-card">
+      <h4>🛍️ La boutique en bref</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:18px;font-weight:800;">${dispo.length}</div><div style="font-size:10px;color:var(--muted);">Produits</div></div>
+        ${prixMin != null ? `<div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:18px;font-weight:800;">${prixMin}<span style="font-size:11px;">${esc2(devise)}</span></div><div style="font-size:10px;color:var(--muted);">À partir de</div></div>` : ''}
+      </div>
+    </div>
+    ${avis && avis.moyenne ? `<div class="pp-side-card">
+      <h4>⭐ Avis clients</h4>
+      <div style="font-size:20px;font-weight:800;color:#f59e0b;">${'★'.repeat(Math.round(avis.moyenne))}${'☆'.repeat(5 - Math.round(avis.moyenne))} <span style="color:var(--text);font-size:15px;">${avis.moyenne}/5</span></div>
+      <div style="font-size:12px;color:var(--muted);">Basé sur ${avis.total} avis</div>
+    </div>` : ''}
+    <div class="pp-side-card">
+      <h4>🔒 Acheter en confiance</h4>
+      <div class="pp-list-item"><span>💳</span><span style="flex:1;">Paiement 100% sécurisé (Stripe)</span></div>
+      <div class="pp-list-item"><span>✅</span><span style="flex:1;">Vendeur vérifié Diaspo'Actif</span></div>
+      <div class="pp-list-item"><span>💬</span><span style="flex:1;">Contact direct avec le vendeur</span></div>
+    </div>
+    ${(_vitrineInit.vitrine_horaires || _vitrineInit.adresse || _vitrineInit.ville) ? `<div class="pp-side-card">
+      <h4>📍 Retrait & horaires</h4>
+      ${_vitrineInit.vitrine_horaires ? `<div class="pp-list-item"><span>🕒</span><span style="flex:1;white-space:pre-line;">${esc2(_vitrineInit.vitrine_horaires)}</span></div>` : ''}
+      ${(_vitrineInit.adresse || _vitrineInit.ville) ? `<div class="pp-list-item"><span>📍</span><span style="flex:1;">${esc2([_vitrineInit.adresse, _vitrineInit.ville, _vitrineInit.pays].filter(Boolean).join(', '))}</span></div>` : ''}
+    </div>` : ''}
+    <div class="pp-side-card">
+      <h4>💬 Une question ?</h4>
+      <a class="pp-join-btn" href="messagerie.html?user=${profil.id}">✉️ Contacter le vendeur</a>
+      ${wa ? `<a class="pp-join-btn" href="https://wa.me/${wa}" target="_blank">💬 WhatsApp</a>` : ''}
+    </div>
+  `;
+
+  /* ── COLONNE DROITE : incitation à l'achat ── */
+  right.innerHTML = `
+    ${offreFlashTitre ? `<div class="pp-side-card" style="border:2px solid #ef4444;background:#fef2f2;">
+      <h4 style="color:#ef4444;">🔥 Offre flash</h4>
+      <div style="font-weight:700;font-size:13.5px;">${esc2(offreFlashTitre)}</div>
+      ${offreFlashFin ? `<div id="pp-flash-timer" style="font-size:12px;color:#ef4444;font-weight:700;margin-top:4px;"></div>` : ''}
+      <button class="pp-join-btn" style="background:#ef4444;color:#fff;border-color:#ef4444;margin-top:8px;" onclick="${scrollTo('pv-produits')}">Voir l'offre →</button>
+    </div>` : ''}
+    ${topProduits.length ? `<div class="pp-side-card">
+      <h4>🏆 ${enAvant.length ? 'Mis en avant' : 'À découvrir'}</h4>
+      ${topProduits.map(p => {
+        const img = (p.photos && p.photos[0]) || p.image_url;
+        return `<div class="pp-list-item" style="cursor:pointer;" onclick="${scrollTo('pv-produits')}">
+          <div style="width:42px;height:42px;border-radius:8px;overflow:hidden;background:var(--bg);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;">${img ? `<img src="${esc2(img)}" style="width:100%;height:100%;object-fit:cover;">` : '🛍️'}</div>
+          <div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc2(p.nom)}</div>${Number(p.prix) > 0 ? `<div style="font-size:12px;color:var(--tp);font-weight:700;">${p.prix} ${esc2(p.devise || devise)}</div>` : '<div style="font-size:11px;color:var(--muted);">Sur devis</div>'}</div>
+        </div>`;
+      }).join('')}
+      <button class="pp-join-btn" style="background:var(--tp);color:#fff;border-color:var(--tp);margin-top:6px;" onclick="${scrollTo('pv-produits')}">🛒 Voir tous les produits</button>
+    </div>` : `<div class="pp-side-card"><h4>🛒 Boutique</h4><button class="pp-join-btn" style="background:var(--tp);color:#fff;border-color:var(--tp);" onclick="${scrollTo('pv-produits')}">Découvrir les produits →</button></div>`}
+    <div class="pp-side-card">
+      <h4>💳 Comment commander</h4>
+      <div class="pp-list-item"><span>1️⃣</span><span style="flex:1;">Choisissez un produit</span></div>
+      <div class="pp-list-item"><span>2️⃣</span><span style="flex:1;">Cliquez sur « Commander »</span></div>
+      <div class="pp-list-item"><span>3️⃣</span><span style="flex:1;">Payez en ligne en toute sécurité</span></div>
+    </div>
+    ${_vitrineInit.vitrine_objectif_cible ? `<div class="pp-side-card">
+      <h4>🎯 Objectif de la boutique</h4>
+      <div style="font-size:12.5px;margin-bottom:6px;">${esc2(_vitrineInit.vitrine_objectif_libelle || 'commandes')}</div>
+      <div class="pp-gauge"><div id="pp-obj-bar" style="width:0%;"></div></div>
+      <div style="font-size:11px;color:var(--muted);">Cible : ${_vitrineInit.vitrine_objectif_cible}</div>
+    </div>` : ''}
+    <div class="pp-side-card" style="background:linear-gradient(135deg,var(--tp),var(--tp-dark));color:#fff;">
+      <h4 style="color:#fff;">📢 Ne ratez rien</h4>
+      <p style="font-size:12px;margin:0 0 8px;opacity:.9;">Abonnez-vous pour être averti des nouveautés et promotions.</p>
+      <button class="pp-join-btn" style="background:#fff;color:var(--tp);border:none;" onclick="document.getElementById('pvz-subscribe-btn')?.click?.() || (${scrollTo('p-card')})">🔔 S'abonner à la boutique</button>
+    </div>
+  `;
+
+  /* Compte à rebours offre flash */
+  if (offreFlashFin) {
+    const timerEl = document.getElementById('pp-flash-timer');
+    const tick = () => {
+      if (!document.getElementById('pp-flash-timer')) return;
+      const diff = new Date(offreFlashFin) - new Date();
+      if (diff <= 0) { timerEl.textContent = '⏱ Offre terminée'; return; }
+      const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000), s = Math.floor((diff % 60000) / 1000);
+      timerEl.textContent = `⏱ Se termine dans ${h}h ${m}m ${s}s`;
+      setTimeout(tick, 1000);
+    };
+    tick();
+  }
+  /* Barre de progression objectif */
+  if (_vitrineInit.vitrine_objectif_cible) {
+    const bar = document.getElementById('pp-obj-bar');
+    if (bar) { const pct = Math.min(100, Math.round((dispo.length / _vitrineInit.vitrine_objectif_cible) * 100)); requestAnimationFrame(() => bar.style.width = pct + '%'); }
   }
 }
 
@@ -1708,6 +2185,7 @@ async function renderVitrine() {
   // renderVitrineVisitor()). Le code de gestion "ancien style" ci-dessous n'est plus
   // exécuté (conservé tel quel comme référence pour les fonctions qu'il définit).
   renderVitrineVisitor(init);
+  renderVitrineCols(); /* colonnes latérales orientées produit/achat (init maintenant chargée) */
   return;
 
   const banniere = init.vitrine_banniere_url || '';
@@ -1983,10 +2461,10 @@ async function renderVitrineVisitor(init) {
   try { const pr = await api('GET', `/initiatives/${init.id}/partenaires`); partenaires = pr.partenaires || []; } catch(e) {}
   const partenairesObjectifSec = (partenaires.length || init.vitrine_objectif_cible || isOwn) ? `<section id="pv-partenaires" class="pvt-section">
     <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🤝 Nos partenaires</h3>${isOwn?`<a href="dashboard-initiative.html#partenaires-liste" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;">⚙️ Gérer</a>`:''}</div>
-    <div style="padding:18px 22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;">
+    <div style="padding:18px 22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;">
       ${partenaires.length ? partenaires.map(p=>`
         <div style="text-align:center;background:#F6F1EE;border-radius:12px;padding:12px;">
-          ${p.logo_url?`<img src="${esc(p.logo_url)}" alt="${esc(p.nom||'')}" style="width:100%;height:52px;object-fit:contain;margin-bottom:6px;">`:`<div style="height:52px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:6px;">🤝</div>`}
+          ${p.logo_url?`<img src="${esc(p.logo_url)}" alt="${esc(p.nom||'')}" style="width:100%;height:130px;object-fit:contain;margin-bottom:6px;">`:`<div style="height:130px;display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:6px;">🤝</div>`}
           <div style="font-size:12.5px;font-weight:700;color:#122A4D;">${esc(p.nom)}</div>
           ${p.type_partenaire?`<div style="font-size:10.5px;color:#8794A7;margin-top:1px;">${esc(p.type_partenaire)}</div>`:''}
           ${p.description?`<div style="font-size:10.5px;color:#6B7686;margin-top:4px;">${esc(p.description)}</div>`:''}
@@ -2262,17 +2740,86 @@ async function pvtRemovePartenaire(i) {
 }
 
 /* Titulaire : téléchargements (documents externes, saisie d'URL) */
-async function pvtAddDocument() {
+function pvtAddDocument() {
   if (!isOwn || !_vitrineInit) return;
-  const titre = prompt('Titre du document (ex : Catalogue produits) :');
-  if (!titre) return;
-  const url = prompt('Lien du document (URL publique — Google Drive, PDF hébergé…) :');
-  if (!url) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:20px;">
+      <h3 style="margin:0 0 14px;">➕ Ajouter un document</h3>
+      <label style="font-size:12px;font-weight:700;">Titre</label>
+      <input type="text" id="pvt-doc-titre" placeholder="Ex : Catalogue produits" style="margin:4px 0 10px;width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;">
+      <div class="da-pill-group" style="margin-bottom:12px;">
+        <label class="da-pill checked" id="pvt-doc-mode-fichier"><input type="radio" name="pvt-doc-mode" value="fichier" checked onchange="pvtDocChoisirMode('fichier')"><span>📁 Fichier</span></label>
+        <label class="da-pill" id="pvt-doc-mode-lien"><input type="radio" name="pvt-doc-mode" value="lien" onchange="pvtDocChoisirMode('lien')"><span>🔗 Lien</span></label>
+        <label class="da-pill" id="pvt-doc-mode-photo"><input type="radio" name="pvt-doc-mode" value="photo" onchange="pvtDocChoisirMode('photo')"><span>🖼️ Photo</span></label>
+      </div>
+      <div id="pvt-doc-fichier-row">
+        <input type="file" id="pvt-doc-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/jpeg,image/png,image/webp" onchange="pvtDocUploadFichier(this)">
+        <div id="pvt-doc-file-status" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
+      </div>
+      <div id="pvt-doc-lien-row" style="display:none;">
+        <input type="url" id="pvt-doc-url" placeholder="https://…" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;">
+      </div>
+      <div id="pvt-doc-photo-row" style="display:none;">
+        <input type="file" id="pvt-doc-photo-file" accept="image/jpeg,image/png,image/webp" onchange="pvtDocUploadFichier(this)">
+        <div id="pvt-doc-photo-status" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button class="btn btn-outline" onclick="window._pvtDocOverlay.remove()">Annuler</button>
+        <button class="btn btn-orange" onclick="pvtDocEnregistrer()">Ajouter</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  window._pvtDocOverlay = overlay;
+  window._pvtDocUrl = null;
+}
+
+function pvtDocChoisirMode(mode) {
+  ['fichier','lien','photo'].forEach(m => document.getElementById('pvt-doc-mode-'+m).classList.toggle('checked', m===mode));
+  document.getElementById('pvt-doc-fichier-row').style.display = mode==='fichier' ? 'block' : 'none';
+  document.getElementById('pvt-doc-lien-row').style.display = mode==='lien' ? 'block' : 'none';
+  document.getElementById('pvt-doc-photo-row').style.display = mode==='photo' ? 'block' : 'none';
+}
+
+async function pvtDocUploadFichier(input) {
+  const file = input.files[0]; if (!file) return;
+  const isPhoto = input.id === 'pvt-doc-photo-file';
+  const statusEl = document.getElementById(isPhoto ? 'pvt-doc-photo-status' : 'pvt-doc-file-status');
+  statusEl.textContent = '⏳ Téléversement en cours…';
+  window._pvtDocUploading = true;
+  try {
+    const url = await uploadMedia(file, isPhoto ? 'document' : 'document');
+    window._pvtDocUrl = url;
+    statusEl.textContent = '✅ ' + file.name;
+  } catch (e) {
+    statusEl.textContent = '';
+    showToast?.('Erreur upload : ' + e.message, 'danger') || alert('Erreur upload : ' + e.message);
+  } finally {
+    window._pvtDocUploading = false;
+  }
+}
+
+async function pvtDocEnregistrer() {
+  if (window._pvtDocUploading) { showToast?.('Patientez la fin du téléversement.', 'warning') || alert('Patientez la fin du téléversement.'); return; }
+  const titre = document.getElementById('pvt-doc-titre').value.trim();
+  if (!titre) { showToast?.('Titre requis.', 'warning') || alert('Titre requis.'); return; }
+  const mode = document.querySelector('input[name="pvt-doc-mode"]:checked').value;
+  let url;
+  if (mode === 'lien') {
+    url = document.getElementById('pvt-doc-url').value.trim();
+    if (!url) { showToast?.('Lien requis.', 'warning') || alert('Lien requis.'); return; }
+  } else {
+    url = window._pvtDocUrl;
+    if (!url) { showToast?.('Choisissez un fichier.', 'warning') || alert('Choisissez un fichier.'); return; }
+  }
   const list = safeParseJson(_vitrineInit.vitrine_documents_json, []);
   list.push({ titre, url });
   try {
     await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_documents_json: list });
     _vitrineInit.vitrine_documents_json = JSON.stringify(list);
+    window._pvtDocOverlay?.remove();
     renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
@@ -2935,7 +3482,10 @@ async function renderBoutique(init, ownerFlag) {
       <span>🛍️ Boutique</span>
       <span class="prod-counter">${count}/${MAX_PRODUITS_VITRINE} produits</span>
     </div>
-    ${!ownerFlag ? `<button class="btn btn-outline" style="margin-bottom:12px;" onclick="contacterBoutique(${ownerId})">💬 Contacter la boutique</button>` : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      ${!ownerFlag ? `<button class="btn btn-outline" onclick="contacterBoutique(${ownerId})">💬 Contacter la boutique</button>` : ''}
+      <a class="btn btn-outline" href="adhesions.html?initiative=${init.id}">🎫 Adhérer / Faire un don</a>
+    </div>
     ${ownerFlag ? `<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
       <button class="btn btn-sm btn-orange" id="pf-filtre-tous" onclick="filtrerProduits('tous')">Tous</button>
       <button class="btn btn-sm btn-outline" id="pf-filtre-dispo" onclick="filtrerProduits('disponible')">Disponibles</button>
@@ -4907,7 +5457,15 @@ async function renderIdentityCard() {
             <div style="font-size:12px;color:#166534;">Identité vérifiée par Diaspo'Actif le ${fmtDateFr(r.verifie_le)}.</div>
           </div>
         </div>
-        <p class="codes-sub" style="margin:0;">Valable jusqu'au <strong>${fmtDateFr(r.expire_le)}</strong>. Aucun document personnel n'est affiché publiquement — seul ce badge est visible des autres utilisateurs.</p>`;
+        <p class="codes-sub" style="margin:0;">Valable jusqu'au <strong>${fmtDateFr(r.expire_le)}</strong>. Aucun document personnel n'est affiché publiquement — seul ce badge est visible des autres utilisateurs.</p>
+        ${r.mismatch ? `
+        <div style="display:flex;align-items:flex-start;gap:10px;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:14px 16px;margin-top:10px;">
+          <span style="font-size:20px;">⚠️</span>
+          <div>
+            <div style="font-weight:800;color:#92400e;font-size:13px;">Origine à confirmer</div>
+            <div style="font-size:12px;color:#92400e;">Le pays associé à votre document d'identité ne correspond pas à la nationalité déclarée sur votre profil. Vérifiez vos informations dans <a href="confidentialite.html" style="color:#92400e;text-decoration:underline;">Confidentialité</a>, ou contactez le support si c'est une erreur.</div>
+          </div>
+        </div>` : ''}`;
     } else if (r.session_en_cours) {
       body.innerHTML = `
         <p class="codes-sub" style="margin:0 0 12px;">Une vérification est en cours de traitement chez Stripe. Cela peut prendre quelques minutes après l'envoi de vos documents.</p>

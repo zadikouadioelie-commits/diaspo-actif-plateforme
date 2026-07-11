@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Diaspo'Actif — Audiovisuel</title>
+<title>Diaspo'Actif — Atelier audiovisuel</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/styles.v2.css">
 <link rel="stylesheet" href="assets/responsive.css">
@@ -73,6 +73,14 @@
 
 /* Modals */
 .av-modal-body{display:flex;flex-direction:column;gap:14px;}
+/* Lisibilité garantie des modales Live / Podcast (fond blanc, texte foncé) */
+.av-modal-bg .modal{background:#fff !important;color:#1f2937 !important;}
+.av-modal-bg .modal-head strong,.av-modal-bg strong{color:#0d1b2a !important;}
+.av-modal-bg .form-label,.av-modal-bg label{color:#374151 !important;font-weight:700;}
+.av-modal-bg .form-input,.av-modal-bg input,.av-modal-bg textarea,.av-modal-bg select{background:#f8fafc !important;color:#111827 !important;border:1px solid #d1d5db !important;}
+.av-modal-bg .form-input::placeholder,.av-modal-bg input::placeholder,.av-modal-bg textarea::placeholder{color:#9ca3af !important;}
+.av-modal-bg .acces-opt{color:#1f2937 !important;}
+.av-modal-bg .acces-opt .an{color:#1f2937 !important;}
 
 /* Accès live */
 .acces-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
@@ -119,10 +127,11 @@
     <div class="av-hero">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
         <div>
-          <h1>📺 Audiovisuel</h1>
-          <p>Votre espace média : diffusez en direct, publiez des podcasts, gérez votre bibliothèque.</p>
+          <h1>🎬 Atelier audiovisuel</h1>
+          <p>Votre studio de création : montez vos vidéos, diffusez en direct, publiez des podcasts et gérez votre médiathèque.</p>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <a class="btn" style="background:#fff;color:#4c1d95;border-color:#fff;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;" href="atelier-audiovisuel.html">🎬 Ouvrir le studio de montage</a>
           <button class="btn" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3);" onclick="openModalLive()">+ Nouveau Live</button>
           <button class="btn" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3);" onclick="openModalPodcast()">+ Podcast</button>
         </div>
@@ -132,6 +141,30 @@
         <div class="av-stat"><div class="sn">—</div><div class="sl">Vues live</div></div>
         <div class="av-stat"><div class="sn">—</div><div class="sl">Épisodes</div></div>
         <div class="av-stat"><div class="sn">—</div><div class="sl">Écoutes</div></div>
+      </div>
+    </div>
+
+    <!-- Vitrine du studio : exemple + illustrations du fonctionnement -->
+    <div class="card" id="av-showcase" style="margin:0 0 20px;padding:20px;">
+      <h2 style="margin:0 0 4px;font-size:19px;">🎬 Découvrez le studio de montage en action</h2>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 16px;">Un exemple réalisé entièrement dans l'Atelier, et les 5 étapes pour créer votre vidéo.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;align-items:start;">
+        <div>
+          <video src="/assets/atelier-demo/demo-souris.mp4" controls playsinline preload="metadata"
+                 poster="/assets/atelier-demo/step1.png"
+                 style="width:100%;border-radius:12px;background:#000;box-shadow:0 6px 20px rgba(0,0,0,.15);"></video>
+          <div style="font-size:12px;color:var(--muted);margin-top:8px;">▶ « La souris à l'œuvre » — vidéo de démonstration (20 s), musique libre de droits.</div>
+        </div>
+        <div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <img src="/assets/atelier-demo/step1.png" alt="Étape 1 — Importez vos médias" style="width:100%;border-radius:10px;">
+            <img src="/assets/atelier-demo/step2.png" alt="Étape 2 — Montez votre vidéo" style="width:100%;border-radius:10px;">
+            <img src="/assets/atelier-demo/step3.png" alt="Étape 3 — Ajoutez le son" style="width:100%;border-radius:10px;">
+            <img src="/assets/atelier-demo/step4.png" alt="Étape 4 — Effets et titres" style="width:100%;border-radius:10px;">
+            <img src="/assets/atelier-demo/step5.png" alt="Étape 5 — Exportez et publiez" style="width:100%;border-radius:10px;grid-column:1/-1;">
+          </div>
+          <a class="btn btn-orange" href="atelier-audiovisuel.html" style="margin-top:14px;display:inline-block;">🎬 Ouvrir le studio de montage</a>
+        </div>
       </div>
     </div>
 
@@ -151,8 +184,8 @@
 </div>
 
 <!-- MODAL NOUVEAU LIVE -->
-<div class="modal-bg" id="modal-live" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;">
-  <div class="modal" style="max-width:560px;width:95%;max-height:90vh;overflow-y:auto;">
+<div class="modal-bg av-modal-bg" id="modal-live" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9000;align-items:center;justify-content:center;">
+  <div class="modal" style="max-width:560px;width:95%;max-height:90vh;overflow-y:auto;background:#ffffff;color:#1f2937;border-radius:14px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.4);">
     <div class="modal-head">
       <strong>📺 Nouveau Live</strong>
       <button onclick="closeModal('modal-live')" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);">✕</button>
@@ -215,8 +248,8 @@
 </div>
 
 <!-- MODAL NOUVEAU PODCAST -->
-<div class="modal-bg" id="modal-podcast" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;">
-  <div class="modal" style="max-width:540px;width:95%;max-height:90vh;overflow-y:auto;">
+<div class="modal-bg av-modal-bg" id="modal-podcast" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9000;align-items:center;justify-content:center;">
+  <div class="modal" style="max-width:540px;width:95%;max-height:90vh;overflow-y:auto;background:#ffffff;color:#1f2937;border-radius:14px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.4);">
     <div class="modal-head">
       <strong>🎙 Nouvel épisode podcast</strong>
       <button onclick="closeModal('modal-podcast')" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);">✕</button>
@@ -290,7 +323,14 @@ const TYPE_LABELS = { conference:'Conférence', ag:'AG', formation:'Formation', 
 const TYPE_ICONS = { conference:'📢', ag:'🏛', formation:'🎓', evenement:'📅', lancement:'🚀', visite:'🌍', reunion:'🧑‍💼', interview:'🎤', podcast:'🎙', actualite:'📰', conseil:'💡', temoignage:'🗣', annonce:'📢', general:'🎵' };
 const STATUT_BADGE = { en_cours:'<span class="live-badge">🔴 EN DIRECT</span>', programme:'<span class="live-badge prog">📅 Programmé</span>', termine:'<span class="live-badge fin">✅ Terminé</span>', annule:'<span class="live-badge fin">❌ Annulé</span>' };
 
-function closeModal(id){ document.getElementById(id).style.display='none'; }
+/* Masque la vitrine de démo (dont la vidéo) pendant qu'une modale est ouverte —
+   évite que le plan vidéo GPU ne « perce » par-dessus la modale. */
+function hideShowcase(hide){
+  const s = document.getElementById('av-showcase'); if(!s) return;
+  s.style.visibility = hide ? 'hidden' : '';
+  const v = s.querySelector('video'); if(v && hide){ try{ v.pause(); }catch(e){} }
+}
+function closeModal(id){ document.getElementById(id).style.display='none'; hideShowcase(false); }
 
 function switchTab(tab) {
   currentTab = tab;
@@ -467,7 +507,7 @@ function renderBibCard(c) {
 }
 
 /* ── Créer un Live ── */
-function openModalLive() { document.getElementById('modal-live').style.display='flex'; }
+function openModalLive() { hideShowcase(true); document.getElementById('modal-live').style.display='flex'; }
 function selectAcces(a) {
   selectedAcces = a;
   document.querySelectorAll('.acces-opt').forEach(el=>el.classList.toggle('selected', el.dataset.acces===a));
@@ -495,7 +535,7 @@ async function createLive() {
 }
 
 /* ── Créer un Podcast ── */
-function openModalPodcast() { document.getElementById('modal-podcast').style.display='flex'; }
+function openModalPodcast() { hideShowcase(true); document.getElementById('modal-podcast').style.display='flex'; }
 async function createPodcast() {
   const titre = document.getElementById('pod-titre').value.trim();
   const url_audio = document.getElementById('pod-url').value.trim();
