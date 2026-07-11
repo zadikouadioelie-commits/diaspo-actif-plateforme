@@ -319,8 +319,6 @@ function typeIcon(t){return{reunion:'📹',rdv:'🤝',conference:'🎙️',webin
 function decIcon(t){return{action:'⚡',tache:'📌',projet:'📁',rappel:'🔔',initiative:'🚀'}[t]||'✅';}
 function decIconCls(t){return{action:'dec-action',tache:'dec-tache',projet:'dec-projet',rappel:'dec-rappel',initiative:'dec-initiative'}[t]||'dec-action';}
 
-const api=(m,p,b)=>fetch('/api'+p,{method:m,credentials:'include',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined})
-  .then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||r.statusText);return d;});
 
 // ========= STATE =========
 let ME=null, allReunions=[], allDecisions=[];
