@@ -318,6 +318,18 @@
         });
       });
     });
+
+    // Correctif bfcache : quand le navigateur restaure cette page depuis le cache
+    // "précédent/suivant" (ex. clic sur ← Retour du navigateur), le DOM est restauré
+    // tel qu'il était juste avant de quitter la page — c'est-à-dire avec ce calque
+    // blanc à opacité 1 (fondu de sortie déclenché juste avant la navigation).
+    // Sans ce correctif, la page revient visuellement blanche. On force la
+    // remise à zéro du calque à chaque affichage, y compris depuis le bfcache.
+    window.addEventListener('pageshow', () => {
+      gsap.killTweensOf(overlay);
+      overlay.style.opacity = '0';
+      overlay.style.pointerEvents = 'none';
+    });
   }
 
   /* ─────────────────────────────────────────
