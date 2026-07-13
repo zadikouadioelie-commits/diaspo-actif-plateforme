@@ -128,6 +128,18 @@ db.exec(`
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
   );
 
+  /* ===== ABONNEMENTS AUX PROFILS PUBLICS COLLECTIVITÉ ===== */
+  CREATE TABLE IF NOT EXISTS abonnements_collectivite (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    collectivite_id INTEGER NOT NULL,
+    prefs TEXT DEFAULT 'toutes',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, collectivite_id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(collectivite_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS formations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     titre TEXT NOT NULL,
@@ -1287,6 +1299,10 @@ const MIGRATIONS = [
   ["users", "coordonnees_gps TEXT"],
   ["users", "horaires_ouverture TEXT"],
   ["users", "site_local TEXT"],
+  // Profil public Collectivité
+  ["users", "reseaux_sociaux_officiels TEXT"],
+  ["users", "documents_publics_json TEXT DEFAULT '[]'"],
+  ["users", "presentation_gouvernance TEXT"],
   // Section 4 – Responsable
   ["users", "signature_responsable TEXT"],
   // Hiérarchie institutionnelle

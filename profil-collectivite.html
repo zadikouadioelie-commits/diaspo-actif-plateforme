@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profil Collectivité — Diaspo'Actif</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .pc-wrap{max-width:1100px;margin:0 auto;padding:20px;}
+  .pc-header{background:linear-gradient(135deg,#0E2E5A,#16457E);border-radius:16px;overflow:hidden;color:#fff;margin-bottom:20px;}
+  .pc-banner{height:140px;background-size:cover;background-position:center;background-color:rgba(255,255,255,.08);}
+  .pc-id{display:flex;gap:16px;align-items:flex-end;padding:0 24px 20px;margin-top:-40px;flex-wrap:wrap;}
+  .pc-logo{width:84px;height:84px;border-radius:14px;background:#fff;object-fit:cover;border:3px solid #fff;box-shadow:0 6px 20px rgba(0,0,0,.25);}
+  .pc-id-info{flex:1;min-width:200px;}
+  .pc-id-info h1{margin:0;font-size:24px;font-weight:800;}
+  .pc-id-meta{font-size:13px;opacity:.85;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .pc-badge{background:rgba(255,255,255,.18);padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;}
+  .pc-actions{display:flex;gap:8px;padding:0 24px 20px;flex-wrap:wrap;}
+  .pc-btn{border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .pc-btn-primary{background:#fff;color:#16457E;}
+  .pc-btn-outline{background:rgba(255,255,255,.12);color:#fff;border:1.5px solid rgba(255,255,255,.4);}
+  .pc-grid{display:grid;grid-template-columns:280px 1fr;gap:20px;}
+  @media (max-width:820px){.pc-grid{grid-template-columns:1fr;}}
+  .pc-card{background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;padding:18px;margin-bottom:16px;}
+  .pc-card h3{margin:0 0 12px;font-size:15px;}
+  .pc-stat-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border,#eee);}
+  .pc-stat-row:last-child{border-bottom:none;}
+  .pc-post{padding:12px 0;border-bottom:1px solid var(--border,#eee);font-size:13.5px;}
+  .pc-post:last-child{border-bottom:none;}
+  .pc-post-date{font-size:11px;color:var(--muted,#888);margin-bottom:4px;}
+  .pc-evt{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border,#eee);font-size:13px;}
+  .pc-evt:last-child{border-bottom:none;}
+  .pc-evt-date{background:#EFF6FF;color:#1e40af;border-radius:8px;padding:4px 8px;font-weight:700;font-size:11px;white-space:nowrap;height:fit-content;}
+  .pc-gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .pc-gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:pointer;}
+  .pc-doc{display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13px;border-bottom:1px solid var(--border,#eee);}
+  .pc-doc:last-child{border-bottom:none;}
+  .pc-empty{color:var(--muted,#888);font-size:13px;}
+</style>
+</head>
+<body>
+
+<div id="topbar-slot"></div>
+
+<div class="pc-wrap" id="pc-wrap">
+  <div class="pc-card"><div class="pc-empty">Chargement du profil…</div></div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/galerie-lightbox.js"></script>
+<script>
+(async function () {
+  const id = new URLSearchParams(location.search).get('id');
+  const wrap = document.getElementById('pc-wrap');
+  if (!id) { wrap.innerHTML = '<div class="pc-card">Profil introuvable.</div>'; return; }
+
+  const CU = await fetchCurrentUser().catch(() => null);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  let profil;
+  try {
+    const r = await api('GET', `/collectivites/${id}/profil-public`);
+    profil = r.profil;
+  } catch (e) {
+    wrap.innerHTML = `<div class="pc-card">Profil introuvable ou erreur : ${esc(e.message)}</div>`;
+    return;
+  }
+
+  const TYPE_LABEL = { region:'Région', district:'District', departement:'Département', prefecture:'Préfecture', commune:'Commune', consulat:'Consulat', institution:'Institution', ambassade:'Ambassade', ministere:'Ministère' };
+  const typeLabel = TYPE_LABEL[(profil.type_organisme||'').toLowerCase()] || profil.type_organisme || 'Collectivité';
+  const territoire = [profil.ville, profil.departement, profil.region, profil.pays].filter(Boolean).join(', ');
+
+  wrap.innerHTML = `
+    <div class="pc-header">
+      <div class="pc-banner" style="${profil.banner_url ? `background-image:url('${esc(profil.banner_url)}')` : ''}"></div>
+      <div class="pc-id">
+        ${profil.logo_url ? `<img class="pc-logo" src="${esc(profil.logo_url)}" alt="">` : `<div class="pc-logo" style="display:flex;align-items:center;justify-content:center;font-size:32px;">🏛️</div>`}
+        <div class="pc-id-info">
+          <h1>${esc(profil.nom)}</h1>
+          <div class="pc-id-meta">
+            <span class="pc-badge">${esc(typeLabel)}</span>
+            ${profil.is_verified ? '<span class="pc-badge">✅ Collectivité vérifiée</span>' : ''}
+            ${territoire ? `<span>📍 ${esc(territoire)}</span>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="pc-actions">
+        <button class="pc-btn pc-btn-primary" id="pc-btn-abonner">${profil.abonne ? '✅ Abonné' : '🔔 S\'abonner'}</button>
+        ${profil.site_web ? `<a class="pc-btn pc-btn-outline" href="${esc(profil.site_web)}" target="_blank" rel="noopener">🌐 Site officiel</a>` : ''}
+        ${CU && CU.id !== profil.id ? `<a class="pc-btn pc-btn-outline" href="messagerie.html?user=${profil.id}">✉️ Contacter</a>` : ''}
+      </div>
+    </div>
+
+    <div class="pc-grid">
+      <div>
+        <div class="pc-card">
+          <h3>📊 Statistiques publiques</h3>
+          <div class="pc-stat-row"><span>Abonnés</span><strong>${profil.stats.abonnes}</strong></div>
+          <div class="pc-stat-row"><span>Publications</span><strong>${profil.stats.publications}</strong></div>
+          <div class="pc-stat-row"><span>Événements organisés</span><strong>${profil.stats.evenements}</strong></div>
+        </div>
+
+        ${(profil.nom_responsable || profil.presentation_gouvernance) ? `
+        <div class="pc-card">
+          <h3>🏛️ Gouvernance</h3>
+          ${profil.nom_responsable ? `<div style="font-size:13px;margin-bottom:8px;"><strong>${esc([profil.prenom_responsable, profil.nom_responsable].filter(Boolean).join(' '))}</strong><br><span style="color:var(--muted,#888);">${esc(profil.fonction_responsable || 'Responsable')}</span></div>` : ''}
+          ${profil.presentation_gouvernance ? `<div style="font-size:13px;white-space:pre-line;">${esc(profil.presentation_gouvernance)}</div>` : ''}
+        </div>` : ''}
+
+        ${Object.keys(profil.reseaux_sociaux || {}).length ? `
+        <div class="pc-card">
+          <h3>🔗 Réseaux sociaux</h3>
+          ${Object.entries(profil.reseaux_sociaux).filter(([,v]) => v).map(([k,v]) => `<div style="font-size:13px;margin-bottom:6px;"><a href="${esc(v)}" target="_blank" rel="noopener">${esc(k)}</a></div>`).join('')}
+        </div>` : ''}
+
+        ${profil.documents.length ? `
+        <div class="pc-card">
+          <h3>📄 Documents publics</h3>
+          ${profil.documents.map(d => `<div class="pc-doc">📎 <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.nom || 'Document')}</a></div>`).join('')}
+        </div>` : ''}
+      </div>
+
+      <div>
+        <div class="pc-card">
+          <h3>📝 Présentation du territoire</h3>
+          ${profil.bio ? `<div style="font-size:13.5px;white-space:pre-line;line-height:1.6;">${esc(profil.bio)}</div>` : '<div class="pc-empty">Aucune présentation renseignée.</div>'}
+        </div>
+
+        <div class="pc-card">
+          <h3>📢 Actualités du territoire</h3>
+          <div id="pc-actualites"><div class="pc-empty">Chargement…</div></div>
+        </div>
+
+        <div class="pc-card">
+          <h3>📅 Agenda territorial</h3>
+          <div id="pc-agenda"><div class="pc-empty">Chargement…</div></div>
+        </div>
+
+        ${profil.galerie.length ? `
+        <div class="pc-card">
+          <h3>🖼️ Galerie</h3>
+          <div class="pc-gallery">
+            ${profil.galerie.map((img, idx) => `<img src="${esc(img.url)}" alt="" onclick='openGaleriePhoto("user", ${profil.id}, ${JSON.stringify(img.id || ('p'+idx))}, ${JSON.stringify(img.url||'')}, ${JSON.stringify(img.titre||'')}, ${JSON.stringify(img.caption||'')})'>`).join('')}
+          </div>
+        </div>` : ''}
+      </div>
+    </div>
+  `;
+
+  // Actualités
+  try {
+    const r = await api('GET', `/collectivites/${id}/actualites`);
+    const posts = r.posts || [];
+    document.getElementById('pc-actualites').innerHTML = posts.length
+      ? posts.map(p => `<div class="pc-post"><div class="pc-post-date">${new Date(p.created_at).toLocaleDateString('fr-FR')}</div>${esc(p.contenu).slice(0,300)}</div>`).join('')
+      : '<div class="pc-empty">Aucune actualité publiée pour le moment.</div>';
+  } catch (e) { document.getElementById('pc-actualites').innerHTML = '<div class="pc-empty">Indisponible.</div>'; }
+
+  // Agenda
+  try {
+    const r = await api('GET', `/collectivites/${id}/agenda`);
+    const events = r.events || [];
+    document.getElementById('pc-agenda').innerHTML = events.length
+      ? events.map(e => `<div class="pc-evt"><div class="pc-evt-date">${e.date_evt ? new Date(e.date_evt).toLocaleDateString('fr-FR') : '—'}</div><div><strong>${esc(e.titre)}</strong>${e.lieu ? `<div style="color:var(--muted,#888);">📍 ${esc(e.lieu)}</div>` : ''}</div></div>`).join('')
+      : '<div class="pc-empty">Aucun événement à venir.</div>';
+  } catch (e) { document.getElementById('pc-agenda').innerHTML = '<div class="pc-empty">Indisponible.</div>'; }
+
+  if (profil.galerie.length && typeof loadGaleriePhotoCounts === 'function') loadGaleriePhotoCounts('user', profil.id);
+
+  // Abonnement
+  document.getElementById('pc-btn-abonner').addEventListener('click', async () => {
+    if (!CU) { location.href = 'login.html?r=' + encodeURIComponent(location.pathname + location.search); return; }
+    const btn = document.getElementById('pc-btn-abonner');
+    btn.disabled = true;
+    try {
+      const r = await api('POST', `/collectivites/${id}/abonnement`);
+      btn.textContent = r.abonne ? '✅ Abonné' : "🔔 S'abonner";
+    } catch (e) { alert('Erreur : ' + e.message); }
+    finally { btn.disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>

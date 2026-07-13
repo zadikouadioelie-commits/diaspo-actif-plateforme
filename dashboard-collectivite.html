@@ -137,6 +137,7 @@
           <div>
             <h1 style="margin:0;" id="cockpit-nom">Chargement…</h1>
             <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Cockpit collectivité — pilotage, initiatives et intelligence territoriale</p>
+            <a id="ck-profil-public-link" href="#" class="btn btn-outline btn-sm" style="margin-top:8px;">👁️ Voir mon profil public</a>
           </div>
           <span class="badge badge-inst">Compte Étatique</span>
         </div>
@@ -1775,6 +1776,9 @@ async function loadPartenariats() {
   if (!ME) { window.location.href = "login.html"; return; }
   if (ME.role !== "collectivite") { window.location.href = ROLE_DASHBOARD[ME.role] || "index.html"; return; }
   if (window.Posts) Posts.init(ME.id);
+
+  const ckProfilLink = document.getElementById("ck-profil-public-link");
+  if (ckProfilLink) ckProfilLink.href = "profil-collectivite.html?id=" + ME.id;
 
   document.getElementById("inst-nom").textContent = ME.nom;
   document.getElementById("inst-infos").textContent = [ME.ville, ME.pays].filter(Boolean).join(", ") + " · Compte Étatique";

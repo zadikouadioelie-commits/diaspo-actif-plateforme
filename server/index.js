@@ -2977,6 +2977,67 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
   sendJSON(res, 200, { initiative: row });
 });
 
+/* ===========================================================================
+   PROFIL PUBLIC COLLECTIVITÉ — vitrine institutionnelle (public, lecture seule
+   des champs déjà déclarés, aucune donnée privée ni outil de gouvernance).
+=========================================================================== */
+
+/* GET /api/collectivites/:id/profil-public — identité, territoire, stats */
+route("GET", "/api/collectivites/:id/profil-public", async (req, res, params) => {
+  const row = await db.prepare("SELECT * FROM users WHERE id=? AND role='collectivite'").get(params.id);
+  if (!row) return sendJSON(res, 404, { error: "Collectivité introuvable." });
+  const cu = await getCurrentUser(req);
+
+  const nb_abonnes = (await db.prepare("SELECT COUNT(*) n FROM abonnements_collectivite WHERE collectivite_id=?").get(row.id))?.n || 0;
+  const nb_publications = (await db.prepare("SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?").get(row.id))?.n || 0;
+  const nb_evenements = (await db.prepare("SELECT COUNT(*) n FROM evenements WHERE owner_user_id=?").get(row.id))?.n || 0;
+  const abonne = cu ? !!(await db.prepare("SELECT id FROM abonnements_collectivite WHERE user_id=? AND collectivite_id=?").get(cu.id, row.id)) : false;
+
+  sendJSON(res, 200, {
+    profil: {
+      id: row.id, nom: row.nom, role: row.role,
+      type_organisme: row.type_organisme || row.type_institution || null,
+      pays: row.pays_exercice || row.pays, region: row.region_exercice, departement: row.departement_exercice, ville: row.ville_exercice,
+      site_web: row.site_local, reseaux_sociaux: safeParse(row.reseaux_sociaux_officiels) || {},
+      logo_url: row.logo_url || row.photo_url, banner_url: row.banner_url,
+      bio: row.bio, presentation_gouvernance: row.presentation_gouvernance,
+      nom_responsable: row.nom_responsable_etatique, prenom_responsable: row.prenom_responsable_etatique, fonction_responsable: row.fonction_responsable_etatique,
+      is_verified: !!row.is_verified,
+      galerie: safeParse(row.galerie_json) || [],
+      documents: safeParse(row.documents_publics_json) || [],
+      stats: { abonnes: nb_abonnes, publications: nb_publications, evenements: nb_evenements },
+      abonne,
+    }
+  });
+});
+
+/* GET /api/collectivites/:id/actualites — fil public de la collectivité */
+route("GET", "/api/collectivites/:id/actualites", async (req, res, params) => {
+  const posts = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? ORDER BY created_at DESC LIMIT 30").all(params.id);
+  sendJSON(res, 200, { posts });
+});
+
+/* GET /api/collectivites/:id/agenda — événements à venir organisés par la collectivité */
+route("GET", "/api/collectivites/:id/agenda", async (req, res, params) => {
+  const events = await db.prepare("SELECT * FROM evenements WHERE owner_user_id=? AND (date_evt IS NULL OR date_evt >= date('now')) ORDER BY date_evt ASC LIMIT 20").all(params.id);
+  sendJSON(res, 200, { events });
+});
+
+/* POST /api/collectivites/:id/abonnement — s'abonner / se désabonner */
+route("POST", "/api/collectivites/:id/abonnement", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const coll = await db.prepare("SELECT id FROM users WHERE id=? AND role='collectivite'").get(params.id);
+  if (!coll) return sendJSON(res, 404, { error: "Collectivité introuvable." });
+  const existe = await db.prepare("SELECT id FROM abonnements_collectivite WHERE user_id=? AND collectivite_id=?").get(user.id, coll.id);
+  if (existe) {
+    await db.prepare("DELETE FROM abonnements_collectivite WHERE id=?").run(existe.id);
+    return sendJSON(res, 200, { abonne: false });
+  }
+  await db.prepare("INSERT INTO abonnements_collectivite (user_id, collectivite_id) VALUES (?,?)").run(user.id, coll.id);
+  sendJSON(res, 200, { abonne: true });
+});
+
 /* ── Équipe publique : responsable principal + membres acceptés (liens vers profils DA) ── */
 route("GET", "/api/initiatives/:id/equipe", async (req, res, params) => {
   const init = await db.prepare("SELECT id, owner_user_id, nom_responsable, prenom_responsable, fonction_responsable FROM initiatives WHERE id = ? OR slug = ?").get(params.id, params.id);
