@@ -8638,7 +8638,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   route("POST", "/api/communications", async (req, res, params, body) => {
     const user = await getCurrentUser(req);
     if (!user || !["collectivite","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux collectivités et administrateurs." });
-    const { titre, contenu, type, cible, photos_json, video_b64, audio_b64 } = body;
+    const { titre, contenu, type, cible, photos_json, video_b64, audio_b64, liste_id } = body;
     if (!titre || !contenu) return sendJSON(res, 400, { error: "titre et contenu requis." });
     // Valider médias
     const photos = Array.isArray(photos_json) ? photos_json.slice(0, 4) : [];
@@ -8653,17 +8653,30 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     // ignorée au profit du périmètre réel (on la remplace par le périmètre appliqué).
     let nb = 0;
     let perimetre = null;
+    // Liste de diffusion optionnelle : restreint l'audience à une liste possédée par l'émetteur,
+    // toujours intersectée avec le périmètre de compétence (jamais un élargissement, principe 4).
+    let liste = null;
+    if (liste_id) {
+      liste = await db.prepare("SELECT id,nom FROM listes_diffusion WHERE id=? AND proprietaire_id=?").get(liste_id, user.id);
+      if (!liste) return sendJSON(res, 404, { error: "Liste de diffusion introuvable." });
+    }
     if (user.role === "collectivite") {
       const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville FROM users WHERE id=?").get(user.id);
       perimetre = getPerimetre(coll);
       const { where: pw, params: pp } = perimetreWhere(perimetre, "u");
-      try { nb = (await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw})`).get(...pp))?.n || 0; } catch(e) { nb = 0; }
+      let sql = `SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw})`;
+      const args = [...pp];
+      if (liste) { sql += ` AND u.id IN (SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL)`; args.push(liste.id); }
+      try { nb = (await db.prepare(sql).get(...args))?.n || 0; } catch(e) { nb = 0; }
     } else {
-      // Administrateur : diffusion globale
-      try { nb = (await db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur','initiative')`).get())?.n || 0; } catch(e) { nb = 0; }
+      // Administrateur : diffusion globale (optionnellement restreinte à une liste)
+      let sql = `SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur','initiative')`;
+      const args = [];
+      if (liste) { sql += ` AND id IN (SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL)`; args.push(liste.id); }
+      try { nb = (await db.prepare(sql).get(...args))?.n || 0; } catch(e) { nb = 0; }
     }
     // La cible stockée reflète le périmètre réellement appliqué (transparence).
-    const cibleAppliquee = perimetre ? { perimetre, libelle: libellePerimetre(perimetre) } : { portee: "globale" };
+    const cibleAppliquee = { ...(perimetre ? { perimetre, libelle: libellePerimetre(perimetre) } : { portee: "globale" }), ...(liste ? { liste_id: liste.id, liste_nom: liste.nom } : {}) };
     // Alter table si colonnes manquantes (migration SQLite)
     try {
       await db.prepare("ALTER TABLE communications_institutionnelles ADD COLUMN photos_json TEXT DEFAULT '[]'").run();

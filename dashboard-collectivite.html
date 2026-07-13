@@ -628,6 +628,14 @@
             <div id="comm-perimetre-info" style="font-size:13px;font-weight:600;color:#075985;">Chargement du périmètre…</div>
           </div>
 
+          <div style="margin-bottom:12px;">
+            <label class="form-label">Liste de diffusion (optionnel)</label>
+            <select id="comm-liste-select" class="input-field" style="width:100%">
+              <option value="">Tout le périmètre</option>
+            </select>
+            <p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;">Restreint l'audience à une liste créée dans « Mes Listes » (module Réseau professionnel), toujours limitée à votre périmètre de compétence.</p>
+          </div>
+
           <!-- ── Médias joints ── -->
           <div style="border:1.5px dashed var(--border);border-radius:14px;padding:16px;background:var(--surface2);margin-bottom:12px;">
             <div style="font-size:13px;font-weight:700;margin-bottom:12px;">📎 Médias joints</div>
@@ -1532,8 +1540,20 @@ async function loadCommPerimetre() {
   } catch(e) { el.textContent = "Périmètre indisponible."; }
 }
 
+async function loadCommListes() {
+  const sel = document.getElementById("comm-liste-select");
+  if (!sel) return;
+  try {
+    const r = await api("GET", "/listes-diffusion");
+    const listes = r.listes || [];
+    sel.innerHTML = `<option value="">Tout le périmètre</option>` +
+      listes.map(l => `<option value="${l.id}">${escH(l.nom)} (${l.nb_contacts || 0})</option>`).join("");
+  } catch(e) { /* silencieux : la liste reste optionnelle */ }
+}
+
 async function loadCommHistorique() {
   loadCommPerimetre();
+  loadCommListes();
   const el = document.getElementById("comm-historique");
   try {
     const r = await api("GET", "/communications");
@@ -1926,11 +1946,13 @@ async function loadPartenariats() {
     const btn = document.getElementById("btn-envoyer-comm");
     btn.disabled = true; btn.textContent = "⏳ Envoi…";
     try {
+      const listeId = document.getElementById("comm-liste-select").value || null;
       const r = await api("POST", "/communications", {
         titre, contenu, type: COMM_TYPE,
         photos_json: photos,
         video_b64: collVideoB64 || null,
         audio_b64: collAudioB64 || null,
+        liste_id: listeId,
       });
       const nb = r.nb_destinataires ?? 0;
       alert(`✅ Communication envoyée à ${nb.toLocaleString("fr-FR")} destinataire(s)${photos.length ? ` · ${photos.length} photo(s)` : ""}${collVideoB64 ? " · 1 vidéo" : ""}${collAudioB64 ? " · 1 audio" : ""}.`);
