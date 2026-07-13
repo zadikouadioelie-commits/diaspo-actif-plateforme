@@ -6,36 +6,53 @@
 <title>Profil Collectivité — Diaspo'Actif</title>
 <link rel="stylesheet" href="assets/style.css">
 <style>
-  .pc-wrap{max-width:1100px;margin:0 auto;padding:20px;}
-  .pc-header{background:linear-gradient(135deg,#0E2E5A,#16457E);border-radius:16px;overflow:hidden;color:#fff;margin-bottom:20px;}
-  .pc-banner{height:140px;background-size:cover;background-position:center;background-color:rgba(255,255,255,.08);}
-  .pc-id{display:flex;gap:16px;align-items:flex-end;padding:0 24px 20px;margin-top:-40px;flex-wrap:wrap;}
-  .pc-logo{width:84px;height:84px;border-radius:14px;background:#fff;object-fit:cover;border:3px solid #fff;box-shadow:0 6px 20px rgba(0,0,0,.25);}
-  .pc-id-info{flex:1;min-width:200px;}
-  .pc-id-info h1{margin:0;font-size:24px;font-weight:800;}
-  .pc-id-meta{font-size:13px;opacity:.85;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
-  .pc-badge{background:rgba(255,255,255,.18);padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;}
-  .pc-actions{display:flex;gap:8px;padding:0 24px 20px;flex-wrap:wrap;}
-  .pc-btn{border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
-  .pc-btn-primary{background:#fff;color:#16457E;}
-  .pc-btn-outline{background:rgba(255,255,255,.12);color:#fff;border:1.5px solid rgba(255,255,255,.4);}
-  .pc-grid{display:grid;grid-template-columns:280px 1fr;gap:20px;}
-  @media (max-width:820px){.pc-grid{grid-template-columns:1fr;}}
-  .pc-card{background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;padding:18px;margin-bottom:16px;}
-  .pc-card h3{margin:0 0 12px;font-size:15px;}
-  .pc-stat-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border,#eee);}
+  body{background:#F3F5F8;}
+  .pc-wrap{max-width:1240px;margin:0 auto;padding:20px;}
+  .pc-header{position:relative;border-radius:20px;overflow:hidden;color:#fff;margin-bottom:22px;box-shadow:0 14px 40px rgba(14,46,90,.18);}
+  .pc-banner{height:220px;background-size:cover;background-position:center;background-color:#16457E;background-image:linear-gradient(135deg,#0E2E5A,#1E6091,#E8933A22);position:relative;}
+  .pc-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,46,90,0) 40%,rgba(9,26,50,.88) 100%);}
+  .pc-id{position:relative;display:flex;gap:18px;align-items:flex-end;padding:0 26px 22px;margin-top:-56px;flex-wrap:wrap;z-index:2;}
+  .pc-logo{width:100px;height:100px;border-radius:20px;background:#fff;object-fit:cover;border:4px solid #fff;box-shadow:0 10px 26px rgba(0,0,0,.3);}
+  .pc-id-info{flex:1;min-width:220px;padding-bottom:4px;}
+  .pc-id-info h1{margin:0;font-size:27px;font-weight:800;text-shadow:0 2px 8px rgba(0,0,0,.35);}
+  .pc-id-meta{font-size:13px;opacity:.92;margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .pc-badge{background:rgba(255,255,255,.2);backdrop-filter:blur(4px);padding:3px 12px;border-radius:99px;font-size:11px;font-weight:700;}
+  .pc-badge.pc-badge-verified{background:#16A34A;}
+  .pc-badge.pc-badge-warm{background:linear-gradient(135deg,#E8933A,#DB6B1F);}
+  .pc-actions{position:relative;display:flex;gap:10px;padding:16px 26px 22px;flex-wrap:wrap;background:linear-gradient(180deg,rgba(9,26,50,.88),#0E2E5A);z-index:2;}
+  .pc-btn{border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:transform .15s,box-shadow .15s;}
+  .pc-btn:hover{transform:translateY(-1px);}
+  .pc-btn-primary{background:linear-gradient(135deg,#F9A94A,#E8703A);color:#fff;box-shadow:0 6px 16px rgba(232,112,58,.35);}
+  .pc-btn-outline{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.4);}
+  .pc-grid{display:grid;grid-template-columns:280px 1fr 300px;gap:20px;align-items:start;}
+  @media (max-width:980px){.pc-grid{grid-template-columns:1fr;}.pc-col-left,.pc-col-right{position:static!important;}}
+  .pc-col-left,.pc-col-right{position:sticky;top:20px;display:flex;flex-direction:column;gap:16px;}
+  .pc-col-center{display:flex;flex-direction:column;gap:16px;min-width:0;}
+  .pc-card{background:var(--card,#fff);border:1px solid var(--border,#eef0f4);border-radius:16px;padding:18px;box-shadow:0 2px 10px rgba(20,30,60,.04);}
+  .pc-card h3{margin:0 0 12px;font-size:14.5px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+  .pc-stat-row{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid var(--border,#f1f2f5);}
   .pc-stat-row:last-child{border-bottom:none;}
-  .pc-post{padding:12px 0;border-bottom:1px solid var(--border,#eee);font-size:13.5px;}
-  .pc-post:last-child{border-bottom:none;}
+  .pc-feed-card{background:var(--card,#fff);border:1px solid var(--border,#eef0f4);border-radius:16px;padding:16px 18px;box-shadow:0 2px 10px rgba(20,30,60,.04);display:flex;gap:12px;}
+  .pc-feed-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#16457E,#E8933A);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;}
+  .pc-post{font-size:13.5px;flex:1;}
   .pc-post-date{font-size:11px;color:var(--muted,#888);margin-bottom:4px;}
-  .pc-evt{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border,#eee);font-size:13px;}
+  .pc-appel-card{background:linear-gradient(135deg,#FFF7ED,#FFEEDB);border:1.5px solid #F9D9A8;border-radius:16px;padding:16px 18px;}
+  .pc-appel-card .pc-post-date{color:#B45309;}
+  .pc-evt{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border,#f1f2f5);font-size:12.5px;}
   .pc-evt:last-child{border-bottom:none;}
-  .pc-evt-date{background:#EFF6FF;color:#1e40af;border-radius:8px;padding:4px 8px;font-weight:700;font-size:11px;white-space:nowrap;height:fit-content;}
-  .pc-gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
-  .pc-gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:pointer;}
-  .pc-doc{display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13px;border-bottom:1px solid var(--border,#eee);}
+  .pc-evt-date{background:#EFF6FF;color:#1e40af;border-radius:8px;padding:4px 8px;font-weight:700;font-size:10.5px;white-space:nowrap;height:fit-content;}
+  .pc-gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+  .pc-gallery img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;cursor:pointer;transition:transform .2s,box-shadow .2s;box-shadow:0 2px 8px rgba(0,0,0,.08);}
+  .pc-gallery img:hover{transform:scale(1.04);box-shadow:0 8px 20px rgba(0,0,0,.18);}
+  .pc-proj{padding:11px 0;border-bottom:1px solid var(--border,#f1f2f5);font-size:12.5px;}
+  .pc-proj:last-child{border-bottom:none;}
+  .pc-proj-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin-bottom:4px;}
+  .pc-proj-badge.cours{background:#FEF3C7;color:#92400E;}
+  .pc-proj-badge.fait{background:#DCFCE7;color:#166534;}
+  .pc-doc{display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13px;border-bottom:1px solid var(--border,#f1f2f5);}
   .pc-doc:last-child{border-bottom:none;}
   .pc-empty{color:var(--muted,#888);font-size:13px;}
+  .pc-mini-btn{padding:3px 10px;font-size:11px;color:#16457E;background:#EFF6FF;border:none;border-radius:8px;cursor:pointer;font-weight:700;}
 </style>
 </head>
 <body>
@@ -74,14 +91,14 @@
 
   wrap.innerHTML = `
     <div class="pc-header">
-      <div class="pc-banner" style="${profil.banner_url ? `background-image:url('${esc(profil.banner_url)}')` : ''}"></div>
+      <div class="pc-banner" style="${profil.banner_url ? `background-image:url('${esc(profil.banner_url)}'),linear-gradient(135deg,#0E2E5A,#1E6091)` : ''}"></div>
       <div class="pc-id">
-        ${profil.logo_url ? `<img class="pc-logo" src="${esc(profil.logo_url)}" alt="">` : `<div class="pc-logo" style="display:flex;align-items:center;justify-content:center;font-size:32px;">🏛️</div>`}
+        ${profil.logo_url ? `<img class="pc-logo" src="${esc(profil.logo_url)}" alt="">` : `<div class="pc-logo" style="display:flex;align-items:center;justify-content:center;font-size:38px;">🏛️</div>`}
         <div class="pc-id-info">
           <h1>${esc(profil.nom)}</h1>
           <div class="pc-id-meta">
-            <span class="pc-badge">${esc(typeLabel)}</span>
-            ${profil.is_verified ? '<span class="pc-badge">✅ Collectivité vérifiée</span>' : ''}
+            <span class="pc-badge pc-badge-warm">${esc(typeLabel)}</span>
+            ${profil.is_verified ? '<span class="pc-badge pc-badge-verified">✅ Vérifiée</span>' : ''}
             ${territoire ? `<span>📍 ${esc(territoire)}</span>` : ''}
           </div>
         </div>
@@ -94,7 +111,9 @@
     </div>
 
     <div class="pc-grid">
-      <div>
+
+      <!-- ══ COLONNE GAUCHE — identité (statique) ══ -->
+      <div class="pc-col-left">
         <div class="pc-card">
           <h3>📊 Statistiques publiques</h3>
           <div class="pc-stat-row"><span>Abonnés</span><strong>${profil.stats.abonnes}</strong></div>
@@ -104,14 +123,19 @@
 
         ${(!profil.is_owner && profil.abonne) ? `
         <div class="pc-card">
-          <h3>🔔 Mes préférences de notification</h3>
+          <h3>🔔 Mes préférences</h3>
           <select id="pc-prefs-select" class="input-field" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border,#e5e7eb);font-size:13px;">
             <option value="toutes" ${profil.prefs==='toutes'?'selected':''}>Toutes les notifications</option>
-            <option value="annonces" ${profil.prefs==='annonces'?'selected':''}>Uniquement les annonces importantes</option>
-            <option value="evenements" ${profil.prefs==='evenements'?'selected':''}>Uniquement les événements</option>
-            <option value="opportunites" ${profil.prefs==='opportunites'?'selected':''}>Uniquement les opportunités</option>
+            <option value="annonces" ${profil.prefs==='annonces'?'selected':''}>Annonces importantes</option>
+            <option value="evenements" ${profil.prefs==='evenements'?'selected':''}>Événements</option>
+            <option value="opportunites" ${profil.prefs==='opportunites'?'selected':''}>Opportunités</option>
           </select>
         </div>` : ''}
+
+        <div class="pc-card">
+          <h3>📝 Présentation</h3>
+          ${profil.bio ? `<div style="font-size:13px;white-space:pre-line;line-height:1.6;">${esc(profil.bio)}</div>` : '<div class="pc-empty">Aucune présentation renseignée.</div>'}
+        </div>
 
         ${(profil.nom_responsable || profil.presentation_gouvernance) ? `
         <div class="pc-card">
@@ -123,68 +147,73 @@
         ${Object.keys(profil.reseaux_sociaux || {}).length ? `
         <div class="pc-card">
           <h3>🔗 Réseaux sociaux</h3>
-          ${Object.entries(profil.reseaux_sociaux).filter(([,v]) => v).map(([k,v]) => `<div style="font-size:13px;margin-bottom:6px;"><a href="${esc(v)}" target="_blank" rel="noopener">${esc(k)}</a></div>`).join('')}
+          ${Object.entries(profil.reseaux_sociaux).filter(([,v]) => v).map(([k,v]) => `<div style="font-size:13px;margin-bottom:6px;"><a href="${esc(v)}" target="_blank" rel="noopener">🔗 ${esc(k)}</a></div>`).join('')}
         </div>` : ''}
 
         ${(profil.documents.length || profil.is_owner) ? `
         <div class="pc-card">
-          <h3>📄 Documents publics ${profil.is_owner ? `<button class="pc-btn pc-btn-outline" style="padding:3px 10px;font-size:11px;color:#16457E;background:#EFF6FF;" id="pc-btn-add-doc">+ Ajouter</button>` : ''}</h3>
+          <h3>📄 Documents <span></span>${profil.is_owner ? `<button class="pc-mini-btn" id="pc-btn-add-doc">+ Ajouter</button>` : ''}</h3>
           <div id="pc-docs-list">${profil.documents.map(d => `<div class="pc-doc">📎 <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.nom || 'Document')}</a></div>`).join('') || '<div class="pc-empty">Aucun document.</div>'}</div>
         </div>` : ''}
       </div>
 
-      <div>
-        <div class="pc-card">
-          <h3>📝 Présentation du territoire</h3>
-          ${profil.bio ? `<div style="font-size:13.5px;white-space:pre-line;line-height:1.6;">${esc(profil.bio)}</div>` : '<div class="pc-empty">Aucune présentation renseignée.</div>'}
+      <!-- ══ COLONNE CENTRE — fil (actualités, appels à projets) ══ -->
+      <div class="pc-col-center">
+        <div class="pc-appel-card" id="pc-appels-card" style="display:none;">
+          <h3 style="margin:0 0 10px;">📢 Appels à projets & recherche de partenariats</h3>
+          <div id="pc-appels"></div>
         </div>
 
+        <div id="pc-actualites">
+          <div class="pc-feed-card"><div class="pc-post pc-empty">Chargement des actualités…</div></div>
+        </div>
+      </div>
+
+      <!-- ══ COLONNE DROITE — projets & galerie (statique) ══ -->
+      <div class="pc-col-right">
         ${(profil.projets_en_cours.length || profil.is_owner) ? `
         <div class="pc-card">
-          <h3>🚧 Projets en cours ${profil.is_owner ? `<button class="pc-btn pc-btn-outline" style="padding:3px 10px;font-size:11px;color:#16457E;background:#EFF6FF;" id="pc-btn-add-projet">+ Ajouter</button>` : ''}</h3>
-          <div id="pc-projets-list">${profil.projets_en_cours.map(p => `<div class="pc-post"><strong>${esc(p.titre)}</strong>${p.description ? `<div style="margin-top:4px;">${esc(p.description)}</div>` : ''}</div>`).join('') || '<div class="pc-empty">Aucun projet en cours.</div>'}</div>
+          <h3>🚧 Projets en cours ${profil.is_owner ? `<button class="pc-mini-btn" id="pc-btn-add-projet">+ Ajouter</button>` : ''}</h3>
+          <div id="pc-projets-list">${profil.projets_en_cours.map(p => `<div class="pc-proj"><span class="pc-proj-badge cours">En cours</span><br><strong>${esc(p.titre)}</strong>${p.description ? `<div style="margin-top:3px;color:var(--muted,#666);">${esc(p.description)}</div>` : ''}</div>`).join('') || '<div class="pc-empty">Aucun projet en cours.</div>'}</div>
         </div>` : ''}
 
         ${(profil.realisations.length || profil.is_owner) ? `
         <div class="pc-card">
-          <h3>🏆 Projets réalisés ${profil.is_owner ? `<button class="pc-btn pc-btn-outline" style="padding:3px 10px;font-size:11px;color:#16457E;background:#EFF6FF;" id="pc-btn-add-realisation">+ Ajouter</button>` : ''}</h3>
-          <div id="pc-realisations-list">${profil.realisations.map(p => `<div class="pc-post"><strong>${esc(p.titre)}</strong>${p.description ? `<div style="margin-top:4px;">${esc(p.description)}</div>` : ''}</div>`).join('') || '<div class="pc-empty">Aucun projet réalisé archivé.</div>'}</div>
+          <h3>🏆 Projets réalisés ${profil.is_owner ? `<button class="pc-mini-btn" id="pc-btn-add-realisation">+ Ajouter</button>` : ''}</h3>
+          <div id="pc-realisations-list">${profil.realisations.map(p => `<div class="pc-proj"><span class="pc-proj-badge fait">Réalisé</span><br><strong>${esc(p.titre)}</strong>${p.description ? `<div style="margin-top:3px;color:var(--muted,#666);">${esc(p.description)}</div>` : ''}</div>`).join('') || '<div class="pc-empty">Aucun projet réalisé archivé.</div>'}</div>
         </div>` : ''}
 
-        <div class="pc-card" id="pc-appels-card" style="display:none;">
-          <h3>📢 Appels à projets & recherche de partenariats</h3>
-          <div id="pc-appels"></div>
-        </div>
-
+        ${profil.galerie.length ? `
         <div class="pc-card">
-          <h3>📢 Actualités du territoire</h3>
-          <div id="pc-actualites"><div class="pc-empty">Chargement…</div></div>
-        </div>
+          <h3>🖼️ Galerie <span style="font-weight:400;font-size:11px;color:var(--muted,#999);">${profil.galerie.length} photo${profil.galerie.length>1?'s':''}</span></h3>
+          <div class="pc-gallery">
+            ${profil.galerie.map((img, idx) => `<img src="${esc(img.url)}" alt="${esc(img.titre||'')}" title="${esc(img.titre||'')}" onclick='openGaleriePhoto("user", ${profil.id}, ${JSON.stringify(img.id || ('p'+idx))}, ${JSON.stringify(img.url||'')}, ${JSON.stringify(img.titre||'')}, ${JSON.stringify(img.caption||'')})'>`).join('')}
+          </div>
+        </div>` : ''}
 
         <div class="pc-card">
           <h3>📅 Agenda territorial</h3>
           <div id="pc-agenda"><div class="pc-empty">Chargement…</div></div>
         </div>
-
-        ${profil.galerie.length ? `
-        <div class="pc-card">
-          <h3>🖼️ Galerie</h3>
-          <div class="pc-gallery">
-            ${profil.galerie.map((img, idx) => `<img src="${esc(img.url)}" alt="" onclick='openGaleriePhoto("user", ${profil.id}, ${JSON.stringify(img.id || ('p'+idx))}, ${JSON.stringify(img.url||'')}, ${JSON.stringify(img.titre||'')}, ${JSON.stringify(img.caption||'')})'>`).join('')}
-          </div>
-        </div>` : ''}
       </div>
     </div>
   `;
 
-  // Actualités
+  // Actualités (fil central)
   try {
     const r = await api('GET', `/collectivites/${id}/actualites`);
     const posts = r.posts || [];
     document.getElementById('pc-actualites').innerHTML = posts.length
-      ? posts.map(p => `<div class="pc-post"><div class="pc-post-date">${new Date(p.created_at).toLocaleDateString('fr-FR')}</div>${esc(p.contenu).slice(0,300)}</div>`).join('')
-      : '<div class="pc-empty">Aucune actualité publiée pour le moment.</div>';
-  } catch (e) { document.getElementById('pc-actualites').innerHTML = '<div class="pc-empty">Indisponible.</div>'; }
+      ? posts.map(p => `
+        <div class="pc-feed-card">
+          <div class="pc-feed-avatar">${profil.logo_url ? `<img src="${esc(profil.logo_url)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : '🏛️'}</div>
+          <div class="pc-post">
+            <div class="pc-post-date">${esc(profil.nom)} · ${new Date(p.created_at).toLocaleDateString('fr-FR')}</div>
+            ${esc(p.contenu).slice(0,400)}
+          </div>
+        </div>`).join('')
+      : `<div class="pc-card"><div class="pc-empty">Aucune actualité publiée pour le moment.</div></div>`;
+  } catch (e) { document.getElementById('pc-actualites').innerHTML = `<div class="pc-card"><div class="pc-empty">Indisponible.</div></div>`; }
 
   // Agenda
   try {
