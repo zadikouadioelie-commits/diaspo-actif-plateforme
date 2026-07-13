@@ -102,6 +102,17 @@
           <div class="pc-stat-row"><span>Événements organisés</span><strong>${profil.stats.evenements}</strong></div>
         </div>
 
+        ${(!profil.is_owner && profil.abonne) ? `
+        <div class="pc-card">
+          <h3>🔔 Mes préférences de notification</h3>
+          <select id="pc-prefs-select" class="input-field" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border,#e5e7eb);font-size:13px;">
+            <option value="toutes" ${profil.prefs==='toutes'?'selected':''}>Toutes les notifications</option>
+            <option value="annonces" ${profil.prefs==='annonces'?'selected':''}>Uniquement les annonces importantes</option>
+            <option value="evenements" ${profil.prefs==='evenements'?'selected':''}>Uniquement les événements</option>
+            <option value="opportunites" ${profil.prefs==='opportunites'?'selected':''}>Uniquement les opportunités</option>
+          </select>
+        </div>` : ''}
+
         ${(profil.nom_responsable || profil.presentation_gouvernance) ? `
         <div class="pc-card">
           <h3>🏛️ Gouvernance</h3>
@@ -139,6 +150,11 @@
           <h3>🏆 Projets réalisés ${profil.is_owner ? `<button class="pc-btn pc-btn-outline" style="padding:3px 10px;font-size:11px;color:#16457E;background:#EFF6FF;" id="pc-btn-add-realisation">+ Ajouter</button>` : ''}</h3>
           <div id="pc-realisations-list">${profil.realisations.map(p => `<div class="pc-post"><strong>${esc(p.titre)}</strong>${p.description ? `<div style="margin-top:4px;">${esc(p.description)}</div>` : ''}</div>`).join('') || '<div class="pc-empty">Aucun projet réalisé archivé.</div>'}</div>
         </div>` : ''}
+
+        <div class="pc-card" id="pc-appels-card" style="display:none;">
+          <h3>📢 Appels à projets & recherche de partenariats</h3>
+          <div id="pc-appels"></div>
+        </div>
 
         <div class="pc-card">
           <h3>📢 Actualités du territoire</h3>
@@ -179,6 +195,17 @@
       : '<div class="pc-empty">Aucun événement à venir.</div>';
   } catch (e) { document.getElementById('pc-agenda').innerHTML = '<div class="pc-empty">Indisponible.</div>'; }
 
+  // Appels à projets & recherche de partenariats
+  let appelsData = [];
+  try {
+    const r = await api('GET', `/collectivites/${id}/appels-projets`);
+    appelsData = r.posts || [];
+    if (appelsData.length) {
+      document.getElementById('pc-appels-card').style.display = '';
+      document.getElementById('pc-appels').innerHTML = appelsData.map(p => `<div class="pc-post"><div class="pc-post-date">${new Date(p.created_at).toLocaleDateString('fr-FR')}</div>${esc(p.contenu).slice(0,300)}</div>`).join('');
+    }
+  } catch (e) { /* section masquée si indisponible */ }
+
   if (profil.galerie.length && typeof loadGaleriePhotoCounts === 'function') loadGaleriePhotoCounts('user', profil.id);
 
   // Abonnement
@@ -188,9 +215,17 @@
     btnAbo.disabled = true;
     try {
       const r = await api('POST', `/collectivites/${id}/abonnement`);
-      btnAbo.textContent = r.abonne ? '✅ Abonné' : "🔔 S'abonner";
+      if (r.abonne) { location.reload(); return; }
+      btnAbo.textContent = "🔔 S'abonner";
     } catch (e) { alert('Erreur : ' + e.message); }
     finally { btnAbo.disabled = false; }
+  });
+
+  // Préférences de notification
+  const prefsSelect = document.getElementById('pc-prefs-select');
+  if (prefsSelect) prefsSelect.addEventListener('change', async () => {
+    try { await api('PUT', `/collectivites/${id}/abonnement/prefs`, { prefs: prefsSelect.value }); }
+    catch (e) { alert('Erreur : ' + e.message); }
   });
 
   // Édition (propriétaire uniquement)
@@ -237,6 +272,70 @@
       try { await api('PUT', '/profil', { realisations: list }); location.reload(); } catch (e) { alert('Erreur : ' + e.message); }
     });
   }
+
+  /* ── Assistant IA d'information territoriale ── agent d'information, pas de décision.
+     Répond uniquement depuis les données du profil déjà chargées par la page (règles
+     par mots-clés, aucun LLM, aucun appel backend supplémentaire). */
+  const agendaEvents = (await api('GET', `/collectivites/${id}/agenda`).catch(() => ({events:[]}))).events || [];
+  const fab = document.createElement('button');
+  fab.textContent = '🤖';
+  fab.title = `Poser une question à ${profil.nom}`;
+  fab.style.cssText = 'position:fixed;bottom:22px;right:22px;width:52px;height:52px;border-radius:50%;background:#16457E;color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:999;';
+  document.body.appendChild(fab);
+
+  const panel = document.createElement('div');
+  panel.style.cssText = 'position:fixed;bottom:84px;right:22px;width:320px;max-height:420px;background:#fff;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.25);display:none;flex-direction:column;overflow:hidden;z-index:999;';
+  panel.innerHTML = `
+    <div style="background:#16457E;color:#fff;padding:12px 14px;font-weight:700;font-size:13px;">🤖 Assistant ${esc(profil.nom)}</div>
+    <div id="pc-ia-msgs" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px;max-height:280px;"></div>
+    <div style="display:flex;gap:6px;padding:10px;border-top:1px solid #eee;">
+      <input id="pc-ia-input" placeholder="Votre question…" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid #ddd;font-size:13px;">
+      <button id="pc-ia-send" style="background:#16457E;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;">➤</button>
+    </div>`;
+  document.body.appendChild(panel);
+  fab.addEventListener('click', () => { panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex'; });
+
+  const msgsEl = panel.querySelector('#pc-ia-msgs');
+  function addMsg(text, fromBot) {
+    const b = document.createElement('div');
+    b.style.cssText = fromBot ? 'align-self:flex-start;background:#EFF6FF;color:#1e3a5f;padding:8px 10px;border-radius:10px;max-width:85%;' : 'align-self:flex-end;background:#16457E;color:#fff;padding:8px 10px;border-radius:10px;max-width:85%;';
+    b.textContent = text;
+    msgsEl.appendChild(b);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+  addMsg(`Bonjour, je peux répondre à vos questions sur ${profil.nom} : présentation du territoire, projets, événements, informations pratiques.`, true);
+
+  function answerIA(q) {
+    const t = q.toLowerCase();
+    if (/pr[ée]sent|qui[ -]?êtes|territoire|histoire/.test(t)) return profil.bio || "Aucune présentation du territoire n'est encore renseignée.";
+    if (/gouvernance|responsable|maire|pr[ée]sident/.test(t)) {
+      if (!profil.nom_responsable) return "Aucune information de gouvernance renseignée.";
+      return `${[profil.prenom_responsable, profil.nom_responsable].filter(Boolean).join(' ')} — ${profil.fonction_responsable || 'Responsable'}.${profil.presentation_gouvernance ? ' ' + profil.presentation_gouvernance : ''}`;
+    }
+    if (/projet.*cours|en cours/.test(t)) return profil.projets_en_cours.length ? profil.projets_en_cours.map(p => `• ${p.titre}`).join('\n') : "Aucun projet en cours n'est publié pour le moment.";
+    if (/r[ée]alis|termin[ée]|historique/.test(t)) return profil.realisations.length ? profil.realisations.map(p => `• ${p.titre}`).join('\n') : "Aucun projet réalisé n'est publié pour le moment.";
+    if (/[ée]v[ée]nement|agenda|rencontre|forum/.test(t)) return agendaEvents.length ? agendaEvents.map(e => `• ${e.titre} — ${e.date_evt ? new Date(e.date_evt).toLocaleDateString('fr-FR') : ''}${e.lieu ? ' (' + e.lieu + ')' : ''}`).join('\n') : "Aucun événement à venir n'est actuellement publié.";
+    if (/appel.*projet|partenariat|opportunit[ée]/.test(t)) return appelsData.length ? appelsData.map(p => `• ${p.contenu.slice(0,120)}`).join('\n') : "Aucun appel à projets ou recherche de partenariat en cours.";
+    if (/contact|joindre|site|web|r[ée]seau/.test(t)) {
+      const parts = [];
+      if (profil.site_web) parts.push(`Site officiel : ${profil.site_web}`);
+      const rs = Object.entries(profil.reseaux_sociaux || {}).filter(([,v]) => v);
+      if (rs.length) parts.push('Réseaux : ' + rs.map(([k]) => k).join(', '));
+      return parts.length ? parts.join('\n') : "Aucune information de contact publique renseignée pour l'instant.";
+    }
+    return "Je n'ai pas d'information à ce sujet dans les contenus publiés par la collectivité. Essayez : présentation, projets, événements, gouvernance, contact.";
+  }
+
+  function sendIA() {
+    const input = panel.querySelector('#pc-ia-input');
+    const q = input.value.trim();
+    if (!q) return;
+    addMsg(q, false);
+    input.value = '';
+    setTimeout(() => addMsg(answerIA(q), true), 200);
+  }
+  panel.querySelector('#pc-ia-send').addEventListener('click', sendIA);
+  panel.querySelector('#pc-ia-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendIA(); });
 })();
 </script>
 </body>

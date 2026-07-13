@@ -2991,7 +2991,8 @@ route("GET", "/api/collectivites/:id/profil-public", async (req, res, params) =>
   const nb_abonnes = (await db.prepare("SELECT COUNT(*) n FROM abonnements_collectivite WHERE collectivite_id=?").get(row.id))?.n || 0;
   const nb_publications = (await db.prepare("SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?").get(row.id))?.n || 0;
   const nb_evenements = (await db.prepare("SELECT COUNT(*) n FROM evenements WHERE owner_user_id=?").get(row.id))?.n || 0;
-  const abonne = cu ? !!(await db.prepare("SELECT id FROM abonnements_collectivite WHERE user_id=? AND collectivite_id=?").get(cu.id, row.id)) : false;
+  const monAbonnement = cu ? await db.prepare("SELECT prefs FROM abonnements_collectivite WHERE user_id=? AND collectivite_id=?").get(cu.id, row.id) : null;
+  const abonne = !!monAbonnement;
 
   sendJSON(res, 200, {
     profil: {
@@ -3008,7 +3009,7 @@ route("GET", "/api/collectivites/:id/profil-public", async (req, res, params) =>
       realisations: safeParse(row.realisations_json) || [],
       projets_en_cours: safeParse(row.projets_en_cours_json) || [],
       stats: { abonnes: nb_abonnes, publications: nb_publications, evenements: nb_evenements },
-      abonne,
+      abonne, prefs: monAbonnement ? monAbonnement.prefs : 'toutes',
       is_owner: cu ? Number(cu.id) === Number(row.id) : false,
     }
   });
@@ -3027,7 +3028,7 @@ route("GET", "/api/collectivites/:id/agenda", async (req, res, params) => {
 });
 
 /* POST /api/collectivites/:id/abonnement — s'abonner / se désabonner */
-route("POST", "/api/collectivites/:id/abonnement", async (req, res, params) => {
+route("POST", "/api/collectivites/:id/abonnement", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const coll = await db.prepare("SELECT id FROM users WHERE id=? AND role='collectivite'").get(params.id);
@@ -3037,8 +3038,25 @@ route("POST", "/api/collectivites/:id/abonnement", async (req, res, params) => {
     await db.prepare("DELETE FROM abonnements_collectivite WHERE id=?").run(existe.id);
     return sendJSON(res, 200, { abonne: false });
   }
-  await db.prepare("INSERT INTO abonnements_collectivite (user_id, collectivite_id) VALUES (?,?)").run(user.id, coll.id);
-  sendJSON(res, 200, { abonne: true });
+  const prefs = ["toutes","annonces","evenements","opportunites"].includes(body?.prefs) ? body.prefs : "toutes";
+  await db.prepare("INSERT INTO abonnements_collectivite (user_id, collectivite_id, prefs) VALUES (?,?,?)").run(user.id, coll.id, prefs);
+  sendJSON(res, 200, { abonne: true, prefs });
+});
+
+/* PUT /api/collectivites/:id/abonnement/prefs — modifier ses préférences de notification */
+route("PUT", "/api/collectivites/:id/abonnement/prefs", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const prefs = ["toutes","annonces","evenements","opportunites"].includes(body?.prefs) ? body.prefs : "toutes";
+  const r = await db.prepare("UPDATE abonnements_collectivite SET prefs=? WHERE user_id=? AND collectivite_id=?").run(prefs, user.id, params.id);
+  if (!r.changes) return sendJSON(res, 404, { error: "Abonnement introuvable." });
+  sendJSON(res, 200, { ok: true, prefs });
+});
+
+/* GET /api/collectivites/:id/appels-projets — appels à projets / recherche de partenariats publiés */
+route("GET", "/api/collectivites/:id/appels-projets", async (req, res, params) => {
+  const posts = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? AND categorie IN ('appel_projets','recherche_partenaire') ORDER BY created_at DESC LIMIT 20").all(params.id);
+  sendJSON(res, 200, { posts });
 });
 
 /* ── Équipe publique : responsable principal + membres acceptés (liens vers profils DA) ── */
