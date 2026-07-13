@@ -211,10 +211,13 @@ const NOTIF_ICONS = {
   validation: "✅",
   abonnement: "⭐",
   reunion_invite: "📹",
+  demande_relation: "🤝",
+  demande_relation_acceptee: "🤝",
 };
 
 function notifUrl(n) {
   const d = (typeof n.data === "object" ? n.data : null) || {};
+  if (d.demande_id)       return `messagerie.html?demande=${d.demande_id}`;
   if (d.post_id)          return `fil-actualite.html#fp-${d.post_id}`;
   if (d.conversation_id)  return `messagerie.html?conv=${d.conversation_id}`;
   if (d.evenement_id)     return `evenements.html#evt-${d.evenement_id}`;

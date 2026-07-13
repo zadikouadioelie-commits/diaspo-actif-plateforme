@@ -3988,13 +3988,16 @@ route("POST", "/api/fil/:id/republier", async (req, res, params, body) => {
    ================================================================ */
 
 /* Matrice d'initiation : qui peut DÉMARRER une conversation avec qui.
-   Les comptes officiels (collectivite) ne peuvent pas initier avec des
-   utilisateurs (personnes physiques) — ils peuvent répondre seulement
-   si l'utilisateur a contacté en premier. */
+   Les comptes officiels (collectivite) ne peuvent JAMAIS initier directement
+   avec un membre (utilisateur) ou une organisation (initiative) — voir règles
+   de communication des comptes Collectivités : ils doivent passer par une
+   demande de mise en relation (table demandes_relation), acceptée explicitement
+   par le destinataire, seule voie créant la conversation. Ils peuvent en
+   revanche échanger librement avec d'autres comptes institutionnels. */
 const PEUT_INITIER = {
   utilisateur:   ["utilisateur", "initiative", "collectivite", "administrateur"],
   initiative:    ["utilisateur", "initiative", "collectivite", "administrateur"],
-  collectivite:  ["initiative", "collectivite", "administrateur"],
+  collectivite:  ["collectivite", "administrateur"],
   administrateur:["utilisateur", "initiative", "collectivite", "administrateur"],
 };
 const PEUT_CONTACTER = PEUT_INITIER;
@@ -4057,19 +4060,6 @@ function membreDansPerimetre(coll, membre) {
   if (p.niveau === "departement" && p.departement && membre.departement !== p.departement) return false;
   if (p.niveau === "ville" && p.ville && membre.ville !== p.ville) return false;
   return true;
-}
-
-/* Un membre a-t-il MANIFESTÉ sa volonté d'échanger avec cette collectivité ?
-   (principe 3 : le premier contact appartient au membre). Vrai si le membre :
-   suit la collectivité, a candidaté à une de ses offres, lui a soumis un projet,
-   ou lui a proposé un rendez-vous. */
-function aRelationEntrante(collId, membreId) {
-  const q = (sql, ...ps) => { try { return (db.prepare(sql).get(...ps)?.n || 0) > 0; } catch(e) { return false; } };
-  if (q("SELECT COUNT(*) n FROM user_follows WHERE follower_id=? AND followed_id=?", membreId, collId)) return true;
-  if (q("SELECT COUNT(*) n FROM offres_candidatures oc JOIN offres o ON o.id=oc.offre_id WHERE o.createur_id=? AND oc.candidat_id=?", collId, membreId)) return true;
-  if (q("SELECT COUNT(*) n FROM proj_eval_destinataires d JOIN proj_eval_projets p ON p.id=d.projet_id WHERE d.destinataire_id=? AND p.createur_id=?", collId, membreId)) return true;
-  if (q("SELECT COUNT(*) n FROM rdv_proposals WHERE destinataire_id=? AND proposeur_id=?", collId, membreId)) return true;
-  return false;
 }
 
 /* ===========================================================================
@@ -4223,13 +4213,9 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
   // Vérification d'initiation uniquement pour les NOUVELLES conversations
   if (!conv) {
     const allowed = PEUT_INITIER[user.role] || [];
-    // Principe 3 : une collectivité peut initier un échange avec un utilisateur
-    // UNIQUEMENT si ce dernier a déjà manifesté sa volonté (suivi, candidature,
-    // projet soumis, demande de rendez-vous). Le premier contact reste au membre.
-    const exceptionRelation = user.role === "collectivite" && other.role === "utilisateur" && aRelationEntrante(user.id, otherId);
-    if (!allowed.includes(other.role) && !exceptionRelation) {
+    if (!allowed.includes(other.role)) {
       const msg = user.role === "collectivite"
-        ? "Les comptes officiels ne peuvent pas initier un contact avec un utilisateur. L'utilisateur doit d'abord vous contacter, vous suivre, candidater à une de vos offres, vous soumettre un projet ou vous proposer un rendez-vous."
+        ? "Les comptes officiels ne peuvent pas initier un contact direct avec un membre ou une organisation. Utilisez « Demande de mise en relation » : la conversation ne sera créée qu'après acceptation du destinataire."
         : `Votre rôle (${user.role}) ne peut pas initier une conversation avec ce type de compte (${other.role}).`;
       return sendJSON(res, 403, { error: msg });
     }
@@ -4243,6 +4229,89 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
     conv = { id };
   }
   sendJSON(res, 201, { conversation_id: conv.id });
+});
+
+/* ===========================================================================
+   DEMANDES DE MISE EN RELATION — seule voie pour un compte Collectivité
+   d'entrer en contact avec un membre (utilisateur) ou une organisation
+   (initiative). Le destinataire accepte, refuse ou ignore ; la conversation
+   n'est créée qu'après acceptation explicite.
+=========================================================================== */
+
+/* POST /api/demandes-relation — la collectivité envoie une demande */
+route("POST", "/api/demandes-relation", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux comptes Collectivité." });
+
+  const membreId = Number(body.membre_id);
+  if (!membreId || membreId === user.id) return sendJSON(res, 400, { error: "Destinataire invalide." });
+  const membre = await db.prepare("SELECT id, nom, role FROM users WHERE id=?").get(membreId);
+  if (!membre || !["utilisateur", "initiative"].includes(membre.role)) return sendJSON(res, 404, { error: "Destinataire introuvable." });
+
+  const existeConv = await db.prepare("SELECT id FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, membreId, membreId, user.id);
+  if (existeConv) return sendJSON(res, 409, { error: "Une conversation existe déjà avec ce compte." });
+  const dejaEnvoyee = await db.prepare("SELECT id FROM demandes_relation WHERE collectivite_id=? AND membre_id=? AND statut='en_attente'").get(user.id, membreId);
+  if (dejaEnvoyee) return sendJSON(res, 409, { error: "Une demande est déjà en attente pour ce compte." });
+
+  const message = (body.message || "").trim().slice(0, 500) || null;
+  const id = (await db.prepare("INSERT INTO demandes_relation (collectivite_id, membre_id, message) VALUES (?,?,?)").run(user.id, membreId, message)).lastInsertRowid;
+
+  creerNotif(membreId, "demande_relation", `${user.nom} souhaite entrer en contact avec vous`,
+    message || "Une collectivité souhaite entrer en relation avec vous. Vous pouvez accepter, refuser ou ignorer cette demande.",
+    { demande_id: id });
+
+  sendJSON(res, 201, { id });
+});
+
+/* GET /api/demandes-relation/envoyees — historique des demandes envoyées par la collectivité */
+route("GET", "/api/demandes-relation/envoyees", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux comptes Collectivité." });
+  const demandes = await db.prepare(
+    "SELECT d.*, u.nom AS membre_nom, u.role AS membre_role, u.photo_url AS membre_photo FROM demandes_relation d JOIN users u ON u.id=d.membre_id WHERE d.collectivite_id=? ORDER BY d.created_at DESC LIMIT 100"
+  ).all(user.id);
+  sendJSON(res, 200, { demandes });
+});
+
+/* GET /api/demandes-relation/recues — demandes en attente reçues par le membre connecté */
+route("GET", "/api/demandes-relation/recues", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const demandes = await db.prepare(
+    "SELECT d.*, u.nom AS collectivite_nom, u.photo_url AS collectivite_photo FROM demandes_relation d JOIN users u ON u.id=d.collectivite_id WHERE d.membre_id=? AND d.statut='en_attente' ORDER BY d.created_at DESC"
+  ).all(user.id);
+  sendJSON(res, 200, { demandes });
+});
+
+/* POST /api/demandes-relation/:id/repondre — le destinataire accepte ou refuse */
+route("POST", "/api/demandes-relation/:id/repondre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const demande = await db.prepare("SELECT * FROM demandes_relation WHERE id=?").get(params.id);
+  if (!demande || demande.membre_id !== user.id) return sendJSON(res, 404, { error: "Demande introuvable." });
+  if (demande.statut !== "en_attente") return sendJSON(res, 409, { error: "Cette demande a déjà été traitée." });
+
+  const action = body.action === "accepter" ? "accepter" : body.action === "refuser" ? "refuser" : null;
+  if (!action) return sendJSON(res, 400, { error: "Action invalide (accepter ou refuser)." });
+
+  const coll = await db.prepare("SELECT id,nom FROM users WHERE id=?").get(demande.collectivite_id);
+  if (action === "refuser") {
+    await db.prepare("UPDATE demandes_relation SET statut='refusee', updated_at=datetime('now') WHERE id=?").run(demande.id);
+    return sendJSON(res, 200, { ok: true, statut: "refusee" });
+  }
+
+  // Acceptation : création de la conversation (ou récupération si déjà existante)
+  let conv = await db.prepare("SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, demande.collectivite_id, demande.collectivite_id, user.id);
+  if (!conv) {
+    const convId = (await db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet) VALUES (?, ?, ?)").run(demande.collectivite_id, user.id, "Mise en relation")).lastInsertRowid;
+    conv = { id: convId };
+  }
+  await db.prepare("UPDATE demandes_relation SET statut='acceptee', conversation_id=?, updated_at=datetime('now') WHERE id=?").run(conv.id, demande.id);
+  creerNotif(demande.collectivite_id, "demande_relation_acceptee", `${user.nom} a accepté votre demande de mise en relation`,
+    "Vous pouvez maintenant échanger avec ce compte.", { conversation_id: conv.id });
+
+  sendJSON(res, 200, { ok: true, statut: "acceptee", conversation_id: conv.id });
 });
 
 /* GET /api/conversations/:id/messages — charger les messages + marquer lu */

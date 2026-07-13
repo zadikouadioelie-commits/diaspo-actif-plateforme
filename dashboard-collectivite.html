@@ -703,6 +703,12 @@
           <h3 style="margin:0 0 14px;">Historique des communications</h3>
           <div id="comm-historique"><div class="notice">Chargement…</div></div>
         </div>
+
+        <div class="card" style="margin-top:20px;">
+          <h3 style="margin:0 0 8px;">🤝 Demandes de mise en relation</h3>
+          <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">Un compte officiel ne peut pas contacter directement un membre : une demande lui est envoyée depuis son profil public, et la conversation ne s'ouvre qu'après son acceptation explicite.</p>
+          <div id="demandes-relation-envoyees"><div class="notice">Chargement…</div></div>
+        </div>
       </section>
 
       <!-- ===================== CONSULTATIONS ===================== -->
@@ -1551,9 +1557,31 @@ async function loadCommListes() {
   } catch(e) { /* silencieux : la liste reste optionnelle */ }
 }
 
+async function loadDemandesRelationEnvoyees() {
+  const el = document.getElementById("demandes-relation-envoyees");
+  if (!el) return;
+  const STATUT_LABEL = { en_attente: "⏳ En attente", acceptee: "✅ Acceptée", refusee: "❌ Refusée" };
+  try {
+    const r = await api("GET", "/demandes-relation/envoyees");
+    const demandes = r.demandes || [];
+    if (!demandes.length) { el.innerHTML = `<div class="empty">Aucune demande envoyée.</div>`; return; }
+    el.innerHTML = demandes.map(d => `
+      <div class="comm-hist-row">
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:14px;">${escH(d.membre_nom)} <span style="font-weight:400;color:var(--muted);font-size:12px;">(${d.membre_role === 'initiative' ? 'organisation' : 'membre'})</span></div>
+          <div style="font-size:12.5px;color:var(--muted);">${fmtDateGlobal(d.created_at)} · ${STATUT_LABEL[d.statut] || d.statut}</div>
+          ${d.message ? `<div style="font-size:13px;margin-top:4px;color:var(--text);">${escH(d.message)}</div>` : ''}
+        </div>
+        ${d.statut === 'acceptee' && d.conversation_id ? `<a class="btn btn-sm btn-outline" href="messagerie.html?conv=${d.conversation_id}">Voir la conversation</a>` : ''}
+      </div>
+    `).join("");
+  } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+}
+
 async function loadCommHistorique() {
   loadCommPerimetre();
   loadCommListes();
+  loadDemandesRelationEnvoyees();
   const el = document.getElementById("comm-historique");
   try {
     const r = await api("GET", "/communications");

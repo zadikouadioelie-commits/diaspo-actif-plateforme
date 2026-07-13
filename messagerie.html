@@ -159,6 +159,8 @@
     </div>
   </header>
 
+  <div id="demandes-relation-bar" style="display:none;flex-shrink:0;"></div>
+
   <div class="msg-shell" id="msg-shell">
 
     <!-- PANNEAU GAUCHE : liste conversations -->
@@ -1164,6 +1166,40 @@ async function prefillProduitMessage(produitId){
   }catch(e){ /* silencieux : le message reste vide */ }
 }
 
+/* ---- Demandes de mise en relation reçues (comptes Collectivité) ---- */
+async function loadDemandesRelation(){
+  const bar = document.getElementById('demandes-relation-bar');
+  if (!bar) return;
+  try {
+    const r = await api('GET', '/demandes-relation/recues');
+    const demandes = r.demandes || [];
+    if (!demandes.length){ bar.style.display='none'; bar.innerHTML=''; return; }
+    bar.style.display='block';
+    bar.innerHTML = `<div style="background:#EFF6FF;border-bottom:1.5px solid #BFDBFE;padding:10px 20px;display:flex;flex-direction:column;gap:8px;">
+      ${demandes.map(d=>`
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap;">
+          <span>🤝 <strong>${escH(d.collectivite_nom)}</strong> souhaite entrer en contact avec vous${d.message?` : « ${escH(d.message)} »`:''}</span>
+          <span style="display:flex;gap:6px;margin-left:auto;">
+            <button class="btn btn-sm btn-orange" onclick="repondreDemandeRelation(${d.id},'accepter')">Accepter</button>
+            <button class="btn btn-sm btn-outline" onclick="repondreDemandeRelation(${d.id},'refuser')">Refuser</button>
+          </span>
+        </div>
+      `).join('')}
+    </div>`;
+  } catch(e) { bar.style.display='none'; }
+}
+
+async function repondreDemandeRelation(id, action){
+  try {
+    const r = await api('POST', `/demandes-relation/${id}/repondre`, { action });
+    await loadDemandesRelation();
+    if (action === 'accepter' && r.conversation_id) {
+      await loadConvList();
+      openConv(r.conversation_id);
+    }
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
 /* ---- Init ---- */
 (async()=>{
   me=await fetchCurrentUser();
@@ -1190,6 +1226,7 @@ async function prefillProduitMessage(produitId){
 
   // Charger la liste des conversations
   await loadConvList();
+  await loadDemandesRelation();
 
   // Boutons header conversation
   document.getElementById('btn-search-msg').addEventListener('click', openSearchPanel);

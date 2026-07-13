@@ -1683,6 +1683,23 @@ db.exec(`
     FOREIGN KEY(destinataire_id) REFERENCES users(id)
   );
 
+  /* ===== DEMANDES DE MISE EN RELATION (comptes Collectivité → membres) =====
+     Principe 3 : le premier contact appartient au membre. Une collectivité ne peut
+     pas créer directement une conversation avec un particulier/une organisation ;
+     elle envoie une demande, que le destinataire accepte, refuse ou ignore. */
+  CREATE TABLE IF NOT EXISTS demandes_relation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    collectivite_id INTEGER NOT NULL,
+    membre_id INTEGER NOT NULL,
+    message TEXT,
+    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','acceptee','refusee')),
+    conversation_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(collectivite_id) REFERENCES users(id),
+    FOREIGN KEY(membre_id) REFERENCES users(id)
+  );
+
   /* ===== SALLES DE RÉUNION VIRTUELLE ===== */
   CREATE TABLE IF NOT EXISTS meetings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

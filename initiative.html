@@ -549,6 +549,16 @@ const DOMAIN_GRAD = {
     location.href = 'messagerie.html?init=' + init.id + '&sujet=' + encodeURIComponent(sujet);
   };
 
+  window.ppDemandeRelationInit = async () => {
+    if (!init.owner_user_id) return;
+    const message = prompt("Message accompagnant votre demande de mise en relation (optionnel) :", "");
+    if (message === null) return;
+    try {
+      await api('POST', '/demandes-relation', { membre_id: init.owner_user_id, message });
+      alert("Demande envoyée. La conversation ne sera ouverte qu'après acceptation par l'organisation.");
+    } catch(e) { alert('Erreur : ' + (e.message || 'impossible d\'envoyer la demande.')); }
+  };
+
   let EQUIPE = [], SCOREACT = null, CAMPAGNES = [], AVIS = null, EVENTS = [], FORMULES = [];
   try {
     const [rEq, rSc, rCamp, rAvis, rEv, rForm] = await Promise.all([
@@ -642,10 +652,15 @@ const DOMAIN_GRAD = {
     document.getElementById('col-right').innerHTML = `
       <div class="side-card">
         <h4>🚀 Rejoindre l'initiative</h4>
-        ${FORMULES.length ? `<a class="rejoindre-btn primary" href="adhesions.html?init=${init.id}">🎫 Adhérer / Cotiser</a>` : ''}
-        <button class="rejoindre-btn" onclick="contacterBesoin('Je souhaite devenir bénévole')">🙋 Devenir bénévole</button>
-        <button class="rejoindre-btn" onclick="contacterBesoin('Proposition de partenariat')">🤝 Devenir partenaire</button>
-        <a class="rejoindre-btn" href="messagerie.html?init=${init.id}">✉️ Contacter</a>
+        ${me && me.role === 'collectivite' ? `
+          <button class="rejoindre-btn" onclick="ppDemandeRelationInit()">🤝 Demande de mise en relation</button>
+          <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Les comptes officiels ne peuvent pas contacter directement une organisation : une demande lui sera envoyée, la conversation ne s'ouvrira qu'après acceptation.</p>
+        ` : `
+          ${FORMULES.length ? `<a class="rejoindre-btn primary" href="adhesions.html?init=${init.id}">🎫 Adhérer / Cotiser</a>` : ''}
+          <button class="rejoindre-btn" onclick="contacterBesoin('Je souhaite devenir bénévole')">🙋 Devenir bénévole</button>
+          <button class="rejoindre-btn" onclick="contacterBesoin('Proposition de partenariat')">🤝 Devenir partenaire</button>
+          <a class="rejoindre-btn" href="messagerie.html?init=${init.id}">✉️ Contacter</a>
+        `}
       </div>
       ${labels.length ? `<div class="side-card"><h4>🏆 Labels & accréditations</h4>${labels.map(l => `<div class="side-list-item">${l}</div>`).join('')}</div>` : ''}
       ${SCOREACT ? `<div class="side-card">
