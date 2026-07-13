@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="assets/style.css">
 <style>
   body{background:#F3F5F8;}
-  .pc-wrap{max-width:1240px;margin:0 auto;padding:20px;}
+  .pc-wrap{max-width:1800px;margin:0 auto;padding:20px 32px;}
   .pc-header{position:relative;border-radius:20px;overflow:hidden;color:#fff;margin-bottom:22px;box-shadow:0 14px 40px rgba(14,46,90,.18);background:var(--pc-c1,#0E2E5A);}
   .pc-banner{height:220px;background-size:cover;background-position:center;background-color:var(--pc-c2,#16457E);background-image:linear-gradient(135deg,var(--pc-c1,#0E2E5A),var(--pc-c2,#1E6091),var(--pc-accent,#E8933A)22);position:relative;}
   .pc-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,46,90,0) 30%,rgba(9,26,50,.95) 100%);}
@@ -28,14 +28,21 @@
   .pc-btn:hover{transform:translateY(-1px);}
   .pc-btn-primary{background:linear-gradient(135deg,var(--pc-accent-light,#F9A94A),var(--pc-accent,#E8703A));color:#fff;box-shadow:0 6px 16px rgba(232,112,58,.35);}
   .pc-btn-outline{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.4);}
-  .pc-grid{display:grid;grid-template-columns:280px 1fr 300px;gap:20px;align-items:start;}
+  .pc-grid{display:grid;grid-template-columns:320px 1fr 360px;gap:24px;align-items:start;}
+  @media (max-width:1400px){.pc-grid{grid-template-columns:280px 1fr 320px;}}
   @media (max-width:980px){.pc-grid{grid-template-columns:1fr;}.pc-col-left,.pc-col-right{position:static!important;}}
   .pc-col-left,.pc-col-right{position:sticky;top:20px;display:flex;flex-direction:column;gap:16px;}
   .pc-col-center{display:flex;flex-direction:column;gap:16px;min-width:0;}
-  .pc-card{background:var(--card,#fff);border:1px solid var(--border,#eef0f4);border-radius:16px;padding:18px;box-shadow:0 2px 10px rgba(20,30,60,.04);}
-  .pc-card h3{margin:0 0 12px;font-size:14.5px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
-  .pc-stat-row{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid var(--border,#f1f2f5);}
+  .pc-card{background:var(--card,#fff);border:1px solid var(--border,#eef0f4);border-radius:18px;padding:20px;box-shadow:0 3px 14px rgba(20,30,60,.05);transition:box-shadow .2s,transform .2s;}
+  .pc-card:hover{box-shadow:0 8px 24px rgba(20,30,60,.09);}
+  .pc-card h3{margin:0 0 14px;font-size:13.5px;font-weight:800;letter-spacing:.2px;text-transform:uppercase;color:var(--pc-c1,#0E2E5A);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+  .pc-card h3 .pc-h3-lbl{display:flex;align-items:center;gap:9px;}
+  .pc-h3-icon{width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,var(--pc-c2,#16457E),var(--pc-c1,#0E2E5A));display:inline-flex;align-items:center;justify-content:center;font-size:14.5px;flex-shrink:0;box-shadow:0 3px 8px rgba(14,46,90,.25);}
+  .pc-stat-row{display:flex;align-items:center;gap:10px;font-size:13.5px;padding:9px 0;border-bottom:1px dashed var(--border,#eef0f4);}
   .pc-stat-row:last-child{border-bottom:none;}
+  .pc-stat-row .pc-stat-icon{width:26px;height:26px;border-radius:8px;background:#EFF6FF;color:var(--pc-c2,#16457E);display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;flex-shrink:0;}
+  .pc-stat-row span{flex:1;color:#4b5568;}
+  .pc-stat-row strong{font-size:15.5px;font-weight:800;color:var(--pc-c1,#0E2E5A);}
   .pc-feed-card{background:var(--card,#fff);border:1px solid var(--border,#eef0f4);border-radius:16px;padding:16px 18px;box-shadow:0 2px 10px rgba(20,30,60,.04);display:flex;gap:12px;}
   .pc-feed-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--pc-c2,#16457E),var(--pc-accent,#E8933A));flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;}
   .pc-post{font-size:13.5px;flex:1;}
@@ -53,8 +60,11 @@
   .pc-proj-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin-bottom:4px;}
   .pc-proj-badge.cours{background:#FEF3C7;color:#92400E;}
   .pc-proj-badge.fait{background:#DCFCE7;color:#166534;}
-  .pc-doc{display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13px;border-bottom:1px solid var(--border,#f1f2f5);}
-  .pc-doc:last-child{border-bottom:none;}
+  .pc-doc{display:flex;align-items:center;gap:9px;padding:9px 4px;font-size:13px;border-radius:10px;transition:background .15s;}
+  .pc-doc:hover{background:#F6F8FC;}
+  .pc-doc a{color:var(--pc-c1,#0E2E5A);font-weight:600;text-decoration:none;}
+  .pc-doc a:hover{text-decoration:underline;}
+  .pc-doc .pc-doc-icon{width:28px;height:28px;border-radius:8px;background:#FEF3E2;color:#B45309;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
   .pc-empty{color:var(--muted,#888);font-size:13px;}
   .pc-mini-btn{padding:3px 10px;font-size:11px;color:var(--pc-c2,#16457E);background:#EFF6FF;border:none;border-radius:8px;cursor:pointer;font-weight:700;}
   .pc-post-wrap{position:relative;}
@@ -154,16 +164,16 @@ function applyPcTheme(name) {
       <!-- ══ COLONNE GAUCHE — identité (statique) ══ -->
       <div class="pc-col-left">
         <div class="pc-card">
-          <h3>📊 Statistiques publiques</h3>
-          <div class="pc-stat-row"><span>Abonnés</span><strong>${profil.stats.abonnes}</strong></div>
-          <div class="pc-stat-row"><span>Publications</span><strong>${profil.stats.publications}</strong></div>
-          <div class="pc-stat-row"><span>Événements organisés</span><strong>${profil.stats.evenements}</strong></div>
+          <h3><span class="pc-h3-lbl"><span class="pc-h3-icon">📊</span>Statistiques publiques</span></h3>
+          <div class="pc-stat-row"><span class="pc-stat-icon">👥</span><span>Abonnés</span><strong>${profil.stats.abonnes}</strong></div>
+          <div class="pc-stat-row"><span class="pc-stat-icon">📰</span><span>Publications</span><strong>${profil.stats.publications}</strong></div>
+          <div class="pc-stat-row"><span class="pc-stat-icon">📅</span><span>Événements organisés</span><strong>${profil.stats.evenements}</strong></div>
         </div>
 
         ${(!profil.is_owner && profil.abonne) ? `
         <div class="pc-card">
-          <h3>🔔 Mes préférences</h3>
-          <select id="pc-prefs-select" class="input-field" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border,#e5e7eb);font-size:13px;">
+          <h3><span class="pc-h3-lbl"><span class="pc-h3-icon">🔔</span>Mes préférences</span></h3>
+          <select id="pc-prefs-select" class="input-field" style="width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--border,#e5e7eb);font-size:13px;">
             <option value="toutes" ${profil.prefs==='toutes'?'selected':''}>Toutes les notifications</option>
             <option value="annonces" ${profil.prefs==='annonces'?'selected':''}>Annonces importantes</option>
             <option value="evenements" ${profil.prefs==='evenements'?'selected':''}>Événements</option>
@@ -172,27 +182,27 @@ function applyPcTheme(name) {
         </div>` : ''}
 
         <div class="pc-card">
-          <h3>📝 Présentation</h3>
-          ${profil.bio ? `<div style="font-size:13px;white-space:pre-line;line-height:1.6;">${esc(profil.bio)}</div>` : '<div class="pc-empty">Aucune présentation renseignée.</div>'}
+          <h3><span class="pc-h3-lbl"><span class="pc-h3-icon">📝</span>Présentation</span></h3>
+          ${profil.bio ? `<div style="font-size:13.5px;white-space:pre-line;line-height:1.65;color:#3a4358;">${esc(profil.bio)}</div>` : '<div class="pc-empty">Aucune présentation renseignée.</div>'}
         </div>
 
         ${(profil.nom_responsable || profil.presentation_gouvernance) ? `
         <div class="pc-card">
-          <h3>🏛️ Gouvernance</h3>
-          ${profil.nom_responsable ? `<div style="font-size:13px;margin-bottom:8px;"><strong>${esc([profil.prenom_responsable, profil.nom_responsable].filter(Boolean).join(' '))}</strong><br><span style="color:var(--muted,#888);">${esc(profil.fonction_responsable || 'Responsable')}</span></div>` : ''}
-          ${profil.presentation_gouvernance ? `<div style="font-size:13px;white-space:pre-line;">${esc(profil.presentation_gouvernance)}</div>` : ''}
+          <h3><span class="pc-h3-lbl"><span class="pc-h3-icon">🏛️</span>Gouvernance</span></h3>
+          ${profil.nom_responsable ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><span style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--pc-c2,#16457E),var(--pc-accent,#E8933A));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">${esc((profil.prenom_responsable||profil.nom_responsable||'?').charAt(0).toUpperCase())}</span><div><strong style="font-size:13.5px;">${esc([profil.prenom_responsable, profil.nom_responsable].filter(Boolean).join(' '))}</strong><br><span style="color:var(--muted,#888);font-size:12px;">${esc(profil.fonction_responsable || 'Responsable')}</span></div></div>` : ''}
+          ${profil.presentation_gouvernance ? `<div style="font-size:13px;white-space:pre-line;color:#3a4358;">${esc(profil.presentation_gouvernance)}</div>` : ''}
         </div>` : ''}
 
         ${Object.keys(profil.reseaux_sociaux || {}).length ? `
         <div class="pc-card">
-          <h3>🔗 Réseaux sociaux</h3>
-          ${Object.entries(profil.reseaux_sociaux).filter(([,v]) => v).map(([k,v]) => `<div style="font-size:13px;margin-bottom:6px;"><a href="${esc(v)}" target="_blank" rel="noopener">🔗 ${esc(k)}</a></div>`).join('')}
+          <h3><span class="pc-h3-lbl"><span class="pc-h3-icon">🔗</span>Réseaux sociaux</span></h3>
+          ${Object.entries(profil.reseaux_sociaux).filter(([,v]) => v).map(([k,v]) => `<a href="${esc(v)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:9px;padding:8px 4px;border-radius:10px;font-size:13px;font-weight:600;color:var(--pc-c1,#0E2E5A);text-decoration:none;transition:background .15s;" onmouseover="this.style.background='#F6F8FC'" onmouseout="this.style.background='transparent'"><span style="width:26px;height:26px;border-radius:8px;background:#EFF6FF;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">🔗</span>${esc(k)}</a>`).join('')}
         </div>` : ''}
 
         ${(profil.documents.length || profil.is_owner) ? `
         <div class="pc-card">
-          <h3>📄 Documents <span></span>${profil.is_owner ? `<button class="pc-mini-btn" id="pc-btn-add-doc">+ Ajouter</button>` : ''}</h3>
-          <div id="pc-docs-list">${profil.documents.map(d => `<div class="pc-doc">📎 <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.nom || 'Document')}</a></div>`).join('') || '<div class="pc-empty">Aucun document.</div>'}</div>
+          <h3><span class="pc-h3-lbl"><span class="pc-h3-icon">📄</span>Documents</span>${profil.is_owner ? `<button class="pc-mini-btn" id="pc-btn-add-doc">+ Ajouter</button>` : ''}</h3>
+          <div id="pc-docs-list">${profil.documents.map(d => `<div class="pc-doc"><span class="pc-doc-icon">📎</span><a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.nom || 'Document')}</a></div>`).join('') || '<div class="pc-empty">Aucun document.</div>'}</div>
         </div>` : ''}
       </div>
 
