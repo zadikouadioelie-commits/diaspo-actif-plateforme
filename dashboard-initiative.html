@@ -2013,9 +2013,19 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         document.getElementById('pub-abo-credits').textContent = '';
       }
       document.getElementById('ad-cta').innerHTML = _adCtaList.map(c => `<option value="${c}">${c}</option>`).join('');
+      const AD_SLOT_LABELS_FR = {
+        homepage_top: "Haut de la page d'accueil",
+        homepage_feed: "Fil de la page d'accueil",
+        between_posts: 'Entre les publications',
+        between_videos: 'Entre les vidéos',
+        projects_page: 'Page des projets',
+        diaspora_impact: 'Impact diaspora',
+        calls_for_projects: "Appels à projets",
+        vitrine_section: 'Section vitrine',
+      };
       document.getElementById('ad-emplacements').innerHTML = _adSlots.map(s => `
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;">
-          <input type="checkbox" value="${s}" class="ad-slot-check"> ${s.replace(/_/g,' ')}
+          <input type="checkbox" value="${s}" class="ad-slot-check"> ${AD_SLOT_LABELS_FR[s] || s.replace(/_/g,' ')}
         </label>`).join('');
       loadMyAds();
     } catch (e) { console.error('initPubSection error', e); }
