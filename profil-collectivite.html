@@ -57,6 +57,9 @@
   .pc-doc:last-child{border-bottom:none;}
   .pc-empty{color:var(--muted,#888);font-size:13px;}
   .pc-mini-btn{padding:3px 10px;font-size:11px;color:#16457E;background:#EFF6FF;border:none;border-radius:8px;cursor:pointer;font-weight:700;}
+  .pc-post-wrap{position:relative;}
+  .pc-more-link{display:inline-block;margin:-6px 0 4px 4px;font-size:12px;font-weight:700;color:#E8703A;text-decoration:none;}
+  .pc-more-link:hover{text-decoration:underline;}
 </style>
 </head>
 <body>
@@ -71,6 +74,7 @@
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
+<script src="assets/posts.js"></script>
 <script>
 (async function () {
   const id = new URLSearchParams(location.search).get('id');
@@ -79,6 +83,7 @@
 
   const CU = await fetchCurrentUser().catch(() => null);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if (window.Posts) Posts.init(CU ? CU.id : null);
 
   let profil;
   try {
@@ -208,18 +213,15 @@
     </div>
   `;
 
-  // Actualités (fil central)
+  // Actualités (fil central) — cartes complètes : photos multiples, réactions, commentaires, republier
   try {
     const r = await api('GET', `/collectivites/${id}/actualites`);
     const posts = r.posts || [];
     document.getElementById('pc-actualites').innerHTML = posts.length
       ? posts.map(p => `
-        <div class="pc-feed-card">
-          <div class="pc-feed-avatar">${profil.logo_url ? `<img src="${esc(profil.logo_url)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : '🏛️'}</div>
-          <div class="pc-post">
-            <div class="pc-post-date">${esc(profil.nom)} · ${new Date(p.created_at).toLocaleDateString('fr-FR')}</div>
-            ${esc(p.contenu).slice(0,400)}
-          </div>
+        <div class="pc-post-wrap">
+          ${Posts.renderPostCard(p, { currentUserId: CU ? CU.id : null })}
+          <a class="pc-more-link" href="fil-actualite.html#fp-${p.id}">En savoir plus →</a>
         </div>`).join('')
       : `<div class="pc-card"><div class="pc-empty">Aucune actualité publiée pour le moment.</div></div>`;
   } catch (e) { document.getElementById('pc-actualites').innerHTML = `<div class="pc-card"><div class="pc-empty">Indisponible.</div></div>`; }
@@ -240,7 +242,7 @@
     appelsData = r.posts || [];
     if (appelsData.length) {
       document.getElementById('pc-appels-card').style.display = '';
-      document.getElementById('pc-appels').innerHTML = appelsData.map(p => `<div class="pc-post"><div class="pc-post-date">${new Date(p.created_at).toLocaleDateString('fr-FR')}</div>${esc(p.contenu).slice(0,300)}</div>`).join('');
+      document.getElementById('pc-appels').innerHTML = appelsData.map(p => Posts.renderPostCard(p, { currentUserId: CU ? CU.id : null })).join('');
     }
   } catch (e) { /* section masquée si indisponible */ }
 

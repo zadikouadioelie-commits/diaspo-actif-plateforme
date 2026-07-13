@@ -3017,7 +3017,9 @@ route("GET", "/api/collectivites/:id/profil-public", async (req, res, params) =>
 
 /* GET /api/collectivites/:id/actualites — fil public de la collectivité */
 route("GET", "/api/collectivites/:id/actualites", async (req, res, params) => {
-  const posts = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? ORDER BY created_at DESC LIMIT 30").all(params.id);
+  const cu = await getCurrentUser(req);
+  const rows = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? ORDER BY created_at DESC LIMIT 30").all(params.id);
+  const posts = await Promise.all(rows.map(p => enrichPost(p, cu)));
   sendJSON(res, 200, { posts });
 });
 
@@ -3055,7 +3057,9 @@ route("PUT", "/api/collectivites/:id/abonnement/prefs", async (req, res, params,
 
 /* GET /api/collectivites/:id/appels-projets — appels à projets / recherche de partenariats publiés */
 route("GET", "/api/collectivites/:id/appels-projets", async (req, res, params) => {
-  const posts = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? AND categorie IN ('appel_projets','recherche_partenaire') ORDER BY created_at DESC LIMIT 20").all(params.id);
+  const cu = await getCurrentUser(req);
+  const rows = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? AND categorie IN ('appel_projets','recherche_partenaire') ORDER BY created_at DESC LIMIT 20").all(params.id);
+  const posts = await Promise.all(rows.map(p => enrichPost(p, cu)));
   sendJSON(res, 200, { posts });
 });
 
