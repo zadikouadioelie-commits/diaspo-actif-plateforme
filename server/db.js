@@ -1023,6 +1023,8 @@ const MIGRATIONS = [
   ["users", "nationalite1 TEXT"],
   ["users", "nationalite2 TEXT"],
   ["users", "nationalite3 TEXT"],
+  ["users", "origine1 TEXT"],
+  ["users", "origine2 TEXT"],
   ["users", "adresse TEXT"],
   ["users", "code_postal TEXT"],
   ["users", "telephone TEXT"],

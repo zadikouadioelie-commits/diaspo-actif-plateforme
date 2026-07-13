@@ -51,6 +51,7 @@
   </header>
 
   <main class="container" style="padding-top:30px;padding-bottom:40px;">
+    <div id="mes-infos-zone"></div>
     <div id="ds-id-zone"></div>
 
     <h2 style="margin:0 0 4px;">Niveau de confidentialité des données</h2>
@@ -74,6 +75,68 @@
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script>
+(async function initMesInfosDeclarees(){
+  try {
+    const me = await api('GET', '/auth/me');
+    if (!me.user) return;
+  } catch(e) { return; }
+
+  const zone = document.getElementById('mes-infos-zone');
+  const r = await api('GET', '/profil/informations-declarees').catch(() => ({ informations: {} }));
+  const inf = r.informations || {};
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  zone.innerHTML = `
+    <div class="codes-card" style="max-width:560px;">
+      <h4>🪪 Mes informations déclarées</h4>
+      <p class="codes-sub">Ces informations sont utilisées pour vérifier votre identité. Toute modification invalidera un badge d'identité déjà vérifié et nécessitera une nouvelle vérification.</p>
+      ${inf.identite_verifiee ? `<div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:14px;">⚠️ Votre identité est actuellement vérifiée. Modifier une information ci-dessous retirera ce badge.</div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div><label style="font-size:12px;font-weight:700;">Nom</label><input id="mi-nom" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.nom)}"></div>
+        <div><label style="font-size:12px;font-weight:700;">Prénom</label><input id="mi-prenom" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.prenom)}"></div>
+        <div><label style="font-size:12px;font-weight:700;">Date de naissance</label><input id="mi-naissance" type="date" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.date_naissance)}"></div>
+        <div><label style="font-size:12px;font-weight:700;">E-mail</label><input id="mi-email" type="email" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.email)}"></div>
+        <div><label style="font-size:12px;font-weight:700;">Nationalité 1</label><input id="mi-nat1" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.nationalite1)}"></div>
+        <div><label style="font-size:12px;font-weight:700;">Nationalité 2</label><input id="mi-nat2" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.nationalite2)}"></div>
+        <div><label style="font-size:12px;font-weight:700;">Origine 1</label><input id="mi-orig1" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.origine1)}"></div>
+        <div><label style="font-size:12px;font-weight:700;">Origine 2</label><input id="mi-orig2" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.origine2)}"></div>
+      </div>
+      <div id="mi-err" class="ds-err"></div>
+      <div id="mi-ok" style="display:none;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:8px;padding:8px 12px;font-size:12px;color:#166534;margin-top:10px;"></div>
+      <div class="codes-btn-row" style="margin-top:14px;">
+        <button class="codes-btn green" onclick="window._saveMesInfos()" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;">💾 Enregistrer</button>
+      </div>
+    </div>
+  `;
+
+  window._saveMesInfos = async function() {
+    const err = document.getElementById('mi-err');
+    const ok = document.getElementById('mi-ok');
+    err.style.display = 'none'; ok.style.display = 'none';
+    const payload = {
+      nom: document.getElementById('mi-nom').value.trim(),
+      prenom: document.getElementById('mi-prenom').value.trim(),
+      date_naissance: document.getElementById('mi-naissance').value || null,
+      email: document.getElementById('mi-email').value.trim(),
+      nationalite1: document.getElementById('mi-nat1').value.trim(),
+      nationalite2: document.getElementById('mi-nat2').value.trim(),
+      origine1: document.getElementById('mi-orig1').value.trim(),
+      origine2: document.getElementById('mi-orig2').value.trim(),
+    };
+    try {
+      const res = await api('PUT', '/profil/informations-declarees', payload);
+      let msg = '✅ Informations mises à jour.';
+      if (res.identite_a_revalider) msg += ' Votre badge d’identité a été retiré : merci de refaire la vérification depuis votre profil.';
+      if (res.email_a_reverifier) msg += ' Un e-mail de confirmation vous a été envoyé pour valider votre nouvelle adresse.';
+      ok.textContent = msg;
+      ok.style.display = 'block';
+    } catch(e) {
+      err.textContent = e.message || 'Erreur lors de l’enregistrement.';
+      err.style.display = 'block';
+    }
+  };
+})();
+
 (async function initDsIdCard(){
   try {
     const me = await api('GET', '/auth/me');

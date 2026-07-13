@@ -790,6 +790,78 @@ route("POST", "/api/auth/resend-verification", async (req, res) => {
   sendJSON(res, 200, { ok: true });
 });
 
+/* ── Mes informations déclarées (nom/prénom/naissance/email/nationalités/origines) — tous rôles ── */
+route("GET", "/api/profil/informations-declarees", async (req, res) => {
+  const cu = await getCurrentUser(req);
+  if (!cu) return sendJSON(res, 401, { error: "Connexion requise." });
+  const u = await db.prepare(
+    "SELECT nom,prenom,email,date_naissance,nationalite1,nationalite2,origine1,origine2,email_verifie,identite_verifiee FROM users WHERE id=?"
+  ).get(cu.id);
+  if (!u) return sendJSON(res, 404, { error: "Introuvable." });
+  sendJSON(res, 200, { informations: u });
+});
+
+route("PUT", "/api/profil/informations-declarees", async (req, res, params, body) => {
+  const cu = await getCurrentUser(req);
+  if (!cu) return sendJSON(res, 401, { error: "Connexion requise." });
+  const current = await db.prepare(
+    "SELECT nom,prenom,email,date_naissance,nationalite1,nationalite2,origine1,origine2,identite_verifiee FROM users WHERE id=?"
+  ).get(cu.id);
+  if (!current) return sendJSON(res, 404, { error: "Introuvable." });
+
+  const { nom, prenom, date_naissance, email, nationalite1, nationalite2, origine1, origine2 } = body;
+  const newEmail = email !== undefined ? SEC.normalizeEmail(email) : current.email;
+  if (email !== undefined && newEmail !== current.email) {
+    if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+    const exists = await db.prepare("SELECT id FROM users WHERE LOWER(email)=? AND id<>?").get(newEmail, cu.id);
+    if (exists) return sendJSON(res, 409, { error: "Cette adresse e-mail est déjà utilisée." });
+  }
+
+  const fields = {
+    nom: nom !== undefined ? nom : current.nom,
+    prenom: prenom !== undefined ? prenom : current.prenom,
+    date_naissance: date_naissance !== undefined ? date_naissance : current.date_naissance,
+    email: newEmail,
+    nationalite1: nationalite1 !== undefined ? nationalite1 : current.nationalite1,
+    nationalite2: nationalite2 !== undefined ? nationalite2 : current.nationalite2,
+    origine1: origine1 !== undefined ? origine1 : current.origine1,
+    origine2: origine2 !== undefined ? origine2 : current.origine2,
+  };
+
+  /* Une info déclarative a-t-elle réellement changé ? */
+  const changed = Object.keys(fields).some(k => (fields[k] || '') !== (current[k] || ''));
+  const emailChanged = newEmail !== current.email;
+
+  const sets = ["nom=?", "prenom=?", "date_naissance=?", "email=?", "nationalite1=?", "nationalite2=?", "origine1=?", "origine2=?"];
+  const vals = [fields.nom, fields.prenom, fields.date_naissance, fields.email, fields.nationalite1, fields.nationalite2, fields.origine1, fields.origine2];
+
+  /* Toute modification d'une info déclarée invalide une identité déjà vérifiée : nouvelle vérification requise. */
+  if (changed && current.identite_verifiee) {
+    sets.push("identite_verifiee=0", "identite_verifiee_le=NULL", "identite_expire_le=NULL", "identite_pays_document=NULL", "identite_mismatch=0");
+  }
+  if (emailChanged) {
+    sets.push("email_verifie=0");
+  }
+  vals.push(cu.id);
+  await db.prepare(`UPDATE users SET ${sets.join(",")} WHERE id=?`).run(...vals);
+
+  if (emailChanged) {
+    try {
+      const verifToken = crypto.randomBytes(32).toString("hex");
+      const verifExpires = Date.now() + 24 * 3600000;
+      await db.prepare("UPDATE users SET email_verif_token=?, email_verif_expires=? WHERE id=?").run(verifToken, verifExpires, cu.id);
+      const { emailVerification } = require("./mailer");
+      emailVerification({ email: fields.email, prenom: fields.prenom || fields.nom, token: verifToken });
+    } catch (e) {}
+  }
+  if (changed && current.identite_verifiee) {
+    creerNotif(cu.id, "identite_a_revalider", "Nouvelle vérification d'identité requise",
+      "Vous avez modifié une information déclarée (nom, date de naissance, nationalité ou origine). Votre badge d'identité vérifiée a été retiré ; merci de refaire la vérification depuis votre profil.", {});
+  }
+
+  sendJSON(res, 200, { ok: true, identite_a_revalider: changed && !!current.identite_verifiee, email_a_reverifier: emailChanged });
+});
+
 route("POST", "/api/auth/logout", async (req, res) => {
   const cookies = parseCookies(req);
   if (cookies.sid) destroySession(cookies.sid);

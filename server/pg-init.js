@@ -207,6 +207,8 @@ async function migratePg(pool) {
     ['users', 'identite_pays_document', 'TEXT'],
     ['users', 'identite_mismatch', 'INTEGER DEFAULT 0'],
     ['users', 'galerie_json', 'TEXT'],
+    ['users', 'origine1', 'TEXT'],
+    ['users', 'origine2', 'TEXT'],
     ['initiatives', 'organisation_verifiee', 'INTEGER DEFAULT 0'],
     ['initiatives', 'organisation_verifiee_le', 'TEXT'],
     ['initiatives', 'organisation_expire_le', 'TEXT'],
