@@ -27,9 +27,11 @@ async function createMissingTables(pool) {
     // Certains blocs mélangent CREATE TABLE + INSERT OR IGNORE de seed — ces INSERT ne sont
     // pas rejouables sans risque ici (rôle de seedPg()), donc on les exclut explicitement.
     const statements = sql.split(';').map(s => s.trim()).filter(Boolean);
-    // On ignore les commentaires SQL (-- ...) en tête de bloc avant de tester le préfixe CREATE,
-    // sinon un commentaire juste avant CREATE TABLE fait échouer le filtre (table jamais créée sur Postgres).
-    const createOnly = statements.filter(s => /^CREATE (TABLE|INDEX|UNIQUE INDEX)/i.test(s.replace(/^(\s*--[^\n]*\n)+/g, '').trim()));
+    // On ignore les commentaires SQL (-- ... et /* ... */) en tête de bloc avant de tester le préfixe
+    // CREATE, sinon un commentaire juste avant CREATE TABLE fait échouer le filtre (table jamais créée
+    // sur Postgres). Bug réel observé sur abonnements_collectivite (commentaire /* */ non filtré).
+    const stripLeadingComments = s => s.replace(/^(\s*(--[^\n]*\n|\/\*[\s\S]*?\*\/))+/g, '').trim();
+    const createOnly = statements.filter(s => /^CREATE (TABLE|INDEX|UNIQUE INDEX)/i.test(stripLeadingComments(s)));
     if (!createOnly.length) continue;
     for (const stmt of createOnly) {
       try {
