@@ -6187,8 +6187,8 @@ const PUB_PLANS = [
   { id: "business", label: "Business", prix_annuel: 150, prix_mensuel_equiv: 12.50, quota_mensuel: 2 },
   { id: "premium",  label: "Premium",  prix_annuel: 200, prix_mensuel_equiv: 16.67, quota_mensuel: 4 },
 ];
-const PUB_SLOTS = ["homepage_top", "homepage_feed", "between_posts", "between_videos",
-  "projects_page", "diaspora_impact", "calls_for_projects", "vitrine_section"];
+const PUB_SLOTS = ["homepage_feed", "between_posts", "between_videos",
+  "calls_for_projects", "vitrine_section"];
 const PUB_AD_CTA = ["En savoir plus", "Acheter", "Contacter", "S'inscrire"];
 
 route("GET", "/api/ads/plans", async (req, res) => {
