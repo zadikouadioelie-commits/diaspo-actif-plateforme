@@ -87,7 +87,7 @@
         </div>
       </div>
       <div class="pc-actions">
-        <button class="pc-btn pc-btn-primary" id="pc-btn-abonner">${profil.abonne ? '✅ Abonné' : '🔔 S\'abonner'}</button>
+        ${profil.is_owner ? `<button class="pc-btn pc-btn-outline" id="pc-btn-edit">✏️ Modifier mon profil</button>` : `<button class="pc-btn pc-btn-primary" id="pc-btn-abonner">${profil.abonne ? '✅ Abonné' : '🔔 S\'abonner'}</button>`}
         ${profil.site_web ? `<a class="pc-btn pc-btn-outline" href="${esc(profil.site_web)}" target="_blank" rel="noopener">🌐 Site officiel</a>` : ''}
         ${CU && CU.id !== profil.id ? `<a class="pc-btn pc-btn-outline" href="messagerie.html?user=${profil.id}">✉️ Contacter</a>` : ''}
       </div>
@@ -115,10 +115,10 @@
           ${Object.entries(profil.reseaux_sociaux).filter(([,v]) => v).map(([k,v]) => `<div style="font-size:13px;margin-bottom:6px;"><a href="${esc(v)}" target="_blank" rel="noopener">${esc(k)}</a></div>`).join('')}
         </div>` : ''}
 
-        ${profil.documents.length ? `
+        ${(profil.documents.length || profil.is_owner) ? `
         <div class="pc-card">
-          <h3>📄 Documents publics</h3>
-          ${profil.documents.map(d => `<div class="pc-doc">📎 <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.nom || 'Document')}</a></div>`).join('')}
+          <h3>📄 Documents publics ${profil.is_owner ? `<button class="pc-btn pc-btn-outline" style="padding:3px 10px;font-size:11px;color:#16457E;background:#EFF6FF;" id="pc-btn-add-doc">+ Ajouter</button>` : ''}</h3>
+          <div id="pc-docs-list">${profil.documents.map(d => `<div class="pc-doc">📎 <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.nom || 'Document')}</a></div>`).join('') || '<div class="pc-empty">Aucun document.</div>'}</div>
         </div>` : ''}
       </div>
 
@@ -127,6 +127,18 @@
           <h3>📝 Présentation du territoire</h3>
           ${profil.bio ? `<div style="font-size:13.5px;white-space:pre-line;line-height:1.6;">${esc(profil.bio)}</div>` : '<div class="pc-empty">Aucune présentation renseignée.</div>'}
         </div>
+
+        ${(profil.projets_en_cours.length || profil.is_owner) ? `
+        <div class="pc-card">
+          <h3>🚧 Projets en cours ${profil.is_owner ? `<button class="pc-btn pc-btn-outline" style="padding:3px 10px;font-size:11px;color:#16457E;background:#EFF6FF;" id="pc-btn-add-projet">+ Ajouter</button>` : ''}</h3>
+          <div id="pc-projets-list">${profil.projets_en_cours.map(p => `<div class="pc-post"><strong>${esc(p.titre)}</strong>${p.description ? `<div style="margin-top:4px;">${esc(p.description)}</div>` : ''}</div>`).join('') || '<div class="pc-empty">Aucun projet en cours.</div>'}</div>
+        </div>` : ''}
+
+        ${(profil.realisations.length || profil.is_owner) ? `
+        <div class="pc-card">
+          <h3>🏆 Projets réalisés ${profil.is_owner ? `<button class="pc-btn pc-btn-outline" style="padding:3px 10px;font-size:11px;color:#16457E;background:#EFF6FF;" id="pc-btn-add-realisation">+ Ajouter</button>` : ''}</h3>
+          <div id="pc-realisations-list">${profil.realisations.map(p => `<div class="pc-post"><strong>${esc(p.titre)}</strong>${p.description ? `<div style="margin-top:4px;">${esc(p.description)}</div>` : ''}</div>`).join('') || '<div class="pc-empty">Aucun projet réalisé archivé.</div>'}</div>
+        </div>` : ''}
 
         <div class="pc-card">
           <h3>📢 Actualités du territoire</h3>
@@ -170,16 +182,61 @@
   if (profil.galerie.length && typeof loadGaleriePhotoCounts === 'function') loadGaleriePhotoCounts('user', profil.id);
 
   // Abonnement
-  document.getElementById('pc-btn-abonner').addEventListener('click', async () => {
+  const btnAbo = document.getElementById('pc-btn-abonner');
+  if (btnAbo) btnAbo.addEventListener('click', async () => {
     if (!CU) { location.href = 'login.html?r=' + encodeURIComponent(location.pathname + location.search); return; }
-    const btn = document.getElementById('pc-btn-abonner');
-    btn.disabled = true;
+    btnAbo.disabled = true;
     try {
       const r = await api('POST', `/collectivites/${id}/abonnement`);
-      btn.textContent = r.abonne ? '✅ Abonné' : "🔔 S'abonner";
+      btnAbo.textContent = r.abonne ? '✅ Abonné' : "🔔 S'abonner";
     } catch (e) { alert('Erreur : ' + e.message); }
-    finally { btn.disabled = false; }
+    finally { btnAbo.disabled = false; }
   });
+
+  // Édition (propriétaire uniquement)
+  if (profil.is_owner) {
+    const btnEdit = document.getElementById('pc-btn-edit');
+    if (btnEdit) btnEdit.addEventListener('click', async () => {
+      const logo_url = prompt("URL du logo :", profil.logo_url || '');
+      if (logo_url === null) return;
+      const site_local = prompt("Site web officiel :", profil.site_web || '');
+      if (site_local === null) return;
+      const bio = prompt("Présentation du territoire :", profil.bio || '');
+      if (bio === null) return;
+      const presentation_gouvernance = prompt("Présentation de la gouvernance :", profil.presentation_gouvernance || '');
+      if (presentation_gouvernance === null) return;
+      const facebook = prompt("Lien Facebook (optionnel) :", (profil.reseaux_sociaux||{}).facebook || '') || '';
+      const linkedin = prompt("Lien LinkedIn (optionnel) :", (profil.reseaux_sociaux||{}).linkedin || '') || '';
+      try {
+        await api('PUT', '/profil', { logo_url, site_local, bio, presentation_gouvernance, reseaux_sociaux_officiels: { facebook, linkedin } });
+        location.reload();
+      } catch (e) { alert('Erreur : ' + e.message); }
+    });
+
+    const btnDoc = document.getElementById('pc-btn-add-doc');
+    if (btnDoc) btnDoc.addEventListener('click', async () => {
+      const nom = prompt("Nom du document :"); if (!nom) return;
+      const url = prompt("URL du document :"); if (!url) return;
+      const docs = [...profil.documents, { nom, url }];
+      try { await api('PUT', '/profil', { documents_publics: docs }); location.reload(); } catch (e) { alert('Erreur : ' + e.message); }
+    });
+
+    const btnProjet = document.getElementById('pc-btn-add-projet');
+    if (btnProjet) btnProjet.addEventListener('click', async () => {
+      const titre = prompt("Titre du projet en cours :"); if (!titre) return;
+      const description = prompt("Description (optionnel) :") || '';
+      const list = [...profil.projets_en_cours, { titre, description }];
+      try { await api('PUT', '/profil', { projets_en_cours: list }); location.reload(); } catch (e) { alert('Erreur : ' + e.message); }
+    });
+
+    const btnReal = document.getElementById('pc-btn-add-realisation');
+    if (btnReal) btnReal.addEventListener('click', async () => {
+      const titre = prompt("Titre du projet réalisé :"); if (!titre) return;
+      const description = prompt("Description (optionnel) :") || '';
+      const list = [...profil.realisations, { titre, description }];
+      try { await api('PUT', '/profil', { realisations: list }); location.reload(); } catch (e) { alert('Erreur : ' + e.message); }
+    });
+  }
 })();
 </script>
 </body>

@@ -1303,6 +1303,7 @@ const MIGRATIONS = [
   ["users", "reseaux_sociaux_officiels TEXT"],
   ["users", "documents_publics_json TEXT DEFAULT '[]'"],
   ["users", "presentation_gouvernance TEXT"],
+  ["users", "projets_en_cours_json TEXT DEFAULT '[]'"],
   // Section 4 – Responsable
   ["users", "signature_responsable TEXT"],
   // Hiérarchie institutionnelle

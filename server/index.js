@@ -3005,8 +3005,11 @@ route("GET", "/api/collectivites/:id/profil-public", async (req, res, params) =>
       is_verified: !!row.is_verified,
       galerie: safeParse(row.galerie_json) || [],
       documents: safeParse(row.documents_publics_json) || [],
+      realisations: safeParse(row.realisations_json) || [],
+      projets_en_cours: safeParse(row.projets_en_cours_json) || [],
       stats: { abonnes: nb_abonnes, publications: nb_publications, evenements: nb_evenements },
       abonne,
+      is_owner: cu ? Number(cu.id) === Number(row.id) : false,
     }
   });
 });
@@ -5335,6 +5338,14 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
   if (competences !== undefined)     { fields.push("competences=?");      vals.push(JSON.stringify(Array.isArray(competences)?competences:[])); }
   if (experiences !== undefined)     { fields.push("experiences=?");      vals.push(JSON.stringify(Array.isArray(experiences)?experiences:[])); }
   if (body.galerie !== undefined)    { fields.push("galerie_json=?");     vals.push(JSON.stringify(Array.isArray(body.galerie)?body.galerie:[])); }
+  // Profil public Collectivité
+  if (body.logo_url !== undefined)               { fields.push("logo_url=?");                vals.push(body.logo_url); }
+  if (body.site_local !== undefined)             { fields.push("site_local=?");               vals.push(body.site_local); }
+  if (body.presentation_gouvernance !== undefined) { fields.push("presentation_gouvernance=?"); vals.push(body.presentation_gouvernance); }
+  if (body.reseaux_sociaux_officiels !== undefined) { fields.push("reseaux_sociaux_officiels=?"); vals.push(JSON.stringify(body.reseaux_sociaux_officiels && typeof body.reseaux_sociaux_officiels === 'object' ? body.reseaux_sociaux_officiels : {})); }
+  if (body.documents_publics !== undefined)      { fields.push("documents_publics_json=?");   vals.push(JSON.stringify(Array.isArray(body.documents_publics)?body.documents_publics:[])); }
+  if (body.realisations !== undefined)           { fields.push("realisations_json=?");        vals.push(JSON.stringify(Array.isArray(body.realisations)?body.realisations:[])); }
+  if (body.projets_en_cours !== undefined)       { fields.push("projets_en_cours_json=?");     vals.push(JSON.stringify(Array.isArray(body.projets_en_cours)?body.projets_en_cours:[])); }
   if (body.profil !== undefined) {
     const cur = await db.prepare("SELECT profil_json FROM users WHERE id=?").get(user.id);
     const merged = { ...safeParse(cur.profil_json), ...body.profil };
