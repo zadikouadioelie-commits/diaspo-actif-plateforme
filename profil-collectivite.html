@@ -404,6 +404,20 @@ function applyPcTheme(name) {
   }
   addMsg(`Bonjour, je peux répondre à vos questions sur ${profil.nom} : présentation du territoire, projets, événements, informations pratiques.`, true);
 
+  const suggestions = ['Présentez-vous', 'Quels sont vos projets en cours ?', 'Quels sont les prochains événements ?', 'Comment vous contacter ?'];
+  const sugEl = document.createElement('div');
+  sugEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-self:flex-start;';
+  sugEl.innerHTML = suggestions.map(s => `<button class="pc-ia-suggestion" style="background:#fff;border:1.5px solid #BFDBFE;color:#1e40af;border-radius:99px;padding:5px 11px;font-size:11.5px;cursor:pointer;">${esc(s)}</button>`).join('');
+  msgsEl.appendChild(sugEl);
+  sugEl.querySelectorAll('.pc-ia-suggestion').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sugEl.remove();
+      const q = btn.textContent;
+      addMsg(q, false);
+      setTimeout(() => addMsg(answerIA(q), true), 200);
+    });
+  });
+
   function answerIA(q) {
     const t = q.toLowerCase();
     if (/pr[ée]sent|qui[ -]?êtes|territoire|histoire/.test(t)) return profil.bio || "Aucune présentation du territoire n'est encore renseignée.";
