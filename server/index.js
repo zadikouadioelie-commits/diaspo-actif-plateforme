@@ -288,6 +288,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     // collectivite étatique — section 4 (responsable)
     nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique,
     email_responsable_etatique, tel_responsable_etatique,
+    service_direction_responsable, adresse_pro_responsable,
     date_prise_fonction, date_fin_mandat,
     declaration_officielle, statut_etatique
   } = body;
@@ -420,6 +421,8 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
       fonction_responsable_etatique: fonction_responsable_etatique || null,
       email_responsable_etatique: email_responsable_etatique || email || null,
       tel_responsable_etatique: tel_responsable_etatique || null,
+      service_direction_responsable: service_direction_responsable || null,
+      adresse_pro_responsable: adresse_pro_responsable || null,
       date_prise_fonction: date_prise_fonction || null,
       date_fin_mandat: date_fin_mandat || null,
       declaration_officielle: declaration_officielle ? 1 : 0,
@@ -3061,6 +3064,91 @@ route("GET", "/api/collectivites/:id/appels-projets", async (req, res, params) =
   const rows = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id=? AND categorie IN ('appel_projets','recherche_partenaire') ORDER BY created_at DESC LIMIT 20").all(params.id);
   const posts = await Promise.all(rows.map(p => enrichPost(p, cu)));
   sendJSON(res, 200, { posts });
+});
+
+/* ===========================================================================
+   RESPONSABLE OFFICIEL D'UN COMPTE COLLECTIVITÉ — chaque compte est rattaché
+   à une seule personne identifiée. Toute modification de son identité
+   (transfert de responsable) invalide le badge « Collectivité vérifiée »
+   et déclenche une nouvelle vérification par l'administration.
+=========================================================================== */
+
+/* GET /api/collectivite/responsable — mes infos de responsable (owner) */
+route("GET", "/api/collectivite/responsable", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux comptes Collectivité." });
+  const row = await db.prepare(`
+    SELECT nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique,
+           service_direction_responsable, adresse_pro_responsable,
+           email_responsable_etatique, tel_responsable_etatique,
+           is_verified, statut_etatique
+    FROM users WHERE id=?
+  `).get(user.id);
+  sendJSON(res, 200, { responsable: row });
+});
+
+/* PUT /api/collectivite/responsable — transfert / mise à jour du responsable (owner uniquement).
+   Toute modification invalide la vérification en cours : le badge est retiré et une
+   nouvelle demande de vérification est requise auprès de l'équipe Diaspo'Actif. */
+route("PUT", "/api/collectivite/responsable", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux comptes Collectivité." });
+  const { nom, prenom, fonction, service_direction, adresse_pro, email, tel } = body;
+  if (!nom || !prenom || !fonction || !email) return sendJSON(res, 400, { error: "Nom, prénom, fonction et e-mail professionnel sont requis." });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+
+  await db.prepare(`
+    UPDATE users SET
+      nom_responsable_etatique=?, prenom_responsable_etatique=?, fonction_responsable_etatique=?,
+      service_direction_responsable=?, adresse_pro_responsable=?,
+      email_responsable_etatique=?, tel_responsable_etatique=?,
+      is_verified=0, statut_etatique='declare'
+    WHERE id=?
+  `).run(nom, prenom, fonction, service_direction || null, adresse_pro || null, email, tel || null, user.id);
+
+  creerNotif(user.id, "responsable_a_revalider", "Nouveau responsable déclaré",
+    "Le badge « Collectivité vérifiée » a été retiré suite au changement de responsable. Une nouvelle vérification par l'équipe Diaspo'Actif est requise.", {});
+
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/admin/collectivites-a-verifier — comptes en attente de vérification du responsable */
+route("GET", "/api/admin/collectivites-a-verifier", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const rows = await db.prepare(`
+    SELECT id, nom, type_organisme, pays, ville,
+           nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique,
+           email_responsable_etatique, statut_etatique, is_verified, created_at
+    FROM users WHERE role='collectivite' AND (statut_etatique IS NULL OR statut_etatique != 'verifie') AND (is_verified IS NULL OR is_verified=0)
+    ORDER BY created_at DESC
+  `).all();
+  sendJSON(res, 200, { collectivites: rows });
+});
+
+/* POST /api/admin/collectivites/:id/verifier — valide l'identité du responsable, accorde le badge */
+route("POST", "/api/admin/collectivites/:id/verifier", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const coll = await db.prepare("SELECT id FROM users WHERE id=? AND role='collectivite'").get(params.id);
+  if (!coll) return sendJSON(res, 404, { error: "Collectivité introuvable." });
+  await db.prepare("UPDATE users SET is_verified=1, statut_etatique='verifie' WHERE id=?").run(coll.id);
+  creerNotif(coll.id, "responsable_verifie", "✅ Collectivité vérifiée",
+    "L'identité de votre responsable officiel a été validée par l'équipe Diaspo'Actif. Le badge « Collectivité vérifiée » est désormais actif sur votre profil public.", {});
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/admin/collectivites/:id/refuser — refuse la vérification (motif transmis au compte) */
+route("POST", "/api/admin/collectivites/:id/refuser", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const coll = await db.prepare("SELECT id FROM users WHERE id=? AND role='collectivite'").get(params.id);
+  if (!coll) return sendJSON(res, 404, { error: "Collectivité introuvable." });
+  await db.prepare("UPDATE users SET is_verified=0, statut_etatique='rejete' WHERE id=?").run(coll.id);
+  const motif = (body?.motif || "").trim();
+  creerNotif(coll.id, "responsable_refuse", "Vérification non validée",
+    motif ? `Votre demande de vérification n'a pas été validée : ${motif}` : "Votre demande de vérification n'a pas été validée. Contactez l'équipe Diaspo'Actif pour plus d'informations.", {});
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ── Équipe publique : responsable principal + membres acceptés (liens vers profils DA) ── */

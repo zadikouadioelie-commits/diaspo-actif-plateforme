@@ -213,6 +213,9 @@ const NOTIF_ICONS = {
   reunion_invite: "📹",
   demande_relation: "🤝",
   demande_relation_acceptee: "🤝",
+  responsable_a_revalider: "🪪",
+  responsable_verifie: "✅",
+  responsable_refuse: "⚠️",
 };
 
 function notifUrl(n) {

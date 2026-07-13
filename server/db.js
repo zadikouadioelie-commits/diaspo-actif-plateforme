@@ -1271,6 +1271,8 @@ const MIGRATIONS = [
   ["users", "nom_responsable_etatique TEXT"],
   ["users", "prenom_responsable_etatique TEXT"],
   ["users", "fonction_responsable_etatique TEXT"],
+  ["users", "service_direction_responsable TEXT"],
+  ["users", "adresse_pro_responsable TEXT"],
   ["users", "date_prise_fonction TEXT"],
   ["users", "date_fin_mandat TEXT"],
   ["users", "photo_responsable TEXT"],

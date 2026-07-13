@@ -474,10 +474,12 @@
           <div><label>Nom <span style="color:#2563EB">*</span></label><input id="ce-rnom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Kouassi"></div>
           <div><label>Prénom <span style="color:#2563EB">*</span></label><input id="ce-rprenom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Jean-Baptiste"></div>
           <div style="grid-column:1/-1;"><label>Fonction <span style="color:#2563EB">*</span></label><input id="ce-rfct" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ambassadeur, Consul Général, Maire, Préfet, Président du Conseil Régional…"></div>
+          <div><label>Service / direction de rattachement</label><input id="ce-rservice" class="input-field" style="width:100%;margin-top:4px;" placeholder="Direction des affaires internationales…"></div>
           <div><label>Date de prise de fonction</label><input id="ce-date-prise" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
           <div><label>Fin de mandat <span style="font-size:11px;color:var(--muted);">(si connue)</span></label><input id="ce-date-fin" type="date" class="input-field" style="width:100%;margin-top:4px;"></div>
           <div><label>E-mail professionnel <span style="color:#2563EB">*</span></label><input id="ce-email-resp" type="email" class="input-field" style="width:100%;margin-top:4px;" placeholder="j.kouassi@ambassade.fr"></div>
           <div><label>Téléphone professionnel</label><input id="ce-tel-resp" type="tel" class="input-field" style="width:100%;margin-top:4px;" placeholder="+33 1 00 00 00 03"></div>
+          <div style="grid-column:1/-1;"><label>Adresse professionnelle</label><input id="ce-adresse-resp" class="input-field" style="width:100%;margin-top:4px;" placeholder="Adresse du service où exerce le responsable"></div>
         </div>
 
         <!-- Déclaration officielle -->
@@ -857,6 +859,8 @@ function collecterTerritoires(){
         fonction_responsable_etatique:rfct,
         email_responsable_etatique:   email,
         tel_responsable_etatique:     v('ce-tel-resp'),
+        service_direction_responsable: v('ce-rservice'),
+        adresse_pro_responsable:       v('ce-adresse-resp'),
         date_prise_fonction:          v('ce-date-prise'),
         date_fin_mandat:              v('ce-date-fin'),
         declaration_officielle: 1,

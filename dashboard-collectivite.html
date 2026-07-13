@@ -169,6 +169,14 @@
           <div id="perimetre-content-ck"></div>
         </div>
 
+        <div class="card" style="margin-top:16px;">
+          <div class="flex-between" style="margin-bottom:10px;">
+            <h3 style="margin:0;font-size:15px;">🪪 Responsable officiel</h3>
+            <button class="btn btn-sm btn-outline" id="btn-transfert-responsable">✏️ Modifier / Transférer</button>
+          </div>
+          <div id="responsable-content"><div class="notice">Chargement…</div></div>
+        </div>
+
         <!-- Charte : les deux droits d'une collectivité -->
         <div class="card" style="margin-top:16px;border:1px solid #C7D2FE;background:linear-gradient(135deg,#EEF2FF,#F5F3FF);">
           <h3 style="margin:0 0 6px;font-size:15px;">🧭 Observer largement, agir localement</h3>
@@ -1558,6 +1566,49 @@ async function loadCommListes() {
   } catch(e) { /* silencieux : la liste reste optionnelle */ }
 }
 
+async function loadResponsable() {
+  const el = document.getElementById("responsable-content");
+  if (!el) return;
+  try {
+    const r = await api("GET", "/collectivite/responsable");
+    const p = r.responsable || {};
+    const STATUT_BADGE = {
+      verifie: '<span class="pc-badge" style="background:#DCFCE7;color:#166534;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;">✅ Collectivité vérifiée</span>',
+      rejete: '<span class="pc-badge" style="background:#FEE2E2;color:#991B1B;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;">⚠️ Vérification refusée</span>',
+      declare: '<span class="pc-badge" style="background:#FEF3C7;color:#92400E;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;">⏳ En attente de vérification</span>',
+    };
+    const statut = p.is_verified ? "verifie" : (p.statut_etatique || "declare");
+    el.innerHTML = `
+      <div style="font-weight:700;font-size:14px;">${escH([p.prenom_responsable_etatique, p.nom_responsable_etatique].filter(Boolean).join(" ") || "Non renseigné")}</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px;">${escH(p.fonction_responsable_etatique || "—")}${p.service_direction_responsable ? " · " + escH(p.service_direction_responsable) : ""}</div>
+      <div style="font-size:12.5px;margin-top:8px;">✉️ ${escH(p.email_responsable_etatique || "—")}${p.tel_responsable_etatique ? " · ☎ " + escH(p.tel_responsable_etatique) : ""}</div>
+      <div style="margin-top:10px;">${STATUT_BADGE[statut] || STATUT_BADGE.declare}</div>
+    `;
+  } catch (e) { el.innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+}
+
+document.addEventListener("click", (e) => {
+  if (e.target && e.target.id === "btn-transfert-responsable") {
+    (async () => {
+      const r = await api("GET", "/collectivite/responsable").catch(() => ({ responsable: {} }));
+      const p = r.responsable || {};
+      const nom = prompt("Nom du responsable :", p.nom_responsable_etatique || ""); if (nom === null) return;
+      const prenom = prompt("Prénom du responsable :", p.prenom_responsable_etatique || ""); if (prenom === null) return;
+      const fonction = prompt("Fonction :", p.fonction_responsable_etatique || ""); if (fonction === null) return;
+      const service_direction = prompt("Service / direction de rattachement (optionnel) :", p.service_direction_responsable || "") || "";
+      const email = prompt("E-mail professionnel :", p.email_responsable_etatique || ""); if (email === null) return;
+      const tel = prompt("Téléphone professionnel (optionnel) :", p.tel_responsable_etatique || "") || "";
+      const adresse_pro = prompt("Adresse professionnelle (optionnel) :", p.adresse_pro_responsable || "") || "";
+      if (!nom || !prenom || !fonction || !email) { alert("Nom, prénom, fonction et e-mail sont obligatoires."); return; }
+      try {
+        await api("PUT", "/collectivite/responsable", { nom, prenom, fonction, service_direction, email, tel, adresse_pro });
+        alert("Responsable mis à jour. Le badge « Collectivité vérifiée » a été retiré : une nouvelle vérification par l'équipe Diaspo'Actif est requise.");
+        loadResponsable();
+      } catch (err) { alert("Erreur : " + err.message); }
+    })();
+  }
+});
+
 async function loadDemandesRelationEnvoyees() {
   const el = document.getElementById("demandes-relation-envoyees");
   if (!el) return;
@@ -1779,6 +1830,8 @@ async function loadPartenariats() {
 
   const ckProfilLink = document.getElementById("ck-profil-public-link");
   if (ckProfilLink) ckProfilLink.href = "profil-collectivite.html?id=" + ME.id;
+
+  loadResponsable();
 
   document.getElementById("inst-nom").textContent = ME.nom;
   document.getElementById("inst-infos").textContent = [ME.ville, ME.pays].filter(Boolean).join(", ") + " · Compte Étatique";

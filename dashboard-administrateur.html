@@ -3112,6 +3112,12 @@
           <h2 style="margin:0;">🏛️ Accréditations Diaspo'Actif</h2>
           <button class="btn btn-orange" onclick="openAccredModal()">+ Nouvelle accréditation</button>
         </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 14px;">🪪 Responsables de collectivités en attente de vérification</h3>
+          <div id="coll-a-verifier-list"><div class="notice">Chargement…</div></div>
+        </div>
+
         <div class="card" style="margin-bottom:20px;">
           <h3 style="margin:0 0 14px;">Institutions accréditées</h3>
           <div id="accred-list"><div class="notice">Chargement…</div></div>
@@ -8211,7 +8217,39 @@ async function submitAccordDirect(){
   let ACCRED_DATA = { accreditations: [], institutions: [] };
   let CURRENT_ACCRED_ID = null;
 
+  async function loadCollectivitesAVerifier() {
+    const el = document.getElementById("coll-a-verifier-list");
+    if (!el) return;
+    try {
+      const r = await api("GET", "/admin/collectivites-a-verifier");
+      const rows = r.collectivites || [];
+      if (!rows.length) { el.innerHTML = `<div class="empty">Aucune demande en attente.</div>`; return; }
+      el.innerHTML = rows.map(c => `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;font-size:13.5px;">${escH(c.nom)} <span style="font-weight:400;color:var(--muted);font-size:12px;">(${escH(c.type_organisme||'—')} · ${escH(c.ville||c.pays||'')})</span></div>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">👤 ${escH([c.prenom_responsable_etatique,c.nom_responsable_etatique].filter(Boolean).join(' ')||'—')} — ${escH(c.fonction_responsable_etatique||'—')} · ✉️ ${escH(c.email_responsable_etatique||'—')}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button class="btn btn-sm btn-orange" onclick="verifierCollectivite(${c.id})">✅ Vérifier</button>
+            <button class="btn btn-sm btn-outline" onclick="refuserCollectivite(${c.id})">✕ Refuser</button>
+          </div>
+        </div>
+      `).join("");
+    } catch (e) { el.innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+  }
+
+  async function verifierCollectivite(id) {
+    if (!confirm("Confirmer la vérification de l'identité du responsable et accorder le badge « Collectivité vérifiée » ?")) return;
+    try { await api("POST", `/admin/collectivites/${id}/verifier`); loadCollectivitesAVerifier(); } catch (e) { alert("Erreur : " + e.message); }
+  }
+  async function refuserCollectivite(id) {
+    const motif = prompt("Motif du refus (optionnel, transmis à la collectivité) :") || "";
+    try { await api("POST", `/admin/collectivites/${id}/refuser`, { motif }); loadCollectivitesAVerifier(); } catch (e) { alert("Erreur : " + e.message); }
+  }
+
   async function loadAccredList() {
+    loadCollectivitesAVerifier();
     const el = document.getElementById("accred-list");
     try {
       ACCRED_DATA = await api("GET", "/admin/accreditations");
