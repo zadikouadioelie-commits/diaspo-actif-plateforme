@@ -3005,6 +3005,7 @@ route("GET", "/api/collectivites/:id/profil-public", async (req, res, params) =>
       site_web: row.site_local, reseaux_sociaux: safeParse(row.reseaux_sociaux_officiels) || {},
       logo_url: row.logo_url || row.photo_url, banner_url: row.banner_url,
       bio: row.bio, presentation_gouvernance: row.presentation_gouvernance,
+      theme_couleur: row.theme_couleur || 'navy',
       nom_responsable: row.nom_responsable_etatique, prenom_responsable: row.prenom_responsable_etatique, fonction_responsable: row.fonction_responsable_etatique,
       is_verified: !!row.is_verified,
       galerie: safeParse(row.galerie_json) || [],
@@ -3535,7 +3536,7 @@ route("GET", "/api/users/search", async (req, res, params, body, query) => {
   if (q.length < 2) return sendJSON(res, 200, { users: [] });
   const like = `%${q}%`;
   const rows = await db.prepare(`
-    SELECT id, nom, prenom, email, role, avatar_url
+    SELECT id, nom, prenom, email, role, photo_url AS avatar_url
     FROM users
     WHERE id != ?
       AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ? OR CAST(id AS TEXT) = ?)

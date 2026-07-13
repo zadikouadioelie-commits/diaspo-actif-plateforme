@@ -70,14 +70,84 @@ function renderMentions(text) {
   return text.replace(/@\[([^\]]+)\]\([ui]:\d+\)/g, '<strong>@$1</strong>');
 }
 
+/* Identification de compte dans le texte (description ou commentaire), déclenchée
+   au choix par @ ou * : format stocké uniforme @[Nom](type:id) où type = u (utilisateur),
+   i (initiative) ou c (collectivité). Rendu en lien cliquable vers le bon profil. */
+const MENTION_LINK = { u: 'profil.html?id=', i: 'initiative.html?id=', c: 'profil-collectivite.html?id=' };
 function processContent(text) {
   if (!text) return '';
   let t = escHtml(text);
   t = t.replace(/#([\wÀ-ÿ]+)/g, '<a href="fil-actualite.html?hashtag=$1" class="post-hashtag">#$1</a>');
-  t = t.replace(/@\[([^\]]+)\]\([ui]:\d+\)/g, '<strong class="post-mention">@$1</strong>');
+  t = t.replace(/[@*]\[([^\]]+)\]\(([uic]):(\d+)\)/g, (m, nom, type, id) =>
+    `<a href="${MENTION_LINK[type]||MENTION_LINK.u}${id}" class="post-mention">@${nom}</a>`);
   t = t.replace(/\n/g, '<br>');
   return t;
 }
+
+/* ── Sélecteur de mention (@ ou *) : attache un autocomplete à un champ texte ── */
+function attachMentionPicker(el) {
+  if (!el || el.dataset.mentionBound) return;
+  el.dataset.mentionBound = '1';
+  let box = null, items = [], activeIdx = -1, triggerPos = -1;
+
+  function closeBox() { if (box) { box.remove(); box = null; } items = []; activeIdx = -1; triggerPos = -1; }
+
+  function insertMention(u) {
+    const type = u.role === 'initiative' ? 'i' : u.role === 'collectivite' ? 'c' : 'u';
+    const label = u.role === 'utilisateur' ? [u.prenom, u.nom].filter(Boolean).join(' ') : u.nom;
+    const val = el.value;
+    const before = val.slice(0, triggerPos);
+    const after = val.slice(el.selectionStart);
+    const insertion = `@[${label}](${type}:${u.id}) `;
+    el.value = before + insertion + after;
+    const pos = (before + insertion).length;
+    el.setSelectionRange(pos, pos);
+    el.focus();
+    closeBox();
+  }
+
+  async function updateBox(query) {
+    if (query.length < 2) { closeBox(); return; }
+    try {
+      const r = await apiRequest('GET', `/api/users/search?q=${encodeURIComponent(query)}`);
+      items = r.users || [];
+    } catch (e) { items = []; }
+    if (!items.length) { closeBox(); return; }
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'post-mention-box';
+      document.body.appendChild(box);
+    }
+    const rect = el.getBoundingClientRect();
+    box.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.bottom+4}px;width:${Math.min(rect.width,280)}px;max-height:200px;overflow-y:auto;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:9999;`;
+    activeIdx = 0;
+    box.innerHTML = items.map((u,i) => {
+      const label = u.role === 'utilisateur' ? [u.prenom, u.nom].filter(Boolean).join(' ') : u.nom;
+      const roleLabel = { utilisateur:'Membre', initiative:'Organisation', collectivite:'Collectivité', administrateur:'Admin' }[u.role] || u.role;
+      return `<div class="post-mention-item" data-idx="${i}" style="padding:8px 12px;cursor:pointer;font-size:13px;${i===0?'background:#F3F4F6;':''}"><strong>${escHtml(label)}</strong> <span style="color:#9ca3af;font-size:11px;">${escHtml(roleLabel)}</span></div>`;
+    }).join('');
+    box.querySelectorAll('.post-mention-item').forEach(it => {
+      it.addEventListener('mousedown', (e) => { e.preventDefault(); insertMention(items[Number(it.dataset.idx)]); });
+    });
+  }
+
+  el.addEventListener('input', () => {
+    const pos = el.selectionStart;
+    const val = el.value.slice(0, pos);
+    const m = val.match(/(?:^|\s)([@*])([\wÀ-ÿ' -]{0,30})$/);
+    if (m) { triggerPos = pos - m[2].length - 1; updateBox(m[2]); }
+    else closeBox();
+  });
+  el.addEventListener('keydown', (e) => {
+    if (!box || !items.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx+1, items.length-1); box.querySelectorAll('.post-mention-item').forEach((it,i)=>it.style.background = i===activeIdx?'#F3F4F6':''); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx-1, 0); box.querySelectorAll('.post-mention-item').forEach((it,i)=>it.style.background = i===activeIdx?'#F3F4F6':''); }
+    else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); insertMention(items[activeIdx]); }
+    else if (e.key === 'Escape') closeBox();
+  });
+  el.addEventListener('blur', () => setTimeout(closeBox, 150));
+}
+window.attachMentionPicker = attachMentionPicker;
 
 function getInitiales(nom) {
   if (!nom) return '?';
@@ -343,7 +413,7 @@ function buildCreateModal() {
   <div class="posts-modal-body">
     <!-- Zone de texte -->
     <div class="posts-field">
-      <textarea id="post-contenu" class="posts-textarea" placeholder="Partagez une actualité, un projet, une opportunité… Utilisez #hashtag et @mention" rows="5" oninput="Posts.updateCounter()"></textarea>
+      <textarea id="post-contenu" class="posts-textarea" placeholder="Partagez une actualité, un projet, une opportunité… Utilisez #hashtag et @ ou * pour identifier un compte" rows="5" oninput="Posts.updateCounter()"></textarea>
       <div class="posts-counter"><span id="post-counter">0</span> caractères</div>
     </div>
 
@@ -650,6 +720,7 @@ const Posts = {
     document.getElementById('posts-schedule-panel').style.display = 'none';
     document.getElementById('post-medias-list').innerHTML = '';
     this.updateCounter();
+    attachMentionPicker(document.getElementById('post-contenu'));
 
     if (draftPost) {
       document.getElementById('post-contenu').value = draftPost.contenu || '';
@@ -878,6 +949,7 @@ const Posts = {
     if (section.style.display === 'none') {
       section.style.display = 'block';
       await this.loadComments(postId);
+      attachMentionPicker(document.getElementById(`comment-input-${postId}`));
     } else {
       section.style.display = 'none';
     }
@@ -901,7 +973,7 @@ const Posts = {
             ${avatarEl}
             <div class="post-comment-bubble">
               <div class="post-comment-author">${escHtml(c.auteur_nom)}</div>
-              <div class="post-comment-text">${escHtml(c.contenu)}</div>
+              <div class="post-comment-text">${processContent(c.contenu)}</div>
               <div class="post-comment-time">${timeAgo(c.created_at)}</div>
             </div>
           </div>`;

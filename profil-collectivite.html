@@ -8,11 +8,11 @@
 <style>
   body{background:#F3F5F8;}
   .pc-wrap{max-width:1240px;margin:0 auto;padding:20px;}
-  .pc-header{position:relative;border-radius:20px;overflow:hidden;color:#fff;margin-bottom:22px;box-shadow:0 14px 40px rgba(14,46,90,.18);background:#0E2E5A;}
-  .pc-banner{height:220px;background-size:cover;background-position:center;background-color:#16457E;background-image:linear-gradient(135deg,#0E2E5A,#1E6091,#E8933A22);position:relative;}
+  .pc-header{position:relative;border-radius:20px;overflow:hidden;color:#fff;margin-bottom:22px;box-shadow:0 14px 40px rgba(14,46,90,.18);background:var(--pc-c1,#0E2E5A);}
+  .pc-banner{height:220px;background-size:cover;background-position:center;background-color:var(--pc-c2,#16457E);background-image:linear-gradient(135deg,var(--pc-c1,#0E2E5A),var(--pc-c2,#1E6091),var(--pc-accent,#E8933A)22);position:relative;}
   .pc-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,46,90,0) 30%,rgba(9,26,50,.95) 100%);}
   .pc-banner-edit{position:absolute;top:14px;right:14px;z-index:3;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;}
-  .pc-id{position:relative;display:flex;gap:18px;align-items:flex-end;padding:0 26px 22px;margin-top:-56px;flex-wrap:wrap;z-index:2;background:linear-gradient(180deg,rgba(9,26,50,.95),#0E2E5A);}
+  .pc-id{position:relative;display:flex;gap:18px;align-items:flex-end;padding:0 26px 22px;margin-top:-56px;flex-wrap:wrap;z-index:2;background:linear-gradient(180deg,rgba(9,26,50,.95),var(--pc-c1,#0E2E5A));}
   .pc-logo-wrap{position:relative;width:100px;height:100px;flex-shrink:0;}
   .pc-logo{width:100px;height:100px;border-radius:20px;background:#fff;object-fit:cover;border:4px solid #fff;box-shadow:0 10px 26px rgba(0,0,0,.3);display:block;}
   .pc-logo-edit{position:absolute;inset:0;border-radius:20px;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .15s,background .15s;color:#fff;font-size:22px;}
@@ -22,11 +22,11 @@
   .pc-id-meta{font-size:13px;opacity:.92;margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
   .pc-badge{background:rgba(255,255,255,.2);backdrop-filter:blur(4px);padding:3px 12px;border-radius:99px;font-size:11px;font-weight:700;}
   .pc-badge.pc-badge-verified{background:#16A34A;}
-  .pc-badge.pc-badge-warm{background:linear-gradient(135deg,#E8933A,#DB6B1F);}
-  .pc-actions{position:relative;display:flex;gap:10px;padding:16px 26px 22px;flex-wrap:wrap;background:linear-gradient(180deg,rgba(9,26,50,.88),#0E2E5A);z-index:2;}
+  .pc-badge.pc-badge-warm{background:linear-gradient(135deg,var(--pc-accent,#E8933A),var(--pc-accent-dark,#DB6B1F));}
+  .pc-actions{position:relative;display:flex;gap:10px;padding:16px 26px 22px;flex-wrap:wrap;background:linear-gradient(180deg,rgba(9,26,50,.88),var(--pc-c1,#0E2E5A));z-index:2;}
   .pc-btn{border:none;border-radius:10px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:transform .15s,box-shadow .15s;}
   .pc-btn:hover{transform:translateY(-1px);}
-  .pc-btn-primary{background:linear-gradient(135deg,#F9A94A,#E8703A);color:#fff;box-shadow:0 6px 16px rgba(232,112,58,.35);}
+  .pc-btn-primary{background:linear-gradient(135deg,var(--pc-accent-light,#F9A94A),var(--pc-accent,#E8703A));color:#fff;box-shadow:0 6px 16px rgba(232,112,58,.35);}
   .pc-btn-outline{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.4);}
   .pc-grid{display:grid;grid-template-columns:280px 1fr 300px;gap:20px;align-items:start;}
   @media (max-width:980px){.pc-grid{grid-template-columns:1fr;}.pc-col-left,.pc-col-right{position:static!important;}}
@@ -37,7 +37,7 @@
   .pc-stat-row{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid var(--border,#f1f2f5);}
   .pc-stat-row:last-child{border-bottom:none;}
   .pc-feed-card{background:var(--card,#fff);border:1px solid var(--border,#eef0f4);border-radius:16px;padding:16px 18px;box-shadow:0 2px 10px rgba(20,30,60,.04);display:flex;gap:12px;}
-  .pc-feed-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#16457E,#E8933A);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;}
+  .pc-feed-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--pc-c2,#16457E),var(--pc-accent,#E8933A));flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;}
   .pc-post{font-size:13.5px;flex:1;}
   .pc-post-date{font-size:11px;color:var(--muted,#888);margin-bottom:4px;}
   .pc-appel-card{background:linear-gradient(135deg,#FFF7ED,#FFEEDB);border:1.5px solid #F9D9A8;border-radius:16px;padding:16px 18px;}
@@ -56,10 +56,12 @@
   .pc-doc{display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13px;border-bottom:1px solid var(--border,#f1f2f5);}
   .pc-doc:last-child{border-bottom:none;}
   .pc-empty{color:var(--muted,#888);font-size:13px;}
-  .pc-mini-btn{padding:3px 10px;font-size:11px;color:#16457E;background:#EFF6FF;border:none;border-radius:8px;cursor:pointer;font-weight:700;}
+  .pc-mini-btn{padding:3px 10px;font-size:11px;color:var(--pc-c2,#16457E);background:#EFF6FF;border:none;border-radius:8px;cursor:pointer;font-weight:700;}
   .pc-post-wrap{position:relative;}
-  .pc-more-link{display:inline-block;margin:-6px 0 4px 4px;font-size:12px;font-weight:700;color:#E8703A;text-decoration:none;}
+  .pc-more-link{display:inline-block;margin:-6px 0 4px 4px;font-size:12px;font-weight:700;color:var(--pc-accent,#E8703A);text-decoration:none;}
   .pc-more-link:hover{text-decoration:underline;}
+  .pc-theme-swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;}
+  .pc-theme-swatch.active{border-color:#111;box-shadow:0 0 0 2px #fff,0 0 0 4px currentColor;}
 </style>
 </head>
 <body>
@@ -76,6 +78,23 @@
 <script src="assets/galerie-lightbox.js"></script>
 <script src="assets/posts.js"></script>
 <script>
+/* 7 thèmes de couleurs pour le profil public Collectivité */
+const PC_THEMES = {
+  navy:   { c1:'#0E2E5A', c2:'#16457E', accent:'#E8933A', accentDark:'#DB6B1F', accentLight:'#F9A94A', label:'Navy' },
+  ocean:  { c1:'#0D47A1', c2:'#1976D2', accent:'#00ACC1', accentDark:'#00838F', accentLight:'#4DD0E1', label:'Océan' },
+  foret:  { c1:'#1B5E20', c2:'#388E3C', accent:'#F9A825', accentDark:'#E65100', accentLight:'#FFCA28', label:'Forêt' },
+  soleil: { c1:'#BF360C', c2:'#E64A19', accent:'#FFB300', accentDark:'#E65100', accentLight:'#FFD54F', label:'Soleil' },
+  violet: { c1:'#4A148C', c2:'#7B1FA2', accent:'#EC407A', accentDark:'#AD1457', accentLight:'#F48FB1', label:'Violet' },
+  terre:  { c1:'#3E2723', c2:'#6D4C41', accent:'#D4A017', accentDark:'#A16E00', accentLight:'#F0C24B', label:'Terre' },
+  emeraude:{ c1:'#004D40', c2:'#00796B', accent:'#FFB300', accentDark:'#E65100', accentLight:'#FFD54F', label:'Émeraude' },
+};
+function applyPcTheme(name) {
+  const t = PC_THEMES[name] || PC_THEMES.navy;
+  const s = document.documentElement.style;
+  s.setProperty('--pc-c1', t.c1); s.setProperty('--pc-c2', t.c2);
+  s.setProperty('--pc-accent', t.accent); s.setProperty('--pc-accent-dark', t.accentDark); s.setProperty('--pc-accent-light', t.accentLight);
+}
+
 (async function () {
   const id = new URLSearchParams(location.search).get('id');
   const wrap = document.getElementById('pc-wrap');
@@ -94,13 +113,14 @@
     return;
   }
 
+  applyPcTheme(profil.theme_couleur);
   const TYPE_LABEL = { region:'Région', district:'District', departement:'Département', prefecture:'Préfecture', commune:'Commune', consulat:'Consulat', institution:'Institution', ambassade:'Ambassade', ministere:'Ministère' };
   const typeLabel = TYPE_LABEL[(profil.type_organisme||'').toLowerCase()] || profil.type_organisme || 'Collectivité';
   const territoire = [profil.ville, profil.departement, profil.region, profil.pays].filter(Boolean).join(', ');
 
   wrap.innerHTML = `
     <div class="pc-header">
-      <div class="pc-banner" style="${profil.banner_url ? `background-image:url('${esc(profil.banner_url)}'),linear-gradient(135deg,#0E2E5A,#1E6091)` : ''}">
+      <div class="pc-banner" style="${profil.banner_url ? `background-image:url('${esc(profil.banner_url)}'),linear-gradient(135deg,var(--pc-c1,#0E2E5A),#1E6091)` : ''}">
         ${profil.is_owner ? `<button class="pc-banner-edit" id="pc-btn-banner">🖼️ Changer la bannière</button><input type="file" id="pc-banner-input" accept="image/*" style="display:none;">` : ''}
       </div>
       <div class="pc-id">
@@ -121,6 +141,11 @@
         ${profil.is_owner ? `<button class="pc-btn pc-btn-outline" id="pc-btn-edit">✏️ Modifier mon profil</button>` : `<button class="pc-btn pc-btn-primary" id="pc-btn-abonner">${profil.abonne ? '✅ Abonné' : '🔔 S\'abonner'}</button>`}
         ${profil.site_web ? `<a class="pc-btn pc-btn-outline" href="${esc(profil.site_web)}" target="_blank" rel="noopener">🌐 Site officiel</a>` : ''}
         ${CU && CU.id !== profil.id ? `<a class="pc-btn pc-btn-outline" href="messagerie.html?user=${profil.id}">✉️ Contacter</a>` : ''}
+        ${profil.is_owner ? `
+          <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+            <span style="font-size:11px;color:rgba(255,255,255,.7);">🎨 Thème</span>
+            ${Object.entries(PC_THEMES).map(([key,t]) => `<button class="pc-theme-swatch${(profil.theme_couleur||'navy')===key?' active':''}" data-theme="${key}" title="${t.label}" style="background:linear-gradient(135deg,${t.c1},${t.c2});color:${t.c1};"></button>`).join('')}
+          </div>` : ''}
       </div>
     </div>
 
@@ -270,6 +295,14 @@
 
   // Édition (propriétaire uniquement)
   if (profil.is_owner) {
+    document.querySelectorAll('.pc-theme-swatch').forEach(sw => {
+      sw.addEventListener('click', async () => {
+        const theme = sw.dataset.theme;
+        applyPcTheme(theme);
+        document.querySelectorAll('.pc-theme-swatch').forEach(s => s.classList.toggle('active', s === sw));
+        try { await api('PUT', '/profil', { theme_couleur: theme }); } catch (e) { /* thème reste appliqué localement */ }
+      });
+    });
     // Photo de profil : cliquer sur l'avatar → upload direct + ajustement (recadrage centré objet)
     const logoInput = document.getElementById('pc-logo-input');
     if (logoInput) logoInput.addEventListener('change', async () => {
