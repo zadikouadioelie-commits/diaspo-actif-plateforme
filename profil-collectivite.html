@@ -8,11 +8,15 @@
 <style>
   body{background:#F3F5F8;}
   .pc-wrap{max-width:1240px;margin:0 auto;padding:20px;}
-  .pc-header{position:relative;border-radius:20px;overflow:hidden;color:#fff;margin-bottom:22px;box-shadow:0 14px 40px rgba(14,46,90,.18);}
+  .pc-header{position:relative;border-radius:20px;overflow:hidden;color:#fff;margin-bottom:22px;box-shadow:0 14px 40px rgba(14,46,90,.18);background:#0E2E5A;}
   .pc-banner{height:220px;background-size:cover;background-position:center;background-color:#16457E;background-image:linear-gradient(135deg,#0E2E5A,#1E6091,#E8933A22);position:relative;}
-  .pc-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,46,90,0) 40%,rgba(9,26,50,.88) 100%);}
-  .pc-id{position:relative;display:flex;gap:18px;align-items:flex-end;padding:0 26px 22px;margin-top:-56px;flex-wrap:wrap;z-index:2;}
-  .pc-logo{width:100px;height:100px;border-radius:20px;background:#fff;object-fit:cover;border:4px solid #fff;box-shadow:0 10px 26px rgba(0,0,0,.3);}
+  .pc-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,46,90,0) 30%,rgba(9,26,50,.95) 100%);}
+  .pc-banner-edit{position:absolute;top:14px;right:14px;z-index:3;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;}
+  .pc-id{position:relative;display:flex;gap:18px;align-items:flex-end;padding:0 26px 22px;margin-top:-56px;flex-wrap:wrap;z-index:2;background:linear-gradient(180deg,rgba(9,26,50,.95),#0E2E5A);}
+  .pc-logo-wrap{position:relative;width:100px;height:100px;flex-shrink:0;}
+  .pc-logo{width:100px;height:100px;border-radius:20px;background:#fff;object-fit:cover;border:4px solid #fff;box-shadow:0 10px 26px rgba(0,0,0,.3);display:block;}
+  .pc-logo-edit{position:absolute;inset:0;border-radius:20px;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .15s,background .15s;color:#fff;font-size:22px;}
+  .pc-logo-wrap:hover .pc-logo-edit{opacity:1;background:rgba(0,0,0,.45);}
   .pc-id-info{flex:1;min-width:220px;padding-bottom:4px;}
   .pc-id-info h1{margin:0;font-size:27px;font-weight:800;text-shadow:0 2px 8px rgba(0,0,0,.35);}
   .pc-id-meta{font-size:13px;opacity:.92;margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
@@ -91,9 +95,14 @@
 
   wrap.innerHTML = `
     <div class="pc-header">
-      <div class="pc-banner" style="${profil.banner_url ? `background-image:url('${esc(profil.banner_url)}'),linear-gradient(135deg,#0E2E5A,#1E6091)` : ''}"></div>
+      <div class="pc-banner" style="${profil.banner_url ? `background-image:url('${esc(profil.banner_url)}'),linear-gradient(135deg,#0E2E5A,#1E6091)` : ''}">
+        ${profil.is_owner ? `<button class="pc-banner-edit" id="pc-btn-banner">🖼️ Changer la bannière</button><input type="file" id="pc-banner-input" accept="image/*" style="display:none;">` : ''}
+      </div>
       <div class="pc-id">
-        ${profil.logo_url ? `<img class="pc-logo" src="${esc(profil.logo_url)}" alt="">` : `<div class="pc-logo" style="display:flex;align-items:center;justify-content:center;font-size:38px;">🏛️</div>`}
+        <div class="pc-logo-wrap">
+          ${profil.logo_url ? `<img class="pc-logo" id="pc-logo-img" src="${esc(profil.logo_url)}" alt="">` : `<div class="pc-logo" id="pc-logo-img" style="display:flex;align-items:center;justify-content:center;font-size:38px;">🏛️</div>`}
+          ${profil.is_owner ? `<label class="pc-logo-edit" for="pc-logo-input" title="Changer la photo de profil">📷<input type="file" id="pc-logo-input" accept="image/*" style="display:none;"></label>` : ''}
+        </div>
         <div class="pc-id-info">
           <h1>${esc(profil.nom)}</h1>
           <div class="pc-id-meta">
@@ -259,6 +268,32 @@
 
   // Édition (propriétaire uniquement)
   if (profil.is_owner) {
+    // Photo de profil : cliquer sur l'avatar → upload direct + ajustement (recadrage centré objet)
+    const logoInput = document.getElementById('pc-logo-input');
+    if (logoInput) logoInput.addEventListener('change', async () => {
+      const file = logoInput.files[0]; if (!file) return;
+      const fd = new FormData(); fd.append('logo', file);
+      try {
+        const up = await fetch('/api/upload/logo', { method: 'POST', body: fd, credentials: 'include' }).then(r => r.json());
+        if (up.error) throw new Error(up.error);
+        await api('PUT', '/profil', { logo_url: up.url });
+        location.reload();
+      } catch (e) { alert('Erreur upload : ' + e.message); }
+    });
+
+    const bannerInput = document.getElementById('pc-banner-input');
+    const btnBanner = document.getElementById('pc-btn-banner');
+    if (btnBanner) btnBanner.addEventListener('click', () => bannerInput.click());
+    if (bannerInput) bannerInput.addEventListener('change', async () => {
+      const file = bannerInput.files[0]; if (!file) return;
+      const fd = new FormData(); fd.append('banner', file);
+      try {
+        const up = await fetch('/api/upload/banner', { method: 'POST', body: fd, credentials: 'include' }).then(r => r.json());
+        if (up.error) throw new Error(up.error);
+        location.reload();
+      } catch (e) { alert('Erreur upload : ' + e.message); }
+    });
+
     const btnEdit = document.getElementById('pc-btn-edit');
     if (btnEdit) btnEdit.addEventListener('click', async () => {
       const logo_url = prompt("URL du logo :", profil.logo_url || '');
