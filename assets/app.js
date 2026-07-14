@@ -665,7 +665,7 @@ async function initAnnuaire(){
   }
 
   /* État des filtres */
-  const state = { typeOrg: "", paysRes: "", paysOrig: "", ville: "", nom: "", prenom: "" };
+  const state = { typeOrg: "", paysRes: "", paysOrig: "", ville: "", nom: "", prenom: "", motCle: "" };
   let USERS_CACHE = null;
 
   /* Normalisation */
@@ -717,10 +717,35 @@ async function initAnnuaire(){
 
   let filtered_count = ALL.length;
 
+  /* ── Recherche par mots-clés (serveur, pertinence + tolérance fautes/synonymes) ── */
+  async function applyRechercheMotCle() {
+    const params = new URLSearchParams({ q: state.motCle });
+    if (state.typeOrg) params.set("type", state.typeOrg);
+    if (state.ville) params.set("ville", state.ville);
+    if (state.paysRes) params.set("pays", state.paysRes);
+    let r;
+    try { r = await api("GET", "/annuaire/recherche?" + params); }
+    catch (e) { list.innerHTML = `<div class="empty">Erreur de recherche.</div>`; return; }
+    const cartes = [
+      ...(r.initiatives || []).map(it => renderInitiativeCard(it)),
+      ...(r.utilisateurs || []).map(u => renderPersonCard(u)),
+    ];
+    filtered_count = r.total || 0;
+    document.getElementById("result-count").textContent = filtered_count;
+    list.innerHTML = cartes.length ? cartes.join("") : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
+        <div style="font-size:2rem;margin-bottom:12px;">🔍</div>
+        <p style="font-weight:700;margin-bottom:6px;">Aucun résultat pour « ${state.motCle} »</p>
+        <p style="font-size:.88rem;">Essayez un autre mot-clé ou <button onclick="annResetFilters()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:700;text-decoration:underline;">réinitialisez la recherche</button>.</p>
+      </div>`;
+    renderChips();
+  }
+
   /* ── Appliquer les filtres ── */
   async function apply() {
     const prenomGroup = document.getElementById("f-prenom-group");
     if (prenomGroup) prenomGroup.style.display = state.typeOrg === "Utilisateurs" ? "" : "none";
+
+    if (state.motCle) { await applyRechercheMotCle(); return; }
 
     if (state.typeOrg === "Utilisateurs") {
       if (!USERS_CACHE) {
@@ -777,7 +802,7 @@ async function initAnnuaire(){
 
   /* ── Exposer reset et removeFilter globalement ── */
   window.annResetFilters = function() {
-    state.typeOrg = state.paysRes = state.paysOrig = state.ville = state.nom = state.prenom = "";
+    state.typeOrg = state.paysRes = state.paysOrig = state.ville = state.nom = state.prenom = state.motCle = "";
     const typeEl = document.getElementById("f-type-org");
     if (typeEl) typeEl.value = "";
     const villeEl = document.getElementById("f-ville-simple");
@@ -786,6 +811,10 @@ async function initAnnuaire(){
     if (nomEl) nomEl.value = "";
     const prenomEl = document.getElementById("f-prenom-simple");
     if (prenomEl) prenomEl.value = "";
+    const motCleEl = document.getElementById("f-motcle");
+    if (motCleEl) motCleEl.value = "";
+    const dd = document.getElementById("f-motcle-suggestions");
+    if (dd) dd.style.display = "none";
     // Reset GeoAutocomplete (vider le champ input visible)
     ["f-pays-res","f-pays-orig"].forEach(id => {
       const wrap = document.getElementById(id);
@@ -814,6 +843,31 @@ async function initAnnuaire(){
   /* ── Type d'organisme ── */
   const typeEl = document.getElementById("f-type-org");
   if (typeEl) typeEl.addEventListener("change", () => { state.typeOrg = typeEl.value; apply(); });
+
+  /* ── Recherche par mot-clé (texte libre, debounce + suggestions) ── */
+  let _motCleTimer, _suggTimer;
+  const motCleEl = document.getElementById("f-motcle");
+  const suggDd = document.getElementById("f-motcle-suggestions");
+  if (motCleEl) {
+    motCleEl.addEventListener("input", () => {
+      clearTimeout(_motCleTimer);
+      _motCleTimer = setTimeout(() => { state.motCle = motCleEl.value.trim(); apply(); }, 350);
+      clearTimeout(_suggTimer);
+      const v = motCleEl.value.trim();
+      if (v.length < 2) { if (suggDd) { suggDd.style.display = "none"; suggDd.innerHTML = ""; } return; }
+      _suggTimer = setTimeout(async () => {
+        try {
+          const r = await api("GET", "/annuaire/suggestions?q=" + encodeURIComponent(v));
+          const sugg = r.suggestions || [];
+          if (!suggDd) return;
+          if (!sugg.length) { suggDd.style.display = "none"; return; }
+          suggDd.innerHTML = sugg.map(s => `<div class="ann-sugg-item" onmousedown="document.getElementById('f-motcle').value='${s.replace(/'/g,"\\'")}';document.getElementById('f-motcle').dispatchEvent(new Event('input'));">${s}</div>`).join("");
+          suggDd.style.display = "block";
+        } catch (e) {}
+      }, 200);
+    });
+    motCleEl.addEventListener("blur", () => { setTimeout(() => { if (suggDd) suggDd.style.display = "none"; }, 150); });
+  }
 
   /* ── Ville (texte libre, debounce) ── */
   let _villeTimer;

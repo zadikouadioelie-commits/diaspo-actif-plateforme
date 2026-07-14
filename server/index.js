@@ -2974,6 +2974,186 @@ async function getCertif(initiativeId) {
   return await db.prepare("SELECT niveau, statut, date_attribution FROM certifications WHERE initiative_id=? AND statut='actif'").get(initiativeId) || null;
 }
 
+/* ===== Recherche par mots-clés — Annuaire ===== */
+const ANNUAIRE_NORMALISE = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const ANNUAIRE_STEM = w => w.replace(/(aux|eux|ies)$/,'al').replace(/s$/,''); // pluriel simplifié
+const ANNUAIRE_SYNONYMES = {
+  livraison: ['livreur','livrer','logistique','transport de colis','coursier'],
+  transport: ['transporteur','logistique','livraison','fret','chauffeur'],
+  assurance: ['assureur','mutuelle','courtier'],
+  agriculture: ['agricole','agriculteur','ferme','exploitation','elevage'],
+  formation: ['former','formateur','cours','ecole','enseignement'],
+  comptabilite: ['comptable','fiscaliste','fiscalite','expertise comptable'],
+  batiment: ['btp','construction','maconnerie','travaux','chantier'],
+  restaurant: ['restauration','traiteur','cuisine','gastronomie'],
+  photovoltaique: ['solaire','energie solaire','panneaux solaires'],
+  medecin: ['medical','sante','clinique','docteur'],
+  electricien: ['electricite','installation electrique'],
+  avocat: ['juriste','droit','cabinet juridique','avocate'],
+  investissement: ['investisseur','placement','capital'],
+  immobilier: ['immobiliere','agence immobiliere','logement','foncier'],
+  elevage: ['eleveur','betail','agriculture'],
+  cooperative: ['mutualisation','groupement'],
+  export: ['exportation','exporter'],
+  import: ['importation','importer'],
+};
+function annuaireExpandTermes(mots) {
+  const set = new Set();
+  mots.forEach(m => {
+    const base = ANNUAIRE_STEM(m);
+    set.add(m); set.add(base);
+    Object.entries(ANNUAIRE_SYNONYMES).forEach(([cle, syns]) => {
+      const cleNorm = ANNUAIRE_NORMALISE(cle);
+      const cleProche = m.length >= 4 && annuaireLevenshtein1(cleNorm, m);
+      if (cleNorm === m || cleNorm === base || cleProche || syns.some(s => ANNUAIRE_NORMALISE(s).includes(m))) {
+        set.add(cleNorm); syns.forEach(s => set.add(ANNUAIRE_NORMALISE(s)));
+      }
+    });
+  });
+  return [...set];
+}
+function annuaireLevenshtein1(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  if (a === b) return true;
+  let i = 0, j = 0, diff = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    diff++;
+    if (diff > 1) return false;
+    if (a.length > b.length) i++;
+    else if (b.length > a.length) j++;
+    else { i++; j++; }
+  }
+  return true;
+}
+function annuaireChampCorrespond(champNorm, termes) {
+  if (!champNorm) return false;
+  return termes.some(t => {
+    if (t.length < 3) return false;
+    if (champNorm.includes(t)) return true;
+    // Tolérance aux fautes de frappe : compare chaque mot du champ au terme (distance <= 1)
+    return champNorm.split(/[^a-z0-9]+/).some(mot => mot.length >= 4 && annuaireLevenshtein1(mot, t));
+  });
+}
+/* Score de pertinence d'une entité (initiative ou utilisateur) pour une liste de termes de recherche.
+   `champsPar Priorite` : tableau ordonné [ [valeurs, poids], ... ] du plus pertinent (nom) au moins pertinent. */
+function annuaireScorerEntite(champsParPriorite, termesOriginaux, termesEtendus) {
+  let score = 0;
+  const motsTrouves = new Set();
+  champsParPriorite.forEach(([valeurs, poids]) => {
+    const texte = ANNUAIRE_NORMALISE(Array.isArray(valeurs) ? valeurs.filter(Boolean).join(' ') : (valeurs || ''));
+    if (!texte) return;
+    termesOriginaux.forEach(t => {
+      if (texte.includes(t)) { score += poids * 2; motsTrouves.add(t); } // correspondance exacte du terme original
+    });
+    termesEtendus.forEach(t => {
+      if (!motsTrouves.has(t) && annuaireChampCorrespond(texte, [t])) { score += poids; motsTrouves.add(t); }
+    });
+  });
+  // Bonus recherche multi-mots : proportion de termes originaux retrouvés
+  if (termesOriginaux.length > 1) {
+    const ratio = termesOriginaux.filter(t => motsTrouves.has(t)).length / termesOriginaux.length;
+    score = score * (0.5 + 0.5 * ratio);
+  }
+  return score;
+}
+
+/* GET /api/annuaire/recherche — recherche par mots-clés combinable avec les filtres existants (pays/ville/type/domaine) */
+route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) => {
+  const qRaw = (query.q || '').trim();
+  const termesOriginaux = qRaw ? ANNUAIRE_NORMALISE(qRaw).split(/\s+/).filter(w => w.length >= 2) : [];
+  const termesEtendus = termesOriginaux.length ? annuaireExpandTermes(termesOriginaux) : [];
+
+  const cu = await getCurrentUser(req);
+  let meVillePays = { ville: null, pays: null };
+  if (cu) { const r = await db.prepare("SELECT ville, pays FROM users WHERE id=?").get(cu.id); meVillePays = { ville: r?.ville || null, pays: r?.pays || null }; }
+
+  let initiatives = await db.prepare("SELECT * FROM initiatives ORDER BY created_at DESC").all();
+  if (query.pays) initiatives = initiatives.filter(r => r.pays === query.pays);
+  if (query.domaine) initiatives = initiatives.filter(r => r.domaine === query.domaine);
+  if (query.type) initiatives = initiatives.filter(r => r.type === query.type);
+  if (query.ville) { const v = query.ville.toLowerCase(); initiatives = initiatives.filter(r => (r.ville||'').toLowerCase().includes(v)); }
+
+  let utilisateurs = (query.type && query.type !== 'Utilisateurs') ? [] : await db.prepare(
+    "SELECT id, nom, prenom, ville, pays, photo_url, titre_pro, bio, competences, experiences, centres_interet FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' LIMIT 500"
+  ).all();
+  if (query.pays) utilisateurs = utilisateurs.filter(r => r.pays === query.pays);
+  if (query.ville) { const v = query.ville.toLowerCase(); utilisateurs = utilisateurs.filter(r => (r.ville||'').toLowerCase().includes(v)); }
+
+  // Produits vitrine (élargit "produits proposés") — rattachés par initiative_id
+  const initIds = initiatives.map(i => i.id);
+  let produitsParInit = {};
+  if (initIds.length && termesOriginaux.length) {
+    const ph = initIds.map(()=>'?').join(',');
+    const produits = await db.prepare(`SELECT initiative_id, nom, description, categorie FROM produits_vitrine WHERE initiative_id IN (${ph})`).all(...initIds);
+    produits.forEach(p => { (produitsParInit[p.initiative_id] = produitsParInit[p.initiative_id] || []).push(p); });
+  }
+
+  const geoRang = (ville, pays) => {
+    if (!termesOriginaux.length) return 0; // le géo n'intervient qu'en tie-break, calculé toujours mais neutre si pas de recherche
+    if (meVillePays.ville && ville && ville === meVillePays.ville) return 3;
+    if (meVillePays.pays && pays && pays === meVillePays.pays) return 1;
+    return 0;
+  };
+
+  let resultats = [];
+
+  initiatives.forEach(ini => {
+    const produits = produitsParInit[ini.id] || [];
+    let score = 1; // visible par défaut hors recherche
+    if (termesOriginaux.length) {
+      score = annuaireScorerEntite([
+        [[ini.nom, ini.sigle], 1000],
+        [[ini.domaine, ini.type], 500],
+        [[ini.services, safeParse(ini.vitrine_services_categories_json)], 400],
+        [produits.map(p => `${p.nom} ${p.categorie}`), 380],
+        [[ini.description, ini.mission, ini.historique, ini.objectifs], 200],
+        [[safeParse(ini.publics_json), safeParse(ini.besoins_json), safeParse(ini.realisations_json)], 150],
+      ], termesOriginaux, termesEtendus);
+      if (score <= 0) return;
+    }
+    resultats.push({ type: 'initiative', score, geo: geoRang(ini.ville, ini.pays), data: ini });
+  });
+
+  utilisateurs.forEach(u => {
+    let score = 1;
+    if (termesOriginaux.length) {
+      score = annuaireScorerEntite([
+        [[u.nom, u.prenom], 1000],
+        [[u.titre_pro], 500],
+        [[safeParse(u.competences)], 400],
+        [[u.bio], 200],
+        [[safeParse(u.experiences), safeParse(u.centres_interet)], 150],
+      ], termesOriginaux, termesEtendus);
+      if (score <= 0) return;
+    }
+    resultats.push({ type: 'utilisateur', score, geo: geoRang(u.ville, u.pays), data: u });
+  });
+
+  resultats.sort((a, b) => (b.score - a.score) || (b.geo - a.geo));
+
+  sendJSON(res, 200, {
+    q: qRaw,
+    total: resultats.length,
+    initiatives: resultats.filter(r => r.type === 'initiative').map(r => r.data),
+    utilisateurs: resultats.filter(r => r.type === 'utilisateur').map(r => r.data),
+  });
+});
+
+/* GET /api/annuaire/suggestions — autocomplétion pendant la saisie */
+route("GET", "/api/annuaire/suggestions", async (req, res, params, body, query) => {
+  const qRaw = ANNUAIRE_NORMALISE((query.q || '').trim());
+  if (qRaw.length < 2) return sendJSON(res, 200, { suggestions: [] });
+  const suggestions = new Set();
+  Object.entries(ANNUAIRE_SYNONYMES).forEach(([cle, syns]) => {
+    if (ANNUAIRE_NORMALISE(cle).startsWith(qRaw)) suggestions.add(cle);
+    syns.forEach(s => { if (ANNUAIRE_NORMALISE(s).startsWith(qRaw)) suggestions.add(s); });
+  });
+  const domaines = await db.prepare("SELECT DISTINCT domaine FROM initiatives WHERE domaine IS NOT NULL").all();
+  domaines.forEach(d => { if (ANNUAIRE_NORMALISE(d.domaine).startsWith(qRaw)) suggestions.add(d.domaine); });
+  sendJSON(res, 200, { suggestions: [...suggestions].slice(0, 8) });
+});
+
 /* GET /api/annuaire/utilisateurs — liste publique des comptes Utilisateur (annuaire), filtrable par nom/prénom/ville */
 route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query) => {
   let rows = await db.prepare(

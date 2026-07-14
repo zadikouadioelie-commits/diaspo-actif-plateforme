@@ -59,6 +59,8 @@
 }
 .ann-filter-group select:focus,
 .ann-filter-group input[type=text]:focus{border-color:#2563EB;outline:none;}
+.ann-sugg-item{padding:9px 14px;font-size:13px;cursor:pointer;}
+.ann-sugg-item:hover{background:#F3F4F6;}
 .ann-filter-geo{height:42px;}
 .ann-btn-reset{
   height:42px;padding:0 18px;background:#f3f4f6;color:#374151;
@@ -218,6 +220,17 @@
       <div class="ann-stat-chip">
         <div class="ann-stat-icon">🌍</div>
         <span>Un impact durable</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RECHERCHE PAR MOT-CLÉ ===== -->
+  <div class="ann-filters" style="padding-bottom:0;">
+    <div class="ann-filters-inner" style="max-width:100%;">
+      <div class="ann-filter-group" style="flex:1;min-width:260px;position:relative;">
+        <label>🔍 Rechercher par mot-clé</label>
+        <input type="text" id="f-motcle" placeholder="Ex : livraison, comptabilité, formation, avocat…" autocomplete="off">
+        <div id="f-motcle-suggestions" style="display:none;position:absolute;z-index:30;top:100%;left:0;right:0;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:8px;margin-top:4px;box-shadow:0 6px 20px rgba(0,0,0,.12);"></div>
       </div>
     </div>
   </div>
