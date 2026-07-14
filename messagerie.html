@@ -1197,7 +1197,8 @@ async function loadDemandesRelation(){
                 <strong>💡 Pourquoi cette mise en relation peut vous intéresser ?</strong>
                 <ul style="margin:4px 0 0;padding-left:16px;">${d.compatibilite.map(c=>`<li>${escH(c)}</li>`).join('')}</ul>
               </div>` : ''}
-            <div style="display:flex;gap:6px;margin-top:8px;">
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+              <a class="btn btn-sm btn-outline" href="profil.html?id=${d.demandeur_id}" target="_blank" rel="noopener">👁️ Voir le profil</a>
               <button class="btn btn-sm btn-orange" onclick="repondreDemandeRelation(${d.id},'accepter')">Accepter</button>
               <button class="btn btn-sm btn-outline" onclick="repondreDemandeRelation(${d.id},'refuser')">Refuser</button>
               <button class="btn btn-sm btn-outline" style="color:#DC2626;border-color:#DC2626;" onclick="repondreDemandeRelation(${d.id},'bloquer')">Bloquer</button>
