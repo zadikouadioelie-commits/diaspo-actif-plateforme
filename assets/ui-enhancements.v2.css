@@ -110,7 +110,7 @@ button, [role="button"], label[for], .card[onclick],
 /* ── Sidebar — liens plus lisibles ── */
 .sidebar a {
   border-radius: 10px;
-  font-size: 31px;
+  font-size: 15.5px;
 }
 .sidebar a:hover {
   background: rgba(255,255,255,.1);
