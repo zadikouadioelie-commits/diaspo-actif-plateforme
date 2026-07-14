@@ -417,7 +417,7 @@ function createEmojiPicker(){
 }
 
 /* ---- Pièces jointes ---- */
-document.getElementById("btn-attach").addEventListener("click",()=>{
+document.getElementById("btn-attach")?.addEventListener("click",()=>{
   document.getElementById("modal-attach").style.display="flex";
 });
 document.getElementById("attach-close").addEventListener("click",()=>{
@@ -527,6 +527,12 @@ async function loadMessages(convId){
   document.getElementById("btn-archive").textContent=archived?"📂":"📁";
 
   renderMessages(messages);
+
+  // Réseau Pro : à la première ouverture d'une conversation issue d'une Mise en relation,
+  // proposer un classement du nouveau contact (indépendant pour chaque partie).
+  if (conversation.sujet === "Demande de contact" && autre?.id && !localStorage.getItem('dc_classe_'+convId)) {
+    proposerClassementContact(autre.id, autre.nom, convId);
+  }
 }
 
 function renderMessages(messages){
@@ -1213,6 +1219,56 @@ async function repondreDemandeRelation(id, action){
       openConv(r.conversation_id);
     }
   } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+/* ---- Réseau Pro : classement du contact après une Mise en relation acceptée ----
+   Chaque partie classe le contact de façon totalement indépendante (aucune visibilité
+   croisée) — réutilise le module "Mes Listes" (listes_diffusion) déjà existant. */
+async function proposerClassementContact(contactId, contactNom, convId){
+  localStorage.setItem('dc_classe_'+convId, '1');
+  let listes = [];
+  try { listes = (await api('GET', '/listes-diffusion')).listes || []; } catch(e) { return; }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.style.zIndex = '200';
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:420px;width:92%;">
+      <h3 style="margin:0 0 4px;">🤝 Classer ce nouveau contact</h3>
+      <p style="margin:0 0 14px;font-size:13px;color:var(--muted);">Ajoutez <strong>${escH(contactNom)}</strong> à une liste de votre Réseau Pro (visible uniquement par vous).</p>
+      ${listes.length ? `
+        <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;">Liste existante</label>
+        <select id="rp-liste-select" class="input-field" style="width:100%;margin-bottom:12px;">
+          <option value="">— Choisir —</option>
+          ${listes.map(l=>`<option value="${l.id}">${escH(l.icone||'📋')} ${escH(l.nom)}</option>`).join('')}
+        </select>` : ''}
+      <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;">Ou créer une nouvelle liste</label>
+      <input id="rp-liste-nouvelle" class="input-field" placeholder="Ex. Correspondants, Partenaires, Clients…" style="width:100%;margin-bottom:16px;">
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" id="rp-ignorer" class="btn btn-outline">Plus tard</button>
+        <button type="button" id="rp-valider" class="btn btn-orange">Ajouter</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#rp-ignorer').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#rp-valider').addEventListener('click', async () => {
+    const btn = overlay.querySelector('#rp-valider');
+    const selectEl = overlay.querySelector('#rp-liste-select');
+    const nouvelleNom = overlay.querySelector('#rp-liste-nouvelle').value.trim();
+    const listeId = selectEl ? selectEl.value : '';
+    if (!listeId && !nouvelleNom) { overlay.remove(); return; }
+    btn.disabled = true; btn.textContent = 'Ajout…';
+    try {
+      let targetId = listeId;
+      if (!targetId && nouvelleNom) {
+        const r = await api('POST', '/listes-diffusion', { nom: nouvelleNom, mode: 'figee' });
+        targetId = r.id;
+      }
+      if (targetId) await api('POST', `/listes-diffusion/${targetId}/contacts`, { user_id: contactId });
+      overlay.remove();
+    } catch(e) { alert('Erreur : ' + e.message); btn.disabled = false; btn.textContent = 'Ajouter'; }
+  });
 }
 
 /* ---- Init ---- */
