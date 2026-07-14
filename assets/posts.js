@@ -1140,10 +1140,48 @@ const Posts = {
       return;
     }
     container.innerHTML = posts.map(p => renderPostCard(p, { currentUserId: this._currentUserId })).join('');
+    trackPostDwell(container);
   },
 
   renderPostCard,
 };
+
+/* ── Priorité 3 (loi de priorité fil) : temps passé sur chaque publication ──
+   Un post visible à l'écran cumule du temps ; dès qu'il quitte l'écran (ou que
+   l'onglet/la page change), la durée cumulée est envoyée au serveur si >= 2s. */
+const _postDwellStart = new Map(); // post_id -> timestamp d'entrée dans le viewport
+let _postDwellObserver = null;
+
+function _flushDwell(postId) {
+  const start = _postDwellStart.get(postId);
+  if (!start) return;
+  _postDwellStart.delete(postId);
+  const duree_sec = Math.round((Date.now() - start) / 1000);
+  if (duree_sec < 2) return;
+  try { apiRequest('POST', `/api/fil/${postId}/dwell`, { duree_sec }); } catch (_) {}
+}
+
+function trackPostDwell(container) {
+  if (!('IntersectionObserver' in window)) return;
+  if (!_postDwellObserver) {
+    _postDwellObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const postId = entry.target.dataset.postId;
+        if (!postId) return;
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+          if (!_postDwellStart.has(postId)) _postDwellStart.set(postId, Date.now());
+        } else {
+          _flushDwell(postId);
+        }
+      });
+    }, { threshold: [0, 0.6] });
+    window.addEventListener('beforeunload', () => { _postDwellStart.forEach((_, id) => _flushDwell(id)); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) _postDwellStart.forEach((_, id) => _flushDwell(id));
+    });
+  }
+  container.querySelectorAll('.post-card[data-post-id]').forEach(card => _postDwellObserver.observe(card));
+}
 
 window.Posts = Posts;
 

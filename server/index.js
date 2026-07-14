@@ -3854,6 +3854,16 @@ function extraitOrDefault(txt) {
   return t ? (t.slice(0, 80) + (t.length > 80 ? "…" : "")) : "Nouvelle publication sur son profil.";
 }
 
+/* Priorité 3 (loi de priorité fil) : temps passé sur une publication */
+route("POST", "/api/fil/:id/dwell", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 200, { ok: false });
+  const duree = Math.max(0, Math.min(600, Number(body.duree_sec) || 0));
+  if (duree < 2) return sendJSON(res, 200, { ok: true, ignore: true });
+  try { db.prepare("INSERT INTO fil_post_dwell (post_id, user_id, duree_sec) VALUES (?,?,?)").run(params.id, user.id, duree); } catch (_) {}
+  sendJSON(res, 200, { ok: true });
+});
+
 route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -6406,6 +6416,10 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
   const like = `%${q}%`;
   const type = query.type || "tous";
 
+  // Priorité 3 (loi de priorité fil) : trace la recherche pour affiner les recommandations OZ
+  const cuRech = await getCurrentUser(req);
+  if (cuRech) { try { db.prepare("INSERT INTO recherches_utilisateur (user_id, requete) VALUES (?,?)").run(cuRech.id, q.slice(0, 200)); } catch (_) {} }
+
   const utilisateurs = (type === "tous" || type === "utilisateurs")
     ? await db.prepare("SELECT id,nom,role,ville,pays FROM users WHERE (nom LIKE ? OR ville LIKE ?) AND role != 'administrateur' LIMIT 8").all(like, like)
     : [];
@@ -8048,6 +8062,8 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     let filPrefs = {};
     let behaviorMap = {};
     let meVillePays = { ville: null, pays: null };
+    let recentAuteurs = new Set();
+    let recentTermes = [];
     if (cu) {
       try {
         const row = await db.prepare("SELECT programmation_json FROM users WHERE id=?").get(cu.id);
@@ -8055,13 +8071,25 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       } catch (_) { filPrefs = {}; }
       const meRow = await db.prepare("SELECT ville, pays FROM users WHERE id=?").get(cu.id);
       meVillePays = { ville: meRow?.ville || null, pays: meRow?.pays || null };
-      // Priorité 3 simplifiée : affinité par catégorie déduite des likes/commentaires passés
+      // Priorité 3 : affinité par catégorie déduite des likes/commentaires ET du temps passé (dwell)
       const interactions = await db.prepare(`
         SELECT p.categorie AS categorie FROM fil_reactions r JOIN fil_posts p ON p.id=r.post_id WHERE r.user_id=? AND p.categorie IS NOT NULL
         UNION ALL
         SELECT p.categorie AS categorie FROM fil_commentaires c JOIN fil_posts p ON p.id=c.post_id WHERE c.auteur_id=? AND p.categorie IS NOT NULL
       `).all(cu.id, cu.id);
       interactions.forEach(r => { behaviorMap[r.categorie] = (behaviorMap[r.categorie] || 0) + 1; });
+      const dwellRows = await db.prepare(`
+        SELECT p.categorie AS categorie, SUM(d.duree_sec) AS total
+        FROM fil_post_dwell d JOIN fil_posts p ON p.id=d.post_id
+        WHERE d.user_id=? AND p.categorie IS NOT NULL GROUP BY p.categorie
+      `).all(cu.id);
+      dwellRows.forEach(r => { behaviorMap[r.categorie] = (behaviorMap[r.categorie] || 0) + Math.floor((r.total || 0) / 20); });
+      // Priorité 3 : profils récemment visités (boost transitoire, hors comptes déjà suivis)
+      (await db.prepare(`SELECT DISTINCT profil_user_id FROM profil_visites WHERE visiteur_id=? ORDER BY created_at DESC LIMIT 50`).all(cu.id))
+        .forEach(r => recentAuteurs.add(r.profil_user_id));
+      // Priorité 3 : recherches récentes (les termes recherchés augmentent la pertinence des posts qui les contiennent)
+      recentTermes = (await db.prepare(`SELECT DISTINCT requete FROM recherches_utilisateur WHERE user_id=? ORDER BY created_at DESC LIMIT 15`).all(cu.id))
+        .map(r => (r.requete || '').toLowerCase()).filter(Boolean);
     }
     const prefsCategories = Array.isArray(filPrefs.categories) && filPrefs.categories.length ? filPrefs.categories : null;
     const prefsOrigines = Array.isArray(filPrefs.origines) && filPrefs.origines.length && !filPrefs.origines.includes('Toutes les origines') ? filPrefs.origines : null;
@@ -8071,8 +8099,12 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       // Priorité 2 : préférences Programmation
       if (prefsCategories && p.categorie && prefsCategories.includes(p.categorie)) score += 1000;
       if (prefsOrigines && p.localisation_pays && prefsOrigines.includes(p.localisation_pays)) score += 200;
-      // Priorité 3 : habitudes (affinité catégorie, plafonnée)
+      // Priorité 3 : habitudes (affinité catégorie via likes/commentaires/temps passé, plafonnée)
       if (p.categorie && behaviorMap[p.categorie]) score += Math.min(behaviorMap[p.categorie] * 50, 500);
+      // Priorité 3 : profil de l'auteur récemment consulté
+      if (recentAuteurs.has(p.auteur_id)) score += 300;
+      // Priorité 3 : le contenu correspond à une recherche récente
+      if (p.contenu && recentTermes.some(t => p.contenu.toLowerCase().includes(t))) score += 250;
       // Priorité 4 : proximité géographique
       if (meVillePays.ville && p.localisation_ville && p.localisation_ville === meVillePays.ville) score += 400;
       else if (meVillePays.pays && p.localisation_pays && p.localisation_pays === meVillePays.pays) score += 150;

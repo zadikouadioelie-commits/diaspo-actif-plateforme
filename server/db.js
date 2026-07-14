@@ -4981,6 +4981,27 @@ db.exec(`
   if (!eventColsProg.includes('communaute')) db.exec("ALTER TABLE events ADD COLUMN communaute TEXT");
 }
 
+/* ===== Tracking comportemental OZ (Priorité 3 de la loi de priorité du fil) ===== */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS fil_post_dwell (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    duree_sec INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_fil_post_dwell_user ON fil_post_dwell(user_id);
+  CREATE INDEX IF NOT EXISTS idx_fil_post_dwell_post ON fil_post_dwell(post_id);
+
+  CREATE TABLE IF NOT EXISTS recherches_utilisateur (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    requete TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_recherches_user ON recherches_utilisateur(user_id);
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;
