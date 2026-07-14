@@ -190,8 +190,61 @@
     }
   }
 
+  /* ── Bouton flottant admin : accès rapide aux signalements Support technique ── */
+  function buildAdminButton() {
+    if (document.getElementById("st-admin-fab")) return;
+    const btn = document.createElement("button");
+    btn.id = "st-admin-fab";
+    btn.type = "button";
+    btn.title = "Signalements Support technique";
+    btn.innerHTML = `📥<span id="st-admin-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#DC2626;color:#fff;font-size:10px;font-weight:800;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 3px;"></span>`;
+    btn.addEventListener("click", () => {
+      if (/dashboard-administrateur\.html$/i.test(location.pathname)) {
+        document.querySelector('[data-section="messages-techniques"]')?.click();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        location.href = "dashboard-administrateur.html#messages-techniques";
+      }
+    });
+    document.body.appendChild(btn);
+
+    const style = document.createElement("style");
+    style.textContent = `
+      #st-admin-fab{
+        position:fixed;bottom:78px;left:20px;z-index:1098;
+        width:48px;height:48px;border-radius:50%;border:none;
+        background:linear-gradient(135deg,#1E2761,#0D1233);color:#fff;
+        font-size:20px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.28);
+        display:flex;align-items:center;justify-content:center;
+      }
+      @media (max-width:600px){ #st-admin-fab{ bottom:142px; left:14px; width:44px; height:44px; font-size:17px; } }
+    `;
+    document.head.appendChild(style);
+    refreshAdminBadge();
+  }
+
+  async function refreshAdminBadge() {
+    try {
+      const data = await api("GET", "/admin/support/tickets?statut=nouveau");
+      const n = (data.stats && data.stats.nouveaux) || 0;
+      const badge = document.getElementById("st-admin-badge");
+      if (badge) { badge.textContent = n; badge.style.display = n ? "flex" : "none"; }
+    } catch (e) { /* silencieux */ }
+  }
+
+  async function initAdminButton() {
+    try {
+      const r = await api("GET", "/auth/me");
+      if (r && r.user && r.user.role === "administrateur") {
+        buildAdminButton();
+        setInterval(refreshAdminBadge, 60000);
+      }
+    } catch (e) { /* non connecté : rien à faire */ }
+  }
+
   function init() {
     buildButton();
+    initAdminButton();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

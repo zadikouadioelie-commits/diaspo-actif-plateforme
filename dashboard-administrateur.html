@@ -6324,6 +6324,12 @@ async function submitAccordDirect(){
     if (SECTION_LOADERS[a.dataset.section]) SECTION_LOADERS[a.dataset.section]();
   }));
 
+  // Ouvrir directement une section si l'URL arrive avec un hash (ex: bouton flottant admin)
+  if (location.hash) {
+    const target = document.querySelector(`.sidebar a[data-section="${location.hash.slice(1)}"]`);
+    if (target) target.click();
+  }
+
   // Charger données
   let data = {};
   try {
