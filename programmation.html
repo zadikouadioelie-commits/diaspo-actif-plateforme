@@ -64,10 +64,33 @@
     <p class="pg-sub">Centralisez ici vos préférences de personnalisation de la plateforme. Définissez-les une seule fois, modifiez-les à tout moment.</p>
 
     <div class="pg-volets">
-      <button type="button" class="pg-volet-btn active" data-volet="evenements">📅 Événements</button>
-      <button type="button" class="pg-volet-btn disabled" title="Bientôt disponible">📰 Fil d'actualité</button>
+      <button type="button" class="pg-volet-btn active" data-volet="evenements" onclick="pgSwitchVolet('evenements')">📅 Événements</button>
+      <button type="button" class="pg-volet-btn" data-volet="fil" onclick="pgSwitchVolet('fil')">📰 Fil d'actualité</button>
       <button type="button" class="pg-volet-btn disabled" title="Bientôt disponible">💬 Messagerie</button>
       <button type="button" class="pg-volet-btn disabled" title="Bientôt disponible">🔔 Notifications</button>
+    </div>
+
+    <div id="volet-fil" style="display:none;">
+      <div class="pg-card">
+        <h3>🏷️ Catégories</h3>
+        <p class="pg-desc">Les publications de ces catégories seront privilégiées dans votre fil (Priorité 2).</p>
+        <div class="pg-chips" id="pgf-categories"></div>
+      </div>
+      <div class="pg-card">
+        <h3>🌍 Origine ou communauté</h3>
+        <p class="pg-desc">Privilégiez les publications liées à certains pays.</p>
+        <label class="pg-chip" id="pgf-origine-toutes-chip" style="margin-bottom:10px;"><input type="checkbox" id="pgf-origine-toutes" onchange="pgfRenderOriginesSelected()">Toutes les origines</label>
+        <div class="pg-field" style="position:relative;">
+          <input type="text" id="pgf-origine-search" placeholder="Rechercher un pays…" autocomplete="off">
+          <div id="pgf-origine-dropdown" style="display:none;position:absolute;z-index:20;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:8px;margin-top:4px;box-shadow:0 6px 20px rgba(0,0,0,.1);"></div>
+        </div>
+        <div class="pg-chips" id="pgf-origines-selected" style="margin-top:10px;"></div>
+      </div>
+      <div class="pg-actions">
+        <span class="pg-saved-msg" id="pgf-saved-msg">✅ Préférences enregistrées</span>
+        <button type="button" class="btn btn-outline" onclick="window.location.href='fil-actualite.html'">Annuler</button>
+        <button type="button" class="btn btn-orange" id="pgf-save-btn" onclick="saveFilPrefs()">Enregistrer</button>
+      </div>
     </div>
 
     <div id="volet-evenements">
@@ -289,9 +312,84 @@ document.getElementById('pg-periode').addEventListener('change', (e) => {
   document.getElementById('pg-periode-custom').style.display = (e.target.value === 'personnalisee') ? '' : 'none';
 });
 
+/* ── Volet Fil d'actualité ── */
+const PGF_CATEGORIES = ['Actualité','Investissement','Emploi','Succès','Témoignage','Appel à bénévoles','Culture','Diaspora','Innovation','Autre'];
+let pgfOriginesSelectionnees = [];
+
+function pgSwitchVolet(volet){
+  document.querySelectorAll('.pg-volet-btn[data-volet]').forEach(b => b.classList.toggle('active', b.dataset.volet === volet));
+  document.getElementById('volet-evenements').style.display = volet === 'evenements' ? '' : 'none';
+  document.getElementById('volet-fil').style.display = volet === 'fil' ? '' : 'none';
+}
+
+function pgfRenderOriginesSelected(){
+  const toutes = document.getElementById('pgf-origine-toutes').checked;
+  document.getElementById('pgf-origine-search').closest('.pg-field').style.display = toutes ? 'none' : '';
+  const el = document.getElementById('pgf-origines-selected');
+  if (toutes) { el.innerHTML = ''; return; }
+  el.innerHTML = pgfOriginesSelectionnees.map(pays => `
+    <span class="pg-chip checked">${escH(pays)} <span style="cursor:pointer;font-weight:900;margin-left:4px;" onclick="pgfRetirerOrigine('${escH(pays).replace(/'/g,"\\'")}')">✕</span></span>
+  `).join('') || '<span style="font-size:12.5px;color:var(--muted);">Aucun pays sélectionné — toutes les origines seront prises en compte pour ce critère.</span>';
+}
+function pgfRetirerOrigine(pays){
+  pgfOriginesSelectionnees = pgfOriginesSelectionnees.filter(p => p !== pays);
+  pgfRenderOriginesSelected();
+}
+function pgfAjouterOrigine(pays){
+  if (!pgfOriginesSelectionnees.includes(pays)) pgfOriginesSelectionnees.push(pays);
+  document.getElementById('pgf-origine-search').value = '';
+  document.getElementById('pgf-origine-dropdown').style.display = 'none';
+  pgfRenderOriginesSelected();
+}
+document.getElementById('pgf-origine-search').addEventListener('input', (e) => {
+  const q = pgNormalise(e.target.value.trim());
+  const dd = document.getElementById('pgf-origine-dropdown');
+  if (!q) { dd.style.display = 'none'; dd.innerHTML = ''; return; }
+  const matches = (typeof PAYS_DU_MONDE !== 'undefined' ? PAYS_DU_MONDE : [])
+    .filter(p => pgNormalise(p).includes(q) && !pgfOriginesSelectionnees.includes(p))
+    .slice(0, 30);
+  dd.innerHTML = matches.map(p => `<div style="padding:8px 12px;font-size:13px;cursor:pointer;" onmousedown="pgfAjouterOrigine('${escH(p).replace(/'/g,"\\'")}')" onmouseover="this.style.background='#F3F4F6'" onmouseout="this.style.background=''">${escH(p)}</div>`).join('')
+    || '<div style="padding:8px 12px;font-size:12.5px;color:var(--muted);">Aucun résultat</div>';
+  dd.style.display = 'block';
+});
+document.getElementById('pgf-origine-search').addEventListener('blur', () => {
+  setTimeout(() => { document.getElementById('pgf-origine-dropdown').style.display = 'none'; }, 150);
+});
+
+async function loadFilPrefs(){
+  let prefs = {};
+  try {
+    const r = await api('GET', '/programmation');
+    prefs = r.prefs?.fil || {};
+  } catch(e) {}
+  pgRenderChips('pgf-categories', PGF_CATEGORIES, prefs.categories || []);
+  const origines = prefs.origines || ['Toutes les origines'];
+  const toutes = origines.includes('Toutes les origines') || !origines.length;
+  document.getElementById('pgf-origine-toutes').checked = toutes;
+  pgfOriginesSelectionnees = toutes ? [] : origines.slice();
+  pgfRenderOriginesSelected();
+}
+
+async function saveFilPrefs(){
+  const btn = document.getElementById('pgf-save-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  const fil = {
+    categories: pgGetChecked('pgf-categories'),
+    origines: document.getElementById('pgf-origine-toutes').checked ? ['Toutes les origines'] : pgfOriginesSelectionnees.slice(),
+  };
+  try {
+    await api('PUT', '/programmation', { fil });
+    const msg = document.getElementById('pgf-saved-msg');
+    msg.style.display = 'inline';
+    setTimeout(() => { msg.style.display = 'none'; }, 3000);
+  } catch(e) { alert('Erreur : ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Enregistrer'; }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   await applyAuthState();
   loadPrefs();
+  loadFilPrefs();
 });
 </script>
 <script src="assets/back-button.js"></script>

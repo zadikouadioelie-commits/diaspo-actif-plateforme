@@ -8034,26 +8034,55 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     }
   }
 
-  // 2) Posts populaires récents (30j)
-  const since = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,19).replace("T"," ");
-  (await db.prepare(`
-    SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
-    WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (u.is_demo IS NULL OR u.is_demo=FALSE)
-    ORDER BY (SELECT COUNT(*) FROM fil_reactions r WHERE r.post_id=p.id)*3 +
-             (SELECT COUNT(*) FROM fil_commentaires c WHERE c.post_id=p.id)*2 DESC,
-             p.created_at DESC
-    LIMIT 10
-  `).all(since)).forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"populaire" }); } });
+  // 2) Reste du fil — classé par la loi de priorité (préférences Programmation > habitudes OZ > proximité géo > fraîcheur)
+  {
+    const excludeClause = orderedIds.size ? `AND p.id NOT IN (${[...orderedIds].map(()=>"?").join(",")})` : "";
+    const excludeArgs = orderedIds.size ? [...orderedIds] : [];
+    const since90 = new Date(Date.now() - 90*24*60*60*1000).toISOString().slice(0,19).replace("T"," ");
+    const candidats = await db.prepare(`
+      SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
+      WHERE p.created_at >= ? ${excludeClause} AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+      ORDER BY p.created_at DESC LIMIT 200
+    `).all(since90, ...excludeArgs);
 
-  // 3) Articles récents mis en avant
-  (await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 5`).all())
-    .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"article" }); } });
+    let filPrefs = {};
+    let behaviorMap = {};
+    let meVillePays = { ville: null, pays: null };
+    if (cu) {
+      try {
+        const row = await db.prepare("SELECT programmation_json FROM users WHERE id=?").get(cu.id);
+        filPrefs = JSON.parse(row?.programmation_json || '{}').fil || {};
+      } catch (_) { filPrefs = {}; }
+      const meRow = await db.prepare("SELECT ville, pays FROM users WHERE id=?").get(cu.id);
+      meVillePays = { ville: meRow?.ville || null, pays: meRow?.pays || null };
+      // Priorité 3 simplifiée : affinité par catégorie déduite des likes/commentaires passés
+      const interactions = await db.prepare(`
+        SELECT p.categorie AS categorie FROM fil_reactions r JOIN fil_posts p ON p.id=r.post_id WHERE r.user_id=? AND p.categorie IS NOT NULL
+        UNION ALL
+        SELECT p.categorie AS categorie FROM fil_commentaires c JOIN fil_posts p ON p.id=c.post_id WHERE c.auteur_id=? AND p.categorie IS NOT NULL
+      `).all(cu.id, cu.id);
+      interactions.forEach(r => { behaviorMap[r.categorie] = (behaviorMap[r.categorie] || 0) + 1; });
+    }
+    const prefsCategories = Array.isArray(filPrefs.categories) && filPrefs.categories.length ? filPrefs.categories : null;
+    const prefsOrigines = Array.isArray(filPrefs.origines) && filPrefs.origines.length && !filPrefs.origines.includes('Toutes les origines') ? filPrefs.origines : null;
 
-  // 4) Reste chronologique
-  const excludeClause = orderedIds.size ? `AND p.id NOT IN (${[...orderedIds].map(()=>"?").join(",")})` : "";
-  const excludeArgs = orderedIds.size ? [...orderedIds] : [];
-  (await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE 1=1 ${excludeClause} AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 30`).all(...excludeArgs))
-    .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"global" }); } });
+    const scored = candidats.map(p => {
+      let score = 0;
+      // Priorité 2 : préférences Programmation
+      if (prefsCategories && p.categorie && prefsCategories.includes(p.categorie)) score += 1000;
+      if (prefsOrigines && p.localisation_pays && prefsOrigines.includes(p.localisation_pays)) score += 200;
+      // Priorité 3 : habitudes (affinité catégorie, plafonnée)
+      if (p.categorie && behaviorMap[p.categorie]) score += Math.min(behaviorMap[p.categorie] * 50, 500);
+      // Priorité 4 : proximité géographique
+      if (meVillePays.ville && p.localisation_ville && p.localisation_ville === meVillePays.ville) score += 400;
+      else if (meVillePays.pays && p.localisation_pays && p.localisation_pays === meVillePays.pays) score += 150;
+      // Priorité 5 : fraîcheur (tie-break infinitésimal, ne dépasse jamais un écart de score entier)
+      score += (new Date(p.created_at).getTime() || 0) / 1e15;
+      return { p, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    scored.forEach(({ p }) => { if (!orderedIds.has(p.id)) { orderedIds.add(p.id); allPosts.push({ ...p, source: "fil" }); } });
+  }
 
   // 5) Cartes vitrine (vitrines/catalogues/promotions/meilleures ventes) — intercalées, plafonnées à ~30%
   try {
@@ -13642,11 +13671,12 @@ ${jsonLd}
     if (req.method === 'PUT' && pathname === '/api/programmation') {
       const me = await getCurrentUser(req);
       if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
-      const { evenements } = body;
+      const { evenements, fil } = body;
       const row = await db.prepare("SELECT programmation_json FROM users WHERE id=?").get(me.id);
       let prefs = {};
       try { prefs = JSON.parse(row?.programmation_json || '{}'); } catch (_) { prefs = {}; }
       if (evenements && typeof evenements === 'object') prefs.evenements = evenements;
+      if (fil && typeof fil === 'object') prefs.fil = fil;
       await db.prepare("UPDATE users SET programmation_json=? WHERE id=?").run(JSON.stringify(prefs), me.id);
       return sendJSON(res, 200, { prefs });
     }
