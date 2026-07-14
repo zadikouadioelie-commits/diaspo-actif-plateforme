@@ -3791,7 +3791,10 @@ function openCommanderModal(productId, publicationId) {
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${payant ? `Paiement sécurisé par Stripe — ${Number(prod.prix).toFixed(2)} ${esc(prod.devise||'EUR')} / unité.` : "Ceci envoie une demande de contact à l'initiative — aucun paiement n'est effectué ici."}</p>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Quantité</label>
       <input type="number" min="1" id="cmd-qte" value="1" oninput="cmdUpdateTotal(${Number(prod.prix)||0})" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
-      ${payant ? `<p style="font-size:13px;font-weight:700;margin:0 0 12px;">Total : <span id="cmd-total">${Number(prod.prix).toFixed(2)}</span> ${esc(prod.devise||'EUR')}</p>` : ''}
+      ${payant ? `<p style="font-size:13px;font-weight:700;margin:0 0 12px;">Total : <span id="cmd-total">${Number(prod.prix).toFixed(2)}</span> ${esc(prod.devise||'EUR')}</p>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#374151;margin:0 0 12px;cursor:pointer;">
+        <input type="checkbox" id="cmd-save-card"> Enregistrer cette carte pour mes prochains achats
+      </label>` : ''}
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Message (optionnel)</label>
       <textarea id="cmd-msg" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;min-height:70px;margin-bottom:8px;"></textarea>
       <p id="cmd-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
@@ -3811,6 +3814,7 @@ function openCommanderModal(productId, publicationId) {
         quantite: Number(document.getElementById('cmd-qte').value) || 1,
         message: document.getElementById('cmd-msg').value.trim() || null,
         publication_id: publicationId != null ? publicationId : null,
+        enregistrer_carte: document.getElementById('cmd-save-card')?.checked || false,
       });
       if (r.checkout_url) { window.location.href = r.checkout_url; return; }
       overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:32px;text-align:center;">

@@ -136,6 +136,7 @@ async function migratePg(pool) {
     ['users', 'email_verifie', 'INTEGER DEFAULT 0'],
     ['users', 'email_verif_token', 'TEXT'],
     ['users', 'email_verif_expires', 'BIGINT'],
+    ['users', 'stripe_customer_id', 'TEXT'],
     // initiatives
     ['initiatives', 'da_id', 'TEXT'],
     ['initiatives', 'vitrine_active', 'INTEGER DEFAULT 0'],

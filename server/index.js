@@ -1610,7 +1610,7 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
 
   /* ── Produit payant : vraie session Stripe Checkout ── */
   if (prod.prix != null && Number(prod.prix) > 0) {
-    const { stripe } = require("./stripe-client");
+    const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
     if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
 
     const montantTotal = parseFloat((Number(prod.prix) * quantite).toFixed(2));
@@ -1621,8 +1621,10 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
 
     try {
       const origin = getOrigin(req);
+      const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
+        customer: stripeCustomerId,
         line_items: [{
           price_data: {
             currency: (prod.devise || "EUR").toLowerCase(),
@@ -1631,6 +1633,7 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
           },
           quantity: quantite,
         }],
+        ...(body.enregistrer_carte ? { payment_intent_data: { setup_future_usage: "off_session" } } : {}),
         metadata: { diaspoactif_commande_vitrine_id: String(id) },
         success_url: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=succes&commande=${id}`,
         cancel_url: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=annule&commande=${id}`,
@@ -2064,7 +2067,7 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
   const montant = resolveAdhesionMontant(formule, body.montant);
   if (montant == null) return sendJSON(res, 400, { error: "Montant invalide." });
 
-  const { stripe } = require("./stripe-client");
+  const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
   if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
 
   let membre = await db.prepare("SELECT * FROM adhesion_membres WHERE formule_id=? AND linked_user_id=?").get(formule.id, user.id);
@@ -2090,12 +2093,15 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
     product_data: productData,
   };
   try {
+    const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
     const session = await stripe.checkout.sessions.create({
       mode: recurring ? "subscription" : "payment",
+      customer: stripeCustomerId,
       line_items: [{
         price_data: recurring ? { ...priceData, recurring: { interval: recurring.interval, interval_count: recurring.interval_count } } : priceData,
         quantity: 1,
       }],
+      ...(!recurring && body.enregistrer_carte ? { payment_intent_data: { setup_future_usage: "off_session" } } : {}),
       metadata: { diaspoactif_adhesion_paiement_id: String(paiementId), diaspoactif_adhesion_membre_id: String(membre.id) },
       success_url: `${origin}/adhesions.html?initiative=${formule.initiative_id}&paiement=succes&paiement_id=${paiementId}`,
       cancel_url: `${origin}/adhesions.html?initiative=${formule.initiative_id}&paiement=annule&paiement_id=${paiementId}`,
@@ -2105,6 +2111,43 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
   } catch (e) {
     await db.prepare(`UPDATE adhesion_paiements SET statut='echoue' WHERE id=?`).run(paiementId);
     return sendJSON(res, 500, SEC.safeError(e, "adhesion-payer"));
+  }
+});
+
+/* ── Moyens de paiement enregistrés (cartes Stripe réutilisables) ── */
+route("GET", "/api/paiement/moyens", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const row = await db.prepare("SELECT stripe_customer_id FROM users WHERE id=?").get(user.id);
+  if (!row || !row.stripe_customer_id) return sendJSON(res, 200, { moyens: [] });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+  try {
+    const list = await stripe.paymentMethods.list({ customer: row.stripe_customer_id, type: "card" });
+    const moyens = list.data.map(pm => ({
+      id: pm.id, brand: pm.card?.brand || "carte", last4: pm.card?.last4 || "????",
+      exp_month: pm.card?.exp_month, exp_year: pm.card?.exp_year,
+    }));
+    sendJSON(res, 200, { moyens });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "paiement-moyens-list"));
+  }
+});
+
+route("DELETE", "/api/paiement/moyens/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const row = await db.prepare("SELECT stripe_customer_id FROM users WHERE id=?").get(user.id);
+  if (!row || !row.stripe_customer_id) return sendJSON(res, 404, { error: "Aucune carte enregistrée." });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+  try {
+    const pm = await stripe.paymentMethods.retrieve(params.id);
+    if (!pm.customer || pm.customer !== row.stripe_customer_id) return sendJSON(res, 403, { error: "Accès refusé." });
+    await stripe.paymentMethods.detach(params.id);
+    sendJSON(res, 200, { ok: true });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "paiement-moyens-delete"));
   }
 });
 
@@ -13806,7 +13849,7 @@ ${jsonLd}
       /* Commande payante : rien n'est validé tant que Stripe n'a pas confirmé le paiement.
          Les tickets sont créés en 'pending' (partageant commande_id) ; le split commission/wallet
          et la consommation du code promo ne se font que dans handleStripeWebhook(). */
-      const { stripe } = require('./stripe-client');
+      const { stripe, getOrCreateStripeCustomer } = require('./stripe-client');
       if (!stripe) return sendJSON(res, 503, { error: 'Paiements momentanément indisponibles.' });
 
       const tempTicketIds = [];
@@ -13821,8 +13864,10 @@ ${jsonLd}
 
       try {
         const origin = getOrigin(req);
+        const stripeCustomerId = await getOrCreateStripeCustomer(db, me);
         const session = await stripe.checkout.sessions.create({
           mode: 'payment',
+          customer: stripeCustomerId,
           line_items: [{
             price_data: {
               currency: (tt.devise || 'EUR').toLowerCase(),
@@ -13831,6 +13876,7 @@ ${jsonLd}
             },
             quantity: quantite,
           }],
+          ...(body.enregistrer_carte ? { payment_intent_data: { setup_future_usage: 'off_session' } } : {}),
           metadata: { diaspoactif_commande_id: commandeId },
           success_url: `${origin}/billetterie.html?paiement=succes&commande=${commandeId}`,
           cancel_url: `${origin}/billetterie.html?paiement=annule&commande=${commandeId}`,

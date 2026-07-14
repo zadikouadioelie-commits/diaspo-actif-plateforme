@@ -631,11 +631,39 @@ async function openEvent(eid) {
 }
 
 /* ══ ACHAT BILLET ══ */
-async function buyTicket(eid, ttid, nom, prix) {
-  if (!confirm(`Confirmer l'achat : "${nom}" — ${prix===0?'Gratuit':prix.toFixed(2)+' €'} ?`)) return;
+function buyTicket(eid, ttid, nom, prix) {
   const notify = (msg, type) => { if (typeof showToast === 'function') showToast(msg, type); else alert(msg); };
+  if (!(prix > 0)) {
+    if (!confirm(`Confirmer l'achat : "${nom}" — Gratuit ?`)) return;
+    return confirmBuyTicket(eid, ttid, false, notify);
+  }
+  const overlay = document.createElement('div');
+  overlay.id = 'buy-ticket-overlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:400px;width:94%;">
+      <h3 style="margin:0 0 6px;font-size:16px;">🎫 Confirmer l'achat</h3>
+      <p style="font-size:13px;color:var(--muted,#888);margin:0 0 14px;">« ${nom} » — <strong>${prix.toFixed(2)} €</strong></p>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#374151;margin:0 0 14px;cursor:pointer;">
+        <input type="checkbox" id="buy-save-card"> Enregistrer cette carte pour mes prochains achats
+      </label>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="document.getElementById('buy-ticket-overlay').remove()">Annuler</button>
+        <button class="btn btn-orange" id="buy-ticket-confirm">💳 Payer maintenant</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  document.getElementById('buy-ticket-confirm').onclick = () => {
+    const saveCard = document.getElementById('buy-save-card').checked;
+    overlay.remove();
+    confirmBuyTicket(eid, ttid, saveCard, notify);
+  };
+}
+
+async function confirmBuyTicket(eid, ttid, saveCard, notify) {
   try {
-    const r = await api('POST', '/events/'+eid+'/buy', { ticket_type_id: ttid });
+    const r = await api('POST', '/events/'+eid+'/buy', { ticket_type_id: ttid, enregistrer_carte: saveCard });
     if (r.checkout_url) {
       notify('Redirection vers le paiement sécurisé Stripe…', 'info');
       window.location.href = r.checkout_url;

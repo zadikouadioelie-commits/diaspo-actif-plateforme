@@ -67,6 +67,7 @@
       <button class="cf-tab active" data-tab="revenus">📊 Mes revenus</button>
       <button class="cf-tab" data-tab="comptes">🏦 Comptes de réception</button>
       <button class="cf-tab" data-tab="retrait">💸 Effectuer un retrait</button>
+      <button class="cf-tab" data-tab="moyens">💳 Moyens de paiement</button>
       <button class="cf-tab" data-tab="parametres">⚙️ Paramètres</button>
     </div>
 
@@ -111,7 +112,37 @@ function cfRenderTab() {
   if (CF_TAB === 'revenus') return cfRenderRevenus(el);
   if (CF_TAB === 'comptes') return cfRenderComptes(el);
   if (CF_TAB === 'retrait') return cfRenderRetrait(el);
+  if (CF_TAB === 'moyens') return cfRenderMoyens(el);
   if (CF_TAB === 'parametres') return cfRenderParametres(el);
+}
+
+/* ── Onglet : Moyens de paiement (cartes Stripe enregistrées) ── */
+async function cfRenderMoyens(el) {
+  el.innerHTML = `<div class="cf-empty">Chargement…</div>`;
+  let moyens = [];
+  try { const r = await api('GET', '/paiement/moyens'); moyens = r.moyens || []; }
+  catch(e) { el.innerHTML = `<div class="cf-empty">Erreur de chargement : ${cfEsc(e.message||'')}</div>`; return; }
+
+  const BRAND_LABELS = { visa: 'Visa', mastercard: 'Mastercard', amex: 'American Express', discover: 'Discover' };
+  el.innerHTML = `
+    <div class="cf-card">
+      <h3 style="margin-top:0;">💳 Cartes enregistrées</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-6px;">Cartes enregistrées volontairement lors d'un achat (boutique, billetterie, adhésion) pour accélérer vos prochains paiements.</p>
+      ${moyens.length ? moyens.map(m => `
+        <div class="cf-provider-row" id="cf-moyen-${cfEsc(m.id)}">
+          <div>${BRAND_LABELS[m.brand] || cfEsc(m.brand)} •••• ${cfEsc(m.last4)} <span style="color:var(--muted);font-size:12px;">— exp. ${String(m.exp_month).padStart(2,'0')}/${String(m.exp_year).slice(-2)}</span></div>
+          <button class="btn-sm" style="background:#fee2e2;color:#991b1b;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;" onclick="cfSupprimerMoyen('${cfEsc(m.id)}')">🗑️ Supprimer</button>
+        </div>`).join('') : '<div class="cf-empty">Aucune carte enregistrée pour l\'instant.</div>'}
+    </div>
+  `;
+}
+
+async function cfSupprimerMoyen(id) {
+  if (!confirm('Supprimer cette carte enregistrée ?')) return;
+  try {
+    await api('DELETE', `/paiement/moyens/${id}`);
+    cfRenderMoyens(document.getElementById('cf-content'));
+  } catch(e) { alert('Erreur : ' + (e.message||'')); }
 }
 
 /* ── Onglet 1 : Mes revenus ── */

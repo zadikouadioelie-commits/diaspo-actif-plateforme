@@ -4957,6 +4957,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_support_reponses_ticket ON support_ticket_reponses(ticket_id);
 `);
 
+/* ===== Carte bancaire réutilisable (Stripe Customer générique par utilisateur) ===== */
+{
+  const userColsPay = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+  if (!userColsPay.includes('stripe_customer_id')) db.exec("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT");
+}
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;

@@ -136,6 +136,8 @@ function renderFormules(){
 
 function escHtml(s){ const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
 
+const ADH_RECURRENTS = ['cotisation_mensuelle', 'cotisation_trimestrielle', 'cotisation_semestrielle', 'cotisation_annuelle'];
+
 async function ouvrirPaiement(formuleId){
   try {
     const me = await api('GET', '/auth/me');
@@ -150,8 +152,36 @@ async function ouvrirPaiement(formuleId){
     montant = Number(saisie);
     if (!montant || montant <= 0) { showToast?.('Montant invalide.', 'warning'); return; }
   }
+  const recurrent = ADH_RECURRENTS.includes(formule.type_contribution);
+  if (recurrent) return confirmerPaiementAdhesion(formuleId, montant, false);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'adh-pay-overlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:400px;width:94%;">
+      <h3 style="margin:0 0 6px;font-size:16px;">💳 Confirmer le paiement</h3>
+      <p style="font-size:13px;color:var(--muted,#888);margin:0 0 14px;">« ${escHtml(formule.nom)} » — <strong>${(montant ?? formule.montant_fixe)} ${escHtml(formule.devise)}</strong></p>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#374151;margin:0 0 14px;cursor:pointer;">
+        <input type="checkbox" id="adh-save-card"> Enregistrer cette carte pour mes prochains achats
+      </label>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="document.getElementById('adh-pay-overlay').remove()">Annuler</button>
+        <button class="btn btn-orange" id="adh-pay-confirm">💳 Payer maintenant</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  document.getElementById('adh-pay-confirm').onclick = () => {
+    const saveCard = document.getElementById('adh-save-card').checked;
+    overlay.remove();
+    confirmerPaiementAdhesion(formuleId, montant, saveCard);
+  };
+}
+
+async function confirmerPaiementAdhesion(formuleId, montant, saveCard){
   try {
-    const r = await api('POST', `/adhesion-formules/${formuleId}/payer`, montant != null ? { montant } : {});
+    const r = await api('POST', `/adhesion-formules/${formuleId}/payer`, { ...(montant != null ? { montant } : {}), enregistrer_carte: saveCard });
     if (r.checkout_url) { location.href = r.checkout_url; return; }
   } catch(e) {
     showToast?.('Erreur : ' + e.message, 'danger');
