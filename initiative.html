@@ -652,6 +652,7 @@ const DOMAIN_GRAD = {
     (init.accreditations || []).forEach(a => labels.push(a === 'mobilisation_active' ? '📢 Mobilisation active' : '💼 Opportunités'));
 
     document.getElementById('col-right').innerHTML = `
+      ${isOwner ? `<div class="side-card" id="pp-recherche-contacts"></div>` : ''}
       <div class="side-card">
         <h4>🚀 Rejoindre l'initiative</h4>
         ${me && me.role === 'collectivite' ? `
@@ -711,6 +712,10 @@ const DOMAIN_GRAD = {
         </label>
       </div>` : ''}
     `;
+    if (isOwner && window.RechercheContacts) {
+      const rcEl = document.getElementById('pp-recherche-contacts');
+      if (rcEl) RechercheContacts.mount(rcEl);
+    }
   }
 
   renderColLeft();
@@ -895,6 +900,7 @@ const DOMAIN_GRAD = {
 </script>
 <script src="assets/galerie-lightbox.js"></script>
 <script src="assets/demande-contact.js"></script>
+<script src="assets/recherche-contacts.js"></script>
 <script src="assets/trust-score.js"></script>
 <script src="assets/profile-qr.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>

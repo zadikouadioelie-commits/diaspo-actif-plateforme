@@ -989,6 +989,7 @@ html, body { overflow-x:clip; }
 <script src="assets/app.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
 <script src="assets/demande-contact.js"></script>
+<script src="assets/recherche-contacts.js"></script>
 <script>
 /* ===================================================
    PROFIL UTILISATEUR — logique complète
@@ -1132,6 +1133,7 @@ async function renderEnrichedColumns() {
     ].filter(Boolean);
 
     left.innerHTML = `
+      ${owner ? `<div class="pp-side-card" id="pp-recherche-contacts"></div>` : ''}
       <div class="pp-side-card">
         <h4><span>💡 Compétences</span> ${owner ? '<button class="edit-btn" onclick="switchProfileTab(\'competences\')" title="Modifier dans l\'onglet Compétences">✏️</button>' : ''}</h4>
         ${comps.length ? comps.map(c => `<span class="pp-tag">${esc2(typeof c === 'string' ? c : (c.nom || c.label || ''))}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
@@ -1249,6 +1251,10 @@ async function renderEnrichedColumns() {
       </div>
     `;
     if (typeof loadProfileSuggestions === 'function') loadProfileSuggestions();
+    if (owner && window.RechercheContacts) {
+      const rcEl = document.getElementById('pp-recherche-contacts');
+      if (rcEl) RechercheContacts.mount(rcEl);
+    }
   }
 
   /* Exposé pour switchProfileView : restaure les colonnes du profil (quand on quitte la vitrine) */

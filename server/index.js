@@ -6331,6 +6331,68 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
   sendJSON(res, 200, { q, utilisateurs, initiatives, publications, formations, evenements });
 });
 
+/* ---------- Recherche de contacts (barre "trouver une personne/initiative", façon amis) ---------- */
+route("GET", "/api/recherche-contacts", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const q = (query.q || "").trim();
+  if (q.length < 2) return sendJSON(res, 200, { results: [] });
+  const like = `%${q}%`;
+
+  const users = await db.prepare(`
+    SELECT id, nom, prenom, role, ville, pays, photo_url
+    FROM users WHERE (nom LIKE ? OR prenom LIKE ?) AND id != ? AND role != 'administrateur' LIMIT 10
+  `).all(like, like, user.id);
+  const inits = await db.prepare(`
+    SELECT id, nom, domaine, ville, pays, owner_user_id, logo_url
+    FROM initiatives WHERE nom LIKE ? LIMIT 10
+  `).all(like);
+
+  const candidats = [
+    ...users.map(u => ({
+      id: u.id, target_user_id: u.id, type: "user",
+      nom: [u.prenom, u.nom].filter(Boolean).join(" ") || u.nom,
+      sous_titre: u.role === "initiative" ? "Initiative" : "Utilisateur",
+      lieu: [u.ville, u.pays].filter(Boolean).join(", "),
+      photo_url: u.photo_url || null,
+      lien: `profil.html?id=${u.id}`,
+    })),
+    ...inits.filter(i => Number(i.owner_user_id) !== Number(user.id)).map(i => ({
+      id: i.id, target_user_id: i.owner_user_id, type: "initiative",
+      nom: i.nom,
+      sous_titre: i.domaine || "Initiative",
+      lieu: [i.ville, i.pays].filter(Boolean).join(", "),
+      photo_url: i.logo_url || null,
+      lien: `initiative.html?id=${i.id}`,
+    })),
+  ].filter(c => c.target_user_id && Number(c.target_user_id) !== Number(user.id));
+
+  const targetIds = [...new Set(candidats.map(c => Number(c.target_user_id)))];
+  let relationsMap = {};
+  if (targetIds.length) {
+    const placeholders = targetIds.map(() => "?").join(",");
+    const relations = await db.prepare(`
+      SELECT demandeur_id, destinataire_id, statut, created_at FROM demandes_contact
+      WHERE (demandeur_id=? AND destinataire_id IN (${placeholders}))
+         OR (destinataire_id=? AND demandeur_id IN (${placeholders}))
+      ORDER BY created_at DESC
+    `).all(user.id, ...targetIds, user.id, ...targetIds);
+    for (const r of relations) {
+      const otherId = Number(r.demandeur_id) === Number(user.id) ? Number(r.destinataire_id) : Number(r.demandeur_id);
+      if (relationsMap[otherId]) continue; // garder la plus récente déjà rencontrée
+      relationsMap[otherId] = r.statut === "acceptee" ? "contact"
+        : r.statut === "en_attente" ? (Number(r.demandeur_id) === Number(user.id) ? "envoyee" : "recue")
+        : "aucune";
+    }
+  }
+
+  const results = candidats.slice(0, 12).map(c => ({
+    ...c,
+    statut_relation: relationsMap[Number(c.target_user_id)] || "aucune",
+  }));
+  sendJSON(res, 200, { results });
+});
+
 /* ---------- Notifications ---------- */
 async function creerNotif(userId, type, titre, contenu, data = {}) {
   try {
