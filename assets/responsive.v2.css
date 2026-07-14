@@ -385,8 +385,8 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   .page { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
 
   /* Sidebar réduite sur tablette */
-  .da-sidebar { width: 220px; }
-  .with-sidebar .sidebar { width: 200px; }
+  .da-sidebar { width: 240px; }
+  .with-sidebar .sidebar { width: 240px; }
   .content { padding: 20px 24px; }
 
   /* Chat : panneau liste plus étroit */
@@ -418,8 +418,8 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   body { font-size: 15px; }
   .da-cards-grid { grid-template-columns: repeat(4, 1fr); }
   .da-stats-grid { grid-template-columns: repeat(5, 1fr); }
-  .sidebar { width: 260px; }
-  .da-sidebar { width: 280px; }
+  .sidebar { width: 300px; }
+  .da-sidebar { width: 300px; }
   .topbar-inner { max-width: 1400px; padding: 14px 40px; }
 }
 
