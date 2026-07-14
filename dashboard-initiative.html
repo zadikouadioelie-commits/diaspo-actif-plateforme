@@ -68,6 +68,7 @@
 
       <div class="sb-group-lbl">06 — COMMUNICATION</div>
       <a href="messagerie.html">🟥 Messages <span class="pill" id="msg-count">—</span></a>
+      <a href="messagerie.html">🤝 Demandes de mise en relation <span class="pill" id="demandes-relation-count" style="display:none;"></span></a>
       <a href="#messages-vitrine" data-section="messages-vitrine">🛍️ Messages de la vitrine <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
       <a href="#parametres-vitrine" data-section="parametres-vitrine">⭐ Paramètres Vitrine</a>
       <a href="#partenaires-liste" data-section="partenaires-liste">🤝 Liste des partenaires</a>
@@ -155,6 +156,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   /* Compteur messages */
   const msgPill = document.getElementById("msg-count");
   if (msgPill) msgPill.textContent = messages_non_lus || 0;
+
+  /* Compteur demandes de mise en relation en attente */
+  try {
+    const dr = await api("GET", "/demandes-contact?direction=recues&statut=en_attente");
+    const n = (dr.demandes || []).length;
+    const drPill = document.getElementById("demandes-relation-count");
+    if (drPill) { drPill.textContent = n; drPill.style.display = n ? "" : "none"; }
+  } catch (e) {}
 
   /* Vitrine : id initiative exposé + badge messages vitrine */
   window.__vitrineInitId = init ? init.id : null;
