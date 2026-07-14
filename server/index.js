@@ -469,21 +469,53 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
 });
 
+/* Anti brute-force PERSISTANT (survit aux cold starts serverless, contrairement à SEC.rateLimit
+   qui vit uniquement en mémoire). Compte les tentatives échouées récentes pour une clé donnée
+   (ip:xxx ou email:xxx) dans la table auth_tentatives. */
+async function dbLoginGuard(cle, maxEchecs, windowMs) {
+  const since = new Date(Date.now() - windowMs).toISOString().slice(0, 19).replace("T", " ");
+  const row = await db.prepare("SELECT COUNT(*) AS n, MIN(created_at) AS plus_ancien FROM auth_tentatives WHERE cle=? AND reussite=0 AND created_at >= ?").get(cle, since);
+  const n = row?.n || 0;
+  if (n >= maxEchecs) {
+    const retryAfter = Math.max(1, Math.ceil((new Date(row.plus_ancien).getTime() + windowMs - Date.now()) / 1000));
+    return { allowed: false, retryAfter };
+  }
+  return { allowed: true };
+}
+async function dbLoginRecord(cle, reussite) {
+  try {
+    await db.prepare("INSERT INTO auth_tentatives (cle, reussite) VALUES (?,?)").run(cle, reussite ? 1 : 0);
+    // Purge paresseuse (1 requête sur ~50) pour éviter la croissance illimitée de la table.
+    if (Math.random() < 0.02) db.prepare("DELETE FROM auth_tentatives WHERE created_at < datetime('now','-2 days')").run();
+  } catch (_) {}
+}
+
 route("POST", "/api/auth/login", async (req, res, params, body) => {
   const ip = SEC.clientIp(req);
   const email = SEC.normalizeEmail(body.email);
   const password = body.password || "";
 
-  /* Anti brute-force : rate-limit par IP puis par compte (fenêtre 15 min). */
+  /* Anti brute-force : rate-limit mémoire (best-effort, rapide) + garde persistante en base
+     (fiable même après un cold start serverless) — par IP puis par compte, fenêtre 15 min. */
   const ipLimit = SEC.rateLimit(`login:ip:${ip}`, 20, 15 * 60 * 1000);
   if (!ipLimit.allowed) {
-    SEC.logSecurity("login_ratelimited", { ip, scope: "ip" });
+    SEC.logSecurity("login_ratelimited", { ip, scope: "ip_memoire" });
     return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
   }
   const emailLimit = SEC.rateLimit(`login:email:${email}`, 8, 15 * 60 * 1000);
   if (!emailLimit.allowed) {
-    SEC.logSecurity("login_ratelimited", { ip, email, scope: "email" });
+    SEC.logSecurity("login_ratelimited", { ip, email, scope: "email_memoire" });
     return sendJSON(res, 429, { error: `Trop de tentatives sur ce compte. Réessayez dans ${emailLimit.retryAfter}s.` });
+  }
+  const ipGuard = await dbLoginGuard(`ip:${ip}`, 20, 15 * 60 * 1000);
+  if (!ipGuard.allowed) {
+    SEC.logSecurity("login_ratelimited", { ip, scope: "ip_persistant" });
+    return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipGuard.retryAfter}s.` });
+  }
+  const emailGuard = await dbLoginGuard(`email:${email}`, 8, 15 * 60 * 1000);
+  if (!emailGuard.allowed) {
+    SEC.logSecurity("login_ratelimited", { ip, email, scope: "email_persistant" });
+    return sendJSON(res, 429, { error: `Trop de tentatives sur ce compte. Réessayez dans ${emailGuard.retryAfter}s.` });
   }
 
   if (!email || !password) return sendJSON(res, 400, { error: "E-mail et mot de passe requis." });
@@ -492,8 +524,12 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   const user = await db.prepare("SELECT * FROM users WHERE LOWER(email) = ?").get(email);
   if (!user || !verifyPassword(password, user.password_salt, user.password_hash)) {
     SEC.logSecurity("login_failed", { ip, email });
+    dbLoginRecord(`ip:${ip}`, false);
+    dbLoginRecord(`email:${email}`, false);
     return sendJSON(res, 401, { error: "E-mail ou mot de passe incorrect." });
   }
+  dbLoginRecord(`ip:${ip}`, true);
+  dbLoginRecord(`email:${email}`, true);
   db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
@@ -12373,6 +12409,27 @@ async function handleRequest(req, res) {
   const parsed = url.parse(req.url, true);
   const pathname = decodeURIComponent(parsed.pathname);
 
+  /* ── Protection CSRF (vérification d'origine) ──────────────────────────────
+     Sur les requêtes qui modifient des données (POST/PUT/PATCH/DELETE), si un
+     en-tête Origin est présent et ne correspond pas à l'hôte du site, on bloque.
+     Un navigateur envoie TOUJOURS Origin sur les requêtes cross-site ; un appel
+     serveur-à-serveur légitime (webhook Stripe, cron Vercel) n'en envoie pas —
+     donc cette vérification ne casse aucune intégration existante tout en
+     bloquant les attaques CSRF classiques (formulaire/JS hébergé sur un autre site). */
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    const origin = req.headers["origin"];
+    if (origin) {
+      const host = req.headers["host"];
+      try {
+        const originHost = new URL(origin).host;
+        if (host && originHost !== host) {
+          SEC.logSecurity("csrf_origin_mismatch", { path: pathname, origin, host });
+          return sendJSON(res, 403, { error: "Requête refusée (origine invalide)." });
+        }
+      } catch (_) { /* Origin malformé — laisse passer, ne casse pas un cas légitime imprévu */ }
+    }
+  }
+
   /* ── Sauvegarde automatique quotidienne (Vercel Cron → zone Bunny privée dédiée) ──
      Filet de sécurité en complément du PITR Neon. Le fichier n'est jamais public :
      zone Bunny distincte de celle des médias, sans CDN/Pull Zone associée. */
@@ -19385,6 +19442,10 @@ ${jsonLd}
       if (!autorise) return sendJSON(res, 403, { error: 'Accès refusé.' });
 
       const buffer = Buffer.from(data_base64, 'base64');
+      if (SEC.isDangerousFile(buffer)) {
+        SEC.logSecurity("upload_bloque_dangereux", { uid: me.id, kind: "proj-eval", nom });
+        return sendJSON(res, 400, { error: 'Type de fichier non autorisé.' });
+      }
       const taille = buffer.length;
       let url_bunny = null, contenu_b64 = null;
       try {

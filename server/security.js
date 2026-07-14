@@ -126,6 +126,19 @@ function isSafeRasterImage(buffer) {
   return t && SAFE_RASTER.has(t) ? t : null;
 }
 
+/* Détecte les formats intrinsèquement dangereux à héberger/servir (HTML actif, exécutables),
+   pour les endpoints qui acceptent volontairement "tout type de fichier" (ex. pièces jointes
+   libres) mais ne doivent pas devenir un vecteur XSS stocké ou de distribution de malware. */
+function isDangerousFile(buffer) {
+  if (!buffer || !buffer.length) return false;
+  const head = buffer.slice(0, 512).toString("utf8").toLowerCase();
+  if (/<!doctype\s+html|<html[\s>]|<script[\s>]/.test(head)) return true; // HTML/JS actif
+  if (buffer[0] === 0x4D && buffer[1] === 0x5A) return true; // MZ — exécutable Windows (PE)
+  if (buffer[0] === 0x7F && buffer[1] === 0x45 && buffer[2] === 0x4C && buffer[3] === 0x46) return true; // ELF — exécutable Linux
+  if (buffer[0] === 0x23 && buffer[1] === 0x21) return true; // #! — script shebang
+  return false;
+}
+
 /* Vérifie que le fichier est bien une vidéo MP4/WebM par ses magic bytes (pas juste l'extension). */
 function isSafeVideo(buffer) {
   if (!buffer || buffer.length < 12) return null;
@@ -160,6 +173,6 @@ module.exports = {
   clientIp,
   isValidEmail, isValidUrl, isValidPhone, normalizeEmail,
   sanitizeString, escapeHtml,
-  sniffImageType, isSafeRasterImage, isSafeVideo,
+  sniffImageType, isSafeRasterImage, isSafeVideo, isDangerousFile,
   safeError, logSecurity,
 };

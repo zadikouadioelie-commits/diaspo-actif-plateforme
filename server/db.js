@@ -5016,6 +5016,21 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_recherches_user ON recherches_utilisateur(user_id);
 `);
 
+/* ===== Anti brute-force persistant (tentatives de connexion) =====
+   Le rate-limit en mémoire de security.js est réinitialisé à chaque cold start
+   serverless (Vercel) — un attaquant peut le contourner en répartissant ses
+   requêtes. Cette table persiste en base (SQLite local / Postgres prod) et
+   garantit la limite même entre invocations distinctes. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS auth_tentatives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cle TEXT NOT NULL,
+    reussite INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_auth_tentatives_cle ON auth_tentatives(cle, created_at);
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;
