@@ -1205,7 +1205,7 @@ async function renderEnrichedColumns() {
       ${!owner ? `<div class="pp-side-card">
         <h4>🚀 Entrer en relation</h4>
         ${CU && CU.role === 'collectivite' ? `
-          <button class="pp-join-btn" onclick="ppDemandeRelation(${profil.id})">🤝 Demande de mise en relation</button>
+          <button class="pp-join-btn" onclick="ppDemandeRelation(${profil.id})">🤝 Mise en relation</button>
           <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Les comptes officiels ne peuvent pas contacter directement un membre : une demande lui sera envoyée, la conversation ne s'ouvrira qu'après son acceptation.</p>
         ` : `
           <a class="pp-join-btn" href="messagerie.html?user=${profil.id}">✉️ Contacter</a>

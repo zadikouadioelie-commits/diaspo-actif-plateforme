@@ -1176,17 +1176,27 @@ async function loadDemandesRelation(){
     const demandes = r.demandes || [];
     if (!demandes.length){ bar.style.display='none'; bar.innerHTML=''; return; }
     bar.style.display='block';
-    bar.innerHTML = `<div style="background:#EFF6FF;border-bottom:1.5px solid #BFDBFE;padding:10px 20px;display:flex;flex-direction:column;gap:8px;">
+    bar.innerHTML = `<div style="background:#EFF6FF;border-bottom:1.5px solid #BFDBFE;padding:10px 20px;display:flex;flex-direction:column;gap:10px;">
       ${demandes.map(d=>`
-        <div style="display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap;">
-          <span>📩 <strong>${escH(d.autre_nom)}</strong> souhaite entrer en contact avec vous
-            <span style="background:${dcUrgenceBadge[d.urgence]||'#64748B'};color:#fff;border-radius:99px;padding:1px 8px;font-size:10px;font-weight:700;margin-left:4px;">${escH(d.urgence)}</span>
-            — <em>${escH(d.motif_autre || d.motif)}</em>${d.message?` : « ${escH(d.message)} »`:''}</span>
-          <span style="display:flex;gap:6px;margin-left:auto;">
-            <button class="btn btn-sm btn-orange" onclick="repondreDemandeRelation(${d.id},'accepter')">Accepter</button>
-            <button class="btn btn-sm btn-outline" onclick="repondreDemandeRelation(${d.id},'refuser')">Refuser</button>
-            <button class="btn btn-sm btn-outline" style="color:#DC2626;border-color:#DC2626;" onclick="repondreDemandeRelation(${d.id},'bloquer')">Bloquer</button>
-          </span>
+        <div style="display:flex;gap:10px;font-size:13px;flex-wrap:wrap;background:#fff;border:1px solid #DCE7FA;border-radius:12px;padding:10px 12px;">
+          ${d.image_url ? `<img src="${escH(d.image_url)}" style="width:56px;height:56px;object-fit:cover;border-radius:10px;flex-shrink:0;">` : ''}
+          <div style="flex:1;min-width:200px;">
+            <div>🤝 <strong>${escH(d.autre_nom)}</strong> souhaite entrer en mise en relation
+              <span style="background:${dcUrgenceBadge[d.urgence]||'#64748B'};color:#fff;border-radius:99px;padding:1px 8px;font-size:10px;font-weight:700;margin-left:4px;">${escH(d.urgence)}</span>
+            </div>
+            <div style="font-weight:700;margin-top:3px;">${escH(d.objet || d.motif_autre || d.motif)}</div>
+            <div style="color:var(--muted);font-size:12px;margin-top:2px;">${escH(d.motif_autre || d.motif)}${d.message?` — ${escH(d.message)}`:''}</div>
+            ${(d.compatibilite && d.compatibilite.length) ? `
+              <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:6px 10px;margin-top:6px;font-size:11.5px;color:#166534;">
+                <strong>💡 Pourquoi cette mise en relation peut vous intéresser ?</strong>
+                <ul style="margin:4px 0 0;padding-left:16px;">${d.compatibilite.map(c=>`<li>${escH(c)}</li>`).join('')}</ul>
+              </div>` : ''}
+            <div style="display:flex;gap:6px;margin-top:8px;">
+              <button class="btn btn-sm btn-orange" onclick="repondreDemandeRelation(${d.id},'accepter')">Accepter</button>
+              <button class="btn btn-sm btn-outline" onclick="repondreDemandeRelation(${d.id},'refuser')">Refuser</button>
+              <button class="btn btn-sm btn-outline" style="color:#DC2626;border-color:#DC2626;" onclick="repondreDemandeRelation(${d.id},'bloquer')">Bloquer</button>
+            </div>
+          </div>
         </div>
       `).join('')}
     </div>`;

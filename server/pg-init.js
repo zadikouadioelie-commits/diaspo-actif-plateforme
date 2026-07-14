@@ -544,6 +544,9 @@ async function migratePg(pool) {
     ['users', 'reseaux_json', 'TEXT'],
     ['users', 'annee_debut', 'INTEGER'],
     ['users', 'assistant_actif', 'INTEGER DEFAULT 1'],
+    // Mise en relation : objet + image d'illustration
+    ['demandes_contact', 'objet', 'TEXT'],
+    ['demandes_contact', 'image_url', 'TEXT'],
   ];
   for (const [table, col, type] of cols) {
     try {

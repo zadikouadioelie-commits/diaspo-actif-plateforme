@@ -4426,7 +4426,7 @@ async function getDemandesContactConfig() {
   let row = await db.prepare("SELECT * FROM demandes_contact_config WHERE id=1").get();
   if (!row) {
     await db.prepare(
-      "INSERT INTO demandes_contact_config (id, expiration_jours, cooldown_jours, max_par_jour, longueur_max_message, motifs_json) VALUES (1,30,90,20,500,?)"
+      "INSERT INTO demandes_contact_config (id, expiration_jours, cooldown_jours, max_par_jour, longueur_max_message, motifs_json) VALUES (1,30,90,20,600,?)"
     ).run(JSON.stringify(DEMANDES_CONTACT_MOTIFS_DEFAUT));
     row = await db.prepare("SELECT * FROM demandes_contact_config WHERE id=1").get();
   }
@@ -4507,10 +4507,14 @@ route("POST", "/api/demandes-contact", async (req, res, params, body) => {
   const motifAutre = motif === "Autre" ? (body.motif_autre || "").trim().slice(0, 200) : null;
   if (motif === "Autre" && !motifAutre) return sendJSON(res, 400, { error: "Merci de préciser le motif." });
 
+  const objet = (body.objet || "").trim().slice(0, 120);
+  if (!objet) return sendJSON(res, 400, { error: "L'objet est requis." });
+
   const message = (body.message || "").trim();
   if (!message) return sendJSON(res, 400, { error: "Le message est requis." });
   if (message.length > cfg.longueur_max_message) return sendJSON(res, 400, { error: `Message limité à ${cfg.longueur_max_message} caractères.` });
 
+  const imageUrl = (body.image_url || "").trim().slice(0, 500) || null;
   const urgence = ["faible", "normal", "important", "urgent"].includes(body.urgence) ? body.urgence : "normal";
 
   // Conversation déjà active (non supprimée par le destinataire) : pas besoin de repasser par une demande.
@@ -4535,14 +4539,39 @@ route("POST", "/api/demandes-contact", async (req, res, params, body) => {
 
   const expiresAt = new Date(Date.now() + cfg.expiration_jours * 86400000).toISOString().slice(0, 19).replace("T", " ");
   const id = (await db.prepare(
-    "INSERT INTO demandes_contact (demandeur_id, destinataire_id, motif, motif_autre, message, urgence, expires_at) VALUES (?,?,?,?,?,?,?)"
-  ).run(user.id, destinataireId, motif, motifAutre, message, urgence, expiresAt)).lastInsertRowid;
+    "INSERT INTO demandes_contact (demandeur_id, destinataire_id, objet, motif, motif_autre, message, image_url, urgence, expires_at) VALUES (?,?,?,?,?,?,?,?,?)"
+  ).run(user.id, destinataireId, objet, motif, motifAutre, message, imageUrl, urgence, expiresAt)).lastInsertRowid;
 
-  creerNotif(destinataireId, "demande_contact", `${user.nom} souhaite entrer en contact avec vous`,
+  creerNotif(destinataireId, "demande_contact", `${user.nom} souhaite entrer en contact avec vous : ${objet}`,
     `Motif : ${motifAutre || motif}. ${message}`.slice(0, 300), { demande_id: id });
 
   sendJSON(res, 201, { id, expires_at: expiresAt });
 });
+
+/* Points communs entre demandeur et destinataire, calculés à partir des données déjà en
+   base (pas d'IA externe) — alimente « Pourquoi cette mise en relation peut vous intéresser ? ». */
+async function calculerCompatibilite(demandeurId, destinataireId) {
+  const [a, b] = await Promise.all([
+    db.prepare("SELECT pays, ville, region, origine1, domaine_utilisateur, role FROM users WHERE id=?").get(demandeurId),
+    db.prepare("SELECT pays, ville, region, origine1, domaine_utilisateur, role FROM users WHERE id=?").get(destinataireId),
+  ]);
+  if (!a || !b) return [];
+  const raisons = [];
+  if (a.origine1 && b.origine1 && a.origine1 === b.origine1) raisons.push(`Vous êtes tous deux originaires de ${a.origine1}.`);
+  if (a.pays && b.pays && a.pays === b.pays) raisons.push(`Vous résidez tous deux en ${a.pays}.`);
+  if (a.ville && b.ville && a.ville === b.ville) raisons.push(`Vous êtes sur le même territoire (${a.ville}).`);
+  if (a.region && b.region && a.region === b.region && !(a.ville && b.ville && a.ville === b.ville)) raisons.push(`Vous exercez dans la même région (${a.region}).`);
+  if (a.domaine_utilisateur && b.domaine_utilisateur && a.domaine_utilisateur === b.domaine_utilisateur) raisons.push(`Vous exercez dans le même secteur d'activité (${a.domaine_utilisateur}).`);
+
+  const suitDemandeur = await db.prepare("SELECT id FROM abonnements WHERE user_id=? AND initiative_id=?").get(destinataireId, demandeurId);
+  if (suitDemandeur) raisons.push("Ce compte suit déjà votre initiative.");
+  const suitDestinataire = await db.prepare("SELECT id FROM abonnements WHERE user_id=? AND initiative_id=?").get(demandeurId, destinataireId);
+  if (suitDestinataire) raisons.push("Vous suivez déjà ce compte.");
+  const suitCollDemandeur = await db.prepare("SELECT id FROM abonnements_collectivite WHERE user_id=? AND collectivite_id=?").get(destinataireId, demandeurId);
+  if (suitCollDemandeur) raisons.push("Cette collectivité suit déjà votre initiative.");
+
+  return raisons;
+}
 
 /* GET /api/demandes-contact?direction=recues|envoyees&statut= — historique */
 route("GET", "/api/demandes-contact", async (req, res, params, body, query) => {
@@ -4560,6 +4589,11 @@ route("GET", "/api/demandes-contact", async (req, res, params, body, query) => {
   if (query.statut && statuts.includes(query.statut)) { sql += " AND d.statut=?"; args.push(query.statut); }
   sql += " ORDER BY d.created_at DESC LIMIT 200";
   const demandes = await db.prepare(sql).all(...args);
+  if (direction === "recues") {
+    for (const d of demandes) {
+      if (d.statut === "en_attente") d.compatibilite = await calculerCompatibilite(d.demandeur_id, d.destinataire_id);
+    }
+  }
   sendJSON(res, 200, { demandes });
 });
 

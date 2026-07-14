@@ -1711,9 +1711,11 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     demandeur_id INTEGER NOT NULL,
     destinataire_id INTEGER NOT NULL,
+    objet TEXT,
     motif TEXT NOT NULL,
     motif_autre TEXT,
     message TEXT NOT NULL,
+    image_url TEXT,
     urgence TEXT DEFAULT 'normal' CHECK(urgence IN ('faible','normal','important','urgent')),
     statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','acceptee','refusee','expiree','bloquee')),
     conversation_id INTEGER,
@@ -4899,6 +4901,15 @@ db.exec(`
     FOREIGN KEY(initiative_id) REFERENCES users(id) ON DELETE CASCADE
   );
 `);
+
+// ── Mise en relation : objet + image d'illustration ──
+{
+  const dcCols = db.prepare("PRAGMA table_info(demandes_contact)").all().map(c => c.name);
+  if (dcCols.length) {
+    if (!dcCols.includes('objet')) db.exec("ALTER TABLE demandes_contact ADD COLUMN objet TEXT");
+    if (!dcCols.includes('image_url')) db.exec("ALTER TABLE demandes_contact ADD COLUMN image_url TEXT");
+  }
+}
 
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
