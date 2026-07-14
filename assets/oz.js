@@ -1309,6 +1309,15 @@
               await audit('navigate', 'cre:' + match.label);
               break;
             }
+            // Avant les suggestions génériques : chercher un module RÉEL sur la page
+            // courante (sidebar du tableau de bord actif — initiative, collectivité,
+            // administrateur…). Sans ça, les suggestions OZ_CRE (seuil très permissif,
+            // limitées aux pages globales + sections admin/utilisateur) prenaient
+            // systématiquement le dessus et empêchaient O-Z d'ouvrir les modules
+            // propres aux autres tableaux de bord (ex: Cotisations, Votes, Partenaires
+            // sur le dashboard Initiative).
+            const actedFirst = tryPageAction(text);
+            if (actedFirst) { await audit('action', 'page_action', { text }); break; }
             // Suggestion si proche
             const sug = OZ_CRE.suggest(query, 4);
             if (sug.length) {
@@ -1320,9 +1329,9 @@
               break;
             }
           }
-          // Dernier recours : cliquer un élément visible sur la page
-          const acted = tryPageAction(text);
-          if (acted) { await audit('action', 'page_action', { text }); break; }
+          // Requête vide ou toujours pas de correspondance : dernière tentative sur la page courante
+          const actedFallback = tryPageAction(text);
+          if (actedFallback) { await audit('action', 'page_action', { text }); break; }
           addMsg('oz',
             `🔍 Je n'ai pas trouvé la section correspondante.\n\nVoulez-vous voir les options proches ?\nTapez « **liste les sections** » pour tout afficher.\n\nOu essayez :\n• « **ouvre messagerie** »\n• « **ouvre agenda** »\n• « **ouvre accréditations** »`
           );
