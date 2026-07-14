@@ -48,9 +48,18 @@ table { border-collapse: collapse; }
 /* ─── TOUCH TARGETS ──────────────────────────────────────────────── */
 /* Tous les éléments interactifs ont une zone de touch suffisante */
 button, [role="button"], a, input[type="checkbox"], input[type="radio"],
-select, .btn, .da-btn, .nav a, .sidebar a, .da-sidebar__item {
+select, .btn, .da-btn, .nav a, .da-sidebar__item {
   min-height: var(--touch-target-sm);
   display: inline-flex;
+  align-items: center;
+}
+/* La bande laterale reste en liste verticale (un module par ligne) — sans
+   cette regle, la ligne ci-dessus la passe en inline-flex et deux modules
+   courts finissent cote a cote sur la meme ligne. */
+.sidebar a {
+  min-height: var(--touch-target-sm);
+  display: flex;
+  width: 100%;
   align-items: center;
 }
 /* Taille explicite pour boutons */
