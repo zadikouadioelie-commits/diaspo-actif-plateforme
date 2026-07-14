@@ -440,7 +440,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
         <input id="mdl-recherche" placeholder="🔍 Rechercher dans cette liste…" oninput="mdlFiltrerContacts()" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:.83rem;">
         <div style="display:flex;gap:6px;">
-          <button class="ld-btn" onclick="envoyerMessageListe(currentListeId)">💬 Message groupé</button>
+          <button class="ld-btn" onclick="ouvrirEcrireListe(currentListeId)">✉️ Écrire à la liste</button>
           <button class="ld-btn" onclick="exporterListe(currentListeId)">⬇️ CSV</button>
           <button class="ld-btn" onclick="editerListe(currentListeId)">✏️ Modifier</button>
         </div>
@@ -462,6 +462,39 @@
       <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-deplacer-contact').classList.remove('open')">✕</button>
     </div>
     <div id="mdc-listes" style="display:flex;flex-direction:column;gap:7px;max-height:300px;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- MODAL: Écrire à toute une liste -->
+<div class="modal-back" id="modal-ecrire-liste">
+  <div class="modal-box" style="max-width:460px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <h2 style="margin:0;font-size:1rem;">✉️ Écrire à <span id="mel-nom-liste"></span></h2>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('modal-ecrire-liste').classList.remove('open')">✕</button>
+    </div>
+    <p style="font-size:.8rem;color:var(--muted);margin:0 0 14px;">Envoyé uniquement aux contacts de cette liste avec qui une conversation existe déjà.</p>
+    <textarea id="mel-message" placeholder="Votre message…" style="width:100%;box-sizing:border-box;min-height:90px;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;margin-bottom:10px;"></textarea>
+
+    <div id="mel-attach-preview" style="display:none;align-items:center;gap:8px;background:var(--bg);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:.82rem;">
+      <span id="mel-attach-icon">📎</span>
+      <span id="mel-attach-nom" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+      <button type="button" class="btn btn-sm btn-outline" onclick="melAnnulerAttach()">✕</button>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+      <label class="ld-btn" style="cursor:pointer;">📷 Photo/Vidéo
+        <input type="file" accept="image/*,video/*" style="display:none;" onchange="melAttachFile(this)">
+      </label>
+      <label class="ld-btn" style="cursor:pointer;">📄 Document
+        <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" style="display:none;" onchange="melAttachFile(this)">
+      </label>
+      <button type="button" class="ld-btn" onclick="melAjouterLien()">🔗 Lien</button>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-ecrire-liste').classList.remove('open')">Annuler</button>
+      <button class="btn btn-orange" id="mel-envoyer-btn" onclick="melEnvoyer()">Envoyer</button>
+    </div>
   </div>
 </div>
 
@@ -1026,7 +1059,7 @@ document.querySelectorAll('.rtab').forEach(btn=>{
 });
 
 /* Fermer modals au clic extérieur */
-['modal-affil','modal-fiche','modal-reponse','modal-liste-form','modal-ajouter-liste','modal-detail-liste'].forEach(id=>{
+['modal-affil','modal-fiche','modal-reponse','modal-liste-form','modal-ajouter-liste','modal-detail-liste','modal-ecrire-liste'].forEach(id=>{
   const el=document.getElementById(id);
   if(el) el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
 });
@@ -1133,6 +1166,7 @@ function renderListesTab(){
             <span>Mise à jour ${new Date(l.updated_at).toLocaleDateString('fr-FR')}</span>
           </div>
           ${!modeFusion?`<div class="ld-card-actions" onclick="event.stopPropagation()">
+            <button class="ld-btn" style="background:#1B3A6B;color:#fff;border-color:#1B3A6B;" onclick="ouvrirEcrireListe(${l.id})">✉️ Écrire à la liste</button>
             <button class="ld-btn" onclick="editerListe(${l.id})">✏️ Modifier</button>
             ${l.mode==='dynamique'?`<button class="ld-btn" onclick="actualiserListeDynamique(${l.id})">🔄 Actualiser</button>`:''}
             <button class="ld-btn" onclick="dupliquerListe(${l.id})">📑 Dupliquer</button>
@@ -1271,16 +1305,60 @@ function exporterListe(id){
   window.open(`/api/listes-diffusion/${id}/export`,'_blank');
 }
 
-async function envoyerMessageListe(id){
+/* ---- Écrire à toute une liste (texte + pièce jointe photo/vidéo/document/lien) ---- */
+const MEL_MAX_MEDIA = 20 * 1024 * 1024; // 20 Mo, comme messagerie.html
+let melListeId = null;
+let melAttach = null; // { type, nom, url, mime }
+
+function ouvrirEcrireListe(id){
+  melListeId = id;
+  melAttach = null;
   const l=mesListes.find(x=>x.id===id);
-  const contenu=prompt(`Message à envoyer à tous les contacts de « ${l?l.nom:'cette liste'} » ayant déjà une conversation avec vous :`);
-  if(contenu===null) return;
-  const msg=contenu.trim();
-  if(!msg){ alert('Message vide.'); return; }
+  document.getElementById('mel-nom-liste').textContent = l ? l.nom : '';
+  document.getElementById('mel-message').value = '';
+  melRenderAttachPreview();
+  document.getElementById('modal-ecrire-liste').classList.add('open');
+}
+
+function melRenderAttachPreview(){
+  const box = document.getElementById('mel-attach-preview');
+  if(!melAttach){ box.style.display='none'; return; }
+  box.style.display='flex';
+  document.getElementById('mel-attach-icon').textContent = melAttach.type==='image'?'🖼️':melAttach.type==='video'?'🎬':melAttach.type==='link'?'🔗':'📄';
+  document.getElementById('mel-attach-nom').textContent = melAttach.nom;
+}
+
+function melAnnulerAttach(){ melAttach=null; melRenderAttachPreview(); }
+
+function melAttachFile(input){
+  const file = input.files[0]; if(!file) return;
+  if(file.size > MEL_MAX_MEDIA){ alert('Fichier trop volumineux (20 Mo max).'); input.value=''; return; }
+  const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : 'file';
+  const reader = new FileReader();
+  reader.onload = e => { melAttach = { type, nom: file.name, url: e.target.result, mime: file.type }; melRenderAttachPreview(); input.value=''; };
+  reader.readAsDataURL(file);
+}
+
+function melAjouterLien(){
+  const url = prompt('Adresse du lien à joindre :');
+  if(!url) return;
+  melAttach = { type:'link', nom:url, url, mime:null };
+  melRenderAttachPreview();
+}
+
+async function melEnvoyer(){
+  const contenu = document.getElementById('mel-message').value.trim();
+  if(!contenu && !melAttach){ alert('Message vide.'); return; }
+  const btn = document.getElementById('mel-envoyer-btn');
+  btn.disabled = true; btn.textContent = 'Envoi…';
   try{
-    const r=await apiCall('POST',`/listes-diffusion/${id}/message-groupe`,{contenu:msg});
+    const payload = { contenu };
+    if(melAttach){ payload.type = melAttach.type; payload.fichier = { nom: melAttach.nom, url: melAttach.url, type: melAttach.type, mime: melAttach.mime }; }
+    const r = await apiCall('POST', `/listes-diffusion/${melListeId}/message-groupe`, payload);
+    document.getElementById('modal-ecrire-liste').classList.remove('open');
     alert(`Message envoyé à ${r.envoyes} contact(s).${r.ignores?` ${r.ignores} contact(s) ignoré(s) (aucune conversation existante — le consentement mutuel doit d'abord être établi).`:''}`);
   }catch(e){ alert('Erreur : '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='Envoyer'; }
 }
 
 let mdlContactsCache=[];

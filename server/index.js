@@ -13303,7 +13303,9 @@ ${jsonLd}
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
       const contenu = (body.contenu || '').trim();
-      if (!contenu) return sendJSON(res, 400, { error: 'Message vide.' });
+      const type = ['image', 'video', 'file', 'link'].includes(body.type) ? body.type : 'text';
+      const fichier = body.fichier && body.fichier.url ? body.fichier : null;
+      if (!contenu && !fichier) return sendJSON(res, 400, { error: 'Message vide.' });
 
       const membres = await db.prepare(`SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL`).all(lid);
       let envoyes = 0, ignores = 0;
@@ -13312,7 +13314,9 @@ ${jsonLd}
         if (otherId === me.id) continue;
         const conv = await db.prepare(`SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)`).get(me.id, otherId, otherId, me.id);
         if (!conv) { ignores++; continue; }
-        await db.prepare(`INSERT INTO messages (conversation_id, sender_id, contenu, type) VALUES (?,?,?,'text')`).run(conv.id, me.id, contenu);
+        await db.prepare(`INSERT INTO messages (conversation_id, sender_id, contenu, type, fichier_json) VALUES (?,?,?,?,?)`).run(
+          conv.id, me.id, contenu || (fichier?.nom || ''), fichier ? type : 'text', fichier ? JSON.stringify(fichier) : null
+        );
         if (conv.user1_id === me.id && conv.deleted_u2) await db.prepare(`UPDATE conversations SET deleted_u2=0 WHERE id=?`).run(conv.id);
         if (conv.user2_id === me.id && conv.deleted_u1) await db.prepare(`UPDATE conversations SET deleted_u1=0 WHERE id=?`).run(conv.id);
         creerNotif(otherId, 'message', 'Nouveau message', `${me.nom} vous a envoyé un message`, { conversation_id: conv.id });
