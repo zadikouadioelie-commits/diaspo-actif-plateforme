@@ -6108,9 +6108,28 @@ route("POST", "/api/users/:id/suivre", async (req, res, params) => {
   const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   if (me.id == params.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
+  const followedId = parseInt(params.id);
   try {
-    db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, parseInt(params.id));
-    const n = await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(parseInt(params.id)).n;
+    db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, followedId);
+    const n = await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(followedId).n;
+    // Notifie le compte suivi + propose un abonnement en retour (sauf s'il suit déjà)
+    const dejaReciproque = await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(followedId, me.id);
+    if (!dejaReciproque) {
+      creerNotif(followedId, "nouveau_abonne", "Nouvel abonné", `${me.nom} vous suit désormais.`, { follower_id: me.id, follower_nom: me.nom });
+    }
+    sendJSON(res, 200, { ok: true, nbAbonnes: n });
+  } catch(e) { sendJSON(res, 400, { error: e.message }); }
+});
+
+/* Accepter la suggestion d'abonnement en retour depuis la notification */
+route("POST", "/api/users/:id/suivre-retour", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const followedId = parseInt(params.id);
+  if (me.id == followedId) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
+  try {
+    db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, followedId);
+    const n = await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(followedId).n;
     sendJSON(res, 200, { ok: true, nbAbonnes: n });
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
 });

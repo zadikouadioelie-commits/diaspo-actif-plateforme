@@ -210,6 +210,7 @@ const NOTIF_ICONS = {
   evenement:  "📅",
   validation: "✅",
   abonnement: "⭐",
+  nouveau_abonne: "👤",
   reunion_invite: "📹",
   demande_contact: "📩",
   demande_contact_acceptee: "🤝",
@@ -228,6 +229,7 @@ function notifUrl(n) {
   if (d.conversation_id)  return `messagerie.html?conv=${d.conversation_id}`;
   if (d.evenement_id)     return `evenements.html#evt-${d.evenement_id}`;
   if (d.reunion_id)       return `reunions.html?reunion=${d.reunion_id}`;
+  if (d.follower_id)      return `profil.html?id=${d.follower_id}`;
   return "#";
 }
 
@@ -235,16 +237,47 @@ function renderNotifItem(n) {
   const icon  = NOTIF_ICONS[n.type] || "🔔";
   const url   = notifUrl(n);
   const unread = !n.lue;
-  return `<a href="${url}" class="notif-item${unread ? " unread" : ""}" data-notif-id="${n.id}" onclick="markNotifRead(${n.id})">
-    <div class="notif-icon ${n.type}">${icon}</div>
-    <div class="notif-content">
-      <div class="notif-titre">${escapeHtml(n.titre || "")}</div>
-      <div class="notif-contenu">${escapeHtml(n.contenu || "")}</div>
-      <div class="notif-date">${fmtDateGlobal(n.created_at)}</div>
-    </div>
-    ${unread ? `<div class="notif-unread-dot"></div>` : ""}
-  </a>`;
+  const d = (typeof n.data === "object" ? n.data : null) || {};
+  const showFollowBack = n.type === "nouveau_abonne" && unread && d.follower_id;
+  return `<div class="notif-item${unread ? " unread" : ""}" data-notif-id="${n.id}">
+    <a href="${url}" style="display:flex;gap:10px;text-decoration:none;color:inherit;" onclick="markNotifRead(${n.id})">
+      <div class="notif-icon ${n.type}">${icon}</div>
+      <div class="notif-content">
+        <div class="notif-titre">${escapeHtml(n.titre || "")}</div>
+        <div class="notif-contenu">${escapeHtml(n.contenu || "")}</div>
+        <div class="notif-date">${fmtDateGlobal(n.created_at)}</div>
+      </div>
+      ${unread ? `<div class="notif-unread-dot"></div>` : ""}
+    </a>
+    ${showFollowBack ? `<div class="notif-followback-actions" style="display:flex;gap:6px;margin:6px 0 2px 46px;">
+      <button type="button" class="btn btn-sm btn-orange" onclick="event.preventDefault();event.stopPropagation();acceptFollowBack(${n.id},${d.follower_id},this)">↩️ Suivre en retour</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick="event.preventDefault();event.stopPropagation();declineFollowBack(${n.id},this)">Ignorer</button>
+    </div>` : ""}
+  </div>`;
 }
+
+window.acceptFollowBack = async function(notifId, followerId, btnEl) {
+  try {
+    await api("POST", `/users/${followerId}/suivre-retour`);
+    await api("PATCH", `/notifications/${notifId}/lire`);
+    const item = document.querySelector(`.notif-item[data-notif-id="${notifId}"]`);
+    if (item) {
+      item.classList.remove("unread");
+      item.querySelector(".notif-unread-dot")?.remove();
+      item.querySelector(".notif-followback-actions")?.remove();
+    }
+  } catch(e) { alert("Erreur : " + (e.message || "")); }
+};
+
+window.declineFollowBack = async function(notifId, btnEl) {
+  try { await api("PATCH", `/notifications/${notifId}/lire`); } catch{}
+  const item = document.querySelector(`.notif-item[data-notif-id="${notifId}"]`);
+  if (item) {
+    item.classList.remove("unread");
+    item.querySelector(".notif-unread-dot")?.remove();
+    item.querySelector(".notif-followback-actions")?.remove();
+  }
+};
 
 function escapeHtml(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function fmtDateGlobal(str){ try{ return new Date(str.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"}); } catch{ return str||""; } }
