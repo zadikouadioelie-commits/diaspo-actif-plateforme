@@ -48,8 +48,11 @@
     try {
       const data = await api("GET", "/recherche-contacts?q=" + encodeURIComponent(q));
       const results = data.results || [];
+      const bandeauReseauVide = data.source === "global"
+        ? `<p style="background:#FEF3C7;color:#92400E;font-size:11.5px;font-weight:600;padding:6px 10px;border-radius:8px;margin-bottom:6px;">Aucun résultat trouvé dans votre réseau. Voici les résultats disponibles sur Diaspo'Actif.</p>`
+        : "";
       resultsEl.innerHTML = results.length
-        ? results.map(card).join("")
+        ? bandeauReseauVide + results.map(card).join("")
         : `<p style="color:var(--muted,#888);font-size:12.5px;padding:8px 0;">Aucun résultat pour « ${esc(q)} ».</p>`;
     } catch (e) {
       resultsEl.innerHTML = `<p style="color:red;font-size:12.5px;">Erreur de recherche.</p>`;

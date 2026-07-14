@@ -6625,41 +6625,79 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
   sendJSON(res, 200, { q, utilisateurs, initiatives, publications, formations, evenements });
 });
 
-/* ---------- Recherche de contacts (barre "trouver une personne/initiative", façon amis) ---------- */
+/* ---------- Recherche de contacts (barre "trouver une personne/initiative", façon amis) ----------
+   Recherche intelligente : priorité au réseau de l'utilisateur (suivis/suiveurs/contacts/initiatives
+   suivies), repli automatique sur toute la plateforme si aucun résultat dans le réseau. Multi-critères
+   (nom, bio, titre, compétences, domaine, description, services) + tolérance fautes/accents/synonymes
+   (réutilise les helpers ANNUAIRE_* du moteur de recherche Annuaire). */
 route("GET", "/api/recherche-contacts", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const q = (query.q || "").trim();
-  if (q.length < 2) return sendJSON(res, 200, { results: [] });
-  const like = `%${q}%`;
+  const qRaw = (query.q || "").trim();
+  if (qRaw.length < 2) return sendJSON(res, 200, { results: [], source: null });
+
+  const termesOriginaux = ANNUAIRE_NORMALISE(qRaw).split(/\s+/).filter(w => w.length >= 2);
+  const termesEtendus = annuaireExpandTermes(termesOriginaux);
 
   const users = await db.prepare(`
-    SELECT id, nom, prenom, role, ville, pays, photo_url
-    FROM users WHERE (nom LIKE ? OR prenom LIKE ?) AND id != ? AND role != 'administrateur' LIMIT 10
-  `).all(like, like, user.id);
+    SELECT id, nom, prenom, role, ville, pays, photo_url, titre_pro, bio, competences
+    FROM users WHERE id != ? AND role != 'administrateur' AND (compte_masque IS NULL OR compte_masque=0) LIMIT 500
+  `).all(user.id);
   const inits = await db.prepare(`
-    SELECT id, nom, domaine, ville, pays, owner_user_id, logo_url
-    FROM initiatives WHERE nom LIKE ? LIMIT 10
-  `).all(like);
+    SELECT id, nom, domaine, ville, pays, owner_user_id, logo_url, description, mission, services, vitrine_services_categories_json
+    FROM initiatives WHERE owner_user_id IS NULL OR owner_user_id != ? LIMIT 500
+  `).all(user.id);
 
-  const candidats = [
-    ...users.map(u => ({
-      id: u.id, target_user_id: u.id, type: "user",
-      nom: [u.prenom, u.nom].filter(Boolean).join(" ") || u.nom,
-      sous_titre: u.role === "initiative" ? "Initiative" : "Utilisateur",
-      lieu: [u.ville, u.pays].filter(Boolean).join(", "),
-      photo_url: u.photo_url || null,
-      lien: `profil.html?id=${u.id}`,
-    })),
-    ...inits.filter(i => Number(i.owner_user_id) !== Number(user.id)).map(i => ({
-      id: i.id, target_user_id: i.owner_user_id, type: "initiative",
-      nom: i.nom,
-      sous_titre: i.domaine || "Initiative",
-      lieu: [i.ville, i.pays].filter(Boolean).join(", "),
-      photo_url: i.logo_url || null,
-      lien: `initiative.html?id=${i.id}`,
-    })),
+  let candidats = [
+    ...users.map(u => {
+      const score = annuaireScorerEntite([
+        [[u.prenom, u.nom], 1000],
+        [[u.titre_pro], 500],
+        [[safeParse(u.competences)], 400],
+        [[u.bio], 200],
+      ], termesOriginaux, termesEtendus);
+      return score > 0 ? {
+        id: u.id, target_user_id: u.id, type: "user", score,
+        nom: [u.prenom, u.nom].filter(Boolean).join(" ") || u.nom,
+        sous_titre: u.role === "initiative" ? "Initiative" : "Utilisateur",
+        lieu: [u.ville, u.pays].filter(Boolean).join(", "),
+        photo_url: u.photo_url || null,
+        lien: `profil.html?id=${u.id}`,
+      } : null;
+    }).filter(Boolean),
+    ...inits.map(i => {
+      const score = annuaireScorerEntite([
+        [[i.nom], 1000],
+        [[i.domaine], 500],
+        [[i.services, safeParse(i.vitrine_services_categories_json)], 400],
+        [[i.description, i.mission], 200],
+      ], termesOriginaux, termesEtendus);
+      return (score > 0 && i.owner_user_id) ? {
+        id: i.id, target_user_id: i.owner_user_id, type: "initiative", score,
+        nom: i.nom,
+        sous_titre: i.domaine || "Initiative",
+        lieu: [i.ville, i.pays].filter(Boolean).join(", "),
+        photo_url: i.logo_url || null,
+        lien: `initiative.html?id=${i.id}`,
+      } : null;
+    }).filter(Boolean),
   ].filter(c => c.target_user_id && Number(c.target_user_id) !== Number(user.id));
+
+  candidats.sort((a, b) => b.score - a.score);
+
+  // ── Priorité 1 : réseau de l'utilisateur (suivis, suiveurs, contacts acceptés, initiatives suivies) ──
+  const reseauIds = new Set();
+  (await db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(user.id)).forEach(r => reseauIds.add(Number(r.followed_id)));
+  (await db.prepare("SELECT follower_id FROM user_follows WHERE followed_id=?").all(user.id)).forEach(r => reseauIds.add(Number(r.follower_id)));
+  (await db.prepare("SELECT demandeur_id, destinataire_id FROM demandes_contact WHERE statut='acceptee' AND (demandeur_id=? OR destinataire_id=?)").all(user.id, user.id))
+    .forEach(r => reseauIds.add(Number(r.demandeur_id) === user.id ? Number(r.destinataire_id) : Number(r.demandeur_id)));
+  const initiativesSuivies = await db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(user.id);
+  if (initiativesSuivies.length) {
+    const ph = initiativesSuivies.map(() => "?").join(",");
+    (await db.prepare(`SELECT owner_user_id FROM initiatives WHERE id IN (${ph}) AND owner_user_id IS NOT NULL`).all(...initiativesSuivies.map(i => i.initiative_id)))
+      .forEach(r => reseauIds.add(Number(r.owner_user_id)));
+  }
+  (await db.prepare("SELECT collectivite_id FROM abonnements_collectivite WHERE user_id=?").all(user.id)).forEach(r => reseauIds.add(Number(r.collectivite_id)));
 
   const targetIds = [...new Set(candidats.map(c => Number(c.target_user_id)))];
   let relationsMap = {};
@@ -6680,11 +6718,11 @@ route("GET", "/api/recherche-contacts", async (req, res, params, body, query) =>
     }
   }
 
-  const results = candidats.slice(0, 12).map(c => ({
-    ...c,
-    statut_relation: relationsMap[Number(c.target_user_id)] || "aucune",
-  }));
-  sendJSON(res, 200, { results });
+  const withRelation = candidats.map(c => ({ ...c, statut_relation: relationsMap[Number(c.target_user_id)] || "aucune" }));
+  const dansReseau = withRelation.filter(c => reseauIds.has(Number(c.target_user_id)));
+  const source = dansReseau.length ? "reseau" : "global";
+  const results = (dansReseau.length ? dansReseau : withRelation).slice(0, 12);
+  sendJSON(res, 200, { results, source });
 });
 
 /* ---------- Notifications ---------- */
