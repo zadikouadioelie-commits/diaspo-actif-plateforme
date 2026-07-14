@@ -83,7 +83,7 @@
       <a href="annuaire.html">Annuaire</a>
       <a href="fil-actualite.html">Fil d'actualité</a>
       <a href="formations.html">Formations</a>
-      <a href="evenements.html" class="active">Événements</a>
+      <a href="evenements.html" class="active">Autres événements</a>
     </nav>
     <div class="topbar-right">
       <select class="lang-select" id="lang-select"></select>
@@ -109,7 +109,10 @@
       <h2 style="margin:0 0 4px">📢 Mobiliser la diaspora — Événements</h2>
       <p class="sub" style="margin:0">Le seul espace pour créer et diffuser un événement communautaire sur Diaspo'Actif</p>
     </div>
-    <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Mobiliser la diaspora</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <a class="btn btn-outline" href="programmation.html" style="font-size:12.5px;">⚙️ Programmation</a>
+      <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Mobiliser la diaspora</button>
+    </div>
   </div>
   <div class="filters">
     <input type="text" id="q" placeholder="Rechercher..." style="min-width:180px">
@@ -309,7 +312,10 @@ async function loadEvts() {
     if(pays)   params.set('pays',pays);
     if(ville)  params.set('ville',ville);
     if(origine)params.set('origine',origine);
-    const r = await api('GET', '/evenements?' + params);
+    const usePrefs = !q && !domaine && !type && !pays && !ville && !origine;
+    const r = usePrefs
+      ? await api('GET', '/evenements/recommandes')
+      : await api('GET', '/evenements?' + params);
     allEvts = r.evenements || [];
     renderEvts();
   } catch(e) {

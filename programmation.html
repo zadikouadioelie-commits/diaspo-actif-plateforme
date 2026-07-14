@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Programmation</title>
+<meta name="viewport" content="width=1280">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<link rel="apple-touch-icon" href="assets/logo.svg">
+<style>
+.pg-wrap{max-width:900px;margin:0 auto;padding:24px 20px 60px;}
+.pg-title{font-size:20px;font-weight:800;margin:0 0 4px;}
+.pg-sub{font-size:13px;color:var(--muted);margin:0 0 20px;}
+.pg-volets{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+.pg-volet-btn{background:#fff;border:1px solid var(--border);border-radius:99px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;color:var(--muted);}
+.pg-volet-btn.active{background:var(--orange);color:#fff;border-color:var(--orange);}
+.pg-volet-btn.disabled{opacity:.5;cursor:not-allowed;}
+.pg-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+.pg-card h3{margin:0 0 4px;font-size:15px;font-weight:800;}
+.pg-card .pg-desc{font-size:12.5px;color:var(--muted);margin:0 0 14px;}
+.pg-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.pg-chip{display:inline-flex;align-items:center;gap:6px;background:#F3F4F6;border:1px solid var(--border);border-radius:99px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;user-select:none;color:#374151;}
+.pg-chip input{display:none;}
+.pg-chip.checked{background:var(--orange);color:#fff;border-color:var(--orange);}
+.pg-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;}
+.pg-field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;}
+.pg-field input[type=text], .pg-field select{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+.pg-check-row{display:flex;align-items:center;gap:8px;font-size:13px;padding:8px 0;border-bottom:1px solid #F3F4F6;}
+.pg-check-row:last-child{border-bottom:none;}
+.pg-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px;}
+.pg-saved-msg{font-size:12.5px;color:#16A34A;font-weight:700;margin-right:auto;align-self:center;display:none;}
+@media (max-width:640px){ .pg-row{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar" style="flex-shrink:0;">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="evenements.html">Autres événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="pg-wrap">
+    <h1 class="pg-title">⚙️ Programmation</h1>
+    <p class="pg-sub">Centralisez ici vos préférences de personnalisation de la plateforme. Définissez-les une seule fois, modifiez-les à tout moment.</p>
+
+    <div class="pg-volets">
+      <button type="button" class="pg-volet-btn active" data-volet="evenements">📅 Événements</button>
+      <button type="button" class="pg-volet-btn disabled" title="Bientôt disponible">📰 Fil d'actualité</button>
+      <button type="button" class="pg-volet-btn disabled" title="Bientôt disponible">💬 Messagerie</button>
+      <button type="button" class="pg-volet-btn disabled" title="Bientôt disponible">🔔 Notifications</button>
+    </div>
+
+    <div id="volet-evenements">
+
+      <div class="pg-card">
+        <h3>📍 Localisation prioritaire</h3>
+        <p class="pg-desc">Choisissez les zones géographiques que vous souhaitez privilégier, et précisez vos coordonnées pour chacune.</p>
+        <div class="pg-chips" id="pg-zones"></div>
+        <div class="pg-row">
+          <div class="pg-field"><label>Ma ville</label><input type="text" id="pg-ville" placeholder="Ex : Abidjan"></div>
+          <div class="pg-field"><label>Ma commune</label><input type="text" id="pg-commune" placeholder="Ex : Cocody"></div>
+          <div class="pg-field"><label>Mon département</label><input type="text" id="pg-departement" placeholder="Ex : Rhône"></div>
+          <div class="pg-field"><label>Ma région</label><input type="text" id="pg-region" placeholder="Ex : Île-de-France"></div>
+          <div class="pg-field"><label>Mon pays</label><input type="text" id="pg-pays" placeholder="Ex : France"></div>
+        </div>
+      </div>
+
+      <div class="pg-card">
+        <h3>🏷️ Types d'événements</h3>
+        <p class="pg-desc">Sélection multiple.</p>
+        <div class="pg-chips" id="pg-types"></div>
+      </div>
+
+      <div class="pg-card">
+        <h3>🌍 Origine ou communauté</h3>
+        <p class="pg-desc">Privilégiez les événements organisés par certaines communautés. Tous les pays du monde sont disponibles.</p>
+        <label class="pg-chip" id="pg-origine-toutes-chip" style="margin-bottom:10px;"><input type="checkbox" id="pg-origine-toutes" onchange="pgToggleOriginesToutes(this)">Toutes les origines</label>
+        <div class="pg-field" style="position:relative;">
+          <input type="text" id="pg-origine-search" placeholder="Rechercher un pays…" autocomplete="off">
+          <div id="pg-origine-dropdown" style="display:none;position:absolute;z-index:20;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:8px;margin-top:4px;box-shadow:0 6px 20px rgba(0,0,0,.1);"></div>
+        </div>
+        <div class="pg-chips" id="pg-origines-selected" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="pg-row">
+        <div class="pg-card">
+          <h3>🗣️ Langue</h3>
+          <div class="pg-field"><select id="pg-langue">
+            <option value="toutes">Toutes</option>
+            <option value="francais">Français</option>
+            <option value="anglais">Anglais</option>
+            <option value="espagnol">Espagnol</option>
+            <option value="arabe">Arabe</option>
+          </select></div>
+        </div>
+        <div class="pg-card">
+          <h3>🖥️ Mode</h3>
+          <div class="pg-field"><select id="pg-mode">
+            <option value="les_deux">Présentiel et en ligne</option>
+            <option value="presentiel">Présentiel</option>
+            <option value="en_ligne">En ligne</option>
+          </select></div>
+        </div>
+      </div>
+
+      <div class="pg-card">
+        <h3>📆 Période</h3>
+        <div class="pg-field"><select id="pg-periode">
+          <option value="toutes">Toutes</option>
+          <option value="aujourd_hui">Aujourd'hui</option>
+          <option value="cette_semaine">Cette semaine</option>
+          <option value="ce_mois">Ce mois</option>
+          <option value="personnalisee">Personnalisée</option>
+        </select></div>
+        <div class="pg-row" id="pg-periode-custom" style="display:none;margin-top:10px;">
+          <div class="pg-field"><label>Du</label><input type="text" id="pg-periode-debut" placeholder="AAAA-MM-JJ"></div>
+          <div class="pg-field"><label>Au</label><input type="text" id="pg-periode-fin" placeholder="AAAA-MM-JJ"></div>
+        </div>
+      </div>
+
+      <div class="pg-card">
+        <h3>🔔 Notifications</h3>
+        <div class="pg-check-row"><input type="checkbox" id="pg-notif-nouveau"><label for="pg-notif-nouveau">Être averti lorsqu'un événement correspondant à mes critères est publié</label></div>
+        <div class="pg-check-row"><input type="checkbox" id="pg-notif-rappel"><label for="pg-notif-rappel">Recevoir un rappel avant le début d'un événement</label></div>
+        <div class="pg-check-row"><input type="checkbox" id="pg-notif-oz"><label for="pg-notif-oz">Recevoir les nouvelles recommandations d'OZ</label></div>
+      </div>
+
+      <div class="pg-actions">
+        <span class="pg-saved-msg" id="pg-saved-msg">✅ Préférences enregistrées</span>
+        <button type="button" class="btn btn-outline" onclick="window.location.href='evenements.html'">Annuler</button>
+        <button type="button" class="btn btn-orange" id="pg-save-btn" onclick="savePrefs()">Enregistrer</button>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+function escH(s){ const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+
+const PG_ZONES = [
+  ['ville','Ma ville'],['commune','Ma commune'],['departement','Mon département'],
+  ['region','Ma région'],['pays','Mon pays'],['international','International']
+];
+const PG_TYPES = ['Associations','Conférences','Forums','Salons','Réunions','Webinaires','Formations','Networking','Culture','Sport','Investissement','Entrepreneuriat','Agriculture','Collectivités','Humanitaire','Emploi','Tous'];
+
+let pgOriginesSelectionnees = [];
+function pgRenderOriginesSelected(){
+  const toutes = document.getElementById('pg-origine-toutes').checked;
+  document.getElementById('pg-origine-search').closest('.pg-field').style.display = toutes ? 'none' : '';
+  const el = document.getElementById('pg-origines-selected');
+  if (toutes) { el.innerHTML = ''; return; }
+  el.innerHTML = pgOriginesSelectionnees.map(pays => `
+    <span class="pg-chip checked">${escH(pays)} <span style="cursor:pointer;font-weight:900;margin-left:4px;" onclick="pgRetirerOrigine('${escH(pays).replace(/'/g,"\\'")}')">✕</span></span>
+  `).join('') || '<span style="font-size:12.5px;color:var(--muted);">Aucun pays sélectionné — tous les événements seront pris en compte pour ce critère.</span>';
+}
+function pgToggleOriginesToutes(input){
+  pgRenderOriginesSelected();
+}
+function pgRetirerOrigine(pays){
+  pgOriginesSelectionnees = pgOriginesSelectionnees.filter(p => p !== pays);
+  pgRenderOriginesSelected();
+}
+function pgAjouterOrigine(pays){
+  if (!pgOriginesSelectionnees.includes(pays)) pgOriginesSelectionnees.push(pays);
+  document.getElementById('pg-origine-search').value = '';
+  document.getElementById('pg-origine-dropdown').style.display = 'none';
+  pgRenderOriginesSelected();
+}
+function pgNormalise(s){ return String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+document.getElementById('pg-origine-search').addEventListener('input', (e) => {
+  const q = pgNormalise(e.target.value.trim());
+  const dd = document.getElementById('pg-origine-dropdown');
+  if (!q) { dd.style.display = 'none'; dd.innerHTML = ''; return; }
+  const matches = (typeof PAYS_DU_MONDE !== 'undefined' ? PAYS_DU_MONDE : [])
+    .filter(p => pgNormalise(p).includes(q) && !pgOriginesSelectionnees.includes(p))
+    .slice(0, 30);
+  dd.innerHTML = matches.map(p => `<div style="padding:8px 12px;font-size:13px;cursor:pointer;" onmousedown="pgAjouterOrigine('${escH(p).replace(/'/g,"\\'")}')" onmouseover="this.style.background='#F3F4F6'" onmouseout="this.style.background=''">${escH(p)}</div>`).join('')
+    || '<div style="padding:8px 12px;font-size:12.5px;color:var(--muted);">Aucun résultat</div>';
+  dd.style.display = 'block';
+});
+document.getElementById('pg-origine-search').addEventListener('blur', () => {
+  setTimeout(() => { document.getElementById('pg-origine-dropdown').style.display = 'none'; }, 150);
+});
+
+function pgRenderChips(containerId, values, selected, allLabel){
+  const el = document.getElementById(containerId);
+  el.innerHTML = values.map(v => {
+    const label = Array.isArray(v) ? v[1] : v;
+    const value = Array.isArray(v) ? v[0] : v;
+    const checked = selected.includes(value);
+    return `<label class="pg-chip${checked?' checked':''}"><input type="checkbox" value="${escH(value)}" onchange="pgToggleChip(this)">${escH(label)}</label>`;
+  }).join('');
+}
+function pgToggleChip(input){
+  input.closest('.pg-chip').classList.toggle('checked', input.checked);
+}
+function pgGetChecked(containerId){
+  return Array.from(document.querySelectorAll('#'+containerId+' input:checked')).map(i => i.value);
+}
+
+async function loadPrefs(){
+  let prefs = {};
+  try {
+    const r = await api('GET', '/programmation');
+    prefs = (r.prefs && r.prefs.evenements) || {};
+  } catch(e) {}
+
+  pgRenderChips('pg-zones', PG_ZONES, prefs.zones || ['ville','commune','region','departement','pays','international']);
+  pgRenderChips('pg-types', PG_TYPES, prefs.types || ['Tous']);
+
+  const origines = prefs.origines || ['Toutes les origines'];
+  const toutes = origines.includes('Toutes les origines') || !origines.length;
+  document.getElementById('pg-origine-toutes').checked = toutes;
+  pgOriginesSelectionnees = toutes ? [] : origines.slice();
+  pgRenderOriginesSelected();
+
+  document.getElementById('pg-ville').value = prefs.ville || '';
+  document.getElementById('pg-commune').value = prefs.commune || '';
+  document.getElementById('pg-departement').value = prefs.departement || '';
+  document.getElementById('pg-region').value = prefs.region || '';
+  document.getElementById('pg-pays').value = prefs.pays || '';
+  document.getElementById('pg-langue').value = prefs.langue || 'toutes';
+  document.getElementById('pg-mode').value = prefs.mode || 'les_deux';
+  document.getElementById('pg-periode').value = prefs.periode || 'toutes';
+  document.getElementById('pg-periode-debut').value = prefs.periode_debut || '';
+  document.getElementById('pg-periode-fin').value = prefs.periode_fin || '';
+  document.getElementById('pg-notif-nouveau').checked = !!prefs.notif_nouveau;
+  document.getElementById('pg-notif-rappel').checked = !!prefs.notif_rappel;
+  document.getElementById('pg-notif-oz').checked = !!prefs.notif_oz;
+  document.getElementById('pg-periode-custom').style.display = (prefs.periode === 'personnalisee') ? '' : 'none';
+}
+
+async function savePrefs(){
+  const btn = document.getElementById('pg-save-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  const evenements = {
+    zones: pgGetChecked('pg-zones'),
+    ville: document.getElementById('pg-ville').value.trim() || null,
+    commune: document.getElementById('pg-commune').value.trim() || null,
+    departement: document.getElementById('pg-departement').value.trim() || null,
+    region: document.getElementById('pg-region').value.trim() || null,
+    pays: document.getElementById('pg-pays').value.trim() || null,
+    types: pgGetChecked('pg-types'),
+    origines: document.getElementById('pg-origine-toutes').checked ? ['Toutes les origines'] : pgOriginesSelectionnees.slice(),
+    langue: document.getElementById('pg-langue').value,
+    mode: document.getElementById('pg-mode').value,
+    periode: document.getElementById('pg-periode').value,
+    periode_debut: document.getElementById('pg-periode-debut').value.trim() || null,
+    periode_fin: document.getElementById('pg-periode-fin').value.trim() || null,
+    notif_nouveau: document.getElementById('pg-notif-nouveau').checked,
+    notif_rappel: document.getElementById('pg-notif-rappel').checked,
+    notif_oz: document.getElementById('pg-notif-oz').checked,
+  };
+  try {
+    await api('PUT', '/programmation', { evenements });
+    const msg = document.getElementById('pg-saved-msg');
+    msg.style.display = 'inline';
+    setTimeout(() => { msg.style.display = 'none'; }, 3000);
+  } catch(e) { alert('Erreur : ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Enregistrer'; }
+}
+
+document.getElementById('pg-periode').addEventListener('change', (e) => {
+  document.getElementById('pg-periode-custom').style.display = (e.target.value === 'personnalisee') ? '' : 'none';
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await applyAuthState();
+  loadPrefs();
+});
+</script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

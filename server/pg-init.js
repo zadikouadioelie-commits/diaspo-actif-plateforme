@@ -137,6 +137,18 @@ async function migratePg(pool) {
     ['users', 'email_verif_token', 'TEXT'],
     ['users', 'email_verif_expires', 'BIGINT'],
     ['users', 'stripe_customer_id', 'TEXT'],
+    ['users', 'programmation_json', "TEXT DEFAULT '{}'"],
+    // events (billetterie) — colonnes ajoutées en prévision, non utilisées par le moteur de priorité (voir evenements ci-dessous)
+    ['events', 'langue', "TEXT DEFAULT 'francais'"],
+    ['events', 'mode_participation', "TEXT DEFAULT 'presentiel'"],
+    ['events', 'region', 'TEXT'],
+    ['events', 'departement', 'TEXT'],
+    ['events', 'communaute', 'TEXT'],
+    // evenements (module Programmation — moteur de priorité, table réellement utilisée par evenements.html)
+    ['evenements', 'langue', "TEXT DEFAULT 'francais'"],
+    ['evenements', 'mode_participation', "TEXT DEFAULT 'presentiel'"],
+    ['evenements', 'region', 'TEXT'],
+    ['evenements', 'departement', 'TEXT'],
     // initiatives
     ['initiatives', 'da_id', 'TEXT'],
     ['initiatives', 'vitrine_active', 'INTEGER DEFAULT 0'],

@@ -7337,6 +7337,83 @@ route("POST", "/api/notifications/lire-tout", async (req, res) => {
 });
 
 /* ---------- Événements (complet) ---------- */
+route("GET", "/api/evenements/recommandes", async (req, res, params, body, query) => {
+  const me = await getCurrentUser(req);
+  let prefs = {};
+  if (me) {
+    const row = await db.prepare("SELECT programmation_json FROM users WHERE id=?").get(me.id);
+    try { prefs = JSON.parse(row?.programmation_json || '{}').evenements || {}; } catch (_) { prefs = {}; }
+  }
+  const baseSelect = `SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id WHERE 1=1`;
+
+  const hasPrefs = prefs && (prefs.ville || prefs.commune || prefs.departement || prefs.region || prefs.pays ||
+    (Array.isArray(prefs.types) && prefs.types.length) || (Array.isArray(prefs.origines) && prefs.origines.length));
+  const withCounts = async (rows) => Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
+
+  if (!hasPrefs) {
+    const rows = await db.prepare(baseSelect + ' ORDER BY e.date_evt ASC').all();
+    return sendJSON(res, 200, { evenements: await withCounts(rows), niveau_priorite: null });
+  }
+
+  const filtresBase = [];
+  const argsBase = [];
+  if (prefs.langue && prefs.langue !== 'toutes') { filtresBase.push('e.langue=?'); argsBase.push(prefs.langue); }
+  if (prefs.mode && prefs.mode !== 'les_deux') { filtresBase.push('e.mode_participation=?'); argsBase.push(prefs.mode); }
+  if (prefs.periode === 'aujourd_hui') filtresBase.push("date(e.date_evt)=date('now')");
+  else if (prefs.periode === 'cette_semaine') filtresBase.push("date(e.date_evt) BETWEEN date('now') AND date('now','+7 days')");
+  else if (prefs.periode === 'ce_mois') filtresBase.push("date(e.date_evt) BETWEEN date('now') AND date('now','+1 month')");
+  else if (prefs.periode === 'personnalisee' && prefs.periode_debut && prefs.periode_fin) {
+    filtresBase.push('date(e.date_evt) BETWEEN date(?) AND date(?)'); argsBase.push(prefs.periode_debut, prefs.periode_fin);
+  }
+  const typesOk = Array.isArray(prefs.types) && prefs.types.length && !prefs.types.includes('Tous');
+  const originesOk = Array.isArray(prefs.origines) && prefs.origines.length && !prefs.origines.includes('Toutes les origines');
+  const zonesAutorisees = Array.isArray(prefs.zones) && prefs.zones.length ? prefs.zones : ['ville','commune','region','departement','pays','international'];
+
+  const typePh = typesOk ? `e.domaine IN (${prefs.types.map(()=>'?').join(',')})` : null;
+  const originePh = originesOk ? `e.origine IN (${prefs.origines.map(()=>'?').join(',')})` : null;
+
+  const niveaux = [];
+  if (zonesAutorisees.includes('ville') && prefs.ville) {
+    niveaux.push({ nom: 1, clauses: ['e.ville=?'], args: [prefs.ville], type: true, origine: true });
+    niveaux.push({ nom: 2, clauses: ['e.ville=?'], args: [prefs.ville], type: true, origine: false });
+  }
+  if (zonesAutorisees.includes('commune') && prefs.commune) {
+    niveaux.push({ nom: 3, clauses: ['e.ville=?'], args: [prefs.commune], type: true, origine: false });
+  }
+  if (zonesAutorisees.includes('region') && prefs.region) {
+    niveaux.push({ nom: 4, clauses: ['e.region=?'], args: [prefs.region], type: false, origine: false });
+  }
+  if (zonesAutorisees.includes('departement') && prefs.departement) {
+    niveaux.push({ nom: 5, clauses: ['e.departement=?'], args: [prefs.departement], type: false, origine: false });
+  }
+  if (zonesAutorisees.includes('pays') && prefs.pays) {
+    niveaux.push({ nom: 6, clauses: ['e.pays=?'], args: [prefs.pays], type: false, origine: false });
+  }
+  if (zonesAutorisees.includes('international')) {
+    niveaux.push({ nom: 7, clauses: [], args: [], type: false, origine: false });
+  }
+  for (const n of [...niveaux]) {
+    if (n.type) niveaux.push({ nom: 8, clauses: n.clauses, args: n.args, type: false, origine: n.origine });
+  }
+
+  let rows = [];
+  let niveauRetenu = null;
+  for (const n of niveaux) {
+    const clauses = [...filtresBase, ...n.clauses];
+    const args = [...argsBase, ...n.args];
+    if (n.type && typePh) { clauses.push(typePh); args.push(...prefs.types); }
+    if (n.origine && originePh) { clauses.push(originePh); args.push(...prefs.origines); }
+    const sql = baseSelect + (clauses.length ? ' AND ' + clauses.join(' AND ') : '') + ' ORDER BY e.date_evt ASC LIMIT 60';
+    const r = await db.prepare(sql).all(...args);
+    if (r.length) { rows = r; niveauRetenu = n.nom; break; }
+  }
+  if (!rows.length) {
+    rows = await db.prepare(baseSelect + (filtresBase.length ? ' AND ' + filtresBase.join(' AND ') : '') + ' ORDER BY e.date_evt ASC LIMIT 60').all(...argsBase);
+    niveauRetenu = rows.length ? 'aucun_filtre_geo' : null;
+  }
+  return sendJSON(res, 200, { evenements: await withCounts(rows), niveau_priorite: niveauRetenu });
+});
+
 route("GET", "/api/evenements", async (req, res, params, body, query) => {
   let rows = await db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.date_evt ASC").all();
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
@@ -7357,7 +7434,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     places_max, inscription_ouverte, lien_inscription, image_url,
     heure_debut, heure_fin, date_fin, lien_visio, visibilite,
     image_couverture, galerie_photos, video1_url, video1_titre, video2_url, video2_titre,
-    pdf_url, pdf_nom, pdf_acces
+    pdf_url, pdf_nom, pdf_acces,
+    langue, mode_participation, region, departement
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   const coverImg = image_couverture || image_url || null;
@@ -7367,8 +7445,9 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      inscription_ouverte,lien_inscription,image_url,statut,owner_user_id,
      heure_debut,heure_fin,date_fin,lien_visio,visibilite,
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
-     pdf_url,pdf_nom,pdf_acces)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+     pdf_url,pdf_nom,pdf_acces,
+     langue,mode_participation,region,departement)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || user.nom, date_evt, lieu||null, pays||null, ville||null, origine||null,
       description||null, type_evt||"evenement", domaine||null, places_max||null,
@@ -7376,7 +7455,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       heure_debut||null, heure_fin||null, date_fin||null, lien_visio||null, visibilite||'public',
       coverImg, galerie,
       video1_url||null, video1_titre||null, video2_url||null, video2_titre||null,
-      pdf_url||null, pdf_nom||null, pdf_acces||'public'
+      pdf_url||null, pdf_nom||null, pdf_acces||'public',
+      langue||'francais', mode_participation||'presentiel', region||null, departement||null
     ).lastInsertRowid;
   // Notifier abonnés de l'initiative
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
@@ -13548,6 +13628,125 @@ ${jsonLd}
       return sendJSON(res, 200, { events });
     }
 
+    /* ── GET /api/programmation — préférences du module Programmation (volet Événements) ── */
+    if (req.method === 'GET' && pathname === '/api/programmation') {
+      const me = await getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const row = await db.prepare("SELECT programmation_json FROM users WHERE id=?").get(me.id);
+      let prefs = {};
+      try { prefs = JSON.parse(row?.programmation_json || '{}'); } catch (_) { prefs = {}; }
+      return sendJSON(res, 200, { prefs });
+    }
+
+    /* ── PUT /api/programmation — enregistrer les préférences (volet Événements) ── */
+    if (req.method === 'PUT' && pathname === '/api/programmation') {
+      const me = await getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const { evenements } = body;
+      const row = await db.prepare("SELECT programmation_json FROM users WHERE id=?").get(me.id);
+      let prefs = {};
+      try { prefs = JSON.parse(row?.programmation_json || '{}'); } catch (_) { prefs = {}; }
+      if (evenements && typeof evenements === 'object') prefs.evenements = evenements;
+      await db.prepare("UPDATE users SET programmation_json=? WHERE id=?").run(JSON.stringify(prefs), me.id);
+      return sendJSON(res, 200, { prefs });
+    }
+
+    /* ── GET /api/events/recommandes — liste triée par le moteur de priorité du module Programmation ── */
+    if (req.method === 'GET' && pathname === '/api/events/recommandes') {
+      autoPublierProgrammes();
+      autoGererDossiersQR();
+      const me = await getCurrentUser(req);
+      let prefs = {};
+      if (me) {
+        const row = await db.prepare("SELECT programmation_json FROM users WHERE id=?").get(me.id);
+        try { prefs = JSON.parse(row?.programmation_json || '{}').evenements || {}; } catch (_) { prefs = {}; }
+      }
+      const expositionExpr = `(
+        CASE WHEN e.statut != 'publie' THEN 'hors_ligne'
+             WHEN e.date_fin IS NOT NULL AND e.date_fin < datetime('now') THEN 'termine'
+             WHEN e.date_fin IS NULL AND e.date_debut < datetime('now','-1 day') THEN 'termine'
+             WHEN e.publie_at IS NOT NULL AND e.publie_at < datetime('now','-'||COALESCE(e.duree_exposition_jours,20)||' days') THEN 'expire'
+             ELSE 'actif'
+        END
+      )`;
+      const baseSelect = `SELECT e.*, u.nom AS organisateur_nom,
+        COALESCE(tkc.billets_vendus,0) AS billets_vendus, COALESCE(ttc.nb_types,0) AS nb_types
+        FROM events e
+        LEFT JOIN users u ON u.id=e.organisateur_id
+        LEFT JOIN (SELECT event_id, COUNT(*) AS billets_vendus FROM tickets WHERE payment_status='paid' GROUP BY event_id) tkc ON tkc.event_id=e.id
+        LEFT JOIN (SELECT event_id, COUNT(*) AS nb_types FROM ticket_types WHERE actif=1 GROUP BY event_id) ttc ON ttc.event_id=e.id
+        WHERE e.statut IN ('publie','ferme') AND ${expositionExpr}='actif'`;
+
+      // Pas de préférences enregistrées → comportement par défaut (chronologique)
+      const hasPrefs = prefs && (prefs.ville || prefs.commune || prefs.departement || prefs.region || prefs.pays ||
+        (Array.isArray(prefs.types) && prefs.types.length) || (Array.isArray(prefs.origines) && prefs.origines.length));
+      if (!hasPrefs) {
+        const events = await db.prepare(baseSelect + ' ORDER BY e.date_debut ASC LIMIT 100').all();
+        return sendJSON(res, 200, { events, niveau_priorite: null });
+      }
+
+      const filtresBase = [];
+      const argsBase = [];
+      if (prefs.langue && prefs.langue !== 'toutes') { filtresBase.push('e.langue=?'); argsBase.push(prefs.langue); }
+      if (prefs.mode && prefs.mode !== 'les_deux') { filtresBase.push('e.mode_participation=?'); argsBase.push(prefs.mode); }
+      if (prefs.periode === 'aujourd_hui') filtresBase.push("date(e.date_debut)=date('now')");
+      else if (prefs.periode === 'cette_semaine') filtresBase.push("date(e.date_debut) BETWEEN date('now') AND date('now','+7 days')");
+      else if (prefs.periode === 'ce_mois') filtresBase.push("date(e.date_debut) BETWEEN date('now') AND date('now','+1 month')");
+      else if (prefs.periode === 'personnalisee' && prefs.periode_debut && prefs.periode_fin) {
+        filtresBase.push('date(e.date_debut) BETWEEN date(?) AND date(?)'); argsBase.push(prefs.periode_debut, prefs.periode_fin);
+      }
+      const typesOk = Array.isArray(prefs.types) && prefs.types.length && !prefs.types.includes('tous');
+      const originesOk = Array.isArray(prefs.origines) && prefs.origines.length && !prefs.origines.includes('toutes');
+      const zonesAutorisees = Array.isArray(prefs.zones) && prefs.zones.length ? prefs.zones : ['ville','commune','region','departement','pays','international'];
+
+      const typePh = typesOk ? `e.categorie IN (${prefs.types.map(()=>'?').join(',')})` : null;
+      const originePh = originesOk ? `e.communaute IN (${prefs.origines.map(()=>'?').join(',')})` : null;
+
+      // Les 8 niveaux de priorité — le premier niveau non vide est retenu.
+      const niveaux = [];
+      if (zonesAutorisees.includes('ville') && prefs.ville) {
+        niveaux.push({ nom: 1, clauses: ['e.ville=?'], args: [prefs.ville], type: true, origine: true });
+        niveaux.push({ nom: 2, clauses: ['e.ville=?'], args: [prefs.ville], type: true, origine: false });
+      }
+      if (zonesAutorisees.includes('commune') && prefs.commune) {
+        niveaux.push({ nom: 3, clauses: ['e.ville=?'], args: [prefs.commune], type: true, origine: false });
+      }
+      if (zonesAutorisees.includes('region') && prefs.region) {
+        niveaux.push({ nom: 4, clauses: ['e.region=?'], args: [prefs.region], type: false, origine: false });
+      }
+      if (zonesAutorisees.includes('departement') && prefs.departement) {
+        niveaux.push({ nom: 5, clauses: ['e.departement=?'], args: [prefs.departement], type: false, origine: false });
+      }
+      if (zonesAutorisees.includes('pays') && prefs.pays) {
+        niveaux.push({ nom: 6, clauses: ['e.pays=?'], args: [prefs.pays], type: false, origine: false });
+      }
+      if (zonesAutorisees.includes('international')) {
+        niveaux.push({ nom: 7, clauses: [], args: [], type: false, origine: false });
+      }
+      // Niveau 8 : reprendre le même ordre géographique en supprimant le filtre type
+      for (const n of [...niveaux]) {
+        if (n.type) niveaux.push({ nom: 8, clauses: n.clauses, args: n.args, type: false, origine: n.origine });
+      }
+
+      let events = [];
+      let niveauRetenu = null;
+      for (const n of niveaux) {
+        const clauses = [...filtresBase, ...n.clauses];
+        const args = [...argsBase, ...n.args];
+        if (n.type && typePh) { clauses.push(typePh); args.push(...prefs.types); }
+        if (n.origine && originePh) { clauses.push(originePh); args.push(...prefs.origines); }
+        const sql = baseSelect + (clauses.length ? ' AND ' + clauses.join(' AND ') : '') + ' ORDER BY e.date_debut ASC LIMIT 60';
+        const rows = await db.prepare(sql).all(...args);
+        if (rows.length) { events = rows; niveauRetenu = n.nom; break; }
+      }
+      // Rien trouvé même à l'international → dernier recours, tous les événements actifs
+      if (!events.length) {
+        events = await db.prepare(baseSelect + (filtresBase.length ? ' AND ' + filtresBase.join(' AND ') : '') + ' ORDER BY e.date_debut ASC LIMIT 60').all(...argsBase);
+        niveauRetenu = events.length ? 'aucun_filtre_geo' : null;
+      }
+      return sendJSON(res, 200, { events, niveau_priorite: niveauRetenu });
+    }
+
     /* ── GET /api/events/stats — admin stats globales ── */
     if (req.method === 'GET' && pathname === '/api/events/stats') {
       const me = await getCurrentUser(req);
@@ -13576,7 +13775,8 @@ ${jsonLd}
         pdf_url, pdf_nom, pdf_acces,
         cible_type, cible_liste_ids,
         fc_resume, fc_objectifs, fc_public, fc_programme, fc_partenaires, fc_partenaires_ids, fc_contact, fc_notes,
-        programmed_at, timezone, billetterie_config
+        programmed_at, timezone, billetterie_config,
+        rayon_publication, langue, mode_participation, region, departement, communaute
       } = body;
       if (!titre || !date_debut) return sendJSON(res, 400, { error: 'Titre et date_debut requis.' });
       const ts = new Date().toISOString();
@@ -13594,8 +13794,9 @@ ${jsonLd}
          video1_url,video1_titre,video1_thumb,video2_url,video2_titre,video2_thumb,
          pdf_url,pdf_nom,pdf_acces,cible_type,cible_liste_ids,
          fc_resume,fc_objectifs,fc_public,fc_programme,fc_partenaires,fc_partenaires_ids,fc_contact,fc_notes,
-         programmed_at,timezone)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+         programmed_at,timezone,
+         rayon_publication,langue,mode_participation,region,departement,communaute)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(titre, description||null, me.id, pays||null, ville||null, adresse||null, date_debut, date_fin||null,
              capacite||0, categorie||'Général', coverImg, finalStatut, ts, ts,
              coverImg, galerie,
@@ -13605,7 +13806,9 @@ ${jsonLd}
              cible_type||'tous', cibleListeStr,
              fc_resume||null, fc_objectifs||null, fc_public||null,
              fc_programme||null, fc_partenaires||null, partenairesIdsStr, fc_contact||null, fc_notes||null,
-             programmed_at||null, timezone||'Europe/Paris').lastInsertRowid;
+             programmed_at||null, timezone||'Europe/Paris',
+             rayon_publication||'international', langue||'francais', mode_participation||'presentiel',
+             region||null, departement||null, communaute||null).lastInsertRowid;
       // Fixer publie_at et envoyer notifications si publication immédiate
       if (finalStatut === 'publie') {
         db.prepare(`UPDATE events SET publie_at=datetime('now') WHERE id=?`).run(eid);
@@ -13644,7 +13847,8 @@ ${jsonLd}
         video1_url, video1_titre, video1_thumb, video2_url, video2_titre, video2_thumb,
         pdf_url, pdf_nom, pdf_acces, cible_type, cible_liste_ids,
         fc_resume, fc_objectifs, fc_public, fc_programme, fc_partenaires, fc_partenaires_ids, fc_contact, fc_notes,
-        programmed_at, timezone, inscription_mode, nb_places, liste_attente, rayon_publication, billetterie_config
+        programmed_at, timezone, inscription_mode, nb_places, liste_attente, rayon_publication, billetterie_config,
+        langue, mode_participation, region, departement, communaute
       } = body;
       const coverUpd = image_couverture || image_b64 || null;
       const galerieUpd = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || null);
@@ -13674,6 +13878,8 @@ ${jsonLd}
         programmed_at=COALESCE(?,programmed_at), timezone=COALESCE(?,timezone),
         inscription_mode=COALESCE(?,inscription_mode), nb_places=COALESCE(?,nb_places), liste_attente=COALESCE(?,liste_attente),
         rayon_publication=COALESCE(?,rayon_publication),
+        langue=COALESCE(?,langue), mode_participation=COALESCE(?,mode_participation),
+        region=COALESCE(?,region), departement=COALESCE(?,departement), communaute=COALESCE(?,communaute),
         statut=COALESCE(?,statut), updated_at=datetime('now') WHERE id=?`)
         .run(titre||null, description||null, pays||null, ville||null, adresse||null,
              date_debut||null, date_fin||null, capacite||null, categorie||null,
@@ -13688,6 +13894,7 @@ ${jsonLd}
              programmed_at||null, timezone||null,
              inscription_mode||null, nb_places!=null?Number(nb_places):null, liste_attente!=null?Number(liste_attente):null,
              rayon_publication||null,
+             langue||null, mode_participation||null, region||null, departement||null, communaute||null,
              finalStatut, eid);
       // Fixer publie_at (première publication, ou rétroactivement si publie_at est null)
       if (finalStatut === 'publie') {

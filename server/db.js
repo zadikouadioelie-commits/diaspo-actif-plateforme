@@ -1104,6 +1104,11 @@ const MIGRATIONS = [
   ["evenements", "pdf_url TEXT"],
   ["evenements", "pdf_nom TEXT"],
   ["evenements", "pdf_acces TEXT DEFAULT 'public'"],
+  // Module Programmation — enrichissement pour le moteur de priorité
+  ["evenements", "langue TEXT DEFAULT 'francais'"],
+  ["evenements", "mode_participation TEXT DEFAULT 'presentiel'"],
+  ["evenements", "region TEXT"],
+  ["evenements", "departement TEXT"],
   // Billetterie events v2 — multimédia
   ["events", "image_couverture TEXT"],
   ["events", "galerie_photos TEXT DEFAULT '[]'"],
@@ -4961,6 +4966,19 @@ db.exec(`
 {
   const userColsPay = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
   if (!userColsPay.includes('stripe_customer_id')) db.exec("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT");
+}
+
+/* ===== Module Programmation (préférences utilisateur + enrichissement events) ===== */
+{
+  const userColsProg = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+  if (!userColsProg.includes('programmation_json')) db.exec("ALTER TABLE users ADD COLUMN programmation_json TEXT DEFAULT '{}'");
+
+  const eventColsProg = db.prepare('PRAGMA table_info(events)').all().map(c => c.name);
+  if (!eventColsProg.includes('langue')) db.exec("ALTER TABLE events ADD COLUMN langue TEXT DEFAULT 'francais'");
+  if (!eventColsProg.includes('mode_participation')) db.exec("ALTER TABLE events ADD COLUMN mode_participation TEXT DEFAULT 'presentiel'");
+  if (!eventColsProg.includes('region')) db.exec("ALTER TABLE events ADD COLUMN region TEXT");
+  if (!eventColsProg.includes('departement')) db.exec("ALTER TABLE events ADD COLUMN departement TEXT");
+  if (!eventColsProg.includes('communaute')) db.exec("ALTER TABLE events ADD COLUMN communaute TEXT");
 }
 
 module.exports = db;
