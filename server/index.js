@@ -4497,7 +4497,11 @@ route("POST", "/api/demandes-contact", async (req, res, params, body) => {
   const destinataire = await db.prepare("SELECT id, nom, role FROM users WHERE id=?").get(destinataireId);
   if (!destinataire) return sendJSON(res, 404, { error: "Destinataire introuvable." });
 
-  const bloque = await db.prepare("SELECT id FROM contacts_bloques WHERE bloqueur_id=? AND bloque_id=?").get(destinataireId, user.id);
+  // Cas exceptionnel : un compte Administrateur peut écrire à tout compte sans restriction
+  // (blocage, cooldown, quota) — nécessaire pour la modération et le support.
+  const estAdmin = user.role === "administrateur";
+
+  const bloque = estAdmin ? null : await db.prepare("SELECT id FROM contacts_bloques WHERE bloqueur_id=? AND bloque_id=?").get(destinataireId, user.id);
   if (bloque) return sendJSON(res, 403, { error: "Vous ne pouvez pas contacter ce compte." });
 
   const cfg = await getDemandesContactConfig();
@@ -4519,23 +4523,25 @@ route("POST", "/api/demandes-contact", async (req, res, params, body) => {
 
   // Conversation déjà active (non supprimée par le destinataire) : pas besoin de repasser par une demande.
   const existeConv = await db.prepare("SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, destinataireId, destinataireId, user.id);
-  if (existeConv) {
+  if (existeConv && !estAdmin) {
     const destASupprime = existeConv.user1_id === destinataireId ? existeConv.deleted_u1 : existeConv.deleted_u2;
     if (!destASupprime) return sendJSON(res, 409, { error: "Une conversation existe déjà avec ce compte." });
   }
 
-  const dejaEnAttente = await db.prepare("SELECT id FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='en_attente'").get(user.id, destinataireId);
-  if (dejaEnAttente) return sendJSON(res, 409, { error: "Une demande est déjà en attente pour ce compte." });
+  if (!estAdmin) {
+    const dejaEnAttente = await db.prepare("SELECT id FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='en_attente'").get(user.id, destinataireId);
+    if (dejaEnAttente) return sendJSON(res, 409, { error: "Une demande est déjà en attente pour ce compte." });
 
-  const derniereRefusee = await db.prepare("SELECT repondu_at FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='refusee' ORDER BY repondu_at DESC LIMIT 1").get(user.id, destinataireId);
-  if (derniereRefusee && derniereRefusee.repondu_at) {
-    const finCooldown = new Date(new Date(derniereRefusee.repondu_at.replace(" ", "T") + "Z").getTime() + cfg.cooldown_jours * 86400000);
-    if (finCooldown > new Date()) return sendJSON(res, 429, { error: `Vous devez patienter avant de recontacter ce compte (nouvelle tentative possible le ${finCooldown.toLocaleDateString("fr-FR")}).` });
+    const derniereRefusee = await db.prepare("SELECT repondu_at FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='refusee' ORDER BY repondu_at DESC LIMIT 1").get(user.id, destinataireId);
+    if (derniereRefusee && derniereRefusee.repondu_at) {
+      const finCooldown = new Date(new Date(derniereRefusee.repondu_at.replace(" ", "T") + "Z").getTime() + cfg.cooldown_jours * 86400000);
+      if (finCooldown > new Date()) return sendJSON(res, 429, { error: `Vous devez patienter avant de recontacter ce compte (nouvelle tentative possible le ${finCooldown.toLocaleDateString("fr-FR")}).` });
+    }
+
+    const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0);
+    const nbAujourdhui = (await db.prepare("SELECT COUNT(*) n FROM demandes_contact WHERE demandeur_id=? AND created_at >= ?").get(user.id, debutJour.toISOString().slice(0, 19).replace("T", " ")))?.n || 0;
+    if (nbAujourdhui >= cfg.max_par_jour) return sendJSON(res, 429, { error: "Nombre maximal de demandes atteint pour aujourd'hui." });
   }
-
-  const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0);
-  const nbAujourdhui = (await db.prepare("SELECT COUNT(*) n FROM demandes_contact WHERE demandeur_id=? AND created_at >= ?").get(user.id, debutJour.toISOString().slice(0, 19).replace("T", " ")))?.n || 0;
-  if (nbAujourdhui >= cfg.max_par_jour) return sendJSON(res, 429, { error: "Nombre maximal de demandes atteint pour aujourd'hui." });
 
   const expiresAt = new Date(Date.now() + cfg.expiration_jours * 86400000).toISOString().slice(0, 19).replace("T", " ");
   const id = (await db.prepare(
