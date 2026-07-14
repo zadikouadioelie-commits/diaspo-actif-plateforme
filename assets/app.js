@@ -217,6 +217,8 @@ const NOTIF_ICONS = {
   responsable_a_revalider: "🪪",
   responsable_verifie: "✅",
   responsable_refuse: "⚠️",
+  support_reponse: "🛠️",
+  support_statut: "🛠️",
 };
 
 function notifUrl(n) {
@@ -2941,4 +2943,14 @@ document.addEventListener("DOMContentLoaded", ()=>{
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', run);
   else run();
   setTimeout(run, 600);
+})();
+
+/* ── Support technique : bouton flottant present partout ou app.js est charge ──
+   Injecte dynamiquement assets/support-technique.js une seule fois, evitant
+   d'editer chaque page HTML individuellement (cf. module Support technique). ── */
+(function loadSupportTechnique(){
+  if (document.querySelector('script[src*="support-technique.js"]')) return;
+  var s = document.createElement('script');
+  s.src = 'assets/support-technique.js';
+  document.body.appendChild(s);
 })();

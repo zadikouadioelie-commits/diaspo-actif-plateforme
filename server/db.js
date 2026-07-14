@@ -4911,6 +4911,52 @@ db.exec(`
   }
 }
 
+/* ===== SUPPORT TECHNIQUE — signalement de dysfonctionnements =====
+   Distinct du module "Parler à Diaspo'Actif" (chatbot, demandes générales) :
+   exclusivement dédié aux bugs/problèmes techniques de la plateforme. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS support_tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero TEXT UNIQUE,
+    user_id INTEGER NOT NULL,
+    role TEXT,
+    categorie TEXT NOT NULL,
+    gravite TEXT NOT NULL DEFAULT 'moyenne',
+    description TEXT NOT NULL,
+    module_concerne TEXT,
+    page_url TEXT,
+    navigateur TEXT,
+    os TEXT,
+    app_version TEXT,
+    screenshots_json TEXT DEFAULT '[]',
+    statut TEXT NOT NULL DEFAULT 'nouveau',
+    admin_id INTEGER,
+    priorite_ia TEXT,
+    groupe_ia TEXT,
+    notes_internes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    resolved_at TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_support_tickets_statut ON support_tickets(statut);
+  CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id);
+
+  CREATE TABLE IF NOT EXISTS support_ticket_reponses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL,
+    auteur_id INTEGER NOT NULL,
+    auteur_role TEXT,
+    message TEXT NOT NULL,
+    interne INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE,
+    FOREIGN KEY(auteur_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_support_reponses_ticket ON support_ticket_reponses(ticket_id);
+`);
+
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;

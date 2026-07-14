@@ -4683,6 +4683,173 @@ route("GET", "/api/demandes-contact/stats", async (req, res) => {
   });
 });
 
+/* ===========================================================================
+   SUPPORT TECHNIQUE — signalement de dysfonctionnements de la plateforme.
+   Distinct du chatbot "Parler à Diaspo'Actif" (demandes générales) : ce canal
+   est exclusivement dédié aux bugs/problèmes techniques, avec un ticket
+   numéroté suivi par les administrateurs (server/index.js, section dédiée).
+=========================================================================== */
+
+const SUPPORT_CATEGORIES = ["Bug", "Erreur d'affichage", "Fonction indisponible", "Erreur lors d'un enregistrement", "Problème de connexion", "Paiement", "Notification", "Téléchargement", "Importation", "Performance", "Autre"];
+const SUPPORT_GRAVITES = ["faible", "moyenne", "importante", "critique"];
+const SUPPORT_STATUTS = ["nouveau", "en_analyse", "reproduit", "en_correction", "attente_info", "corrige", "resolu", "archive"];
+
+/* Analyse légère (sans IA externe) : détecte des mots-clés récurrents pour
+   regrouper les signalements similaires, et affine la priorité suggérée à
+   partir de la gravité déclarée + de la catégorie. */
+const SUPPORT_MOTS_CLES = {
+  paiement: ["paiement", "stripe", "carte", "facture", "rembours"],
+  connexion: ["connexion", "login", "mot de passe", "session", "déconnect"],
+  affichage: ["affich", "css", "mise en page", "responsive", "bouton invisible"],
+  upload: ["upload", "téléch", "importat", "fichier", "photo", "image"],
+  performance: ["lent", "lenteur", "timeout", "charge", "performance"],
+};
+function analyserTicketIA(categorie, gravite, description) {
+  const d = (description || "").toLowerCase();
+  let groupe = "general";
+  for (const [g, mots] of Object.entries(SUPPORT_MOTS_CLES)) {
+    if (mots.some(m => d.includes(m))) { groupe = g; break; }
+  }
+  const rangGravite = { faible: 0, moyenne: 1, importante: 2, critique: 3 }[gravite] ?? 1;
+  const motsUrgents = ["urgent", "impossible", "bloqué", "plus accès", "perte de données", "critique"];
+  const boost = motsUrgents.some(m => d.includes(m)) ? 1 : 0;
+  const score = Math.min(3, rangGravite + boost);
+  const priorite = ["basse", "normale", "haute", "critique"][score];
+  return { groupe, priorite };
+}
+
+function genererNumeroTicket(id) {
+  const annee = new Date().getFullYear();
+  return `ST-${annee}-${String(id).padStart(5, "0")}`;
+}
+
+/* POST /api/support/tickets — signaler un dysfonctionnement */
+route("POST", "/api/support/tickets", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  const categorie = SUPPORT_CATEGORIES.includes(body.categorie) ? body.categorie : null;
+  if (!categorie) return sendJSON(res, 400, { error: "Catégorie invalide." });
+  const gravite = SUPPORT_GRAVITES.includes(body.gravite) ? body.gravite : "moyenne";
+  const description = (body.description || "").trim();
+  if (!description) return sendJSON(res, 400, { error: "Merci de décrire le problème rencontré." });
+  if (description.length > 3000) return sendJSON(res, 400, { error: "Description limitée à 3000 caractères." });
+
+  const screenshots = Array.isArray(body.screenshots) ? body.screenshots.filter(u => typeof u === "string").slice(0, 5) : [];
+  const { groupe, priorite } = analyserTicketIA(categorie, gravite, description);
+
+  const id = (await db.prepare(
+    `INSERT INTO support_tickets (numero, user_id, role, categorie, gravite, description, module_concerne, page_url, navigateur, os, app_version, screenshots_json, groupe_ia, priorite_ia)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  ).run(
+    "", user.id, user.role, categorie, gravite, description,
+    (body.module_concerne || "").slice(0, 120) || null, (body.page_url || "").slice(0, 300) || null,
+    (body.navigateur || "").slice(0, 120) || null, (body.os || "").slice(0, 120) || null,
+    (body.app_version || "").slice(0, 40) || null, JSON.stringify(screenshots), groupe, priorite
+  )).lastInsertRowid;
+
+  const numero = genererNumeroTicket(id);
+  await db.prepare("UPDATE support_tickets SET numero=? WHERE id=?").run(numero, id);
+
+  sendJSON(res, 201, { id, numero });
+});
+
+/* GET /api/support/tickets — mes signalements */
+route("GET", "/api/support/tickets", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const tickets = await db.prepare("SELECT * FROM support_tickets WHERE user_id=? ORDER BY created_at DESC LIMIT 100").all(user.id);
+  sendJSON(res, 200, { tickets });
+});
+
+/* GET /api/support/tickets/:id — détail + réponses (auteur ou administrateur) */
+route("GET", "/api/support/tickets/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ticket = await db.prepare("SELECT * FROM support_tickets WHERE id=?").get(params.id);
+  if (!ticket) return sendJSON(res, 404, { error: "Ticket introuvable." });
+  if (ticket.user_id !== user.id && user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const estAdmin = user.role === "administrateur";
+  const reponses = await db.prepare(
+    `SELECT r.*, u.nom AS auteur_nom FROM support_ticket_reponses r JOIN users u ON u.id=r.auteur_id WHERE r.ticket_id=?${estAdmin ? "" : " AND r.interne=0"} ORDER BY r.created_at ASC`
+  ).all(ticket.id);
+  sendJSON(res, 200, { ticket, reponses });
+});
+
+/* POST /api/support/tickets/:id/reponses — répondre (auteur ou administrateur) */
+route("POST", "/api/support/tickets/:id/reponses", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ticket = await db.prepare("SELECT * FROM support_tickets WHERE id=?").get(params.id);
+  if (!ticket) return sendJSON(res, 404, { error: "Ticket introuvable." });
+  const estAdmin = user.role === "administrateur";
+  if (ticket.user_id !== user.id && !estAdmin) return sendJSON(res, 403, { error: "Accès refusé." });
+
+  const message = (body.message || "").trim();
+  if (!message) return sendJSON(res, 400, { error: "Message vide." });
+  const interne = estAdmin && body.interne ? 1 : 0;
+
+  await db.prepare("INSERT INTO support_ticket_reponses (ticket_id, auteur_id, auteur_role, message, interne) VALUES (?,?,?,?,?)")
+    .run(ticket.id, user.id, user.role, message, interne);
+  await db.prepare("UPDATE support_tickets SET updated_at=datetime('now') WHERE id=?").run(ticket.id);
+
+  if (!interne) {
+    const destinataire = estAdmin ? ticket.user_id : null;
+    if (destinataire) creerNotif(destinataire, "support_reponse", `Réponse à votre signalement ${ticket.numero}`, message.slice(0, 200), { ticket_id: ticket.id });
+  }
+  sendJSON(res, 201, { ok: true });
+});
+
+/* GET /api/admin/support/tickets — liste (filtres statut/categorie/gravite) */
+route("GET", "/api/admin/support/tickets", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  let sql = `SELECT t.*, u.nom AS user_nom, a.nom AS admin_nom FROM support_tickets t JOIN users u ON u.id=t.user_id LEFT JOIN users a ON a.id=t.admin_id WHERE 1=1`;
+  const args = [];
+  if (query.statut && SUPPORT_STATUTS.includes(query.statut)) { sql += " AND t.statut=?"; args.push(query.statut); }
+  if (query.categorie && SUPPORT_CATEGORIES.includes(query.categorie)) { sql += " AND t.categorie=?"; args.push(query.categorie); }
+  if (query.gravite && SUPPORT_GRAVITES.includes(query.gravite)) { sql += " AND t.gravite=?"; args.push(query.gravite); }
+  sql += " ORDER BY t.created_at DESC LIMIT 300";
+  const tickets = await db.prepare(sql).all(...args);
+  const rows = await db.prepare("SELECT statut, gravite, COUNT(*) n FROM support_tickets GROUP BY statut, gravite").all();
+  const resolusStatuts = ["resolu", "corrige", "archive"];
+  const stats = { total: 0, nouveaux: 0, critiques: 0, resolus: 0, ouverts: 0 };
+  for (const r of rows) {
+    stats.total += r.n;
+    if (r.statut === "nouveau") stats.nouveaux += r.n;
+    if (resolusStatuts.includes(r.statut)) stats.resolus += r.n;
+    else stats.ouverts += r.n;
+    if (r.gravite === "critique" && !resolusStatuts.includes(r.statut)) stats.critiques += r.n;
+  }
+  sendJSON(res, 200, { tickets, stats });
+});
+
+/* PUT /api/admin/support/tickets/:id — statut, attribution, gravité, notes internes */
+route("PUT", "/api/admin/support/tickets/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const ticket = await db.prepare("SELECT * FROM support_tickets WHERE id=?").get(params.id);
+  if (!ticket) return sendJSON(res, 404, { error: "Ticket introuvable." });
+
+  const fields = [], vals = [];
+  if (body.statut !== undefined) {
+    if (!SUPPORT_STATUTS.includes(body.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+    fields.push("statut=?"); vals.push(body.statut);
+    if (["resolu", "corrige"].includes(body.statut) && !ticket.resolved_at) { fields.push("resolved_at=datetime('now')"); }
+  }
+  if (body.gravite !== undefined && SUPPORT_GRAVITES.includes(body.gravite)) { fields.push("gravite=?"); vals.push(body.gravite); }
+  if (body.admin_id !== undefined) { fields.push("admin_id=?"); vals.push(body.admin_id || null); }
+  if (body.notes_internes !== undefined) { fields.push("notes_internes=?"); vals.push(body.notes_internes); }
+  if (!fields.length) return sendJSON(res, 400, { error: "Aucune modification fournie." });
+  fields.push("updated_at=datetime('now')");
+
+  await db.prepare(`UPDATE support_tickets SET ${fields.join(", ")} WHERE id=?`).run(...vals, ticket.id);
+  if (body.statut && body.statut !== ticket.statut) {
+    creerNotif(ticket.user_id, "support_statut", `Votre signalement ${ticket.numero} a évolué`, `Nouveau statut : ${body.statut}`, { ticket_id: ticket.id });
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
 /* GET /api/conversations/:id/messages — charger les messages + marquer lu */
 route("GET", "/api/conversations/:id/messages", async (req, res, params) => {
   const user = await getCurrentUser(req);

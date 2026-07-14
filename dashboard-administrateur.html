@@ -41,6 +41,7 @@
       <a href="projets-evaluation.html">📁 Évaluation de Projet</a>
       <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a>
       <a href="#error-logs" data-section="error-logs" style="display:flex;justify-content:space-between;align-items:center;">🩺 Journal d'erreurs <span id="errlog-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
+      <a href="#messages-techniques" data-section="messages-techniques" style="display:flex;justify-content:space-between;align-items:center;">🛠️ Messages techniques <span id="support-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="#formations" data-section="formations">📚 Formations</a>
       <a href="#chatbot" data-section="chatbot">🧠 Mémoire Chatbot</a>
       <a href="#faq" data-section="faq">💡 Gestion FAQ</a>
@@ -4037,6 +4038,39 @@
         </div>
       </section>
 
+      <!-- SUPPORT TECHNIQUE -->
+      <section id="section-messages-techniques" style="display:none;">
+        <h2>🛠️ Messages techniques</h2>
+        <div class="notice" style="margin-bottom:16px;">Signalements techniques envoyés par les utilisateurs depuis le bouton flottant "Support technique", présent sur toutes les pages. Espace entièrement séparé des autres modules de messagerie.</div>
+        <div id="support-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px;"></div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <select id="support-filtre-statut" class="input-field" style="font-size:12.5px;" onchange="loadSupportTickets()">
+                <option value="">Tous les statuts</option>
+                <option value="nouveau">Nouveau</option>
+                <option value="en_analyse">En cours d'analyse</option>
+                <option value="reproduit">Reproduit</option>
+                <option value="en_correction">En cours de correction</option>
+                <option value="attente_info">En attente d'informations</option>
+                <option value="corrige">Corrigé</option>
+                <option value="resolu">Résolu</option>
+                <option value="archive">Archivé</option>
+              </select>
+              <select id="support-filtre-gravite" class="input-field" style="font-size:12.5px;" onchange="loadSupportTickets()">
+                <option value="">Toutes gravités</option>
+                <option value="faible">Faible</option>
+                <option value="moyenne">Moyenne</option>
+                <option value="importante">Importante</option>
+                <option value="critique">Critique</option>
+              </select>
+            </div>
+            <button class="btn btn-sm btn-outline" onclick="loadSupportTickets()">↺ Rafraîchir</button>
+          </div>
+          <div id="support-list"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+      </section>
+
       <!-- COMMUNICATION -->
       <section id="section-communication" style="display:none;">
         <h2>Communication institutionnelle</h2>
@@ -4408,6 +4442,161 @@ async function purgerErreursResolues() {
 document.querySelector('[data-section="error-logs"]')?.addEventListener('click', () => {
   setTimeout(() => loadErrorLogs(), 100);
 });
+
+/* ===== Support technique ===== */
+const SUPPORT_STATUT_LABELS = {
+  nouveau: ['Nouveau', '#dc2626', '#fee2e2'],
+  en_analyse: ["En analyse", '#d97706', '#fef3c7'],
+  reproduit: ['Reproduit', '#7c3aed', '#ede9fe'],
+  en_correction: ['En correction', '#2563eb', '#dbeafe'],
+  attente_info: ["Attente d'info", '#64748b', '#f1f5f9'],
+  corrige: ['Corrigé', '#16a34a', '#dcfce7'],
+  resolu: ['Résolu', '#16a34a', '#dcfce7'],
+  archive: ['Archivé', '#94a3b8', '#f1f5f9'],
+};
+const SUPPORT_GRAVITE_LABELS = {
+  faible: ['Faible', '#64748b'],
+  moyenne: ['Moyenne', '#d97706'],
+  importante: ['Importante', '#ea580c'],
+  critique: ['Critique', '#dc2626'],
+};
+async function loadSupportTickets() {
+  const statut = document.getElementById('support-filtre-statut')?.value || '';
+  const gravite = document.getElementById('support-filtre-gravite')?.value || '';
+  const el = document.getElementById('support-list');
+  el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Chargement…</p>';
+  try {
+    const qs = new URLSearchParams();
+    if (statut) qs.set('statut', statut);
+    if (gravite) qs.set('gravite', gravite);
+    const data = await api('GET', '/admin/support/tickets' + (qs.toString() ? '?' + qs.toString() : ''));
+    const tickets = data.tickets || [];
+    const stats = data.stats || {};
+    const statsEl = document.getElementById('support-stats');
+    if (statsEl) {
+      statsEl.innerHTML = `
+        <div class="card" style="text-align:center;padding:10px;"><div style="font-size:20px;font-weight:800;">${stats.total ?? 0}</div><div style="font-size:11px;color:var(--muted);">Total</div></div>
+        <div class="card" style="text-align:center;padding:10px;"><div style="font-size:20px;font-weight:800;color:#dc2626;">${stats.nouveaux ?? 0}</div><div style="font-size:11px;color:var(--muted);">Nouveaux</div></div>
+        <div class="card" style="text-align:center;padding:10px;"><div style="font-size:20px;font-weight:800;color:#ea580c;">${stats.critiques ?? 0}</div><div style="font-size:11px;color:var(--muted);">Critiques ouverts</div></div>
+        <div class="card" style="text-align:center;padding:10px;"><div style="font-size:20px;font-weight:800;color:#16a34a;">${stats.resolus ?? 0}</div><div style="font-size:11px;color:var(--muted);">Résolus</div></div>`;
+    }
+    const badge = document.getElementById('support-badge');
+    if (badge) {
+      const n = stats.ouverts ?? stats.nouveaux ?? 0;
+      badge.textContent = n; badge.style.display = n ? '' : 'none';
+    }
+    if (!tickets.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0;">Aucun signalement.</p>'; return; }
+    el.innerHTML = tickets.map(t => {
+      const st = SUPPORT_STATUT_LABELS[t.statut] || ['—', '#64748b', '#f1f5f9'];
+      const gr = SUPPORT_GRAVITE_LABELS[t.gravite] || ['—', '#64748b'];
+      return `
+      <div style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="openSupportTicket(${t.id})">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+          <div style="flex:1;min-width:240px;">
+            <div style="font-size:12.5px;font-weight:800;color:#DC2626;">${esc(t.numero)}</div>
+            <div style="font-size:13px;font-weight:700;margin-top:2px;">${esc(t.categorie)} — ${esc((t.description||'').slice(0,90))}${(t.description||'').length>90?'…':''}</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">${esc(t.module_concerne||'')} · ${esc(t.user_nom||'')} (${esc(t.role||'')})</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${t.created_at ? t.created_at.slice(0,19).replace('T',' ') : ''}</div>
+          </div>
+          <div style="flex-shrink:0;display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+            <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;background:${st[2]};color:${st[1]};">${st[0]}</span>
+            <span style="font-size:10.5px;font-weight:700;color:${gr[1]};">${gr[0]}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<p style="color:red;font-size:13px;">Erreur de chargement.</p>`;
+  }
+}
+
+async function openSupportTicket(id) {
+  try {
+    const data = await api('GET', `/support/tickets/${id}`);
+    renderSupportTicketModal({ ...data.ticket, reponses: data.reponses });
+  } catch(e) { alert('Impossible de charger ce signalement.'); }
+}
+
+function renderSupportTicketModal(t) {
+  let modal = document.getElementById('st-admin-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'st-admin-modal';
+    modal.className = 'modal-overlay';
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+  const st = SUPPORT_STATUT_LABELS[t.statut] || ['—', '#64748b', '#f1f5f9'];
+  const shots = (t.screenshots_json ? JSON.parse(t.screenshots_json) : []) || [];
+  const reponses = t.reponses || [];
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:600px;width:94%;max-height:90vh;overflow:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">${esc(t.numero)}</h3>
+        <button type="button" onclick="document.getElementById('st-admin-modal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted,#888);">✕</button>
+      </div>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+        ${esc(t.user_nom||'')} (${esc(t.role||'')}) · ${esc(t.categorie)} · ${t.created_at ? t.created_at.slice(0,19).replace('T',' ') : ''}
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;font-size:13px;white-space:pre-wrap;margin-bottom:10px;">${esc(t.description)}</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.6;">
+        Module : ${esc(t.module_concerne||'—')}<br>
+        Page : ${esc(t.page_url||'—')}<br>
+        Navigateur : ${esc(t.navigateur||'—')} · OS : ${esc(t.os||'—')}<br>
+        ${t.priorite_ia ? 'Priorité IA : ' + esc(t.priorite_ia) + (t.groupe_ia ? ' (' + esc(t.groupe_ia) + ')' : '') : ''}
+      </div>
+      ${shots.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">${shots.map(u=>`<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;"></a>`).join('')}</div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <select id="st-admin-statut" class="input-field" style="font-size:12.5px;">
+          ${Object.keys(SUPPORT_STATUT_LABELS).map(s => `<option value="${s}" ${s===t.statut?'selected':''}>${SUPPORT_STATUT_LABELS[s][0]}</option>`).join('')}
+        </select>
+        <select id="st-admin-gravite" class="input-field" style="font-size:12.5px;">
+          ${Object.keys(SUPPORT_GRAVITE_LABELS).map(g => `<option value="${g}" ${g===t.gravite?'selected':''}>${SUPPORT_GRAVITE_LABELS[g][0]}</option>`).join('')}
+        </select>
+        <button class="btn btn-sm btn-orange" onclick="majSupportTicket(${t.id})">Enregistrer</button>
+      </div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px;">Échanges</div>
+      <div style="max-height:180px;overflow:auto;margin-bottom:10px;">
+        ${reponses.length ? reponses.map(r => `
+          <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+            <strong>${esc(r.auteur_role||'')}</strong> · ${r.created_at ? r.created_at.slice(0,19).replace('T',' ') : ''}<br>
+            ${esc(r.message)}
+          </div>`).join('') : '<p style="color:var(--muted);font-size:12.5px;">Aucun échange.</p>'}
+      </div>
+      <textarea id="st-admin-reponse" class="input-field" rows="2" style="width:100%;resize:vertical;" placeholder="Répondre à l'utilisateur…"></textarea>
+      <div style="margin-top:8px;display:flex;justify-content:flex-end;">
+        <button class="btn btn-sm btn-orange" onclick="repondreSupportTicket(${t.id})">Envoyer la réponse</button>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+async function majSupportTicket(id) {
+  const statut = document.getElementById('st-admin-statut').value;
+  const gravite = document.getElementById('st-admin-gravite').value;
+  await api('PUT', `/admin/support/tickets/${id}`, { statut, gravite });
+  document.getElementById('st-admin-modal').style.display = 'none';
+  loadSupportTickets();
+}
+async function repondreSupportTicket(id) {
+  const msg = document.getElementById('st-admin-reponse').value.trim();
+  if (!msg) return;
+  await api('POST', `/support/tickets/${id}/reponses`, { message: msg });
+  await openSupportTicket(id);
+  loadSupportTickets();
+}
+
+document.querySelector('[data-section="messages-techniques"]')?.addEventListener('click', () => {
+  setTimeout(() => loadSupportTickets(), 100);
+});
+// Badge au chargement initial
+api('GET', '/admin/support/tickets?statut=nouveau').then(d => {
+  const badge = document.getElementById('support-badge');
+  if (badge) {
+    const n = (d.stats && (d.stats.ouverts ?? d.stats.nouveaux)) || 0;
+    badge.textContent = n; badge.style.display = n ? '' : 'none';
+  }
+}).catch(() => {});
 
 // Charger le badge au chargement de la section modération
 document.querySelectorAll(".sidebar a[data-section='moderation']").forEach(a => {
