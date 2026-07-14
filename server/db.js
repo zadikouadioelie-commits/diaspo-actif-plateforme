@@ -1109,6 +1109,14 @@ const MIGRATIONS = [
   ["evenements", "mode_participation TEXT DEFAULT 'presentiel'"],
   ["evenements", "region TEXT"],
   ["evenements", "departement TEXT"],
+  // Mon Agenda — intégration Google Calendar
+  ["users", "google_calendar_access_token TEXT"],
+  ["users", "google_calendar_refresh_token TEXT"],
+  ["users", "google_calendar_token_expiry TEXT"],
+  ["users", "google_calendar_sync_mode TEXT DEFAULT 'desactive'"],
+  ["users", "google_calendar_connected_email TEXT"],
+  ["users", "google_calendar_last_sync TEXT"],
+  ["agenda_events", "google_event_id TEXT"],
   // Billetterie events v2 — multimédia
   ["events", "image_couverture TEXT"],
   ["events", "galerie_photos TEXT DEFAULT '[]'"],

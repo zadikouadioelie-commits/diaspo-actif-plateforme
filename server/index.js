@@ -12885,6 +12885,178 @@ ${jsonLd}
     try { await db.prepare("ALTER TABLE rdv_proposals ADD COLUMN lien_visio TEXT").run(); } catch(e) {}
     try { await db.prepare("ALTER TABLE rdv_proposals ADD COLUMN converted_event_id INTEGER").run(); } catch(e) {}
 
+    /* ===== Intégration Google Calendar (module Mon Agenda) ===== */
+    const GCAL_CLIENT_ID = process.env.GOOGLE_CALENDAR_CLIENT_ID;
+    const GCAL_CLIENT_SECRET = process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
+    const GCAL_REDIRECT_URI = process.env.GOOGLE_CALENDAR_REDIRECT_URI;
+
+    async function gcalSendRedirect(res, location) {
+      res.writeHead(302, { Location: location });
+      res.end();
+    }
+
+    async function gcalExchangeCode(code) {
+      const r = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code, client_id: GCAL_CLIENT_ID, client_secret: GCAL_CLIENT_SECRET,
+          redirect_uri: GCAL_REDIRECT_URI, grant_type: "authorization_code",
+        }),
+      });
+      if (!r.ok) throw new Error("Échange du code OAuth Google échoué : " + (await r.text()));
+      return r.json();
+    }
+
+    async function gcalRefreshToken(refreshToken) {
+      const r = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          refresh_token: refreshToken, client_id: GCAL_CLIENT_ID, client_secret: GCAL_CLIENT_SECRET,
+          grant_type: "refresh_token",
+        }),
+      });
+      if (!r.ok) throw new Error("Rafraîchissement du token Google échoué : " + (await r.text()));
+      return r.json();
+    }
+
+    /* Retourne un access_token Google valide pour cet utilisateur, en le rafraîchissant si expiré. */
+    async function gcalGetValidAccessToken(userId) {
+      const u = await db.prepare("SELECT google_calendar_access_token, google_calendar_refresh_token, google_calendar_token_expiry FROM users WHERE id=?").get(userId);
+      if (!u || !u.google_calendar_refresh_token) return null;
+      const expiry = u.google_calendar_token_expiry ? new Date(u.google_calendar_token_expiry).getTime() : 0;
+      if (u.google_calendar_access_token && expiry > Date.now() + 60000) return u.google_calendar_access_token;
+      const refreshed = await gcalRefreshToken(u.google_calendar_refresh_token);
+      const newExpiry = new Date(Date.now() + (refreshed.expires_in || 3600) * 1000).toISOString();
+      await db.prepare("UPDATE users SET google_calendar_access_token=?, google_calendar_token_expiry=? WHERE id=?").run(refreshed.access_token, newExpiry, userId);
+      return refreshed.access_token;
+    }
+
+    function gcalMapEvent(ev) {
+      const isAllDay = !!ev.all_day;
+      return {
+        summary: ev.titre,
+        description: [ev.description, ev.notes_privees ? `\n\nNotes privées : ${ev.notes_privees}` : ''].filter(Boolean).join(''),
+        location: ev.lieu || undefined,
+        start: isAllDay ? { date: ev.date_debut.slice(0, 10) } : { dateTime: new Date(ev.date_debut).toISOString() },
+        end: isAllDay ? { date: ev.date_fin.slice(0, 10) } : { dateTime: new Date(ev.date_fin).toISOString() },
+      };
+    }
+
+    /* Pousse un événement de l'agenda Diaspo'Actif vers Google Calendar (création ou mise à jour). */
+    async function gcalPushEvent(userId, ev) {
+      const token = await gcalGetValidAccessToken(userId);
+      if (!token) return;
+      const payload = gcalMapEvent(ev);
+      const base = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+      const url = ev.google_event_id ? `${base}/${ev.google_event_id}` : base;
+      const r = await fetch(url, {
+        method: ev.google_event_id ? "PATCH" : "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) { SEC.logSecurity("gcal_push_erreur", { uid: userId, status: r.status, body: await r.text() }); return; }
+      const data = await r.json();
+      if (!ev.google_event_id && data.id) {
+        await db.prepare("UPDATE agenda_events SET google_event_id=? WHERE id=?").run(data.id, ev.id);
+      }
+    }
+
+    async function gcalDeleteEvent(userId, googleEventId) {
+      if (!googleEventId) return;
+      const token = await gcalGetValidAccessToken(userId);
+      if (!token) return;
+      await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${googleEventId}`, {
+        method: "DELETE", headers: { "Authorization": `Bearer ${token}` },
+      }).catch(() => {});
+    }
+
+    /* GET /api/agenda/google/connect — démarre le flux OAuth Google */
+    if (req.method === "GET" && pathname === "/api/agenda/google/connect") {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      if (!GCAL_CLIENT_ID) return sendJSON(res, 500, { error: "Intégration Google Agenda non configurée sur ce serveur." });
+      const authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({
+        client_id: GCAL_CLIENT_ID, redirect_uri: GCAL_REDIRECT_URI, response_type: "code",
+        scope: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email",
+        access_type: "offline", prompt: "consent",
+      });
+      return gcalSendRedirect(res, authUrl);
+    }
+
+    /* GET /api/agenda/google/callback — retour de Google avec le code d'autorisation */
+    if (req.method === "GET" && pathname === "/api/agenda/google/callback") {
+      const me = await getCurrentUser(req);
+      const p = new URLSearchParams(parsed.search || "");
+      const code = p.get("code");
+      const erreur = p.get("error");
+      if (!me || erreur || !code) return gcalSendRedirect(res, "/agenda.html?google=erreur");
+      try {
+        const tokens = await gcalExchangeCode(code);
+        const expiry = new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString();
+        let email = null;
+        try {
+          const infoR = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", { headers: { Authorization: `Bearer ${tokens.access_token}` } });
+          if (infoR.ok) email = (await infoR.json()).email || null;
+        } catch (_) {}
+        await db.prepare(`UPDATE users SET
+          google_calendar_access_token=?, google_calendar_refresh_token=COALESCE(?,google_calendar_refresh_token),
+          google_calendar_token_expiry=?, google_calendar_connected_email=?,
+          google_calendar_sync_mode=CASE WHEN google_calendar_sync_mode='desactive' THEN 'diaspo_vers_google' ELSE google_calendar_sync_mode END
+          WHERE id=?`).run(tokens.access_token, tokens.refresh_token || null, expiry, email, me.id);
+        return gcalSendRedirect(res, "/agenda.html?google=connecte");
+      } catch (e) {
+        SEC.logSecurity("gcal_callback_erreur", { uid: me.id, message: e.message });
+        return gcalSendRedirect(res, "/agenda.html?google=erreur");
+      }
+    }
+
+    /* GET /api/agenda/google/status */
+    if (req.method === "GET" && pathname === "/api/agenda/google/status") {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const u = await db.prepare("SELECT google_calendar_refresh_token, google_calendar_sync_mode, google_calendar_connected_email, google_calendar_last_sync FROM users WHERE id=?").get(me.id);
+      return sendJSON(res, 200, {
+        connecte: !!u.google_calendar_refresh_token,
+        email: u.google_calendar_connected_email,
+        mode: u.google_calendar_sync_mode || 'desactive',
+        derniere_synchro: u.google_calendar_last_sync,
+      });
+    }
+
+    /* PUT /api/agenda/google/parametres — change le mode de synchronisation */
+    if (req.method === "PUT" && pathname === "/api/agenda/google/parametres") {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const mode = ['desactive', 'diaspo_vers_google'].includes(body.mode) ? body.mode : 'desactive';
+      await db.prepare("UPDATE users SET google_calendar_sync_mode=? WHERE id=?").run(mode, me.id);
+      return sendJSON(res, 200, { mode });
+    }
+
+    /* POST /api/agenda/google/disconnect — déconnecte le compte Google (révocation + suppression des tokens) */
+    if (req.method === "POST" && pathname === "/api/agenda/google/disconnect") {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const u = await db.prepare("SELECT google_calendar_access_token FROM users WHERE id=?").get(me.id);
+      if (u?.google_calendar_access_token) {
+        try { await fetch(`https://oauth2.googleapis.com/revoke?token=${u.google_calendar_access_token}`, { method: "POST" }); } catch (_) {}
+      }
+      await db.prepare(`UPDATE users SET google_calendar_access_token=NULL, google_calendar_refresh_token=NULL,
+        google_calendar_token_expiry=NULL, google_calendar_connected_email=NULL, google_calendar_sync_mode='desactive' WHERE id=?`).run(me.id);
+      return sendJSON(res, 200, { deconnecte: true });
+    }
+
+    /* POST /api/agenda/google/sync-now — pousse manuellement tous les événements non encore synchronisés */
+    if (req.method === "POST" && pathname === "/api/agenda/google/sync-now") {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const u = await db.prepare("SELECT google_calendar_refresh_token FROM users WHERE id=?").get(me.id);
+      if (!u?.google_calendar_refresh_token) return sendJSON(res, 400, { error: "Google Agenda non connecté." });
+      const events = await db.prepare("SELECT * FROM agenda_events WHERE user_id=? AND date(date_debut) >= date('now','-7 days')").all(me.id);
+      let ok = 0, echecs = 0;
+      for (const ev of events) {
+        try { await gcalPushEvent(me.id, ev); ok++; } catch (e) { echecs++; }
+      }
+      await db.prepare("UPDATE users SET google_calendar_last_sync=datetime('now') WHERE id=?").run(me.id);
+      return sendJSON(res, 200, { synchronises: ok, echecs });
+    }
+
     /* GET /api/agenda/events — événements de l'utilisateur (avec range dates) */
     if (req.method === "GET" && pathname === "/api/agenda/events") {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
@@ -12923,6 +13095,13 @@ ${jsonLd}
           }
         }
       } catch(e) {}
+      try {
+        const u = await db.prepare("SELECT google_calendar_sync_mode, google_calendar_refresh_token FROM users WHERE id=?").get(me.id);
+        if (u?.google_calendar_sync_mode === 'diaspo_vers_google' && u.google_calendar_refresh_token) {
+          const ev = await db.prepare("SELECT * FROM agenda_events WHERE id=?").get(r.lastInsertRowid);
+          gcalPushEvent(me.id, ev).catch(() => {});
+        }
+      } catch (_) {}
       return sendJSON(res, 201, { id: r.lastInsertRowid });
     }
 
@@ -12935,6 +13114,13 @@ ${jsonLd}
       const { titre, description, date_debut, date_fin, lieu, lieu_type, couleur, notes_privees, all_day } = body;
       db.prepare(`UPDATE agenda_events SET titre=?,description=?,date_debut=?,date_fin=?,lieu=?,lieu_type=?,couleur=?,notes_privees=?,all_day=?,updated_at=datetime('now') WHERE id=?`)
         .run(titre||ev.titre, description??ev.description, date_debut||ev.date_debut, date_fin||ev.date_fin, lieu??ev.lieu, lieu_type||ev.lieu_type, couleur||ev.couleur, notes_privees??ev.notes_privees, all_day?1:0, evId);
+      try {
+        const u = await db.prepare("SELECT google_calendar_sync_mode, google_calendar_refresh_token FROM users WHERE id=?").get(me.id);
+        if (u?.google_calendar_sync_mode === 'diaspo_vers_google' && u.google_calendar_refresh_token) {
+          const evUpdated = await db.prepare("SELECT * FROM agenda_events WHERE id=?").get(evId);
+          gcalPushEvent(me.id, evUpdated).catch(() => {});
+        }
+      } catch (_) {}
       return sendJSON(res, 200, { updated: true });
     }
 
@@ -12942,8 +13128,10 @@ ${jsonLd}
     if (req.method === "DELETE" && /^\/api\/agenda\/events\/\d+$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const evId = parseInt(pathname.split('/')[4]);
+      const evToDelete = await db.prepare(`SELECT google_event_id FROM agenda_events WHERE id=? AND user_id=?`).get(evId, me.id);
       await db.prepare(`DELETE FROM agenda_events WHERE id=? AND user_id=?`).run(evId, me.id);
       await db.prepare(`DELETE FROM agenda_reminders WHERE event_id=? AND user_id=?`).run(evId, me.id);
+      if (evToDelete?.google_event_id) gcalDeleteEvent(me.id, evToDelete.google_event_id).catch(() => {});
       return sendJSON(res, 200, { deleted: true });
     }
 

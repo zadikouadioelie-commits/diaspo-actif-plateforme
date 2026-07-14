@@ -149,6 +149,14 @@ async function migratePg(pool) {
     ['evenements', 'mode_participation', "TEXT DEFAULT 'presentiel'"],
     ['evenements', 'region', 'TEXT'],
     ['evenements', 'departement', 'TEXT'],
+    // Mon Agenda — intégration Google Calendar
+    ['users', 'google_calendar_access_token', 'TEXT'],
+    ['users', 'google_calendar_refresh_token', 'TEXT'],
+    ['users', 'google_calendar_token_expiry', 'TEXT'],
+    ['users', 'google_calendar_sync_mode', "TEXT DEFAULT 'desactive'"],
+    ['users', 'google_calendar_connected_email', 'TEXT'],
+    ['users', 'google_calendar_last_sync', 'TEXT'],
+    ['agenda_events', 'google_event_id', 'TEXT'],
     // initiatives
     ['initiatives', 'da_id', 'TEXT'],
     ['initiatives', 'vitrine_active', 'INTEGER DEFAULT 0'],

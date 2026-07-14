@@ -157,6 +157,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   <button class="ag-nav-btn" onclick="goToday()">Aujourd'hui</button>
   <button class="ag-nav-btn accent" onclick="openNewRdv()">+ Rendez-vous</button>
   <button class="ag-nav-btn orange" onclick="location.href='/meeting.html'">📹 Réunion</button>
+  <button class="ag-nav-btn" id="btn-google-agenda" onclick="openModal('modal-google')">🔗 Google Agenda</button>
 </header>
 
 <!-- IDENTITY BANNER -->
@@ -346,6 +347,17 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal('modal-event-detail')">×</button>
     <div id="event-detail-content"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MODAL GOOGLE AGENDA
+═══════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modal-google">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('modal-google')">×</button>
+    <div class="modal-title">🔗 Google Agenda</div>
+    <div id="gcal-content">Chargement…</div>
   </div>
 </div>
 
@@ -960,6 +972,82 @@ function showMsg(msg,type='info'){
 document.addEventListener('click',e=>{
   if(!e.target.closest('.part-search-wrap')) document.getElementById('part-results').style.display='none';
 });
+
+/* ═══════════ GOOGLE AGENDA ═══════════ */
+async function renderGoogleModal(){
+  const el = document.getElementById('gcal-content');
+  el.innerHTML = 'Chargement…';
+  let s;
+  try { s = await (await fetch('/api/agenda/google/status',{credentials:'include'})).json(); }
+  catch(e){ el.innerHTML = '<p style="color:#dc2626;">Erreur de chargement.</p>'; return; }
+
+  if (!s.connecte) {
+    el.innerHTML = `
+      <p style="font-size:.85rem;color:#555;margin-bottom:16px;">
+        Connectez votre compte Google pour retrouver vos rendez-vous Diaspo'Actif dans Google Agenda.
+        L'autorisation n'est demandée qu'une seule fois, et vous gardez le contrôle total (déconnexion possible à tout moment).
+      </p>
+      <button class="btn btn-orange" style="width:100%;" onclick="location.href='/api/agenda/google/connect'">🔗 Connecter mon Google Agenda</button>
+    `;
+    return;
+  }
+
+  const modeLabel = s.mode === 'diaspo_vers_google' ? '✅ Activée (Diaspo\'Actif → Google Agenda)' : '⏸️ Désactivée';
+  const derniere = s.derniere_synchro ? new Date(s.derniere_synchro).toLocaleString('fr-FR') : 'Jamais';
+  el.innerHTML = `
+    <p style="font-size:.85rem;color:#555;margin-bottom:4px;">Connecté avec <strong>${_esc(s.email||'votre compte Google')}</strong></p>
+    <p style="font-size:.78rem;color:#888;margin-bottom:16px;">Dernière synchronisation : ${derniere}</p>
+    <div class="form-field">
+      <label>Synchronisation</label>
+      <select id="gcal-mode-select" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;">
+        <option value="desactive" ${s.mode==='desactive'?'selected':''}>Désactivée</option>
+        <option value="diaspo_vers_google" ${s.mode==='diaspo_vers_google'?'selected':''}>Diaspo'Actif → Google Agenda (chaque événement créé est ajouté à Google)</option>
+      </select>
+    </div>
+    <p style="font-size:.72rem;color:#999;margin:6px 0 16px;">État actuel : ${modeLabel}. Les modes d'import (Google → Diaspo'Actif) et bidirectionnel arriveront dans une prochaine mise à jour.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-orange" onclick="gcalSyncNow()">🔄 Synchroniser maintenant</button>
+      <button class="btn btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="gcalDisconnect()">Déconnecter</button>
+    </div>
+  `;
+  document.getElementById('gcal-mode-select').addEventListener('change', async (e) => {
+    try {
+      await fetch('/api/agenda/google/parametres', { method:'PUT', credentials:'include', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ mode: e.target.value }) });
+      showMsg('Préférence de synchronisation mise à jour.', 'success');
+      renderGoogleModal();
+    } catch(err) { showMsg('Erreur de mise à jour.', 'danger'); }
+  });
+}
+
+async function gcalSyncNow(){
+  try {
+    const r = await fetch('/api/agenda/google/sync-now', { method:'POST', credentials:'include' });
+    const j = await r.json();
+    if (r.ok) showMsg(`✅ ${j.synchronises} événement(s) synchronisé(s) vers Google Agenda.`, 'success');
+    else showMsg('Erreur : ' + (j.error||'inconnue'), 'danger');
+    renderGoogleModal();
+  } catch(e) { showMsg('Erreur de synchronisation.', 'danger'); }
+}
+
+async function gcalDisconnect(){
+  if (!confirm('Déconnecter votre compte Google Agenda ? La synchronisation sera arrêtée immédiatement.')) return;
+  try {
+    await fetch('/api/agenda/google/disconnect', { method:'POST', credentials:'include' });
+    showMsg('Compte Google Agenda déconnecté.', 'success');
+    renderGoogleModal();
+  } catch(e) { showMsg('Erreur de déconnexion.', 'danger'); }
+}
+
+document.getElementById('btn-google-agenda').addEventListener('click', renderGoogleModal);
+
+/* Retour depuis Google OAuth (?google=connecte|erreur) */
+(() => {
+  const p = new URLSearchParams(location.search);
+  const g = p.get('google');
+  if (g === 'connecte') { showMsg('✅ Google Agenda connecté avec succès !', 'success'); openModal('modal-google'); renderGoogleModal(); }
+  else if (g === 'erreur') { showMsg('❌ Échec de la connexion à Google Agenda. Réessayez.', 'danger'); }
+  if (g) { const url = new URL(location.href); url.searchParams.delete('google'); history.replaceState({}, '', url); }
+})();
 </script>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>
