@@ -32,7 +32,33 @@
     return titre || seg;
   }
 
+  function buildSidebarLink() {
+    const sidebar = document.querySelector(".sidebar");
+    if (!sidebar || document.getElementById("st-sidebar-link")) return false;
+    const a = document.createElement("a");
+    a.id = "st-sidebar-link";
+    a.href = "#";
+    a.innerHTML = "🛠️ Support technique";
+    a.addEventListener("click", (e) => { e.preventDefault(); openModal(); });
+    sidebar.appendChild(a);
+
+    if (!document.getElementById("st-sidebar-style")) {
+      const style = document.createElement("style");
+      style.id = "st-sidebar-style";
+      style.textContent = `
+        #st-sidebar-link{
+          margin-top:18px;background:linear-gradient(135deg,#16A34A,#052e16)!important;
+          color:#fff!important;font-weight:700;
+        }
+        #st-sidebar-link:hover{background:linear-gradient(135deg,#22C55E,#0a3d1e)!important;}
+      `;
+      document.head.appendChild(style);
+    }
+    return true;
+  }
+
   function buildButton() {
+    if (buildSidebarLink()) return;
     if (document.getElementById("st-fab")) return;
     const btn = document.createElement("button");
     btn.id = "st-fab";
@@ -236,6 +262,9 @@
     try {
       const r = await api("GET", "/auth/me");
       if (r && r.user && r.user.role === "administrateur") {
+        /* Sur les tableaux de bord (sidebar présente), le lien "Messages techniques"
+           existe déjà dans la colonne des modules — pas de doublon flottant. */
+        if (document.querySelector(".sidebar")) return;
         buildAdminButton();
         setInterval(refreshAdminBadge, 60000);
       }
