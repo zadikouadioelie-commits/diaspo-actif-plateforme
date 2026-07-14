@@ -7283,6 +7283,56 @@ route("GET", "/api/ads/:id/stats", async (req, res, params) => {
 });
 
 /* POST /api/ads/create — crée une campagne (multipart: media image/vidéo) */
+/* Compte le nombre de comptes correspondant à un ciblage géo + listes Réseau Pro (cumulatif). */
+async function adsComptesCiblage({ zones = [], ville, departement, region, pays, listes = [] }) {
+  let sql = "SELECT COUNT(DISTINCT u.id) AS n FROM users u WHERE u.role != 'administrateur' AND (u.compte_masque IS NULL OR u.compte_masque=0)";
+  const args = [];
+  const zoneConds = [];
+  if ((zones.includes('ville') || zones.includes('commune')) && ville) { zoneConds.push('u.ville=?'); args.push(ville); }
+  if (zones.includes('departement') && departement) { zoneConds.push('u.departement_exercice=?'); args.push(departement); }
+  if (zones.includes('region') && region) { zoneConds.push('u.region_exercice=?'); args.push(region); }
+  if (zones.includes('pays') && pays) { zoneConds.push('u.pays=?'); args.push(pays); }
+  if (zoneConds.length) sql += ' AND (' + zoneConds.join(' OR ') + ')';
+  if (listes.length) {
+    const ph = listes.map(() => '?').join(',');
+    sql += ` AND u.id IN (SELECT user_id FROM listes_diffusion_contacts WHERE liste_id IN (${ph}) AND user_id IS NOT NULL)`;
+    args.push(...listes);
+  }
+  const r = await db.prepare(sql).get(...args);
+  return r?.n || 0;
+}
+
+/* GET /api/ads/audience-preview — estimation en temps réel du nombre de destinataires avant publication */
+route("GET", "/api/ads/audience-preview", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  let zones = [], listes = [];
+  try { zones = JSON.parse(query.zones || "[]"); } catch (_) {}
+  try { listes = JSON.parse(query.listes || "[]"); } catch (_) {}
+  const criteres = { zones, ville: query.ville || null, departement: query.departement || null, region: query.region || null, pays: query.pays || null, listes: listes.map(Number).filter(Boolean) };
+  const total = await adsComptesCiblage(criteres);
+  // Répartition par pays (top 5) sur le même périmètre, pour l'aperçu
+  let repartitionPays = [];
+  try {
+    let sql = "SELECT u.pays, COUNT(*) AS n FROM users u WHERE u.role != 'administrateur' AND u.pays IS NOT NULL";
+    const args = [];
+    const zoneConds = [];
+    if ((zones.includes('ville') || zones.includes('commune')) && criteres.ville) { zoneConds.push('u.ville=?'); args.push(criteres.ville); }
+    if (zones.includes('departement') && criteres.departement) { zoneConds.push('u.departement_exercice=?'); args.push(criteres.departement); }
+    if (zones.includes('region') && criteres.region) { zoneConds.push('u.region_exercice=?'); args.push(criteres.region); }
+    if (zones.includes('pays') && criteres.pays) { zoneConds.push('u.pays=?'); args.push(criteres.pays); }
+    if (zoneConds.length) sql += ' AND (' + zoneConds.join(' OR ') + ')';
+    if (criteres.listes.length) {
+      const ph = criteres.listes.map(() => '?').join(',');
+      sql += ` AND u.id IN (SELECT user_id FROM listes_diffusion_contacts WHERE liste_id IN (${ph}) AND user_id IS NOT NULL)`;
+      args.push(...criteres.listes);
+    }
+    sql += " GROUP BY u.pays ORDER BY n DESC LIMIT 5";
+    repartitionPays = await db.prepare(sql).all(...args);
+  } catch (_) {}
+  sendJSON(res, 200, { total, repartition_pays: repartitionPays });
+});
+
 route("POST", "/api/ads/create", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -7328,21 +7378,32 @@ route("POST", "/api/ads/create", async (req, res) => {
   let emplacements = ["homepage_feed"];
   try { const p = JSON.parse(fields.emplacements || "[]"); if (Array.isArray(p) && p.length) emplacements = p.filter(e => PUB_SLOTS.includes(e)); } catch (_) {}
 
+  let cibleZones = [];
+  try { const z = JSON.parse(fields.cible_zones || "[]"); if (Array.isArray(z)) cibleZones = z.filter(v => ['ville','commune','departement','region','pays','international'].includes(v)); } catch (_) {}
+  let cibleListes = [];
+  try { const l = JSON.parse(fields.cible_listes || "[]"); if (Array.isArray(l)) cibleListes = l.map(Number).filter(Boolean); } catch (_) {}
+  const cibleVille = fields.cible_ville || null;
+  const cibleDepartement = fields.cible_departement || null;
+  const cibleRegion = fields.cible_region || null;
+  const ciblePaysVal = fields.cible_pays || null;
+
   try {
     const filename = uniqueFilename(file.filename, user.id);
     const url = await uploadToBunny(file.buffer, filename, "ads");
     const id = db.prepare(`
       INSERT INTO publicites (user_id, annonceur, media_type, media_url, titre, description, cta, lien_url, duree_jours,
-        cible_pays, cible_langue, cible_interet, emplacements, statut)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending_admin')
+        cible_pays, cible_langue, cible_interet, emplacements, statut,
+        cible_zones, cible_ville, cible_departement, cible_region, cible_listes)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending_admin', ?,?,?,?,?)
     `).run(
       user.id, user.nom || 'Diaspo\'Actif', mediaType, url, titre, fields.description || null,
       PUB_AD_CTA.includes(fields.cta) ? fields.cta : "En savoir plus",
       fields.lien_url || null, Math.min(Math.max(parseInt(fields.duree_jours) || 7, 1), 30),
-      JSON.stringify(fields.cible_pays ? [fields.cible_pays] : []),
+      JSON.stringify(ciblePaysVal ? [ciblePaysVal] : []),
       JSON.stringify(fields.cible_langue ? [fields.cible_langue] : []),
       JSON.stringify(fields.cible_interet ? [fields.cible_interet] : []),
-      JSON.stringify(emplacements)
+      JSON.stringify(emplacements),
+      JSON.stringify(cibleZones), cibleVille, cibleDepartement, cibleRegion, JSON.stringify(cibleListes)
     ).lastInsertRowid;
 
     if (abo) await db.prepare("UPDATE pub_abonnements SET credits_restants=credits_restants-1, updated_at=datetime('now') WHERE id=?").run(abo.id);
@@ -7374,8 +7435,28 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
 
   let ad = null;
   for (const c of candidates) {
-    const cp = safeParse(c.cible_pays);
-    if (Array.isArray(cp) && cp.length && (!user || !cp.includes(user.pays))) continue;
+    const zones = safeParse(c.cible_zones) || [];
+    if (zones.length && !zones.includes('international')) {
+      if (!user) continue;
+      let geoOk = false;
+      if ((zones.includes('ville') || zones.includes('commune')) && c.cible_ville && user.ville === c.cible_ville) geoOk = true;
+      if (!geoOk && zones.includes('departement') && c.cible_departement && user.departement_exercice === c.cible_departement) geoOk = true;
+      if (!geoOk && zones.includes('region') && c.cible_region && user.region_exercice === c.cible_region) geoOk = true;
+      const cp = safeParse(c.cible_pays);
+      if (!geoOk && zones.includes('pays') && Array.isArray(cp) && cp.length && cp.includes(user.pays)) geoOk = true;
+      if (!geoOk) continue;
+    } else {
+      // Rétrocompatibilité : ancien ciblage cible_pays seul, sans cible_zones défini
+      const cp = safeParse(c.cible_pays);
+      if (Array.isArray(cp) && cp.length && (!user || !cp.includes(user.pays))) continue;
+    }
+    const cibleListes = safeParse(c.cible_listes) || [];
+    if (cibleListes.length) {
+      if (!user) continue;
+      const ph = cibleListes.map(() => '?').join(',');
+      const membre = await db.prepare(`SELECT 1 FROM listes_diffusion_contacts WHERE liste_id IN (${ph}) AND user_id=? LIMIT 1`).get(...cibleListes, user.id);
+      if (!membre) continue;
+    }
     ad = c;
     break;
   }

@@ -1117,6 +1117,12 @@ const MIGRATIONS = [
   ["users", "google_calendar_connected_email TEXT"],
   ["users", "google_calendar_last_sync TEXT"],
   ["agenda_events", "google_event_id TEXT"],
+  // Ciblage d'audience des publicités (zone géographique + listes Réseau Pro)
+  ["publicites", "cible_zones TEXT DEFAULT '[]'"],
+  ["publicites", "cible_ville TEXT"],
+  ["publicites", "cible_departement TEXT"],
+  ["publicites", "cible_region TEXT"],
+  ["publicites", "cible_listes TEXT DEFAULT '[]'"],
   // Billetterie events v2 — multimédia
   ["events", "image_couverture TEXT"],
   ["events", "galerie_photos TEXT DEFAULT '[]'"],

@@ -157,6 +157,12 @@ async function migratePg(pool) {
     ['users', 'google_calendar_connected_email', 'TEXT'],
     ['users', 'google_calendar_last_sync', 'TEXT'],
     ['agenda_events', 'google_event_id', 'TEXT'],
+    // Ciblage d'audience des publicités (zone géographique + listes Réseau Pro)
+    ['publicites', 'cible_zones', "TEXT DEFAULT '[]'"],
+    ['publicites', 'cible_ville', 'TEXT'],
+    ['publicites', 'cible_departement', 'TEXT'],
+    ['publicites', 'cible_region', 'TEXT'],
+    ['publicites', 'cible_listes', "TEXT DEFAULT '[]'"],
     // initiatives
     ['initiatives', 'da_id', 'TEXT'],
     ['initiatives', 'vitrine_active', 'INTEGER DEFAULT 0'],

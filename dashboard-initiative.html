@@ -929,6 +929,28 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <span style="font-size:12px;font-weight:700;color:var(--muted);">EMPLACEMENTS</span>
             <div id="ad-emplacements" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>
           </label>
+
+          <div style="border-top:1px solid var(--border);padding-top:14px;">
+            <span style="font-size:12px;font-weight:700;color:var(--muted);">📍 ZONE DE DIFFUSION</span>
+            <div id="ad-zones" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>
+            <div id="ad-zones-champs" style="display:none;margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <label style="display:block;"><span style="font-size:11px;color:var(--muted);">Pays</span><input type="text" id="ad-cible-pays" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ex : France" oninput="adRefreshAudiencePreview()"></label>
+              <label style="display:block;"><span style="font-size:11px;color:var(--muted);">Région</span><input type="text" id="ad-cible-region" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ex : Occitanie" oninput="adRefreshAudiencePreview()"></label>
+              <label style="display:block;"><span style="font-size:11px;color:var(--muted);">Département</span><input type="text" id="ad-cible-departement" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ex : Haute-Garonne" oninput="adRefreshAudiencePreview()"></label>
+              <label style="display:block;"><span style="font-size:11px;color:var(--muted);">Ville / Commune</span><input type="text" id="ad-cible-ville" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ex : Toulouse" oninput="adRefreshAudiencePreview()"></label>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid var(--border);padding-top:14px;">
+            <span style="font-size:12px;font-weight:700;color:var(--muted);">🌐 DIFFUSER À UNE LISTE DU RÉSEAU PRO</span>
+            <div id="ad-listes" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"><span style="font-size:12px;color:var(--muted);">Chargement…</span></div>
+          </div>
+
+          <div id="ad-audience-preview" style="background:#F0F7FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 14px;font-size:13px;">
+            <div style="font-weight:700;color:#1E40AF;">👁️ Audience estimée : <span id="ad-audience-total">—</span></div>
+            <div id="ad-audience-detail" style="font-size:11.5px;color:#3B5A9A;margin-top:4px;"></div>
+          </div>
+
           <div id="ad-err" style="display:none;font-size:13px;color:#dc2626;background:#fef2f2;border-radius:8px;padding:10px 14px;"></div>
         </div>
         <div style="padding:14px 24px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
@@ -2038,7 +2060,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;">
           <input type="checkbox" value="${s}" class="ad-slot-check"> ${AD_SLOT_LABELS_FR[s] || s.replace(/_/g,' ')}
         </label>`).join('');
+      const AD_ZONE_LABELS = { ville:'Ville', commune:'Commune', departement:'Département', region:'Région', pays:'Pays', international:'International' };
+      document.getElementById('ad-zones').innerHTML = Object.entries(AD_ZONE_LABELS).map(([v,l]) => `
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;">
+          <input type="checkbox" value="${v}" class="ad-zone-check" onchange="adUpdateZonesUI()"> ${l}
+        </label>`).join('');
       loadMyAds();
+      loadAdListesReseauPro();
     } catch (e) { console.error('initPubSection error', e); }
   }
 
@@ -2066,14 +2094,62 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     } catch (e) { listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">Impossible de charger les publicités.</p>'; }
   }
 
+  let _adListesReseauPro = [];
+  async function loadAdListesReseauPro() {
+    try {
+      const r = await api('GET', '/listes-diffusion');
+      _adListesReseauPro = r.listes || [];
+      document.getElementById('ad-listes').innerHTML = _adListesReseauPro.length
+        ? _adListesReseauPro.map(l => `
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;">
+              <input type="checkbox" value="${l.id}" class="ad-liste-check" onchange="adRefreshAudiencePreview()"> ${l.icone||'📋'} ${l.nom}
+            </label>`).join('')
+        : `<span style="font-size:12px;color:var(--muted);">Aucune liste créée dans le module Réseau Pro.</span>`;
+    } catch (e) { document.getElementById('ad-listes').innerHTML = `<span style="font-size:12px;color:var(--muted);">Impossible de charger les listes.</span>`; }
+  }
+
+  function adUpdateZonesUI() {
+    const zones = Array.from(document.querySelectorAll('.ad-zone-check:checked')).map(c => c.value);
+    document.getElementById('ad-zones-champs').style.display = zones.some(z => z !== 'international') ? 'grid' : 'none';
+    adRefreshAudiencePreview();
+  }
+
+  let _adAudienceTimer;
+  function adRefreshAudiencePreview() {
+    clearTimeout(_adAudienceTimer);
+    _adAudienceTimer = setTimeout(async () => {
+      const zones = Array.from(document.querySelectorAll('.ad-zone-check:checked')).map(c => c.value);
+      const listes = Array.from(document.querySelectorAll('.ad-liste-check:checked')).map(c => c.value);
+      const params = new URLSearchParams({
+        zones: JSON.stringify(zones),
+        listes: JSON.stringify(listes),
+        ville: document.getElementById('ad-cible-ville')?.value || '',
+        departement: document.getElementById('ad-cible-departement')?.value || '',
+        region: document.getElementById('ad-cible-region')?.value || '',
+        pays: document.getElementById('ad-cible-pays')?.value || '',
+      });
+      try {
+        const r = await api('GET', '/ads/audience-preview?' + params);
+        document.getElementById('ad-audience-total').textContent = `${r.total} compte${r.total !== 1 ? 's' : ''}`;
+        const rep = (r.repartition_pays || []).map(p => `${p.pays} (${p.n})`).join(', ');
+        document.getElementById('ad-audience-detail').textContent = rep ? `Répartition : ${rep}` : (zones.length || listes.length ? '' : 'Aucun filtre — diffusion à tous les comptes de la plateforme.');
+      } catch (e) { document.getElementById('ad-audience-total').textContent = '—'; }
+    }, 400);
+  }
+
   function openAdModal() {
     document.getElementById('ad-media').value = '';
     document.getElementById('ad-titre').value = '';
     document.getElementById('ad-description').value = '';
     document.getElementById('ad-lien').value = '';
     document.getElementById('ad-duree').value = 7;
+    document.querySelectorAll('.ad-zone-check').forEach(c => c.checked = false);
+    document.querySelectorAll('.ad-liste-check').forEach(c => c.checked = false);
+    ['ad-cible-ville','ad-cible-departement','ad-cible-region','ad-cible-pays'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('ad-zones-champs').style.display = 'none';
     document.getElementById('ad-err').style.display = 'none';
     document.getElementById('ad-modal').style.display = 'block';
+    adRefreshAudiencePreview();
   }
   function closeAdModal() { document.getElementById('ad-modal').style.display = 'none'; }
 
@@ -2099,6 +2175,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     }
 
     const emplacements = Array.from(document.querySelectorAll('.ad-slot-check:checked')).map(c => c.value);
+    const zones = Array.from(document.querySelectorAll('.ad-zone-check:checked')).map(c => c.value);
+    const listes = Array.from(document.querySelectorAll('.ad-liste-check:checked')).map(c => c.value);
     const fd = new FormData();
     fd.append('media', file);
     fd.append('titre', titre);
@@ -2108,6 +2186,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     fd.append('duree_jours', document.getElementById('ad-duree').value);
     fd.append('duree_sec', String(Math.round(dureeSec)));
     fd.append('emplacements', JSON.stringify(emplacements));
+    fd.append('cible_zones', JSON.stringify(zones));
+    fd.append('cible_listes', JSON.stringify(listes));
+    fd.append('cible_ville', document.getElementById('ad-cible-ville').value.trim());
+    fd.append('cible_departement', document.getElementById('ad-cible-departement').value.trim());
+    fd.append('cible_region', document.getElementById('ad-cible-region').value.trim());
+    fd.append('cible_pays', document.getElementById('ad-cible-pays').value.trim());
 
     const btn = document.getElementById('ad-btn-save');
     btn.disabled = true;
@@ -2134,6 +2218,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   window.openAdModal = openAdModal;
   window.closeAdModal = closeAdModal;
   window.saveAd = saveAd;
+  window.adUpdateZonesUI = adUpdateZonesUI;
+  window.adRefreshAudiencePreview = adRefreshAudiencePreview;
 
   /* ===== RECRUTEMENT / CANDIDATURES ===== */
   const STATUT_REC = {
