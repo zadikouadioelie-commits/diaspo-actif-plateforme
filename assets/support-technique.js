@@ -39,18 +39,20 @@
     btn.type = "button";
     btn.title = "Support technique";
     btn.innerHTML = "🛠️";
-    btn.style.cssText = [
-      "position:fixed", "bottom:20px", "left:20px", "z-index:1098",
-      "width:48px", "height:48px", "border-radius:50%", "border:none",
-      "background:linear-gradient(135deg,#DC2626,#991B1B)", "color:#fff",
-      "font-size:22px", "cursor:pointer", "box-shadow:0 6px 18px rgba(0,0,0,.28)",
-      "display:flex", "align-items:center", "justify-content:center",
-    ].join(";");
     btn.addEventListener("click", openModal);
     document.body.appendChild(btn);
 
     const style = document.createElement("style");
-    style.textContent = "@media (max-width:600px){ #st-fab{ bottom:88px; left:14px; width:44px; height:44px; font-size:19px; } }";
+    style.textContent = `
+      #st-fab{
+        position:fixed;bottom:20px;left:20px;z-index:1098;
+        width:48px;height:48px;border-radius:50%;border:none;
+        background:linear-gradient(135deg,#DC2626,#991B1B);color:#fff;
+        font-size:22px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.28);
+        display:flex;align-items:center;justify-content:center;
+      }
+      @media (max-width:600px){ #st-fab{ bottom:88px; left:14px; width:44px; height:44px; font-size:19px; } }
+    `;
     document.head.appendChild(style);
   }
 
