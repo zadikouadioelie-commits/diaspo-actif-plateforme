@@ -523,6 +523,7 @@ function renderInitiativeCard(it){
         ${membres}
         <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
         ${vitrineBtn}
+        ${(it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'collectivite') ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); if(window.DemandeContact) window.DemandeContact.open(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')});">🤝 Mise en relation</button>` : ''}
         ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 S'inscrire à un événement</button>` : ''}
       </div>
     </div>
