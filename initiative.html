@@ -551,10 +551,11 @@ const DOMAIN_GRAD = {
 
   window.ppDemandeRelationInit = async () => {
     if (!init.owner_user_id) return;
-    const message = prompt("Message accompagnant votre demande de mise en relation (optionnel) :", "");
+    if (window.DemandeContact) return window.DemandeContact.open(init.owner_user_id, init.nom);
+    const message = prompt("Message accompagnant votre demande de contact (optionnel) :", "");
     if (message === null) return;
     try {
-      await api('POST', '/demandes-relation', { membre_id: init.owner_user_id, message });
+      await api('POST', '/demandes-contact', { destinataire_id: init.owner_user_id, motif: "Demande d'informations", message: message || "Bonjour, je souhaite entrer en contact avec vous." });
       alert("Demande envoyée. La conversation ne sera ouverte qu'après acceptation par l'organisation.");
     } catch(e) { alert('Erreur : ' + (e.message || 'impossible d\'envoyer la demande.')); }
   };
@@ -892,6 +893,7 @@ const DOMAIN_GRAD = {
 })();
 </script>
 <script src="assets/galerie-lightbox.js"></script>
+<script src="assets/demande-contact.js"></script>
 <script src="assets/trust-score.js"></script>
 <script src="assets/profile-qr.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>

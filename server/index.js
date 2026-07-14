@@ -4407,86 +4407,240 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
 });
 
 /* ===========================================================================
-   DEMANDES DE MISE EN RELATION — seule voie pour un compte Collectivité
-   d'entrer en contact avec un membre (utilisateur) ou une organisation
-   (initiative). Le destinataire accepte, refuse ou ignore ; la conversation
-   n'est créée qu'après acceptation explicite.
+   DEMANDES DE CONTACT INSTITUTIONNELLES
+   Remplace le premier message privé par un consentement explicite du
+   destinataire. Obligatoire pour les comptes Collectivité (voir PEUT_INITIER,
+   ils ne peuvent jamais démarrer une conversation directement) ; ouvert à tout
+   compte souhaitant une prise de contact plus formelle (motif, urgence).
 =========================================================================== */
 
-/* POST /api/demandes-relation — la collectivité envoie une demande */
-route("POST", "/api/demandes-relation", async (req, res, params, body) => {
+const DEMANDES_CONTACT_MOTIFS_DEFAUT = [
+  "Proposition de partenariat", "Demande d'expertise", "Invitation à un événement",
+  "Opportunité d'investissement", "Recherche de compétences", "Participation à une mission",
+  "Projet de développement territorial", "Demande d'informations", "Échange institutionnel", "Autre",
+];
+
+let _demandesContactConfigCache = null;
+async function getDemandesContactConfig() {
+  if (_demandesContactConfigCache) return _demandesContactConfigCache;
+  let row = await db.prepare("SELECT * FROM demandes_contact_config WHERE id=1").get();
+  if (!row) {
+    await db.prepare(
+      "INSERT INTO demandes_contact_config (id, expiration_jours, cooldown_jours, max_par_jour, longueur_max_message, motifs_json) VALUES (1,30,90,20,500,?)"
+    ).run(JSON.stringify(DEMANDES_CONTACT_MOTIFS_DEFAUT));
+    row = await db.prepare("SELECT * FROM demandes_contact_config WHERE id=1").get();
+  }
+  _demandesContactConfigCache = {
+    expiration_jours: row.expiration_jours, cooldown_jours: row.cooldown_jours,
+    max_par_jour: row.max_par_jour, longueur_max_message: row.longueur_max_message,
+    motifs: safeParse(row.motifs_json) || DEMANDES_CONTACT_MOTIFS_DEFAUT,
+  };
+  return _demandesContactConfigCache;
+}
+
+/* Révision légère (sans LLM) du message avant envoi : signale un ton commercial
+   ou un message trop court, propose une reformulation neutre. Non bloquant —
+   l'utilisateur reste libre d'envoyer tel quel (voir spec « Intelligence artificielle »). */
+const DEMANDE_CONTACT_MOTS_DEMARCHAGE = [
+  "achetez", "promo", "% de réduction", "cliquez ici", "argent facile", "offre limitée",
+  "gratuit aujourd'hui", "投资", "buy now", "click here",
+];
+function analyserDemandeContactIA(motif, message) {
+  const remarques = [];
+  const m = (message || "").toLowerCase();
+  if ((message || "").trim().length < 20) remarques.push("Le message est très court : détaillez le contexte et vos attentes pour augmenter vos chances de réponse.");
+  if (DEMANDE_CONTACT_MOTS_DEMARCHAGE.some(w => m.includes(w))) remarques.push("Le message contient des formulations proches du démarchage commercial ; reformulez-le de façon institutionnelle.");
+  if (!/[.?!]$/.test((message || "").trim())) remarques.push("Terminez votre message par une phrase de clôture claire (ex. une question ou un appel à échanger).");
+  const suggestion = remarques.length
+    ? `Bonjour, je me permets de vous contacter au sujet de « ${motif || "notre demande"} ». [Présentez le contexte en une phrase, puis votre demande précise et ce que vous proposez en retour.] Restant à votre disposition pour en échanger.`
+    : null;
+  return { ok: remarques.length === 0, remarques, suggestion };
+}
+
+/* POST /api/demandes-contact/analyser — pré-vérification IA avant envoi (étape 5 du formulaire) */
+route("POST", "/api/demandes-contact/analyser", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux comptes Collectivité." });
-
-  const membreId = Number(body.membre_id);
-  if (!membreId || membreId === user.id) return sendJSON(res, 400, { error: "Destinataire invalide." });
-  const membre = await db.prepare("SELECT id, nom, role FROM users WHERE id=?").get(membreId);
-  if (!membre || !["utilisateur", "initiative"].includes(membre.role)) return sendJSON(res, 404, { error: "Destinataire introuvable." });
-
-  const existeConv = await db.prepare("SELECT id FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, membreId, membreId, user.id);
-  if (existeConv) return sendJSON(res, 409, { error: "Une conversation existe déjà avec ce compte." });
-  const dejaEnvoyee = await db.prepare("SELECT id FROM demandes_relation WHERE collectivite_id=? AND membre_id=? AND statut='en_attente'").get(user.id, membreId);
-  if (dejaEnvoyee) return sendJSON(res, 409, { error: "Une demande est déjà en attente pour ce compte." });
-
-  const message = (body.message || "").trim().slice(0, 500) || null;
-  const id = (await db.prepare("INSERT INTO demandes_relation (collectivite_id, membre_id, message) VALUES (?,?,?)").run(user.id, membreId, message)).lastInsertRowid;
-
-  creerNotif(membreId, "demande_relation", `${user.nom} souhaite entrer en contact avec vous`,
-    message || "Une collectivité souhaite entrer en relation avec vous. Vous pouvez accepter, refuser ou ignorer cette demande.",
-    { demande_id: id });
-
-  sendJSON(res, 201, { id });
+  sendJSON(res, 200, analyserDemandeContactIA(body.motif, body.message));
 });
 
-/* GET /api/demandes-relation/envoyees — historique des demandes envoyées par la collectivité */
-route("GET", "/api/demandes-relation/envoyees", async (req, res) => {
+/* GET /api/demandes-contact/config — motifs disponibles + limites (formulaire) */
+route("GET", "/api/demandes-contact/config", async (req, res) => {
+  sendJSON(res, 200, await getDemandesContactConfig());
+});
+
+/* PUT /api/admin/demandes-contact/config — paramètres modifiables par un administrateur */
+route("PUT", "/api/admin/demandes-contact/config", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux comptes Collectivité." });
-  const demandes = await db.prepare(
-    "SELECT d.*, u.nom AS membre_nom, u.role AS membre_role, u.photo_url AS membre_photo FROM demandes_relation d JOIN users u ON u.id=d.membre_id WHERE d.collectivite_id=? ORDER BY d.created_at DESC LIMIT 100"
-  ).all(user.id);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  await getDemandesContactConfig(); // garantit que la ligne id=1 existe
+  const fields = [], vals = [];
+  if (body.expiration_jours != null) { fields.push("expiration_jours=?"); vals.push(Number(body.expiration_jours)); }
+  if (body.cooldown_jours != null) { fields.push("cooldown_jours=?"); vals.push(Number(body.cooldown_jours)); }
+  if (body.max_par_jour != null) { fields.push("max_par_jour=?"); vals.push(Number(body.max_par_jour)); }
+  if (body.longueur_max_message != null) { fields.push("longueur_max_message=?"); vals.push(Number(body.longueur_max_message)); }
+  if (Array.isArray(body.motifs)) { fields.push("motifs_json=?"); vals.push(JSON.stringify(body.motifs.slice(0, 30))); }
+  if (fields.length) {
+    await db.prepare(`UPDATE demandes_contact_config SET ${fields.join(", ")} WHERE id=1`).run(...vals);
+    _demandesContactConfigCache = null;
+  }
+  sendJSON(res, 200, await getDemandesContactConfig());
+});
+
+/* POST /api/demandes-contact — envoyer une demande de contact */
+route("POST", "/api/demandes-contact", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  const destinataireId = Number(body.destinataire_id);
+  if (!destinataireId || destinataireId === user.id) return sendJSON(res, 400, { error: "Destinataire invalide." });
+  const destinataire = await db.prepare("SELECT id, nom, role FROM users WHERE id=?").get(destinataireId);
+  if (!destinataire) return sendJSON(res, 404, { error: "Destinataire introuvable." });
+
+  const bloque = await db.prepare("SELECT id FROM contacts_bloques WHERE bloqueur_id=? AND bloque_id=?").get(destinataireId, user.id);
+  if (bloque) return sendJSON(res, 403, { error: "Vous ne pouvez pas contacter ce compte." });
+
+  const cfg = await getDemandesContactConfig();
+  const motifsValides = new Set(cfg.motifs);
+  const motif = (body.motif || "").trim();
+  if (!motif || !motifsValides.has(motif)) return sendJSON(res, 400, { error: "Motif invalide." });
+  const motifAutre = motif === "Autre" ? (body.motif_autre || "").trim().slice(0, 200) : null;
+  if (motif === "Autre" && !motifAutre) return sendJSON(res, 400, { error: "Merci de préciser le motif." });
+
+  const message = (body.message || "").trim();
+  if (!message) return sendJSON(res, 400, { error: "Le message est requis." });
+  if (message.length > cfg.longueur_max_message) return sendJSON(res, 400, { error: `Message limité à ${cfg.longueur_max_message} caractères.` });
+
+  const urgence = ["faible", "normal", "important", "urgent"].includes(body.urgence) ? body.urgence : "normal";
+
+  // Conversation déjà active (non supprimée par le destinataire) : pas besoin de repasser par une demande.
+  const existeConv = await db.prepare("SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, destinataireId, destinataireId, user.id);
+  if (existeConv) {
+    const destASupprime = existeConv.user1_id === destinataireId ? existeConv.deleted_u1 : existeConv.deleted_u2;
+    if (!destASupprime) return sendJSON(res, 409, { error: "Une conversation existe déjà avec ce compte." });
+  }
+
+  const dejaEnAttente = await db.prepare("SELECT id FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='en_attente'").get(user.id, destinataireId);
+  if (dejaEnAttente) return sendJSON(res, 409, { error: "Une demande est déjà en attente pour ce compte." });
+
+  const derniereRefusee = await db.prepare("SELECT repondu_at FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='refusee' ORDER BY repondu_at DESC LIMIT 1").get(user.id, destinataireId);
+  if (derniereRefusee && derniereRefusee.repondu_at) {
+    const finCooldown = new Date(new Date(derniereRefusee.repondu_at.replace(" ", "T") + "Z").getTime() + cfg.cooldown_jours * 86400000);
+    if (finCooldown > new Date()) return sendJSON(res, 429, { error: `Vous devez patienter avant de recontacter ce compte (nouvelle tentative possible le ${finCooldown.toLocaleDateString("fr-FR")}).` });
+  }
+
+  const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0);
+  const nbAujourdhui = (await db.prepare("SELECT COUNT(*) n FROM demandes_contact WHERE demandeur_id=? AND created_at >= ?").get(user.id, debutJour.toISOString().slice(0, 19).replace("T", " ")))?.n || 0;
+  if (nbAujourdhui >= cfg.max_par_jour) return sendJSON(res, 429, { error: "Nombre maximal de demandes atteint pour aujourd'hui." });
+
+  const expiresAt = new Date(Date.now() + cfg.expiration_jours * 86400000).toISOString().slice(0, 19).replace("T", " ");
+  const id = (await db.prepare(
+    "INSERT INTO demandes_contact (demandeur_id, destinataire_id, motif, motif_autre, message, urgence, expires_at) VALUES (?,?,?,?,?,?,?)"
+  ).run(user.id, destinataireId, motif, motifAutre, message, urgence, expiresAt)).lastInsertRowid;
+
+  creerNotif(destinataireId, "demande_contact", `${user.nom} souhaite entrer en contact avec vous`,
+    `Motif : ${motifAutre || motif}. ${message}`.slice(0, 300), { demande_id: id });
+
+  sendJSON(res, 201, { id, expires_at: expiresAt });
+});
+
+/* GET /api/demandes-contact?direction=recues|envoyees&statut= — historique */
+route("GET", "/api/demandes-contact", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  // Expiration paresseuse (pas de process persistant en serverless) : toute demande en
+  // attente dont le délai est dépassé passe à "expiree" au fil des lectures.
+  await db.prepare("UPDATE demandes_contact SET statut='expiree', updated_at=datetime('now') WHERE statut='en_attente' AND expires_at IS NOT NULL AND expires_at < datetime('now')").run();
+  const direction = query.direction === "envoyees" ? "envoyees" : "recues";
+  const col = direction === "envoyees" ? "demandeur_id" : "destinataire_id";
+  const autreCol = direction === "envoyees" ? "destinataire_id" : "demandeur_id";
+  const statuts = ["en_attente", "acceptee", "refusee", "expiree", "bloquee"];
+  let sql = `SELECT d.*, u.nom AS autre_nom, u.role AS autre_role, u.photo_url AS autre_photo FROM demandes_contact d JOIN users u ON u.id=d.${autreCol} WHERE d.${col}=?`;
+  const args = [user.id];
+  if (query.statut && statuts.includes(query.statut)) { sql += " AND d.statut=?"; args.push(query.statut); }
+  sql += " ORDER BY d.created_at DESC LIMIT 200";
+  const demandes = await db.prepare(sql).all(...args);
   sendJSON(res, 200, { demandes });
 });
 
-/* GET /api/demandes-relation/recues — demandes en attente reçues par le membre connecté */
-route("GET", "/api/demandes-relation/recues", async (req, res) => {
+/* POST /api/demandes-contact/:id/repondre — le destinataire accepte, refuse ou bloque */
+route("POST", "/api/demandes-contact/:id/repondre", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const demandes = await db.prepare(
-    "SELECT d.*, u.nom AS collectivite_nom, u.photo_url AS collectivite_photo FROM demandes_relation d JOIN users u ON u.id=d.collectivite_id WHERE d.membre_id=? AND d.statut='en_attente' ORDER BY d.created_at DESC"
-  ).all(user.id);
-  sendJSON(res, 200, { demandes });
-});
-
-/* POST /api/demandes-relation/:id/repondre — le destinataire accepte ou refuse */
-route("POST", "/api/demandes-relation/:id/repondre", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const demande = await db.prepare("SELECT * FROM demandes_relation WHERE id=?").get(params.id);
-  if (!demande || demande.membre_id !== user.id) return sendJSON(res, 404, { error: "Demande introuvable." });
+  const demande = await db.prepare("SELECT * FROM demandes_contact WHERE id=?").get(params.id);
+  if (!demande || demande.destinataire_id !== user.id) return sendJSON(res, 404, { error: "Demande introuvable." });
   if (demande.statut !== "en_attente") return sendJSON(res, 409, { error: "Cette demande a déjà été traitée." });
 
-  const action = body.action === "accepter" ? "accepter" : body.action === "refuser" ? "refuser" : null;
-  if (!action) return sendJSON(res, 400, { error: "Action invalide (accepter ou refuser)." });
+  const action = ["accepter", "refuser", "bloquer"].includes(body.action) ? body.action : null;
+  if (!action) return sendJSON(res, 400, { error: "Action invalide (accepter, refuser ou bloquer)." });
 
-  const coll = await db.prepare("SELECT id,nom FROM users WHERE id=?").get(demande.collectivite_id);
   if (action === "refuser") {
-    await db.prepare("UPDATE demandes_relation SET statut='refusee', updated_at=datetime('now') WHERE id=?").run(demande.id);
+    await db.prepare("UPDATE demandes_contact SET statut='refusee', repondu_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(demande.id);
+    creerNotif(demande.demandeur_id, "demande_contact_refusee", "Votre demande de contact n'a pas été acceptée", "", { demande_id: demande.id });
     return sendJSON(res, 200, { ok: true, statut: "refusee" });
   }
 
-  // Acceptation : création de la conversation (ou récupération si déjà existante)
-  let conv = await db.prepare("SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, demande.collectivite_id, demande.collectivite_id, user.id);
-  if (!conv) {
-    const convId = (await db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet) VALUES (?, ?, ?)").run(demande.collectivite_id, user.id, "Mise en relation")).lastInsertRowid;
-    conv = { id: convId };
+  if (action === "bloquer") {
+    await db.prepare("INSERT OR IGNORE INTO contacts_bloques (bloqueur_id, bloque_id) VALUES (?,?)").run(user.id, demande.demandeur_id);
+    await db.prepare("UPDATE demandes_contact SET statut='bloquee', repondu_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(demande.id);
+    return sendJSON(res, 200, { ok: true, statut: "bloquee" });
   }
-  await db.prepare("UPDATE demandes_relation SET statut='acceptee', conversation_id=?, updated_at=datetime('now') WHERE id=?").run(conv.id, demande.id);
-  creerNotif(demande.collectivite_id, "demande_relation_acceptee", `${user.nom} a accepté votre demande de mise en relation`,
+
+  // Acceptation : création de la conversation (ou récupération/réactivation si déjà existante)
+  let conv = await db.prepare("SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, demande.demandeur_id, demande.demandeur_id, user.id);
+  if (!conv) {
+    const convId = (await db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet) VALUES (?, ?, ?)").run(demande.demandeur_id, user.id, "Demande de contact")).lastInsertRowid;
+    conv = { id: convId };
+  } else {
+    if (conv.user1_id === user.id && conv.deleted_u1) await db.prepare("UPDATE conversations SET deleted_u1=0 WHERE id=?").run(conv.id);
+    if (conv.user2_id === user.id && conv.deleted_u2) await db.prepare("UPDATE conversations SET deleted_u2=0 WHERE id=?").run(conv.id);
+  }
+  await db.prepare("UPDATE demandes_contact SET statut='acceptee', conversation_id=?, repondu_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(conv.id, demande.id);
+  creerNotif(demande.demandeur_id, "demande_contact_acceptee", `${user.nom} a accepté votre demande de contact`,
     "Vous pouvez maintenant échanger avec ce compte.", { conversation_id: conv.id });
 
   sendJSON(res, 200, { ok: true, statut: "acceptee", conversation_id: conv.id });
+});
+
+/* GET /api/demandes-contact/blocages — comptes que j'ai bloqués */
+route("GET", "/api/demandes-contact/blocages", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const blocages = await db.prepare(
+    "SELECT b.id, b.bloque_id, b.created_at, u.nom, u.role, u.photo_url FROM contacts_bloques b JOIN users u ON u.id=b.bloque_id WHERE b.bloqueur_id=? ORDER BY b.created_at DESC"
+  ).all(user.id);
+  sendJSON(res, 200, { blocages });
+});
+
+/* DELETE /api/demandes-contact/blocages/:userId — lever un blocage */
+route("DELETE", "/api/demandes-contact/blocages/:userId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("DELETE FROM contacts_bloques WHERE bloqueur_id=? AND bloque_id=?").run(user.id, Number(params.userId));
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/demandes-contact/stats — indicateurs pour le tableau de bord de l'expéditeur */
+route("GET", "/api/demandes-contact/stats", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare("SELECT statut, created_at, repondu_at FROM demandes_contact WHERE demandeur_id=?").all(user.id);
+  const envoyees = rows.length;
+  const acceptees = rows.filter(r => r.statut === "acceptee").length;
+  const refusees = rows.filter(r => r.statut === "refusee").length;
+  const expirees = rows.filter(r => r.statut === "expiree").length;
+  const bloquees = rows.filter(r => r.statut === "bloquee").length;
+  const repondues = rows.filter(r => r.repondu_at);
+  const delaiMoyenMs = repondues.length
+    ? repondues.reduce((s, r) => s + (new Date(r.repondu_at.replace(" ", "T") + "Z") - new Date(r.created_at.replace(" ", "T") + "Z")), 0) / repondues.length
+    : 0;
+  sendJSON(res, 200, {
+    envoyees, acceptees, refusees, expirees, bloquees,
+    conversations_ouvertes: acceptees,
+    taux_acceptation: envoyees ? Math.round((acceptees / envoyees) * 100) : 0,
+    taux_blocage: envoyees ? Math.round((bloquees / envoyees) * 100) : 0,
+    delai_moyen_heures: Math.round(delaiMoyenMs / 3600000),
+  });
 });
 
 /* GET /api/conversations/:id/messages — charger les messages + marquer lu */
@@ -4513,6 +4667,14 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
 
   const conv = await db.prepare("SELECT * FROM conversations WHERE id = ?").get(params.id);
   if (!conv || (conv.user1_id !== user.id && conv.user2_id !== user.id)) return sendJSON(res, 403, { error: "Accès refusé." });
+
+  // Un compte Collectivité perd le droit de reprendre contact si le membre a supprimé la
+  // conversation — il doit effectuer une nouvelle demande de mise en relation (règles de
+  // communication des comptes Collectivités : le consentement du membre prime toujours).
+  if (user.role === "collectivite") {
+    const autreSupprimee = conv.user1_id === user.id ? conv.deleted_u2 : conv.deleted_u1;
+    if (autreSupprimee) return sendJSON(res, 403, { error: "Ce membre a mis fin à la conversation. Vous devez envoyer une nouvelle demande de mise en relation." });
+  }
 
   const contenu = (body.contenu || "").trim();
   const type = body.type || "text"; // text | file | image | link

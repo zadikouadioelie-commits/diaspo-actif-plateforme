@@ -1166,22 +1166,26 @@ async function prefillProduitMessage(produitId){
   }catch(e){ /* silencieux : le message reste vide */ }
 }
 
-/* ---- Demandes de mise en relation reçues (comptes Collectivité) ---- */
+/* ---- Demandes de contact reçues (consentement avant toute conversation) ---- */
 async function loadDemandesRelation(){
   const bar = document.getElementById('demandes-relation-bar');
   if (!bar) return;
+  const dcUrgenceBadge = { faible:'#94A3B8', normal:'#64748B', important:'#D97706', urgent:'#DC2626' };
   try {
-    const r = await api('GET', '/demandes-relation/recues');
+    const r = await api('GET', '/demandes-contact?direction=recues&statut=en_attente');
     const demandes = r.demandes || [];
     if (!demandes.length){ bar.style.display='none'; bar.innerHTML=''; return; }
     bar.style.display='block';
     bar.innerHTML = `<div style="background:#EFF6FF;border-bottom:1.5px solid #BFDBFE;padding:10px 20px;display:flex;flex-direction:column;gap:8px;">
       ${demandes.map(d=>`
         <div style="display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap;">
-          <span>🤝 <strong>${escH(d.collectivite_nom)}</strong> souhaite entrer en contact avec vous${d.message?` : « ${escH(d.message)} »`:''}</span>
+          <span>📩 <strong>${escH(d.autre_nom)}</strong> souhaite entrer en contact avec vous
+            <span style="background:${dcUrgenceBadge[d.urgence]||'#64748B'};color:#fff;border-radius:99px;padding:1px 8px;font-size:10px;font-weight:700;margin-left:4px;">${escH(d.urgence)}</span>
+            — <em>${escH(d.motif_autre || d.motif)}</em>${d.message?` : « ${escH(d.message)} »`:''}</span>
           <span style="display:flex;gap:6px;margin-left:auto;">
             <button class="btn btn-sm btn-orange" onclick="repondreDemandeRelation(${d.id},'accepter')">Accepter</button>
             <button class="btn btn-sm btn-outline" onclick="repondreDemandeRelation(${d.id},'refuser')">Refuser</button>
+            <button class="btn btn-sm btn-outline" style="color:#DC2626;border-color:#DC2626;" onclick="repondreDemandeRelation(${d.id},'bloquer')">Bloquer</button>
           </span>
         </div>
       `).join('')}
@@ -1190,8 +1194,9 @@ async function loadDemandesRelation(){
 }
 
 async function repondreDemandeRelation(id, action){
+  if (action === 'bloquer' && !confirm('Bloquer ce compte ? Il ne pourra plus vous envoyer de demande de contact.')) return;
   try {
-    const r = await api('POST', `/demandes-relation/${id}/repondre`, { action });
+    const r = await api('POST', `/demandes-contact/${id}/repondre`, { action });
     await loadDemandesRelation();
     if (action === 'accepter' && r.conversation_id) {
       await loadConvList();

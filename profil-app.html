@@ -988,6 +988,7 @@ html, body { overflow-x:clip; }
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
+<script src="assets/demande-contact.js"></script>
 <script>
 /* ===================================================
    PROFIL UTILISATEUR — logique complète
@@ -1076,10 +1077,11 @@ async function renderEnrichedColumns() {
   window.ppContact = (sujet) => { location.href = `messagerie.html?user=${profil.id}&sujet=${encodeURIComponent(sujet)}`; };
 
   window.ppDemandeRelation = async (membreId) => {
-    const message = prompt("Message accompagnant votre demande de mise en relation (optionnel) :", "");
+    if (window.DemandeContact) return window.DemandeContact.open(membreId, profil.nom);
+    const message = prompt("Message accompagnant votre demande de contact (optionnel) :", "");
     if (message === null) return;
     try {
-      await api('POST', '/demandes-relation', { membre_id: membreId, message });
+      await api('POST', '/demandes-contact', { destinataire_id: membreId, motif: "Demande d'informations", message: message || "Bonjour, je souhaite entrer en contact avec vous." });
       alert("Demande envoyée. La conversation ne sera ouverte qu'après acceptation par le membre.");
     } catch(e) { alert('Erreur : ' + (e.message || 'impossible d\'envoyer la demande.')); }
   };

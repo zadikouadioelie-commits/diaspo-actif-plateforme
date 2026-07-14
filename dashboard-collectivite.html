@@ -714,8 +714,9 @@
         </div>
 
         <div class="card" style="margin-top:20px;">
-          <h3 style="margin:0 0 8px;">🤝 Demandes de mise en relation</h3>
+          <h3 style="margin:0 0 8px;">📩 Demandes de contact</h3>
           <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">Un compte officiel ne peut pas contacter directement un membre : une demande lui est envoyée depuis son profil public, et la conversation ne s'ouvre qu'après son acceptation explicite.</p>
+          <div id="dc-stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;"></div>
           <div id="demandes-relation-envoyees"><div class="notice">Chargement…</div></div>
         </div>
       </section>
@@ -1612,16 +1613,16 @@ document.addEventListener("click", (e) => {
 async function loadDemandesRelationEnvoyees() {
   const el = document.getElementById("demandes-relation-envoyees");
   if (!el) return;
-  const STATUT_LABEL = { en_attente: "⏳ En attente", acceptee: "✅ Acceptée", refusee: "❌ Refusée" };
+  const STATUT_LABEL = { en_attente: "⏳ En attente", acceptee: "✅ Acceptée", refusee: "❌ Refusée", expiree: "⌛ Expirée", bloquee: "🚫 Bloquée" };
   try {
-    const r = await api("GET", "/demandes-relation/envoyees");
+    const r = await api("GET", "/demandes-contact?direction=envoyees");
     const demandes = r.demandes || [];
     if (!demandes.length) { el.innerHTML = `<div class="empty">Aucune demande envoyée.</div>`; return; }
     el.innerHTML = demandes.map(d => `
       <div class="comm-hist-row">
         <div style="flex:1;">
-          <div style="font-weight:700;font-size:14px;">${escH(d.membre_nom)} <span style="font-weight:400;color:var(--muted);font-size:12px;">(${d.membre_role === 'initiative' ? 'organisation' : 'membre'})</span></div>
-          <div style="font-size:12.5px;color:var(--muted);">${fmtDateGlobal(d.created_at)} · ${STATUT_LABEL[d.statut] || d.statut}</div>
+          <div style="font-weight:700;font-size:14px;">${escH(d.autre_nom)} <span style="font-weight:400;color:var(--muted);font-size:12px;">(${d.autre_role === 'initiative' ? 'organisation' : 'membre'})</span></div>
+          <div style="font-size:12.5px;color:var(--muted);">${fmtDateGlobal(d.created_at)} · ${STATUT_LABEL[d.statut] || d.statut} · ${escH(d.motif_autre || d.motif)}</div>
           ${d.message ? `<div style="font-size:13px;margin-top:4px;color:var(--text);">${escH(d.message)}</div>` : ''}
         </div>
         ${d.statut === 'acceptee' && d.conversation_id ? `<a class="btn btn-sm btn-outline" href="messagerie.html?conv=${d.conversation_id}">Voir la conversation</a>` : ''}
@@ -1630,10 +1631,29 @@ async function loadDemandesRelationEnvoyees() {
   } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
 }
 
+async function loadDemandesContactStats() {
+  const el = document.getElementById("dc-stats-grid");
+  if (!el) return;
+  try {
+    const s = await api("GET", "/demandes-contact/stats");
+    const items = [
+      ["Envoyées", s.envoyees], ["Acceptées", s.acceptees], ["Refusées", s.refusees],
+      ["Expirées", s.expirees], ["Conversations ouvertes", s.conversations_ouvertes],
+      ["Taux d'acceptation", s.taux_acceptation + "%"], ["Délai moyen", s.delai_moyen_heures + "h"], ["Taux de blocage", s.taux_blocage + "%"],
+    ];
+    el.innerHTML = items.map(([label, val]) => `
+      <div style="background:var(--card,#fff);border:1px solid var(--border,#eef0f4);border-radius:12px;padding:10px 12px;text-align:center;">
+        <div style="font-size:19px;font-weight:800;">${val}</div>
+        <div style="font-size:10.5px;color:var(--muted);">${label}</div>
+      </div>`).join("");
+  } catch(e) { el.innerHTML = ""; }
+}
+
 async function loadCommHistorique() {
   loadCommPerimetre();
   loadCommListes();
   loadDemandesRelationEnvoyees();
+  loadDemandesContactStats();
   const el = document.getElementById("comm-historique");
   try {
     const r = await api("GET", "/communications");
