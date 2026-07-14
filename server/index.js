@@ -3833,8 +3833,26 @@ route("POST", "/api/fil", async (req, res, params, body) => {
     }
   }
 
+  // --- Notifie les abonnés du profil de l'auteur qu'une nouvelle publication est en ligne ---
+  if (statut === "publie" && visibilite === "public") {
+    try {
+      const abonnes = await db.prepare("SELECT follower_id FROM user_follows WHERE followed_id=?").all(user.id);
+      for (const a of abonnes) {
+        if (Number(a.follower_id) === user.id) continue;
+        creerNotif(a.follower_id, "nouvelle_publication", `${user.nom} a publié`,
+          extraitOrDefault(contenu || article_titre || article_contenu),
+          { post_id: Number(id) });
+      }
+    } catch (_) {}
+  }
+
   sendJSON(res, 201, { id, post });
 });
+
+function extraitOrDefault(txt) {
+  const t = (txt || "").replace(/<[^>]+>/g, "").trim();
+  return t ? (t.slice(0, 80) + (t.length > 80 ? "…" : "")) : "Nouvelle publication sur son profil.";
+}
 
 route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -3946,7 +3964,7 @@ route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
   // Notifier l'auteur du post
   const post = await db.prepare("SELECT auteur_id, contenu FROM fil_posts WHERE id=?").get(params.id);
   if (post && post.auteur_id && post.auteur_id !== user.id) {
-    creerNotif(post.auteur_id, "message", `${user.nom} a commenté votre publication`,
+    creerNotif(post.auteur_id, "pub_commentaire", `${user.nom} a commenté votre publication`,
       contenu.slice(0, 80) + (contenu.length > 80 ? "…" : ""),
       { post_id: Number(params.id) });
   }
@@ -7297,8 +7315,10 @@ route("GET", "/api/notifications", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const limit = Math.min(Number(query.limit) || 20, 50);
-  const rows = await db.prepare("SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT ?").all(user.id, limit);
-  const non_lues = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id=? AND lue=0").get(user.id))?.n;
+  /* Les nouveaux messages de conversation ont leur propre indicateur (icône Messages) —
+     on ne les duplique pas dans le centre de notifications. */
+  const rows = await db.prepare("SELECT * FROM notifications WHERE user_id=? AND type != 'message' ORDER BY created_at DESC LIMIT ?").all(user.id, limit);
+  const non_lues = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id=? AND lue=0 AND type != 'message'").get(user.id))?.n;
   sendJSON(res, 200, { notifications: rows.map(r => ({ ...r, data: safeParse(r.data_json) })), non_lues });
 });
 

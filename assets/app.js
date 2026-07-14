@@ -173,28 +173,31 @@ function injectNotifStyles() {
 .notif-dd-markall:hover { text-decoration:underline; }
 .notif-list { max-height:360px; overflow-y:auto; }
 .notif-item {
-  display:flex; gap:11px; padding:12px 16px; cursor:pointer;
-  border-bottom:1px solid #F9FAFB; transition:background .13s;
-  text-decoration:none; color:inherit;
+  position:relative; display:flex; flex-direction:column; gap:0; padding:0; cursor:pointer;
+  border-bottom:1px solid #EEF0F3; transition:background .13s;
 }
-.notif-item:hover { background:#F9FAFB; }
-.notif-item.unread { background:#EEF2FF; }
-.notif-item.unread:hover { background:#E0E7FF; }
+.notif-item:hover { background:#F5F7FA; }
+.notif-item.unread { background:#EAF0FF; border-left:3px solid #2952CC; }
+.notif-item.unread:hover { background:#DCE6FF; }
 .notif-icon {
-  width:36px; height:36px; border-radius:50%; flex-shrink:0;
+  width:38px; height:38px; border-radius:50%; flex-shrink:0;
   display:flex; align-items:center; justify-content:center;
-  font-size:17px; background:#F3F4F6;
+  font-size:18px; background:#E5E7EB;
 }
-.notif-icon.mention { background:#EEF2FF; }
-.notif-icon.reaction { background:#FEF2F2; }
-.notif-icon.message  { background:#F0FDF4; }
-.notif-icon.evenement { background:#FFF7ED; }
-.notif-icon.validation { background:#F0FDF4; }
+.notif-icon.mention { background:#C7D2FE; }
+.notif-icon.nouveau_abonne { background:#BBF7D0; }
+.notif-icon.nouvelle_publication { background:#FDE68A; }
+.notif-icon.reaction { background:#FBCFE8; }
+.notif-icon.pub_like { background:#FBCFE8; }
+.notif-icon.pub_commentaire { background:#BAE6FD; }
+.notif-icon.evenement { background:#FED7AA; }
+.notif-icon.validation, .notif-icon.demande_contact_acceptee { background:#BBF7D0; }
+.notif-icon.demande_contact_refusee, .notif-icon.responsable_refuse { background:#FECACA; }
 .notif-content { flex:1; min-width:0; }
-.notif-titre { font-size:13px; font-weight:700; color:#0D1B2A; line-height:1.3; margin-bottom:2px; }
-.notif-contenu { font-size:12px; color:#6B7280; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.notif-date { font-size:11px; color:#9CA3AF; margin-top:3px; }
-.notif-unread-dot { width:8px; height:8px; border-radius:50%; background:#4338CA; flex-shrink:0; margin-top:4px; }
+.notif-titre { font-size:13px; font-weight:800; color:#0D1B2A; line-height:1.3; margin-bottom:2px; }
+.notif-contenu { font-size:12px; color:#4B5563; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.notif-date { font-size:11px; color:#6B7280; margin-top:3px; font-weight:600; }
+.notif-unread-dot { width:9px; height:9px; border-radius:50%; background:#2952CC; flex-shrink:0; margin-top:4px; box-shadow:0 0 0 2px #fff; }
 .notif-empty { text-align:center; padding:28px 16px; color:#9CA3AF; font-size:13px; }
 .notif-dd-footer { border-top:1px solid #F3F4F6; text-align:center; padding:10px; }
 .notif-dd-footer a { font-size:12.5px; color:#4338CA; font-weight:700; text-decoration:none; }
@@ -211,6 +214,9 @@ const NOTIF_ICONS = {
   validation: "✅",
   abonnement: "⭐",
   nouveau_abonne: "👤",
+  nouvelle_publication: "📰",
+  pub_commentaire: "💬",
+  pub_like: "❤️",
   reunion_invite: "📹",
   demande_contact: "📩",
   demande_contact_acceptee: "🤝",
@@ -240,7 +246,7 @@ function renderNotifItem(n) {
   const d = (typeof n.data === "object" ? n.data : null) || {};
   const showFollowBack = n.type === "nouveau_abonne" && unread && d.follower_id;
   return `<div class="notif-item${unread ? " unread" : ""}" data-notif-id="${n.id}">
-    <a href="${url}" style="display:flex;gap:10px;text-decoration:none;color:inherit;" onclick="markNotifRead(${n.id})">
+    <a href="${url}" style="display:flex;gap:11px;padding:12px 16px;text-decoration:none;color:inherit;" onclick="markNotifRead(${n.id})">
       <div class="notif-icon ${n.type}">${icon}</div>
       <div class="notif-content">
         <div class="notif-titre">${escapeHtml(n.titre || "")}</div>
@@ -249,7 +255,7 @@ function renderNotifItem(n) {
       </div>
       ${unread ? `<div class="notif-unread-dot"></div>` : ""}
     </a>
-    ${showFollowBack ? `<div class="notif-followback-actions" style="display:flex;gap:6px;margin:6px 0 2px 46px;">
+    ${showFollowBack ? `<div class="notif-followback-actions" style="display:flex;gap:6px;margin:0 16px 12px 65px;">
       <button type="button" class="btn btn-sm btn-orange" onclick="event.preventDefault();event.stopPropagation();acceptFollowBack(${n.id},${d.follower_id},this)">↩️ Suivre en retour</button>
       <button type="button" class="btn btn-sm btn-outline" onclick="event.preventDefault();event.stopPropagation();declineFollowBack(${n.id},this)">Ignorer</button>
     </div>` : ""}
