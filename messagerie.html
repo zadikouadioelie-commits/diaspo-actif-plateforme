@@ -175,6 +175,12 @@
         <input id="conv-search" placeholder="Rechercher par nom, organisation…" autocomplete="off">
       </div>
 
+      <div style="padding:0 12px 10px;">
+        <select id="conv-liste-filter" style="width:100%;padding:7px 10px;border-radius:10px;border:1px solid var(--border);font-size:12.5px;font-family:inherit;background:#fff;">
+          <option value="">🤝 Toutes mes listes Réseau Pro</option>
+        </select>
+      </div>
+
       <div class="msg-tabs">
         <button class="msg-tab active" data-filtre="tous">Tous</button>
         <button class="msg-tab" data-filtre="non_lus">Non lus <span id="tab-nonlus-count" style="display:none;"></span></button>
@@ -358,6 +364,7 @@ let me = null;
 let activeConvId = null;
 let pollTimer = null;
 let filtre = "tous";
+let listeFiltre = "";
 let pendingAttach = null; // { type, icon, nom, url }
 const EMOJI_LIST = ["👍","😊","🙏","💪","🎉","❤️","😂","👏","🔥","✅","💡","🤝"];
 
@@ -451,6 +458,7 @@ async function loadConvList(searchQ){
   const list=document.getElementById("conv-list");
   const params=new URLSearchParams({filtre});
   if(searchQ) params.set("q",searchQ);
+  if(listeFiltre) params.set("liste_id",listeFiltre);
   let data;
   try{ data=await api("GET","/conversations?"+params.toString()); }
   catch(e){ list.innerHTML=`<div style="padding:16px;color:#D33;font-size:13px;">${e.message}</div>`; return; }
@@ -1114,6 +1122,25 @@ async function deleteMessage(id){
   } catch(e){ alert(e.message); }
 }
 
+/* ---- Filtre par liste Réseau Pro ---- */
+async function loadListeFilterOptions(){
+  const sel = document.getElementById("conv-liste-filter");
+  try {
+    const r = await api("GET", "/listes-diffusion");
+    const listes = r.listes || [];
+    listes.forEach(l => {
+      const opt = document.createElement("option");
+      opt.value = l.id;
+      opt.textContent = `${l.icone || "📋"} ${l.nom}`;
+      sel.appendChild(opt);
+    });
+  } catch(e) { /* silencieux */ }
+}
+document.getElementById("conv-liste-filter").addEventListener("change", function(){
+  listeFiltre = this.value;
+  loadConvList(document.getElementById("conv-search").value.trim() || undefined);
+});
+
 /* ---- Filtres ---- */
 document.querySelectorAll(".msg-tab").forEach(tab=>{
   tab.addEventListener("click",()=>{
@@ -1299,6 +1326,7 @@ async function proposerClassementContact(contactId, contactNom, convId){
   // Charger la liste des conversations
   await loadConvList();
   await loadDemandesRelation();
+  loadListeFilterOptions();
 
   // Boutons header conversation
   document.getElementById('btn-search-msg').addEventListener('click', openSearchPanel);

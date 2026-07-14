@@ -328,6 +328,15 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   // Assigner le DA-ID à l'utilisateur
   try { await db.prepare('UPDATE users SET da_id=? WHERE id=?').run(generateDaId(), id); } catch (_) {}
+  // Réseau Pro : quelques listes par défaut, entièrement modifiables/supprimables ensuite
+  try {
+    const LISTES_DEFAUT = [
+      ["Correspondants", "🤝"], ["Partenaires", "🏢"], ["Prospects", "🎯"], ["Collaborateurs", "👥"],
+    ];
+    LISTES_DEFAUT.forEach(([nomListe, icone], i) => {
+      db.prepare("INSERT INTO listes_diffusion (proprietaire_id, nom, icone, ordre) VALUES (?,?,?,?)").run(id, nomListe, icone, i);
+    });
+  } catch (_) {}
   // Profil public enrichi : publics/besoins facultatifs du formulaire d'inscription
   try {
     if (Array.isArray(body.publics) && body.publics.length) await db.prepare('UPDATE users SET publics_json=? WHERE id=?').run(JSON.stringify(body.publics), id);
@@ -4405,6 +4414,17 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
   if (filtre === "non_lus") filtered = filtered.filter(r => r.non_lus > 0);
   if (filtre === "archives") filtered = filtered.filter(r => r.archive);
   else if (filtre === "tous") filtered = filtered.filter(r => !r.archive);
+
+  if (query.liste_id) {
+    const liste = await db.prepare("SELECT id FROM listes_diffusion WHERE id=? AND proprietaire_id=?").get(query.liste_id, user.id);
+    if (liste) {
+      const membres = await db.prepare("SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL").all(query.liste_id);
+      const ids = new Set(membres.map(m => Number(m.user_id)));
+      filtered = filtered.filter(r => ids.has(r.user1_id === user.id ? Number(r.user2_id) : Number(r.user1_id)));
+    } else {
+      filtered = [];
+    }
+  }
 
   if (q) filtered = filtered.filter(r =>
     (r.avec_nom||"").toLowerCase().includes(q) ||
@@ -13272,6 +13292,33 @@ ${jsonLd}
         })()
       };
       return sendJSON(res, 200, { stats });
+    }
+
+    /* ── POST /api/listes-diffusion/:id/message-groupe — envoie le même message à tous les
+       membres de la liste ayant déjà une conversation existante (ne contourne jamais le
+       consentement mutuel : les contacts sans conversation établie sont ignorés). ── */
+    if (req.method === 'POST' && /^\/api\/listes-diffusion\/\d+\/message-groupe$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const lid = parseInt(pathname.split('/')[3]);
+      const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
+      if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
+      const contenu = (body.contenu || '').trim();
+      if (!contenu) return sendJSON(res, 400, { error: 'Message vide.' });
+
+      const membres = await db.prepare(`SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL`).all(lid);
+      let envoyes = 0, ignores = 0;
+      for (const m of membres) {
+        const otherId = Number(m.user_id);
+        if (otherId === me.id) continue;
+        const conv = await db.prepare(`SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)`).get(me.id, otherId, otherId, me.id);
+        if (!conv) { ignores++; continue; }
+        await db.prepare(`INSERT INTO messages (conversation_id, sender_id, contenu, type) VALUES (?,?,?,'text')`).run(conv.id, me.id, contenu);
+        if (conv.user1_id === me.id && conv.deleted_u2) await db.prepare(`UPDATE conversations SET deleted_u2=0 WHERE id=?`).run(conv.id);
+        if (conv.user2_id === me.id && conv.deleted_u1) await db.prepare(`UPDATE conversations SET deleted_u1=0 WHERE id=?`).run(conv.id);
+        creerNotif(otherId, 'message', 'Nouveau message', `${me.nom} vous a envoyé un message`, { conversation_id: conv.id });
+        envoyes++;
+      }
+      return sendJSON(res, 200, { envoyes, ignores });
     }
 
     /* ── POST /api/listes-diffusion/:id/duplicate — dupliquer ── */

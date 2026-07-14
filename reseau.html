@@ -440,6 +440,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
         <input id="mdl-recherche" placeholder="🔍 Rechercher dans cette liste…" oninput="mdlFiltrerContacts()" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:.83rem;">
         <div style="display:flex;gap:6px;">
+          <button class="ld-btn" onclick="envoyerMessageListe(currentListeId)">💬 Message groupé</button>
           <button class="ld-btn" onclick="exporterListe(currentListeId)">⬇️ CSV</button>
           <button class="ld-btn" onclick="editerListe(currentListeId)">✏️ Modifier</button>
         </div>
@@ -1268,6 +1269,18 @@ async function supprimerListe(id,nom){
 
 function exporterListe(id){
   window.open(`/api/listes-diffusion/${id}/export`,'_blank');
+}
+
+async function envoyerMessageListe(id){
+  const l=mesListes.find(x=>x.id===id);
+  const contenu=prompt(`Message à envoyer à tous les contacts de « ${l?l.nom:'cette liste'} » ayant déjà une conversation avec vous :`);
+  if(contenu===null) return;
+  const msg=contenu.trim();
+  if(!msg){ alert('Message vide.'); return; }
+  try{
+    const r=await apiCall('POST',`/listes-diffusion/${id}/message-groupe`,{contenu:msg});
+    alert(`Message envoyé à ${r.envoyes} contact(s).${r.ignores?` ${r.ignores} contact(s) ignoré(s) (aucune conversation existante — le consentement mutuel doit d'abord être établi).`:''}`);
+  }catch(e){ alert('Erreur : '+e.message); }
 }
 
 let mdlContactsCache=[];
