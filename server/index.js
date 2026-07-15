@@ -21050,7 +21050,7 @@ async function getAccredDef(idOrType) {
   if (!def) return null;
   def.droits  = safeParse(def.droits);
   def.regles  = await db.prepare("SELECT role,mode FROM accred_regles WHERE accred_id=?").all(def.id);
-  def.tarifs  = await db.prepare("SELECT role,type_tarif,montant,devise,renouvellement_auto,periode_grace_jours,validation_admin FROM accred_tarifs WHERE accred_id=?").all(def.id);
+  def.tarifs  = await db.prepare("SELECT role,type_tarif,montant,devise,renouvellement_auto,periode_grace_jours,validation_admin,reduction_annuelle_pct FROM accred_tarifs WHERE accred_id=?").all(def.id);
   /* eligible = liste des rôles dont le mode n'est pas 'non_concerne' */
   def.eligible = def.regles.filter(r => r.mode !== 'non_concerne').map(r => r.role);
   /* prix pour compat ACCREDITATIONS_DA statique */
@@ -21107,8 +21107,8 @@ route("POST", "/api/admin/accred/definitions", async (req, res, params, body) =>
     for (const r of regles) if (r.role && r.mode) insR.run(id, r.role, r.mode);
   }
   if (Array.isArray(tarifs)) {
-    const insT = db.prepare("INSERT OR REPLACE INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,renouvellement_auto,periode_grace_jours,validation_admin) VALUES (?,?,?,?,?,?,?,?)");
-    for (const t of tarifs) if (t.role) insT.run(id, t.role, t.type_tarif||'gratuit', t.montant||0, t.devise||'EUR', t.renouvellement_auto||0, t.periode_grace_jours||7, t.validation_admin||1);
+    const insT = db.prepare("INSERT OR REPLACE INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,renouvellement_auto,periode_grace_jours,validation_admin,reduction_annuelle_pct) VALUES (?,?,?,?,?,?,?,?,?)");
+    for (const t of tarifs) if (t.role) insT.run(id, t.role, t.type_tarif||'gratuit', t.montant||0, t.devise||'EUR', t.renouvellement_auto||0, t.periode_grace_jours||7, t.validation_admin||1, t.reduction_annuelle_pct||0);
   }
 
   /* Appliquer accès automatique aux comptes éligibles */
@@ -21208,8 +21208,8 @@ route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body)
   }
   if (Array.isArray(tarifs)) {
     await db.prepare("DELETE FROM accred_tarifs WHERE accred_id=?").run(params.id);
-    const insT = db.prepare("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,renouvellement_auto,periode_grace_jours,validation_admin) VALUES (?,?,?,?,?,?,?,?)");
-    for (const t of tarifs) if (t.role) insT.run(params.id, t.role, t.type_tarif||'gratuit', t.montant||0, t.devise||'EUR', t.renouvellement_auto||0, t.periode_grace_jours||7, t.validation_admin||1);
+    const insT = db.prepare("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,renouvellement_auto,periode_grace_jours,validation_admin,reduction_annuelle_pct) VALUES (?,?,?,?,?,?,?,?,?)");
+    for (const t of tarifs) if (t.role) insT.run(params.id, t.role, t.type_tarif||'gratuit', t.montant||0, t.devise||'EUR', t.renouvellement_auto||0, t.periode_grace_jours||7, t.validation_admin||1, t.reduction_annuelle_pct||0);
   }
 
   /* Snapshot après pour audit */

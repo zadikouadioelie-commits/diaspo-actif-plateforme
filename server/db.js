@@ -3326,6 +3326,11 @@ db.exec(`
   "date_application TEXT"
 ].forEach(col => { try { db.exec(`ALTER TABLE accred_definitions ADD COLUMN ${col}`); } catch(_) {} });
 
+/* Extension de accred_tarifs — abonnement mensuel avec réduction sur le total annuel */
+;["reduction_annuelle_pct REAL DEFAULT 0"].forEach(col => {
+  try { db.exec(`ALTER TABLE accred_tarifs ADD COLUMN ${col}`); } catch(_) {}
+});
+
 db.exec(`
   /* Journal d'audit des modifications d'accréditations */
   CREATE TABLE IF NOT EXISTS accred_audit_log (

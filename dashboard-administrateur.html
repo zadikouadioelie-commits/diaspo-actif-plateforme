@@ -5055,6 +5055,7 @@ function adpRenderRoleBlock(role, regle, tarif) {
   const ttype = tarif?.type_tarif || 'gratuit';
   const mnt   = tarif?.montant   ?? 0;
   const val   = tarif?.validation_admin ?? 1;
+  const reduc = tarif?.reduction_annuelle_pct ?? 0;
   const label = ROLES_LBL[role] || role;
   const sel   = (v, cmp) => v == cmp ? ' selected' : '';
   const chk   = (v, cmp) => v === cmp ? ' checked' : '';
@@ -5075,7 +5076,7 @@ function adpRenderRoleBlock(role, regle, tarif) {
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
       <div>
         <label class="form-label" style="font-size:11px;">Tarification</label>
-        <select id="tarif-type-${role}" class="input-field" style="width:100%;font-size:13px;">
+        <select id="tarif-type-${role}" class="input-field" style="width:100%;font-size:13px;" onchange="adpToggleAbonnement('${role}')">
           <option value="gratuit"${sel(ttype,'gratuit')}>Gratuit</option>
           <option value="paiement_unique"${sel(ttype,'paiement_unique')}>Paiement unique</option>
           <option value="mensuel"${sel(ttype,'mensuel')}>Abonnement mensuel</option>
@@ -5083,8 +5084,8 @@ function adpRenderRoleBlock(role, regle, tarif) {
         </select>
       </div>
       <div>
-        <label class="form-label" style="font-size:11px;">Montant (€)</label>
-        <input id="tarif-montant-${role}" class="input-field" style="width:100%;font-size:13px;" type="number" min="0" step="0.01" value="${mnt}">
+        <label class="form-label" style="font-size:11px;" id="tarif-montant-label-${role}">${ttype==='mensuel'?'Prix / mois (€)':'Montant (€)'}</label>
+        <input id="tarif-montant-${role}" class="input-field" style="width:100%;font-size:13px;" type="number" min="0" step="0.01" value="${mnt}" oninput="adpUpdateAbonnementTotal('${role}')">
       </div>
       <div>
         <label class="form-label" style="font-size:11px;">Validation admin</label>
@@ -5093,8 +5094,43 @@ function adpRenderRoleBlock(role, regle, tarif) {
           <option value="0"${sel(val,0)}>Non requise (accès immédiat)</option>
         </select>
       </div>
+    </div>
+    <div id="tarif-abo-${role}" style="display:${ttype==='mensuel'?'grid':'none'};grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+      <div>
+        <label class="form-label" style="font-size:11px;">Réduction si payé à l'année (%)</label>
+        <input id="tarif-reduc-${role}" class="input-field" style="width:100%;font-size:13px;" type="number" min="0" max="100" step="1" value="${reduc}" oninput="adpUpdateAbonnementTotal('${role}')">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:11px;">Total par an</label>
+        <div id="tarif-annuel-${role}" class="input-field" style="width:100%;font-size:13px;background:#f8fafc;display:flex;align-items:center;min-height:36px;"></div>
+      </div>
     </div>`;
+  setTimeout(()=>adpUpdateAbonnementTotal(role), 0);
   return div;
+}
+
+function adpToggleAbonnement(role) {
+  const type = document.getElementById(`tarif-type-${role}`)?.value;
+  const block = document.getElementById(`tarif-abo-${role}`);
+  const label = document.getElementById(`tarif-montant-label-${role}`);
+  if (!block || !label) return;
+  block.style.display = type === 'mensuel' ? 'grid' : 'none';
+  label.textContent = type === 'mensuel' ? 'Prix / mois (€)' : 'Montant (€)';
+  if (type === 'mensuel') adpUpdateAbonnementTotal(role);
+}
+
+function adpUpdateAbonnementTotal(role) {
+  const type = document.getElementById(`tarif-type-${role}`)?.value;
+  if (type !== 'mensuel') return;
+  const mensuel = parseFloat(document.getElementById(`tarif-montant-${role}`)?.value) || 0;
+  const reduc = parseFloat(document.getElementById(`tarif-reduc-${role}`)?.value) || 0;
+  const brut = mensuel * 12;
+  const net = brut * (1 - reduc / 100);
+  const el = document.getElementById(`tarif-annuel-${role}`);
+  if (!el) return;
+  el.innerHTML = reduc > 0
+    ? `<span style="text-decoration:line-through;color:var(--muted);margin-right:6px;">${brut.toFixed(2)} €</span><strong style="color:#059669;">${net.toFixed(2)} €</strong>`
+    : `<strong>${net.toFixed(2)} €</strong>`;
 }
 
 function adpAddRole(role, regle, tarif) {
@@ -5147,7 +5183,14 @@ async function loadAccredDefinitions() {
         const tarif = (d.tarifs||[]).map(t=>{
           const m = t.montant>0 ? `${t.montant}€` : 'Gratuit';
           const period = t.type_tarif==='mensuel'?'/mois':t.type_tarif==='annuel'?'/an':t.type_tarif==='paiement_unique'?' (unique)':'';
-          return `${ROLES_LBL[t.role]||t.role}: ${m}${period}`;
+          let ligne = `${ROLES_LBL[t.role]||t.role}: ${m}${period}`;
+          if (t.type_tarif==='mensuel' && t.montant>0) {
+            const brut = t.montant*12, reduc = t.reduction_annuelle_pct||0, net = brut*(1-reduc/100);
+            ligne += reduc>0
+              ? ` <span style="color:var(--muted);">(${net.toFixed(2)}€/an, -${reduc}%)</span>`
+              : ` <span style="color:var(--muted);">(${brut.toFixed(2)}€/an)</span>`;
+          }
+          return ligne;
         }).join('<br>') || '—';
         return `<tr style="border-bottom:1px solid var(--border);">
           <td style="padding:12px 14px;font-weight:700;">${d.emoji||'🎖'} ${d.label}
@@ -5426,12 +5469,14 @@ async function saveAccredDef() {
     const mode = document.querySelector(`input[name="mode-${role}"]:checked`)?.value || 'non_concerne';
     regles.push({ role, mode });
     if (mode !== 'non_concerne') {
+      const typeTarif = document.getElementById(`tarif-type-${role}`)?.value || 'gratuit';
       tarifs.push({
         role,
-        type_tarif: document.getElementById(`tarif-type-${role}`)?.value || 'gratuit',
+        type_tarif: typeTarif,
         montant: parseFloat(document.getElementById(`tarif-montant-${role}`)?.value) || 0,
         devise: 'EUR',
-        validation_admin: parseInt(document.getElementById(`tarif-validation-${role}`)?.value) ?? 1
+        validation_admin: parseInt(document.getElementById(`tarif-validation-${role}`)?.value) ?? 1,
+        reduction_annuelle_pct: typeTarif === 'mensuel' ? (parseFloat(document.getElementById(`tarif-reduc-${role}`)?.value) || 0) : 0
       });
     }
   });

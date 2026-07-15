@@ -637,6 +637,7 @@ async function migratePg(pool) {
     ['accred_definitions', 'double_validation', 'INTEGER DEFAULT 0'],
     ['accred_definitions', 'controle_documentaire', 'INTEGER DEFAULT 0'],
     ['accred_definitions', 'date_application', 'TEXT'],
+    ['accred_tarifs', 'reduction_annuelle_pct', 'REAL DEFAULT 0'],
   ];
   for (const [table, col, type] of cols) {
     try {
