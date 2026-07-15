@@ -5084,7 +5084,7 @@ function adpRenderRoleBlock(role, regle, tarif) {
         </select>
       </div>
       <div>
-        <label class="form-label" style="font-size:11px;" id="tarif-montant-label-${role}">${ttype==='mensuel'?'Prix / mois (€)':'Montant (€)'}</label>
+        <label class="form-label" style="font-size:11px;" id="tarif-montant-label-${role}">${adpMontantLabel(ttype)}</label>
         <input id="tarif-montant-${role}" class="input-field" style="width:100%;font-size:13px;" type="number" min="0" step="0.01" value="${mnt}" oninput="adpUpdateAbonnementTotal('${role}')">
       </div>
       <div>
@@ -5095,13 +5095,13 @@ function adpRenderRoleBlock(role, regle, tarif) {
         </select>
       </div>
     </div>
-    <div id="tarif-abo-${role}" style="display:${ttype==='mensuel'?'grid':'none'};grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+    <div id="tarif-abo-${role}" style="display:${(ttype==='mensuel'||ttype==='annuel')?'grid':'none'};grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
       <div>
-        <label class="form-label" style="font-size:11px;">Réduction si payé à l'année (%)</label>
+        <label class="form-label" style="font-size:11px;" id="tarif-reduc-label-${role}">${adpReducLabel(ttype)}</label>
         <input id="tarif-reduc-${role}" class="input-field" style="width:100%;font-size:13px;" type="number" min="0" max="100" step="1" value="${reduc}" oninput="adpUpdateAbonnementTotal('${role}')">
       </div>
       <div>
-        <label class="form-label" style="font-size:11px;">Total par an</label>
+        <label class="form-label" style="font-size:11px;" id="tarif-calc-label-${role}">${adpCalcLabel(ttype)}</label>
         <div id="tarif-annuel-${role}" class="input-field" style="width:100%;font-size:13px;background:#f8fafc;display:flex;align-items:center;min-height:36px;"></div>
       </div>
     </div>`;
@@ -5109,25 +5109,41 @@ function adpRenderRoleBlock(role, regle, tarif) {
   return div;
 }
 
+function adpMontantLabel(type) {
+  return type==='mensuel' ? 'Prix / mois (€)' : type==='annuel' ? 'Prix / an (€)' : 'Montant (€)';
+}
+function adpReducLabel(type) {
+  return type==='mensuel' ? "Réduction si payé à l'année (%)" : type==='annuel' ? 'Réduction annuelle (%)' : 'Réduction (%)';
+}
+function adpCalcLabel(type) {
+  return type==='mensuel' ? 'Total par an' : type==='annuel' ? 'Équivalent par mois' : '';
+}
+
 function adpToggleAbonnement(role) {
   const type = document.getElementById(`tarif-type-${role}`)?.value;
   const block = document.getElementById(`tarif-abo-${role}`);
   const label = document.getElementById(`tarif-montant-label-${role}`);
+  const reducLabel = document.getElementById(`tarif-reduc-label-${role}`);
+  const calcLabel = document.getElementById(`tarif-calc-label-${role}`);
   if (!block || !label) return;
-  block.style.display = type === 'mensuel' ? 'grid' : 'none';
-  label.textContent = type === 'mensuel' ? 'Prix / mois (€)' : 'Montant (€)';
-  if (type === 'mensuel') adpUpdateAbonnementTotal(role);
+  const isAbo = type === 'mensuel' || type === 'annuel';
+  block.style.display = isAbo ? 'grid' : 'none';
+  label.textContent = adpMontantLabel(type);
+  if (reducLabel) reducLabel.textContent = adpReducLabel(type);
+  if (calcLabel) calcLabel.textContent = adpCalcLabel(type);
+  if (isAbo) adpUpdateAbonnementTotal(role);
 }
 
 function adpUpdateAbonnementTotal(role) {
   const type = document.getElementById(`tarif-type-${role}`)?.value;
-  if (type !== 'mensuel') return;
-  const mensuel = parseFloat(document.getElementById(`tarif-montant-${role}`)?.value) || 0;
+  if (type !== 'mensuel' && type !== 'annuel') return;
+  const montant = parseFloat(document.getElementById(`tarif-montant-${role}`)?.value) || 0;
   const reduc = parseFloat(document.getElementById(`tarif-reduc-${role}`)?.value) || 0;
-  const brut = mensuel * 12;
-  const net = brut * (1 - reduc / 100);
   const el = document.getElementById(`tarif-annuel-${role}`);
   if (!el) return;
+  let brut, net;
+  if (type === 'mensuel') { brut = montant * 12; net = brut * (1 - reduc / 100); }
+  else { brut = montant / 12; net = (montant * (1 - reduc / 100)) / 12; }
   el.innerHTML = reduc > 0
     ? `<span style="text-decoration:line-through;color:var(--muted);margin-right:6px;">${brut.toFixed(2)} €</span><strong style="color:#059669;">${net.toFixed(2)} €</strong>`
     : `<strong>${net.toFixed(2)} €</strong>`;
@@ -5189,6 +5205,11 @@ async function loadAccredDefinitions() {
             ligne += reduc>0
               ? ` <span style="color:var(--muted);">(${net.toFixed(2)}€/an, -${reduc}%)</span>`
               : ` <span style="color:var(--muted);">(${brut.toFixed(2)}€/an)</span>`;
+          } else if (t.type_tarif==='annuel' && t.montant>0) {
+            const reduc = t.reduction_annuelle_pct||0, netAn = t.montant*(1-reduc/100), netMois = netAn/12;
+            ligne += reduc>0
+              ? ` <span style="color:var(--muted);">(${netAn.toFixed(2)}€/an net, -${reduc}%, soit ${netMois.toFixed(2)}€/mois)</span>`
+              : ` <span style="color:var(--muted);">(soit ${netMois.toFixed(2)}€/mois)</span>`;
           }
           return ligne;
         }).join('<br>') || '—';
@@ -5476,7 +5497,7 @@ async function saveAccredDef() {
         montant: parseFloat(document.getElementById(`tarif-montant-${role}`)?.value) || 0,
         devise: 'EUR',
         validation_admin: parseInt(document.getElementById(`tarif-validation-${role}`)?.value) ?? 1,
-        reduction_annuelle_pct: typeTarif === 'mensuel' ? (parseFloat(document.getElementById(`tarif-reduc-${role}`)?.value) || 0) : 0
+        reduction_annuelle_pct: (typeTarif === 'mensuel' || typeTarif === 'annuel') ? (parseFloat(document.getElementById(`tarif-reduc-${role}`)?.value) || 0) : 0
       });
     }
   });
