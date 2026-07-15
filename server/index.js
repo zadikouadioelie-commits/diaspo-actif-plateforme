@@ -21040,8 +21040,12 @@ route("POST", "/api/asso/membre-roles", async (req, res, params, body) => {
 
 /* Helper : récupère la définition complète (def + regles + tarifs) */
 async function getAccredDef(idOrType) {
-  const def = typeof idOrType === 'number'
-    ? await db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(idOrType)
+  /* En Postgres, les id numériques peuvent revenir en chaîne (piège BIGSERIAL déjà
+     documenté ailleurs dans ce fichier) — un simple typeof==='number' route alors
+     à tort vers la recherche par "type" et renvoie systématiquement null. */
+  const isId = typeof idOrType === 'number' || (typeof idOrType === 'string' && /^\d+$/.test(idOrType));
+  const def = isId
+    ? await db.prepare("SELECT * FROM accred_definitions WHERE id=?").get(Number(idOrType))
     : await db.prepare("SELECT * FROM accred_definitions WHERE type=?").get(idOrType);
   if (!def) return null;
   def.droits  = safeParse(def.droits);

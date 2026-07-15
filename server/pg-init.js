@@ -628,6 +628,15 @@ async function migratePg(pool) {
     ['formations', 'certificat_conditions', 'TEXT'],
     ['formations', 'certificat_qr', 'INTEGER DEFAULT 1'],
     ['formations', 'date_soumission', 'TEXT'],
+    // Moteur Accréditations v2 — champs étendus (jamais migrés en Postgres jusqu'ici,
+    // ce qui empêchait aussi le seed du catalogue de s'appliquer correctement en prod)
+    ['accred_definitions', 'duree_validite_jours', 'INTEGER'],
+    ['accred_definitions', 'conditions_obtention', 'TEXT'],
+    ['accred_definitions', 'documents_requis', "TEXT DEFAULT '[]'"],
+    ['accred_definitions', 'renouvellement_auto', 'INTEGER DEFAULT 0'],
+    ['accred_definitions', 'double_validation', 'INTEGER DEFAULT 0'],
+    ['accred_definitions', 'controle_documentaire', 'INTEGER DEFAULT 0'],
+    ['accred_definitions', 'date_application', 'TEXT'],
   ];
   for (const [table, col, type] of cols) {
     try {
@@ -639,6 +648,40 @@ async function migratePg(pool) {
   // Index unique da_id (comme en SQLite)
   try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_da_id ON users(da_id) WHERE da_id IS NOT NULL`); } catch(_) {}
   try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_initiatives_da_id ON initiatives(da_id) WHERE da_id IS NOT NULL`); } catch(_) {}
+
+  /* ── Accréditation "Créateur de formations" — jamais seedée en Postgres ──
+     Bug racine identifié le 2026-07-15 : le seed dans db.js (seedCreateurFormations)
+     s'exécute uniquement via l'API synchrone better-sqlite3 (db.prepare(...).run(...))
+     au chargement du module — il ne s'exécute donc jamais contre la base Postgres de
+     production, qui passe par pg-init.js. Contrairement aux 5 autres accréditations
+     visibles en prod (créées manuellement par l'admin via l'UI), celle-ci n'existait
+     nulle part côté Postgres, empêchant toute demande d'accréditation "Créateur de
+     formations" côté utilisateurs. Idempotent via ON CONFLICT (type) DO NOTHING —
+     n'écrase rien si l'admin l'a entre-temps recréée manuellement. */
+  try {
+    const { rows: insRows } = await pool.query(
+      `INSERT INTO accred_definitions
+        (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre,conditions_obtention,documents_requis)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT (type) DO NOTHING RETURNING id`,
+      [
+        'createur_formations', 'Créateur de formations', '🎓',
+        "Autorisation de proposer des formations dans l'espace Diaspo Formation. Permet de créer, publier et gérer des formations avec suivi des inscriptions et des revenus.",
+        JSON.stringify(['Créer et publier des formations','Suivre les inscriptions et les revenus',"Choisir le mode d'accès (gratuit, payant, payant sauf membres)",'Consulter les avis des apprenants','Émettre des attestations de formation']),
+        '#f59e0b', '#fffbeb', '#f59e0b', '#92400e', 'diaspo_formation', 7,
+        "Disposer d'une expertise démontrable dans le domaine de formation visé (diplôme, certification professionnelle ou expérience équivalente) et s'engager à respecter la charte qualité des formateurs Diaspo'Actif.",
+        JSON.stringify(["Pièce d'identité", "Justificatif de diplôme ou certification (si applicable)", "CV ou portfolio détaillant l'expérience professionnelle"]),
+      ]
+    );
+    if (insRows[0]) {
+      const defId = insRows[0].id;
+      for (const role of ['initiative', 'collectivite', 'utilisateur']) {
+        await pool.query("INSERT INTO accred_regles (accred_id,role,mode) VALUES ($1,$2,'sur_demande')", [defId, role]);
+        await pool.query("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES ($1,$2,'gratuit',0,'EUR',1)", [defId, role]);
+      }
+      console.log('[pg-init] Accréditation "createur_formations" seedée (id=' + defId + ').');
+    }
+  } catch (e) { console.error('[pg-init migration] seed createur_formations:', e.message); }
 
   /* ── Module Accréditations : élargissement des CHECK constraints ──
      Bug réel : compte_accreditations.type / demandes_accreditation.type limitaient les
