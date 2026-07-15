@@ -21252,21 +21252,27 @@ route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body)
   sendJSON(res, 200, { ok: true, nb_comptes_impactes: nb_titulaires });
 });
 
-/* DELETE /api/admin/accred/definitions/:id — désactiver (ou suppression définitive avec ?purge=1) */
+/* DELETE /api/admin/accred/definitions/:id — désactiver, suppression définitive (?purge=1),
+   ou suppression forcée y compris les titulaires/demandes liés (?purge=1&force=1) */
 route("DELETE", "/api/admin/accred/definitions/:id", async (req, res, params, body, query) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   if (query && query.purge === '1') {
     const nbTitulaires = (await db.prepare("SELECT COUNT(*) AS n FROM user_accreditations WHERE accred_id=?").get(params.id))?.n || 0;
     const nbDemandes = (await db.prepare("SELECT COUNT(*) AS n FROM accred_demandes WHERE accred_id=?").get(params.id))?.n || 0;
-    if (nbTitulaires > 0 || nbDemandes > 0) {
-      return sendJSON(res, 400, { error: `Suppression impossible : ${nbTitulaires} titulaire(s) et ${nbDemandes} demande(s) référencent encore cette accréditation. Désactivez-la plutôt.` });
+    if ((nbTitulaires > 0 || nbDemandes > 0) && query.force !== '1') {
+      return sendJSON(res, 400, { error: `Suppression impossible : ${nbTitulaires} titulaire(s) et ${nbDemandes} demande(s) référencent encore cette accréditation. Désactivez-la plutôt, ou ajoutez force=1 pour supprimer aussi ces liens.` });
+    }
+    if (query.force === '1') {
+      await db.prepare("DELETE FROM user_accreditations WHERE accred_id=?").run(params.id);
+      await db.prepare("DELETE FROM accred_demandes WHERE accred_id=?").run(params.id);
+      await db.prepare("DELETE FROM accred_historique_v2 WHERE accred_id=?").run(params.id);
     }
     await db.prepare("DELETE FROM accred_regles WHERE accred_id=?").run(params.id);
     await db.prepare("DELETE FROM accred_tarifs WHERE accred_id=?").run(params.id);
     await db.prepare("DELETE FROM accred_audit_log WHERE accred_id=?").run(params.id);
     await db.prepare("DELETE FROM accred_definitions WHERE id=?").run(params.id);
-    return sendJSON(res, 200, { ok: true, purged: true });
+    return sendJSON(res, 200, { ok: true, purged: true, forced: query.force === '1', nbTitulairesSupprimes: query.force==='1'?nbTitulaires:0, nbDemandesSupprimees: query.force==='1'?nbDemandes:0 });
   }
   db.prepare("UPDATE accred_definitions SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
