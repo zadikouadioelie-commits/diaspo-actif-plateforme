@@ -165,6 +165,15 @@ async function send(res, status, data, headers = {}) {
   res.end(data);
 }
 
+/* Ajoute "; Secure" aux cookies uniquement quand la requête est réellement en HTTPS
+   (production Vercel via x-forwarded-proto, ou TLS direct) — sinon le navigateur
+   refuse purement et simplement de poser le cookie, ce qui casserait la connexion
+   en développement local (http://localhost). */
+function cookieSecureFlag(req) {
+  const proto = req.headers["x-forwarded-proto"] || (req.socket && req.socket.encrypted ? "https" : "http");
+  return proto === "https" ? "; Secure" : "";
+}
+
 async function sendJSON(res, status, obj, extraHeaders = {}) {
   send(res, status, JSON.stringify(obj), { "Content-Type": "application/json; charset=utf-8", ...extraHeaders });
 }
@@ -466,7 +475,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     emailVerification({ email: user.email, prenom: user.prenom || user.nom, token: verifToken });
   } catch (_) {}
 
-  sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
+  { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
 });
 
 /* Anti brute-force PERSISTANT (survit aux cold starts serverless, contrairement à SEC.rateLimit
@@ -535,7 +544,7 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   const token = createSession(user.id);
   const authTok = signAuthToken({ uid: user.id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
   SEC.logSecurity("login_success", { ip, email, uid: Number(user.id), role: user.role });
-  sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
+  { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
 });
 
 /* POST /api/auth/forgot-password — demande de réinitialisation */
@@ -15447,6 +15456,8 @@ ${jsonLd}
         return sendJSON(res, 403, { error: 'Quota annuel atteint (2 campagnes par an maximum).' });
       const { nom, description, titre_poste, type_recrutement, organisme, secteur_activite, pays, region, departement, ville, adresse, teletravail, rayon_publication, image_b64, statut: statutInit, niveau_etudes, experience_annees, competences, langues, certifications, qualites, date_debut, duree_mission, remuneration, devise, nb_postes, photos_json, pdf_b64, pdf_nom, date_limite_candidature } = body;
       if (!nom) return sendJSON(res, 400, { error: 'Nom de campagne requis.' });
+      if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
+      if (image_b64 && !SEC.isSafeRasterImage(Buffer.from(String(image_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Image invalide.' });
       const finalStatut = statutInit === 'active' ? 'active' : 'brouillon';
       const now = new Date().toISOString();
       const publie_at = finalStatut === 'active' ? now : null;
@@ -15490,6 +15501,8 @@ ${jsonLd}
       if (!c) return sendJSON(res, 404, { error: 'Introuvable.' });
       if (c.recruteur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
       const { nom, description, titre_poste, type_recrutement, organisme, secteur_activite, pays, region, departement, ville, adresse, teletravail, rayon_publication, image_b64, statut, niveau_etudes, experience_annees, competences, langues, certifications, qualites, date_debut, duree_mission, remuneration, devise, nb_postes, photos_json, pdf_b64, pdf_nom, date_limite_candidature } = body;
+      if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
+      if (image_b64 && !SEC.isSafeRasterImage(Buffer.from(String(image_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Image invalide.' });
       // Calculer dates si passage à active
       let publie_at = c.publie_at, promotion_fin = c.promotion_fin, expire_at = c.expire_at;
       if (statut === 'active' && c.statut === 'brouillon') {
@@ -15779,10 +15792,18 @@ ${jsonLd}
       const email = String(body.email || '').trim().toLowerCase();
       const password = String(body.password || '');
       if (!email || !password) return sendJSON(res, 400, { error: "E-mail et mot de passe requis." });
+      const guardIp = await dbLoginGuard(`vitrine-admin-ip:${ip}`, 8, 15 * 60 * 1000);
+      if (!guardIp.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${guardIp.retryAfter}s.` });
+      const guardEmail = await dbLoginGuard(`vitrine-admin-email:${email}`, 5, 15 * 60 * 1000);
+      if (!guardEmail.allowed) return sendJSON(res, 429, { error: `Trop de tentatives sur ce compte. Réessayez dans ${guardEmail.retryAfter}s.` });
       const admin = await db.prepare(`SELECT * FROM vitrine_site_admins WHERE email=?`).get(email);
       if (!admin || !verifyPassword(password, admin.password_salt, admin.password_hash)) {
+        dbLoginRecord(`vitrine-admin-ip:${ip}`, false);
+        dbLoginRecord(`vitrine-admin-email:${email}`, false);
         return sendJSON(res, 401, { error: "Identifiants incorrects." });
       }
+      dbLoginRecord(`vitrine-admin-ip:${ip}`, true);
+      dbLoginRecord(`vitrine-admin-email:${email}`, true);
       const code = String(Math.floor(100000 + Math.random() * 900000));
       const expires = Date.now() + 10 * 60 * 1000;
       await db.prepare(`UPDATE vitrine_site_admins SET twofa_code=?, twofa_expires=? WHERE id=?`).run(code, expires, admin.id);
@@ -15814,12 +15835,18 @@ ${jsonLd}
       if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
       const email = String(body.email || '').trim().toLowerCase();
       const code = String(body.code || '').trim();
+      const guard2fa = await dbLoginGuard(`vitrine-admin-2fa:${email}`, 10, 15 * 60 * 1000);
+      if (!guard2fa.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${guard2fa.retryAfter}s.` });
       const admin = await db.prepare(`SELECT * FROM vitrine_site_admins WHERE email=?`).get(email);
-      if (!admin || !admin.twofa_code || admin.twofa_code !== code) return sendJSON(res, 401, { error: "Code incorrect." });
+      if (!admin || !admin.twofa_code || admin.twofa_code !== code) {
+        dbLoginRecord(`vitrine-admin-2fa:${email}`, false);
+        return sendJSON(res, 401, { error: "Code incorrect." });
+      }
       if (Number(admin.twofa_expires) < Date.now()) return sendJSON(res, 401, { error: "Code expiré, reconnectez-vous." });
+      dbLoginRecord(`vitrine-admin-2fa:${email}`, true);
       await db.prepare(`UPDATE vitrine_site_admins SET last_login_at=datetime('now'), twofa_code=NULL, twofa_expires=NULL WHERE id=?`).run(admin.id);
       const token = signAuthToken({ vitrineAdminId: admin.id, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL });
-      return sendJSON(res, 200, { ok: true, email: admin.email }, { "Set-Cookie": [`vitrine_admin_auth=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}`] });
+      return sendJSON(res, 200, { ok: true, email: admin.email }, { "Set-Cookie": [`vitrine_admin_auth=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${cookieSecureFlag(req)}`] });
     }
 
     /* ── POST /api/vitrine-site/admin/forgot-password ── */
@@ -16173,6 +16200,7 @@ ${jsonLd}
       if (!['initiative','collectivite','administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé aux Initiatives et Comptes Étatiques.' });
       const { titre, description, objectif, categorie, type = 'sondage', ville, pays, region, departement, rayon_publication, date_debut, date_cloture, anonyme, confidentialite, resultats_visibles, une_reponse_par_compte, modification_autorisee, cible_roles, photos_json, pdf_b64, pdf_nom, video_url, questions = [], statut = 'brouillon' } = body;
       if (!titre) return sendJSON(res, 400, { error: 'Titre requis.' });
+      if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
       if (date_cloture && date_debut) {
         const diffDays = (new Date(date_cloture) - new Date(date_debut)) / 86400000;
         if (diffDays > 30) return sendJSON(res, 400, { error: 'Durée maximale : 30 jours.' });
@@ -16224,6 +16252,7 @@ ${jsonLd}
       const s = await db.prepare(`SELECT * FROM sondages WHERE id=?`).get(sid);
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
       const { titre, description, objectif, categorie, date_cloture, statut, rayon_publication, confidentialite, resultats_visibles, photos_json, pdf_b64, pdf_nom, video_url } = body;
+      if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
       db.prepare(`UPDATE sondages SET titre=COALESCE(?,titre),description=COALESCE(?,description),objectif=COALESCE(?,objectif),categorie=COALESCE(?,categorie),date_cloture=COALESCE(?,date_cloture),statut=COALESCE(?,statut),rayon_publication=COALESCE(?,rayon_publication),confidentialite=COALESCE(?,confidentialite),resultats_visibles=COALESCE(?,resultats_visibles),photos_json=COALESCE(?,photos_json),pdf_b64=COALESCE(?,pdf_b64),pdf_nom=COALESCE(?,pdf_nom),video_url=COALESCE(?,video_url) WHERE id=?`)
         .run(titre,description,objectif,categorie,date_cloture,statut,rayon_publication,confidentialite,resultats_visibles,photos_json?JSON.stringify(photos_json):null,pdf_b64,pdf_nom,video_url,sid);
       return sendJSON(res, 200, { message: 'Sondage mis à jour.' });
