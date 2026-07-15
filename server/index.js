@@ -21252,10 +21252,22 @@ route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body)
   sendJSON(res, 200, { ok: true, nb_comptes_impactes: nb_titulaires });
 });
 
-/* DELETE /api/admin/accred/definitions/:id — désactiver */
-route("DELETE", "/api/admin/accred/definitions/:id", async (req, res, params) => {
+/* DELETE /api/admin/accred/definitions/:id — désactiver (ou suppression définitive avec ?purge=1) */
+route("DELETE", "/api/admin/accred/definitions/:id", async (req, res, params, body, query) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  if (query && query.purge === '1') {
+    const nbTitulaires = (await db.prepare("SELECT COUNT(*) AS n FROM user_accreditations WHERE accred_id=?").get(params.id))?.n || 0;
+    const nbDemandes = (await db.prepare("SELECT COUNT(*) AS n FROM accred_demandes WHERE accred_id=?").get(params.id))?.n || 0;
+    if (nbTitulaires > 0 || nbDemandes > 0) {
+      return sendJSON(res, 400, { error: `Suppression impossible : ${nbTitulaires} titulaire(s) et ${nbDemandes} demande(s) référencent encore cette accréditation. Désactivez-la plutôt.` });
+    }
+    await db.prepare("DELETE FROM accred_regles WHERE accred_id=?").run(params.id);
+    await db.prepare("DELETE FROM accred_tarifs WHERE accred_id=?").run(params.id);
+    await db.prepare("DELETE FROM accred_audit_log WHERE accred_id=?").run(params.id);
+    await db.prepare("DELETE FROM accred_definitions WHERE id=?").run(params.id);
+    return sendJSON(res, 200, { ok: true, purged: true });
+  }
   db.prepare("UPDATE accred_definitions SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
