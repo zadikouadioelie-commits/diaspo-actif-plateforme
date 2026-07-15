@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diaspo'Actif Mobile — Prototype cliquable</title>
+<style>
+  :root{
+    --navy:#0D2B4E; --orange:#F26422; --orange-light:#FFF0E8;
+    --bg:#EEF2F8; --card:#FFFFFF; --border:#DCE4EF; --muted:#5B6B82;
+    --ink:#0D2B4E; --ink-soft:#33465F; --shadow:0 10px 26px rgba(13,43,78,.10);
+    --outer:#E4E9F1; --bezel:#141B24; --bezel-hi:#2A3542;
+    --mono:ui-monospace,"Cascadia Code","SFMono-Regular",Consolas,"Liberation Mono",monospace;
+    --sans:"Segoe UI","Helvetica Neue",Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --navy:#EAF0F8; --orange:#FF7C46; --orange-light:rgba(242,100,34,.20);
+      --bg:#0A1622; --card:#0F2036; --border:#1E3350; --muted:#93A8C2;
+      --ink:#EAF0F8; --ink-soft:#C4D3E5; --shadow:0 10px 26px rgba(0,0,0,.45);
+      --outer:#05080D; --bezel:#05080D; --bezel-hi:#233042;
+    }
+  }
+  :root[data-theme="dark"]{
+    --navy:#EAF0F8; --orange:#FF7C46; --orange-light:rgba(242,100,34,.20);
+    --bg:#0A1622; --card:#0F2036; --border:#1E3350; --muted:#93A8C2;
+    --ink:#EAF0F8; --ink-soft:#C4D3E5; --shadow:0 10px 26px rgba(0,0,0,.45);
+    --outer:#05080D; --bezel:#05080D; --bezel-hi:#233042;
+  }
+  :root[data-theme="light"]{
+    --navy:#0D2B4E; --orange:#F26422; --orange-light:#FFF0E8;
+    --bg:#EEF2F8; --card:#FFFFFF; --border:#DCE4EF; --muted:#5B6B82;
+    --ink:#0D2B4E; --ink-soft:#33465F; --shadow:0 10px 26px rgba(13,43,78,.10);
+    --outer:#E4E9F1; --bezel:#141B24; --bezel-hi:#2A3542;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0; background:var(--outer); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased;}
+  button,input{font-family:inherit;}
+  :focus-visible{outline:2px solid var(--orange); outline-offset:2px;}
+
+  .topcaption{max-width:412px; margin:20px auto 12px; padding:0 8px; display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .topcaption .tc-text{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);}
+  .topcaption .tc-text b{color:var(--orange);}
+  .resetlink{font-family:var(--mono); font-size:11px; letter-spacing:.04em; color:var(--muted); background:var(--card); border:1px solid var(--border); border-radius:20px; padding:5px 12px; cursor:pointer;}
+  .resetlink:hover{color:var(--orange); border-color:var(--orange);}
+
+  .stage{display:flex; align-items:flex-start; justify-content:center; padding:0 16px 40px;}
+  .device{
+    width:100%; max-width:412px; height:844px; max-height:calc(100vh - 110px);
+    background:var(--bg); border-radius:42px; overflow:hidden; position:relative;
+    box-shadow:var(--shadow), 0 0 0 10px var(--bezel), 0 0 0 12px var(--bezel-hi);
+    display:flex; flex-direction:column;
+  }
+  @media (max-width:480px){
+    .topcaption{display:none;}
+    .stage{padding:0;}
+    .device{max-width:100%; height:100vh; max-height:100vh; border-radius:0; box-shadow:none;}
+  }
+  .notch{position:absolute; top:0; left:50%; transform:translateX(-50%); width:120px; height:26px; background:var(--bezel); border-radius:0 0 16px 16px; z-index:20;}
+  .d-status{display:flex; justify-content:space-between; align-items:center; padding:14px 22px 2px; font-size:13px; font-weight:700; flex:none;}
+  .mini-reset{position:absolute; top:14px; right:16px; z-index:21; width:30px; height:30px; border-radius:50%; background:var(--card); border:1px solid var(--border); color:var(--muted); font-size:13px; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+
+  .d-main{flex:1; min-height:0; position:relative;}
+  .view{display:none; height:100%; flex-direction:column;}
+  .view.active{display:flex;}
+
+  /* ---- onboarding ---- */
+  .onb{flex:1; overflow-y:auto; padding:26px 26px 40px; display:flex; flex-direction:column;}
+  .onb-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+  .backbtn{background:none; border:none; color:var(--muted); font-weight:700; font-size:14px; padding:6px 0; cursor:pointer; text-align:left;}
+  .step-dots{display:flex; gap:6px;}
+  .step-dots span{width:6px; height:6px; border-radius:50%; background:var(--border); display:block;}
+  .step-dots span.on{background:var(--orange); width:18px; border-radius:3px;}
+  .onb-center{text-align:center; margin:10px 0 4px;}
+  .onb-logo{width:60px; height:60px; border-radius:18px; background:var(--orange); color:#fff; font-size:28px; display:flex; align-items:center; justify-content:center; margin:0 auto 12px;}
+  .onb-title{font-size:20px; font-weight:800; letter-spacing:-.01em; margin:6px 0 0;}
+  .onb-sub{font-size:13px; color:var(--muted); margin-top:6px; line-height:1.4;}
+  .onb-text{font-size:13.5px; color:var(--ink-soft); line-height:1.55; margin:16px 0 0;}
+  .onb-text b{color:var(--ink);}
+  .field{margin-top:20px;}
+  .field label{display:block; font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:7px;}
+  .field input[type=text],.field input[type=email],.field input[type=password]{
+    width:100%; padding:14px 16px; border:1.6px solid var(--border); border-radius:12px;
+    font-family:var(--mono); font-size:15px; background:var(--card); color:var(--ink); letter-spacing:.03em;
+  }
+  .field input:focus{border-color:var(--orange);}
+  .btn{display:block; width:100%; text-align:center; padding:14px; border-radius:26px; font-weight:700; font-size:15px; border:none; cursor:pointer; margin-top:14px;}
+  .btn-pri{background:var(--orange); color:#fff;}
+  .btn-pri:disabled{opacity:.5; cursor:not-allowed;}
+  .btn-sec{background:transparent; border:1.6px solid var(--orange); color:var(--orange);}
+  .btn-ghost{background:transparent; border:1.6px solid var(--border); color:var(--ink);}
+  .divider{font-size:11px; color:var(--muted); font-family:var(--mono); text-transform:uppercase; letter-spacing:.08em; text-align:center; margin:16px 0;}
+  .linkbtn{background:none; border:none; color:var(--orange); font-weight:700; font-size:13.5px; text-decoration:underline; cursor:pointer; display:block; margin:0 auto; padding:4px;}
+  .onb-note{margin-top:22px; font-size:11.5px; color:var(--muted); display:flex; gap:8px; align-items:flex-start;}
+  .reco{background:var(--orange-light); border-radius:14px; padding:16px 18px; margin-top:18px;}
+  .reco .rt{font-size:13px; font-weight:700; color:var(--orange);}
+  .reco .rd{font-size:12px; color:var(--ink-soft); margin-top:6px; line-height:1.5;}
+  .qr{width:72px; height:72px; border-radius:8px; margin:14px auto 6px; background-image:linear-gradient(90deg,var(--ink) 50%,transparent 50%),linear-gradient(var(--ink) 50%,transparent 50%); background-size:9px 9px; background-color:var(--card); border:1px solid var(--border);}
+  .qr-cap{font-size:11px; color:var(--muted); text-align:center; display:block;}
+  .mailconf{font-size:11px; color:var(--orange); font-weight:700; text-align:center; margin-top:4px; display:none;}
+  .mailconf.show{display:block;}
+  .type-card{width:100%; display:flex; align-items:center; gap:12px; border:1.6px solid var(--border); border-radius:14px; padding:13px 14px; margin-top:10px; background:var(--card); cursor:pointer; text-align:left;}
+  .type-card.on{border-color:var(--orange); background:var(--orange-light);}
+  .type-card .tic{font-size:20px; flex:none;}
+  .type-card .tt{font-size:13px; font-weight:700; color:var(--ink);}
+  .type-card .td{font-size:11px; color:var(--muted); margin-top:1px;}
+
+  /* ---- app shell ---- */
+  #view-app.active{position:relative;}
+  .app-scroll{flex:1; overflow-y:auto; position:relative;}
+  .tab-panel{display:none; padding:0 20px 24px;}
+  .tab-panel.active{display:block;}
+  .appbar{padding:16px 0 12px; display:flex; align-items:center; justify-content:space-between;}
+  .appbar h1{font-size:19px; margin:0; font-weight:800;}
+  .appbar .sub{font-size:11.5px; color:var(--muted); font-weight:600; margin-top:2px;}
+  .icon-btn{width:38px; height:38px; border-radius:50%; background:var(--card); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; position:relative; flex:none;}
+  .icon-btn .badge{position:absolute; top:-4px; right:-4px; background:var(--orange); color:#fff; font-size:10px; font-weight:700; border-radius:10px; min-width:17px; height:17px; display:flex; align-items:center; justify-content:center; padding:0 3px;}
+
+  .tabbar{display:flex; border-top:1px solid var(--border); background:var(--card); padding:9px 6px calc(9px + env(safe-area-inset-bottom)); flex:none;}
+  .tabbar button{flex:1; background:none; border:none; text-align:center; font-size:9.3px; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:4px; font-weight:700; cursor:pointer; padding:2px 0;}
+  .tabbar button .ic{font-size:18px; position:relative;}
+  .tabbar button.active{color:var(--orange);}
+  .tabbar button .ic .dot{position:absolute; top:-2px; right:-5px; width:8px; height:8px; border-radius:50%; background:var(--orange); border:1.5px solid var(--card);}
+
+  /* profil */
+  .top-search{position:relative; margin-bottom:14px;}
+  .top-search-box{display:flex; align-items:center; gap:8px; background:var(--card); border:1.5px solid var(--border); border-radius:22px; padding:10px 14px;}
+  .top-search-box input{flex:1; border:none; background:none; font-size:13.5px; color:var(--ink); outline:none;}
+  .search-results{position:absolute; left:0; right:0; top:calc(100% + 6px); background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; z-index:5; display:none;}
+  .search-results.show{display:block;}
+  .search-results .sr-item{display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--border);}
+  .search-results .sr-item:last-child{border-bottom:none;}
+  .search-results .sr-item:hover{background:var(--orange-light);}
+  .search-results .sr-av{width:30px; height:30px; border-radius:50%; background:var(--orange-light); color:var(--orange); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:none;}
+  .search-results .sr-n{font-size:12.5px; font-weight:700;}
+  .search-results .sr-id{font-size:10.5px; color:var(--muted); font-family:var(--mono);}
+  .search-empty{padding:14px; font-size:12px; color:var(--muted); text-align:center;}
+
+  .cover{height:96px; border-radius:16px; background:linear-gradient(120deg,var(--navy),#4A6486);}
+  .avatar-row{display:flex; align-items:flex-end; gap:12px; margin-top:-34px; padding:0 4px;}
+  .avatar{width:68px; height:68px; border-radius:50%; background:var(--orange); color:#fff; font-weight:800; font-size:22px; display:flex; align-items:center; justify-content:center; border:4px solid var(--bg);}
+  .verified{background:var(--card); border:1px solid var(--border); border-radius:20px; font-size:11px; padding:4px 10px; color:var(--orange); font-weight:700; margin-bottom:6px;}
+  .p-name{font-size:19px; font-weight:800; margin:12px 4px 0;}
+  .p-cat{font-size:12.5px; color:var(--muted); margin:3px 4px 0;}
+  .stat-row{display:flex; gap:22px; margin:14px 4px 0;}
+  .stat-row div b{display:block; color:var(--ink); font-size:15px;}
+  .stat-row div span{color:var(--muted); font-size:11.5px;}
+  .p-bio{font-size:13px; color:var(--ink-soft); margin:14px 4px 0; line-height:1.55;}
+  .chip-row{display:flex; gap:8px; margin:16px 4px 0; flex-wrap:wrap;}
+  .subtab{font-size:12px; border:1px solid var(--border); border-radius:18px; padding:7px 13px; color:var(--muted); font-weight:700; background:var(--card); cursor:pointer;}
+  .subtab.on{background:var(--orange-light); color:var(--orange); border-color:transparent;}
+  .cta-row{display:flex; gap:10px; margin:16px 4px 0;}
+  .cta-row .btn{margin-top:0; flex:1; padding:11px;}
+  .own-sec{margin:22px 4px 0;}
+  .own-sec-h{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .own-sec-h span.t{font-size:13.5px; font-weight:700; color:var(--ink);}
+  .own-sec-h button.more{background:none; border:none; font-size:12px; color:var(--muted); font-weight:600; cursor:pointer;}
+  .mv-card{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; box-shadow:var(--shadow);}
+  .mv-prod-row{display:flex; gap:8px; margin-bottom:12px;}
+  .mv-prod{flex:1; background:var(--bg); border-radius:10px; padding:9px 11px; font-size:11px; color:var(--ink-soft);}
+  .mv-prod b{display:block; font-size:12px; color:var(--ink); font-weight:700; margin-bottom:2px;}
+  .mv-stats{display:flex; align-items:center; gap:8px; background:var(--orange-light); border-radius:10px; padding:10px 12px; font-size:12px; color:var(--orange); font-weight:700;}
+
+  /* support technique */
+  .st-btn{width:100%; margin:26px 0 18px; padding:13px; border:none; border-radius:26px; font-size:13.5px; font-weight:700; color:#fff; cursor:pointer;
+    background:linear-gradient(135deg,#16A34A,#052e16); box-shadow:0 8px 20px rgba(5,46,22,.25);}
+  .st-btn:hover{background:linear-gradient(135deg,#22C55E,#0a3d1e);}
+  .st-modal{position:absolute; inset:0; background:rgba(10,20,30,.5); display:none; align-items:center; justify-content:center; z-index:60; padding:18px;}
+  .st-modal.open{display:flex;}
+  .st-box{background:var(--card); border-radius:18px; width:100%; max-height:92%; overflow-y:auto; padding:20px; box-shadow:0 20px 50px rgba(0,0,0,.35);}
+  .st-box h3{margin:0 0 12px; font-size:15px; display:flex; align-items:center; justify-content:space-between;}
+  .st-box h3 button{background:none; border:none; font-size:17px; color:var(--muted); cursor:pointer;}
+  .st-notice{background:#FEF2F2; border:1px solid #FECACA; border-radius:10px; padding:9px 11px; font-size:11px; color:#7F1D1D; margin-bottom:14px; line-height:1.5;}
+  .st-box label{display:block; font-size:11px; font-weight:700; color:var(--ink); margin:0 0 5px;}
+  .st-box select, .st-box textarea{width:100%; border:1.5px solid var(--border); border-radius:10px; padding:9px 11px; font-size:12.5px; color:var(--ink); background:var(--bg); margin-bottom:12px; font-family:inherit;}
+  .st-box textarea{resize:vertical; min-height:70px;}
+  .st-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:4px;}
+  .st-actions button{border-radius:20px; padding:9px 16px; font-size:12px; font-weight:700; border:none; cursor:pointer;}
+  .st-actions .st-cancel{background:var(--bg); color:var(--muted); border:1px solid var(--border);}
+  .st-actions .st-send{background:var(--orange); color:#fff;}
+  .st-actions .st-send:disabled{opacity:.6;}
+  .st-status{font-size:12px; border-radius:10px; padding:10px 12px; margin-top:12px; display:none;}
+  .st-status.show{display:block;}
+  .st-status.ok{background:#E7F5EC; color:#1E7A3C;}
+  .st-status.err{background:#FEF2F2; color:#B42318;}
+
+  /* vitrine */
+  .filter-row{display:flex; gap:8px; margin:2px 0 16px; overflow-x:auto; padding-bottom:2px;}
+  .fchip{font-size:12px; border-radius:16px; padding:7px 13px; border:1px solid var(--border); color:var(--muted); font-weight:700; white-space:nowrap; background:var(--card); cursor:pointer; flex:none;}
+  .fchip.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+  .prod-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; padding-bottom:80px;}
+  .prod{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:12px; box-shadow:var(--shadow);}
+  .prod .img{height:64px; border-radius:10px; margin-bottom:9px; overflow:hidden; position:relative;}
+  .prod .img img{width:100%; height:100%; object-fit:cover; display:block;}
+  .prod .n{font-size:12.5px; font-weight:700; color:var(--ink); line-height:1.3; min-height:32px;}
+  .prod .row2{display:flex; justify-content:space-between; align-items:center; margin-top:8px;}
+  .prod .price{font-size:12.5px; font-weight:800; color:var(--navy);}
+  .prod .add{width:28px; height:28px; border-radius:50%; background:var(--orange); color:#fff; font-size:16px; display:flex; align-items:center; justify-content:center; font-weight:700; border:none; cursor:pointer; position:relative;}
+  .prod .add .qty{position:absolute; top:-8px; right:-8px; background:var(--navy); color:#fff; font-size:9.5px; font-weight:700; border-radius:9px; min-width:16px; height:16px; display:none; align-items:center; justify-content:center; padding:0 2px;}
+  .prod .add .qty.show{display:flex;}
+  .cart-bar{position:sticky; bottom:0; margin:0 -20px -24px; background:var(--navy); color:#fff; padding:14px 20px calc(14px + env(safe-area-inset-bottom)); display:flex; justify-content:space-between; align-items:center; font-size:12.5px; font-weight:700;}
+  .cart-bar button{background:var(--orange); color:#fff; border:none; border-radius:16px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer;}
+
+  /* billetterie */
+  .evt{display:flex; gap:12px; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:13px; box-shadow:var(--shadow); margin-bottom:12px;}
+  .evt .date{background:var(--orange-light); color:var(--orange); border-radius:10px; padding:8px 10px; text-align:center; font-weight:800; font-size:11px; line-height:1.2; flex:none; min-width:48px;}
+  .evt .date .n{font-size:17px; display:block;}
+  .evt .body{flex:1;}
+  .evt .t{font-size:13.5px; font-weight:700; color:var(--ink); line-height:1.3;}
+  .evt .loc{font-size:11.5px; color:var(--muted); margin-top:3px;}
+  .evt .row3{display:flex; justify-content:space-between; align-items:center; margin-top:9px;}
+  .evt .price{font-size:12px; font-weight:700; color:var(--navy);}
+  .evt .go2{font-size:11.5px; font-weight:700; color:var(--orange); border:1.5px solid var(--orange-light); background:var(--orange-light); border-radius:16px; padding:6px 12px; cursor:pointer;}
+  .evt .go2.done{color:#3A8452; background:#E7F5EC; border-color:#E7F5EC;}
+  .evt-tag{display:inline-block; font-size:10px; font-weight:700; color:var(--muted); background:var(--bg); border-radius:8px; padding:2px 8px; margin-top:6px;}
+  .ticket-status{font-size:11px; font-weight:700; color:var(--orange); background:var(--orange-light); border-radius:12px; padding:5px 10px;}
+  .ticket-status.done{color:var(--muted); background:var(--bg);}
+  .note-strip{background:var(--orange-light); color:var(--orange); border-radius:12px; padding:11px 14px; font-size:12px; font-weight:600; margin-top:6px;}
+
+  /* fil */
+  .post{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:14px; box-shadow:var(--shadow); margin-bottom:14px;}
+  .post .head{display:flex; align-items:center; gap:9px;}
+  .post .av2{width:32px; height:32px; border-radius:50%; background:var(--orange); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:none;}
+  .post .who{font-size:12.5px; font-weight:700; color:var(--ink);}
+  .post .when{font-size:11px; color:var(--muted); font-weight:500;}
+  .post .tag2{margin-left:auto; font-size:10px; font-weight:700; background:var(--orange-light); color:var(--orange); border-radius:8px; padding:3px 8px;}
+  .post .txt{font-size:13px; color:var(--ink-soft); margin-top:10px; line-height:1.5;}
+  .post .ph{height:90px; border-radius:10px; background:linear-gradient(120deg,#E7B7A3,#F2D9A0); margin-top:10px;}
+  .post .acts{display:flex; gap:16px; margin-top:11px; font-size:12px; color:var(--muted); font-weight:600;}
+  .post .acts button{background:none; border:none; color:inherit; font:inherit; cursor:pointer; padding:0; display:flex; align-items:center; gap:4px;}
+  .post .acts button.liked{color:var(--orange); font-weight:700;}
+
+  /* messages */
+  .scr-subhead{font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:16px 0 10px;}
+  .scr-subhead:first-child{margin-top:0;}
+  .req-item{display:flex; flex-direction:column; gap:10px; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:11px; box-shadow:var(--shadow); margin-bottom:10px;}
+  .req-item .rtop{display:flex; align-items:center; gap:10px;}
+  .req-item .av2{width:34px; height:34px; border-radius:50%; background:var(--navy); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:none;}
+  .req-item .rt{flex:1; min-width:0;}
+  .req-item .rn{font-size:12.5px; font-weight:700; color:var(--ink);}
+  .req-item .rd{font-size:11px; color:var(--muted);}
+  .req-item .racts{display:flex; gap:6px;}
+  .req-item .rbtn{font-size:11px; font-weight:700; border-radius:14px; padding:8px 11px; border:none; cursor:pointer; flex:1; text-align:center;}
+  .req-item .rbtn.view{border:1px solid var(--border); background:var(--card); color:var(--ink);}
+  .req-item .rbtn.ok{background:var(--orange); color:#fff;}
+  .req-item .rbtn.no{border:1px solid var(--border); background:var(--card); color:var(--muted); flex:0 0 40px;}
+  .msg-item{display:flex; align-items:center; gap:11px; padding:10px 4px; cursor:pointer; border-radius:12px;}
+  .msg-item:hover{background:var(--card);}
+  .msg-item .av2{width:40px; height:40px; border-radius:50%; background:var(--orange-light); color:var(--orange); font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:none;}
+  .msg-item .mt{flex:1; min-width:0;}
+  .msg-item .mn{font-size:13px; font-weight:700; color:var(--ink); display:flex; justify-content:space-between; gap:8px;}
+  .msg-item .mn .time{font-size:10.5px; font-weight:500; color:var(--muted); flex:none;}
+  .msg-item .mp{font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;}
+  .msg-item.unread .mp{color:var(--ink-soft); font-weight:700;}
+  .msg-item .ub{width:8px; height:8px; border-radius:50%; background:var(--orange); flex:none;}
+  .msg-item .shoptag{display:inline-flex; align-items:center; gap:4px; font-size:9.5px; font-weight:700; color:var(--orange); background:var(--orange-light); border-radius:8px; padding:2px 7px; margin-top:4px;}
+  .empty-req{font-size:12px; color:var(--muted); padding:6px 4px 4px;}
+
+  /* perle rare */
+  .perle-band{background:linear-gradient(90deg,#7c3aed,#db2777); border-radius:16px; padding:16px 18px; color:#fff; margin-bottom:14px;}
+  .perle-band .pt{font-size:17px; font-weight:800;}
+  .perle-band .pd{font-size:12px; opacity:.92; margin-top:4px; line-height:1.4;}
+  .perle-stats{display:flex; gap:8px; margin-bottom:16px;}
+  .perle-stats div{flex:1; text-align:center; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:8px 4px; font-size:10.5px; color:var(--muted);}
+  .perle-stats div b{display:block; color:var(--ink); font-size:15px;}
+  .perle-card{display:flex; align-items:center; gap:11px; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:11px; box-shadow:var(--shadow); margin-bottom:10px; cursor:pointer;}
+  .perle-card .pav{width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#7c3aed,#db2777); color:#fff; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:none;}
+  .perle-card .pinfo{flex:1; min-width:0;}
+  .perle-card .pn{font-size:12.5px; font-weight:700; color:var(--ink);}
+  .perle-card .pdsc{font-size:11px; color:var(--muted); margin-top:2px;}
+  .perle-card .pgo{font-size:11px; font-weight:700; color:#fff; background:linear-gradient(90deg,#7c3aed,#db2777); border:none; border-radius:14px; padding:6px 12px; flex:none; cursor:pointer;}
+
+  /* chat overlay */
+  .chat-overlay{position:absolute; inset:0; background:var(--bg); display:flex; flex-direction:column; transform:translateX(100%); transition:transform .28s ease; z-index:10;}
+  .chat-overlay.open{transform:translateX(0);}
+  .chat-head{display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--border); flex:none;}
+  .chat-head .av2{width:34px; height:34px; border-radius:50%; background:var(--orange); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;}
+  .chat-head .cn{font-size:14px; font-weight:800;}
+  .chat-body{flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:10px;}
+  .bubble{max-width:75%; padding:10px 13px; border-radius:16px; font-size:13px; line-height:1.4;}
+  .bubble.them{background:var(--card); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px;}
+  .bubble.me{background:var(--orange); color:#fff; align-self:flex-end; border-bottom-right-radius:4px;}
+  .chat-input{display:flex; gap:8px; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); flex:none;}
+  .chat-input input{flex:1; border:1.5px solid var(--border); border-radius:22px; padding:10px 16px; font-size:13px; background:var(--card); color:var(--ink);}
+  .chat-input button{background:var(--orange); color:#fff; border:none; border-radius:50%; width:40px; height:40px; font-size:15px; cursor:pointer; flex:none;}
+
+  /* toast */
+  .toast{position:absolute; left:50%; bottom:90px; transform:translate(-50%,10px); background:var(--navy); color:#fff; font-size:12.5px; font-weight:600; padding:11px 18px; border-radius:24px; box-shadow:0 10px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:30; white-space:nowrap;}
+  .toast.show{opacity:1; transform:translate(-50%,0);}
+
+  ::-webkit-scrollbar{width:0; height:0;}
+</style>
+</head>
+<body>
+
+<div class="topcaption">
+  <span class="tc-text">Diaspo'Actif Mobile — <b>prototype cliquable</b>, état non sauvegardé</span>
+  <button class="resetlink" type="button" onclick="resetDemo()">↺ Réinitialiser</button>
+</div>
+
+<div class="stage">
+  <div class="device">
+    <div class="notch"></div>
+    <button class="mini-reset" type="button" onclick="resetDemo()" title="Réinitialiser la démo">↺</button>
+    <div class="d-status"><span id="clock">9:41</span><span>●●● 5G 🔋</span></div>
+
+    <div class="d-main">
+
+      <!-- Étape 0 : association DS-ID -->
+      <section class="view active" id="view-onb-associate">
+        <div class="onb">
+          <div class="onb-center">
+            <div class="onb-logo">🌳</div>
+            <div class="onb-title">Diaspo'Actif Mobile</div>
+            <div class="onb-sub">Associez l'application à votre compte existant</div>
+          </div>
+          <p class="onb-text">Retrouvez votre compte grâce à votre <b>Code de Sécurité (DS-ID)</b>, disponible sur la version web dans <b>Profil → Confidentialité → Codes</b>.</p>
+          <div class="field">
+            <label>Code de sécurité</label>
+            <input type="text" id="dsidInput" placeholder="DS-XXXX-XXXX" value="DS-4471-9203">
+          </div>
+          <button class="btn btn-pri" type="button" onclick="toast('Compte associé (démo) ✅'); enterApp();">Associer mon compte</button>
+          <div class="divider">ou</div>
+          <button class="linkbtn" type="button" onclick="showView('view-onb-nocompte')">Pas encore de compte ? →</button>
+          <div class="onb-note"><span>🔒</span><span>Code personnel — ne le partagez jamais. Régénérable à tout moment depuis la version web.</span></div>
+        </div>
+      </section>
+
+      <!-- Étape 0a : pas encore de compte -->
+      <section class="view" id="view-onb-nocompte">
+        <div class="onb">
+          <div class="onb-top"><button class="backbtn" type="button" onclick="showView('view-onb-associate')">← Retour</button></div>
+          <div class="onb-title" style="margin-top:10px;">Comment souhaitez-vous procéder ?</div>
+          <div class="onb-sub">L'inscription est plus confortable sur ordinateur — mais elle reste possible ici.</div>
+          <div class="reco">
+            <div class="rt">💻 Recommandé : sur ordinateur</div>
+            <div class="rd">Formulaire complet, upload de documents et signature plus simples sur grand écran.</div>
+            <div class="qr"></div>
+            <span class="qr-cap">Scannez avec votre ordinateur</span>
+            <button class="linkbtn" type="button" style="margin-top:8px;" onclick="showMailConf()">✉️ Ou recevoir le lien par email</button>
+            <span class="mailconf" id="mailConf">Lien envoyé (démo) ✓</span>
+          </div>
+          <div class="divider">ou</div>
+          <button class="btn btn-sec" type="button" onclick="showView('view-onb-type')">📱 Créer mon compte ici →</button>
+        </div>
+      </section>
+
+      <!-- Étape 0b : type de compte -->
+      <section class="view" id="view-onb-type">
+        <div class="onb">
+          <div class="onb-top"><button class="backbtn" type="button" onclick="showView('view-onb-nocompte')">← Retour</button><div class="step-dots"><span class="on"></span><span></span></div></div>
+          <div class="onb-title" style="margin-top:10px;">Quel type de compte ?</div>
+          <div class="onb-sub">Toutes les options sont disponibles, comme sur ordinateur.</div>
+          <div class="type-card" data-type="utilisateur" onclick="selectType(this)"><span class="tic">👤</span><div><div class="tt">Utilisateur</div><div class="td">Particulier de la diaspora</div></div></div>
+          <div class="type-card on" data-type="initiative" onclick="selectType(this)"><span class="tic">🏬</span><div><div class="tt">Initiative</div><div class="td">Association, entreprise, projet</div></div></div>
+          <div class="type-card" data-type="collectivite" onclick="selectType(this)"><span class="tic">🏛️</span><div><div class="tt">Collectivité</div><div class="td">Institution, mairie, consulat</div></div></div>
+          <button class="btn btn-pri" type="button" onclick="showView('view-onb-form')">Continuer</button>
+        </div>
+      </section>
+
+      <!-- Étape 0c : formulaire (simulé) -->
+      <section class="view" id="view-onb-form">
+        <div class="onb">
+          <div class="onb-top"><button class="backbtn" type="button" onclick="showView('view-onb-type')">← Retour</button><div class="step-dots"><span class="on"></span><span class="on"></span></div></div>
+          <div class="onb-title" style="margin-top:10px;">Créer mon compte</div>
+          <div class="onb-sub">Même formulaire que sur le web, adapté à l'écran mobile.</div>
+          <div class="field"><label>Nom de l'initiative</label><input type="text" placeholder="Ex. Sahel Saveurs"></div>
+          <div class="field"><label>Email</label><input type="email" placeholder="contact@initiative.diaspoactif"></div>
+          <div class="field"><label>Mot de passe</label><input type="password" placeholder="••••••••"></div>
+          <p class="onb-text" style="font-size:11.5px; margin-top:14px;">📋 Suite du parcours réel : documents justificatifs, CGU, vérification — identique à la version web.</p>
+          <button class="btn btn-pri" type="button" onclick="toast('Compte créé (démo) 🎉'); enterApp();">Créer mon compte (démo)</button>
+        </div>
+      </section>
+
+      <!-- App principale -->
+      <section class="view" id="view-app">
+        <div class="app-scroll" id="appScroll">
+
+          <!-- Profil -->
+          <div class="tab-panel active" id="tab-profil">
+            <div class="top-search">
+              <div class="top-search-box">
+                <span>🔍</span>
+                <input type="text" id="searchBox" placeholder="Rechercher une initiative — nom ou DA-ID" oninput="runSearch(this.value)" onfocus="runSearch(this.value)">
+              </div>
+              <div class="search-results" id="searchResults"></div>
+            </div>
+            <div class="cover"></div>
+            <div class="avatar-row">
+              <div class="avatar">SS</div>
+              <span class="verified">✓ Vérifié</span>
+            </div>
+            <div class="p-name">Sahel Saveurs</div>
+            <div class="p-cat">🍲 Gastronomie solidaire · Dakar → Paris</div>
+            <div class="stat-row">
+              <div><b id="statFollowers">328</b><span>Abonnés</span></div>
+              <div><b>4.8★</b><span>86 avis</span></div>
+              <div><b>56</b><span>Événements</span></div>
+            </div>
+            <p class="p-bio">Traiteur associatif porté par la diaspora sénégalaise. Chaque plat vendu finance une bourse d'étude au pays.</p>
+            <div class="chip-row">
+              <span class="subtab" onclick="showTab('vitrine')">🏬 Vitrine</span>
+              <span class="subtab" onclick="showTab('billetterie')">🎟️ Billetterie</span>
+              <span class="subtab" onclick="showTab('fil')">📰 Publications</span>
+            </div>
+            <div class="cta-row">
+              <button class="btn btn-pri" type="button" onclick="toast('Édition du profil (démo)')">✎ Modifier le profil</button>
+              <button class="btn btn-ghost" type="button" onclick="toast('Lien copié (démo) 🔗')">Partager</button>
+            </div>
+
+            <div class="own-sec" id="ownVitrineSec">
+              <div class="own-sec-h"><span class="t">🏬 Ma Vitrine</span><button class="more" type="button" onclick="showTab('vitrine')">Voir tout ›</button></div>
+              <div class="mv-card">
+                <div class="mv-prod-row" id="ownProdRow"></div>
+                <div class="mv-stats">📈 142 ventes · 1 680 € de CA (30 derniers jours)</div>
+              </div>
+            </div>
+
+            <div class="own-sec">
+              <div class="own-sec-h"><span class="t">📰 Mes publications</span><button class="more" type="button" onclick="showTab('fil')">Voir tout ›</button></div>
+              <div id="ownPostPreview"></div>
+            </div>
+
+            <button class="st-btn" type="button" onclick="openSupportModal()">🛠️ Support technique</button>
+          </div>
+
+          <!-- Vitrine -->
+          <div class="tab-panel" id="tab-vitrine">
+            <div class="appbar"><div><h1>Vitrine</h1><div class="sub">Sahel Saveurs</div></div><button class="icon-btn" type="button" onclick="toast(cartCount()+' article(s) au panier')">🛒<span class="badge" id="cartBadge" style="display:none;">0</span></button></div>
+            <div class="filter-row" id="filterRow">
+              <span class="fchip on" data-cat="tous" onclick="setCat(this)">Tous</span>
+              <span class="fchip" data-cat="plats" onclick="setCat(this)">Plats</span>
+              <span class="fchip" data-cat="boissons" onclick="setCat(this)">Boissons</span>
+              <span class="fchip" data-cat="coffrets" onclick="setCat(this)">Coffrets</span>
+            </div>
+            <div class="prod-grid" id="prodGrid"></div>
+          </div>
+
+          <!-- Billetterie -->
+          <div class="tab-panel" id="tab-billetterie">
+            <div class="appbar"><div><h1>Billetterie</h1><div class="sub">Mes billets</div></div><button class="icon-btn" type="button" onclick="toast('Aucune nouvelle notification')">🔔</button></div>
+            <button class="btn btn-pri" type="button" style="margin-bottom:18px;" onclick="openDiscover()">🔍 S'inscrire à un événement</button>
+            <div class="scr-subhead">Mes billets</div>
+            <div id="myTicketsList"></div>
+            <div class="scr-subhead" style="margin-top:18px;">Historique</div>
+            <div id="ticketHistoryList"></div>
+            <div class="note-strip" style="margin-top:14px;">🎫 Billets accessibles hors-ligne, QR code intégré.</div>
+          </div>
+
+          <!-- Fil -->
+          <div class="tab-panel" id="tab-fil">
+            <div class="appbar"><div><h1>Publications</h1><div class="sub">Abonnements + tout Diaspo'Actif</div></div><button class="icon-btn" type="button" onclick="toast('Aucune nouvelle notification')">🔔</button></div>
+            <div class="filter-row">
+              <span class="fchip on" data-feed="pourvous" onclick="setFeed(this)">Pour vous</span>
+              <span class="fchip" data-feed="abonnements" onclick="setFeed(this)">Abonnements</span>
+            </div>
+            <div id="postList"></div>
+          </div>
+
+          <!-- Messages -->
+          <div class="tab-panel" id="tab-messages">
+            <div class="appbar"><div><h1>Messages</h1><div class="sub" id="reqCountLabel">2 demandes en attente</div></div><button class="icon-btn" type="button" onclick="toast('Nouvelle conversation (démo)')">✎</button></div>
+            <div class="scr-subhead">Demandes de mise en relation</div>
+            <div id="reqList"></div>
+            <div class="scr-subhead">Conversations</div>
+            <div id="convList"></div>
+          </div>
+
+          <!-- Perle Rare -->
+          <div class="tab-panel" id="tab-perle">
+            <div class="perle-band">
+              <div class="pt">💎 Perle Rare</div>
+              <div class="pd">Talents et initiatives de la diaspora à découvrir</div>
+            </div>
+            <div class="perle-stats">
+              <div><b>1 240</b>Membres</div>
+              <div><b>340</b>Initiatives</div>
+              <div><b>42</b>Pays</div>
+            </div>
+            <div class="filter-row" id="perleFilterRow">
+              <span class="fchip on" data-pcat="tous" onclick="setPerleCat(this)">Tous</span>
+              <span class="fchip" data-pcat="talent" onclick="setPerleCat(this)">Talents</span>
+              <span class="fchip" data-pcat="initiative" onclick="setPerleCat(this)">Initiatives</span>
+            </div>
+            <div id="perleList"></div>
+          </div>
+
+          <!-- Explore overlay (profil d'un autre compte) -->
+          <div class="chat-overlay" id="exploreOverlay">
+            <div class="chat-head">
+              <button class="backbtn" type="button" onclick="closeExplore()">←</button>
+              <span class="cn">Profil</span>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding:0 20px 24px;">
+              <div class="cover" id="expCover"></div>
+              <div class="avatar-row">
+                <div class="avatar" id="expAvatar">XX</div>
+                <span class="verified" id="expVerified">✓ Vérifié</span>
+              </div>
+              <div class="p-name" id="expName">—</div>
+              <div class="p-cat" id="expCat">—</div>
+              <div class="stat-row" id="expStats"></div>
+              <p class="p-bio" id="expBio"></p>
+              <div class="cta-row">
+                <button class="btn btn-pri" id="expCta" type="button" onclick="exploreCta()">Suivre</button>
+                <button class="btn btn-ghost" type="button" onclick="toast('Lien copié (démo) 🔗')">Partager</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Discover events overlay -->
+          <div class="chat-overlay" id="discoverOverlay">
+            <div class="chat-head">
+              <button class="backbtn" type="button" onclick="closeDiscover()">←</button>
+              <span class="cn">Découvrir des événements</span>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding:16px 20px 24px;">
+              <div class="filter-row" id="discoverFilterRow">
+                <span class="fchip on" data-dcat="tous" onclick="setDiscoverCat(this)">Tous</span>
+                <span class="fchip" data-dcat="zone" onclick="setDiscoverCat(this)">Votre zone</span>
+                <span class="fchip" data-dcat="mine" onclick="setDiscoverCat(this)">Vos événements</span>
+              </div>
+              <div id="evtList"></div>
+            </div>
+          </div>
+
+          <!-- Chat overlay -->
+          <div class="chat-overlay" id="chatOverlay">
+            <div class="chat-head">
+              <button class="backbtn" type="button" onclick="closeChat()">←</button>
+              <span class="av2" id="chatAv">SS</span>
+              <span class="cn" id="chatName">Sahel Saveurs</span>
+            </div>
+            <div class="chat-body" id="chatBody"></div>
+            <div class="chat-input">
+              <input type="text" id="chatInput" placeholder="Écrire un message…" onkeydown="if(event.key==='Enter')sendChat();">
+              <button type="button" onclick="sendChat()">➤</button>
+            </div>
+          </div>
+
+        </div>
+
+        <nav class="tabbar" id="tabbar">
+          <button data-tab="profil" onclick="showTab('profil')"><span class="ic">👤</span>Profil</button>
+          <button data-tab="vitrine" onclick="showTab('vitrine')"><span class="ic">🏬</span>Vitrine</button>
+          <button data-tab="billetterie" onclick="showTab('billetterie')"><span class="ic">🎟️</span>Billets</button>
+          <button data-tab="fil" onclick="showTab('fil')"><span class="ic">📰</span>Fil</button>
+          <button data-tab="messages" onclick="showTab('messages')"><span class="ic">💬<span class="dot" id="msgDot"></span></span>Messages</button>
+          <button data-tab="perle" onclick="showTab('perle')"><span class="ic">💎</span>Perle Rare</button>
+        </nav>
+      </section>
+
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <div class="st-modal" id="stModal">
+      <div class="st-box">
+        <h3>🛠️ Support technique<button type="button" onclick="closeSupportModal()">✕</button></h3>
+        <div class="st-notice"><b>Vous rencontrez un dysfonctionnement ?</b><br>Ce formulaire envoie un vrai signalement à l'équipe Diaspo'Actif (même système que le bouton web) — pas une simulation.</div>
+        <label>Catégorie</label>
+        <select id="stCategorie">
+          <option>Bug</option>
+          <option>Erreur d'affichage</option>
+          <option>Fonction indisponible</option>
+          <option>Erreur lors d'un enregistrement</option>
+          <option>Problème de connexion</option>
+          <option>Paiement</option>
+          <option>Notification</option>
+          <option>Téléchargement</option>
+          <option>Importation</option>
+          <option>Performance</option>
+          <option>Autre</option>
+        </select>
+        <label>Gravité</label>
+        <select id="stGravite">
+          <option value="faible">Faible</option>
+          <option value="moyenne" selected>Moyenne</option>
+          <option value="importante">Importante</option>
+          <option value="critique">Critique</option>
+        </select>
+        <label>Description</label>
+        <textarea id="stDescription" placeholder="Ce que vous essayiez de faire, ce qui s'est passé, ce que vous attendiez…"></textarea>
+        <div class="st-actions">
+          <button class="st-cancel" type="button" onclick="closeSupportModal()">Annuler</button>
+          <button class="st-send" id="stSendBtn" type="button" onclick="submitSupportTicket()">Envoyer le signalement</button>
+        </div>
+        <div class="st-status" id="stStatus"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------- data ----------
+  var products = [
+    {id:'p1', name:'Thiéboudienne (part)', price:14, cat:'plats', color:'#F0C29A', img:'https://picsum.photos/seed/thieboudienne-sahel/240/160'},
+    {id:'p2', name:'Mafé poulet', price:12, cat:'plats', color:'#D9A56A', img:'https://picsum.photos/seed/mafe-poulet-sahel/240/160'},
+    {id:'p3', name:'Yassa poisson', price:13.5, cat:'plats', color:'#E7B7A3', img:'https://picsum.photos/seed/yassa-poisson-sahel/240/160'},
+    {id:'p4', name:'Beignets sucrés (x6)', price:6, cat:'plats', color:'#F2D9A0', img:'https://picsum.photos/seed/beignets-sahel/240/160'},
+    {id:'p5', name:'Bissap artisanal 1L', price:5, cat:'boissons', color:'#C9DDCE', img:'https://picsum.photos/seed/bissap-sahel/240/160'},
+    {id:'p6', name:'Jus de gingembre 1L', price:5, cat:'boissons', color:'#E3C9E8', img:'https://picsum.photos/seed/gingembre-sahel/240/160'},
+    {id:'p7', name:'Coffret découverte', price:32, cat:'coffrets', color:'#F2C9A0', img:'https://picsum.photos/seed/coffret-sahel/240/160'}
+  ];
+  var events = [
+    {n:'15', m:'JUIL', title:'Soirée dégustation Sahel', loc:'Paris 18e', price:'15 €', cta:'Réserver', mine:true, zone:true, tag:'🏬 Votre initiative'},
+    {n:'22', m:'JUIL', title:'Atelier cuisine — Mafé', loc:'En ligne', price:'Gratuit', cta:"S'inscrire", mine:true, zone:true, tag:'🏬 Votre initiative'},
+    {n:'03', m:'AOÛT', title:'Marché de la diaspora', loc:'Paris 11e', price:'8 €', cta:'Réserver', mine:false, zone:true, tag:'📍 Votre zone'},
+    {n:'10', m:'AOÛT', title:'Forum Diaspora & Entrepreneuriat', loc:'Paris', price:'Gratuit', cta:"S'inscrire", mine:false, zone:true, tag:'📍 Votre zone'},
+    {n:'18', m:'AOÛT', title:'Conférence Diaspora Tech', loc:'Montréal', price:'12 €', cta:'Réserver', mine:false, zone:false, tag:'🌍 Hors zone'}
+  ];
+  var ticketHistory = [
+    {title:'Nuit du Mafé', date:'02 juin 2026', loc:'Paris 18e'},
+    {title:'Atelier Bissap maison', date:'14 mai 2026', loc:'En ligne'}
+  ];
+  var posts = [
+    {id:'po1', who:'Sahel Saveurs', av:'SS', when:'il y a 3 h', badge:'Abonnement', tag:'Nouveauté', txt:"Nouvelle recette du mois 🌶️ Notre Thiéboudienne revisitée arrive en boutique dès jeudi.", photo:true, likes:42, comments:8, followed:true},
+    {id:'po2', who:'Réseau Diaspora Santé', av:'RD', when:'il y a 5 h', badge:'Suggéré', tag:'Découverte', txt:"Recrutement de 5 mentors santé pour la rentrée — candidatures ouvertes jusqu'au 30 juillet.", photo:false, likes:17, comments:2, followed:false}
+  ];
+  var searchIndex = [
+    {name:'Sahel Saveurs', id:'DA-00042', cat:'Gastronomie'},
+    {name:'Réseau Diaspora Santé', id:'DA-00118', cat:'Santé'},
+    {name:'Association Warra', id:'DA-00077', cat:'Culture'},
+    {name:'A.I.T.O', id:'DA-00029', cat:'Éducation'},
+    {name:'Collectif Racines', id:'DA-00151', cat:'Solidarité'},
+    {name:'Fatou Diallo', id:'DS-33210', cat:'Membre'}
+  ];
+  var perles = [
+    {name:'Aminata Traoré', type:'talent', role:'Ingénieure logicielle', loc:'Bamako → Lyon', icon:'👤'},
+    {name:'Kora Design Studio', type:'initiative', role:'Artisanat & design', loc:'Abidjan', icon:'🏬'},
+    {name:'Yves Mensah', type:'talent', role:'Chef cuisinier', loc:'Lomé → Bruxelles', icon:'👤'},
+    {name:'Réseau Diaspora Santé', type:'initiative', role:'Santé communautaire', loc:'Dakar', icon:'🏬'},
+    {name:'Awa Sarr', type:'talent', role:'Avocate en droit des affaires', loc:'Dakar → Montréal', icon:'👤'}
+  ];
+  var chatSeed = {
+    'Sahel Saveurs': [['them','Merci pour votre commande, à bientôt !'],['me','Avec plaisir, tout était délicieux 😋'],['them','Ravi que ça vous ait plu ! Le prochain menu spécial sort la semaine prochaine 🎉']],
+    'Fatou Diallo': [['them',"On se voit à l'atelier du 22 ?"]],
+    'Association Warra': [['them','Votre billet est confirmé ✅']],
+    'Ndeye Fall': [['them','Bonjour, le Coffret découverte est-il sans arachides ?']]
+  };
+
+  var state = {
+    cart:{}, cat:'tous', pcat:'tous', dcat:'tous', feed:'pourvous', following:false, followers:328,
+    reqs:[{id:'r1', name:'Moussa Traoré', init:'MT'},{id:'r2', name:'Aïcha Koné', init:'AK'}],
+    convs:[
+      {id:'c4', name:'Ndeye Fall', av:'NF', time:'09:20', preview:'Bonjour, le Coffret découverte est-il sans arachides ?', unread:true, shopTag:'Coffret découverte'},
+      {id:'c1', name:'Sahel Saveurs', av:'SS', time:'14:02', preview:'Merci pour votre commande, à bientôt !', unread:true},
+      {id:'c2', name:'Fatou Diallo', av:'FD', time:'hier', preview:"On se voit à l'atelier du 22 ?", unread:false},
+      {id:'c3', name:'Association Warra', av:'AW', time:'lundi', preview:'Votre billet est confirmé ✅', unread:false}
+    ],
+    likedPosts:{},
+    reservedEvents:{},
+    chatOpenWith:null
+  };
+  var pristine = JSON.parse(JSON.stringify(state));
+
+  // ---------- view / tab navigation ----------
+  function showView(id){
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+  }
+  function enterApp(){ showView('view-app'); showTab('profil'); }
+
+  function showTab(name){
+    document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('tab-'+name).classList.add('active');
+    document.querySelectorAll('.tabbar button').forEach(function(b){ b.classList.toggle('active', b.dataset.tab===name); });
+    if(name==='messages'){ document.getElementById('msgDot').style.display='none'; }
+    document.getElementById('appScroll').scrollTop = 0;
+  }
+
+  function selectType(el){
+    document.querySelectorAll('.type-card').forEach(function(c){ c.classList.remove('on'); });
+    el.classList.add('on');
+  }
+
+  function showMailConf(){
+    var el = document.getElementById('mailConf');
+    el.classList.add('show');
+    setTimeout(function(){ el.classList.remove('show'); }, 3000);
+  }
+
+  // ---------- search ----------
+  function runSearch(q){
+    var box = document.getElementById('searchResults');
+    q = (q||'').trim().toLowerCase();
+    if(!q){ box.classList.remove('show'); box.innerHTML=''; return; }
+    var matches = searchIndex.filter(function(it){
+      return it.name.toLowerCase().indexOf(q)>-1 || it.id.toLowerCase().indexOf(q)>-1;
+    });
+    if(!matches.length){ box.innerHTML = '<div class="search-empty">Aucun résultat pour « '+escapeHtml(q)+' »</div>'; box.classList.add('show'); return; }
+    box.innerHTML = matches.map(function(it){
+      var initials = it.name.split(' ').map(function(w){return w[0];}).slice(0,2).join('').toUpperCase();
+      return '<div class="sr-item" onclick="pickSearch(\''+it.name.replace(/'/g,"\\'")+'\')"><span class="sr-av">'+initials+'</span><div><div class="sr-n">'+it.name+'</div><div class="sr-id">'+it.id+' · '+it.cat+'</div></div></div>';
+    }).join('');
+    box.classList.add('show');
+  }
+  function pickSearch(name){
+    document.getElementById('searchResults').classList.remove('show');
+    document.getElementById('searchBox').value='';
+    openExplore(name);
+  }
+  document.addEventListener('click', function(e){
+    if(!e.target.closest('.top-search')){ var r=document.getElementById('searchResults'); if(r) r.classList.remove('show'); }
+  });
+
+  // ---------- exploration d'un autre profil ----------
+  var exploreData = {
+    'Réseau Diaspora Santé': {cat:'⚕️ Santé communautaire · Réseau', type:'initiative', color:'#2E6F5E',
+      bio:'Réseau de professionnels de santé de la diaspora — mentorat, prévention et accès aux soins pour les familles expatriées.',
+      stats:[['512','Abonnés'],['4.6★','86 avis'],['28','Événements']]},
+    'Association Warra': {cat:'🎭 Culture · Abidjan', type:'initiative', color:'#7C4A9A',
+      bio:'Association culturelle — valorisation du patrimoine et des arts de la diaspora à travers expositions et ateliers.',
+      stats:[['890','Abonnés'],['4.9★','142 avis'],['74','Événements']]},
+    'A.I.T.O': {cat:'🎓 Éducation · Bourses & mentorat', type:'initiative', color:'#1E5B8C',
+      bio:'Programmes de bourses et de mentorat pour les étudiants de la diaspora, du secondaire au doctorat.',
+      stats:[['1 120','Abonnés'],['4.7★','203 avis'],['112','Événements']]},
+    'Collectif Racines': {cat:'🤝 Solidarité · Entraide', type:'initiative', color:'#B5622A',
+      bio:"Collectif solidaire — entraide, dons et accompagnement des nouveaux arrivants dans leur pays d'accueil.",
+      stats:[['340','Abonnés'],['4.8★','61 avis'],['19','Événements']]},
+    'Fatou Diallo': {cat:'👤 Membre · Lyon', type:'membre', color:'#5B6B82',
+      bio:'Membre de la diaspora sénégalaise installée à Lyon. Déjà connectée avec vous.',
+      stats:[['1','Connexion'],['12','Publications'],['2024','Membre depuis']]}
+  };
+  var currentExplore = null;
+  function openExplore(name){
+    if(name==='Sahel Saveurs'){ toast('C\'est votre profil'); showTab('profil'); return; }
+    var d = exploreData[name];
+    if(!d) return;
+    currentExplore = {name:name, type:d.type};
+    var initials = name.split(' ').map(function(w){return w[0];}).slice(0,2).join('').toUpperCase();
+    document.getElementById('expCover').style.background = 'linear-gradient(120deg,'+d.color+',#4A6486)';
+    document.getElementById('expAvatar').textContent = initials;
+    document.getElementById('expAvatar').style.background = d.color;
+    document.getElementById('expVerified').style.display = d.type==='initiative' ? '' : 'none';
+    document.getElementById('expName').textContent = name;
+    document.getElementById('expCat').textContent = d.cat;
+    document.getElementById('expStats').innerHTML = d.stats.map(function(s){ return '<div><b>'+s[0]+'</b><span>'+s[1]+'</span></div>'; }).join('');
+    document.getElementById('expBio').textContent = d.bio;
+    var cta = document.getElementById('expCta');
+    cta.textContent = d.type==='membre' ? '💬 Envoyer un message' : 'Suivre';
+    document.getElementById('exploreOverlay').classList.add('open');
+  }
+  function closeExplore(){ document.getElementById('exploreOverlay').classList.remove('open'); }
+  function exploreCta(){
+    if(!currentExplore) return;
+    if(currentExplore.type==='membre'){
+      closeExplore();
+      var conv = state.convs.find(function(c){ return c.name===currentExplore.name; });
+      var initials = currentExplore.name.split(' ').map(function(w){return w[0];}).slice(0,2).join('').toUpperCase();
+      showTab('messages');
+      openChat(currentExplore.name, conv ? conv.av : initials);
+    } else {
+      toast('Vous suivez '+currentExplore.name);
+      closeExplore();
+    }
+  }
+
+  // ---------- profil (compte connecté) ----------
+  function renderOwnPreview(){
+    var prodRow = document.getElementById('ownProdRow');
+    if(prodRow){
+      prodRow.innerHTML = products.slice(0,2).map(function(p){
+        return '<div class="mv-prod"><b>'+p.name+'</b>'+p.price.toFixed(2).replace('.',',')+' €</div>';
+      }).join('');
+    }
+    var preview = document.getElementById('ownPostPreview');
+    if(preview){
+      var p = posts[0];
+      var liked = state.likedPosts[p.id];
+      preview.innerHTML = '<div class="post"><div class="head"><span class="av2">'+p.av+'</span><div><div class="who">'+p.who+'</div><div class="when">'+p.when+'</div></div></div>'
+        +'<p class="txt">'+p.txt+'</p><div class="acts"><span>❤ '+(p.likes+(liked?1:0))+'</span><span>💬 '+p.comments+'</span></div></div>';
+    }
+  }
+
+  // ---------- vitrine ----------
+  function renderProducts(){
+    var grid = document.getElementById('prodGrid');
+    var list = state.cat==='tous' ? products : products.filter(function(p){ return p.cat===state.cat; });
+    grid.innerHTML = list.map(function(p){
+      var qty = state.cart[p.id]||0;
+      return '<div class="prod"><div class="img" style="background:'+p.color+'"><img src="'+p.img+'" alt="" onerror="this.remove()"></div><div class="n">'+p.name+'</div>'
+        +'<div class="row2"><span class="price">'+p.price.toFixed(2).replace('.',',')+' €</span>'
+        +'<button class="add" type="button" onclick="addToCart(\''+p.id+'\')">+<span class="qty '+(qty?'show':'')+'">'+qty+'</span></button></div></div>';
+    }).join('');
+    renderCartBar();
+  }
+  function setCat(el){
+    document.querySelectorAll('#filterRow .fchip').forEach(function(c){ c.classList.remove('on'); });
+    el.classList.add('on'); state.cat = el.dataset.cat; renderProducts();
+  }
+  function addToCart(id){
+    state.cart[id] = (state.cart[id]||0)+1;
+    renderProducts();
+  }
+  function cartCount(){ return Object.values(state.cart).reduce(function(a,b){return a+b;},0); }
+  function cartTotal(){
+    return Object.keys(state.cart).reduce(function(sum,id){
+      var p = products.find(function(x){return x.id===id;});
+      return sum + p.price*state.cart[id];
+    },0);
+  }
+  function renderCartBar(){
+    var n = cartCount();
+    var badge = document.getElementById('cartBadge');
+    badge.style.display = n? 'flex':'none'; badge.textContent = n;
+    var grid = document.getElementById('prodGrid');
+    var old = document.getElementById('cartBarEl');
+    if(old) old.remove();
+    if(n>0){
+      var bar = document.createElement('div');
+      bar.className = 'cart-bar'; bar.id='cartBarEl';
+      bar.innerHTML = '<span>Panier · '+n+' art. · '+cartTotal().toFixed(2).replace('.',',')+' €</span><button type="button" onclick="checkout()">Commander</button>';
+      grid.after(bar);
+    }
+  }
+  function checkout(){
+    toast('Commande simulée envoyée à Stripe Connect ✅');
+    state.cart = {}; renderProducts();
+  }
+
+  // ---------- billetterie ----------
+  function openDiscover(){ document.getElementById('discoverOverlay').classList.add('open'); }
+  function closeDiscover(){ document.getElementById('discoverOverlay').classList.remove('open'); }
+  function setDiscoverCat(el){
+    document.querySelectorAll('#discoverFilterRow .fchip').forEach(function(c){ c.classList.remove('on'); });
+    el.classList.add('on'); state.dcat = el.dataset.dcat; renderEvents();
+  }
+  function renderEvents(){
+    var wrap = document.getElementById('evtList');
+    var list = events.map(function(e,i){ return {e:e, i:i}; }).filter(function(x){
+      if(state.dcat==='mine') return x.e.mine;
+      if(state.dcat==='zone') return x.e.zone;
+      return true;
+    });
+    wrap.innerHTML = list.length ? list.map(function(x){
+      var e=x.e, i=x.i, done = state.reservedEvents[i];
+      return '<div class="evt"><div class="date"><span class="n">'+e.n+'</span>'+e.m+'</div><div class="body"><div class="t">'+e.title+'</div><div class="loc">'+e.loc+'</div><span class="evt-tag">'+e.tag+'</span>'
+        +'<div class="row3"><span class="price">'+e.price+'</span><button class="go2 '+(done?'done':'')+'" type="button" onclick="reserveEvt('+i+')">'+(done?'✓ Réservé':e.cta)+'</button></div></div></div>';
+    }).join('') : '<div class="empty-req">Aucun événement dans cette catégorie.</div>';
+  }
+  function reserveEvt(i){
+    if(state.reservedEvents[i]) return;
+    state.reservedEvents[i] = true;
+    renderEvents();
+    renderMyTickets();
+    toast('Billet ajouté à Mes Billets — QR généré (démo)');
+  }
+  function renderMyTickets(){
+    var wrap = document.getElementById('myTicketsList');
+    var mine = events.map(function(e,i){ return {e:e,i:i}; }).filter(function(x){ return state.reservedEvents[x.i]; });
+    wrap.innerHTML = mine.length ? mine.map(function(x){
+      var e=x.e;
+      return '<div class="evt"><div class="date"><span class="n">'+e.n+'</span>'+e.m+'</div><div class="body"><div class="t">'+e.title+'</div><div class="loc">'+e.loc+'</div>'
+        +'<div class="row3"><span class="ticket-status">À venir</span><button class="go2" type="button" onclick="toast(\'QR code affiché (démo)\')">▦ QR</button></div></div></div>';
+    }).join('') : '<div class="empty-req">Aucun billet pour l\'instant — inscrivez-vous à un événement ci-dessus.</div>';
+  }
+  function renderTicketHistory(){
+    var wrap = document.getElementById('ticketHistoryList');
+    wrap.innerHTML = ticketHistory.map(function(h){
+      return '<div class="evt"><div class="date" style="opacity:.55"><span class="n">✓</span>Fini</div><div class="body"><div class="t">'+h.title+'</div><div class="loc">'+h.loc+' · '+h.date+'</div>'
+        +'<div class="row3"><span class="ticket-status done">Utilisé</span></div></div></div>';
+    }).join('');
+  }
+
+  // ---------- fil ----------
+  function renderPosts(){
+    var wrap = document.getElementById('postList');
+    var list = state.feed==='pourvous' ? posts : posts.filter(function(p){ return p.followed; });
+    wrap.innerHTML = list.map(function(p){
+      var liked = state.likedPosts[p.id];
+      var likeCount = p.likes + (liked?1:0);
+      return '<div class="post"><div class="head"><span class="av2">'+p.av+'</span><div><div class="who">'+p.who+'</div><div class="when">'+p.when+' · '+p.badge+'</div></div><span class="tag2">'+p.tag+'</span></div>'
+        +'<p class="txt">'+p.txt+'</p>'+(p.photo?'<div class="ph"></div>':'')
+        +'<div class="acts"><button type="button" class="'+(liked?'liked':'')+'" onclick="toggleLike(\''+p.id+'\')">❤ '+likeCount+'</button><button type="button" onclick="toast(\'Commentaires (démo)\')">💬 '+p.comments+'</button><button type="button" onclick="toast(\'Lien partagé (démo)\')">↗ Partager</button></div></div>';
+    }).join('');
+  }
+  function setFeed(el){
+    document.querySelectorAll('#tab-fil .fchip').forEach(function(c){ c.classList.remove('on'); });
+    el.classList.add('on'); state.feed = el.dataset.feed; renderPosts();
+  }
+  function toggleLike(id){ state.likedPosts[id] = !state.likedPosts[id]; renderPosts(); renderOwnPreview(); }
+
+  // ---------- perle rare ----------
+  function renderPerles(){
+    var wrap = document.getElementById('perleList');
+    var list = state.pcat==='tous' ? perles : perles.filter(function(p){ return p.type===state.pcat; });
+    wrap.innerHTML = list.map(function(p){
+      return '<div class="perle-card" onclick="toast(\'Ouverture du profil « '+p.name.replace(/'/g,"\\'")+' » (démo)\')">'
+        +'<span class="pav">'+p.icon+'</span><div class="pinfo"><div class="pn">'+p.name+'</div><div class="pdsc">'+p.role+' · '+p.loc+'</div></div>'
+        +'<button class="pgo" type="button" onclick="event.stopPropagation(); toast(\'Ouverture du profil « '+p.name.replace(/'/g,"\\'")+' » (démo)\')">Voir</button></div>';
+    }).join('');
+  }
+  function setPerleCat(el){
+    document.querySelectorAll('#perleFilterRow .fchip').forEach(function(c){ c.classList.remove('on'); });
+    el.classList.add('on'); state.pcat = el.dataset.pcat; renderPerles();
+  }
+
+  // ---------- messages ----------
+  function renderReqs(){
+    var wrap = document.getElementById('reqList');
+    document.getElementById('reqCountLabel').textContent = state.reqs.length ? state.reqs.length+' demande'+(state.reqs.length>1?'s':'')+' en attente' : 'Aucune demande en attente';
+    wrap.innerHTML = state.reqs.length ? state.reqs.map(function(r){
+      return '<div class="req-item"><div class="rtop"><span class="av2">'+r.init+'</span><div class="rt"><div class="rn">'+r.name+'</div><div class="rd">souhaite se connecter</div></div></div>'
+        +'<div class="racts"><button class="rbtn view" type="button" onclick="toast(\'Ouverture du profil « '+r.name.replace(/'/g,"\\'")+' » (démo)\')">👁 Voir le profil</button><button class="rbtn ok" type="button" onclick="acceptReq(\''+r.id+'\')">Accepter</button><button class="rbtn no" type="button" onclick="declineReq(\''+r.id+'\')">✕</button></div></div>';
+    }).join('') : '<div class="empty-req">Aucune demande pour le moment.</div>';
+  }
+  function acceptReq(id){
+    var r = state.reqs.find(function(x){return x.id===id;});
+    state.reqs = state.reqs.filter(function(x){ return x.id!==id; });
+    if(r){
+      state.convs.unshift({id:'new-'+id, name:r.name, av:r.init, time:'à l\'instant', preview:'Vous êtes maintenant connectés ✅', unread:false});
+      chatSeed[r.name] = [['them','Merci d\'avoir accepté ma demande !']];
+    }
+    renderReqs(); renderConvs();
+    toast('Vous êtes maintenant connectés ✅');
+  }
+  function declineReq(id){
+    state.reqs = state.reqs.filter(function(x){ return x.id!==id; });
+    renderReqs();
+    toast('Demande refusée');
+  }
+  function renderConvs(){
+    var wrap = document.getElementById('convList');
+    wrap.innerHTML = state.convs.map(function(c){
+      return '<div class="msg-item '+(c.unread?'unread':'')+'" onclick="openChat(\''+c.name.replace(/'/g,"\\'")+'\',\''+c.av+'\')"><span class="av2">'+c.av+'</span>'
+        +'<div class="mt"><div class="mn"><span>'+c.name+'</span><span class="time">'+c.time+'</span></div><div class="mp">'+c.preview+'</div>'
+        +(c.shopTag?'<span class="shoptag">🛍️ '+c.shopTag+'</span>':'')+'</div>'
+        +(c.unread?'<span class="ub"></span>':'')+'</div>';
+    }).join('');
+  }
+
+  // ---------- chat ----------
+  function openChat(name, av){
+    state.chatOpenWith = name;
+    document.getElementById('chatName').textContent = name;
+    document.getElementById('chatAv').textContent = av;
+    var conv = state.convs.find(function(c){return c.name===name;});
+    if(conv && conv.unread){ conv.unread = false; renderConvs(); }
+    var body = document.getElementById('chatBody');
+    var seed = chatSeed[name] || [['them','Nouvelle conversation.']];
+    body.innerHTML = seed.map(function(m){ return '<div class="bubble '+(m[0]==='me'?'me':'them')+'">'+m[1]+'</div>'; }).join('');
+    document.getElementById('chatOverlay').classList.add('open');
+    body.scrollTop = body.scrollHeight;
+  }
+  function closeChat(){ document.getElementById('chatOverlay').classList.remove('open'); }
+  function sendChat(){
+    var input = document.getElementById('chatInput');
+    var txt = input.value.trim();
+    if(!txt) return;
+    var body = document.getElementById('chatBody');
+    var b = document.createElement('div'); b.className='bubble me'; b.textContent = txt;
+    body.appendChild(b); input.value=''; body.scrollTop = body.scrollHeight;
+    if(state.chatOpenWith){
+      var conv = state.convs.find(function(c){return c.name===state.chatOpenWith;});
+      if(conv) conv.preview = txt;
+      renderConvs();
+    }
+  }
+
+  // ---------- support technique (relié au vrai backend, POST /api/support/tickets) ----------
+  function openSupportModal(){
+    document.getElementById('stCategorie').value = 'Bug';
+    document.getElementById('stGravite').value = 'moyenne';
+    document.getElementById('stDescription').value = '';
+    var status = document.getElementById('stStatus');
+    status.className = 'st-status'; status.textContent = '';
+    document.getElementById('stModal').classList.add('open');
+  }
+  function closeSupportModal(){ document.getElementById('stModal').classList.remove('open'); }
+
+  async function submitSupportTicket(){
+    var categorie = document.getElementById('stCategorie').value;
+    var gravite = document.getElementById('stGravite').value;
+    var description = document.getElementById('stDescription').value.trim();
+    var status = document.getElementById('stStatus');
+    var btn = document.getElementById('stSendBtn');
+    if(!description){ status.className='st-status err show'; status.textContent='Merci de décrire le problème rencontré.'; return; }
+    btn.disabled = true; btn.textContent = 'Envoi…';
+    status.className = 'st-status'; status.textContent = '';
+    try{
+      var res = await fetch('/api/support/tickets', {
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          categorie: categorie,
+          gravite: gravite,
+          description: description,
+          module_concerne: 'Application mobile (prototype)',
+          page_url: location.href,
+          navigateur: navigator.userAgent.slice(0,60),
+          os: 'Mobile (prototype)',
+          app_version: 'mobile-proto-v1',
+          screenshots: []
+        })
+      });
+      var data = {};
+      try{ data = await res.json(); }catch(e){}
+      if(res.status === 401){
+        status.className = 'st-status err show';
+        status.textContent = "Connexion requise — connectez-vous sur Diaspo'Actif (dans ce même navigateur) pour que le signalement soit rattaché à votre compte.";
+      } else if(!res.ok){
+        status.className = 'st-status err show';
+        status.textContent = data.error || 'Erreur serveur — signalement non envoyé.';
+      } else {
+        status.className = 'st-status ok show';
+        status.textContent = '✅ Signalement envoyé — numéro ' + data.numero + '. Visible dans Messages techniques côté admin.';
+        setTimeout(closeSupportModal, 2200);
+      }
+    } catch(e){
+      status.className = 'st-status err show';
+      status.textContent = "Impossible de contacter le serveur — vérifiez que node server/index.js tourne bien sur ce port.";
+    } finally {
+      btn.disabled = false; btn.textContent = 'Envoyer le signalement';
+    }
+  }
+
+  // ---------- toast ----------
+  var toastTimer;
+  function toast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+  function escapeHtml(s){ return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  // ---------- reset ----------
+  function resetDemo(){
+    state = JSON.parse(JSON.stringify(pristine));
+    chatSeed['Sahel Saveurs'] = [['them','Merci pour votre commande, à bientôt !'],['me','Avec plaisir, tout était délicieux 😋'],['them','Ravi que ça vous ait plu ! Le prochain menu spécial sort la semaine prochaine 🎉']];
+    delete chatSeed['Moussa Traoré']; delete chatSeed['Aïcha Koné'];
+    document.getElementById('statFollowers').textContent = state.followers;
+    document.getElementById('dsidInput').value = 'DS-4471-9203';
+    document.querySelectorAll('#filterRow .fchip').forEach(function(c){ c.classList.toggle('on', c.dataset.cat==='tous'); });
+    document.querySelectorAll('#tab-fil .fchip').forEach(function(c){ c.classList.toggle('on', c.dataset.feed==='pourvous'); });
+    document.querySelectorAll('#perleFilterRow .fchip').forEach(function(c){ c.classList.toggle('on', c.dataset.pcat==='tous'); });
+    document.querySelectorAll('#discoverFilterRow .fchip').forEach(function(c){ c.classList.toggle('on', c.dataset.dcat==='tous'); });
+    document.querySelectorAll('.type-card').forEach(function(c){ c.classList.toggle('on', c.dataset.type==='initiative'); });
+    closeChat(); closeExplore(); closeDiscover(); closeSupportModal();
+    renderAll();
+    document.getElementById('msgDot').style.display='block';
+    showView('view-onb-associate');
+    toast('Démo réinitialisée');
+  }
+
+  function renderAll(){
+    renderProducts(); renderEvents(); renderMyTickets(); renderTicketHistory(); renderPosts(); renderReqs(); renderConvs(); renderPerles(); renderOwnPreview();
+  }
+  renderAll();
+
+  // live clock
+  function tick(){
+    var d = new Date();
+    document.getElementById('clock').textContent = d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+  }
+  tick(); setInterval(tick, 15000);
+</script>
+</body>
+</html>

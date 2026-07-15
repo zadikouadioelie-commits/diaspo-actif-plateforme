@@ -81,8 +81,9 @@
     { re: /newsletter/i, id: 'create_newsletter' },
 
     // ── Navigation : accréditations / habilitations
-    { re: _nav('(les?\s+)?accr[eé]ditations?|(mon\s+)?badge|ma\s+carte\s+d[e\']accr[eé]ditation'), id: 'nav_accreditations' },
-    { re: /accr[eé]ditations?|accréditation/i, id: 'nav_accreditations' },
+    // (tolère les fautes/dictées vocales fréquentes : "acréditation", "accreditation" sans accent, singulier)
+    { re: _nav('(les?\s+)?acc?r[eé]ditations?|(mon\s+)?badge|ma\s+carte\s+d[e\']acc?r[eé]ditation'), id: 'nav_accreditations' },
+    { re: /acc?r[eé]ditations?/i, id: 'nav_accreditations' },
     { re: /habilitations?|autorisations?\s+(plateforme|compte|profil)?/i, id: 'nav_accreditations' },
 
     // ── Navigation : CV & Lettres

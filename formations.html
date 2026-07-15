@@ -14,6 +14,23 @@
 <link rel="apple-touch-icon" href="assets/logo.svg">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+.mf-cat-pill{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;background:#fff;border:2px solid var(--border);border-radius:99px;padding:8px 14px;cursor:pointer;transition:all .15s;user-select:none;}
+.mf-cat-pill:hover{border-color:#ff6b00;}
+.mf-cat-pill input{width:16px;height:16px;accent-color:#ff6b00;cursor:pointer;}
+.mf-cat-pill.checked{background:#fff3e8 !important;border-color:#ff6b00 !important;color:#c2410c !important;}
+#mf-charte{width:20px;height:20px;flex-shrink:0;accent-color:#ff6b00;cursor:pointer;}
+.mfw-step{flex:1;text-align:center;font-size:11.5px;font-weight:700;color:var(--muted);padding:8px 4px;border-bottom:3px solid var(--border);}
+.mfw-step.active{color:#ff6b00;border-bottom-color:#ff6b00;}
+.mfw-step.done{color:#059669;border-bottom-color:#bbf7d0;}
+.fb-tab{background:#fff;border:2px solid var(--border);color:var(--muted);}
+.fb-tab.active{background:#fff3e8;border-color:#ff6b00;color:#c2410c;}
+.fb-module-card{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;background:#fff;}
+.fb-module-card.dragover{border-color:#ff6b00;background:#fff7ed;}
+.fb-lecon-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-top:6px;background:#f8fafc;cursor:grab;}
+.fb-lecon-row.dragover{border-color:#ff6b00;background:#fff7ed;}
+.fb-drag-handle{cursor:grab;color:var(--muted);}
+</style>
 </head>
 <body>
 <div class="page">
@@ -42,13 +59,16 @@
     <aside class="sidebar">
       <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
       <div class="brand">Formations</div>
-      <a class="active" href="#">📚 Catalogue</a>
-      <a href="#">🎓 Mes inscriptions</a>
-      <a href="#">⭐ Favoris</a>
-      <a href="#">📜 Certifications</a>
+      <a class="active" href="#" id="sb-tab-catalogue">📚 Catalogue</a>
+      <a href="#" id="sb-tab-besoins">💡 Besoins en formation</a>
+      <a href="#" id="sb-tab-inscriptions">🎓 Mes inscriptions</a>
+      <a href="#" id="sb-tab-favoris">⭐ Favoris</a>
+      <a href="#" id="sb-tab-certifications">📜 Certifications</a>
+      <a href="#" id="sb-tab-espace-formateur" style="display:none;">🎬 Espace Formateur</a>
     </aside>
     <main class="content">
 
+      <div id="volet-catalogue">
       <div class="flex-between" style="margin-bottom:16px;">
         <div>
           <h1 style="margin:0;">Plateforme de formations</h1>
@@ -98,10 +118,19 @@
         </div>
       </div>
 
+      <div id="devenir-formateur-banner" style="display:none;margin-bottom:16px;padding:16px 20px;border-radius:12px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1.5px solid #ff6b00;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+          <strong style="font-size:14.5px;">🎓 Partagez votre expertise avec la diaspora</strong>
+          <p style="margin:4px 0 0;font-size:13px;color:var(--muted);">Devenez créateur de formation accrédité Diaspo'Actif pour créer, publier et vendre vos propres formations.</p>
+        </div>
+        <button class="btn btn-orange" id="btn-devenir-formateur">Devenir créateur de formation</button>
+      </div>
+      <div id="demande-formateur-statut" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:10px;background:#f8fafc;border:1px solid var(--border);font-size:13.5px;"></div>
+
       <div class="flex-between" style="margin-bottom:12px;">
         <span style="font-size:13.5px;color:var(--muted);"><strong id="formations-count">—</strong> formations disponibles</span>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-sm btn-outline" id="btn-proposer">+ Proposer une formation</button>
+          <button class="btn btn-sm btn-outline" id="btn-proposer">💡 Exprimer un besoin en formation</button>
         </div>
       </div>
 
@@ -109,31 +138,177 @@
       <div id="formations-grid">
         <div class="notice">Chargement des formations…</div>
       </div>
+      </div><!-- /volet-catalogue -->
+
+      <!-- Volet Besoins en formation -->
+      <div id="volet-besoins" style="display:none;">
+        <div class="notice" style="margin-bottom:20px;">
+          💡 Exprimez un besoin en formation : décrivez ce que vous aimeriez apprendre. Les autres membres de la diaspora peuvent soutenir votre idée, et les formateurs accrédités s'en inspirent pour créer de nouvelles formations.
+        </div>
+        <div class="flex-between" style="margin-bottom:12px;">
+          <span style="font-size:13.5px;color:var(--muted);"><strong id="besoins-count">—</strong> besoins exprimés</span>
+          <button class="btn btn-sm btn-orange" id="btn-proposer-besoin">+ Exprimer un besoin</button>
+        </div>
+        <div id="besoins-list"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- Volet Mes inscriptions -->
+      <div id="volet-inscriptions" style="display:none;">
+        <div class="flex-between" style="margin-bottom:12px;">
+          <h2 style="margin:0;">🎓 Mes inscriptions</h2>
+        </div>
+        <div id="inscriptions-list"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- Volet Favoris -->
+      <div id="volet-favoris" style="display:none;">
+        <div class="flex-between" style="margin-bottom:12px;">
+          <h2 style="margin:0;">⭐ Mes formations favorites</h2>
+        </div>
+        <div id="favoris-list"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- Volet Certifications -->
+      <div id="volet-certifications" style="display:none;">
+        <div class="flex-between" style="margin-bottom:12px;">
+          <h2 style="margin:0;">📜 Mes certifications</h2>
+        </div>
+        <div class="notice" style="margin-bottom:16px;">📜 Terminez une formation à 100% dans « Mes inscriptions » pour générer votre attestation numérique.</div>
+        <div id="certifications-list"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- Volet Espace Formateur (visible uniquement après accréditation Créateur de formation) -->
+      <div id="volet-espace-formateur" style="display:none;">
+        <div class="flex-between" style="margin-bottom:12px;">
+          <h2 style="margin:0;">🎬 Espace Formateur</h2>
+          <button class="btn btn-sm btn-orange" id="btn-creer-formation">+ Créer une nouvelle formation</button>
+        </div>
+        <div class="notice" style="margin-bottom:16px;">🎬 Chaque formation soumise est examinée par l'équipe Diaspo'Actif avant publication dans le catalogue.</div>
+        <div id="mes-formations-list"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- ════ Éditeur de contenu complet d'une formation (modules/leçons, quiz, certificat, soumission) ════ -->
+      <div id="fb-view" style="display:none;">
+        <button class="btn btn-sm btn-outline" id="fb-back" style="margin-bottom:14px;">← Retour à mes formations</button>
+        <h2 style="margin:0 0 4px;" id="fb-titre">Construction de la formation</h2>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">Statut : <span id="fb-statut-badge" class="tag"></span></div>
+
+        <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;" id="fb-tabs">
+          <button class="btn btn-sm fb-tab active" data-tab="contenu">🧩 Modules &amp; Leçons</button>
+          <button class="btn btn-sm fb-tab" data-tab="quiz">📝 Quiz &amp; Évaluations</button>
+          <button class="btn btn-sm fb-tab" data-tab="certificat">🎓 Certificat</button>
+          <button class="btn btn-sm fb-tab" data-tab="apercu">👁️ Aperçu</button>
+          <button class="btn btn-sm fb-tab" data-tab="soumission">📤 Soumission</button>
+        </div>
+
+        <!-- Onglet Modules & Leçons -->
+        <div class="fb-panel" data-fb-panel="contenu">
+          <div style="display:flex;gap:8px;margin-bottom:14px;">
+            <input id="fb-new-module-titre" class="input-field" style="flex:1;" placeholder="Titre du nouveau module">
+            <button class="btn btn-orange btn-sm" id="fb-add-module">+ Ajouter un module</button>
+          </div>
+          <div id="fb-modules-list"></div>
+        </div>
+
+        <!-- Onglet Quiz -->
+        <div class="fb-panel" data-fb-panel="quiz" style="display:none;">
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="margin:0 0 10px;">+ Nouveau quiz</h3>
+            <div class="grid grid-2" style="gap:10px;">
+              <input id="fb-quiz-titre" class="input-field" placeholder="Titre du quiz">
+              <select id="fb-quiz-type" class="input-field">
+                <option value="intermediaire">Quiz intermédiaire</option>
+                <option value="exercice">Exercice</option>
+                <option value="travail_pratique">Travail pratique</option>
+                <option value="examen_final">Examen final</option>
+              </select>
+              <input id="fb-quiz-note-min" type="number" min="0" max="100" class="input-field" placeholder="Note minimale (%)" value="50">
+              <input id="fb-quiz-temps" type="number" min="0" class="input-field" placeholder="Temps limité (minutes, facultatif)">
+            </div>
+            <button class="btn btn-orange btn-sm" id="fb-add-quiz" style="margin-top:10px;">+ Créer le quiz</button>
+          </div>
+          <div id="fb-quiz-list"></div>
+        </div>
+
+        <!-- Onglet Certificat -->
+        <div class="fb-panel" data-fb-panel="certificat" style="display:none;">
+          <div class="card">
+            <label style="display:flex;gap:8px;align-items:center;font-size:14px;font-weight:700;margin-bottom:14px;">
+              <input type="checkbox" id="fb-cert-actif"> Délivrer un certificat à la fin de cette formation
+            </label>
+            <div id="fb-cert-fields" style="display:none;flex-direction:column;gap:12px;">
+              <div><label style="font-size:13px;font-weight:700;">Modèle de certificat</label>
+                <select id="fb-cert-modele" class="input-field" style="width:100%;margin-top:4px;">
+                  <option value="classique">Classique</option>
+                  <option value="moderne">Moderne</option>
+                  <option value="premium">Premium</option>
+                </select>
+              </div>
+              <div><label style="font-size:13px;font-weight:700;">Conditions d'obtention</label>
+                <textarea id="fb-cert-conditions" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="ex: Réussir l'examen final avec au moins 70%…"></textarea>
+              </div>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="fb-cert-qr" checked> Inclure un QR code de vérification et un numéro unique</label>
+              <button class="btn btn-orange btn-sm" id="fb-save-cert" style="align-self:flex-start;">💾 Enregistrer</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Onglet Aperçu -->
+        <div class="fb-panel" data-fb-panel="apercu" style="display:none;">
+          <div id="fb-apercu-content" class="card"></div>
+        </div>
+
+        <!-- Onglet Soumission -->
+        <div class="fb-panel" data-fb-panel="soumission" style="display:none;">
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="margin:0 0 10px;">📋 Vérification avant soumission</h3>
+            <div id="fb-checklist"><div class="notice">Cliquez sur « Vérifier » pour lancer le contrôle.</div></div>
+            <button class="btn btn-outline btn-sm" id="fb-check-btn" style="margin-top:10px;">🔍 Vérifier</button>
+            <button class="btn btn-orange btn-sm" id="fb-submit-btn" style="margin-top:10px;margin-left:8px;">📤 Soumettre à Diaspo'Actif</button>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 10px;">💬 Espace de messagerie avec Diaspo'Actif</h3>
+            <div id="fb-messages-list" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+            <div style="display:flex;gap:8px;">
+              <input id="fb-message-input" class="input-field" style="flex:1;" placeholder="Écrire un message…">
+              <button class="btn btn-sm btn-outline" id="fb-message-send">Envoyer</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Modal proposer formation (initiative/admin) -->
       <div id="modal-formation" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;overflow-y:auto;">
-        <div class="card" style="max-width:600px;margin:40px auto;padding:24px;">
-          <div class="flex-between" style="margin-bottom:20px;">
-            <h2 style="margin:0;">Proposer une formation</h2>
+        <div class="card" style="max-width:680px;margin:30px auto;padding:24px;">
+          <div class="flex-between" style="margin-bottom:8px;">
+            <h2 style="margin:0;">Créer une formation</h2>
             <button class="btn btn-sm btn-outline" id="modal-close">✕ Fermer</button>
           </div>
-          <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;gap:6px;margin-bottom:20px;" id="mfw-stepper">
+            <div class="mfw-step" data-step="1">1. Infos générales</div>
+            <div class="mfw-step" data-step="2">2. Catégorie</div>
+            <div class="mfw-step" data-step="3">3. Tarification</div>
+            <div class="mfw-step" data-step="4">4. Accès</div>
+          </div>
+
+          <!-- Étape 1 : Informations générales -->
+          <div class="mfw-panel" data-panel="1" style="display:flex;flex-direction:column;gap:12px;">
             <div><label style="font-size:13px;font-weight:700;">Titre *</label><input id="new-form-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Titre de la formation"></div>
+            <div><label style="font-size:13px;font-weight:700;">Sous-titre</label><input id="new-form-sous-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Sous-titre accrocheur (facultatif)"></div>
+            <div><label style="font-size:13px;font-weight:700;">Description courte</label>
+              <textarea id="new-form-desc-courte" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Résumé en une ou deux phrases, affiché sur la carte du catalogue…"></textarea>
+            </div>
+            <div><label style="font-size:13px;font-weight:700;">Description complète</label>
+              <textarea id="new-form-desc" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Décrivez le contenu, les objectifs et le public cible…"></textarea>
+            </div>
+            <div><label style="font-size:13px;font-weight:700;">Objectifs pédagogiques</label>
+              <textarea id="new-form-objectifs" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Ce que l'apprenant saura faire à l'issue de la formation…"></textarea>
+            </div>
+            <div><label style="font-size:13px;font-weight:700;">Compétences qui seront acquises</label>
+              <textarea id="new-form-competences" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Une compétence par ligne…"></textarea>
+            </div>
+            <div><label style="font-size:13px;font-weight:700;">Public concerné</label><input id="new-form-public" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Entrepreneurs débutants, membres de la diaspora…"></div>
             <div class="grid grid-2" style="gap:10px;">
-              <div><label style="font-size:13px;font-weight:700;">Type</label>
-                <select id="new-form-type" class="input-field" style="width:100%;margin-top:4px;">
-                  <option value="Webinaire">Webinaire</option>
-                  <option value="Atelier en ligne">Atelier en ligne</option>
-                  <option value="Module certifiant">Module certifiant</option>
-                  <option value="Coaching">Coaching et mentorat</option>
-                  <option value="Programme professionnel">Programme professionnel</option>
-                </select>
-              </div>
-              <div><label style="font-size:13px;font-weight:700;">Domaine</label>
-                <select id="new-form-domaine" class="input-field" style="width:100%;margin-top:4px;">
-                  ${["Action Sociale","Agriculture","Santé","Éducation","Technologie","Culture","Économie","Finance","Droit","Environnement"].map(d=>`<option>${d}</option>`).join("")}
-                </select>
-              </div>
               <div><label style="font-size:13px;font-weight:700;">Niveau</label>
                 <select id="new-form-niveau" class="input-field" style="width:100%;margin-top:4px;">
                   <option value="Débutant">Débutant</option>
@@ -147,19 +322,187 @@
                   <option>Français</option><option>Anglais</option><option>Espagnol</option><option>Arabe</option><option>Portugais</option>
                 </select>
               </div>
-              <div><label style="font-size:13px;font-weight:700;">Durée</label><input id="new-form-duree" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 3h, 2 jours, 6 semaines"></div>
+              <div><label style="font-size:13px;font-weight:700;">Durée estimée</label><input id="new-form-duree" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 3h, 2 jours, 6 semaines"></div>
+              <div><label style="font-size:13px;font-weight:700;">Nombre d'heures</label><input type="number" min="0" step="0.5" id="new-form-duree-heures" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 12"></div>
+              <div><label style="font-size:13px;font-weight:700;">Nombre de modules prévu</label><input type="number" min="0" id="new-form-nb-modules" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 5"></div>
+              <div><label style="font-size:13px;font-weight:700;">Nombre approximatif de leçons</label><input type="number" min="0" id="new-form-nb-lecons" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 20"></div>
               <div><label style="font-size:13px;font-weight:700;">Places</label><input type="number" id="new-form-places" class="input-field" style="width:100%;margin-top:4px;" placeholder="Nombre de places"></div>
             </div>
-            <div><label style="font-size:13px;font-weight:700;">Description</label>
-              <textarea id="new-form-desc" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Décrivez le contenu, les objectifs et le public cible…"></textarea>
+          </div>
+
+          <!-- Étape 2 : Catégorie -->
+          <div class="mfw-panel" data-panel="2" style="display:none;flex-direction:column;gap:12px;">
+            <div class="grid grid-2" style="gap:10px;">
+              <div><label style="font-size:13px;font-weight:700;">Catégorie</label>
+                <select id="new-form-domaine" class="input-field" style="width:100%;margin-top:4px;">
+                  <option>Action Sociale</option><option>Agriculture</option><option>Santé</option><option>Éducation</option><option>Technologie</option><option>Culture</option><option>Économie</option><option>Finance</option><option>Droit</option><option>Environnement</option>
+                </select>
+              </div>
+              <div><label style="font-size:13px;font-weight:700;">Sous-catégorie</label><input id="new-form-sous-categorie" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Comptabilité, Marketing digital…"></div>
+              <div><label style="font-size:13px;font-weight:700;">Type</label>
+                <select id="new-form-type" class="input-field" style="width:100%;margin-top:4px;">
+                  <option value="Webinaire">Webinaire</option>
+                  <option value="Atelier en ligne">Atelier en ligne</option>
+                  <option value="Module certifiant">Module certifiant</option>
+                  <option value="Coaching">Coaching et mentorat</option>
+                  <option value="Programme professionnel">Programme professionnel</option>
+                </select>
+              </div>
+              <div><label style="font-size:13px;font-weight:700;">Secteur d'activité</label><input id="new-form-secteur" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Artisanat, Numérique, Santé…"></div>
+              <div><label style="font-size:13px;font-weight:700;">Pays concerné <span style="color:var(--muted);font-weight:400;">(facultatif)</span></label><input id="new-form-pays" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Sénégal, France…"></div>
+              <div><label style="font-size:13px;font-weight:700;">Mots-clés</label><input id="new-form-mots-cles" class="input-field" style="width:100%;margin-top:4px;" placeholder="séparés par des virgules"></div>
             </div>
+          </div>
+
+          <!-- Étape 3 : Tarification -->
+          <div class="mfw-panel" data-panel="3" style="display:none;flex-direction:column;gap:12px;">
             <div style="display:flex;gap:14px;align-items:center;">
               <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="new-form-gratuit" checked> <span style="font-size:13px;font-weight:700;">Formation gratuite</span></label>
-              <div style="flex:1;display:none;" id="prix-wrap"><label style="font-size:13px;">Prix (€)</label><input type="number" id="new-form-prix" class="input-field" style="width:80px;margin-left:8px;" value="0"></div>
             </div>
-            <div id="new-form-error" style="color:#D33;font-size:13px;display:none;"></div>
-            <button class="btn btn-orange btn-block" id="btn-submit-formation">Soumettre la formation</button>
+            <div id="mfw-tarif-block" style="display:none;flex-direction:column;gap:12px;">
+              <div class="grid grid-2" style="gap:10px;">
+                <div><label style="font-size:13px;font-weight:700;">Prix</label><input type="number" min="0" step="0.01" id="new-form-prix" class="input-field" style="width:100%;margin-top:4px;" value="0"></div>
+                <div><label style="font-size:13px;font-weight:700;">Devise</label>
+                  <select id="new-form-devise" class="input-field" style="width:100%;margin-top:4px;">
+                    <option value="EUR">EUR (€)</option><option value="USD">USD ($)</option><option value="XOF">XOF (FCFA)</option><option value="GBP">GBP (£)</option>
+                  </select>
+                </div>
+              </div>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;"><input type="checkbox" id="new-form-promo-active"> Activer une promotion</label>
+              <div id="mfw-promo-block" style="display:none;" class="grid grid-2" style="gap:10px;">
+                <div><label style="font-size:13px;font-weight:700;">Réduction (%)</label><input type="number" min="1" max="99" id="new-form-promo-pct" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 20"></div>
+                <div><label style="font-size:13px;font-weight:700;">Fin de la promotion</label><input type="date" id="new-form-promo-fin" class="input-field" style="width:100%;margin-top:4px;"></div>
+              </div>
+              <div>
+                <div class="flex-between"><label style="font-size:13px;font-weight:700;">Coupons de réduction</label></div>
+                <p style="font-size:12px;color:var(--muted);margin:2px 0 8px;">Les coupons ne peuvent être ajoutés qu'après l'enregistrement du brouillon (étape 1 validée).</p>
+                <div id="mfw-coupons-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+                <div style="display:flex;gap:8px;">
+                  <input id="mfw-coupon-code" class="input-field" style="flex:1;" placeholder="CODE20">
+                  <input id="mfw-coupon-pct" type="number" min="1" max="100" class="input-field" style="width:80px;" placeholder="%">
+                  <input id="mfw-coupon-max" type="number" min="1" class="input-field" style="width:90px;" placeholder="Max util.">
+                  <button class="btn btn-sm btn-outline" id="btn-mfw-add-coupon" type="button">+ Ajouter</button>
+                </div>
+              </div>
+            </div>
+            <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--muted);">
+              💰 Commission Diaspo'Actif : <strong id="mfw-commission-pct">5%</strong> · Revenu net estimé : <strong id="mfw-revenu-net">—</strong>
+            </div>
           </div>
+
+          <!-- Étape 4 : Accès -->
+          <div class="mfw-panel" data-panel="4" style="display:none;flex-direction:column;gap:12px;">
+            <label style="font-size:13px;font-weight:700;">Qui peut accéder à cette formation ?</label>
+            <select id="new-form-acces-type" class="input-field" style="width:100%;">
+              <option value="public">🌍 Public — visible et accessible à tous</option>
+              <option value="prive">🔒 Privé — non listé dans le catalogue, accès par lien direct</option>
+              <option value="payant">💳 Accessible uniquement après paiement</option>
+              <option value="invitation">✉️ Sur invitation</option>
+              <option value="organisation">🏢 Membres de mon initiative uniquement</option>
+              <option value="liste_reseau">📇 Une liste du Réseau Professionnel</option>
+            </select>
+            <div id="mfw-acces-liste-wrap" style="display:none;">
+              <label style="font-size:13px;font-weight:700;">Liste du Réseau Professionnel</label>
+              <select id="new-form-acces-liste" class="input-field" style="width:100%;margin-top:4px;"></select>
+            </div>
+            <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="new-form-telecharge"> Autoriser le téléchargement des ressources</label>
+          </div>
+
+          <div id="new-form-error" style="color:#D33;font-size:13px;display:none;margin-top:14px;"></div>
+          <div style="display:flex;gap:8px;margin-top:18px;">
+            <button class="btn btn-outline" id="btn-mfw-prev" style="display:none;">← Précédent</button>
+            <button class="btn btn-outline" id="btn-mfw-save-draft" style="margin-left:auto;">💾 Enregistrer le brouillon</button>
+            <button class="btn btn-orange" id="btn-mfw-next">Suivant →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal demande d'accréditation Formateur -->
+      <div id="modal-formateur" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;overflow-y:auto;">
+        <div class="card" style="max-width:640px;margin:40px auto;padding:24px;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <h2 style="margin:0;">🎓 Devenir créateur de formation</h2>
+            <button class="btn btn-sm btn-outline" id="modal-formateur-close">✕ Fermer</button>
+          </div>
+          <div id="mf-conditions" style="display:none;background:#f8fafc;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;">
+            <strong>Conditions d'obtention :</strong>
+            <p id="mf-conditions-text" style="margin:6px 0 0;color:var(--muted);"></p>
+          </div>
+          <div id="mf-documents-requis" style="display:none;background:#fff7ed;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;">
+            <strong>Documents à fournir :</strong>
+            <ul id="mf-documents-requis-list" style="margin:6px 0 0;padding-left:18px;color:var(--muted);"></ul>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div><label style="font-size:13px;font-weight:700;">Domaine d'expertise *</label>
+              <input id="mf-domaine" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Entrepreneuriat, Agriculture, Développement web…"></div>
+            <div class="grid grid-2" style="gap:10px;">
+              <div><label style="font-size:13px;font-weight:700;">Qualifications</label>
+                <textarea id="mf-qualifications" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Certifications professionnelles…"></textarea></div>
+              <div><label style="font-size:13px;font-weight:700;">Diplômes <span style="color:var(--muted);font-weight:400;">(facultatif)</span></label>
+                <textarea id="mf-diplomes" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Diplômes obtenus…"></textarea></div>
+            </div>
+            <div><label style="font-size:13px;font-weight:700;">Expérience professionnelle</label>
+              <textarea id="mf-experience" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Décrivez votre parcours et votre expérience dans ce domaine…"></textarea></div>
+            <div><label style="font-size:13px;font-weight:700;">Références ou réalisations</label>
+              <textarea id="mf-references" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Projets, publications, témoignages…"></textarea></div>
+            <div><label style="font-size:13px;font-weight:700;">Présentation personnelle</label>
+              <textarea id="mf-presentation" style="width:100%;min-height:70px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Présentez-vous en quelques lignes…"></textarea></div>
+            <div><label style="font-size:13px;font-weight:700;">Catégories de formations souhaitées</label>
+              <div id="mf-categories" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"></div>
+            </div>
+            <div><label style="font-size:13px;font-weight:700;">Pièces justificatives <span style="color:var(--muted);font-weight:400;">(optionnel)</span></label>
+              <input id="mf-fichier" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="margin-top:4px;">
+              <div id="mf-documents-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+            <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;background:#fff8f2;border:1.5px solid #ffd9b3;border-radius:10px;padding:12px 14px;cursor:pointer;">
+              <input type="checkbox" id="mf-charte" style="margin-top:2px;">
+              <span>Je m'engage à respecter la <strong>charte qualité des formateurs Diaspo'Actif</strong> (contenus fiables, respect des apprenants, mise à jour régulière des formations). *</span>
+            </label>
+            <div id="mf-error" style="color:#D33;font-size:13px;display:none;"></div>
+            <button class="btn btn-orange btn-block" id="btn-submit-formateur">Soumettre ma demande</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal exprimer un besoin en formation -->
+      <div id="modal-besoin" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;overflow-y:auto;">
+        <div class="card" style="max-width:520px;margin:60px auto;padding:24px;">
+          <div class="flex-between" style="margin-bottom:16px;">
+            <h2 style="margin:0;">💡 Exprimer un besoin en formation</h2>
+            <button class="btn btn-sm btn-outline" id="modal-besoin-close">✕ Fermer</button>
+          </div>
+          <p style="font-size:13px;color:var(--muted);margin-top:0;">Décrivez ce que vous aimeriez apprendre. Les autres membres pourront soutenir votre idée, et les formateurs accrédités s'en inspireront.</p>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div><label style="font-size:13px;font-weight:700;">Titre du besoin *</label>
+              <input id="besoin-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Formation en comptabilité pour petites entreprises"></div>
+            <div><label style="font-size:13px;font-weight:700;">Domaine</label>
+              <select id="besoin-domaine" class="input-field" style="width:100%;margin-top:4px;">
+                <option value="">Non précisé</option>
+                <option>Action Sociale</option><option>Agriculture</option><option>Santé</option><option>Éducation</option><option>Technologie</option><option>Culture</option><option>Économie</option><option>Finance</option><option>Droit</option><option>Environnement</option>
+              </select>
+            </div>
+            <div><label style="font-size:13px;font-weight:700;">Description</label>
+              <textarea id="besoin-description" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Expliquez ce dont vous auriez besoin et pourquoi…"></textarea></div>
+            <div id="besoin-error" style="color:#D33;font-size:13px;display:none;"></div>
+            <button class="btn btn-orange btn-block" id="btn-submit-besoin">Publier mon besoin</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal accès au contenu de la formation -->
+      <div id="modal-acces" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;overflow-y:auto;">
+        <div class="card" style="max-width:560px;margin:60px auto;padding:24px;">
+          <div class="flex-between" style="margin-bottom:16px;">
+            <h2 style="margin:0;" id="acces-titre">Formation</h2>
+            <button class="btn btn-sm btn-outline" id="modal-acces-close">✕ Fermer</button>
+          </div>
+          <p id="acces-organisme" style="font-size:13px;color:var(--muted);margin:0 0 12px;"></p>
+          <div id="acces-video" style="margin-bottom:14px;"></div>
+          <div>
+            <label style="font-size:13px;font-weight:700;">Contenu de la formation</label>
+            <p id="acces-description" style="margin:6px 0 0;font-size:13.5px;white-space:pre-wrap;"></p>
+          </div>
+          <div class="notice" style="margin-top:16px;font-size:12.5px;">📌 Mettez à jour votre progression depuis « Mes inscriptions » au fur et à mesure que vous avancez dans la formation.</div>
         </div>
       </div>
 
@@ -178,39 +521,850 @@
     new MutationObserver(syncBadge).observe(countEl, {childList:true, characterData:true, subtree:true});
   }
 
-  // Modal proposer formation
-  document.getElementById("btn-proposer").addEventListener("click", async ()=>{
-    const me = await fetchCurrentUser();
-    if(!me){ showMsg("Connectez-vous pour proposer une formation.", "warning"); return; }
-    if(!["initiative","administrateur"].includes(me.role)){ showMsg("Seuls les comptes Initiative et Administrateur peuvent proposer des formations.", "warning"); return; }
-    document.getElementById("modal-formation").style.display = "block";
-  });
   document.getElementById("modal-close").addEventListener("click", ()=>{ document.getElementById("modal-formation").style.display = "none"; });
-  document.getElementById("new-form-gratuit").addEventListener("change", function(){
-    document.getElementById("prix-wrap").style.display = this.checked ? "none" : "flex";
-  });
-  document.getElementById("btn-submit-formation").addEventListener("click", async ()=>{
+
+  // ── Assistant de création de formation (étapes 1-4 : infos, catégorie, tarification, accès) ──
+  let mfwStep = 1;
+  let mfwFormationId = null; // rempli après le premier enregistrement du brouillon
+  const MFW_STEPS = 4;
+
+  function mfwCollectPayload(){
+    return {
+      titre: document.getElementById("new-form-titre").value.trim(),
+      sous_titre: document.getElementById("new-form-sous-titre").value.trim(),
+      description_courte: document.getElementById("new-form-desc-courte").value.trim(),
+      description: document.getElementById("new-form-desc").value.trim(),
+      objectifs: document.getElementById("new-form-objectifs").value.trim(),
+      competences_acquises: document.getElementById("new-form-competences").value.trim(),
+      public_concerne: document.getElementById("new-form-public").value.trim(),
+      niveau: document.getElementById("new-form-niveau").value,
+      langue: document.getElementById("new-form-langue").value,
+      duree: document.getElementById("new-form-duree").value,
+      duree_heures: parseFloat(document.getElementById("new-form-duree-heures").value)||null,
+      nombre_modules_prevu: parseInt(document.getElementById("new-form-nb-modules").value)||null,
+      nombre_lecons_approx: parseInt(document.getElementById("new-form-nb-lecons").value)||null,
+      places: parseInt(document.getElementById("new-form-places").value)||null,
+      type_formation: document.getElementById("new-form-type").value,
+      domaine: document.getElementById("new-form-domaine").value,
+      sous_categorie: document.getElementById("new-form-sous-categorie").value.trim(),
+      secteur_activite: document.getElementById("new-form-secteur").value.trim(),
+      pays_concerne: document.getElementById("new-form-pays").value.trim(),
+      mots_cles: document.getElementById("new-form-mots-cles").value.trim(),
+      mode_acces: document.getElementById("new-form-gratuit").checked ? "gratuit" : "payant",
+      prix: parseFloat(document.getElementById("new-form-prix").value)||0,
+      devise: document.getElementById("new-form-devise").value,
+      promo_active: document.getElementById("new-form-promo-active").checked,
+      promo_reduction_pct: parseFloat(document.getElementById("new-form-promo-pct").value)||null,
+      promo_date_fin: document.getElementById("new-form-promo-fin").value || null,
+      acces_type: document.getElementById("new-form-acces-type").value,
+      acces_liste_id: document.getElementById("new-form-acces-type").value === 'liste_reseau' ? (parseInt(document.getElementById("new-form-acces-liste").value)||null) : null,
+      telecharge_autorise: document.getElementById("new-form-telecharge").checked
+    };
+  }
+
+  function mfwUpdateStepper(){
+    document.querySelectorAll('.mfw-step').forEach(el=>{
+      const n = parseInt(el.dataset.step);
+      el.classList.toggle('active', n===mfwStep);
+      el.classList.toggle('done', n<mfwStep);
+    });
+    document.querySelectorAll('.mfw-panel').forEach(el=>{
+      el.style.display = parseInt(el.dataset.panel)===mfwStep ? 'flex' : 'none';
+    });
+    document.getElementById('btn-mfw-prev').style.display = mfwStep>1 ? '' : 'none';
+    document.getElementById('btn-mfw-next').textContent = mfwStep<MFW_STEPS ? 'Suivant →' : '✅ Terminer';
+  }
+
+  async function mfwSaveDraft(silent){
     const titre = document.getElementById("new-form-titre").value.trim();
     const errEl = document.getElementById("new-form-error");
-    if(!titre){ errEl.textContent = "Le titre est obligatoire."; errEl.style.display="block"; return; }
+    if(!titre){ errEl.textContent = "Le titre est obligatoire."; errEl.style.display="block"; return false; }
     errEl.style.display = "none";
+    const payload = mfwCollectPayload();
     try {
-      await api("POST", "/formations", {
-        titre,
-        type_formation: document.getElementById("new-form-type").value,
-        domaine: document.getElementById("new-form-domaine").value,
-        niveau: document.getElementById("new-form-niveau").value,
-        langue: document.getElementById("new-form-langue").value,
-        duree: document.getElementById("new-form-duree").value,
-        places: parseInt(document.getElementById("new-form-places").value)||null,
-        description: document.getElementById("new-form-desc").value.trim(),
-        gratuit: document.getElementById("new-form-gratuit").checked,
-        prix: parseFloat(document.getElementById("new-form-prix").value)||0
-      });
-      document.getElementById("modal-formation").style.display = "none";
-      window.location.reload();
-    } catch(e){ errEl.textContent = e.message||"Erreur."; errEl.style.display="block"; }
+      if(!mfwFormationId){
+        const { id } = await api("POST", "/formations", payload);
+        mfwFormationId = id;
+      } else {
+        await api("PUT", `/formations/${mfwFormationId}`, payload);
+      }
+      if(!silent) showMsg('Brouillon enregistré.', 'success');
+      return true;
+    } catch(e){ errEl.textContent = e.message||"Erreur."; errEl.style.display="block"; return false; }
+  }
+
+  document.getElementById("new-form-gratuit").addEventListener("change", function(){
+    document.getElementById("mfw-tarif-block").style.display = this.checked ? "none" : "flex";
+    mfwUpdateCommissionPreview();
   });
+  document.getElementById("new-form-promo-active").addEventListener("change", function(){
+    document.getElementById("mfw-promo-block").style.display = this.checked ? "flex" : "none";
+  });
+  ["new-form-prix","new-form-devise"].forEach(id=>document.getElementById(id).addEventListener("input", mfwUpdateCommissionPreview));
+  function mfwUpdateCommissionPreview(){
+    const gratuit = document.getElementById("new-form-gratuit").checked;
+    const prix = parseFloat(document.getElementById("new-form-prix").value)||0;
+    const devise = document.getElementById("new-form-devise").value;
+    const pct = gratuit ? 0 : 5;
+    document.getElementById('mfw-commission-pct').textContent = pct + '%';
+    document.getElementById('mfw-revenu-net').textContent = gratuit ? '—' : (prix * (1 - pct/100)).toFixed(2) + ' ' + devise;
+  }
+
+  document.getElementById("new-form-acces-type").addEventListener("change", async function(){
+    const wrap = document.getElementById('mfw-acces-liste-wrap');
+    if(this.value === 'liste_reseau'){
+      wrap.style.display = '';
+      try {
+        const { listes } = await api('GET', '/listes-diffusion');
+        const sel = document.getElementById('new-form-acces-liste');
+        sel.innerHTML = (listes||[]).map(l=>`<option value="${l.id}">${l.nom}</option>`).join('') || '<option value="">Aucune liste disponible</option>';
+      } catch(_) {}
+    } else {
+      wrap.style.display = 'none';
+    }
+  });
+
+  async function mfwRenderCoupons(){
+    const el = document.getElementById('mfw-coupons-list');
+    if(!mfwFormationId){ el.innerHTML = ''; return; }
+    try {
+      const { coupons } = await api('GET', `/formations/${mfwFormationId}/coupons`);
+      el.innerHTML = (coupons||[]).map(c=>
+        `<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;">
+          🏷️ <strong>${c.code}</strong> — ${c.reduction_pct}% ${c.max_utilisations?`(max ${c.max_utilisations})`:''}
+          <button type="button" class="mfw-del-coupon" data-id="${c.id}" style="margin-left:auto;border:none;background:none;color:#dc2626;cursor:pointer;">✕</button>
+        </div>`).join('') || '<div style="font-size:12px;color:var(--muted);">Aucun coupon.</div>';
+      el.querySelectorAll('.mfw-del-coupon').forEach(b=>b.addEventListener('click', async ()=>{
+        await api('DELETE', `/formations/${mfwFormationId}/coupons/${b.dataset.id}`);
+        mfwRenderCoupons();
+      }));
+    } catch(_) {}
+  }
+  document.getElementById('btn-mfw-add-coupon').addEventListener('click', async ()=>{
+    if(!mfwFormationId){ showMsg('Enregistrez d\'abord le brouillon (étape 1) avant d\'ajouter un coupon.', 'danger'); return; }
+    const code = document.getElementById('mfw-coupon-code').value.trim();
+    const pct = document.getElementById('mfw-coupon-pct').value;
+    const max = document.getElementById('mfw-coupon-max').value;
+    if(!code || !pct){ showMsg('Code et pourcentage de réduction requis.', 'danger'); return; }
+    try {
+      await api('POST', `/formations/${mfwFormationId}/coupons`, { code, reduction_pct: parseFloat(pct), max_utilisations: max?parseInt(max):null });
+      document.getElementById('mfw-coupon-code').value = '';
+      document.getElementById('mfw-coupon-pct').value = '';
+      document.getElementById('mfw-coupon-max').value = '';
+      mfwRenderCoupons();
+    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+  });
+
+  document.getElementById('btn-mfw-prev').addEventListener('click', ()=>{
+    if(mfwStep>1){ mfwStep--; mfwUpdateStepper(); }
+  });
+  document.getElementById('btn-mfw-save-draft').addEventListener('click', ()=> mfwSaveDraft(false));
+  document.getElementById('btn-mfw-next').addEventListener('click', async ()=>{
+    const ok = await mfwSaveDraft(true);
+    if(!ok) return;
+    if(mfwStep < MFW_STEPS){
+      mfwStep++;
+      mfwUpdateStepper();
+      if(mfwStep===3) mfwRenderCoupons();
+    } else {
+      document.getElementById("modal-formation").style.display = "none";
+      showMsg("Formation enregistrée en brouillon. Retrouvez-la dans « Espace Formateur » pour poursuivre sa création et la soumettre à validation.", "success");
+      loadMesFormations();
+    }
+  });
+
+  document.getElementById("btn-creer-formation")?.addEventListener("click", ()=>{
+    document.getElementById("new-form-error").style.display = "none";
+    mfwStep = 1;
+    mfwFormationId = null;
+    document.querySelectorAll('.mfw-panel input, .mfw-panel textarea, .mfw-panel select').forEach(el=>{
+      if(el.type==='checkbox') el.checked = el.id==='new-form-gratuit';
+      else if(el.tagName==='SELECT') el.selectedIndex = 0;
+      else el.value = '';
+    });
+    document.getElementById('mfw-tarif-block').style.display = 'none';
+    document.getElementById('mfw-promo-block').style.display = 'none';
+    document.getElementById('mfw-acces-liste-wrap').style.display = 'none';
+    document.getElementById('mfw-coupons-list').innerHTML = '';
+    mfwUpdateCommissionPreview();
+    mfwUpdateStepper();
+    document.getElementById("modal-formation").style.display = "block";
+  });
+
+  // ── Devenir formateur (demande d'accréditation "createur_formations") ──
+  let mfDocuments = [];
+  let mfDef = null;
+  (function initMfCategories(){
+    const el = document.getElementById('mf-categories');
+    if(!el) return;
+    el.innerHTML = ["Action Sociale","Agriculture","Santé","Éducation","Technologie","Culture","Économie","Finance","Droit","Environnement"].map(c=>
+      `<label class="mf-cat-pill">
+        <input type="checkbox" value="${c}" class="mf-cat-cb"> <span>${c}</span>
+      </label>`).join('');
+    el.querySelectorAll('.mf-cat-cb').forEach(cb=>{
+      cb.addEventListener('change', ()=> cb.closest('.mf-cat-pill').classList.toggle('checked', cb.checked));
+    });
+  })();
+
+  async function initDevenirFormateur(){
+    const me = await fetchCurrentUser().catch(()=>null);
+    if(!me) return;
+    try {
+      const { catalogue } = await api('GET', '/accreditations/catalogue');
+      mfDef = (catalogue||[]).find(d=>d.type==='createur_formations');
+      if(!mfDef) return; // rôle non éligible selon les règles définies par l'admin
+
+      const { accreditations } = await api('GET', '/accreditations/mes');
+      const dejaAccredite = (accreditations||[]).some(a=>a.type==='createur_formations' && a.statut==='active');
+      if(dejaAccredite) {
+        document.getElementById('sb-tab-espace-formateur').style.display = '';
+        return;
+      }
+
+      const { demandes } = await api('GET', '/accreditations/demandes');
+      const demandeEnCours = (demandes||[]).find(d=>d.type==='createur_formations');
+      const STATUT_LBL = { en_attente:'⏳ En attente de traitement', deposee:'⏳ Déposée', en_cours_analyse:"🔍 En cours d'analyse", info_complementaire_demandee:'📩 Informations complémentaires demandées', refusee:'❌ Non retenue — vous pouvez déposer une nouvelle demande.' };
+      if(demandeEnCours && STATUT_LBL[demandeEnCours.statut] && demandeEnCours.statut !== 'refusee'){
+        const el = document.getElementById('demande-formateur-statut');
+        el.style.display = 'block';
+        el.innerHTML = `🎓 Votre demande d'accréditation Formateur : <strong>${STATUT_LBL[demandeEnCours.statut]}</strong>`;
+        return;
+      }
+      document.getElementById('devenir-formateur-banner').style.display = 'flex';
+    } catch(e) { /* silencieux : bannière simplement non affichée */ }
+  }
+
+  document.getElementById('btn-devenir-formateur')?.addEventListener('click', ()=>{
+    if(!mfDef) return;
+    document.querySelectorAll('.mf-cat-cb').forEach(cb=>{ cb.checked=false; cb.closest('.mf-cat-pill')?.classList.remove('checked'); });
+    ['mf-domaine','mf-qualifications','mf-diplomes','mf-experience','mf-references','mf-presentation'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('mf-charte').checked = false;
+    document.getElementById('mf-error').style.display = 'none';
+    mfDocuments = [];
+    document.getElementById('mf-documents-list').innerHTML = '';
+
+    const condEl = document.getElementById('mf-conditions');
+    if(mfDef.conditions_obtention){ document.getElementById('mf-conditions-text').textContent = mfDef.conditions_obtention; condEl.style.display=''; }
+    else condEl.style.display='none';
+    const docsEl = document.getElementById('mf-documents-requis');
+    let docsReq = [];
+    try { docsReq = Array.isArray(mfDef.documents_requis) ? mfDef.documents_requis : JSON.parse(mfDef.documents_requis||'[]'); } catch(_){}
+    if(docsReq.length){ document.getElementById('mf-documents-requis-list').innerHTML = docsReq.map(d=>`<li>${d}</li>`).join(''); docsEl.style.display=''; }
+    else docsEl.style.display='none';
+
+    document.getElementById('modal-formateur').style.display = 'block';
+  });
+  document.getElementById('modal-formateur-close')?.addEventListener('click', ()=>{
+    document.getElementById('modal-formateur').style.display = 'none';
+  });
+
+  document.getElementById('mf-fichier')?.addEventListener('change', async function(){
+    const file = this.files[0];
+    if(!file) return;
+    const btn = document.getElementById('btn-submit-formateur');
+    btn.disabled = true; btn.textContent = 'Envoi du document…';
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      const r = await fetch('/api/upload/document', { method:'POST', credentials:'include', body: fd });
+      const data = await r.json();
+      if(!r.ok) throw new Error(data.error || "Échec de l'envoi du document.");
+      mfDocuments.push({ nom: file.name, url: data.url });
+      document.getElementById('mf-documents-list').innerHTML = mfDocuments.map((d,i)=>
+        `<div style="display:flex;align-items:center;gap:8px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;">
+          📎 ${d.nom} <button type="button" data-i="${i}" class="mf-remove-doc" style="margin-left:auto;border:none;background:none;color:#dc2626;cursor:pointer;">✕</button>
+        </div>`).join('');
+      document.querySelectorAll('.mf-remove-doc').forEach(b=>b.addEventListener('click', function(){ mfDocuments.splice(+this.dataset.i,1); this.closest('div').remove(); }));
+    } catch(e){ showMsg(e.message||"Erreur lors de l'envoi du document.", 'danger'); }
+    finally { btn.disabled = false; btn.textContent = 'Soumettre ma demande'; this.value=''; }
+  });
+
+  document.getElementById('btn-submit-formateur')?.addEventListener('click', async ()=>{
+    const errEl = document.getElementById('mf-error');
+    const domaine_expertise = document.getElementById('mf-domaine').value.trim();
+    const charte_acceptee = document.getElementById('mf-charte').checked;
+    if(!domaine_expertise){ errEl.textContent = "Le domaine d'expertise est obligatoire."; errEl.style.display='block'; return; }
+    if(!charte_acceptee){ errEl.textContent = "Vous devez accepter la charte qualité des formateurs."; errEl.style.display='block'; return; }
+    errEl.style.display = 'none';
+    const categories = [...document.querySelectorAll('.mf-cat-cb:checked')].map(cb=>cb.value);
+    try {
+      await api('POST', '/accreditations/demande', {
+        type: 'createur_formations',
+        message: document.getElementById('mf-presentation').value.trim(),
+        lettre_motivation: document.getElementById('mf-experience').value.trim(),
+        documents: mfDocuments.length ? mfDocuments : undefined,
+        champs_specifiques: {
+          domaine_expertise,
+          qualifications: document.getElementById('mf-qualifications').value.trim(),
+          diplomes: document.getElementById('mf-diplomes').value.trim(),
+          experience: document.getElementById('mf-experience').value.trim(),
+          references: document.getElementById('mf-references').value.trim(),
+          categories,
+          charte_acceptee: true
+        }
+      });
+      document.getElementById('modal-formateur').style.display = 'none';
+      document.getElementById('devenir-formateur-banner').style.display = 'none';
+      showMsg('Demande envoyée ! L\'équipe Diaspo\'Actif vous répondra sous 5 jours ouvrés.', 'success');
+    } catch(e){ errEl.textContent = e.message||'Erreur lors de la demande.'; errEl.style.display='block'; }
+  });
+
+  initDevenirFormateur();
+
+  // ── Volets Catalogue / Besoins / Mes inscriptions / Favoris / Certifications ──
+  const VOLETS = ['catalogue','besoins','inscriptions','favoris','certifications','espace-formateur'];
+  function switchVolet(v){
+    VOLETS.forEach(x => {
+      document.getElementById('volet-'+x).style.display = (x===v) ? '' : 'none';
+      document.getElementById('sb-tab-'+x).classList.toggle('active', x===v);
+    });
+    if(v==='besoins') loadBesoins();
+    if(v==='inscriptions') loadInscriptions();
+    if(v==='favoris') loadFavoris();
+    if(v==='certifications') loadCertifications();
+    if(v==='espace-formateur') loadMesFormations();
+  }
+  VOLETS.forEach(v => document.getElementById('sb-tab-'+v).addEventListener('click', e=>{ e.preventDefault(); switchVolet(v); }));
+
+  async function requireLoginForVolet(){
+    const me = await fetchCurrentUser();
+    if(!me){ showMsg("Connectez-vous pour accéder à cet espace.", "warning"); return null; }
+    return me;
+  }
+
+  async function loadInscriptions(){
+    const el = document.getElementById('inscriptions-list');
+    if(!await requireLoginForVolet()){ el.innerHTML = '<div class="notice">Connectez-vous pour voir vos inscriptions.</div>'; return; }
+    try {
+      const rows = await api('GET', '/formations/suivi');
+      if(!rows.length){ el.innerHTML = '<div class="notice">Vous n\'êtes inscrit à aucune formation pour le moment. Explorez le catalogue !</div>'; return; }
+      const STATUT_LBL = { en_cours:'🟠 En cours', termine:'✅ Terminée', abandonne:'⏸️ Abandonnée', certifie:'📜 Certifiée' };
+      el.innerHTML = rows.map(r => `
+        <div class="card" style="margin-bottom:14px;">
+          <div class="flex-between" style="align-items:flex-start;flex-wrap:wrap;gap:8px;">
+            <div style="flex:1;">
+              <h3 style="margin:0 0 4px;">${r.titre}</h3>
+              <p style="margin:0;color:var(--muted);font-size:13px;">${r.organisme||''} ${r.domaine?'· '+r.domaine:''}</p>
+            </div>
+            <span class="tag">${STATUT_LBL[r.statut]||r.statut}</span>
+          </div>
+          <div style="margin-top:10px;">
+            <div style="background:var(--bg);border-radius:99px;height:8px;overflow:hidden;">
+              <div style="background:#ff6b00;height:100%;width:${r.progression||0}%;"></div>
+            </div>
+            <p style="margin:4px 0 0;font-size:12px;color:var(--muted);">${r.progression||0}% complété</p>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-orange insc-acceder" data-id="${r.id}">▶ Accéder à la formation</button>
+            ${r.progression < 100 ? `<button class="btn btn-sm btn-outline insc-progress" data-id="${r.id}" data-p="${Math.min(100,(r.progression||0)+25)}">+ 25% de progression</button>` : ''}
+            ${r.progression >= 100 && r.statut !== 'certifie' ? `<button class="btn btn-sm btn-outline insc-certifier" data-id="${r.id}" data-titre="${r.titre.replace(/"/g,'&quot;')}" data-organisme="${(r.organisme||'').replace(/"/g,'&quot;')}" data-formation="${r.formation_id||''}">🎓 Générer mon attestation</button>` : ''}
+          </div>
+        </div>`).join('');
+      document.querySelectorAll('.insc-acceder').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const r = rows.find(x=>x.id===+btn.dataset.id);
+          if(!r) return;
+          document.getElementById('acces-titre').textContent = r.titre;
+          const videoEl = document.getElementById('acces-video');
+          videoEl.innerHTML = r.video_intro
+            ? `<a href="${r.video_intro}" target="_blank" rel="noopener" class="btn btn-sm btn-outline">🎥 Voir la vidéo d'introduction</a>`
+            : '';
+          document.getElementById('acces-description').textContent = r.formation_description || 'Aucune description détaillée fournie par l\'organisme pour le moment.';
+          document.getElementById('acces-organisme').textContent = r.organisme ? `Organisme : ${r.organisme}` : '';
+          document.getElementById('modal-acces').style.display = 'block';
+        });
+      });
+      document.querySelectorAll('.insc-progress').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const p = +btn.dataset.p;
+          await api('PATCH', `/formations/suivi/${btn.dataset.id}`, { progression: p, statut: p>=100?'termine':'en_cours' });
+          loadInscriptions();
+        });
+      });
+      document.querySelectorAll('.insc-certifier').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          await api('POST', '/certifications', { titre: btn.dataset.titre, organisme: btn.dataset.organisme, formation_id: btn.dataset.formation||null });
+          await api('PATCH', `/formations/suivi/${btn.dataset.id}`, { statut: 'certifie' });
+          showMsg('Attestation générée ! Retrouvez-la dans « Certifications ».', 'success');
+          loadInscriptions();
+        });
+      });
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+
+  async function loadFavoris(){
+    const el = document.getElementById('favoris-list');
+    if(!await requireLoginForVolet()){ el.innerHTML = '<div class="notice">Connectez-vous pour voir vos favoris.</div>'; return; }
+    try {
+      const { favoris } = await api('GET', '/formation-favoris');
+      if(!favoris.length){ el.innerHTML = '<div class="notice">Aucun favori pour le moment. Cliquez sur ☆ sur une formation du catalogue pour l\'ajouter ici.</div>'; return; }
+      el.innerHTML = favoris.map(f => `
+        <div class="card" style="margin-bottom:14px;">
+          <div class="flex-between" style="align-items:flex-start;flex-wrap:wrap;gap:8px;">
+            <div style="flex:1;">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+                <span class="feed-cat">${f.type_formation||'Formation'}</span>
+                ${f.gratuit ? `<span class="badge badge-asso">Gratuite</span>` : `<span class="badge badge-ent">${(f.prix||0).toFixed(0)} €</span>`}
+              </div>
+              <h3 style="margin:0 0 4px;">${f.titre}</h3>
+              <p style="margin:0;color:var(--muted);font-size:13px;">${f.organisme||''} ${f.domaine?'· '+f.domaine:''}</p>
+            </div>
+            <button class="btn btn-sm btn-outline fav-remove" data-id="${f.id}">★ Retirer</button>
+          </div>
+        </div>`).join('');
+      document.querySelectorAll('.fav-remove').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{ await api('DELETE', `/formation-favoris/${btn.dataset.id}`); loadFavoris(); });
+      });
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+
+  async function loadCertifications(){
+    const el = document.getElementById('certifications-list');
+    if(!await requireLoginForVolet()){ el.innerHTML = '<div class="notice">Connectez-vous pour voir vos certifications.</div>'; return; }
+    try {
+      const rows = await api('GET', '/certifications');
+      if(!rows.length){ el.innerHTML = '<div class="notice">Aucune certification obtenue pour le moment.</div>'; return; }
+      el.innerHTML = rows.map(c => `
+        <div class="card" style="margin-bottom:14px;">
+          <h3 style="margin:0 0 4px;">📜 ${c.titre}</h3>
+          <p style="margin:0;color:var(--muted);font-size:13px;">${c.organisme||'Diaspo\'Actif'} · obtenue le ${(c.date_obtention||'').slice(0,10)}</p>
+          <p style="margin:8px 0 0;font-size:12px;color:var(--muted);">Code de vérification : <code>${c.code_verification}</code></p>
+        </div>`).join('');
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+
+  async function loadMesFormations(){
+    const el = document.getElementById('mes-formations-list');
+    if(!await requireLoginForVolet()){ el.innerHTML = '<div class="notice">Connectez-vous pour accéder à votre Espace Formateur.</div>'; return; }
+    try {
+      const { formations } = await api('GET', '/mes-formations');
+      if(!formations.length){ el.innerHTML = '<div class="notice">Vous n\'avez encore créé aucune formation. Cliquez sur « + Créer une nouvelle formation ».</div>'; return; }
+      el.innerHTML = formations.map(f => `
+        <div class="card" style="margin-bottom:14px;">
+          <div class="flex-between" style="align-items:flex-start;flex-wrap:wrap;gap:8px;">
+            <div style="flex:1;">
+              <h3 style="margin:0 0 4px;">${f.titre}</h3>
+              <p style="margin:0;color:var(--muted);font-size:13px;">${f.domaine||''} ${f.type_formation?'· '+f.type_formation:''}</p>
+            </div>
+            <span class="tag">${FB_STATUT_LBL[f.statut]||f.statut}</span>
+          </div>
+          <div class="tags" style="margin-top:10px;">
+            <span class="tag">👥 ${f.nb_inscrits||0} inscrit(s)</span>
+            <span class="tag">💰 ${(f.revenu_brut||0).toFixed(2)} € brut</span>
+          </div>
+          ${(f.statut==='refusee'||f.statut==='modifications_demandees') && f.motif_refus ? `<p style="margin:8px 0 0;font-size:12.5px;color:#dc2626;">Motif : ${f.motif_refus}</p>` : ''}
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline mf-construire" data-id="${f.id}" data-titre="${f.titre.replace(/"/g,'&quot;')}" data-statut="${f.statut}">🛠️ Construire le contenu</button>
+          </div>
+        </div>`).join('');
+      document.querySelectorAll('.mf-construire').forEach(btn=>{
+        btn.addEventListener('click', ()=> openFormationBuilder(btn.dataset.id, btn.dataset.titre, btn.dataset.statut));
+      });
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // Éditeur de contenu complet (Étapes 5-11 de l'assistant de création)
+  // ════════════════════════════════════════════════════════════════
+  const FB_STATUT_LBL = {
+    brouillon:'📝 Brouillon', soumise:'📤 Soumise', en_attente:'⏳ En attente de validation',
+    en_cours_analyse:"🔍 En cours d'analyse", modifications_demandees:'✏️ Modifications demandées',
+    validee:'✅ Validée', programmee:'🗓️ Programmée', publiee:'✅ Publiée',
+    suspendue:'⏸️ Suspendue', refusee:'❌ Refusée'
+  };
+  let fbFormationId = null;
+
+  function openFormationBuilder(id, titre, statut){
+    fbFormationId = id;
+    document.getElementById('fb-titre').textContent = titre;
+    document.getElementById('fb-statut-badge').textContent = FB_STATUT_LBL[statut] || statut;
+    document.getElementById('volet-espace-formateur').style.display = 'none';
+    document.getElementById('fb-view').style.display = 'block';
+    fbSwitchTab('contenu');
+  }
+  document.getElementById('fb-back').addEventListener('click', ()=>{
+    document.getElementById('fb-view').style.display = 'none';
+    document.getElementById('volet-espace-formateur').style.display = '';
+    loadMesFormations();
+  });
+  function fbSwitchTab(tab){
+    document.querySelectorAll('.fb-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+    document.querySelectorAll('.fb-panel').forEach(p=>p.style.display = p.dataset.fbPanel===tab ? 'block' : 'none');
+    if(tab==='contenu') fbLoadModules();
+    else if(tab==='quiz') fbLoadQuiz();
+    else if(tab==='certificat') fbLoadCertificat();
+    else if(tab==='apercu') fbLoadApercu();
+    else if(tab==='soumission') fbLoadMessages();
+  }
+  document.querySelectorAll('.fb-tab').forEach(b=> b.addEventListener('click', ()=> fbSwitchTab(b.dataset.tab)));
+
+  const FB_LECON_TYPES = [
+    ['video','🎬 Vidéo'],['texte','📄 Texte'],['pdf','📑 PDF'],['quiz','📝 Quiz'],
+    ['audio','🎧 Audio'],['presentation','📊 Présentation'],['images','🖼️ Images'],
+    ['telechargement','⬇️ Téléchargement'],['exercice','✏️ Exercice'],['etude_cas','🔎 Étude de cas'],
+    ['travail_pratique','🛠️ Travail pratique'],['classe_virtuelle','🖥️ Classe virtuelle'],['session_direct','🔴 Session en direct']
+  ];
+
+  // ── Modules & Leçons ──
+  async function fbLoadModules(){
+    const el = document.getElementById('fb-modules-list');
+    el.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const { modules } = await api('GET', `/formations/${fbFormationId}/modules`);
+      if(!modules.length){ el.innerHTML = '<div class="notice">Aucun module. Ajoutez-en un ci-dessus.</div>'; return; }
+      el.innerHTML = modules.map(m => `
+        <div class="fb-module-card" draggable="true" data-module-id="${m.id}">
+          <div class="flex-between">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="fb-drag-handle">⠿</span>
+              <strong>${m.titre}</strong>
+            </div>
+            <button class="btn btn-sm btn-outline fb-del-module" data-id="${m.id}">🗑️</button>
+          </div>
+          <div class="fb-lecons" data-module-id="${m.id}">
+            ${m.lecons.map(l => `
+              <div class="fb-lecon-row" draggable="true" data-lecon-id="${l.id}">
+                <span class="fb-drag-handle">⠿</span>
+                <span style="flex:1;">${(FB_LECON_TYPES.find(t=>t[0]===l.type)||['','?'])[1]} — ${l.titre}${l.duree_minutes?` (${l.duree_minutes} min)`:''}</span>
+                <button class="btn btn-sm btn-outline fb-edit-lecon" data-id="${l.id}" data-module-id="${m.id}">✏️</button>
+                <button class="btn btn-sm btn-outline fb-del-lecon" data-id="${l.id}">🗑️</button>
+              </div>`).join('')}
+          </div>
+          <div style="margin-top:10px;">
+            <button class="btn btn-sm btn-outline fb-add-lecon" data-module-id="${m.id}">+ Ajouter une leçon</button>
+          </div>
+        </div>`).join('');
+      fbWireModuleEvents();
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+
+  document.getElementById('fb-add-module').addEventListener('click', async ()=>{
+    const titre = document.getElementById('fb-new-module-titre').value.trim();
+    if(!titre){ showMsg('Titre du module requis.', 'danger'); return; }
+    try {
+      await api('POST', `/formations/${fbFormationId}/modules`, { titre });
+      document.getElementById('fb-new-module-titre').value = '';
+      fbLoadModules();
+    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+  });
+
+  function fbWireModuleEvents(){
+    document.querySelectorAll('.fb-del-module').forEach(b=>b.addEventListener('click', async ()=>{
+      if(!confirm('Supprimer ce module et toutes ses leçons ?')) return;
+      await api('DELETE', `/formations/${fbFormationId}/modules/${b.dataset.id}`);
+      fbLoadModules();
+    }));
+    document.querySelectorAll('.fb-add-lecon').forEach(b=>b.addEventListener('click', ()=> fbOpenLeconForm(b.dataset.moduleId)));
+    document.querySelectorAll('.fb-edit-lecon').forEach(b=>b.addEventListener('click', ()=> fbOpenLeconForm(b.dataset.moduleId, b.dataset.id)));
+    document.querySelectorAll('.fb-del-lecon').forEach(b=>b.addEventListener('click', async ()=>{
+      if(!confirm('Supprimer cette leçon ?')) return;
+      await api('DELETE', `/formations/${fbFormationId}/lecons/${b.dataset.id}`);
+      fbLoadModules();
+    }));
+
+    // Drag & drop réordonnancement des modules
+    const modCards = [...document.querySelectorAll('.fb-module-card')];
+    let dragModId = null;
+    modCards.forEach(card=>{
+      card.addEventListener('dragstart', e=>{ dragModId = card.dataset.moduleId; e.stopPropagation(); });
+      card.addEventListener('dragover', e=>{ e.preventDefault(); card.classList.add('dragover'); });
+      card.addEventListener('dragleave', ()=> card.classList.remove('dragover'));
+      card.addEventListener('drop', async e=>{
+        e.preventDefault(); e.stopPropagation(); card.classList.remove('dragover');
+        if(!dragModId || dragModId===card.dataset.moduleId) return;
+        const ids = modCards.map(c=>c.dataset.moduleId);
+        const from = ids.indexOf(dragModId), to = ids.indexOf(card.dataset.moduleId);
+        ids.splice(to,0,ids.splice(from,1)[0]);
+        await api('PUT', `/formations/${fbFormationId}/modules/reorder`, { ordre: ids });
+        fbLoadModules();
+      });
+    });
+
+    // Drag & drop réordonnancement des leçons (au sein d'un même module)
+    document.querySelectorAll('.fb-lecons').forEach(container=>{
+      const rows = [...container.querySelectorAll('.fb-lecon-row')];
+      let dragLeconId = null;
+      rows.forEach(row=>{
+        row.addEventListener('dragstart', e=>{ dragLeconId = row.dataset.leconId; e.stopPropagation(); });
+        row.addEventListener('dragover', e=>{ e.preventDefault(); e.stopPropagation(); row.classList.add('dragover'); });
+        row.addEventListener('dragleave', ()=> row.classList.remove('dragover'));
+        row.addEventListener('drop', async e=>{
+          e.preventDefault(); e.stopPropagation(); row.classList.remove('dragover');
+          if(!dragLeconId || dragLeconId===row.dataset.leconId) return;
+          const ids = rows.map(r=>r.dataset.leconId);
+          const from = ids.indexOf(dragLeconId), to = ids.indexOf(row.dataset.leconId);
+          ids.splice(to,0,ids.splice(from,1)[0]);
+          await api('PUT', `/formations/${fbFormationId}/modules/${container.dataset.moduleId}/lecons/reorder`, { ordre: ids });
+          fbLoadModules();
+        });
+      });
+    });
+  }
+
+  function fbOpenLeconForm(moduleId, leconId){
+    const typeOptions = FB_LECON_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+    const titre = prompt('Titre de la leçon :', '');
+    if(titre===null || !titre.trim()) return;
+    const type = prompt('Type de leçon (video, texte, pdf, quiz, audio, presentation, images, telechargement, exercice, etude_cas, travail_pratique, classe_virtuelle, session_direct) :', 'texte');
+    if(type===null) return;
+    const duree = prompt('Durée (minutes, facultatif) :', '');
+    const contenu_url = ['video','pdf','audio','presentation','images','telechargement'].includes(type) ? prompt('URL du fichier (facultatif, à uploader séparément) :', '') : null;
+    const contenu_texte = type==='texte' ? prompt('Contenu texte :', '') : null;
+    const payload = { titre: titre.trim(), type: type.trim()||'texte', duree_minutes: duree?parseInt(duree):null, contenu_url: contenu_url||null, contenu_texte: contenu_texte||null };
+    const req = leconId
+      ? api('PUT', `/formations/${fbFormationId}/lecons/${leconId}`, payload)
+      : api('POST', `/formations/${fbFormationId}/modules/${moduleId}/lecons`, payload);
+    req.then(()=> fbLoadModules()).catch(e=> showMsg(e.message||'Erreur.', 'danger'));
+  }
+
+  // ── Quiz ──
+  async function fbLoadQuiz(){
+    const el = document.getElementById('fb-quiz-list');
+    el.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const { quiz } = await api('GET', `/formations/${fbFormationId}/quiz`);
+      if(!quiz.length){ el.innerHTML = '<div class="notice">Aucun quiz créé.</div>'; return; }
+      el.innerHTML = quiz.map(q => `
+        <div class="card" style="margin-bottom:12px;">
+          <div class="flex-between">
+            <strong>${q.titre}</strong>
+            <button class="btn btn-sm btn-outline fb-del-quiz" data-id="${q.id}">🗑️</button>
+          </div>
+          <p style="font-size:12.5px;color:var(--muted);margin:6px 0;">Note minimale : ${q.note_minimale}% ${q.temps_limite_min?`· ${q.temps_limite_min} min`:''} · Correction ${q.correction_auto?'automatique':'manuelle'}</p>
+          <div id="fb-quiz-q-${q.id}">
+            ${q.questions.map(qu=>`<div style="font-size:13px;padding:6px 0;border-top:1px dashed var(--border);">❓ ${qu.question} <button class="btn btn-sm btn-outline fb-del-question" data-quiz="${q.id}" data-id="${qu.id}" style="float:right;">✕</button></div>`).join('')}
+          </div>
+          <button class="btn btn-sm btn-outline fb-add-question" data-id="${q.id}" style="margin-top:8px;">+ Ajouter une question</button>
+        </div>`).join('');
+      document.querySelectorAll('.fb-del-quiz').forEach(b=>b.addEventListener('click', async ()=>{
+        if(!confirm('Supprimer ce quiz ?')) return;
+        await api('DELETE', `/formations/${fbFormationId}/quiz/${b.dataset.id}`);
+        fbLoadQuiz();
+      }));
+      document.querySelectorAll('.fb-del-question').forEach(b=>b.addEventListener('click', async ()=>{
+        await api('DELETE', `/formations/${fbFormationId}/quiz/${b.dataset.quiz}/questions/${b.dataset.id}`);
+        fbLoadQuiz();
+      }));
+      document.querySelectorAll('.fb-add-question').forEach(b=>b.addEventListener('click', async ()=>{
+        const question = prompt('Énoncé de la question :');
+        if(!question) return;
+        const reponse = prompt('Réponse correcte :');
+        try { await api('POST', `/formations/${fbFormationId}/quiz/${b.dataset.id}/questions`, { question, type:'qcm', reponse_correcte: reponse||null }); fbLoadQuiz(); }
+        catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+      }));
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+  document.getElementById('fb-add-quiz').addEventListener('click', async ()=>{
+    const titre = document.getElementById('fb-quiz-titre').value.trim();
+    if(!titre){ showMsg('Titre du quiz requis.', 'danger'); return; }
+    try {
+      await api('POST', `/formations/${fbFormationId}/quiz`, {
+        titre, type: document.getElementById('fb-quiz-type').value,
+        note_minimale: parseInt(document.getElementById('fb-quiz-note-min').value)||50,
+        temps_limite_min: parseInt(document.getElementById('fb-quiz-temps').value)||null
+      });
+      document.getElementById('fb-quiz-titre').value = '';
+      fbLoadQuiz();
+    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+  });
+
+  // ── Certificat ──
+  async function fbLoadCertificat(){
+    try {
+      const { formation } = await api('GET', `/formations/${fbFormationId}`);
+      document.getElementById('fb-cert-actif').checked = !!formation.certificat_actif;
+      document.getElementById('fb-cert-fields').style.display = formation.certificat_actif ? 'flex' : 'none';
+      document.getElementById('fb-cert-modele').value = formation.certificat_modele || 'classique';
+      document.getElementById('fb-cert-conditions').value = formation.certificat_conditions || '';
+      document.getElementById('fb-cert-qr').checked = formation.certificat_qr !== 0;
+    } catch(e){}
+  }
+  document.getElementById('fb-cert-actif').addEventListener('change', function(){
+    document.getElementById('fb-cert-fields').style.display = this.checked ? 'flex' : 'none';
+  });
+  document.getElementById('fb-save-cert').addEventListener('click', async ()=>{
+    try {
+      await api('PUT', `/formations/${fbFormationId}/certificat`, {
+        certificat_actif: document.getElementById('fb-cert-actif').checked,
+        certificat_modele: document.getElementById('fb-cert-modele').value,
+        certificat_conditions: document.getElementById('fb-cert-conditions').value.trim(),
+        certificat_qr: document.getElementById('fb-cert-qr').checked
+      });
+      showMsg('Configuration du certificat enregistrée.', 'success');
+    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+  });
+
+  // ── Aperçu ──
+  async function fbLoadApercu(){
+    const el = document.getElementById('fb-apercu-content');
+    el.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const { formation } = await api('GET', `/formations/${fbFormationId}`);
+      const { modules } = await api('GET', `/formations/${fbFormationId}/modules`);
+      el.innerHTML = `
+        <h2 style="margin:0 0 6px;">${formation.titre}</h2>
+        ${formation.sous_titre?`<p style="margin:0 0 12px;color:var(--muted);">${formation.sous_titre}</p>`:''}
+        <p style="white-space:pre-wrap;">${formation.description||''}</p>
+        <div class="tags" style="margin:10px 0;">
+          <span class="tag">${formation.niveau||'—'}</span><span class="tag">${formation.langue||'—'}</span>
+          <span class="tag">${formation.mode_acces==='gratuit'?'Gratuit':(formation.prix+' '+(formation.devise||'EUR'))}</span>
+        </div>
+        <h3 style="margin:16px 0 8px;">Programme</h3>
+        ${modules.map(m=>`<div style="margin-bottom:10px;"><strong>${m.titre}</strong><ul style="margin:4px 0 0;">${m.lecons.map(l=>`<li>${l.titre}${l.duree_minutes?` (${l.duree_minutes} min)`:''}</li>`).join('')||'<li style="color:var(--muted);">Aucune leçon</li>'}</ul></div>`).join('') || '<p class="notice">Aucun module.</p>'}
+      `;
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+
+  // ── Soumission : checklist + messagerie ──
+  document.getElementById('fb-check-btn').addEventListener('click', async ()=>{
+    const el = document.getElementById('fb-checklist');
+    el.innerHTML = '<div class="notice">Vérification…</div>';
+    try {
+      await api('POST', `/formations/${fbFormationId}/publier`);
+      el.innerHTML = '<div style="color:#059669;font-weight:700;">✅ Tout est prêt ! Cliquez sur « Soumettre » pour envoyer à Diaspo\'Actif.</div>';
+    } catch(e){
+      const details = (e.data && e.data.details) || [];
+      el.innerHTML = `<div style="color:#dc2626;font-weight:700;margin-bottom:6px;">${e.message||'Formation incomplète.'}</div>` +
+        `<ul style="margin:0;color:#dc2626;font-size:13px;">${details.map(d=>`<li>${d}</li>`).join('')}</ul>`;
+    }
+  });
+  document.getElementById('fb-submit-btn').addEventListener('click', async ()=>{
+    try {
+      await api('POST', `/formations/${fbFormationId}/publier`);
+      showMsg('Formation soumise à Diaspo\'Actif pour validation.', 'success');
+      document.getElementById('fb-statut-badge').textContent = FB_STATUT_LBL['soumise'];
+    } catch(e){
+      showMsg(e.message||'Formation incomplète — utilisez « Vérifier » pour voir le détail.', 'danger');
+    }
+  });
+  async function fbLoadMessages(){
+    const el = document.getElementById('fb-messages-list');
+    el.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const { messages } = await api('GET', `/formations/${fbFormationId}/messages`);
+      el.innerHTML = messages.length ? messages.map(m=>`
+        <div style="align-self:${m.sender_role==='administrateur'?'flex-start':'flex-end'};background:${m.sender_role==='administrateur'?'#f1f5f9':'#fff3e8'};border-radius:10px;padding:8px 12px;max-width:80%;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">${m.sender_role==='administrateur'?"Diaspo'Actif":'Vous'} · ${(m.created_at||'').slice(0,16)}</div>
+          <div style="font-size:13.5px;">${m.message}</div>
+        </div>`).join('') : '<div class="notice">Aucun message pour le moment.</div>';
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
+  document.getElementById('fb-message-send').addEventListener('click', async ()=>{
+    const input = document.getElementById('fb-message-input');
+    const message = input.value.trim();
+    if(!message) return;
+    try { await api('POST', `/formations/${fbFormationId}/messages`, { message }); input.value = ''; fbLoadMessages(); }
+    catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+  });
+
+  document.getElementById('btn-proposer').addEventListener('click', async ()=>{
+    const me = await fetchCurrentUser();
+    if(!me){ showMsg("Connectez-vous pour exprimer un besoin en formation.", "warning"); return; }
+    openBesoinModal();
+  });
+  document.getElementById('btn-proposer-besoin').addEventListener('click', async ()=>{
+    const me = await fetchCurrentUser();
+    if(!me){ showMsg("Connectez-vous pour exprimer un besoin en formation.", "warning"); return; }
+    openBesoinModal();
+  });
+  function openBesoinModal(){
+    document.getElementById('besoin-titre').value = '';
+    document.getElementById('besoin-domaine').value = '';
+    document.getElementById('besoin-description').value = '';
+    document.getElementById('besoin-error').style.display = 'none';
+    document.getElementById('modal-besoin').style.display = 'block';
+  }
+  document.getElementById('modal-besoin-close').addEventListener('click', ()=>{
+    document.getElementById('modal-besoin').style.display = 'none';
+  });
+  document.getElementById('modal-acces-close').addEventListener('click', ()=>{
+    document.getElementById('modal-acces').style.display = 'none';
+  });
+  document.getElementById('btn-submit-besoin').addEventListener('click', async ()=>{
+    const titre = document.getElementById('besoin-titre').value.trim();
+    const errEl = document.getElementById('besoin-error');
+    if(!titre){ errEl.textContent = "Le titre du besoin est obligatoire."; errEl.style.display='block'; return; }
+    errEl.style.display = 'none';
+    try {
+      await api('POST', '/formation-besoins', {
+        titre,
+        domaine: document.getElementById('besoin-domaine').value,
+        description: document.getElementById('besoin-description').value.trim()
+      });
+      document.getElementById('modal-besoin').style.display = 'none';
+      showMsg('Votre besoin en formation a été publié !', 'success');
+      switchVolet('besoins');
+    } catch(e){ errEl.textContent = e.message||'Erreur lors de la publication.'; errEl.style.display='block'; }
+  });
+
+  async function loadBesoins(){
+    const el = document.getElementById('besoins-list');
+    const countEl2 = document.getElementById('besoins-count');
+    try {
+      const { besoins } = await api('GET', '/formation-besoins');
+      countEl2.textContent = besoins.length;
+      if(!besoins.length){ el.innerHTML = '<div class="notice">Aucun besoin exprimé pour le moment. Soyez le premier !</div>'; return; }
+      el.innerHTML = besoins.map(b => `
+        <div class="card" style="margin-bottom:14px;">
+          <div class="flex-between" style="align-items:flex-start;flex-wrap:wrap;gap:8px;">
+            <div style="flex:1;">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+                ${b.domaine ? `<span class="feed-cat">${b.domaine}</span>` : ''}
+                <span class="tag" style="font-size:11px;color:var(--muted);">par ${b.auteur_nom||'un membre'}</span>
+              </div>
+              <h3 style="margin:0 0 4px;">${b.titre}</h3>
+              ${b.description ? `<p style="margin:0;color:var(--muted);font-size:13.5px;">${b.description}</p>` : ''}
+            </div>
+            <div style="text-align:center;flex-shrink:0;">
+              <button class="btn btn-sm ${b.mon_vote?'btn-orange':'btn-outline'} besoin-vote-btn" data-id="${b.id}" data-voted="${b.mon_vote?'1':'0'}">
+                ${b.mon_vote ? '✅' : '👍'} ${b.nb_votes} ${b.mon_vote ? 'Vous soutenez' : 'Moi aussi'}
+              </button>
+            </div>
+          </div>
+          <div class="besoin-comment-zone" data-id="${b.id}" style="display:none;margin-top:10px;">
+            <textarea class="besoin-comment-input" style="width:100%;min-height:50px;border-radius:8px;border:1px solid var(--border);padding:8px;font-family:inherit;font-size:13px;" placeholder="Pourquoi en avez-vous besoin aussi ? (optionnel)"></textarea>
+            <button class="btn btn-sm btn-orange besoin-comment-confirm" data-id="${b.id}" style="margin-top:6px;">Confirmer mon soutien</button>
+          </div>
+        </div>`).join('');
+      attachBesoinHandlers();
+    } catch(e) {
+      el.innerHTML = `<div class="notice">Erreur de chargement.</div>`;
+    }
+  }
+
+  function attachBesoinHandlers(){
+    document.querySelectorAll('.besoin-vote-btn').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.dataset.id;
+        const voted = btn.dataset.voted === '1';
+        if(voted){
+          try { await api('DELETE', `/formation-besoins/${id}/voter`); loadBesoins(); }
+          catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+        } else {
+          document.querySelector(`.besoin-comment-zone[data-id="${id}"]`).style.display = 'block';
+        }
+      });
+    });
+    document.querySelectorAll('.besoin-comment-confirm').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.dataset.id;
+        const commentaire = document.querySelector(`.besoin-comment-zone[data-id="${id}"] .besoin-comment-input`).value.trim();
+        try { await api('POST', `/formation-besoins/${id}/voter`, { commentaire: commentaire||undefined }); loadBesoins(); }
+        catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+      });
+    });
+  }
+
+  // ── Retour de paiement Stripe (formation payante) ──
+  (function handleStripeReturn(){
+    const params = new URLSearchParams(window.location.search);
+    const paiement = params.get('paiement');
+    if (!paiement) return;
+    if (paiement === 'succes') showMsg('Paiement confirmé ! Votre inscription est active dans « Mes inscriptions ».', 'success');
+    else if (paiement === 'annule') showMsg('Paiement annulé — vous n\'avez pas été inscrit(e) à cette formation.', 'warning');
+    window.history.replaceState({}, '', window.location.pathname);
+    if (paiement === 'succes') document.getElementById('sb-tab-inscriptions').click();
+  })();
 </script>
 <script>
 (function(){

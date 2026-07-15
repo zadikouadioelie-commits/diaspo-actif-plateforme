@@ -5408,6 +5408,147 @@ async function hasAccreditation(userId, type) {
   return !!nouv;
 }
 
+/* ── Besoins en formation (la communauté exprime un besoin, formateurs/diasportifs peuvent voter) ── */
+
+/* GET /api/formation-besoins — liste des besoins avec nombre de votes (+ mon vote éventuel) */
+route("GET", "/api/formation-besoins", async (req, res, params, body, query) => {
+  const me = await getCurrentUser(req);
+  const rows = await db.prepare(`
+    SELECT b.*, u.nom AS auteur_nom,
+      (SELECT COUNT(*) FROM formation_besoins_votes v WHERE v.besoin_id=b.id) AS nb_votes
+    FROM formation_besoins b
+    LEFT JOIN users u ON u.id=b.user_id
+    WHERE b.statut != 'clos'
+    ORDER BY nb_votes DESC, b.created_at DESC
+  `).all();
+  let monVote = new Map();
+  if (me) {
+    const mine = await db.prepare("SELECT besoin_id, commentaire FROM formation_besoins_votes WHERE user_id=?").all(me.id);
+    monVote = new Map(mine.map(v => [v.besoin_id, v.commentaire]));
+  }
+  const enriched = rows.map(r => ({ ...r, mon_vote: monVote.has(r.id), mon_commentaire: monVote.get(r.id) || null }));
+  if (query.domaine) return sendJSON(res, 200, { besoins: enriched.filter(r => r.domaine === query.domaine) });
+  sendJSON(res, 200, { besoins: enriched });
+});
+
+/* POST /api/formation-besoins — soumettre un besoin en formation (tous comptes connectés) */
+route("POST", "/api/formation-besoins", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const titre = SEC.sanitizeString(body.titre || "", 200);
+  const domaine = SEC.sanitizeString(body.domaine || "", 100);
+  const description = SEC.sanitizeString(body.description || "", 3000);
+  if (!titre) return sendJSON(res, 400, { error: "Le titre du besoin est obligatoire." });
+  const id = await db.prepare("INSERT INTO formation_besoins (user_id,titre,domaine,description) VALUES (?,?,?,?)")
+    .run(me.id, titre, domaine || null, description || null).lastInsertRowid;
+  /* L'auteur soutient automatiquement son propre besoin */
+  try { db.prepare("INSERT OR IGNORE INTO formation_besoins_votes (besoin_id,user_id,commentaire) VALUES (?,?,?)").run(id, me.id, null); } catch(_) {}
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* POST /api/formation-besoins/:id/voter — soutenir un besoin (avec commentaire optionnel) */
+route("POST", "/api/formation-besoins/:id/voter", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const besoin = await db.prepare("SELECT id FROM formation_besoins WHERE id=?").get(params.id);
+  if (!besoin) return sendJSON(res, 404, { error: "Besoin introuvable." });
+  const commentaire = body.commentaire ? SEC.sanitizeString(body.commentaire, 1000) : null;
+  db.prepare(`INSERT INTO formation_besoins_votes (besoin_id,user_id,commentaire) VALUES (?,?,?)
+    ON CONFLICT(besoin_id,user_id) DO UPDATE SET commentaire=?`).run(params.id, me.id, commentaire, commentaire);
+  const nb_votes = (await db.prepare("SELECT COUNT(*) AS n FROM formation_besoins_votes WHERE besoin_id=?").get(params.id))?.n;
+  sendJSON(res, 200, { ok: true, nb_votes });
+});
+
+/* DELETE /api/formation-besoins/:id/voter — retirer son soutien */
+route("DELETE", "/api/formation-besoins/:id/voter", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("DELETE FROM formation_besoins_votes WHERE besoin_id=? AND user_id=?").run(params.id, me.id);
+  const nb_votes = (await db.prepare("SELECT COUNT(*) AS n FROM formation_besoins_votes WHERE besoin_id=?").get(params.id))?.n;
+  sendJSON(res, 200, { ok: true, nb_votes });
+});
+
+/* GET /api/formation-besoins/:id/votes — détail des votes (formateurs/admin curieux du besoin) */
+route("GET", "/api/formation-besoins/:id/votes", async (req, res, params) => {
+  const rows = await db.prepare(`
+    SELECT v.commentaire, v.created_at, u.nom AS auteur_nom
+    FROM formation_besoins_votes v JOIN users u ON u.id=v.user_id
+    WHERE v.besoin_id=? ORDER BY v.created_at DESC
+  `).all(params.id);
+  sendJSON(res, 200, { votes: rows });
+});
+
+/* ── Favoris de formations ── */
+route("GET", "/api/formation-favoris", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare(`
+    SELECT f.*, ff.created_at AS favori_depuis
+    FROM formation_favoris ff JOIN formations f ON f.id=ff.formation_id
+    WHERE ff.user_id=? ORDER BY ff.created_at DESC
+  `).all(me.id);
+  sendJSON(res, 200, { favoris: rows });
+});
+route("POST", "/api/formation-favoris/:formationId", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  db.prepare("INSERT OR IGNORE INTO formation_favoris (user_id,formation_id) VALUES (?,?)").run(me.id, params.formationId);
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/formation-favoris/:formationId", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("DELETE FROM formation_favoris WHERE user_id=? AND formation_id=?").run(me.id, params.formationId);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Suivi des formations (Mes inscriptions) ──
+   Enregistrées ici (chemin fixe) AVANT /api/formations/:id plus bas, sinon le routeur
+   (premier match gagne, ordre d'enregistrement) interprète "suivi" comme un :id
+   et répond 404 "Formation introuvable" — bug réel identifié en vérifiant le volet
+   « Mes inscriptions » du catalogue. Les définitions dupliquées plus loin dans le fichier
+   (via le shim app.get/post/patch) ne sont donc jamais atteintes mais restent inoffensives. */
+route("GET", "/api/formations/suivi", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare(`
+    SELECT ufs.*, f.domaine, f.niveau AS niveau_formation, f.prix, f.gratuit, f.duree,
+           f.video_intro, f.description AS formation_description
+    FROM user_formations_suivi ufs
+    LEFT JOIN formations f ON f.id=ufs.formation_id
+    WHERE ufs.user_id=? ORDER BY ufs.created_at DESC
+  `).all(me.id);
+  sendJSON(res, 200, rows);
+});
+route("POST", "/api/formations/suivi", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { formation_id, titre, organisme } = body;
+  if (formation_id) {
+    const exists = await db.prepare("SELECT id FROM user_formations_suivi WHERE user_id=? AND formation_id=?").get(me.id, formation_id);
+    if (exists) return sendJSON(res, 409, { error: "Déjà inscrit à cette formation." });
+  }
+  let formTitre = titre;
+  if (formation_id && !titre) {
+    const f = await db.prepare("SELECT titre FROM formations WHERE id=?").get(formation_id);
+    if (f) formTitre = f.titre;
+  }
+  if (!formTitre) return sendJSON(res, 400, { error: "Titre requis." });
+  const id = db.prepare("INSERT INTO user_formations_suivi (user_id,formation_id,titre,organisme) VALUES (?,?,?,?)")
+    .run(me.id, formation_id||null, formTitre, organisme||null).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+route("PATCH", "/api/formations/suivi/:id", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const item = await db.prepare("SELECT * FROM user_formations_suivi WHERE id=? AND user_id=?").get(params.id, me.id);
+  if (!item) return sendJSON(res, 404, { error: "Non trouvé." });
+  const { progression, statut, notes, date_fin } = body;
+  await db.prepare("UPDATE user_formations_suivi SET progression=?, statut=?, notes=?, date_fin=? WHERE id=?")
+    .run(progression ?? item.progression, statut || item.statut, notes ?? item.notes, date_fin || item.date_fin, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("GET", "/api/formations", async (req, res, params, body, query) => {
   let rows = await db.prepare(`
     SELECT f.*, u.nom AS auteur_nom
@@ -5472,14 +5613,22 @@ route("GET", "/api/mes-inscriptions", async (req, res) => {
 route("POST", "/api/formations", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (user.role === 'utilisateur') return sendJSON(res, 403, { error: "Accréditation Créateur de formations requise." });
-  if (!['initiative','collectivite','administrateur'].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Institution." });
-  if (user.role !== 'administrateur' && !hasAccreditation(user.id, 'createur_formations')) {
-    return sendJSON(res, 403, { error: "Accréditation Créateur de formations requise. Faites une demande dans la section Accréditations." });
+  /* Seule l'accréditation « Créateur de formation » fait foi (tous types de compte confondus) —
+     pas de restriction de rôle : bug corrigé (l'ancienne restriction ['initiative','collectivite',...]
+     empêchait un compte Utilisateur accrédité de créer une formation, contrairement au module
+     Accréditations). Le manque de `await` sur hasAccreditation() (toujours vrai car promesse
+     tronquée) était un second bug réel — corrigé ici aussi. */
+  if (user.role !== 'administrateur' && !(await hasAccreditation(user.id, 'createur_formations'))) {
+    return sendJSON(res, 403, { error: "Accréditation Créateur de formation requise. Faites une demande depuis l'onglet Formation." });
   }
   const { titre, type_formation, organisme, domaine, nationalite, langue, niveau, description,
           prix, duree, duree_heures, places, mode_acces, telecharge_autorise,
-          objectifs, prerequis, categorie, video_intro } = body;
+          objectifs, prerequis, categorie, video_intro,
+          sous_titre, description_courte, competences_acquises, public_concerne,
+          nombre_modules_prevu, nombre_lecons_approx,
+          sous_categorie, mots_cles, pays_concerne, secteur_activite,
+          devise, promo_active, promo_reduction_pct, promo_date_fin,
+          acces_type, acces_liste_id, banniere_url, image_url } = body;
   if (!titre) return sendJSON(res, 400, { error: "Le titre est requis." });
   const modeAcces = mode_acces || 'gratuit';
   const commission = modeAcces === 'gratuit' ? 0 : modeAcces === 'payant_sauf_membres' ? 2 : 5;
@@ -5488,14 +5637,25 @@ route("POST", "/api/formations", async (req, res, params, body) => {
   const id = db.prepare(`
     INSERT INTO formations (titre, type_formation, organisme, domaine, nationalite, langue, niveau, description,
       prix, gratuit, duree, duree_heures, places, initiative_id, owner_user_id,
-      statut, mode_acces, commission_pct, telecharge_autorise, objectifs, prerequis, categorie, video_intro)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'brouillon',?,?,?,?,?,?,?)
+      statut, mode_acces, commission_pct, telecharge_autorise, objectifs, prerequis, categorie, video_intro,
+      sous_titre, description_courte, competences_acquises, public_concerne,
+      nombre_modules_prevu, nombre_lecons_approx,
+      sous_categorie, mots_cles, pays_concerne, secteur_activite,
+      devise, promo_active, promo_reduction_pct, promo_date_fin,
+      acces_type, acces_liste_id, banniere_url, image_url)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'brouillon',?,?,?,?,?,?,?,
+      ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     titre, type_formation||null, organisme||null, domaine||null, nationalite||null, langue||'Français',
     niveau||null, description||null, prix||0, gratuit, duree||null, duree_heures||null, places||null,
     init?.id||null, user.id,
     modeAcces, commission, telecharge_autorise?1:0,
-    objectifs||null, prerequis||null, categorie||null, video_intro||null
+    objectifs||null, prerequis||null, categorie||null, video_intro||null,
+    sous_titre||null, description_courte||null, competences_acquises||null, public_concerne||null,
+    nombre_modules_prevu||null, nombre_lecons_approx||null,
+    sous_categorie||null, mots_cles||null, pays_concerne||null, secteur_activite||null,
+    devise||'EUR', promo_active?1:0, promo_reduction_pct||null, promo_date_fin||null,
+    acces_type||'public', acces_liste_id||null, banniere_url||null, image_url||null
   ).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
@@ -5513,22 +5673,78 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
   const n = v => (v === undefined ? null : v);
   const modeAcces = body.mode_acces || f.mode_acces || 'gratuit';
   const commission = modeAcces === 'gratuit' ? 0 : modeAcces === 'payant_sauf_membres' ? 2 : 5;
+  const gratuit = modeAcces === 'gratuit' ? 1 : 0;
   const newTelecharge = body.telecharge_autorise != null ? (body.telecharge_autorise ? 1 : 0) : null;
+  const newPromoActive = body.promo_active != null ? (body.promo_active ? 1 : 0) : null;
   const newStatut = (f.statut === 'refusee') ? 'brouillon' : f.statut;
   const newMotif = (f.statut === 'refusee') ? null : f.motif_refus;
   db.prepare(`UPDATE formations SET
     titre=COALESCE(?,titre), description=COALESCE(?,description), objectifs=COALESCE(?,objectifs),
     prerequis=COALESCE(?,prerequis), niveau=COALESCE(?,niveau), langue=COALESCE(?,langue),
     duree=COALESCE(?,duree), duree_heures=COALESCE(?,duree_heures), places=COALESCE(?,places),
-    categorie=COALESCE(?,categorie), mode_acces=?, prix=COALESCE(?,prix),
+    categorie=COALESCE(?,categorie), mode_acces=?, gratuit=?, prix=COALESCE(?,prix),
     commission_pct=?, telecharge_autorise=COALESCE(?,telecharge_autorise),
     video_intro=COALESCE(?,video_intro), image_url=COALESCE(?,image_url),
-    statut=?, motif_refus=?
+    statut=?, motif_refus=?,
+    sous_titre=COALESCE(?,sous_titre), description_courte=COALESCE(?,description_courte),
+    competences_acquises=COALESCE(?,competences_acquises), public_concerne=COALESCE(?,public_concerne),
+    nombre_modules_prevu=COALESCE(?,nombre_modules_prevu), nombre_lecons_approx=COALESCE(?,nombre_lecons_approx),
+    sous_categorie=COALESCE(?,sous_categorie), mots_cles=COALESCE(?,mots_cles),
+    pays_concerne=COALESCE(?,pays_concerne), secteur_activite=COALESCE(?,secteur_activite),
+    devise=COALESCE(?,devise), promo_active=COALESCE(?,promo_active),
+    promo_reduction_pct=COALESCE(?,promo_reduction_pct), promo_date_fin=COALESCE(?,promo_date_fin),
+    acces_type=COALESCE(?,acces_type), acces_liste_id=COALESCE(?,acces_liste_id), banniere_url=COALESCE(?,banniere_url)
     WHERE id=?`
   ).run(n(body.titre),n(body.description),n(body.objectifs),n(body.prerequis),
     n(body.niveau),n(body.langue),n(body.duree),n(body.duree_heures),n(body.places),
-    n(body.categorie),modeAcces,n(body.prix),commission,newTelecharge,
-    n(body.video_intro),n(body.image_url),newStatut,newMotif,params.id);
+    n(body.categorie),modeAcces,gratuit,n(body.prix),commission,newTelecharge,
+    n(body.video_intro),n(body.image_url),newStatut,newMotif,
+    n(body.sous_titre),n(body.description_courte),n(body.competences_acquises),n(body.public_concerne),
+    n(body.nombre_modules_prevu),n(body.nombre_lecons_approx),
+    n(body.sous_categorie),n(body.mots_cles),n(body.pays_concerne),n(body.secteur_activite),
+    n(body.devise),newPromoActive,n(body.promo_reduction_pct),n(body.promo_date_fin),
+    n(body.acces_type),n(body.acces_liste_id),n(body.banniere_url),
+    params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Coupons de réduction sur une formation payante (propriétaire uniquement) ── */
+route("GET", "/api/formations/:id/coupons", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT owner_user_id FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  const coupons = await db.prepare("SELECT * FROM formation_coupons WHERE formation_id=? ORDER BY created_at DESC").all(params.id);
+  sendJSON(res, 200, { coupons });
+});
+
+route("POST", "/api/formations/:id/coupons", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT owner_user_id FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  const code = (body.code||'').trim().toUpperCase();
+  const reduction = parseFloat(body.reduction_pct);
+  if (!code) return sendJSON(res, 400, { error: "Le code du coupon est requis." });
+  if (!reduction || reduction <= 0 || reduction > 100) return sendJSON(res, 400, { error: "La réduction doit être comprise entre 1 et 100 %." });
+  try {
+    const id = db.prepare(`INSERT INTO formation_coupons (formation_id, code, reduction_pct, max_utilisations)
+      VALUES (?,?,?,?)`).run(params.id, code, reduction, body.max_utilisations ? parseInt(body.max_utilisations) : null).lastInsertRowid;
+    sendJSON(res, 201, { id });
+  } catch(e) {
+    sendJSON(res, 400, { error: "Ce code de coupon existe déjà pour cette formation." });
+  }
+});
+
+route("DELETE", "/api/formations/:id/coupons/:couponId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT owner_user_id FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  await db.prepare("DELETE FROM formation_coupons WHERE id=? AND formation_id=?").run(params.couponId, params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -5544,7 +5760,209 @@ route("DELETE", "/api/formations/:id", async (req, res, params) => {
   sendJSON(res, 200, { ok: true });
 });
 
-/* Soumettre à validation */
+/* ── Étapes 5-6 : Modules et leçons ── */
+route("GET", "/api/formations/:id/modules", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const modules = await db.prepare("SELECT * FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(params.id);
+  for (const m of modules) {
+    m.lecons = await db.prepare("SELECT * FROM formation_lecons WHERE module_id=? ORDER BY ordre ASC, id ASC").all(m.id);
+  }
+  sendJSON(res, 200, { modules });
+});
+function checkFormationOwner(f, user) { return f && (f.owner_user_id === user.id || user.role === 'administrateur'); }
+route("POST", "/api/formations/:id/modules", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!body.titre) return sendJSON(res, 400, { error: "Le titre du module est requis." });
+  const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_modules WHERE formation_id=?").get(params.id);
+  const id = db.prepare("INSERT INTO formation_modules (formation_id,titre,description,ordre) VALUES (?,?,?,?)")
+    .run(params.id, body.titre, body.description||null, max+1).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+route("PUT", "/api/formations/:id/modules/:moduleId", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  db.prepare("UPDATE formation_modules SET titre=COALESCE(?,titre), description=COALESCE(?,description) WHERE id=? AND formation_id=?")
+    .run(body.titre||null, body.description||null, params.moduleId, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/formations/:id/modules/:moduleId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  const lecons = await db.prepare("SELECT id FROM formation_lecons WHERE module_id=?").all(params.moduleId);
+  for (const l of lecons) { await db.prepare("DELETE FROM formation_quiz WHERE lecon_id=?").run(l.id); await db.prepare("DELETE FROM formation_lecons WHERE id=?").run(l.id); }
+  await db.prepare("DELETE FROM formation_modules WHERE id=? AND formation_id=?").run(params.moduleId, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("PUT", "/api/formations/:id/modules/reorder", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  const ids = body.ordre || [];
+  ids.forEach((mid, i) => { db.prepare("UPDATE formation_modules SET ordre=? WHERE id=? AND formation_id=?").run(i, mid, params.id); });
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/formations/:id/modules/:moduleId/lecons", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!body.titre) return sendJSON(res, 400, { error: "Le titre de la leçon est requis." });
+  const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_lecons WHERE module_id=?").get(params.moduleId);
+  const id = db.prepare(`INSERT INTO formation_lecons (module_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre)
+    VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+    params.moduleId, body.titre, body.description||null, body.type||'texte', body.duree_minutes||null,
+    body.contenu_url||null, body.contenu_texte||null, body.ressources_json ? JSON.stringify(body.ressources_json) : null,
+    body.image_url||null, max+1
+  ).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+route("PUT", "/api/formations/:id/lecons/:leconId", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  const n = v => (v === undefined ? null : v);
+  db.prepare(`UPDATE formation_lecons SET
+    titre=COALESCE(?,titre), description=COALESCE(?,description), type=COALESCE(?,type),
+    duree_minutes=COALESCE(?,duree_minutes), contenu_url=COALESCE(?,contenu_url),
+    contenu_texte=COALESCE(?,contenu_texte), ressources_json=COALESCE(?,ressources_json), image_url=COALESCE(?,image_url)
+    WHERE id=?`).run(n(body.titre),n(body.description),n(body.type),n(body.duree_minutes),n(body.contenu_url),
+    n(body.contenu_texte), body.ressources_json?JSON.stringify(body.ressources_json):null, n(body.image_url), params.leconId);
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/formations/:id/lecons/:leconId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  await db.prepare("DELETE FROM formation_quiz WHERE lecon_id=?").run(params.leconId);
+  await db.prepare("DELETE FROM formation_lecons WHERE id=?").run(params.leconId);
+  sendJSON(res, 200, { ok: true });
+});
+route("PUT", "/api/formations/:id/modules/:moduleId/lecons/reorder", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  const ids = body.ordre || [];
+  ids.forEach((lid, i) => { db.prepare("UPDATE formation_lecons SET ordre=? WHERE id=? AND module_id=?").run(i, lid, params.moduleId); });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Étape 7 : Quiz et évaluations ── */
+route("GET", "/api/formations/:id/quiz", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const quiz = await db.prepare("SELECT * FROM formation_quiz WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(params.id);
+  for (const q of quiz) { q.questions = await db.prepare("SELECT * FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(q.id); }
+  sendJSON(res, 200, { quiz });
+});
+route("POST", "/api/formations/:id/quiz", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!body.titre) return sendJSON(res, 400, { error: "Le titre du quiz est requis." });
+  const id = db.prepare(`INSERT INTO formation_quiz (formation_id,lecon_id,titre,type,note_minimale,temps_limite_min,correction_auto,commentaires_personnalises)
+    VALUES (?,?,?,?,?,?,?,?)`).run(params.id, body.lecon_id||null, body.titre, body.type||'intermediaire',
+    body.note_minimale||50, body.temps_limite_min||null, body.correction_auto===false?0:1, body.commentaires_personnalises||null).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+route("PUT", "/api/formations/:id/quiz/:quizId", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  const n = v => (v === undefined ? null : v);
+  db.prepare(`UPDATE formation_quiz SET titre=COALESCE(?,titre), type=COALESCE(?,type),
+    note_minimale=COALESCE(?,note_minimale), temps_limite_min=COALESCE(?,temps_limite_min),
+    correction_auto=COALESCE(?,correction_auto), commentaires_personnalises=COALESCE(?,commentaires_personnalises)
+    WHERE id=?`).run(n(body.titre),n(body.type),n(body.note_minimale),n(body.temps_limite_min),
+    body.correction_auto===undefined?null:(body.correction_auto?1:0), n(body.commentaires_personnalises), params.quizId);
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/formations/:id/quiz/:quizId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  await db.prepare("DELETE FROM formation_quiz_questions WHERE quiz_id=?").run(params.quizId);
+  await db.prepare("DELETE FROM formation_quiz WHERE id=?").run(params.quizId);
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/formations/:id/quiz/:quizId/questions", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!body.question) return sendJSON(res, 400, { error: "L'énoncé de la question est requis." });
+  const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_quiz_questions WHERE quiz_id=?").get(params.quizId);
+  const id = db.prepare(`INSERT INTO formation_quiz_questions (quiz_id,question,type,options_json,reponse_correcte,points,ordre)
+    VALUES (?,?,?,?,?,?,?)`).run(params.quizId, body.question, body.type||'qcm',
+    body.options ? JSON.stringify(body.options) : null, body.reponse_correcte||null, body.points||1, max+1).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+route("DELETE", "/api/formations/:id/quiz/:quizId/questions/:questionId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  await db.prepare("DELETE FROM formation_quiz_questions WHERE id=? AND quiz_id=?").run(params.questionId, params.quizId);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Étape 8 : Certificat ── */
+route("PUT", "/api/formations/:id/certificat", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  db.prepare(`UPDATE formations SET certificat_actif=?, certificat_modele=COALESCE(?,certificat_modele),
+    certificat_conditions=COALESCE(?,certificat_conditions), certificat_qr=? WHERE id=?`)
+    .run(body.certificat_actif?1:0, body.certificat_modele||null, body.certificat_conditions||null, body.certificat_qr===false?0:1, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Étape 11 : Messagerie de dossier (formateur ↔ équipe Diaspo'Actif pendant l'analyse) ── */
+route("GET", "/api/formations/:id/messages", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  const messages = await db.prepare(`SELECT m.*, u.nom AS sender_nom FROM formation_dossier_messages m
+    LEFT JOIN users u ON u.id=m.sender_id WHERE m.formation_id=? ORDER BY m.created_at ASC`).all(params.id);
+  sendJSON(res, 200, { messages });
+});
+route("POST", "/api/formations/:id/messages", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!body.message) return sendJSON(res, 400, { error: "Message vide." });
+  const senderRole = user.role === 'administrateur' ? 'administrateur' : 'formateur';
+  const id = db.prepare("INSERT INTO formation_dossier_messages (formation_id,sender_id,sender_role,message) VALUES (?,?,?,?)")
+    .run(params.id, user.id, senderRole, body.message).lastInsertRowid;
+  const destId = senderRole === 'administrateur' ? f.owner_user_id : null;
+  if (destId) {
+    creerNotif(destId, 'formation', 'Nouveau message sur votre dossier', `Diaspo'Actif a répondu concernant « ${f.titre} ».`, { formation_id: params.id });
+  } else {
+    const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+    for (const a of admins) creerNotif(a.id, 'formation', 'Message formateur', `${user.nom} a répondu concernant « ${f.titre} ».`, { formation_id: params.id });
+  }
+  sendJSON(res, 201, { id });
+});
+
+/* Soumettre à validation — Étape 11 : vérifications automatiques */
 route("POST", "/api/formations/:id/publier", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -5552,9 +5970,35 @@ route("POST", "/api/formations/:id/publier", async (req, res, params) => {
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id) return sendJSON(res, 403, { error: "Interdit." });
   if (!['brouillon','refusee'].includes(f.statut||'brouillon')) return sendJSON(res, 400, { error: `Statut actuel : ${f.statut}` });
-  await db.prepare("UPDATE formations SET statut='en_attente', motif_refus=NULL WHERE id=?").run(params.id);
+
+  /* Vérifications automatiques avant soumission */
+  const erreurs = [];
+  if (!f.titre) erreurs.push("Le titre est manquant.");
+  if (!f.description) erreurs.push("La description complète est manquante.");
+  const modules = await db.prepare("SELECT * FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC").all(params.id);
+  if (!modules.length) erreurs.push("Ajoutez au moins un module.");
+  for (const m of modules) {
+    const lecons = await db.prepare("SELECT * FROM formation_lecons WHERE module_id=?").all(m.id);
+    if (!lecons.length) erreurs.push(`Le module « ${m.titre} » ne contient aucune leçon.`);
+    for (const l of lecons) {
+      if (['video','pdf','audio','presentation'].includes(l.type) && !l.contenu_url) erreurs.push(`La leçon « ${l.titre} » n'a pas de fichier importé.`);
+      if (l.type === 'quiz') {
+        const quiz = await db.prepare("SELECT * FROM formation_quiz WHERE lecon_id=?").get(l.id);
+        if (!quiz) erreurs.push(`La leçon quiz « ${l.titre} » n'a pas de quiz configuré.`);
+        else {
+          const questions = await db.prepare("SELECT id FROM formation_quiz_questions WHERE quiz_id=?").all(quiz.id);
+          if (!questions.length) erreurs.push(`Le quiz « ${quiz.titre} » n'a aucune question.`);
+        }
+      }
+    }
+  }
+  if (f.mode_acces && f.mode_acces !== 'gratuit') {
+    if (!f.prix || f.prix <= 0) erreurs.push("Le prix doit être défini pour une formation payante.");
+  }
+  if (erreurs.length) return sendJSON(res, 400, { error: "Formation incomplète.", details: erreurs });
+
+  await db.prepare("UPDATE formations SET statut='soumise', date_soumission=datetime('now'), motif_refus=NULL WHERE id=?").run(params.id);
   db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom) VALUES (?,'soumise',?,?)").run(params.id, user.id, user.nom);
-  /* Notif aux admins */
   const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
   for (const a of admins) {
     creerNotif(a.id, 'formation', 'Nouvelle formation à valider', `« ${f.titre} » est en attente de validation.`, { formation_id: params.id });
@@ -5585,11 +6029,47 @@ route("POST", "/api/formations/:id/inscrire", async (req, res, params, body) => 
   } else if (f.mode_acces === 'payant') {
     montant = f.prix || 0;
   }
-  db.prepare(`INSERT INTO formation_inscriptions
-    (formation_id,user_id,montant_paye,acces_gratuit_membre,code_acces)
-    VALUES (?,?,?,?,?)`).run(params.id, user.id, montant, acces_gratuit, code_valide);
-  creerNotif(user.id, 'formation', 'Inscription confirmée', `Vous êtes inscrit à la formation « ${f.titre} ».`, { formation_id: params.id });
-  sendJSON(res, 201, { ok: true, acces_gratuit });
+
+  /* Formation gratuite (ou code d'accès valide) : inscription immédiate, comme avant. */
+  if (montant <= 0) {
+    db.prepare(`INSERT INTO formation_inscriptions
+      (formation_id,user_id,montant_paye,acces_gratuit_membre,code_acces,paiement_statut)
+      VALUES (?,?,0,?,?,'paye')`).run(params.id, user.id, acces_gratuit, code_valide);
+    creerNotif(user.id, 'formation', 'Inscription confirmée', `Vous êtes inscrit à la formation « ${f.titre} ».`, { formation_id: params.id });
+    return sendJSON(res, 201, { ok: true, acces_gratuit });
+  }
+
+  /* Formation payante : rien n'est confirmé tant que Stripe n'a pas validé le paiement.
+     Même modèle que la billetterie/boutique — voir handleStripeWebhook(). */
+  const { stripe, getOrCreateStripeCustomer } = require('./stripe-client');
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+  const inscriptionId = db.prepare(`INSERT INTO formation_inscriptions
+    (formation_id,user_id,montant_paye,acces_gratuit_membre,code_acces,paiement_statut)
+    VALUES (?,?,0,?,?,'en_attente')`).run(params.id, user.id, acces_gratuit, code_valide).lastInsertRowid;
+  try {
+    const origin = getOrigin(req);
+    const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer: stripeCustomerId,
+      line_items: [{
+        price_data: {
+          currency: 'eur',
+          unit_amount: Math.round(montant * 100),
+          product_data: { name: f.titre, description: f.organisme || undefined },
+        },
+        quantity: 1,
+      }],
+      metadata: { diaspoactif_formation_inscription_id: String(inscriptionId) },
+      success_url: `${origin}/formations.html?paiement=succes&inscription=${inscriptionId}`,
+      cancel_url: `${origin}/formations.html?paiement=annule&inscription=${inscriptionId}`,
+    });
+    db.prepare(`UPDATE formation_inscriptions SET stripe_session_id=? WHERE id=?`).run(session.id, inscriptionId);
+    sendJSON(res, 201, { checkout_url: session.url, en_attente_paiement: true });
+  } catch (e) {
+    db.prepare(`DELETE FROM formation_inscriptions WHERE id=?`).run(inscriptionId);
+    sendJSON(res, 500, SEC.safeError(e, 'formation-checkout'));
+  }
 });
 
 /* Ajouter un avis */
@@ -5625,10 +6105,48 @@ route("GET", "/api/admin/formations/en-attente", async (req, res) => {
   const formations = await db.prepare(`
     SELECT f.*, u.nom AS auteur_nom, u.email AS auteur_email
     FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id
-    WHERE f.statut='en_attente'
+    WHERE f.statut IN ('soumise','en_attente','en_cours_analyse')
     ORDER BY f.created_at ASC
   `).all();
   sendJSON(res, 200, { formations });
+});
+
+route("PATCH", "/api/admin/formations/:id/analyser", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  await db.prepare("UPDATE formations SET statut='en_cours_analyse' WHERE id=?").run(params.id);
+  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom) VALUES (?,'en_cours_analyse',?,?)").run(params.id, user.id, user.nom);
+  creerNotif(f.owner_user_id, 'formation', 'Formation en cours d\'analyse', `« ${f.titre} » est en cours d'analyse par l'équipe Diaspo'Actif.`, { formation_id: params.id });
+  sendJSON(res, 200, { ok: true });
+});
+
+route("PATCH", "/api/admin/formations/:id/demander-modifications", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  const motif = body.motif || "Des modifications sont nécessaires avant publication.";
+  await db.prepare("UPDATE formations SET statut='modifications_demandees', motif_refus=? WHERE id=?").run(motif, params.id);
+  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'modifications_demandees',?,?,?)").run(params.id, user.id, user.nom, motif);
+  if (body.message) {
+    db.prepare("INSERT INTO formation_dossier_messages (formation_id,sender_id,sender_role,message) VALUES (?,?,'administrateur',?)").run(params.id, user.id, body.message);
+  }
+  creerNotif(f.owner_user_id, 'formation', 'Modifications demandées', `L'équipe Diaspo'Actif demande des modifications sur « ${f.titre} ». Motif : ${motif}`, { formation_id: params.id });
+  sendJSON(res, 200, { ok: true });
+});
+
+route("PATCH", "/api/admin/formations/:id/programmer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (!body.date_publication) return sendJSON(res, 400, { error: "La date de publication est requise." });
+  await db.prepare("UPDATE formations SET statut='programmee', valide_at=? WHERE id=?").run(body.date_publication, params.id);
+  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'programmee',?,?,?)").run(params.id, user.id, user.nom, body.date_publication);
+  creerNotif(f.owner_user_id, 'formation', 'Formation validée et programmée', `« ${f.titre} » sera publiée le ${body.date_publication}.`, { formation_id: params.id });
+  sendJSON(res, 200, { ok: true });
 });
 
 route("GET", "/api/admin/formations", async (req, res, params, body, query) => {
@@ -7101,6 +7619,42 @@ async function handleStripeWebhook(req, res) {
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_commande_vitrine_id) {
       const commandeId = Number(event.data.object.metadata.diaspoactif_commande_vitrine_id);
       await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id=? AND paiement_statut='en_attente'`).run(commandeId);
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_formation_inscription_id) {
+      /* Paiement formation confirmé — même modèle que Boutique/Billetterie (commission 5%,
+         crédit wallet_balance au propriétaire de la formation). Idempotent : ne traite que si
+         encore 'en_attente' (une session Stripe peut renvoyer plusieurs fois le même événement). */
+      const inscriptionId = Number(event.data.object.metadata.diaspoactif_formation_inscription_id);
+      const insc = await db.prepare(`SELECT * FROM formation_inscriptions WHERE id=? AND paiement_statut='en_attente'`).get(inscriptionId);
+      if (insc) {
+        const f = await db.prepare(`SELECT * FROM formations WHERE id=?`).get(insc.formation_id);
+        const session = event.data.object;
+        const montant = (session.amount_total || 0) / 100;
+        await db.prepare(`UPDATE formation_inscriptions SET paiement_statut='paye', montant_paye=? WHERE id=?`).run(montant, inscriptionId);
+        if (f?.owner_user_id) {
+          const COMMISSION_RATE = 0.05;
+          const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
+          const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
+          await db.prepare(`INSERT INTO wallet_transactions (type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES ('platform_fee',NULL,?,?,?,?,?)`)
+            .run(platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+          await db.prepare(`INSERT INTO wallet_transactions (type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES ('organizer_credit',?,?,?,?,?,?)`)
+            .run(f.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+          await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, f.owner_user_id);
+          await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+          creerNotif(f.owner_user_id, "commande_vendue", "Nouvelle inscription payante 🎓", `« ${f.titre} » vendue (+${organizer_amount}€).`, { formation_id: f.id });
+        }
+        creerNotif(insc.user_id, "formation", "Inscription confirmée ✅", `Votre paiement pour « ${f?.titre||''} » est confirmé. Accédez à la formation depuis « Mes inscriptions ».`, { formation_id: insc.formation_id });
+        /* Alimente aussi le suivi de progression (« Mes inscriptions ») — pour le parcours gratuit
+           c'est le frontend qui l'appelle juste après l'inscription instantanée ; ici, côté paiement
+           différé par Stripe, on le fait côté serveur pour que ce soit fiable même si l'utilisateur
+           ferme l'onglet avant le retour sur le site. */
+        try {
+          const exists = await db.prepare("SELECT id FROM user_formations_suivi WHERE user_id=? AND formation_id=?").get(insc.user_id, insc.formation_id);
+          if (!exists && f) db.prepare("INSERT INTO user_formations_suivi (user_id,formation_id,titre,organisme) VALUES (?,?,?,?)").run(insc.user_id, insc.formation_id, f.titre, f.organisme||null);
+        } catch(_) {}
+      }
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_formation_inscription_id) {
+      const inscriptionId = Number(event.data.object.metadata.diaspoactif_formation_inscription_id);
+      await db.prepare(`DELETE FROM formation_inscriptions WHERE id=? AND paiement_statut='en_attente'`).run(inscriptionId);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_adhesion_paiement_id) {
       /* Paiement Cotisations & Adhésions confirmé (one-off ou 1ère facture d'une subscription).
          Même modèle commission 5%/wallet_balance que Boutique/Billetterie. Idempotent : ne traite que si 'en_attente'. */
@@ -7945,6 +8499,15 @@ route("DELETE", "/api/admin/membres/:id", async (req, res, params) => {
   if (Number(params.id) === user.id) return sendJSON(res, 400, { error: "Impossible de supprimer votre propre compte." });
   await db.prepare("DELETE FROM users WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/admin/users?role=administrateur — liste légère pour les sélecteurs d'assignation admin */
+route("GET", "/api/admin/users", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const role = query.role || "administrateur";
+  const rows = await db.prepare("SELECT id,nom,prenom,email FROM users WHERE role=? ORDER BY nom").all(role);
+  sendJSON(res, 200, { users: rows });
 });
 
 route("GET", "/api/admin/comptes", async (req, res, params, body, query) => {
@@ -10349,8 +10912,29 @@ route("GET", "/api/accreditations/user/:id", async (req, res, params) => {
 route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const { type, message } = body;
+  const { type, message, documents, lettre_motivation, video_url, champs_specifiques } = body;
   if (!type) return sendJSON(res, 400, { error: "Type requis." });
+  if (documents !== undefined && !Array.isArray(documents)) return sendJSON(res, 400, { error: "Documents invalides." });
+  if (video_url && !SEC.isValidUrl(video_url)) return sendJSON(res, 400, { error: "URL de vidéo invalide." });
+  const documentsJson = Array.isArray(documents) && documents.length
+    ? JSON.stringify(documents.filter(d => d && d.url && SEC.isValidUrl(d.url)).map(d => ({ nom: SEC.sanitizeString(d.nom || '', 200), url: d.url })))
+    : null;
+  /* Formulaire spécifique par type d'accréditation (ex. Formateur : expertise, diplômes,
+     expérience, références, catégories, charte). Réutilisable pour tout futur type. */
+  let champsSpecifiquesJson = null;
+  if (champs_specifiques !== undefined) {
+    if (typeof champs_specifiques !== 'object' || champs_specifiques === null || Array.isArray(champs_specifiques))
+      return sendJSON(res, 400, { error: "Champs spécifiques invalides." });
+    if (type === 'createur_formations' && champs_specifiques.charte_acceptee !== true)
+      return sendJSON(res, 400, { error: "Vous devez accepter la charte qualité des formateurs pour soumettre votre demande." });
+    const clean = {};
+    for (const [k, v] of Object.entries(champs_specifiques)) {
+      if (typeof v === 'boolean') clean[k] = v;
+      else if (Array.isArray(v)) clean[k] = v.map(x => SEC.sanitizeString(String(x), 200)).slice(0, 30);
+      else clean[k] = SEC.sanitizeString(String(v ?? ''), 3000);
+    }
+    champsSpecifiquesJson = JSON.stringify(clean);
+  }
 
   /* Chercher dans le nouveau catalogue dynamique */
   const def = await db.prepare("SELECT * FROM accred_definitions WHERE type=? AND actif=1").get(type);
@@ -10361,12 +10945,22 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
     if (regle.mode === 'automatique')
       return sendJSON(res, 400, { error: "Cette accréditation est accordée automatiquement à votre type de compte." });
     const existingDem = await db.prepare("SELECT id,statut FROM accred_demandes WHERE user_id=? AND accred_id=? ORDER BY created_at DESC LIMIT 1").get(user.id, def.id);
-    if (existingDem && existingDem.statut === 'en_attente')
+    if (existingDem && ['en_attente','deposee','en_cours_analyse','info_complementaire_demandee'].includes(existingDem.statut))
       return sendJSON(res, 409, { error: "Une demande est déjà en cours pour cette accréditation." });
     if (await db.prepare("SELECT id FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(user.id, def.id))
       return sendJSON(res, 409, { error: "Vous possédez déjà cette accréditation." });
     const tarif = await db.prepare("SELECT validation_admin FROM accred_tarifs WHERE accred_id=? AND role=?").get(def.id, user.role);
-    const id = await db.prepare("INSERT OR IGNORE INTO accred_demandes (user_id,accred_id,message) VALUES (?,?,?)").run(user.id, def.id, message||null).lastInsertRowid;
+    /* Une demande précédente refusée laisse une ligne (UNIQUE user_id,accred_id) : on la remet à jour au lieu de tenter un INSERT qui échouerait silencieusement. */
+    let id;
+    if (existingDem) {
+      await db.prepare(`UPDATE accred_demandes SET message=?,documents_json=?,lettre_motivation=?,video_url=?,champs_specifiques_json=?,
+        statut='en_attente',motif_refus=NULL,commentaire_interne=NULL,created_at=datetime('now') WHERE id=?`)
+        .run(message||null, documentsJson, lettre_motivation ? SEC.sanitizeString(lettre_motivation, 8000) : null, video_url||null, champsSpecifiquesJson, existingDem.id);
+      id = existingDem.id;
+    } else {
+      id = await db.prepare(`INSERT INTO accred_demandes (user_id,accred_id,message,documents_json,lettre_motivation,video_url,champs_specifiques_json) VALUES (?,?,?,?,?,?,?)`)
+        .run(user.id, def.id, message||null, documentsJson, lettre_motivation ? SEC.sanitizeString(lettre_motivation, 8000) : null, video_url||null, champsSpecifiquesJson).lastInsertRowid;
+    }
     if (!tarif || tarif.validation_admin !== 0) {
       const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
       admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation",
@@ -20758,6 +21352,125 @@ route("PATCH", "/api/admin/accred/users/:userId/:accredId/retirer", async (req, 
   sendJSON(res, 200, { ok: true });
 });
 
+/* PATCH /api/admin/accred/users/:userId/:accredId/suspendre */
+route("PATCH", "/api/admin/accred/users/:userId/:accredId/suspendre", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE user_accreditations SET statut='suspendue',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
+    .run(params.userId, params.accredId);
+  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+    .run(params.userId, params.accredId, 'suspendu', admin.id, admin.nom, body.motif||null);
+  const def = await getAccredDef(params.accredId);
+  creerNotif(Number(params.userId), "validation", "Accréditation suspendue",
+    `Votre accréditation « ${def?.label||''} » a été suspendue temporairement${body.motif?` : ${body.motif}`:"."}.`, { accred_type: def?.type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accred/users/:userId/:accredId/geler */
+route("PATCH", "/api/admin/accred/users/:userId/:accredId/geler", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE user_accreditations SET statut='gelee',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
+    .run(params.userId, params.accredId);
+  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+    .run(params.userId, params.accredId, 'gele', admin.id, admin.nom, body.motif||null);
+  const def = await getAccredDef(params.accredId);
+  creerNotif(Number(params.userId), "validation", "Accréditation gelée",
+    `Votre accréditation « ${def?.label||''} » a été gelée${body.motif?` : ${body.motif}`:"."}.`, { accred_type: def?.type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accred/users/:userId/:accredId/reactiver — sort de suspendue/gelee */
+route("PATCH", "/api/admin/accred/users/:userId/:accredId/reactiver", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE user_accreditations SET statut='active',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
+    .run(params.userId, params.accredId);
+  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+    .run(params.userId, params.accredId, 'reactive', admin.id, admin.nom, body.motif||null);
+  const def = await getAccredDef(params.accredId);
+  creerNotif(Number(params.userId), "validation", "Accréditation réactivée",
+    `Votre accréditation « ${def?.label||''} » a été réactivée.`, { accred_type: def?.type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accred/users/:userId/:accredId/renouveler */
+route("PATCH", "/api/admin/accred/users/:userId/:accredId/renouveler", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  db.prepare("UPDATE user_accreditations SET statut='active',date_expiration=?,updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
+    .run(body.date_expiration||null, params.userId, params.accredId);
+  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+    .run(params.userId, params.accredId, 'renouvele', admin.id, admin.nom, body.motif||null);
+  const def = await getAccredDef(params.accredId);
+  creerNotif(Number(params.userId), "validation", "Accréditation renouvelée",
+    `Votre accréditation « ${def?.label||''} » a été renouvelée.`, { accred_type: def?.type });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/admin/accred/users/:userId/:accredId/historique */
+route("GET", "/api/admin/accred/users/:userId/:accredId/historique", async (req, res, params) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = await db.prepare(
+    "SELECT * FROM accred_historique_v2 WHERE user_id=? AND accred_id=? ORDER BY created_at DESC"
+  ).all(params.userId, params.accredId);
+  sendJSON(res, 200, { historique: rows });
+});
+
+/* ──── File d'attente des demandes : transitions de statut, commentaire interne, assignation, deadline ──── */
+
+/* PATCH /api/admin/accred/demandes/:id/statut — en_cours_analyse | info_complementaire_demandee | deposee */
+route("PATCH", "/api/admin/accred/demandes/:id/statut", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const STATUTS_OK = ["en_cours_analyse", "info_complementaire_demandee", "deposee"];
+  if (!STATUTS_OK.includes(body.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  const dem = await db.prepare("SELECT * FROM accred_demandes WHERE id=?").get(params.id);
+  if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
+  await db.prepare("UPDATE accred_demandes SET statut=? WHERE id=?").run(body.statut, params.id);
+  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+    .run(dem.user_id, dem.accred_id, `statut_${body.statut}`, admin.id, admin.nom, body.motif||null);
+  const def = await getAccredDef(dem.accred_id);
+  const LABELS = { en_cours_analyse: "en cours d'analyse", info_complementaire_demandee: "informations complémentaires demandées", deposee: "déposée" };
+  creerNotif(dem.user_id, "validation", "Mise à jour de votre demande",
+    `Votre demande d'accréditation « ${def?.label||''} » est maintenant : ${LABELS[body.statut]}${body.motif?` — ${body.motif}`:""}.`,
+    { accred_type: def?.type, demande_id: Number(params.id) });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accred/demandes/:id/commentaire — commentaire interne (non visible du demandeur) */
+route("PATCH", "/api/admin/accred/demandes/:id/commentaire", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  await db.prepare("UPDATE accred_demandes SET commentaire_interne=? WHERE id=?").run(body.commentaire_interne||null, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accred/demandes/:id/assigner — réassigner à un autre administrateur */
+route("PATCH", "/api/admin/accred/demandes/:id/assigner", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const assignee = body.assignee_id ? await db.prepare("SELECT id,role FROM users WHERE id=?").get(body.assignee_id) : null;
+  if (body.assignee_id && (!assignee || assignee.role !== "administrateur")) return sendJSON(res, 400, { error: "Administrateur cible invalide." });
+  await db.prepare("UPDATE accred_demandes SET assignee_id=? WHERE id=?").run(body.assignee_id||null, params.id);
+  if (body.assignee_id) {
+    const dem = await db.prepare("SELECT * FROM accred_demandes WHERE id=?").get(params.id);
+    const def = await getAccredDef(dem.accred_id);
+    creerNotif(Number(body.assignee_id), "validation", "Dossier d'accréditation assigné",
+      `Une demande « ${def?.label||''} » vous a été assignée.`, { demande_id: Number(params.id) });
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/admin/accred/demandes/:id/deadline — date limite de traitement */
+route("PATCH", "/api/admin/accred/demandes/:id/deadline", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  await db.prepare("UPDATE accred_demandes SET date_limite=? WHERE id=?").run(body.date_limite||null, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 /* ═══════════════════════════════════════════════════════════════════
    FEATURE ENGINE — OS applicatif Diaspo'Actif
    ═══════════════════════════════════════════════════════════════════ */
@@ -20778,14 +21491,28 @@ async function computeFeatureStates(userId, userRole) {
   const userFeats = await db.prepare("SELECT * FROM user_features WHERE user_id=?").all(userId);
   const ufMap = new Map(userFeats.map(uf => [uf.feature_id, uf]));
 
-  return features.map(f => {
+  const results = [];
+  for (const f of features) {
     const uf = ufMap.get(f.id);
 
     // 1. Gelé explicitement par l'utilisateur
-    if (uf?.statut === 'frozen') return { ...f, statut: 'frozen', source: 'user', uf };
+    if (uf?.statut === 'frozen') { results.push({ ...f, statut: 'frozen', source: 'user', uf }); continue; }
 
-    // 2. Active via user_features (accred, pack, manuel)
-    if (uf?.statut === 'active') return { ...f, statut: 'active', source: uf.source, uf };
+    // 2. Active via user_features (accred, pack, manuel) — si la source est une accréditation,
+    //    on revérifie qu'elle est toujours active avant de confirmer l'accès (une accréditation
+    //    gelée/suspendue/retirée après coup ne doit pas laisser un accès mis en cache indéfiniment).
+    if (uf?.statut === 'active') {
+      if (uf.source === 'accreditation' && f.require_accreditation && f.accred_type) {
+        const encoreValide = await hasAccreditation(userId, f.accred_type);
+        if (!encoreValide) {
+          try { db.prepare("UPDATE user_features SET statut='locked' WHERE user_id=? AND feature_id=?").run(userId, f.id); } catch(_) {}
+          results.push({ ...f, statut: 'locked', source: 'accreditation_revoquee', uf: { ...uf, statut: 'locked' } });
+          continue;
+        }
+      }
+      results.push({ ...f, statut: 'active', source: uf.source, uf });
+      continue;
+    }
 
     // 3. Accès par rôle par défaut
     let rolesAcces = [];
@@ -20798,27 +21525,31 @@ async function computeFeatureStates(userId, userRole) {
             .run(userId, f.id);
         } catch(_) {}
       }
-      return { ...f, statut: 'active', source: 'automatique', uf };
+      results.push({ ...f, statut: 'active', source: 'automatique', uf });
+      continue;
     }
 
     // 4. Accred requise
     if (f.require_accreditation && f.accred_type) {
-      if (hasAccreditation(userId, f.accred_type)) {
+      if (await hasAccreditation(userId, f.accred_type)) {
         if (!uf) {
           try {
             db.prepare("INSERT OR IGNORE INTO user_features (user_id,feature_id,statut,source) VALUES (?,?,'active','accreditation')")
               .run(userId, f.id);
           } catch(_) {}
         }
-        return { ...f, statut: 'active', source: 'accreditation', uf };
+        results.push({ ...f, statut: 'active', source: 'accreditation', uf });
+        continue;
       }
-      return { ...f, statut: 'locked', source: 'accreditation_manquante', uf };
+      results.push({ ...f, statut: 'locked', source: 'accreditation_manquante', uf });
+      continue;
     }
 
     // 5. pending ou locked
-    if (uf?.statut === 'pending_accreditation') return { ...f, statut: 'pending_accreditation', source: 'demande', uf };
-    return { ...f, statut: 'locked', source: null, uf };
-  });
+    if (uf?.statut === 'pending_accreditation') { results.push({ ...f, statut: 'pending_accreditation', source: 'demande', uf }); continue; }
+    results.push({ ...f, statut: 'locked', source: null, uf });
+  }
+  return results;
 }
 
 /* ── Tracker d'usage ── */
@@ -20899,7 +21630,7 @@ route("GET", "/api/features", async (req, res, params, body, query) => {
   ).all(...(categorie ? [categorie] : []));
   if (!me) return sendJSON(res, 200, { features: features.map(f => ({ ...f, statut: 'locked', source: null })) });
 
-  const states = computeFeatureStates(me.id, me.role);
+  const states = await computeFeatureStates(me.id, me.role);
   const stateMap = new Map(states.map(s => [s.id, s]));
   sendJSON(res, 200, { features: features.map(f => {
     const s = stateMap.get(f.id);
@@ -20912,7 +21643,7 @@ route("GET", "/api/me/features", async (req, res) => {
   const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   runFreezeSuggestionEngine(me.id);
-  const states = computeFeatureStates(me.id, me.role);
+  const states = await computeFeatureStates(me.id, me.role);
   const usages = await db.prepare("SELECT feature_id, nb_utilisations, derniere_utilisation FROM feature_usage WHERE user_id=?").all(me.id);
   const usageMap = new Map(usages.map(u => [u.feature_id, u]));
   sendJSON(res, 200, {
@@ -20932,7 +21663,7 @@ route("GET", "/api/features/check/:slug", async (req, res, params) => {
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM features WHERE slug=? AND actif=1").get(params.slug);
   if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
-  const states = computeFeatureStates(me.id, me.role);
+  const states = await computeFeatureStates(me.id, me.role);
   const state = states.find(s => s.slug === params.slug);
   const statut = state?.statut || 'locked';
   sendJSON(res, statut === 'active' ? 200 : 403, { slug: params.slug, statut, access: statut === 'active' });
@@ -21033,7 +21764,7 @@ route("POST", "/api/me/recommendations/:featureSlug/dismiss", async (req, res, p
 async function _generateRecommendations(userId, userRole) {
   try {
     const allFeatures = await db.prepare("SELECT * FROM features WHERE actif=1").all();
-    const states = computeFeatureStates(userId, userRole);
+    const states = await computeFeatureStates(userId, userRole);
     const stateMap = new Map(states.map(async s => [s.slug, s]));
     const usages = await db.prepare("SELECT feature_id, nb_utilisations FROM feature_usage WHERE user_id=?").all(userId);
     const usageMap = new Map(usages.map(async u => [u.feature_id, u.nb_utilisations]));

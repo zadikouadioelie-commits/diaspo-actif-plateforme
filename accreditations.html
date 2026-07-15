@@ -31,7 +31,8 @@
 .btn-demande{width:100%;margin-top:12px;}
 .tab-row{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
 .tab-btn{padding:8px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;}
-.tab-btn.on{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;}
+.tab-btn.on{background:linear-gradient(135deg,#ff6b00,#e85d00) !important;color:#fff !important;border-color:#ff6b00 !important;border-bottom-color:#ff6b00 !important;}
+.tab-btn:not(.on):hover{border-color:#ff6b00 !important;color:#ff6b00 !important;border-bottom-color:#ff6b00 !important;}
 .tab-panel{display:none;}
 .tab-panel.show{display:block;}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;}
@@ -68,11 +69,16 @@
 
   <div class="tab-row">
     <button class="tab-btn on" onclick="switchTab('mes')">Mes accréditations</button>
+    <button class="tab-btn" onclick="switchTab('catalogue')">📋 Catalogue</button>
     <button class="tab-btn" onclick="switchTab('info')">Comment ça marche ?</button>
   </div>
 
   <div id="tab-mes" class="tab-panel show">
     <div id="mes-accreds-container"><div style="color:var(--muted)">Chargement…</div></div>
+  </div>
+
+  <div id="tab-catalogue" class="tab-panel">
+    <div id="tab-catalogue-content"><div style="color:var(--muted)">Chargement…</div></div>
   </div>
 
   <div id="tab-info" class="tab-panel">
@@ -95,12 +101,33 @@
   <div class="modal-box">
     <h2 style="margin-top:0;" id="modal-title">Demander une accréditation</h2>
     <p style="font-size:13px;color:var(--muted);" id="modal-desc"></p>
+    <div id="modal-conditions" style="display:none;background:#f8fafc;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;">
+      <strong>Conditions d'obtention :</strong>
+      <p id="modal-conditions-text" style="margin:6px 0 0;color:var(--muted);"></p>
+    </div>
+    <div id="modal-documents-requis" style="display:none;background:#fff7ed;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;">
+      <strong>Documents à fournir :</strong>
+      <ul id="modal-documents-requis-list" style="margin:6px 0 0;padding-left:18px;color:var(--muted);"></ul>
+    </div>
     <div class="form-row">
       <label>Message de présentation <span style="color:var(--muted)">(optionnel mais recommandé)</span></label>
-      <textarea id="demande-message" rows="5" placeholder="Présentez votre organisation et expliquez pourquoi vous souhaitez cette accréditation…"></textarea>
+      <textarea id="demande-message" rows="4" placeholder="Présentez votre organisation et expliquez pourquoi vous souhaitez cette accréditation…"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Lettre de motivation <span style="color:var(--muted)">(optionnel)</span></label>
+      <textarea id="demande-lettre" rows="4" placeholder="Développez votre motivation, votre expérience…"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Lien vidéo de présentation <span style="color:var(--muted)">(optionnel)</span></label>
+      <input id="demande-video" type="url" placeholder="https://…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+    </div>
+    <div class="form-row">
+      <label>Documents justificatifs <span style="color:var(--muted)">(optionnel)</span></label>
+      <input id="demande-fichier" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="ajouterDocumentDemande(this)">
+      <div id="demande-documents-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;"></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:4px;">
-      <button class="btn btn-orange" onclick="submitDemande()">Envoyer la demande</button>
+      <button class="btn btn-orange" id="btn-submit-demande" onclick="submitDemande()">Envoyer la demande</button>
       <button class="btn btn-outline" onclick="closeModalDemande()">Annuler</button>
     </div>
   </div>
@@ -113,14 +140,15 @@
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});}catch(e){return d;}}
 
+const TAB_ORDER=['mes','catalogue','info'];
 function switchTab(t){
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('on',i===(t==='mes'?0:1)));
-  document.getElementById('tab-mes').classList.toggle('show',t==='mes');
-  document.getElementById('tab-info').classList.toggle('show',t==='info');
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('on',TAB_ORDER[i]===t));
+  TAB_ORDER.forEach(x=>document.getElementById('tab-'+x).classList.toggle('show',x===t));
 }
 
-const STAT_LBL={active:'✅ Active',suspendue:'⚠️ Suspendue',retiree:'❌ Retirée'};
-const STAT_CLS={active:'status-active',suspendue:'status-suspendue',retiree:'status-retiree'};
+const STAT_LBL={active:'✅ Active',suspendue:'⚠️ Suspendue',gelee:'🧊 Gelée',retiree:'❌ Retirée',expiree:'⌛ Expirée'};
+const STAT_CLS={active:'status-active',suspendue:'status-suspendue',gelee:'status-suspendue',retiree:'status-retiree',expiree:'status-retiree'};
+const DEM_STAT_LBL={en_attente:'⏳ Déposée — en attente',deposee:'⏳ Déposée — en attente',en_cours_analyse:"🔍 En cours d'analyse",info_complementaire_demandee:'📩 Informations complémentaires demandées'};
 
 /* Cache du catalogue dynamique (chargé depuis l'API) */
 let _catalogue = null;
@@ -157,33 +185,91 @@ function renderInfoTab(catalogue){
 }
 
 let pendingType=null;
+let pendingDocuments=[];
+
 function openModalDemande(type){
   const def = (_catalogue||[]).find(d=>d.type===type)||{};
   pendingType=type;
+  pendingDocuments=[];
   document.getElementById('modal-title').textContent='Demande — '+(def.emoji||'')+' '+(def.label||type);
   document.getElementById('modal-desc').textContent=def.description||'';
   document.getElementById('demande-message').value='';
+  document.getElementById('demande-lettre').value='';
+  document.getElementById('demande-video').value='';
+  document.getElementById('demande-documents-list').innerHTML='';
+
+  const condEl = document.getElementById('modal-conditions');
+  if (def.conditions_obtention) {
+    document.getElementById('modal-conditions-text').textContent = def.conditions_obtention;
+    condEl.style.display = '';
+  } else condEl.style.display = 'none';
+
+  const docsEl = document.getElementById('modal-documents-requis');
+  let docsReq = [];
+  try { docsReq = Array.isArray(def.documents_requis) ? def.documents_requis : JSON.parse(def.documents_requis||'[]'); } catch(_) {}
+  if (docsReq.length) {
+    document.getElementById('modal-documents-requis-list').innerHTML = docsReq.map(d=>`<li>${esc(d)}</li>`).join('');
+    docsEl.style.display = '';
+  } else docsEl.style.display = 'none';
+
   document.getElementById('modal-demande').style.display='flex';
 }
-function closeModalDemande(){document.getElementById('modal-demande').style.display='none';pendingType=null;}
+function closeModalDemande(){document.getElementById('modal-demande').style.display='none';pendingType=null;pendingDocuments=[];}
+
+async function ajouterDocumentDemande(input){
+  const file = input.files[0];
+  if (!file) return;
+  const btn = document.getElementById('btn-submit-demande');
+  btn.disabled = true; btn.textContent = 'Envoi du document…';
+  try {
+    const fd = new FormData();
+    fd.append('document', file);
+    const r = await fetch('/api/upload/document', { method:'POST', credentials:'include', body: fd });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Échec de l\'envoi du document.');
+    pendingDocuments.push({ nom: file.name, url: data.url });
+    renderDemandeDocuments();
+  } catch(e) {
+    showMsg(e.message || 'Erreur lors de l\'envoi du document.', 'danger');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Envoyer la demande';
+    input.value = '';
+  }
+}
+function retirerDocumentDemande(i){ pendingDocuments.splice(i,1); renderDemandeDocuments(); }
+function renderDemandeDocuments(){
+  document.getElementById('demande-documents-list').innerHTML = pendingDocuments.map((d,i)=>
+    `<div style="display:flex;align-items:center;gap:8px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;">
+      📎 ${esc(d.nom)} <button type="button" onclick="retirerDocumentDemande(${i})" style="margin-left:auto;border:none;background:none;color:#dc2626;cursor:pointer;">✕</button>
+    </div>`).join('');
+}
 
 async function submitDemande(){
   if(!pendingType)return;
   const message=document.getElementById('demande-message').value.trim();
+  const lettre_motivation=document.getElementById('demande-lettre').value.trim();
+  const video_url=document.getElementById('demande-video').value.trim();
   try{
-    await api('POST','/accreditations/demande',{type:pendingType,message});
+    await api('POST','/accreditations/demande',{
+      type:pendingType, message,
+      lettre_motivation: lettre_motivation||undefined,
+      video_url: video_url||undefined,
+      documents: pendingDocuments.length ? pendingDocuments : undefined,
+    });
     closeModalDemande();
     showMsg('Demande envoyée ! L\'équipe vous répondra sous 5 jours ouvrés.', 'success');
     loadMesAccreds();
   }catch(e){showMsg(e.message||'Erreur lors de la demande.', 'danger');}
 }
 
+/* Onglet « Mes accréditations » — vue strictement personnelle : demandes en cours + accréditations accordées. */
 async function loadMesAccreds(){
   const el=document.getElementById('mes-accreds-container');
   const me=await fetchCurrentUser().catch(()=>null);
   if(!me){
     el.innerHTML='<p style="color:var(--muted);">Connectez-vous pour voir vos accréditations. <a href="login.html" class="btn btn-orange btn-sm" style="margin-left:8px;">Se connecter</a></p>';
     document.getElementById('tab-info-content').innerHTML='';
+    document.getElementById('tab-catalogue-content').innerHTML='';
     return;
   }
   const catalogue = await getCatalogue();
@@ -196,48 +282,50 @@ async function loadMesAccreds(){
     ]);
     const accreds=r1.accreditations||[];
     const demandes=r2.demandes||[];
-    if(!catalogue.length){
-      el.innerHTML='<p style="color:var(--muted);">Aucune accréditation disponible pour votre type de compte.</p>';
+    renderCatalogueTab(catalogue, accreds, demandes);
+
+    const EN_COURS=['en_attente','deposee','en_cours_analyse','info_complementaire_demandee'];
+    const enCours = demandes.filter(d=>EN_COURS.includes(d.statut));
+    const accordees = accreds.filter(a=>a.statut==='active');
+    const refusees = demandes.filter(d=>d.statut==='refusee');
+
+    if(!enCours.length && !accordees.length && !refusees.length){
+      el.innerHTML=`<p style="color:var(--muted);">Vous n'avez aucune demande ni accréditation pour le moment. Consultez l'onglet <a href="#" onclick="switchTab('catalogue');return false;">📋 Catalogue</a> pour en demander une.</p>`;
       return;
     }
 
-    let html='<div class="accred-grid">';
-    for(const def of catalogue){
-      const type=def.type;
-      const acc=accreds.find(a=>a.type===type);
-      const dem=demandes.find(d=>d.type===type&&d.statut==='en_attente');
-      const _bg=def.couleur_bg||def.couleurBg||'#f5f3ff', _border=def.couleur_border||def.couleurBorder||'#6366f1', _text=def.couleur_text||def.couleurText||'#3730a3';
-      html+=`<div class="accred-card ${acc?acc.statut:''}" style="border-color:${acc&&acc.statut==='active'?'#22c55e':_border};">
-        <div class="accred-badge" style="background:${_bg};color:${_text};border:1.5px solid ${_border};">${def.emoji} ${def.label}</div>
-        ${acc?`<span class="status-pill ${STAT_CLS[acc.statut]||''}">${STAT_LBL[acc.statut]||acc.statut}</span>`:''}
-        <p style="font-size:13px;color:var(--muted);margin:8px 0 12px;">${def.description}</p>`;
+    let html='';
 
-      if(def.module==='asso'){
-        /* Accréditation Gestion des Associations → volet dédié du dashboard */
-        if(acc && acc.statut==='active'){
-          html+=`<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#dcfce7;color:#16a34a;font-weight:700;font-size:13px;">✅ Accréditation active</div>
-            <a href="dashboard-initiative.html#asso-cockpit" class="btn btn-orange btn-sm btn-demande" style="margin-top:8px;">Ouvrir mon espace association →</a>`;
-        } else if(dem){
-          html+=`<p style="font-size:13px;color:var(--muted);padding:8px 0;"><span class="status-pill status-attente" style="position:static;display:inline-block;margin-right:6px;">⏳ En attente</span>Votre demande est en cours d'examen.</p>`;
-        } else {
-          html+=`<a href="dashboard-initiative.html#asso-accreditation" class="btn btn-orange btn-demande">Découvrir &amp; demander →</a>`;
-        }
-      } else if(acc){
-        html+=`<p style="font-size:13px;margin:6px 0;">Accordée le ${fmtDate(acc.date_attribution)}</p>`;
-        if(acc.date_expiration) html+=`<p style="font-size:12px;color:var(--muted);">Expire le ${fmtDate(acc.date_expiration)}</p>`;
-      } else if(dem){
-        html+=`<p style="font-size:13px;color:var(--muted);padding:8px 0;"><span class="status-pill status-attente" style="position:static;display:inline-block;margin-right:6px;">⏳ En attente</span>Votre demande est en cours d'examen.</p>`;
-      } else {
-        html+=`<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Vous n'avez pas encore cette accréditation.</p>
-          <button class="btn btn-outline btn-demande" onclick="openModalDemande('${type}')">Faire une demande</button>`;
-      }
-      html+='</div>';
-    }
-    html+='</div>';
+    html+=`<h3 style="margin:0 0 10px;">📤 Mes demandes en cours ${enCours.length?`<span class="status-pill status-attente" style="position:static;display:inline-block;">${enCours.length}</span>`:''}</h3>`;
+    html+= enCours.length
+      ? '<div class="accred-grid">'+enCours.map(d=>{
+          const def=catalogue.find(x=>x.type===d.type)||{};
+          const _bg=def.couleur_bg||def.couleurBg||'#f5f3ff', _border=def.couleur_border||def.couleurBorder||'#6366f1', _text=def.couleur_text||def.couleurText||'#3730a3';
+          return `<div class="accred-card" style="border-color:${_border};">
+            <div class="accred-badge" style="background:${_bg};color:${_text};border:1.5px solid ${_border};">${def.emoji||''} ${def.label||d.type}</div>
+            <span class="status-pill status-attente" style="position:static;display:inline-block;margin:6px 0;">${DEM_STAT_LBL[d.statut]||d.statut}</span>
+            <p style="font-size:12px;color:var(--muted);">Déposée le ${fmtDate(d.created_at)}</p>
+          </div>`;
+        }).join('')+'</div>'
+      : '<p style="color:var(--muted);font-size:13px;margin-bottom:20px;">Aucune demande en cours.</p>';
 
-    const refusees=demandes.filter(d=>d.statut==='refusee' && catalogue.find(e=>e.type===d.type));
+    html+=`<h3 style="margin:24px 0 10px;">✅ Mes accréditations accordées ${accordees.length?`<span class="status-pill status-active" style="position:static;display:inline-block;">${accordees.length}</span>`:''}</h3>`;
+    html+= accordees.length
+      ? '<div class="accred-grid">'+accordees.map(a=>{
+          const def=catalogue.find(x=>x.type===a.type)||{};
+          const _bg=def.couleur_bg||def.couleurBg||'#f5f3ff', _border=def.couleur_border||def.couleurBorder||'#6366f1', _text=def.couleur_text||def.couleurText||'#3730a3';
+          return `<div class="accred-card active" style="border-color:#22c55e;">
+            <div class="accred-badge" style="background:${_bg};color:${_text};border:1.5px solid ${_border};">${def.emoji||a.emoji||''} ${def.label||a.label||a.type}</div>
+            <span class="status-pill status-active">${STAT_LBL[a.statut]||a.statut}</span>
+            <p style="font-size:13px;margin:8px 0 0;">Accordée le ${fmtDate(a.date_attribution)}</p>
+            ${a.date_expiration?`<p style="font-size:12px;color:var(--muted);">Expire le ${fmtDate(a.date_expiration)}</p>`:''}
+            ${def.module==='asso'?`<a href="dashboard-initiative.html#asso-cockpit" class="btn btn-orange btn-sm btn-demande" style="margin-top:8px;">Ouvrir mon espace association →</a>`:''}
+          </div>`;
+        }).join('')+'</div>'
+      : '<p style="color:var(--muted);font-size:13px;">Aucune accréditation accordée pour le moment.</p>';
+
     if(refusees.length){
-      html+='<div class="card" style="margin-top:20px;border-left:4px solid #ef4444;"><h4 style="margin-top:0;color:#dc2626;">Demandes non retenues</h4>';
+      html+='<div class="card" style="margin-top:24px;border-left:4px solid #ef4444;"><h4 style="margin-top:0;color:#dc2626;">Demandes non retenues</h4>';
       html+=refusees.map(d=>{
         const def=catalogue.find(x=>x.type===d.type)||{};
         return `<div style="font-size:13px;padding:6px 0;border-bottom:1px solid var(--border);">
@@ -250,6 +338,45 @@ async function loadMesAccreds(){
     }
     el.innerHTML=html;
   }catch(e){el.innerHTML='<p style="color:red;">Erreur : '+esc(e.message)+'</p>';}
+}
+
+/* Onglet « Catalogue » — parcourir tous les types disponibles et faire une demande. */
+function renderCatalogueTab(catalogue, accreds, demandes){
+  const el=document.getElementById('tab-catalogue-content');
+  if(!catalogue.length){ el.innerHTML='<p style="color:var(--muted);">Aucune accréditation disponible pour votre type de compte.</p>'; return; }
+  const EN_COURS=['en_attente','deposee','en_cours_analyse','info_complementaire_demandee'];
+  let html='<div class="accred-grid">';
+  for(const def of catalogue){
+    const type=def.type;
+    const acc=accreds.find(a=>a.type===type);
+    const dem=demandes.find(d=>d.type===type&&EN_COURS.includes(d.statut));
+    const _bg=def.couleur_bg||def.couleurBg||'#f5f3ff', _border=def.couleur_border||def.couleurBorder||'#6366f1', _text=def.couleur_text||def.couleurText||'#3730a3';
+    html+=`<div class="accred-card ${acc?acc.statut:''}" style="border-color:${acc&&acc.statut==='active'?'#22c55e':_border};">
+      <div class="accred-badge" style="background:${_bg};color:${_text};border:1.5px solid ${_border};">${def.emoji} ${def.label}</div>
+      ${acc?`<span class="status-pill ${STAT_CLS[acc.statut]||''}">${STAT_LBL[acc.statut]||acc.statut}</span>`:''}
+      <p style="font-size:13px;color:var(--muted);margin:8px 0 12px;">${def.description}</p>`;
+
+    if(def.module==='asso'){
+      if(acc && acc.statut==='active'){
+        html+=`<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#dcfce7;color:#16a34a;font-weight:700;font-size:13px;">✅ Accréditation active</div>
+          <a href="dashboard-initiative.html#asso-cockpit" class="btn btn-orange btn-sm btn-demande" style="margin-top:8px;">Ouvrir mon espace association →</a>`;
+      } else if(dem){
+        html+=`<p style="font-size:13px;color:var(--muted);padding:8px 0;"><span class="status-pill status-attente" style="position:static;display:inline-block;margin-right:6px;">⏳ En attente</span>Votre demande est en cours d'examen.</p>`;
+      } else {
+        html+=`<a href="dashboard-initiative.html#asso-accreditation" class="btn btn-orange btn-demande">Découvrir &amp; demander →</a>`;
+      }
+    } else if(acc && acc.statut==='active'){
+      html+=`<p style="font-size:13px;margin:6px 0;color:var(--muted);">Déjà accordée — voir l'onglet « Mes accréditations ».</p>`;
+    } else if(dem){
+      html+=`<p style="font-size:13px;color:var(--muted);padding:8px 0;"><span class="status-pill status-attente" style="position:static;display:inline-block;margin-right:6px;">⏳ En attente</span>Votre demande est en cours d'examen.</p>`;
+    } else {
+      html+=`<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Vous n'avez pas encore cette accréditation.</p>
+        <button class="btn btn-outline btn-demande" onclick="openModalDemande('${type}')">Faire une demande</button>`;
+    }
+    html+='</div>';
+  }
+  html+='</div>';
+  el.innerHTML=html;
 }
 
 function showMsg(msg, type='info') {

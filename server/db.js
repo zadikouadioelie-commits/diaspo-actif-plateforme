@@ -161,6 +161,39 @@ db.exec(`
     FOREIGN KEY(owner_user_id) REFERENCES users(id)
   );
 
+  /* Besoins en formation exprimés par la communauté (avant qu'un formateur ne crée le contenu) */
+  CREATE TABLE IF NOT EXISTS formation_besoins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    domaine TEXT,
+    description TEXT,
+    statut TEXT NOT NULL DEFAULT 'ouvert' CHECK(statut IN ('ouvert','en_cours','satisfait','clos')),
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS formation_favoris (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    formation_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, formation_id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(formation_id) REFERENCES formations(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS formation_besoins_votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    besoin_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    commentaire TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(besoin_id, user_id),
+    FOREIGN KEY(besoin_id) REFERENCES formation_besoins(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS actualites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     titre TEXT NOT NULL,
@@ -1460,7 +1493,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS compte_accreditations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('mobilisation_active','createur_opportunites')),
+    type TEXT NOT NULL,
     statut TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','suspendue','retiree')),
     date_attribution TEXT DEFAULT (datetime('now')),
     date_expiration TEXT,
@@ -1490,7 +1523,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS demandes_accreditation (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('mobilisation_active','createur_opportunites')),
+    type TEXT NOT NULL,
     message TEXT,
     statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','approuvee','refusee')),
     motif_refus TEXT,
@@ -2970,7 +3003,7 @@ db.exec(`
     user_id          INTEGER NOT NULL,
     accred_id        INTEGER NOT NULL,
     statut           TEXT NOT NULL DEFAULT 'active'
-                     CHECK(statut IN ('active','suspendue','retiree','expiree')),
+                     CHECK(statut IN ('active','suspendue','gelee','retiree','expiree')),
     date_attribution TEXT DEFAULT (datetime('now')),
     date_expiration  TEXT,
     type_tarif       TEXT DEFAULT 'gratuit',
@@ -2991,12 +3024,16 @@ db.exec(`
     accred_id   INTEGER NOT NULL,
     message     TEXT,
     statut      TEXT DEFAULT 'en_attente'
-                CHECK(statut IN ('en_attente','approuvee','refusee')),
+                CHECK(statut IN ('brouillon','en_attente','deposee','en_cours_analyse','info_complementaire_demandee','approuvee','refusee')),
     motif_refus TEXT,
+    commentaire_interne TEXT,
+    assignee_id INTEGER,
+    date_limite TEXT,
     created_at  TEXT DEFAULT (datetime('now')),
     UNIQUE(user_id, accred_id),
     FOREIGN KEY(user_id)   REFERENCES users(id),
-    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id)
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id),
+    FOREIGN KEY(assignee_id) REFERENCES users(id)
   );
 
   /* Historique du moteur dynamique */
@@ -3084,12 +3121,34 @@ db.exec(`
   'telecharge_autorise INTEGER DEFAULT 0','image_url TEXT','duree_heures REAL',
   'prerequis TEXT','objectifs TEXT','video_intro TEXT','categorie TEXT',
   'motif_refus TEXT','validateur_id INTEGER','valide_at TEXT',
-  'nb_inscrits INTEGER DEFAULT 0','revenu_total REAL DEFAULT 0'
+  'nb_inscrits INTEGER DEFAULT 0','revenu_total REAL DEFAULT 0',
+  /* Assistant de création — Étape 1 : informations générales */
+  'sous_titre TEXT','description_courte TEXT','competences_acquises TEXT','public_concerne TEXT',
+  'nombre_modules_prevu INTEGER','nombre_lecons_approx INTEGER',
+  /* Étape 2 : catégorie */
+  'sous_categorie TEXT','mots_cles TEXT','pays_concerne TEXT','secteur_activite TEXT',
+  /* Étape 4 : tarification */
+  'devise TEXT DEFAULT \'EUR\'','promo_active INTEGER DEFAULT 0','promo_reduction_pct REAL','promo_date_fin TEXT',
+  /* Étape 9 : accès */
+  'acces_type TEXT DEFAULT \'public\'','acces_liste_id INTEGER','banniere_url TEXT'
 ].forEach(col => {
   try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {}
 });
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS formation_coupons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    code TEXT NOT NULL,
+    reduction_pct REAL NOT NULL DEFAULT 0,
+    max_utilisations INTEGER,
+    nb_utilises INTEGER DEFAULT 0,
+    actif INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(formation_id, code),
+    FOREIGN KEY(formation_id) REFERENCES formations(id)
+  );
+
   CREATE TABLE IF NOT EXISTS formation_inscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     formation_id INTEGER NOT NULL,
@@ -3099,6 +3158,8 @@ db.exec(`
     montant_paye REAL DEFAULT 0,
     acces_gratuit_membre INTEGER DEFAULT 0,
     avancement_pct INTEGER DEFAULT 0,
+    paiement_statut TEXT DEFAULT 'paye' CHECK(paiement_statut IN ('paye','en_attente','echoue')),
+    stripe_session_id TEXT,
     date_inscription TEXT DEFAULT (datetime('now')),
     created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(formation_id, user_id),
@@ -3138,7 +3199,84 @@ db.exec(`
     motif TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  /* ── Étapes 5-6 : construction de la formation (modules et leçons) ── */
+  CREATE TABLE IF NOT EXISTS formation_modules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(formation_id) REFERENCES formations(id)
+  );
+  CREATE TABLE IF NOT EXISTS formation_lecons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    module_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    type TEXT NOT NULL DEFAULT 'texte' CHECK(type IN (
+      'video','texte','pdf','audio','presentation','images','telechargement',
+      'exercice','etude_cas','travail_pratique','quiz','classe_virtuelle','session_direct'
+    )),
+    duree_minutes INTEGER,
+    contenu_url TEXT,
+    contenu_texte TEXT,
+    ressources_json TEXT,
+    image_url TEXT,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(module_id) REFERENCES formation_modules(id)
+  );
+
+  /* ── Étape 7 : quiz et évaluations (rattachés à une leçon de type quiz, ou à la formation pour l'examen final) ── */
+  CREATE TABLE IF NOT EXISTS formation_quiz (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    lecon_id INTEGER,
+    titre TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'intermediaire' CHECK(type IN ('intermediaire','exercice','travail_pratique','examen_final')),
+    note_minimale INTEGER DEFAULT 50,
+    temps_limite_min INTEGER,
+    correction_auto INTEGER DEFAULT 1,
+    commentaires_personnalises TEXT,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(formation_id) REFERENCES formations(id),
+    FOREIGN KEY(lecon_id) REFERENCES formation_lecons(id)
+  );
+  CREATE TABLE IF NOT EXISTS formation_quiz_questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    quiz_id INTEGER NOT NULL,
+    question TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'qcm' CHECK(type IN ('qcm','vrai_faux','texte_libre')),
+    options_json TEXT,
+    reponse_correcte TEXT,
+    points INTEGER DEFAULT 1,
+    ordre INTEGER DEFAULT 0,
+    FOREIGN KEY(quiz_id) REFERENCES formation_quiz(id)
+  );
+
+  /* ── Étape 11 : messagerie de dossier entre formateur et équipe Diaspo'Actif pendant l'analyse ── */
+  CREATE TABLE IF NOT EXISTS formation_dossier_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formation_id INTEGER NOT NULL,
+    sender_id INTEGER NOT NULL,
+    sender_role TEXT NOT NULL,
+    message TEXT NOT NULL,
+    lu INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(formation_id) REFERENCES formations(id),
+    FOREIGN KEY(sender_id) REFERENCES users(id)
+  );
 `);
+
+/* Extension de formations pour les étapes 8 (certificat) et 11 (soumission/analyse) */
+;['certificat_actif INTEGER DEFAULT 0','certificat_modele TEXT','certificat_conditions TEXT',
+  'certificat_qr INTEGER DEFAULT 1','date_soumission TEXT'
+].forEach(col => {
+  try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {}
+});
 
 /* Ajouter l'accréditation createur_formations si elle n'existe pas encore */
 ;(function seedCreateurFormations() {
@@ -3157,8 +3295,22 @@ db.exec(`
   const { id } = db.prepare("SELECT id FROM accred_definitions WHERE type='createur_formations'").get();
   insR.run(id,'initiative','sur_demande');
   insR.run(id,'collectivite','sur_demande');
+  insR.run(id,'utilisateur','sur_demande');
   insT.run(id,'initiative','gratuit',0,'EUR',1);
   insT.run(id,'collectivite','gratuit',0,'EUR',1);
+  insT.run(id,'utilisateur','gratuit',0,'EUR',1);
+})();
+
+/* Migration : ouvre l'accréditation Créateur de formation aux comptes Utilisateur individuels
+   (absente si la base a été créée avant cette extension — le bloc ci-dessus ne s'exécute
+   qu'à la toute première création de l'accréditation). */
+;(function ouvrirCreateurFormationsAuxUtilisateurs() {
+  const def = db.prepare("SELECT id FROM accred_definitions WHERE type='createur_formations'").get();
+  if (!def) return;
+  const regle = db.prepare("SELECT id FROM accred_regles WHERE accred_id=? AND role='utilisateur'").get(def.id);
+  if (regle) return;
+  db.prepare("INSERT INTO accred_regles (accred_id,role,mode) VALUES (?,'utilisateur','sur_demande')").run(def.id);
+  db.prepare("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES (?,'utilisateur','gratuit',0,'EUR',1)").run(def.id);
 })();
 
 /* ===== MOTEUR ACCRÉDITATIONS v2 : audit + champs étendus + packs ===== */
@@ -5030,6 +5182,146 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_auth_tentatives_cle ON auth_tentatives(cle, created_at);
 `);
+
+/* ===== Migration : élargissement des statuts/colonnes du module Accréditations =====
+   Sur une base déjà créée, "CREATE TABLE IF NOT EXISTS" ne touche pas les tables
+   existantes — donc l'ancien CHECK (type IN ('mobilisation_active','createur_opportunites'))
+   restait actif et bloquait l'insertion des types 'observatoire_diaspora'/'institutionnelle'
+   pourtant utilisés par le code (bug réel identifié en audit). SQLite ne permet pas
+   d'ALTER un CHECK : on reconstruit la table (rename → recreate → copy → drop). */
+;(function migrateAccredCheckConstraints() {
+  function rebuildIfOldCheck(table, oldCheckFragment, createSql, columns) {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(table);
+    if (!row || !row.sql.includes(oldCheckFragment)) return;
+    db.exec(`ALTER TABLE ${table} RENAME TO ${table}_old_migr`);
+    db.exec(createSql);
+    db.exec(`INSERT INTO ${table} (${columns}) SELECT ${columns} FROM ${table}_old_migr`);
+    db.exec(`DROP TABLE ${table}_old_migr`);
+  }
+
+  rebuildIfOldCheck(
+    "compte_accreditations",
+    "CHECK(type IN ('mobilisation_active','createur_opportunites'))",
+    `CREATE TABLE compte_accreditations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      statut TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','suspendue','retiree')),
+      date_attribution TEXT DEFAULT (datetime('now')),
+      date_expiration TEXT,
+      frais_acces REAL DEFAULT 0,
+      admin_id INTEGER,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, type),
+      FOREIGN KEY(user_id) REFERENCES users(id),
+      FOREIGN KEY(admin_id) REFERENCES users(id)
+    )`,
+    "id,user_id,type,statut,date_attribution,date_expiration,frais_acces,admin_id,notes,created_at,updated_at"
+  );
+
+  rebuildIfOldCheck(
+    "demandes_accreditation",
+    "CHECK(type IN ('mobilisation_active','createur_opportunites'))",
+    `CREATE TABLE demandes_accreditation (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      message TEXT,
+      statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','approuvee','refusee')),
+      motif_refus TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    )`,
+    "id,user_id,type,message,statut,motif_refus,created_at"
+  );
+
+  rebuildIfOldCheck(
+    "user_accreditations",
+    "CHECK(statut IN ('active','suspendue','retiree','expiree'))",
+    `CREATE TABLE user_accreditations (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id          INTEGER NOT NULL,
+      accred_id        INTEGER NOT NULL,
+      statut           TEXT NOT NULL DEFAULT 'active'
+                       CHECK(statut IN ('active','suspendue','gelee','retiree','expiree')),
+      date_attribution TEXT DEFAULT (datetime('now')),
+      date_expiration  TEXT,
+      type_tarif       TEXT DEFAULT 'gratuit',
+      montant_paye     REAL DEFAULT 0,
+      admin_id         INTEGER,
+      notes            TEXT,
+      feature_slug     TEXT,
+      created_at       TEXT DEFAULT (datetime('now')),
+      updated_at       TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, accred_id),
+      FOREIGN KEY(user_id)   REFERENCES users(id),
+      FOREIGN KEY(accred_id) REFERENCES accred_definitions(id)
+    )`,
+    "id,user_id,accred_id,statut,date_attribution,date_expiration,type_tarif,montant_paye,admin_id,notes,feature_slug,created_at,updated_at"
+  );
+
+  rebuildIfOldCheck(
+    "accred_demandes",
+    "CHECK(statut IN ('en_attente','approuvee','refusee'))",
+    `CREATE TABLE accred_demandes (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL,
+      accred_id   INTEGER NOT NULL,
+      message     TEXT,
+      statut      TEXT DEFAULT 'en_attente'
+                  CHECK(statut IN ('brouillon','en_attente','deposee','en_cours_analyse','info_complementaire_demandee','approuvee','refusee')),
+      motif_refus TEXT,
+      commentaire_interne TEXT,
+      assignee_id INTEGER,
+      date_limite TEXT,
+      documents_json TEXT,
+      lettre_motivation TEXT,
+      video_url TEXT,
+      champs_specifiques_json TEXT,
+      created_at  TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, accred_id),
+      FOREIGN KEY(user_id)   REFERENCES users(id),
+      FOREIGN KEY(accred_id) REFERENCES accred_definitions(id),
+      FOREIGN KEY(assignee_id) REFERENCES users(id)
+    )`,
+    "id,user_id,accred_id,message,statut,motif_refus,created_at"
+  );
+})();
+
+/* Colonnes ajoutées à accred_demandes si la table existait déjà sans le rebuild ci-dessus
+   (cas où le CHECK était déjà large mais les colonnes de gestion manquaient). */
+;(function addAccredDemandesColumns() {
+  const cols = db.prepare("PRAGMA table_info(accred_demandes)").all().map(c => c.name);
+  if (!cols.includes("commentaire_interne")) db.exec("ALTER TABLE accred_demandes ADD COLUMN commentaire_interne TEXT");
+  if (!cols.includes("assignee_id")) db.exec("ALTER TABLE accred_demandes ADD COLUMN assignee_id INTEGER");
+  if (!cols.includes("date_limite")) db.exec("ALTER TABLE accred_demandes ADD COLUMN date_limite TEXT");
+  if (!cols.includes("documents_json")) db.exec("ALTER TABLE accred_demandes ADD COLUMN documents_json TEXT");
+  if (!cols.includes("lettre_motivation")) db.exec("ALTER TABLE accred_demandes ADD COLUMN lettre_motivation TEXT");
+  if (!cols.includes("video_url")) db.exec("ALTER TABLE accred_demandes ADD COLUMN video_url TEXT");
+  if (!cols.includes("champs_specifiques_json")) db.exec("ALTER TABLE accred_demandes ADD COLUMN champs_specifiques_json TEXT");
+})();
+
+/* Migration : colonnes de suivi de paiement Stripe sur formation_inscriptions
+   (table déjà créée par IF NOT EXISTS sur les bases existantes, donc ajoutées à part). */
+;(function migrateFormationInscriptionsPaiement() {
+  const cols = db.prepare("PRAGMA table_info(formation_inscriptions)").all().map(c => c.name);
+  if (!cols.includes("paiement_statut")) db.exec("ALTER TABLE formation_inscriptions ADD COLUMN paiement_statut TEXT DEFAULT 'paye'");
+  if (!cols.includes("stripe_session_id")) db.exec("ALTER TABLE formation_inscriptions ADD COLUMN stripe_session_id TEXT");
+})();
+
+/* Complète conditions_obtention / documents_requis pour l'accréditation Formateur,
+   restées vides depuis sa création initiale (colonnes ajoutées après coup). */
+;(function completerAccredFormateur() {
+  const def = db.prepare("SELECT id, conditions_obtention FROM accred_definitions WHERE type='createur_formations'").get();
+  if (!def || def.conditions_obtention) return;
+  db.prepare("UPDATE accred_definitions SET conditions_obtention=?, documents_requis=? WHERE id=?").run(
+    "Disposer d'une expertise démontrable dans le domaine de formation visé (diplôme, certification professionnelle ou expérience équivalente) et s'engager à respecter la charte qualité des formateurs Diaspo'Actif.",
+    JSON.stringify(["Pièce d'identité", "Justificatif de diplôme ou certification (si applicable)", "CV ou portfolio détaillant l'expérience professionnelle"]),
+    def.id
+  );
+})();
 
 module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;

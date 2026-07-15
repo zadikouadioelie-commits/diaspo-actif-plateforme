@@ -297,17 +297,17 @@
         <!-- ── Bloc 7 : Widget Accréditations DA ── -->
         <div style="margin-bottom:8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Accréditations Diaspo'Actif</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;align-items:stretch;margin-bottom:0;" id="widget-accred-da">
-          <div class="card" style="border-left:4px solid #f59e0b;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('demandes'),200)">
+          <div class="card" style="border-left:4px solid #f59e0b;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>{showAccredHub('legacy');switchDATab('demandes');},200)">
             <div style="font-size:28px;font-weight:800;color:#92400e;" id="da-widget-pending">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">⏳ Demandes en attente</div>
           </div>
-          <div class="card" style="border-left:4px solid #bbf7d0;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('actives'),200)">
+          <div class="card" style="border-left:4px solid #bbf7d0;cursor:pointer;" onclick="goSection('accreditations');setTimeout(()=>{showAccredHub('legacy');switchDATab('actives');},200)">
             <div style="font-size:28px;font-weight:800;color:#065f46;" id="da-widget-observatoire">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">📊 Observatoire</div>
           </div>
           <div class="card" style="display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:160px;">
-            <button class="btn btn-orange" style="font-size:13px;" onclick="goSection('accreditations');setTimeout(()=>switchDATab('demandes'),200)">⏳ Voir les demandes</button>
-            <button class="btn btn-outline" style="font-size:13px;" onclick="goSection('accreditations');setTimeout(()=>openAccordDirectModal(),200)">➕ Accorder directement</button>
+            <button class="btn btn-orange" style="font-size:13px;" onclick="goSection('accreditations');setTimeout(()=>{showAccredHub('legacy');switchDATab('demandes');},200)">⏳ Voir les demandes</button>
+            <button class="btn btn-outline" style="font-size:13px;" onclick="goSection('accreditations');setTimeout(()=>{showAccredHub('legacy');openAccordDirectModal();},200)">➕ Accorder directement</button>
           </div>
         </div>
       </section>
@@ -3114,6 +3114,44 @@
           <button class="btn btn-orange" onclick="openAccredModal()">+ Nouvelle accréditation</button>
         </div>
 
+        <!-- ════ HUB — menu d'entrée pour éviter de tout charger d'un coup ════ -->
+        <div id="accred-hub-menu" class="grid grid-3" style="gap:14px;">
+          <div class="card" style="cursor:pointer;border-left:4px solid #ff6b00;" onclick="showAccredHub('demandes')">
+            <div style="font-size:28px;margin-bottom:8px;">⏳</div>
+            <h3 style="margin:0 0 4px;">Demandes en attente</h3>
+            <p style="margin:0;font-size:12.5px;color:var(--muted);">Examiner les demandes d'accréditation déposées par les comptes.</p>
+            <span id="accred-hub-demandes-badge" style="display:none;background:#fef3c7;color:#92400e;font-weight:700;font-size:11px;padding:2px 8px;border-radius:99px;margin-top:8px;display:inline-block;"></span>
+          </div>
+          <div class="card" style="cursor:pointer;border-left:4px solid #2563EB;" onclick="showAccredHub('legacy')">
+            <div style="font-size:28px;margin-bottom:8px;">📜</div>
+            <h3 style="margin:0 0 4px;">Accréditations DA</h3>
+            <p style="margin:0;font-size:12.5px;color:var(--muted);">Mobilisation Active, Créateur d'Opportunités — demandes, comptes actifs, historique.</p>
+          </div>
+          <div class="card" style="cursor:pointer;border-left:4px solid #6366f1;" onclick="showAccredHub('moteur')">
+            <div style="font-size:28px;margin-bottom:8px;">⚙️</div>
+            <h3 style="margin:0 0 4px;">Moteur d'accréditation</h3>
+            <p style="margin:0;font-size:12.5px;color:var(--muted);">Créer et configurer les types d'accréditation (règles, tarifs, droits).</p>
+          </div>
+          <div class="card" style="cursor:pointer;border-left:4px solid #f59e0b;" onclick="showAccredHub('packs')">
+            <div style="font-size:28px;margin-bottom:8px;">📦</div>
+            <h3 style="margin:0 0 4px;">Packs d'accréditation</h3>
+            <p style="margin:0;font-size:12.5px;color:var(--muted);">Regrouper plusieurs accréditations dans un pack accordé en une fois.</p>
+          </div>
+          <div class="card" style="cursor:pointer;border-left:4px solid #10b981;" onclick="showAccredHub('feature')">
+            <div style="font-size:28px;margin-bottom:8px;">🧩</div>
+            <h3 style="margin:0 0 4px;">Feature Engine</h3>
+            <p style="margin:0;font-size:12.5px;color:var(--muted);">Registre des fonctionnalités de la plateforme et de leurs règles d'accès.</p>
+          </div>
+          <div class="card" style="cursor:pointer;border-left:4px solid #64748b;" onclick="showAccredHub('institutions')">
+            <div style="font-size:28px;margin-bottom:8px;">🏢</div>
+            <h3 style="margin:0 0 4px;">Institutions &amp; vérifications</h3>
+            <p style="margin:0;font-size:12.5px;color:var(--muted);">Responsables de collectivités en attente, institutions accréditées.</p>
+          </div>
+        </div>
+
+        <button class="btn btn-sm btn-outline" id="accred-hub-back" style="display:none;margin-bottom:16px;" onclick="showAccredHub(null)">← Retour au menu Accréditations</button>
+
+        <div id="accred-hub-institutions" style="display:none;">
         <div class="card" style="margin-bottom:20px;">
           <h3 style="margin:0 0 14px;">🪪 Responsables de collectivités en attente de vérification</h3>
           <div id="coll-a-verifier-list"><div class="notice">Chargement…</div></div>
@@ -3162,9 +3200,10 @@
             <div id="af-histo-list"></div>
           </div>
         </div>
+        </div><!-- /accred-hub-institutions -->
 
         <!-- ════ MOTEUR D'ACCRÉDITATIONS DYNAMIQUE ════ -->
-        <div id="section-moteur-accred" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
+        <div id="section-moteur-accred" style="display:none;margin-top:0;padding-top:0;">
           <div class="flex-between" style="margin-bottom:6px;">
             <h2 style="margin:0;">⚙️ Moteur d'accréditations</h2>
             <button class="btn btn-orange" onclick="openAccredDefModal()">+ Créer une accréditation</button>
@@ -3313,14 +3352,67 @@
           <div style="margin:8px 0 0;display:none;" id="adp-toggle-advanced-wrap">
             <button class="btn btn-sm btn-outline" onclick="toggleAdpAdvanced()">⚙️ Paramètres avancés</button>
           </div>
+        </div>
+
+        <!-- ════ DEMANDES EN ATTENTE (panneau dédié, prioritaire) ════ -->
+        <div id="section-accred-demandes" style="display:none;margin-top:0;padding-top:0;">
+          <div class="flex-between" style="margin-bottom:6px;">
+            <h2 style="margin:0;">⏳ Demandes en attente</h2>
+          </div>
+          <p style="color:var(--muted);font-size:13px;margin:0 0 16px;">Demandes d'accréditation déposées par les comptes, à traiter en priorité.</p>
 
           <!-- Demandes du nouveau système -->
-          <div id="accred-def-demandes" style="margin-top:24px;">
-            <div class="flex-between" style="margin-bottom:10px;">
-              <h3 style="margin:0;font-size:15px;">Demandes en attente (nouveau système)</h3>
-            </div>
+          <div id="accred-def-demandes" style="margin-top:0;">
             <div id="accred-def-demandes-list" class="card" style="padding:0;overflow:hidden;">
               <div style="padding:16px;color:var(--muted);">Chargement…</div>
+            </div>
+          </div>
+
+          <!-- Dossier détaillé d'une demande -->
+          <div id="accred-dem-panel" class="card" style="display:none;margin-top:20px;">
+            <div class="flex-between" style="margin-bottom:14px;">
+              <h3 style="margin:0;" id="adm-title">Dossier de demande</h3>
+              <button class="btn btn-sm btn-outline" onclick="closeAccredDemPanel()">✕</button>
+            </div>
+            <div style="font-size:13px;color:var(--muted);margin-bottom:10px;" id="adm-meta"></div>
+            <div class="grid grid-2" style="gap:14px;margin-bottom:14px;">
+              <div>
+                <label class="form-label">Message du demandeur</label>
+                <div id="adm-message" class="input-field" style="width:100%;min-height:60px;white-space:pre-wrap;background:#f8fafc;"></div>
+              </div>
+              <div>
+                <label class="form-label">Lettre de motivation</label>
+                <div id="adm-lettre" class="input-field" style="width:100%;min-height:60px;white-space:pre-wrap;background:#f8fafc;"></div>
+              </div>
+            </div>
+            <div style="margin-bottom:14px;">
+              <label class="form-label">Vidéo de présentation</label>
+              <div id="adm-video"></div>
+            </div>
+            <div style="margin-bottom:14px;">
+              <label class="form-label">Documents joints</label>
+              <div id="adm-documents"></div>
+            </div>
+            <div class="grid grid-2" style="gap:14px;margin-bottom:14px;">
+              <div>
+                <label class="form-label">Commentaire interne <span style="color:var(--muted);">(non visible du demandeur)</span></label>
+                <textarea id="adm-commentaire" class="input-field" style="width:100%;min-height:60px;"></textarea>
+              </div>
+              <div>
+                <label class="form-label">Assigner à un administrateur</label>
+                <select id="adm-assignee" class="input-field" style="width:100%;"></select>
+                <label class="form-label" style="margin-top:10px;">Date limite de traitement</label>
+                <input id="adm-deadline" type="date" class="input-field" style="width:100%;">
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+              <button class="btn btn-sm btn-outline" onclick="setAccredDemStatut('en_cours_analyse')">🔍 Marquer « En cours d'analyse »</button>
+              <button class="btn btn-sm btn-outline" onclick="setAccredDemStatut('info_complementaire_demandee')">📩 Demander des compléments</button>
+              <button class="btn btn-sm btn-outline" onclick="saveAccredDemMeta()">💾 Enregistrer commentaire / assignation / deadline</button>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-orange" onclick="approuverAccredDem(_accredDemPanelId)">✅ Approuver</button>
+              <button class="btn btn-outline" style="color:#B91C1C;" onclick="refuserAccredDem(_accredDemPanelId)">❌ Refuser</button>
             </div>
           </div>
 
@@ -3337,7 +3429,7 @@
         </div>
 
         <!-- PACKS D'ACCRÉDITATIONS -->
-        <div id="section-accred-packs" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
+        <div id="section-accred-packs" style="display:none;margin-top:0;padding-top:0;">
           <div class="flex-between" style="margin-bottom:6px;">
             <h2 style="margin:0;">📦 Packs d'accréditations</h2>
             <button class="btn btn-orange" onclick="openPackModal()">+ Créer un pack</button>
@@ -3515,7 +3607,7 @@
         </div>
 
         <!-- FEATURE ENGINE — Registry des fonctionnalités -->
-        <div id="section-feature-engine" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
+        <div id="section-feature-engine" style="display:none;margin-top:0;padding-top:0;">
           <div class="flex-between" style="margin-bottom:6px;">
             <h2 style="margin:0;">⚙️ Feature Engine</h2>
             <button class="btn btn-orange" onclick="openFeatureModal()">+ Nouvelle fonctionnalité</button>
@@ -3660,7 +3752,7 @@
         </div>
 
         <!-- ACCRÉDITATIONS DA : Mobilisation Active / Créateur d'Opportunités -->
-        <div id="section-accred-da" style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px;">
+        <div id="section-accred-da" style="display:none;margin-top:0;padding-top:0;">
           <h2 style="margin:0 0 6px;">Accréditations Diaspo'Actif</h2>
           <p style="color:var(--muted);font-size:13px;margin:0 0 8px;">Gérez les demandes et attributions des accréditations opérationnelles Diaspo'Actif.</p>
           <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
@@ -5085,32 +5177,97 @@ async function loadAccredDefDemandes() {
   if (!el) return;
   try {
     const { demandes } = await api('GET', '/admin/accred/demandes?statut=en_attente');
+    const badge = document.getElementById('accred-hub-demandes-badge');
+    if (badge) {
+      if (demandes.length) { badge.style.display = 'inline-block'; badge.textContent = demandes.length + ' en attente'; }
+      else { badge.style.display = 'none'; }
+    }
     if (!demandes.length) {
       el.innerHTML = '<div style="padding:16px;color:var(--muted);">Aucune demande en attente.</div>';
       return;
     }
+    _accredDemCache = new Map(demandes.map(d=>[d.id, d]));
+    const STATUT_LBL = { en_attente:'⏳ Déposée', en_cours_analyse:"🔍 En cours d'analyse", info_complementaire_demandee:'📩 Compléments demandés' };
     el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="border-bottom:2px solid var(--border);background:#f8fafc;">
         <th style="padding:10px 14px;text-align:left;">Compte</th>
         <th style="padding:10px 14px;text-align:left;">Accréditation</th>
-        <th style="padding:10px 14px;text-align:left;">Message</th>
+        <th style="padding:10px 14px;text-align:left;">Statut</th>
+        <th style="padding:10px 14px;text-align:left;">Dossier</th>
         <th style="padding:10px 14px;text-align:left;">Date</th>
         <th style="padding:10px 14px;text-align:left;"></th>
       </tr></thead><tbody>
-      ${demandes.map(d=>`<tr style="border-bottom:1px solid var(--border);">
+      ${demandes.map(d=>{
+        const nbDocs = (()=>{ try { return JSON.parse(d.documents_json||'[]').length; } catch(_) { return 0; } })();
+        return `<tr style="border-bottom:1px solid var(--border);">
         <td style="padding:10px 14px;font-weight:600;">${d.user_nom}<div style="font-size:11px;color:var(--muted);">${d.user_email} · ${d.user_role}</div></td>
         <td style="padding:10px 14px;">${d.accred_emoji||'🎖'} ${d.accred_label}</td>
-        <td style="padding:10px 14px;font-size:12px;color:var(--muted);max-width:200px;">${d.message||'—'}</td>
+        <td style="padding:10px 14px;font-size:12px;">${STATUT_LBL[d.statut]||d.statut}${d.date_limite?`<div style="font-size:11px;color:#B91C1C;">⏰ ${d.date_limite}</div>`:''}</td>
+        <td style="padding:10px 14px;font-size:12px;color:var(--muted);">${d.lettre_motivation?'📝 ':''}${d.video_url?'🎥 ':''}${nbDocs?`📎 ${nbDocs}`:''}${!d.lettre_motivation&&!d.video_url&&!nbDocs?'—':''}</td>
         <td style="padding:10px 14px;color:var(--muted);font-size:12px;">${(d.created_at||'').slice(0,10)}</td>
         <td style="padding:10px 14px;display:flex;gap:6px;">
-          <button class="btn btn-sm btn-orange" onclick="approuverAccredDem(${d.id})">✅ Approuver</button>
-          <button class="btn btn-sm btn-outline" style="color:#B91C1C;" onclick="refuserAccredDem(${d.id})">❌ Refuser</button>
+          <button class="btn btn-sm btn-outline" onclick="openAccredDemPanel(${d.id})">📂 Dossier</button>
+          <button class="btn btn-sm btn-orange" onclick="approuverAccredDem(${d.id})">✅</button>
+          <button class="btn btn-sm btn-outline" style="color:#B91C1C;" onclick="refuserAccredDem(${d.id})">❌</button>
         </td>
-      </tr>`).join('')}
+      </tr>`;}).join('')}
       </tbody></table>`;
   } catch(e) {
     el.innerHTML = `<div style="padding:16px;color:red;">Erreur : ${e.message}</div>`;
   }
+}
+
+let _accredDemCache = new Map();
+let _accredDemPanelId = null;
+
+async function openAccredDemPanel(id) {
+  const d = _accredDemCache.get(id);
+  if (!d) return;
+  _accredDemPanelId = id;
+  document.getElementById('adm-title').textContent = `Dossier — ${d.accred_emoji||''} ${d.accred_label}`;
+  document.getElementById('adm-meta').textContent = `${d.user_nom} (${d.user_email} · ${d.user_role}) — déposée le ${(d.created_at||'').slice(0,10)}`;
+  document.getElementById('adm-message').textContent = d.message || '—';
+  document.getElementById('adm-lettre').textContent = d.lettre_motivation || '—';
+  document.getElementById('adm-video').innerHTML = d.video_url
+    ? `<a href="${d.video_url}" target="_blank" rel="noopener" class="btn btn-sm btn-outline">🎥 Voir la vidéo</a>` : '<span style="color:var(--muted);font-size:13px;">Aucune</span>';
+  let docs = [];
+  try { docs = JSON.parse(d.documents_json||'[]'); } catch(_) {}
+  document.getElementById('adm-documents').innerHTML = docs.length
+    ? docs.map(doc=>`<a href="${doc.url}" target="_blank" rel="noopener" class="btn btn-sm btn-outline" style="margin:0 6px 6px 0;">📎 ${doc.nom||'Document'}</a>`).join('')
+    : '<span style="color:var(--muted);font-size:13px;">Aucun</span>';
+  document.getElementById('adm-commentaire').value = d.commentaire_interne || '';
+  document.getElementById('adm-deadline').value = d.date_limite || '';
+  try {
+    const { users } = await api('GET', '/admin/users?role=administrateur');
+    const sel = document.getElementById('adm-assignee');
+    sel.innerHTML = '<option value="">— Non assigné —</option>' + (users||[]).map(u=>`<option value="${u.id}" ${d.assignee_id==u.id?'selected':''}>${u.nom}</option>`).join('');
+  } catch(_) {}
+  document.getElementById('accred-dem-panel').style.display = '';
+  document.getElementById('accred-dem-panel').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function closeAccredDemPanel() {
+  document.getElementById('accred-dem-panel').style.display = 'none';
+  _accredDemPanelId = null;
+}
+async function setAccredDemStatut(statut) {
+  if (!_accredDemPanelId) return;
+  await api('PATCH', `/admin/accred/demandes/${_accredDemPanelId}/statut`, { statut });
+  showMsg('Statut mis à jour.', 'success');
+  closeAccredDemPanel();
+  loadAccredDefDemandes();
+}
+async function saveAccredDemMeta() {
+  if (!_accredDemPanelId) return;
+  const commentaire_interne = document.getElementById('adm-commentaire').value.trim();
+  const assignee_id = document.getElementById('adm-assignee').value || null;
+  const date_limite = document.getElementById('adm-deadline').value || null;
+  await Promise.all([
+    api('PATCH', `/admin/accred/demandes/${_accredDemPanelId}/commentaire`, { commentaire_interne }),
+    api('PATCH', `/admin/accred/demandes/${_accredDemPanelId}/assigner`, { assignee_id }),
+    api('PATCH', `/admin/accred/demandes/${_accredDemPanelId}/deadline`, { date_limite }),
+  ]);
+  showMsg('Dossier mis à jour.', 'success');
+  loadAccredDefDemandes();
 }
 
 async function approuverAccredDem(id) {
@@ -5847,8 +6004,26 @@ async function retirerDA(userId, type){
 
 // Charger quand la section accreditations s'ouvre
 document.querySelector('[data-section="accreditations"]')?.addEventListener('click',()=>{
-  setTimeout(()=>{ loadDADemandes(); loadMoteurAccred(); loadAdminPacks(); loadPacksDemandes(); loadAdminFeatures(); }, 150);
+  setTimeout(()=>{ loadDADemandes(); loadMoteurAccred(); loadAdminPacks(); loadPacksDemandes(); loadAdminFeatures(); loadAccredDefDemandes(); showAccredHub(null); }, 150);
 });
+
+/* ── Hub Accréditations : navigation par boutons ── */
+function showAccredHub(id) {
+  const panels = { demandes: 'section-accred-demandes', legacy: 'section-accred-da', moteur: 'section-moteur-accred', packs: 'section-accred-packs', feature: 'section-feature-engine', institutions: 'accred-hub-institutions' };
+  const menu = document.getElementById('accred-hub-menu');
+  const back = document.getElementById('accred-hub-back');
+  Object.values(panels).forEach(pid => { const el = document.getElementById(pid); if (el) el.style.display = 'none'; });
+  if (!id) {
+    if (menu) menu.style.display = '';
+    if (back) back.style.display = 'none';
+    return;
+  }
+  if (menu) menu.style.display = 'none';
+  if (back) back.style.display = '';
+  const target = document.getElementById(panels[id]);
+  if (target) target.style.display = '';
+  if (id === 'demandes') loadAccredDefDemandes();
+}
 
 /* ── Navigation helper ── */
 function goSection(name){

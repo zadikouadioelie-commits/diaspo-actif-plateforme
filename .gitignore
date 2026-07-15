@@ -9,3 +9,5 @@ backups/
 
 .vercel
 server/uploads/
+server/data.sqlite
+tools/

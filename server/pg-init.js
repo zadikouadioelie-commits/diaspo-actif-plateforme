@@ -574,6 +574,60 @@ async function migratePg(pool) {
     // Mise en relation : objet + image d'illustration
     ['demandes_contact', 'objet', 'TEXT'],
     ['demandes_contact', 'image_url', 'TEXT'],
+    // Module Accréditations — file d'attente enrichie (commentaire interne, assignation, deadline)
+    ['accred_demandes', 'commentaire_interne', 'TEXT'],
+    ['accred_demandes', 'assignee_id', 'INTEGER'],
+    ['accred_demandes', 'date_limite', 'TEXT'],
+    ['accred_demandes', 'documents_json', 'TEXT'],
+    ['accred_demandes', 'lettre_motivation', 'TEXT'],
+    ['accred_demandes', 'video_url', 'TEXT'],
+    ['accred_demandes', 'champs_specifiques_json', 'TEXT'],
+    // Paiement Stripe réel pour l'inscription à une formation payante
+    ['formation_inscriptions', 'paiement_statut', "TEXT DEFAULT 'paye'"],
+    ['formation_inscriptions', 'stripe_session_id', 'TEXT'],
+    // Module Diaspo Formation — extension de la table formations (jamais migrée en Postgres jusqu'ici)
+    ['formations', 'statut', "TEXT DEFAULT 'brouillon'"],
+    ['formations', 'mode_acces', "TEXT DEFAULT 'gratuit'"],
+    ['formations', 'commission_pct', 'REAL DEFAULT 0'],
+    ['formations', 'telecharge_autorise', 'INTEGER DEFAULT 0'],
+    ['formations', 'image_url', 'TEXT'],
+    ['formations', 'duree_heures', 'REAL'],
+    ['formations', 'prerequis', 'TEXT'],
+    ['formations', 'objectifs', 'TEXT'],
+    ['formations', 'video_intro', 'TEXT'],
+    ['formations', 'categorie', 'TEXT'],
+    ['formations', 'motif_refus', 'TEXT'],
+    ['formations', 'validateur_id', 'INTEGER'],
+    ['formations', 'valide_at', 'TEXT'],
+    ['formations', 'nb_inscrits', 'INTEGER DEFAULT 0'],
+    ['formations', 'revenu_total', 'REAL DEFAULT 0'],
+    // Assistant de création — Étape 1 : informations générales
+    ['formations', 'sous_titre', 'TEXT'],
+    ['formations', 'description_courte', 'TEXT'],
+    ['formations', 'competences_acquises', 'TEXT'],
+    ['formations', 'public_concerne', 'TEXT'],
+    ['formations', 'nombre_modules_prevu', 'INTEGER'],
+    ['formations', 'nombre_lecons_approx', 'INTEGER'],
+    // Étape 2 : catégorie
+    ['formations', 'sous_categorie', 'TEXT'],
+    ['formations', 'mots_cles', 'TEXT'],
+    ['formations', 'pays_concerne', 'TEXT'],
+    ['formations', 'secteur_activite', 'TEXT'],
+    // Étape 4 : tarification
+    ['formations', 'devise', "TEXT DEFAULT 'EUR'"],
+    ['formations', 'promo_active', 'INTEGER DEFAULT 0'],
+    ['formations', 'promo_reduction_pct', 'REAL'],
+    ['formations', 'promo_date_fin', 'TEXT'],
+    // Étape 9 : accès
+    ['formations', 'acces_type', "TEXT DEFAULT 'public'"],
+    ['formations', 'acces_liste_id', 'INTEGER'],
+    ['formations', 'banniere_url', 'TEXT'],
+    // Étape 8 : certificat / Étape 11 : soumission
+    ['formations', 'certificat_actif', 'INTEGER DEFAULT 0'],
+    ['formations', 'certificat_modele', 'TEXT'],
+    ['formations', 'certificat_conditions', 'TEXT'],
+    ['formations', 'certificat_qr', 'INTEGER DEFAULT 1'],
+    ['formations', 'date_soumission', 'TEXT'],
   ];
   for (const [table, col, type] of cols) {
     try {
@@ -585,6 +639,53 @@ async function migratePg(pool) {
   // Index unique da_id (comme en SQLite)
   try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_da_id ON users(da_id) WHERE da_id IS NOT NULL`); } catch(_) {}
   try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_initiatives_da_id ON initiatives(da_id) WHERE da_id IS NOT NULL`); } catch(_) {}
+
+  /* ── Module Accréditations : élargissement des CHECK constraints ──
+     Bug réel : compte_accreditations.type / demandes_accreditation.type limitaient les
+     valeurs à 2 types alors que le code en insère 4 (observatoire_diaspora, institutionnelle).
+     Postgres nomme ses contraintes CHECK "<table>_<colonne>_check" par défaut. On les
+     supprime (si présentes, best-effort) avant de les recréer plus larges / de les retirer. */
+  const checkFixes = [
+    { table: 'compte_accreditations', constraint: 'compte_accreditations_type_check', addBack: null },
+    { table: 'demandes_accreditation', constraint: 'demandes_accreditation_type_check', addBack: null },
+    { table: 'user_accreditations', constraint: 'user_accreditations_statut_check',
+      addBack: "CHECK (statut IN ('active','suspendue','gelee','retiree','expiree'))" },
+    { table: 'accred_demandes', constraint: 'accred_demandes_statut_check',
+      addBack: "CHECK (statut IN ('brouillon','en_attente','deposee','en_cours_analyse','info_complementaire_demandee','approuvee','refusee'))" },
+  ];
+  try {
+    const { rows: cfRows } = await pool.query("SELECT id FROM accred_definitions WHERE type='createur_formations'");
+    if (cfRows[0]) {
+      const cfId = cfRows[0].id;
+      const { rows: regleRows } = await pool.query("SELECT id FROM accred_regles WHERE accred_id=$1 AND role='utilisateur'", [cfId]);
+      if (!regleRows[0]) {
+        await pool.query("INSERT INTO accred_regles (accred_id,role,mode) VALUES ($1,'utilisateur','sur_demande')", [cfId]);
+        await pool.query("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES ($1,'utilisateur','gratuit',0,'EUR',1)", [cfId]);
+      }
+    }
+  } catch (e) { console.error('[pg-init migration] ouvrir createur_formations aux utilisateurs:', e.message); }
+
+  try {
+    await pool.query(
+      `UPDATE accred_definitions SET conditions_obtention=$1, documents_requis=$2
+       WHERE type='createur_formations' AND (conditions_obtention IS NULL OR conditions_obtention='')`,
+      [
+        "Disposer d'une expertise démontrable dans le domaine de formation visé (diplôme, certification professionnelle ou expérience équivalente) et s'engager à respecter la charte qualité des formateurs Diaspo'Actif.",
+        JSON.stringify(["Pièce d'identité", "Justificatif de diplôme ou certification (si applicable)", "CV ou portfolio détaillant l'expérience professionnelle"]),
+      ]
+    );
+  } catch (e) { console.error('[pg-init migration] conditions_obtention createur_formations:', e.message); }
+
+  for (const { table, constraint, addBack } of checkFixes) {
+    try { await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`); } catch (e) {
+      console.error(`[pg-init migration] drop constraint ${constraint}:`, e.message);
+    }
+    if (addBack) {
+      try { await pool.query(`ALTER TABLE ${table} ADD CONSTRAINT ${constraint} ${addBack}`); } catch (e) {
+        console.error(`[pg-init migration] add constraint ${constraint}:`, e.message);
+      }
+    }
+  }
 }
 
 async function seedPg(pool) {

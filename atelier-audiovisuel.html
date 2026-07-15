@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>Diaspo'Actif — Atelier audiovisuel (Studio)</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: "Segoe UI", Arial, sans-serif; background: #0f1117; color: #e7e9ee; overflow: hidden; }
+  a { color: inherit; }
+  .st-top { height: 54px; background: #171a23; border-bottom: 1px solid #262b38; display: flex; align-items: center; gap: 14px; padding: 0 16px; }
+  .st-top .brand { font-weight: 800; letter-spacing: .3px; color: #fff; display: flex; align-items: center; gap: 8px; }
+  .st-back { color: #9aa3b2; text-decoration: none; font-size: 13px; font-weight: 700; }
+  .st-back:hover { color: #fff; }
+  .st-proj { flex: 1; display: flex; align-items: center; gap: 10px; }
+  .st-proj input { background: #0f1117; border: 1px solid #2a3040; color: #fff; border-radius: 8px; padding: 7px 10px; font-size: 13.5px; font-weight: 600; width: 240px; }
+  .st-btn { border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .st-btn.ghost { background: #22283a; color: #cfd6e4; }
+  .st-btn.ghost:hover { background: #2c3450; }
+  .st-btn.primary { background: #6d28d9; color: #fff; }
+  .st-btn.primary:hover { background: #7c3aed; }
+  .st-btn.ai { background: linear-gradient(90deg,#7c3aed,#db2777); color: #fff; }
+  .st-main { display: grid; grid-template-columns: 268px 1fr 300px; height: calc(100% - 54px); }
+  .st-col { overflow-y: auto; padding: 14px; }
+  .st-left { background: #12151d; border-right: 1px solid #262b38; }
+  .st-right { background: #12151d; border-left: 1px solid #262b38; }
+  .st-center { display: flex; flex-direction: column; padding: 0; }
+  h3.sec { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #7d8598; margin: 4px 0 10px; font-weight: 800; }
+  .folder { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13.5px; color: #c3cad8; }
+  .folder:hover { background: #1c2130; }
+  .folder.active { background: #2a2350; color: #fff; }
+  .folder .count { margin-left: auto; font-size: 11px; color: #7d8598; }
+  .media-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .media-item { background: #1c2130; border: 1px solid #2a3040; border-radius: 8px; overflow: hidden; cursor: pointer; position: relative; }
+  .media-item:hover { border-color: #6d28d9; }
+  .media-item .thumb { height: 60px; display: flex; align-items: center; justify-content: center; font-size: 22px; background: #0f1117; }
+  .media-item .thumb img, .media-item .thumb video { width: 100%; height: 100%; object-fit: cover; }
+  .media-item .nm { font-size: 10.5px; padding: 5px 6px; color: #c3cad8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .import-btn { width: 100%; border: 1.5px dashed #3a4360; background: #171b26; color: #a9b2c4; border-radius: 10px; padding: 14px; font-size: 13px; font-weight: 700; cursor: pointer; margin-bottom: 12px; }
+  .import-btn:hover { border-color: #6d28d9; color: #fff; }
+  .hist-item { padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 12.5px; color: #c3cad8; border: 1px solid #232838; margin-bottom: 6px; }
+  .hist-item:hover { background: #1c2130; border-color: #6d28d9; }
+  .hist-item .d { font-size: 10.5px; color: #7d8598; margin-top: 2px; }
+  .preview-wrap { flex: 1; display: flex; align-items: center; justify-content: center; background: #08090d; padding: 18px; min-height: 0; }
+  .preview-stage { background: #000; border-radius: 8px; max-width: 100%; max-height: 100%; display: flex; align-items: center; justify-content: center; color: #4b5468; position: relative; overflow: hidden; }
+  .preview-stage video { width: 100%; height: 100%; object-fit: contain; }
+  .format-bar { display: flex; gap: 8px; padding: 10px 16px; background: #12151d; border-top: 1px solid #262b38; align-items: center; flex-wrap: wrap; }
+  .fmt { background: #1c2130; border: 1px solid #2a3040; color: #c3cad8; border-radius: 7px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; font-weight: 700; }
+  .fmt.active { background: #6d28d9; color: #fff; border-color: #6d28d9; }
+  .timeline { height: 150px; background: #0d0f15; border-top: 1px solid #262b38; padding: 12px 16px; overflow-x: auto; }
+  .track { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .track .lbl { width: 74px; flex-shrink: 0; font-size: 11px; color: #7d8598; font-weight: 700; }
+  .track .lane { flex: 1; height: 34px; background: #12151d; border: 1px dashed #2a3040; border-radius: 6px; display: flex; align-items: center; gap: 4px; padding: 3px; min-width: 200px; }
+  .clip { height: 28px; border-radius: 5px; font-size: 10.5px; color: #fff; display: flex; align-items: center; padding: 0 8px; white-space: nowrap; font-weight: 700; }
+  .clip.vid { background: #6d28d9; } .clip.aud { background: #0f766e; } .clip.txt { background: #b45309; }
+  .tool-group { border: 1px solid #232838; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+  .tool-head { padding: 11px 12px; background: #1a1e2a; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: #e7e9ee; }
+  .tool-head .chev { margin-left: auto; color: #7d8598; transition: transform .15s; }
+  .tool-group.open .chev { transform: rotate(90deg); }
+  .tool-body { display: none; padding: 10px 12px; flex-wrap: wrap; gap: 7px; }
+  .tool-group.open .tool-body { display: flex; }
+  .tool-btn { background: #1c2130; border: 1px solid #2a3040; color: #cfd6e4; border-radius: 7px; padding: 7px 10px; font-size: 12px; cursor: pointer; font-weight: 600; }
+  .tool-btn:hover { background: #2a2350; border-color: #6d28d9; color: #fff; }
+  .tool-btn.ai::before { content: "✨ "; }
+  .publish-target { display: flex; align-items: center; gap: 8px; width: 100%; background: #1c2130; border: 1px solid #2a3040; color: #cfd6e4; border-radius: 8px; padding: 9px 11px; font-size: 12.5px; cursor: pointer; font-weight: 600; margin-bottom: 6px; }
+  .publish-target:hover { background: #14361f; border-color: #16a34a; color: #fff; }
+  .st-toast { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); background: #1a1e2a; border: 1px solid #6d28d9; color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 30px rgba(0,0,0,.5); opacity: 0; transition: opacity .2s; z-index: 50; }
+  .st-toast.show { opacity: 1; }
+  .badge-soon { font-size: 9.5px; background: #3a2a55; color: #c4b5fd; border-radius: 5px; padding: 1px 5px; margin-left: 4px; font-weight: 800; vertical-align: middle; }
+  @media (max-width: 900px) { .st-main { grid-template-columns: 1fr; grid-auto-rows: auto; overflow-y: auto; height: calc(100% - 54px); } .st-left,.st-right{ border: none; } }
+</style>
+</head>
+<body>
+
+<div class="st-top">
+  <a class="st-back" href="audiovisuel.html">← Atelier</a>
+  <span class="brand">🎬 Studio</span>
+  <div class="st-proj">
+    <input id="proj-name" value="Nouveau projet" aria-label="Nom du projet">
+  </div>
+  <button class="st-btn ai" onclick="opAmeliorer()">✨ Améliorer automatiquement</button>
+  <button class="st-btn ghost" onclick="saveProject()">💾 Enregistrer</button>
+  <button class="st-btn ghost" onclick="openExport()">⤓ Exporter</button>
+  <button class="st-btn primary" onclick="scrollToPublish()">🚀 Publier</button>
+</div>
+
+<div class="st-main">
+
+  <!-- MÉDIATHÈQUE + HISTORIQUE -->
+  <aside class="st-col st-left">
+    <button class="import-btn" onclick="document.getElementById('file-in').click()">＋ Importer un média</button>
+    <input type="file" id="file-in" accept="video/*,image/*,audio/*" multiple style="display:none" onchange="handleImport(this)">
+
+    <h3 class="sec">📁 Médiathèque</h3>
+    <div id="folders"></div>
+
+    <div class="media-grid" id="media-grid"></div>
+
+    <h3 class="sec" style="margin-top:20px;">🕐 Historique · Projets récents</h3>
+    <div id="history"></div>
+  </aside>
+
+  <!-- APERÇU + TIMELINE -->
+  <section class="st-center">
+    <div class="preview-wrap">
+      <div class="preview-stage" id="stage" style="width:480px;height:270px;">
+        <span id="stage-empty">Importez un média puis cliquez dessus pour l'aperçu</span>
+        <video id="preview" controls style="display:none;"></video>
+      </div>
+    </div>
+    <div class="format-bar">
+      <span style="font-size:12px;color:#7d8598;font-weight:700;">Format :</span>
+      <button class="fmt active" data-r="16/9" onclick="setFormat('16/9',this)">16:9</button>
+      <button class="fmt" data-r="9/16" onclick="setFormat('9/16',this)">9:16</button>
+      <button class="fmt" data-r="1/1" onclick="setFormat('1/1',this)">1:1</button>
+      <button class="fmt" data-r="4/5" onclick="setFormat('4/5',this)">4:5</button>
+      <button class="fmt" style="background:#3a2130;border-color:#7c2d3a;color:#ffb3c1;" onclick="clearSelection()">↩️ Annuler la sélection</button>
+      <span style="margin-left:auto;font-size:11.5px;color:#7d8598;">Redimensionnement auto selon le réseau <span class="badge-soon">bientôt</span></span>
+    </div>
+    <div class="timeline">
+      <div class="track"><div class="lbl">🎬 Vidéo</div><div class="lane" id="lane-vid"></div></div>
+      <div class="track"><div class="lbl">🎵 Audio</div><div class="lane" id="lane-aud"></div></div>
+      <div class="track"><div class="lbl">🔤 Texte</div><div class="lane" id="lane-txt"></div></div>
+    </div>
+  </section>
+
+  <!-- PANNEAU D'OUTILS -->
+  <aside class="st-col st-right">
+    <div class="tool-group open" id="grp-montage">
+      <div class="tool-head" onclick="toggleGrp('grp-montage')">✂️ Montage <span class="chev">›</span></div>
+      <div class="tool-body">
+        <button class="tool-btn" onclick="opDecouper()">✅ Découper</button>
+        <button class="tool-btn" onclick="opFusion()">✅ Fusionner</button>
+        <button class="tool-btn" onclick="opFormat()">✅ Appliquer le format</button>
+        <button class="tool-btn" onclick="addClip('vid')">Ajouter à la timeline</button>
+        <button class="tool-btn" onclick="soon('Supprimer un passage au milieu')">Supprimer passage</button>
+        <button class="tool-btn" onclick="soon('Rogner (crop libre)')">Rogner</button>
+      </div>
+    </div>
+    <div class="tool-group" id="grp-audio">
+      <div class="tool-head" onclick="toggleGrp('grp-audio')">🎵 Audio <span class="chev">›</span></div>
+      <div class="tool-body">
+        <button class="tool-btn" onclick="opMusique()">✅ Ajouter musique de fond</button>
+        <button class="tool-btn" onclick="opRemplacerPiste()">✅ Remplacer la piste</button>
+        <button class="tool-btn" onclick="opVolume()">✅ Volume</button>
+        <button class="tool-btn" onclick="opExtraitAudio()">✅ Extraire l'audio (MP3)</button>
+        <button class="tool-btn" onclick="soon('Voix off / enregistrement micro')">Voix off</button>
+        <button class="tool-btn ai" onclick="soon('Suppression du bruit de fond (IA)')">Débruitage IA</button>
+      </div>
+    </div>
+    <div class="tool-group" id="grp-soustitres">
+      <div class="tool-head" onclick="toggleGrp('grp-soustitres')">💬 Sous-titres <span class="chev">›</span></div>
+      <div class="tool-body">
+        <button class="tool-btn ai" onclick="soon('Génération automatique des sous-titres (IA)')">Générer auto</button>
+        <button class="tool-btn" onclick="soon('Correction manuelle')">Corriger</button>
+        <button class="tool-btn" onclick="soon('Police & couleurs')">Police & couleurs</button>
+        <button class="tool-btn" onclick="soon('Position des sous-titres')">Position</button>
+        <button class="tool-btn ai" onclick="soon('Traduction automatique (IA)')">Traduire</button>
+      </div>
+    </div>
+    <div class="tool-group" id="grp-effets">
+      <div class="tool-head" onclick="toggleGrp('grp-effets')">🎨 Effets visuels <span class="chev">›</span></div>
+      <div class="tool-body">
+        <button class="tool-btn" onclick="opVitesse()">✅ Vitesse (ralenti/accéléré)</button>
+        <button class="tool-btn" onclick="opFlou()">✅ Flou</button>
+        <button class="tool-btn" onclick="opFiltre()">✅ Filtres</button>
+        <button class="tool-btn" onclick="opColorimetrie()">✅ Colorimétrie</button>
+        <button class="tool-btn" onclick="soon('Transitions entre séquences')">Transitions</button>
+        <button class="tool-btn ai" onclick="soon('Stabilisation vidéo (IA)')">Stabilisation</button>
+      </div>
+    </div>
+    <div class="tool-group" id="grp-texte">
+      <div class="tool-head" onclick="toggleGrp('grp-texte')">🔤 Texte & graphiques <span class="chev">›</span></div>
+      <div class="tool-body">
+        <button class="tool-btn" onclick="opTitre()">✅ Ajouter un titre</button>
+        <button class="tool-btn" onclick="opGenerique()">✅ Générique début/fin</button>
+        <button class="tool-btn" onclick="soon('Insérer un logo')">Logo</button>
+        <button class="tool-btn" onclick="soon('Filigrane')">Filigrane</button>
+        <button class="tool-btn" onclick="soon('Insérer une image / icône')">Image / icône</button>
+      </div>
+    </div>
+    <div class="tool-group" id="grp-ia">
+      <div class="tool-head" onclick="toggleGrp('grp-ia')">🤖 Découpage & IA <span class="chev">›</span></div>
+      <div class="tool-body">
+        <button class="tool-btn ai" onclick="soon('Suppression des silences (IA)')">Couper silences</button>
+        <button class="tool-btn ai" onclick="soon('Détection des meilleurs passages (IA)')">Meilleurs passages</button>
+        <button class="tool-btn ai" onclick="soon('Clips courts pour réseaux (IA)')">Clips courts</button>
+        <button class="tool-btn ai" onclick="soon('Miniature automatique (IA)')">Miniature auto</button>
+        <button class="tool-btn ai" onclick="soon('Titre & description (IA)')">Titre & description</button>
+        <button class="tool-btn ai" onclick="soon('Hashtags & résumé (IA)')">Hashtags & résumé</button>
+      </div>
+    </div>
+    <div class="tool-group open" id="grp-publier">
+      <div class="tool-head" onclick="toggleGrp('grp-publier')">🚀 Publier directement <span class="chev">›</span></div>
+      <div class="tool-body" style="flex-direction:column;">
+        <button class="publish-target" onclick="publishTo('La vitrine','profil-app.html')">🏬 La vitrine</button>
+        <button class="publish-target" onclick="publishTo('Publications / podcasts','audiovisuel.html')">📺 Les publications / podcasts</button>
+        <button class="publish-target" onclick="publishTo('Actualités','fil-actualite.html')">📰 Les actualités</button>
+        <button class="publish-target" onclick="publishTo('Formations','formations.html')">📚 Les formations</button>
+        <button class="publish-target" onclick="publishTo('Événements','evenements.html')">📅 Les événements</button>
+        <button class="publish-target" onclick="publishTo('Fiches produits','dashboard-initiative.html')">📦 Les fiches produits</button>
+        <div style="font-size:11px;color:#7d8598;margin-top:6px;">La vidéo est exportée et téléchargée, puis le module s'ouvre pour la joindre.</div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<div class="st-toast" id="toast"></div>
+
+<script>
+/* ══ Atelier audiovisuel — client branché sur le moteur ffmpeg réel du serveur ══ */
+const FOLDERS = [
+  { id:'videos', ic:'🎬', nom:'Vidéos' }, { id:'images', ic:'🖼', nom:'Images' },
+  { id:'musiques', ic:'🎵', nom:'Musiques' }, { id:'logos', ic:'🏷', nom:'Logos' },
+  { id:'sons', ic:'🔊', nom:'Effets sonores' }, { id:'generiques', ic:'🎞', nom:'Génériques' },
+  { id:'animations', ic:'✨', nom:'Animations' },
+];
+let mediaList = [];          // médias serveur de l'utilisateur
+let musicLib = [];           // musiques libres de droits (pour l'op "ajouter musique")
+let library = { musiques:[], sons:[], generiques:[], animations:[] }; // bibliothèques libres de droits
+let activeFolder = 'videos';
+let selectedId = null;       // média courant (pour les opérations)
+let audioPlayer = null;      // lecteur audio courant
+
+async function api(method, path, body){
+  const r = await fetch('/api'+path, { method, credentials:'same-origin',
+    headers: body?{'Content-Type':'application/json'}:{}, body: body?JSON.stringify(body):undefined });
+  let d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok) throw new Error(d.error||('Erreur '+r.status));
+  return d;
+}
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),3200); }
+function soon(f){ toast('🚧 ' + f + ' — nécessite un traitement IA (modèles/serveur dédié), bientôt disponible.'); }
+function busy(on,msg){ document.getElementById('toast').classList.toggle('show', !!on); if(on){ const t=document.getElementById('toast'); t.textContent='⏳ '+msg; } }
+
+function renderFolders(){
+  document.getElementById('folders').innerHTML = FOLDERS.map(f=>{
+    const n = mediaList.filter(m=>m.folder===f.id).length + (library[f.id]?library[f.id].length:0);
+    return `<div class="folder ${f.id===activeFolder?'active':''}" onclick="selectFolder('${f.id}')">${f.ic} ${f.nom}<span class="count">${n}</span></div>`;
+  }).join('');
+}
+function selectFolder(id){ activeFolder=id; renderFolders(); renderMedia(); }
+
+function mediaThumb(url,type){
+  return (type||'').startsWith('video') ? `<video src="${url}" muted preload="metadata"></video>`
+       : (type||'').startsWith('image') ? `<img src="${url}">`
+       : (type||'').startsWith('audio') ? '🎵' : '🎬';
+}
+function renderMedia(){
+  const g = document.getElementById('media-grid');
+  // Médias de l'utilisateur
+  let html = mediaList.filter(m=>m.folder===activeFolder).map(m=>{
+    const sel = m.id===selectedId ? 'style="border-color:#7c3aed;box-shadow:0 0 0 2px #7c3aed"' : '';
+    const tag = m.source==='render' ? '<span style="position:absolute;top:3px;left:3px;background:#7c3aed;color:#fff;font-size:8px;padding:1px 4px;border-radius:4px;font-weight:800;">RENDU</span>' : '';
+    const del = `<button onclick="event.stopPropagation();deleteMedia(${m.id},${JSON.stringify(m.nom).replace(/"/g,'&quot;')})" title="Supprimer" style="position:absolute;top:2px;right:2px;background:rgba(220,38,38,.92);color:#fff;border:none;border-radius:5px;width:18px;height:18px;font-size:11px;line-height:1;cursor:pointer;padding:0;font-weight:800;">✕</button>`;
+    return `<div class="media-item" ${sel} onclick="selectMedia(${m.id})" title="${m.nom}">
+      <div class="thumb">${mediaThumb(m.url,m.type)}${tag}${del}</div><div class="nm">${m.nom}</div></div>`;
+  }).join('');
+  // Éléments de bibliothèque libre de droits (musiques, sons, génériques, animations)
+  const lib = library[activeFolder] || [];
+  html += lib.map(it=>{
+    const isAudio = activeFolder==='musiques' || activeFolder==='sons';
+    const thumb = isAudio ? (activeFolder==='sons'?'🔊':'🎵') : `<video src="${it.url}" muted preload="metadata"></video>`;
+    const action = isAudio ? `playAsset('${it.url}','${(it.nom+'').replace(/'/g,'')}')` : `previewLibVideo('${it.url}','${(it.nom+'').replace(/'/g,'')}')`;
+    return `<div class="media-item" onclick="${action}" title="${it.nom} (libre de droits)">
+      <div class="thumb">${thumb}<span style="position:absolute;top:3px;right:3px;background:#0f766e;color:#fff;font-size:8px;padding:1px 4px;border-radius:4px;font-weight:800;">LIBRE</span></div>
+      <div class="nm">${it.nom}</div></div>`;
+  }).join('');
+  g.innerHTML = html || `<div style="grid-column:1/-1;color:#5b6478;font-size:12px;text-align:center;padding:14px;">Dossier vide — importez un média.</div>`;
+}
+
+function stopAudio(){ if(audioPlayer){ audioPlayer.pause(); audioPlayer=null; } }
+function playAsset(url,nom){ stopAudio(); audioPlayer=new Audio(url); audioPlayer.play().catch(()=>toast('⚠️ Lecture impossible')); toast('🎵 Lecture : '+nom); }
+function previewLibVideo(url,nom){
+  const v=document.getElementById('preview'), empty=document.getElementById('stage-empty');
+  v.src=url; v.style.display='block'; empty.style.display='none'; v.load(); v.play().catch(()=>{}); toast('▶ '+nom+' (libre de droits)');
+}
+
+function selectMedia(id){
+  selectedId = id; const m = mediaList.find(x=>x.id===id); if(!m) return;
+  renderMedia();
+  const v=document.getElementById('preview'), empty=document.getElementById('stage-empty');
+  if((m.type||'').startsWith('video')){ v.src=m.url; v.style.display='block'; empty.style.display='none'; v.load(); }
+  else if((m.type||'').startsWith('image')){ v.style.display='none'; empty.style.display='block'; empty.innerHTML=`<img src="${m.url}" style="max-width:100%;max-height:100%;object-fit:contain;">`; }
+  else { v.style.display='none'; empty.style.display='block'; empty.innerHTML=`<div style="text-align:center"><div style="font-size:34px">🎵</div><audio src="${m.url}" controls autoplay style="margin-top:10px"></audio><div style="font-size:12px;color:#9aa3b2;margin-top:6px">${m.nom}</div></div>`; }
+}
+
+async function deleteMedia(id, nom){
+  if(!confirm('Supprimer « '+nom+' » de votre médiathèque ?\nCette action est définitive.')) return;
+  try{
+    await api('DELETE','/atelier/media/'+id);
+    mediaList = mediaList.filter(m=>m.id!==id);
+    if(selectedId===id) clearSelection();
+    renderFolders(); renderMedia();
+    toast('🗑️ « '+nom+' » supprimé');
+  }catch(e){ toast('⚠️ '+e.message); }
+}
+
+function clearSelection(){
+  stopAudio(); selectedId=null; renderMedia();
+  const v=document.getElementById('preview'), empty=document.getElementById('stage-empty');
+  v.pause(); v.removeAttribute('src'); v.style.display='none';
+  empty.style.display='block'; empty.innerHTML='Sélection annulée — cliquez sur un média pour l\'aperçu';
+  toast('↩️ Sélection annulée');
+}
+
+async function loadMedia(){
+  try{
+    const [md, lib] = await Promise.all([ api('GET','/atelier/media'), api('GET','/atelier/library') ]);
+    mediaList = md.media||[]; library = lib.library||{musiques:[],sons:[],generiques:[],animations:[]};
+    musicLib = library.musiques.map(m=>({ id:m.id, nom:m.nom })); // pour l'op ajouter-musique
+    renderFolders(); renderMedia();
+  }catch(e){ toast('⚠️ '+e.message+' — connectez-vous.'); }
+}
+
+/* ── Import réel (upload serveur) ── */
+function handleImport(input){
+  const files=[...input.files]; if(!files.length) return;
+  let done=0;
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=async e=>{
+      try{
+        busy(true,'Import de '+file.name+'…');
+        const r = await api('POST','/atelier/upload', { dataUrl:e.target.result, nom:file.name });
+        mediaList.unshift(r.media); activeFolder=r.media.folder;
+      }catch(err){ toast('⚠️ '+err.message); }
+      if(++done===files.length){ renderFolders(); renderMedia(); toast('✅ '+files.length+' média(s) importé(s) sur le serveur'); if(mediaList[0]) selectMedia(mediaList[0].id); }
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+
+/* ── Opérations réelles (ffmpeg côté serveur) ── */
+function needSel(){ if(!selectedId){ toast('👉 Cliquez d\'abord sur un média dans la médiathèque.'); return false; } return true; }
+async function process(payload, label){
+  try{
+    busy(true, label+'…');
+    const r = await api('POST','/atelier/process', payload);
+    mediaList.unshift(r.media); activeFolder=r.media.folder; renderFolders(); renderMedia(); selectMedia(r.media.id);
+    toast('✅ '+label+' terminé — nouveau média « '+r.media.nom+' »');
+    return r.media;
+  }catch(e){ toast('⚠️ '+e.message); }
+}
+function opDecouper(){ if(!needSel())return; const s=prompt('Début (secondes) :','0'); if(s===null)return; const en=prompt('Fin (secondes) :','5'); if(en===null)return; process({op:'trim',mediaId:selectedId,start:parseFloat(s),end:parseFloat(en)}, 'Découpe'); }
+function opFormat(){ if(!needSel())return; const r=document.querySelector('.fmt.active')?.dataset.r||'9/16'; process({op:'format',mediaId:selectedId,ratio:r}, 'Mise au format '+r); }
+function opExtraitAudio(){ if(!needSel())return; process({op:'extract-audio',mediaId:selectedId}, 'Extraction audio'); }
+function opFusion(){
+  const vids = mediaList.filter(m=>m.folder==='videos' && (m.type||'').startsWith('video'));
+  if(vids.length<2){ toast('👉 Importez au moins 2 vidéos à fusionner.'); return; }
+  process({op:'concat', mediaIds: vids.slice(0,6).map(v=>v.id)}, 'Fusion de '+Math.min(vids.length,6)+' vidéos');
+}
+function opMusique(){
+  if(!needSel())return;
+  if(!musicLib.length){ toast('Bibliothèque musicale en cours de génération…'); return; }
+  const liste = musicLib.map((m,i)=>(i+1)+'. '+m.nom).join('\n');
+  const c = prompt('Choisissez une musique de fond (libre de droits) :\n'+liste+'\n\nNuméro :','1'); if(c===null)return;
+  const track = musicLib[parseInt(c)-1]; if(!track){ toast('Choix invalide.'); return; }
+  process({op:'add-music', mediaId:selectedId, musique:track.id, volVideo:1, volMusic:0.4}, 'Ajout musique « '+track.nom+' »');
+}
+async function opExport(){
+  if(!needSel())return;
+  const fmt = confirm('OK = MP4 (recommandé)   ·   Annuler = WebM') ? 'mp4' : 'webm';
+  const m = await process({op:'export', mediaId:selectedId, format:fmt}, 'Export '+fmt.toUpperCase());
+  if(m){ telecharger(m, fmt); toast('⤓ Téléchargement de l\'export lancé'); }
+  return m;
+}
+function telecharger(m, ext){ const a=document.createElement('a'); a.href=m.url; a.download=(m.nom||'export').replace(/[^\w.-]+/g,'_')+'.'+(ext||'mp4'); document.body.appendChild(a); a.click(); a.remove(); }
+
+/* ── Amélioration auto (netteté + colorimétrie + réduction bruit, sans IA) ── */
+function opAmeliorer(){ if(!needSel())return; process({op:'enhance', mediaId:selectedId}, '✨ Amélioration automatique'); }
+
+/* ── Audio ── */
+function opRemplacerPiste(){
+  if(!needSel())return; if(!musicLib.length){ toast('Bibliothèque musicale non prête.'); return; }
+  const liste = musicLib.map((m,i)=>(i+1)+'. '+m.nom).join('\n');
+  const c = prompt('Remplacer la piste audio par (libre de droits) :\n'+liste+'\n\nNuméro :','1'); if(c===null)return;
+  const t = musicLib[parseInt(c)-1]; if(!t){ toast('Choix invalide.'); return; }
+  process({op:'replace-audio', mediaId:selectedId, musique:t.id}, 'Remplacement de la piste');
+}
+function opVolume(){ if(!needSel())return; const v=prompt('Volume (1 = normal, 0.5 = plus bas, 2 = plus fort) :','1.5'); if(v===null)return; process({op:'volume', mediaId:selectedId, vol:parseFloat(v)}, 'Réglage du volume'); }
+
+/* ── Effets visuels ── */
+function opVitesse(){ if(!needSel())return; const f=prompt('Vitesse (0.5 = ralenti, 1 = normal, 2 = accéléré) :','2'); if(f===null)return; process({op:'speed', mediaId:selectedId, factor:parseFloat(f)}, 'Changement de vitesse'); }
+function opFlou(){ if(!needSel())return; process({op:'blur', mediaId:selectedId}, 'Flou'); }
+function opFiltre(){
+  if(!needSel())return;
+  const presets=[['nb','Noir & blanc'],['sepia','Sépia'],['vintage','Vintage'],['vif','Couleurs vives'],['froid','Ambiance froide'],['chaud','Ambiance chaude']];
+  const c=prompt('Filtre :\n'+presets.map((p,i)=>(i+1)+'. '+p[1]).join('\n')+'\n\nNuméro :','4'); if(c===null)return;
+  const p=presets[parseInt(c)-1]; if(!p){ toast('Choix invalide.'); return; }
+  process({op:'filter', mediaId:selectedId, preset:p[0]}, 'Filtre '+p[1]);
+}
+function opColorimetrie(){
+  if(!needSel())return;
+  const b=prompt('Luminosité (-0.5 à 0.5, 0 = normal) :','0.05'); if(b===null)return;
+  const c=prompt('Contraste (0.5 à 2, 1 = normal) :','1.1'); if(c===null)return;
+  const s=prompt('Saturation (0 à 3, 1 = normal) :','1.2'); if(s===null)return;
+  process({op:'color', mediaId:selectedId, brightness:parseFloat(b), contrast:parseFloat(c), saturation:parseFloat(s)}, 'Colorimétrie');
+}
+
+/* ── Texte & graphiques ── */
+function opTitre(){
+  if(!needSel())return;
+  const txt=prompt('Texte du titre :','Mon titre'); if(txt===null||!txt.trim())return;
+  const p=prompt('Position : haut / centre / bas','bas'); if(p===null)return;
+  process({op:'title', mediaId:selectedId, texte:txt.trim(), position:(p||'bas').trim()}, 'Ajout du titre');
+}
+function opGenerique(){
+  if(!needSel())return; const gens=library.generiques||[];
+  if(!gens.length){ toast('Génériques non prêts.'); return; }
+  const liste=gens.map((g,i)=>(i+1)+'. '+g.nom).join('\n');
+  const c=prompt('Générique à ajouter :\n'+liste+'\n\nNuméro :','1'); if(c===null)return;
+  const g=gens[parseInt(c)-1]; if(!g){ toast('Choix invalide.'); return; }
+  const p=prompt('Position : debut / fin','debut'); if(p===null)return;
+  process({op:'generique', mediaId:selectedId, generique:g.id, position:(p||'debut').trim()}, 'Ajout du générique « '+g.nom+' »');
+}
+
+/* ── Publication directe : exporte puis ouvre le module cible ── */
+async function publishTo(target, url){
+  if(!needSel()){ return; }
+  toast('⏳ Export avant publication…');
+  const m = await process({op:'export', mediaId:selectedId, format:'mp4'}, 'Export pour publication');
+  if(!m) return;
+  telecharger(m, 'mp4');
+  toast('✅ Vidéo exportée — ouverture de « '+target+' » pour la joindre.');
+  setTimeout(()=>window.open(url,'_blank'), 800);
+}
+
+/* ── Format d'aperçu ── */
+function setFormat(r, btn){
+  document.querySelectorAll('.fmt').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  const stage=document.getElementById('stage'); const [w,h]=r.split('/').map(Number);
+  const base=300; stage.style.height=base+'px'; stage.style.width=(base*w/h)+'px';
+}
+
+/* ── Timeline (repère visuel) ── */
+let clipN={vid:0,aud:0,txt:0};
+function addClip(kind){
+  const lane={vid:'lane-vid',aud:'lane-aud',txt:'lane-txt'}[kind]; clipN[kind]++;
+  const c=document.createElement('div'); c.className='clip '+kind; c.style.width=(60+Math.random()*60)+'px';
+  c.textContent={vid:'Séquence',aud:'Piste',txt:'Titre'}[kind]+' '+clipN[kind];
+  c.onclick=()=>c.remove(); c.title='Cliquer pour retirer';
+  document.getElementById(lane).appendChild(c);
+}
+
+function toggleGrp(id){ document.getElementById(id).classList.toggle('open'); }
+
+/* ── Projets : historique (localStorage) ── */
+function currentProject(){ const rl=id=>[...document.getElementById(id).children].map(c=>c.textContent);
+  return { name:document.getElementById('proj-name').value.trim()||'Projet sans titre', date:Date.now(),
+    timeline:{vid:rl('lane-vid'),aud:rl('lane-aud'),txt:rl('lane-txt')} }; }
+function saveProject(){ const p=currentProject(); const projs=JSON.parse(localStorage.getItem('av_projects')||'[]');
+  const i=projs.findIndex(x=>x.name===p.name); if(i>=0)projs[i]=p; else projs.unshift(p);
+  localStorage.setItem('av_projects',JSON.stringify(projs.slice(0,20))); renderHistory(); toast('💾 Projet enregistré'); }
+function renderHistory(){ const projs=JSON.parse(localStorage.getItem('av_projects')||'[]'); const h=document.getElementById('history');
+  if(!projs.length){ h.innerHTML=`<div style="color:#5b6478;font-size:12px;">Aucun projet enregistré.</div>`; return; }
+  h.innerHTML=projs.map((p,i)=>`<div class="hist-item" onclick="loadProject(${i})">🎬 ${p.name}<div class="d">${new Date(p.date).toLocaleString('fr')} · ${(p.timeline.vid.length+p.timeline.aud.length+p.timeline.txt.length)} élément(s)</div></div>`).join(''); }
+function loadProject(i){ const projs=JSON.parse(localStorage.getItem('av_projects')||'[]'); const p=projs[i]; if(!p)return;
+  document.getElementById('proj-name').value=p.name;
+  ['vid','aud','txt'].forEach(k=>{ const lane=document.getElementById('lane-'+k); lane.innerHTML='';
+    (p.timeline[k]||[]).forEach(txt=>{ const c=document.createElement('div'); c.className='clip '+k; c.style.width='80px'; c.textContent=txt; c.onclick=()=>c.remove(); lane.appendChild(c); }); });
+  toast('📂 Projet « '+p.name+' » chargé'); }
+
+function openExport(){ opExport(); }
+function scrollToPublish(){ const g=document.getElementById('grp-publier'); g.classList.add('open'); g.scrollIntoView({behavior:'smooth'}); }
+
+/* Init */
+loadMedia(); renderFolders(); renderHistory();
+
+</script>
+</body>
+</html>

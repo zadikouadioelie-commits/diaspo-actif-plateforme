@@ -2827,9 +2827,24 @@ async function initFormations() {
       </div>
       <div style="margin-top:12px;display:flex;gap:8px;">
         <button class="btn btn-orange btn-sm btn-inscrire" data-id="${f.id}" data-titre="${f.titre}">S'inscrire</button>
-        <button class="btn btn-outline btn-sm">En savoir plus</button>
+        <button class="btn btn-outline btn-sm btn-favori-formation" data-id="${f.id}" title="Ajouter aux favoris">☆</button>
       </div>
     </div>`;
+  }
+
+  async function refreshFavoriButtons(){
+    try {
+      const me = await fetchCurrentUser();
+      if (!me) return;
+      const { favoris } = await api("GET", "/formation-favoris");
+      const ids = new Set((favoris||[]).map(f=>f.id));
+      grid.querySelectorAll(".btn-favori-formation").forEach(btn=>{
+        const isFav = ids.has(+btn.dataset.id);
+        btn.textContent = isFav ? "★" : "☆";
+        btn.dataset.fav = isFav ? "1" : "0";
+        btn.title = isFav ? "Retirer des favoris" : "Ajouter aux favoris";
+      });
+    } catch(_) {}
   }
 
   function apply() {
@@ -2856,13 +2871,43 @@ async function initFormations() {
     grid.querySelectorAll(".btn-inscrire").forEach(btn => {
       btn.addEventListener("click", async () => {
         const me = await fetchCurrentUser();
-        if (!me) { alert("Connectez-vous pour vous inscrire à une formation."); return; }
-        btn.textContent = "✓ Inscrit !";
+        if (!me) { showMsg("Connectez-vous pour vous inscrire à une formation.", "warning"); return; }
         btn.disabled = true;
-        btn.classList.remove("btn-orange");
-        btn.classList.add("btn-outline");
+        try {
+          const r = await api("POST", `/formations/${btn.dataset.id}/inscrire`, {});
+          if (r.checkout_url) {
+            showMsg("Redirection vers le paiement sécurisé Stripe…", "success");
+            window.location.href = r.checkout_url;
+            return;
+          }
+          try { await api("POST", "/formations/suivi", { formation_id: +btn.dataset.id }); } catch(_) {}
+          btn.textContent = "✓ Inscrit !";
+          btn.classList.remove("btn-orange");
+          btn.classList.add("btn-outline");
+          showMsg("Inscription confirmée ! Retrouvez-la dans « Mes inscriptions ».", "success");
+        } catch(e) {
+          if (e.message && e.message.includes("Déjà inscrit")) {
+            btn.textContent = "✓ Déjà inscrit";
+            btn.classList.remove("btn-orange"); btn.classList.add("btn-outline");
+          } else { showMsg(e.message || "Erreur lors de l'inscription.", "danger"); btn.disabled = false; }
+        }
       });
     });
+    grid.querySelectorAll(".btn-favori-formation").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const me = await fetchCurrentUser();
+        if (!me) { showMsg("Connectez-vous pour ajouter une formation en favori.", "warning"); return; }
+        const isFav = btn.dataset.fav === "1";
+        try {
+          if (isFav) await api("DELETE", `/formation-favoris/${btn.dataset.id}`);
+          else await api("POST", `/formation-favoris/${btn.dataset.id}`, {});
+          btn.textContent = isFav ? "☆" : "★";
+          btn.dataset.fav = isFav ? "0" : "1";
+          btn.title = isFav ? "Ajouter aux favoris" : "Retirer des favoris";
+        } catch(e) { showMsg(e.message || "Erreur.", "danger"); }
+      });
+    });
+    refreshFavoriButtons();
   }
 
   // Peupler filtres
