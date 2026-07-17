@@ -9997,6 +9997,119 @@ route("GET", "/api/admin/finances", async (req, res) => {
   });
 });
 
+/* ===== MODULE PAIEMENTS (Lot 1) — tableau de bord agrégé en lecture seule + moyens de paiement =====
+   Ne touche à aucune table de paiement existante (wallet_transactions, commandes_vitrine,
+   adhesion_paiements, transactions) : lecture seule, agrégation. Limité pour l'instant à
+   carte bancaire / PayPal / virement bancaire. */
+
+route("GET", "/api/admin/paiements/methodes", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  let methodes = await db.prepare("SELECT * FROM payment_methods_config ORDER BY code").all();
+  if (!methodes.length) {
+    methodes = [
+      { code: 'carte', libelle: 'Carte bancaire', actif: 1 },
+      { code: 'paypal', libelle: 'PayPal', actif: 1 },
+      { code: 'virement', libelle: 'Virement bancaire', actif: 1 },
+    ];
+  }
+  sendJSON(res, 200, { methodes });
+});
+
+route("PUT", "/api/admin/paiements/methodes/:code", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  if (!['carte', 'paypal', 'virement'].includes(params.code)) return sendJSON(res, 400, { error: "Moyen de paiement inconnu." });
+  const libelles = { carte: 'Carte bancaire', paypal: 'PayPal', virement: 'Virement bancaire' };
+  const actif = body.actif ? 1 : 0;
+  const existe = await db.prepare("SELECT code FROM payment_methods_config WHERE code=?").get(params.code);
+  if (existe) await db.prepare("UPDATE payment_methods_config SET actif=?, updated_at=datetime('now') WHERE code=?").run(actif, params.code);
+  else await db.prepare("INSERT INTO payment_methods_config (code, libelle, actif) VALUES (?,?,?)").run(params.code, libelles[params.code], actif);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/admin/paiements/dashboard", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  const auj = "date('now')", debutSemaine = "datetime('now','-7 days')", debutMois = "datetime('now','-30 days')";
+
+  // Boutique (commandes_vitrine)
+  let boutique = { revenu:0, reussis:0, en_attente:0, refuses:0, revenu_jour:0, revenu_semaine:0, revenu_mois:0 };
+  try {
+    boutique = await db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN statut='traitee' THEN montant_total ELSE 0 END),0) AS revenu,
+        COUNT(CASE WHEN statut='traitee' THEN 1 END) AS reussis,
+        COUNT(CASE WHEN statut='en_attente' THEN 1 END) AS en_attente,
+        COUNT(CASE WHEN statut='annulee' THEN 1 END) AS refuses,
+        COALESCE(SUM(CASE WHEN statut='traitee' AND date(created_at)=${auj} THEN montant_total ELSE 0 END),0) AS revenu_jour,
+        COALESCE(SUM(CASE WHEN statut='traitee' AND created_at>=${debutSemaine} THEN montant_total ELSE 0 END),0) AS revenu_semaine,
+        COALESCE(SUM(CASE WHEN statut='traitee' AND created_at>=${debutMois} THEN montant_total ELSE 0 END),0) AS revenu_mois
+      FROM commandes_vitrine
+    `).get();
+  } catch (_) {}
+
+  // Adhésions
+  let adhesions = { revenu:0, reussis:0, en_attente:0, refuses:0, rembourses:0, revenu_jour:0, revenu_semaine:0, revenu_mois:0 };
+  let parDevise = [];
+  try {
+    adhesions = await db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN statut='paye' THEN montant ELSE 0 END),0) AS revenu,
+        COUNT(CASE WHEN statut='paye' THEN 1 END) AS reussis,
+        COUNT(CASE WHEN statut='en_attente' THEN 1 END) AS en_attente,
+        COUNT(CASE WHEN statut='echoue' THEN 1 END) AS refuses,
+        COUNT(CASE WHEN statut='rembourse' THEN 1 END) AS rembourses,
+        COALESCE(SUM(CASE WHEN statut='paye' AND date(date_paiement)=${auj} THEN montant ELSE 0 END),0) AS revenu_jour,
+        COALESCE(SUM(CASE WHEN statut='paye' AND date_paiement>=${debutSemaine} THEN montant ELSE 0 END),0) AS revenu_semaine,
+        COALESCE(SUM(CASE WHEN statut='paye' AND date_paiement>=${debutMois} THEN montant ELSE 0 END),0) AS revenu_mois
+      FROM adhesion_paiements
+    `).get();
+    parDevise = await db.prepare(`
+      SELECT devise, COALESCE(SUM(montant),0) AS total FROM adhesion_paiements WHERE statut='paye' GROUP BY devise
+    `).all();
+  } catch (_) {}
+
+  // Billetterie + abonnements (wallet_transactions — ledger immuable, insert-only donc tout y est "réussi")
+  let billetterie = { commission:0, revenu_organisateurs:0, nb:0, commission_jour:0, commission_semaine:0, commission_mois:0 };
+  try {
+    billetterie = await db.prepare(`
+      SELECT
+        COALESCE(SUM(platform_fee),0) AS commission,
+        COALESCE(SUM(organizer_amount),0) AS revenu_organisateurs,
+        COUNT(*) AS nb,
+        COALESCE(SUM(CASE WHEN date(timestamp)=${auj} THEN platform_fee ELSE 0 END),0) AS commission_jour,
+        COALESCE(SUM(CASE WHEN timestamp>=${debutSemaine} THEN platform_fee ELSE 0 END),0) AS commission_semaine,
+        COALESCE(SUM(CASE WHEN timestamp>=${debutMois} THEN platform_fee ELSE 0 END),0) AS commission_mois
+      FROM wallet_transactions
+    `).get();
+  } catch (_) {}
+
+  // Solde des commissions Diaspo'Actif
+  let wallet = { total_commissions: 0, total_transactions: 0 };
+  try { wallet = await db.prepare("SELECT * FROM platform_wallet WHERE id=1").get() || wallet; } catch (_) {}
+
+  const revenu_total = (boutique.revenu||0) + (adhesions.revenu||0) + (billetterie.revenu_organisateurs||0);
+  const paiements_aujourdhui = (boutique.revenu_jour||0) + (adhesions.revenu_jour||0) + (billetterie.commission_jour||0);
+  const paiements_semaine = (boutique.revenu_semaine||0) + (adhesions.revenu_semaine||0) + (billetterie.commission_semaine||0);
+  const paiements_mois = (boutique.revenu_mois||0) + (adhesions.revenu_mois||0) + (billetterie.commission_mois||0);
+
+  sendJSON(res, 200, {
+    revenu_total,
+    paiements_aujourdhui,
+    paiements_semaine,
+    paiements_mois,
+    paiements_reussis: (boutique.reussis||0) + (adhesions.reussis||0) + (billetterie.nb||0),
+    paiements_en_attente: (boutique.en_attente||0) + (adhesions.en_attente||0),
+    paiements_refuses: (boutique.refuses||0) + (adhesions.refuses||0),
+    remboursements: adhesions.rembourses||0,
+    solde_commissions: wallet.total_commissions||0,
+    par_devise: parDevise,
+    detail: { boutique, adhesions, billetterie }
+  });
+});
+
 /* ===== PLANS D'ABONNEMENT — CRUD ===== */
 
 route("GET", "/api/admin/plans", async (req, res) => {

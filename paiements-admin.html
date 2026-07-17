@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Module Paiements</title>
+<meta name="viewport" content="width=1280">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+.pay-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:28px;}
+.pay-dash-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;}
+.pay-dash-num{font-size:22px;font-weight:800;color:#ff6b00;}
+.pay-dash-lbl{font-size:12px;color:var(--muted);margin-top:4px;}
+.pay-methode-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:#fff;}
+.pay-switch{position:relative;display:inline-block;width:44px;height:24px;}
+.pay-switch input{opacity:0;width:0;height:0;}
+.pay-switch-track{position:absolute;inset:0;background:#cbd5e1;border-radius:99px;cursor:pointer;transition:background .18s;}
+.pay-switch-track::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .18s;}
+.pay-switch input:checked + .pay-switch-track{background:#22c55e;}
+.pay-switch input:checked + .pay-switch-track::after{transform:translateX(20px);}
+.notice{padding:16px;color:var(--muted);}
+</style>
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="dashboard-administrateur.html">← Tableau de bord admin</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:32px;padding-bottom:60px;">
+    <div style="margin-bottom:24px;">
+      <h1 style="margin:0;font-size:24px;">💳 Module Paiements</h1>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Vue centralisée en lecture seule des paiements de la plateforme (Boutique, Adhésions, Billetterie). Moyens de paiement disponibles pour l'instant : carte bancaire, PayPal, virement bancaire.</p>
+    </div>
+
+    <div id="pay-access-denied" style="display:none;" class="notice">Réservé aux administrateurs.</div>
+
+    <div id="pay-content" style="display:none;">
+      <h2 style="font-size:16px;margin:0 0 12px;">🎛️ Tableau de bord</h2>
+      <div class="pay-dash-grid" id="pay-dash-grid"><div class="notice">Chargement…</div></div>
+
+      <h2 style="font-size:16px;margin:24px 0 12px;">Moyens de paiement</h2>
+      <div id="pay-methodes-list"><div class="notice">Chargement…</div></div>
+    </div>
+  </main>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtMontant(n, devise){ return (n||0).toFixed(2) + ' ' + (devise||'€'); }
+
+async function initPaiementsAdmin(){
+  const me = await fetchCurrentUser().catch(()=>null);
+  if(!me || me.role !== 'administrateur'){
+    document.getElementById('pay-access-denied').style.display = '';
+    return;
+  }
+  document.getElementById('pay-content').style.display = '';
+  loadDashboard();
+  loadMethodes();
+}
+
+async function loadDashboard(){
+  const el = document.getElementById('pay-dash-grid');
+  try {
+    const d = await api('GET', '/admin/paiements/dashboard');
+    const cards = [
+      [fmtMontant(d.revenu_total,'€'), "Chiffre d'affaires"],
+      [fmtMontant(d.paiements_aujourdhui,'€'), "Paiements aujourd'hui"],
+      [fmtMontant(d.paiements_semaine,'€'), 'Paiements cette semaine'],
+      [fmtMontant(d.paiements_mois,'€'), 'Paiements ce mois'],
+      [d.paiements_reussis, 'Paiements réussis'],
+      [d.paiements_en_attente, 'Paiements en attente'],
+      [d.paiements_refuses, 'Paiements refusés'],
+      [d.remboursements, 'Remboursements'],
+      [fmtMontant(d.solde_commissions,'€'), "Solde des commissions Diaspo'Actif"],
+    ];
+    let html = cards.map(([num,lbl]) => `<div class="pay-dash-card"><div class="pay-dash-num">${num}</div><div class="pay-dash-lbl">${lbl}</div></div>`).join('');
+    if(d.par_devise && d.par_devise.length){
+      html += d.par_devise.map(dv => `<div class="pay-dash-card"><div class="pay-dash-num">${fmtMontant(dv.total, dv.devise)}</div><div class="pay-dash-lbl">Paiements en ${escH(dv.devise)}</div></div>`).join('');
+    }
+    el.innerHTML = html;
+  } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement du tableau de bord.</div>'; }
+}
+
+async function loadMethodes(){
+  const el = document.getElementById('pay-methodes-list');
+  try {
+    const { methodes } = await api('GET', '/admin/paiements/methodes');
+    el.innerHTML = methodes.map(m => `
+      <div class="pay-methode-row">
+        <span style="font-weight:700;">${escH(m.libelle)}</span>
+        <label class="pay-switch">
+          <input type="checkbox" class="pay-methode-toggle" data-code="${m.code}" ${m.actif ? 'checked' : ''}>
+          <span class="pay-switch-track"></span>
+        </label>
+      </div>`).join('');
+    el.querySelectorAll('.pay-methode-toggle').forEach(cb => {
+      cb.addEventListener('change', async () => {
+        try { await api('PUT', `/admin/paiements/methodes/${cb.dataset.code}`, { actif: cb.checked }); }
+        catch(e){ cb.checked = !cb.checked; showMsg(e.message||'Erreur.', 'danger'); }
+      });
+    });
+  } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+}
+
+initPaiementsAdmin();
+</script>
+</body>
+</html>

@@ -1030,6 +1030,22 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
   INSERT OR IGNORE INTO platform_wallet (id, total_commissions, total_transactions) VALUES (1, 0, 0);
+
+  /* ── Module Paiements — Lot 1 : moyens de paiement centralisés (lecture seule sur l'existant) ──
+     Volontairement limité à carte bancaire / PayPal / virement bancaire pour l'instant.
+     N'écrit dans aucune table de paiement existante (wallet_transactions, commandes_vitrine,
+     adhesion_paiements, transactions) : ce module ne fait qu'agréger en lecture et piloter
+     l'activation des moyens de paiement. */
+  CREATE TABLE IF NOT EXISTS payment_methods_config (
+    code TEXT PRIMARY KEY CHECK(code IN ('carte','paypal','virement')),
+    libelle TEXT NOT NULL,
+    actif INTEGER DEFAULT 1,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+  INSERT OR IGNORE INTO payment_methods_config (code, libelle, actif) VALUES
+    ('carte', 'Carte bancaire', 1),
+    ('paypal', 'PayPal', 1),
+    ('virement', 'Virement bancaire', 1);
 `);
 
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
