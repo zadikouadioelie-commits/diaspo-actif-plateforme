@@ -10,9 +10,9 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "assets/logo.svg",
+      "src": "assets/logo.png",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
@@ -21,19 +21,19 @@
       "name": "Fil d'actualité",
       "short_name": "Fil",
       "url": "/fil-actualite.html",
-      "icons": [{ "src": "assets/logo.svg", "sizes": "any" }]
+      "icons": [{ "src": "assets/logo.png", "sizes": "any" }]
     },
     {
       "name": "Messagerie",
       "short_name": "Messages",
       "url": "/messagerie.html",
-      "icons": [{ "src": "assets/logo.svg", "sizes": "any" }]
+      "icons": [{ "src": "assets/logo.png", "sizes": "any" }]
     },
     {
       "name": "Annuaire",
       "short_name": "Annuaire",
       "url": "/annuaire.html",
-      "icons": [{ "src": "assets/logo.svg", "sizes": "any" }]
+      "icons": [{ "src": "assets/logo.png", "sizes": "any" }]
     }
   ],
   "categories": ["social", "business", "education"]

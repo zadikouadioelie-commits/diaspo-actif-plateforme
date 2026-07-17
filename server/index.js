@@ -13680,7 +13680,7 @@ async function handleRequest(req, res) {
       if (init && init.vitrine_active === 1) {
         title = `${init.nom} — Vitrine | Diaspo'Actif`;
         description = (init.description || `Découvrez ${init.nom} et ses produits sur Diaspo'Actif.`).slice(0, 160);
-        image = init.vitrine_banniere_url || `${base}/assets/logo.svg`;
+        image = init.vitrine_banniere_url || `${base}/assets/logo.png`;
         const adresseParts = [init.vitrine_ville, init.vitrine_region, init.vitrine_pays].filter(Boolean);
         jsonLd = `<script type="application/ld+json">${JSON.stringify({
           "@context": "https://schema.org", "@type": "LocalBusiness",
@@ -13690,16 +13690,16 @@ async function handleRequest(req, res) {
       } else if (init && init.vitrine_active !== 1) {
         title = `Diaspo'Actif — Profil`;
         description = `Rejoignez Diaspo'Actif, la plateforme de la diaspora.`;
-        image = `${base}/assets/logo.svg`;
+        image = `${base}/assets/logo.png`;
         noindex = true;
       } else if (u) {
         title = `${[u.prenom, u.nom].filter(Boolean).join(' ')} — Diaspo'Actif`;
         description = `Profil de ${[u.prenom, u.nom].filter(Boolean).join(' ')} sur Diaspo'Actif.`;
-        image = `${base}/assets/logo.svg`;
+        image = `${base}/assets/logo.png`;
       } else {
         title = `Diaspo'Actif — Profil`;
         description = `Rejoignez Diaspo'Actif, la plateforme de la diaspora.`;
-        image = `${base}/assets/logo.svg`;
+        image = `${base}/assets/logo.png`;
         noindex = true;
       }
 
