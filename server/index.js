@@ -11521,8 +11521,8 @@ route("GET", "/api/offres/accueil", async (req, res) => {
   })));
 
   const recruteurs = await db.prepare(`
-    SELECT o.createur_id, u.nom AS createur_nom, u.role AS createur_role, u.photo_url AS createur_photo,
-      o.initiative_id, COUNT(*) n
+    SELECT o.createur_id, MIN(u.nom) AS createur_nom, MIN(u.role) AS createur_role, MIN(u.photo_url) AS createur_photo,
+      MIN(o.initiative_id) AS initiative_id, COUNT(*) n
     FROM offres o JOIN users u ON u.id=o.createur_id
     WHERE ${baseWhere}
     GROUP BY o.createur_id ORDER BY n DESC LIMIT 6
