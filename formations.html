@@ -1133,6 +1133,7 @@
     const text = input.value.trim();
     if(!text) return;
     input.value = '';
+    window.fbAiResetMicBeforeSend && window.fbAiResetMicBeforeSend();
     fbAiHandleUserMessage(text);
   }
   document.getElementById('fb-ai-send').addEventListener('click', fbAiSend);
@@ -1199,6 +1200,14 @@
       document.getElementById('fb-ai-input').value = '';
       try { recognition.start(); } catch(_) { listening = false; micBtn.classList.remove('recording'); }
     });
+
+    // Appelé avant l'envoi d'un message : si le micro écoutait encore, on l'arrête et on
+    // vide la transcription en mémoire pour que la prochaine dictée reparte de zéro
+    // (sans quoi la phrase précédente réapparaissait au début de la suivante).
+    window.fbAiResetMicBeforeSend = () => {
+      finalTranscript = '';
+      if (listening) { stoppedManually = true; recognition.stop(); }
+    };
   })();
 
   let fbAutosaveTimer = null;
