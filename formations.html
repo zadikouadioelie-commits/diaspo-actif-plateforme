@@ -543,7 +543,7 @@
         <!-- Section Tarification -->
         <div class="fb-panel" data-fb-panel="tarification" style="display:none;flex-direction:column;gap:12px;">
             <div style="display:flex;gap:14px;align-items:center;">
-              <label class="fb-switch"><input type="checkbox" id="new-form-gratuit" checked><span class="fb-switch-track"></span> <span style="font-size:13px;font-weight:700;">Formation gratuite</span></label>
+              <label class="fb-switch"><input type="checkbox" id="new-form-gratuit"><span class="fb-switch-track"></span> <span style="font-size:13px;font-weight:700;">Formation gratuite</span></label>
               <span class="fb-help" title="Une formation gratuite est diffusée sans commission Diaspo'Actif. Décochez pour fixer un prix.">?</span>
             </div>
             <div id="mfw-tarif-block" style="display:none;flex-direction:column;gap:12px;">
@@ -555,7 +555,7 @@
                   </select>
                 </div>
               </div>
-              <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;"><input type="checkbox" id="new-form-promo-active"> Activer une promotion <span class="fb-help" title="Affiche un prix barré et un prix réduit pendant une période donnée.">?</span></label>
+              <label class="fb-switch" style="font-size:13px;font-weight:700;"><input type="checkbox" id="new-form-promo-active"><span class="fb-switch-track"></span> Activer une promotion <span class="fb-help" title="Affiche un prix barré et un prix réduit pendant une période donnée.">?</span></label>
               <div id="mfw-promo-block" style="display:none;" class="grid grid-2" style="gap:10px;">
                 <div><label style="font-size:13px;font-weight:700;">Réduction (%)</label><input type="number" min="1" max="99" id="new-form-promo-pct" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 20"></div>
                 <div><label style="font-size:13px;font-weight:700;">Fin de la promotion</label><input type="date" id="new-form-promo-fin" class="input-field" style="width:100%;margin-top:4px;"></div>
@@ -1438,7 +1438,7 @@
   document.getElementById("btn-creer-formation")?.addEventListener("click", async ()=>{
     try {
       const titre = 'Nouvelle formation';
-      const { id } = await api('POST', '/formations', { titre, mode_acces: 'gratuit' });
+      const { id } = await api('POST', '/formations', { titre, mode_acces: 'payant' });
       await openFormationBuilder(id, titre, 'brouillon');
       document.getElementById('fb-ai-toggle').click(); // ouvre directement l'assistant IA, prêt à décrire la formation
       document.getElementById('new-form-titre').focus();
