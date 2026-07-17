@@ -1005,7 +1005,7 @@
     ['travail_pratique','🛠️ Travail pratique'],['classe_virtuelle','🖥️ Classe virtuelle'],['session_direct','🔴 Session en direct']
   ];
 
-  // ── Modules & Leçons ──
+  // ── Modules & Chapitres & Leçons ──
   async function fbLoadModules(){
     const el = document.getElementById('fb-modules-list');
     el.innerHTML = '<div class="notice">Chargement…</div>';
@@ -1021,17 +1021,32 @@
             </div>
             <button class="btn btn-sm btn-outline fb-del-module" data-id="${m.id}">🗑️</button>
           </div>
-          <div class="fb-lecons" data-module-id="${m.id}">
-            ${m.lecons.map(l => `
-              <div class="fb-lecon-row" draggable="true" data-lecon-id="${l.id}">
-                <span class="fb-drag-handle">⠿</span>
-                <span style="flex:1;">${(FB_LECON_TYPES.find(t=>t[0]===l.type)||['','?'])[1]} — ${l.titre}${l.duree_minutes?` (${l.duree_minutes} min)`:''}</span>
-                <button class="btn btn-sm btn-outline fb-edit-lecon" data-id="${l.id}" data-module-id="${m.id}">✏️</button>
-                <button class="btn btn-sm btn-outline fb-del-lecon" data-id="${l.id}">🗑️</button>
+          <div class="fb-chapitres" data-module-id="${m.id}">
+            ${(m.chapitres||[]).map(c => `
+              <div class="fb-chapitre-card" draggable="true" data-chapitre-id="${c.id}" data-module-id="${m.id}" style="margin:10px 0 0 18px;padding:10px;border:1px solid var(--border);border-radius:8px;">
+                <div class="flex-between">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="fb-drag-handle">⠿</span>
+                    <span>📖 ${c.titre}</span>
+                  </div>
+                  <button class="btn btn-sm btn-outline fb-del-chapitre" data-id="${c.id}" data-module-id="${m.id}">🗑️</button>
+                </div>
+                <div class="fb-lecons" data-chapitre-id="${c.id}">
+                  ${c.lecons.map(l => `
+                    <div class="fb-lecon-row" draggable="true" data-lecon-id="${l.id}">
+                      <span class="fb-drag-handle">⠿</span>
+                      <span style="flex:1;">${(FB_LECON_TYPES.find(t=>t[0]===l.type)||['','?'])[1]} — ${l.titre}${l.duree_minutes?` (${l.duree_minutes} min)`:''}</span>
+                      <button class="btn btn-sm btn-outline fb-edit-lecon" data-id="${l.id}" data-chapitre-id="${c.id}">✏️</button>
+                      <button class="btn btn-sm btn-outline fb-del-lecon" data-id="${l.id}">🗑️</button>
+                    </div>`).join('')}
+                </div>
+                <div style="margin-top:8px;">
+                  <button class="btn btn-sm btn-outline fb-add-lecon" data-chapitre-id="${c.id}">+ Ajouter une leçon</button>
+                </div>
               </div>`).join('')}
           </div>
           <div style="margin-top:10px;">
-            <button class="btn btn-sm btn-outline fb-add-lecon" data-module-id="${m.id}">+ Ajouter une leçon</button>
+            <button class="btn btn-sm btn-outline fb-add-chapitre" data-module-id="${m.id}">+ Ajouter un chapitre</button>
           </div>
         </div>`).join('');
       fbWireModuleEvents();
@@ -1050,12 +1065,25 @@
 
   function fbWireModuleEvents(){
     document.querySelectorAll('.fb-del-module').forEach(b=>b.addEventListener('click', async ()=>{
-      if(!confirm('Supprimer ce module et toutes ses leçons ?')) return;
+      if(!confirm('Supprimer ce module, ses chapitres et toutes leurs leçons ?')) return;
       await api('DELETE', `/formations/${fbFormationId}/modules/${b.dataset.id}`);
       fbLoadModules();
     }));
-    document.querySelectorAll('.fb-add-lecon').forEach(b=>b.addEventListener('click', ()=> fbOpenLeconForm(b.dataset.moduleId)));
-    document.querySelectorAll('.fb-edit-lecon').forEach(b=>b.addEventListener('click', ()=> fbOpenLeconForm(b.dataset.moduleId, b.dataset.id)));
+    document.querySelectorAll('.fb-add-chapitre').forEach(b=>b.addEventListener('click', async ()=>{
+      const titre = prompt('Titre du chapitre :', '');
+      if(titre===null || !titre.trim()) return;
+      try {
+        await api('POST', `/formations/${fbFormationId}/modules/${b.dataset.moduleId}/chapitres`, { titre: titre.trim() });
+        fbLoadModules();
+      } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+    }));
+    document.querySelectorAll('.fb-del-chapitre').forEach(b=>b.addEventListener('click', async ()=>{
+      if(!confirm('Supprimer ce chapitre et toutes ses leçons ?')) return;
+      await api('DELETE', `/formations/${fbFormationId}/modules/${b.dataset.moduleId}/chapitres/${b.dataset.id}`);
+      fbLoadModules();
+    }));
+    document.querySelectorAll('.fb-add-lecon').forEach(b=>b.addEventListener('click', ()=> fbOpenLeconForm(b.dataset.chapitreId)));
+    document.querySelectorAll('.fb-edit-lecon').forEach(b=>b.addEventListener('click', ()=> fbOpenLeconForm(b.dataset.chapitreId, b.dataset.id)));
     document.querySelectorAll('.fb-del-lecon').forEach(b=>b.addEventListener('click', async ()=>{
       if(!confirm('Supprimer cette leçon ?')) return;
       await api('DELETE', `/formations/${fbFormationId}/lecons/${b.dataset.id}`);
@@ -1080,7 +1108,27 @@
       });
     });
 
-    // Drag & drop réordonnancement des leçons (au sein d'un même module)
+    // Drag & drop réordonnancement des chapitres (au sein d'un même module)
+    document.querySelectorAll('.fb-chapitres').forEach(container=>{
+      const cards = [...container.querySelectorAll('.fb-chapitre-card')];
+      let dragChapId = null;
+      cards.forEach(card=>{
+        card.addEventListener('dragstart', e=>{ dragChapId = card.dataset.chapitreId; e.stopPropagation(); });
+        card.addEventListener('dragover', e=>{ e.preventDefault(); e.stopPropagation(); card.classList.add('dragover'); });
+        card.addEventListener('dragleave', ()=> card.classList.remove('dragover'));
+        card.addEventListener('drop', async e=>{
+          e.preventDefault(); e.stopPropagation(); card.classList.remove('dragover');
+          if(!dragChapId || dragChapId===card.dataset.chapitreId) return;
+          const ids = cards.map(c=>c.dataset.chapitreId);
+          const from = ids.indexOf(dragChapId), to = ids.indexOf(card.dataset.chapitreId);
+          ids.splice(to,0,ids.splice(from,1)[0]);
+          await api('PUT', `/formations/${fbFormationId}/modules/${container.dataset.moduleId}/chapitres/reorder`, { ordre: ids });
+          fbLoadModules();
+        });
+      });
+    });
+
+    // Drag & drop réordonnancement des leçons (au sein d'un même chapitre)
     document.querySelectorAll('.fb-lecons').forEach(container=>{
       const rows = [...container.querySelectorAll('.fb-lecon-row')];
       let dragLeconId = null;
@@ -1094,14 +1142,14 @@
           const ids = rows.map(r=>r.dataset.leconId);
           const from = ids.indexOf(dragLeconId), to = ids.indexOf(row.dataset.leconId);
           ids.splice(to,0,ids.splice(from,1)[0]);
-          await api('PUT', `/formations/${fbFormationId}/modules/${container.dataset.moduleId}/lecons/reorder`, { ordre: ids });
+          await api('PUT', `/formations/${fbFormationId}/chapitres/${container.dataset.chapitreId}/lecons/reorder`, { ordre: ids });
           fbLoadModules();
         });
       });
     });
   }
 
-  function fbOpenLeconForm(moduleId, leconId){
+  function fbOpenLeconForm(chapitreId, leconId){
     const typeOptions = FB_LECON_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
     const titre = prompt('Titre de la leçon :', '');
     if(titre===null || !titre.trim()) return;
@@ -1113,7 +1161,7 @@
     const payload = { titre: titre.trim(), type: type.trim()||'texte', duree_minutes: duree?parseInt(duree):null, contenu_url: contenu_url||null, contenu_texte: contenu_texte||null };
     const req = leconId
       ? api('PUT', `/formations/${fbFormationId}/lecons/${leconId}`, payload)
-      : api('POST', `/formations/${fbFormationId}/modules/${moduleId}/lecons`, payload);
+      : api('POST', `/formations/${fbFormationId}/chapitres/${chapitreId}/lecons`, payload);
     req.then(()=> fbLoadModules()).catch(e=> showMsg(e.message||'Erreur.', 'danger'));
   }
 

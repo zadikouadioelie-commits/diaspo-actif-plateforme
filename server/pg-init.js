@@ -668,6 +668,7 @@ async function migratePg(pool) {
     ['offres', 'certifications_requises', "TEXT DEFAULT '[]'"],
     ['offres', 'pieces_demandees', 'TEXT DEFAULT \'["cv","lettre"]\''],
     ['offres', 'nb_vues', 'INTEGER DEFAULT 0'],
+    ['formation_lecons', 'chapitre_id', 'INTEGER'],
   ];
   for (const [table, col, type] of cols) {
     try {

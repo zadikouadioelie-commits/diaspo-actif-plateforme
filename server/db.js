@@ -1034,6 +1034,8 @@ db.exec(`
 
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
 const MIGRATIONS = [
+  // Formations — ajout du niveau Chapitre entre Module et Leçon
+  ["formation_lecons", "chapitre_id INTEGER"],
   // Billetterie V1 — early-bird + attributs enrichis par type de billet
   ["ticket_types", "avantages TEXT"],
   ["ticket_types", "devise TEXT DEFAULT 'EUR'"],
@@ -3247,9 +3249,19 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(formation_id) REFERENCES formations(id)
   );
+  CREATE TABLE IF NOT EXISTS formation_chapitres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    module_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(module_id) REFERENCES formation_modules(id)
+  );
   CREATE TABLE IF NOT EXISTS formation_lecons (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     module_id INTEGER NOT NULL,
+    chapitre_id INTEGER,
     titre TEXT NOT NULL,
     description TEXT,
     type TEXT NOT NULL DEFAULT 'texte' CHECK(type IN (
@@ -3263,7 +3275,8 @@ db.exec(`
     image_url TEXT,
     ordre INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(module_id) REFERENCES formation_modules(id)
+    FOREIGN KEY(module_id) REFERENCES formation_modules(id),
+    FOREIGN KEY(chapitre_id) REFERENCES formation_chapitres(id)
   );
 
   /* ── Étape 7 : quiz et évaluations (rattachés à une leçon de type quiz, ou à la formation pour l'examen final) ── */
