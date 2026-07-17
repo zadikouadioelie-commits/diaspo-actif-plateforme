@@ -379,10 +379,14 @@ async function applyAuthState() {
   const user = await fetchCurrentUser();
   if (user) {
     injectNotifStyles();
-    const premiumBtnHtml = user.role === 'utilisateur' ? `
-      <a href="premium.html?type=utilisateur" id="premium-topbar-btn" style="text-decoration:none;display:none;flex-direction:column;align-items:center;gap:1px;background:linear-gradient(135deg,#F5D061,#C9971C);color:#000;font-weight:800;font-size:12.5px;padding:6px 14px;border-radius:14px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Passer à Premium">
+    const premiumSousTitres = {
+      utilisateur: '1 abonnement · 6 modules accessibles',
+      initiative: '1 abonnement · tous les modules Initiative',
+    };
+    const premiumBtnHtml = (user.role === 'utilisateur' || user.role === 'initiative') ? `
+      <a href="premium.html?type=${user.role}" id="premium-topbar-btn" style="text-decoration:none;display:none;flex-direction:column;align-items:center;gap:1px;background:linear-gradient(135deg,#F5D061,#C9971C);color:#000;font-weight:800;font-size:12.5px;padding:6px 14px;border-radius:14px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Passer à Premium">
         <span><span style="font-size:14px;">👑</span> Passer à Premium</span>
-        <span style="font-size:9.5px;font-weight:700;color:#000;opacity:.85;">1 abonnement · 6 modules accessibles</span>
+        <span style="font-size:9.5px;font-weight:700;color:#000;opacity:.85;">${premiumSousTitres[user.role]}</span>
       </a>` : '';
     el.innerHTML = `
       ${premiumBtnHtml}
@@ -409,12 +413,16 @@ async function applyAuthState() {
       window.location.href = "index.html";
     });
     // Bouton "Passer à Premium" : visible seulement si pas déjà abonné
-    if (user.role === 'utilisateur') {
+    if (user.role === 'utilisateur' || user.role === 'initiative') {
+      const accredType = user.role === 'initiative' ? 'initiative_abonne' : 'utilisateur_abonne';
       api("GET", "/accreditations/mes").then(r => {
-        const dejaAbonne = (r.accreditations || []).some(a => a.type === 'utilisateur_abonne' && a.statut === 'active');
+        const dejaAbonne = (r.accreditations || []).some(a => a.type === accredType && a.statut === 'active');
         const btn = document.getElementById('premium-topbar-btn');
         if (btn && !dejaAbonne) btn.style.display = 'flex';
-      }).catch(() => {});
+      }).catch(() => {
+        const btn = document.getElementById('premium-topbar-btn');
+        if (btn) btn.style.display = 'flex';
+      });
     }
     // Démo : vérifier si on doit déclencher le tour guidé
     if (window.DADemo) DADemo.checkUser(user);

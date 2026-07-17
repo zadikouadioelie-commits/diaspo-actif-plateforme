@@ -52,6 +52,43 @@
       banniereTitre: "🚀 Rejoignez les membres Premium de Diaspo'Actif",
       banniereTexte: "Donnez un nouvel élan à votre parcours professionnel. Débloquez tous les outils Premium, développez votre réseau, trouvez plus facilement un emploi, valorisez vos compétences et profitez pleinement de tout le potentiel de Diaspo'Actif. Votre avenir commence aujourd'hui.",
     },
+    initiative: {
+      accredType: 'initiative_abonne',
+      titre: "Compte Initiative Premium",
+      sousTitre: "Un seul abonnement pour accéder à toutes les fonctionnalités Premium de votre initiative.",
+      texteEngageant: "Donnez à votre initiative les moyens de ses ambitions. Développez votre visibilité, votre réseau de partenaires et professionnalisez votre gestion grâce à un seul abonnement Premium.",
+      retourUrl: 'dashboard-initiative.html',
+      fonctionnalites: [
+        { icon: '🏬', titre: 'Vitrine & Visibilité', items: ['Vitrine publique personnalisée', 'Publications mises en avant', 'Statistiques de visibilité', 'Thèmes premium'] },
+        { icon: '🎫', titre: 'Cotisations & Adhésions', items: ['Formules d’adhésion illimitées', 'Encaissement des cotisations', 'Registre des membres', 'Relances automatiques'] },
+        { icon: '🗳️', titre: 'Votes sécurisés', items: ['Organisation de scrutins', 'Assemblées générales', 'Émargement QR code', 'Comptes rendus automatiques'] },
+        { icon: '💼', titre: 'Recrutement', items: ['Publication d’offres illimitée', 'Suivi des candidatures', 'Mise en avant des offres'] },
+        { icon: '🤝', titre: 'Partenaires & Réseau', items: ['Liste de partenaires', 'Mise en relation', 'Développement de la visibilité'] },
+        { icon: '🤖', titre: 'Assistant IA OZ', items: ['Conseils personnalisés', 'Analyse de votre activité', 'Automatisation de certaines tâches'] },
+      ],
+      pourquoi: [
+        { icon: '📈', titre: 'Développez votre visibilité' },
+        { icon: '🤝', titre: 'Développez votre réseau' },
+        { icon: '💰', titre: 'Professionnalisez votre gestion' },
+        { icon: '🎯', titre: "Accédez aux meilleurs outils de Diaspo'Actif" },
+      ],
+      comparatif: [
+        { label: 'Vitrine premium', gratuit: false, premium: true },
+        { label: 'Cotisations & Adhésions', gratuit: false, premium: true },
+        { label: 'Votes sécurisés', gratuit: false, premium: true },
+        { label: 'Recrutement illimité', gratuit: false, premium: true },
+        { label: 'Partenaires & Réseau', gratuit: false, premium: true },
+        { label: 'Assistant IA OZ avancé', gratuit: false, premium: true },
+        { label: 'Profil public', gratuit: true, premium: true },
+        { label: 'Messagerie', gratuit: true, premium: true },
+        { label: 'Visioconférence', gratuit: true, premium: true },
+        { label: 'Annuaire', gratuit: true, premium: true },
+        { label: 'Centre des tutos', gratuit: true, premium: true },
+        { label: 'Agenda synchronisé', gratuit: true, premium: true },
+      ],
+      banniereTitre: "🚀 Rejoignez les initiatives Premium de Diaspo'Actif",
+      banniereTexte: "Donnez un nouvel élan à votre initiative. Débloquez tous les outils Premium, développez votre réseau de partenaires, professionnalisez votre gestion et gagnez en visibilité. Votre développement commence aujourd'hui.",
+    },
   };
 
   async function fetchFormules(accredType) {
