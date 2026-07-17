@@ -390,6 +390,7 @@ const CATALOGUE = [
   { id:'f-qrcode',        cat:'profil',         role:null, titre:"Mon QR Code personnel",           desc:"Générez et partagez votre QR Code pour être trouvé facilement.", icon:'📱', couleur:'#0f172a', duree:'1 min', tags:['profil','qrcode'] },
   { id:'f-badges',        cat:'profil',         role:null, titre:"Les badges et certifications",    desc:"Débloquez des badges en complétant votre profil et vos activités.", icon:'🎖️', couleur:'#b45309', duree:'1 min', tags:['profil','badges'] },
   { id:'f-confidentialite',cat:'profil',        role:null, titre:"Niveaux de confidentialité",      desc:"Contrôlez qui peut voir vos informations.", icon:'🔒', couleur:'#374151', duree:'1 min', tags:['profil','sécurité'] },
+  { id:'f-creer-post',    cat:'communication',  role:null, titre:"Créer un post",                   desc:"Partagez du texte, des photos ou des vidéos avec la communauté depuis votre tableau de bord.", icon:'✍️', couleur:'#4338CA', duree:'1 min', tags:['post','fil','partage'], recommande:true, nouveau:true },
   { id:'f-publication',   cat:'communication',  role:null, titre:"Publier une actualité",           desc:"Rédigez, illustrez et diffusez vos publications.", icon:'📝', couleur:'#1e3a8a', duree:'2 min', tags:['fil','publication'], recommande:true },
   { id:'f-messagerie',    cat:'communication',  role:null, titre:"Utiliser la messagerie",          desc:"Démarrez des conversations, partagez des fichiers.", icon:'💬', couleur:'#7c3aed', duree:'2 min', tags:['messagerie'], nouveau:true },
   { id:'f-connexion',     cat:'communication',  role:null, titre:"Envoyer une demande de connexion", desc:"Développez votre réseau en quelques clics.", icon:'🤝', couleur:'#15803d', duree:'1 min', tags:['réseau','connexion'] },
@@ -408,6 +409,15 @@ const CATALOGUE = [
   { id:'f-mes-billets',   cat:'evenements',     role:null, titre:"Consulter mes billets",           desc:"Retrouvez tous les billets achetés pour des événements, avec leur QR code.", icon:'🎟', couleur:'#7c3aed', duree:'1 min', tags:['événements','billets'], nouveau:true },
   { id:'f-business-plan', cat:'collaboration',  role:null, titre:"Créer un Business Plan",          desc:"Structurez votre projet avec un business plan professionnel et exportable.", icon:'📋', couleur:'#1e3a8a', duree:'2 min', tags:['business plan','projet'], recommande:true },
   { id:'f-cv-lettre',     cat:'profil',         role:null, titre:"CV et lettre de motivation",      desc:"Générez un CV et une lettre de motivation professionnels, avec QR code et export PDF.", icon:'🟧', couleur:'#b45309', duree:'2 min', tags:['CV','lettre','candidature'], recommande:true },
+  { id:'f-emploi-stage',  cat:'profil',         role:null, titre:"Recherche d'emploi & Stage",      desc:"Filtrez les offres, consultez le détail et postulez en un clic avec vos CV et lettres.", icon:'💼', couleur:'#0D2B4E', duree:'2 min', tags:['emploi','stage','candidature'], recommande:true, nouveau:true },
+  { id:'f-reseau-pro',    cat:'communication',  role:null, titre:"Mon Réseau Pro",                  desc:"Recherchez et affiliez-vous aux initiatives de la diaspora, créez vos listes ciblées.", icon:'🌐', couleur:'#0D2B4E', duree:'2 min', tags:['réseau','affiliation'], nouveau:true },
+  { id:'f-social-sync',   cat:'profil',         role:null, titre:"Synchronisation réseaux sociaux", desc:"Connectez vos comptes sociaux pour relayer automatiquement vos publications.", icon:'🔄', couleur:'#0369a1', duree:'1 min', tags:['réseaux sociaux','synchronisation'] },
+  { id:'f-programmation', cat:'profil',         role:null, titre:"Programmation",                   desc:"Planifiez et automatisez vos publications et actions sur la plateforme.", icon:'⚙️', couleur:'#374151', duree:'1 min', tags:['programmation','automatisation'] },
+  { id:'f-localisation',  cat:'profil',         role:null, titre:"Ma localisation",                 desc:"Renseignez votre position pour être visible dans les recherches locales et l'annuaire.", icon:'📍', couleur:'#b45309', duree:'1 min', tags:['localisation','géographie'] },
+  { id:'f-apparence',     cat:'profil',         role:null, titre:"Personnaliser l'apparence",       desc:"Choisissez le thème de couleurs de votre espace Diaspo'Actif.", icon:'🎨', couleur:'#7c3aed', duree:'1 min', tags:['apparence','thème'] },
+  { id:'f-annuaire',      cat:'profil',         role:null, titre:"Parcourir l'annuaire",            desc:"Recherchez des initiatives, utilisateurs et organismes par nom, secteur ou localisation.", icon:'🔍', couleur:'#6366f1', duree:'1 min', tags:['annuaire','recherche'] },
+  { id:'f-formations',    cat:'evenements',     role:null, titre:"Suivre une formation",            desc:"Découvrez et inscrivez-vous aux formations proposées sur la plateforme.", icon:'🎓', couleur:'#15803d', duree:'1 min', tags:['formation','apprentissage'] },
+  { id:'f-actualites',    cat:'communication',  role:null, titre:"Consulter les actualités",        desc:"Suivez les dernières actualités et annonces de la plateforme et de la diaspora.", icon:'📰', couleur:'#1e3a8a', duree:'1 min', tags:['actualités','veille'] },
 
   /* ── GESTION DES ASSOCIATIONS (accréditation premium) ── */
   { id:'f-asso-accreditation', cat:'association', role:null, titre:"Obtenir l'accréditation Gestion des Associations", desc:"Demandez l'accréditation premium pour gérer entièrement votre association.", icon:'🏅', couleur:'#7c3aed', duree:'2 min', tags:['association','accréditation'], recommande:true, nouveau:true },
@@ -720,7 +730,7 @@ document.getElementById('tuto-search').addEventListener('input', e => {
 ══════════════════════════════════════════════ */
 const TUTOS_PAR_ROLE = {
   visiteur:             ['f-recherche','f-oz'],
-  utilisateur:          ['f-profil','f-qrcode','f-badges','f-confidentialite','f-publication','f-messagerie','f-connexion','f-groupes','f-agenda','f-mes-billets','f-business-plan','f-cv-lettre','f-recherche','f-oz','f-verification'],
+  utilisateur:          ['f-profil','f-qrcode','f-badges','f-confidentialite','f-creer-post','f-publication','f-messagerie','f-visio','f-connexion','f-groupes','f-agenda','f-mes-billets','f-business-plan','f-cv-lettre','f-emploi-stage','f-reseau-pro','f-social-sync','f-programmation','f-localisation','f-apparence','f-annuaire','f-formations','f-actualites','f-recherche','f-oz','f-verification'],
   entrepreneur:         ['f-profil','f-qrcode','f-badges','f-confidentialite','f-publication','f-messagerie','f-connexion','f-deal','f-projet','f-contrat','f-evenement','f-billetterie','f-mes-billets','f-business-plan','f-cv-lettre','f-agenda','f-visio','f-groupes','f-recherche','f-oz','f-verification','f-stats'],
   association:          ['f-profil','f-qrcode','f-badges','f-confidentialite','f-publication','f-messagerie','f-connexion','f-deal','f-projet','f-evenement','f-billetterie','f-mes-billets','f-business-plan','f-cv-lettre','f-agenda','f-visio','f-groupes','f-recherche','f-oz','f-verification','f-stats'],
   initiative:           ['f-profil','f-qrcode','f-badges','f-confidentialite','f-publication','f-messagerie','f-connexion','f-deal','f-projet','f-contrat','f-evenement','f-billetterie','f-mes-billets','f-business-plan','f-cv-lettre','f-agenda','f-visio','f-groupes','f-recherche','f-oz','f-verification','f-stats','f-init-presentation','f-init-publications','f-init-zones','f-init-stats','f-init-messages-vitrine','f-init-vitrine','f-init-partenaires','f-init-adhesions','f-init-votes','f-init-recrutement','f-init-paiement','f-init-publicites'],
@@ -791,11 +801,26 @@ function renderMonEspace(user) {
     </div>
 
     <div class="me-section-title">🛠️ Tutoriels pour votre compte</div>
+    <div class="tuto-search-wrap" style="margin:0 0 18px;max-width:100%;">
+      <input type="text" id="me-tuto-search" class="tuto-search" placeholder="Rechercher un tutoriel de votre compte…">
+      <span class="tuto-search-icon">🔍</span>
+    </div>
     <div class="tuto-cards" id="me-cards-fonc"></div>
+    <p id="me-no-result" style="display:none;text-align:center;color:var(--muted);padding:20px;">Aucun tutoriel ne correspond à votre recherche.</p>
   `;
 
   /* Remplir les cartes */
   renderCards(document.getElementById('me-cards-fonc'), tutosFonc);
+
+  /* Recherche locale dans les tutos du compte */
+  document.getElementById('me-tuto-search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    const filtres = q
+      ? tutosFonc.filter(t => (t.titre + ' ' + t.desc + ' ' + (t.tags||[]).join(' ')).toLowerCase().includes(q))
+      : tutosFonc;
+    renderCards(document.getElementById('me-cards-fonc'), filtres);
+    document.getElementById('me-no-result').style.display = filtres.length ? 'none' : '';
+  });
 
   /* Bouton tutoriel de rôle */
   document.getElementById('me-start-role-tuto').addEventListener('click', () => {

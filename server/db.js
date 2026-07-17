@@ -1237,6 +1237,32 @@ const MIGRATIONS = [
   ["offres_candidatures", "type_candidature TEXT DEFAULT 'offre'"],
   // CV versions history
   ["cv_profiles", "versions_json TEXT DEFAULT '[]'"],
+  // ── Module Recherche d'emploi & Stage : alertes ──
+  ["offres", "initiative_id INTEGER"],
+  ["offres", "contrat TEXT"],
+  ["offres", "duree_alternance TEXT"],
+  ["offres", "region TEXT"],
+  ["offres", "departement TEXT"],
+  ["offres", "ville TEXT"],
+  ["offres", "commune TEXT"],
+  ["offres", "domaine TEXT"],
+  ["offres", "niveau_experience TEXT"],
+  ["offres", "niveau_etudes TEXT"],
+  ["offres", "teletravail INTEGER DEFAULT 0"],
+  ["offres", "temps TEXT DEFAULT 'plein'"],
+  ["offres", "salaire_min REAL"],
+  ["offres", "salaire_max REAL"],
+  ["offres", "salaire_communique INTEGER DEFAULT 1"],
+  ["offres", "avantages TEXT DEFAULT '[]'"],
+  ["offres", "horaires TEXT"],
+  ["offres", "debut_mission TEXT"],
+  ["offres", "missions TEXT DEFAULT '[]'"],
+  ["offres", "diplome_requis TEXT"],
+  ["offres", "langues_requises TEXT DEFAULT '[]'"],
+  ["offres", "permis_requis TEXT"],
+  ["offres", "certifications_requises TEXT DEFAULT '[]'"],
+  ["offres", "pieces_demandees TEXT DEFAULT '[\"cv\",\"lettre\"]'"],
+  ["offres", "nb_vues INTEGER DEFAULT 0"],
   // ── Module Réseau Professionnel ──
   ["initiatives", "numero_immatriculation TEXT"],
   ["initiatives", "pays_immatriculation TEXT"],
@@ -1600,6 +1626,17 @@ db.exec(`
     UNIQUE(offre_id, candidat_id),
     FOREIGN KEY(offre_id) REFERENCES offres(id),
     FOREIGN KEY(candidat_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS offres_alertes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    domaine TEXT,
+    pays TEXT,
+    ville TEXT,
+    type TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
   );
 `);
 

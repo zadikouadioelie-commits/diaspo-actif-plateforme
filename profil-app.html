@@ -678,34 +678,35 @@ html, body { overflow-x:clip; }
 .pvz-scope h1, .pvz-scope h2, .pvz-scope h3 { font-family:'Bricolage Grotesque','Public Sans',sans-serif; margin:0; }
 
 /* ---- Carte identité hi-fi ---- */
-.pvz-hero { background:#fff; border:1px solid rgba(18,32,56,.07); border-radius:18px; box-shadow:0 2px 10px rgba(18,32,56,.05); padding:0 26px 22px; margin-top:16px; }
+.pvz-hero { background:#fff; border:1px solid rgba(18,32,56,.07); border-top:4px solid var(--tp,#2F6BED); border-radius:18px; box-shadow:0 2px 10px rgba(18,32,56,.05); padding:0 26px 22px; margin-top:16px; }
 .pvz-hero-top { display:flex; gap:22px; align-items:flex-start; }
-.pvz-avatar { width:132px; height:132px; flex:none; margin-top:-58px; border:5px solid #fff; border-radius:50%; box-shadow:0 8px 24px -10px rgba(18,32,56,.45); background:#EEF1F5 center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-size:40px; font-weight:700; color:#8794A7; overflow:visible; position:relative; }
+.pvz-avatar { width:132px; height:132px; flex:none; margin-top:-58px; border:5px solid #fff; border-radius:50%; box-shadow:0 0 0 3px var(--tp,#2F6BED), 0 8px 24px -10px rgba(18,32,56,.45); background:#EEF1F5 center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-size:40px; font-weight:700; color:#8794A7; overflow:visible; position:relative; }
 .pvz-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
 .pvz-hero-info { flex:1; min-width:0; padding-top:20px; }
 .pvz-hero-row { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap; }
 .pvz-name-row { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
 .pvz-name { font-size:28px; font-weight:700; color:#122A4D; line-height:1.1; }
-.pvz-verified { display:inline-flex; align-items:center; gap:5px; background:#E4F0FB; color:#2F6BED; font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:999px; }
-.pvz-verified .dot { width:15px; height:15px; border-radius:50%; background:#2F6BED; color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; }
+.pvz-verified { display:inline-flex; align-items:center; gap:5px; background:var(--tp-light,#E4F0FB); color:var(--tp,#2F6BED); font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:999px; }
+.pvz-premium-badge { display:inline-flex; align-items:center; gap:4px; background:linear-gradient(135deg,#F5D061,#C9971C); color:#3A2600; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:999px; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+.pvz-verified .dot { width:15px; height:15px; border-radius:50%; background:var(--tp,#2F6BED); color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; }
 .pvz-sub { font-size:13.5px; color:#6B7686; margin-top:5px; }
 .pvz-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
-.pvz-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:#F2F5FA; font-size:12.5px; color:#3B4658; font-weight:500; }
+.pvz-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:var(--tp-light,#F2F5FA); color:var(--tp-dark,#3B4658); font-size:12.5px; font-weight:500; }
 .pvz-actions { display:flex; gap:9px; flex:none; padding-top:20px; flex-wrap:wrap; }
 .pvz-btn { font-size:13px; font-weight:600; padding:10px 18px; border-radius:10px; border:1px solid rgba(18,32,56,.16); background:#fff; color:#3B4658; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
-.pvz-btn.primary { background:#2F6BED; border-color:#2F6BED; color:#fff; }
+.pvz-btn.primary { background:var(--tp,#2F6BED); border-color:var(--tp,#2F6BED); color:#fff; }
 .pvz-btn.following { background:#E4F3EC; border-color:#1F8A5B; color:#1F8A5B; }
-.pvz-btn.follow-main { font-size:14.5px; font-weight:800; padding:12px 24px; border-radius:11px; box-shadow:0 4px 14px rgba(47,107,237,.35); transition:transform .12s ease, box-shadow .12s ease; }
-.pvz-btn.follow-main:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(47,107,237,.45); }
+.pvz-btn.follow-main { font-size:14.5px; font-weight:800; padding:12px 24px; border-radius:11px; box-shadow:0 4px 14px rgba(0,0,0,.18); transition:transform .12s ease, box-shadow .12s ease; }
+.pvz-btn.follow-main:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(0,0,0,.24); }
 .pvz-btn.follow-main.following { box-shadow:0 4px 14px rgba(31,138,91,.25); }
 .pvz-tabrow { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-top:18px; padding-top:16px; border-top:1px solid rgba(18,32,56,.07); }
-.pvz-segmented { display:inline-flex; background:#F2F5FA; border-radius:11px; padding:4px; }
+.pvz-segmented { display:inline-flex; background:var(--tp-light,#F2F5FA); border-radius:11px; padding:4px; }
 .pvz-seg-btn { border:none; background:none; cursor:pointer; font-size:13px; font-weight:700; padding:9px 18px; border-radius:8px; color:#6B7686; }
-.pvz-seg-btn.active.profil { background:#1F8A5B; color:#fff; }
+.pvz-seg-btn.active.profil { background:var(--tp,#1F8A5B); color:#fff; }
 .pvz-seg-btn.active.vitrine { background:var(--v1,#8E1B2E); color:#fff; }
 .pvz-stats { display:flex; gap:30px; flex-wrap:wrap; }
 .pvz-stat { text-align:center; }
-.pvz-stat .n { font-family:'Bricolage Grotesque'; font-size:20px; font-weight:700; }
+.pvz-stat .n { font-family:'Bricolage Grotesque'; font-size:20px; font-weight:700; color:var(--tp,#122A4D); }
 .pvz-stat .l { font-size:11.5px; color:#8794A7; }
 
 /* ---- Grille 3 colonnes Profil ---- */
@@ -715,17 +716,17 @@ html, body { overflow-x:clip; }
 .pvz-main { display:flex; flex-direction:column; gap:18px; min-width:0; }
 .pvz-card { background:#fff; border:1px solid rgba(18,32,56,.07); border-radius:16px; box-shadow:0 1px 2px rgba(18,32,56,.04); padding:18px 20px; }
 .pvz-card-title { font-size:14px; font-weight:700; color:#122A4D; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
-.pvz-card-title .more { font-size:12.5px; font-weight:600; color:#2F6BED; cursor:pointer; }
+.pvz-card-title .more { font-size:12.5px; font-weight:600; color:var(--tp,#2F6BED); cursor:pointer; }
 .pvz-empty { font-size:13px; color:#94a3b8; font-style:italic; }
-.pvz-interest-chip { padding:6px 11px; border-radius:8px; background:#EAF1FE; color:#2F6BED; font-size:12px; font-weight:500; }
+.pvz-interest-chip { padding:6px 11px; border-radius:8px; background:var(--tp-light,#EAF1FE); color:var(--tp,#2F6BED); font-size:12px; font-weight:500; }
 .pvz-link-row { display:flex; align-items:center; gap:10px; font-size:13px; color:#3B4658; }
-.pvz-link-ico { width:30px; height:30px; border-radius:8px; background:#F2F5FA; display:flex; align-items:center; justify-content:center; flex:none; }
+.pvz-link-ico { width:30px; height:30px; border-radius:8px; background:var(--tp-light,#F2F5FA); display:flex; align-items:center; justify-content:center; flex:none; }
 
 /* Publications (colonne centrale) */
 .pvz-pub { padding:16px 0; border-top:1px solid rgba(18,32,56,.07); }
 .pvz-pub:first-child { border-top:none; padding-top:0; }
 .pvz-pub-head { display:flex; align-items:center; gap:11px; margin-bottom:11px; }
-.pvz-pub-av { width:40px; height:40px; border-radius:50%; flex:none; background:linear-gradient(135deg,#2F6BED,#1a3f8a); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; }
+.pvz-pub-av { width:40px; height:40px; border-radius:50%; flex:none; background:linear-gradient(135deg,var(--tp,#2F6BED),var(--tp-dark,#1a3f8a)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; }
 .pvz-pub-name { font-size:13.5px; font-weight:600; color:#122A4D; }
 .pvz-pub-date { font-size:11.5px; color:#8794A7; }
 .pvz-pub-text { margin:0 0 12px; font-size:14px; line-height:1.55; color:#3B4658; white-space:pre-wrap; }
@@ -915,7 +916,7 @@ html, body { overflow-x:clip; }
     <div id="theme-row-wrap" style="display:none">
       <div class="theme-row">
         <span>🎨 Thème :</span>
-        <div id="theme-swatches"></div>
+        <div id="theme-swatches-legacy"></div>
       </div>
     </div>
     <div class="p-stats" id="p-stats"></div>
@@ -1002,6 +1003,7 @@ const THEMES = {
   violet: { primary:'#6A1B9A', dark:'#4A148C', light:'#F3E5F5', banner:'linear-gradient(135deg,#4A148C 0%,#7B1FA2 100%)', label:'Violet' },
   terre:  { primary:'#5D4037', dark:'#3E2723', light:'#EFEBE9', banner:'linear-gradient(135deg,#3E2723 0%,#6D4C41 100%)', label:'Terre' },
   nuit:   { primary:'#1A237E', dark:'#0D1B2A', light:'#E8EAF6', banner:'linear-gradient(135deg,#0D1B2A 0%,#1A237E 100%)', label:'Nuit' },
+  rose:   { primary:'#C2185B', dark:'#880E4F', light:'#FCE4EC', banner:'linear-gradient(135deg,#880E4F 0%,#D81B60 100%)', label:'Rose' },
 };
 
 const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
@@ -1426,6 +1428,15 @@ async function setTheme(name) {
   try { await api('PUT', '/profil', { theme_couleur: name }); } catch(e){}
 }
 
+function pvzToggleThemePicker() {
+  const el = document.getElementById('pvz-theme-picker');
+  if (!el) return;
+  const show = el.style.display === 'none';
+  el.style.display = show ? 'flex' : 'none';
+  if (show) renderThemeSwatches(profil.theme_couleur || 'ocean');
+}
+window.pvzToggleThemePicker = pvzToggleThemePicker;
+
 function renderThemeSwatches(active) {
   const el = document.getElementById('theme-swatches');
   el.innerHTML = Object.entries(THEMES).map(([k,t]) =>
@@ -1578,6 +1589,7 @@ function renderVisitorProfile() {
   const sub = profil.titre_pro || (profil.situation_pro ? profil.situation_pro.replace(/_/g,' ') : (profil.role_label || profil.role || 'Membre'));
   const isInit = profil.role === 'initiative';
   const verified = !!(profil.identite_verifiee);
+  const isPremium = (profil._accreditations || []).includes('utilisateur_abonne');
 
   // Avatar
   const avInner = profil.photo_url
@@ -1597,7 +1609,7 @@ function renderVisitorProfile() {
     : `<button class="pvz-btn follow-main ${following?'following':'primary'}" id="pvz-follow" onclick="pvzToggleFollow()">${following?'✓ Abonné':'🔔 S\'abonner'}</button>`;
   const msgBtn = `<a href="messagerie.html?user=${profil.id}" class="pvz-btn">✉️ Message</a>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
-  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button>${shareBtn}`;
+  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button><button class="pvz-btn" onclick="pvzToggleThemePicker()">🎨 Thème</button>${shareBtn}`;
 
   // Onglets + stats
   const seg = `<div class="pvz-segmented">
@@ -1619,6 +1631,7 @@ function renderVisitorProfile() {
           <div style="min-width:0;">
             <div class="pvz-name-row">
               <h1 class="pvz-name">${esc(nom)}</h1>
+              ${isPremium ? `<span class="pvz-premium-badge" title="Membre Premium">👑 Premium</span>` : ''}
               ${verified ? `<span class="pvz-verified"><span class="dot">✓</span>Identité vérifiée</span>` : ''}
             </div>
             <div class="pvz-sub">${esc(sub)}</div>
@@ -1629,6 +1642,10 @@ function renderVisitorProfile() {
       </div>
     </div>
     <div id="pvz-identity-edit-slot"></div>
+    ${isOwn ? `<div id="pvz-theme-picker" style="display:none;padding:12px 16px;border-top:1px solid var(--border);align-items:center;gap:10px;">
+      <span style="font-size:12.5px;font-weight:700;color:var(--muted);">🎨 Thème du profil :</span>
+      <div id="theme-swatches"></div>
+    </div>` : ''}
     <div class="pvz-tabrow">${seg}${stats}</div>
   </div>`;
 
@@ -1680,7 +1697,7 @@ function renderVisitorProfile() {
         <div class="pvz-pub-head">
           <div class="pvz-pub-av">${pubAv}</div>
           <div style="flex:1;min-width:0;">
-            <div class="pvz-pub-name">${esc(nom)} <span style="color:#2F6BED;font-size:11px;font-weight:600;background:#EAF1FE;padding:2px 7px;border-radius:999px;margin-left:4px;">${esc(cat)}</span></div>
+            <div class="pvz-pub-name">${esc(nom)} <span style="color:var(--tp,#2F6BED);font-size:11px;font-weight:600;background:var(--tp-light,#EAF1FE);padding:2px 7px;border-radius:999px;margin-left:4px;">${esc(cat)}</span></div>
             <div class="pvz-pub-date">${dateStr}</div>
           </div>
         </div>

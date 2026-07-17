@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Premium — Diaspo'Actif</title>
+<meta name="viewport" content="width=1280">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="assets/premium-page.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0D2B4E">
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html"><img src="assets/logo.png" alt="Diaspo'Actif" class="brand-logo"></a>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+  <div id="premium-content"></div>
+</div>
+
+<script src="assets/app.js"></script>
+<script src="assets/premium-page.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script>
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const type = params.get('type') || 'utilisateur';
+  const moduleOrigine = params.get('module') || '';
+  PremiumPage('#premium-content', { type, moduleOrigine });
+})();
+</script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

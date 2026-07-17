@@ -545,6 +545,28 @@ function afficherUpsellAbonne(){
       'Voir les accréditations officielles de chaque initiative',
       'Suivre vos demandes et affiliations en cours',
     ],
+    heroMockup: `
+      <div style="background:linear-gradient(135deg,#0D2B4E 0%,#1E4F8A 100%);color:#fff;padding:40px 28px;text-align:center;">
+        <h2 style="margin:0 0 8px;font-size:22px;font-weight:800;">🌐 Réseau Professionnel</h2>
+        <p style="margin:0 auto 20px;max-width:560px;font-size:13px;opacity:.85;">Un écosystème professionnel interconnecté d'initiatives de la diaspora mondiale.</p>
+        <div style="display:flex;justify-content:center;gap:36px;flex-wrap:wrap;">
+          <div><div style="font-size:22px;font-weight:800;">312</div><div style="font-size:11.5px;opacity:.75;">Initiatives</div></div>
+          <div><div style="font-size:22px;font-weight:800;">28</div><div style="font-size:11.5px;opacity:.75;">Pays</div></div>
+          <div><div style="font-size:22px;font-weight:800;">94</div><div style="font-size:11.5px;opacity:.75;">Affiliations actives</div></div>
+          <div><div style="font-size:22px;font-weight:800;">17</div><div style="font-size:11.5px;opacity:.75;">Secteurs</div></div>
+        </div>
+      </div>`,
+    preview: [
+      { icon: '🎖️', titre: 'Adhérents 2026', sous: 'Liste des membres à jour de cotisation', badge: 'Exemple' },
+      { icon: '🌍', titre: 'Réseau entrepreneurs maliens', sous: 'Porteurs de projets originaires du Mali', badge: 'Exemple' },
+      { icon: '💼', titre: 'Investisseurs diaspora', sous: 'Profils prêts à financer des projets', badge: 'Exemple' },
+      { icon: '🤝', titre: 'Associations partenaires', sous: 'Structures affiliées et partenaires officiels', badge: 'Exemple' },
+    ],
+    moduleFaq: [
+      { q: 'À quoi sert le module Réseau Pro ?', r: "Il vous permet de rechercher, filtrer et vous affilier aux initiatives immatriculées de la diaspora, de créer vos propres listes ciblées (adhérents, investisseurs, partenaires...) et de suivre vos échanges avec elles." },
+      { q: 'Puis-je créer mes propres listes comme celles montrées en aperçu ?', r: "Oui, une fois abonné vous pouvez créer autant de listes que vous le souhaitez, les organiser par secteur, pays ou statut, puis les utiliser pour vos communications ciblées." },
+      { q: 'Ce module est-il utile si je ne cherche pas de partenaires actuellement ?', r: "Le Réseau Pro sert aussi à faire connaître votre initiative, à être recommandé par d'autres membres et à suivre l'actualité des acteurs de votre secteur, même sans démarche active." },
+    ],
     accredType: 'utilisateur_abonne',
     retourUrl: 'dashboard-utilisateur.html',
   });

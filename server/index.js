@@ -3190,6 +3190,13 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   if (query.pays) utilisateurs = utilisateurs.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); utilisateurs = utilisateurs.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
+  // Collectivités et Diaspo'Actif (Administrateur) — organismes institutionnels, absents de la table initiatives
+  let organismes = (query.type && !['Collectivités','Institutions'].includes(query.type)) ? [] : await db.prepare(
+    "SELECT id, nom, ville, pays, photo_url, bio, role FROM users WHERE role IN ('collectivite','administrateur') AND compte_masque=0 AND nom != 'Compte supprimé' LIMIT 500"
+  ).all();
+  if (query.pays) organismes = organismes.filter(r => r.pays === query.pays);
+  if (query.ville) { const v = query.ville.toLowerCase(); organismes = organismes.filter(r => (r.ville||'').toLowerCase().includes(v)); }
+
   // Produits vitrine (élargit "produits proposés") — rattachés par initiative_id
   const initIds = initiatives.map(i => i.id);
   let produitsParInit = {};
@@ -3240,13 +3247,46 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
     resultats.push({ type: 'utilisateur', score, geo: geoRang(u.ville, u.pays), data: u });
   });
 
+  organismes.forEach(o => {
+    let score = 1;
+    if (termesOriginaux.length) {
+      score = annuaireScorerEntite([
+        [[o.nom], 1000],
+        [[o.bio], 200],
+      ], termesOriginaux, termesEtendus);
+      if (score <= 0) return;
+    }
+    resultats.push({ type: 'organisme', score, geo: geoRang(o.ville, o.pays), data: o });
+  });
+
   resultats.sort((a, b) => (b.score - a.score) || (b.geo - a.geo));
+
+  // Vue par défaut (sans recherche) : épingle les 3 comptes de démonstration en tête
+  // (Utilisateur, Initiative, Collectivité) pour une simulation immédiatement représentative.
+  if (!qRaw) {
+    const DEMO_PINS = [
+      { type: 'utilisateur', id: 16 },   // Jean Kouassi
+      { type: 'initiative', id: 14 },    // Aminata Koné Beauty
+      { type: 'organisme', id: 20 },     // Région du Bélier (Moussa Coulibaly)
+    ];
+    const pinned = [];
+    DEMO_PINS.forEach(pin => {
+      const idx = resultats.findIndex(r => r.type === pin.type && r.data.id === pin.id);
+      if (idx >= 0) pinned.push(resultats.splice(idx, 1)[0]);
+    });
+    resultats = [...pinned, ...resultats];
+  }
+
+  // Rang global (ordre d'affichage voulu, tous types confondus) — le frontend agrège les 3
+  // tableaux typés séparément, ce champ lui permet de reconstituer l'ordre exact (épingles incluses).
+  resultats.forEach((r, i) => { r.data._rang = i; });
 
   sendJSON(res, 200, {
     q: qRaw,
     total: resultats.length,
     initiatives: resultats.filter(r => r.type === 'initiative').map(r => r.data),
     utilisateurs: resultats.filter(r => r.type === 'utilisateur').map(r => r.data),
+    organismes: resultats.filter(r => r.type === 'organisme').map(r => r.data),
   });
 });
 
@@ -7404,7 +7444,9 @@ const IDENTITY_VALIDITY_MONTHS = 24;
 function getOrigin(req) {
   const proto = req.headers["x-forwarded-proto"] || (req.socket && req.socket.encrypted ? "https" : "http");
   const host = req.headers.host || "localhost:3000";
-  return `${proto}://${host}`;
+  // Stripe Identity exige un return_url en https, sauf pour localhost (autorisé en test).
+  const isLocal = /^localhost(:\d+)?$/.test(host) || /^127\.0\.0\.1(:\d+)?$/.test(host);
+  return `${isLocal ? proto : "https"}://${host}`;
 }
 
 function addMonths(dateStr, months) {
@@ -7473,6 +7515,11 @@ route("POST", "/api/identity/verify", async (req, res) => {
     ).run(user.id, session.id, "personne", "requires_input");
     sendJSON(res, 200, { url: session.url });
   } catch (e) {
+    // Erreurs Stripe (StripeInvalidRequestError, etc.) portent le détail utile dans e.raw / e.type / e.code,
+    // que safeError() n'expose pas au client — on les journalise ici pour diagnostiquer sans exposer de données.
+    if (e && e.type) {
+      console.error(`[identity-verify] Stripe ${e.type} (code=${e.code || "?"}): ${e.raw?.message || e.message}`);
+    }
     sendJSON(res, 500, SEC.safeError(e, "identity-verify"));
   }
 });
@@ -11325,43 +11372,255 @@ route("GET", "/api/mes-sondages", async (req, res) => {
 /* ──── MODULE CRÉATEUR D'OPPORTUNITÉS — Offres ──── */
 
 /* GET /api/offres */
+/* Enrichit une offre avec les infos publiques de l'organisme émetteur (logo, nom, vérification, lien profil) */
+async function enrichOffreOrganisme(o) {
+  if (o.initiative_id) {
+    const init = await db.prepare("SELECT id,nom,logo_url,organisation_verifiee FROM initiatives WHERE id=?").get(o.initiative_id);
+    return {
+      organisme_nom: init?.nom || o.createur_nom,
+      organisme_logo: init?.logo_url || null,
+      organisme_verifie: !!init?.organisation_verifiee,
+      organisme_profil_url: init ? `initiative.html?id=${init.id}` : null,
+    };
+  }
+  return {
+    organisme_nom: o.createur_nom,
+    organisme_logo: o.createur_photo || null,
+    organisme_verifie: o.createur_role === 'administrateur' || o.createur_role === 'collectivite',
+    organisme_profil_url: `profil.html?id=${o.createur_id}`,
+  };
+}
+
+/* GET /api/offres — recherche filtrée (module Emplois & Stages, type IN emploi/stage) */
 route("GET", "/api/offres", async (req, res, params, body, query) => {
-  let rows = await db.prepare(`
-    SELECT o.*, u.nom AS createur_nom, u.role AS createur_role
+  const conditions = ["o.statut='publiee'"];
+  const args = [];
+  if (query.module === 'emploi_stage') { conditions.push("o.type IN ('emploi','stage')"); }
+  if (query.type) { conditions.push("o.type=?"); args.push(query.type); }
+  if (query.contrat) { conditions.push("o.contrat=?"); args.push(query.contrat); }
+  if (query.pays) { conditions.push("o.pays=?"); args.push(query.pays); }
+  if (query.region) { conditions.push("o.region=?"); args.push(query.region); }
+  if (query.departement) { conditions.push("o.departement=?"); args.push(query.departement); }
+  if (query.ville) { conditions.push("o.ville LIKE ?"); args.push(`%${query.ville}%`); }
+  if (query.domaine) { conditions.push("o.domaine=?"); args.push(query.domaine); }
+  if (query.niveau_experience) { conditions.push("o.niveau_experience=?"); args.push(query.niveau_experience); }
+  if (query.niveau_etudes) { conditions.push("o.niveau_etudes=?"); args.push(query.niveau_etudes); }
+  if (query.teletravail) { conditions.push("o.teletravail=1"); }
+  if (query.q) { conditions.push("(o.titre LIKE ? OR o.description LIKE ?)"); args.push(`%${query.q}%`, `%${query.q}%`); }
+  const sql = `
+    SELECT o.*, u.nom AS createur_nom, u.role AS createur_role, u.photo_url AS createur_photo
     FROM offres o JOIN users u ON u.id=o.createur_id
-    WHERE o.statut='publiee'
+    WHERE ${conditions.join(' AND ')}
     ORDER BY o.created_at DESC
-  `).all();
-  if (query.type) rows = rows.filter(r => r.type === query.type);
-  if (query.pays) rows = rows.filter(r => r.pays === query.pays);
-  if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+(r.description||"")).toLowerCase().includes(q)); }
-  rows = rows.map(r => ({ ...r, competences_requises: safeParse(r.competences_requises) }));
-  sendJSON(res, 200, { offres: rows });
+    LIMIT 100
+  `;
+  const rows = await db.prepare(sql).all(...args);
+  const enriched = await Promise.all(rows.map(async r => ({
+    ...r,
+    competences_requises: safeParse(r.competences_requises),
+    missions: safeParse(r.missions),
+    avantages: safeParse(r.avantages),
+    langues_requises: safeParse(r.langues_requises),
+    certifications_requises: safeParse(r.certifications_requises),
+    pieces_demandees: safeParse(r.pieces_demandees),
+    ...(await enrichOffreOrganisme(r)),
+  })));
+  sendJSON(res, 200, { offres: enriched });
 });
 
-/* POST /api/offres */
+/* POST /api/offres — publication réservée aux Initiatives, Collectivités et Administrateurs */
 route("POST", "/api/offres", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!hasAccred(user.id, "createur_opportunites")) return sendJSON(res, 403, { error: "Accréditation « Créateur d'Opportunités » requise." });
-  const { titre, type, description, competences_requises, localisation, pays, remuneration, date_limite, nb_postes } = body;
+  if (!['initiative', 'collectivite', 'administrateur'].includes(user.role)) {
+    return sendJSON(res, 403, { error: "Seules les Collectivités, Initiatives et Diaspo'Actif peuvent publier une offre." });
+  }
+  const {
+    titre, type, contrat, duree_alternance, description, missions, competences_requises,
+    pays, region, departement, ville, commune, localisation, domaine,
+    niveau_experience, niveau_etudes, teletravail, temps,
+    salaire_min, salaire_max, salaire_communique, remuneration, avantages, horaires, debut_mission,
+    diplome_requis, langues_requises, permis_requis, certifications_requises,
+    pieces_demandees, date_limite, nb_postes, statut,
+  } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-  const id = db.prepare(`INSERT INTO offres (createur_id,titre,type,description,competences_requises,localisation,pays,remuneration,date_limite,nb_postes)
-    VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
-    user.id, titre, type||"emploi", description||null,
-    JSON.stringify(Array.isArray(competences_requises)?competences_requises:[]),
-    localisation||null, pays||null, remuneration||null, date_limite||null, nb_postes||1
-  ).lastInsertRowid;
+  if (!['emploi', 'stage'].includes(type)) return sendJSON(res, 400, { error: "Type invalide (emploi ou stage)." });
+
+  let initiativeId = null;
+  if (user.role === 'initiative') {
+    const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+    initiativeId = init?.id || null;
+  }
+
+  const id = (await db.prepare(`
+    INSERT INTO offres (
+      createur_id, initiative_id, titre, type, contrat, duree_alternance, description, missions,
+      competences_requises, localisation, pays, region, departement, ville, commune, domaine,
+      niveau_experience, niveau_etudes, teletravail, temps, salaire_min, salaire_max, salaire_communique,
+      remuneration, avantages, horaires, debut_mission, diplome_requis, langues_requises, permis_requis,
+      certifications_requises, pieces_demandees, date_limite, nb_postes, statut
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    user.id, initiativeId, titre, type, contrat || null, duree_alternance || null, description || null,
+    JSON.stringify(Array.isArray(missions) ? missions : []),
+    JSON.stringify(Array.isArray(competences_requises) ? competences_requises : []),
+    localisation || null, pays || null, region || null, departement || null, ville || null, commune || null,
+    domaine || null, niveau_experience || null, niveau_etudes || null, teletravail ? 1 : 0, temps || 'plein',
+    salaire_min || null, salaire_max || null, salaire_communique === false ? 0 : 1,
+    remuneration || null, JSON.stringify(Array.isArray(avantages) ? avantages : []), horaires || null, debut_mission || null,
+    diplome_requis || null, JSON.stringify(Array.isArray(langues_requises) ? langues_requises : []), permis_requis || null,
+    JSON.stringify(Array.isArray(certifications_requises) ? certifications_requises : []),
+    JSON.stringify(Array.isArray(pieces_demandees) ? pieces_demandees : ['cv', 'lettre']),
+    date_limite || null, nb_postes || 1, statut === 'brouillon' ? 'brouillon' : 'publiee'
+  )).lastInsertRowid;
+
+  // Notifie les comptes ayant une alerte correspondant à cette offre (domaine, pays ou ville)
+  if (statut !== 'brouillon') {
+    try {
+      const alertes = await db.prepare(`
+        SELECT DISTINCT user_id FROM offres_alertes
+        WHERE (domaine IS NOT NULL AND domaine=?) OR (pays IS NOT NULL AND pays=?) OR (ville IS NOT NULL AND ville=?)
+      `).all(domaine || '', pays || '', ville || '');
+      alertes.forEach(a => creerNotif(a.user_id, 'offre_alerte', 'Nouvelle offre correspondant à votre alerte 🔔',
+        `« ${titre} » vient d'être publiée${ville ? ' à ' + ville : pays ? ' en ' + pays : ''}.`, { offre_id: id }));
+    } catch (_) {}
+  }
+
   sendJSON(res, 201, { id });
+});
+
+/* GET /api/offres/accueil — données réelles pour la page d'accueil du module Emplois & Stages
+   (doit être déclarée AVANT /api/offres/:id, sinon "accueil" est intercepté comme un id) */
+route("GET", "/api/offres/accueil", async (req, res) => {
+  const baseWhere = "statut='publiee' AND type IN ('emploi','stage')";
+  const totalOffres = (await db.prepare(`SELECT COUNT(*) n FROM offres WHERE ${baseWhere}`).get())?.n || 0;
+  const totalOrganismes = (await db.prepare(`SELECT COUNT(DISTINCT createur_id) n FROM offres WHERE ${baseWhere}`).get())?.n || 0;
+  const totalCandidatures = (await db.prepare(`
+    SELECT COUNT(*) n FROM offres_candidatures c JOIN offres o ON o.id=c.offre_id WHERE o.type IN ('emploi','stage')
+  `).get())?.n || 0;
+  const totalRecrutements = (await db.prepare(`
+    SELECT COUNT(*) n FROM offres_candidatures c JOIN offres o ON o.id=c.offre_id WHERE o.type IN ('emploi','stage') AND c.statut='accepte'
+  `).get())?.n || 0;
+  const paysCount = (await db.prepare(`SELECT COUNT(DISTINCT pays) n FROM offres WHERE ${baseWhere} AND pays IS NOT NULL AND pays!=''`).get())?.n || 0;
+
+  const categories = await db.prepare(`
+    SELECT domaine, COUNT(*) n FROM offres WHERE ${baseWhere} AND domaine IS NOT NULL AND domaine!='' GROUP BY domaine ORDER BY n DESC LIMIT 8
+  `).all();
+
+  const featuredRows = await db.prepare(`
+    SELECT o.*, u.nom AS createur_nom, u.role AS createur_role, u.photo_url AS createur_photo
+    FROM offres o JOIN users u ON u.id=o.createur_id
+    WHERE ${baseWhere}
+    ORDER BY o.created_at DESC LIMIT 6
+  `).all();
+  const featured = await Promise.all(featuredRows.map(async o => ({
+    id: o.id, titre: o.titre, type: o.type, contrat: o.contrat, ville: o.ville, pays: o.pays,
+    salaire_min: o.salaire_min, salaire_max: o.salaire_max, salaire_communique: o.salaire_communique,
+    nb_candidatures: o.nb_candidatures, created_at: o.created_at,
+    ...(await enrichOffreOrganisme(o)),
+  })));
+
+  const recruteurs = await db.prepare(`
+    SELECT o.createur_id, u.nom AS createur_nom, u.role AS createur_role, u.photo_url AS createur_photo,
+      o.initiative_id, COUNT(*) n
+    FROM offres o JOIN users u ON u.id=o.createur_id
+    WHERE ${baseWhere}
+    GROUP BY o.createur_id ORDER BY n DESC LIMIT 6
+  `).all();
+  const topRecruteurs = await Promise.all(recruteurs.map(async r => ({
+    nb_offres: r.n,
+    ...(await enrichOffreOrganisme(r)),
+  })));
+
+  const metiers = await db.prepare(`
+    SELECT titre, COUNT(*) n FROM offres WHERE ${baseWhere} GROUP BY titre ORDER BY n DESC LIMIT 10
+  `).all();
+
+  const pays = await db.prepare(`
+    SELECT pays, COUNT(*) n FROM offres WHERE ${baseWhere} AND pays IS NOT NULL AND pays!='' GROUP BY pays ORDER BY n DESC LIMIT 10
+  `).all();
+
+  sendJSON(res, 200, {
+    stats: { offres: totalOffres, organismes: totalOrganismes, candidatures: totalCandidatures, recrutements: totalRecrutements, pays: paysCount },
+    categories, featured, topRecruteurs, metiers, pays,
+  });
 });
 
 /* GET /api/offres/:id */
 route("GET", "/api/offres/:id", async (req, res, params) => {
-  const o = await db.prepare("SELECT o.*,u.nom AS createur_nom,u.role AS createur_role FROM offres o JOIN users u ON u.id=o.createur_id WHERE o.id=?").get(params.id);
+  const o = await db.prepare("SELECT o.*,u.nom AS createur_nom,u.role AS createur_role,u.photo_url AS createur_photo FROM offres o JOIN users u ON u.id=o.createur_id WHERE o.id=?").get(params.id);
   if (!o) return sendJSON(res, 404, { error: "Offre introuvable." });
+  await db.prepare("UPDATE offres SET nb_vues=COALESCE(nb_vues,0)+1 WHERE id=?").run(params.id);
   const me = await getCurrentUser(req);
   const dejaPostule = me ? !!await db.prepare("SELECT 1 FROM offres_candidatures WHERE offre_id=? AND candidat_id=?").get(params.id, me.id) : false;
-  sendJSON(res, 200, { offre: { ...o, competences_requises: safeParse(o.competences_requises) }, dejaPostule });
+  sendJSON(res, 200, {
+    offre: {
+      ...o,
+      competences_requises: safeParse(o.competences_requises),
+      missions: safeParse(o.missions),
+      avantages: safeParse(o.avantages),
+      langues_requises: safeParse(o.langues_requises),
+      certifications_requises: safeParse(o.certifications_requises),
+      pieces_demandees: safeParse(o.pieces_demandees),
+      ...(await enrichOffreOrganisme(o)),
+    },
+    dejaPostule,
+  });
+});
+
+/* ── Alertes emploi : notifie le compte quand une offre correspondante est publiée ── */
+route("POST", "/api/offres-alertes", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { domaine, pays, ville, type } = body;
+  if (!domaine && !pays && !ville) return sendJSON(res, 400, { error: "Précisez au moins un domaine, un pays ou une ville." });
+  const id = (await db.prepare(`
+    INSERT INTO offres_alertes (user_id, domaine, pays, ville, type) VALUES (?,?,?,?,?)
+  `).run(user.id, domaine || null, pays || null, ville || null, type || null)).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("GET", "/api/offres-alertes/mes", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const alertes = await db.prepare("SELECT * FROM offres_alertes WHERE user_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { alertes });
+});
+
+route("DELETE", "/api/offres-alertes/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("DELETE FROM offres_alertes WHERE id=? AND user_id=?").run(params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/mes-offres — offres publiées par l'organisme connecté (Initiative/Collectivité/Admin) */
+route("GET", "/api/mes-offres", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare("SELECT * FROM offres WHERE createur_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { offres: rows.map(r => ({ ...r, competences_requises: safeParse(r.competences_requises), missions: safeParse(r.missions) })) });
+});
+
+/* PUT /api/offres/:id — modifier (créateur uniquement) */
+route("PUT", "/api/offres/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const o = await db.prepare("SELECT * FROM offres WHERE id=?").get(params.id);
+  if (!o) return sendJSON(res, 404, { error: "Offre introuvable." });
+  if (o.createur_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Non autorisé." });
+  const fields = ['titre', 'description', 'contrat', 'localisation', 'pays', 'region', 'departement', 'ville', 'commune',
+    'domaine', 'niveau_experience', 'niveau_etudes', 'temps', 'salaire_min', 'salaire_max', 'horaires', 'debut_mission',
+    'diplome_requis', 'permis_requis', 'date_limite', 'nb_postes', 'statut'];
+  const sets = [], args = [];
+  for (const f of fields) { if (body[f] !== undefined) { sets.push(`${f}=?`); args.push(body[f]); } }
+  const jsonFields = ['missions', 'competences_requises', 'avantages', 'langues_requises', 'certifications_requises', 'pieces_demandees'];
+  for (const f of jsonFields) { if (body[f] !== undefined) { sets.push(`${f}=?`); args.push(JSON.stringify(Array.isArray(body[f]) ? body[f] : [])); } }
+  if (body.teletravail !== undefined) { sets.push('teletravail=?'); args.push(body.teletravail ? 1 : 0); }
+  if (!sets.length) return sendJSON(res, 400, { error: "Rien à modifier." });
+  args.push(params.id);
+  await db.prepare(`UPDATE offres SET ${sets.join(', ')} WHERE id=?`).run(...args);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* POST /api/offres/:id/postuler */

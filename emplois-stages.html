@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Recherche d'emploi & Stage — Diaspo'Actif</title>
+<meta name="viewport" content="width=1280">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="assets/subscription-required.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0D2B4E">
+<style>
+.es-hero{background:linear-gradient(135deg,#0D2B4E 0%,#1E4F8A 100%);color:#fff;padding:52px 24px;}
+.es-hero-inner{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;}
+@media (max-width:860px){ .es-hero-inner{grid-template-columns:1fr;} }
+.es-hero h1{font-size:1.9rem;font-weight:900;margin:0 0 16px;line-height:1.25;}
+.es-hero-mini{display:flex;flex-wrap:wrap;gap:16px 26px;margin:0 0 24px;font-size:12.5px;color:rgba(255,255,255,.82);}
+.es-hero-mini strong{color:#fff;font-size:14px;}
+.es-hero-ctas{display:flex;gap:12px;flex-wrap:wrap;}
+.es-hero-illu{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:26px;position:relative;min-height:220px;}
+.es-illu-chrono{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:rgba(255,255,255,.65);font-weight:700;margin-bottom:16px;letter-spacing:.3px;}
+.es-illu-chrono span{color:#fff;font-variant-numeric:tabular-nums;}
+.es-illu-cards{display:flex;flex-direction:column;gap:10px;}
+.es-illu-card{background:rgba(255,255,255,.1);border-radius:12px;padding:10px 14px;font-size:12px;display:flex;align-items:center;gap:12px;animation:esIlluFade .5s ease both;}
+.es-illu-card .av{font-size:28px;line-height:1;flex-shrink:0;}
+.es-illu-card .txt{flex:1;display:flex;flex-direction:column;}
+.es-illu-card .txt b{font-size:13px;}
+.es-illu-card .txt small{color:rgba(255,255,255,.65);font-weight:600;}
+@keyframes esIlluFade{from{opacity:0;transform:translateX(8px);}to{opacity:1;transform:translateX(0);}}
+
+.es-stats-strip{background:#fff;border-bottom:1px solid var(--border);padding:22px 24px;}
+.es-stats-inner{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+@media (max-width:700px){ .es-stats-inner{grid-template-columns:repeat(2,1fr);} }
+.es-stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;box-shadow:var(--shadow);}
+.es-stat-card .n{font-size:22px;font-weight:900;color:var(--navy);}
+.es-stat-card .l{font-size:11px;color:var(--muted);font-weight:700;margin-top:2px;}
+
+.es-home-section{max-width:1200px;margin:0 auto;padding:36px 24px;}
+.es-home-section h2{font-size:18px;font-weight:800;color:var(--navy);margin:0 0 4px;}
+.es-home-section .sub{font-size:12.5px;color:var(--muted);margin:0 0 18px;}
+
+.es-cat-grid{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity;}
+.es-cat-grid .es-cat-card{flex:0 0 150px;scroll-snap-align:start;}
+.es-cat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:transform .12s;}
+.es-cat-card:hover{transform:translateY(-2px);border-color:var(--orange);}
+.es-cat-card .ic{font-size:26px;margin-bottom:6px;}
+.es-cat-card .n{font-size:13px;font-weight:800;color:var(--navy);}
+.es-cat-card .c{font-size:11px;color:var(--muted);}
+
+.es-recruiters-grid{display:flex;gap:14px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity;}
+.es-recruiters-grid .es-recruiter-card{flex:0 0 200px;scroll-snap-align:start;}
+.es-recruiter-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;}
+.es-recruiter-card .es-logo{margin:0 auto 10px;width:48px;height:48px;}
+.es-recruiter-card .n{font-size:13px;font-weight:700;color:var(--navy);}
+.es-recruiter-card .c{font-size:11.5px;color:var(--muted);margin:4px 0 12px;}
+
+.es-metiers-list{display:flex;flex-wrap:wrap;gap:10px;}
+.es-metier-chip{background:var(--card);border:1px solid var(--border);border-radius:30px;padding:8px 16px;font-size:12.5px;font-weight:700;color:var(--navy);}
+.es-metier-chip span{color:var(--orange);margin-left:6px;}
+
+.es-pays-list{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity;}
+.es-pays-list .es-pays-item{flex:0 0 180px;scroll-snap-align:start;}
+.es-pays-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:var(--navy);}
+.es-pays-item span{color:var(--muted);font-weight:600;font-size:12px;}
+
+.es-search-bar{background:#fff;border-bottom:1px solid var(--border);padding:14px 0;position:sticky;top:0;z-index:40;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.es-search-inner{max-width:1200px;margin:0 auto;padding:0 24px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.es-search-inner input{flex:1;min-width:220px;padding:10px 16px;border:1px solid var(--border);border-radius:30px;font-size:.88rem;}
+.es-type-toggle{display:flex;gap:6px;background:var(--bg);border-radius:30px;padding:4px;}
+.es-type-toggle button{border:none;background:none;padding:7px 16px;border-radius:24px;font-size:.82rem;font-weight:700;color:var(--muted);cursor:pointer;}
+.es-type-toggle button.active{background:var(--orange);color:#fff;}
+.btn-es-search{background:var(--navy);color:#fff;border:none;padding:10px 22px;border-radius:30px;font-size:.85rem;font-weight:700;cursor:pointer;}
+
+.es-layout{max-width:1320px;margin:0 auto;padding:22px 24px 60px;display:grid;grid-template-columns:250px 260px 1fr;gap:22px;}
+@media (max-width:1150px){ .es-layout{grid-template-columns:260px 1fr;} .es-docs-col{display:none;} }
+@media (max-width:900px){ .es-layout{grid-template-columns:1fr;} }
+
+.es-docs-col{align-self:start;position:sticky;top:80px;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 100px);overflow-y:auto;}
+.es-docs-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;}
+.es-docs-box h4{font-size:12.5px;margin:0 0 12px;color:var(--navy);display:flex;align-items:center;gap:6px;}
+.es-doc-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.es-doc-item:last-child{border-bottom:none;}
+.es-doc-item a{color:var(--navy);font-weight:700;text-decoration:none;}
+.es-doc-empty{font-size:11.5px;color:var(--muted);text-align:center;padding:10px 0;}
+.es-alert-form{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+.es-alert-form select,.es-alert-form input{padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-size:11.5px;}
+.es-alert-item{background:var(--bg);border-radius:8px;padding:7px 10px;font-size:11px;color:var(--navy);display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;}
+.es-alert-item button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;}
+
+.es-filters{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;align-self:start;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;}
+.es-filters h3{font-size:13px;margin:0 0 14px;color:var(--navy);}
+.es-filter-group{margin-bottom:16px;}
+.es-filter-group label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+.es-filter-group select,.es-filter-group input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;}
+.es-filter-group.chk{display:flex;align-items:center;gap:8px;}
+.es-filter-group.chk label{margin:0;text-transform:none;font-weight:600;font-size:12.5px;color:var(--navy);}
+.btn-es-reset{width:100%;background:none;border:1px solid var(--border);border-radius:30px;padding:8px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;margin-top:4px;}
+
+.es-layout>main{align-self:start;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;padding-right:6px;}
+.es-results-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.es-results-head span{font-size:13px;color:var(--muted);font-weight:600;}
+.es-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+.es-grid-scroll{display:flex;grid-template-columns:none;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity;}
+.es-grid-scroll .es-card{flex:0 0 300px;scroll-snap-align:start;}
+.es-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;cursor:pointer;transition:transform .12s,box-shadow .12s;}
+.es-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(13,43,78,.14);}
+.es-card-top{display:flex;gap:10px;align-items:center;margin-bottom:10px;}
+.es-logo{width:42px;height:42px;border-radius:10px;background:var(--navy-light);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0;overflow:hidden;}
+.es-logo img{width:100%;height:100%;object-fit:cover;}
+.es-org-name{font-size:12.5px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:4px;}
+.es-org-verif{color:var(--green);font-size:12px;}
+.es-card-titre{font-size:15px;font-weight:800;color:var(--navy);margin:0 0 6px;}
+.es-card-desc{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 10px;}
+.es-card-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.es-tag{font-size:10.5px;font-weight:700;background:var(--bg);color:var(--navy);border-radius:20px;padding:3px 10px;}
+.es-tag.type{background:var(--orange-light);color:var(--orange);}
+.es-card-foot{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;}
+
+.es-empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.es-empty .ic{font-size:44px;margin-bottom:10px;}
+
+/* Detail overlay */
+.es-detail-overlay{position:fixed;inset:0;background:rgba(13,43,78,.5);z-index:200;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px;}
+.es-detail-overlay.open{display:flex;}
+.es-detail-box{background:#fff;border-radius:14px;max-width:720px;width:100%;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.es-detail-head{background:var(--navy);color:#fff;padding:24px 26px;border-radius:14px 14px 0 0;position:relative;}
+.es-detail-head .close{position:absolute;top:14px;right:18px;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;}
+.es-detail-org{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.es-detail-titre{font-size:20px;font-weight:800;margin:0 0 6px;}
+.es-detail-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.es-detail-tags span{font-size:11px;font-weight:700;background:rgba(255,255,255,.15);padding:4px 12px;border-radius:20px;}
+.es-detail-body{padding:24px 26px 30px;}
+.es-detail-section{margin-bottom:22px;}
+.es-detail-section h4{font-size:13px;color:var(--navy);margin:0 0 10px;text-transform:uppercase;letter-spacing:.4px;}
+.es-detail-section ul{margin:0;padding-left:20px;font-size:13.5px;color:var(--text);line-height:1.7;}
+.es-detail-section p{font-size:13.5px;color:var(--text);line-height:1.7;margin:0;}
+.es-cond-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;}
+.es-cond-item{background:var(--bg);border-radius:8px;padding:10px 12px;}
+.es-cond-item .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;font-weight:700;}
+.es-cond-item .v{font-size:13px;color:var(--navy);font-weight:700;margin-top:2px;}
+.es-detail-actions{display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:20px;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.svg" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="evenements.html">Événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="es-hero">
+    <div class="es-hero-inner">
+      <div>
+        <h1>💼 Trouvez l'emploi, le stage ou l'alternance qui fera grandir votre avenir.</h1>
+        <div class="es-hero-mini" id="es-hero-mini">
+          <div><strong id="hm-offres">—</strong><br>offres</div>
+          <div><strong id="hm-orgs">—</strong><br>organismes recruteurs</div>
+          <div><strong id="hm-pays">—</strong><br>pays représentés</div>
+        </div>
+        <div class="es-hero-ctas">
+          <button class="btn btn-navy" onclick="document.getElementById('es-search-anchor').scrollIntoView({behavior:'smooth'})">🔍 Rechercher un emploi</button>
+          <button class="btn btn-orange" id="es-btn-publier" style="display:none;" onclick="location.href='dashboard-initiative.html#offres-emploi'">+ Publier une offre</button>
+        </div>
+      </div>
+      <div class="es-hero-illu">
+        <div class="es-illu-chrono" id="es-illu-chrono">⏱ Prochaine rotation dans <span id="es-illu-countdown">—</span></div>
+        <div class="es-illu-cards" id="es-illu-cards"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="es-stats-strip">
+    <div class="es-stats-inner">
+      <div class="es-stat-card"><div class="n" id="st-offres">—</div><div class="l">📄 OFFRES DISPONIBLES</div></div>
+      <div class="es-stat-card"><div class="n" id="st-orgs">—</div><div class="l">🏢 ORGANISMES RECRUTEURS</div></div>
+      <div class="es-stat-card"><div class="n" id="st-cands">—</div><div class="l">👥 CANDIDATURES ENVOYÉES</div></div>
+      <div class="es-stat-card"><div class="n" id="st-recrut">—</div><div class="l">🎯 RECRUTEMENTS RÉALISÉS</div></div>
+    </div>
+  </div>
+
+  <div id="es-search-anchor"></div>
+  <div class="es-search-bar">
+    <div class="es-search-inner">
+      <div class="es-type-toggle" id="es-type-toggle">
+        <button data-type="" class="active">Tout</button>
+        <button data-type="emploi">Emploi</button>
+        <button data-type="stage">Stage</button>
+      </div>
+      <input id="es-q" placeholder="Intitulé du poste, mot-clé…" onkeydown="if(event.key==='Enter')esSearch()">
+      <button class="btn-es-search" onclick="esSearch()">🔍 Rechercher</button>
+    </div>
+  </div>
+
+  <section class="es-home-section" id="es-categories-section" style="display:none;">
+    <h2>Catégories populaires</h2>
+    <p class="sub">Explorez les offres par domaine d'activité.</p>
+    <div class="es-cat-grid" id="es-categories"></div>
+  </section>
+
+  <section class="es-home-section" id="es-featured-section" style="display:none;background:var(--bg);border-radius:14px;">
+    <h2>Offres mises en avant</h2>
+    <p class="sub">Les dernières offres publiées sur la plateforme.</p>
+    <div class="es-grid es-grid-scroll" id="es-featured"></div>
+  </section>
+
+  <section class="es-home-section" id="es-recruiters-section" style="display:none;">
+    <h2>Ils recrutent sur Diaspo'Actif</h2>
+    <p class="sub">Découvrez les organisations qui publient des offres.</p>
+    <div class="es-recruiters-grid" id="es-recruiters"></div>
+  </section>
+
+  <section class="es-home-section" id="es-metiers-section" style="display:none;background:var(--bg);border-radius:14px;">
+    <h2>Les métiers qui recrutent</h2>
+    <div class="es-metiers-list" id="es-metiers"></div>
+  </section>
+
+  <section class="es-home-section" id="es-pays-section" style="display:none;">
+    <h2>Offres par pays</h2>
+    <div class="es-pays-list" id="es-pays"></div>
+  </section>
+
+  <div class="es-layout">
+    <aside class="es-docs-col" id="es-docs-col" style="display:none;">
+      <div class="es-docs-box">
+        <h4>📄 Mes CV</h4>
+        <div id="es-cv-list"><div class="es-doc-empty">Chargement…</div></div>
+        <a href="cv-builder.html" class="btn btn-outline" style="width:100%;font-size:11px;margin-top:8px;">+ Créer / gérer mes CV</a>
+      </div>
+      <div class="es-docs-box">
+        <h4>✉️ Mes lettres de motivation</h4>
+        <div id="es-lettre-list"><div class="es-doc-empty">Chargement…</div></div>
+        <a href="lettre-builder.html" class="btn btn-outline" style="width:100%;font-size:11px;margin-top:8px;">+ Créer / gérer mes lettres</a>
+      </div>
+      <div class="es-docs-box">
+        <h4>🔔 Mes alertes emploi</h4>
+        <div class="es-alert-form">
+          <select id="al-domaine">
+            <option value="">Domaine…</option>
+            <option>Informatique</option><option>Santé</option><option>Agriculture</option>
+            <option>BTP</option><option>Éducation</option><option>Commerce</option>
+            <option>Administration</option><option>Industrie</option><option>Communication</option>
+            <option>Transport</option><option>Finance</option>
+          </select>
+          <input id="al-pays" placeholder="Pays (ex. France)">
+          <input id="al-ville" placeholder="Ville (ex. Lyon)">
+          <button class="btn btn-orange" style="font-size:11px;" onclick="esCreerAlerte()">+ Créer l'alerte</button>
+        </div>
+        <div id="es-alertes-list"></div>
+      </div>
+    </aside>
+
+    <aside class="es-filters">
+      <h3>🎯 Filtres</h3>
+
+      <div class="es-filter-group">
+        <label>Contrat</label>
+        <select id="f-contrat" onchange="esSearch()">
+          <option value="">Tous</option>
+          <option value="CDI">CDI</option>
+          <option value="CDD">CDD</option>
+          <option value="Intérim">Intérim</option>
+          <option value="Freelance">Freelance</option>
+          <option value="Alternance">Alternance</option>
+          <option value="Mission">Mission</option>
+          <option value="Stage découverte">Stage découverte</option>
+          <option value="Stage académique">Stage académique</option>
+          <option value="Stage professionnel">Stage professionnel</option>
+          <option value="Stage de fin d'études">Stage de fin d'études</option>
+        </select>
+      </div>
+
+      <div class="es-filter-group">
+        <label>Domaine</label>
+        <select id="f-domaine" onchange="esSearch()">
+          <option value="">Tous les domaines</option>
+          <option>Informatique</option><option>Santé</option><option>Agriculture</option>
+          <option>BTP</option><option>Éducation</option><option>Commerce</option>
+          <option>Administration</option><option>Industrie</option><option>Communication</option>
+          <option>Transport</option><option>Finance</option>
+        </select>
+      </div>
+
+      <div class="es-filter-group">
+        <label>Pays</label>
+        <input id="f-pays" placeholder="Ex. France, Sénégal…" onkeydown="if(event.key==='Enter')esSearch()">
+      </div>
+      <div class="es-filter-group">
+        <label>Ville</label>
+        <input id="f-ville" placeholder="Ex. Lyon, Dakar…" onkeydown="if(event.key==='Enter')esSearch()">
+      </div>
+
+      <div class="es-filter-group">
+        <label>Niveau d'expérience</label>
+        <select id="f-experience" onchange="esSearch()">
+          <option value="">Indifférent</option>
+          <option value="Sans expérience">Sans expérience</option>
+          <option value="Débutant">Débutant</option>
+          <option value="1 à 3 ans">1 à 3 ans</option>
+          <option value="3 à 5 ans">3 à 5 ans</option>
+          <option value="Plus de 5 ans">Plus de 5 ans</option>
+        </select>
+      </div>
+
+      <div class="es-filter-group">
+        <label>Niveau d'études</label>
+        <select id="f-etudes" onchange="esSearch()">
+          <option value="">Indifférent</option>
+          <option value="Sans diplôme">Sans diplôme</option>
+          <option value="CAP">CAP</option>
+          <option value="Bac">Bac</option>
+          <option value="BTS">BTS</option>
+          <option value="Licence">Licence</option>
+          <option value="Master">Master</option>
+          <option value="Doctorat">Doctorat</option>
+        </select>
+      </div>
+
+      <div class="es-filter-group chk">
+        <input type="checkbox" id="f-teletravail" onchange="esSearch()">
+        <label for="f-teletravail">Télétravail possible</label>
+      </div>
+
+      <button class="btn-es-reset" onclick="esReset()">✕ Réinitialiser les filtres</button>
+    </aside>
+
+    <main>
+      <div class="es-results-head">
+        <span id="es-count">Chargement…</span>
+      </div>
+      <div class="es-grid" id="es-grid"></div>
+    </main>
+  </div>
+
+</div>
+
+<!-- DETAIL OVERLAY -->
+<div class="es-detail-overlay" id="es-detail-overlay" onclick="if(event.target===this)esCloseDetail()">
+  <div class="es-detail-box" id="es-detail-box"></div>
+</div>
+
+<script src="assets/app.js"></script>
+<script src="assets/subscription-required.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script>
+let ME=null;
+const apiCall=(m,p,b)=>fetch('/api'+p,{method:m,credentials:'same-origin',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined})
+  .then(async r=>{const d=await r.json();if(!r.ok)throw Object.assign(new Error(d.error||r.statusText),{status:r.status,data:d});return d;});
+
+let esType='';
+document.querySelectorAll('#es-type-toggle button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('#es-type-toggle button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); esType=b.dataset.type; esSearch();
+  });
+});
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function esCardHtml(o){
+  const initiale=(o.organisme_nom||'?').charAt(0).toUpperCase();
+  const logo=o.organisme_logo?`<img src="${esc(o.organisme_logo)}" alt="">`:initiale;
+  const contrat=o.contrat?`<span class="es-tag">${esc(o.contrat)}</span>`:'';
+  const loc=[o.ville,o.pays].filter(Boolean).join(', ')||'Non précisé';
+  const salaire=o.salaire_communique && (o.salaire_min||o.salaire_max)
+    ? `${o.salaire_min||''}${o.salaire_min&&o.salaire_max?'–':''}${o.salaire_max||''} €` : '';
+  return `
+    <div class="es-card" onclick="esOpenDetail(${o.id})">
+      <div class="es-card-top">
+        <div class="es-logo">${logo}</div>
+        <div>
+          <div class="es-org-name">${esc(o.organisme_nom||'')} ${o.organisme_verifie?'<span class="es-org-verif" title="Compte vérifié">✔</span>':''}</div>
+        </div>
+      </div>
+      <h3 class="es-card-titre">${esc(o.titre)}</h3>
+      ${o.description?`<p class="es-card-desc">${esc(o.description.length>140?o.description.slice(0,140)+'…':o.description)}</p>`:''}
+      <div class="es-card-meta">
+        <span class="es-tag type">${o.type==='stage'?'Stage':'Emploi'}</span>
+        ${contrat}
+        ${o.teletravail?'<span class="es-tag">🏠 Télétravail</span>':''}
+        ${salaire?`<span class="es-tag">💶 ${esc(salaire)}</span>`:''}
+      </div>
+      <div class="es-card-foot">
+        <span>📍 ${esc(loc)}</span>
+        <span>👥 ${o.nb_candidatures||0} candidature(s)</span>
+      </div>
+    </div>`;
+}
+
+async function esSearch(){
+  const grid=document.getElementById('es-grid');
+  const count=document.getElementById('es-count');
+  grid.innerHTML='';
+  count.textContent='Chargement…';
+  const params=new URLSearchParams({module:'emploi_stage'});
+  if(esType) params.set('type',esType);
+  const q=document.getElementById('es-q').value.trim(); if(q) params.set('q',q);
+  const contrat=document.getElementById('f-contrat').value; if(contrat) params.set('contrat',contrat);
+  const domaine=document.getElementById('f-domaine').value; if(domaine) params.set('domaine',domaine);
+  const pays=document.getElementById('f-pays').value.trim(); if(pays) params.set('pays',pays);
+  const ville=document.getElementById('f-ville').value.trim(); if(ville) params.set('ville',ville);
+  const experience=document.getElementById('f-experience').value; if(experience) params.set('niveau_experience',experience);
+  const etudes=document.getElementById('f-etudes').value; if(etudes) params.set('niveau_etudes',etudes);
+  if(document.getElementById('f-teletravail').checked) params.set('teletravail','1');
+  try{
+    const {offres}=await apiCall('GET','/offres?'+params.toString());
+    count.textContent=offres.length+' offre(s) trouvée(s)';
+    grid.innerHTML=offres.length?offres.map(esCardHtml).join(''):`
+      <div class="es-empty" style="grid-column:1/-1;">
+        <div class="ic">🔍</div>
+        <p>Aucune offre ne correspond à votre recherche pour le moment.</p>
+      </div>`;
+  }catch(e){
+    count.textContent='';
+    grid.innerHTML=`<div class="es-empty" style="grid-column:1/-1;">Erreur : ${esc(e.message)}</div>`;
+  }
+}
+
+function esReset(){
+  document.getElementById('es-q').value='';
+  document.getElementById('f-contrat').value='';
+  document.getElementById('f-domaine').value='';
+  document.getElementById('f-pays').value='';
+  document.getElementById('f-ville').value='';
+  document.getElementById('f-experience').value='';
+  document.getElementById('f-etudes').value='';
+  document.getElementById('f-teletravail').checked=false;
+  esType='';
+  document.querySelectorAll('#es-type-toggle button').forEach(x=>x.classList.remove('active'));
+  document.querySelector('#es-type-toggle button[data-type=""]').classList.add('active');
+  esSearch();
+}
+
+async function esOpenDetail(id){
+  const overlay=document.getElementById('es-detail-overlay');
+  const box=document.getElementById('es-detail-box');
+  box.innerHTML='<div style="padding:60px;text-align:center;color:var(--muted);">Chargement…</div>';
+  overlay.classList.add('open');
+  try{
+    const {offre}=await apiCall('GET','/offres/'+id);
+    box.innerHTML=esDetailHtml(offre);
+  }catch(e){
+    box.innerHTML=`<div style="padding:40px;color:#ef4444;">Erreur : ${esc(e.message)}</div>`;
+  }
+}
+function esCloseDetail(){document.getElementById('es-detail-overlay').classList.remove('open');}
+
+function esDetailHtml(o){
+  const initiale=(o.organisme_nom||'?').charAt(0).toUpperCase();
+  const logo=o.organisme_logo?`<img src="${esc(o.organisme_logo)}" alt="" style="width:100%;height:100%;object-fit:cover;">`:initiale;
+  const missions=(o.missions||[]).map(m=>`<li>${esc(m)}</li>`).join('')||'<li>Non précisées.</li>';
+  const competences=(o.competences_requises||[]).map(c=>`<li>${esc(c)}</li>`).join('')||'<li>Non précisées.</li>';
+  const avantages=(o.avantages||[]).length?`<p>${o.avantages.map(esc).join(' · ')}</p>`:'';
+  const langues=(o.langues_requises||[]).length?o.langues_requises.map(esc).join(', '):'—';
+  const certifs=(o.certifications_requises||[]).length?o.certifications_requises.map(esc).join(', '):'—';
+  const pieces=(o.pieces_demandees||['cv','lettre']).map(p=>({cv:'CV',lettre:'Lettre de motivation',portfolio:'Portfolio',diplomes:'Diplômes',autres:'Autres documents'}[p]||p));
+  const salaire=o.salaire_communique && (o.salaire_min||o.salaire_max) ? `${o.salaire_min||''}${o.salaire_min&&o.salaire_max?' – ':''}${o.salaire_max||''} €` : 'Non communiqué';
+  const loc=[o.ville,o.departement,o.region,o.pays].filter(Boolean).join(', ')||'Non précisée';
+
+  return `
+    <div class="es-detail-head">
+      <button class="close" onclick="esCloseDetail()">✕</button>
+      <div class="es-detail-org">
+        <div class="es-logo" style="width:36px;height:36px;font-size:13px;">${logo}</div>
+        <a href="${esc(o.organisme_profil_url||'#')}" style="color:#fff;font-weight:700;font-size:13px;text-decoration:none;">
+          ${esc(o.organisme_nom||'')} ${o.organisme_verifie?'✔':''}
+        </a>
+      </div>
+      <h2 class="es-detail-titre">${esc(o.titre)}</h2>
+      <div class="es-detail-tags">
+        <span>${o.type==='stage'?'Stage':'Emploi'}</span>
+        ${o.contrat?`<span>${esc(o.contrat)}</span>`:''}
+        <span>📍 ${esc(loc)}</span>
+        ${o.teletravail?'<span>🏠 Télétravail</span>':''}
+      </div>
+    </div>
+    <div class="es-detail-body">
+      ${o.description?`<div class="es-detail-section"><h4>Présentation</h4><p>${esc(o.description)}</p></div>`:''}
+      <div class="es-detail-section"><h4>Missions</h4><ul>${missions}</ul></div>
+      <div class="es-detail-section"><h4>Compétences recherchées</h4><ul>${competences}</ul></div>
+      <div class="es-detail-section">
+        <h4>Profil recherché</h4>
+        <div class="es-cond-grid">
+          <div class="es-cond-item"><div class="k">Diplôme</div><div class="v">${esc(o.diplome_requis||o.niveau_etudes||'—')}</div></div>
+          <div class="es-cond-item"><div class="k">Expérience</div><div class="v">${esc(o.niveau_experience||'—')}</div></div>
+          <div class="es-cond-item"><div class="k">Langues</div><div class="v">${langues}</div></div>
+          <div class="es-cond-item"><div class="k">Permis</div><div class="v">${esc(o.permis_requis||'—')}</div></div>
+          <div class="es-cond-item"><div class="k">Certifications</div><div class="v">${certifs}</div></div>
+        </div>
+      </div>
+      <div class="es-detail-section">
+        <h4>Conditions</h4>
+        <div class="es-cond-grid">
+          <div class="es-cond-item"><div class="k">Salaire</div><div class="v">${esc(salaire)}</div></div>
+          <div class="es-cond-item"><div class="k">Horaires</div><div class="v">${esc(o.horaires||'—')}</div></div>
+          <div class="es-cond-item"><div class="k">Début</div><div class="v">${esc(o.debut_mission||'Dès que possible')}</div></div>
+          <div class="es-cond-item"><div class="k">Temps</div><div class="v">${o.temps==='partiel'?'Temps partiel':'Temps plein'}</div></div>
+        </div>
+        ${avantages}
+      </div>
+      <div class="es-detail-section"><h4>Pièces demandées</h4><p>${pieces.map(esc).join(' · ')}</p></div>
+      <div class="es-detail-actions">
+        <button class="btn btn-orange" onclick="esPostuler(${o.id})" ${o.dejaPostule?'disabled':''}>${o.dejaPostule?'✔ Déjà postulé':'📤 Postuler'}</button>
+        <button class="btn btn-outline" onclick="alert('Bientôt disponible')">📌 Enregistrer</button>
+        <button class="btn btn-outline" onclick="alert('Bientôt disponible')">🔁 Republier</button>
+      </div>
+    </div>`;
+}
+
+function esPostuler(id){
+  alert("La candidature avec CV/lettre Diaspo'Actif arrive dans un prochain lot. Pour l'instant, cette offre est consultable uniquement.");
+}
+
+const ES_CAT_ICONS = {Informatique:'💻',BTP:'🏗',Agriculture:'🚜',Santé:'🏥',Éducation:'🏫',Commerce:'🛒',Administration:'🏛️',Industrie:'⚙️',Communication:'📣',Transport:'🚚',Finance:'💰'};
+
+/* ── Vignette métiers du hero : rotation automatique toutes les 2h ── */
+const ES_ILLU_METIERS = [
+  { av:'👨🏾‍💻', titre:'Développeur Web', contrat:'CDI' },
+  { av:'👩🏾‍⚕️', titre:'Infirmier(ère)', contrat:'Stage' },
+  { av:'👷🏿', titre:'Chef de chantier', contrat:'CDI' },
+  { av:'👩🏽‍🏫', titre:'Enseignant(e)', contrat:'CDD' },
+  { av:'👨🏽‍🔧', titre:'Électricien', contrat:'Alternance' },
+  { av:'👩🏾‍💼', titre:'Comptable', contrat:'CDI' },
+  { av:'🧑🏾‍🌾', titre:'Agronome', contrat:'Stage' },
+  { av:'👨🏿‍🍳', titre:'Cuisinier', contrat:'CDD' },
+  { av:'👩🏽‍⚖️', titre:'Juriste', contrat:'CDI' },
+  { av:'🧑🏾‍🔬', titre:'Technicien de laboratoire', contrat:'CDI' },
+  { av:'👨🏾‍🏭', titre:'Mécanicien', contrat:'Alternance' },
+  { av:'👩🏿‍💻', titre:'Commercial(e)', contrat:'CDI' },
+];
+const ES_ILLU_ROTATION_MS = 2 * 60 * 60 * 1000; // 2 heures
+const ES_ILLU_AVATARS = {Informatique:'👨🏾‍💻',BTP:'👷🏿',Agriculture:'🧑🏾‍🌾',Santé:'👩🏾‍⚕️',Éducation:'👩🏽‍🏫',Commerce:'👩🏿‍💻',Administration:'👩🏾‍💼',Industrie:'👨🏾‍🏭',Communication:'📣',Transport:'🚚',Finance:'👩🏽‍⚖️'};
+let ES_ILLU_POOL = []; // rempli avec les offres réelles publiées, via loadAccueil()
+
+function esIlluPickSet() {
+  const source = ES_ILLU_POOL.length ? ES_ILLU_POOL : ES_ILLU_METIERS;
+  const windowIdx = Math.floor(Date.now() / ES_ILLU_ROTATION_MS);
+  // Mélange déterministe basé sur la fenêtre de 2h (même résultat pour tous les visiteurs, change chaque fenêtre)
+  const shuffled = source.map((m, i) => ({ m, k: Math.sin(windowIdx * 999 + i * 137.51) }))
+    .sort((a, b) => a.k - b.k).map(x => x.m);
+  return shuffled.slice(0, 3);
+}
+
+function esIlluRender() {
+  const el = document.getElementById('es-illu-cards');
+  if (!el) return;
+  el.innerHTML = esIlluPickSet().map(m => `
+    <div class="es-illu-card" ${m.id ? `onclick="esOpenDetail(${m.id})" style="cursor:pointer;"` : ''}>
+      <div class="av">${m.av || ES_ILLU_AVATARS[m.domaine] || '💼'}</div>
+      <div class="txt"><b>${esc(m.titre)}</b><small>${esc(m.contrat || '')}</small></div>
+    </div>`).join('');
+}
+
+function esIlluTick() {
+  const nextWindow = (Math.floor(Date.now() / ES_ILLU_ROTATION_MS) + 1) * ES_ILLU_ROTATION_MS;
+  const remaining = nextWindow - Date.now();
+  if (remaining <= 0) { esIlluRender(); }
+  const h = Math.floor(remaining / 3600000);
+  const m = Math.floor((remaining % 3600000) / 60000);
+  const s = Math.floor((remaining % 60000) / 1000);
+  const cd = document.getElementById('es-illu-countdown');
+  if (cd) cd.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+esIlluRender();
+setInterval(esIlluTick, 1000);
+esIlluTick();
+
+async function loadAccueil(){
+  try{
+    const data = await apiCall('GET','/offres/accueil');
+    document.getElementById('hm-offres').textContent = data.stats.offres;
+    document.getElementById('hm-orgs').textContent = data.stats.organismes;
+    document.getElementById('hm-pays').textContent = data.stats.pays;
+    document.getElementById('st-offres').textContent = data.stats.offres;
+    document.getElementById('st-orgs').textContent = data.stats.organismes;
+    document.getElementById('st-cands').textContent = data.stats.candidatures;
+    document.getElementById('st-recrut').textContent = data.stats.recrutements;
+
+    ES_ILLU_POOL = (data.featured || []).map(o => ({ id: o.id, titre: o.titre, contrat: o.contrat || (o.type === 'stage' ? 'Stage' : o.type === 'emploi' ? 'Emploi' : ''), domaine: o.domaine }));
+    esIlluRender();
+
+    if (data.categories.length) {
+      document.getElementById('es-categories-section').style.display = '';
+      document.getElementById('es-categories').innerHTML = data.categories.map(c => `
+        <div class="es-cat-card" onclick="document.getElementById('f-domaine').value='${esc(c.domaine)}';esSearch();document.getElementById('es-search-anchor').scrollIntoView({behavior:'smooth'});">
+          <div class="ic">${ES_CAT_ICONS[c.domaine]||'💼'}</div>
+          <div class="n">${esc(c.domaine)}</div>
+          <div class="c">${c.n} offre(s)</div>
+        </div>`).join('');
+    }
+
+    if (data.featured.length) {
+      document.getElementById('es-featured-section').style.display = '';
+      document.getElementById('es-featured').innerHTML = data.featured.map(esCardHtml).join('');
+    }
+
+    if (data.topRecruteurs.length) {
+      document.getElementById('es-recruiters-section').style.display = '';
+      document.getElementById('es-recruiters').innerHTML = data.topRecruteurs.map(r => {
+        const initiale = (r.organisme_nom||'?').charAt(0).toUpperCase();
+        const logo = r.organisme_logo ? `<img src="${esc(r.organisme_logo)}" alt="">` : initiale;
+        return `<div class="es-recruiter-card">
+          <div class="es-logo">${logo}</div>
+          <div class="n">${esc(r.organisme_nom||'')} ${r.organisme_verifie?'✔':''}</div>
+          <div class="c">${r.nb_offres} offre(s)</div>
+          <a class="btn btn-outline" style="font-size:11px;padding:6px 14px;" href="${esc(r.organisme_profil_url||'#')}">Voir le profil</a>
+        </div>`;
+      }).join('');
+    }
+
+    if (data.metiers.length) {
+      document.getElementById('es-metiers-section').style.display = '';
+      document.getElementById('es-metiers').innerHTML = data.metiers.map(m => `
+        <div class="es-metier-chip">${esc(m.titre)}<span>${m.n}</span></div>`).join('');
+    }
+
+    if (data.pays.length) {
+      document.getElementById('es-pays-section').style.display = '';
+      document.getElementById('es-pays').innerHTML = data.pays.map(p => `
+        <div class="es-pays-item" onclick="document.getElementById('f-pays').value='${esc(p.pays)}';esSearch();document.getElementById('es-search-anchor').scrollIntoView({behavior:'smooth'});" style="cursor:pointer;">
+          ${esc(p.pays)}<span>${p.n} offre(s)</span>
+        </div>`).join('');
+    }
+  }catch(e){ /* silencieux — la page reste fonctionnelle sans ces sections */ }
+}
+
+async function esLoadDocsColumn(){
+  document.getElementById('es-docs-col').style.display = '';
+  try{
+    const { cv = [] } = await apiCall('GET','/cv');
+    document.getElementById('es-cv-list').innerHTML = cv.length
+      ? cv.map(c => `<div class="es-doc-item"><a href="cv-builder.html?numero=${c.numero}">${esc(c.titre||'Mon CV')}</a></div>`).join('')
+      : '<div class="es-doc-empty">Aucun CV créé.</div>';
+  }catch(e){ document.getElementById('es-cv-list').innerHTML = '<div class="es-doc-empty">Aucun CV créé.</div>'; }
+
+  try{
+    const { lettres = [] } = await apiCall('GET','/lettres');
+    document.getElementById('es-lettre-list').innerHTML = lettres.length
+      ? lettres.map(l => `<div class="es-doc-item"><a href="lettre-builder.html?numero=${l.numero}">${esc(l.titre||'Ma lettre')}</a></div>`).join('')
+      : '<div class="es-doc-empty">Aucune lettre créée.</div>';
+  }catch(e){ document.getElementById('es-lettre-list').innerHTML = '<div class="es-doc-empty">Aucune lettre créée.</div>'; }
+
+  esLoadAlertes();
+}
+
+async function esLoadAlertes(){
+  try{
+    const { alertes = [] } = await apiCall('GET','/offres-alertes/mes');
+    const el = document.getElementById('es-alertes-list');
+    el.innerHTML = alertes.length ? alertes.map(a => {
+      const parts = [a.domaine, a.ville, a.pays].filter(Boolean).join(' · ');
+      return `<div class="es-alert-item"><span>🔔 ${esc(parts)}</span><button onclick="esSupprimerAlerte(${a.id})" title="Supprimer">✕</button></div>`;
+    }).join('') : '<div class="es-doc-empty">Aucune alerte active.</div>';
+  }catch(e){}
+}
+
+async function esCreerAlerte(){
+  const domaine = document.getElementById('al-domaine').value;
+  const pays = document.getElementById('al-pays').value.trim();
+  const ville = document.getElementById('al-ville').value.trim();
+  if (!domaine && !pays && !ville) { alert('Précisez au moins un domaine, un pays ou une ville.'); return; }
+  try{
+    await apiCall('POST','/offres-alertes', { domaine: domaine||null, pays: pays||null, ville: ville||null });
+    document.getElementById('al-domaine').value='';
+    document.getElementById('al-pays').value='';
+    document.getElementById('al-ville').value='';
+    esLoadAlertes();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+
+async function esSupprimerAlerte(id){
+  try{ await apiCall('DELETE','/offres-alertes/'+id); esLoadAlertes(); }catch(e){}
+}
+
+async function esCheckAccesAbonne(){
+  if (!ME || ME.role !== 'utilisateur') return true;
+  try{
+    const r = await apiCall('GET','/accreditations/mes');
+    return (r.accreditations||[]).some(a=>a.type==='utilisateur_abonne' && a.statut==='active');
+  }catch(_){ return true; }
+}
+function esAfficherUpsellAbonne(){
+  document.querySelectorAll('.page > *').forEach(n=>n.remove());
+  const el=document.createElement('div');
+  document.querySelector('.page').appendChild(el);
+  SubscriptionRequiredPage(el, {
+    moduleName: "Recherche d'emploi & Stage",
+    moduleIcon: '💼',
+    moduleIllustration: '💼',
+    moduleDescription: "Trouvez l'emploi, le stage ou l'alternance qui fera grandir votre avenir : recherche filtrée, candidature en un clic, alertes personnalisées.",
+    fonctionnalites: [
+      'Rechercher des offres par domaine, pays, ville ou contrat',
+      'Consulter le détail complet de chaque offre',
+      "Postuler avec vos CV et lettres de motivation Diaspo'Actif",
+      'Créer des alertes emploi personnalisées',
+      'Suivre vos candidatures envoyées',
+    ],
+    heroMockup: `
+      <div style="background:linear-gradient(135deg,#0D2B4E 0%,#1E4F8A 100%);color:#fff;padding:40px 28px;display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:center;">
+        <div>
+          <h2 style="margin:0 0 14px;font-size:22px;font-weight:800;line-height:1.3;">💼 Trouvez l'emploi, le stage ou l'alternance qui fera grandir votre avenir.</h2>
+          <div style="display:flex;gap:20px;margin-bottom:16px;font-size:12.5px;">
+            <div><strong style="font-size:17px;">128</strong><br>offres</div>
+            <div><strong style="font-size:17px;">46</strong><br>organismes recruteurs</div>
+            <div><strong style="font-size:17px;">9</strong><br>pays représentés</div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <span style="background:#fff;color:#0D2B4E;font-weight:700;font-size:12.5px;padding:9px 18px;border-radius:24px;">🔍 Rechercher un emploi</span>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,.08);border-radius:14px;padding:18px;">
+          <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.65);font-weight:700;margin-bottom:14px;">⏱ Prochaine rotation dans <span id="sr-illu-countdown">—</span></div>
+          <div id="sr-illu-cards" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+      </div>`,
+    onRendered: (el) => {
+      const cardsEl = el.querySelector('#sr-illu-cards');
+      const cdEl = el.querySelector('#sr-illu-countdown');
+      if (!cardsEl || !cdEl) return;
+      function render() {
+        cardsEl.innerHTML = esIlluPickSet().map(m => `
+          <div style="background:rgba(255,255,255,.12);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:20px;">${m.av || ES_ILLU_AVATARS[m.domaine] || '💼'}</span>
+            <div><b style="font-size:13px;">${esc(m.titre)}</b><br><small style="opacity:.75;">${esc(m.contrat || '')}</small></div>
+          </div>`).join('');
+      }
+      function tick() {
+        const nextWindow = (Math.floor(Date.now() / ES_ILLU_ROTATION_MS) + 1) * ES_ILLU_ROTATION_MS;
+        const remaining = nextWindow - Date.now();
+        if (remaining <= 0) render();
+        const h = Math.floor(remaining / 3600000), m = Math.floor((remaining % 3600000) / 60000), s = Math.floor((remaining % 60000) / 1000);
+        cdEl.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      }
+      render();
+      tick();
+      setInterval(tick, 1000);
+    },
+    preview: [
+      { icon: '💻', titre: 'Développeur Full Stack', sous: 'Diaspo\'Actif · Paris, France · CDI', badge: 'Exemple' },
+      { icon: '🏛️', titre: 'Chargé(e) de mission Jeunesse', sous: 'Mairie de Paris · Paris, France · CDI', badge: 'Exemple' },
+      { icon: '🎨', titre: 'Développeur Web Junior', sous: 'Aminata Koné Beauty · Lyon, France · Télétravail', badge: 'Exemple' },
+      { icon: '📦', titre: 'Assistant(e) e-commerce', sous: 'Bah · Royaume-Uni · Emploi', badge: 'Exemple' },
+      { icon: '🏥', titre: 'Infirmier(ère) diplômé(e)', sous: 'Hôpital Necker · Paris, France · CDI', badge: 'Exemple' },
+      { icon: '🏗️', titre: 'Chef de chantier BTP', sous: 'BTP Diaspora · Dakar, Sénégal · CDD', badge: 'Exemple' },
+      { icon: '🎓', titre: 'Stage Marketing Digital', sous: "Fatoumata Traoré Initiative · Bamako, Mali · Stage", badge: 'Exemple' },
+      { icon: '💰', titre: 'Comptable confirmé(e)', sous: 'Diaspo\'Actif Admin · Lyon, France · CDI', badge: 'Exemple' },
+    ],
+    accredType: 'utilisateur_abonne',
+    retourUrl: 'dashboard-utilisateur.html',
+  });
+}
+
+(async function init(){
+  try{ ME=await fetchCurrentUser(); }catch(_){}
+  if (!(await esCheckAccesAbonne())) { esAfficherUpsellAbonne(); return; }
+  if (ME && ['initiative','collectivite','administrateur'].includes(ME.role)) {
+    document.getElementById('es-btn-publier').style.display = '';
+  }
+  if (ME && ME.role === 'utilisateur') {
+    esLoadDocsColumn();
+  }
+  loadAccueil();
+  esSearch();
+})();
+</script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

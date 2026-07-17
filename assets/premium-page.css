@@ -1,0 +1,85 @@
+/* ===========================================================
+   PremiumPage — styles
+   =========================================================== */
+.prm-wrap{max-width:1180px;margin:0 auto;padding:24px 20px 70px;animation:prmFadeIn .4s ease both;}
+@keyframes prmFadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+.prm-retour-top{margin-bottom:18px;}
+
+.prm-contexte{
+  max-width:720px;margin:0 auto 20px;background:#FBF0D6;border:1px solid #E8CE8E;border-radius:var(--radius);
+  padding:14px 20px;text-align:center;font-size:13px;color:#6B4F0E;line-height:1.6;
+}
+.prm-contexte p{margin:4px 0;}
+
+.prm-hero{
+  text-align:center;padding:44px 24px;border-radius:var(--radius);margin-bottom:32px;
+  background:linear-gradient(135deg,#0D2B4E 0%,#1E4F8A 100%);color:#fff;box-shadow:var(--shadow);
+}
+.prm-hero-crown{font-size:44px;margin-bottom:8px;}
+.prm-hero h1{margin:0 0 10px;font-size:28px;font-weight:800;}
+.prm-hero-sub{margin:0 auto 16px;max-width:600px;font-size:14.5px;opacity:.9;}
+.prm-hero-texte{margin:0 auto;max-width:640px;font-size:13px;opacity:.8;line-height:1.7;}
+
+.prm-section{padding:36px 0;}
+.prm-section-alt{background:var(--bg);border-radius:var(--radius);}
+.prm-section-title{font-size:20px;font-weight:800;color:var(--navy);margin:0 0 22px;text-align:center;}
+
+.prm-fonc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;}
+.prm-fonc-card{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);
+  padding:22px;transition:transform .15s;
+}
+.prm-fonc-card:hover{transform:translateY(-3px);}
+.prm-fonc-icon{font-size:32px;margin-bottom:10px;}
+.prm-fonc-card h3{margin:0 0 12px;font-size:15px;font-weight:800;color:var(--navy);}
+.prm-fonc-card ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.prm-fonc-card ul li{font-size:12.5px;color:var(--muted);}
+
+.prm-pourquoi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;}
+.prm-pourquoi-card{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);
+  padding:26px 16px;text-align:center;
+}
+.prm-pourquoi-icon{font-size:34px;margin-bottom:10px;}
+.prm-pourquoi-titre{font-size:13.5px;font-weight:800;color:var(--navy);}
+
+.prm-comparatif-wrap{max-width:720px;margin:0 auto;overflow-x:auto;}
+.prm-comparatif{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
+.prm-comparatif th,.prm-comparatif td{padding:12px 16px;text-align:center;font-size:13px;border-bottom:1px solid var(--border);}
+.prm-comparatif th{background:var(--navy);color:#fff;font-weight:800;}
+.prm-comparatif td:first-child,.prm-comparatif th:first-child{text-align:left;}
+.prm-comparatif .prm-yes{color:#15803d;font-weight:800;}
+
+.prm-tarifs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;max-width:760px;margin:0 auto;}
+.prm-tarif-card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);
+  padding:30px 24px;text-align:center;position:relative;
+}
+.prm-tarif-reco{border:2px solid #C9971C;transform:scale(1.03);box-shadow:0 8px 30px rgba(201,151,28,.25);}
+.prm-tarif-badge{
+  position:absolute;top:-14px;left:50%;transform:translateX(-50%);
+  background:linear-gradient(135deg,#F5D061,#C9971C);color:#3A2600;font-size:11.5px;font-weight:800;
+  padding:6px 16px;border-radius:20px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.2);
+}
+.prm-tarif-icon{font-size:28px;margin-bottom:8px;}
+.prm-tarif-nom{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:10px;}
+.prm-tarif-prix{font-size:30px;font-weight:800;color:var(--navy);margin-bottom:6px;}
+.prm-tarif-prix span{font-size:13px;font-weight:600;color:var(--muted);}
+.prm-tarif-desc{font-size:12.5px;color:var(--muted);margin-bottom:18px;min-height:34px;}
+
+.prm-btn-gold{background:linear-gradient(135deg,#F5D061,#C9971C)!important;color:#3A2600!important;border:none!important;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,.2);}
+.prm-btn-navy{background:var(--navy)!important;color:#fff!important;border:none!important;font-weight:800;}
+
+.prm-banniere{
+  text-align:center;padding:44px 24px;border-radius:var(--radius);margin-top:36px;
+  background:linear-gradient(135deg,#0D2B4E 0%,#1E4F8A 100%);color:#fff;box-shadow:var(--shadow);
+}
+.prm-banniere h2{margin:0 0 12px;font-size:22px;font-weight:800;}
+.prm-banniere p{margin:0 auto 24px;max-width:640px;font-size:13.5px;opacity:.88;line-height:1.7;}
+.prm-banniere-ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+
+@media (max-width:640px){
+  .prm-hero h1{font-size:22px;}
+  .prm-tarif-reco{transform:none;}
+}

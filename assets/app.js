@@ -379,7 +379,12 @@ async function applyAuthState() {
   const user = await fetchCurrentUser();
   if (user) {
     injectNotifStyles();
+    const premiumBtnHtml = user.role === 'utilisateur' ? `
+      <a href="premium.html?type=utilisateur" id="premium-topbar-btn" style="text-decoration:none;display:none;align-items:center;gap:6px;background:linear-gradient(135deg,#F5D061,#C9971C);color:#3A2600;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:20px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Passer à Premium">
+        <span style="font-size:14px;">👑</span> Passer à Premium
+      </a>` : '';
     el.innerHTML = `
+      ${premiumBtnHtml}
       <a href="messagerie.html" class="user-chip" style="text-decoration:none;position:relative;" title="Messagerie">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span id="msg-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
@@ -402,6 +407,14 @@ async function applyAuthState() {
       try { await api("POST", "/auth/logout"); } catch (err) { /* ignore */ }
       window.location.href = "index.html";
     });
+    // Bouton "Passer à Premium" : visible seulement si pas déjà abonné
+    if (user.role === 'utilisateur') {
+      api("GET", "/accreditations/mes").then(r => {
+        const dejaAbonne = (r.accreditations || []).some(a => a.type === 'utilisateur_abonne' && a.statut === 'active');
+        const btn = document.getElementById('premium-topbar-btn');
+        if (btn && !dejaAbonne) btn.style.display = 'inline-flex';
+      }).catch(() => {});
+    }
     // Démo : vérifier si on doit déclencher le tour guidé
     if (window.DADemo) DADemo.checkUser(user);
     // Charger le nombre de messages non lus + notifications non lues
@@ -691,6 +704,27 @@ async function initAnnuaire(){
     </div>`;
   }
 
+  function renderOrganismeCard(o) {
+    const loc = [o.ville, o.pays].filter(Boolean).join(', ') || '—';
+    const profilHref = `profil.html?id=${encodeURIComponent(o.id)}`;
+    const badge = o.role === 'administrateur' ? "DIASPO'ACTIF" : 'COLLECTIVITÉ';
+    return `
+    <div class="ann-card" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
+      <div class="ann-card-photo" style="position:relative;display:flex;align-items:center;justify-content:center;background:#f1f5f9;">
+        ${photoAvatar(o.nom, 96, 'user')}
+        <span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>
+      </div>
+      <div class="ann-card-body">
+        <div class="ann-card-title">${o.nom}</div>
+        <div class="ann-card-meta-row"><span class="ann-card-loc">📍 ${loc}</span></div>
+        ${o.bio ? `<div class="ann-card-desc">${o.bio}</div>` : ''}
+        <div class="ann-card-foot">
+          <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
+        </div>
+      </div>
+    </div>`;
+  }
+
   /* ── Rendu des chips filtres actifs ── */
   function renderChips() {
     const bar = document.getElementById("active-filters-bar");
@@ -719,17 +753,19 @@ async function initAnnuaire(){
 
   /* ── Recherche par mots-clés (serveur, pertinence + tolérance fautes/synonymes) ── */
   async function applyRechercheMotCle() {
-    const params = new URLSearchParams({ q: state.motCle });
+    const params = new URLSearchParams({ q: state.motCle || "" });
     if (state.typeOrg) params.set("type", state.typeOrg);
     if (state.ville) params.set("ville", state.ville);
     if (state.paysRes) params.set("pays", state.paysRes);
     let r;
     try { r = await api("GET", "/annuaire/recherche?" + params); }
     catch (e) { list.innerHTML = `<div class="empty">Erreur de recherche.</div>`; return; }
-    const cartes = [
-      ...(r.initiatives || []).map(it => renderInitiativeCard(it)),
-      ...(r.utilisateurs || []).map(u => renderPersonCard(u)),
-    ];
+    const entites = [
+      ...(r.initiatives || []).map(it => ({ rang: it._rang ?? 0, html: renderInitiativeCard(it) })),
+      ...(r.utilisateurs || []).map(u => ({ rang: u._rang ?? 0, html: renderPersonCard(u) })),
+      ...(r.organismes || []).map(o => ({ rang: o._rang ?? 0, html: renderOrganismeCard(o) })),
+    ].sort((a, b) => a.rang - b.rang);
+    const cartes = entites.map(e => e.html);
     filtered_count = r.total || 0;
     document.getElementById("result-count").textContent = filtered_count;
     list.innerHTML = cartes.length ? cartes.join("") : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
@@ -745,7 +781,9 @@ async function initAnnuaire(){
     const prenomGroup = document.getElementById("f-prenom-group");
     if (prenomGroup) prenomGroup.style.display = state.typeOrg === "Utilisateurs" ? "" : "none";
 
-    if (state.motCle) { await applyRechercheMotCle(); return; }
+    // Recherche serveur (mots-clés OU vue par défaut) — inclut Initiatives + Utilisateurs +
+    // Collectivités/Diaspo'Actif dès l'arrivée sur la page, même sans recherche.
+    if (state.motCle || state.typeOrg !== "Utilisateurs") { await applyRechercheMotCle(); return; }
 
     if (state.typeOrg === "Utilisateurs") {
       if (!USERS_CACHE) {

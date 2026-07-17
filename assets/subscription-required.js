@@ -93,7 +93,7 @@
       moduleName = 'Ce module', moduleIcon = '⭐', moduleIllustration = moduleIcon,
       moduleDescription = "Ce module fait partie des fonctionnalités premium de Diaspo'Actif.",
       fonctionnalites = [], avantages = DEFAULT_AVANTAGES, accredType = 'utilisateur_abonne',
-      retourUrl = null,
+      retourUrl = null, preview = [], moduleFaq = [], heroMockup = '', onRendered = null, parcours = [],
     } = config || {};
 
     el.innerHTML = `<div class="src-loading" style="text-align:center;padding:80px 20px;color:var(--muted);">Chargement…</div>`;
@@ -148,48 +148,81 @@
       </div>
     `).join('');
 
+    const moduleFaqHtml = moduleFaq.length ? moduleFaq.map(f => `
+      <div class="src-faq-item">
+        <button class="src-faq-q" onclick="this.parentElement.classList.toggle('open')">
+          <span>${esc(f.q)}</span><span class="src-faq-chevron">›</span>
+        </button>
+        <div class="src-faq-a">${esc(f.r)}</div>
+      </div>
+    `).join('') : '';
+
+    const previewHtml = preview.length ? `
+      <div class="src-preview-panel">
+        <div class="src-preview-panel-label">👀 Aperçu du module</div>
+        <div class="src-preview-grid">
+          ${preview.map(p => `
+            <div class="src-preview-card">
+              <div class="src-preview-icon">${esc(p.icon || '📋')}</div>
+              <div class="src-preview-txt">
+                <div class="src-preview-titre">${esc(p.titre)}</div>
+                <div class="src-preview-sous">${esc(p.sous || '')}</div>
+              </div>
+              ${p.badge ? `<div class="src-preview-badge">${esc(p.badge)}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>` : '';
+
+    const parcoursHtml = parcours.length ? `
+      <div class="src-parcours">
+        ${parcours.map((p, i) => `
+          <div class="src-parcours-step">
+            <div class="src-parcours-num">${i + 1}</div>
+            <div class="src-parcours-icon">${esc(p.icon || '📌')}</div>
+            <div class="src-parcours-txt">${esc(p.titre)}</div>
+          </div>
+          ${i < parcours.length - 1 ? '<div class="src-parcours-arrow">→</div>' : ''}
+        `).join('')}
+      </div>` : '';
+
     el.innerHTML = `
       <div class="src-wrap">
         <button class="btn btn-outline src-retour" id="src-btn-retour">← Retour</button>
 
-        <div class="src-hero">
-          <div class="src-hero-illu">${moduleIllustration}</div>
-          <div class="src-hero-icon">${moduleIcon}</div>
-          <h1 class="src-hero-title">${esc(moduleName)}</h1>
-          <p class="src-hero-desc">${esc(moduleDescription)}</p>
-          <div class="src-hero-lock">🔒 Module réservé aux comptes Abonné</div>
-          <div class="src-hero-ctas">
-            <button class="btn btn-orange" id="src-btn-abonner">S'abonner</button>
-            <button class="btn btn-outline" id="src-btn-comparer">Comparer les abonnements</button>
+        ${heroMockup ? `<section class="src-section" style="padding-top:0;">
+          <h2 class="src-section-title">Aperçu de la page</h2>
+          <div class="src-mockup-frame">${heroMockup}</div>
+        </section>` : ''}
+
+        <div class="src-hero ${previewHtml ? 'src-hero-split' : ''}">
+          <div class="src-hero-main">
+            <div class="src-hero-illu">${moduleIllustration}</div>
+            <div class="src-hero-icon">${moduleIcon}</div>
+            <h1 class="src-hero-title">${esc(moduleName)}</h1>
+            <p class="src-hero-desc">${esc(moduleDescription)}</p>
+            <div class="src-hero-lock">🔒 Module premium</div>
+            <div class="src-hero-ctas">
+              <button class="btn" id="src-btn-abonner">Voir les abonnements</button>
+            </div>
           </div>
+          ${previewHtml}
         </div>
+
+        ${parcoursHtml ? `<section class="src-section src-section-alt">
+          <h2 class="src-section-title">De l'idée à la réalisation</h2>
+          <div class="src-parcours-wrap">${parcoursHtml}</div>
+        </section>` : ''}
 
         <section class="src-section">
           <h2 class="src-section-title">Ce que permet ce module</h2>
           <div class="src-features-grid">${featuresHtml}</div>
         </section>
 
-        <section class="src-section src-section-alt">
-          <h2 class="src-section-title">Pourquoi s'abonner ?</h2>
-          <div class="src-avantages-grid">${avantagesHtml}</div>
-        </section>
-
-        <section class="src-section" id="src-formules-anchor">
-          <h2 class="src-section-title">Formules disponibles</h2>
-          <div class="src-formules-grid">${formulesHtml}</div>
-        </section>
-
-        ${comparatifHtml ? `<section class="src-section src-section-alt" id="src-comparatif-anchor">
-          <h2 class="src-section-title">Comparatif</h2>
-          <div class="src-comparatif-wrap">${comparatifHtml}</div>
-        </section>` : ''}
-
-        <section class="src-section">
-          <h2 class="src-section-title">Questions fréquentes</h2>
-          <div class="src-faq">${faqHtml}</div>
-        </section>
       </div>
     `;
+
+    if (typeof onRendered === 'function') { try { onRendered(el); } catch (_) {} }
 
     const retourBtn = el.querySelector('#src-btn-retour');
     retourBtn.addEventListener('click', () => {
@@ -198,13 +231,13 @@
       else if (window.history.length > 1) window.history.back();
       else window.location.href = 'dashboard-utilisateur.html';
     });
-    el.querySelector('#src-btn-abonner').addEventListener('click', () => {
-      el.querySelector('#src-formules-anchor').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    el.querySelector('#src-btn-comparer').addEventListener('click', () => {
-      const target = el.querySelector('#src-comparatif-anchor') || el.querySelector('#src-formules-anchor');
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    const abonnerBtn = el.querySelector('#src-btn-abonner');
+    if (abonnerBtn) {
+      abonnerBtn.addEventListener('click', () => {
+        const params = new URLSearchParams({ type: accredType === 'utilisateur_abonne' ? 'utilisateur' : accredType, module: moduleName });
+        window.location.href = 'premium.html?' + params.toString();
+      });
+    }
   };
   window.SubscriptionRequiredPage._souscrire = souscrire;
 })();

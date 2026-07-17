@@ -76,6 +76,7 @@
       <a href="#partenaires-liste" data-section="partenaires-liste">🤝 Liste des partenaires</a>
       <a href="#adhesions-init" data-section="adhesions-init">🎫 Cotisations &amp; Adhésions</a>
       <a href="#votes-init" data-section="votes-init">🗳️ Votes sécurisés</a>
+      <a href="#offres-emploi" data-section="offres-emploi">💼 Emplois & Stages</a>
       <a href="#recrutement" data-section="recrutement">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
       <a href="agenda.html">📅 Mon Agenda</a>
       <a href="reseau.html">🌐 Mon Réseau Pro <span class="pill" id="reseau-badge" style="display:none;"></span></a>
@@ -690,6 +691,16 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div class="payment-grid" id="moyens-paiement"></div>
       <button class="btn btn-navy btn-block" style="margin-top:14px;" disabled>Activer le module de paiement (démonstration)</button>
       <p style="color:var(--muted);font-size:11px;margin-top:8px;">⚠️ Démonstration uniquement — aucune transaction réelle n'est traitée.</p>
+    </div>
+
+    <!-- ── Section Emplois & Stages (publication d'offres) ── -->
+    <div class="card" style="margin-bottom:20px;display:none;" id="offres-emploi">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px;">
+        <h3 style="margin:0;">💼 Emplois & Stages</h3>
+        <button class="btn btn-orange" onclick="openOffreEmploiModal()">+ Publier une offre</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Publiez une offre d'emploi ou de stage, visible dans le module de recherche d'emploi de la plateforme.</p>
+      <div id="offres-emploi-content"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
     </div>
 
     <!-- ── Section Recrutement / Candidatures ── -->
@@ -2566,7 +2577,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
+  const INIT_SECTIONS = ['cockpit','presentation','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -2583,6 +2594,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'adhesions-init') adhSwitchTab('formules');
     if (name === 'votes-init') voSwitchTab('scrutins');
     if (name === 'paiement') renderPaiementMarketplace();
+    if (name === 'offres-emploi') renderOffresEmploiInit();
     if (name === 'asso-accreditation') renderAssoAccreditation();
     if (name === 'asso-cockpit') renderAssoCockpit();
     if (name === 'asso-adherents') renderAssoAdherents();
@@ -2591,6 +2603,120 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'asso-documents') renderAssoDocuments();
     if (name === 'asso-votes') renderAssoVotes();
     window.scrollTo(0,0);
+  };
+
+  /* ══ SECTION EMPLOIS & STAGES — publication d'offres ══ */
+  const OE_STATUT_LABELS = {brouillon:'📝 Brouillon',publiee:'🟢 Publiée',cloturee:'🔒 Clôturée',archivee:'📁 Archivée'};
+  window.renderOffresEmploiInit = async function renderOffresEmploiInit() {
+    const el = document.getElementById('offres-emploi-content');
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);">Chargement…</div>';
+    try {
+      const { offres = [] } = await api('GET', '/mes-offres');
+      if (!offres.length) {
+        el.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted);">
+          <div style="font-size:32px;margin-bottom:8px;">💼</div>
+          <p>Aucune offre publiée pour le moment.</p>
+        </div>`;
+        return;
+      }
+      el.innerHTML = offres.map(o => `
+        <div class="card" style="margin-bottom:10px;padding:14px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+            <div>
+              <strong style="font-size:14px;">${escH(o.titre)}</strong>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px;">${o.type==='stage'?'Stage':'Emploi'}${o.contrat?' · '+escH(o.contrat):''} · ${o.nb_candidatures||0} candidature(s) · ${o.nb_vues||0} vue(s)</div>
+            </div>
+            <span class="pill">${OE_STATUT_LABELS[o.statut]||o.statut}</span>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      el.innerHTML = `<p style="color:#ef4444;">Erreur : ${escH(e.message)}</p>`;
+    }
+  };
+
+  window.openOffreEmploiModal = function openOffreEmploiModal() {
+    let modal = document.getElementById('oe-modal');
+    if (modal) modal.remove();
+    modal = document.createElement('div');
+    modal.id = 'oe-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(13,43,78,.5);z-index:300;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px;';
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    modal.innerHTML = `
+      <div class="card" style="max-width:640px;width:100%;padding:24px;">
+        <h3 style="margin:0 0 16px;">+ Publier une offre</h3>
+        <div style="display:grid;gap:10px;">
+          <input id="oe-titre" placeholder="Intitulé du poste *" style="padding:10px;border:1px solid var(--border);border-radius:8px;">
+          <div style="display:flex;gap:10px;">
+            <select id="oe-type" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+              <option value="emploi">Emploi</option>
+              <option value="stage">Stage</option>
+            </select>
+            <select id="oe-contrat" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+              <option value="">Contrat…</option>
+              <option>CDI</option><option>CDD</option><option>Intérim</option><option>Freelance</option>
+              <option>Alternance</option><option>Mission</option>
+              <option>Stage découverte</option><option>Stage académique</option><option>Stage professionnel</option><option>Stage de fin d'études</option>
+            </select>
+          </div>
+          <textarea id="oe-description" placeholder="Description de l'offre" rows="3" style="padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></textarea>
+          <textarea id="oe-missions" placeholder="Missions (une par ligne)" rows="3" style="padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></textarea>
+          <textarea id="oe-competences" placeholder="Compétences recherchées (une par ligne)" rows="2" style="padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></textarea>
+          <div style="display:flex;gap:10px;">
+            <input id="oe-pays" placeholder="Pays" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+            <input id="oe-ville" placeholder="Ville" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+          </div>
+          <input id="oe-domaine" placeholder="Domaine (ex. Informatique, Santé…)" style="padding:10px;border:1px solid var(--border);border-radius:8px;">
+          <div style="display:flex;gap:10px;">
+            <select id="oe-experience" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+              <option value="">Expérience…</option>
+              <option>Sans expérience</option><option>Débutant</option><option>1 à 3 ans</option><option>3 à 5 ans</option><option>Plus de 5 ans</option>
+            </select>
+            <select id="oe-etudes" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+              <option value="">Niveau d'études…</option>
+              <option>Sans diplôme</option><option>CAP</option><option>Bac</option><option>BTS</option><option>Licence</option><option>Master</option><option>Doctorat</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <input id="oe-salaire-min" type="number" placeholder="Salaire min (€)" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+            <input id="oe-salaire-max" type="number" placeholder="Salaire max (€)" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+            <input id="oe-date-limite" type="date" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" id="oe-teletravail"> Télétravail possible</label>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px;">
+          <button class="btn btn-orange" onclick="submitOffreEmploi()">Publier l'offre</button>
+          <button class="btn btn-outline" onclick="document.getElementById('oe-modal').remove()">Annuler</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  };
+
+  window.submitOffreEmploi = async function submitOffreEmploi() {
+    const titre = document.getElementById('oe-titre').value.trim();
+    if (!titre) { alert('Titre requis.'); return; }
+    const splitLines = (id) => document.getElementById(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
+    try {
+      await api('POST', '/offres', {
+        titre,
+        type: document.getElementById('oe-type').value,
+        contrat: document.getElementById('oe-contrat').value || null,
+        description: document.getElementById('oe-description').value.trim() || null,
+        missions: splitLines('oe-missions'),
+        competences_requises: splitLines('oe-competences'),
+        pays: document.getElementById('oe-pays').value.trim() || null,
+        ville: document.getElementById('oe-ville').value.trim() || null,
+        domaine: document.getElementById('oe-domaine').value.trim() || null,
+        niveau_experience: document.getElementById('oe-experience').value || null,
+        niveau_etudes: document.getElementById('oe-etudes').value || null,
+        salaire_min: document.getElementById('oe-salaire-min').value || null,
+        salaire_max: document.getElementById('oe-salaire-max').value || null,
+        date_limite: document.getElementById('oe-date-limite').value || null,
+        teletravail: document.getElementById('oe-teletravail').checked,
+      });
+      document.getElementById('oe-modal').remove();
+      renderOffresEmploiInit();
+    } catch (e) { alert('Erreur : ' + e.message); }
   };
 
   /* ══ SECTION BILLETTERIE — INITIATIVE ══ */

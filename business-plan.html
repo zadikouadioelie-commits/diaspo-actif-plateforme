@@ -302,11 +302,43 @@ function afficherUpsellAbonneBP(){
     moduleIllustration: '📋',
     moduleDescription: "Construisez un business plan professionnel et structuré pour convaincre vos partenaires et financeurs — sections guidées, versions, collaborateurs et assistant IA.",
     fonctionnalites: [
-      'Créer un business plan structuré par sections',
+      'Remplir mon business plan section par section',
+      "Aide de l'IA disponible directement dans le module",
+      'Télécharger en PowerPoint pour vos présentations ou en PDF',
+      'Transmettre le document à ma banque ou à des investisseurs',
+      'Rassurer mes associés avec un dossier structuré et professionnel',
+      "Finaliser et concrétiser mon idée, de la conception à la réalisation",
       'Historique de versions et restauration',
       'Inviter des collaborateurs et commenter par section',
-      'Suivre la complétude de votre document',
-      "Assistant IA d'aide à la rédaction",
+    ],
+    parcours: [
+      { icon: '💡', titre: 'Idée de projet' },
+      { icon: '📝', titre: 'Remplir mon business plan' },
+      { icon: '🤖', titre: "Aide de l'IA dans le module" },
+      { icon: '📊', titre: 'PowerPoint ou PDF' },
+      { icon: '🏦', titre: 'Transmettre à ma banque / investisseur' },
+      { icon: '🤝', titre: 'Rassurer mes associés' },
+      { icon: '🚀', titre: 'Concrétiser le projet' },
+      { icon: '🏆', titre: 'Réalisation' },
+    ],
+    heroMockup: `
+      <div style="background:linear-gradient(135deg,#0D2B4E 0%,#1E4F8A 100%);color:#fff;padding:36px 28px;display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:center;">
+        <div>
+          <h2 style="margin:0 0 10px;font-size:20px;font-weight:800;">📋 Mon Business Plan</h2>
+          <div style="font-size:12.5px;opacity:.85;margin-bottom:14px;">Complétude du document</div>
+          <div style="background:rgba(255,255,255,.15);border-radius:20px;height:10px;overflow:hidden;margin-bottom:6px;"><div style="background:#fff;height:100%;width:72%;border-radius:20px;"></div></div>
+          <div style="font-size:12px;opacity:.8;">72 % complété · 7/9 sections rédigées</div>
+        </div>
+        <div style="background:rgba(255,255,255,.08);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+          ${['✅ Résumé exécutif','✅ Étude de marché','✅ Stratégie commerciale','🕐 Plan financier','⬜ Équipe & gouvernance'].map(s=>`
+            <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:8px 12px;font-size:12.5px;">${s}</div>`).join('')}
+        </div>
+      </div>`,
+    preview: [
+      { icon: '📊', titre: 'Résumé exécutif', sous: "Rédigé avec l'assistant IA", badge: 'Exemple' },
+      { icon: '🎯', titre: 'Étude de marché', sous: 'Analyse concurrentielle & cible', badge: 'Exemple' },
+      { icon: '💶', titre: 'Plan financier 3 ans', sous: 'Prévisionnel de trésorerie', badge: 'Exemple' },
+      { icon: '👥', titre: 'Équipe & gouvernance', sous: 'Organigramme & rôles', badge: 'Exemple' },
     ],
     accredType: 'utilisateur_abonne',
     retourUrl: 'dashboard-utilisateur.html',
