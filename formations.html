@@ -1134,28 +1134,44 @@
     const recognition = new SpeechRecognitionAPI();
     recognition.lang = 'fr-FR';
     recognition.interimResults = true;
-    recognition.continuous = false;
+    recognition.continuous = true; // ne pas couper à la première pause : l'utilisateur décide quand il a fini
     let listening = false;
+    let stoppedManually = false;
+    let finalTranscript = '';
 
     recognition.addEventListener('result', (e) => {
-      let transcript = '';
-      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-      document.getElementById('fb-ai-input').value = transcript;
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      document.getElementById('fb-ai-input').value = (finalTranscript + ' ' + interim).trim();
     });
+    // Certains navigateurs déclenchent 'end' après un court silence même en mode continu :
+    // on relance automatiquement tant que l'utilisateur n'a pas cliqué sur le micro pour arrêter.
     recognition.addEventListener('end', () => {
+      if (!stoppedManually) {
+        try { recognition.start(); return; } catch(_) {}
+      }
       listening = false;
       micBtn.classList.remove('recording');
-      const input = document.getElementById('fb-ai-input');
-      if(input.value.trim()) fbAiSend();
     });
-    recognition.addEventListener('error', () => {
+    recognition.addEventListener('error', (e) => {
+      if (e.error === 'no-speech' || e.error === 'aborted') return; // on laisse 'end' gérer le redémarrage
       listening = false;
+      stoppedManually = true;
       micBtn.classList.remove('recording');
     });
 
     micBtn.addEventListener('click', () => {
-      if(listening){ recognition.stop(); return; }
+      if (listening) {
+        stoppedManually = true;
+        recognition.stop();
+        return;
+      }
       listening = true;
+      stoppedManually = false;
+      finalTranscript = '';
       micBtn.classList.add('recording');
       document.getElementById('fb-ai-input').value = '';
       try { recognition.start(); } catch(_) { listening = false; micBtn.classList.remove('recording'); }
