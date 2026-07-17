@@ -380,8 +380,9 @@ async function applyAuthState() {
   if (user) {
     injectNotifStyles();
     const premiumBtnHtml = user.role === 'utilisateur' ? `
-      <a href="premium.html?type=utilisateur" id="premium-topbar-btn" style="text-decoration:none;display:none;align-items:center;gap:6px;background:linear-gradient(135deg,#F5D061,#C9971C);color:#3A2600;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:20px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Passer à Premium">
-        <span style="font-size:14px;">👑</span> Passer à Premium
+      <a href="premium.html?type=utilisateur" id="premium-topbar-btn" style="text-decoration:none;display:none;flex-direction:column;align-items:center;gap:1px;background:linear-gradient(135deg,#F5D061,#C9971C);color:#000;font-weight:800;font-size:12.5px;padding:6px 14px;border-radius:14px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Passer à Premium">
+        <span><span style="font-size:14px;">👑</span> Passer à Premium</span>
+        <span style="font-size:9.5px;font-weight:700;color:#000;opacity:.85;">1 abonnement · 6 modules accessibles</span>
       </a>` : '';
     el.innerHTML = `
       ${premiumBtnHtml}
@@ -412,7 +413,7 @@ async function applyAuthState() {
       api("GET", "/accreditations/mes").then(r => {
         const dejaAbonne = (r.accreditations || []).some(a => a.type === 'utilisateur_abonne' && a.statut === 'active');
         const btn = document.getElementById('premium-topbar-btn');
-        if (btn && !dejaAbonne) btn.style.display = 'inline-flex';
+        if (btn && !dejaAbonne) btn.style.display = 'flex';
       }).catch(() => {});
     }
     // Démo : vérifier si on doit déclencher le tour guidé
