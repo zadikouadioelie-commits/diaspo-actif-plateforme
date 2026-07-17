@@ -62,6 +62,8 @@
 .fb-ai-msg .fb-ai-filled{display:block;margin-top:4px;font-size:11px;color:#059669;font-weight:700;}
 #fb-ai-mic.recording{background:#dc2626;color:#fff;border-color:#dc2626;animation:fbMicPulse 1.2s infinite;}
 @keyframes fbMicPulse{0%{box-shadow:0 0 0 0 rgba(220,38,38,.5);}70%{box-shadow:0 0 0 8px rgba(220,38,38,0);}100%{box-shadow:0 0 0 0 rgba(220,38,38,0);}}
+.fb-ai-highlight{animation:fbAiFieldGlow 1.6s ease-out;}
+@keyframes fbAiFieldGlow{0%{background-color:#fff3c4;box-shadow:0 0 0 3px #fbbf24;}100%{background-color:transparent;box-shadow:0 0 0 0 rgba(251,191,36,0);}}
 @media (max-width:1100px){
   [data-fb-panel="infos"]{flex-direction:column !important;}
   .fb-preview-card{width:100%;position:static;}
@@ -1010,7 +1012,20 @@
     if(!el || !value) return false;
     el.value = value;
     if(triggerEvent !== false) el.dispatchEvent(new Event('change', { bubbles: true }));
+    fbAiHighlightField(el);
     return true;
+  }
+
+  // Bascule sur l'onglet Infos générales et fait un halo visuel sur le champ pour que
+  // l'utilisateur voie le formulaire se remplir en direct pendant qu'il parle à l'assistant.
+  function fbAiHighlightField(el){
+    if(document.querySelector('.fb-tab[data-tab="infos"]') && !document.querySelector('.fb-tab[data-tab="infos"]').classList.contains('active')){
+      fbSwitchTab('infos');
+    }
+    el.classList.remove('fb-ai-highlight');
+    void el.offsetWidth; // relance l'animation même si le champ vient déjà d'être surligné
+    el.classList.add('fb-ai-highlight');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   // Extraction par motifs (regex) — pas d'IA générative, détection de formulations courantes en français
@@ -1122,6 +1137,14 @@
   }
   document.getElementById('fb-ai-send').addEventListener('click', fbAiSend);
   document.getElementById('fb-ai-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter') fbAiSend(); });
+
+  // Visualisation en temps réel : dès que le texte tapé/dicté correspond à un motif reconnu,
+  // les champs se remplissent sous les yeux de l'utilisateur, sans attendre l'envoi du message.
+  let fbAiLiveTimer = null;
+  document.getElementById('fb-ai-input').addEventListener('input', (e) => {
+    clearTimeout(fbAiLiveTimer);
+    fbAiLiveTimer = setTimeout(() => { fbAiExtract(e.target.value); }, 500);
+  });
 
   // ── Commande vocale : reconnaissance vocale native du navigateur (gratuite, aucune clé API) ──
   (function fbAiInitMic(){
