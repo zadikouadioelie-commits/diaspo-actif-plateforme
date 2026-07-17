@@ -5804,6 +5804,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
   const newPromoActive = body.promo_active != null ? (body.promo_active ? 1 : 0) : null;
   const newStatut = (f.statut === 'refusee') ? 'brouillon' : f.statut;
   const newMotif = (f.statut === 'refusee') ? null : f.motif_refus;
+  const b = k => (body[k] === undefined ? null : (typeof body[k] === 'boolean' ? (body[k]?1:0) : body[k]));
   db.prepare(`UPDATE formations SET
     titre=COALESCE(?,titre), description=COALESCE(?,description), objectifs=COALESCE(?,objectifs),
     prerequis=COALESCE(?,prerequis), niveau=COALESCE(?,niveau), langue=COALESCE(?,langue),
@@ -5819,7 +5820,20 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
     pays_concerne=COALESCE(?,pays_concerne), secteur_activite=COALESCE(?,secteur_activite),
     devise=COALESCE(?,devise), promo_active=COALESCE(?,promo_active),
     promo_reduction_pct=COALESCE(?,promo_reduction_pct), promo_date_fin=COALESCE(?,promo_date_fin),
-    acces_type=COALESCE(?,acces_type), acces_liste_id=COALESCE(?,acces_liste_id), banniere_url=COALESCE(?,banniere_url)
+    acces_type=COALESCE(?,acces_type), acces_liste_id=COALESCE(?,acces_liste_id), banniere_url=COALESCE(?,banniere_url),
+    type_formation=COALESCE(?,type_formation), domaine=COALESCE(?,domaine),
+    galerie_json=COALESCE(?,galerie_json), resultats_attendus=COALESCE(?,resultats_attendus),
+    metier_concerne=COALESCE(?,metier_concerne), date_ouverture=COALESCE(?,date_ouverture),
+    date_fermeture_inscriptions=COALESCE(?,date_fermeture_inscriptions), date_debut=COALESCE(?,date_debut), date_fin=COALESCE(?,date_fin),
+    accessible_ordinateur=COALESCE(?,accessible_ordinateur), accessible_tablette=COALESCE(?,accessible_tablette),
+    accessible_mobile=COALESCE(?,accessible_mobile), accessible_hors_ligne=COALESCE(?,accessible_hors_ligne),
+    temps_conseille=COALESCE(?,temps_conseille), badge=COALESCE(?,badge), langues_disponibles_json=COALESCE(?,langues_disponibles_json),
+    sous_titres=COALESCE(?,sous_titres), transcription=COALESCE(?,transcription),
+    lecteur_ecran=COALESCE(?,lecteur_ecran), police_dyslexie=COALESCE(?,police_dyslexie),
+    formateur_bio=COALESCE(?,formateur_bio), formateur_fonction=COALESCE(?,formateur_fonction),
+    formateur_organisation=COALESCE(?,formateur_organisation), formateur_annees_exp=COALESCE(?,formateur_annees_exp),
+    formateur_site=COALESCE(?,formateur_site), formateur_reseaux=COALESCE(?,formateur_reseaux), formateur_photo_url=COALESCE(?,formateur_photo_url),
+    formateur_nom=COALESCE(?,formateur_nom)
     WHERE id=?`
   ).run(n(body.titre),n(body.description),n(body.objectifs),n(body.prerequis),
     n(body.niveau),n(body.langue),n(body.duree),n(body.duree_heures),n(body.places),
@@ -5830,6 +5844,17 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
     n(body.sous_categorie),n(body.mots_cles),n(body.pays_concerne),n(body.secteur_activite),
     n(body.devise),newPromoActive,n(body.promo_reduction_pct),n(body.promo_date_fin),
     n(body.acces_type),n(body.acces_liste_id),n(body.banniere_url),
+    n(body.type_formation),n(body.domaine),
+    n(body.galerie_json ? JSON.stringify(body.galerie_json) : undefined),n(body.resultats_attendus),
+    n(body.metier_concerne),n(body.date_ouverture),
+    n(body.date_fermeture_inscriptions),n(body.date_debut),n(body.date_fin),
+    b('accessible_ordinateur'),b('accessible_tablette'),b('accessible_mobile'),b('accessible_hors_ligne'),
+    n(body.temps_conseille),n(body.badge),n(body.langues_disponibles_json ? JSON.stringify(body.langues_disponibles_json) : undefined),
+    b('sous_titres'),b('transcription'),b('lecteur_ecran'),b('police_dyslexie'),
+    n(body.formateur_bio),n(body.formateur_fonction),
+    n(body.formateur_organisation),n(body.formateur_annees_exp),
+    n(body.formateur_site),n(body.formateur_reseaux),n(body.formateur_photo_url),
+    n(body.formateur_nom),
     params.id);
   sendJSON(res, 200, { ok: true });
 });

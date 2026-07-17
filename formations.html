@@ -38,6 +38,36 @@
 .fb-field input[type=text],.fb-field input[type=number],.fb-field select,.fb-field textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;}
 .fb-field textarea{min-height:80px;}
 .fb-upload-status{font-size:12px;color:var(--muted);margin-top:6px;}
+.fb-workspace{display:flex;gap:24px;align-items:flex-start;}
+.fb-sidebar-nav{display:flex;flex-direction:column;gap:4px;width:220px;flex-shrink:0;position:sticky;top:80px;}
+.fb-sidebar-nav .fb-tab{justify-content:flex-start;text-align:left;width:100%;}
+.fb-panels-area{flex:1;min-width:0;}
+.fb-help{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#e2e8f0;color:#475569;font-size:10px;font-weight:800;margin-left:5px;cursor:help;vertical-align:middle;user-select:none;}
+.fb-help:hover{background:#ff6b00;color:#fff;}
+.fb-sidebar-nav .fb-tab .fb-help{float:right;margin-left:0;}
+.fb-subsection-title{margin:0 0 10px;font-size:14px;font-weight:800;color:#334155;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:center;flex-wrap:wrap;gap:4px;}
+.fb-stats-auto{display:flex;gap:14px;flex-wrap:wrap;background:#f8fafc;border-radius:8px;padding:12px 14px;margin-top:10px;}
+.fb-stats-auto>div{display:flex;flex-direction:column;align-items:flex-start;}
+.fb-stats-num{font-size:18px;font-weight:800;color:#ff6b00;}
+.fb-stats-lbl{font-size:11px;color:var(--muted);}
+.fb-preview-card{width:280px;flex-shrink:0;position:sticky;top:80px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.05);}
+.fb-preview-banner{height:120px;background:linear-gradient(135deg,#ff6b00,#ff9f43);background-size:cover;background-position:center;}
+.fb-preview-badge{display:inline-block;font-size:11px;font-weight:800;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:99px;margin-bottom:6px;}
+#fb-tooltip-popup{position:fixed;z-index:9999;max-width:280px;background:#1e293b;color:#fff;font-size:12.5px;font-weight:400;line-height:1.4;padding:10px 12px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);display:none;}
+#fb-tooltip-popup::after{content:'';position:absolute;top:-5px;left:16px;width:10px;height:10px;background:#1e293b;transform:rotate(45deg);}
+#fb-tooltip-popup.open{display:block;}
+.fb-ai-msg{max-width:85%;padding:8px 11px;border-radius:10px;line-height:1.4;white-space:pre-wrap;}
+.fb-ai-msg.bot{align-self:flex-start;background:#f1f5f9;color:#1e293b;}
+.fb-ai-msg.user{align-self:flex-end;background:#ff6b00;color:#fff;}
+.fb-ai-msg .fb-ai-filled{display:block;margin-top:4px;font-size:11px;color:#059669;font-weight:700;}
+@media (max-width:1100px){
+  [data-fb-panel="infos"]{flex-direction:column !important;}
+  .fb-preview-card{width:100%;position:static;}
+}
+@media (max-width:900px){
+  .fb-workspace{flex-direction:column;}
+  .fb-sidebar-nav{flex-direction:row;flex-wrap:wrap;width:100%;position:static;}
+}
 </style>
 </head>
 <body>
@@ -195,22 +225,316 @@
         <div id="mes-formations-list"><div class="notice">Chargement…</div></div>
       </div>
 
-      <!-- ════ Éditeur de contenu complet d'une formation (modules/leçons, quiz, certificat, soumission) ════ -->
+      <!-- ════ Éditeur de contenu complet d'une formation (menu latéral libre : infos, contenu, quiz, certificat, accès, aperçu, soumission) ════ -->
       <div id="fb-view" style="display:none;">
         <button class="btn btn-sm btn-outline" id="fb-back" style="margin-bottom:14px;">← Retour à mes formations</button>
-        <h2 style="margin:0 0 4px;" id="fb-titre">Construction de la formation</h2>
+        <div class="flex-between" style="margin-bottom:4px;">
+          <h2 style="margin:0;" id="fb-titre">Construction de la formation</h2>
+          <span id="fb-autosave-status" style="font-size:12px;color:var(--muted);"></span>
+        </div>
         <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">Statut : <span id="fb-statut-badge" class="tag"></span></div>
 
-        <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;" id="fb-tabs">
-          <button class="btn btn-sm fb-tab active" data-tab="contenu">🧩 Modules &amp; Leçons</button>
-          <button class="btn btn-sm fb-tab" data-tab="quiz">📝 Quiz &amp; Évaluations</button>
-          <button class="btn btn-sm fb-tab" data-tab="certificat">🎓 Certificat</button>
-          <button class="btn btn-sm fb-tab" data-tab="apercu">👁️ Aperçu</button>
-          <button class="btn btn-sm fb-tab" data-tab="soumission">📤 Soumission</button>
+        <div class="fb-workspace">
+          <nav class="fb-sidebar-nav" id="fb-tabs">
+            <button class="btn btn-sm fb-tab active" data-tab="infos">📝 Infos générales <span class="fb-help" title="Titre, description, objectifs, public visé, durée : les informations de base qui présentent votre formation.">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="categorie">🏷️ Catégorie <span class="fb-help" title="Domaine, type et mots-clés qui permettent aux apprenants de retrouver votre formation dans le catalogue.">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="tarification">💰 Tarification <span class="fb-help" title="Gratuit ou payant, prix, promotions et coupons de réduction.">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="acces">🔑 Accès <span class="fb-help" title="Qui peut voir et rejoindre votre formation : tout le monde, sur invitation, membres de votre initiative…">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="contenu">🧩 Modules &amp; Leçons <span class="fb-help" title="Le contenu pédagogique : organisez vos modules, chapitres et leçons (vidéo, PDF, texte, quiz…).">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="quiz">📝 Quiz &amp; Évaluations <span class="fb-help" title="Créez des quiz et exercices pour évaluer la progression des apprenants.">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="certificat">🎓 Certificat <span class="fb-help" title="Activez un certificat de réussite délivré automatiquement à la fin de la formation.">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="apercu">👁️ Aperçu <span class="fb-help" title="Voyez votre formation exactement comme la verra un apprenant, avant de la publier.">?</span></button>
+            <button class="btn btn-sm fb-tab" data-tab="soumission">📤 Soumission <span class="fb-help" title="Vérifiez que tout est prêt puis envoyez votre formation à l'équipe Diaspo'Actif pour validation.">?</span></button>
+          </nav>
+          <div class="fb-panels-area">
+
+        <!-- Section Infos générales -->
+        <div class="fb-panel" data-fb-panel="infos" style="display:none;flex-direction:row;gap:24px;align-items:flex-start;">
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:20px;">
+
+            <div>
+              <h4 class="fb-subsection-title">Informations de base</h4>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div><label style="font-size:13px;font-weight:700;">Titre * <span class="fb-help" title="Le nom de votre formation, affiché partout dans le catalogue.">?</span></label><input id="new-form-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Titre de la formation"></div>
+                <div><label style="font-size:13px;font-weight:700;">Sous-titre <span class="fb-help" title="Une phrase courte et accrocheuse affichée sous le titre.">?</span></label><input id="new-form-sous-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Sous-titre accrocheur (facultatif)"></div>
+                <div><label style="font-size:13px;font-weight:700;">Description courte <span class="fb-help" title="1 à 2 phrases affichées sur la carte de la formation dans le catalogue.">?</span></label>
+                  <textarea id="new-form-desc-courte" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Résumé en une ou deux phrases, affiché sur la carte du catalogue…"></textarea>
+                </div>
+                <div><label style="font-size:13px;font-weight:700;">Description complète <span class="fb-help" title="Le texte détaillé affiché sur la page de la formation : contenu, objectifs, public visé.">?</span></label>
+                  <textarea id="new-form-desc" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Décrivez le contenu, les objectifs et le public cible…"></textarea>
+                </div>
+                <div><label style="font-size:13px;font-weight:700;">Vidéo de présentation (2 à 3 minutes) <span class="fb-help" title="URL d'une courte vidéo de présentation, ou uploadez un fichier ci-dessous.">?</span></label>
+                  <input id="new-form-video-intro" class="input-field" style="width:100%;margin-top:4px;" placeholder="URL de la vidéo (facultatif)">
+                  <input type="file" id="new-form-video-intro-file" accept="video/*" style="margin-top:6px;">
+                  <div class="fb-upload-status" id="new-form-video-intro-status"></div>
+                </div>
+                <div><label style="font-size:13px;font-weight:700;">Image de couverture <span class="fb-help" title="L'image principale affichée en tête de la page de la formation.">?</span></label>
+                  <input type="file" id="new-form-image-file" accept="image/*">
+                  <div class="fb-upload-status" id="new-form-image-status"></div>
+                  <img id="new-form-image-preview" style="max-width:180px;border-radius:8px;margin-top:6px;display:none;">
+                </div>
+                <div><label style="font-size:13px;font-weight:700;">Galerie d'images (jusqu'à 5 images) <span class="fb-help" title="Des images complémentaires affichées sur la page de la formation (ateliers, résultats, ambiance…).">?</span></label>
+                  <input type="file" id="new-form-galerie-file" accept="image/*">
+                  <div class="fb-upload-status" id="new-form-galerie-status"></div>
+                  <div id="new-form-galerie-preview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="fb-subsection-title">Objectifs pédagogiques</h4>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div><label style="font-size:13px;font-weight:700;">Objectifs pédagogiques <span class="fb-help" title="Ce que l'apprenant saura faire concrètement après avoir suivi la formation.">?</span></label>
+                  <textarea id="new-form-objectifs" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Ce que l'apprenant saura faire à l'issue de la formation…"></textarea>
+                </div>
+                <div><label style="font-size:13px;font-weight:700;">Compétences acquises <span class="fb-help" title="Listez une compétence par ligne : elles seront affichées sous forme de liste sur la page de la formation.">?</span></label>
+                  <textarea id="new-form-competences" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Une compétence par ligne…"></textarea>
+                </div>
+                <div><label style="font-size:13px;font-weight:700;">Public concerné <span class="fb-help" title="À qui s'adresse cette formation ? Aide les visiteurs à savoir si elle leur correspond.">?</span></label><input id="new-form-public" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Entrepreneurs débutants, membres de la diaspora…"></div>
+                <div><label style="font-size:13px;font-weight:700;">Prérequis (optionnel) <span class="fb-help" title="Connaissances ou matériel nécessaires avant de commencer.">?</span></label><input id="new-form-prerequis" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Notions de base en informatique"></div>
+                <div><label style="font-size:13px;font-weight:700;">Résultats attendus après la formation <span class="fb-help" title="Le bénéfice concret obtenu à l'issue de la formation.">?</span></label>
+                  <textarea id="new-form-resultats" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="ex: Être capable de monter son business plan…"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="fb-subsection-title">Classification</h4>
+              <div class="grid grid-2" style="gap:10px;">
+                <div><label style="font-size:13px;font-weight:700;">Catégorie <span class="fb-help" title="Le domaine principal sous lequel la formation apparaîtra dans le catalogue.">?</span></label>
+                  <select id="new-form-domaine" class="input-field" style="width:100%;margin-top:4px;">
+                    <option>Action Sociale</option><option>Agriculture</option><option>Santé</option><option>Éducation</option><option>Technologie</option><option>Culture</option><option>Économie</option><option>Finance</option><option>Droit</option><option>Environnement</option>
+                  </select>
+                </div>
+                <div><label style="font-size:13px;font-weight:700;">Sous-catégorie <span class="fb-help" title="Une précision facultative à l'intérieur de la catégorie principale.">?</span></label><input id="new-form-sous-categorie" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Comptabilité, Marketing digital…"></div>
+                <div><label style="font-size:13px;font-weight:700;">Niveau <span class="fb-help" title="Le niveau requis pour suivre la formation.">?</span></label>
+                  <select id="new-form-niveau" class="input-field" style="width:100%;margin-top:4px;">
+                    <option value="Débutant">Débutant</option>
+                    <option value="Intermédiaire">Intermédiaire</option>
+                    <option value="Avancé">Avancé</option>
+                    <option value="Tous niveaux">Tous niveaux</option>
+                  </select>
+                </div>
+                <div><label style="font-size:13px;font-weight:700;">Langue <span class="fb-help" title="La langue principale dans laquelle la formation est dispensée.">?</span></label>
+                  <select id="new-form-langue" class="input-field" style="width:100%;margin-top:4px;">
+                    <option>Français</option><option>Anglais</option><option>Espagnol</option><option>Arabe</option><option>Portugais</option>
+                  </select>
+                </div>
+                <div><label style="font-size:13px;font-weight:700;">Mots-clés (tags) <span class="fb-help" title="Séparés par des virgules — améliorent la recherche de votre formation dans le catalogue.">?</span></label><input id="new-form-mots-cles" class="input-field" style="width:100%;margin-top:4px;" placeholder="séparés par des virgules"></div>
+                <div><label style="font-size:13px;font-weight:700;">Domaine d'activité <span class="fb-help" title="Le secteur professionnel visé par la formation.">?</span></label><input id="new-form-secteur" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Artisanat, Numérique, Santé…"></div>
+                <div><label style="font-size:13px;font-weight:700;">Métier concerné <span class="fb-help" title="Le métier auquel prépare ou se rattache la formation.">?</span></label><input id="new-form-metier" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Comptable, Développeur web…"></div>
+                <div><label style="font-size:13px;font-weight:700;">Type <span class="fb-help" title="Le format pédagogique de la formation.">?</span></label>
+                  <select id="new-form-type" class="input-field" style="width:100%;margin-top:4px;">
+                    <option value="Webinaire">Webinaire</option>
+                    <option value="Atelier en ligne">Atelier en ligne</option>
+                    <option value="Module certifiant">Module certifiant</option>
+                    <option value="Coaching">Coaching et mentorat</option>
+                    <option value="Programme professionnel">Programme professionnel</option>
+                  </select>
+                </div>
+                <div><label style="font-size:13px;font-weight:700;">Pays concerné <span style="color:var(--muted);font-weight:400;">(facultatif)</span> <span class="fb-help" title="Si la formation cible un pays en particulier (ex: réglementation locale).">?</span></label><input id="new-form-pays" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Sénégal, France…"></div>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="fb-subsection-title">Organisation</h4>
+              <div class="grid grid-2" style="gap:10px;">
+                <div><label style="font-size:13px;font-weight:700;">Durée estimée <span class="fb-help" title="Une estimation lisible pour l'apprenant, ex: 3h, 2 jours, 6 semaines.">?</span></label><input id="new-form-duree" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 3h, 2 jours, 6 semaines"></div>
+                <div><label style="font-size:13px;font-weight:700;">Places <span class="fb-help" title="Nombre maximum d'apprenants pouvant s'inscrire. Laissez vide pour un nombre illimité.">?</span></label><input type="number" id="new-form-places" class="input-field" style="width:100%;margin-top:4px;" placeholder="Nombre de places"></div>
+              </div>
+              <div class="fb-stats-auto">
+                <div><span class="fb-stats-num" id="fb-stat-modules">0</span><span class="fb-stats-lbl">Modules <span class="fb-help" title="Calculé automatiquement à partir des modules créés dans l'onglet Modules & Leçons.">?</span></span></div>
+                <div><span class="fb-stats-num" id="fb-stat-lecons">0</span><span class="fb-stats-lbl">Leçons <span class="fb-help" title="Calculé automatiquement.">?</span></span></div>
+                <div><span class="fb-stats-num" id="fb-stat-heures">0h</span><span class="fb-stats-lbl">Durée totale <span class="fb-help" title="Additionne automatiquement la durée de toutes les leçons.">?</span></span></div>
+                <div><span class="fb-stats-num" id="fb-stat-min-par-lecon">0 min</span><span class="fb-stats-lbl">Temps moyen / leçon</span></div>
+                <div><span class="fb-stats-num" id="fb-stat-min-par-module">0 min</span><span class="fb-stats-lbl">Temps moyen / module</span></div>
+              </div>
+              <input type="hidden" id="new-form-nb-modules"><input type="hidden" id="new-form-nb-lecons"><input type="hidden" id="new-form-duree-heures">
+            </div>
+
+            <div>
+              <h4 class="fb-subsection-title">Formateur <button type="button" class="btn btn-sm btn-outline" id="fb-voir-profil-formateur" style="margin-left:10px;">👁 Voir le profil public du formateur</button></h4>
+              <div class="grid grid-2" style="gap:10px;">
+                <div><label style="font-size:13px;font-weight:700;">Nom du formateur <span class="fb-help" title="Affiché par défaut : le nom de votre compte. Modifiable si la formation est portée par quelqu'un d'autre.">?</span></label><input id="new-form-formateur-nom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Nom affiché"></div>
+                <div><label style="font-size:13px;font-weight:700;">Fonction <span class="fb-help" title="Le titre professionnel du formateur.">?</span></label><input id="new-form-formateur-fonction" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Formatrice en gestion de projet"></div>
+                <div><label style="font-size:13px;font-weight:700;">Organisation <span class="fb-help" title="La structure ou l'initiative représentée.">?</span></label><input id="new-form-formateur-organisation" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Diaspo'Actif"></div>
+                <div><label style="font-size:13px;font-weight:700;">Années d'expérience <span class="fb-help" title="Nombre d'années d'expérience dans le domaine enseigné.">?</span></label><input type="number" min="0" id="new-form-formateur-exp" class="input-field" style="width:100%;margin-top:4px;"></div>
+                <div><label style="font-size:13px;font-weight:700;">Site internet (optionnel) <span class="fb-help" title="Lien vers un site personnel ou professionnel.">?</span></label><input id="new-form-formateur-site" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://…"></div>
+                <div><label style="font-size:13px;font-weight:700;">Réseaux sociaux (optionnel) <span class="fb-help" title="Liens vers les profils professionnels du formateur.">?</span></label><input id="new-form-formateur-reseaux" class="input-field" style="width:100%;margin-top:4px;" placeholder="LinkedIn, Twitter…"></div>
+              </div>
+              <div style="margin-top:10px;"><label style="font-size:13px;font-weight:700;">Photo <span class="fb-help" title="La photo affichée à côté de la présentation du formateur.">?</span></label>
+                <input type="file" id="new-form-formateur-photo-file" accept="image/*">
+                <div class="fb-upload-status" id="new-form-formateur-photo-status"></div>
+              </div>
+              <div style="margin-top:10px;"><label style="font-size:13px;font-weight:700;">Biographie <span class="fb-help" title="Une courte présentation du parcours du formateur, affichée sur la page de la formation.">?</span></label>
+                <textarea id="new-form-formateur-bio" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Parcours, expérience, expertise…"></textarea>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="fb-subsection-title">Disponibilité</h4>
+              <div class="grid grid-2" style="gap:10px;">
+                <div><label style="font-size:13px;font-weight:700;">Date d'ouverture <span class="fb-help" title="Date à partir de laquelle la formation devient visible/accessible.">?</span></label><input type="date" id="new-form-date-ouverture" class="input-field" style="width:100%;margin-top:4px;"></div>
+                <div><label style="font-size:13px;font-weight:700;">Date de fermeture des inscriptions <span class="fb-help" title="Après cette date, plus aucune nouvelle inscription n'est possible.">?</span></label><input type="date" id="new-form-date-fermeture" class="input-field" style="width:100%;margin-top:4px;"></div>
+                <div><label style="font-size:13px;font-weight:700;">Date de début de la formation <span class="fb-help" title="Date à laquelle le contenu devient accessible aux apprenants inscrits.">?</span></label><input type="date" id="new-form-date-debut" class="input-field" style="width:100%;margin-top:4px;"></div>
+                <div><label style="font-size:13px;font-weight:700;">Date de fin (optionnelle) <span class="fb-help" title="Si la formation n'est disponible que pendant une période limitée.">?</span></label><input type="date" id="new-form-date-fin" class="input-field" style="width:100%;margin-top:4px;"></div>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="fb-subsection-title">Accessibilité des appareils</h4>
+              <div style="display:flex;flex-wrap:wrap;gap:16px;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="new-form-acc-ordinateur" checked> Accessible sur ordinateur</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="new-form-acc-tablette" checked> Accessible sur tablette</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="new-form-acc-mobile" checked> Accessible sur mobile</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="new-form-acc-hors-ligne"> Accessible hors ligne <span class="fb-help" title="Nécessite que le téléchargement des ressources soit autorisé (voir onglet Accès).">?</span></label>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="fb-subsection-title">Temps de travail conseillé</h4>
+              <input id="new-form-temps-conseille" class="input-field" style="width:100%;" placeholder="ex: 2 heures par semaine, ou 30 minutes par jour">
+            </div>
+
+            <div>
+              <h4 class="fb-subsection-title">Badge de la formation <span class="fb-help" title="Un badge attire l'attention sur votre formation dans le catalogue.">?</span></h4>
+              <select id="new-form-badge" class="input-field" style="width:100%;">
+                <option value="">Aucun badge</option>
+                <option value="nouveau">⭐ Nouveau</option>
+                <option value="tres_demande">🔥 Très demandé</option>
+                <option value="certification">🏆 Certification</option>
+                <option value="professionnel">💼 Professionnel</option>
+                <option value="debutant">🎓 Débutant</option>
+                <option value="intensif">🚀 Intensif</option>
+              </select>
+            </div>
+
+            <div>
+              <h4 class="fb-subsection-title">Langues disponibles <span class="fb-help" title="Si la formation est traduite ou sous-titrée dans plusieurs langues.">?</span></h4>
+              <div style="display:flex;flex-wrap:wrap;gap:14px;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="new-form-langue-dispo" value="Français"> Français</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="new-form-langue-dispo" value="Anglais"> Anglais</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="new-form-langue-dispo" value="Espagnol"> Espagnol</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="new-form-langue-dispo" value="Arabe"> Arabe</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="new-form-langue-dispo" value="Portugais"> Portugais</label>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="fb-subsection-title">Accessibilité pédagogique</h4>
+              <div style="display:flex;flex-wrap:wrap;gap:16px;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="new-form-sous-titres"> Sous-titres</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="new-form-transcription"> Transcription des vidéos</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="new-form-lecteur-ecran"> Compatible lecteur d'écran</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="new-form-police-dyslexie"> Police adaptée aux personnes dyslexiques</label>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Aperçu public en temps réel -->
+          <aside class="fb-preview-card" id="fb-preview-card">
+            <div class="fb-preview-banner" id="fb-preview-banner"></div>
+            <div style="padding:14px;">
+              <span class="fb-preview-badge" id="fb-preview-badge" style="display:none;"></span>
+              <h3 id="fb-preview-titre" style="margin:6px 0 2px;">Titre de la formation</h3>
+              <p id="fb-preview-sous-titre" style="margin:0 0 10px;color:var(--muted);font-size:13px;"></p>
+              <p id="fb-preview-formateur" style="margin:0 0 10px;font-size:12.5px;color:var(--muted);"></p>
+              <div class="tags" style="margin-bottom:10px;">
+                <span class="tag" id="fb-preview-duree">—</span>
+                <span class="tag" id="fb-preview-niveau">—</span>
+                <span class="tag" id="fb-preview-langue">—</span>
+              </div>
+              <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+                <span id="fb-preview-modules">0 module</span> · <span id="fb-preview-lecons">0 leçon</span>
+              </div>
+              <div style="font-weight:800;font-size:16px;" id="fb-preview-prix">Gratuit</div>
+            </div>
+          </aside>
+        </div>
+
+        <!-- Section Catégorie -->
+        <div class="fb-panel" data-fb-panel="categorie" style="display:none;flex-direction:column;gap:12px;">
+            <div class="grid grid-2" style="gap:10px;">
+              <div><label style="font-size:13px;font-weight:700;">Catégorie <span class="fb-help" title="Le domaine principal sous lequel la formation apparaîtra dans le catalogue.">?</span></label>
+                <select id="new-form-domaine" class="input-field" style="width:100%;margin-top:4px;">
+                  <option>Action Sociale</option><option>Agriculture</option><option>Santé</option><option>Éducation</option><option>Technologie</option><option>Culture</option><option>Économie</option><option>Finance</option><option>Droit</option><option>Environnement</option>
+                </select>
+              </div>
+              <div><label style="font-size:13px;font-weight:700;">Sous-catégorie <span class="fb-help" title="Une précision facultative à l'intérieur de la catégorie principale.">?</span></label><input id="new-form-sous-categorie" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Comptabilité, Marketing digital…"></div>
+              <div><label style="font-size:13px;font-weight:700;">Type <span class="fb-help" title="Le format pédagogique de la formation.">?</span></label>
+                <select id="new-form-type" class="input-field" style="width:100%;margin-top:4px;">
+                  <option value="Webinaire">Webinaire</option>
+                  <option value="Atelier en ligne">Atelier en ligne</option>
+                  <option value="Module certifiant">Module certifiant</option>
+                  <option value="Coaching">Coaching et mentorat</option>
+                  <option value="Programme professionnel">Programme professionnel</option>
+                </select>
+              </div>
+              <div><label style="font-size:13px;font-weight:700;">Secteur d'activité <span class="fb-help" title="Le secteur professionnel visé par la formation.">?</span></label><input id="new-form-secteur" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Artisanat, Numérique, Santé…"></div>
+              <div><label style="font-size:13px;font-weight:700;">Pays concerné <span style="color:var(--muted);font-weight:400;">(facultatif)</span> <span class="fb-help" title="Si la formation cible un pays en particulier (ex: réglementation locale).">?</span></label><input id="new-form-pays" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Sénégal, France…"></div>
+              <div><label style="font-size:13px;font-weight:700;">Mots-clés <span class="fb-help" title="Séparés par des virgules — améliorent la recherche de votre formation dans le catalogue.">?</span></label><input id="new-form-mots-cles" class="input-field" style="width:100%;margin-top:4px;" placeholder="séparés par des virgules"></div>
+            </div>
+        </div>
+
+        <!-- Section Tarification -->
+        <div class="fb-panel" data-fb-panel="tarification" style="display:none;flex-direction:column;gap:12px;">
+            <div style="display:flex;gap:14px;align-items:center;">
+              <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="new-form-gratuit" checked> <span style="font-size:13px;font-weight:700;">Formation gratuite</span></label>
+              <span class="fb-help" title="Une formation gratuite est diffusée sans commission Diaspo'Actif. Décochez pour fixer un prix.">?</span>
+            </div>
+            <div id="mfw-tarif-block" style="display:none;flex-direction:column;gap:12px;">
+              <div class="grid grid-2" style="gap:10px;">
+                <div><label style="font-size:13px;font-weight:700;">Prix <span class="fb-help" title="Le montant payé par l'apprenant pour accéder à la formation.">?</span></label><input type="number" min="0" step="0.01" id="new-form-prix" class="input-field" style="width:100%;margin-top:4px;" value="0"></div>
+                <div><label style="font-size:13px;font-weight:700;">Devise <span class="fb-help" title="La devise dans laquelle le prix est affiché et facturé.">?</span></label>
+                  <select id="new-form-devise" class="input-field" style="width:100%;margin-top:4px;">
+                    <option value="EUR">EUR (€)</option><option value="USD">USD ($)</option><option value="XOF">XOF (FCFA)</option><option value="GBP">GBP (£)</option>
+                  </select>
+                </div>
+              </div>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;"><input type="checkbox" id="new-form-promo-active"> Activer une promotion <span class="fb-help" title="Affiche un prix barré et un prix réduit pendant une période donnée.">?</span></label>
+              <div id="mfw-promo-block" style="display:none;" class="grid grid-2" style="gap:10px;">
+                <div><label style="font-size:13px;font-weight:700;">Réduction (%)</label><input type="number" min="1" max="99" id="new-form-promo-pct" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 20"></div>
+                <div><label style="font-size:13px;font-weight:700;">Fin de la promotion</label><input type="date" id="new-form-promo-fin" class="input-field" style="width:100%;margin-top:4px;"></div>
+              </div>
+              <div>
+                <div class="flex-between"><label style="font-size:13px;font-weight:700;">Coupons de réduction <span class="fb-help" title="Codes que les apprenants peuvent saisir au paiement pour obtenir une réduction ponctuelle.">?</span></label></div>
+                <div id="mfw-coupons-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+                <div style="display:flex;gap:8px;">
+                  <input id="mfw-coupon-code" class="input-field" style="flex:1;" placeholder="CODE20">
+                  <input id="mfw-coupon-pct" type="number" min="1" max="100" class="input-field" style="width:80px;" placeholder="%">
+                  <input id="mfw-coupon-max" type="number" min="1" class="input-field" style="width:90px;" placeholder="Max util.">
+                  <button class="btn btn-sm btn-outline" id="btn-mfw-add-coupon" type="button">+ Ajouter</button>
+                </div>
+              </div>
+            </div>
+            <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--muted);">
+              💰 Commission Diaspo'Actif : <strong id="mfw-commission-pct">5%</strong> · Revenu net estimé : <strong id="mfw-revenu-net">—</strong>
+              <span class="fb-help" title="Pourcentage prélevé par Diaspo'Actif sur chaque vente de formation payante.">?</span>
+            </div>
+        </div>
+
+        <!-- Section Accès -->
+        <div class="fb-panel" data-fb-panel="acces" style="display:none;flex-direction:column;gap:12px;">
+            <label style="font-size:13px;font-weight:700;">Qui peut accéder à cette formation ? <span class="fb-help" title="Détermine quels comptes peuvent voir et s'inscrire à la formation.">?</span></label>
+            <select id="new-form-acces-type" class="input-field" style="width:100%;">
+              <option value="public">🌍 Public — visible et accessible à tous</option>
+              <option value="prive">🔒 Privé — non listé dans le catalogue, accès par lien direct</option>
+              <option value="payant">💳 Accessible uniquement après paiement</option>
+              <option value="invitation">✉️ Sur invitation</option>
+              <option value="organisation">🏢 Membres de mon initiative uniquement</option>
+              <option value="liste_reseau">📇 Une liste du Réseau Professionnel</option>
+            </select>
+            <div id="mfw-acces-liste-wrap" style="display:none;">
+              <label style="font-size:13px;font-weight:700;">Liste du Réseau Professionnel <span class="fb-help" title="Seuls les membres de cette liste (créée dans Mes Listes) pourront accéder à la formation.">?</span></label>
+              <select id="new-form-acces-liste" class="input-field" style="width:100%;margin-top:4px;"></select>
+            </div>
+            <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="new-form-telecharge"> Autoriser le téléchargement des ressources par défaut <span class="fb-help" title="Réglage par défaut appliqué aux nouvelles leçons ; modifiable ensuite ressource par ressource dans Modules & Leçons.">?</span></label>
         </div>
 
         <!-- Onglet Modules & Leçons -->
         <div class="fb-panel" data-fb-panel="contenu">
+          <div class="notice" style="margin-bottom:14px;">🧩 Structurez votre contenu en 3 niveaux : <strong>Module</strong> → <strong>Chapitre</strong> → <strong>Leçon</strong>. <span class="fb-help" title="Un module regroupe une grande partie de la formation. Chaque module contient des chapitres, et chaque chapitre contient les leçons (vidéo, PDF, texte, quiz…) que suivra l'apprenant.">?</span></div>
           <div style="display:flex;gap:8px;margin-bottom:14px;">
             <input id="fb-new-module-titre" class="input-field" style="flex:1;" placeholder="Titre du nouveau module">
             <button class="btn btn-orange btn-sm" id="fb-add-module">+ Ajouter un module</button>
@@ -221,7 +545,7 @@
         <!-- Onglet Quiz -->
         <div class="fb-panel" data-fb-panel="quiz" style="display:none;">
           <div class="card" style="margin-bottom:16px;">
-            <h3 style="margin:0 0 10px;">+ Nouveau quiz</h3>
+            <h3 style="margin:0 0 10px;">+ Nouveau quiz <span class="fb-help" title="Un quiz peut être rattaché à une leçon (contrôle intermédiaire) ou servir d'examen final pour valider la formation entière.">?</span></h3>
             <div class="grid grid-2" style="gap:10px;">
               <input id="fb-quiz-titre" class="input-field" placeholder="Titre du quiz">
               <select id="fb-quiz-type" class="input-field">
@@ -243,19 +567,20 @@
           <div class="card">
             <label style="display:flex;gap:8px;align-items:center;font-size:14px;font-weight:700;margin-bottom:14px;">
               <input type="checkbox" id="fb-cert-actif"> Délivrer un certificat à la fin de cette formation
+              <span class="fb-help" title="Un certificat numérique (avec QR de vérification) est généré automatiquement pour chaque apprenant qui termine la formation avec succès.">?</span>
             </label>
             <div id="fb-cert-fields" style="display:none;flex-direction:column;gap:12px;">
-              <div><label style="font-size:13px;font-weight:700;">Modèle de certificat</label>
+              <div><label style="font-size:13px;font-weight:700;">Modèle de certificat <span class="fb-help" title="Le design visuel du certificat délivré.">?</span></label>
                 <select id="fb-cert-modele" class="input-field" style="width:100%;margin-top:4px;">
                   <option value="classique">Classique</option>
                   <option value="moderne">Moderne</option>
                   <option value="premium">Premium</option>
                 </select>
               </div>
-              <div><label style="font-size:13px;font-weight:700;">Conditions d'obtention</label>
+              <div><label style="font-size:13px;font-weight:700;">Conditions d'obtention <span class="fb-help" title="Décrivez ce que l'apprenant doit accomplir pour recevoir le certificat (ex: réussir l'examen final, terminer toutes les leçons…).">?</span></label>
                 <textarea id="fb-cert-conditions" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="ex: Réussir l'examen final avec au moins 70%…"></textarea>
               </div>
-              <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="fb-cert-qr" checked> Inclure un QR code de vérification et un numéro unique</label>
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="fb-cert-qr" checked> Inclure un QR code de vérification et un numéro unique <span class="fb-help" title="Permet à n'importe qui de vérifier l'authenticité du certificat en scannant le QR code.">?</span></label>
               <button class="btn btn-orange btn-sm" id="fb-save-cert" style="align-self:flex-start;">💾 Enregistrer</button>
             </div>
           </div>
@@ -263,13 +588,14 @@
 
         <!-- Onglet Aperçu -->
         <div class="fb-panel" data-fb-panel="apercu" style="display:none;">
+          <div class="notice" style="margin-bottom:14px;">👁️ Cette vue montre exactement ce que verra un apprenant inscrit — utilisez-la pour vérifier le rendu avant de publier. <span class="fb-help" title="L'aperçu se met à jour en temps réel : toute modification enregistrée dans les autres sections apparaît immédiatement ici.">?</span></div>
           <div id="fb-apercu-content" class="card"></div>
         </div>
 
         <!-- Onglet Soumission -->
         <div class="fb-panel" data-fb-panel="soumission" style="display:none;">
           <div class="card" style="margin-bottom:16px;">
-            <h3 style="margin:0 0 10px;">📋 Vérification avant soumission</h3>
+            <h3 style="margin:0 0 10px;">📋 Vérification avant soumission <span class="fb-help" title="Le bouton Vérifier contrôle automatiquement que tous les éléments obligatoires sont présents (chapitres, fichiers, quiz, accès…) avant l'envoi à l'équipe Diaspo'Actif.">?</span></h3>
             <div id="fb-checklist"><div class="notice">Cliquez sur « Vérifier » pour lancer le contrôle.</div></div>
             <button class="btn btn-outline btn-sm" id="fb-check-btn" style="margin-top:10px;">🔍 Vérifier</button>
             <button class="btn btn-orange btn-sm" id="fb-submit-btn" style="margin-top:10px;margin-left:8px;">📤 Soumettre à Diaspo'Actif</button>
@@ -283,145 +609,23 @@
             </div>
           </div>
         </div>
+        <div id="new-form-error" style="color:#D33;font-size:13px;display:none;margin:0 20px 12px;"></div>
+
+          </div>
+        </div>
       </div>
 
-      <!-- Modal proposer formation (initiative/admin) -->
-      <div id="modal-formation" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;overflow-y:auto;">
-        <div class="card" style="max-width:680px;margin:30px auto;padding:24px;">
-          <div class="flex-between" style="margin-bottom:8px;">
-            <h2 style="margin:0;">Créer une formation</h2>
-            <button class="btn btn-sm btn-outline" id="modal-close">✕ Fermer</button>
-          </div>
-          <div style="display:flex;gap:6px;margin-bottom:20px;" id="mfw-stepper">
-            <div class="mfw-step" data-step="1">1. Infos générales</div>
-            <div class="mfw-step" data-step="2">2. Catégorie</div>
-            <div class="mfw-step" data-step="3">3. Tarification</div>
-            <div class="mfw-step" data-step="4">4. Accès</div>
-          </div>
-
-          <!-- Étape 1 : Informations générales -->
-          <div class="mfw-panel" data-panel="1" style="display:flex;flex-direction:column;gap:12px;">
-            <div><label style="font-size:13px;font-weight:700;">Titre *</label><input id="new-form-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Titre de la formation"></div>
-            <div><label style="font-size:13px;font-weight:700;">Sous-titre</label><input id="new-form-sous-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Sous-titre accrocheur (facultatif)"></div>
-            <div><label style="font-size:13px;font-weight:700;">Description courte</label>
-              <textarea id="new-form-desc-courte" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Résumé en une ou deux phrases, affiché sur la carte du catalogue…"></textarea>
-            </div>
-            <div><label style="font-size:13px;font-weight:700;">Description complète</label>
-              <textarea id="new-form-desc" style="width:100%;min-height:80px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Décrivez le contenu, les objectifs et le public cible…"></textarea>
-            </div>
-            <div><label style="font-size:13px;font-weight:700;">Objectifs pédagogiques</label>
-              <textarea id="new-form-objectifs" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Ce que l'apprenant saura faire à l'issue de la formation…"></textarea>
-            </div>
-            <div><label style="font-size:13px;font-weight:700;">Compétences qui seront acquises</label>
-              <textarea id="new-form-competences" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Une compétence par ligne…"></textarea>
-            </div>
-            <div><label style="font-size:13px;font-weight:700;">Public concerné</label><input id="new-form-public" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Entrepreneurs débutants, membres de la diaspora…"></div>
-            <div class="grid grid-2" style="gap:10px;">
-              <div><label style="font-size:13px;font-weight:700;">Niveau</label>
-                <select id="new-form-niveau" class="input-field" style="width:100%;margin-top:4px;">
-                  <option value="Débutant">Débutant</option>
-                  <option value="Intermédiaire">Intermédiaire</option>
-                  <option value="Avancé">Avancé</option>
-                  <option value="Tous niveaux">Tous niveaux</option>
-                </select>
-              </div>
-              <div><label style="font-size:13px;font-weight:700;">Langue</label>
-                <select id="new-form-langue" class="input-field" style="width:100%;margin-top:4px;">
-                  <option>Français</option><option>Anglais</option><option>Espagnol</option><option>Arabe</option><option>Portugais</option>
-                </select>
-              </div>
-              <div><label style="font-size:13px;font-weight:700;">Durée estimée</label><input id="new-form-duree" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 3h, 2 jours, 6 semaines"></div>
-              <div><label style="font-size:13px;font-weight:700;">Nombre d'heures</label><input type="number" min="0" step="0.5" id="new-form-duree-heures" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 12"></div>
-              <div><label style="font-size:13px;font-weight:700;">Nombre de modules prévu</label><input type="number" min="0" id="new-form-nb-modules" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 5"></div>
-              <div><label style="font-size:13px;font-weight:700;">Nombre approximatif de leçons</label><input type="number" min="0" id="new-form-nb-lecons" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 20"></div>
-              <div><label style="font-size:13px;font-weight:700;">Places</label><input type="number" id="new-form-places" class="input-field" style="width:100%;margin-top:4px;" placeholder="Nombre de places"></div>
-            </div>
-          </div>
-
-          <!-- Étape 2 : Catégorie -->
-          <div class="mfw-panel" data-panel="2" style="display:none;flex-direction:column;gap:12px;">
-            <div class="grid grid-2" style="gap:10px;">
-              <div><label style="font-size:13px;font-weight:700;">Catégorie</label>
-                <select id="new-form-domaine" class="input-field" style="width:100%;margin-top:4px;">
-                  <option>Action Sociale</option><option>Agriculture</option><option>Santé</option><option>Éducation</option><option>Technologie</option><option>Culture</option><option>Économie</option><option>Finance</option><option>Droit</option><option>Environnement</option>
-                </select>
-              </div>
-              <div><label style="font-size:13px;font-weight:700;">Sous-catégorie</label><input id="new-form-sous-categorie" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Comptabilité, Marketing digital…"></div>
-              <div><label style="font-size:13px;font-weight:700;">Type</label>
-                <select id="new-form-type" class="input-field" style="width:100%;margin-top:4px;">
-                  <option value="Webinaire">Webinaire</option>
-                  <option value="Atelier en ligne">Atelier en ligne</option>
-                  <option value="Module certifiant">Module certifiant</option>
-                  <option value="Coaching">Coaching et mentorat</option>
-                  <option value="Programme professionnel">Programme professionnel</option>
-                </select>
-              </div>
-              <div><label style="font-size:13px;font-weight:700;">Secteur d'activité</label><input id="new-form-secteur" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Artisanat, Numérique, Santé…"></div>
-              <div><label style="font-size:13px;font-weight:700;">Pays concerné <span style="color:var(--muted);font-weight:400;">(facultatif)</span></label><input id="new-form-pays" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Sénégal, France…"></div>
-              <div><label style="font-size:13px;font-weight:700;">Mots-clés</label><input id="new-form-mots-cles" class="input-field" style="width:100%;margin-top:4px;" placeholder="séparés par des virgules"></div>
-            </div>
-          </div>
-
-          <!-- Étape 3 : Tarification -->
-          <div class="mfw-panel" data-panel="3" style="display:none;flex-direction:column;gap:12px;">
-            <div style="display:flex;gap:14px;align-items:center;">
-              <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="new-form-gratuit" checked> <span style="font-size:13px;font-weight:700;">Formation gratuite</span></label>
-            </div>
-            <div id="mfw-tarif-block" style="display:none;flex-direction:column;gap:12px;">
-              <div class="grid grid-2" style="gap:10px;">
-                <div><label style="font-size:13px;font-weight:700;">Prix</label><input type="number" min="0" step="0.01" id="new-form-prix" class="input-field" style="width:100%;margin-top:4px;" value="0"></div>
-                <div><label style="font-size:13px;font-weight:700;">Devise</label>
-                  <select id="new-form-devise" class="input-field" style="width:100%;margin-top:4px;">
-                    <option value="EUR">EUR (€)</option><option value="USD">USD ($)</option><option value="XOF">XOF (FCFA)</option><option value="GBP">GBP (£)</option>
-                  </select>
-                </div>
-              </div>
-              <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;"><input type="checkbox" id="new-form-promo-active"> Activer une promotion</label>
-              <div id="mfw-promo-block" style="display:none;" class="grid grid-2" style="gap:10px;">
-                <div><label style="font-size:13px;font-weight:700;">Réduction (%)</label><input type="number" min="1" max="99" id="new-form-promo-pct" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: 20"></div>
-                <div><label style="font-size:13px;font-weight:700;">Fin de la promotion</label><input type="date" id="new-form-promo-fin" class="input-field" style="width:100%;margin-top:4px;"></div>
-              </div>
-              <div>
-                <div class="flex-between"><label style="font-size:13px;font-weight:700;">Coupons de réduction</label></div>
-                <p style="font-size:12px;color:var(--muted);margin:2px 0 8px;">Les coupons ne peuvent être ajoutés qu'après l'enregistrement du brouillon (étape 1 validée).</p>
-                <div id="mfw-coupons-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
-                <div style="display:flex;gap:8px;">
-                  <input id="mfw-coupon-code" class="input-field" style="flex:1;" placeholder="CODE20">
-                  <input id="mfw-coupon-pct" type="number" min="1" max="100" class="input-field" style="width:80px;" placeholder="%">
-                  <input id="mfw-coupon-max" type="number" min="1" class="input-field" style="width:90px;" placeholder="Max util.">
-                  <button class="btn btn-sm btn-outline" id="btn-mfw-add-coupon" type="button">+ Ajouter</button>
-                </div>
-              </div>
-            </div>
-            <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--muted);">
-              💰 Commission Diaspo'Actif : <strong id="mfw-commission-pct">5%</strong> · Revenu net estimé : <strong id="mfw-revenu-net">—</strong>
-            </div>
-          </div>
-
-          <!-- Étape 4 : Accès -->
-          <div class="mfw-panel" data-panel="4" style="display:none;flex-direction:column;gap:12px;">
-            <label style="font-size:13px;font-weight:700;">Qui peut accéder à cette formation ?</label>
-            <select id="new-form-acces-type" class="input-field" style="width:100%;">
-              <option value="public">🌍 Public — visible et accessible à tous</option>
-              <option value="prive">🔒 Privé — non listé dans le catalogue, accès par lien direct</option>
-              <option value="payant">💳 Accessible uniquement après paiement</option>
-              <option value="invitation">✉️ Sur invitation</option>
-              <option value="organisation">🏢 Membres de mon initiative uniquement</option>
-              <option value="liste_reseau">📇 Une liste du Réseau Professionnel</option>
-            </select>
-            <div id="mfw-acces-liste-wrap" style="display:none;">
-              <label style="font-size:13px;font-weight:700;">Liste du Réseau Professionnel</label>
-              <select id="new-form-acces-liste" class="input-field" style="width:100%;margin-top:4px;"></select>
-            </div>
-            <label style="display:flex;gap:8px;align-items:center;font-size:13px;"><input type="checkbox" id="new-form-telecharge"> Autoriser le téléchargement des ressources</label>
-          </div>
-
-          <div id="new-form-error" style="color:#D33;font-size:13px;display:none;margin-top:14px;"></div>
-          <div style="display:flex;gap:8px;margin-top:18px;">
-            <button class="btn btn-outline" id="btn-mfw-prev" style="display:none;">← Précédent</button>
-            <button class="btn btn-outline" id="btn-mfw-save-draft" style="margin-left:auto;">💾 Enregistrer le brouillon</button>
-            <button class="btn btn-orange" id="btn-mfw-next">Suivant →</button>
-          </div>
+      <!-- Assistant IA Formation : bouton flottant + fenêtre de chat -->
+      <button class="btn btn-orange" id="fb-ai-toggle" style="position:fixed;bottom:24px;right:24px;z-index:500;border-radius:99px;padding:12px 18px;box-shadow:0 4px 16px rgba(0,0,0,.2);display:none;">🤖 Assistant IA Formation</button>
+      <div id="fb-ai-window" style="display:none;position:fixed;bottom:24px;right:24px;z-index:500;width:340px;max-width:calc(100vw - 32px);height:460px;background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.25);flex-direction:column;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#ff6b00,#ff9f43);color:#fff;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+          <strong>🤖 Assistant IA Formation</strong>
+          <button id="fb-ai-close" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;">✕</button>
+        </div>
+        <div id="fb-ai-messages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px;"></div>
+        <div style="display:flex;gap:6px;padding:10px;border-top:1px solid var(--border);">
+          <input id="fb-ai-input" class="input-field" style="flex:1;" placeholder="Décrivez votre formation…">
+          <button class="btn btn-sm btn-orange" id="fb-ai-send">➤</button>
         </div>
       </div>
 
@@ -518,6 +722,8 @@
   </div>
 </div>
 
+<div id="fb-tooltip-popup"></div>
+
 <!-- MODAL LEÇON -->
 <div class="fb-modal-bg" id="fb-lecon-modal-bg" onclick="if(event.target===this) fbCloseLeconModal()">
   <div class="fb-modal-box">
@@ -530,35 +736,36 @@
       <input type="text" id="fb-lecon-titre">
     </div>
     <div class="fb-field">
-      <label>Type de contenu</label>
+      <label>Type de contenu <span class="fb-help" title="Choisissez le format de cette leçon : vidéo, PDF, PowerPoint, texte, quiz, exercice…">?</span></label>
       <select id="fb-lecon-type"></select>
     </div>
     <div class="fb-field">
-      <label>Description (facultatif)</label>
+      <label>Description (facultatif) <span class="fb-help" title="Un court texte affiché au-dessus du contenu pour situer la leçon.">?</span></label>
       <textarea id="fb-lecon-description"></textarea>
     </div>
     <div class="fb-field">
-      <label>Durée (minutes, facultatif)</label>
+      <label>Durée (minutes, facultatif) <span class="fb-help" title="Temps estimé pour suivre cette leçon, affiché à l'apprenant.">?</span></label>
       <input type="number" id="fb-lecon-duree" min="0">
     </div>
     <div class="fb-field" id="fb-lecon-texte-field" style="display:none;">
-      <label>Contenu texte</label>
+      <label>Contenu texte <span class="fb-help" title="Le texte affiché tel quel à l'apprenant pour ce type de leçon.">?</span></label>
       <textarea id="fb-lecon-texte"></textarea>
     </div>
     <div class="fb-field" id="fb-lecon-fichier-field" style="display:none;">
-      <label>Fichier</label>
+      <label>Fichier <span class="fb-help" title="Selon le type choisi : vidéo, audio, PDF, PowerPoint (.ppt/.pptx), image ou document à télécharger. 15 Mo maximum.">?</span></label>
       <input type="file" id="fb-lecon-fichier">
       <div class="fb-upload-status" id="fb-lecon-upload-status"></div>
       <input type="hidden" id="fb-lecon-contenu-url">
     </div>
     <div class="fb-field" id="fb-lecon-pages-field" style="display:none;">
-      <label>Nombre de pages (PDF, facultatif)</label>
+      <label>Nombre de pages (PDF, facultatif) <span class="fb-help" title="Affiché à l'apprenant dans le lecteur PDF, ex: « Document PDF — 12 pages ».">?</span></label>
       <input type="number" id="fb-lecon-nb-pages" min="1">
     </div>
     <div class="fb-field" id="fb-lecon-telechargement-field" style="display:none;">
       <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
         <input type="checkbox" id="fb-lecon-telechargement" checked style="width:auto;">
         Autoriser le téléchargement par les apprenants
+        <span class="fb-help" title="Décochez pour permettre la consultation en ligne uniquement, sans possibilité de télécharger le fichier.">?</span>
       </label>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
@@ -572,6 +779,32 @@
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
 <script>
+  // ── Infobulles d'aide (?) : au clic (fiable sur tous les appareils, contrairement au title au survol) ──
+  (function(){
+    const popup = document.getElementById('fb-tooltip-popup');
+    if(!popup) return;
+    document.addEventListener('click', (e)=>{
+      const help = e.target.closest('.fb-help');
+      if(help){
+        e.preventDefault();
+        e.stopPropagation();
+        const text = help.getAttribute('title') || help.dataset.tip || '';
+        if(popup.classList.contains('open') && popup.dataset.for === text){
+          popup.classList.remove('open');
+          return;
+        }
+        popup.textContent = text;
+        popup.dataset.for = text;
+        const rect = help.getBoundingClientRect();
+        popup.style.left = Math.min(rect.left, window.innerWidth - 300) + 'px';
+        popup.style.top = (rect.bottom + 8) + 'px';
+        popup.classList.add('open');
+      } else if(!e.target.closest('#fb-tooltip-popup')){
+        popup.classList.remove('open');
+      }
+    });
+  })();
+
   const countEl = document.getElementById("formations-count");
   const badgeEl = document.getElementById("formations-count-badge");
   function syncBadge() { if(badgeEl && countEl && countEl.textContent !== '—') badgeEl.textContent = countEl.textContent; }
@@ -579,13 +812,7 @@
     new MutationObserver(syncBadge).observe(countEl, {childList:true, characterData:true, subtree:true});
   }
 
-  document.getElementById("modal-close").addEventListener("click", ()=>{ document.getElementById("modal-formation").style.display = "none"; });
-
-  // ── Assistant de création de formation (étapes 1-4 : infos, catégorie, tarification, accès) ──
-  let mfwStep = 1;
-  let mfwFormationId = null; // rempli après le premier enregistrement du brouillon
-  const MFW_STEPS = 4;
-
+  // ── Infos / Catégorie / Tarification / Accès : sections libres de l'espace de travail, sauvegarde automatique ──
   function mfwCollectPayload(){
     return {
       titre: document.getElementById("new-form-titre").value.trim(),
@@ -616,40 +843,313 @@
       promo_date_fin: document.getElementById("new-form-promo-fin").value || null,
       acces_type: document.getElementById("new-form-acces-type").value,
       acces_liste_id: document.getElementById("new-form-acces-type").value === 'liste_reseau' ? (parseInt(document.getElementById("new-form-acces-liste").value)||null) : null,
-      telecharge_autorise: document.getElementById("new-form-telecharge").checked
+      telecharge_autorise: document.getElementById("new-form-telecharge").checked,
+      video_intro: document.getElementById("new-form-video-intro").value.trim(),
+      image_url: document.getElementById("new-form-image-file").dataset.url || undefined,
+      galerie_json: fbGalerieUrls,
+      prerequis: document.getElementById("new-form-prerequis").value.trim(),
+      resultats_attendus: document.getElementById("new-form-resultats").value.trim(),
+      metier_concerne: document.getElementById("new-form-metier").value.trim(),
+      date_ouverture: document.getElementById("new-form-date-ouverture").value || null,
+      date_fermeture_inscriptions: document.getElementById("new-form-date-fermeture").value || null,
+      date_debut: document.getElementById("new-form-date-debut").value || null,
+      date_fin: document.getElementById("new-form-date-fin").value || null,
+      accessible_ordinateur: document.getElementById("new-form-acc-ordinateur").checked,
+      accessible_tablette: document.getElementById("new-form-acc-tablette").checked,
+      accessible_mobile: document.getElementById("new-form-acc-mobile").checked,
+      accessible_hors_ligne: document.getElementById("new-form-acc-hors-ligne").checked,
+      temps_conseille: document.getElementById("new-form-temps-conseille").value.trim(),
+      badge: document.getElementById("new-form-badge").value || null,
+      langues_disponibles_json: [...document.querySelectorAll('.new-form-langue-dispo:checked')].map(el=>el.value),
+      sous_titres: document.getElementById("new-form-sous-titres").checked,
+      transcription: document.getElementById("new-form-transcription").checked,
+      lecteur_ecran: document.getElementById("new-form-lecteur-ecran").checked,
+      police_dyslexie: document.getElementById("new-form-police-dyslexie").checked,
+      formateur_bio: document.getElementById("new-form-formateur-bio").value.trim(),
+      formateur_fonction: document.getElementById("new-form-formateur-fonction").value.trim(),
+      formateur_organisation: document.getElementById("new-form-formateur-organisation").value.trim(),
+      formateur_annees_exp: parseInt(document.getElementById("new-form-formateur-exp").value)||null,
+      formateur_site: document.getElementById("new-form-formateur-site").value.trim(),
+      formateur_reseaux: document.getElementById("new-form-formateur-reseaux").value.trim(),
+      formateur_photo_url: document.getElementById("new-form-formateur-photo-file").dataset.url || undefined,
+      formateur_nom: document.getElementById("new-form-formateur-nom") ? document.getElementById("new-form-formateur-nom").value.trim() : undefined,
     };
   }
 
-  function mfwUpdateStepper(){
-    document.querySelectorAll('.mfw-step').forEach(el=>{
-      const n = parseInt(el.dataset.step);
-      el.classList.toggle('active', n===mfwStep);
-      el.classList.toggle('done', n<mfwStep);
-    });
-    document.querySelectorAll('.mfw-panel').forEach(el=>{
-      el.style.display = parseInt(el.dataset.panel)===mfwStep ? 'flex' : 'none';
-    });
-    document.getElementById('btn-mfw-prev').style.display = mfwStep>1 ? '' : 'none';
-    document.getElementById('btn-mfw-next').textContent = mfwStep<MFW_STEPS ? 'Suivant →' : '✅ Terminer';
+  // ── Médias : upload image (couverture, galerie, photo formateur) via /api/upload/document ──
+  let fbGalerieUrls = [];
+  async function fbUploadImage(file, statusElId){
+    const statusEl = document.getElementById(statusElId);
+    statusEl.textContent = 'Envoi en cours…';
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      const r = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Échec de l'envoi.");
+      statusEl.textContent = '✅ Image envoyée.';
+      return data.url;
+    } catch(e){ statusEl.textContent = '❌ ' + (e.message||"Erreur lors de l'envoi."); return null; }
+  }
+  document.getElementById('new-form-image-file').addEventListener('change', async (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const url = await fbUploadImage(file, 'new-form-image-status');
+    if(url){ e.target.dataset.url = url; document.getElementById('new-form-image-preview').src = url; document.getElementById('new-form-image-preview').style.display = ''; fbScheduleAutosave(); fbUpdatePreview(); }
+  });
+  document.getElementById('new-form-galerie-file').addEventListener('change', async (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    if(fbGalerieUrls.length >= 5){ showMsg('Maximum 5 images dans la galerie.', 'danger'); return; }
+    const url = await fbUploadImage(file, 'new-form-galerie-status');
+    if(url){
+      fbGalerieUrls.push(url);
+      const img = document.createElement('img');
+      img.src = url; img.style.cssText = 'width:60px;height:60px;object-fit:cover;border-radius:6px;';
+      document.getElementById('new-form-galerie-preview').appendChild(img);
+      e.target.value = '';
+      fbScheduleAutosave();
+    }
+  });
+  document.getElementById('new-form-formateur-photo-file').addEventListener('change', async (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const url = await fbUploadImage(file, 'new-form-formateur-photo-status');
+    if(url){ e.target.dataset.url = url; fbScheduleAutosave(); fbUpdatePreview(); }
+  });
+  document.getElementById('new-form-video-intro-file').addEventListener('change', async (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const statusEl = document.getElementById('new-form-video-intro-status');
+    statusEl.textContent = 'Envoi en cours (max 60 Mo)…';
+    try {
+      const r = await fetch('/api/upload/video', { method: 'POST', credentials: 'same-origin', body: file });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Échec de l'envoi.");
+      document.getElementById('new-form-video-intro').value = data.url;
+      statusEl.textContent = '✅ Vidéo envoyée.';
+      fbScheduleAutosave();
+    } catch(e2){ statusEl.textContent = '❌ ' + (e2.message||"Erreur lors de l'envoi."); }
+  });
+
+  // ── Statistiques auto-calculées (Organisation) ──
+  async function fbUpdateOrganisationStats(){
+    if(!fbFormationId) return;
+    try {
+      const { modules } = await api('GET', `/formations/${fbFormationId}/modules`);
+      let nbModules = modules.length, nbLecons = 0, totalMin = 0;
+      modules.forEach(m => (m.chapitres||[]).forEach(c => (c.lecons||[]).forEach(l => { nbLecons++; totalMin += (l.duree_minutes||0); })));
+      document.getElementById('fb-stat-modules').textContent = nbModules;
+      document.getElementById('fb-stat-lecons').textContent = nbLecons;
+      document.getElementById('fb-stat-heures').textContent = (totalMin/60).toFixed(1) + 'h';
+      document.getElementById('fb-stat-min-par-lecon').textContent = (nbLecons ? Math.round(totalMin/nbLecons) : 0) + ' min';
+      document.getElementById('fb-stat-min-par-module').textContent = (nbModules ? Math.round(totalMin/nbModules) : 0) + ' min';
+      document.getElementById('new-form-nb-modules').value = nbModules;
+      document.getElementById('new-form-nb-lecons').value = nbLecons;
+      document.getElementById('new-form-duree-heures').value = (totalMin/60).toFixed(2);
+      fbScheduleAutosave();
+      fbUpdatePreview(nbModules, nbLecons);
+    } catch(_) {}
   }
 
-  async function mfwSaveDraft(silent){
-    const titre = document.getElementById("new-form-titre").value.trim();
-    const errEl = document.getElementById("new-form-error");
-    if(!titre){ errEl.textContent = "Le titre est obligatoire."; errEl.style.display="block"; return false; }
-    errEl.style.display = "none";
-    const payload = mfwCollectPayload();
-    try {
-      if(!mfwFormationId){
-        const { id } = await api("POST", "/formations", payload);
-        mfwFormationId = id;
-      } else {
-        await api("PUT", `/formations/${mfwFormationId}`, payload);
-      }
-      if(!silent) showMsg('Brouillon enregistré.', 'success');
-      return true;
-    } catch(e){ errEl.textContent = e.message||"Erreur."; errEl.style.display="block"; return false; }
+  // ── Aperçu public en temps réel ──
+  function fbUpdatePreview(nbModulesOverride, nbLeconsOverride){
+    const el = (id) => document.getElementById(id);
+    if(!el('fb-preview-card')) return;
+    el('fb-preview-titre').textContent = el('new-form-titre').value.trim() || 'Titre de la formation';
+    el('fb-preview-sous-titre').textContent = el('new-form-sous-titre').value.trim();
+    const formateurNom = el('new-form-formateur-nom') ? el('new-form-formateur-nom').value.trim() : '';
+    el('fb-preview-formateur').textContent = formateurNom ? `👤 ${formateurNom}` : '';
+    el('fb-preview-duree').textContent = el('new-form-duree').value.trim() || '—';
+    el('fb-preview-niveau').textContent = el('new-form-niveau').value || '—';
+    el('fb-preview-langue').textContent = el('new-form-langue').value || '—';
+    const nbModules = nbModulesOverride ?? (parseInt(el('new-form-nb-modules').value)||0);
+    const nbLecons = nbLeconsOverride ?? (parseInt(el('new-form-nb-lecons').value)||0);
+    el('fb-preview-modules').textContent = `${nbModules} module${nbModules>1?'s':''}`;
+    el('fb-preview-lecons').textContent = `${nbLecons} leçon${nbLecons>1?'s':''}`;
+    const gratuit = el('new-form-gratuit').checked;
+    const prix = parseFloat(el('new-form-prix').value)||0;
+    const devise = el('new-form-devise').value;
+    el('fb-preview-prix').textContent = gratuit ? 'Gratuit' : `${prix} ${devise}`;
+    const imgUrl = el('new-form-image-file').dataset.url;
+    if(imgUrl) el('fb-preview-banner').style.backgroundImage = `url('${imgUrl}')`;
+    const badgeLbl = { nouveau:'⭐ Nouveau', tres_demande:'🔥 Très demandé', certification:'🏆 Certification', professionnel:'💼 Professionnel', debutant:'🎓 Débutant', intensif:'🚀 Intensif' };
+    const badgeVal = el('new-form-badge').value;
+    if(badgeVal && badgeLbl[badgeVal]){ el('fb-preview-badge').textContent = badgeLbl[badgeVal]; el('fb-preview-badge').style.display = ''; }
+    else el('fb-preview-badge').style.display = 'none';
   }
+  document.getElementById('fb-voir-profil-formateur')?.addEventListener('click', ()=>{
+    if(CURRENT_USER && CURRENT_USER.id) window.open(`profil.html?id=${CURRENT_USER.id}`, '_blank');
+  });
+
+  // ── Assistant IA Formation (Lot 1 : conversation guidée, sans IA générative — détection de motifs, gratuit) ──
+  const FB_AI_STEPS = ['sujet','public','duree','niveau','objectifs','competences'];
+  let fbAiStepIndex = 0;
+  let fbAiStarted = false;
+  const FB_AI_QUESTIONS = {
+    sujet: "Quel est le sujet de votre formation ? (ex: « Je veux créer une formation sur la gestion financière pour les associations. »)",
+    public: "Très bien ! À qui s'adresse cette formation ? (ex: « Le public est constitué d'entrepreneurs. »)",
+    duree: "Combien de temps doit durer la formation ? (ex: « Elle dure 4 semaines. »)",
+    niveau: "Quel niveau visez-vous : débutant, intermédiaire, avancé ou tous niveaux ?",
+    objectifs: "Que devront être capables de faire les apprenants à la fin ? (ex: « Les participants apprendront à créer une entreprise. »)",
+    competences: "Et pour finir : à la fin, ils sauront faire quoi concrètement ? (ex: « À la fin ils sauront établir un business plan. »)"
+  };
+  const FB_AI_DONE_MSG = "C'est noté, merci ! J'ai rempli les champs correspondants dans « Infos générales » — vous pouvez les modifier à tout moment. Continuez à me parler si vous voulez préciser d'autres points (catégorie, durée en heures, prérequis…), ou complétez directement le formulaire.";
+
+  function fbAiAddMsg(text, who, filledLabel){
+    const box = document.getElementById('fb-ai-messages');
+    const div = document.createElement('div');
+    div.className = 'fb-ai-msg ' + who;
+    div.textContent = text;
+    if(filledLabel){ const s = document.createElement('span'); s.className='fb-ai-filled'; s.textContent = '✅ ' + filledLabel; div.appendChild(s); }
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function fbAiSetField(id, value, triggerEvent){
+    const el = document.getElementById(id);
+    if(!el || !value) return false;
+    el.value = value;
+    if(triggerEvent !== false) el.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+
+  // Extraction par motifs (regex) — pas d'IA générative, détection de formulations courantes en français
+  function fbAiExtract(text){
+    const filled = [];
+    const lower = text.toLowerCase();
+
+    // Sujet / titre : "formation sur X", "formation de X", "je veux créer une formation sur X"
+    const sujetMatch = text.match(/formation\s+(?:sur|de|en)\s+(.+?)(?:[.!]|$)/i);
+    if(sujetMatch && sujetMatch[1].trim().length > 2){
+      const sujet = sujetMatch[1].trim().replace(/^(la|le|les|l')\s+/i,'');
+      if(fbAiSetField('new-form-titre', sujet.charAt(0).toUpperCase()+sujet.slice(1))) filled.push('Titre');
+      if(fbAiSetField('new-form-desc-courte', text.trim())) filled.push('Description courte');
+    }
+
+    // Durée : "dure 4 semaines", "durée : 3 jours", "2h", "12 heures"
+    const dureeMatch = text.match(/(\d+)\s*(semaines?|jours?|mois|heures?|h\b)/i);
+    if(dureeMatch){
+      const n = dureeMatch[1], unit = dureeMatch[2].toLowerCase();
+      if(fbAiSetField('new-form-duree', `${n} ${unit}`)) filled.push('Durée');
+      if(/heures?|h\b/.test(unit)) if(fbAiSetField('new-form-duree-heures', n)) filled.push('Nombre d\'heures');
+    }
+
+    // Public : "public est/sont X", "s'adresse à X", "pour les X", "destiné à X"
+    const publicMatch = text.match(/(?:public(?:\s+est|\s+sont|\s+concerné)?|s'adresse\s+à|destiné(?:e)?\s+à|pour\s+les)\s+(?:des\s+|de\s+|constitué\s+de\s+|constitué\s+d['’])?(.+?)(?:[.!]|$)/i);
+    if(publicMatch && publicMatch[1].trim().length > 2 && !/formation|semaine|jour|heure/i.test(publicMatch[1])){
+      if(fbAiSetField('new-form-public', publicMatch[1].trim())) filled.push('Public concerné');
+    }
+
+    // Niveau
+    if(/débutant/i.test(text)){ if(fbAiSetField('new-form-niveau', 'Débutant')) filled.push('Niveau'); }
+    else if(/intermédiaire/i.test(text)){ if(fbAiSetField('new-form-niveau', 'Intermédiaire')) filled.push('Niveau'); }
+    else if(/avancé/i.test(text)){ if(fbAiSetField('new-form-niveau', 'Avancé')) filled.push('Niveau'); }
+    else if(/tous\s+niveaux/i.test(text)){ if(fbAiSetField('new-form-niveau', 'Tous niveaux')) filled.push('Niveau'); }
+
+    // Objectifs : "apprendront à X", "sauront X", "objectif est de X"
+    const objMatch = text.match(/(?:apprendront\s+à|pourront|seront\s+capables\s+de|objectifs?\s+(?:est|sont)?\s*(?:de|:)?)\s+(.+?)(?:[.!]|$)/i);
+    if(objMatch && objMatch[1].trim().length > 3){
+      if(fbAiSetField('new-form-objectifs', text.trim())) filled.push('Objectifs pédagogiques');
+    }
+
+    // Compétences : "sauront établir/faire/créer X", "à la fin ils sauront X"
+    const compMatch = text.match(/sauront\s+(.+?)(?:[.!]|$)/i);
+    if(compMatch && compMatch[1].trim().length > 3){
+      if(fbAiSetField('new-form-competences', text.trim())) filled.push('Compétences acquises');
+    }
+
+    // Gratuit / payant
+    if(/gratuit/i.test(text)){ document.getElementById('new-form-gratuit').checked = true; document.getElementById('new-form-gratuit').dispatchEvent(new Event('change')); filled.push('Tarification (gratuite)'); }
+    const prixMatch = text.match(/(\d+)\s*(€|eur|euros?|\$|usd|fcfa|xof)/i);
+    if(prixMatch){
+      document.getElementById('new-form-gratuit').checked = false;
+      document.getElementById('new-form-gratuit').dispatchEvent(new Event('change'));
+      if(fbAiSetField('new-form-prix', prixMatch[1])) filled.push('Prix');
+    }
+
+    // Prérequis
+    const prereqMatch = text.match(/pr[ée]requis?\s*:?\s*(.+?)(?:[.!]|$)/i);
+    if(prereqMatch && prereqMatch[1].trim().length > 2){
+      if(fbAiSetField('new-form-prerequis', prereqMatch[1].trim())) filled.push('Prérequis');
+    }
+
+    if(filled.length) fbUpdatePreview();
+    return filled;
+  }
+
+  function fbAiNextQuestion(){
+    if(fbAiStepIndex >= FB_AI_STEPS.length){
+      fbAiAddMsg(FB_AI_DONE_MSG, 'bot');
+      return;
+    }
+    fbAiAddMsg(FB_AI_QUESTIONS[FB_AI_STEPS[fbAiStepIndex]], 'bot');
+  }
+
+  function fbAiHandleUserMessage(text){
+    fbAiAddMsg(text, 'user');
+    const filled = fbAiExtract(text);
+    if(filled.length){
+      const last = document.getElementById('fb-ai-messages').lastElementChild;
+      const s = document.createElement('div');
+      s.className = 'fb-ai-msg bot';
+      s.innerHTML = `J'ai rempli : ${filled.map(f=>`<span class="fb-ai-filled" style="display:inline;margin-right:6px;">✅ ${f}</span>`).join('')}`;
+      document.getElementById('fb-ai-messages').appendChild(s);
+    }
+    fbAiStepIndex++;
+    fbAiNextQuestion();
+    document.getElementById('fb-ai-messages').scrollTop = document.getElementById('fb-ai-messages').scrollHeight;
+  }
+
+  document.getElementById('fb-ai-toggle').addEventListener('click', ()=>{
+    document.getElementById('fb-ai-window').style.display = 'flex';
+    document.getElementById('fb-ai-toggle').style.display = 'none';
+    if(!fbAiStarted){
+      fbAiStarted = true;
+      fbAiAddMsg("Bonjour ! Je suis votre Assistant IA Formation. Je vais vous poser quelques questions pour remplir automatiquement les informations générales de votre formation — vous pourrez tout modifier ensuite manuellement.", 'bot');
+      fbAiNextQuestion();
+    }
+  });
+  document.getElementById('fb-ai-close').addEventListener('click', ()=>{
+    document.getElementById('fb-ai-window').style.display = 'none';
+    document.getElementById('fb-ai-toggle').style.display = '';
+  });
+  function fbAiSend(){
+    const input = document.getElementById('fb-ai-input');
+    const text = input.value.trim();
+    if(!text) return;
+    input.value = '';
+    fbAiHandleUserMessage(text);
+  }
+  document.getElementById('fb-ai-send').addEventListener('click', fbAiSend);
+  document.getElementById('fb-ai-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter') fbAiSend(); });
+
+  let fbAutosaveTimer = null;
+  function fbScheduleAutosave(){
+    if(!fbFormationId) return;
+    const statusEl = document.getElementById('fb-autosave-status');
+    if(statusEl) statusEl.textContent = '● Modifications non enregistrées…';
+    clearTimeout(fbAutosaveTimer);
+    fbAutosaveTimer = setTimeout(fbAutosaveNow, 700);
+  }
+  async function fbAutosaveNow(){
+    if(!fbFormationId) return;
+    const errEl = document.getElementById("new-form-error");
+    const titre = document.getElementById("new-form-titre").value.trim();
+    if(!titre){ errEl.textContent = "Le titre est obligatoire."; errEl.style.display="block"; return; }
+    errEl.style.display = "none";
+    const statusEl = document.getElementById('fb-autosave-status');
+    try {
+      await api("PUT", `/formations/${fbFormationId}`, mfwCollectPayload());
+      document.getElementById('fb-titre').textContent = titre;
+      if(statusEl) statusEl.textContent = '✓ Enregistré';
+    } catch(e){
+      errEl.textContent = e.message||"Erreur d'enregistrement."; errEl.style.display="block";
+      if(statusEl) statusEl.textContent = '⚠ Non enregistré';
+    }
+  }
+  ['infos','categorie','tarification','acces'].forEach(tab=>{
+    const panel = document.querySelector(`[data-fb-panel="${tab}"]`);
+    if(!panel) return;
+    panel.addEventListener('input', ()=>{ fbScheduleAutosave(); if(tab==='infos') fbUpdatePreview(); });
+    panel.addEventListener('change', ()=>{ fbScheduleAutosave(); if(tab==='infos') fbUpdatePreview(); });
+  });
 
   document.getElementById("new-form-gratuit").addEventListener("change", function(){
     document.getElementById("mfw-tarif-block").style.display = this.checked ? "none" : "flex";
@@ -684,28 +1184,28 @@
 
   async function mfwRenderCoupons(){
     const el = document.getElementById('mfw-coupons-list');
-    if(!mfwFormationId){ el.innerHTML = ''; return; }
+    if(!fbFormationId){ el.innerHTML = ''; return; }
     try {
-      const { coupons } = await api('GET', `/formations/${mfwFormationId}/coupons`);
+      const { coupons } = await api('GET', `/formations/${fbFormationId}/coupons`);
       el.innerHTML = (coupons||[]).map(c=>
         `<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;">
           🏷️ <strong>${c.code}</strong> — ${c.reduction_pct}% ${c.max_utilisations?`(max ${c.max_utilisations})`:''}
           <button type="button" class="mfw-del-coupon" data-id="${c.id}" style="margin-left:auto;border:none;background:none;color:#dc2626;cursor:pointer;">✕</button>
         </div>`).join('') || '<div style="font-size:12px;color:var(--muted);">Aucun coupon.</div>';
       el.querySelectorAll('.mfw-del-coupon').forEach(b=>b.addEventListener('click', async ()=>{
-        await api('DELETE', `/formations/${mfwFormationId}/coupons/${b.dataset.id}`);
+        await api('DELETE', `/formations/${fbFormationId}/coupons/${b.dataset.id}`);
         mfwRenderCoupons();
       }));
     } catch(_) {}
   }
   document.getElementById('btn-mfw-add-coupon').addEventListener('click', async ()=>{
-    if(!mfwFormationId){ showMsg('Enregistrez d\'abord le brouillon (étape 1) avant d\'ajouter un coupon.', 'danger'); return; }
+    if(!fbFormationId) return;
     const code = document.getElementById('mfw-coupon-code').value.trim();
     const pct = document.getElementById('mfw-coupon-pct').value;
     const max = document.getElementById('mfw-coupon-max').value;
     if(!code || !pct){ showMsg('Code et pourcentage de réduction requis.', 'danger'); return; }
     try {
-      await api('POST', `/formations/${mfwFormationId}/coupons`, { code, reduction_pct: parseFloat(pct), max_utilisations: max?parseInt(max):null });
+      await api('POST', `/formations/${fbFormationId}/coupons`, { code, reduction_pct: parseFloat(pct), max_utilisations: max?parseInt(max):null });
       document.getElementById('mfw-coupon-code').value = '';
       document.getElementById('mfw-coupon-pct').value = '';
       document.getElementById('mfw-coupon-max').value = '';
@@ -713,40 +1213,14 @@
     } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
   });
 
-  document.getElementById('btn-mfw-prev').addEventListener('click', ()=>{
-    if(mfwStep>1){ mfwStep--; mfwUpdateStepper(); }
-  });
-  document.getElementById('btn-mfw-save-draft').addEventListener('click', ()=> mfwSaveDraft(false));
-  document.getElementById('btn-mfw-next').addEventListener('click', async ()=>{
-    const ok = await mfwSaveDraft(true);
-    if(!ok) return;
-    if(mfwStep < MFW_STEPS){
-      mfwStep++;
-      mfwUpdateStepper();
-      if(mfwStep===3) mfwRenderCoupons();
-    } else {
-      document.getElementById("modal-formation").style.display = "none";
-      showMsg("Formation enregistrée en brouillon. Retrouvez-la dans « Espace Formateur » pour poursuivre sa création et la soumettre à validation.", "success");
-      loadMesFormations();
-    }
-  });
-
-  document.getElementById("btn-creer-formation")?.addEventListener("click", ()=>{
-    document.getElementById("new-form-error").style.display = "none";
-    mfwStep = 1;
-    mfwFormationId = null;
-    document.querySelectorAll('.mfw-panel input, .mfw-panel textarea, .mfw-panel select').forEach(el=>{
-      if(el.type==='checkbox') el.checked = el.id==='new-form-gratuit';
-      else if(el.tagName==='SELECT') el.selectedIndex = 0;
-      else el.value = '';
-    });
-    document.getElementById('mfw-tarif-block').style.display = 'none';
-    document.getElementById('mfw-promo-block').style.display = 'none';
-    document.getElementById('mfw-acces-liste-wrap').style.display = 'none';
-    document.getElementById('mfw-coupons-list').innerHTML = '';
-    mfwUpdateCommissionPreview();
-    mfwUpdateStepper();
-    document.getElementById("modal-formation").style.display = "block";
+  document.getElementById("btn-creer-formation")?.addEventListener("click", async ()=>{
+    const titre = prompt('Titre de la nouvelle formation :', '');
+    if(titre===null || !titre.trim()) return;
+    try {
+      const { id } = await api('POST', '/formations', { titre: titre.trim(), mode_acces: 'gratuit' });
+      showMsg('Formation créée. Complétez librement chaque section.', 'success');
+      openFormationBuilder(id, titre.trim(), 'brouillon');
+    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
   });
 
   // ── Devenir formateur (demande d'accréditation "createur_formations") ──
@@ -1032,27 +1506,122 @@
   };
   let fbFormationId = null;
 
-  function openFormationBuilder(id, titre, statut){
+  const FB_FLEX_PANELS = ['infos','categorie','tarification','acces'];
+
+  async function openFormationBuilder(id, titre, statut){
     fbFormationId = id;
     document.getElementById('fb-titre').textContent = titre;
     document.getElementById('fb-statut-badge').textContent = FB_STATUT_LBL[statut] || statut;
+    document.getElementById('fb-autosave-status').textContent = '';
     document.getElementById('volet-espace-formateur').style.display = 'none';
     document.getElementById('fb-view').style.display = 'block';
-    fbSwitchTab('contenu');
+    document.getElementById('fb-ai-toggle').style.display = '';
+    await fbPopulateInfosFromServer();
+    fbSwitchTab('infos');
+  }
+  async function fbPopulateInfosFromServer(){
+    try {
+      const { formation: f } = await api('GET', `/formations/${fbFormationId}`);
+      const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val ?? (el.tagName==='SELECT' ? el.value : ''); };
+      set('new-form-titre', f.titre);
+      set('new-form-sous-titre', f.sous_titre);
+      set('new-form-desc-courte', f.description_courte);
+      set('new-form-desc', f.description);
+      set('new-form-objectifs', f.objectifs);
+      set('new-form-competences', f.competences_acquises);
+      set('new-form-public', f.public_concerne);
+      if(f.niveau) set('new-form-niveau', f.niveau);
+      if(f.langue) set('new-form-langue', f.langue);
+      set('new-form-duree', f.duree);
+      set('new-form-duree-heures', f.duree_heures);
+      set('new-form-nb-modules', f.nombre_modules_prevu);
+      set('new-form-nb-lecons', f.nombre_lecons_approx);
+      set('new-form-places', f.places);
+      if(f.type_formation) set('new-form-type', f.type_formation);
+      if(f.domaine) set('new-form-domaine', f.domaine);
+      set('new-form-sous-categorie', f.sous_categorie);
+      set('new-form-secteur', f.secteur_activite);
+      set('new-form-pays', f.pays_concerne);
+      set('new-form-mots-cles', f.mots_cles);
+      document.getElementById('new-form-gratuit').checked = (f.mode_acces||'gratuit') === 'gratuit';
+      document.getElementById('mfw-tarif-block').style.display = document.getElementById('new-form-gratuit').checked ? 'none' : 'flex';
+      set('new-form-prix', f.prix || 0);
+      if(f.devise) set('new-form-devise', f.devise);
+      document.getElementById('new-form-promo-active').checked = !!f.promo_active;
+      document.getElementById('mfw-promo-block').style.display = f.promo_active ? 'flex' : 'none';
+      set('new-form-promo-pct', f.promo_reduction_pct);
+      set('new-form-promo-fin', (f.promo_date_fin||'').slice(0,10));
+      if(f.acces_type) document.getElementById('new-form-acces-type').value = f.acces_type;
+      document.getElementById('mfw-acces-liste-wrap').style.display = f.acces_type === 'liste_reseau' ? '' : 'none';
+      document.getElementById('new-form-telecharge').checked = !!f.telecharge_autorise;
+      set('new-form-video-intro', f.video_intro);
+      const imgPrev = document.getElementById('new-form-image-preview');
+      document.getElementById('new-form-image-file').dataset.url = f.image_url || '';
+      if(f.image_url){ imgPrev.src = f.image_url; imgPrev.style.display = ''; } else { imgPrev.style.display = 'none'; }
+      fbGalerieUrls = []; document.getElementById('new-form-galerie-preview').innerHTML = '';
+      try {
+        const galerie = f.galerie_json ? (typeof f.galerie_json === 'string' ? JSON.parse(f.galerie_json) : f.galerie_json) : [];
+        fbGalerieUrls = Array.isArray(galerie) ? galerie : [];
+        fbGalerieUrls.forEach(url => {
+          const img = document.createElement('img');
+          img.src = url; img.style.cssText = 'width:60px;height:60px;object-fit:cover;border-radius:6px;';
+          document.getElementById('new-form-galerie-preview').appendChild(img);
+        });
+      } catch(_){}
+      set('new-form-prerequis', f.prerequis);
+      set('new-form-resultats', f.resultats_attendus);
+      set('new-form-metier', f.metier_concerne);
+      set('new-form-date-ouverture', (f.date_ouverture||'').slice(0,10));
+      set('new-form-date-fermeture', (f.date_fermeture_inscriptions||'').slice(0,10));
+      set('new-form-date-debut', (f.date_debut||'').slice(0,10));
+      set('new-form-date-fin', (f.date_fin||'').slice(0,10));
+      document.getElementById('new-form-acc-ordinateur').checked = f.accessible_ordinateur !== 0 && f.accessible_ordinateur !== false;
+      document.getElementById('new-form-acc-tablette').checked = f.accessible_tablette !== 0 && f.accessible_tablette !== false;
+      document.getElementById('new-form-acc-mobile').checked = f.accessible_mobile !== 0 && f.accessible_mobile !== false;
+      document.getElementById('new-form-acc-hors-ligne').checked = !!f.accessible_hors_ligne;
+      set('new-form-temps-conseille', f.temps_conseille);
+      if(f.badge) document.getElementById('new-form-badge').value = f.badge;
+      try {
+        const langues = f.langues_disponibles_json ? (typeof f.langues_disponibles_json === 'string' ? JSON.parse(f.langues_disponibles_json) : f.langues_disponibles_json) : [];
+        document.querySelectorAll('.new-form-langue-dispo').forEach(cb => cb.checked = (langues||[]).includes(cb.value));
+      } catch(_){}
+      document.getElementById('new-form-sous-titres').checked = !!f.sous_titres;
+      document.getElementById('new-form-transcription').checked = !!f.transcription;
+      document.getElementById('new-form-lecteur-ecran').checked = !!f.lecteur_ecran;
+      document.getElementById('new-form-police-dyslexie').checked = !!f.police_dyslexie;
+      set('new-form-formateur-nom', f.formateur_nom || (CURRENT_USER && CURRENT_USER.nom) || '');
+      set('new-form-formateur-fonction', f.formateur_fonction);
+      set('new-form-formateur-organisation', f.formateur_organisation);
+      set('new-form-formateur-exp', f.formateur_annees_exp);
+      set('new-form-formateur-site', f.formateur_site);
+      set('new-form-formateur-reseaux', f.formateur_reseaux);
+      set('new-form-formateur-bio', f.formateur_bio);
+      document.getElementById('new-form-formateur-photo-file').dataset.url = f.formateur_photo_url || '';
+      mfwUpdateCommissionPreview();
+      mfwRenderCoupons();
+      await fbUpdateOrganisationStats();
+      fbUpdatePreview();
+    } catch(e){ showMsg(e.message||'Erreur de chargement de la formation.', 'danger'); }
   }
   document.getElementById('fb-back').addEventListener('click', ()=>{
     document.getElementById('fb-view').style.display = 'none';
     document.getElementById('volet-espace-formateur').style.display = '';
+    document.getElementById('fb-ai-toggle').style.display = 'none';
+    document.getElementById('fb-ai-window').style.display = 'none';
     loadMesFormations();
   });
   function fbSwitchTab(tab){
     document.querySelectorAll('.fb-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
-    document.querySelectorAll('.fb-panel').forEach(p=>p.style.display = p.dataset.fbPanel===tab ? 'block' : 'none');
+    document.querySelectorAll('.fb-panel').forEach(p=>{
+      const isActive = p.dataset.fbPanel===tab;
+      p.style.display = isActive ? (FB_FLEX_PANELS.includes(tab) ? 'flex' : 'block') : 'none';
+    });
     if(tab==='contenu') fbLoadModules();
     else if(tab==='quiz') fbLoadQuiz();
     else if(tab==='certificat') fbLoadCertificat();
     else if(tab==='apercu') fbLoadApercu();
     else if(tab==='soumission') fbLoadMessages();
+    else if(tab==='tarification') mfwRenderCoupons();
   }
   document.querySelectorAll('.fb-tab').forEach(b=> b.addEventListener('click', ()=> fbSwitchTab(b.dataset.tab)));
 
@@ -1069,6 +1638,7 @@
     el.innerHTML = '<div class="notice">Chargement…</div>';
     try {
       const { modules } = await api('GET', `/formations/${fbFormationId}/modules`);
+      fbUpdateOrganisationStats();
       if(!modules.length){ el.innerHTML = '<div class="notice">Aucun module. Ajoutez-en un ci-dessus.</div>'; return; }
       el.innerHTML = modules.map(m => `
         <div class="fb-module-card" draggable="true" data-module-id="${m.id}">
