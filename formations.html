@@ -1100,16 +1100,70 @@
     fbAiAddMsg(FB_AI_QUESTIONS[FB_AI_STEPS[fbAiStepIndex]], 'bot');
   }
 
+  // ── « Je veux commencer par X » : l'utilisateur choisit librement la rubrique à remplir,
+  // au lieu de suivre l'ordre des questions par défaut. ──
+  const FB_AI_FIELD_MAP = [
+    { id: 'new-form-sous-titre', label: 'sous-titre', kw: ['sous-titre','sous titre'] },
+    { id: 'new-form-desc-courte', label: 'description courte', kw: ['description courte','résumé','resume'] },
+    { id: 'new-form-desc', label: 'description complète', kw: ['description complète','description complete','description'] },
+    { id: 'new-form-resultats', label: 'résultats attendus', kw: ['résultats attendus','resultats attendus','résultats','resultats'] },
+    { id: 'new-form-objectifs', label: 'objectifs pédagogiques', kw: ['objectifs pédagogiques','objectifs'] },
+    { id: 'new-form-competences', label: 'compétences acquises', kw: ['compétences acquises','competences acquises','compétences','competences'] },
+    { id: 'new-form-public', label: 'public concerné', kw: ['public concerné','public concerne','public'] },
+    { id: 'new-form-prerequis', label: 'prérequis', kw: ['prérequis','prerequis'] },
+    { id: 'new-form-duree', label: 'durée', kw: ['durée estimée','duree estimee','durée','duree'] },
+    { id: 'new-form-niveau', label: 'niveau', kw: ['niveau'] },
+    { id: 'new-form-mots-cles', label: 'mots-clés', kw: ['mots-clés','mots cles','mots clés','tags'] },
+    { id: 'new-form-titre', label: 'titre', kw: ['titre'] },
+  ].sort((a,b) => Math.max(...b.kw.map(k=>k.length)) - Math.max(...a.kw.map(k=>k.length))); // motifs les plus précis en premier (ex: "description courte" avant "description")
+
+  let fbAiPendingField = null;
+
+  function fbAiDetectStartIntent(text){
+    const m = text.match(/(?:je\s+veux|j'aimerais|on\s+va|commen[çc]ons|commencer)\s+(?:d'abord\s+)?par\s+(?:le|la|les|l['’])?\s*(.+?)(?:[.!]|$)/i);
+    if(!m) return null;
+    const phrase = m[1].toLowerCase();
+    for(const field of FB_AI_FIELD_MAP){
+      if(field.kw.some(k => phrase.includes(k))) return field;
+    }
+    return null;
+  }
+
+  function fbAiAddFilledMsg(labels){
+    const s = document.createElement('div');
+    s.className = 'fb-ai-msg bot';
+    s.innerHTML = `J'ai rempli : ${labels.map(f=>`<span class="fb-ai-filled" style="display:inline;margin-right:6px;">✅ ${f}</span>`).join('')}`;
+    document.getElementById('fb-ai-messages').appendChild(s);
+    document.getElementById('fb-ai-messages').scrollTop = document.getElementById('fb-ai-messages').scrollHeight;
+  }
+
   function fbAiHandleUserMessage(text){
     fbAiAddMsg(text, 'user');
-    const filled = fbAiExtract(text);
-    if(filled.length){
-      const last = document.getElementById('fb-ai-messages').lastElementChild;
-      const s = document.createElement('div');
-      s.className = 'fb-ai-msg bot';
-      s.innerHTML = `J'ai rempli : ${filled.map(f=>`<span class="fb-ai-filled" style="display:inline;margin-right:6px;">✅ ${f}</span>`).join('')}`;
-      document.getElementById('fb-ai-messages').appendChild(s);
+
+    // 1) Une rubrique était en attente de réponse directe (l'utilisateur a choisi par quoi commencer)
+    if(fbAiPendingField){
+      const field = fbAiPendingField;
+      fbAiPendingField = null;
+      if(fbAiSetField(field.id, text.trim())){
+        fbUpdatePreview();
+        fbAiAddFilledMsg([field.label.charAt(0).toUpperCase()+field.label.slice(1)]);
+      }
+      fbAiAddMsg("Autre chose que vous voulez préciser ? Dites-moi « je veux commencer par… » pour une autre rubrique, ou continuons avec mes questions.", 'bot');
+      fbAiNextQuestion();
+      return;
     }
+
+    // 2) « Je veux commencer par le sous-titre / la description courte / etc. »
+    const startField = fbAiDetectStartIntent(text);
+    if(startField){
+      fbAiPendingField = startField;
+      fbAiAddMsg(`D'accord, commençons par « ${startField.label} ». Dites-moi ce que vous voulez y écrire :`, 'bot');
+      return;
+    }
+
+    // 3) Sinon, détection par motifs habituelle + progression dans les questions par défaut
+    const filled = fbAiExtract(text);
+    if(filled.length) fbAiAddFilledMsg(filled);
     fbAiStepIndex++;
     fbAiNextQuestion();
     document.getElementById('fb-ai-messages').scrollTop = document.getElementById('fb-ai-messages').scrollHeight;
