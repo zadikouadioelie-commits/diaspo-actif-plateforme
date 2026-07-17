@@ -3061,28 +3061,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
   setTimeout(_moveToSlots, 1800);
 });
 
-/* ── Bouton « Trouvez la perle rare » — inséré dans la barre de navigation de toutes les pages
-   (accueil public + bandeau après connexion), à côté du bouton Formations. ── */
-(function insertPerleRare(){
-  function run(){
-    document.querySelectorAll('nav.nav').forEach(function(nav){
-      if(nav.querySelector('.nav-perle')) return;
-      var a=document.createElement('a');
-      a.href='annuaire.html';
-      a.className='nav-perle';
-      a.textContent='💎 Trouvez la perle rare';
-      a.title='Découvrez les talents et initiatives de la diaspora';
-      a.style.cssText='background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff !important;padding:5px 12px;border-radius:8px;font-weight:700;';
-      var form=nav.querySelector('a[href="formations.html"]');
-      if(form) form.insertAdjacentElement('afterend', a);
-      else nav.appendChild(a);
-    });
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', run);
-  else run();
-  setTimeout(run, 600);
-})();
-
 /* ── Support technique : bouton flottant present partout ou app.js est charge ──
    Injecte dynamiquement assets/support-technique.js une seule fois, evitant
    d'editer chaque page HTML individuellement (cf. module Support technique). ── */

@@ -3313,6 +3313,42 @@ db.exec(`
   db.prepare("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES (?,'utilisateur','gratuit',0,'EUR',1)").run(def.id);
 })();
 
+/* Accréditation "Utilisateur Abonné" : débloque Réseau Pro, Business Plans, Mes projets
+   pour les comptes Utilisateur individuels. Paiement carte bancaire (Stripe), auto-activée
+   au paiement (pas de validation admin). Une seule ligne accred_tarifs par rôle (contrainte
+   UNIQUE(accred_id,role)) : on stocke le prix mensuel + une réduction annuelle en %, le prix
+   annuel (50€, soit -16.5% vs 12×4.99€) se calcule à la volée — même pattern que le
+   calculateur d'abonnement déjà utilisé dans dashboard-administrateur.html. */
+;(function seedUtilisateurAbonne() {
+  const exists = db.prepare("SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'").get();
+  if (exists) return;
+  const insD = db.prepare(`INSERT OR IGNORE INTO accred_definitions
+    (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+  const insR = db.prepare(`INSERT OR IGNORE INTO accred_regles (accred_id,role,mode) VALUES (?,?,?)`);
+  const insT = db.prepare(`INSERT OR IGNORE INTO accred_tarifs
+    (accred_id,role,type_tarif,montant,devise,validation_admin,reduction_annuelle_pct) VALUES (?,?,?,?,?,?,?)`);
+  insD.run('utilisateur_abonne','Utilisateur Abonné','⭐',
+    "Abonnement individuel qui débloque le Réseau Pro, les Business Plans et Mes projets.",
+    JSON.stringify(['Accès au Réseau Pro','Création de Business Plans','Création de projets']),
+    '#7c3aed','#f5f3ff','#7c3aed','#4c1d95','compte_utilisateur', 1);
+  const { id } = db.prepare("SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'").get();
+  insR.run(id,'utilisateur','automatique');
+  insT.run(id,'utilisateur','mensuel',4.99,'EUR',0,16.5);
+})();
+
+/* Fix-up idempotent : corrige les bases où le premier seed a partiellement échoué
+   (mode='payant' invalide dans accred_regles, 2e ligne accred_tarifs rejetée par
+   UNIQUE(accred_id,role)) avant la correction du bug ci-dessus. */
+;(function fixUtilisateurAbonne() {
+  const def = db.prepare("SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'").get();
+  if (!def) return;
+  const regle = db.prepare("SELECT id FROM accred_regles WHERE accred_id=? AND role='utilisateur'").get(def.id);
+  if (!regle) db.prepare("INSERT INTO accred_regles (accred_id,role,mode) VALUES (?,'utilisateur','automatique')").run(def.id);
+  const tarif = db.prepare("SELECT id,reduction_annuelle_pct FROM accred_tarifs WHERE accred_id=? AND role='utilisateur'").get(def.id);
+  if (tarif && !tarif.reduction_annuelle_pct) db.prepare("UPDATE accred_tarifs SET reduction_annuelle_pct=16.5 WHERE id=?").run(tarif.id);
+})();
+
 /* ===== MOTEUR ACCRÉDITATIONS v2 : audit + champs étendus + packs ===== */
 
 /* Extension de accred_definitions */
@@ -3535,6 +3571,30 @@ db.exec(`
 
 /* Extension user_accreditations : lier à la feature si accred donne accès à une feature */
 try { db.exec("ALTER TABLE user_accreditations ADD COLUMN feature_slug TEXT"); } catch(_) {}
+
+/* Extension user_accreditations : suivi de l'abonnement Stripe (accréditations payantes récurrentes) */
+try { db.exec("ALTER TABLE user_accreditations ADD COLUMN stripe_subscription_id TEXT"); } catch(_) {}
+try { db.exec("ALTER TABLE user_accreditations ADD COLUMN stripe_customer_id TEXT"); } catch(_) {}
+
+/* Paiements d'accréditations payantes (Stripe Checkout) */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS accred_paiements (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id           INTEGER NOT NULL,
+    accred_id         INTEGER NOT NULL,
+    type_tarif        TEXT NOT NULL,
+    montant           REAL NOT NULL,
+    devise            TEXT DEFAULT 'EUR',
+    statut            TEXT NOT NULL DEFAULT 'en_attente'
+                       CHECK(statut IN ('en_attente','paye','echoue')),
+    stripe_session_id TEXT,
+    stripe_subscription_id TEXT,
+    created_at        TEXT DEFAULT (datetime('now')),
+    updated_at        TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id)   REFERENCES users(id),
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id)
+  );
+`);
 
 /* Seed initial du Feature Registry */
 ;(function seedFeatureRegistry() {

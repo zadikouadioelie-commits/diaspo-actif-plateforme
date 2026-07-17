@@ -2168,6 +2168,71 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
   }
 });
 
+/* ── Paiement d'une accréditation payante (ex. Utilisateur Abonné) — one-off ou subscription ── */
+route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const def = await getAccredDef(params.type);
+  if (!def) return sendJSON(res, 404, { error: "Accréditation introuvable." });
+  const typeTarif = body.type_tarif === 'annuel' ? 'annuel' : 'mensuel';
+  // Une seule ligne accred_tarifs par rôle (UNIQUE(accred_id,role)) : elle peut être stockée
+  // en mensuel ou en annuel selon comment l'admin l'a configurée. On dérive le prix de
+  // l'autre période via reduction_annuelle_pct — même calcul que le panneau admin.
+  const tarifRow = (def.tarifs || []).find(t => t.role === user.role);
+  if (!tarifRow) return sendJSON(res, 400, { error: "Aucun tarif disponible pour votre type de compte." });
+  const reduc = Number(tarifRow.reduction_annuelle_pct) || 0;
+  let montant;
+  if (tarifRow.type_tarif === typeTarif) {
+    montant = Number(tarifRow.montant);
+  } else if (tarifRow.type_tarif === 'mensuel' && typeTarif === 'annuel') {
+    montant = Number(tarifRow.montant) * 12 * (1 - reduc / 100);
+  } else if (tarifRow.type_tarif === 'annuel' && typeTarif === 'mensuel') {
+    montant = (Number(tarifRow.montant) * (1 - reduc / 100)) / 12;
+  } else {
+    return sendJSON(res, 400, { error: "Ce type de formule n'est pas disponible." });
+  }
+  montant = Math.round(montant * 100) / 100;
+  const tarif = { montant, devise: tarifRow.devise || 'EUR' };
+
+  const dejaActive = await hasAccreditation(user.id, def.type);
+  if (dejaActive) return sendJSON(res, 400, { error: "Vous êtes déjà abonné." });
+
+  const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+
+  const paiementId = (await db.prepare(`
+    INSERT INTO accred_paiements (user_id, accred_id, type_tarif, montant, devise, statut)
+    VALUES (?,?,?,?,?,'en_attente')
+  `).run(user.id, def.id, typeTarif, tarif.montant, tarif.devise || 'EUR')).lastInsertRowid;
+
+  const origin = getOrigin(req);
+  const interval = typeTarif === 'annuel' ? 'year' : 'month';
+  try {
+    const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: stripeCustomerId,
+      line_items: [{
+        price_data: {
+          currency: (tarif.devise || "EUR").toLowerCase(),
+          unit_amount: Math.round(tarif.montant * 100),
+          recurring: { interval },
+          product_data: { name: def.label },
+        },
+        quantity: 1,
+      }],
+      metadata: { diaspoactif_accred_paiement_id: String(paiementId), diaspoactif_accred_user_id: String(user.id), diaspoactif_accred_def_id: String(def.id) },
+      success_url: `${origin}/dashboard-utilisateur.html?abonnement=succes&paiement_id=${paiementId}`,
+      cancel_url: `${origin}/dashboard-utilisateur.html?abonnement=annule&paiement_id=${paiementId}`,
+    });
+    await db.prepare(`UPDATE accred_paiements SET stripe_session_id=? WHERE id=?`).run(session.id, paiementId);
+    return sendJSON(res, 201, { ok: true, id: paiementId, checkout_url: session.url });
+  } catch (e) {
+    await db.prepare(`UPDATE accred_paiements SET statut='echoue' WHERE id=?`).run(paiementId);
+    return sendJSON(res, 500, SEC.safeError(e, "accred-payer"));
+  }
+});
+
 /* ── Moyens de paiement enregistrés (cartes Stripe réutilisables) ── */
 route("GET", "/api/paiement/moyens", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -5408,6 +5473,27 @@ async function hasAccreditation(userId, type) {
   return !!nouv;
 }
 
+/* Gate "Utilisateur Abonné" — Réseau Pro, Business Plans, Mes projets.
+   Ne s'applique qu'aux comptes de rôle 'utilisateur' (les autres rôles ne sont pas concernés
+   par cette accréditation). Retourne true si l'accès est autorisé, sinon répond 402 et retourne false. */
+async function requireUtilisateurAbonne(user, res) {
+  if (user.role !== 'utilisateur') return true;
+  const ok = await hasAccreditation(user.id, 'utilisateur_abonne');
+  if (!ok) {
+    sendJSON(res, 402, { error: "Ce module est réservé aux comptes Utilisateur Abonné.", accred_type: 'utilisateur_abonne' });
+    return false;
+  }
+  return true;
+}
+
+/* Middleware Express équivalent, pour les routes Business Plans (app.get/post/put/delete + requireAuth) */
+async function requireUtilisateurAbonneMw(req, res, next) {
+  const user = req.user || await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!(await requireUtilisateurAbonne(user, res))) return;
+  next();
+}
+
 /* ── Besoins en formation (la communauté exprime un besoin, formateurs/diasportifs peuvent voter) ── */
 
 /* GET /api/formation-besoins — liste des besoins avec nombre de votes (+ mon vote éventuel) */
@@ -7700,6 +7786,27 @@ async function handleStripeWebhook(req, res) {
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_adhesion_paiement_id) {
       const paiementId = Number(event.data.object.metadata.diaspoactif_adhesion_paiement_id);
       await db.prepare(`UPDATE adhesion_paiements SET statut='echoue' WHERE id=? AND statut='en_attente'`).run(paiementId);
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_accred_paiement_id) {
+      /* Paiement d'une accréditation payante confirmé (ex. Utilisateur Abonné). Auto-active
+         immédiatement — pas de validation admin pour ce type d'accréditation. Idempotent. */
+      const paiementId = Number(event.data.object.metadata.diaspoactif_accred_paiement_id);
+      const session = event.data.object;
+      const pay = await db.prepare(`SELECT * FROM accred_paiements WHERE id=? AND statut='en_attente'`).get(paiementId);
+      if (pay) {
+        await db.prepare(`UPDATE accred_paiements SET statut='paye', stripe_subscription_id=?, updated_at=datetime('now') WHERE id=?`)
+          .run(session.subscription || null, paiementId);
+        await db.prepare(`
+          INSERT INTO user_accreditations (user_id, accred_id, statut, type_tarif, montant_paye, stripe_customer_id, stripe_subscription_id)
+          VALUES (?,?,'active',?,?,?,?)
+          ON CONFLICT(user_id, accred_id) DO UPDATE SET statut='active', type_tarif=excluded.type_tarif,
+            montant_paye=excluded.montant_paye, stripe_customer_id=excluded.stripe_customer_id,
+            stripe_subscription_id=excluded.stripe_subscription_id, updated_at=datetime('now')
+        `).run(pay.user_id, pay.accred_id, pay.type_tarif, pay.montant, session.customer || null, session.subscription || null);
+        creerNotif(pay.user_id, "accred_abonnement", "Abonnement activé ⭐", "Votre abonnement est actif : Réseau Pro, Business Plans et Mes projets sont débloqués.", { accred_id: pay.accred_id });
+      }
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_accred_paiement_id) {
+      const paiementId = Number(event.data.object.metadata.diaspoactif_accred_paiement_id);
+      await db.prepare(`UPDATE accred_paiements SET statut='echoue' WHERE id=? AND statut='en_attente'`).run(paiementId);
     } else if (event.type === "invoice.payment_succeeded" && event.data.object.subscription) {
       const invoice = event.data.object;
       const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);
@@ -7739,6 +7846,11 @@ async function handleStripeWebhook(req, res) {
             `Votre cotisation a été renouvelée. Reçu ${numeroRecu}.`, { membre_id: adhMembre.id });
         }
       }
+      /* Renouvellement de l'abonnement Utilisateur Abonné (hors 1ère facture) */
+      const accredUA = await db.prepare("SELECT * FROM user_accreditations WHERE stripe_subscription_id=?").get(invoice.subscription);
+      if (accredUA && invoice.billing_reason !== "subscription_create") {
+        await db.prepare(`UPDATE user_accreditations SET statut='active', updated_at=datetime('now') WHERE id=?`).run(accredUA.id);
+      }
     } else if (event.type === "invoice.payment_failed" && event.data.object.subscription) {
       const invoice = event.data.object;
       const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);
@@ -7759,6 +7871,7 @@ async function handleStripeWebhook(req, res) {
       const sub = event.data.object;
       await db.prepare(`UPDATE pub_abonnements SET statut='canceled', updated_at=datetime('now') WHERE stripe_subscription_id=?`).run(sub.id);
       await db.prepare(`UPDATE adhesion_membres SET statut='non_a_jour', updated_at=datetime('now') WHERE stripe_subscription_id=?`).run(sub.id);
+      await db.prepare(`UPDATE user_accreditations SET statut='expiree', updated_at=datetime('now') WHERE stripe_subscription_id=?`).run(sub.id);
     } else if (event.type === "account.updated") {
       const account = event.data.object;
       const row = await db.prepare("SELECT initiative_id FROM stripe_connect_accounts WHERE stripe_account_id=?").get(account.id);
@@ -14301,6 +14414,13 @@ ${jsonLd}
       rejete:       ['en_attente']
     };
 
+    /* Gate abonnement — Mes projets réservé aux comptes Utilisateur Abonné (n'affecte pas
+       collectivite/administrateur, qui utilisent ce module pour leur propre rôle). */
+    if (pathname.startsWith('/api/projets')) {
+      const gateUser = await getCurrentUser(req);
+      if (gateUser && !(await requireUtilisateurAbonne(gateUser, res))) return;
+    }
+
     /* GET /api/projets — liste selon rôle */
     if (req.method === 'GET' && pathname === '/api/projets') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
@@ -17803,6 +17923,13 @@ ${jsonLd}
         nb_recommandations: await countRecos(row.id),
         nb_affiliations: (await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(row.id))?.c || 0,
       };
+    }
+
+    /* Gate abonnement — Réseau Pro réservé aux comptes Utilisateur Abonné (les autres rôles
+       ne sont pas concernés, voir requireUtilisateurAbonne). Couvre toutes les routes /api/reseau*. */
+    if (pathname.startsWith("/api/reseau")) {
+      const gateUser = await getCurrentUser(req);
+      if (gateUser && !(await requireUtilisateurAbonne(gateUser, res))) return;
     }
 
     /* GET /api/reseau — recherche d'initiatives immatriculées */
@@ -23625,7 +23752,7 @@ async function checkBPCompletude(sections) {
 }
 
 /* ---- Liste des business plans ---- */
-app.get('/api/business-plans', requireAuth, async (req, res) => {
+app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const rows = await db.prepare(`
     SELECT bp.*, u.nom as owner_nom, u.prenom as owner_prenom,
       (SELECT COUNT(*) FROM bp_collaborateurs bc WHERE bc.bp_id=bp.id) as nb_collab
@@ -23646,7 +23773,7 @@ app.get('/api/business-plans', requireAuth, async (req, res) => {
 });
 
 /* ---- Créer un business plan ---- */
-app.post('/api/business-plans', requireAuth, async (req, res) => {
+app.post('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const body = await parseBody(req);
   const { nom_projet='Sans titre', type_initiative='startup', template='startup', secteur='' } = body;
   const r = db.prepare(`
@@ -23659,7 +23786,7 @@ app.post('/api/business-plans', requireAuth, async (req, res) => {
 });
 
 /* ---- Lire un business plan ---- */
-app.get('/api/business-plans/:id', requireAuth, async (req, res) => {
+app.get('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Plan introuvable' });
   // Vérifier accès (propriétaire ou collaborateur)
@@ -23672,7 +23799,7 @@ app.get('/api/business-plans/:id', requireAuth, async (req, res) => {
 });
 
 /* ---- Mise à jour (auto-save) ---- */
-app.put('/api/business-plans/:id', requireAuth, async (req, res) => {
+app.put('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Plan introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
@@ -23708,7 +23835,7 @@ app.put('/api/business-plans/:id', requireAuth, async (req, res) => {
 });
 
 /* ---- Supprimer ---- */
-app.delete('/api/business-plans/:id', requireAuth, async (req, res) => {
+app.delete('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
   await db.prepare('DELETE FROM business_plans WHERE id=?').run(bp.id);
@@ -23716,7 +23843,7 @@ app.delete('/api/business-plans/:id', requireAuth, async (req, res) => {
 });
 
 /* ---- Dupliquer ---- */
-app.post('/api/business-plans/:id/duplicate', requireAuth, async (req, res) => {
+app.post('/api/business-plans/:id/duplicate', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
@@ -23729,7 +23856,7 @@ app.post('/api/business-plans/:id/duplicate', requireAuth, async (req, res) => {
 });
 
 /* ---- Versions ---- */
-app.get('/api/business-plans/:id/versions', requireAuth, async (req, res) => {
+app.get('/api/business-plans/:id/versions', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
@@ -23742,7 +23869,7 @@ app.get('/api/business-plans/:id/versions', requireAuth, async (req, res) => {
   sendJSON(res, 200, versions);
 });
 
-app.post('/api/business-plans/:id/versions', requireAuth, async (req, res) => {
+app.post('/api/business-plans/:id/versions', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   if (bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
@@ -23757,7 +23884,7 @@ app.post('/api/business-plans/:id/versions', requireAuth, async (req, res) => {
   sendJSON(res, 201, { version: newVer });
 });
 
-app.get('/api/business-plans/:id/versions/:v', requireAuth, async (req, res) => {
+app.get('/api/business-plans/:id/versions/:v', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
@@ -23768,7 +23895,7 @@ app.get('/api/business-plans/:id/versions/:v', requireAuth, async (req, res) => 
 });
 
 /* ---- Restaurer une version ---- */
-app.post('/api/business-plans/:id/versions/:v/restore', requireAuth, async (req, res) => {
+app.post('/api/business-plans/:id/versions/:v/restore', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
   const ver = await db.prepare('SELECT * FROM bp_versions WHERE bp_id=? AND version=?').get(req.params.id, req.params.v);
@@ -23782,7 +23909,7 @@ app.post('/api/business-plans/:id/versions/:v/restore', requireAuth, async (req,
 });
 
 /* ---- Complétude ---- */
-app.get('/api/business-plans/:id/completude', requireAuth, async (req, res) => {
+app.get('/api/business-plans/:id/completude', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
@@ -23792,7 +23919,7 @@ app.get('/api/business-plans/:id/completude', requireAuth, async (req, res) => {
 });
 
 /* ---- Collaborateurs ---- */
-app.get('/api/business-plans/:id/collaborateurs', requireAuth, async (req, res) => {
+app.get('/api/business-plans/:id/collaborateurs', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   if (bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
@@ -23804,7 +23931,7 @@ app.get('/api/business-plans/:id/collaborateurs', requireAuth, async (req, res) 
   sendJSON(res, 200, list);
 });
 
-app.post('/api/business-plans/:id/collaborateurs', requireAuth, async (req, res) => {
+app.post('/api/business-plans/:id/collaborateurs', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
   const { user_id, role='lecteur' } = await parseBody(req);
@@ -23816,7 +23943,7 @@ app.post('/api/business-plans/:id/collaborateurs', requireAuth, async (req, res)
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
 });
 
-app.delete('/api/business-plans/:id/collaborateurs/:uid', requireAuth, async (req, res) => {
+app.delete('/api/business-plans/:id/collaborateurs/:uid', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
   await db.prepare('DELETE FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').run(req.params.id, req.params.uid);
@@ -23824,7 +23951,7 @@ app.delete('/api/business-plans/:id/collaborateurs/:uid', requireAuth, async (re
 });
 
 /* ---- Commentaires par section ---- */
-app.get('/api/business-plans/:id/commentaires/:section', requireAuth, async (req, res) => {
+app.get('/api/business-plans/:id/commentaires/:section', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
@@ -23837,7 +23964,7 @@ app.get('/api/business-plans/:id/commentaires/:section', requireAuth, async (req
   sendJSON(res, 200, list);
 });
 
-app.post('/api/business-plans/:id/commentaires/:section', requireAuth, async (req, res) => {
+app.post('/api/business-plans/:id/commentaires/:section', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
@@ -24253,7 +24380,7 @@ async function getProgressReport(bp, sections) {
 }
 
 /* ── Route : message à l'assistant BP ── */
-app.post('/api/business-plans/:id/assistant', requireAuth, async (req, res) => {
+app.post('/api/business-plans/:id/assistant', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Plan introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
@@ -24285,7 +24412,7 @@ app.post('/api/business-plans/:id/assistant', requireAuth, async (req, res) => {
 });
 
 /* ── Route : historique assistant BP ── */
-app.get('/api/business-plans/:id/assistant/history', requireAuth, async (req, res) => {
+app.get('/api/business-plans/:id/assistant/history', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const conv = await db.prepare('SELECT * FROM bp_assistant_conv WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);

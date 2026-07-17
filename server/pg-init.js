@@ -638,6 +638,10 @@ async function migratePg(pool) {
     ['accred_definitions', 'controle_documentaire', 'INTEGER DEFAULT 0'],
     ['accred_definitions', 'date_application', 'TEXT'],
     ['accred_tarifs', 'reduction_annuelle_pct', 'REAL DEFAULT 0'],
+    // Abonnement Utilisateur Premium — suivi Stripe
+    ['user_accreditations', 'feature_slug', 'TEXT'],
+    ['user_accreditations', 'stripe_subscription_id', 'TEXT'],
+    ['user_accreditations', 'stripe_customer_id', 'TEXT'],
   ];
   for (const [table, col, type] of cols) {
     try {
@@ -683,6 +687,44 @@ async function migratePg(pool) {
       console.log('[pg-init] Accréditation "createur_formations" seedée (id=' + defId + ').');
     }
   } catch (e) { console.error('[pg-init migration] seed createur_formations:', e.message); }
+
+  /* ── Accréditation "Utilisateur Abonné" — même bug racine que createur_formations :
+     le seed dans db.js (seedUtilisateurAbonne) ne s'exécute que via better-sqlite3, jamais
+     contre Postgres. Idempotent via ON CONFLICT (type) DO NOTHING. */
+  try {
+    const { rows: insRows } = await pool.query(
+      `INSERT INTO accred_definitions
+        (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (type) DO NOTHING RETURNING id`,
+      [
+        'utilisateur_abonne', 'Utilisateur Abonné', '⭐',
+        "Abonnement individuel qui débloque le Réseau Pro, les Business Plans et Mes projets.",
+        JSON.stringify(['Accès au Réseau Pro','Création de Business Plans','Création de projets']),
+        '#7c3aed', '#f5f3ff', '#7c3aed', '#4c1d95', 'compte_utilisateur', 1,
+      ]
+    );
+    if (insRows[0]) {
+      const defId = insRows[0].id;
+      // Une seule ligne accred_tarifs par rôle (UNIQUE(accred_id,role)) : prix mensuel +
+      // réduction annuelle en %, le prix annuel se calcule à la volée (50€ = -16.5% vs 12×4.99€).
+      await pool.query("INSERT INTO accred_regles (accred_id,role,mode) VALUES ($1,'utilisateur','automatique')", [defId]);
+      await pool.query("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin,reduction_annuelle_pct) VALUES ($1,'utilisateur','mensuel',4.99,'EUR',0,16.5)", [defId]);
+      console.log('[pg-init] Accréditation "utilisateur_abonne" seedée (id=' + defId + ').');
+    }
+  } catch (e) { console.error('[pg-init migration] seed utilisateur_abonne:', e.message); }
+
+  /* Fix-up idempotent (Postgres) : même correction que db.js si le premier déploiement
+     avait tourné avec le bug mode='payant' / double INSERT accred_tarifs. */
+  try {
+    const { rows: uaRows } = await pool.query("SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'");
+    if (uaRows[0]) {
+      const uaId = uaRows[0].id;
+      const { rows: uaRegle } = await pool.query("SELECT id FROM accred_regles WHERE accred_id=$1 AND role='utilisateur'", [uaId]);
+      if (!uaRegle[0]) await pool.query("INSERT INTO accred_regles (accred_id,role,mode) VALUES ($1,'utilisateur','automatique')", [uaId]);
+      await pool.query("UPDATE accred_tarifs SET reduction_annuelle_pct=16.5 WHERE accred_id=$1 AND role='utilisateur' AND (reduction_annuelle_pct IS NULL OR reduction_annuelle_pct=0)", [uaId]);
+    }
+  } catch (e) { console.error('[pg-init migration] fixup utilisateur_abonne:', e.message); }
 
   /* ── Module Accréditations : élargissement des CHECK constraints ──
      Bug réel : compte_accreditations.type / demandes_accreditation.type limitaient les

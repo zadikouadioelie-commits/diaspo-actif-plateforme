@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=1280">
 <link rel="stylesheet" href="assets/styles.v2.css">
 <link rel="stylesheet" href="assets/responsive.css">
+<link rel="stylesheet" href="assets/subscription-required.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1B3A6B">
 <style>
@@ -501,6 +502,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/subscription-required.js"></script>
 <script src="assets/ds.js"></script>
 <script>
 /* ── HELPERS ── */
@@ -519,9 +521,39 @@ let mesListes=[], pendingAddUserId=null, pendingAddUserNom=null;
 const TYPES_ORG=['Association','Entreprise','Fédération','ONG','Institution','Coopérative','Entrepreneur individuel','Fondation','Collectif','Réseau'];
 const SECTEURS=['Action Sociale','Agriculture','Santé','Éducation','Technologie','Culture','Économie','Finance','Droit','Environnement','Commerce','Immobilier','Transport','Tourisme','Médias','Sport','Énergie','Mode','Alimentation','Sécurité'];
 
+/* ── Gate abonnement Utilisateur Premium ── */
+async function checkAccesAbonne(){
+  if(!ME || ME.role!=='utilisateur') return true;
+  try{
+    const {accreditations}=await apiCall('GET','/accreditations/mes');
+    return (accreditations||[]).some(a=>a.type==='utilisateur_abonne' && a.statut==='active');
+  }catch(_){ return true; }
+}
+function afficherUpsellAbonne(){
+  document.querySelectorAll('.page > *:not(header)').forEach(n=>n.remove());
+  const el=document.createElement('div');
+  document.querySelector('.page').appendChild(el);
+  SubscriptionRequiredPage(el, {
+    moduleName: 'Réseau Pro',
+    moduleIcon: '🌐',
+    moduleIllustration: '🌐',
+    moduleDescription: "Recherchez, filtrez et affiliez-vous aux initiatives immatriculées de la diaspora. Le Réseau Pro connecte les porteurs de projets entre eux, partout dans le monde.",
+    fonctionnalites: [
+      'Rechercher des initiatives par secteur, pays ou ville',
+      "S'affilier aux réseaux d'initiatives partenaires",
+      'Recommander une initiative que vous connaissez',
+      'Voir les accréditations officielles de chaque initiative',
+      'Suivre vos demandes et affiliations en cours',
+    ],
+    accredType: 'utilisateur_abonne',
+    retourUrl: 'dashboard-utilisateur.html',
+  });
+}
+
 /* ── INIT ── */
 async function init(){
   ME=await fetchCurrentUser();
+  if(!(await checkAccesAbonne())){ afficherUpsellAbonne(); return; }
   populateFilters();
   await Promise.all([loadAnnuaire(), loadHeroStats()]);
   if(ME){

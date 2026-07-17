@@ -5,6 +5,7 @@
 <title>Diaspo'Actif — Business Plans</title>
 <meta name="viewport" content="width=1280">
 <link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="assets/subscription-required.css">
 <link rel="stylesheet" href="assets/responsive.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
@@ -166,6 +167,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/subscription-required.js"></script>
 <script>
 let me = null;
 let selectedTpl = 'startup';
@@ -290,9 +292,37 @@ document.querySelectorAll('.bp-tab').forEach(t => {
 // Enter dans le modal
 document.getElementById('new-nom').addEventListener('keydown', e => { if(e.key==='Enter') createBP(); });
 
+function afficherUpsellAbonneBP(){
+  document.querySelectorAll('.page > *:not(header)').forEach(n=>n.remove());
+  const el=document.createElement('div');
+  document.querySelector('.page').appendChild(el);
+  SubscriptionRequiredPage(el, {
+    moduleName: 'Business Plans',
+    moduleIcon: '📋',
+    moduleIllustration: '📋',
+    moduleDescription: "Construisez un business plan professionnel et structuré pour convaincre vos partenaires et financeurs — sections guidées, versions, collaborateurs et assistant IA.",
+    fonctionnalites: [
+      'Créer un business plan structuré par sections',
+      'Historique de versions et restauration',
+      'Inviter des collaborateurs et commenter par section',
+      'Suivre la complétude de votre document',
+      "Assistant IA d'aide à la rédaction",
+    ],
+    accredType: 'utilisateur_abonne',
+    retourUrl: 'dashboard-utilisateur.html',
+  });
+}
+
 (async()=>{
   me = await fetchCurrentUser();
   if (!me) { window.location.href='login.html'; return; }
+  if(me.role==='utilisateur'){
+    try{
+      const {accreditations}=await api('GET','/accreditations/mes');
+      const abonne=(accreditations||[]).some(a=>a.type==='utilisateur_abonne' && a.statut==='active');
+      if(!abonne){ afficherUpsellAbonneBP(); return; }
+    }catch(_){}
+  }
   loadBPs();
 })();
 </script>
