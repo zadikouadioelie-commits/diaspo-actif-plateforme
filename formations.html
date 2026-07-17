@@ -1412,12 +1412,12 @@
   });
 
   document.getElementById("btn-creer-formation")?.addEventListener("click", async ()=>{
-    const titre = prompt('Titre de la nouvelle formation :', '');
-    if(titre===null || !titre.trim()) return;
     try {
-      const { id } = await api('POST', '/formations', { titre: titre.trim(), mode_acces: 'gratuit' });
-      showMsg('Formation créée. Complétez librement chaque section.', 'success');
-      openFormationBuilder(id, titre.trim(), 'brouillon');
+      const titre = 'Nouvelle formation';
+      const { id } = await api('POST', '/formations', { titre, mode_acces: 'gratuit' });
+      await openFormationBuilder(id, titre, 'brouillon');
+      document.getElementById('fb-ai-toggle').click(); // ouvre directement l'assistant IA, prêt à décrire la formation
+      document.getElementById('new-form-titre').focus();
     } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
   });
 
