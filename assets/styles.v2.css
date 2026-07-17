@@ -62,7 +62,8 @@ button{font-family:inherit;cursor:pointer;}
 .nav a{font-size:14px;font-weight:600;color:rgba(255,255,255,.8);padding:6px 0;border-bottom:2px solid transparent;}
 .nav a.active,.nav a:hover{color:#fff;border-bottom-color:var(--orange);}
 .topbar-right{display:flex;align-items:center;gap:12px;}
-.lang-select{border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:6px 10px;font-size:12px;font-weight:700;color:#fff;background:rgba(255,255,255,.15);}
+.lang-select{border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:6px 10px;font-size:12px;font-weight:700;color:#000;background:rgba(255,255,255,.85);}
+.lang-select option{color:#000;}
 .role-switch{display:flex;background:rgba(255,255,255,.1);border-radius:30px;padding:3px;gap:2px;border:1px solid rgba(255,255,255,.2);}
 .role-switch button{border:none;background:transparent;padding:6px 12px;border-radius:24px;font-size:12px;font-weight:700;color:rgba(255,255,255,.7);}
 .role-switch button.active{background:#fff;color:var(--navy);}

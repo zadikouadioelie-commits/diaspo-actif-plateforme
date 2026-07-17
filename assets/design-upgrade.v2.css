@@ -112,6 +112,18 @@ a.btn-deconnexion,
 .topbar .btn-primary {
   color: #fff !important;
 }
+/* Exceptions : Déconnexion et sélecteur de langue en encre noire */
+.topbar #logout-link {
+  color: #000 !important;
+  background: #fff !important;
+}
+.topbar #lang-select,
+.topbar #lang-select option {
+  color: #000 !important;
+}
+.topbar #lang-select {
+  background: #fff !important;
+}
 .topbar-inner {
   padding: 12px 24px !important;
 }
