@@ -2853,28 +2853,40 @@ async function initFormations() {
   }
 
   function renderCard(f) {
+    const desc = (f.description_courte || f.description || "").slice(0, 160);
+    let mediaHtml;
+    if (f.image_url) {
+      mediaHtml = `<div class="fc-media" style="background-image:url('${f.image_url}');"></div>`;
+    } else if (f.video_intro) {
+      mediaHtml = `<div class="fc-media fc-media-video"><video src="${f.video_intro}" muted loop playsinline preload="metadata" onmouseover="this.play().catch(()=>{})" onmouseout="this.pause()"></video><span class="fc-play-icon">▶</span></div>`;
+    } else {
+      mediaHtml = `<div class="fc-media fc-media-placeholder"><span>${(f.type_formation || "Formation").charAt(0)}</span></div>`;
+    }
+    const logoHtml = f.logo_url ? `<img class="fc-logo" src="${f.logo_url}" alt="">` : "";
     return `
-    <div class="card formation-card" style="margin-bottom:16px;">
-      <div class="flex-between" style="align-items:flex-start;flex-wrap:wrap;gap:8px;">
-        <div style="flex:1;">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
-            <span class="feed-cat">${f.type_formation || "Formation"}</span>
-            ${f.gratuit ? `<span class="badge badge-asso">Gratuite</span>` : `<span class="badge badge-ent">${(f.prix||0).toFixed(0)} €</span>`}
-            ${f.niveau ? `<span class="tag">${f.niveau}</span>` : ""}
-          </div>
-          <h3 style="margin:0 0 4px;">${f.titre}</h3>
-          <p style="margin:0;color:var(--muted);font-size:13px;">${f.organisme || ""} ${f.domaine ? "· " + f.domaine : ""} ${f.langue ? "· " + f.langue : ""}</p>
+    <div class="card formation-card" style="margin-bottom:16px;padding:0;overflow:hidden;display:flex;flex-wrap:wrap;gap:0;">
+      <div class="fc-media-wrap">
+        ${mediaHtml}
+        ${logoHtml}
+      </div>
+      <div style="flex:1;min-width:240px;padding:16px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+          <span class="feed-cat">${f.type_formation || "Formation"}</span>
+          ${f.gratuit ? `<span class="badge badge-asso">Gratuite</span>` : `<span class="badge badge-ent">${(f.prix||0).toFixed(0)} €</span>`}
+          ${f.niveau ? `<span class="tag">${f.niveau}</span>` : ""}
         </div>
-      </div>
-      ${f.description ? `<p style="margin:10px 0 0;font-size:13.5px;">${f.description}</p>` : ""}
-      <div class="tags" style="margin-top:10px;">
-        ${f.duree ? `<span class="tag">⏱ ${f.duree}</span>` : ""}
-        ${f.places ? `<span class="tag">👥 ${f.places} places</span>` : ""}
-        ${f.nationalite && f.nationalite !== "Toutes nationalités" ? `<span class="tag">🌍 ${f.nationalite}</span>` : ""}
-      </div>
-      <div style="margin-top:12px;display:flex;gap:8px;">
-        <button class="btn btn-orange btn-sm btn-inscrire" data-id="${f.id}" data-titre="${f.titre}">S'inscrire</button>
-        <button class="btn btn-outline btn-sm btn-favori-formation" data-id="${f.id}" title="Ajouter aux favoris">☆</button>
+        <h3 style="margin:0 0 4px;">${f.titre}</h3>
+        <p style="margin:0;color:var(--muted);font-size:13px;">${f.organisme || ""} ${f.domaine ? "· " + f.domaine : ""} ${f.langue ? "· " + f.langue : ""}</p>
+        ${desc ? `<p style="margin:10px 0 0;font-size:13.5px;">${desc}</p>` : ""}
+        <div class="tags" style="margin-top:10px;">
+          ${f.duree ? `<span class="tag">⏱ ${f.duree}</span>` : ""}
+          ${f.places ? `<span class="tag">👥 ${f.places} places</span>` : ""}
+          ${f.nationalite && f.nationalite !== "Toutes nationalités" ? `<span class="tag">🌍 ${f.nationalite}</span>` : ""}
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button class="btn btn-orange btn-sm btn-inscrire" data-id="${f.id}" data-titre="${f.titre}">S'inscrire</button>
+          <button class="btn btn-outline btn-sm btn-favori-formation" data-id="${f.id}" title="Ajouter aux favoris">☆</button>
+        </div>
       </div>
     </div>`;
   }
