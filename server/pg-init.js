@@ -699,6 +699,11 @@ async function migratePg(pool) {
     ['formations', 'formateur_nom', 'TEXT'],
     ['formations', 'date_suppression_prevue', 'TEXT'],
     ['formations', 'suppression_alerte_envoyee', 'INTEGER DEFAULT 0'],
+    ['formations', 'suppression_alerte_7j', 'INTEGER DEFAULT 0'],
+    ['formations', 'suppression_alerte_3j', 'INTEGER DEFAULT 0'],
+    ['formations', 'suppression_alerte_24h', 'INTEGER DEFAULT 0'],
+    ['formations', 'date_archivage', 'TEXT'],
+    ['formations', 'date_suppression_definitive', 'TEXT'],
   ];
   for (const [table, col, type] of cols) {
     try {

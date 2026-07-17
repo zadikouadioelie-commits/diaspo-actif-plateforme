@@ -6030,18 +6030,18 @@ route("POST", "/api/formations/:id/programmer-suppression", async (req, res, par
   if (!date || isNaN(Date.parse(date))) return sendJSON(res, 400, { error: "Date invalide." });
   const minDate = new Date(); minDate.setDate(minDate.getDate() + 7); minDate.setHours(0,0,0,0);
   if (new Date(date) < minDate) return sendJSON(res, 400, { error: "La date de suppression doit être au minimum une semaine après aujourd'hui." });
-  await db.prepare("UPDATE formations SET date_suppression_prevue=?, suppression_alerte_envoyee=0 WHERE id=?").run(date, params.id);
+  await db.prepare("UPDATE formations SET date_suppression_prevue=?, suppression_alerte_7j=0, suppression_alerte_3j=0, suppression_alerte_24h=0 WHERE id=?").run(date, params.id);
   sendJSON(res, 200, { ok: true });
 });
 
-/* Annuler une suppression programmée */
+/* Annuler une suppression programmée (réouvre les inscriptions) */
 route("DELETE", "/api/formations/:id/programmer-suppression", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
-  await db.prepare("UPDATE formations SET date_suppression_prevue=NULL, suppression_alerte_envoyee=0 WHERE id=?").run(params.id);
+  await db.prepare("UPDATE formations SET date_suppression_prevue=NULL, suppression_alerte_7j=0, suppression_alerte_3j=0, suppression_alerte_24h=0 WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -6420,6 +6420,7 @@ route("POST", "/api/formations/:id/inscrire", async (req, res, params, body) => 
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f || f.statut !== 'publiee') return sendJSON(res, 404, { error: "Formation introuvable ou non publiée." });
+  if (f.date_suppression_prevue) return sendJSON(res, 400, { error: "Les inscriptions sont fermées : cette formation sera bientôt retirée du catalogue." });
   const deja = await db.prepare("SELECT id FROM formation_inscriptions WHERE formation_id=? AND user_id=?").get(params.id, user.id);
   if (deja) return sendJSON(res, 409, { error: "Déjà inscrit." });
   let montant = 0, acces_gratuit = 0, code_valide = null;
@@ -13895,54 +13896,77 @@ async function handleRequest(req, res) {
     return;
   }
 
-  /* ── Suppressions programmées de formations publiées (Vercel Cron, quotidien) ──
-     À J-7 avant la date choisie : alerte tous les élèves inscrits (notification + email).
-     À la date choisie (ou après) : suppression effective en cascade. */
+  /* ── Cycle de vie des suppressions de formations publiées (Vercel Cron, quotidien) ──
+     Rappels à J-7, J-3 et J-24h avant la date choisie (notification + email).
+     À la date choisie : la formation est ARCHIVÉE (pas supprimée) — retirée du catalogue et des
+     inscriptions, mais son contenu/statistiques/certificats sont conservés pour traçabilité.
+     Après le délai de rétention (par défaut 60 jours après l'archivage) : suppression définitive. */
   if (pathname === '/api/cron/formation-suppressions') {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.headers['authorization'] || '';
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       return sendJSON(res, 401, { error: "Non autorisé." });
     }
+    const RETENTION_JOURS = 60;
     try {
       const { sendEmail } = require('./mailer');
-      const formations = await db.prepare(`
-        SELECT * FROM formations WHERE date_suppression_prevue IS NOT NULL
-      `).all();
-      let alertesEnvoyees = 0, suppressions = 0;
       const now = new Date();
+
+      /* 1) Formations en attente d'archivage (suppression programmée) */
+      const formations = await db.prepare(`
+        SELECT * FROM formations WHERE date_suppression_prevue IS NOT NULL AND statut != 'archivee'
+      `).all();
+      let alertesEnvoyees = 0, archivages = 0;
       for (const f of formations) {
         const dateSuppr = new Date(f.date_suppression_prevue);
         const joursRestants = Math.round((dateSuppr - now) / 86400000);
 
         if (joursRestants <= 0) {
-          await cascadeDeleteFormation(f.id);
-          suppressions++;
+          const dateArchivage = now.toISOString();
+          const dateSupprDef = new Date(now.getTime() + RETENTION_JOURS*86400000).toISOString();
+          await db.prepare("UPDATE formations SET statut='archivee', date_archivage=?, date_suppression_definitive=? WHERE id=?").run(dateArchivage, dateSupprDef, f.id);
+          archivages++;
           continue;
         }
 
-        if (joursRestants <= 7 && !f.suppression_alerte_envoyee) {
-          const eleves = await db.prepare(`
-            SELECT i.user_id, u.email, u.nom FROM formation_inscriptions i
-            JOIN users u ON u.id=i.user_id
-            WHERE i.formation_id=? AND i.statut='active'
-          `).all(f.id);
-          for (const e of eleves) {
-            creerNotif(e.user_id, 'formation',
-              `« ${f.titre} » ne sera bientôt plus accessible`,
-              `Cette formation sera supprimée le ${f.date_suppression_prevue.slice(0,10)}. Terminez-la avant cette date pour obtenir votre certification si vous êtes proche de la fin.`,
-              { formation_id: f.id });
-            if (e.email) {
-              sendEmail(e.email, `« ${f.titre} » ne sera bientôt plus accessible`,
-                `Bonjour ${e.nom||''},\n\nLa formation « ${f.titre} » que vous suivez sur Diaspo'Actif sera supprimée le ${f.date_suppression_prevue.slice(0,10)} (dans ${joursRestants} jour${joursRestants>1?'s':''}).\n\nSi vous êtes proche de la fin, nous vous invitons à terminer la formation avant cette date afin d'obtenir votre certification.\n\nL'équipe Diaspo'Actif`
-              ).catch(()=>{});
-            }
+        let niveau = null;
+        if (joursRestants <= 7 && !f.suppression_alerte_7j) niveau = '7j';
+        else if (joursRestants <= 3 && !f.suppression_alerte_3j) niveau = '3j';
+        else if (joursRestants <= 1 && !f.suppression_alerte_24h) niveau = '24h';
+        if (!niveau) continue;
+
+        const eleves = await db.prepare(`
+          SELECT i.user_id, u.email, u.nom FROM formation_inscriptions i
+          JOIN users u ON u.id=i.user_id
+          WHERE i.formation_id=? AND i.statut='active'
+        `).all(f.id);
+        for (const e of eleves) {
+          creerNotif(e.user_id, 'formation',
+            `« ${f.titre} » ne sera bientôt plus accessible`,
+            `Cette formation sera retirée du catalogue le ${f.date_suppression_prevue.slice(0,10)}. Nous vous invitons à terminer votre parcours avant cette date afin de conserver votre progression et d'obtenir votre certificat.`,
+            { formation_id: f.id });
+          if (e.email) {
+            sendEmail(e.email, `« ${f.titre} » ne sera bientôt plus accessible`,
+              `Bonjour ${e.nom||''},\n\nLa formation « ${f.titre} » que vous suivez sur Diaspo'Actif sera retirée du catalogue le ${f.date_suppression_prevue.slice(0,10)} (dans ${joursRestants} jour${joursRestants>1?'s':''}).\n\nNous vous invitons à terminer votre parcours avant cette date afin de conserver votre progression et d'obtenir votre certificat.\n\nL'équipe Diaspo'Actif`
+            ).catch(()=>{});
           }
-          await db.prepare("UPDATE formations SET suppression_alerte_envoyee=1 WHERE id=?").run(f.id);
-          alertesEnvoyees++;
         }
+        const col = niveau === '7j' ? 'suppression_alerte_7j' : niveau === '3j' ? 'suppression_alerte_3j' : 'suppression_alerte_24h';
+        await db.prepare(`UPDATE formations SET ${col}=1 WHERE id=?`).run(f.id);
+        alertesEnvoyees++;
       }
-      sendJSON(res, 200, { ok: true, alertesEnvoyees, suppressions });
+
+      /* 2) Formations archivées dont le délai de rétention est écoulé : suppression définitive */
+      const aSupprimer = await db.prepare(`
+        SELECT id FROM formations WHERE statut='archivee' AND date_suppression_definitive IS NOT NULL AND date_suppression_definitive <= ?
+      `).all(now.toISOString());
+      let suppressions = 0;
+      for (const f of aSupprimer) {
+        await cascadeDeleteFormation(f.id);
+        suppressions++;
+      }
+
+      sendJSON(res, 200, { ok: true, alertesEnvoyees, archivages, suppressions });
     } catch (e) {
       sendJSON(res, 500, SEC.safeError(e, "cron formation-suppressions"));
     }

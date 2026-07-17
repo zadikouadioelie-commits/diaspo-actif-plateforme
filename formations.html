@@ -264,6 +264,25 @@
         </div>
       </div>
 
+      <!-- Modal Suppression programmée d'une formation publiée -->
+      <div id="modal-suppr-programmee" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;overflow-y:auto;">
+        <div class="card" style="max-width:480px;margin:60px auto;padding:24px;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <h2 style="margin:0;">🗑️ Programmer la suppression</h2>
+            <button class="btn btn-sm btn-outline" id="modal-suppr-close">✕ Fermer</button>
+          </div>
+          <p style="font-size:13.5px;color:var(--muted);margin:0 0 14px;" id="suppr-formation-titre"></p>
+          <div class="notice" style="margin-bottom:14px;">Cette formation est publiée et suivie par des élèves. Une fois la suppression programmée, les nouvelles inscriptions sont automatiquement fermées ; les élèves déjà inscrits gardent l'accès jusqu'à la date choisie et recevront des rappels (J-7, J-3, J-24h) pour terminer leur parcours.</div>
+          <label style="font-size:13px;font-weight:700;">Date de suppression <span class="fb-help" title="Préavis minimum d'une semaine à partir d'aujourd'hui. Vous pouvez choisir une date plus éloignée si vous préférez laisser plus de temps aux élèves.">?</span></label>
+          <input type="date" id="suppr-date-input" class="input-field" style="width:100%;margin-top:6px;">
+          <div id="suppr-date-error" style="color:#D33;font-size:12.5px;display:none;margin-top:6px;"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+            <button class="btn btn-sm btn-outline" id="suppr-annuler-btn">Annuler</button>
+            <button class="btn btn-sm" style="background:#dc2626;color:#fff;" id="suppr-confirmer-btn">Programmer la suppression</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ════ Éditeur de contenu complet d'une formation (menu latéral libre : infos, contenu, quiz, certificat, accès, aperçu, soumission) ════ -->
       <div id="fb-view" style="display:none;">
         <button class="btn btn-sm btn-outline" id="fb-back" style="margin-bottom:14px;">← Retour à mes formations</button>
@@ -1691,28 +1710,43 @@
     loadDashboardCentreCommande();
   }
 
-  async function handleSupprimerFormation(id, titre, statut){
+  let suppressionCtx = null;
+  function handleSupprimerFormation(id, titre, statut){
     if(statut !== 'publiee'){
       if(!confirm(`Supprimer définitivement « ${titre} » ? Cette action est immédiate et irréversible.`)) return;
-      try { await api('DELETE', `/formations/${id}`); showMsg('Formation supprimée.', 'success'); loadMesFormations(); }
-      catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+      api('DELETE', `/formations/${id}`).then(()=>{ showMsg('Formation supprimée.', 'success'); loadMesFormations(); })
+        .catch(e=> showMsg(e.message||'Erreur.', 'danger'));
       return;
     }
-    // Formation publiée : suppression programmée avec préavis minimum d'une semaine
+    // Formation publiée : suppression programmée avec préavis minimum d'une semaine (calendrier)
+    suppressionCtx = { id, titre };
     const minDate = new Date(); minDate.setDate(minDate.getDate() + 7);
     const minStr = minDate.toISOString().slice(0,10);
-    const saisie = prompt(`Cette formation est publiée et suivie par des élèves. Choisissez une date de suppression (préavis minimum d'une semaine).\nUn message d'alerte sera envoyé aux élèves inscrits 7 jours avant cette date.\n\nDate minimale : ${minStr}\nFormat : AAAA-MM-JJ`, minStr);
-    if(saisie === null) return;
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(saisie) || saisie < minStr){
-      showMsg(`Date invalide. Elle doit être au format AAAA-MM-JJ et au minimum le ${minStr}.`, 'danger');
+    document.getElementById('suppr-formation-titre').textContent = `Formation : « ${titre} »`;
+    const input = document.getElementById('suppr-date-input');
+    input.min = minStr;
+    input.value = minStr;
+    document.getElementById('suppr-date-error').style.display = 'none';
+    document.getElementById('modal-suppr-programmee').style.display = 'block';
+  }
+  document.getElementById('modal-suppr-close').addEventListener('click', ()=>{ document.getElementById('modal-suppr-programmee').style.display = 'none'; });
+  document.getElementById('suppr-annuler-btn').addEventListener('click', ()=>{ document.getElementById('modal-suppr-programmee').style.display = 'none'; });
+  document.getElementById('suppr-confirmer-btn').addEventListener('click', async ()=>{
+    if(!suppressionCtx) return;
+    const input = document.getElementById('suppr-date-input');
+    const errEl = document.getElementById('suppr-date-error');
+    if(!input.value || input.value < input.min){
+      errEl.textContent = `La date doit être au minimum le ${input.min} (préavis d'une semaine).`;
+      errEl.style.display = 'block';
       return;
     }
     try {
-      await api('POST', `/formations/${id}/programmer-suppression`, { date: saisie });
-      showMsg(`Suppression programmée pour le ${saisie}. Les élèves seront alertés 7 jours avant.`, 'success');
+      await api('POST', `/formations/${suppressionCtx.id}/programmer-suppression`, { date: input.value });
+      document.getElementById('modal-suppr-programmee').style.display = 'none';
+      showMsg(`Suppression programmée pour le ${input.value}. Les élèves seront alertés (J-7, J-3, J-24h).`, 'success');
       loadMesFormations();
-    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
-  }
+    } catch(e){ errEl.textContent = e.message||'Erreur.'; errEl.style.display = 'block'; }
+  });
 
   async function loadDashboardCentreCommande(){
     const el = document.getElementById('fb-dash-grid');
@@ -1778,7 +1812,7 @@
     brouillon:'📝 Brouillon', soumise:'📤 Soumise', en_attente:'⏳ En attente de validation',
     en_cours_analyse:"🔍 En cours d'analyse", modifications_demandees:'✏️ Modifications demandées',
     validee:'✅ Validée', programmee:'🗓️ Programmée', publiee:'✅ Publiée',
-    suspendue:'⏸️ Suspendue', refusee:'❌ Refusée'
+    suspendue:'⏸️ Suspendue', refusee:'❌ Refusée', archivee:'🗄️ Archivée'
   };
   let fbFormationId = null;
 
