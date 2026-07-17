@@ -56,6 +56,13 @@
 #fb-tooltip-popup{position:fixed;z-index:9999;max-width:280px;background:#1e293b;color:#fff;font-size:12.5px;font-weight:400;line-height:1.4;padding:10px 12px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);display:none;}
 #fb-tooltip-popup::after{content:'';position:absolute;top:-5px;left:16px;width:10px;height:10px;background:#1e293b;transform:rotate(45deg);}
 #fb-tooltip-popup.open{display:block;}
+.fb-switch{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
+.fb-switch input[type=checkbox]{position:absolute;opacity:0;width:0;height:0;}
+.fb-switch .fb-switch-track{position:relative;width:42px;height:24px;flex-shrink:0;border-radius:99px;background:#cbd5e1;transition:background .18s;}
+.fb-switch .fb-switch-track::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .18s;}
+.fb-switch input[type=checkbox]:checked + .fb-switch-track{background:#ff6b00;}
+.fb-switch input[type=checkbox]:checked + .fb-switch-track::after{transform:translateX(18px);}
+.fb-switch input[type=checkbox]:focus-visible + .fb-switch-track{outline:2px solid #ff6b00;outline-offset:2px;}
 .fb-ai-msg{max-width:85%;padding:8px 11px;border-radius:10px;line-height:1.4;white-space:pre-wrap;}
 .fb-ai-msg.bot{align-self:flex-start;background:#f1f5f9;color:#1e293b;}
 .fb-ai-msg.user{align-self:flex-end;background:#ff6b00;color:#fff;}
@@ -484,7 +491,7 @@
         <!-- Section Tarification -->
         <div class="fb-panel" data-fb-panel="tarification" style="display:none;flex-direction:column;gap:12px;">
             <div style="display:flex;gap:14px;align-items:center;">
-              <label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" id="new-form-gratuit" checked> <span style="font-size:13px;font-weight:700;">Formation gratuite</span></label>
+              <label class="fb-switch"><input type="checkbox" id="new-form-gratuit" checked><span class="fb-switch-track"></span> <span style="font-size:13px;font-weight:700;">Formation gratuite</span></label>
               <span class="fb-help" title="Une formation gratuite est diffusée sans commission Diaspo'Actif. Décochez pour fixer un prix.">?</span>
             </div>
             <div id="mfw-tarif-block" style="display:none;flex-direction:column;gap:12px;">
@@ -569,8 +576,8 @@
         <!-- Onglet Certificat -->
         <div class="fb-panel" data-fb-panel="certificat" style="display:none;">
           <div class="card">
-            <label style="display:flex;gap:8px;align-items:center;font-size:14px;font-weight:700;margin-bottom:14px;">
-              <input type="checkbox" id="fb-cert-actif"> Délivrer un certificat à la fin de cette formation
+            <label class="fb-switch" style="font-size:14px;font-weight:700;margin-bottom:14px;">
+              <input type="checkbox" id="fb-cert-actif"><span class="fb-switch-track"></span> Délivrer un certificat à la fin de cette formation
               <span class="fb-help" title="Un certificat numérique (avec QR de vérification) est généré automatiquement pour chaque apprenant qui termine la formation avec succès.">?</span>
             </label>
             <div id="fb-cert-fields" style="display:none;flex-direction:column;gap:12px;">
