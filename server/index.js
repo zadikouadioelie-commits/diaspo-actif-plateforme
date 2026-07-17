@@ -5912,6 +5912,66 @@ route("GET", "/api/formations/:id/modules", async (req, res, params) => {
   sendJSON(res, 200, { modules });
 });
 function checkFormationOwner(f, user) { return f && (f.owner_user_id === user.id || user.role === 'administrateur'); }
+
+/* ── Espace apprenant : suivre une formation ── */
+route("GET", "/api/formations/:id/suivre", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  const isOwner = checkFormationOwner(f, user);
+  const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active'").get(params.id, user.id);
+  if (!inscription && !isOwner) return sendJSON(res, 403, { error: "Vous devez être inscrit pour accéder à cette formation." });
+
+  const progressionRows = inscription
+    ? await db.prepare("SELECT lecon_id, termine FROM formation_lecons_progression WHERE inscription_id=?").all(inscription.id)
+    : [];
+  const progressionMap = {};
+  progressionRows.forEach(p => { progressionMap[p.lecon_id] = !!p.termine; });
+
+  const modules = await db.prepare("SELECT * FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(params.id);
+  let totalLecons = 0, nbTermine = 0;
+  for (const m of modules) {
+    const chapitres = await db.prepare("SELECT * FROM formation_chapitres WHERE module_id=? ORDER BY ordre ASC, id ASC").all(m.id);
+    for (const c of chapitres) {
+      const lecons = await db.prepare("SELECT * FROM formation_lecons WHERE chapitre_id=? ORDER BY ordre ASC, id ASC").all(c.id);
+      lecons.forEach(l => {
+        l.termine = progressionMap[l.id] || false;
+        totalLecons++;
+        if (l.termine) nbTermine++;
+      });
+      c.lecons = lecons;
+    }
+    m.chapitres = chapitres;
+  }
+  const avancement_pct = totalLecons ? Math.round((nbTermine / totalLecons) * 100) : 0;
+  sendJSON(res, 200, { formation: f, modules, avancement_pct, mode: inscription ? 'apprenant' : 'apercu', inscription_id: inscription ? inscription.id : null });
+});
+
+/* Marquer une leçon comme terminée / non terminée */
+route("POST", "/api/formations/:id/lecons/:leconId/progression", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active'").get(params.id, user.id);
+  if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit pour suivre cette formation." });
+  const termine = body.termine ? 1 : 0;
+  const existe = await db.prepare("SELECT id FROM formation_lecons_progression WHERE inscription_id=? AND lecon_id=?").get(inscription.id, params.leconId);
+  if (existe) {
+    await db.prepare("UPDATE formation_lecons_progression SET termine=?, date_completion=? WHERE id=?").run(termine, termine ? new Date().toISOString() : null, existe.id);
+  } else {
+    await db.prepare("INSERT INTO formation_lecons_progression (inscription_id, lecon_id, termine, date_completion) VALUES (?,?,?,?)").run(inscription.id, params.leconId, termine, termine ? new Date().toISOString() : null);
+  }
+  const totalLecons = (await db.prepare(`
+    SELECT COUNT(*) AS n FROM formation_lecons l
+    JOIN formation_chapitres c ON c.id=l.chapitre_id
+    JOIN formation_modules m ON m.id=c.module_id
+    WHERE m.formation_id=?
+  `).get(params.id))?.n || 0;
+  const nbTermine = (await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons_progression WHERE inscription_id=? AND termine=1").get(inscription.id))?.n || 0;
+  const avancement_pct = totalLecons ? Math.round((nbTermine / totalLecons) * 100) : 0;
+  await db.prepare("UPDATE formation_inscriptions SET avancement_pct=? WHERE id=?").run(avancement_pct, inscription.id);
+  sendJSON(res, 200, { ok: true, avancement_pct });
+});
 route("POST", "/api/formations/:id/modules", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -6006,11 +6066,11 @@ route("POST", "/api/formations/:id/chapitres/:chapitreId/lecons", async (req, re
   const chapitre = await db.prepare("SELECT module_id FROM formation_chapitres WHERE id=?").get(params.chapitreId);
   if (!chapitre) return sendJSON(res, 404, { error: "Chapitre introuvable." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_lecons WHERE chapitre_id=?").get(params.chapitreId);
-  const id = db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
+  const id = db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     chapitre.module_id, params.chapitreId, body.titre, body.description||null, body.type||'texte', body.duree_minutes||null,
     body.contenu_url||null, body.contenu_texte||null, body.ressources_json ? JSON.stringify(body.ressources_json) : null,
-    body.image_url||null, max+1
+    body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null
   ).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
@@ -6023,9 +6083,11 @@ route("PUT", "/api/formations/:id/lecons/:leconId", async (req, res, params, bod
   db.prepare(`UPDATE formation_lecons SET
     titre=COALESCE(?,titre), description=COALESCE(?,description), type=COALESCE(?,type),
     duree_minutes=COALESCE(?,duree_minutes), contenu_url=COALESCE(?,contenu_url),
-    contenu_texte=COALESCE(?,contenu_texte), ressources_json=COALESCE(?,ressources_json), image_url=COALESCE(?,image_url)
+    contenu_texte=COALESCE(?,contenu_texte), ressources_json=COALESCE(?,ressources_json), image_url=COALESCE(?,image_url),
+    telechargement_autorise=COALESCE(?,telechargement_autorise), nb_pages=COALESCE(?,nb_pages)
     WHERE id=?`).run(n(body.titre),n(body.description),n(body.type),n(body.duree_minutes),n(body.contenu_url),
-    n(body.contenu_texte), body.ressources_json?JSON.stringify(body.ressources_json):null, n(body.image_url), params.leconId);
+    n(body.contenu_texte), body.ressources_json?JSON.stringify(body.ressources_json):null, n(body.image_url),
+    body.telechargement_autorise === undefined ? null : (body.telechargement_autorise ? 1 : 0), n(body.nb_pages), params.leconId);
   sendJSON(res, 200, { ok: true });
 });
 route("DELETE", "/api/formations/:id/lecons/:leconId", async (req, res, params) => {
@@ -6165,17 +6227,25 @@ route("POST", "/api/formations/:id/publier", async (req, res, params) => {
   if (!f.description) erreurs.push("La description complète est manquante.");
   const modules = await db.prepare("SELECT * FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC").all(params.id);
   if (!modules.length) erreurs.push("Ajoutez au moins un module.");
+  const TYPE_LABELS = { video: "vidéo", pdf: "PDF", audio: "audio", presentation: "PowerPoint" };
   for (const m of modules) {
-    const lecons = await db.prepare("SELECT * FROM formation_lecons WHERE module_id=?").all(m.id);
-    if (!lecons.length) erreurs.push(`Le module « ${m.titre} » ne contient aucune leçon.`);
-    for (const l of lecons) {
-      if (['video','pdf','audio','presentation'].includes(l.type) && !l.contenu_url) erreurs.push(`La leçon « ${l.titre} » n'a pas de fichier importé.`);
-      if (l.type === 'quiz') {
-        const quiz = await db.prepare("SELECT * FROM formation_quiz WHERE lecon_id=?").get(l.id);
-        if (!quiz) erreurs.push(`La leçon quiz « ${l.titre} » n'a pas de quiz configuré.`);
-        else {
-          const questions = await db.prepare("SELECT id FROM formation_quiz_questions WHERE quiz_id=?").all(quiz.id);
-          if (!questions.length) erreurs.push(`Le quiz « ${quiz.titre} » n'a aucune question.`);
+    const chapitres = await db.prepare("SELECT * FROM formation_chapitres WHERE module_id=?").all(m.id);
+    if (!chapitres.length) erreurs.push(`Le module « ${m.titre} » ne contient aucun chapitre.`);
+    for (const c of chapitres) {
+      const lecons = await db.prepare("SELECT * FROM formation_lecons WHERE chapitre_id=?").all(c.id);
+      if (!lecons.length) erreurs.push(`Le chapitre « ${c.titre} » (module « ${m.titre} ») ne contient aucune leçon.`);
+      for (const l of lecons) {
+        if (['video','pdf','audio','presentation'].includes(l.type) && !l.contenu_url) {
+          erreurs.push(`La leçon « ${l.titre} » (${TYPE_LABELS[l.type]}) n'a pas de fichier importé.`);
+        }
+        if (l.type === 'telechargement' && !l.contenu_url) erreurs.push(`La leçon « ${l.titre} » n'a pas de document à télécharger.`);
+        if (l.type === 'quiz') {
+          const quiz = await db.prepare("SELECT * FROM formation_quiz WHERE lecon_id=?").get(l.id);
+          if (!quiz) erreurs.push(`La leçon quiz « ${l.titre} » n'a pas de quiz configuré.`);
+          else {
+            const questions = await db.prepare("SELECT id FROM formation_quiz_questions WHERE quiz_id=?").all(quiz.id);
+            if (!questions.length) erreurs.push(`Le quiz « ${quiz.titre} » n'a aucune question.`);
+          }
         }
       }
     }
@@ -6183,6 +6253,8 @@ route("POST", "/api/formations/:id/publier", async (req, res, params) => {
   if (f.mode_acces && f.mode_acces !== 'gratuit') {
     if (!f.prix || f.prix <= 0) erreurs.push("Le prix doit être défini pour une formation payante.");
   }
+  if (f.certificat_actif && !f.certificat_conditions) erreurs.push("Les conditions d'obtention du certificat ne sont pas définies.");
+  if (!f.mode_acces) erreurs.push("Le mode d'accès (gratuit / payant / adhérents / invitation) n'est pas défini.");
   if (erreurs.length) return sendJSON(res, 400, { error: "Formation incomplète.", details: erreurs });
 
   await db.prepare("UPDATE formations SET statut='soumise', date_soumission=datetime('now'), motif_refus=NULL WHERE id=?").run(params.id);

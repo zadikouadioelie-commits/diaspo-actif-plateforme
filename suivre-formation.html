@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Suivre la formation</title>
+<meta name="viewport" content="width=1280">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="assets/responsive.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+.sf-wrap{display:flex;gap:0;min-height:calc(100vh - 64px);}
+.sf-sidebar{width:320px;flex-shrink:0;background:#f8fafc;border-right:1px solid var(--border);overflow-y:auto;max-height:calc(100vh - 64px);position:sticky;top:64px;}
+.sf-sidebar-head{padding:16px;border-bottom:1px solid var(--border);}
+.sf-progress-bar{height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-top:8px;}
+.sf-progress-fill{height:100%;background:var(--orange, #ff6b00);transition:width .3s;}
+.sf-module{border-bottom:1px solid var(--border);}
+.sf-module-title{padding:12px 16px;font-weight:800;font-size:13px;color:#334155;background:#f1f5f9;}
+.sf-chapitre-title{padding:8px 16px 4px;font-weight:700;font-size:12px;color:#64748b;text-transform:uppercase;}
+.sf-lecon{display:flex;align-items:center;gap:8px;padding:8px 16px 8px 24px;cursor:pointer;font-size:13px;color:#334155;}
+.sf-lecon:hover{background:#eef2f7;}
+.sf-lecon.active{background:#fff3e6;color:var(--orange,#ff6b00);font-weight:700;}
+.sf-lecon .chk{width:16px;height:16px;border-radius:50%;border:2px solid #cbd5e1;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;}
+.sf-lecon.termine .chk{background:#22c55e;border-color:#22c55e;color:#fff;}
+.sf-main{flex:1;padding:32px;max-width:900px;margin:0 auto;}
+.sf-content-video video{width:100%;border-radius:12px;background:#000;}
+.sf-content-pdf iframe{width:100%;height:75vh;border:1px solid var(--border);border-radius:12px;}
+.sf-content-pdf .sf-pdf-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px;color:var(--muted);}
+.sf-content-ppt iframe{width:100%;height:75vh;border:1px solid var(--border);border-radius:12px;}
+.sf-content-image img{max-width:100%;border-radius:12px;}
+.sf-fullscreen-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;}
+.sf-nav-btns{display:flex;justify-content:space-between;margin-top:32px;gap:12px;}
+.sf-badge-apercu{background:#fef3c7;color:#92400e;padding:4px 12px;border-radius:99px;font-size:12px;font-weight:800;}
+.notice{text-align:center;padding:60px 20px;color:var(--muted);}
+</style>
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="formations.html" id="sf-back-editeur" style="display:none;">← Retour à l'éditeur</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div id="sf-root"><div class="notice">Chargement…</div></div>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script>
+function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+const params = new URLSearchParams(location.search);
+const formationId = params.get('id');
+let SF_DATA = null;
+let SF_CURRENT_LECON = null;
+
+function flatLecons(){
+  const flat = [];
+  (SF_DATA.modules||[]).forEach(m => (m.chapitres||[]).forEach(c => (c.lecons||[]).forEach(l => flat.push(l))));
+  return flat;
+}
+
+async function sfLoad(){
+  if (!formationId){ document.getElementById('sf-root').innerHTML = '<div class="notice">Formation introuvable.</div>'; return; }
+  const r = await fetch(`/api/formations/${formationId}/suivre`, { credentials: 'same-origin' });
+  if (!r.ok){
+    const err = await r.json().catch(()=>({}));
+    document.getElementById('sf-root').innerHTML = `<div class="notice">${escH(err.error || "Impossible de charger cette formation.")}</div>`;
+    return;
+  }
+  SF_DATA = await r.json();
+  if (SF_DATA.mode === 'apercu') document.getElementById('sf-back-editeur').style.display = '';
+  const flat = flatLecons();
+  const startLeconId = Number(params.get('lecon'));
+  SF_CURRENT_LECON = (startLeconId && flat.find(l => l.id === startLeconId)) || flat.find(l => !l.termine) || flat[0] || null;
+  sfRender();
+}
+
+function sfRender(){
+  const root = document.getElementById('sf-root');
+  const f = SF_DATA.formation;
+  root.innerHTML = `
+    <div class="sf-wrap">
+      <aside class="sf-sidebar">
+        <div class="sf-sidebar-head">
+          <div style="font-weight:800;">${escH(f.titre)}</div>
+          ${SF_DATA.mode === 'apercu' ? '<span class="sf-badge-apercu">👁️ Mode aperçu créateur</span>' : `
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">${SF_DATA.avancement_pct}% terminé</div>
+          <div class="sf-progress-bar"><div class="sf-progress-fill" style="width:${SF_DATA.avancement_pct}%;"></div></div>`}
+        </div>
+        <div id="sf-modules-list"></div>
+      </aside>
+      <main class="sf-main" id="sf-content"></main>
+    </div>
+  `;
+  const list = document.getElementById('sf-modules-list');
+  (SF_DATA.modules||[]).forEach(m => {
+    const modEl = document.createElement('div');
+    modEl.className = 'sf-module';
+    let html = `<div class="sf-module-title">${escH(m.titre)}</div>`;
+    (m.chapitres||[]).forEach(c => {
+      html += `<div class="sf-chapitre-title">${escH(c.titre)}</div>`;
+      (c.lecons||[]).forEach(l => {
+        const active = SF_CURRENT_LECON && SF_CURRENT_LECON.id === l.id;
+        html += `<div class="sf-lecon ${l.termine ? 'termine':''} ${active?'active':''}" data-lecon-id="${l.id}">
+          <span class="chk">${l.termine ? '✓' : ''}</span>
+          <span>${escH(l.titre)}</span>
+        </div>`;
+      });
+    });
+    modEl.innerHTML = html;
+    list.appendChild(modEl);
+  });
+  list.querySelectorAll('.sf-lecon').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = Number(el.dataset.leconId);
+      const flat = flatLecons();
+      SF_CURRENT_LECON = flat.find(l => l.id === id);
+      sfRenderContent();
+      list.querySelectorAll('.sf-lecon').forEach(e => e.classList.remove('active'));
+      el.classList.add('active');
+    });
+  });
+  sfRenderContent();
+}
+
+function sfContentHtml(l){
+  if (!l) return '<div class="notice">Aucune leçon.</div>';
+  switch (l.type){
+    case 'video':
+      return `<div class="sf-content-video"><video controls controlsList="${!l.telechargement_autorise ? 'nodownload' : ''}" src="${escH(l.contenu_url||'')}"></video></div>`;
+    case 'audio':
+      return `<audio controls controlsList="${!l.telechargement_autorise ? 'nodownload' : ''}" style="width:100%;" src="${escH(l.contenu_url||'')}"></audio>`;
+    case 'pdf': {
+      if (!l.contenu_url) return '<div class="notice">Aucun fichier PDF.</div>';
+      const src = `${escH(l.contenu_url)}#toolbar=1&view=FitH`;
+      return `<div class="sf-content-pdf">
+        <div class="sf-pdf-toolbar">
+          <span>📑 Document PDF${l.nb_pages ? ` — ${l.nb_pages} page${l.nb_pages>1?'s':''}` : ''}</span>
+          <button class="sf-fullscreen-btn" onclick="document.getElementById('sf-pdf-frame').requestFullscreen && document.getElementById('sf-pdf-frame').requestFullscreen()">⛶ Plein écran</button>
+          ${!l.telechargement_autorise ? '' : `<a href="${escH(l.contenu_url)}" target="_blank" rel="noopener">⬇️ Télécharger</a>`}
+        </div>
+        <iframe id="sf-pdf-frame" src="${src}"></iframe>
+      </div>`;
+    }
+    case 'presentation':
+      if (!l.contenu_url) return '<div class="notice">Aucune présentation PowerPoint.</div>';
+      return `<div class="sf-content-ppt">
+        <div class="sf-pdf-toolbar">
+          <span>📊 Présentation PowerPoint</span>
+          ${!l.telechargement_autorise ? '' : `<a href="${escH(l.contenu_url)}" target="_blank" rel="noopener">⬇️ Télécharger</a>`}
+        </div>
+        <iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(l.contenu_url)}"></iframe>
+      </div>`;
+    case 'images':
+      return `<div class="sf-content-image"><img src="${escH(l.contenu_url||'')}" alt="">${!l.telechargement_autorise ? '' : `<div style="margin-top:8px;"><a href="${escH(l.contenu_url||'')}" target="_blank" rel="noopener">⬇️ Télécharger l'image</a></div>`}</div>`;
+    case 'telechargement':
+      return `<div class="notice">📎 ${l.contenu_url ? (!l.telechargement_autorise ? 'Le téléchargement de ce document n\'est pas autorisé par le formateur.' : `<a href="${escH(l.contenu_url)}" target="_blank" rel="noopener">Télécharger le document</a>`) : 'Aucun fichier.'}</div>`;
+    case 'quiz':
+      return `<div class="notice">📝 Quiz — bientôt disponible.</div>`;
+    case 'exercice':
+    case 'travail_pratique':
+    case 'etude_cas':
+      return `<div style="white-space:pre-wrap;line-height:1.6;">${escH(l.contenu_texte||'Aucune consigne fournie.')}</div>`;
+    default:
+      return `<div style="white-space:pre-wrap;line-height:1.6;">${escH(l.contenu_texte||'')}</div>`;
+  }
+}
+
+function sfRenderContent(){
+  const el = document.getElementById('sf-content');
+  const l = SF_CURRENT_LECON;
+  const flat = flatLecons();
+  const idx = flat.findIndex(x => l && x.id === l.id);
+  const prev = idx > 0 ? flat[idx-1] : null;
+  const next = idx >= 0 && idx < flat.length - 1 ? flat[idx+1] : null;
+  el.innerHTML = `
+    <h2 style="margin-top:0;">${l ? escH(l.titre) : ''}</h2>
+    ${l && l.description ? `<p style="color:var(--muted);">${escH(l.description)}</p>` : ''}
+    ${sfContentHtml(l)}
+    <div class="sf-nav-btns">
+      <button class="btn secondary" ${!prev?'disabled':''} onclick="sfGoTo(${prev?prev.id:'null'})">← Précédent</button>
+      ${SF_DATA.mode !== 'apercu' && l ? `<button class="btn" onclick="sfToggleTermine(${l.id})">${l.termine ? '✓ Terminé' : 'Marquer comme terminé'}</button>` : ''}
+      <button class="btn secondary" ${!next?'disabled':''} onclick="sfGoTo(${next?next.id:'null'})">Suivant →</button>
+    </div>
+  `;
+}
+
+function sfGoTo(id){
+  if (!id) return;
+  const flat = flatLecons();
+  SF_CURRENT_LECON = flat.find(l => l.id === id);
+  document.querySelectorAll('.sf-lecon').forEach(e => e.classList.toggle('active', Number(e.dataset.leconId) === id));
+  sfRenderContent();
+}
+
+async function sfToggleTermine(leconId){
+  const flat = flatLecons();
+  const l = flat.find(x => x.id === leconId);
+  const nouveauStatut = !l.termine;
+  const r = await fetch(`/api/formations/${formationId}/lecons/${leconId}/progression`, {
+    method: 'POST', headers: {'Content-Type':'application/json'}, credentials:'same-origin',
+    body: JSON.stringify({ termine: nouveauStatut })
+  });
+  if (!r.ok) return;
+  const data = await r.json();
+  l.termine = nouveauStatut;
+  SF_DATA.avancement_pct = data.avancement_pct;
+  sfRender();
+}
+
+sfLoad();
+</script>
+</body>
+</html>

@@ -30,6 +30,14 @@
 .fb-lecon-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-top:6px;background:#f8fafc;cursor:grab;}
 .fb-lecon-row.dragover{border-color:#ff6b00;background:#fff7ed;}
 .fb-drag-handle{cursor:grab;color:var(--muted);}
+.fb-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;display:none;align-items:center;justify-content:center;padding:20px;}
+.fb-modal-bg.open{display:flex;}
+.fb-modal-box{background:#fff;border-radius:16px;padding:24px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;}
+.fb-field{margin-bottom:14px;}
+.fb-field label{display:block;font-size:13px;font-weight:700;margin-bottom:4px;}
+.fb-field input[type=text],.fb-field input[type=number],.fb-field select,.fb-field textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;}
+.fb-field textarea{min-height:80px;}
+.fb-upload-status{font-size:12px;color:var(--muted);margin-top:6px;}
 </style>
 </head>
 <body>
@@ -507,6 +515,56 @@
       </div>
 
     </main>
+  </div>
+</div>
+
+<!-- MODAL LEÇON -->
+<div class="fb-modal-bg" id="fb-lecon-modal-bg" onclick="if(event.target===this) fbCloseLeconModal()">
+  <div class="fb-modal-box">
+    <div class="flex-between" style="margin-bottom:14px;">
+      <h3 style="margin:0;" id="fb-lecon-modal-title">Ajouter une leçon</h3>
+      <button class="btn btn-sm btn-outline" onclick="fbCloseLeconModal()">✕</button>
+    </div>
+    <div class="fb-field">
+      <label>Titre de la leçon</label>
+      <input type="text" id="fb-lecon-titre">
+    </div>
+    <div class="fb-field">
+      <label>Type de contenu</label>
+      <select id="fb-lecon-type"></select>
+    </div>
+    <div class="fb-field">
+      <label>Description (facultatif)</label>
+      <textarea id="fb-lecon-description"></textarea>
+    </div>
+    <div class="fb-field">
+      <label>Durée (minutes, facultatif)</label>
+      <input type="number" id="fb-lecon-duree" min="0">
+    </div>
+    <div class="fb-field" id="fb-lecon-texte-field" style="display:none;">
+      <label>Contenu texte</label>
+      <textarea id="fb-lecon-texte"></textarea>
+    </div>
+    <div class="fb-field" id="fb-lecon-fichier-field" style="display:none;">
+      <label>Fichier</label>
+      <input type="file" id="fb-lecon-fichier">
+      <div class="fb-upload-status" id="fb-lecon-upload-status"></div>
+      <input type="hidden" id="fb-lecon-contenu-url">
+    </div>
+    <div class="fb-field" id="fb-lecon-pages-field" style="display:none;">
+      <label>Nombre de pages (PDF, facultatif)</label>
+      <input type="number" id="fb-lecon-nb-pages" min="1">
+    </div>
+    <div class="fb-field" id="fb-lecon-telechargement-field" style="display:none;">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+        <input type="checkbox" id="fb-lecon-telechargement" checked style="width:auto;">
+        Autoriser le téléchargement par les apprenants
+      </label>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+      <button class="btn btn-sm btn-outline" onclick="fbCloseLeconModal()">Annuler</button>
+      <button class="btn btn-sm btn-orange" id="fb-lecon-save-btn">Enregistrer</button>
+    </div>
   </div>
 </div>
 
@@ -1149,21 +1207,101 @@
     });
   }
 
+  const FB_TYPES_AVEC_FICHIER = ['video','pdf','audio','presentation','images','telechargement'];
+  let fbLeconModalCtx = { chapitreId: null, leconId: null, lecon: null };
+
+  function fbUpdateLeconModalFields(){
+    const type = document.getElementById('fb-lecon-type').value;
+    document.getElementById('fb-lecon-texte-field').style.display = (type==='texte' || ['exercice','etude_cas','travail_pratique'].includes(type)) ? '' : 'none';
+    document.getElementById('fb-lecon-fichier-field').style.display = FB_TYPES_AVEC_FICHIER.includes(type) ? '' : 'none';
+    document.getElementById('fb-lecon-pages-field').style.display = type==='pdf' ? '' : 'none';
+    document.getElementById('fb-lecon-telechargement-field').style.display = FB_TYPES_AVEC_FICHIER.includes(type) ? '' : 'none';
+  }
+
   function fbOpenLeconForm(chapitreId, leconId){
-    const typeOptions = FB_LECON_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
-    const titre = prompt('Titre de la leçon :', '');
-    if(titre===null || !titre.trim()) return;
-    const type = prompt('Type de leçon (video, texte, pdf, quiz, audio, presentation, images, telechargement, exercice, etude_cas, travail_pratique, classe_virtuelle, session_direct) :', 'texte');
-    if(type===null) return;
-    const duree = prompt('Durée (minutes, facultatif) :', '');
-    const contenu_url = ['video','pdf','audio','presentation','images','telechargement'].includes(type) ? prompt('URL du fichier (facultatif, à uploader séparément) :', '') : null;
-    const contenu_texte = type==='texte' ? prompt('Contenu texte :', '') : null;
-    const payload = { titre: titre.trim(), type: type.trim()||'texte', duree_minutes: duree?parseInt(duree):null, contenu_url: contenu_url||null, contenu_texte: contenu_texte||null };
+    fbLeconModalCtx = { chapitreId, leconId, lecon: null };
+    document.getElementById('fb-lecon-modal-title').textContent = leconId ? 'Modifier la leçon' : 'Ajouter une leçon';
+    const typeSel = document.getElementById('fb-lecon-type');
+    typeSel.innerHTML = FB_LECON_TYPES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+    document.getElementById('fb-lecon-titre').value = '';
+    document.getElementById('fb-lecon-description').value = '';
+    document.getElementById('fb-lecon-duree').value = '';
+    document.getElementById('fb-lecon-texte').value = '';
+    document.getElementById('fb-lecon-contenu-url').value = '';
+    document.getElementById('fb-lecon-fichier').value = '';
+    document.getElementById('fb-lecon-upload-status').textContent = '';
+    document.getElementById('fb-lecon-nb-pages').value = '';
+    document.getElementById('fb-lecon-telechargement').checked = true;
+    typeSel.value = 'texte';
+
+    const populate = (l) => {
+      fbLeconModalCtx.lecon = l;
+      document.getElementById('fb-lecon-titre').value = l.titre || '';
+      document.getElementById('fb-lecon-description').value = l.description || '';
+      document.getElementById('fb-lecon-duree').value = l.duree_minutes || '';
+      document.getElementById('fb-lecon-texte').value = l.contenu_texte || '';
+      document.getElementById('fb-lecon-contenu-url').value = l.contenu_url || '';
+      document.getElementById('fb-lecon-nb-pages').value = l.nb_pages || '';
+      document.getElementById('fb-lecon-telechargement').checked = l.telechargement_autorise !== 0 && l.telechargement_autorise !== false;
+      typeSel.value = l.type || 'texte';
+      if (l.contenu_url) document.getElementById('fb-lecon-upload-status').innerHTML = `Fichier actuel : <a href="${l.contenu_url}" target="_blank" rel="noopener">voir</a>`;
+      fbUpdateLeconModalFields();
+    };
+
+    if (leconId) {
+      api('GET', `/formations/${fbFormationId}/modules`).then(({ modules }) => {
+        for (const m of modules) for (const c of (m.chapitres||[])) {
+          const l = (c.lecons||[]).find(x => String(x.id) === String(leconId));
+          if (l) { populate(l); return; }
+        }
+      });
+    } else {
+      fbUpdateLeconModalFields();
+    }
+    document.getElementById('fb-lecon-modal-bg').classList.add('open');
+  }
+
+  function fbCloseLeconModal(){ document.getElementById('fb-lecon-modal-bg').classList.remove('open'); }
+  document.getElementById('fb-lecon-type').addEventListener('change', fbUpdateLeconModalFields);
+
+  document.getElementById('fb-lecon-fichier').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('fb-lecon-upload-status');
+    statusEl.textContent = 'Envoi en cours…';
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      const r = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Échec de l\'envoi.');
+      document.getElementById('fb-lecon-contenu-url').value = data.url;
+      statusEl.innerHTML = `✅ ${file.name} envoyé.`;
+    } catch (err) {
+      statusEl.textContent = '❌ ' + (err.message || 'Erreur lors de l\'envoi.');
+    }
+  });
+
+  document.getElementById('fb-lecon-save-btn').addEventListener('click', () => {
+    const titre = document.getElementById('fb-lecon-titre').value.trim();
+    if (!titre) { showMsg('Le titre est requis.', 'danger'); return; }
+    const type = document.getElementById('fb-lecon-type').value;
+    const duree = document.getElementById('fb-lecon-duree').value;
+    const payload = {
+      titre, type,
+      description: document.getElementById('fb-lecon-description').value.trim() || null,
+      duree_minutes: duree ? parseInt(duree) : null,
+      contenu_texte: document.getElementById('fb-lecon-texte').value || null,
+      contenu_url: document.getElementById('fb-lecon-contenu-url').value || null,
+      nb_pages: document.getElementById('fb-lecon-nb-pages').value ? parseInt(document.getElementById('fb-lecon-nb-pages').value) : null,
+      telechargement_autorise: document.getElementById('fb-lecon-telechargement').checked,
+    };
+    const { chapitreId, leconId } = fbLeconModalCtx;
     const req = leconId
       ? api('PUT', `/formations/${fbFormationId}/lecons/${leconId}`, payload)
       : api('POST', `/formations/${fbFormationId}/chapitres/${chapitreId}/lecons`, payload);
-    req.then(()=> fbLoadModules()).catch(e=> showMsg(e.message||'Erreur.', 'danger'));
-  }
+    req.then(() => { fbCloseLeconModal(); fbLoadModules(); }).catch(e => showMsg(e.message || 'Erreur.', 'danger'));
+  });
 
   // ── Quiz ──
   async function fbLoadQuiz(){
@@ -1250,6 +1388,9 @@
       const { formation } = await api('GET', `/formations/${fbFormationId}`);
       const { modules } = await api('GET', `/formations/${fbFormationId}/modules`);
       el.innerHTML = `
+        <div style="margin-bottom:16px;">
+          <a class="btn btn-orange" href="suivre-formation.html?id=${fbFormationId}" target="_blank" rel="noopener">👁️ Aperçu de la formation (vue élève complète)</a>
+        </div>
         <h2 style="margin:0 0 6px;">${formation.titre}</h2>
         ${formation.sous_titre?`<p style="margin:0 0 12px;color:var(--muted);">${formation.sous_titre}</p>`:''}
         <p style="white-space:pre-wrap;">${formation.description||''}</p>
@@ -1258,7 +1399,24 @@
           <span class="tag">${formation.mode_acces==='gratuit'?'Gratuit':(formation.prix+' '+(formation.devise||'EUR'))}</span>
         </div>
         <h3 style="margin:16px 0 8px;">Programme</h3>
-        ${modules.map(m=>`<div style="margin-bottom:10px;"><strong>${m.titre}</strong><ul style="margin:4px 0 0;">${m.lecons.map(l=>`<li>${l.titre}${l.duree_minutes?` (${l.duree_minutes} min)`:''}</li>`).join('')||'<li style="color:var(--muted);">Aucune leçon</li>'}</ul></div>`).join('') || '<p class="notice">Aucun module.</p>'}
+        ${modules.map(m=>`
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <strong>${m.titre}</strong>
+              <a class="btn btn-sm btn-outline" href="suivre-formation.html?id=${fbFormationId}${(m.chapitres||[])[0]?.lecons?.[0]?.id ? `&lecon=${(m.chapitres||[])[0].lecons[0].id}`:''}" target="_blank" rel="noopener">👁️ Voir comme l'élève</a>
+            </div>
+            ${(m.chapitres||[]).map(c => `
+              <div style="margin:6px 0 0 14px;">
+                <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;">${c.titre}</div>
+                <ul style="margin:4px 0 0;">
+                  ${(c.lecons||[]).map(l => `
+                    <li style="display:flex;align-items:center;gap:8px;">
+                      <span style="flex:1;">${l.titre}${l.duree_minutes?` (${l.duree_minutes} min)`:''}</span>
+                      <a href="suivre-formation.html?id=${fbFormationId}&lecon=${l.id}" target="_blank" rel="noopener" style="font-size:12px;">👁️ Voir</a>
+                    </li>`).join('') || '<li style="color:var(--muted);">Aucune leçon</li>'}
+                </ul>
+              </div>`).join('') || '<div class="notice" style="padding:6px;">Aucun chapitre.</div>'}
+          </div>`).join('') || '<p class="notice">Aucun module.</p>'}
       `;
     } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
   }

@@ -669,6 +669,8 @@ async function migratePg(pool) {
     ['offres', 'pieces_demandees', 'TEXT DEFAULT \'["cv","lettre"]\''],
     ['offres', 'nb_vues', 'INTEGER DEFAULT 0'],
     ['formation_lecons', 'chapitre_id', 'INTEGER'],
+    ['formation_lecons', 'telechargement_autorise', 'INTEGER DEFAULT 1'],
+    ['formation_lecons', 'nb_pages', 'INTEGER'],
   ];
   for (const [table, col, type] of cols) {
     try {

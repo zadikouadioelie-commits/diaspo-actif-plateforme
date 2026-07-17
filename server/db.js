@@ -1036,6 +1036,9 @@ db.exec(`
 const MIGRATIONS = [
   // Formations — ajout du niveau Chapitre entre Module et Leçon
   ["formation_lecons", "chapitre_id INTEGER"],
+  // Formations — permission de téléchargement par ressource + nombre de pages (PDF)
+  ["formation_lecons", "telechargement_autorise INTEGER DEFAULT 1"],
+  ["formation_lecons", "nb_pages INTEGER"],
   // Billetterie V1 — early-bird + attributs enrichis par type de billet
   ["ticket_types", "avantages TEXT"],
   ["ticket_types", "devise TEXT DEFAULT 'EUR'"],
@@ -3274,6 +3277,8 @@ db.exec(`
     ressources_json TEXT,
     image_url TEXT,
     ordre INTEGER DEFAULT 0,
+    telechargement_autorise INTEGER DEFAULT 1,
+    nb_pages INTEGER,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(module_id) REFERENCES formation_modules(id),
     FOREIGN KEY(chapitre_id) REFERENCES formation_chapitres(id)
@@ -3318,6 +3323,18 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(formation_id) REFERENCES formations(id),
     FOREIGN KEY(sender_id) REFERENCES users(id)
+  );
+
+  /* ── Espace apprenant : progression par leçon ── */
+  CREATE TABLE IF NOT EXISTS formation_lecons_progression (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    inscription_id INTEGER NOT NULL,
+    lecon_id INTEGER NOT NULL,
+    termine INTEGER DEFAULT 0,
+    date_completion TEXT,
+    UNIQUE(inscription_id, lecon_id),
+    FOREIGN KEY(inscription_id) REFERENCES formation_inscriptions(id),
+    FOREIGN KEY(lecon_id) REFERENCES formation_lecons(id)
   );
 `);
 
