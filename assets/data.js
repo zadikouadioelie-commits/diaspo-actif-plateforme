@@ -277,7 +277,7 @@ const ACCREDITATIONS_DA = [
     description: 'Accréditation premium pour gérer entièrement votre association depuis un espace sécurisé : adhérents, cotisations, trésorerie, comptabilité intelligente, assemblées générales et votes électroniques.',
     droits: [
       'Gérer les adhérents et cartes de membre (QR Code)',
-      'Encaisser les cotisations (carte, virement, Mobile Money) et relances automatiques',
+      'Encaisser les cotisations (carte, virement, PayPal) et relances automatiques',
       'Tenir la trésorerie et la comptabilité (OCR des factures, coffre-fort numérique)',
       'Organiser des assemblées générales et des votes électroniques',
       'Consulter les statistiques avancées et l\'indice d\'engagement',
@@ -380,7 +380,7 @@ const MES_COLLABORATIONS = [
 ];
 
 /* ---------- Moyens de paiement disponibles pour billetterie/cotisations (démo) ---------- */
-const MOYENS_PAIEMENT = ["Carte bancaire", "PayPal", "Virement bancaire", "Mobile Money (Orange/MTN/Moov/Wave)", "Apple Pay", "Google Pay"];
+const MOYENS_PAIEMENT = ["Carte bancaire", "PayPal", "Virement bancaire"];
 const TYPES_TARIFICATION = ["Tarif unique", "Plusieurs catégories de tarifs", "Accès gratuit", "Participation libre"];
 
 /* ---------- Système multilingue (démo) ---------- */

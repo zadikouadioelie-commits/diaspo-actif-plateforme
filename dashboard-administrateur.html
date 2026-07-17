@@ -90,7 +90,7 @@
       <a href="#moderation" data-section="moderation">🛡 Modération</a>
       <a href="#suppression-comptes" data-section="suppression-comptes" style="display:flex;justify-content:space-between;align-items:center;">🗑 Demandes de suppression <span id="delreq-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="audiovisuel.html" style="display:none;">🎬 Atelier audiovisuel</a>
-      <a href="#ads" data-section="ads">📣 Publicités <span id="ads-pending-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
+      <a href="#ads" data-section="ads">📣 Publicités</a>
       <a href="#social-sync" data-section="social-sync">🔄 Synchronisation réseaux sociaux (vue admin)</a>
     </aside>
 
@@ -3999,10 +3999,8 @@
 
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;" id="ads-filter-tabs">
           <button class="btn btn-sm ads-filter active" data-statut="" onclick="filterAdsAdmin('')">Toutes</button>
-          <button class="btn btn-sm ads-filter" data-statut="pending_admin" onclick="filterAdsAdmin('pending_admin')">⏳ En attente</button>
           <button class="btn btn-sm ads-filter" data-statut="approved" onclick="filterAdsAdmin('approved')">✅ Actives</button>
           <button class="btn btn-sm ads-filter" data-statut="paused" onclick="filterAdsAdmin('paused')">⏸ En pause</button>
-          <button class="btn btn-sm ads-filter" data-statut="rejected" onclick="filterAdsAdmin('rejected')">❌ Refusées</button>
         </div>
 
         <div style="overflow-x:auto;">
@@ -8949,8 +8947,10 @@ async function submitAccordDirect(){
     catch(e) { alert(e.message || 'Erreur'); }
   };
 
-  /* ===== Publicités (régie) ===== */
-  const ADS_STATUT_LBL = { pending_admin:'⏳ En attente', approved:'✅ Active', rejected:'❌ Refusée', need_modification:'✏️ Modif. demandée', paused:'⏸ En pause' };
+  /* ===== Publicités (régie) — publication libre, sans validation admin.
+     L'administrateur garde uniquement un droit de modération a posteriori (pause/reprise/suppression),
+     par exemple sur signalement d'une publicité problématique. ===== */
+  const ADS_STATUT_LBL = { approved:'✅ Active', paused:'⏸ En pause' };
   let _adsFilter = '';
 
   async function loadAdsAdmin() {
@@ -8958,14 +8958,11 @@ async function submitAccordDirect(){
       const dash = await api('GET', '/admin/ads/dashboard');
       document.getElementById('ads-dashboard-cards').innerHTML = `
         <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:800;">${dash.total}</div><div style="font-size:11px;color:var(--muted);">Campagnes totales</div></div>
-        <div class="card" style="padding:14px;text-align:center;border-left:3px solid #f59e0b;"><div style="font-size:22px;font-weight:800;color:#92400e;">${dash.pending}</div><div style="font-size:11px;color:var(--muted);">En attente</div></div>
         <div class="card" style="padding:14px;text-align:center;border-left:3px solid #16a34a;"><div style="font-size:22px;font-weight:800;color:#16a34a;">${dash.active}</div><div style="font-size:11px;color:var(--muted);">Actives</div></div>
         <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:800;">${dash.impressions_totales}</div><div style="font-size:11px;color:var(--muted);">Impressions</div></div>
         <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:800;">${dash.ctr_global}%</div><div style="font-size:11px;color:var(--muted);">CTR global</div></div>
         <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:800;">${dash.abonnements_actifs}</div><div style="font-size:11px;color:var(--muted);">Abonnements actifs</div></div>
       `;
-      const badge = document.getElementById('ads-pending-badge');
-      if (badge) { if (dash.pending > 0) { badge.textContent = dash.pending; badge.style.display = 'inline-block'; } else badge.style.display = 'none'; }
     } catch (e) {}
     await renderAdsAdminTable();
   }
@@ -8991,10 +8988,7 @@ async function submitAccordDirect(){
           <td style="padding:8px;">${a.nb_impressions}</td>
           <td style="padding:8px;">${a.nb_clics}</td>
           <td style="padding:8px;white-space:nowrap;">
-            ${a.statut === 'pending_admin' ? `
-              <button class="btn btn-sm" style="background:#16a34a;color:#fff;" onclick="approveAdAdmin(${a.id})">✅</button>
-              <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;" onclick="rejectAdAdmin(${a.id})">❌</button>
-            ` : a.statut === 'approved' ? `
+            ${a.statut === 'approved' ? `
               <button class="btn btn-sm btn-outline" onclick="pauseAdAdmin(${a.id})">⏸ Pause</button>
             ` : a.statut === 'paused' ? `
               <button class="btn btn-sm" style="background:#16a34a;color:#fff;" onclick="resumeAdAdmin(${a.id})">▶️ Reprendre</button>
@@ -9007,12 +9001,6 @@ async function submitAccordDirect(){
 
   window.loadAdsAdmin = loadAdsAdmin;
   window.filterAdsAdmin = filterAdsAdmin;
-  window.approveAdAdmin = async function(id) { await api('POST', `/admin/ads/${id}/approve`); renderAdsAdminTable(); loadAdsAdmin(); };
-  window.rejectAdAdmin = async function(id) {
-    const motif = prompt('Motif du refus (optionnel) :') || '';
-    await api('POST', `/admin/ads/${id}/reject`, { motif });
-    renderAdsAdminTable(); loadAdsAdmin();
-  };
   window.pauseAdAdmin = async function(id) { await api('POST', `/admin/ads/${id}/pause`); renderAdsAdminTable(); };
   window.resumeAdAdmin = async function(id) { await api('POST', `/admin/ads/${id}/resume`); renderAdsAdminTable(); };
   window.deleteAdAdmin = async function(id) {

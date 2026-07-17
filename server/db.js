@@ -1001,7 +1001,8 @@ const _pubCols = db.prepare("PRAGMA table_info(publicites)").all().map(c=>c.name
 [["user_id INTEGER","user_id"],["media_type TEXT DEFAULT 'image'","media_type"],["media_url TEXT","media_url"],
  ["thumbnail_url TEXT","thumbnail_url"],["cta TEXT DEFAULT 'En savoir plus'","cta"],["duree_jours INTEGER DEFAULT 7","duree_jours"],
  ["cible_langue TEXT DEFAULT '[]'","cible_langue"],["cible_interet TEXT DEFAULT '[]'","cible_interet"],
- ["motif_rejet TEXT","motif_rejet"],["nb_video_views INTEGER DEFAULT 0","nb_video_views"],["nb_full_video_views INTEGER DEFAULT 0","nb_full_video_views"]]
+ ["motif_rejet TEXT","motif_rejet"],["nb_video_views INTEGER DEFAULT 0","nb_video_views"],["nb_full_video_views INTEGER DEFAULT 0","nb_full_video_views"],
+ ["charte_acceptee_le TEXT","charte_acceptee_le"]]
   .forEach(([def,col])=>{ if(!_pubCols.includes(col)) try{db.prepare(`ALTER TABLE publicites ADD COLUMN ${def}`).run();}catch(e){} });
 
 /* ══ WALLET SYSTÈME ══ */

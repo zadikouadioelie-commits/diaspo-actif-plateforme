@@ -688,7 +688,7 @@
     ]},
     'f-init-adhesions': { badge:'🎫 Cotisations & Adhésions', couleur:'#15803d', steps:[
       { el:null, pos:'center', badge:true, titre:"Cotisations & Adhésions", voice:"Créez des formules d'adhésion payantes ou gratuites et gérez votre registre de membres.", desc:"Carte membre numérique avec QR Code, relances automatiques, encaissement en ligne." },
-      { el:null, pos:'center', titre:"💳 Créer une formule", voice:"Définissez le montant, la périodicité et les moyens de paiement acceptés (carte, virement, Mobile Money).", desc:"• Nom et description de la formule\n• Montant et périodicité\n• Modes de paiement\n• Liste de stockage des adhérents", lien:{href:'dashboard-initiative.html', label:'Cotisations & Adhésions'} },
+      { el:null, pos:'center', titre:"💳 Créer une formule", voice:"Définissez le montant, la périodicité et les moyens de paiement acceptés (carte, PayPal, virement).", desc:"• Nom et description de la formule\n• Montant et périodicité\n• Modes de paiement\n• Liste de stockage des adhérents", lien:{href:'dashboard-initiative.html', label:'Cotisations & Adhésions'} },
       { el:null, pos:'center', titre:"🔔 Relances automatiques", voice:"Les adhérents en retard reçoivent automatiquement des rappels par email.", desc:"Suivez vos encaissements et exportez votre registre en CSV." },
       { el:null, pos:'center', cta:'initiative', titre:"✅ Une gestion simplifiée", voice:"Toute votre trésorerie d'adhésion centralisée en un seul endroit.", desc:"Tableau de bord → Cotisations & Adhésions → suivez vos campagnes." }
     ]},
@@ -971,8 +971,8 @@
           desc:"Cotisations annuelles, mensuelles, trimestrielles ou personnalisées, avec suivi visuel par membre." },
         { el:null, pos:'center',
           titre:"💳 Encaisser un paiement",
-          voice:"Vos membres paient par carte, PayPal, Mobile Money ou virement bancaire avec une référence générée automatiquement.",
-          desc:"• Carte / PayPal / Stripe\n• Mobile Money (Orange Money, Wave…)\n• Virement bancaire → référence COTISATION-2026-PRENOM-NOM\n• Validation du virement par le trésorier",
+          voice:"Vos membres paient par carte, PayPal ou virement bancaire avec une référence générée automatiquement.",
+          desc:"• Carte / PayPal / Stripe\n• Virement bancaire → référence COTISATION-2026-PRENOM-NOM\n• Validation du virement par le trésorier",
           lien:{href:'dashboard-initiative.html#asso-cotisations', label:'Mes cotisations'} },
         { el:null, pos:'center',
           titre:"🔔 Relances automatiques",

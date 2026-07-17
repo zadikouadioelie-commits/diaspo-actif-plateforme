@@ -116,7 +116,7 @@ if (typeof ACCREDITATIONS_DA === 'undefined') {
   window.ACCREDITATIONS_DA = [
     { type:'gestion_associations', label:'Gestion des Associations', emoji:'🏅', couleur:'#7c3aed', couleurBg:'#f5f3ff', couleurBorder:'#7c3aed', couleurText:'#4c1d95',
       description:"Accréditation premium pour gérer entièrement votre association depuis un espace sécurisé : adhérents, cotisations, trésorerie, comptabilité intelligente, assemblées générales et votes électroniques.",
-      droits:["Gérer les adhérents et cartes de membre (QR Code)","Encaisser les cotisations (carte, virement, Mobile Money) et relances automatiques","Tenir la trésorerie et la comptabilité (OCR des factures, coffre-fort numérique)","Organiser des assemblées générales et des votes électroniques","Consulter les statistiques avancées et l'indice d'engagement","Assistant IA : analyses financières, prédictions, rapports automatiques"],
+      droits:["Gérer les adhérents et cartes de membre (QR Code)","Encaisser les cotisations (carte, virement, PayPal) et relances automatiques","Tenir la trésorerie et la comptabilité (OCR des factures, coffre-fort numérique)","Organiser des assemblées générales et des votes électroniques","Consulter les statistiques avancées et l'indice d'engagement","Assistant IA : analyses financières, prédictions, rapports automatiques"],
       eligible:['initiative'], prix:{initiative:0}, prixLabel:'Premium — sur abonnement', module:'asso' }
   ];
 }
@@ -874,7 +874,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
         <h3 style="margin:0;">📣 Publicités</h3>
       </div>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Créez des campagnes publicitaires diffusées sur la plateforme. Chaque campagne est soumise à validation avant diffusion.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Créez des campagnes publicitaires diffusées sur la plateforme, immédiatement ou à une date programmée. Durée maximale : un mois par campagne, renouvelable.</p>
 
       <!-- Aucun abonnement : choix d'un plan -->
       <div id="pub-no-abo">
@@ -933,10 +933,21 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <select id="ad-cta" class="input-field" style="width:100%;margin-top:6px;"></select>
             </label>
             <label style="display:block;">
-              <span style="font-size:12px;font-weight:700;color:var(--muted);">DURÉE (jours)</span>
+              <span style="font-size:12px;font-weight:700;color:var(--muted);">DURÉE (jours, 1 mois max)</span>
               <input type="number" id="ad-duree" class="input-field" style="width:100%;margin-top:6px;" value="7" min="1" max="30">
+              <span id="ad-duree-lock-note" style="display:none;font-size:11px;color:var(--muted);">🔒 Non modifiable après création.</span>
             </label>
           </div>
+          <label style="display:block;">
+            <span style="font-size:12px;font-weight:700;color:var(--muted);">PUBLICATION</span>
+            <div class="da-pill-group" id="ad-pub-mode-group" style="margin-top:6px;">
+              <label class="da-pill checked"><input type="radio" name="ad-pub-mode" id="ad-pub-immediat" value="immediat" checked onchange="document.querySelectorAll('#ad-pub-mode-group .da-pill').forEach(p=>p.classList.toggle('checked',p.contains(this)&&this.checked));document.getElementById('ad-date-publication-wrap').style.display='none';"><span>Immédiate</span></label>
+              <label class="da-pill"><input type="radio" name="ad-pub-mode" id="ad-pub-programmee" value="programmee" onchange="document.querySelectorAll('#ad-pub-mode-group .da-pill').forEach(p=>p.classList.toggle('checked',p.contains(this)&&this.checked));document.getElementById('ad-date-publication-wrap').style.display='block';"><span>Programmée</span></label>
+            </div>
+            <div id="ad-date-publication-wrap" style="display:none;margin-top:8px;">
+              <input type="date" id="ad-date-publication" class="input-field" style="width:100%;">
+            </div>
+          </label>
           <label style="display:block;">
             <span style="font-size:12px;font-weight:700;color:var(--muted);">EMPLACEMENTS</span>
             <div id="ad-emplacements" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>
@@ -963,12 +974,45 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <div id="ad-audience-detail" style="font-size:11.5px;color:#3B5A9A;margin-top:4px;"></div>
           </div>
 
+          <div id="ad-charte-wrap" style="border-top:1px solid var(--border);padding-top:14px;">
+            <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">📜 CHARTE D'ENGAGEMENT DES ANNONCEURS</div>
+            <div style="background:#F8FAFD;border:1px solid var(--border);border-radius:10px;padding:12px 14px;max-height:160px;overflow-y:auto;font-size:12px;line-height:1.6;color:#374151;">
+              <p style="margin:0 0 8px;">En publiant une publicité sur Diaspo'Actif, vous vous engagez à respecter les règles de la plateforme et à diffuser un contenu conforme aux lois en vigueur ainsi qu'aux valeurs de respect, de diversité et de bienveillance portées par notre communauté.</p>
+              <p style="margin:0 0 4px;font-weight:700;">Sont notamment interdits :</p>
+              <ul style="margin:0 0 8px;padding-left:18px;">
+                <li>Les contenus à caractère sexuel, pornographique ou à connotation sexuelle explicite.</li>
+                <li>Les contenus violents, choquants ou incitant à la haine, à la discrimination ou au harcèlement.</li>
+                <li>Les contenus trompeurs, mensongers ou frauduleux.</li>
+                <li>Les publicités faisant la promotion d'activités illégales ou de produits interdits.</li>
+                <li>Les contenus portant atteinte aux droits d'auteur, aux marques ou aux droits des tiers.</li>
+                <li>Tout contenu susceptible de nuire à l'image, à la sécurité ou au bon fonctionnement de la plateforme.</li>
+              </ul>
+              <p style="margin:0 0 8px;">Diaspo'Actif se réserve le droit de contrôler toute publicité avant ou après sa publication. En cas de non-respect de cette charte, Diaspo'Actif pourra, sans préavis : refuser ou retirer la publicité ; suspendre ou supprimer le compte de l'annonceur en cas de manquements graves ou répétés ; prendre toute autre mesure nécessaire pour protéger la communauté et assurer le respect des présentes règles.</p>
+            </div>
+            <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:12.5px;cursor:pointer;">
+              <input type="checkbox" id="ad-charte-accept" style="margin-top:2px;">
+              <span>Je reconnais avoir pris connaissance de cette charte et je m'engage à la respecter avant de publier ma publicité.</span>
+            </label>
+          </div>
+
           <div id="ad-err" style="display:none;font-size:13px;color:#dc2626;background:#fef2f2;border-radius:8px;padding:10px 14px;"></div>
         </div>
         <div style="padding:14px 24px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
           <button onclick="closeAdModal()" class="btn btn-outline">Annuler</button>
           <button id="ad-btn-save" class="btn btn-orange" onclick="saveAd()">📣 Soumettre pour validation</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal Aperçu d'un emplacement publicitaire -->
+    <div id="ad-slot-preview-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1100;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <h3 id="ad-slot-preview-title" style="margin:0;font-size:15px;"></h3>
+          <button onclick="closeAdSlotPreview()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+        </div>
+        <div id="ad-slot-preview-body" style="padding:18px 20px;"></div>
+        <div id="ad-slot-preview-caption" style="padding:0 20px 20px;font-size:12.5px;color:var(--muted);line-height:1.5;"></div>
       </div>
     </div>
 
@@ -1172,8 +1216,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <label class="da-pill"><input type="checkbox" value="carte" class="adh-f-mode" checked onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>💳 Carte bancaire</span></label>
           <label class="da-pill"><input type="checkbox" value="paypal" class="adh-f-mode" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>🅿️ PayPal</span></label>
           <label class="da-pill"><input type="checkbox" value="virement" class="adh-f-mode" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>🏦 Virement</span></label>
-          <label class="da-pill"><input type="checkbox" value="mobile_money" class="adh-f-mode" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>📱 Mobile Money</span></label>
-          <label class="da-pill"><input type="checkbox" value="prelevement" class="adh-f-mode" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>🔁 Prélèvement auto</span></label>
         </div>
 
         <label style="font-size:12px;font-weight:700;">📋 Liste de stockage des participants</label>
@@ -1250,8 +1292,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <input type="number" id="adh-p-montant" class="input" style="margin:4px 0 10px;width:100%;">
         <label style="font-size:12px;font-weight:700;">Mode de paiement</label>
         <select id="adh-p-mode" class="input" style="margin:4px 0 14px;width:100%;">
+          <option value="carte">Carte bancaire</option>
+          <option value="paypal">PayPal</option>
           <option value="virement">Virement</option>
-          <option value="mobile_money">Mobile Money</option>
         </select>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button class="btn btn-outline" onclick="document.getElementById('modal-adh-payer').style.display='none'">Annuler</button>
@@ -1892,6 +1935,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     } catch(e) { el.innerHTML = '<p style="color:#ef4444;font-size:13px;">Erreur de chargement.</p>'; }
   };
 
+  let _editingAdId = null;
+  let _myAdsCache = [];
   loadMyAds();
 
   /* ── Accréditations DA ── */
@@ -2059,23 +2104,24 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       }
       document.getElementById('ad-cta').innerHTML = _adCtaList.map(c => `<option value="${c}">${c}</option>`).join('');
       const AD_SLOT_LABELS_FR = {
-        homepage_top: "Haut de la page d'accueil",
         homepage_feed: "Fil de la page d'accueil",
         between_posts: 'Entre les publications',
         between_videos: 'Entre les vidéos',
-        projects_page: 'Page des projets',
-        diaspora_impact: 'Impact diaspora',
-        calls_for_projects: "Appels à projets",
         vitrine_section: 'Section vitrine',
       };
+      document.getElementById('ad-emplacements').className = 'da-pill-group';
       document.getElementById('ad-emplacements').innerHTML = _adSlots.map(s => `
-        <label style="display:flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;">
-          <input type="checkbox" value="${s}" class="ad-slot-check"> ${AD_SLOT_LABELS_FR[s] || s.replace(/_/g,' ')}
-        </label>`).join('');
+        <div style="display:inline-flex;align-items:center;gap:5px;">
+          <label class="da-pill">
+            <input type="checkbox" value="${s}" class="ad-slot-check" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>${AD_SLOT_LABELS_FR[s] || s.replace(/_/g,' ')}</span>
+          </label>
+          <button type="button" onclick="showAdSlotPreview('${s}')" title="Voir un aperçu de cet emplacement" style="width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:#fff;cursor:pointer;font-size:14px;flex-shrink:0;">👁</button>
+        </div>`).join('');
       const AD_ZONE_LABELS = { ville:'Ville', commune:'Commune', departement:'Département', region:'Région', pays:'Pays', international:'International' };
+      document.getElementById('ad-zones').className = 'da-pill-group';
       document.getElementById('ad-zones').innerHTML = Object.entries(AD_ZONE_LABELS).map(([v,l]) => `
-        <label style="display:flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;">
-          <input type="checkbox" value="${v}" class="ad-zone-check" onchange="adUpdateZonesUI()"> ${l}
+        <label class="da-pill">
+          <input type="checkbox" value="${v}" class="ad-zone-check" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked);adUpdateZonesUI()"><span>${l}</span>
         </label>`).join('');
       loadMyAds();
       loadAdListesReseauPro();
@@ -2094,27 +2140,53 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     try {
       const r = await api('GET', '/ads/mes');
       const ads = r.publicites || [];
-      if (!ads.length) { listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune publicité soumise pour l\'instant.</p>'; return; }
-      const STATUT_LBL = { pending_admin:'⏳ En attente', approved:'✅ Active', rejected:'❌ Refusée', need_modification:'✏️ Modification demandée', paused:'⏸ En pause' };
-      listEl.innerHTML = ads.map(a => `
+      _myAdsCache = ads;
+      if (!ads.length) { listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune publicité pour l\'instant.</p>'; return; }
+      const STATUT_LBL = { approved:'✅ Active', paused:'⏸ En pause' };
+      listEl.innerHTML = ads.map(a => {
+        const renouvelable = a.statut === 'approved' || a.statut === 'paused';
+        const programmee = a.date_debut && new Date(a.date_debut) > new Date(new Date().toDateString());
+        let dateTxt = '';
+        if (programmee) dateTxt = ` · 🗓️ Programmée le ${a.date_debut.slice(0,10)}`;
+        else if (a.date_fin) {
+          const joursRestants = Math.ceil((new Date(a.date_fin) - new Date()) / 86400000);
+          dateTxt = ` · Fin le ${a.date_fin.slice(0,10)}${joursRestants >= 0 ? ` (${joursRestants} j restant${joursRestants>1?'s':''})` : ''}`;
+        }
+        return `
         <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
           <div>
             <div style="font-weight:700;font-size:13.5px;">${a.titre}</div>
-            <div style="font-size:11.5px;color:var(--muted);">${STATUT_LBL[a.statut] || a.statut} · ${a.nb_impressions} impressions · ${a.nb_clics} clics</div>
+            <div style="font-size:11.5px;color:var(--muted);">${STATUT_LBL[a.statut] || a.statut} · ${a.nb_impressions} impressions · ${a.nb_clics} clics${dateTxt}</div>
           </div>
-        </div>`).join('');
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${renouvelable ? `<button class="btn btn-sm btn-outline" onclick="renewAd(${a.id})" style="font-size:11px;">🔄 Renouveler (1 mois)</button>` : ''}
+            <button class="btn btn-sm btn-outline" onclick="editAd(${a.id})" style="font-size:11px;">✏️ Modifier</button>
+            <button class="btn btn-sm" onclick="deleteAd(${a.id})" style="font-size:11px;background:#fee2e2;color:#991b1b;">🗑️ Supprimer</button>
+          </div>
+        </div>`;
+      }).join('');
     } catch (e) { listEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">Impossible de charger les publicités.</p>'; }
   }
+
+  window.renewAd = async function(id) {
+    if (!confirm("Renouveler cette campagne pour un mois supplémentaire à partir d'aujourd'hui ?")) return;
+    try {
+      await api('POST', `/ads/${id}/renouveler`);
+      showMsg('Campagne renouvelée pour un mois.', 'success');
+      loadMyAds();
+    } catch (e) { showMsg(e.message || 'Erreur lors du renouvellement.', 'danger'); }
+  };
 
   let _adListesReseauPro = [];
   async function loadAdListesReseauPro() {
     try {
       const r = await api('GET', '/listes-diffusion');
       _adListesReseauPro = r.listes || [];
+      document.getElementById('ad-listes').className = _adListesReseauPro.length ? 'da-pill-group' : '';
       document.getElementById('ad-listes').innerHTML = _adListesReseauPro.length
         ? _adListesReseauPro.map(l => `
-            <label style="display:flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;">
-              <input type="checkbox" value="${l.id}" class="ad-liste-check" onchange="adRefreshAudiencePreview()"> ${l.icone||'📋'} ${l.nom}
+            <label class="da-pill">
+              <input type="checkbox" value="${l.id}" class="ad-liste-check" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked);adRefreshAudiencePreview()"><span>${l.icone||'📋'} ${l.nom}</span>
             </label>`).join('')
         : `<span style="font-size:12px;color:var(--muted);">Aucune liste créée dans le module Réseau Pro.</span>`;
     } catch (e) { document.getElementById('ad-listes').innerHTML = `<span style="font-size:12px;color:var(--muted);">Impossible de charger les listes.</span>`; }
@@ -2149,30 +2221,184 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     }, 400);
   }
 
-  function openAdModal() {
+  function openAdModal(ad) {
+    _editingAdId = ad ? ad.id : null;
     document.getElementById('ad-media').value = '';
-    document.getElementById('ad-titre').value = '';
-    document.getElementById('ad-description').value = '';
-    document.getElementById('ad-lien').value = '';
-    document.getElementById('ad-duree').value = 7;
+    document.getElementById('ad-media').required = !ad;
+    document.getElementById('ad-media').closest('label').style.display = ad ? 'none' : 'block';
+    document.getElementById('ad-titre').value = ad ? ad.titre : '';
+    document.getElementById('ad-description').value = ad ? (ad.description || '') : '';
+    document.getElementById('ad-lien').value = ad ? (ad.lien_url || '') : '';
+    document.getElementById('ad-duree').value = ad ? ad.duree_jours : 7;
+    document.getElementById('ad-duree').disabled = !!ad;
+    document.getElementById('ad-duree-lock-note').style.display = ad ? 'inline' : 'none';
+    document.getElementById('ad-charte-wrap').style.display = ad ? 'none' : 'block';
+    document.getElementById('ad-charte-accept').checked = false;
+    document.getElementById('ad-pub-immediat').checked = true;
+    document.getElementById('ad-pub-programmee').checked = false;
+    document.getElementById('ad-date-publication-wrap').style.display = 'none';
+    document.getElementById('ad-date-publication').value = '';
+    if (ad && ad.date_debut && new Date(ad.date_debut) > new Date(new Date().toDateString())) {
+      document.getElementById('ad-pub-programmee').checked = true;
+      document.getElementById('ad-date-publication-wrap').style.display = 'block';
+      document.getElementById('ad-date-publication').value = ad.date_debut.slice(0, 10);
+    }
+    if (ad && ad.cta) document.getElementById('ad-cta').value = ad.cta;
+    const emplacementsAd = ad ? (JSON.parse(ad.emplacements || '[]')) : [];
+    document.querySelectorAll('.ad-slot-check').forEach(c => c.checked = ad ? emplacementsAd.includes(c.value) : false);
     document.querySelectorAll('.ad-zone-check').forEach(c => c.checked = false);
     document.querySelectorAll('.ad-liste-check').forEach(c => c.checked = false);
     ['ad-cible-ville','ad-cible-departement','ad-cible-region','ad-cible-pays'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     document.getElementById('ad-zones-champs').style.display = 'none';
     document.getElementById('ad-err').style.display = 'none';
+    document.querySelector('#ad-modal h3').textContent = ad ? 'Modifier la publicité' : 'Nouvelle publicité';
+    document.getElementById('ad-btn-save').textContent = ad ? '💾 Enregistrer' : '📣 Publier';
+    document.querySelectorAll('#ad-modal .da-pill').forEach(p => p.classList.toggle('checked', p.querySelector('input')?.checked));
     document.getElementById('ad-modal').style.display = 'block';
     adRefreshAudiencePreview();
   }
-  function closeAdModal() { document.getElementById('ad-modal').style.display = 'none'; }
+  function closeAdModal() { document.getElementById('ad-modal').style.display = 'none'; _editingAdId = null; }
+
+  /* Aperçus visuels des emplacements publicitaires — mockups CSS légers, pas de vraies captures d'écran. */
+  const AD_SLOT_PREVIEWS = {
+    homepage_feed: {
+      titre: "Fil de la page d'accueil",
+      caption: "Votre publicité apparaît mêlée aux publications du fil de la page d'accueil, avec un badge « Publicité » bien visible pour rester transparente vis-à-vis des visiteurs.",
+      html: `
+        <div style="background:#F4F6FA;border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.05em;color:#94a3b8;margin-bottom:8px;">🏠 ACCUEIL — FIL D'ACTUALITÉ</div>
+          <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;padding:10px;margin-bottom:8px;">
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><div style="width:20px;height:20px;border-radius:50%;background:#DCE4EF;"></div><div style="height:7px;width:35%;background:#E5EAF2;border-radius:3px;"></div></div>
+            <div style="height:6px;width:90%;background:#EEF1F6;border-radius:3px;margin-bottom:4px;"></div>
+            <div style="height:6px;width:70%;background:#EEF1F6;border-radius:3px;"></div>
+          </div>
+          <div style="background:#FFF3EC;border:2px solid #F26422;border-radius:8px;padding:10px;margin-bottom:8px;position:relative;">
+            <span style="position:absolute;top:-9px;left:10px;background:#F26422;color:#fff;font-size:9px;padding:2px 8px;border-radius:99px;font-weight:800;">📣 PUBLICITÉ</span>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+              <div style="width:44px;height:44px;border-radius:6px;background:#FBD2BB;flex-shrink:0;"></div>
+              <div style="flex:1;"><div style="height:7px;width:70%;background:#FBD2BB;border-radius:3px;margin-bottom:5px;"></div><div style="height:6px;width:90%;background:#FCE0CD;border-radius:3px;"></div></div>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;padding:10px;">
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><div style="width:20px;height:20px;border-radius:50%;background:#DCE4EF;"></div><div style="height:7px;width:30%;background:#E5EAF2;border-radius:3px;"></div></div>
+            <div style="height:6px;width:80%;background:#EEF1F6;border-radius:3px;"></div>
+          </div>
+        </div>`
+    },
+    between_posts: {
+      titre: 'Entre les publications',
+      caption: "Diffusée dans le fil des publications (posts d'utilisateurs et d'initiatives), insérée entre deux publications au fil de la lecture.",
+      html: `
+        <div style="background:#F4F6FA;border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.05em;color:#94a3b8;margin-bottom:8px;">📣 FIL D'ACTUALITÉ</div>
+          <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;padding:9px;margin-bottom:7px;"><div style="height:6px;width:60%;background:#EEF1F6;border-radius:3px;margin-bottom:5px;"></div><div style="height:6px;width:85%;background:#EEF1F6;border-radius:3px;"></div></div>
+          <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;padding:9px;margin-bottom:7px;"><div style="height:6px;width:50%;background:#EEF1F6;border-radius:3px;margin-bottom:5px;"></div><div style="height:6px;width:75%;background:#EEF1F6;border-radius:3px;"></div></div>
+          <div style="background:#FFF3EC;border:2px solid #F26422;border-radius:8px;padding:9px;margin-bottom:7px;position:relative;">
+            <span style="position:absolute;top:-9px;left:10px;background:#F26422;color:#fff;font-size:9px;padding:2px 8px;border-radius:99px;font-weight:800;">📣 PUBLICITÉ</span>
+            <div style="height:6px;width:55%;background:#FBD2BB;border-radius:3px;margin-top:4px;margin-bottom:5px;"></div>
+            <div style="height:6px;width:80%;background:#FCE0CD;border-radius:3px;"></div>
+          </div>
+          <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;padding:9px;"><div style="height:6px;width:65%;background:#EEF1F6;border-radius:3px;margin-bottom:5px;"></div><div style="height:6px;width:40%;background:#EEF1F6;border-radius:3px;"></div></div>
+        </div>`
+    },
+    between_videos: {
+      titre: 'Entre les vidéos',
+      caption: "Positionnée dans les grilles de vidéos (audiovisuel, contenus vidéo), sous forme de tuile publicitaire au milieu des miniatures vidéo.",
+      html: `
+        <div style="background:#F4F6FA;border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.05em;color:#94a3b8;margin-bottom:8px;">🎬 GRILLE VIDÉOS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="background:#0D1B2A;border-radius:8px;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;">▶️</div>
+            <div style="background:#0D1B2A;border-radius:8px;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;">▶️</div>
+            <div style="background:#FFF3EC;border:2px solid #F26422;border-radius:8px;aspect-ratio:16/10;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
+              <span style="position:absolute;top:-9px;left:8px;background:#F26422;color:#fff;font-size:8px;padding:2px 7px;border-radius:99px;font-weight:800;">📣 PUB</span>
+              <span style="font-size:18px;">📣</span>
+            </div>
+            <div style="background:#0D1B2A;border-radius:8px;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;">▶️</div>
+          </div>
+        </div>`
+    },
+    vitrine_section: {
+      titre: 'Section vitrine',
+      caption: "Affichée dans une section dédiée des vitrines boutiques (profils Initiative), en complément des produits mis en avant.",
+      html: `
+        <div style="background:#F4F6FA;border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.05em;color:#94a3b8;margin-bottom:8px;">🛍️ VITRINE — BOUTIQUE</div>
+          <div style="height:36px;background:linear-gradient(135deg,#0D2B4E,#1E4F8A);border-radius:8px;margin-bottom:8px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;padding:6px;"><div style="height:30px;background:#EEF1F6;border-radius:5px;margin-bottom:5px;"></div><div style="height:6px;width:70%;background:#E5EAF2;border-radius:3px;"></div></div>
+            <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;padding:6px;"><div style="height:30px;background:#EEF1F6;border-radius:5px;margin-bottom:5px;"></div><div style="height:6px;width:70%;background:#E5EAF2;border-radius:3px;"></div></div>
+          </div>
+          <div style="background:#FFF3EC;border:2px solid #F26422;border-radius:8px;padding:9px;position:relative;">
+            <span style="position:absolute;top:-9px;left:10px;background:#F26422;color:#fff;font-size:9px;padding:2px 8px;border-radius:99px;font-weight:800;">📣 SPONSORISÉ</span>
+            <div style="height:6px;width:60%;background:#FBD2BB;border-radius:3px;margin-top:4px;margin-bottom:5px;"></div>
+            <div style="height:6px;width:85%;background:#FCE0CD;border-radius:3px;"></div>
+          </div>
+        </div>`
+    },
+  };
+  window.showAdSlotPreview = function(slot) {
+    const p = AD_SLOT_PREVIEWS[slot];
+    if (!p) return;
+    document.getElementById('ad-slot-preview-title').textContent = '👁 Aperçu — ' + p.titre;
+    document.getElementById('ad-slot-preview-body').innerHTML = p.html;
+    document.getElementById('ad-slot-preview-caption').textContent = p.caption;
+    document.getElementById('ad-slot-preview-modal').style.display = 'flex';
+  };
+  window.closeAdSlotPreview = function() { document.getElementById('ad-slot-preview-modal').style.display = 'none'; };
+
+  window.editAd = function(id) {
+    const ad = _myAdsCache.find(a => Number(a.id) === Number(id));
+    if (ad) openAdModal(ad);
+  };
+
+  window.deleteAd = async function(id) {
+    if (!confirm('Supprimer définitivement cette publicité ?')) return;
+    try {
+      await api('DELETE', `/ads/${id}`);
+      loadMyAds();
+    } catch (e) { alert(e.message || 'Erreur lors de la suppression.'); }
+  };
 
   async function saveAd() {
     const errBox = document.getElementById('ad-err');
     errBox.style.display = 'none';
-    const fileInput = document.getElementById('ad-media');
     const titre = document.getElementById('ad-titre').value.trim();
-    if (!fileInput.files[0]) { errBox.textContent = 'Un média est requis.'; errBox.style.display = 'block'; return; }
     if (!titre) { errBox.textContent = 'Le titre est requis.'; errBox.style.display = 'block'; return; }
 
+    const emplacements = Array.from(document.querySelectorAll('.ad-slot-check:checked')).map(c => c.value);
+    const zones = Array.from(document.querySelectorAll('.ad-zone-check:checked')).map(c => c.value);
+    const listes = Array.from(document.querySelectorAll('.ad-liste-check:checked')).map(c => c.value);
+    const publicationProgrammee = document.getElementById('ad-pub-programmee').checked;
+    const datePublication = publicationProgrammee ? document.getElementById('ad-date-publication').value : '';
+
+    const btn = document.getElementById('ad-btn-save');
+    btn.disabled = true;
+
+    if (_editingAdId) {
+      // Modification : jamais de changement de durée ni de média, uniquement les champs éditoriaux/ciblage/planification.
+      try {
+        await api('PUT', `/ads/${_editingAdId}`, {
+          titre, description: document.getElementById('ad-description').value,
+          lien_url: document.getElementById('ad-lien').value, cta: document.getElementById('ad-cta').value,
+          emplacements, date_publication: datePublication || undefined,
+        });
+        closeAdModal();
+        loadMyAds();
+      } catch (e) {
+        errBox.textContent = e.message || 'Erreur lors de la modification.';
+        errBox.style.display = 'block';
+      }
+      btn.disabled = false;
+      return;
+    }
+
+    if (!document.getElementById('ad-charte-accept').checked) {
+      errBox.textContent = "Vous devez accepter la charte d'engagement des annonceurs avant de publier.";
+      errBox.style.display = 'block'; btn.disabled = false; return;
+    }
+    const fileInput = document.getElementById('ad-media');
+    if (!fileInput.files[0]) { errBox.textContent = 'Un média est requis.'; errBox.style.display = 'block'; btn.disabled = false; return; }
     const file = fileInput.files[0];
     let dureeSec = 0;
     if (file.type.startsWith('video/')) {
@@ -2183,12 +2409,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         v.onerror = () => resolve(0);
         v.src = URL.createObjectURL(file);
       });
-      if (dureeSec > 30) { errBox.textContent = 'La vidéo doit durer 30 secondes maximum.'; errBox.style.display = 'block'; return; }
+      if (dureeSec > 30) { errBox.textContent = 'La vidéo doit durer 30 secondes maximum.'; errBox.style.display = 'block'; btn.disabled = false; return; }
     }
 
-    const emplacements = Array.from(document.querySelectorAll('.ad-slot-check:checked')).map(c => c.value);
-    const zones = Array.from(document.querySelectorAll('.ad-zone-check:checked')).map(c => c.value);
-    const listes = Array.from(document.querySelectorAll('.ad-liste-check:checked')).map(c => c.value);
     const fd = new FormData();
     fd.append('media', file);
     fd.append('titre', titre);
@@ -2197,6 +2420,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     fd.append('cta', document.getElementById('ad-cta').value);
     fd.append('duree_jours', document.getElementById('ad-duree').value);
     fd.append('duree_sec', String(Math.round(dureeSec)));
+    fd.append('charte_acceptee', '1');
     fd.append('emplacements', JSON.stringify(emplacements));
     fd.append('cible_zones', JSON.stringify(zones));
     fd.append('cible_listes', JSON.stringify(listes));
@@ -2204,18 +2428,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     fd.append('cible_departement', document.getElementById('ad-cible-departement').value.trim());
     fd.append('cible_region', document.getElementById('ad-cible-region').value.trim());
     fd.append('cible_pays', document.getElementById('ad-cible-pays').value.trim());
+    if (datePublication) fd.append('date_publication', datePublication);
 
-    const btn = document.getElementById('ad-btn-save');
-    btn.disabled = true;
     try {
       const r = await fetch('/api/ads/create', { method: 'POST', credentials: 'include', body: fd });
       const data = await r.json();
       if (r.ok) {
         closeAdModal();
-        alert('✅ Votre publicité a été soumise avec succès. L\'équipe Diaspo\'Actif l\'examinera avant diffusion.');
+        alert(publicationProgrammee ? '✅ Publicité programmée avec succès.' : '✅ Publicité publiée avec succès.');
         initPubSection();
       } else {
-        errBox.textContent = data.error || 'Erreur lors de la soumission.';
+        errBox.textContent = data.error || 'Erreur lors de la publication.';
         errBox.style.display = 'block';
       }
     } catch (e) {

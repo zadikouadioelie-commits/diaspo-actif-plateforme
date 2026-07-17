@@ -285,6 +285,7 @@ async function migratePg(pool) {
     ['publicites', 'motif_rejet', 'TEXT'],
     ['publicites', 'nb_video_views', 'INTEGER DEFAULT 0'],
     ['publicites', 'nb_full_video_views', 'INTEGER DEFAULT 0'],
+    ['publicites', 'charte_acceptee_le', 'TEXT'],
     // Synchronisation des réseaux sociaux — badge "Importé depuis X" sur les posts du fil
     ['fil_posts', 'source_import', 'TEXT'],
     // ─── Rattrapage massif : colonnes présentes dans db.js (SQLite) mais jamais migrées vers Postgres ───

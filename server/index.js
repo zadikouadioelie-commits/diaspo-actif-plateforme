@@ -1733,7 +1733,7 @@ function adhesionExpirationMonths(type) {
   return null;
 }
 /* Modes de paiement autorisés — chèque et espèces définitivement supprimés (non vérifiables, hors politique plateforme) */
-const ADHESION_PAYMENT_MODES = ['carte', 'paypal', 'virement', 'mobile_money', 'prelevement'];
+const ADHESION_PAYMENT_MODES = ['carte', 'paypal', 'virement'];
 function sanitizeAdhesionModes(modes) {
   const arr = Array.isArray(modes) ? modes.filter(m => ADHESION_PAYMENT_MODES.includes(m)) : [];
   return arr.length ? arr : ['carte'];
@@ -1958,7 +1958,7 @@ route("POST", "/api/adhesion-membres/:id/marquer-paye", async (req, res, params,
   if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=?").get(m.formule_id);
   const montant = Number(body.montant) || 0;
-  const MODES_MANUELS = ['virement', 'mobile_money'];
+  const MODES_MANUELS = ['virement', 'carte', 'paypal'];
   const modePaiement = MODES_MANUELS.includes(body.mode_paiement) ? body.mode_paiement : 'virement';
   if (montant <= 0) return sendJSON(res, 400, { error: "Montant invalide." });
 
@@ -8244,8 +8244,7 @@ const PUB_PLANS = [
   { id: "business", label: "Business", prix_annuel: 150, prix_mensuel_equiv: 12.50, quota_mensuel: 2 },
   { id: "premium",  label: "Premium",  prix_annuel: 200, prix_mensuel_equiv: 16.67, quota_mensuel: 4 },
 ];
-const PUB_SLOTS = ["homepage_feed", "between_posts", "between_videos",
-  "calls_for_projects", "vitrine_section"];
+const PUB_SLOTS = ["homepage_feed", "between_posts", "between_videos", "vitrine_section"];
 const PUB_AD_CTA = ["En savoir plus", "Acheter", "Contacter", "S'inscrire"];
 
 route("GET", "/api/ads/plans", async (req, res) => {
@@ -8401,6 +8400,7 @@ route("POST", "/api/ads/create", async (req, res) => {
 
   const titre = String(fields.titre || "").trim();
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  if (fields.charte_acceptee !== "1") return sendJSON(res, 400, { error: "Vous devez accepter la charte d'engagement des annonceurs avant de publier." });
   const dureeSec = Number(fields.duree_sec || 0);
 
   let mediaType = "image", checkedType = null;
@@ -8429,18 +8429,30 @@ route("POST", "/api/ads/create", async (req, res) => {
   const cibleRegion = fields.cible_region || null;
   const ciblePaysVal = fields.cible_pays || null;
 
+  /* Durée toujours plafonnée à un mois maximum (30 jours) — jamais modifiable ensuite. */
+  const dureeJours = Math.min(Math.max(parseInt(fields.duree_jours) || 7, 1), 30);
+
+  /* Publication immédiate par défaut, ou programmée à une date future (fields.date_publication, YYYY-MM-DD).
+     Aucune validation administrateur n'est requise : la campagne est active dès sa date de début. */
+  let datePublicationSql = "date('now')";
+  const dp = fields.date_publication ? String(fields.date_publication).slice(0, 10) : null;
+  if (dp && /^\d{4}-\d{2}-\d{2}$/.test(dp) && new Date(dp) >= new Date(new Date().toDateString())) {
+    datePublicationSql = `date('${dp}')`;
+  }
+  const dateFinSql = `date(${datePublicationSql},'+${dureeJours} days')`;
+
   try {
     const filename = uniqueFilename(file.filename, user.id);
     const url = await uploadToBunny(file.buffer, filename, "ads");
     const id = db.prepare(`
       INSERT INTO publicites (user_id, annonceur, media_type, media_url, titre, description, cta, lien_url, duree_jours,
-        cible_pays, cible_langue, cible_interet, emplacements, statut,
+        cible_pays, cible_langue, cible_interet, emplacements, statut, date_debut, date_fin, charte_acceptee_le,
         cible_zones, cible_ville, cible_departement, cible_region, cible_listes)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending_admin', ?,?,?,?,?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'approved', ${datePublicationSql}, ${dateFinSql}, datetime('now'), ?,?,?,?,?)
     `).run(
       user.id, user.nom || 'Diaspo\'Actif', mediaType, url, titre, fields.description || null,
       PUB_AD_CTA.includes(fields.cta) ? fields.cta : "En savoir plus",
-      fields.lien_url || null, Math.min(Math.max(parseInt(fields.duree_jours) || 7, 1), 30),
+      fields.lien_url || null, dureeJours,
       JSON.stringify(ciblePaysVal ? [ciblePaysVal] : []),
       JSON.stringify(fields.cible_langue ? [fields.cible_langue] : []),
       JSON.stringify(fields.cible_interet ? [fields.cible_interet] : []),
@@ -8449,10 +8461,6 @@ route("POST", "/api/ads/create", async (req, res) => {
     ).lastInsertRowid;
 
     if (abo) await db.prepare("UPDATE pub_abonnements SET credits_restants=credits_restants-1, updated_at=datetime('now') WHERE id=?").run(abo.id);
-
-    const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
-    admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle campagne publicitaire",
-      `${user.nom} a soumis une publicité « ${titre} » en attente de validation.`, { publicite_id: Number(id) }));
 
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "ad", type: checkedType, size: file.buffer.length });
     sendJSON(res, 201, { id, ok: true });
@@ -8524,18 +8532,66 @@ route("POST", "/api/ads/:id/video-full-view", async (req, res, params) => {
   sendJSON(res, 200, { ok: true });
 });
 
-/* ── Admin : dashboard + modération des campagnes ── */
+/* PUT /api/ads/:id — le propriétaire modifie sa campagne (titre, description, cible, planification).
+   La durée (duree_jours) n'est jamais modifiable : plafonnée à un mois dès la création, non éditable ici. */
+route("PUT", "/api/ads/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
+  if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
+  if (Number(ad.user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de la campagne." });
+
+  const titre = body.titre !== undefined ? String(body.titre).trim() : ad.titre;
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  const description = body.description !== undefined ? body.description : ad.description;
+  const cta = body.cta !== undefined ? (PUB_AD_CTA.includes(body.cta) ? body.cta : ad.cta) : ad.cta;
+  const lienUrl = body.lien_url !== undefined ? body.lien_url : ad.lien_url;
+  let emplacements = safeParse(ad.emplacements) || [];
+  if (Array.isArray(body.emplacements)) emplacements = body.emplacements.filter(e => PUB_SLOTS.includes(e));
+
+  /* La durée reste celle définie à la création (max 30 jours) — on ignore volontairement body.duree_jours. */
+  const dureeJours = Math.min(Math.max(parseInt(ad.duree_jours) || 7, 1), 30);
+  let dateDebut = ad.date_debut;
+  let dateFin = ad.date_fin;
+  if (body.date_publication) {
+    const dp = String(body.date_publication).slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dp)) {
+      dateDebut = dp;
+      const d = new Date(dp + 'T00:00:00');
+      d.setDate(d.getDate() + dureeJours);
+      dateFin = d.toISOString().slice(0, 10);
+    }
+  }
+
+  await db.prepare(`
+    UPDATE publicites SET titre=?, description=?, cta=?, lien_url=?, emplacements=?, date_debut=?, date_fin=?, updated_at=datetime('now')
+    WHERE id=?
+  `).run(titre, description, cta, lienUrl, JSON.stringify(emplacements), dateDebut, dateFin, ad.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/ads/:id — le propriétaire supprime sa propre campagne. */
+route("DELETE", "/api/ads/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
+  if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
+  if (Number(ad.user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de la campagne." });
+  await db.prepare("DELETE FROM publicites WHERE id=?").run(ad.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Admin : dashboard + modération des campagnes signalées (pause/reprise/suppression) ── */
 route("GET", "/api/admin/ads/dashboard", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
   const total = await db.prepare("SELECT COUNT(*) n FROM publicites").get();
-  const pending = await db.prepare("SELECT COUNT(*) n FROM publicites WHERE statut='pending_admin'").get();
   const active = await db.prepare("SELECT COUNT(*) n FROM publicites WHERE statut='approved'").get();
   const agg = await db.prepare("SELECT SUM(nb_impressions) imp, SUM(nb_clics) clics FROM publicites").get();
   const revenus = await db.prepare("SELECT COUNT(*) n FROM pub_abonnements WHERE statut='active'").get();
   const ctr = agg.imp > 0 ? ((agg.clics / agg.imp) * 100).toFixed(2) : "0.00";
   sendJSON(res, 200, {
-    total: total.n, pending: pending.n, active: active.n,
+    total: total.n, active: active.n,
     impressions_totales: agg.imp || 0, ctr_global: ctr, abonnements_actifs: revenus.n,
   });
 });
@@ -8550,33 +8606,20 @@ route("GET", "/api/admin/ads", async (req, res, params, body, query) => {
   sendJSON(res, 200, { publicites: rows });
 });
 
-route("POST", "/api/admin/ads/:id/approve", async (req, res, params) => {
+/* POST /api/ads/:id/renouveler — le propriétaire renouvelle sa campagne pour un nouveau cycle (max 30 jours).
+   Doit être appelé avant l'expiration : passé la date de fin, la campagne est supprimée par le cron /api/cron/ads-expiration. */
+route("POST", "/api/ads/:id/renouveler", async (req, res, params) => {
   const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
   if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
-  db.prepare(`UPDATE publicites SET statut='approved', date_debut=date('now'), date_fin=date('now','+${Number(ad.duree_jours) || 7} days'), updated_at=datetime('now') WHERE id=?`).run(ad.id);
-  creerNotif(ad.user_id, "pub_approuvee", "Publicité approuvée ✅", `Votre publicité « ${ad.titre} » est maintenant diffusée.`, { publicite_id: ad.id });
+  if (Number(ad.user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de la campagne." });
+  if (ad.statut !== 'approved' && ad.statut !== 'paused') return sendJSON(res, 400, { error: "Seule une campagne active ou en pause peut être renouvelée." });
+  const dureeJours = Math.min(Math.max(parseInt(ad.duree_jours) || 7, 1), 30);
+  db.prepare(`UPDATE publicites SET statut='approved', date_debut=date('now'), date_fin=date('now','+${dureeJours} days'), updated_at=datetime('now') WHERE id=?`).run(ad.id);
   sendJSON(res, 200, { ok: true });
 });
-route("POST", "/api/admin/ads/:id/reject", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
-  if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
-  db.prepare("UPDATE publicites SET statut='rejected', motif_rejet=?, updated_at=datetime('now') WHERE id=?").run(body.motif || null, ad.id);
-  creerNotif(ad.user_id, "pub_refusee", "Publicité refusée", `Votre publicité « ${ad.titre} » a été refusée. ${body.motif ? 'Motif : ' + body.motif : ''}`, { publicite_id: ad.id });
-  sendJSON(res, 200, { ok: true });
-});
-route("POST", "/api/admin/ads/:id/need-modification", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
-  if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
-  db.prepare("UPDATE publicites SET statut='need_modification', motif_rejet=?, updated_at=datetime('now') WHERE id=?").run(body.commentaire || null, ad.id);
-  creerNotif(ad.user_id, "pub_modif", "Modification demandée", `L'équipe demande une modification sur « ${ad.titre} » : ${body.commentaire || ''}`, { publicite_id: ad.id });
-  sendJSON(res, 200, { ok: true });
-});
+
 route("POST", "/api/admin/ads/:id/pause", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
@@ -14082,6 +14125,35 @@ async function handleRequest(req, res) {
       sendJSON(res, 200, { ok: true, alertesEnvoyees, archivages, suppressions });
     } catch (e) {
       sendJSON(res, 500, SEC.safeError(e, "cron formation-suppressions"));
+    }
+    return;
+  }
+
+  /* ── Expiration des publicités (Vercel Cron, quotidien) ──
+     Une publicité dure au maximum un mois (duree_jours ≤ 30, voir /api/ads/create et /approve).
+     Passé sa date_fin, elle est supprimée définitivement : elle disparaît immédiatement de tous les
+     emplacements de diffusion (/api/ads/servir ne sert que les campagnes en base) et de toutes les
+     plateformes. Le propriétaire peut la renouveler avant l'échéance via POST /api/ads/:id/renouveler. */
+  if (pathname === '/api/cron/ads-expiration') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const expirees = await db.prepare(`
+        SELECT * FROM publicites WHERE statut IN ('approved','paused') AND date_fin IS NOT NULL AND date_fin < date('now')
+      `).all();
+      let suppressions = 0;
+      for (const ad of expirees) {
+        creerNotif(ad.user_id, 'pub_expiree', 'Publicité arrivée à expiration',
+          `Votre publicité « ${ad.titre} » a atteint la durée maximale d'un mois et a été retirée de la plateforme. Vous pouvez créer une nouvelle campagne à tout moment.`);
+        await db.prepare("DELETE FROM publicites WHERE id=?").run(ad.id);
+        suppressions++;
+      }
+      sendJSON(res, 200, { ok: true, suppressions });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron ads-expiration"));
     }
     return;
   }
