@@ -1712,6 +1712,7 @@ function renderVisitorProfile() {
   const centerCol = `<main class="pvz-main">
     <section class="pvz-card">
       <div class="pvz-card-title">🗞️ Publications ${pubs.length?`<a class="more" href="fil-actualite.html" style="text-decoration:none;">Voir tout</a>`:''}</div>
+      ${isOwn ? `<button class="pvz-btn primary" style="width:100%;justify-content:center;margin-bottom:14px;" onclick="window.Posts&&Posts.openModal()">✍️ Créer une publication</button>` : ''}
       ${pubsInner}
     </section>
   </main>`;
