@@ -5,7 +5,8 @@
   "crons": [
     { "path": "/api/cron/backup", "schedule": "0 3 * * *" },
     { "path": "/api/cron/adhesion-relances", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/vote-relances", "schedule": "0 9 * * *" }
+    { "path": "/api/cron/vote-relances", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/formation-suppressions", "schedule": "0 6 * * *" }
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },

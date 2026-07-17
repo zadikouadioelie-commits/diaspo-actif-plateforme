@@ -1066,6 +1066,8 @@ const MIGRATIONS = [
   ["formations", "formateur_reseaux TEXT"],
   ["formations", "formateur_photo_url TEXT"],
   ["formations", "formateur_nom TEXT"],
+  ["formations", "date_suppression_prevue TEXT"],
+  ["formations", "suppression_alerte_envoyee INTEGER DEFAULT 0"],
   // Billetterie V1 — early-bird + attributs enrichis par type de billet
   ["ticket_types", "avantages TEXT"],
   ["ticket_types", "devise TEXT DEFAULT 'EUR'"],

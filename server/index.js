@@ -5988,26 +5988,60 @@ route("DELETE", "/api/formations/:id/coupons/:couponId", async (req, res, params
   sendJSON(res, 200, { ok: true });
 });
 
-/* Supprimer une formation (brouillon seulement) */
+async function cascadeDeleteFormation(id) {
+  const quizIds = (await db.prepare("SELECT id FROM formation_quiz WHERE formation_id=?").all(id)).map(q => q.id);
+  for (const qid of quizIds) {
+    await db.prepare("DELETE FROM formation_quiz_questions WHERE quiz_id=?").run(qid);
+  }
+  await db.prepare("DELETE FROM formation_quiz WHERE formation_id=?").run(id);
+  try { await db.prepare("DELETE FROM formation_lecons_progression WHERE inscription_id IN (SELECT id FROM formation_inscriptions WHERE formation_id=?)").run(id); } catch(_) {}
+  await db.prepare("DELETE FROM formation_lecons WHERE module_id IN (SELECT id FROM formation_modules WHERE formation_id=?)").run(id);
+  await db.prepare("DELETE FROM formation_chapitres WHERE module_id IN (SELECT id FROM formation_modules WHERE formation_id=?)").run(id);
+  await db.prepare("DELETE FROM formation_modules WHERE formation_id=?").run(id);
+  await db.prepare("DELETE FROM formation_coupons WHERE formation_id=?").run(id);
+  await db.prepare("DELETE FROM formation_avis WHERE formation_id=?").run(id);
+  await db.prepare("DELETE FROM formation_inscriptions WHERE formation_id=?").run(id);
+  await db.prepare("DELETE FROM formations WHERE id=?").run(id);
+}
+
+/* Supprimer une formation : immédiat pour un brouillon, refusé pour une formation publiée
+   (utiliser /programmer-suppression pour ces dernières — délai de préavis obligatoire) */
 route("DELETE", "/api/formations/:id", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
-  if ((f.statut||'brouillon') !== 'brouillon' && user.role !== 'administrateur') return sendJSON(res, 400, { error: "Seule une formation en brouillon peut être supprimée." });
-  const quizIds = (await db.prepare("SELECT id FROM formation_quiz WHERE formation_id=?").all(params.id)).map(q => q.id);
-  for (const qid of quizIds) {
-    await db.prepare("DELETE FROM formation_quiz_questions WHERE quiz_id=?").run(qid);
-  }
-  await db.prepare("DELETE FROM formation_quiz WHERE formation_id=?").run(params.id);
-  await db.prepare("DELETE FROM formation_lecons WHERE module_id IN (SELECT id FROM formation_modules WHERE formation_id=?)").run(params.id);
-  await db.prepare("DELETE FROM formation_chapitres WHERE module_id IN (SELECT id FROM formation_modules WHERE formation_id=?)").run(params.id);
-  await db.prepare("DELETE FROM formation_modules WHERE formation_id=?").run(params.id);
-  await db.prepare("DELETE FROM formation_coupons WHERE formation_id=?").run(params.id);
-  await db.prepare("DELETE FROM formation_avis WHERE formation_id=?").run(params.id);
-  await db.prepare("DELETE FROM formation_inscriptions WHERE formation_id=?").run(params.id);
-  await db.prepare("DELETE FROM formations WHERE id=?").run(params.id);
+  if ((f.statut||'brouillon') !== 'brouillon' && user.role !== 'administrateur') return sendJSON(res, 400, { error: "Seule une formation en brouillon peut être supprimée immédiatement. Pour une formation publiée, utilisez la suppression programmée." });
+  await cascadeDeleteFormation(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Programmer la suppression d'une formation publiée : préavis minimum d'une semaine.
+   Une alerte est envoyée aux élèves inscrits 7 jours avant la date choisie (voir cron ci-dessous). */
+route("POST", "/api/formations/:id/programmer-suppression", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if (f.statut !== 'publiee') return sendJSON(res, 400, { error: "Seule une formation publiée peut faire l'objet d'une suppression programmée." });
+  const date = body.date;
+  if (!date || isNaN(Date.parse(date))) return sendJSON(res, 400, { error: "Date invalide." });
+  const minDate = new Date(); minDate.setDate(minDate.getDate() + 7); minDate.setHours(0,0,0,0);
+  if (new Date(date) < minDate) return sendJSON(res, 400, { error: "La date de suppression doit être au minimum une semaine après aujourd'hui." });
+  await db.prepare("UPDATE formations SET date_suppression_prevue=?, suppression_alerte_envoyee=0 WHERE id=?").run(date, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Annuler une suppression programmée */
+route("DELETE", "/api/formations/:id/programmer-suppression", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  await db.prepare("UPDATE formations SET date_suppression_prevue=NULL, suppression_alerte_envoyee=0 WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -13857,6 +13891,60 @@ async function handleRequest(req, res) {
     } catch (e) {
       console.error('[vote-relances]', e.stack || e.message);
       sendJSON(res, 500, { error: 'Relances failed', detail: e.message });
+    }
+    return;
+  }
+
+  /* ── Suppressions programmées de formations publiées (Vercel Cron, quotidien) ──
+     À J-7 avant la date choisie : alerte tous les élèves inscrits (notification + email).
+     À la date choisie (ou après) : suppression effective en cascade. */
+  if (pathname === '/api/cron/formation-suppressions') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const { sendEmail } = require('./mailer');
+      const formations = await db.prepare(`
+        SELECT * FROM formations WHERE date_suppression_prevue IS NOT NULL
+      `).all();
+      let alertesEnvoyees = 0, suppressions = 0;
+      const now = new Date();
+      for (const f of formations) {
+        const dateSuppr = new Date(f.date_suppression_prevue);
+        const joursRestants = Math.round((dateSuppr - now) / 86400000);
+
+        if (joursRestants <= 0) {
+          await cascadeDeleteFormation(f.id);
+          suppressions++;
+          continue;
+        }
+
+        if (joursRestants <= 7 && !f.suppression_alerte_envoyee) {
+          const eleves = await db.prepare(`
+            SELECT i.user_id, u.email, u.nom FROM formation_inscriptions i
+            JOIN users u ON u.id=i.user_id
+            WHERE i.formation_id=? AND i.statut='active'
+          `).all(f.id);
+          for (const e of eleves) {
+            creerNotif(e.user_id, 'formation',
+              `« ${f.titre} » ne sera bientôt plus accessible`,
+              `Cette formation sera supprimée le ${f.date_suppression_prevue.slice(0,10)}. Terminez-la avant cette date pour obtenir votre certification si vous êtes proche de la fin.`,
+              { formation_id: f.id });
+            if (e.email) {
+              sendEmail(e.email, `« ${f.titre} » ne sera bientôt plus accessible`,
+                `Bonjour ${e.nom||''},\n\nLa formation « ${f.titre} » que vous suivez sur Diaspo'Actif sera supprimée le ${f.date_suppression_prevue.slice(0,10)} (dans ${joursRestants} jour${joursRestants>1?'s':''}).\n\nSi vous êtes proche de la fin, nous vous invitons à terminer la formation avant cette date afin d'obtenir votre certification.\n\nL'équipe Diaspo'Actif`
+              ).catch(()=>{});
+            }
+          }
+          await db.prepare("UPDATE formations SET suppression_alerte_envoyee=1 WHERE id=?").run(f.id);
+          alertesEnvoyees++;
+        }
+      }
+      sendJSON(res, 200, { ok: true, alertesEnvoyees, suppressions });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron formation-suppressions"));
     }
     return;
   }

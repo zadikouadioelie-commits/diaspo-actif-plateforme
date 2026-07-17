@@ -1664,9 +1664,11 @@
             <span class="tag">💰 ${(f.revenu_brut||0).toFixed(2)} € brut</span>
           </div>
           ${(f.statut==='refusee'||f.statut==='modifications_demandees') && f.motif_refus ? `<p style="margin:8px 0 0;font-size:12.5px;color:#dc2626;">Motif : ${f.motif_refus}</p>` : ''}
+          ${f.date_suppression_prevue ? `<div class="notice" style="margin-top:8px;font-size:12.5px;">🗑️ Suppression programmée le <strong>${f.date_suppression_prevue.slice(0,10)}</strong>. <button type="button" class="mf-annuler-suppr" data-id="${f.id}" style="border:none;background:none;color:#ff6b00;text-decoration:underline;cursor:pointer;">Annuler</button></div>` : ''}
           <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline mf-construire" data-id="${f.id}" data-titre="${f.titre.replace(/"/g,'&quot;')}" data-statut="${f.statut}">🛠️ Construire le contenu</button>
             <button class="btn btn-sm btn-outline mf-suivi" data-id="${f.id}" data-titre="${f.titre.replace(/"/g,'&quot;')}">📊 Suivi</button>
+            <button class="btn btn-sm btn-outline mf-supprimer" data-id="${f.id}" data-titre="${f.titre.replace(/"/g,'&quot;')}" data-statut="${f.statut}" style="color:#dc2626;border-color:#fca5a5;">🗑️ Supprimer la formation</button>
           </div>
         </div>`).join('');
       document.querySelectorAll('.mf-construire').forEach(btn=>{
@@ -1675,8 +1677,41 @@
       document.querySelectorAll('.mf-suivi').forEach(btn=>{
         btn.addEventListener('click', ()=> openSuiviFormation(btn.dataset.id, btn.dataset.titre));
       });
+      document.querySelectorAll('.mf-supprimer').forEach(btn=>{
+        btn.addEventListener('click', ()=> handleSupprimerFormation(btn.dataset.id, btn.dataset.titre, btn.dataset.statut));
+      });
+      document.querySelectorAll('.mf-annuler-suppr').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          if(!confirm('Annuler la suppression programmée de cette formation ?')) return;
+          try { await api('DELETE', `/formations/${btn.dataset.id}/programmer-suppression`); showMsg('Suppression annulée.', 'success'); loadMesFormations(); }
+          catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+        });
+      });
     } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
     loadDashboardCentreCommande();
+  }
+
+  async function handleSupprimerFormation(id, titre, statut){
+    if(statut !== 'publiee'){
+      if(!confirm(`Supprimer définitivement « ${titre} » ? Cette action est immédiate et irréversible.`)) return;
+      try { await api('DELETE', `/formations/${id}`); showMsg('Formation supprimée.', 'success'); loadMesFormations(); }
+      catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
+      return;
+    }
+    // Formation publiée : suppression programmée avec préavis minimum d'une semaine
+    const minDate = new Date(); minDate.setDate(minDate.getDate() + 7);
+    const minStr = minDate.toISOString().slice(0,10);
+    const saisie = prompt(`Cette formation est publiée et suivie par des élèves. Choisissez une date de suppression (préavis minimum d'une semaine).\nUn message d'alerte sera envoyé aux élèves inscrits 7 jours avant cette date.\n\nDate minimale : ${minStr}\nFormat : AAAA-MM-JJ`, minStr);
+    if(saisie === null) return;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(saisie) || saisie < minStr){
+      showMsg(`Date invalide. Elle doit être au format AAAA-MM-JJ et au minimum le ${minStr}.`, 'danger');
+      return;
+    }
+    try {
+      await api('POST', `/formations/${id}/programmer-suppression`, { date: saisie });
+      showMsg(`Suppression programmée pour le ${saisie}. Les élèves seront alertés 7 jours avant.`, 'success');
+      loadMesFormations();
+    } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
   }
 
   async function loadDashboardCentreCommande(){
