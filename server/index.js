@@ -5723,6 +5723,95 @@ route("GET", "/api/mes-formations", async (req, res) => {
   sendJSON(res, 200, { formations });
 });
 
+/* Centre de commande du formateur — tableau de bord agrégé sur toutes ses formations */
+route("GET", "/api/mes-formations/dashboard", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const formations = await db.prepare("SELECT id, statut FROM formations WHERE owner_user_id=?").all(user.id);
+  const ids = formations.map(f => f.id);
+  const nb = { total: formations.length, publiees: 0, brouillons: 0, archivees: 0 };
+  for (const f of formations) {
+    if (f.statut === 'publiee') nb.publiees++;
+    else if (f.statut === 'brouillon' || f.statut === 'refusee' || f.statut === 'soumise' || f.statut === 'en_attente' || f.statut === 'en_cours_analyse') nb.brouillons++;
+    else if (f.statut === 'suspendue') nb.archivees++;
+  }
+  let stats = {
+    nb_formations: nb.total, nb_publiees: nb.publiees, nb_brouillons: nb.brouillons, nb_archivees: nb.archivees,
+    nb_eleves: 0, nb_nouveaux_eleves_7j: 0, nb_formations_terminees: 0,
+    taux_reussite_moyen: 0, taux_avancement_moyen: 0,
+    revenu_total: 0, revenu_mois: 0, revenu_annee: 0,
+    nb_certificats: 0, nb_avis: 0, note_moyenne: 0
+  };
+  if (ids.length) {
+    const placeholders = ids.map(() => '?').join(',');
+    const inscriptions = await db.prepare(`SELECT * FROM formation_inscriptions WHERE formation_id IN (${placeholders}) AND statut='active'`).all(...ids);
+    const uniqueUsers = new Set(inscriptions.map(i => i.user_id));
+    stats.nb_eleves = uniqueUsers.size;
+    const sevenDaysAgo = new Date(Date.now() - 7*24*3600*1000).toISOString();
+    stats.nb_nouveaux_eleves_7j = inscriptions.filter(i => (i.date_inscription || i.created_at) >= sevenDaysAgo).length;
+    stats.nb_formations_terminees = inscriptions.filter(i => (i.avancement_pct||0) >= 100).length;
+    if (inscriptions.length) {
+      stats.taux_avancement_moyen = Math.round(inscriptions.reduce((s,i)=>s+(i.avancement_pct||0),0) / inscriptions.length);
+      stats.taux_reussite_moyen = Math.round((inscriptions.filter(i=>(i.avancement_pct||0)>=100).length / inscriptions.length) * 100);
+    }
+    stats.revenu_total = inscriptions.reduce((s,i)=>s+(i.montant_paye||0), 0);
+    const now = new Date();
+    const debutMois = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const debutAnnee = new Date(now.getFullYear(), 0, 1).toISOString();
+    stats.revenu_mois = inscriptions.filter(i => (i.date_inscription||i.created_at) >= debutMois).reduce((s,i)=>s+(i.montant_paye||0), 0);
+    stats.revenu_annee = inscriptions.filter(i => (i.date_inscription||i.created_at) >= debutAnnee).reduce((s,i)=>s+(i.montant_paye||0), 0);
+
+    stats.nb_certificats = (await db.prepare(`SELECT COUNT(*) AS n FROM user_certifications_obtenues WHERE formation_id IN (${placeholders})`).get(...ids))?.n || 0;
+    const avis = await db.prepare(`SELECT note FROM formation_avis WHERE formation_id IN (${placeholders})`).all(...ids);
+    stats.nb_avis = avis.length;
+    stats.note_moyenne = avis.length ? Math.round((avis.reduce((s,a)=>s+a.note,0) / avis.length) * 10) / 10 : 0;
+  }
+  sendJSON(res, 200, { stats });
+});
+
+/* Centre de commande — suivi détaillé d'une formation (stats + liste des élèves) */
+route("GET", "/api/formations/:id/suivi", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  const modules = await db.prepare("SELECT id FROM formation_modules WHERE formation_id=?").all(params.id);
+  const nb_modules = modules.length;
+  let nb_lecons = 0;
+  for (const m of modules) {
+    const chapitres = await db.prepare("SELECT id FROM formation_chapitres WHERE module_id=?").all(m.id);
+    for (const c of chapitres) nb_lecons += (await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons WHERE chapitre_id=?").get(c.id))?.n || 0;
+  }
+  const inscriptions = await db.prepare(`
+    SELECT i.*, u.nom AS eleve_nom, u.email AS eleve_email
+    FROM formation_inscriptions i JOIN users u ON u.id=i.user_id
+    WHERE i.formation_id=? AND i.statut='active'
+    ORDER BY i.avancement_pct DESC
+  `).all(params.id);
+  for (const i of inscriptions) {
+    const last = await db.prepare(`
+      SELECT MAX(date_completion) AS d FROM formation_lecons_progression WHERE inscription_id=? AND termine=1
+    `).get(i.id);
+    i.derniere_activite = last?.d || i.date_inscription || i.created_at;
+  }
+  const termine = inscriptions.filter(i => (i.avancement_pct||0) >= 100).length;
+  const enCours = inscriptions.filter(i => (i.avancement_pct||0) > 0 && (i.avancement_pct||0) < 100).length;
+  const nonCommence = inscriptions.filter(i => (i.avancement_pct||0) === 0).length;
+  const progressionMoyenne = inscriptions.length ? Math.round(inscriptions.reduce((s,i)=>s+(i.avancement_pct||0),0) / inscriptions.length) : 0;
+  const tauxReussite = inscriptions.length ? Math.round((termine / inscriptions.length) * 100) : 0;
+  sendJSON(res, 200, {
+    formation: f, nb_modules, nb_lecons,
+    nb_inscrits: inscriptions.length, progression_moyenne: progressionMoyenne,
+    termine, en_cours: enCours, non_commence: nonCommence, taux_reussite: tauxReussite,
+    eleves: inscriptions.map(i => ({
+      nom: i.eleve_nom, email: i.eleve_email, avancement_pct: i.avancement_pct,
+      derniere_activite: i.derniere_activite,
+      statut: (i.avancement_pct||0) >= 100 ? 'Terminée' : (i.avancement_pct||0) > 0 ? 'Active' : 'Non commencée'
+    }))
+  });
+});
+
 /* Mes inscriptions (apprenant) */
 route("GET", "/api/mes-inscriptions", async (req, res) => {
   const user = await getCurrentUser(req);

@@ -70,6 +70,17 @@
 #fb-ai-mic.recording{background:#dc2626;color:#fff;border-color:#dc2626;animation:fbMicPulse 1.2s infinite;}
 @keyframes fbMicPulse{0%{box-shadow:0 0 0 0 rgba(220,38,38,.5);}70%{box-shadow:0 0 0 8px rgba(220,38,38,0);}100%{box-shadow:0 0 0 0 rgba(220,38,38,0);}}
 .fb-ai-highlight{animation:fbAiFieldGlow 1.6s ease-out;}
+.fb-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.fb-dash-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.fb-dash-num{font-size:20px;font-weight:800;color:#ff6b00;}
+.fb-dash-lbl{font-size:11.5px;color:var(--muted);margin-top:2px;}
+.fb-eleve-table{width:100%;border-collapse:collapse;font-size:13px;}
+.fb-eleve-table th{text-align:left;padding:6px 8px;color:var(--muted);font-size:11.5px;text-transform:uppercase;border-bottom:1px solid var(--border);}
+.fb-eleve-table td{padding:8px;border-bottom:1px solid var(--border);}
+.fb-statut-pill{padding:2px 10px;border-radius:99px;font-size:11.5px;font-weight:700;}
+.fb-statut-pill.active{background:#dbeafe;color:#1e40af;}
+.fb-statut-pill.terminee{background:#dcfce7;color:#166534;}
+.fb-statut-pill.non-commencee{background:#f1f5f9;color:#64748b;}
 @keyframes fbAiFieldGlow{0%{background-color:#fff3c4;box-shadow:0 0 0 3px #fbbf24;}100%{background-color:transparent;box-shadow:0 0 0 0 rgba(251,191,36,0);}}
 @media (max-width:1100px){
   [data-fb-panel="infos"]{flex-direction:column !important;}
@@ -233,7 +244,24 @@
           <button class="btn btn-sm btn-orange" id="btn-creer-formation">+ Créer une nouvelle formation</button>
         </div>
         <div class="notice" style="margin-bottom:16px;">🎬 Chaque formation soumise est examinée par l'équipe Diaspo'Actif avant publication dans le catalogue.</div>
+
+        <!-- Centre de commande du formateur : tableau de bord synthétique -->
+        <h3 style="margin:0 0 10px;">🎛️ Centre de commande</h3>
+        <div class="fb-dash-grid" id="fb-dash-grid"><div class="notice">Chargement du tableau de bord…</div></div>
+
+        <h3 style="margin:20px 0 10px;">Mes formations</h3>
         <div id="mes-formations-list"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <!-- Modal Suivi d'une formation (Centre de commande) -->
+      <div id="modal-suivi" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;overflow-y:auto;">
+        <div class="card" style="max-width:820px;margin:30px auto;padding:24px;">
+          <div class="flex-between" style="margin-bottom:12px;">
+            <h2 style="margin:0;" id="suivi-titre">Suivi de la formation</h2>
+            <button class="btn btn-sm btn-outline" id="modal-suivi-close">✕ Fermer</button>
+          </div>
+          <div id="suivi-content"><div class="notice">Chargement…</div></div>
+        </div>
       </div>
 
       <!-- ════ Éditeur de contenu complet d'une formation (menu latéral libre : infos, contenu, quiz, certificat, accès, aperçu, soumission) ════ -->
@@ -1638,13 +1666,75 @@
           ${(f.statut==='refusee'||f.statut==='modifications_demandees') && f.motif_refus ? `<p style="margin:8px 0 0;font-size:12.5px;color:#dc2626;">Motif : ${f.motif_refus}</p>` : ''}
           <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline mf-construire" data-id="${f.id}" data-titre="${f.titre.replace(/"/g,'&quot;')}" data-statut="${f.statut}">🛠️ Construire le contenu</button>
+            <button class="btn btn-sm btn-outline mf-suivi" data-id="${f.id}" data-titre="${f.titre.replace(/"/g,'&quot;')}">📊 Suivi</button>
           </div>
         </div>`).join('');
       document.querySelectorAll('.mf-construire').forEach(btn=>{
         btn.addEventListener('click', ()=> openFormationBuilder(btn.dataset.id, btn.dataset.titre, btn.dataset.statut));
       });
+      document.querySelectorAll('.mf-suivi').forEach(btn=>{
+        btn.addEventListener('click', ()=> openSuiviFormation(btn.dataset.id, btn.dataset.titre));
+      });
     } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+    loadDashboardCentreCommande();
   }
+
+  async function loadDashboardCentreCommande(){
+    const el = document.getElementById('fb-dash-grid');
+    if(!el) return;
+    try {
+      const { stats: s } = await api('GET', '/mes-formations/dashboard');
+      const cards = [
+        [s.nb_formations, 'Formations'], [s.nb_publiees, 'Publiées'], [s.nb_brouillons, 'En brouillon'], [s.nb_archivees, 'Archivées'],
+        [s.nb_eleves, 'Élèves'], [s.nb_nouveaux_eleves_7j, 'Nouveaux (7j)'], [s.nb_formations_terminees, 'Formations terminées'],
+        [s.taux_reussite_moyen+'%', 'Taux de réussite moyen'], [s.taux_avancement_moyen+'%', "Taux d'avancement moyen"],
+        [(s.revenu_total||0).toFixed(2)+' €', "Chiffre d'affaires"], [(s.revenu_mois||0).toFixed(2)+' €', 'Revenus du mois'], [(s.revenu_annee||0).toFixed(2)+' €', 'Revenus annuels'],
+        [s.nb_certificats, 'Certificats délivrés'], [s.nb_avis, 'Avis laissés'], [s.note_moyenne ? s.note_moyenne+'/5' : '—', 'Note moyenne'],
+      ];
+      el.innerHTML = cards.map(([num,lbl]) => `<div class="fb-dash-card"><div class="fb-dash-num">${num}</div><div class="fb-dash-lbl">${lbl}</div></div>`).join('');
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement du tableau de bord.</div>'; }
+  }
+
+  async function openSuiviFormation(id, titre){
+    document.getElementById('suivi-titre').textContent = `Suivi — ${titre}`;
+    document.getElementById('modal-suivi').style.display = 'block';
+    const el = document.getElementById('suivi-content');
+    el.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const d = await api('GET', `/formations/${id}/suivi`);
+      el.innerHTML = `
+        <div class="tags" style="margin-bottom:14px;">
+          <span class="tag">${FB_STATUT_LBL[d.formation.statut]||d.formation.statut}</span>
+          <span class="tag">${d.formation.gratuit ? 'Gratuit' : (d.formation.prix||0)+' '+(d.formation.devise||'EUR')}</span>
+          <span class="tag">🧩 ${d.nb_modules} module(s)</span>
+          <span class="tag">📖 ${d.nb_lecons} leçon(s)</span>
+        </div>
+        <div class="fb-dash-grid" style="margin-bottom:18px;">
+          <div class="fb-dash-card"><div class="fb-dash-num">${d.nb_inscrits}</div><div class="fb-dash-lbl">Élèves inscrits</div></div>
+          <div class="fb-dash-card"><div class="fb-dash-num">${d.progression_moyenne}%</div><div class="fb-dash-lbl">Progression moyenne</div></div>
+          <div class="fb-dash-card"><div class="fb-dash-num">${d.termine}</div><div class="fb-dash-lbl">Formation terminée</div></div>
+          <div class="fb-dash-card"><div class="fb-dash-num">${d.en_cours}</div><div class="fb-dash-lbl">Formation en cours</div></div>
+          <div class="fb-dash-card"><div class="fb-dash-num">${d.non_commence}</div><div class="fb-dash-lbl">Non commencée</div></div>
+          <div class="fb-dash-card"><div class="fb-dash-num">${d.taux_reussite}%</div><div class="fb-dash-lbl">Taux de réussite</div></div>
+        </div>
+        <h3 style="margin:0 0 10px;">Progression détaillée des élèves</h3>
+        ${d.eleves.length ? `
+        <table class="fb-eleve-table">
+          <thead><tr><th>Élève</th><th>Progression</th><th>Dernière activité</th><th>Statut</th></tr></thead>
+          <tbody>
+            ${d.eleves.map(e => `
+              <tr>
+                <td>${e.nom}</td>
+                <td>${e.avancement_pct||0}%</td>
+                <td>${(e.derniere_activite||'').slice(0,10)}</td>
+                <td><span class="fb-statut-pill ${e.statut==='Terminée'?'terminee':e.statut==='Active'?'active':'non-commencee'}">${e.statut}</span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>` : '<div class="notice">Aucun élève inscrit pour le moment.</div>'}
+      `;
+    } catch(e){ el.innerHTML = '<div class="notice">Erreur de chargement du suivi.</div>'; }
+  }
+  document.getElementById('modal-suivi-close').addEventListener('click', ()=>{ document.getElementById('modal-suivi').style.display = 'none'; });
 
   // ════════════════════════════════════════════════════════════════
   // Éditeur de contenu complet (Étapes 5-11 de l'assistant de création)
