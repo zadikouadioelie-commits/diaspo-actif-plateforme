@@ -326,6 +326,11 @@
                   <input type="file" id="new-form-video-intro-file" accept="video/*" style="margin-top:6px;">
                   <div class="fb-upload-status" id="new-form-video-intro-status"></div>
                 </div>
+                <div><label style="font-size:13px;font-weight:700;">Logo de la formation <span class="fb-help" title="Un logo carré propre à cette formation, distinct de l'image de couverture — affiché comme icône dans le catalogue et les listes.">?</span></label>
+                  <input type="file" id="new-form-logo-file" accept="image/*">
+                  <div class="fb-upload-status" id="new-form-logo-status"></div>
+                  <img id="new-form-logo-preview" style="max-width:80px;border-radius:8px;margin-top:6px;display:none;">
+                </div>
                 <div><label style="font-size:13px;font-weight:700;">Image de couverture <span class="fb-help" title="L'image principale affichée en tête de la page de la formation.">?</span></label>
                   <input type="file" id="new-form-image-file" accept="image/*">
                   <div class="fb-upload-status" id="new-form-image-status"></div>
@@ -905,6 +910,7 @@
       telecharge_autorise: document.getElementById("new-form-telecharge").checked,
       video_intro: document.getElementById("new-form-video-intro").value.trim(),
       image_url: document.getElementById("new-form-image-file").dataset.url || undefined,
+      logo_url: document.getElementById("new-form-logo-file").dataset.url || undefined,
       galerie_json: fbGalerieUrls,
       prerequis: document.getElementById("new-form-prerequis").value.trim(),
       resultats_attendus: document.getElementById("new-form-resultats").value.trim(),
@@ -950,6 +956,11 @@
       return data.url;
     } catch(e){ statusEl.textContent = '❌ ' + (e.message||"Erreur lors de l'envoi."); return null; }
   }
+  document.getElementById('new-form-logo-file').addEventListener('change', async (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const url = await fbUploadImage(file, 'new-form-logo-status');
+    if(url){ e.target.dataset.url = url; document.getElementById('new-form-logo-preview').src = url; document.getElementById('new-form-logo-preview').style.display = ''; fbScheduleAutosave(); }
+  });
   document.getElementById('new-form-image-file').addEventListener('change', async (e)=>{
     const file = e.target.files[0]; if(!file) return;
     const url = await fbUploadImage(file, 'new-form-image-status');
@@ -973,9 +984,22 @@
     const url = await fbUploadImage(file, 'new-form-formateur-photo-status');
     if(url){ e.target.dataset.url = url; fbScheduleAutosave(); fbUpdatePreview(); }
   });
+  // Durée max 2 minutes pour toute vidéo uploadée (présentation de formation ou contenu de leçon)
+  function fbGetVideoDuration(file){
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement('video');
+      v.preload = 'metadata';
+      v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(v.duration || 0); };
+      v.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+      v.src = url;
+    });
+  }
   document.getElementById('new-form-video-intro-file').addEventListener('change', async (e)=>{
     const file = e.target.files[0]; if(!file) return;
     const statusEl = document.getElementById('new-form-video-intro-status');
+    const duree = await fbGetVideoDuration(file);
+    if(duree > 120){ statusEl.textContent = '❌ Vidéo trop longue : 2 minutes maximum.'; e.target.value = ''; return; }
     statusEl.textContent = 'Envoi en cours (max 60 Mo)…';
     try {
       const r = await fetch('/api/upload/video', { method: 'POST', credentials: 'same-origin', body: file });
@@ -1868,6 +1892,9 @@
       const imgPrev = document.getElementById('new-form-image-preview');
       document.getElementById('new-form-image-file').dataset.url = f.image_url || '';
       if(f.image_url){ imgPrev.src = f.image_url; imgPrev.style.display = ''; } else { imgPrev.style.display = 'none'; }
+      const logoPrev = document.getElementById('new-form-logo-preview');
+      document.getElementById('new-form-logo-file').dataset.url = f.logo_url || '';
+      if(f.logo_url){ logoPrev.src = f.logo_url; logoPrev.style.display = ''; } else { logoPrev.style.display = 'none'; }
       fbGalerieUrls = []; document.getElementById('new-form-galerie-preview').innerHTML = '';
       try {
         const galerie = f.galerie_json ? (typeof f.galerie_json === 'string' ? JSON.parse(f.galerie_json) : f.galerie_json) : [];
@@ -2148,13 +2175,25 @@
     const file = e.target.files[0];
     if (!file) return;
     const statusEl = document.getElementById('fb-lecon-upload-status');
+    const type = document.getElementById('fb-lecon-type').value;
+    if (type === 'video') {
+      const duree = await fbGetVideoDuration(file);
+      if (duree > 120) { statusEl.textContent = '❌ Vidéo trop longue : 2 minutes maximum.'; e.target.value = ''; return; }
+    }
     statusEl.textContent = 'Envoi en cours…';
     try {
-      const fd = new FormData();
-      fd.append('document', file);
-      const r = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Échec de l\'envoi.');
+      let data;
+      if (type === 'video') {
+        const r = await fetch('/api/upload/video', { method: 'POST', credentials: 'same-origin', body: file });
+        data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Échec de l'envoi.");
+      } else {
+        const fd = new FormData();
+        fd.append('document', file);
+        const r = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
+        data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Échec de l\'envoi.');
+      }
       document.getElementById('fb-lecon-contenu-url').value = data.url;
       statusEl.innerHTML = `✅ ${file.name} envoyé.`;
     } catch (err) {

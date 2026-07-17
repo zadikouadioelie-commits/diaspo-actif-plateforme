@@ -5922,7 +5922,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
     formateur_bio=COALESCE(?,formateur_bio), formateur_fonction=COALESCE(?,formateur_fonction),
     formateur_organisation=COALESCE(?,formateur_organisation), formateur_annees_exp=COALESCE(?,formateur_annees_exp),
     formateur_site=COALESCE(?,formateur_site), formateur_reseaux=COALESCE(?,formateur_reseaux), formateur_photo_url=COALESCE(?,formateur_photo_url),
-    formateur_nom=COALESCE(?,formateur_nom)
+    formateur_nom=COALESCE(?,formateur_nom), logo_url=COALESCE(?,logo_url)
     WHERE id=?`
   ).run(n(body.titre),n(body.description),n(body.objectifs),n(body.prerequis),
     n(body.niveau),n(body.langue),n(body.duree),n(body.duree_heures),n(body.places),
@@ -5943,7 +5943,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
     n(body.formateur_bio),n(body.formateur_fonction),
     n(body.formateur_organisation),n(body.formateur_annees_exp),
     n(body.formateur_site),n(body.formateur_reseaux),n(body.formateur_photo_url),
-    n(body.formateur_nom),
+    n(body.formateur_nom), n(body.logo_url),
     params.id);
   sendJSON(res, 200, { ok: true });
 });
