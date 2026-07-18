@@ -59,6 +59,32 @@
     } catch (e) { return { def: null, tarifs: [] }; }
   }
 
+  /* 🛠 Bypass Premium (développement / tests uniquement).
+     Actif seulement quand la variable serveur PREMIUM_DEMO_UNLOCK=1 est présente :
+     en production (variable absente), le bouton est masqué et le bypass inopérant.
+     Le contournement est temporaire (sessionStorage), module par module : aucun
+     abonnement créé, aucune facturation, aucun statut Premium modifié. */
+  let _devModePromise = null;
+  function fetchDevMode() {
+    if (typeof window._daDemoUnlock === 'boolean') return Promise.resolve(window._daDemoUnlock);
+    if (!_devModePromise) {
+      _devModePromise = fetch('/api/config/premium-demo-unlock', { credentials: 'same-origin' })
+        .then(r => r.json()).then(d => { window._daDemoUnlock = !!d.enabled; return window._daDemoUnlock; })
+        .catch(() => { window._daDemoUnlock = false; return false; });
+    }
+    return _devModePromise;
+  }
+  function bypassSlug(config) {
+    if (config && config.bypassKey) return config.bypassKey;
+    const name = (config && config.moduleName) || 'module';
+    return name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  }
+  /* Vérifie si le bypass dev est actif pour un module (utilisable par les pages appelantes). */
+  window.daPageBypassActive = async function (key) {
+    const dev = await fetchDevMode();
+    return dev && sessionStorage.getItem('da_bypass_' + key) === '1';
+  };
+
   async function souscrire(accredType, typeTarif, btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Redirection…'; }
     try {
@@ -238,6 +264,25 @@
         window.location.href = 'premium.html?' + params.toString();
       });
     }
+
+    /* 🛠 Bouton Bypass Premium — visible uniquement en mode dev (PREMIUM_DEMO_UNLOCK=1) */
+    fetchDevMode().then(dev => {
+      if (!dev) return;
+      const ctas = el.querySelector('.src-hero-ctas');
+      if (!ctas || ctas.querySelector('.src-bypass-dev')) return;
+      const key = bypassSlug(config);
+      const btn = document.createElement('button');
+      btn.className = 'src-bypass-dev';
+      btn.textContent = '🛠 Bypass Premium (dev)';
+      btn.title = 'Développement/tests uniquement — accès temporaire à ce module, sans abonnement.';
+      btn.style.cssText = 'background:none;border:1px dashed #b45309;color:#b45309;font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;margin-left:10px;';
+      btn.addEventListener('click', () => {
+        sessionStorage.setItem('da_bypass_' + key, '1');
+        if (typeof (config && config.onBypass) === 'function') config.onBypass();
+        else window.location.reload();
+      });
+      ctas.appendChild(btn);
+    });
   };
   window.SubscriptionRequiredPage._souscrire = souscrire;
 })();

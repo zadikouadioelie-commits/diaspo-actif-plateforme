@@ -821,13 +821,10 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
             { icon: '📊', titre: 'Suivi des candidatures', sous: '3 envoyées · 1 retenue', badge: 'Exemple' },
           ],
           accredType: 'utilisateur_abonne',
+          bypassKey: 'outils',
+          onBypass: () => uBypassOutils(),
           retourUrl: () => uShowSection('cockpit'),
         });
-        /* 🛠 Bouton Bypass Premium — visible uniquement en mode dev (PREMIUM_DEMO_UNLOCK=1) */
-        if (window._daDemoUnlock) {
-          document.getElementById('usec-outils-gate')?.insertAdjacentHTML('beforeend',
-            `<div style="text-align:center;margin:14px 0;"><button onclick="uBypassOutils()" style="background:none;border:1px dashed #b45309;color:#b45309;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;" title="Développement/tests uniquement — accès temporaire, sans abonnement.">🛠 Bypass Premium (dev)</button></div>`);
-        }
         return;
       }
     }

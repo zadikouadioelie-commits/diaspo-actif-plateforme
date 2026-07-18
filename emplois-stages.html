@@ -689,6 +689,8 @@ async function esSupprimerAlerte(id){
 
 async function esCheckAccesAbonne(){
   if (!ME || ME.role !== 'utilisateur') return true;
+  /* 🛠 Bypass Premium dev (temporaire, module Emploi & Stage uniquement) */
+  if (window.daPageBypassActive && await daPageBypassActive('emplois_stages')) return true;
   try{
     const r = await apiCall('GET','/accreditations/mes');
     return (r.accreditations||[]).some(a=>a.type==='utilisateur_abonne' && a.statut==='active');
@@ -761,6 +763,7 @@ function esAfficherUpsellAbonne(){
       { icon: '💰', titre: 'Comptable confirmé(e)', sous: 'Diaspo\'Actif Admin · Lyon, France · CDI', badge: 'Exemple' },
     ],
     accredType: 'utilisateur_abonne',
+    bypassKey: 'emplois_stages',
     retourUrl: 'dashboard-utilisateur.html',
   });
 }

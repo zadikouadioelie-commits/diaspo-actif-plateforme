@@ -524,6 +524,8 @@ const SECTEURS=['Action Sociale','Agriculture','Santé','Éducation','Technologi
 /* ── Gate abonnement Utilisateur Premium ── */
 async function checkAccesAbonne(){
   if(!ME || ME.role!=='utilisateur') return true;
+  /* 🛠 Bypass Premium dev (temporaire, module Réseau Pro uniquement) */
+  if (window.daPageBypassActive && await daPageBypassActive('reseau_pro')) return true;
   try{
     const {accreditations}=await apiCall('GET','/accreditations/mes');
     return (accreditations||[]).some(a=>a.type==='utilisateur_abonne' && a.statut==='active');
@@ -568,6 +570,7 @@ function afficherUpsellAbonne(){
       { q: 'Ce module est-il utile si je ne cherche pas de partenaires actuellement ?', r: "Le Réseau Pro sert aussi à faire connaître votre initiative, à être recommandé par d'autres membres et à suivre l'actualité des acteurs de votre secteur, même sans démarche active." },
     ],
     accredType: 'utilisateur_abonne',
+    bypassKey: 'reseau_pro',
     retourUrl: 'dashboard-utilisateur.html',
   });
 }
