@@ -5515,7 +5515,14 @@ route("GET", "/api/mes-suivis", async (req, res) => {
    DIASPO FORMATION — Routes publiques & créateur
    ────────────────────────────────────────────────────────── */
 
+/* 🎭 Mode démo investisseurs (temporaire) — PREMIUM_DEMO_UNLOCK=1 débloque l'accès réel à
+   toutes les fonctionnalités Premium pour tous les comptes, sans toucher aux visuels (badges
+   dorés, cadenas, modales "Passer à Premium" restent affichés normalement côté front).
+   Désactiver : retirer la variable d'environnement PREMIUM_DEMO_UNLOCK (Vercel + .env local). */
+function isPremiumDemoUnlock() { return process.env.PREMIUM_DEMO_UNLOCK === '1'; }
+
 async function hasAccreditation(userId, type) {
+  if (isPremiumDemoUnlock()) return true;
   const ancien = await db.prepare("SELECT id FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type);
   if (ancien) return true;
   const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
@@ -11519,6 +11526,13 @@ async function hasAccred(userId, type) {
 }
 
 /* GET /api/accreditations/mes — mes accréditations (ancien + nouveau système) */
+/* GET /api/config/premium-demo-unlock — indique au front s'il doit laisser passer les clics
+   sur les fonctionnalités Premium (mode démo investisseurs) sans jamais changer les visuels
+   (badges/cadenas dorés restent gérés indépendamment par window._daPremiumInitiative). */
+route("GET", "/api/config/premium-demo-unlock", async (req, res) => {
+  sendJSON(res, 200, { enabled: isPremiumDemoUnlock() });
+});
+
 route("GET", "/api/accreditations/mes", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });

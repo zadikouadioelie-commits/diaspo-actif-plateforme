@@ -758,9 +758,10 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   let _uEstAbonnePromise = null;
   function uEstAbonne() {
     if (!_uEstAbonnePromise) {
-      _uEstAbonnePromise = api('GET','/accreditations/mes')
-        .then(r => (r.accreditations||[]).some(a=>a.type==='utilisateur_abonne' && a.statut==='active'))
-        .catch(()=>true);
+      _uEstAbonnePromise = Promise.all([
+        api('GET','/accreditations/mes').then(r => (r.accreditations||[]).some(a=>a.type==='utilisateur_abonne' && a.statut==='active')).catch(()=>true),
+        api('GET','/config/premium-demo-unlock').then(r=>r.enabled).catch(()=>false),
+      ]).then(([abonne, demoUnlock]) => abonne || demoUnlock);
     }
     return _uEstAbonnePromise;
   }

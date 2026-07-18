@@ -3471,6 +3471,7 @@ async function pvzInitVitrineToggleBtn() {
     if (!init) { btn.remove(); return; }
     _vitrineInit = init;
     window._daPremiumInitiative = (accredRes.accreditations || []).some(a => a.type === 'initiative_abonne' && a.statut === 'active');
+    try { window._daDemoUnlock = (await api('GET', '/config/premium-demo-unlock')).enabled; } catch(_) { window._daDemoUnlock = false; }
     pvzPaintVitrineToggleBtn(init.id, init.vitrine_active !== 0);
   } catch (e) { btn.remove(); }
 }
@@ -3499,7 +3500,7 @@ function pvzPaintVitrineToggleBtn(initId, visible) {
 async function pvzQuickToggleVitrine() {
   const btn = document.getElementById('pvz-vitrine-toggle-btn');
   if (!btn || !btn.dataset.initId) return;
-  if (!window._daPremiumInitiative) {
+  if (!window._daPremiumInitiative && !window._daDemoUnlock) {
     if (confirm("Rendre votre vitrine visible au public est réservé aux comptes Premium.\n\nDécouvrir Premium maintenant ?")) {
       window.location.href = 'premium.html?type=initiative';
     }
