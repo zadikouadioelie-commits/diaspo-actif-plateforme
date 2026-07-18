@@ -49,10 +49,10 @@
 
       <div class="sb-group-lbl">01 — OUTILS</div>
       <a href="profil.html">👤 Mon profil public</a>
-      <a href="emplois-stages.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné">👑 Recherche d'emploi & Stage</a>
+      <a href="emplois-stages.html">💼 Recherche d'emploi & Stage</a>
       <a href="reseau.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné">👑 Mon Réseau Pro <span class="pill" id="u-reseau-badge" style="display:none;"></span></a>
       <a href="business-plan.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné">👑 Business Plans</a>
-      <a href="#" data-usection="outils" class="sb-premium" title="Module premium — réservé aux comptes Abonné">👑 CV, Lettres, Candidatures</a>
+      <a href="#" data-usection="outils">📄 CV, Lettres, Candidatures</a>
       <a href="mes-billets.html">🎟 Mes Billets</a>
       <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a>
       <a href="confidentialite.html">🔐 Confidentialité</a>
@@ -785,49 +785,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     document.querySelectorAll('.sidebar a[data-usection]').forEach(a=>{
       a.classList.toggle('active', a.dataset.usection===name);
     });
-    if(name==='outils'){
-      if(!(await uEstAbonne())){
-        el.innerHTML = '<div id="usec-outils-gate"></div>';
-        SubscriptionRequiredPage(document.getElementById('usec-outils-gate'), {
-          moduleName: 'CV, Lettres & Candidatures',
-          moduleIcon: '📄',
-          moduleIllustration: '📄',
-          moduleDescription: "Créez des CV et lettres de motivation professionnels, exportez-les en PDF et postulez en un clic aux offres Diaspo'Actif.",
-          fonctionnalites: [
-            'Créer et personnaliser plusieurs CV',
-            'Générer des lettres de motivation adaptées',
-            'Exporter vos documents en PDF avec QR code',
-            'Suivre vos candidatures envoyées',
-          ],
-          heroMockup: `
-            <div style="background:linear-gradient(135deg,#0D2B4E 0%,#1E4F8A 100%);color:#fff;padding:36px 28px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-              <div style="background:#fff;color:#0D2B4E;border-radius:10px;padding:16px;">
-                <div style="font-size:12px;font-weight:800;opacity:.5;margin-bottom:8px;">CV — Aïcha Diallo</div>
-                <div style="height:8px;background:#e5e9f0;border-radius:4px;width:70%;margin-bottom:6px;"></div>
-                <div style="height:8px;background:#e5e9f0;border-radius:4px;width:90%;margin-bottom:6px;"></div>
-                <div style="height:8px;background:#e5e9f0;border-radius:4px;width:55%;margin-bottom:10px;"></div>
-                <div style="font-size:10.5px;background:var(--orange);color:#fff;display:inline-block;padding:4px 10px;border-radius:14px;">📄 Export PDF</div>
-              </div>
-              <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:16px;">
-                <div style="font-size:12.5px;font-weight:700;margin-bottom:10px;">✉️ Candidatures envoyées</div>
-                ${['Développeur Full Stack — Envoyée','Chargé(e) de mission — En cours','Comptable — Retenu(e)'].map(s=>`
-                  <div style="font-size:11.5px;background:rgba(255,255,255,.12);border-radius:8px;padding:7px 10px;margin-bottom:6px;">${s}</div>`).join('')}
-              </div>
-            </div>`,
-          preview: [
-            { icon: '📄', titre: 'CV — Modèle Corporate', sous: 'Export PDF avec QR code', badge: 'Exemple' },
-            { icon: '✉️', titre: 'Lettre de motivation', sous: 'Générée pour une offre ciblée', badge: 'Exemple' },
-            { icon: '📤', titre: 'Candidature envoyée', sous: "Développeur Full Stack — Diaspo'Actif", badge: 'Exemple' },
-            { icon: '📊', titre: 'Suivi des candidatures', sous: '3 envoyées · 1 retenue', badge: 'Exemple' },
-          ],
-          accredType: 'utilisateur_abonne',
-          bypassKey: 'outils',
-          onBypass: () => uBypassOutils(),
-          retourUrl: () => uShowSection('cockpit'),
-        });
-        return;
-      }
-    }
+    /* Module CV, Lettres & Candidatures : accès libre (plus de restriction Premium). */
     if(name==='projets') loadMesProjets();
     if(name==='apparence') renderThemeSelector();
   };

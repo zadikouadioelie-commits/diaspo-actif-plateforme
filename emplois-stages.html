@@ -770,7 +770,7 @@ function esAfficherUpsellAbonne(){
 
 (async function init(){
   try{ ME=await fetchCurrentUser(); }catch(_){}
-  if (!(await esCheckAccesAbonne())) { esAfficherUpsellAbonne(); return; }
+  /* Module Recherche d'emploi & Stage : accès libre (plus de restriction Premium). */
   if (ME && ['initiative','collectivite','administrateur'].includes(ME.role)) {
     document.getElementById('es-btn-publier').style.display = '';
   }
