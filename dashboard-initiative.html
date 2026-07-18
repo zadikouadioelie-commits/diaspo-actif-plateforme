@@ -1060,6 +1060,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </div>
           </div>
           <a href="premium.html?type=initiative" class="btn btn-block" style="background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;border:none;padding:13px;border-radius:10px;text-align:center;text-decoration:none;display:block;">🎉 Passer à Premium</a>
+          <div id="premium-upsell-bypass" style="text-align:center;"></div>
         </div>
       </div>
     </div>
@@ -2270,7 +2271,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   function openAdModal(ad) {
-    if (!ad && !window._daPremiumInitiative && !window._daDemoUnlock) { openPremiumUpsell('publicites'); return; }
+    if (!ad && !window._daPremiumInitiative && !window.daBypassActive?.('publicites')) { openPremiumUpsell('publicites'); return; }
     _editingAdId = ad ? ad.id : null;
     document.getElementById('ad-media').value = '';
     document.getElementById('ad-media').required = !ad;
@@ -3195,7 +3196,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   window.openInitEvtModal = async function(id) {
-    if (!id && !window._daPremiumInitiative && !window._daDemoUnlock) { openPremiumUpsell('evenements'); return; }
+    if (!id && !window._daPremiumInitiative && !window.daBypassActive?.('evenements')) { openPremiumUpsell('evenements'); return; }
     initEvtEditingId = id || null;
     initEvtCoverB64 = null; initEvtGallery = [null,null,null,null]; initEvtPdfB64 = null; initEvtPdfNom = null;
     const modal = document.getElementById('init-evt-modal-bg');
@@ -4226,7 +4227,7 @@ async function replyVitrineMessage(convId){
 async function renderPaiementMarketplace(){
   const body = document.getElementById('paiement-marketplace-body');
   if (!body) return;
-  if (!window._daPremiumInitiative && !window._daDemoUnlock) { body.innerHTML = premiumLockedCardHtml('paiement_boutique'); return; }
+  if (!window._daPremiumInitiative && !window.daBypassActive?.('paiement_boutique')) { body.innerHTML = premiumLockedCardHtml('paiement_boutique'); return; }
   const initId = window.__vitrineInitId;
   if(!initId){ body.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune initiative liée.</p>'; return; }
   body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
@@ -6019,10 +6020,30 @@ const PREMIUM_UPSELL_CONTEXTS = {
   adhesions: { title:'Gérez cotisations & adhésions', intro:"Le module Cotisations & Adhésions est réservé aux comptes Premium." },
   votes: { title:'Organisez des votes sécurisés', intro:"Le module Votes sécurisés est réservé aux comptes Premium." },
 };
+/* 🛠 Bypass Premium (développement / tests uniquement) — visible seulement quand la variable
+   serveur PREMIUM_DEMO_UNLOCK=1 est active (window._daDemoUnlock). Le contournement est
+   temporaire (sessionStorage du navigateur), module par module : aucun abonnement créé,
+   aucune donnée de facturation ni statut Premium modifié, aucun paiement déclenché.
+   En production (variable absente), le bouton est masqué et inactif. */
+window.daBypassActive = function(context) {
+  return !!window._daDemoUnlock && sessionStorage.getItem('da_bypass_' + context) === '1';
+};
+window.daBypassPremium = function(context) {
+  if (!window._daDemoUnlock) return;
+  sessionStorage.setItem('da_bypass_' + context, '1');
+  location.reload();
+};
+function daBypassBtnHtml(context) {
+  if (!window._daDemoUnlock) return '';
+  return `<div style="margin-top:10px;"><button onclick="daBypassPremium('${context}')" style="background:none;border:1px dashed #b45309;color:#b45309;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;" title="Développement/tests uniquement — accès temporaire à ce module, sans abonnement.">🛠 Bypass Premium (dev)</button></div>`;
+}
+
 window.openPremiumUpsell = function(context) {
   const c = PREMIUM_UPSELL_CONTEXTS[context] || {};
   document.getElementById('premium-upsell-title').textContent = c.title || 'Débloquez tous les modules Initiative';
   document.getElementById('premium-upsell-intro').textContent = c.intro || 'Ce module fait partie des fonctionnalités réservées aux comptes Premium.';
+  const bypassWrap = document.getElementById('premium-upsell-bypass');
+  if (bypassWrap) bypassWrap.innerHTML = daBypassBtnHtml(context);
   document.getElementById('premium-upsell-modal').style.display = 'flex';
 };
 window.closePremiumUpsell = function() { document.getElementById('premium-upsell-modal').style.display = 'none'; };
@@ -6034,6 +6055,7 @@ function premiumLockedCardHtml(context) {
     <div style="font-weight:800;color:#92400e;margin-bottom:4px;">${c.title || 'Module réservé aux comptes Premium'}</div>
     <p style="font-size:12.5px;color:#92400e;margin:0 0 12px;">${c.intro || ''}</p>
     <button onclick="openPremiumUpsell('${context}')" style="background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;">🎉 Passer à Premium</button>
+    ${daBypassBtnHtml(context)}
   </div>`;
 }
 
@@ -6078,25 +6100,25 @@ async function initPremiumGates() {
     link.classList.add('premium-locked');
     link.style.margin = '0 8px';
     link.innerHTML = '🔒 ' + link.innerHTML;
-    if (intercept) link.addEventListener('click', (e) => { if (window._daDemoUnlock) return; e.preventDefault(); openPremiumUpsell(context); });
+    if (intercept) link.addEventListener('click', (e) => { if (window.daBypassActive?.(context)) return; e.preventDefault(); openPremiumUpsell(context); });
   });
 
-  /* 🎭 Mode démo investisseurs : ne pas remplacer le contenu réel par les cartes verrouillées
-     (les badges/cadenas de la sidebar au-dessus restent affichés, seul l'accès au contenu change). */
-  if (window._daDemoUnlock) return;
+  /* Paiements boutique (Stripe Connect) — sauf Bypass Premium dev actif pour ce module */
+  if (!window.daBypassActive('paiement_boutique')) {
+    const stripeBody = document.getElementById('paiement-marketplace-body');
+    if (stripeBody) stripeBody.innerHTML = premiumLockedCardHtml('paiement_boutique');
+    const stripeRefresh = document.querySelector('#paiement-marketplace button[onclick="renderPaiementMarketplace()"]');
+    if (stripeRefresh) stripeRefresh.style.display = 'none';
+  }
 
-  /* Paiements boutique (Stripe Connect) */
-  const stripeBody = document.getElementById('paiement-marketplace-body');
-  if (stripeBody) stripeBody.innerHTML = premiumLockedCardHtml('paiement_boutique');
-  const stripeRefresh = document.querySelector('#paiement-marketplace button[onclick="renderPaiementMarketplace()"]');
-  if (stripeRefresh) stripeRefresh.style.display = 'none';
-
-  /* Module de paiement — billetterie & cotisations (carte démo) */
-  const paiementCard = document.getElementById('paiement');
-  if (paiementCard) {
-    const h3 = paiementCard.querySelector('h3');
-    const titre = h3 ? h3.outerHTML : '<h3>Module de paiement — billetterie &amp; cotisations</h3>';
-    paiementCard.innerHTML = titre + premiumLockedCardHtml('paiement_billetterie');
+  /* Module de paiement — billetterie & cotisations (carte démo) — sauf Bypass Premium dev */
+  if (!window.daBypassActive('paiement_billetterie')) {
+    const paiementCard = document.getElementById('paiement');
+    if (paiementCard) {
+      const h3 = paiementCard.querySelector('h3');
+      const titre = h3 ? h3.outerHTML : '<h3>Module de paiement — billetterie &amp; cotisations</h3>';
+      paiementCard.innerHTML = titre + premiumLockedCardHtml('paiement_billetterie');
+    }
   }
 }
 /* Initialisation au chargement */

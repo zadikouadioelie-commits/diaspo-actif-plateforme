@@ -3500,11 +3500,17 @@ function pvzPaintVitrineToggleBtn(initId, visible) {
 async function pvzQuickToggleVitrine() {
   const btn = document.getElementById('pvz-vitrine-toggle-btn');
   if (!btn || !btn.dataset.initId) return;
-  if (!window._daPremiumInitiative && !window._daDemoUnlock) {
-    if (confirm("Rendre votre vitrine visible au public est réservé aux comptes Premium.\n\nDécouvrir Premium maintenant ?")) {
-      window.location.href = 'premium.html?type=initiative';
+  if (!window._daPremiumInitiative && !(window._daDemoUnlock && sessionStorage.getItem('da_bypass_vitrine') === '1')) {
+    /* 🛠 Bypass Premium (dev/tests uniquement) : proposé seulement quand PREMIUM_DEMO_UNLOCK=1
+       côté serveur. Temporaire (session navigateur), aucun abonnement ni statut modifié. */
+    if (window._daDemoUnlock && confirm("🛠 Mode développement : activer le Bypass Premium pour la vitrine ?\n(temporaire, sans abonnement — OK = bypasser, Annuler = voir l'offre Premium)")) {
+      sessionStorage.setItem('da_bypass_vitrine', '1');
+    } else {
+      if (confirm("Rendre votre vitrine visible au public est réservé aux comptes Premium.\n\nDécouvrir Premium maintenant ?")) {
+        window.location.href = 'premium.html?type=initiative';
+      }
+      return;
     }
-    return;
   }
   const initId = btn.dataset.initId;
   const visible = btn.dataset.visible === '1';

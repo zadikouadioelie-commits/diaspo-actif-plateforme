@@ -761,10 +761,21 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
       _uEstAbonnePromise = Promise.all([
         api('GET','/accreditations/mes').then(r => (r.accreditations||[]).some(a=>a.type==='utilisateur_abonne' && a.statut==='active')).catch(()=>true),
         api('GET','/config/premium-demo-unlock').then(r=>r.enabled).catch(()=>false),
-      ]).then(([abonne, demoUnlock]) => abonne || demoUnlock);
+      ]).then(([abonne, demoUnlock]) => {
+        window._daDemoUnlock = demoUnlock;
+        /* 🛠 Bypass Premium (dev/tests) : temporaire (session navigateur), par module,
+           actif uniquement si le bouton a été cliqué ET que le mode dev est activé côté serveur. */
+        return abonne || (demoUnlock && sessionStorage.getItem('da_bypass_outils') === '1');
+      });
     }
     return _uEstAbonnePromise;
   }
+  window.uBypassOutils = function() {
+    if (!window._daDemoUnlock) return;
+    sessionStorage.setItem('da_bypass_outils', '1');
+    _uEstAbonnePromise = null;
+    uShowSection('outils');
+  };
 
   /* ── Section switching ── */
   window.uShowSection = async function(name) {
@@ -812,6 +823,11 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
           accredType: 'utilisateur_abonne',
           retourUrl: () => uShowSection('cockpit'),
         });
+        /* 🛠 Bouton Bypass Premium — visible uniquement en mode dev (PREMIUM_DEMO_UNLOCK=1) */
+        if (window._daDemoUnlock) {
+          document.getElementById('usec-outils-gate')?.insertAdjacentHTML('beforeend',
+            `<div style="text-align:center;margin:14px 0;"><button onclick="uBypassOutils()" style="background:none;border:1px dashed #b45309;color:#b45309;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;" title="Développement/tests uniquement — accès temporaire, sans abonnement.">🛠 Bypass Premium (dev)</button></div>`);
+        }
         return;
       }
     }
