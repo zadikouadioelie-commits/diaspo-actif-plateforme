@@ -43,13 +43,19 @@
       <button class="sidebar-close" id="sidebar-close">×</button>
       <div class="brand" id="sidebar-brand">Mon espace initiative</div>
 
-      <div class="sb-group-lbl">01 — OUTILS</div>
-      <a href="profil.html">👤 Mon profil public</a>
+      <div class="sb-group-lbl">⭐ MODULES PREMIUM</div>
       <a href="#paiement" data-section="paiement">💳 Module paiement</a>
       <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" style="display:none;">🎓 Diaspo Formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
+      <a href="#publicites-init" data-section="publicites-init">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
+      <a href="#evenements" data-section="evenements">📅 Événements</a>
+      <a href="business-plan.html">📋 Business Plans</a>
+      <a href="#adhesions-init" data-section="adhesions-init">🎫 Cotisations &amp; Adhésions</a>
+      <a href="#votes-init" data-section="votes-init">🗳️ Votes sécurisés</a>
+
+      <div class="sb-group-lbl">01 — OUTILS</div>
+      <a href="profil.html">👤 Mon profil public</a>
       <a href="accreditations.html">🎖 Accréditations DA</a>
       <a href="#asso-accreditation" data-section="asso-accreditation" style="display:none;">🏅 Accréditation Asso</a>
-      <a href="#publicites-init" data-section="publicites-init">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
       <a href="confidentialite.html">🔐 Confidentialité</a>
       <a href="programmation.html">⚙️ Programmation</a>
 
@@ -59,7 +65,6 @@
       <div class="sb-group-lbl">03 — INITIATIVES</div>
       <a href="#presentation" data-section="presentation" style="display:none;">📋 Ma fiche initiative</a>
       <a href="#publications" data-section="publications">📰 Publications</a>
-      <a href="#evenements" data-section="evenements">📅 Événements</a>
       <a href="#billetterie-init" data-section="billetterie-init">🎟️ Billetterie <span class="pill" id="init-billets-badge" style="display:none;"></span></a>
 
       <div class="sb-group-lbl">04 — TERRITOIRES</div>
@@ -74,8 +79,6 @@
       <a href="#messages-vitrine" data-section="messages-vitrine">🛍️ Messages de la vitrine <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
       <a href="#parametres-vitrine" data-section="parametres-vitrine">⭐ Paramètres Vitrine</a>
       <a href="#partenaires-liste" data-section="partenaires-liste">🤝 Liste des partenaires</a>
-      <a href="#adhesions-init" data-section="adhesions-init">🎫 Cotisations &amp; Adhésions</a>
-      <a href="#votes-init" data-section="votes-init">🗳️ Votes sécurisés</a>
       <a href="#offres-emploi" data-section="offres-emploi">💼 Emplois & Stages</a>
       <a href="#recrutement" data-section="recrutement">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
       <a href="agenda.html">📅 Mon Agenda</a>
@@ -85,7 +88,6 @@
       <a href="centre-financier.html">💰 Centre Financier</a>
 
       <div class="sb-group-lbl">07 — COLLABORATION</div>
-      <a href="business-plan.html">📋 Business Plans</a>
       <a href="audiovisuel.html" style="display:none;">🎬 Atelier audiovisuel</a>
       <a href="projets-evaluation.html">📁 Évaluation de Projet</a>
 
@@ -144,6 +146,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     return;
   }
   if (window.Posts) Posts.init(me.id);
+
+  /* Statut Premium — déterminé tôt pour que le premier rendu (paiement, etc.) soit déjà correctement gaté. */
+  try {
+    const { accreditations } = await api('GET', '/accreditations/mes');
+    window._daPremiumInitiative = (accreditations||[]).some(a => a.type==='initiative_abonne' && a.statut==='active');
+  } catch(_) { window._daPremiumInitiative = false; }
 
   /* Chargement des données du dashboard */
   let data;
@@ -1013,6 +1021,43 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
         <div id="ad-slot-preview-body" style="padding:18px 20px;"></div>
         <div id="ad-slot-preview-caption" style="padding:0 20px 20px;font-size:12.5px;color:var(--muted);line-height:1.5;"></div>
+      </div>
+    </div>
+
+    <!-- Modal Passer à Premium — réutilisé par tous les modules réservés Premium -->
+    <div id="premium-upsell-modal" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,.7);z-index:1200;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:18px;max-width:560px;width:100%;overflow:hidden;margin:30px auto;">
+        <div style="background:linear-gradient(135deg,#7a5a00,#c8960c 45%,#f2c94c);padding:26px 28px;color:#2a1e00;position:relative;">
+          <button onclick="closePremiumUpsell()" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.35);border:none;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer;">×</button>
+          <div style="font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.85;">👑 Diaspo'Actif Premium</div>
+          <h2 id="premium-upsell-title" style="margin:6px 0 0;font-size:21px;">Débloquez tous les modules Initiative</h2>
+        </div>
+        <div style="padding:22px 28px;">
+          <p id="premium-upsell-intro" style="font-size:13.5px;color:#374151;margin:0 0 16px;">Ce module fait partie des fonctionnalités réservées aux comptes Premium.</p>
+          <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#92400e;margin-bottom:8px;">✅ CE QUE VOUS DÉBLOQUEZ</div>
+          <ul id="premium-upsell-benefits" style="margin:0 0 20px;padding-left:20px;font-size:13.5px;line-height:1.9;color:#374151;">
+            <li>📣 Créer des campagnes publicitaires sur la plateforme</li>
+            <li>📅 Créer des événements et gérer la billetterie</li>
+            <li>🎓 Créer et vendre vos propres formations (Espace Formateur)</li>
+            <li>📋 Business Plans complets (21 sections, simulation, IA)</li>
+            <li>💳 Paiements réels de votre boutique (Stripe Connect)</li>
+            <li>🎫 Module de paiement billetterie & cotisations</li>
+          </ul>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+            <div style="border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center;">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Mensuel</div>
+              <div style="font-size:22px;font-weight:800;margin:4px 0;">12,99 €<span style="font-size:12px;font-weight:600;color:var(--muted);">/mois</span></div>
+              <div style="font-size:11.5px;color:var(--muted);">Sans engagement</div>
+            </div>
+            <div style="border:1.5px solid #f2c94c;background:#fffbeb;border-radius:12px;padding:14px;text-align:center;position:relative;">
+              <span style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:#c8960c;color:#fff;font-size:10px;font-weight:800;padding:2px 10px;border-radius:99px;">-15%</span>
+              <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;">Annuel</div>
+              <div style="font-size:22px;font-weight:800;margin:4px 0;color:#92400e;">132,50 €<span style="font-size:12px;font-weight:600;">/an</span></div>
+              <div style="font-size:11.5px;color:#92400e;">soit 11,04 €/mois — économisez 23,38 €</div>
+            </div>
+          </div>
+          <a href="premium.html?type=initiative" class="btn btn-block" style="background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;border:none;padding:13px;border-radius:10px;text-align:center;text-decoration:none;display:block;">🎉 Passer à Premium</a>
+        </div>
       </div>
     </div>
 
@@ -2222,6 +2267,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   function openAdModal(ad) {
+    if (!ad && !window._daPremiumInitiative) { openPremiumUpsell('publicites'); return; }
     _editingAdId = ad ? ad.id : null;
     document.getElementById('ad-media').value = '';
     document.getElementById('ad-media').required = !ad;
@@ -2457,19 +2503,25 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   window.adRefreshAudiencePreview = adRefreshAudiencePreview;
 
   /* ===== RECRUTEMENT / CANDIDATURES ===== */
+  /* 9 statuts officiels du module Gestion des candidatures (+ anciens libellés conservés
+     pour compatibilité avec les candidatures déjà enregistrées avant cette mise à jour). */
+  const STATUTS_OFFICIELS = ['nouvelle','en_etude','preselectionnee','entretien_prevu','test_demande','en_attente','refusee','acceptee','embauchee'];
   const STATUT_REC = {
-    envoyee:'📤 Envoyée', recue:'📥 Reçue', consultee:'👁 Consultée',
-    preselectionnee:'⭐ Présélectionnée', entretien_demande:'📞 Entretien demandé',
-    entretien_programme:'📅 Entretien programmé', entretien_realise:'✅ Entretien réalisé',
-    docs_demandes:'📎 Docs demandés', en_attente:'⏳ En attente',
-    acceptee:'🎉 Acceptée', refusee:'❌ Refusée', cloturee:'🔒 Clôturée',
-    recu:'📥 Reçue', en_etude:'🔍 En étude', entretien:'📅 Entretien',
-    accepte:'🎉 Accepté', refuse:'❌ Refusé'
+    nouvelle:'🆕 Nouvelle candidature', en_etude:"🔍 En cours d'étude", preselectionnee:'⭐ Présélectionnée',
+    entretien_prevu:'📅 Entretien prévu', test_demande:'📝 Test demandé', en_attente:'⏳ En attente',
+    refusee:'❌ Refusée', acceptee:'🎉 Acceptée', embauchee:'✅ Embauchée',
+    /* anciens libellés (candidatures créées avant l'introduction des 9 statuts officiels) */
+    envoyee:'📤 Envoyée', recue:'🆕 Nouvelle candidature', consultee:"🔍 En cours d'étude",
+    entretien_demande:'📞 Entretien demandé', entretien_programme:'📅 Entretien prévu', entretien_realise:'✅ Entretien réalisé',
+    docs_demandes:'📎 Docs demandés', cloturee:'🔒 Clôturée',
+    recu:'🆕 Nouvelle candidature', entretien:'📅 Entretien prévu',
+    accepte:'🎉 Acceptée', refuse:'❌ Refusée'
   };
   const STATUT_COLORS_R = {
-    acceptee:'#27ae60',accepte:'#27ae60',refusee:'#e74c3c',refuse:'#e74c3c',
-    preselectionnee:'#9b59b6',entretien_programme:'#3498db',entretien:'#3498db',
-    envoyee:'#2980b9',recue:'#16a085',consultee:'#8e44ad',entretien_demande:'#e67e22'
+    acceptee:'#27ae60',accepte:'#27ae60',embauchee:'#16a085',refusee:'#e74c3c',refuse:'#e74c3c',
+    preselectionnee:'#9b59b6',entretien_prevu:'#3498db',entretien_programme:'#3498db',entretien:'#3498db',
+    test_demande:'#e67e22',en_attente:'#f39c12',
+    envoyee:'#2980b9',recue:'#16a085',nouvelle:'#16a085',consultee:'#8e44ad',en_etude:'#8e44ad',entretien_demande:'#e67e22'
   };
   function esc2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
   function fd(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}}
@@ -2481,15 +2533,34 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     // Récupérer les offres de l'initiative
     let offres = [];
     try {
-      const r = await api('GET', '/offres?createur_id=' + init.user_id);
+      const r = await api('GET', '/offres?createur_id=' + me.id);
       offres = r.offres || r || [];
     } catch(e) { el.innerHTML='<p style="color:var(--muted);font-size:13px;">Erreur de chargement des offres.</p>'; return; }
     if (!offres.length) {
       el.innerHTML='<p style="color:var(--muted);font-size:13px;">Aucune offre publiée. <a href="annuaire.html">Créer une offre</a></p>';
       return;
     }
+    // Statistiques avancées : provenance, répartition géographique, temps moyen, offres performantes
+    let statsHTML = '';
+    try {
+      const s = await api('GET', '/offres/stats-avancees/mes');
+      const geoTop = Object.entries(s.repartition_geographique||{}).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      const srcTop = Object.entries(s.provenance_sources||{}).sort((a,b)=>b[1]-a[1]);
+      statsHTML = `<div class="card" style="margin-bottom:16px;padding:16px;">
+        <h3 style="margin:0 0 12px;font-size:14px;">📊 Statistiques des candidatures</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;font-size:12px;">
+          <div><strong>⏱️ Temps moyen avant recrutement</strong><div style="color:var(--muted);margin-top:2px;">${s.temps_moyen_recrutement_jours!=null ? s.temps_moyen_recrutement_jours+' jour(s)' : '—'}</div></div>
+          <div><strong>🌍 Répartition géographique</strong><div style="color:var(--muted);margin-top:2px;">${geoTop.length ? geoTop.map(([p,n])=>`${esc2(p)} (${n})`).join(', ') : '—'}</div></div>
+          <div><strong>📥 Sources des candidatures</strong><div style="color:var(--muted);margin-top:2px;">${srcTop.length ? srcTop.map(([src,n])=>`${esc2(src)} (${n})`).join(', ') : '—'}</div></div>
+        </div>
+        ${s.offres_performantes && s.offres_performantes.length ? `<div style="margin-top:12px;">
+          <strong style="font-size:12px;">🏆 Offres les plus performantes</strong>
+          <div style="margin-top:6px;font-size:12px;">${s.offres_performantes.map(o=>`<div style="padding:4px 0;border-bottom:1px solid #f0f0f0;">${esc2(o.titre)} — ${o.nb_candidatures} candidature(s), ${o.nb_vues} vue(s), ${o.taux_conversion}% conversion</div>`).join('')}</div>
+        </div>` : ''}
+      </div>`;
+    } catch(e) {}
     // Pour chaque offre, charger les candidatures
-    let html = '';
+    let html = statsHTML;
     let totalCands = 0;
     for (const offre of offres.slice(0, 10)) {
       let cands = [];
@@ -2541,7 +2612,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
                   <td style="padding:10px 8px;font-size:11px;color:var(--muted);white-space:nowrap;">${fd(c.created_at)}</td>
                   <td style="padding:10px 8px;">
                     <select onchange="changerStatut(${c.id}, this.value)" style="font-size:11px;padding:3px 6px;border:1px solid ${col}44;border-radius:6px;color:${col};background:${col}11;font-weight:700;">
-                      ${['recue','consultee','preselectionnee','entretien_demande','entretien_programme','entretien_realise','docs_demandes','en_attente','acceptee','refusee','cloturee'].map(s=>`<option value="${s}" ${st===s?'selected':''}>${STATUT_REC[s]||s}</option>`).join('')}
+                      ${STATUTS_OFFICIELS.map(s=>`<option value="${s}" ${st===s?'selected':''}>${STATUT_REC[s]||s}</option>`).join('')}
                     </select>
                   </td>
                   <td style="padding:10px 8px;">
@@ -2584,22 +2655,48 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <label style="font-size:11px;font-weight:700;display:block;margin-bottom:2px;">${f}</label>
         <div style="display:flex;gap:4px;">${[1,2,3,4,5].map(n=>`<button onclick="noterEval(${c.id},'${f}',${n},this)" style="width:28px;height:28px;border-radius:50%;border:1px solid #ddd;cursor:pointer;font-size:13px;background:${(evJson[f]||0)>=n?'#f5a623':'#f9f9f9'};">★</button>`).join('')}</div>
       </div>`).join('');
+    /* Fiche complète : rendu générique des sections du CV (expériences, formations,
+       compétences, langues, certifications, portfolio…), quelle que soit la structure
+       exacte utilisée par cv-builder.html — on affiche toute clé non vide du data_json. */
+    let cvData = {};
+    try { cvData = JSON.parse(c.cv_data_json || '{}'); } catch(e) {}
+    const CV_SECTION_LABELS = { resume:'Résumé', experiences:'Expériences', formations:'Formations', competences:'Compétences', langues:'Langues', certifications:'Certifications', portfolio:'Portfolio', diplomes:'Diplômes' };
+    const cvSectionsHTML = Object.entries(cvData).filter(([,v]) => v && (!Array.isArray(v) || v.length)).map(([k,v]) => `
+      <div style="margin-bottom:8px;">
+        <strong style="font-size:11px;text-transform:uppercase;color:#888;">${CV_SECTION_LABELS[k]||k}</strong>
+        <div style="font-size:12px;color:#333;margin-top:2px;">${Array.isArray(v) ? v.map(item=>esc2(typeof item==='object'?Object.values(item).filter(Boolean).join(' — '):item)).join('<br>') : esc2(String(v))}</div>
+      </div>`).join('');
+    const tags = Array.isArray(c.tags) ? c.tags : (typeof c.tags === 'string' ? JSON.parse(c.tags||'[]') : []);
     const modal = document.createElement('div');
     modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;';
-    modal.innerHTML=`<div style="background:var(--card);border-radius:14px;padding:24px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;">
+    modal.innerHTML=`<div style="background:var(--card);border-radius:14px;padding:24px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <h3 style="margin:0;font-size:1rem;">👤 Fiche candidat</h3>
         <button onclick="this.closest('.modal-fiche').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;">×</button>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
         ${c.photo_url?`<img loading="lazy" src="${esc2(c.photo_url)}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;" alt="">`:`<div style="width:56px;height:56px;border-radius:50%;background:#4a90d9;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;">${(c.prenom||c.nom||'?')[0].toUpperCase()}</div>`}
         <div>
           <div style="font-weight:800;font-size:1rem;">${esc2([c.prenom,c.nom].filter(Boolean).join(' ')||'Candidat')}</div>
           ${c.titre_pro?`<div style="font-size:12px;color:#666;">${esc2(c.titre_pro)}</div>`:''}
-          ${c.candidat_pays?`<div style="font-size:11px;color:#999;">📍 ${esc2(c.candidat_pays)}</div>`:''}
+          ${(c.candidat_ville||c.candidat_pays)?`<div style="font-size:11px;color:#999;">📍 ${esc2([c.candidat_ville,c.candidat_pays].filter(Boolean).join(', '))}</div>`:''}
         </div>
       </div>
-      ${c.message?`<div style="background:#f8f9ff;border-radius:8px;padding:10px 14px;font-size:12px;color:#333;margin-bottom:16px;"><strong>Message :</strong><br>${esc2(c.message)}</div>`:''}
+      <div style="font-size:11.5px;color:#555;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:10px;">
+        ${c.email?`<span>✉️ ${esc2(c.email)}</span>`:''}
+        ${c.telephone?`<span>📞 ${esc2(c.telephone)}</span>`:''}
+        <a href="profil.html?id=${c.candidat_id}" target="_blank" style="color:#4a90d9;">👤 Profil Diaspo'Actif</a>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;font-weight:700;display:block;margin-bottom:4px;">🏷️ Tags / classement</label>
+        <input id="tags-rec-${c.id}" value="${esc2(tags.join(', '))}" placeholder="ex: prioritaire, technique, à revoir" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;" onblur="sauvegarderTags(${c.id}, this.value)">
+      </div>
+      ${c.message?`<div style="background:#f8f9ff;border-radius:8px;padding:10px 14px;font-size:12px;color:#333;margin-bottom:12px;"><strong>Message / réponses aux questions :</strong><br>${esc2(c.message)}</div>`:''}
+      ${cvSectionsHTML?`<div style="margin-bottom:16px;border-top:1px solid #eee;padding-top:10px;">${cvSectionsHTML}</div>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        ${c.cv_titre?`<a href="cv-builder.html?id=${c.cv_profile_id}" target="_blank" class="btn btn-sm btn-outline" style="font-size:12px;">📄 CV — ${esc2(c.cv_titre)}</a>`:''}
+        ${c.lettre_titre?`<a href="cv-builder.html?lettre=${c.lettre_id}" target="_blank" class="btn btn-sm btn-outline" style="font-size:12px;">✉️ Lettre — ${esc2(c.lettre_titre)}</a>`:''}
+      </div>
       <div style="margin-bottom:16px;">
         <strong style="font-size:12px;text-transform:uppercase;color:#888;letter-spacing:.5px;">Évaluation interne (privée)</strong>
         <div style="margin-top:8px;">${evalHTML}</div>
@@ -2609,13 +2706,44 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <textarea id="notes-rec-${c.id}" rows="3" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;" placeholder="Vos notes privées…">${esc2(c.notes_recruteur||'')}</textarea>
         <button class="btn btn-sm btn-outline" style="margin-top:6px;font-size:12px;" onclick="sauvegarderNotes(${c.id})">💾 Sauvegarder les notes</button>
       </div>
-      ${c.cv_titre?`<a href="cv-builder.html?id=${c.cv_profile_id}" target="_blank" class="btn btn-outline" style="font-size:12px;display:inline-flex;align-items:center;gap:6px;">📄 Voir le CV — ${esc2(c.cv_titre)}</a>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid #eee;padding-top:12px;">
+        <button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="programmerEntretien(${c.id})">📅 Programmer un entretien</button>
+        <button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="demanderDocuments(${c.id})">📎 Demander des documents</button>
+        <a href="messagerie.html?user=${c.candidat_id}" class="btn btn-sm btn-outline" style="font-size:12px;">💬 Envoyer un message</a>
+      </div>
     </div>`;
     modal.classList.add('modal-fiche');
     modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
     document.body.appendChild(modal);
     // Fix close button
     modal.querySelector('button').onclick = () => modal.remove();
+  };
+
+  window.sauvegarderTags = async function(candId, value) {
+    const tags = value.split(',').map(s=>s.trim()).filter(Boolean);
+    try { await fetch('/api/candidatures/'+candId+'/tags', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({tags}) }); }
+    catch(e) {}
+  };
+
+  window.programmerEntretien = async function(candId) {
+    const date = prompt('Date et heure de l\'entretien (AAAA-MM-JJ HH:MM) :');
+    if (!date) return;
+    const lieu = prompt('Lieu / lien visio :') || '';
+    const type = prompt('Type (présentiel / visio / téléphone) :') || 'visio';
+    try {
+      await fetch('/api/candidatures/'+candId+'/statut', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include',
+        body: JSON.stringify({ statut_detail:'entretien_prevu', date_entretien: date, lieu_entretien: lieu, type_entretien: type }) });
+      alert('Entretien programmé.'); document.querySelector('.modal-fiche')?.remove(); loadRecrutement();
+    } catch(e) { alert('Erreur'); }
+  };
+
+  window.demanderDocuments = async function(candId) {
+    const message = prompt('Message au candidat (documents demandés) :', 'Merci de nous transmettre un justificatif complémentaire.');
+    if (!message) return;
+    try {
+      await fetch('/api/candidatures/'+candId+'/demander-documents', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({message}) });
+      alert('Demande envoyée au candidat.');
+    } catch(e) { alert('Erreur'); }
   };
 
   window.noterEval = async function(candId, champ, note, btn) {
@@ -2825,24 +2953,43 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'asso-finances') renderAssoFinances();
     if (name === 'asso-documents') renderAssoDocuments();
     if (name === 'asso-votes') renderAssoVotes();
+    if (['evenements','publicites-init'].includes(name)) setTimeout(() => window.applyPremiumButtonStyles?.(), 50);
     window.scrollTo(0,0);
   };
 
   /* ══ SECTION EMPLOIS & STAGES — publication d'offres ══ */
-  const OE_STATUT_LABELS = {brouillon:'📝 Brouillon',publiee:'🟢 Publiée',cloturee:'🔒 Clôturée',archivee:'📁 Archivée'};
+  const OE_STATUT_LABELS = {brouillon:'📝 Brouillon',publiee:'🟢 Publiée',suspendue:'⏸️ Suspendue',cloturee:'🔒 Clôturée',archivee:'📁 Archivée'};
   window.renderOffresEmploiInit = async function renderOffresEmploiInit() {
     const el = document.getElementById('offres-emploi-content');
     el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);">Chargement…</div>';
     try {
-      const { offres = [] } = await api('GET', '/mes-offres');
+      const [{ offres = [] }, stats] = await Promise.all([
+        api('GET', '/mes-offres'),
+        api('GET', '/offres/stats/mes').catch(() => null),
+      ]);
+      let html = '';
+      if (stats) {
+        html += `
+        <div class="card" style="margin-bottom:16px;padding:16px;">
+          <h3 style="margin:0 0 12px;font-size:14px;">📊 Statistiques</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;">
+            <div><div style="font-size:20px;font-weight:700;">${stats.nb_offres}</div><div style="font-size:11px;color:var(--muted);">Offres publiées</div></div>
+            <div><div style="font-size:20px;font-weight:700;">${stats.nb_actives}</div><div style="font-size:11px;color:var(--muted);">Offres actives</div></div>
+            <div><div style="font-size:20px;font-weight:700;">${stats.total_candidatures}</div><div style="font-size:11px;color:var(--muted);">Candidatures reçues</div></div>
+            <div><div style="font-size:20px;font-weight:700;">${stats.total_vues}</div><div style="font-size:11px;color:var(--muted);">Consultations</div></div>
+            <div><div style="font-size:20px;font-weight:700;">${stats.taux_reponse}%</div><div style="font-size:11px;color:var(--muted);">Taux de réponse</div></div>
+          </div>
+        </div>`;
+      }
       if (!offres.length) {
-        el.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted);">
+        html += `<div style="text-align:center;padding:30px;color:var(--muted);">
           <div style="font-size:32px;margin-bottom:8px;">💼</div>
           <p>Aucune offre publiée pour le moment.</p>
         </div>`;
+        el.innerHTML = html;
         return;
       }
-      el.innerHTML = offres.map(o => `
+      html += offres.map(o => `
         <div class="card" style="margin-bottom:10px;padding:14px 16px;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
             <div>
@@ -2851,29 +2998,52 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </div>
             <span class="pill">${OE_STATUT_LABELS[o.statut]||o.statut}</span>
           </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+            <button class="btn btn-outline" style="padding:5px 10px;font-size:12px;" onclick="openOffreEmploiModal(${o.id})">✏️ Modifier</button>
+            ${o.statut==='publiee' ? `<button class="btn btn-outline" style="padding:5px 10px;font-size:12px;" onclick="changerStatutOffreEmploi(${o.id},'suspendue')">⏸️ Suspendre</button>` : ''}
+            ${o.statut==='suspendue' ? `<button class="btn btn-outline" style="padding:5px 10px;font-size:12px;" onclick="changerStatutOffreEmploi(${o.id},'publiee')">▶️ Réactiver</button>` : ''}
+            ${['publiee','suspendue'].includes(o.statut) ? `<button class="btn btn-outline" style="padding:5px 10px;font-size:12px;" onclick="changerStatutOffreEmploi(${o.id},'cloturee')">🔒 Clôturer</button>` : ''}
+            <button class="btn btn-outline" style="padding:5px 10px;font-size:12px;color:#ef4444;" onclick="supprimerOffreEmploi(${o.id})">🗑️ Supprimer</button>
+          </div>
         </div>
       `).join('');
+      el.innerHTML = html;
     } catch (e) {
       el.innerHTML = `<p style="color:#ef4444;">Erreur : ${escH(e.message)}</p>`;
     }
   };
 
-  window.openOffreEmploiModal = function openOffreEmploiModal() {
+  window.changerStatutOffreEmploi = async function changerStatutOffreEmploi(id, statut) {
+    try { await api('PUT', `/offres/${id}`, { statut }); renderOffresEmploiInit(); }
+    catch (e) { alert('Erreur : ' + e.message); }
+  };
+  window.supprimerOffreEmploi = async function supprimerOffreEmploi(id) {
+    if (!confirm('Supprimer définitivement cette offre et ses candidatures ?')) return;
+    try { await api('DELETE', `/offres/${id}`); renderOffresEmploiInit(); }
+    catch (e) { alert('Erreur : ' + e.message); }
+  };
+
+  window.openOffreEmploiModal = async function openOffreEmploiModal(id) {
     let modal = document.getElementById('oe-modal');
     if (modal) modal.remove();
+    let o = null;
+    if (id) {
+      try { const r = await api('GET', `/offres/${id}`); o = r.offre; } catch (e) { alert('Erreur : ' + e.message); return; }
+    }
     modal = document.createElement('div');
     modal.id = 'oe-modal';
+    modal.dataset.editId = id || '';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(13,43,78,.5);z-index:300;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px;';
     modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
     modal.innerHTML = `
       <div class="card" style="max-width:640px;width:100%;padding:24px;">
-        <h3 style="margin:0 0 16px;">+ Publier une offre</h3>
+        <h3 style="margin:0 0 16px;">${o ? '✏️ Modifier l\'offre' : '+ Publier une offre'}</h3>
         <div style="display:grid;gap:10px;">
-          <input id="oe-titre" placeholder="Intitulé du poste *" style="padding:10px;border:1px solid var(--border);border-radius:8px;">
+          <input id="oe-titre" placeholder="Intitulé du poste *" value="${o?escH(o.titre):''}" style="padding:10px;border:1px solid var(--border);border-radius:8px;">
           <div style="display:flex;gap:10px;">
             <select id="oe-type" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
-              <option value="emploi">Emploi</option>
-              <option value="stage">Stage</option>
+              <option value="emploi" ${o&&o.type==='emploi'?'selected':''}>Emploi</option>
+              <option value="stage" ${o&&o.type==='stage'?'selected':''}>Stage</option>
             </select>
             <select id="oe-contrat" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
               <option value="">Contrat…</option>
@@ -2882,14 +3052,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <option>Stage découverte</option><option>Stage académique</option><option>Stage professionnel</option><option>Stage de fin d'études</option>
             </select>
           </div>
-          <textarea id="oe-description" placeholder="Description de l'offre" rows="3" style="padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></textarea>
-          <textarea id="oe-missions" placeholder="Missions (une par ligne)" rows="3" style="padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></textarea>
-          <textarea id="oe-competences" placeholder="Compétences recherchées (une par ligne)" rows="2" style="padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></textarea>
+          <textarea id="oe-description" placeholder="Description de l'offre" rows="3" style="padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;">${o?escH(o.description||''):''}</textarea>
+          <textarea id="oe-missions" placeholder="Missions (une par ligne)" rows="3" style="padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;">${o&&Array.isArray(o.missions)?o.missions.join('\n'):''}</textarea>
+          <textarea id="oe-competences" placeholder="Compétences recherchées (une par ligne)" rows="2" style="padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;">${o&&Array.isArray(o.competences_requises)?o.competences_requises.join('\n'):''}</textarea>
           <div style="display:flex;gap:10px;">
-            <input id="oe-pays" placeholder="Pays" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
-            <input id="oe-ville" placeholder="Ville" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+            <input id="oe-pays" placeholder="Pays" value="${o?escH(o.pays||''):''}" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+            <input id="oe-ville" placeholder="Ville" value="${o?escH(o.ville||''):''}" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
           </div>
-          <input id="oe-domaine" placeholder="Domaine (ex. Informatique, Santé…)" style="padding:10px;border:1px solid var(--border);border-radius:8px;">
+          <input id="oe-domaine" placeholder="Domaine (ex. Informatique, Santé…)" value="${o?escH(o.domaine||''):''}" style="padding:10px;border:1px solid var(--border);border-radius:8px;">
           <div style="display:flex;gap:10px;">
             <select id="oe-experience" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
               <option value="">Expérience…</option>
@@ -2901,42 +3071,52 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </select>
           </div>
           <div style="display:flex;gap:10px;">
-            <input id="oe-salaire-min" type="number" placeholder="Salaire min (€)" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
-            <input id="oe-salaire-max" type="number" placeholder="Salaire max (€)" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
-            <input id="oe-date-limite" type="date" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+            <input id="oe-salaire-min" type="number" placeholder="Salaire min (€)" value="${o&&o.salaire_min?o.salaire_min:''}" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+            <input id="oe-salaire-max" type="number" placeholder="Salaire max (€)" value="${o&&o.salaire_max?o.salaire_max:''}" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
+            <input id="oe-date-limite" type="date" value="${o&&o.date_limite?o.date_limite:''}" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;">
           </div>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" id="oe-teletravail"> Télétravail possible</label>
+          <input id="oe-recruteur-contact" placeholder="Coordonnées du recruteur (si différentes du compte)" value="${o?escH(o.recruteur_contact||''):''}" style="padding:10px;border:1px solid var(--border);border-radius:8px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" id="oe-teletravail" ${o&&o.teletravail?'checked':''}> Télétravail possible</label>
         </div>
         <div style="display:flex;gap:10px;margin-top:18px;">
-          <button class="btn btn-orange" onclick="submitOffreEmploi()">Publier l'offre</button>
+          <button class="btn btn-orange" onclick="submitOffreEmploi()">${o ? 'Enregistrer' : "Publier l'offre"}</button>
           <button class="btn btn-outline" onclick="document.getElementById('oe-modal').remove()">Annuler</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
+    if (o) {
+      document.getElementById('oe-contrat').value = o.contrat || '';
+      document.getElementById('oe-experience').value = o.niveau_experience || '';
+      document.getElementById('oe-etudes').value = o.niveau_etudes || '';
+    }
   };
 
   window.submitOffreEmploi = async function submitOffreEmploi() {
     const titre = document.getElementById('oe-titre').value.trim();
     if (!titre) { alert('Titre requis.'); return; }
+    const editId = document.getElementById('oe-modal').dataset.editId;
     const splitLines = (id) => document.getElementById(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
+    const payload = {
+      titre,
+      type: document.getElementById('oe-type').value,
+      contrat: document.getElementById('oe-contrat').value || null,
+      description: document.getElementById('oe-description').value.trim() || null,
+      missions: splitLines('oe-missions'),
+      competences_requises: splitLines('oe-competences'),
+      pays: document.getElementById('oe-pays').value.trim() || null,
+      ville: document.getElementById('oe-ville').value.trim() || null,
+      domaine: document.getElementById('oe-domaine').value.trim() || null,
+      niveau_experience: document.getElementById('oe-experience').value || null,
+      niveau_etudes: document.getElementById('oe-etudes').value || null,
+      salaire_min: document.getElementById('oe-salaire-min').value || null,
+      salaire_max: document.getElementById('oe-salaire-max').value || null,
+      date_limite: document.getElementById('oe-date-limite').value || null,
+      recruteur_contact: document.getElementById('oe-recruteur-contact').value.trim() || null,
+      teletravail: document.getElementById('oe-teletravail').checked,
+    };
     try {
-      await api('POST', '/offres', {
-        titre,
-        type: document.getElementById('oe-type').value,
-        contrat: document.getElementById('oe-contrat').value || null,
-        description: document.getElementById('oe-description').value.trim() || null,
-        missions: splitLines('oe-missions'),
-        competences_requises: splitLines('oe-competences'),
-        pays: document.getElementById('oe-pays').value.trim() || null,
-        ville: document.getElementById('oe-ville').value.trim() || null,
-        domaine: document.getElementById('oe-domaine').value.trim() || null,
-        niveau_experience: document.getElementById('oe-experience').value || null,
-        niveau_etudes: document.getElementById('oe-etudes').value || null,
-        salaire_min: document.getElementById('oe-salaire-min').value || null,
-        salaire_max: document.getElementById('oe-salaire-max').value || null,
-        date_limite: document.getElementById('oe-date-limite').value || null,
-        teletravail: document.getElementById('oe-teletravail').checked,
-      });
+      if (editId) await api('PUT', `/offres/${editId}`, payload);
+      else await api('POST', '/offres', payload);
       document.getElementById('oe-modal').remove();
       renderOffresEmploiInit();
     } catch (e) { alert('Erreur : ' + e.message); }
@@ -3012,6 +3192,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   window.openInitEvtModal = async function(id) {
+    if (!id && !window._daPremiumInitiative) { openPremiumUpsell('evenements'); return; }
     initEvtEditingId = id || null;
     initEvtCoverB64 = null; initEvtGallery = [null,null,null,null]; initEvtPdfB64 = null; initEvtPdfNom = null;
     const modal = document.getElementById('init-evt-modal-bg');
@@ -3859,6 +4040,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
   openFromHash();
   window.addEventListener('hashchange', openFromHash);
+  window.initPremiumGates && window.initPremiumGates();
 
   /* Style commun projets */
   if(!document.getElementById('init-proj-style')){
@@ -4040,8 +4222,9 @@ async function replyVitrineMessage(convId){
 ══════════════════════════════════════════════ */
 async function renderPaiementMarketplace(){
   const body = document.getElementById('paiement-marketplace-body');
+  if (!body) return;
+  if (!window._daPremiumInitiative) { body.innerHTML = premiumLockedCardHtml('paiement_boutique'); return; }
   const initId = window.__vitrineInitId;
-  if(!body) return;
   if(!initId){ body.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune initiative liée.</p>'; return; }
   body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
   try{
@@ -5657,10 +5840,13 @@ const MODE_LBL = { gratuit:'Gratuit (0%)', payant:'Payant (5%)', payant_sauf_mem
 
 async function initFormationsSidebar() {
   try {
+    /* La création de formations (Espace Formateur) est réservée aux comptes Premium.
+       Le lien reste toujours visible : doré + verrouillé si non Premium (voir initPremiumGates),
+       sinon actif et mène à la gestion des formations. */
     const { accreditations } = await api('GET', '/accreditations/mes');
-    const has = (accreditations||[]).some(a => a.type === 'createur_formations' && a.statut === 'active');
+    const has = (accreditations||[]).some(a => a.type === 'initiative_abonne' && a.statut === 'active');
     const sb = document.getElementById('sb-formations-gestion');
-    if (sb) sb.style.display = has ? '' : 'none';
+    if (sb) sb.style.display = '';
     if (has) loadMesFormations();
   } catch(_) {}
 }
@@ -5817,9 +6003,96 @@ document.querySelector('[data-section="formations-gestion"]')?.addEventListener(
   setTimeout(loadMesFormations, 150);
 });
 
+/* ── Modules réservés aux comptes Premium (initiative_abonne) ──
+   Bouton doré + modal d'upsell partagé, appliqué à : Publicités, Événements, Business Plans,
+   Paiements boutique (Stripe Connect), Module de paiement billetterie & cotisations. */
+const PREMIUM_UPSELL_CONTEXTS = {
+  publicites:  { title:'Créez vos campagnes publicitaires', intro:"La création de publicités est réservée aux comptes Premium." },
+  evenements:  { title:'Créez vos événements', intro:"La création d'événements est réservée aux comptes Premium." },
+  business_plans: { title:'Débloquez les Business Plans', intro:"Le module Business Plans complet est réservé aux comptes Premium." },
+  paiement_boutique: { title:'Activez les paiements réels', intro:"Les paiements réels de votre boutique (Stripe Connect) sont réservés aux comptes Premium." },
+  paiement_billetterie: { title:'Activez le module de paiement', intro:"Le module de paiement billetterie & cotisations est réservé aux comptes Premium." },
+  espace_formateur: { title:'Devenez créateur de formations', intro:"L'Espace Formateur (créer et vendre vos propres formations) est réservé aux comptes Premium." },
+  adhesions: { title:'Gérez cotisations & adhésions', intro:"Le module Cotisations & Adhésions est réservé aux comptes Premium." },
+  votes: { title:'Organisez des votes sécurisés', intro:"Le module Votes sécurisés est réservé aux comptes Premium." },
+};
+window.openPremiumUpsell = function(context) {
+  const c = PREMIUM_UPSELL_CONTEXTS[context] || {};
+  document.getElementById('premium-upsell-title').textContent = c.title || 'Débloquez tous les modules Initiative';
+  document.getElementById('premium-upsell-intro').textContent = c.intro || 'Ce module fait partie des fonctionnalités réservées aux comptes Premium.';
+  document.getElementById('premium-upsell-modal').style.display = 'flex';
+};
+window.closePremiumUpsell = function() { document.getElementById('premium-upsell-modal').style.display = 'none'; };
+
+function premiumLockedCardHtml(context) {
+  const c = PREMIUM_UPSELL_CONTEXTS[context] || {};
+  return `<div style="background:linear-gradient(135deg,#fffbeb,#fff7e0);border:1.5px solid #f2c94c;border-radius:12px;padding:18px 20px;text-align:center;">
+    <div style="font-size:26px;margin-bottom:6px;">🔒</div>
+    <div style="font-weight:800;color:#92400e;margin-bottom:4px;">${c.title || 'Module réservé aux comptes Premium'}</div>
+    <p style="font-size:12.5px;color:#92400e;margin:0 0 12px;">${c.intro || ''}</p>
+    <button onclick="openPremiumUpsell('${context}')" style="background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;">🎉 Passer à Premium</button>
+  </div>`;
+}
+
+function applyPremiumButtonStyles() {
+  if (window._daPremiumInitiative) return;
+  /* Boutons dorés : Nouvelle publicité + Créer un événement (jamais les boutons Modifier). */
+  document.querySelectorAll('button[onclick="openAdModal()"], button[onclick="openInitEvtModal()"]').forEach(btn => {
+    btn.style.background = 'linear-gradient(135deg,#c8960c,#f2c94c)';
+    btn.style.color = '#2a1e00';
+    btn.style.border = 'none';
+    if (!btn.textContent.includes('🔒')) btn.textContent = '🔒 ' + btn.textContent;
+  });
+}
+
+async function initPremiumGates() {
+  if (window._daPremiumInitiative === undefined) {
+    try {
+      const { accreditations } = await api('GET', '/accreditations/mes');
+      window._daPremiumInitiative = (accreditations||[]).some(a => a.type==='initiative_abonne' && a.statut==='active');
+    } catch(_) { window._daPremiumInitiative = false; }
+  }
+  if (window._daPremiumInitiative) return;
+  applyPremiumButtonStyles();
+
+  /* Les 5 liens du groupe « ⭐ MODULES PREMIUM » (sidebar) — tous dorés, une seule fois chacun. */
+  const SIDEBAR_PREMIUM_LINKS = [
+    { href: '#paiement', context: 'paiement_boutique' },
+    { href: '#formations-gestion', context: 'espace_formateur', intercept: true },
+    { href: '#publicites-init', context: 'publicites' },
+    { href: '#evenements', context: 'evenements' },
+    { href: 'business-plan.html', context: 'business_plans', intercept: true },
+    { href: '#adhesions-init', context: 'adhesions', intercept: true },
+    { href: '#votes-init', context: 'votes', intercept: true },
+  ];
+  SIDEBAR_PREMIUM_LINKS.forEach(({ href, context, intercept }) => {
+    const link = document.querySelector(`.sidebar a[href="${href}"]`);
+    if (!link || link.dataset.premiumStyled) return;
+    link.dataset.premiumStyled = '1';
+    link.classList.add('premium-locked');
+    link.style.margin = '0 8px';
+    link.innerHTML = '🔒 ' + link.innerHTML;
+    if (intercept) link.addEventListener('click', (e) => { e.preventDefault(); openPremiumUpsell(context); });
+  });
+
+  /* Paiements boutique (Stripe Connect) */
+  const stripeBody = document.getElementById('paiement-marketplace-body');
+  if (stripeBody) stripeBody.innerHTML = premiumLockedCardHtml('paiement_boutique');
+  const stripeRefresh = document.querySelector('#paiement-marketplace button[onclick="renderPaiementMarketplace()"]');
+  if (stripeRefresh) stripeRefresh.style.display = 'none';
+
+  /* Module de paiement — billetterie & cotisations (carte démo) */
+  const paiementCard = document.getElementById('paiement');
+  if (paiementCard) {
+    const h3 = paiementCard.querySelector('h3');
+    const titre = h3 ? h3.outerHTML : '<h3>Module de paiement — billetterie &amp; cotisations</h3>';
+    paiementCard.innerHTML = titre + premiumLockedCardHtml('paiement_billetterie');
+  }
+}
 /* Initialisation au chargement */
 initAssoSidebar();
 initFormationsSidebar();
+initPremiumGates();
 </script>
 
   <nav class="mobile-bottom-nav">

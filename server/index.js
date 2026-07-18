@@ -337,6 +337,8 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   // Assigner le DA-ID à l'utilisateur
   try { await db.prepare('UPDATE users SET da_id=? WHERE id=?').run(generateDaId(), id); } catch (_) {}
+  // 🥇 Découverte Premium : 30 jours d'accès Premium offerts automatiquement à la création du compte
+  await accorderDecouvertePremium(id, role);
   // Réseau Pro : quelques listes par défaut, entièrement modifiables/supprimables ensuite
   try {
     const LISTES_DEFAUT = [
@@ -1385,6 +1387,13 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  /* Rendre la vitrine visible au public est réservé aux comptes Premium (initiative_abonne).
+     La masquer reste toujours possible, y compris sans Premium. */
+  if (body.vitrine_active === true && init.vitrine_active !== 1) {
+    const estPremium = await hasAccreditation(user.id, 'initiative_abonne');
+    if (!estPremium) return sendJSON(res, 402, { error: "Rendre votre vitrine visible au public est réservé aux comptes Premium.", accred_type: 'initiative_abonne' });
+  }
 
   const {
     vitrine_active, vitrine_banniere_url, vitrine_horaires, vitrine_services, description, mission, galerie_json,
@@ -3336,7 +3345,8 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
     const accreds = r.owner_user_id
       ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(r.owner_user_id)).map(a => a.type)
       : [];
-    return { ...r, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: await getCertif(r.id), accreditations: accreds };
+    const decouverte_premium = r.owner_user_id ? await getDecouvertePremium(r.owner_user_id) : null;
+    return { ...r, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: await getCertif(r.id), accreditations: accreds, decouverte_premium };
   }));
   sendJSON(res, 200, { initiatives: rows });
 });
@@ -3351,6 +3361,7 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
   row.accreditations = row.owner_user_id
     ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(row.owner_user_id)).map(a => a.type)
     : [];
+  row.decouverte_premium = row.owner_user_id ? await getDecouvertePremium(row.owner_user_id) : null;
   /* Profil public enrichi : champs JSON parsés pour les colonnes gauche/droite d'initiative.html */
   row.publics = safeParse(row.publics_json) || [];
   row.besoins = safeParse(row.besoins_json) || [];
@@ -5509,8 +5520,44 @@ async function hasAccreditation(userId, type) {
   if (ancien) return true;
   const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
   if (!def) return false;
-  const nouv = await db.prepare("SELECT id FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id);
-  return !!nouv;
+  const nouv = await db.prepare("SELECT id, date_expiration FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id);
+  if (!nouv) return false;
+  if (nouv.date_expiration && new Date(nouv.date_expiration).getTime() < Date.now()) return false;
+  return true;
+}
+
+/* 🥇 Découverte Premium — période d'essai de 30 jours accordée automatiquement à la création
+   du compte, pour tout rôle disposant d'un type d'accréditation "_abonne" premium.
+   Générique : ajouter une entrée ici suffit à couvrir un futur type de compte. */
+const PREMIUM_ACCRED_TYPE_BY_ROLE = {
+  utilisateur: 'utilisateur_abonne',
+  initiative: 'initiative_abonne',
+};
+/* Retourne { date_expiration } si l'utilisateur est actuellement en période d'essai
+   🥇 Découverte Premium (active, non expirée, type_tarif='decouverte'), sinon null. */
+async function getDecouvertePremium(userId) {
+  const row = await db.prepare(`
+    SELECT ua.date_expiration FROM user_accreditations ua
+    WHERE ua.user_id=? AND ua.statut='active' AND ua.type_tarif='decouverte'
+    ORDER BY ua.date_expiration DESC LIMIT 1
+  `).get(userId);
+  if (!row || !row.date_expiration) return null;
+  if (new Date(row.date_expiration).getTime() < Date.now()) return null;
+  return { date_expiration: row.date_expiration };
+}
+
+async function accorderDecouvertePremium(userId, role) {
+  const type = PREMIUM_ACCRED_TYPE_BY_ROLE[role];
+  if (!type) return;
+  try {
+    const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
+    if (!def) return;
+    const expire = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await db.prepare(`
+      INSERT INTO user_accreditations (user_id, accred_id, statut, date_expiration, type_tarif, montant_paye)
+      VALUES (?,?,?,?,?,0)
+    `).run(userId, def.id, 'active', expire, 'decouverte');
+  } catch (_) {}
 }
 
 /* Gate "Utilisateur Abonné" — Réseau Pro, Business Plans, Mes projets.
@@ -5828,13 +5875,11 @@ route("GET", "/api/mes-inscriptions", async (req, res) => {
 route("POST", "/api/formations", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  /* Seule l'accréditation « Créateur de formation » fait foi (tous types de compte confondus) —
-     pas de restriction de rôle : bug corrigé (l'ancienne restriction ['initiative','collectivite',...]
-     empêchait un compte Utilisateur accrédité de créer une formation, contrairement au module
-     Accréditations). Le manque de `await` sur hasAccreditation() (toujours vrai car promesse
-     tronquée) était un second bug réel — corrigé ici aussi. */
-  if (user.role !== 'administrateur' && !(await hasAccreditation(user.id, 'createur_formations'))) {
-    return sendJSON(res, 403, { error: "Accréditation Créateur de formation requise. Faites une demande depuis l'onglet Formation." });
+  /* La création de formations n'est plus une accréditation à demander : elle est réservée
+     aux comptes Premium (accréditation utilisateur_abonne / initiative_abonne selon le rôle). */
+  const premiumType = user.role === 'initiative' ? 'initiative_abonne' : 'utilisateur_abonne';
+  if (user.role !== 'administrateur' && !(await hasAccreditation(user.id, premiumType))) {
+    return sendJSON(res, 402, { error: "La création de formations est réservée aux comptes Premium.", accred_type: premiumType });
   }
   const { titre, type_formation, organisme, domaine, nationalite, langue, niveau, description,
           prix, duree, duree_heures, places, mode_acces, telecharge_autorise,
@@ -6117,7 +6162,7 @@ route("POST", "/api/formations/:id/lecons/:leconId/progression", async (req, res
   `).get(params.id))?.n || 0;
   const nbTermine = (await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons_progression WHERE inscription_id=? AND termine=1").get(inscription.id))?.n || 0;
   const avancement_pct = totalLecons ? Math.round((nbTermine / totalLecons) * 100) : 0;
-  await db.prepare("UPDATE formation_inscriptions SET avancement_pct=? WHERE id=?").run(avancement_pct, inscription.id);
+  await db.prepare("UPDATE formation_inscriptions SET avancement_pct=?, derniere_activite_le=datetime('now'), relance_inactivite_le=NULL WHERE id=?").run(avancement_pct, inscription.id);
   sendJSON(res, 200, { ok: true, avancement_pct });
 });
 route("POST", "/api/formations/:id/modules", async (req, res, params, body) => {
@@ -11501,10 +11546,17 @@ route("GET", "/api/accreditations/demandes", async (req, res) => {
   sendJSON(res, 200, { demandes: [...anciens, ...nouveaux.filter(n => !types.has(n.type))] });
 });
 
-/* GET /api/accreditations/user/:id — accréditations publiques d'un compte */
+/* GET /api/accreditations/user/:id — accréditations publiques d'un compte
+   (inclut type_tarif/date_expiration pour l'affichage transparent du badge 🥇 Découverte Premium). */
 route("GET", "/api/accreditations/user/:id", async (req, res, params) => {
-  const rows = await db.prepare("SELECT type, statut, date_attribution FROM compte_accreditations WHERE user_id=? AND statut='active'").all(params.id);
-  sendJSON(res, 200, { accreditations: rows });
+  const anciens = await db.prepare("SELECT type, statut, date_attribution, NULL AS date_expiration, NULL AS type_tarif FROM compte_accreditations WHERE user_id=? AND statut='active'").all(params.id);
+  const nouveaux = await db.prepare(`
+    SELECT d.type, ua.statut, ua.date_attribution, ua.date_expiration, ua.type_tarif
+    FROM user_accreditations ua JOIN accred_definitions d ON d.id=ua.accred_id
+    WHERE ua.user_id=? AND ua.statut='active'
+  `).all(params.id);
+  const types = new Set(anciens.map(a => a.type));
+  sendJSON(res, 200, { accreditations: [...anciens, ...nouveaux.filter(n => !types.has(n.type))] });
 });
 
 /* POST /api/accreditations/demande — demander une accréditation (nouveau + ancien système) */
@@ -11524,8 +11576,6 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
   if (champs_specifiques !== undefined) {
     if (typeof champs_specifiques !== 'object' || champs_specifiques === null || Array.isArray(champs_specifiques))
       return sendJSON(res, 400, { error: "Champs spécifiques invalides." });
-    if (type === 'createur_formations' && champs_specifiques.charte_acceptee !== true)
-      return sendJSON(res, 400, { error: "Vous devez accepter la charte qualité des formateurs pour soumettre votre demande." });
     const clean = {};
     for (const [k, v] of Object.entries(champs_specifiques)) {
       if (typeof v === 'boolean') clean[k] = v;
@@ -11560,6 +11610,7 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
       id = await db.prepare(`INSERT INTO accred_demandes (user_id,accred_id,message,documents_json,lettre_motivation,video_url,champs_specifiques_json) VALUES (?,?,?,?,?,?,?)`)
         .run(user.id, def.id, message||null, documentsJson, lettre_motivation ? SEC.sanitizeString(lettre_motivation, 8000) : null, video_url||null, champsSpecifiquesJson).lastInsertRowid;
     }
+    let autoApprouvee = false;
     if (!tarif || tarif.validation_admin !== 0) {
       const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
       admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation",
@@ -11568,8 +11619,9 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
       /* Accès immédiat sans validation */
       await db.prepare("UPDATE accred_demandes SET statut='approuvee' WHERE id=?").run(id);
       db.prepare("INSERT OR IGNORE INTO user_accreditations (user_id,accred_id,statut) VALUES (?,?,'active')").run(user.id, def.id);
+      autoApprouvee = true;
     }
-    return sendJSON(res, 201, { id, ok: true });
+    return sendJSON(res, 201, { id, ok: true, auto_approuvee: autoApprouvee });
   }
 
   /* Fallback : ancien système pour les types hardcodés */
@@ -11832,8 +11884,16 @@ async function enrichOffreOrganisme(o) {
 
 /* GET /api/offres — recherche filtrée (module Emplois & Stages, type IN emploi/stage) */
 route("GET", "/api/offres", async (req, res, params, body, query) => {
-  const conditions = ["o.statut='publiee'"];
-  const args = [];
+  const conditions = [], args = [];
+  if (query.createur_id) {
+    conditions.push("o.createur_id=?"); args.push(query.createur_id);
+    const me = await getCurrentUser(req);
+    if (!me || (Number(me.id) !== Number(query.createur_id) && me.role !== 'administrateur')) {
+      conditions.push("o.statut='publiee'");
+    }
+  } else {
+    conditions.push("o.statut='publiee'");
+  }
   if (query.module === 'emploi_stage') { conditions.push("o.type IN ('emploi','stage')"); }
   if (query.type) { conditions.push("o.type=?"); args.push(query.type); }
   if (query.contrat) { conditions.push("o.contrat=?"); args.push(query.contrat); }
@@ -11880,7 +11940,7 @@ route("POST", "/api/offres", async (req, res, params, body) => {
     niveau_experience, niveau_etudes, teletravail, temps,
     salaire_min, salaire_max, salaire_communique, remuneration, avantages, horaires, debut_mission,
     diplome_requis, langues_requises, permis_requis, certifications_requises,
-    pieces_demandees, date_limite, nb_postes, statut,
+    pieces_demandees, date_limite, nb_postes, statut, recruteur_contact,
   } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   if (!['emploi', 'stage'].includes(type)) return sendJSON(res, 400, { error: "Type invalide (emploi ou stage)." });
@@ -11897,8 +11957,8 @@ route("POST", "/api/offres", async (req, res, params, body) => {
       competences_requises, localisation, pays, region, departement, ville, commune, domaine,
       niveau_experience, niveau_etudes, teletravail, temps, salaire_min, salaire_max, salaire_communique,
       remuneration, avantages, horaires, debut_mission, diplome_requis, langues_requises, permis_requis,
-      certifications_requises, pieces_demandees, date_limite, nb_postes, statut
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      certifications_requises, pieces_demandees, date_limite, nb_postes, statut, recruteur_contact
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     user.id, initiativeId, titre, type, contrat || null, duree_alternance || null, description || null,
     JSON.stringify(Array.isArray(missions) ? missions : []),
@@ -11910,7 +11970,7 @@ route("POST", "/api/offres", async (req, res, params, body) => {
     diplome_requis || null, JSON.stringify(Array.isArray(langues_requises) ? langues_requises : []), permis_requis || null,
     JSON.stringify(Array.isArray(certifications_requises) ? certifications_requises : []),
     JSON.stringify(Array.isArray(pieces_demandees) ? pieces_demandees : ['cv', 'lettre']),
-    date_limite || null, nb_postes || 1, statut === 'brouillon' ? 'brouillon' : 'publiee'
+    date_limite || null, nb_postes || 1, statut === 'brouillon' ? 'brouillon' : 'publiee', recruteur_contact || null
   )).lastInsertRowid;
 
   // Notifie les comptes ayant une alerte correspondant à cette offre (domaine, pays ou ville)
@@ -12041,6 +12101,55 @@ route("GET", "/api/mes-offres", async (req, res, params, body, query) => {
   sendJSON(res, 200, { offres: rows.map(r => ({ ...r, competences_requises: safeParse(r.competences_requises), missions: safeParse(r.missions) })) });
 });
 
+/* GET /api/offres/stats/mes — statistiques essentielles pour l'organisme connecté */
+route("GET", "/api/offres/stats/mes", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare("SELECT statut, nb_candidatures, nb_vues FROM offres WHERE createur_id=?").all(user.id);
+  const nb_offres = rows.length;
+  const nb_actives = rows.filter(r => r.statut === 'publiee').length;
+  const total_candidatures = rows.reduce((s, r) => s + (r.nb_candidatures || 0), 0);
+  const total_vues = rows.reduce((s, r) => s + (r.nb_vues || 0), 0);
+  const taux_reponse = total_vues > 0 ? Math.round((total_candidatures / total_vues) * 1000) / 10 : 0;
+  sendJSON(res, 200, { nb_offres, nb_actives, total_candidatures, total_vues, taux_reponse });
+});
+
+/* GET /api/offres/stats-avancees/mes — Gestion des candidatures : provenance, répartition
+   géographique, temps moyen avant recrutement, offres les plus performantes, sources. */
+route("GET", "/api/offres/stats-avancees/mes", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const offres = await db.prepare("SELECT id, titre, nb_candidatures, nb_vues FROM offres WHERE createur_id=?").all(user.id);
+  const offreIds = offres.map(o => o.id);
+  let candidatures = [];
+  if (offreIds.length) {
+    candidatures = await db.prepare(`
+      SELECT oc.*, u.pays AS candidat_pays, u.ville AS candidat_ville
+      FROM offres_candidatures oc JOIN users u ON u.id=oc.candidat_id
+      WHERE oc.offre_id IN (${offreIds.map(() => '?').join(',')})
+    `).all(...offreIds);
+  }
+  const sources = {};
+  candidatures.forEach(c => { const s = c.source || 'plateforme'; sources[s] = (sources[s] || 0) + 1; });
+  const geo = {};
+  candidatures.forEach(c => { const p = c.candidat_pays || 'Non renseigné'; geo[p] = (geo[p] || 0) + 1; });
+  const embauches = candidatures.filter(c => c.embauche_le);
+  const tempsMoyenJours = embauches.length
+    ? Math.round(embauches.reduce((s, c) => s + (new Date(c.embauche_le) - new Date(c.created_at)) / 86400000, 0) / embauches.length)
+    : null;
+  const offresPerformantes = offres
+    .map(o => ({ id: o.id, titre: o.titre, nb_vues: o.nb_vues || 0, nb_candidatures: o.nb_candidatures || 0,
+      taux_conversion: o.nb_vues ? Math.round((o.nb_candidatures / o.nb_vues) * 1000) / 10 : 0 }))
+    .sort((a, b) => b.nb_candidatures - a.nb_candidatures)
+    .slice(0, 5);
+  sendJSON(res, 200, {
+    provenance_sources: sources,
+    repartition_geographique: geo,
+    temps_moyen_recrutement_jours: tempsMoyenJours,
+    offres_performantes: offresPerformantes,
+  });
+});
+
 /* PUT /api/offres/:id — modifier (créateur uniquement) */
 route("PUT", "/api/offres/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -12050,7 +12159,10 @@ route("PUT", "/api/offres/:id", async (req, res, params, body) => {
   if (o.createur_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Non autorisé." });
   const fields = ['titre', 'description', 'contrat', 'localisation', 'pays', 'region', 'departement', 'ville', 'commune',
     'domaine', 'niveau_experience', 'niveau_etudes', 'temps', 'salaire_min', 'salaire_max', 'horaires', 'debut_mission',
-    'diplome_requis', 'permis_requis', 'date_limite', 'nb_postes', 'statut'];
+    'diplome_requis', 'permis_requis', 'date_limite', 'nb_postes', 'statut', 'recruteur_contact'];
+  if (body.statut !== undefined && !['brouillon','publiee','suspendue','cloturee','archivee'].includes(body.statut)) {
+    return sendJSON(res, 400, { error: "Statut invalide." });
+  }
   const sets = [], args = [];
   for (const f of fields) { if (body[f] !== undefined) { sets.push(`${f}=?`); args.push(body[f]); } }
   const jsonFields = ['missions', 'competences_requises', 'avantages', 'langues_requises', 'certifications_requises', 'pieces_demandees'];
@@ -12059,6 +12171,22 @@ route("PUT", "/api/offres/:id", async (req, res, params, body) => {
   if (!sets.length) return sendJSON(res, 400, { error: "Rien à modifier." });
   args.push(params.id);
   await db.prepare(`UPDATE offres SET ${sets.join(', ')} WHERE id=?`).run(...args);
+  if (body.statut === 'cloturee' && o.statut !== 'cloturee') {
+    const candidats = await db.prepare("SELECT candidat_id FROM offres_candidatures WHERE offre_id=? AND statut_detail NOT IN ('refusee','acceptee','embauchee')").all(params.id);
+    candidats.forEach(c => creerNotif(c.candidat_id, 'offre_relance', '🔒 Offre clôturée', `L'offre « ${o.titre} » à laquelle vous avez postulé a été clôturée.`, { offre_id: Number(params.id) }));
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/offres/:id — supprimer (créateur uniquement) */
+route("DELETE", "/api/offres/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const o = await db.prepare("SELECT * FROM offres WHERE id=?").get(params.id);
+  if (!o) return sendJSON(res, 404, { error: "Offre introuvable." });
+  if (o.createur_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Non autorisé." });
+  await db.prepare("DELETE FROM offres_candidatures WHERE offre_id=?").run(params.id);
+  await db.prepare("DELETE FROM offres WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -12071,12 +12199,15 @@ route("POST", "/api/offres/:id/postuler", async (req, res, params, body) => {
   if (o.statut !== "publiee") return sendJSON(res, 400, { error: "Cette offre n'est plus disponible." });
   if (o.createur_id === user.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas postuler à votre propre offre." });
   try {
-    db.prepare("INSERT INTO offres_candidatures (offre_id,candidat_id,message,cv_url,lettre_url) VALUES (?,?,?,?,?)").run(
-      params.id, user.id, body.message||null, body.cv_url||null, body.lettre_url||null
-    );
+    const cvProfileId = body.cv_profile_id || null;
+    const lettreId = body.lettre_id || null;
+    const insId = (await db.prepare(
+      "INSERT INTO offres_candidatures (offre_id,candidat_id,message,cv_url,lettre_url,cv_profile_id,lettre_id) VALUES (?,?,?,?,?,?,?)"
+    ).run(params.id, user.id, body.message||null, body.cv_url||null, body.lettre_url||null, cvProfileId, lettreId)).lastInsertRowid;
     await db.prepare("UPDATE offres SET nb_candidatures=nb_candidatures+1 WHERE id=?").run(params.id);
+    try { await db.prepare("INSERT INTO candidature_historique(candidature_id,statut,auteur_id) VALUES(?,?,?)").run(insId, 'recu', user.id); } catch(_) {}
     creerNotif(o.createur_id, "mention", "Nouvelle candidature", `${user.nom} a postulé à « ${o.titre} »`, { offre_id: Number(params.id) });
-    sendJSON(res, 201, { ok: true });
+    sendJSON(res, 201, { ok: true, id: insId });
   } catch(e) {
     sendJSON(res, 409, { error: "Vous avez déjà postulé à cette offre." });
   }
@@ -12087,13 +12218,19 @@ route("GET", "/api/offres/:id/candidatures", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const o = await db.prepare("SELECT * FROM offres WHERE id=?").get(params.id);
-  if (!o || o.createur_id !== user.id) return sendJSON(res, 403, { error: "Réservé au créateur." });
+  if (!o || (o.createur_id !== user.id && user.role !== 'administrateur')) return sendJSON(res, 403, { error: "Réservé au créateur." });
   const cands = await db.prepare(`
-    SELECT oc.*, u.nom AS candidat_nom, u.email AS candidat_email, u.ville AS candidat_ville, u.pays AS candidat_pays
-    FROM offres_candidatures oc JOIN users u ON u.id=oc.candidat_id
+    SELECT oc.*, u.nom, u.prenom, u.email, u.telephone, u.ville AS candidat_ville, u.pays AS candidat_pays,
+           u.photo_url, u.titre_pro,
+           cv.titre AS cv_titre, cv.data_json AS cv_data_json,
+           lm.titre AS lettre_titre, lm.data_json AS lettre_data_json
+    FROM offres_candidatures oc
+    JOIN users u ON u.id=oc.candidat_id
+    LEFT JOIN cv_profiles cv ON oc.cv_profile_id = cv.id
+    LEFT JOIN lettres_motivation lm ON oc.lettre_id = lm.id
     WHERE oc.offre_id=? ORDER BY oc.created_at DESC
   `).all(params.id);
-  sendJSON(res, 200, { candidatures: cands, offre: o });
+  sendJSON(res, 200, cands.map(c => ({ ...c, tags: safeParse(c.tags) || [], documents_recus: safeParse(c.documents_recus_json) || [] })));
 });
 
 /* PATCH /api/offres/:id/candidatures/:cid */
@@ -12111,14 +12248,6 @@ route("PATCH", "/api/offres/:id/candidatures/:cid", async (req, res, params, bod
     creerNotif(cand.candidat_id, "validation", "Mise à jour de votre candidature", `Votre candidature pour « ${o.titre} » est ${labels[body.statut]||body.statut}.`, { offre_id: Number(params.id) });
   }
   sendJSON(res, 200, { ok: true });
-});
-
-/* GET /api/mes-offres */
-route("GET", "/api/mes-offres", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const rows = await db.prepare("SELECT * FROM offres WHERE createur_id=? ORDER BY created_at DESC").all(user.id);
-  sendJSON(res, 200, { offres: rows.map(r => ({ ...r, competences_requises: safeParse(r.competences_requises) })) });
 });
 
 /* GET /api/mes-candidatures-offres — mes candidatures aux offres */
@@ -14129,6 +14258,184 @@ async function handleRequest(req, res) {
     return;
   }
 
+  /* ── Relances de progression des apprenants (Vercel Cron, quotidien) — Lot 1 ──
+     Notifications plateforme uniquement (pas email/push pour l'instant) :
+       - franchissement des paliers 25 % / 50 % / 75 % d'avancement ;
+       - inactivité ≥ 7 jours depuis la dernière leçon complétée (une seule relance tant que
+         l'apprenant ne reprend pas — le flag est réinitialisé à chaque nouvelle activité,
+         voir POST .../lecons/:leconId/progression) ;
+       - plus qu'une leçon restante avant la fin de la formation.
+     Chaque type de relance n'est envoyé qu'une fois par inscription (flags relance_*_le). */
+  if (pathname === '/api/cron/formation-relances') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const inscriptions = await db.prepare(`
+        SELECT i.*, f.titre AS formation_titre
+        FROM formation_inscriptions i
+        JOIN formations f ON f.id=i.formation_id
+        WHERE i.statut='active' AND i.avancement_pct < 100
+      `).all();
+      let relancesEnvoyees = 0;
+      const now = new Date();
+      for (const insc of inscriptions) {
+        const pct = insc.avancement_pct || 0;
+
+        /* Paliers de progression 25/50/75 % */
+        const PALIERS = [
+          { seuil: 25, col: 'relance_25_le', msg: (t) => `Vous avez terminé 25 % de la formation « ${t} ». Continuez votre apprentissage !` },
+          { seuil: 50, col: 'relance_50_le', msg: (t) => `Félicitations, vous êtes à 50 % de votre formation « ${t} ». Plus que quelques modules avant d'obtenir votre certificat.` },
+          { seuil: 75, col: 'relance_75_le', msg: (t) => `Vous avez déjà parcouru 75 % de la formation « ${t} ». Vous êtes presque arrivé au bout.` },
+        ];
+        for (const p of PALIERS) {
+          if (pct >= p.seuil && !insc[p.col]) {
+            creerNotif(insc.user_id, 'formation_relance', '🎓 Progression de votre formation', p.msg(insc.formation_titre), { formation_id: insc.formation_id, inscription_id: insc.id });
+            await db.prepare(`UPDATE formation_inscriptions SET ${p.col}=datetime('now') WHERE id=?`).run(insc.id);
+            relancesEnvoyees++;
+          }
+        }
+
+        /* Inactivité ≥ 7 jours */
+        const derniereActivite = insc.derniere_activite_le ? new Date(insc.derniere_activite_le) : new Date(insc.date_inscription || insc.created_at);
+        const joursInactif = Math.floor((now - derniereActivite) / 86400000);
+        if (joursInactif >= 7 && !insc.relance_inactivite_le) {
+          creerNotif(insc.user_id, 'formation_relance', '⏰ Reprenez votre formation',
+            `Vous n'avez pas repris la formation « ${insc.formation_titre} » depuis ${joursInactif} jours. Votre progression est sauvegardée — reprenez en un clic.`,
+            { formation_id: insc.formation_id, inscription_id: insc.id });
+          await db.prepare("UPDATE formation_inscriptions SET relance_inactivite_le=datetime('now') WHERE id=?").run(insc.id);
+          relancesEnvoyees++;
+        }
+
+        /* Plus qu'une leçon avant la fin */
+        const totalLecons = (await db.prepare(`
+          SELECT COUNT(*) AS n FROM formation_lecons l
+          JOIN formation_chapitres c ON c.id=l.chapitre_id
+          JOIN formation_modules m ON m.id=c.module_id
+          WHERE m.formation_id=?
+        `).get(insc.formation_id))?.n || 0;
+        const nbTermine = (await db.prepare("SELECT COUNT(*) AS n FROM formation_lecons_progression WHERE inscription_id=? AND termine=1").get(insc.id))?.n || 0;
+        if (totalLecons > 1 && totalLecons - nbTermine === 1 && !insc.relance_75_le) {
+          creerNotif(insc.user_id, 'formation_relance', '🏁 Dernière ligne droite',
+            `Il ne vous reste qu'une leçon avant de terminer la formation « ${insc.formation_titre} » !`,
+            { formation_id: insc.formation_id, inscription_id: insc.id });
+          await db.prepare("UPDATE formation_inscriptions SET relance_75_le=datetime('now') WHERE id=?").run(insc.id);
+          relancesEnvoyees++;
+        }
+      }
+      sendJSON(res, 200, { ok: true, relancesEnvoyees });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron formation-relances"));
+    }
+    return;
+  }
+
+  /* ── 🥇 Découverte Premium : relances (10j/5j/3j/24h/jour J) + expiration automatique.
+     Chaque essai est une ligne user_accreditations (type_tarif='decouverte'). On la fait
+     passer à statut='expiree' une fois la date_expiration dépassée (hasAccreditation() vérifie
+     déjà date_expiration, mais rien ne "range" les lignes périmées sans cette purge). */
+  if (pathname === '/api/cron/decouverte-premium-relances') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const essais = await db.prepare(`
+        SELECT ua.*, u.nom AS user_nom FROM user_accreditations ua
+        JOIN users u ON u.id=ua.user_id
+        WHERE ua.statut='active' AND ua.type_tarif='decouverte' AND ua.date_expiration IS NOT NULL
+      `).all();
+      const now = Date.now();
+      let relancesEnvoyees = 0, expirations = 0;
+      for (const e of essais) {
+        const msRestant = new Date(e.date_expiration).getTime() - now;
+        const joursRestants = msRestant / 86400000;
+        const PALIERS = [
+          { seuilJours: 10, col: 'relance_10j_le', msg: "Il vous reste 10 jours de 🥇 Découverte Premium." },
+          { seuilJours: 5, col: 'relance_5j_le', msg: "Il vous reste 5 jours de 🥇 Découverte Premium." },
+          { seuilJours: 3, col: 'relance_3j_le', msg: "Il vous reste 3 jours de 🥇 Découverte Premium." },
+          { seuilJours: 1, col: 'relance_24h_le', msg: "Votre 🥇 Découverte Premium se termine dans 24 heures." },
+        ];
+        for (const p of PALIERS) {
+          if (joursRestants <= p.seuilJours && joursRestants > 0 && !e[p.col]) {
+            creerNotif(e.user_id, 'decouverte_premium', '🥇 Découverte Premium', p.msg, { accred_id: e.accred_id, cta: 'passer_premium' });
+            await db.prepare(`UPDATE user_accreditations SET ${p.col}=datetime('now') WHERE id=?`).run(e.id);
+            relancesEnvoyees++;
+          }
+        }
+        if (joursRestants <= 0) {
+          if (!e.relance_expire_le) {
+            creerNotif(e.user_id, 'decouverte_premium', '🥇 Découverte Premium terminée', "Votre période de découverte Premium est terminée. Passez au Premium pour conserver vos avantages.", { accred_id: e.accred_id, cta: 'passer_premium' });
+            await db.prepare("UPDATE user_accreditations SET relance_expire_le=datetime('now') WHERE id=?").run(e.id);
+            relancesEnvoyees++;
+          }
+          await db.prepare("UPDATE user_accreditations SET statut='expiree' WHERE id=?").run(e.id);
+          expirations++;
+        }
+      }
+      sendJSON(res, 200, { ok: true, relancesEnvoyees, expirations });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron decouverte-premium-relances"));
+    }
+    return;
+  }
+
+  /* ── Gestion des candidatures : relances Emploi & Stage —
+     offre bientôt expirée (≤3j), offre expirée (clôture auto), entretien imminent (≤24h). */
+  if (pathname === '/api/cron/offres-relances') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      let relancesEnvoyees = 0;
+      const now = new Date();
+
+      const offresActives = await db.prepare(`SELECT * FROM offres WHERE statut='publiee' AND date_limite IS NOT NULL`).all();
+      for (const o of offresActives) {
+        const joursRestants = (new Date(o.date_limite).getTime() - now.getTime()) / 86400000;
+        if (joursRestants <= 3 && joursRestants > 0 && !o.relance_bientot_expiree_le) {
+          creerNotif(o.createur_id, 'offre_relance', '⏰ Offre bientôt expirée', `Votre offre « ${o.titre} » expire dans ${Math.ceil(joursRestants)} jour(s).`, { offre_id: o.id });
+          await db.prepare("UPDATE offres SET relance_bientot_expiree_le=datetime('now') WHERE id=?").run(o.id);
+          relancesEnvoyees++;
+        }
+        if (joursRestants <= 0) {
+          if (!o.relance_expiree_le) {
+            creerNotif(o.createur_id, 'offre_relance', '🔒 Offre expirée', `Votre offre « ${o.titre} » a atteint sa date limite et a été clôturée automatiquement.`, { offre_id: o.id });
+            await db.prepare("UPDATE offres SET relance_expiree_le=datetime('now') WHERE id=?").run(o.id);
+            relancesEnvoyees++;
+          }
+          await db.prepare("UPDATE offres SET statut='cloturee' WHERE id=?").run(o.id);
+        }
+      }
+
+      const entretiensAVenir = await db.prepare(`
+        SELECT oc.*, o.titre AS offre_titre, o.createur_id FROM offres_candidatures oc
+        JOIN offres o ON o.id=oc.offre_id
+        WHERE oc.date_entretien IS NOT NULL AND oc.statut_detail='entretien_prevu'
+      `).all();
+      for (const c of entretiensAVenir) {
+        const heuresRestantes = (new Date(c.date_entretien).getTime() - now.getTime()) / 3600000;
+        if (heuresRestantes <= 24 && heuresRestantes > 0) {
+          const dejaEnvoye = await db.prepare("SELECT 1 FROM candidature_historique WHERE candidature_id=? AND statut='entretien_imminent_notifie'").get(c.id);
+          if (!dejaEnvoye) {
+            creerNotif(c.createur_id, 'offre_relance', '⏰ Entretien imminent', `L'entretien pour la candidature à « ${c.offre_titre} » a lieu dans moins de 24 heures.`, { offre_id: c.offre_id, candidature_id: c.id });
+            db.prepare("INSERT INTO candidature_historique(candidature_id,statut,auteur_id) VALUES(?,'entretien_imminent_notifie',NULL)").run(c.id);
+            relancesEnvoyees++;
+          }
+        }
+      }
+      sendJSON(res, 200, { ok: true, relancesEnvoyees });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron offres-relances"));
+    }
+    return;
+  }
+
   /* ── Expiration des publicités (Vercel Cron, quotidien) ──
      Une publicité dure au maximum un mois (duree_jours ≤ 30, voir /api/ads/create et /approve).
      Passé sa date_fin, elle est supprimée définitivement : elle disparaît immédiatement de tous les
@@ -14491,24 +14798,55 @@ ${jsonLd}
       return sendJSON(res, 200, hist);
     }
 
-    /* --- PATCH /api/candidatures/:id/statut — changer le statut (recruteur ou admin) --- */
-    if (req.method === "PATCH" && /^\/api\/candidatures\/\d+\/statut$/.test(pathname)) {
+    /* --- PATCH /api/candidatures/:id/tags — classement/étiquettes privées du recruteur --- */
+    if (req.method === "PATCH" && /^\/api\/candidatures\/\d+\/tags$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const id = parseInt(pathname.split('/')[3]);
       const cand = await db.prepare(`SELECT * FROM offres_candidatures WHERE id=?`).get(id);
       if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable" });
       const offre = await db.prepare(`SELECT createur_id FROM offres WHERE id=?`).get(cand.offre_id);
       if (me.role !== 'admin' && offre?.createur_id !== me.id) return sendJSON(res, 403, { error: "Accès refusé" });
+      await db.prepare(`UPDATE offres_candidatures SET tags=? WHERE id=?`).run(JSON.stringify(Array.isArray(body.tags) ? body.tags : []), id);
+      return sendJSON(res, 200, { updated: true });
+    }
+
+    /* --- POST /api/candidatures/:id/demander-documents — demande de documents complémentaires --- */
+    if (req.method === "POST" && /^\/api\/candidatures\/\d+\/demander-documents$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const id = parseInt(pathname.split('/')[3]);
+      const cand = await db.prepare(`SELECT * FROM offres_candidatures WHERE id=?`).get(id);
+      if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable" });
+      const offre = await db.prepare(`SELECT createur_id, titre FROM offres WHERE id=?`).get(cand.offre_id);
+      if (me.role !== 'admin' && offre?.createur_id !== me.id) return sendJSON(res, 403, { error: "Accès refusé" });
+      const message = (body.message || "Merci de compléter votre dossier avec les documents demandés.").trim();
+      await db.prepare(`UPDATE offres_candidatures SET documents_demande_le=datetime('now'), documents_demande_message=? WHERE id=?`).run(message, id);
+      creerNotif(cand.candidat_id, 'candidature', '📎 Documents complémentaires demandés', `Pour votre candidature à « ${offre?.titre || ''} » : ${message}`, { offre_id: cand.offre_id, candidature_id: id });
+      return sendJSON(res, 201, { ok: true });
+    }
+
+    /* --- PATCH /api/candidatures/:id/statut — changer le statut (recruteur ou admin) ---
+       Statuts officiels (Gestion des candidatures) : nouvelle, en_etude, preselectionnee,
+       entretien_prevu, test_demande, en_attente, refusee, acceptee, embauchee. */
+    if (req.method === "PATCH" && /^\/api\/candidatures\/\d+\/statut$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const id = parseInt(pathname.split('/')[3]);
+      const cand = await db.prepare(`SELECT * FROM offres_candidatures WHERE id=?`).get(id);
+      if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable" });
+      const offre = await db.prepare(`SELECT createur_id, titre FROM offres WHERE id=?`).get(cand.offre_id);
+      if (me.role !== 'admin' && offre?.createur_id !== me.id) return sendJSON(res, 403, { error: "Accès refusé" });
       const { statut_detail, note, date_entretien, lieu_entretien, type_entretien } = body;
-      await db.prepare(`UPDATE offres_candidatures SET statut_detail=?, date_entretien=?, lieu_entretien=?, type_entretien=?, vu_recruteur=1 WHERE id=?`)
+      const embaucheSql = statut_detail === 'embauchee' ? "datetime('now')" : 'embauche_le';
+      await db.prepare(`UPDATE offres_candidatures SET statut_detail=?, date_entretien=?, lieu_entretien=?, type_entretien=?, vu_recruteur=1, embauche_le=${embaucheSql} WHERE id=?`)
         .run(statut_detail || cand.statut_detail, date_entretien || cand.date_entretien, lieu_entretien || cand.lieu_entretien, type_entretien || cand.type_entretien, id);
       db.prepare(`INSERT INTO candidature_historique(candidature_id,statut,note,auteur_id) VALUES(?,?,?,?)`)
         .run(id, statut_detail, note || null, me.id);
-      // Notif candidat
-      try {
-        db.prepare(`INSERT INTO notifications(user_id,type,titre,message,lien) VALUES(?,?,?,?,?)`)
-          .run(cand.candidat_id, 'candidature', 'Mise à jour candidature', `Votre candidature a été mise à jour : ${statut_detail}`, `/dashboard-utilisateur.html#candidatures`);
-      } catch(e) {}
+      const LABELS_STATUT = { nouvelle:'Nouvelle candidature', en_etude:"En cours d'étude", preselectionnee:'Présélectionnée',
+        entretien_prevu:'Entretien prévu', test_demande:'Test demandé', en_attente:'En attente',
+        refusee:'Refusée', acceptee:'Acceptée', embauchee:'Embauchée 🎉' };
+      const titreNotif = statut_detail === 'entretien_prevu' ? '📅 Entretien programmé' : 'Mise à jour de votre candidature';
+      creerNotif(cand.candidat_id, 'candidature', titreNotif,
+        `Votre candidature pour « ${offre?.titre || ''} » est maintenant : ${LABELS_STATUT[statut_detail] || statut_detail}.`,
+        { offre_id: cand.offre_id, candidature_id: id });
       return sendJSON(res, 200, { updated: true });
     }
 
@@ -14524,49 +14862,6 @@ ${jsonLd}
       await db.prepare(`UPDATE offres_candidatures SET notes_recruteur=?, evaluation_json=?, vu_recruteur=1 WHERE id=?`)
         .run(notes_recruteur ?? cand.notes_recruteur, JSON.stringify(evaluation_json) ?? cand.evaluation_json, id);
       return sendJSON(res, 200, { updated: true });
-    }
-
-    /* --- GET /api/offres/:id/candidatures — candidatures d'une offre (recruteur) --- */
-    if (req.method === "GET" && /^\/api\/offres\/\d+\/candidatures$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const offreId = parseInt(pathname.split('/')[3]);
-      const offre = await db.prepare(`SELECT * FROM offres WHERE id=?`).get(offreId);
-      if (!offre) return sendJSON(res, 404, { error: "Offre introuvable" });
-      if (me.role !== 'admin' && offre.createur_id !== me.id) return sendJSON(res, 403, { error: "Accès refusé" });
-      const rows = await db.prepare(`
-        SELECT oc.*,
-               u.nom, u.prenom, u.email, u.photo_url, u.pays AS candidat_pays, u.titre_pro,
-               cv.titre AS cv_titre, cv.data_json AS cv_data, cv.theme AS cv_theme,
-               lm.titre AS lettre_titre, lm.data_json AS lettre_data
-        FROM offres_candidatures oc
-        LEFT JOIN users u ON oc.candidat_id = u.id
-        LEFT JOIN cv_profiles cv ON oc.cv_profile_id = cv.id
-        LEFT JOIN lettres_motivation lm ON oc.lettre_id = lm.id
-        WHERE oc.offre_id = ?
-        ORDER BY oc.created_at DESC
-      `).all(offreId);
-      return sendJSON(res, 200, rows);
-    }
-
-    /* --- POST /api/offres/:id/postuler — postuler avec CV+LM --- */
-    if (req.method === "POST" && /^\/api\/offres\/\d+\/postuler$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const offreId = parseInt(pathname.split('/')[3]);
-      const { message, cv_profile_id, lettre_id } = body;
-      const existing = await db.prepare(`SELECT id FROM offres_candidatures WHERE offre_id=? AND candidat_id=?`).get(offreId, me.id);
-      if (existing) return sendJSON(res, 409, { error: "Vous avez déjà postulé à cette offre" });
-      const r = db.prepare(`INSERT INTO offres_candidatures(offre_id,candidat_id,message,cv_profile_id,lettre_id,statut,statut_detail,type_candidature) VALUES(?,?,?,?,?,'recu','envoyee','offre')`)
-        .run(offreId, me.id, message || null, cv_profile_id || null, lettre_id || null);
-      await db.prepare(`UPDATE offres SET nb_candidatures = nb_candidatures + 1 WHERE id=?`).run(offreId);
-      db.prepare(`INSERT INTO candidature_historique(candidature_id,statut,auteur_id) VALUES(?,?,?)`)
-        .run(r.lastInsertRowid, 'envoyee', me.id);
-      // Notif recruteur
-      try {
-        const offre = await db.prepare(`SELECT createur_id, titre FROM offres WHERE id=?`).get(offreId);
-        db.prepare(`INSERT INTO notifications(user_id,type,titre,message,lien) VALUES(?,?,?,?,?)`)
-          .run(offre.createur_id, 'candidature', 'Nouvelle candidature', `Nouvelle candidature reçue pour "${offre.titre}"`, `/dashboard-initiative.html#candidatures`);
-      } catch(e) {}
-      return sendJSON(res, 201, { id: r.lastInsertRowid, success: true });
     }
 
     /* ================================================================

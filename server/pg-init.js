@@ -586,6 +586,12 @@ async function migratePg(pool) {
     // Paiement Stripe réel pour l'inscription à une formation payante
     ['formation_inscriptions', 'paiement_statut', "TEXT DEFAULT 'paye'"],
     ['formation_inscriptions', 'stripe_session_id', 'TEXT'],
+    // Relances de progression (Lot 1 — notifications plateforme)
+    ['formation_inscriptions', 'derniere_activite_le', 'TEXT'],
+    ['formation_inscriptions', 'relance_25_le', 'TEXT'],
+    ['formation_inscriptions', 'relance_50_le', 'TEXT'],
+    ['formation_inscriptions', 'relance_75_le', 'TEXT'],
+    ['formation_inscriptions', 'relance_inactivite_le', 'TEXT'],
     // Module Diaspo Formation — extension de la table formations (jamais migrée en Postgres jusqu'ici)
     ['formations', 'statut', "TEXT DEFAULT 'brouillon'"],
     ['formations', 'mode_acces', "TEXT DEFAULT 'gratuit'"],
@@ -669,6 +675,22 @@ async function migratePg(pool) {
     ['offres', 'certifications_requises', "TEXT DEFAULT '[]'"],
     ['offres', 'pieces_demandees', 'TEXT DEFAULT \'["cv","lettre"]\''],
     ['offres', 'nb_vues', 'INTEGER DEFAULT 0'],
+    ['offres', 'recruteur_contact', 'TEXT'],
+    // Module Gestion des candidatures
+    ['offres_candidatures', 'tags', "TEXT DEFAULT '[]'"],
+    ['offres_candidatures', 'documents_demande_le', 'TEXT'],
+    ['offres_candidatures', 'documents_demande_message', 'TEXT'],
+    ['offres_candidatures', 'documents_recus_json', "TEXT DEFAULT '[]'"],
+    ['offres_candidatures', 'embauche_le', 'TEXT'],
+    ['offres_candidatures', 'source', "TEXT DEFAULT 'plateforme'"],
+    ['offres', 'relance_bientot_expiree_le', 'TEXT'],
+    ['offres', 'relance_expiree_le', 'TEXT'],
+    // 🥇 Découverte Premium — flags de relance (évite les doublons)
+    ['user_accreditations', 'relance_10j_le', 'TEXT'],
+    ['user_accreditations', 'relance_5j_le', 'TEXT'],
+    ['user_accreditations', 'relance_3j_le', 'TEXT'],
+    ['user_accreditations', 'relance_24h_le', 'TEXT'],
+    ['user_accreditations', 'relance_expire_le', 'TEXT'],
     ['formation_lecons', 'chapitre_id', 'INTEGER'],
     ['formation_lecons', 'telechargement_autorise', 'INTEGER DEFAULT 1'],
     ['formation_lecons', 'nb_pages', 'INTEGER'],
@@ -718,39 +740,81 @@ async function migratePg(pool) {
   try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_da_id ON users(da_id) WHERE da_id IS NOT NULL`); } catch(_) {}
   try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_initiatives_da_id ON initiatives(da_id) WHERE da_id IS NOT NULL`); } catch(_) {}
 
-  /* ── Accréditation "Créateur de formations" — jamais seedée en Postgres ──
-     Bug racine identifié le 2026-07-15 : le seed dans db.js (seedCreateurFormations)
-     s'exécute uniquement via l'API synchrone better-sqlite3 (db.prepare(...).run(...))
-     au chargement du module — il ne s'exécute donc jamais contre la base Postgres de
-     production, qui passe par pg-init.js. Contrairement aux 5 autres accréditations
-     visibles en prod (créées manuellement par l'admin via l'UI), celle-ci n'existait
-     nulle part côté Postgres, empêchant toute demande d'accréditation "Créateur de
-     formations" côté utilisateurs. Idempotent via ON CONFLICT (type) DO NOTHING —
-     n'écrase rien si l'admin l'a entre-temps recréée manuellement. */
+  /* ── Accréditation "Créateur de formations" retirée ──
+     La création de formations est désormais réservée aux comptes Premium
+     (accréditation utilisateur_abonne / initiative_abonne), plus besoin de demande séparée.
+     Nettoyage idempotent des définitions résiduelles si l'accréditation avait déjà été seedée. */
   try {
-    const { rows: insRows } = await pool.query(
-      `INSERT INTO accred_definitions
-        (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre,conditions_obtention,documents_requis)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-       ON CONFLICT (type) DO NOTHING RETURNING id`,
-      [
-        'createur_formations', 'Créateur de formations', '🎓',
-        "Autorisation de proposer des formations dans l'espace Diaspo Formation. Permet de créer, publier et gérer des formations avec suivi des inscriptions et des revenus.",
-        JSON.stringify(['Créer et publier des formations','Suivre les inscriptions et les revenus',"Choisir le mode d'accès (gratuit, payant, payant sauf membres)",'Consulter les avis des apprenants','Émettre des attestations de formation']),
-        '#f59e0b', '#fffbeb', '#f59e0b', '#92400e', 'diaspo_formation', 7,
-        "Disposer d'une expertise démontrable dans le domaine de formation visé (diplôme, certification professionnelle ou expérience équivalente) et s'engager à respecter la charte qualité des formateurs Diaspo'Actif.",
-        JSON.stringify(["Pièce d'identité", "Justificatif de diplôme ou certification (si applicable)", "CV ou portfolio détaillant l'expérience professionnelle"]),
-      ]
-    );
-    if (insRows[0]) {
-      const defId = insRows[0].id;
-      for (const role of ['initiative', 'collectivite', 'utilisateur']) {
-        await pool.query("INSERT INTO accred_regles (accred_id,role,mode) VALUES ($1,$2,'sur_demande')", [defId, role]);
-        await pool.query("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES ($1,$2,'gratuit',0,'EUR',1)", [defId, role]);
-      }
-      console.log('[pg-init] Accréditation "createur_formations" seedée (id=' + defId + ').');
+    const { rows: defRows } = await pool.query("SELECT id FROM accred_definitions WHERE type='createur_formations'");
+    if (defRows[0]) {
+      const defId = defRows[0].id;
+      await pool.query("DELETE FROM accred_regles WHERE accred_id=$1", [defId]);
+      await pool.query("DELETE FROM accred_tarifs WHERE accred_id=$1", [defId]);
+      await pool.query("DELETE FROM accred_demandes WHERE accred_id=$1", [defId]);
+      await pool.query("DELETE FROM user_accreditations WHERE accred_id=$1", [defId]);
+      await pool.query("DELETE FROM accred_definitions WHERE id=$1", [defId]);
+      console.log('[pg-init] Accréditation "createur_formations" retirée (id=' + defId + ').');
     }
-  } catch (e) { console.error('[pg-init migration] seed createur_formations:', e.message); }
+    await pool.query("DELETE FROM compte_accreditations WHERE type='createur_formations'");
+  } catch (e) { console.error('[pg-init migration] retrait createur_formations:', e.message); }
+
+  /* ── Accréditations mobilisation_active / createur_opportunites / observatoire_diaspora /
+     institutionnelle / gestion_associations — même bug racine que createur_formations : jamais
+     seedées en Postgres (existent seulement si un admin les a recréées manuellement via l'UI).
+     On les seed ici (idempotent, ON CONFLICT DO NOTHING) ET on retire le flux « demande à
+     valider par un admin » : validation_admin=0 pour toutes, qu'elles viennent d'être seedées
+     ou qu'elles existaient déjà (créées manuellement avec validation_admin=1). */
+  try {
+    const SEED = [
+      { type:'mobilisation_active', label:'Mobilisation Active', emoji:'📢',
+        description:"Autorisation d'exercer des fonctions de mobilisation au sein de Diaspo'Actif.",
+        droits:['Participer à des missions rémunérées','Répondre à des appels de mobilisation','Réaliser des enquêtes de terrain','Participer à des campagnes de sensibilisation'],
+        couleur:'#f59e0b',bg:'#fffbeb',border:'#f59e0b',text:'#92400e', module:null, ordre:1,
+        regles:[['utilisateur','sur_demande'],['initiative','sur_demande']],
+        tarifs:[['utilisateur','paiement_unique',19],['initiative','paiement_unique',29]] },
+      { type:'createur_opportunites', label:"Créateur d'Opportunités", emoji:'💼',
+        description:"Autorisation de publier des offres et de créer des opportunités professionnelles.",
+        droits:['Publier des offres (emplois, stages, marchés)','Mettre en relation des acteurs','Participer à des programmes de recrutement'],
+        couleur:'#3b82f6',bg:'#eff6ff',border:'#3b82f6',text:'#1e40af', module:null, ordre:2,
+        regles:[['initiative','sur_demande'],['collectivite','sur_demande']],
+        tarifs:[['initiative','paiement_unique',39],['collectivite','gratuit',0]] },
+      { type:'observatoire_diaspora', label:'Observatoire Diaspora', emoji:'📊',
+        description:"Autorisation d'accéder aux données statistiques et outils d'analyse de la plateforme.",
+        droits:['Accéder aux statistiques autorisées','Consulter les tableaux de bord','Réaliser des consultations publiques','Obtenir des rapports périodiques'],
+        couleur:'#059669',bg:'#f0fdf4',border:'#059669',text:'#065f46', module:null, ordre:3,
+        regles:[['collectivite','sur_demande']], tarifs:[['collectivite','gratuit',0]] },
+      { type:'institutionnelle', label:'Institutionnelle', emoji:'🏛️',
+        description:"Autorisation d'exercer des fonctions institutionnelles sur la plateforme.",
+        droits:['Diffuser des communications officielles','Organiser des consultations publiques','Interagir avec un territoire donné','Publier des avis et informations officiels'],
+        couleur:'#7c3aed',bg:'#f5f3ff',border:'#7c3aed',text:'#4c1d95', module:null, ordre:4,
+        regles:[['collectivite','sur_demande']], tarifs:[['collectivite','gratuit',0]] },
+      { type:'gestion_associations', label:'Gestion des Associations', emoji:'🏅',
+        description:"Accréditation premium pour gérer entièrement votre association : adhérents, cotisations, trésorerie, comptabilité intelligente, assemblées générales et votes électroniques.",
+        droits:['Gérer les adhérents et cartes de membre (QR Code)','Encaisser les cotisations et relances automatiques','Tenir la trésorerie et la comptabilité (OCR des factures)','Organiser des assemblées générales et des votes électroniques','Consulter les statistiques avancées','Assistant IA : analyses financières, prédictions, rapports'],
+        couleur:'#7c3aed',bg:'#f5f3ff',border:'#7c3aed',text:'#4c1d95', module:'asso', ordre:6,
+        regles:[['initiative','sur_demande']], tarifs:[['initiative','annuel',0]] },
+    ];
+    for (const d of SEED) {
+      const { rows } = await pool.query(
+        `INSERT INTO accred_definitions
+          (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         ON CONFLICT (type) DO NOTHING RETURNING id`,
+        [d.type, d.label, d.emoji, d.description, JSON.stringify(d.droits), d.couleur, d.bg, d.border, d.text, d.module, d.ordre]
+      );
+      if (rows[0]) {
+        const defId = rows[0].id;
+        for (const [role, mode] of d.regles) await pool.query("INSERT INTO accred_regles (accred_id,role,mode) VALUES ($1,$2,$3)", [defId, role, mode]);
+        for (const [role, type_tarif, montant] of d.tarifs) await pool.query("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES ($1,$2,$3,$4,'EUR',0)", [defId, role, type_tarif, montant]);
+        console.log('[pg-init] Accréditation "' + d.type + '" seedée (id=' + defId + ').');
+      }
+    }
+    await pool.query(
+      `UPDATE accred_tarifs SET validation_admin=0
+       WHERE accred_id IN (SELECT id FROM accred_definitions WHERE type = ANY($1))`,
+      [SEED.map(d => d.type)]
+    );
+  } catch (e) { console.error('[pg-init migration] seed/maj accréditations sans validation admin:', e.message); }
 
   /* ── Accréditation "Utilisateur Abonné" — même bug racine que createur_formations :
      le seed dans db.js (seedUtilisateurAbonne) ne s'exécute que via better-sqlite3, jamais
@@ -778,6 +842,30 @@ async function migratePg(pool) {
     }
   } catch (e) { console.error('[pg-init migration] seed utilisateur_abonne:', e.message); }
 
+  /* ── Accréditation "Initiative Abonnée" — même bug : jamais seedée côté Postgres,
+     alors que tout le Premium-gating de dashboard-initiative.html/initiative.html en dépend
+     via hasAccreditation(userId,'initiative_abonne'). Idempotent via ON CONFLICT (type). */
+  try {
+    const { rows: insRowsInit } = await pool.query(
+      `INSERT INTO accred_definitions
+        (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (type) DO NOTHING RETURNING id`,
+      [
+        'initiative_abonne', 'Initiative Abonnée', '⭐',
+        "Abonnement qui débloque le module paiement, la publicité, les événements, les business plans, les cotisations & adhésions, les votes sécurisés et la visibilité publique de la vitrine.",
+        JSON.stringify(['Module paiement (Stripe Connect)','Publicités','Événements','Business Plans','Cotisations & Adhésions','Votes sécurisés','Vitrine visible au public']),
+        '#c8960c', '#fffbeb', '#f2c94c', '#8a6400', 'compte_initiative', 1,
+      ]
+    );
+    if (insRowsInit[0]) {
+      const defId = insRowsInit[0].id;
+      await pool.query("INSERT INTO accred_regles (accred_id,role,mode) VALUES ($1,'initiative','automatique')", [defId]);
+      await pool.query("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin,reduction_annuelle_pct) VALUES ($1,'initiative','mensuel',12.99,'EUR',0,15)", [defId]);
+      console.log('[pg-init] Accréditation "initiative_abonne" seedée (id=' + defId + ').');
+    }
+  } catch (e) { console.error('[pg-init migration] seed initiative_abonne:', e.message); }
+
   /* Fix-up idempotent (Postgres) : même correction que db.js si le premier déploiement
      avait tourné avec le bug mode='payant' / double INSERT accred_tarifs. */
   try {
@@ -802,30 +890,9 @@ async function migratePg(pool) {
       addBack: "CHECK (statut IN ('active','suspendue','gelee','retiree','expiree'))" },
     { table: 'accred_demandes', constraint: 'accred_demandes_statut_check',
       addBack: "CHECK (statut IN ('brouillon','en_attente','deposee','en_cours_analyse','info_complementaire_demandee','approuvee','refusee'))" },
+    { table: 'offres', constraint: 'offres_statut_check',
+      addBack: "CHECK (statut IN ('brouillon','publiee','suspendue','cloturee','archivee'))" },
   ];
-  try {
-    const { rows: cfRows } = await pool.query("SELECT id FROM accred_definitions WHERE type='createur_formations'");
-    if (cfRows[0]) {
-      const cfId = cfRows[0].id;
-      const { rows: regleRows } = await pool.query("SELECT id FROM accred_regles WHERE accred_id=$1 AND role='utilisateur'", [cfId]);
-      if (!regleRows[0]) {
-        await pool.query("INSERT INTO accred_regles (accred_id,role,mode) VALUES ($1,'utilisateur','sur_demande')", [cfId]);
-        await pool.query("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES ($1,'utilisateur','gratuit',0,'EUR',1)", [cfId]);
-      }
-    }
-  } catch (e) { console.error('[pg-init migration] ouvrir createur_formations aux utilisateurs:', e.message); }
-
-  try {
-    await pool.query(
-      `UPDATE accred_definitions SET conditions_obtention=$1, documents_requis=$2
-       WHERE type='createur_formations' AND (conditions_obtention IS NULL OR conditions_obtention='')`,
-      [
-        "Disposer d'une expertise démontrable dans le domaine de formation visé (diplôme, certification professionnelle ou expérience équivalente) et s'engager à respecter la charte qualité des formateurs Diaspo'Actif.",
-        JSON.stringify(["Pièce d'identité", "Justificatif de diplôme ou certification (si applicable)", "CV ou portfolio détaillant l'expérience professionnelle"]),
-      ]
-    );
-  } catch (e) { console.error('[pg-init migration] conditions_obtention createur_formations:', e.message); }
-
   for (const { table, constraint, addBack } of checkFixes) {
     try { await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`); } catch (e) {
       console.error(`[pg-init migration] drop constraint ${constraint}:`, e.message);

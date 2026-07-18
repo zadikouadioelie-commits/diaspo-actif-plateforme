@@ -181,6 +181,7 @@ html, body{overflow-x:clip !important;}
   </div>
 </div>
 
+<script src="assets/decouverte-premium.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
@@ -277,6 +278,7 @@ const DOMAIN_GRAD = {
             <h1>${init.nom}</h1>
             ${init.type ? `<span class="type-badge">${init.type}</span>` : ''}
             ${init.certif ? badgeCertif(init.certif) : ''}
+            ${(!init.accreditations?.includes('initiative_abonne') && init.decouverte_premium && window.decouvertePremiumBadgeHtml) ? window.decouvertePremiumBadgeHtml(init.decouverte_premium.date_expiration) : ''}
           </div>
           <div class="init-profile-meta">
             ${init.domaine ? `<span>📂 ${init.domaine}</span>` : ''}
@@ -307,6 +309,8 @@ const DOMAIN_GRAD = {
           <a href="messagerie.html?init=${init.id}" class="btn btn-outline">✏️ Écrire</a>
         </div>
       </div>
+
+      ${(!init.accreditations?.includes('initiative_abonne') && init.decouverte_premium && window.decouvertePremiumBlockHtml) ? `<div style="padding:0 24px;">${window.decouvertePremiumBlockHtml(init.decouverte_premium.date_expiration, 'init-dp-block')}</div>` : ''}
 
       <!-- ===== BOTTOM STRIP ===== -->
       <div class="init-strip">
@@ -414,6 +418,8 @@ const DOMAIN_GRAD = {
     <aside id="col-right"><div class="side-card" style="text-align:center;color:var(--muted);font-size:12px;">Chargement…</div></aside>
     </div><!-- /init-3col -->
   `;
+
+  if (window.startDecouvertePremiumCountdown) window.startDecouvertePremiumCountdown();
 
   /* ---- Partenaires ---- */
   (async () => {

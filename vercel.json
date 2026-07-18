@@ -7,7 +7,10 @@
     { "path": "/api/cron/adhesion-relances", "schedule": "0 8 * * *" },
     { "path": "/api/cron/vote-relances", "schedule": "0 9 * * *" },
     { "path": "/api/cron/formation-suppressions", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/ads-expiration", "schedule": "0 7 * * *" }
+    { "path": "/api/cron/ads-expiration", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/formation-relances", "schedule": "0 10 * * *" },
+    { "path": "/api/cron/decouverte-premium-relances", "schedule": "0 11 * * *" },
+    { "path": "/api/cron/offres-relances", "schedule": "0 12 * * *" }
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },

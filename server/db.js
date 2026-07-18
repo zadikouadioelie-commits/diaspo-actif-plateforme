@@ -1665,8 +1665,9 @@ db.exec(`
     remuneration TEXT,
     date_limite TEXT,
     nb_postes INTEGER DEFAULT 1,
-    statut TEXT DEFAULT 'publiee' CHECK(statut IN ('brouillon','publiee','cloturee','archivee')),
+    statut TEXT DEFAULT 'publiee' CHECK(statut IN ('brouillon','publiee','suspendue','cloturee','archivee')),
     nb_candidatures INTEGER DEFAULT 0,
+    recruteur_contact TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(createur_id) REFERENCES users(id)
   );
@@ -3163,7 +3164,7 @@ db.exec(`
       droits:JSON.stringify(['Participer à des missions rémunérées','Répondre à des appels de mobilisation','Réaliser des enquêtes de terrain','Participer à des campagnes de sensibilisation']),
       couleur:'#f59e0b',bg:'#fffbeb',border:'#f59e0b',text:'#92400e', module:null, ordre:1,
       regles:[{role:'utilisateur',mode:'sur_demande'},{role:'initiative',mode:'sur_demande'}],
-      tarifs:[{role:'utilisateur',type:'paiement_unique',montant:19},{role:'initiative',type:'paiement_unique',montant:29}]
+      tarifs:[{role:'utilisateur',type:'paiement_unique',montant:19,validation_admin:0},{role:'initiative',type:'paiement_unique',montant:29,validation_admin:0}]
     },
     {
       type:'createur_opportunites', label:"Créateur d'Opportunités", emoji:'💼',
@@ -3171,7 +3172,7 @@ db.exec(`
       droits:JSON.stringify(['Publier des offres (emplois, stages, marchés)','Mettre en relation des acteurs','Participer à des programmes de recrutement']),
       couleur:'#3b82f6',bg:'#eff6ff',border:'#3b82f6',text:'#1e40af', module:null, ordre:2,
       regles:[{role:'initiative',mode:'sur_demande'},{role:'collectivite',mode:'sur_demande'}],
-      tarifs:[{role:'initiative',type:'paiement_unique',montant:39},{role:'collectivite',type:'gratuit',montant:0}]
+      tarifs:[{role:'initiative',type:'paiement_unique',montant:39,validation_admin:0},{role:'collectivite',type:'gratuit',montant:0,validation_admin:0}]
     },
     {
       type:'observatoire_diaspora', label:'Observatoire Diaspora', emoji:'📊',
@@ -3179,7 +3180,7 @@ db.exec(`
       droits:JSON.stringify(['Accéder aux statistiques autorisées','Consulter les tableaux de bord','Réaliser des consultations publiques','Obtenir des rapports périodiques']),
       couleur:'#059669',bg:'#f0fdf4',border:'#059669',text:'#065f46', module:null, ordre:3,
       regles:[{role:'collectivite',mode:'sur_demande'}],
-      tarifs:[{role:'collectivite',type:'gratuit',montant:0}]
+      tarifs:[{role:'collectivite',type:'gratuit',montant:0,validation_admin:0}]
     },
     {
       type:'institutionnelle', label:'Institutionnelle', emoji:'🏛️',
@@ -3187,7 +3188,7 @@ db.exec(`
       droits:JSON.stringify(['Diffuser des communications officielles','Organiser des consultations publiques','Interagir avec un territoire donné','Publier des avis et informations officiels']),
       couleur:'#7c3aed',bg:'#f5f3ff',border:'#7c3aed',text:'#4c1d95', module:null, ordre:4,
       regles:[{role:'collectivite',mode:'sur_demande'}],
-      tarifs:[{role:'collectivite',type:'gratuit',montant:0}]
+      tarifs:[{role:'collectivite',type:'gratuit',montant:0,validation_admin:0}]
     },
     {
       type:'gestion_associations', label:'Gestion des Associations', emoji:'🏅',
@@ -3195,7 +3196,7 @@ db.exec(`
       droits:JSON.stringify(['Gérer les adhérents et cartes de membre (QR Code)','Encaisser les cotisations et relances automatiques','Tenir la trésorerie et la comptabilité (OCR des factures)','Organiser des assemblées générales et des votes électroniques','Consulter les statistiques avancées','Assistant IA : analyses financières, prédictions, rapports']),
       couleur:'#7c3aed',bg:'#f5f3ff',border:'#7c3aed',text:'#4c1d95', module:'asso', ordre:6,
       regles:[{role:'initiative',mode:'sur_demande'}],
-      tarifs:[{role:'initiative',type:'annuel',montant:0,validation_admin:1}]
+      tarifs:[{role:'initiative',type:'annuel',montant:0,validation_admin:0}]
     }
   ];
 
@@ -3397,39 +3398,78 @@ db.exec(`
   try { db.exec(`ALTER TABLE formations ADD COLUMN ${col}`); } catch(_) {}
 });
 
-/* Ajouter l'accréditation createur_formations si elle n'existe pas encore */
-;(function seedCreateurFormations() {
-  const exists = db.prepare("SELECT id FROM accred_definitions WHERE type='createur_formations'").get();
-  if (exists) return;
+/* L'accréditation createur_formations est supprimée : la création de formations est désormais
+   réservée aux comptes Premium (accréditation utilisateur_abonne / initiative_abonne), plus besoin
+   de demande séparée. On nettoie les définitions résiduelles pour les bases déjà seedées. */
+;(function retirerCreateurFormations() {
+  const def = db.prepare("SELECT id FROM accred_definitions WHERE type='createur_formations'").get();
+  if (!def) return;
+  db.prepare("DELETE FROM accred_regles WHERE accred_id=?").run(def.id);
+  db.prepare("DELETE FROM accred_tarifs WHERE accred_id=?").run(def.id);
+  db.prepare("DELETE FROM accred_demandes WHERE accred_id=?").run(def.id);
+  db.prepare("DELETE FROM user_accreditations WHERE accred_id=?").run(def.id);
+  db.prepare("DELETE FROM accred_definitions WHERE id=?").run(def.id);
+  try { db.exec("DELETE FROM compte_accreditations WHERE type='createur_formations'"); } catch(_) {}
+})();
+
+/* Retrait du flux « demande à valider par un administrateur » pour les accréditations restantes
+   (mobilisation_active, createur_opportunites, observatoire_diaspora, institutionnelle,
+   gestion_associations) : l'accréditation est désormais accordée immédiatement à la demande,
+   sans passer par une file d'attente admin. Migration idempotente qui (1) seed la définition
+   si absente — seedAccredDefinitions() ci-dessus ne s'exécute qu'à la toute première création
+   des tables, donc une base déjà peuplée (ex. par seedCreateurFormations) ne les a jamais eues —
+   et (2) force validation_admin=0 dans tous les cas. */
+;(function retirerValidationAdminAccreds() {
   const insD = db.prepare(`INSERT OR IGNORE INTO accred_definitions
     (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre)
     VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
   const insR = db.prepare(`INSERT OR IGNORE INTO accred_regles (accred_id,role,mode) VALUES (?,?,?)`);
   const insT = db.prepare(`INSERT OR IGNORE INTO accred_tarifs
-    (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES (?,?,?,?,?,?)`);
-  insD.run('createur_formations','Créateur de formations','🎓',
-    "Autorisation de proposer des formations dans l'espace Diaspo Formation. Permet de créer, publier et gérer des formations avec suivi des inscriptions et des revenus.",
-    JSON.stringify(['Créer et publier des formations','Suivre les inscriptions et les revenus','Choisir le mode d\'accès (gratuit, payant, payant sauf membres)','Consulter les avis des apprenants','Émettre des attestations de formation']),
-    '#f59e0b','#fffbeb','#f59e0b','#92400e','diaspo_formation', 7);
-  const { id } = db.prepare("SELECT id FROM accred_definitions WHERE type='createur_formations'").get();
-  insR.run(id,'initiative','sur_demande');
-  insR.run(id,'collectivite','sur_demande');
-  insR.run(id,'utilisateur','sur_demande');
-  insT.run(id,'initiative','gratuit',0,'EUR',1);
-  insT.run(id,'collectivite','gratuit',0,'EUR',1);
-  insT.run(id,'utilisateur','gratuit',0,'EUR',1);
-})();
+    (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES (?,?,?,?,?,0)`);
+  const getD = db.prepare("SELECT id FROM accred_definitions WHERE type=?");
 
-/* Migration : ouvre l'accréditation Créateur de formation aux comptes Utilisateur individuels
-   (absente si la base a été créée avant cette extension — le bloc ci-dessus ne s'exécute
-   qu'à la toute première création de l'accréditation). */
-;(function ouvrirCreateurFormationsAuxUtilisateurs() {
-  const def = db.prepare("SELECT id FROM accred_definitions WHERE type='createur_formations'").get();
-  if (!def) return;
-  const regle = db.prepare("SELECT id FROM accred_regles WHERE accred_id=? AND role='utilisateur'").get(def.id);
-  if (regle) return;
-  db.prepare("INSERT INTO accred_regles (accred_id,role,mode) VALUES (?,'utilisateur','sur_demande')").run(def.id);
-  db.prepare("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES (?,'utilisateur','gratuit',0,'EUR',1)").run(def.id);
+  const SEED = [
+    { type:'mobilisation_active', label:'Mobilisation Active', emoji:'📢',
+      description:"Autorisation d'exercer des fonctions de mobilisation au sein de Diaspo'Actif.",
+      droits:['Participer à des missions rémunérées','Répondre à des appels de mobilisation','Réaliser des enquêtes de terrain','Participer à des campagnes de sensibilisation'],
+      couleur:'#f59e0b',bg:'#fffbeb',border:'#f59e0b',text:'#92400e', module:null, ordre:1,
+      regles:[['utilisateur','sur_demande'],['initiative','sur_demande']],
+      tarifs:[['utilisateur','paiement_unique',19],['initiative','paiement_unique',29]] },
+    { type:'createur_opportunites', label:"Créateur d'Opportunités", emoji:'💼',
+      description:"Autorisation de publier des offres et de créer des opportunités professionnelles.",
+      droits:['Publier des offres (emplois, stages, marchés)','Mettre en relation des acteurs','Participer à des programmes de recrutement'],
+      couleur:'#3b82f6',bg:'#eff6ff',border:'#3b82f6',text:'#1e40af', module:null, ordre:2,
+      regles:[['initiative','sur_demande'],['collectivite','sur_demande']],
+      tarifs:[['initiative','paiement_unique',39],['collectivite','gratuit',0]] },
+    { type:'observatoire_diaspora', label:'Observatoire Diaspora', emoji:'📊',
+      description:"Autorisation d'accéder aux données statistiques et outils d'analyse de la plateforme.",
+      droits:['Accéder aux statistiques autorisées','Consulter les tableaux de bord','Réaliser des consultations publiques','Obtenir des rapports périodiques'],
+      couleur:'#059669',bg:'#f0fdf4',border:'#059669',text:'#065f46', module:null, ordre:3,
+      regles:[['collectivite','sur_demande']], tarifs:[['collectivite','gratuit',0]] },
+    { type:'institutionnelle', label:'Institutionnelle', emoji:'🏛️',
+      description:"Autorisation d'exercer des fonctions institutionnelles sur la plateforme.",
+      droits:['Diffuser des communications officielles','Organiser des consultations publiques','Interagir avec un territoire donné','Publier des avis et informations officiels'],
+      couleur:'#7c3aed',bg:'#f5f3ff',border:'#7c3aed',text:'#4c1d95', module:null, ordre:4,
+      regles:[['collectivite','sur_demande']], tarifs:[['collectivite','gratuit',0]] },
+    { type:'gestion_associations', label:'Gestion des Associations', emoji:'🏅',
+      description:"Accréditation premium pour gérer entièrement votre association : adhérents, cotisations, trésorerie, comptabilité intelligente, assemblées générales et votes électroniques.",
+      droits:['Gérer les adhérents et cartes de membre (QR Code)','Encaisser les cotisations et relances automatiques','Tenir la trésorerie et la comptabilité (OCR des factures)','Organiser des assemblées générales et des votes électroniques','Consulter les statistiques avancées','Assistant IA : analyses financières, prédictions, rapports'],
+      couleur:'#7c3aed',bg:'#f5f3ff',border:'#7c3aed',text:'#4c1d95', module:'asso', ordre:6,
+      regles:[['initiative','sur_demande']], tarifs:[['initiative','annuel',0]] },
+  ];
+
+  for (const d of SEED) {
+    insD.run(d.type, d.label, d.emoji, d.description, JSON.stringify(d.droits),
+             d.couleur, d.bg, d.border, d.text, d.module, d.ordre);
+    const { id } = getD.get(d.type);
+    for (const [role, mode] of d.regles) insR.run(id, role, mode);
+    for (const [role, type_tarif, montant] of d.tarifs) insT.run(id, role, type_tarif, montant);
+  }
+
+  const types = SEED.map(d => d.type);
+  const ph = types.map(()=>'?').join(',');
+  db.prepare(`UPDATE accred_tarifs SET validation_admin=0
+    WHERE accred_id IN (SELECT id FROM accred_definitions WHERE type IN (${ph}))`).run(...types);
 })();
 
 /* Accréditation "Utilisateur Abonné" : débloque Réseau Pro, Business Plans, Mes projets
@@ -3466,6 +3506,28 @@ db.exec(`
   if (!regle) db.prepare("INSERT INTO accred_regles (accred_id,role,mode) VALUES (?,'utilisateur','automatique')").run(def.id);
   const tarif = db.prepare("SELECT id,reduction_annuelle_pct FROM accred_tarifs WHERE accred_id=? AND role='utilisateur'").get(def.id);
   if (tarif && !tarif.reduction_annuelle_pct) db.prepare("UPDATE accred_tarifs SET reduction_annuelle_pct=16.5 WHERE id=?").run(tarif.id);
+})();
+
+/* Accréditation "Initiative Abonnée" : débloque le Module paiement (Stripe Connect),
+   Diaspo Formation (Espace Formateur), Publicités, Événements, Business Plans,
+   Cotisations & Adhésions, Votes sécurisés, et la visibilité publique de la vitrine,
+   pour les comptes Initiative. 12,99€/mois ou 132,50€/an (-15%, cf. dashboard-initiative.html). */
+;(function seedInitiativeAbonne() {
+  const exists = db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
+  if (exists) return;
+  const insD = db.prepare(`INSERT OR IGNORE INTO accred_definitions
+    (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+  const insR = db.prepare(`INSERT OR IGNORE INTO accred_regles (accred_id,role,mode) VALUES (?,?,?)`);
+  const insT = db.prepare(`INSERT OR IGNORE INTO accred_tarifs
+    (accred_id,role,type_tarif,montant,devise,validation_admin,reduction_annuelle_pct) VALUES (?,?,?,?,?,?,?)`);
+  insD.run('initiative_abonne','Initiative Abonnée','⭐',
+    "Abonnement qui débloque le module paiement, la publicité, les événements, les business plans, les cotisations & adhésions, les votes sécurisés et la visibilité publique de la vitrine.",
+    JSON.stringify(['Module paiement (Stripe Connect)','Publicités','Événements','Business Plans','Cotisations & Adhésions','Votes sécurisés','Vitrine visible au public']),
+    '#c8960c','#fffbeb','#f2c94c','#8a6400','compte_initiative', 1);
+  const { id } = db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
+  insR.run(id,'initiative','automatique');
+  insT.run(id,'initiative','mensuel',12.99,'EUR',0,15);
 })();
 
 /* ===== MOTEUR ACCRÉDITATIONS v2 : audit + champs étendus + packs ===== */
@@ -3740,7 +3802,7 @@ db.exec(`
 
     /* Formation */
     ['createur_formations','Créateur de formations','Créer et publier des formations Diaspo Formation',
-     'formation','hidden',1,'createur_formations','[]','🎓','#f59e0b',20],
+     'formation','hidden',1,'utilisateur_abonne','[]','🎓','#f59e0b',20],
     ['catalogue_formations','Catalogue formations','Accéder au catalogue de formations',
      'formation','visible',0,null,'["utilisateur","initiative","collectivite"]','📚','#f59e0b',21],
 
@@ -5493,6 +5555,86 @@ db.exec(`
   const cols = db.prepare("PRAGMA table_info(formation_inscriptions)").all().map(c => c.name);
   if (!cols.includes("paiement_statut")) db.exec("ALTER TABLE formation_inscriptions ADD COLUMN paiement_statut TEXT DEFAULT 'paye'");
   if (!cols.includes("stripe_session_id")) db.exec("ALTER TABLE formation_inscriptions ADD COLUMN stripe_session_id TEXT");
+})();
+
+/* Migration : colonnes de relance de progression (Lot 1 — notifications plateforme uniquement).
+   derniere_activite_le est mise à jour à chaque complétion de leçon ; les 4 flags relance_*
+   évitent de renvoyer plusieurs fois la même relance pour une même inscription. */
+;(function migrateFormationInscriptionsRelances() {
+  const cols = db.prepare("PRAGMA table_info(formation_inscriptions)").all().map(c => c.name);
+  [["derniere_activite_le","TEXT"],["relance_25_le","TEXT"],["relance_50_le","TEXT"],
+   ["relance_75_le","TEXT"],["relance_inactivite_le","TEXT"]].forEach(([col,type]) => {
+    if (!cols.includes(col)) db.exec(`ALTER TABLE formation_inscriptions ADD COLUMN ${col} ${type}`);
+  });
+})();
+
+/* Migration : offres_candidatures — Gestion des candidatures (tags, documents complémentaires,
+   date d'embauche pour le calcul du temps moyen de recrutement, source de la candidature). */
+;(function migrateCandidaturesGestion() {
+  const cols = db.prepare("PRAGMA table_info(offres_candidatures)").all().map(c => c.name);
+  [["tags","TEXT DEFAULT '[]'"],["documents_demande_le","TEXT"],["documents_demande_message","TEXT"],
+   ["documents_recus_json","TEXT DEFAULT '[]'"],["embauche_le","TEXT"],["source","TEXT DEFAULT 'plateforme'"]]
+    .forEach(([col,type]) => { if (!cols.includes(col)) db.exec(`ALTER TABLE offres_candidatures ADD COLUMN ${col} ${type}`); });
+})();
+
+/* Migration : offres — flags de relance (bientôt expirée / expirée / clôturée notifiée). */
+;(function migrateOffresRelances() {
+  const cols = db.prepare("PRAGMA table_info(offres)").all().map(c => c.name);
+  [["relance_bientot_expiree_le","TEXT"],["relance_expiree_le","TEXT"]]
+    .forEach(([col,type]) => { if (!cols.includes(col)) db.exec(`ALTER TABLE offres ADD COLUMN ${col} ${type}`); });
+})();
+
+/* Migration : user_accreditations — flags de relance 🥇 Découverte Premium (évite les doublons). */
+;(function migrateDecouvertePremiumRelances() {
+  const cols = db.prepare("PRAGMA table_info(user_accreditations)").all().map(c => c.name);
+  [["relance_10j_le","TEXT"],["relance_5j_le","TEXT"],["relance_3j_le","TEXT"],
+   ["relance_24h_le","TEXT"],["relance_expire_le","TEXT"]].forEach(([col,type]) => {
+    if (!cols.includes(col)) db.exec(`ALTER TABLE user_accreditations ADD COLUMN ${col} ${type}`);
+  });
+})();
+
+/* Migration : offres — colonne recruteur_contact + statut 'suspendue' (rebuild pour lever l'ancien CHECK). */
+;(function migrateOffresSuspendueEtContact() {
+  const cols = db.prepare("PRAGMA table_info(offres)").all().map(c => c.name);
+  if (!cols.includes("recruteur_contact")) db.exec("ALTER TABLE offres ADD COLUMN recruteur_contact TEXT");
+  const tblSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='offres'").get();
+  if (tblSql && tblSql.sql && !tblSql.sql.includes("'suspendue'")) {
+    db.exec(`PRAGMA foreign_keys=OFF;`);
+    db.exec(`DROP TABLE IF EXISTS offres_new;`);
+    db.exec(`
+      CREATE TABLE offres_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        createur_id INTEGER NOT NULL,
+        titre TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'emploi' CHECK(type IN ('emploi','stage','mission','contrat','partenariat','investissement','distribution','fournisseur','representant','incubation','acceleration','mentorat','coaching','forum_emploi','rencontre_b2b','networking','salon')),
+        description TEXT,
+        competences_requises TEXT DEFAULT '[]',
+        localisation TEXT,
+        pays TEXT,
+        remuneration TEXT,
+        date_limite TEXT,
+        nb_postes INTEGER DEFAULT 1,
+        statut TEXT DEFAULT 'publiee' CHECK(statut IN ('brouillon','publiee','suspendue','cloturee','archivee')),
+        nb_candidatures INTEGER DEFAULT 0,
+        recruteur_contact TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(createur_id) REFERENCES users(id)
+      );
+      INSERT INTO offres_new SELECT id,createur_id,titre,type,description,competences_requises,localisation,pays,remuneration,date_limite,nb_postes,statut,nb_candidatures,recruteur_contact,created_at FROM offres;
+      DROP TABLE offres;
+      ALTER TABLE offres_new RENAME TO offres;
+    `);
+    [["initiative_id","INTEGER"],["contrat","TEXT"],["duree_alternance","TEXT"],["missions","TEXT DEFAULT '[]'"],
+     ["region","TEXT"],["departement","TEXT"],["ville","TEXT"],["commune","TEXT"],["domaine","TEXT"],
+     ["niveau_experience","TEXT"],["niveau_etudes","TEXT"],["teletravail","INTEGER DEFAULT 0"],["temps","TEXT"],
+     ["salaire_min","INTEGER"],["salaire_max","INTEGER"],["salaire_communique","INTEGER DEFAULT 1"],
+     ["avantages","TEXT DEFAULT '[]'"],["horaires","TEXT"],["debut_mission","TEXT"],["diplome_requis","TEXT"],
+     ["langues_requises","TEXT DEFAULT '[]'"],["permis_requis","TEXT"],["certifications_requises","TEXT DEFAULT '[]'"],
+     ["pieces_demandees","TEXT DEFAULT '[]'"],["nb_vues","INTEGER DEFAULT 0"]].forEach(([col,type]) => {
+      db.exec(`ALTER TABLE offres ADD COLUMN ${col} ${type}`);
+    });
+    db.exec(`PRAGMA foreign_keys=ON;`);
+  }
 })();
 
 /* Complète conditions_obtention / documents_requis pour l'accréditation Formateur,

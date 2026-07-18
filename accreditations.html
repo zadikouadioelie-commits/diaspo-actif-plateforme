@@ -86,10 +86,9 @@
     <div class="card" style="margin-top:24px;">
       <h3 style="margin-top:0;">Processus de demande</h3>
       <ol style="padding-left:18px;font-size:14px;line-height:2.2;">
-        <li>Soumettez votre demande depuis l'onglet "Mes accréditations"</li>
-        <li>L'équipe Diaspo'Actif étudie votre dossier sous 5 jours ouvrés</li>
-        <li>Vous recevez une notification lors de la décision</li>
-        <li>Une fois accordée, les fonctionnalités avancées sont immédiatement accessibles</li>
+        <li>Faites votre demande depuis l'onglet « Catalogue »</li>
+        <li>L'accréditation est activée immédiatement, sans validation manuelle</li>
+        <li>Les fonctionnalités avancées sont aussitôt accessibles</li>
       </ol>
     </div>
   </div>
@@ -250,14 +249,14 @@ async function submitDemande(){
   const lettre_motivation=document.getElementById('demande-lettre').value.trim();
   const video_url=document.getElementById('demande-video').value.trim();
   try{
-    await api('POST','/accreditations/demande',{
+    const r = await api('POST','/accreditations/demande',{
       type:pendingType, message,
       lettre_motivation: lettre_motivation||undefined,
       video_url: video_url||undefined,
       documents: pendingDocuments.length ? pendingDocuments : undefined,
     });
     closeModalDemande();
-    showMsg('Demande envoyée ! L\'équipe vous répondra sous 5 jours ouvrés.', 'success');
+    showMsg(r.auto_approuvee ? '✅ Accréditation activée immédiatement !' : 'Demande envoyée ! L\'équipe vous répondra sous 5 jours ouvrés.', 'success');
     loadMesAccreds();
   }catch(e){showMsg(e.message||'Erreur lors de la demande.', 'danger');}
 }
@@ -371,7 +370,7 @@ function renderCatalogueTab(catalogue, accreds, demandes){
       html+=`<p style="font-size:13px;color:var(--muted);padding:8px 0;"><span class="status-pill status-attente" style="position:static;display:inline-block;margin-right:6px;">⏳ En attente</span>Votre demande est en cours d'examen.</p>`;
     } else {
       html+=`<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Vous n'avez pas encore cette accréditation.</p>
-        <button class="btn btn-outline btn-demande" onclick="openModalDemande('${type}')">Faire une demande</button>`;
+        <button class="btn btn-outline btn-demande" onclick="openModalDemande('${type}')">Activer</button>`;
     }
     html+='</div>';
   }

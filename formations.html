@@ -178,14 +178,13 @@
         </div>
       </div>
 
-      <div id="devenir-formateur-banner" style="display:none;margin-bottom:16px;padding:16px 20px;border-radius:12px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1.5px solid #ff6b00;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+      <div id="devenir-formateur-banner" style="display:none;margin-bottom:16px;padding:16px 20px;border-radius:12px;background:linear-gradient(135deg,#fffbeb,#fff7e0);border:1.5px solid #f2c94c;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
         <div>
           <strong style="font-size:14.5px;">🎓 Partagez votre expertise avec la diaspora</strong>
-          <p style="margin:4px 0 0;font-size:13px;color:var(--muted);">Devenez créateur de formation accrédité Diaspo'Actif pour créer, publier et vendre vos propres formations.</p>
+          <p style="margin:4px 0 0;font-size:13px;color:var(--muted);">La création de formations est réservée aux comptes Premium — créez, publiez et vendez vos propres formations.</p>
         </div>
-        <button class="btn btn-orange" id="btn-devenir-formateur">Devenir créateur de formation</button>
+        <a id="btn-devenir-formateur" href="premium.html" style="background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;border:none;padding:11px 20px;border-radius:8px;text-decoration:none;white-space:nowrap;">🎉 Passer à Premium</a>
       </div>
-      <div id="demande-formateur-statut" style="display:none;margin-bottom:16px;padding:12px 16px;border-radius:10px;background:#f8fafc;border:1px solid var(--border);font-size:13.5px;"></div>
 
       <div class="flex-between" style="margin-bottom:12px;">
         <span style="font-size:13.5px;color:var(--muted);"><strong id="formations-count">—</strong> formations disponibles</span>
@@ -690,53 +689,6 @@
           <input id="fb-ai-input" class="input-field" style="flex:1;" placeholder="Décrivez votre formation…">
           <button class="btn btn-sm btn-outline" id="fb-ai-mic" title="Parler à l'assistant">🎤</button>
           <button class="btn btn-sm btn-orange" id="fb-ai-send">➤</button>
-        </div>
-      </div>
-
-      <!-- Modal demande d'accréditation Formateur -->
-      <div id="modal-formateur" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;overflow-y:auto;">
-        <div class="card" style="max-width:640px;margin:40px auto;padding:24px;">
-          <div class="flex-between" style="margin-bottom:12px;">
-            <h2 style="margin:0;">🎓 Devenir créateur de formation</h2>
-            <button class="btn btn-sm btn-outline" id="modal-formateur-close">✕ Fermer</button>
-          </div>
-          <div id="mf-conditions" style="display:none;background:#f8fafc;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;">
-            <strong>Conditions d'obtention :</strong>
-            <p id="mf-conditions-text" style="margin:6px 0 0;color:var(--muted);"></p>
-          </div>
-          <div id="mf-documents-requis" style="display:none;background:#fff7ed;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;">
-            <strong>Documents à fournir :</strong>
-            <ul id="mf-documents-requis-list" style="margin:6px 0 0;padding-left:18px;color:var(--muted);"></ul>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:12px;">
-            <div><label style="font-size:13px;font-weight:700;">Domaine d'expertise *</label>
-              <input id="mf-domaine" class="input-field" style="width:100%;margin-top:4px;" placeholder="ex: Entrepreneuriat, Agriculture, Développement web…"></div>
-            <div class="grid grid-2" style="gap:10px;">
-              <div><label style="font-size:13px;font-weight:700;">Qualifications</label>
-                <textarea id="mf-qualifications" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Certifications professionnelles…"></textarea></div>
-              <div><label style="font-size:13px;font-weight:700;">Diplômes <span style="color:var(--muted);font-weight:400;">(facultatif)</span></label>
-                <textarea id="mf-diplomes" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Diplômes obtenus…"></textarea></div>
-            </div>
-            <div><label style="font-size:13px;font-weight:700;">Expérience professionnelle</label>
-              <textarea id="mf-experience" style="width:100%;min-height:60px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Décrivez votre parcours et votre expérience dans ce domaine…"></textarea></div>
-            <div><label style="font-size:13px;font-weight:700;">Références ou réalisations</label>
-              <textarea id="mf-references" style="width:100%;min-height:50px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Projets, publications, témoignages…"></textarea></div>
-            <div><label style="font-size:13px;font-weight:700;">Présentation personnelle</label>
-              <textarea id="mf-presentation" style="width:100%;min-height:70px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-top:4px;" placeholder="Présentez-vous en quelques lignes…"></textarea></div>
-            <div><label style="font-size:13px;font-weight:700;">Catégories de formations souhaitées</label>
-              <div id="mf-categories" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"></div>
-            </div>
-            <div><label style="font-size:13px;font-weight:700;">Pièces justificatives <span style="color:var(--muted);font-weight:400;">(optionnel)</span></label>
-              <input id="mf-fichier" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="margin-top:4px;">
-              <div id="mf-documents-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;"></div>
-            </div>
-            <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;background:#fff8f2;border:1.5px solid #ffd9b3;border-radius:10px;padding:12px 14px;cursor:pointer;">
-              <input type="checkbox" id="mf-charte" style="margin-top:2px;">
-              <span>Je m'engage à respecter la <strong>charte qualité des formateurs Diaspo'Actif</strong> (contenus fiables, respect des apprenants, mise à jour régulière des formations). *</span>
-            </label>
-            <div id="mf-error" style="color:#D33;font-size:13px;display:none;"></div>
-            <button class="btn btn-orange btn-block" id="btn-submit-formateur">Soumettre ma demande</button>
-          </div>
         </div>
       </div>
 
@@ -1445,123 +1397,22 @@
     } catch(e){ showMsg(e.message||'Erreur.', 'danger'); }
   });
 
-  // ── Devenir formateur (demande d'accréditation "createur_formations") ──
-  let mfDocuments = [];
-  let mfDef = null;
-  (function initMfCategories(){
-    const el = document.getElementById('mf-categories');
-    if(!el) return;
-    el.innerHTML = ["Action Sociale","Agriculture","Santé","Éducation","Technologie","Culture","Économie","Finance","Droit","Environnement"].map(c=>
-      `<label class="mf-cat-pill">
-        <input type="checkbox" value="${c}" class="mf-cat-cb"> <span>${c}</span>
-      </label>`).join('');
-    el.querySelectorAll('.mf-cat-cb').forEach(cb=>{
-      cb.addEventListener('change', ()=> cb.closest('.mf-cat-pill').classList.toggle('checked', cb.checked));
-    });
-  })();
-
+  // ── Devenir formateur : réservé aux comptes Premium (accréditation utilisateur_abonne / initiative_abonne) ──
   async function initDevenirFormateur(){
     const me = await fetchCurrentUser().catch(()=>null);
     if(!me) return;
+    if (me.role !== 'utilisateur' && me.role !== 'initiative') return; // Premium non proposé aux autres rôles
     try {
-      const { catalogue } = await api('GET', '/accreditations/catalogue');
-      mfDef = (catalogue||[]).find(d=>d.type==='createur_formations');
-      if(!mfDef) return; // rôle non éligible selon les règles définies par l'admin
-
+      const premiumType = me.role === 'initiative' ? 'initiative_abonne' : 'utilisateur_abonne';
       const { accreditations } = await api('GET', '/accreditations/mes');
-      const dejaAccredite = (accreditations||[]).some(a=>a.type==='createur_formations' && a.statut==='active');
-      if(dejaAccredite) {
+      const estPremium = (accreditations||[]).some(a=>a.type===premiumType && a.statut==='active');
+      if (estPremium) {
         document.getElementById('sb-tab-espace-formateur').style.display = '';
-        return;
-      }
-
-      const { demandes } = await api('GET', '/accreditations/demandes');
-      const demandeEnCours = (demandes||[]).find(d=>d.type==='createur_formations');
-      const STATUT_LBL = { en_attente:'⏳ En attente de traitement', deposee:'⏳ Déposée', en_cours_analyse:"🔍 En cours d'analyse", info_complementaire_demandee:'📩 Informations complémentaires demandées', refusee:'❌ Non retenue — vous pouvez déposer une nouvelle demande.' };
-      if(demandeEnCours && STATUT_LBL[demandeEnCours.statut] && demandeEnCours.statut !== 'refusee'){
-        const el = document.getElementById('demande-formateur-statut');
-        el.style.display = 'block';
-        el.innerHTML = `🎓 Votre demande d'accréditation Formateur : <strong>${STATUT_LBL[demandeEnCours.statut]}</strong>`;
         return;
       }
       document.getElementById('devenir-formateur-banner').style.display = 'flex';
     } catch(e) { /* silencieux : bannière simplement non affichée */ }
   }
-
-  document.getElementById('btn-devenir-formateur')?.addEventListener('click', ()=>{
-    if(!mfDef) return;
-    document.querySelectorAll('.mf-cat-cb').forEach(cb=>{ cb.checked=false; cb.closest('.mf-cat-pill')?.classList.remove('checked'); });
-    ['mf-domaine','mf-qualifications','mf-diplomes','mf-experience','mf-references','mf-presentation'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('mf-charte').checked = false;
-    document.getElementById('mf-error').style.display = 'none';
-    mfDocuments = [];
-    document.getElementById('mf-documents-list').innerHTML = '';
-
-    const condEl = document.getElementById('mf-conditions');
-    if(mfDef.conditions_obtention){ document.getElementById('mf-conditions-text').textContent = mfDef.conditions_obtention; condEl.style.display=''; }
-    else condEl.style.display='none';
-    const docsEl = document.getElementById('mf-documents-requis');
-    let docsReq = [];
-    try { docsReq = Array.isArray(mfDef.documents_requis) ? mfDef.documents_requis : JSON.parse(mfDef.documents_requis||'[]'); } catch(_){}
-    if(docsReq.length){ document.getElementById('mf-documents-requis-list').innerHTML = docsReq.map(d=>`<li>${d}</li>`).join(''); docsEl.style.display=''; }
-    else docsEl.style.display='none';
-
-    document.getElementById('modal-formateur').style.display = 'block';
-  });
-  document.getElementById('modal-formateur-close')?.addEventListener('click', ()=>{
-    document.getElementById('modal-formateur').style.display = 'none';
-  });
-
-  document.getElementById('mf-fichier')?.addEventListener('change', async function(){
-    const file = this.files[0];
-    if(!file) return;
-    const btn = document.getElementById('btn-submit-formateur');
-    btn.disabled = true; btn.textContent = 'Envoi du document…';
-    try {
-      const fd = new FormData();
-      fd.append('document', file);
-      const r = await fetch('/api/upload/document', { method:'POST', credentials:'include', body: fd });
-      const data = await r.json();
-      if(!r.ok) throw new Error(data.error || "Échec de l'envoi du document.");
-      mfDocuments.push({ nom: file.name, url: data.url });
-      document.getElementById('mf-documents-list').innerHTML = mfDocuments.map((d,i)=>
-        `<div style="display:flex;align-items:center;gap:8px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;">
-          📎 ${d.nom} <button type="button" data-i="${i}" class="mf-remove-doc" style="margin-left:auto;border:none;background:none;color:#dc2626;cursor:pointer;">✕</button>
-        </div>`).join('');
-      document.querySelectorAll('.mf-remove-doc').forEach(b=>b.addEventListener('click', function(){ mfDocuments.splice(+this.dataset.i,1); this.closest('div').remove(); }));
-    } catch(e){ showMsg(e.message||"Erreur lors de l'envoi du document.", 'danger'); }
-    finally { btn.disabled = false; btn.textContent = 'Soumettre ma demande'; this.value=''; }
-  });
-
-  document.getElementById('btn-submit-formateur')?.addEventListener('click', async ()=>{
-    const errEl = document.getElementById('mf-error');
-    const domaine_expertise = document.getElementById('mf-domaine').value.trim();
-    const charte_acceptee = document.getElementById('mf-charte').checked;
-    if(!domaine_expertise){ errEl.textContent = "Le domaine d'expertise est obligatoire."; errEl.style.display='block'; return; }
-    if(!charte_acceptee){ errEl.textContent = "Vous devez accepter la charte qualité des formateurs."; errEl.style.display='block'; return; }
-    errEl.style.display = 'none';
-    const categories = [...document.querySelectorAll('.mf-cat-cb:checked')].map(cb=>cb.value);
-    try {
-      await api('POST', '/accreditations/demande', {
-        type: 'createur_formations',
-        message: document.getElementById('mf-presentation').value.trim(),
-        lettre_motivation: document.getElementById('mf-experience').value.trim(),
-        documents: mfDocuments.length ? mfDocuments : undefined,
-        champs_specifiques: {
-          domaine_expertise,
-          qualifications: document.getElementById('mf-qualifications').value.trim(),
-          diplomes: document.getElementById('mf-diplomes').value.trim(),
-          experience: document.getElementById('mf-experience').value.trim(),
-          references: document.getElementById('mf-references').value.trim(),
-          categories,
-          charte_acceptee: true
-        }
-      });
-      document.getElementById('modal-formateur').style.display = 'none';
-      document.getElementById('devenir-formateur-banner').style.display = 'none';
-      showMsg('Demande envoyée ! L\'équipe Diaspo\'Actif vous répondra sous 5 jours ouvrés.', 'success');
-    } catch(e){ errEl.textContent = e.message||'Erreur lors de la demande.'; errEl.style.display='block'; }
-  });
 
   initDevenirFormateur();
 

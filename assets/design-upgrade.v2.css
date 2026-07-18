@@ -306,13 +306,13 @@ tbody td {
   border-radius: 8px !important;
   transition: background .15s, color .15s !important;
   font-weight: 600 !important;
-  color: rgba(255,255,255,.75) !important;
+  background: #fff !important;
+  color: #0D2B4E !important;
 }
 .sidebar-link:hover,
 .sidebar a:hover,
 .side-nav a:hover {
-  background: rgba(255,255,255,.1) !important;
-  color: #fff !important;
+  filter: brightness(0.96);
 }
 .sidebar-link.active,
 .sidebar a.active,
@@ -320,6 +320,14 @@ tbody td {
   background: #F26422 !important;
   color: #fff !important;
   font-weight: 700 !important;
+}
+.sidebar a.premium-locked,
+.sidebar a.premium-locked:hover {
+  background: linear-gradient(135deg,#c8960c,#f2c94c) !important;
+  color: #2a1e00 !important;
+}
+.sidebar .sb-group-lbl {
+  color: rgba(255,255,255,.55) !important;
 }
 
 /* ── Notifications / Alertes ── */

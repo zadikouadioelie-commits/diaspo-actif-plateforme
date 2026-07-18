@@ -573,6 +573,7 @@ function renderInitiativeCard(it){
     </div>
     <div class="ann-card-body">
       <div class="ann-card-title">${it.nom}</div>
+      ${(!(it.accreditations||[]).includes('initiative_abonne') && it.decouverte_premium && window.decouvertePremiumBadgeHtml) ? `<div>${window.decouvertePremiumBadgeHtml(it.decouverte_premium.date_expiration, { showDate: true })}</div>` : ''}
       <div class="ann-card-meta-row">
         <span class="ann-card-loc">📍 ${loc}</span>
         ${rayHtml}

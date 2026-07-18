@@ -985,6 +985,7 @@ html, body { overflow-x:clip; }
 
 </div><!-- /page -->
 
+<script src="assets/decouverte-premium.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
@@ -1034,7 +1035,9 @@ async function init() {
     try {
       const ra = await api('GET', '/accreditations/user/' + uid);
       profil._accreditations = (ra.accreditations||[]).map(a=>a.type);
-    } catch(e) { profil._accreditations = []; }
+      const decouverte = (ra.accreditations||[]).find(a => a.type_tarif === 'decouverte' && a.date_expiration && new Date(a.date_expiration).getTime() > Date.now());
+      profil._decouverte_premium = decouverte ? { date_expiration: decouverte.date_expiration } : null;
+    } catch(e) { profil._accreditations = []; profil._decouverte_premium = null; }
     // Charger le badge association
     try {
       const rb = await api('GET', '/asso/badge/' + uid);
@@ -1609,7 +1612,8 @@ function renderVisitorProfile() {
     : `<button class="pvz-btn follow-main ${following?'following':'primary'}" id="pvz-follow" onclick="pvzToggleFollow()">${following?'✓ Abonné':'🔔 S\'abonner'}</button>`;
   const msgBtn = `<a href="messagerie.html?user=${profil.id}" class="pvz-btn">✉️ Message</a>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
-  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button><button class="pvz-btn" onclick="pvzToggleThemePicker()">🎨 Thème</button>${shareBtn}`;
+  const vitrineToggleBtn = (isOwn && isInit) ? `<button class="pvz-btn" id="pvz-vitrine-toggle-btn" onclick="pvzQuickToggleVitrine()" disabled>⏳ Vitrine…</button>` : '';
+  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button><button class="pvz-btn" onclick="pvzToggleThemePicker()">🎨 Thème</button>${vitrineToggleBtn}${shareBtn}`;
 
   // Onglets + stats
   const seg = `<div class="pvz-segmented">
@@ -1632,6 +1636,7 @@ function renderVisitorProfile() {
             <div class="pvz-name-row">
               <h1 class="pvz-name">${esc(nom)}</h1>
               ${isPremium ? `<span class="pvz-premium-badge" title="Membre Premium">👑 Premium</span>` : ''}
+              ${(!isPremium && profil._decouverte_premium) ? window.decouvertePremiumBadgeHtml(profil._decouverte_premium.date_expiration) : ''}
               ${verified ? `<span class="pvz-verified"><span class="dot">✓</span>Identité vérifiée</span>` : ''}
             </div>
             <div class="pvz-sub">${esc(sub)}</div>
@@ -1728,7 +1733,12 @@ function renderVisitorProfile() {
 
   const grid = `<div id="pvz-profil-body"><div class="pvz-grid pvz-grid-2col">${leftCol}${centerCol}</div>${confidentialiteCard}</div>`;
 
-  root.innerHTML = hero + grid;
+  const dpBlock = (!isPremium && profil._decouverte_premium) ? window.decouvertePremiumBlockHtml(profil._decouverte_premium.date_expiration, 'pvz-dp-block') : '';
+
+  root.innerHTML = hero + dpBlock + grid;
+  if (dpBlock) window.startDecouvertePremiumCountdown();
+
+  if (isOwn && isInit) pvzInitVitrineToggleBtn();
 
   if (isOwn) {
     const privacyPanel = document.getElementById('conf-panel-privacy');
@@ -2587,8 +2597,10 @@ async function renderVitrineVisitor(init) {
     </div>
   </section>`;
 
-  const masqueeBanner = (isOwn && init.vitrine_active === 0) ? `<div style="background:#1F2937;color:#FBBF24;padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
-    🔒 Votre vitrine est actuellement masquée. Elle n'est visible que par vous et les administrateurs de Diaspo'Actif.
+  const vitrineVisible = init.vitrine_active !== 0;
+  const masqueeBanner = isOwn ? `<div style="background:${vitrineVisible?'#F0FDF4':'#1F2937'};color:${vitrineVisible?'#166534':'#FBBF24'};padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+    <span>${vitrineVisible ? '🟢 Votre vitrine est visible publiquement.' : "🔒 Votre vitrine est actuellement masquée. Elle n'est visible que par vous et les administrateurs de Diaspo'Actif."}</span>
+    <button class="pvz-btn" style="white-space:nowrap;${window._daPremiumInitiative===false?'background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;border:none;':''}" onclick="pvzQuickToggleVitrine()">${vitrineVisible ? '🔒 Masquer la vitrine' : '🌐 Rendre visible'}</button>
   </div>` : '';
 
   el.innerHTML = `<div class="pvt-scope" id="pvt-scope" data-theme="${theme==='bordeaux'?'':theme}">
@@ -3443,6 +3455,68 @@ function paintSubscribeBtn(initId) {
         ${_vtAbonne ? '✓ Abonné' : '➕ S’abonner à cette vitrine'}
       </button>
     </div>`;
+}
+
+/* Bouton doré-toggle de visibilité de la vitrine, toujours visible dans l'en-tête du profil
+   (pas seulement une fois l'onglet Vitrine ouvert). */
+async function pvzInitVitrineToggleBtn() {
+  const btn = document.getElementById('pvz-vitrine-toggle-btn');
+  if (!btn) return;
+  try {
+    const [all, accredRes] = await Promise.all([
+      api('GET', '/initiatives'),
+      api('GET', '/accreditations/mes').catch(() => ({ accreditations: [] })),
+    ]);
+    const init = (all.initiatives || []).find(i => Number(i.owner_user_id) === Number(profil.id));
+    if (!init) { btn.remove(); return; }
+    _vitrineInit = init;
+    window._daPremiumInitiative = (accredRes.accreditations || []).some(a => a.type === 'initiative_abonne' && a.statut === 'active');
+    pvzPaintVitrineToggleBtn(init.id, init.vitrine_active !== 0);
+  } catch (e) { btn.remove(); }
+}
+function pvzPaintVitrineToggleBtn(initId, visible) {
+  const btn = document.getElementById('pvz-vitrine-toggle-btn');
+  if (!btn) return;
+  const premium = !!window._daPremiumInitiative;
+  btn.disabled = false;
+  btn.dataset.initId = initId;
+  btn.dataset.visible = visible ? '1' : '0';
+  if (!premium) {
+    /* Sans Premium, la vitrine reste masquée : le bouton est doré et ouvre l'upsell au lieu de basculer. */
+    btn.textContent = '🔒 Vitrine masquée';
+    btn.title = 'Rendre votre vitrine visible au public est réservé aux comptes Premium.';
+    btn.style.background = 'linear-gradient(135deg,#c8960c,#f2c94c)';
+    btn.style.color = '#2a1e00';
+    btn.style.border = 'none';
+  } else {
+    btn.textContent = visible ? '🌐 Vitrine visible' : '🔒 Vitrine masquée';
+    btn.title = visible ? 'Cliquer pour masquer votre vitrine au public' : 'Cliquer pour rendre votre vitrine visible au public';
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.border = '';
+  }
+}
+async function pvzQuickToggleVitrine() {
+  const btn = document.getElementById('pvz-vitrine-toggle-btn');
+  if (!btn || !btn.dataset.initId) return;
+  if (!window._daPremiumInitiative) {
+    if (confirm("Rendre votre vitrine visible au public est réservé aux comptes Premium.\n\nDécouvrir Premium maintenant ?")) {
+      window.location.href = 'premium.html?type=initiative';
+    }
+    return;
+  }
+  const initId = btn.dataset.initId;
+  const visible = btn.dataset.visible === '1';
+  await toggleMaVitrineVisibilite(initId, visible);
+}
+
+async function toggleMaVitrineVisibilite(initId, currentlyVisible) {
+  if (!isOwn) return;
+  try {
+    await api('PUT', `/initiatives/${initId}/vitrine`, { vitrine_active: !currentlyVisible });
+    if (_vitrineLoaded) renderVitrine();
+    pvzPaintVitrineToggleBtn(initId, !currentlyVisible);
+  } catch (e) { alert(e.message || 'Erreur lors du changement de visibilité.'); }
 }
 
 async function toggleVitrineSubscribe(initId) {
