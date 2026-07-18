@@ -3262,7 +3262,10 @@ function renderPvtCatalogues(catalogues, produits, ownerId) {
   const visibles = isOwn ? catalogues : catalogues.filter(c => c.statut !== 'masque');
   if (!visibles.length) return;
   grid.innerHTML = visibles.map(cat => {
-    const articles = produits.filter(p => p.catalogue_id === cat.id);
+    /* Number() des deux côtés : Postgres renvoie les ids BIGSERIAL en texte ("3"), la
+       comparaison stricte "3" === 3 échouait et faisait disparaître les articles rangés
+       dans un catalogue (même bug racine que users.id, cf. corrections précédentes). */
+    const articles = produits.filter(p => p.catalogue_id != null && Number(p.catalogue_id) === Number(cat.id));
     const articlesVisibles = isOwn ? articles : articles.filter(p => (p.statut||'disponible') !== 'masque');
     const plein = articles.length >= MAX_ARTICLES_PAR_CATALOGUE;
     return `<div class="pvt-catalogue-block" data-catid="${cat.id}" style="margin-bottom:22px;${cat.statut==='masque'?'opacity:.55;':''}">
@@ -3759,7 +3762,7 @@ let _prodPhotoData = [null, null, null, null];
 
 function openProductModal(productId, presetCatalogueId) {
   const editing = !!productId;
-  const prod = editing ? _produitsVitrine.find(p => p.id === productId) : null;
+  const prod = editing ? _produitsVitrine.find(p => Number(p.id) === Number(productId)) : null;
   _prodPhotoData = [null, null, null, null];
   if (prod && prod.photos) prod.photos.forEach((u, i) => { if (i < 4) _prodPhotoData[i] = u; });
   const currentCatId = prod ? prod.catalogue_id : (presetCatalogueId != null ? presetCatalogueId : null);
@@ -3772,7 +3775,7 @@ function openProductModal(productId, presetCatalogueId) {
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Catalogue</label>
       <select id="pf-catalogue" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;background:#fff;">
         <option value="">— Non classé —</option>
-        ${(_cataloguesVitrine||[]).map(c => `<option value="${c.id}" ${Number(currentCatId)===c.id?'selected':''}>${esc(c.nom)}</option>`).join('')}
+        ${(_cataloguesVitrine||[]).map(c => `<option value="${c.id}" ${currentCatId != null && Number(currentCatId)===Number(c.id)?'selected':''}>${esc(c.nom)}</option>`).join('')}
       </select>
       <h2 style="margin:0 0 16px;font-size:17px;">${editing?'✏️ Modifier':'➕ Ajouter'} un produit</h2>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Nom *</label>
