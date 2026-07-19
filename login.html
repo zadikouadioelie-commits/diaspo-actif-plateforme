@@ -169,8 +169,9 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
 
       <p style="margin-top:18px;font-size:13px;color:var(--muted);">Pas encore de compte ? <a href="inscription.html" style="color:#2563EB;font-weight:700;">Créer un compte</a></p>
 
-      <div class="notice" style="margin-top:18px;">
-        <strong>🔎 Comptes de démonstration</strong><br>
+      <!-- Bloc réservé aux administrateurs connectés (masqué au public). Révélé par JS si role='administrateur'. -->
+      <div class="notice" id="demo-accounts-block" style="margin-top:18px;display:none;">
+        <strong>🔎 Comptes de démonstration</strong> <span style="font-size:11px;color:var(--muted);">(visible car vous êtes administrateur)</span><br>
         <table style="margin-top:10px;width:100%;font-size:12.5px;border-collapse:collapse;">
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:5px 6px;font-weight:700;">jean@diaspoactif.demo</td>
@@ -190,12 +191,6 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
             <td style="padding:5px 6px;font-weight:700;color:#2563EB;">Demo1234!</td>
             <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('moussa.coulibaly@diaspoactif.demo','Demo1234!')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
           </tr>
-          <tr>
-            <td style="padding:5px 6px;font-weight:700;">admin@diaspoactif.demo</td>
-            <td style="padding:5px 6px;color:var(--muted);">👑 Super Administrateur</td>
-            <td style="padding:5px 6px;font-weight:700;color:#2563EB;">Demo1234!</td>
-            <td style="padding:5px 6px;"><button type="button" onclick="fillDemo('admin@diaspoactif.demo','Demo1234!')" style="font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);background:var(--bg);cursor:pointer;">Remplir</button></td>
-          </tr>
         </table>
       </div>
     </div>
@@ -213,6 +208,18 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
     document.getElementById("password").value = password || "Demo1234!";
     document.getElementById("email").focus();
   }
+
+  /* Comptes de démonstration : visibles UNIQUEMENT pour un administrateur connecté.
+     Le public et les comptes non-admin ne voient jamais ce bloc. */
+  (async () => {
+    try {
+      const me = await api("GET", "/auth/me");
+      if (me && me.user && me.user.role === "administrateur") {
+        const bloc = document.getElementById("demo-accounts-block");
+        if (bloc) bloc.style.display = "";
+      }
+    } catch (_) { /* non connecté : le bloc reste masqué */ }
+  })();
 
   document.getElementById("login-form").addEventListener("submit", async (e)=>{
     e.preventDefault();
