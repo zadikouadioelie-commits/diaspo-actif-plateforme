@@ -373,6 +373,61 @@ function showEmailVerifBanner(user) {
   };
 }
 
+/* ─── Comptes de test (démo) — réservé à l'administrateur ───
+   Ouvre une fenêtre listant les comptes de démonstration et permet de s'y
+   connecter en un clic (déconnexion admin → connexion démo → redirection). */
+const DEMO_TEST_ACCOUNTS = [
+  { email: "jean@diaspoactif.demo", role: "Utilisateur", icon: "👤", pass: "Demo1234!" },
+  { email: "fatoumata.bah@diaspoactif.demo", role: "Initiative", icon: "🌐", pass: "Demo1234!" },
+  { email: "moussa.coulibaly@diaspoactif.demo", role: "Collectivité", icon: "🏛️", pass: "Demo1234!" },
+];
+const DEMO_ROLE_DASHBOARD = { Utilisateur: "dashboard-utilisateur.html", Initiative: "dashboard-initiative.html", "Collectivité": "dashboard-collectivite.html" };
+
+window.openDemoTestModal = function () {
+  if (document.getElementById("demo-test-overlay")) {
+    document.getElementById("demo-test-overlay").style.display = "flex";
+    return;
+  }
+  const overlay = document.createElement("div");
+  overlay.id = "demo-test-overlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(9,17,30,.6);backdrop-filter:blur(3px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;";
+  const rows = DEMO_TEST_ACCOUNTS.map(a => `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border,#e2e8f0);border-radius:12px;background:var(--bg,#fff);">
+      <div style="font-size:22px;">${a.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:800;font-size:13.5px;color:var(--text,#0D1B2A);">${a.role}</div>
+        <div style="font-size:11.5px;color:var(--muted,#64748b);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.email}</div>
+      </div>
+      <button type="button" onclick="loginAsDemo('${a.email}','${a.pass}','${a.role}')" style="cursor:pointer;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border:none;border-radius:99px;font-weight:800;font-size:12px;padding:8px 16px;white-space:nowrap;">Se connecter →</button>
+    </div>`).join("");
+  overlay.innerHTML = `
+    <div style="background:var(--bg,#fff);border-radius:20px;max-width:440px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.4);overflow:hidden;">
+      <div style="background:#0F2A50;color:#fff;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-weight:900;font-size:16px;">🧪 Comptes de test</div>
+        <button type="button" onclick="document.getElementById('demo-test-overlay').style.display='none'" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;">×</button>
+      </div>
+      <div style="padding:20px 22px;">
+        <p style="font-size:12.5px;color:var(--muted,#64748b);margin:0 0 16px;line-height:1.5;">Vous êtes actuellement connecté en administrateur. Choisir un compte vous déconnecte puis vous connecte au compte de démonstration pour observer les rendus.</p>
+        <div style="display:flex;flex-direction:column;gap:10px;">${rows}</div>
+        <p id="demo-test-err" style="display:none;color:#EF4444;font-size:12.5px;margin:14px 0 0;"></p>
+      </div>
+    </div>`;
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.style.display = "none"; });
+  document.body.appendChild(overlay);
+};
+
+window.loginAsDemo = async function (email, password, role) {
+  const err = document.getElementById("demo-test-err");
+  if (err) { err.style.display = "none"; }
+  try {
+    try { await api("POST", "/auth/logout"); } catch (_) {}
+    await api("POST", "/auth/login", { email, password });
+    window.location.href = DEMO_ROLE_DASHBOARD[role] || "index.html";
+  } catch (ex) {
+    if (err) { err.textContent = "Connexion impossible : " + (ex && ex.message ? ex.message : "compte de démo indisponible."); err.style.display = "block"; }
+  }
+};
+
 async function applyAuthState() {
   const el = document.getElementById("auth-area");
   if (!el) return;
@@ -383,12 +438,17 @@ async function applyAuthState() {
       utilisateur: '1 abonnement · 6 modules accessibles',
       initiative: '1 abonnement · tous les modules Initiative',
     };
+    const demoBtnHtml = (user.role === 'administrateur') ? `
+      <button type="button" id="demo-test-btn" onclick="openDemoTestModal()" title="Se connecter à un compte de démonstration" style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);">
+        <span style="font-size:14px;">🧪</span> Comptes test
+      </button>` : '';
     const premiumBtnHtml = (user.role === 'utilisateur' || user.role === 'initiative') ? `
       <a href="premium.html?type=${user.role}" id="premium-topbar-btn" style="text-decoration:none;display:none;flex-direction:column;align-items:center;gap:1px;background:linear-gradient(135deg,#F5D061,#C9971C);color:#000;font-weight:800;font-size:12.5px;padding:6px 14px;border-radius:14px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Passer à Premium">
         <span><span style="font-size:14px;">👑</span> Passer à Premium</span>
         <span style="font-size:9.5px;font-weight:700;color:#000;opacity:.85;">${premiumSousTitres[user.role]}</span>
       </a>` : '';
     el.innerHTML = `
+      ${demoBtnHtml}
       ${premiumBtnHtml}
       <a href="messagerie.html" class="user-chip" style="text-decoration:none;position:relative;" title="Messagerie">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
