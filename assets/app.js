@@ -428,6 +428,57 @@ window.loginAsDemo = async function (email, password, role) {
   }
 };
 
+/* ── Rappel périodique de vérification d'identité ──
+   Tant que le compte (utilisateur) n'est pas identite_verifiee, on propose
+   la vérification toutes les 5 connexions (5, 10, 15…). Un seul rappel par
+   session de navigation (sessionStorage) pour ne pas harceler sur chaque page. */
+function checkIdentityReminder(user) {
+  if (!user || user.role !== 'utilisateur' || user.identite_verifiee) return;
+  const n = user.nb_connexions || 0;
+  if (n <= 0 || n % 5 !== 0) return;
+  const flagKey = 'da_identity_reminder_' + n;
+  if (sessionStorage.getItem(flagKey)) return;
+  sessionStorage.setItem(flagKey, '1');
+  showIdentityReminderModal();
+}
+function showIdentityReminderModal() {
+  if (document.getElementById('identity-reminder-overlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'identity-reminder-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(9,17,30,.6);backdrop-filter:blur(3px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px;max-width:420px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.4);overflow:hidden;">
+      <div style="padding:26px 24px 20px;text-align:center;">
+        <div style="font-size:40px;margin-bottom:10px;">🔐</div>
+        <h3 style="margin:0 0 8px;font-size:17px;color:#0D1B2A;">Vérifiez votre identité</h3>
+        <p style="font-size:13px;color:#64748b;line-height:1.5;margin:0 0 20px;">
+          Confirmez votre carte d'identité ou passeport pour obtenir le badge « Identité vérifiée »
+          et renforcer la confiance sur votre profil. Cela ne prend que quelques minutes.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button id="identity-reminder-verify" class="btn btn-orange" style="width:100%;">🔐 Vérifier maintenant</button>
+          <button id="identity-reminder-later" style="background:none;border:none;color:#94a3b8;font-size:13px;cursor:pointer;padding:8px;">Me le rappeler plus tard</button>
+        </div>
+        <p id="identity-reminder-error" style="display:none;color:#EF4444;font-size:12.5px;margin:12px 0 0;"></p>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('identity-reminder-later').addEventListener('click', () => overlay.remove());
+  document.getElementById('identity-reminder-verify').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const errEl = document.getElementById('identity-reminder-error');
+    btn.disabled = true; btn.textContent = 'Préparation…';
+    try {
+      const r = await api('POST', '/identity/verify', {});
+      if (r.url) window.location.href = r.url;
+    } catch (err) {
+      btn.disabled = false; btn.textContent = '🔐 Vérifier maintenant';
+      errEl.textContent = 'Vérification impossible pour le moment : ' + err.message;
+      errEl.style.display = 'block';
+    }
+  });
+}
+
 async function applyAuthState() {
   const el = document.getElementById("auth-area");
   if (!el) return;
@@ -486,6 +537,8 @@ async function applyAuthState() {
     }
     // Démo : vérifier si on doit déclencher le tour guidé
     if (window.DADemo) DADemo.checkUser(user);
+    // Rappel de vérification d'identité : toutes les 5 connexions, tant que non vérifiée
+    checkIdentityReminder(user);
     // Charger le nombre de messages non lus + notifications non lues
     try {
       const [msgs, notifs] = await Promise.all([

@@ -790,8 +790,14 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
   }catch(e){const eb=document.getElementById("i-error");eb.textContent=e.message;eb.style.display="block";}
 });
 /* ===== Rayonnement + territoires dynamiques ===== */
+function refreshRayPills(){
+  document.querySelectorAll('input[name="i-ray"]').forEach(r=>{
+    r.closest('label')?.classList.toggle('pill-on', r.checked);
+  });
+}
 document.querySelectorAll('input[name="i-ray"]').forEach(r=>{
   r.addEventListener('change',()=>{
+    refreshRayPills();
     const box=document.getElementById('i-territoires-box');
     if(r.value==='internationale'&&r.checked){
       box.style.display='block';
@@ -799,6 +805,7 @@ document.querySelectorAll('input[name="i-ray"]').forEach(r=>{
     } else if(r.checked) box.style.display='none';
   });
 });
+refreshRayPills(); // reflète l'état initial (Locale cochée par défaut)
 document.getElementById('i-add-territoire').addEventListener('click', ajouterTerritoire);
 
 let terIdx=0;

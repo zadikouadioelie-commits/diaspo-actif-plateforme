@@ -207,7 +207,7 @@ async function getCurrentUser(req) {
   if (authCookie) {
     const payload = verifyAuthToken(authCookie);
     if (payload?.uid) {
-      const user = await db.prepare("SELECT id, nom, email, role, ville, pays, profil_json, email_verifie FROM users WHERE id = ?").get(payload.uid);
+      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee FROM users WHERE id = ?").get(payload.uid);
       if (user) { user.id = Number(user.id); return user; }
     }
   }
@@ -216,7 +216,7 @@ async function getCurrentUser(req) {
   if (!sid) return null;
   const session = getSession(sid);
   if (!session) return null;
-  const user = await db.prepare("SELECT id, nom, email, role, ville, pays, profil_json, email_verifie FROM users WHERE id = ?").get(session.userId);
+  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee FROM users WHERE id = ?").get(session.userId);
   if (user) user.id = Number(user.id);
   return user || null;
 }
@@ -226,7 +226,7 @@ function publicUser(u) {
   return { id: Number(u.id), nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
     photo_url: u.photo_url || null,
     nb_connexions: u.nb_connexions || 0, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
-    demo_vue: u.demo_vue || 0, da_id: u.da_id || null, email_verifie: !!u.email_verifie };
+    demo_vue: u.demo_vue || 0, da_id: u.da_id || null, email_verifie: !!u.email_verifie, identite_verifiee: !!u.identite_verifiee };
   // NOTE: ds_id est intentionnellement exclu — jamais exposé via cette fonction
 }
 
