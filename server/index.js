@@ -6731,9 +6731,10 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   const totalUtilisateurs  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur'").get())?.n;
   const totalInitiatives   = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives").get())?.n;
   const totalInstitutions  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite'").get())?.n;
-  const totalPublications  = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts").get())?.n;
-  const totalFormations    = (await db.prepare("SELECT COUNT(*) AS n FROM formations").get())?.n;
-  const totalAbonnements   = (await db.prepare("SELECT COUNT(*) AS n FROM abonnements").get())?.n;
+  // Contenu réel uniquement : on exclut les comptes de démonstration (is_demo).
+  const totalPublications  = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
+  const totalFormations    = (await db.prepare("SELECT COUNT(*) AS n FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
+  const totalAbonnements   = (await db.prepare("SELECT COUNT(*) AS n FROM abonnements a JOIN users u ON u.id=a.user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
 
   // Nouveaux inscrits
   const inscJour    = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE date(created_at)=date('now')").get())?.n;
@@ -6741,9 +6742,9 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   const inscMois    = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE created_at>=datetime('now','-30 days')").get())?.n;
 
   // Utilisateurs actifs (DAU/WAU/MAU)
-  const dau = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date=date('now')").get())?.n;
-  const wau = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=date('now','-6 days')").get())?.n;
-  const mau = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE date>=date('now','-29 days')").get())?.n;
+  const dau = (await db.prepare("SELECT COUNT(DISTINCT a.user_id) AS n FROM user_activity a JOIN users u ON u.id=a.user_id WHERE a.date=date('now') AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
+  const wau = (await db.prepare("SELECT COUNT(DISTINCT a.user_id) AS n FROM user_activity a JOIN users u ON u.id=a.user_id WHERE a.date>=date('now','-6 days') AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
+  const mau = (await db.prepare("SELECT COUNT(DISTINCT a.user_id) AS n FROM user_activity a JOIN users u ON u.id=a.user_id WHERE a.date>=date('now','-29 days') AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
 
   // Tendance inscriptions : 14 derniers jours
   const tendance14j = await db.prepare(`
@@ -6754,9 +6755,10 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
 
   // Tendance activité : 14 derniers jours
   const tendanceActif14j = await db.prepare(`
-    SELECT date AS jour, COUNT(DISTINCT user_id) AS n FROM user_activity
-    WHERE date >= date('now','-13 days')
-    GROUP BY date ORDER BY date ASC
+    SELECT a.date AS jour, COUNT(DISTINCT a.user_id) AS n FROM user_activity a
+    JOIN users u ON u.id=a.user_id
+    WHERE a.date >= date('now','-13 days') AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+    GROUP BY a.date ORDER BY a.date ASC
   `).all();
 
   // Répartition par rôle
@@ -6766,9 +6768,9 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   const topPays = await db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 8").all();
 
   // ── Engagement
-  const totalCommentaires = (await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires").get())?.n;
-  const totalLikes    = (await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE type='like'").get())?.n;
-  const totalReposts  = (await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE type IN ('repost','partage','share')").get())?.n;
+  const totalCommentaires = (await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires c JOIN users u ON u.id=c.auteur_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
+  const totalLikes    = (await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions r JOIN users u ON u.id=r.user_id WHERE r.type='like' AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
+  const totalReposts  = (await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions r JOIN users u ON u.id=r.user_id WHERE r.type IN ('repost','partage','share') AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
 
   // Taux d'interaction moyen par publication (likes + commentaires + reposts) / nb_posts
   const tauxInteraction = totalPublications > 0
@@ -6776,7 +6778,7 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
     : "0.00";
 
   // Temps moyen de session (secondes → minutes)
-  const sessionRow = await db.prepare("SELECT AVG(duree_sec) AS avg_sec, SUM(duree_sec) AS total_sec FROM user_sessions WHERE duree_sec > 30").get();
+  const sessionRow = await db.prepare("SELECT AVG(s.duree_sec) AS avg_sec, SUM(s.duree_sec) AS total_sec FROM user_sessions s LEFT JOIN users u ON u.id=s.user_id WHERE s.duree_sec > 30 AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get();
   const tempsSessionMoyenMin = sessionRow.avg_sec ? (sessionRow.avg_sec / 60).toFixed(1) : "0.0";
   const tempsSessionTotalH   = sessionRow.total_sec ? (sessionRow.total_sec / 3600).toFixed(1) : "0.0";
 
@@ -6789,9 +6791,9 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
             SELECT 10 UNION SELECT 11 UNION SELECT 12 UNION SELECT 13)
     )
     SELECT j.jour,
-      COALESCE((SELECT COUNT(*) FROM fil_reactions r WHERE date(r.id, 'unixepoch') = j.jour), 0) +
-      COALESCE((SELECT COUNT(*) FROM fil_commentaires c WHERE date(c.created_at) = j.jour), 0) AS interactions,
-      COALESCE((SELECT COUNT(*) FROM fil_posts p WHERE date(p.created_at) = j.jour), 0) AS publications
+      COALESCE((SELECT COUNT(*) FROM fil_reactions r JOIN users ur ON ur.id=r.user_id WHERE date(r.id, 'unixepoch') = j.jour AND (ur.is_demo IS NULL OR ur.is_demo=FALSE)), 0) +
+      COALESCE((SELECT COUNT(*) FROM fil_commentaires c JOIN users uc ON uc.id=c.auteur_id WHERE date(c.created_at) = j.jour AND (uc.is_demo IS NULL OR uc.is_demo=FALSE)), 0) AS interactions,
+      COALESCE((SELECT COUNT(*) FROM fil_posts p JOIN users up ON up.id=p.auteur_id WHERE date(p.created_at) = j.jour AND (up.is_demo IS NULL OR up.is_demo=FALSE)), 0) AS publications
     FROM jours j
     ORDER BY j.jour ASC
   `).all();
@@ -6804,6 +6806,7 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
       COUNT(DISTINCT c.id) AS nb_commentaires,
       (COUNT(DISTINCT r.id) * 2 + COUNT(DISTINCT c.id) * 3) AS score
     FROM fil_posts p
+    JOIN users up ON up.id = p.auteur_id AND (up.is_demo IS NULL OR up.is_demo=FALSE)
     LEFT JOIN fil_reactions r ON r.post_id = p.id
     LEFT JOIN fil_commentaires c ON c.post_id = p.id
     GROUP BY p.id
@@ -6811,8 +6814,16 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
     LIMIT 5
   `).all();
 
-  const publicationsRecentes = await db.prepare("SELECT * FROM fil_posts ORDER BY created_at DESC LIMIT 10").all();
+  const publicationsRecentes = await db.prepare("SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 10").all();
   const derniersInscrits = await db.prepare("SELECT id, nom, email, role, ville, pays, created_at FROM users ORDER BY created_at DESC LIMIT 8").all();
+
+  // Signalements en attente (vrai comptage : comptes + initiatives)
+  let signalementsEnAttente = 0;
+  try {
+    const sa = (await db.prepare("SELECT COUNT(*) AS n FROM account_reports WHERE statut='en_attente'").get())?.n || 0;
+    const si = (await db.prepare("SELECT COUNT(*) AS n FROM initiative_reports WHERE statut IN ('en_attente','en_cours')").get())?.n || 0;
+    signalementsEnAttente = sa + si;
+  } catch (_) { signalementsEnAttente = 0; }
 
   sendJSON(res, 200, {
     // Totaux
@@ -6823,7 +6834,7 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
     total_formations:   totalFormations,
     total_abonnements:  totalAbonnements,
     total_collectivites: totalInstitutions,
-    signalements: 3,
+    signalements: signalementsEnAttente,
     // Inscriptions
     inscrits_jour:    inscJour,
     inscrits_semaine: inscSemaine,
@@ -23851,9 +23862,7 @@ route("GET", "/api/admin/observatoire-institutionnel", async (req, res) => {
   postsByUser.forEach(r => postMap[r.auteur_id]=r.n);
   recrutByUser.forEach(r => recrutMap[r.recruteur_id]=r.n);
 
-  const seed = nbTotal * 43 + nbVerif * 19 + 7;
-  const rng = (min, max, s=0) => { const v=((seed+s*83)%(max-min+1)); return Math.floor(min+Math.abs(v)+(max-min)*0.32); };
-
+  /* ── DONNÉES RÉELLES uniquement (aucune simulation) ── */
   // Répartition types
   const typeCount={};
   allColl.forEach(c => { const t=c.type_organisme||'Autre'; typeCount[t]=(typeCount[t]||0)+1; });
@@ -23864,8 +23873,8 @@ route("GET", "/api/admin/observatoire-institutionnel", async (req, res) => {
   allColl.forEach(c => { const p=c.pays||c.pays_exercice||'Inconnu'; paysCount[p]=(paysCount[p]||0)+1; });
   const par_pays = Object.entries(paysCount).map(([pays,n])=>({pays,n})).sort((a,b)=>b.n-a.n);
 
-  // Générer enrichissement simulé pour chaque institution
-  const institutions = allColl.map((c,i) => ({
+  // Institutions : uniquement des indicateurs réels (aucun enrichissement inventé).
+  const institutions = allColl.map((c) => ({
     id: c.id,
     nom: c.nom,
     type: c.type_organisme||'Institution',
@@ -23875,108 +23884,52 @@ route("GET", "/api/admin/observatoire-institutionnel", async (req, res) => {
     events: evMap[c.id]||0,
     publications: postMap[c.id]||0,
     recrutements: recrutMap[c.id]||0,
-    // Enrichissement simulé
-    abonnes: rng(10,850,i*10+1),
-    vues_profil: rng(80,4200,i*10+2),
-    sondages: rng(0,12,i*10+3),
-    deals: rng(0,8,i*10+4),
-    partenariats: rng(0,6,i*10+5),
-    reactions: rng(5,420,i*10+6),
-    commentaires: rng(2,180,i*10+7),
-    repub: rng(0,60,i*10+8),
-    taux_engagement: parseFloat((rng(5,48,i*10+9)/10).toFixed(1)),
-    evol_abonnes: parseFloat((rng(-5,32,i*10+10)/10).toFixed(1)),
-    score: rng(35,98,i*10+11)
+    abonnes: 0, vues_profil: 0, sondages: 0, deals: 0, partenariats: 0,
+    reactions: 0, commentaires: 0, repub: 0,
+    taux_engagement: 0, evol_abonnes: 0, score: 0
   }));
 
-  // Classements
-  const top_actives      = [...institutions].sort((a,b)=>b.connexions-a.connexions||b.score-a.score).slice(0,10);
+  // Classements (sur données réelles disponibles)
+  const top_actives      = [...institutions].sort((a,b)=>b.connexions-a.connexions).slice(0,10);
   const top_communicantes= [...institutions].sort((a,b)=>(b.publications+b.events+b.recrutements)-(a.publications+a.events+a.recrutements)).slice(0,10);
-  const top_consultees   = [...institutions].sort((a,b)=>b.vues_profil-a.vues_profil).slice(0,10);
-  const top_suivies      = [...institutions].sort((a,b)=>b.abonnes-a.abonnes).slice(0,10);
-  const top_reactives    = [...institutions].sort((a,b)=>b.taux_engagement-a.taux_engagement).slice(0,10);
+  const top_consultees   = [];
+  const top_suivies      = [];
+  const top_reactives    = [];
 
-  // Analyse communications globale
+  // Communications : totaux réels ; réactions/commentaires non ventilés par institution → 0 ; thèmes vides.
   const comms = {
     total_publications: institutions.reduce((s,i)=>s+i.publications,0),
     total_events: institutions.reduce((s,i)=>s+i.events,0),
-    total_reactions: institutions.reduce((s,i)=>s+i.reactions,0),
-    total_commentaires: institutions.reduce((s,i)=>s+i.commentaires,0),
-    total_repub: institutions.reduce((s,i)=>s+i.repub,0),
-    themes: [
-      { theme:"Recrutement & Emploi", n:rng(40,140,200) },
-      { theme:"Événements institutionnels", n:rng(35,120,210) },
-      { theme:"Annonces officielles", n:rng(30,110,220) },
-      { theme:"Services aux diaspora", n:rng(25,95,230) },
-      { theme:"Culture & Patrimoine", n:rng(20,80,240) },
-      { theme:"Coopération internationale", n:rng(15,65,250) },
-      { theme:"Santé & Social", n:rng(12,55,260) },
-      { theme:"Éducation & Formation", n:rng(10,48,270) },
-    ].sort((a,b)=>b.n-a.n)
+    total_reactions: 0,
+    total_commentaires: 0,
+    total_repub: 0,
+    themes: []
   };
 
-  // Sondages
-  const sondages = {
-    total: institutions.reduce((s,i)=>s+i.sondages,0),
-    taux_participation_moy: rng(18,72,300),
-    themes_pop: ["Retour au pays", "Services consulaires", "Événements diaspora", "Investissements", "Formation"],
-    nb_reponses_moy: rng(45,280,310),
-    evol: parseFloat((rng(5,28,320)/10).toFixed(1))
-  };
+  const sondages = { total: 0, taux_participation_moy: 0, themes_pop: [], nb_reponses_moy: 0, evol: 0 };
 
-  // Événements
   const events_stats = {
     total: institutions.reduce((s,i)=>s+i.events,0),
-    participants_total: rng(1200,8500,400),
-    taux_presence: rng(55,88,410),
-    taux_remplissage: rng(62,95,420),
-    engagement: rng(28,75,430)
+    participants_total: 0, taux_presence: 0, taux_remplissage: 0, engagement: 0
   };
 
-  // Recrutements
   const recruit_stats = {
     campagnes: institutions.reduce((s,i)=>s+i.recrutements,0),
-    candidatures: rng(180,920,500),
-    recrutements: rng(40,280,510),
-    taux_reussite: rng(35,78,520)
+    candidatures: 0, recrutements: 0, taux_reussite: 0
   };
 
-  // Coopérations
-  const coop_stats = {
-    deals: institutions.reduce((s,i)=>s+i.deals,0),
-    partenariats_national: rng(25,95,600),
-    partenariats_intl: rng(18,72,610),
-    projets_cours: rng(12,48,620),
-    projets_realises: rng(8,35,630),
-    top_coop: [...institutions].sort((a,b)=>(b.deals+b.partenariats)-(a.deals+a.partenariats)).slice(0,5)
-  };
+  const coop_stats = { deals: 0, partenariats_national: 0, partenariats_intl: 0, projets_cours: 0, projets_realises: 0, top_coop: [] };
 
-  // Indices
-  const igpi_base = nbActifs>0 ? (nbVerif/nbTotal*25 + nbActifs/nbTotal*25 + comms.total_publications/100*25 + events_stats.total/50*25) : 45;
-  const indices = {
-    ici:  Math.min(100, parseFloat((comms.total_publications/Math.max(nbTotal,1)*10+rng(20,55,700)).toFixed(1))),
-    iei:  Math.min(100, parseFloat((institutions.reduce((s,i)=>s+i.taux_engagement,0)/Math.max(nbTotal,1)+rng(15,40,710)).toFixed(1))),
-    ico:  Math.min(100, parseFloat(((coop_stats.deals+coop_stats.partenariats_intl)/Math.max(nbTotal,1)*5+rng(18,48,720)).toFixed(1))),
-    iri:  Math.min(100, parseFloat((recruit_stats.taux_reussite*0.6+rng(10,30,730)).toFixed(1))),
-    iii:  Math.min(100, parseFloat((rng(25,70,740)+nbVerif*2).toFixed(1))),
-    igpi: Math.min(100, parseFloat((igpi_base+rng(5,15,750)).toFixed(1)))
-  };
+  const indices = { ici: 0, iei: 0, ico: 0, iri: 0, iii: 0, igpi: 0 };
 
-  // AI tendances
-  const ai = {
-    dynamiques: ["Mairie de Paris (activité ×3 ce mois)", "Consulat de Montréal (forte progression)", "Préfecture de Dakar (nouveaux services)"],
-    progression: ["Institutions Côte d'Ivoire (+62%)", "Comptes Canada (+48%)", "Institutions Belgique (+35%)"],
-    domaines: ["Recrutement diaspora", "Services consulaires digitaux", "Coopération culturelle"],
-    emergents: ["Diplomatie numérique", "E-administration pour diaspora", "Partenariats inter-institutionnels Nord-Sud"],
-    meilleures_pratiques: ["Publication hebdomadaire régulière", "Réponse aux messages < 24h", "Événements en ligne accessibles"]
-  };
+  const ai = { dynamiques: [], progression: [], domaines: [], emergents: [], meilleures_pratiques: [] };
 
   sendJSON(res, 200, {
     overview: { nbTotal, nbVerif, nbActifs, nbInactifs, par_type, par_pays, continents:[
-      { continent:"Europe", n:allColl.filter(c=>(c.pays||'').match(/France|Belgique|Suisse|Allemagne|Italie|Espagne|UK/)).length+rng(2,8,800) },
-      { continent:"Afrique", n:allColl.filter(c=>(c.pays||'').match(/Sénégal|Côte d'Ivoire|Cameroun|Mali|Maroc/)).length+rng(2,6,810) },
-      { continent:"Amériques", n:allColl.filter(c=>(c.pays||'').match(/Canada|USA|Haïti/)).length+rng(1,4,820) },
-      { continent:"Asie-Océanie", n:rng(1,3,830) },
+      { continent:"Europe", n:allColl.filter(c=>(c.pays||'').match(/France|Belgique|Suisse|Allemagne|Italie|Espagne|UK/)).length },
+      { continent:"Afrique", n:allColl.filter(c=>(c.pays||'').match(/Sénégal|Côte d'Ivoire|Cameroun|Mali|Maroc/)).length },
+      { continent:"Amériques", n:allColl.filter(c=>(c.pays||'').match(/Canada|USA|Haïti/)).length },
+      { continent:"Asie-Océanie", n:0 },
     ]},
     classements: { top_actives, top_communicantes, top_consultees, top_suivies, top_reactives },
     comms, sondages, events_stats, recruit_stats, coop_stats, indices, ai,
@@ -24036,148 +23989,33 @@ route("GET", "/api/admin/observatoire-coop", async (req, res) => {
   const paysList = (await db.prepare("SELECT DISTINCT pays FROM initiatives WHERE pays IS NOT NULL").all()).map(r=>r.pays);
   const nbPays   = new Set([...paysList, "France", "Belgique", "Canada", "Maroc", "Espagne"]).size;
 
-  const seed = nbInit * 41 + nbEvents * 13 + nbDeals * 7 + nbUsers * 3;
-  const rng = (min, max, s=0) => { const v = ((seed + s * 97) % (max - min + 1)); return Math.floor(min + Math.abs(v) + (max - min) * 0.35); };
+  /* ── DONNÉES RÉELLES uniquement (aucune simulation) ──
+     Les compteurs proviennent de la base ; les ventilations non encore
+     alimentées par de vraies données restent vides (états « aucune donnée »). */
+  let nbPartenariats = 0;
+  try { nbPartenariats = (await db.prepare("SELECT COUNT(*) as n FROM initiative_partenaires").get())?.n || 0; } catch (_) { nbPartenariats = 0; }
+  const nbDiasporas = (await db.prepare("SELECT COUNT(DISTINCT nationalite1) as n FROM users WHERE nationalite1 IS NOT NULL AND nationalite1 <> ''").get())?.n || 0;
 
-  // Tableau de bord mondial
   const dashboard = {
-    cooperations_actives: nbIntl + rng(120, 480, 1),
-    deals_internationaux: nbDeals + rng(40, 180, 2),
-    partenariats: rng(80, 320, 3),
-    projets_internationaux: nbProjets + rng(25, 120, 4),
-    campagnes: nbCampagnes + rng(30, 140, 5),
-    evenements_internationaux: nbEvents + rng(60, 240, 6),
-    pays_impliques: nbPays + rng(18, 42, 7),
-    diasporas_impliquees: rng(22, 48, 8),
-    valeur_eco: rng(280000, 950000, 9)
+    cooperations_actives: nbIntl,
+    deals_internationaux: nbDeals,
+    partenariats: nbPartenariats,
+    projets_internationaux: nbProjets,
+    campagnes: nbCampagnes,
+    evenements_internationaux: nbEvents,
+    pays_impliques: paysList.length,
+    diasporas_impliquees: nbDiasporas,
+    valeur_eco: 0
   };
 
-  // Flux cartographie
-  const flux_coop = [
-    { origine:"France", destination:"Sénégal",       volume:rng(80,280,10), valeur:rng(42000,180000,11), type:"multi" },
-    { origine:"France", destination:"Mali",           volume:rng(60,220,20), valeur:rng(32000,140000,21), type:"multi" },
-    { origine:"France", destination:"Côte d'Ivoire", volume:rng(70,250,30), valeur:rng(38000,160000,31), type:"multi" },
-    { origine:"Belgique","destination":"RD Congo",   volume:rng(50,190,40), valeur:rng(28000,120000,41), type:"multi" },
-    { origine:"Canada",  destination:"Haïti",        volume:rng(55,200,50), valeur:rng(30000,130000,51), type:"multi" },
-    { origine:"Espagne", destination:"Maroc",        volume:rng(65,230,60), valeur:rng(35000,150000,61), type:"multi" },
-    { origine:"Italie",  destination:"Tunisie",      volume:rng(45,170,70), valeur:rng(25000,110000,71), type:"multi" },
-    { origine:"UK",      destination:"Nigeria",      volume:rng(75,260,80), valeur:rng(40000,170000,81), type:"multi" },
-    { origine:"USA",     destination:"Ghana",        volume:rng(70,240,90), valeur:rng(38000,165000,91), type:"multi" },
-    { origine:"Portugal",destination:"Guinée-Bissau",volume:rng(35,140,100),valeur:rng(18000,80000,101), type:"multi" },
-    { origine:"Sénégal", destination:"Mali",         volume:rng(30,120,110),valeur:rng(15000,65000,111), type:"sud-sud" },
-    { origine:"Maroc",   destination:"Sénégal",      volume:rng(28,115,120),valeur:rng(14000,62000,121), type:"sud-sud" },
-  ];
-
-  // Deals internationaux
-  const deals = {
-    total: dashboard.deals_internationaux,
-    entre_pays: rng(60, 200, 130),
-    entre_diasporas: rng(40, 160, 131),
-    valeur: rng(180000, 620000, 132),
-    taux_reussite: rng(55, 85, 133),
-    domaines: [
-      { nom:"Commerce", n:rng(20,80,140), evol:rng(5,28,141) },
-      { nom:"Services", n:rng(18,70,150), evol:rng(6,32,151) },
-      { nom:"Formation", n:rng(14,55,160), evol:rng(8,38,161) },
-      { nom:"Numérique", n:rng(12,50,170), evol:rng(12,48,171) },
-      { nom:"Culture",   n:rng(10,42,180), evol:rng(4,20,181) },
-      { nom:"Santé",     n:rng(8,35,190),  evol:rng(7,30,191) },
-    ],
-    top_pays: [
-      { pays:"France", emoji:"🇫🇷", n:rng(35,120,200) },
-      { pays:"Sénégal",emoji:"🇸🇳", n:rng(25,95,210)  },
-      { pays:"USA",    emoji:"🇺🇸", n:rng(28,100,220) },
-      { pays:"Maroc",  emoji:"🇲🇦", n:rng(22,85,230)  },
-      { pays:"Canada", emoji:"🇨🇦", n:rng(20,80,240)  },
-    ],
-    top_diasporas: [
-      { nom:"Sénégalaise", n:rng(30,110,250), evol:rng(5,25,251) },
-      { nom:"Marocaine",   n:rng(28,100,260), evol:rng(6,28,261) },
-      { nom:"Ivoirienne",  n:rng(24,90,270),  evol:rng(4,22,271) },
-      { nom:"Algérienne",  n:rng(22,85,280),  evol:rng(7,30,281) },
-      { nom:"Camerounaise",n:rng(18,75,290),  evol:rng(5,24,291) },
-    ]
-  };
-
-  // Partenariats par type
-  const partenariats = [
-    { type:"Institutionnel", emoji:"🏛️", n:rng(30,110,300), evol:rng(3,18,301), pays:["France","Sénégal","Maroc"] },
-    { type:"Entreprises",    emoji:"🏢", n:rng(25,95,310),  evol:rng(5,24,311), pays:["France","CI","Canada"] },
-    { type:"Public-Privé",   emoji:"🤝", n:rng(20,80,320),  evol:rng(4,20,321), pays:["France","Sénégal","Belgique"] },
-    { type:"Associatif",     emoji:"🌐", n:rng(35,120,330), evol:rng(6,28,331), pays:["France","Mali","Cameroun"] },
-    { type:"Universitaire",  emoji:"🎓", n:rng(18,70,340),  evol:rng(8,35,341), pays:["France","Maroc","Tunisie"] },
-    { type:"Économique",     emoji:"💰", n:rng(22,85,350),  evol:rng(7,30,351), pays:["France","CI","Canada"] },
-    { type:"Culturel",       emoji:"🎨", n:rng(28,100,360), evol:rng(5,25,361), pays:["France","Sénégal","Mali"] },
-    { type:"Scientifique",   emoji:"🔬", n:rng(12,50,370),  evol:rng(9,40,371), pays:["France","Maroc","Tunisie"] },
-    { type:"Humanitaire",    emoji:"❤️", n:rng(24,90,380),  evol:rng(4,22,381), pays:["France","Congo","Niger"] },
-  ];
-
-  // Secteurs
-  const secteurs = [
-    { nom:"Commerce",               emoji:"🛒", n:rng(55,180,400), evol:rng(5,22,401), valeur:rng(38000,150000,402) },
-    { nom:"Éducation & Formation",  emoji:"🎓", n:rng(48,160,410), evol:rng(8,35,411), valeur:rng(32000,130000,412) },
-    { nom:"Numérique & IA",         emoji:"💻", n:rng(42,140,420), evol:rng(12,48,421), valeur:rng(28000,120000,422) },
-    { nom:"Santé",                  emoji:"🩺", n:rng(35,120,430), evol:rng(7,30,431), valeur:rng(24000,100000,432) },
-    { nom:"Agriculture",            emoji:"🌾", n:rng(30,110,440), evol:rng(4,18,441), valeur:rng(20000,85000,442) },
-    { nom:"Culture & Arts",         emoji:"🎨", n:rng(40,130,450), evol:rng(5,24,451), valeur:rng(18000,75000,452) },
-    { nom:"Finance & Fintech",      emoji:"💳", n:rng(25,95,460),  evol:rng(10,42,461), valeur:rng(35000,145000,462) },
-    { nom:"Énergie & Environnement",emoji:"⚡", n:rng(20,80,470),  evol:rng(8,35,471), valeur:rng(15000,65000,472) },
-    { nom:"Immobilier",             emoji:"🏠", n:rng(18,70,480),  evol:rng(3,15,481), valeur:rng(40000,180000,482) },
-    { nom:"Tourisme",               emoji:"✈️", n:rng(22,85,490),  evol:rng(6,28,491), valeur:rng(16000,70000,492) },
-    { nom:"Transport & Logistique", emoji:"🚢", n:rng(15,60,500),  evol:rng(4,20,501), valeur:rng(12000,55000,502) },
-    { nom:"Recherche & Innovation", emoji:"🔬", n:rng(14,55,510),  evol:rng(9,38,511), valeur:rng(10000,48000,512) },
-    { nom:"Entrepreneuriat",        emoji:"🚀", n:rng(38,125,520), evol:rng(10,44,521), valeur:rng(22000,95000,522) },
-    { nom:"Sport",                  emoji:"⚽", n:rng(12,48,530),  evol:rng(5,22,531), valeur:rng(8000,35000,532) },
-    { nom:"Développement territorial",emoji:"🌍",n:rng(20,78,540), evol:rng(6,26,541), valeur:rng(18000,80000,542) },
-  ].map(s => ({ ...s, evol_pct: parseFloat((s.evol/10).toFixed(1)) })).sort((a,b)=>b.n-a.n);
-
-  // Analyse géographique
-  const geo = {
-    flux_types: [
-      { type:"Nord → Sud",   n:rng(180,520,600), pct:rng(35,55,601) },
-      { type:"Sud → Sud",    n:rng(80,260,610),  pct:rng(15,30,611) },
-      { type:"Nord → Nord",  n:rng(60,200,620),  pct:rng(12,22,621) },
-      { type:"Intercontinental", n:rng(40,160,630), pct:rng(8,18,631) },
-    ],
-    top_pays_origine: [
-      { pays:"France", emoji:"🇫🇷", coops:rng(80,260,640) },
-      { pays:"Sénégal",emoji:"🇸🇳", coops:rng(60,200,650) },
-      { pays:"Belgique",emoji:"🇧🇪",coops:rng(50,180,660) },
-      { pays:"Maroc",  emoji:"🇲🇦", coops:rng(55,190,670) },
-      { pays:"Canada", emoji:"🇨🇦", coops:rng(45,160,680) },
-    ],
-    top_continents: [
-      { continent:"Europe",        n:rng(180,520,700), evol:rng(4,20,701) },
-      { continent:"Afrique",       n:rng(150,450,710), evol:rng(6,28,711) },
-      { continent:"Amériques",     n:rng(80,250,720),  evol:rng(5,22,721) },
-      { continent:"Asie & Océanie",n:rng(40,140,730),  evol:rng(8,35,731) },
-    ]
-  };
-
-  // Indices stratégiques
-  const total = dashboard.cooperations_actives;
-  const indices = {
-    ici:  parseFloat(((total / 400) * 100).toFixed(1)),
-    icd:  parseFloat(((dashboard.diasporas_impliquees / 50) * 100).toFixed(1)),
-    ipi:  parseFloat(((partenariats.reduce((s,p)=>s+p.n,0) / 800) * 100).toFixed(1)),
-    idi:  parseFloat(((dashboard.pays_impliques / 60) * 100).toFixed(1)),
-    icvi: parseFloat(((dashboard.valeur_eco / 1000000) * 100).toFixed(1))
-  };
-
-  // Tendances
-  const tendances = {
-    axes_emergents: ["Corridor numérique Afrique–Europe", "Coopération Sud-Sud via Diaspo'Actif", "Partenariats santé franco-africains"],
-    pays_actifs: ["France ↔ Sénégal", "Belgique ↔ Congo", "Canada ↔ Haïti", "Espagne ↔ Maroc"],
-    secteurs_croissance: ["Numérique & IA (+48%)", "Finance & Fintech (+42%)", "Entrepreneuriat (+44%)"],
-    reseaux_emergents: ["Réseau santé diaspora", "Hub numérique africain", "Alliance entrepreneuriale diasporique"]
-  };
-
-  const ai_insights = {
-    opportunites: ["Corridor technologique Maroc–France sous-exploité", "Marché éducatif diaspora anglophone en forte demande", "Partenariats agro-alimentaires Sahel–Europe à développer"],
-    complementaires: ["Initiatives tech + collectivités publiques", "Associations culturelles + entreprises événementielles", "ONG santé + universités de médecine"],
-    potentiel: ["Agriculture durable", "Formations certifiantes", "Tourisme des racines", "Finance islamique"],
-    tendances: ["Digitalisation des coopérations post-COVID", "Montée des partenariats trilatéraux", "Essor des coopérations entre diasporas du Sud"]
-  };
+  const flux_coop = [];
+  const deals = { total: nbDeals, entre_pays: 0, entre_diasporas: 0, valeur: 0, taux_reussite: 0, domaines: [], top_pays: [], top_diasporas: [] };
+  const partenariats = [];
+  const secteurs = [];
+  const geo = { flux_types: [], top_pays_origine: [], top_continents: [] };
+  const indices = { ici: 0, icd: 0, ipi: 0, idi: 0, icvi: 0 };
+  const tendances = { axes_emergents: [], pays_actifs: [], secteurs_croissance: [], reseaux_emergents: [] };
+  const ai_insights = { opportunites: [], complementaires: [], potentiel: [], tendances: [] };
 
   sendJSON(res, 200, { dashboard, flux_coop, deals, partenariats, secteurs, geo, indices, tendances, ai_insights });
 });
@@ -24193,103 +24031,44 @@ route("GET", "/api/admin/observatoire-eco", async (req, res) => {
   const diaspora = url.searchParams.get("diaspora") || "";
   const pays = url.searchParams.get("pays") || "";
 
-  // Données réelles de la DB
-  const nbUsers = (await db.prepare("SELECT COUNT(*) as n FROM users").get())?.n || 0;
-  const nbInit  = (await db.prepare("SELECT COUNT(*) as n FROM initiatives").get())?.n || 0;
-  const nbEvents= (await db.prepare("SELECT COUNT(*) as n FROM events").get())?.n || 0;
-  const nbPosts = (await db.prepare("SELECT COUNT(*) as n FROM fil_posts").get())?.n || 0;
-  const nbProjets=(await db.prepare("SELECT COUNT(*) as n FROM projets").get())?.n || 0;
+  /* ── DONNÉES RÉELLES uniquement ──
+     Sources : `transactions` (abonnements/paiements réussis) et `commandes_vitrine`
+     (commandes boutique traitées, valorisées via produits_vitrine.prix).
+     Aucune simulation : tant qu'il n'y a pas de vraies transactions, tout est à 0
+     et les ventilations sont vides. */
+  const stReussi = "('reussi','reussie','paye','payee','succeeded','completed')";
 
-  // Simulation économique réaliste (prototype — DB vide de transactions réelles)
-  const seed = nbUsers * 31 + nbInit * 17 + nbEvents * 7;
-  const rng = (min, max, s=0) => { const v = (seed + s * 137) % (max - min); return Math.floor(min + v + (max - min) * 0.4); };
+  // Ventes / paiements réels (table transactions)
+  const trx = (await db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(montant),0) AS v FROM transactions WHERE statut IN ${stReussi}`).get()) || { n: 0, v: 0 };
+  // Achats boutique réels (commandes traitées) valorisés au prix produit
+  const cmd = (await db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(pv.prix * cv.quantite),0) AS v
+      FROM commandes_vitrine cv JOIN produits_vitrine pv ON pv.id=cv.produit_id
+      WHERE cv.statut='traitee'`).get()) || { n: 0, v: 0 };
 
-  const totalTx   = rng(1240, 3800, 1);
-  const totalVal  = parseFloat((rng(48000, 210000, 2) + rng(500, 9000, 22) * 0.73).toFixed(2));
-  const nbAchats  = Math.floor(totalTx * 0.58);
-  const nbVentes  = totalTx - nbAchats;
-  const valMoy    = parseFloat((totalVal / totalTx).toFixed(2));
-  const txJour    = rng(8, 42, 3);
-  const txMois    = rng(180, 620, 4);
-  const txAn      = rng(1100, 3200, 5);
+  const nbVentes  = Number(trx.n) || 0;
+  const nbAchats  = Number(cmd.n) || 0;
+  const totalTx   = nbVentes + nbAchats;
+  const totalVal  = parseFloat(((Number(trx.v) || 0) + (Number(cmd.v) || 0)).toFixed(2));
+  const valMoy    = totalTx > 0 ? parseFloat((totalVal / totalTx).toFixed(2)) : 0;
 
-  const diasporas = [
-    { nom:"Sénégalaise", pays_origine:"SN", achats:rng(180,420,10), val_achats:rng(12000,48000,11), ventes:rng(90,240,12), ca_ventes:rng(8000,32000,13), vendeurs:rng(18,55,14), acheteurs:rng(34,90,15) },
-    { nom:"Malienne",    pays_origine:"ML", achats:rng(140,380,20), val_achats:rng(9000,36000,21), ventes:rng(70,200,22), ca_ventes:rng(6000,24000,23), vendeurs:rng(14,44,24), acheteurs:rng(28,76,25) },
-    { nom:"Ivoirienne",  pays_origine:"CI", achats:rng(160,400,30), val_achats:rng(11000,42000,31), ventes:rng(80,220,32), ca_ventes:rng(7000,28000,33), vendeurs:rng(16,50,34), acheteurs:rng(30,84,35) },
-    { nom:"Camerounaise",pays_origine:"CM", achats:rng(120,320,40), val_achats:rng(8000,30000,41), ventes:rng(60,180,42), ca_ventes:rng(5000,22000,43), vendeurs:rng(12,40,44), acheteurs:rng(24,68,45) },
-    { nom:"Marocaine",   pays_origine:"MA", achats:rng(200,460,50), val_achats:rng(14000,52000,51), ventes:rng(100,260,52), ca_ventes:rng(9000,36000,53), vendeurs:rng(20,60,54), acheteurs:rng(38,98,55) },
-    { nom:"Tunisienne",  pays_origine:"TN", achats:rng(110,300,60), val_achats:rng(7000,26000,61), ventes:rng(55,160,62), ca_ventes:rng(4500,20000,63), vendeurs:rng(11,36,64), acheteurs:rng(22,62,65) },
-    { nom:"Congolaise",  pays_origine:"CD", achats:rng(130,340,70), val_achats:rng(8500,32000,71), ventes:rng(65,185,72), ca_ventes:rng(5500,24000,73), vendeurs:rng(13,42,74), acheteurs:rng(26,72,75) },
-    { nom:"Guinéenne",   pays_origine:"GN", achats:rng(100,280,80), val_achats:rng(6500,24000,81), ventes:rng(50,150,82), ca_ventes:rng(4000,18000,83), vendeurs:rng(10,34,84), acheteurs:rng(20,58,85) },
-    { nom:"Algérienne",  pays_origine:"DZ", achats:rng(170,420,90), val_achats:rng(12000,44000,91), ventes:rng(85,230,92), ca_ventes:rng(7500,30000,93), vendeurs:rng(17,52,94), acheteurs:rng(32,88,95) },
-    { nom:"Burkinabè",   pays_origine:"BF", achats:rng(95,260,100), val_achats:rng(6000,22000,101), ventes:rng(48,140,102), ca_ventes:rng(3800,16000,103), vendeurs:rng(10,32,104), acheteurs:rng(19,55,105) },
-  ].map(d => ({
-    ...d,
-    panier_moy: parseFloat((d.val_achats / d.achats).toFixed(2)),
-    val_moy_vente: parseFloat((d.ca_ventes / d.ventes).toFixed(2)),
-    valeur_eco: d.val_achats + d.ca_ventes,
-    evol: parseFloat((rng(-8, 28, d.pays_origine.charCodeAt(0)) / 10).toFixed(1))
-  })).sort((a,b) => b.valeur_eco - a.valeur_eco);
+  // Évolution : comptage réel par fenêtre temporelle (transactions + commandes)
+  const cntPeriode = async (since) => {
+    const t = (await db.prepare(`SELECT COUNT(*) AS n FROM transactions WHERE statut IN ${stReussi} AND date_transaction >= ${since}`).get())?.n || 0;
+    const c = (await db.prepare(`SELECT COUNT(*) AS n FROM commandes_vitrine WHERE statut='traitee' AND created_at >= ${since}`).get())?.n || 0;
+    return Number(t) + Number(c);
+  };
+  const txJour = await cntPeriode("date('now')");
+  const txMois = await cntPeriode("datetime('now','-30 days')");
+  const txAn   = await cntPeriode("datetime('now','-365 days')");
 
-  const categories = [
-    { nom:"Services professionnels", emoji:"💼", ventes:rng(220,580,200), ca:rng(18000,72000,201), evol:rng(5,32,202) },
-    { nom:"Formations & Coaching",   emoji:"🎓", ventes:rng(180,480,210), ca:rng(12000,56000,211), evol:rng(8,38,212) },
-    { nom:"Billetterie événements",  emoji:"🎟️", ventes:rng(300,720,220), ca:rng(15000,64000,221), evol:rng(12,45,222) },
-    { nom:"Artisanat & Culture",     emoji:"🎨", ventes:rng(150,420,230), ca:rng(9000,38000,231), evol:rng(3,22,232) },
-    { nom:"Restauration & Traiteur", emoji:"🍽️", ventes:rng(200,520,240), ca:rng(14000,52000,241), evol:rng(6,28,242) },
-    { nom:"Technologies & Digital",  emoji:"💻", ventes:rng(120,380,250), ca:rng(10000,48000,251), evol:rng(15,52,252) },
-    { nom:"Commerce & Import-Export",emoji:"📦", ventes:rng(160,440,260), ca:rng(13000,58000,261), evol:rng(4,25,262) },
-    { nom:"Santé & Bien-être",       emoji:"🩺", ventes:rng(90,280,270), ca:rng(7000,32000,271), evol:rng(10,40,272) },
-    { nom:"Immobilier & Conseil",    emoji:"🏠", ventes:rng(60,200,280), ca:rng(15000,80000,281), evol:rng(2,18,282) },
-    { nom:"Mode & Textile",          emoji:"👗", ventes:rng(130,360,290), ca:rng(8000,34000,291), evol:rng(5,26,292) },
-  ].map(c => ({ ...c, evol_pct: parseFloat((c.evol / 10).toFixed(1)) })).sort((a,b) => b.ca - a.ca);
-
-  const secteurs = [
-    { nom:"Commerce de détail",  ca:rng(22000,88000,300), ventes:rng(380,920,301), achats:rng(420,980,302), croissance:rng(3,18,303) },
-    { nom:"Services aux entreprises", ca:rng(18000,72000,310), ventes:rng(280,720,311), achats:rng(310,780,312), croissance:rng(5,25,313) },
-    { nom:"Éducation & Formation", ca:rng(14000,58000,320), ventes:rng(240,640,321), achats:rng(260,680,322), croissance:rng(8,35,323) },
-    { nom:"Culture & Loisirs",  ca:rng(10000,42000,330), ventes:rng(200,560,331), achats:rng(220,600,332), croissance:rng(6,28,333) },
-    { nom:"Technologies",       ca:rng(12000,52000,340), ventes:rng(180,480,341), achats:rng(200,520,342), croissance:rng(12,48,343) },
-    { nom:"Santé & Bien-être",  ca:rng(8000,36000,350), ventes:rng(140,400,351), achats:rng(160,440,352), croissance:rng(9,38,353) },
-    { nom:"Immobilier",         ca:rng(20000,96000,360), ventes:rng(80,240,361), achats:rng(90,260,362), croissance:rng(2,14,363) },
-    { nom:"Alimentaire",        ca:rng(16000,64000,370), ventes:rng(320,800,371), achats:rng(340,840,372), croissance:rng(4,20,373) },
-  ].map(s => ({ ...s, croissance_pct: parseFloat((s.croissance / 10).toFixed(1)), valeur: s.ca + s.ventes * 8 })).sort((a,b) => b.ca - a.ca);
-
-  // Flux pays (cartographie)
-  const flux_pays = [
-    { origine:"FR", destination:"SN", montant:rng(8000,32000,400), nb:rng(80,280,401) },
-    { origine:"FR", destination:"ML", montant:rng(6000,24000,410), nb:rng(60,220,411) },
-    { origine:"FR", destination:"CI", montant:rng(7000,28000,420), nb:rng(70,240,421) },
-    { origine:"FR", destination:"CM", montant:rng(5000,20000,430), nb:rng(50,200,431) },
-    { origine:"BE", destination:"CD", montant:rng(4000,18000,440), nb:rng(40,180,441) },
-    { origine:"ES", destination:"MA", montant:rng(5000,22000,450), nb:rng(52,210,451) },
-    { origine:"IT", destination:"TN", montant:rng(4500,19000,460), nb:rng(45,190,461) },
-    { origine:"GB", destination:"GH", montant:rng(6000,26000,470), nb:rng(62,230,471) },
-    { origine:"DE", destination:"SN", montant:rng(5500,23000,480), nb:rng(55,215,481) },
-    { origine:"CA", destination:"HT", montant:rng(4000,17000,490), nb:rng(42,175,491) },
-  ];
-
-  // Indices stratégiques
-  const igcv = parseFloat(((totalVal / 50000) * 100).toFixed(1));
-  const idc  = parseFloat(((totalTx / 1000) * 100).toFixed(1));
-  const ied  = parseFloat((flux_pays.reduce((s,f)=>s+f.montant,0) / 100000 * 100).toFixed(1));
-  const icd  = parseFloat(((nbAchats / totalTx) * 100).toFixed(1));
-  const ipe  = parseFloat(((nbVentes / totalTx) * 100).toFixed(1));
-
-  // Top 10 pays CA
-  const top_pays = [
-    { pays:"France", emoji:"🇫🇷", ca:rng(28000,92000,500), achats:rng(420,980,501), exports:rng(280,720,502) },
-    { pays:"Belgique",emoji:"🇧🇪",ca:rng(14000,46000,510), achats:rng(210,580,511), exports:rng(140,420,512) },
-    { pays:"Canada", emoji:"🇨🇦", ca:rng(12000,42000,520), achats:rng(190,540,521), exports:rng(120,380,522) },
-    { pays:"Espagne",emoji:"🇪🇸", ca:rng(10000,36000,530), achats:rng(170,500,531), exports:rng(100,340,532) },
-    { pays:"Italie", emoji:"🇮🇹", ca:rng(9000,32000,540), achats:rng(150,460,541), exports:rng(90,310,542) },
-    { pays:"Allemagne",emoji:"🇩🇪",ca:rng(11000,40000,550),achats:rng(180,520,551),exports:rng(110,360,552) },
-    { pays:"R.-Uni",emoji:"🇬🇧",  ca:rng(13000,44000,560), achats:rng(200,560,561), exports:rng(130,400,562) },
-    { pays:"Suisse", emoji:"🇨🇭", ca:rng(8000,28000,570), achats:rng(130,400,571), exports:rng(80,280,572) },
-    { pays:"USA",    emoji:"🇺🇸", ca:rng(16000,56000,580), achats:rng(240,640,581), exports:rng(160,480,582) },
-    { pays:"Portugal",emoji:"🇵🇹",ca:rng(7000,24000,590), achats:rng(120,360,591), exports:rng(70,240,592) },
-  ].sort((a,b) => b.ca - a.ca);
+  // Ventilations (diasporas, catégories, secteurs, flux, top pays, IA) :
+  // aucune donnée réelle exploitable pour l'instant → listes vides (états « aucune donnée »).
+  const diasporas = [];
+  const categories = [];
+  const secteurs = [];
+  const flux_pays = [];
+  const top_pays = [];
+  const indices = { igcv: 0, idc: 0, ied: 0, icd: 0, ipe: 0 };
 
   sendJSON(res, 200, {
     global: { totalVal, totalTx, nbAchats, nbVentes, valMoy, txJour, txMois, txAn, periode },
@@ -24297,15 +24076,9 @@ route("GET", "/api/admin/observatoire-eco", async (req, res) => {
     categories,
     secteurs,
     flux_pays,
-    indices: { igcv, idc, ied, icd, ipe },
+    indices,
     top_pays,
-    ai_insights: {
-      croissance: ["Technologies & Digital (+52%)", "Formations & Coaching (+38%)", "Billetterie événements (+45%)"],
-      recherches:  ["Services de traduction", "Coaching entrepreneurial", "Formations certifiantes"],
-      marches:     ["Diaspora haïtienne en émergence", "Corridor Espagne–Maghreb en forte croissance"],
-      tendances:   ["Montée du commerce de services vs biens physiques", "Digitalisation accélérée des échanges inter-diasporas"],
-      opportunites:["Fintech diaspora sous-exploitée", "E-learning en langues africaines", "Tourisme des racines"]
-    }
+    ai_insights: { croissance: [], recherches: [], marches: [], tendances: [], opportunites: [] }
   });
 });
 
