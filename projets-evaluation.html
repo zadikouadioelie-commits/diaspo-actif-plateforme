@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>Diaspo'Actif — Évaluation de Projet</title>
-<meta name="viewport" content="width=1280">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="assets/styles.v2.css">
-<link rel="stylesheet" href="assets/responsive.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#F26422">
 <style>
@@ -99,6 +99,11 @@
     <div class="pe-field"><label>Description détaillée</label><textarea id="pe-c-description"></textarea></div>
     <div class="pe-field"><label>Objectifs</label><textarea id="pe-c-objectifs"></textarea></div>
     <div class="pe-field"><label>Lettre d'accompagnement</label><textarea id="pe-c-lettre" placeholder="Expliquez l'objet de votre demande, vos attentes, le type de partenariat recherché…"></textarea></div>
+    <div class="pe-field">
+      <label>📄 Business Plan associé (optionnel)</label>
+      <select id="pe-c-bp"><option value="">— Aucun —</option></select>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Reliez un de vos Business Plans existants ; vous pourrez le télécharger directement depuis la fiche du projet.</div>
+    </div>
     <div class="pe-field">
       <label>📎 Documents (PDF, Word, Excel, PowerPoint, image, audio, vidéo ≤3min…)</label>
       <input type="file" id="pe-c-docs" multiple>
@@ -219,7 +224,19 @@ function peOpenCreate() {
   });
   peUploadedDocsBuffer = [];
   document.getElementById('pe-c-docs-list').innerHTML = '';
+  peLoadBPSelect();
   document.getElementById('pe-modal-create-bg').classList.add('open');
+}
+
+async function peLoadBPSelect() {
+  const sel = document.getElementById('pe-c-bp');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Aucun —</option>';
+  try {
+    const r = await api('GET', '/business-plans');
+    const all = [...(r.mes_plans||[]), ...(r.partages||[])];
+    sel.innerHTML += all.map(bp => `<option value="${bp.id}">${escH(bp.nom_projet||'Sans titre')}</option>`).join('');
+  } catch (e) { /* liste vide si l'API échoue (ex : module non accessible) — le champ reste optionnel */ }
 }
 
 document.getElementById('pe-c-docs')?.addEventListener('change', async (ev) => {
@@ -258,6 +275,7 @@ async function peSaveProjet() {
     description: document.getElementById('pe-c-description').value || null,
     objectifs: document.getElementById('pe-c-objectifs').value || null,
     lettre_accompagnement: document.getElementById('pe-c-lettre').value || null,
+    business_plan_id: document.getElementById('pe-c-bp').value || null,
   };
   try {
     const r = await api('POST', '/proj-eval/projets', data);
@@ -282,6 +300,11 @@ async function peOpenProjet(pid) {
       </div>
       <p style="font-size:13px;color:var(--muted);">${escH(p.categorie||'')} · ${escH(p.secteur||'')} · ${escH(p.pays||'')} ${p.budget_estime?'· '+p.budget_estime+' €':''}</p>
       <p style="font-size:13px;">${escH(p.resume||'')}</p>
+      ${r.business_plan ? `
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:13px;">📄 Business Plan associé : <strong>${escH(r.business_plan.nom_projet||'Sans titre')}</strong></span>
+        <a class="btn btn-sm btn-outline" href="business-plan-edit.html?id=${r.business_plan.id}&dl=1" target="_blank" rel="noopener">⬇️ Télécharger</a>
+      </div>` : ''}
       <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;">
         <h4 style="margin:0;">📬 Destinataires (${r.destinataires.length})</h4>
         <button class="btn btn-sm btn-orange" onclick="peOpenEnvoyer(${pid})">📤 Envoyer à…</button>
