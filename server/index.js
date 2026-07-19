@@ -303,7 +303,9 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   } = body;
 
   if (!nom || !email || !password || !role) return sendJSON(res, 400, { error: "Champs requis manquants (nom, email, password, role)." });
-  if (!["utilisateur", "initiative", "administrateur", "collectivite"].includes(role)) return sendJSON(res, 400, { error: "Rôle invalide." });
+  /* Sécurité : le rôle "administrateur" ne peut PAS être créé via l'inscription publique.
+     Un admin ne peut être promu que manuellement en base (ou par un admin existant). */
+  if (!["utilisateur", "initiative", "collectivite"].includes(role)) return sendJSON(res, 400, { error: "Rôle invalide." });
   if (!SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
   if (password.length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit comporter au moins 8 caractères." });
 
