@@ -21064,7 +21064,10 @@ ${jsonLd}
         FROM proj_eval_destinataires d JOIN users u ON u.id=d.destinataire_id WHERE d.projet_id=? ORDER BY d.created_at ASC`).all(pid);
       const documents = await db.prepare(`SELECT id,projet_id,destinataire_id,nom,type_mime,categorie,taille,duree_secondes,uploaded_by,created_at
         FROM proj_eval_documents WHERE projet_id=? ORDER BY created_at ASC`).all(pid);
-      return sendJSON(res, 200, { projet: check.projet, destinataires, documents });
+      const business_plan = check.projet.business_plan_id
+        ? await db.prepare(`SELECT id, nom_projet FROM business_plans WHERE id=?`).get(check.projet.business_plan_id)
+        : null;
+      return sendJSON(res, 200, { projet: check.projet, destinataires, documents, business_plan });
     }
 
     /* ── POST /api/proj-eval/projets/:id/envoyer — envoi à un ou plusieurs destinataires ── */

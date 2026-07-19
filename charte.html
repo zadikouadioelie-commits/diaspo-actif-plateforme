@@ -422,10 +422,32 @@
       👉 Le cadre de sécurisation des collaborations<br>
       👉 La fondation de tout l'écosystème numérique D'A
     </div>
-    <a href="inscription.html" class="btn-white">Créer mon compte →</a>
+    <button type="button" id="ch-accept-btn" class="btn-white" onclick="chAccepterCharte()">✅ J'accepte la charte — Continuer mon inscription</button>
   </div>
 
 </main>
+<script>
+/* Si la charte a été ouverte depuis l'inscription (nouvel onglet), on coche
+   directement la case d'acceptation dans l'onglet d'origine et on referme
+   celui-ci, plutôt que de recharger une page d'inscription vierge. */
+function chAccepterCharte(){
+  try{
+    if (window.opener && !window.opener.closed){
+      const doc = window.opener.document;
+      const box = doc.getElementById("u-charte") || doc.getElementById("i-charte");
+      if (box){
+        box.checked = true;
+        box.dispatchEvent(new Event("change"));
+        box.scrollIntoView({behavior:"smooth", block:"center"});
+        window.opener.focus();
+        window.close();
+        return;
+      }
+    }
+  }catch(e){ /* origine différente ou onglet fermé : on retombe sur le lien classique */ }
+  window.location.href = "inscription.html";
+}
+</script>
 
 <footer class="footer">
   <span>Diaspo'Actif · Du Sud au Nord — Charte institutionnelle · 2026</span>

@@ -38,12 +38,20 @@
 @media(max-width:580px){.grid-2,.grid-3{grid-template-columns:1fr}}
 .nat-notice{background:#fff8e1;border:1px solid #ffd54f;border-radius:8px;padding:10px 14px;font-size:12px;color:#7a5700;margin-bottom:14px}
 .interests-grid{display:flex;flex-wrap:wrap;gap:8px}
-.interests-grid label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:5px 10px;border:1px solid var(--border);border-radius:99px}
+.interests-grid label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border:1.5px solid var(--border);border-radius:99px;transition:background .12s,border-color .12s,color .12s}
 .interests-grid label:hover{border-color:#2563EB}
-.interests-grid input[type=checkbox]{accent-color:#2563EB}
+.interests-grid input[type=checkbox]{accent-color:#2563EB;width:16px;height:16px}
 .radio-grid{display:flex;flex-wrap:wrap;gap:8px}
-.radio-grid label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:5px 12px;border:1px solid var(--border);border-radius:99px}
-.radio-grid input[type=radio]{accent-color:#2563EB}
+.radio-grid label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border:1.5px solid var(--border);border-radius:99px;transition:background .12s,border-color .12s,color .12s}
+.radio-grid input[type=checkbox]{accent-color:#2563EB;width:16px;height:16px}
+/* Etat sélectionné bien visible pour tous les groupes de pastilles à choix multiples.
+   Piloté en JS (classe .pill-on) plutôt qu'en CSS :has() pur, pour un rendu fiable
+   sur tous les navigateurs (y compris versions plus anciennes de Safari/Firefox). */
+.interests-grid label.pill-on,
+.radio-grid label.pill-on,
+label.pill-on{
+  background:#2563EB;border-color:#2563EB;color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(37,99,235,.25);
+}
 .pwd-strength{height:4px;border-radius:4px;margin-top:6px;background:var(--border);overflow:hidden}
 .pwd-strength-bar{height:100%;border-radius:4px;transition:width .3s,background .3s;width:0%}
 .pwd-hint{font-size:11px;color:var(--muted);margin-top:4px}
@@ -174,14 +182,14 @@
       </div>
       <div class="form-section"><h4>Situation professionnelle</h4>
         <div class="radio-grid">
-          <label><input type="radio" name="sitpro" value="etudiant"> Etudiant</label>
-          <label><input type="radio" name="sitpro" value="salarie"> Salarie</label>
-          <label><input type="radio" name="sitpro" value="entrepreneur"> Entrepreneur</label>
-          <label><input type="radio" name="sitpro" value="liberal"> Profession liberale</label>
-          <label><input type="radio" name="sitpro" value="fonctionnaire"> Fonctionnaire</label>
-          <label><input type="radio" name="sitpro" value="retraite"> Retraite</label>
-          <label><input type="radio" name="sitpro" value="sans_emploi"> Sans emploi</label>
-          <label><input type="radio" name="sitpro" value="autre"> Autre</label>
+          <label><input type="checkbox" class="u-sitpro" value="etudiant"> Etudiant</label>
+          <label><input type="checkbox" class="u-sitpro" value="salarie"> Salarie</label>
+          <label><input type="checkbox" class="u-sitpro" value="entrepreneur"> Entrepreneur</label>
+          <label><input type="checkbox" class="u-sitpro" value="liberal"> Profession liberale</label>
+          <label><input type="checkbox" class="u-sitpro" value="fonctionnaire"> Fonctionnaire</label>
+          <label><input type="checkbox" class="u-sitpro" value="retraite"> Retraite</label>
+          <label><input type="checkbox" class="u-sitpro" value="sans_emploi"> Sans emploi</label>
+          <label><input type="checkbox" class="u-sitpro" value="autre"> Autre</label>
         </div>
       </div>
       <div class="form-section"><h4>Profil public (facultatif)</h4>
@@ -522,6 +530,23 @@
         <h3 id="success-title">Compte cree !</h3>
         <p id="success-msg">Bienvenue sur Diaspo'Actif.</p>
         <button class="btn btn-orange" id="success-btn">Acceder a la plateforme</button>
+        <div id="success-identity-box" style="display:none;margin-top:28px;padding-top:24px;border-top:1px solid var(--border);text-align:left;">
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div style="font-size:28px;">🔐</div>
+            <div style="flex:1;">
+              <strong style="font-size:14px;">Vérifier votre identité (facultatif)</strong>
+              <p style="font-size:12.5px;color:var(--muted);margin:4px 0 12px;line-height:1.5;">
+                Confirmez votre carte d'identité ou passeport pour un badge « Identité vérifiée » sur votre profil.
+                Nous comparons automatiquement le pays du document à la ou les nationalité(s) que vous avez déclarées.
+              </p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-outline" id="success-identity-btn" style="font-size:13px;">🔐 Vérifier maintenant</button>
+                <button class="btn" id="success-identity-skip" style="font-size:13px;background:none;border:none;color:var(--muted);">Plus tard</button>
+              </div>
+              <div class="auth-error" id="success-identity-error"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -537,6 +562,86 @@
 <script>
 const PAGE_LOAD_TS = Date.now(); // sert au calcul du délai anti-bot côté serveur
 let currentRole=null;
+
+/* ── Indicatif téléphonique automatique selon le pays saisi ──
+   Table volontairement centrée sur les pays les plus représentés dans une
+   diaspora francophone/internationale ; complétable au besoin. Le préfixe
+   n'est appliqué que si le champ téléphone est vide ou ne contient que
+   l'indicatif précédemment auto-rempli (on n'écrase jamais une saisie). */
+const DIAL_CODES = {
+  "france":"+33","côte d'ivoire":"+225","cote d'ivoire":"+225","civ":"+225",
+  "sénégal":"+221","senegal":"+221","mali":"+223","burkina faso":"+226","burkina":"+226",
+  "guinée":"+224","guinee":"+224","bénin":"+229","benin":"+229","togo":"+228",
+  "niger":"+227","cameroun":"+237","gabon":"+241","congo":"+242",
+  "république démocratique du congo":"+243","rdc":"+243","tchad":"+235",
+  "centrafrique":"+236","république centrafricaine":"+236","mauritanie":"+222",
+  "maroc":"+212","algérie":"+213","algerie":"+213","tunisie":"+216","libye":"+218",
+  "égypte":"+20","egypte":"+20","madagascar":"+261","comores":"+269","djibouti":"+253",
+  "rwanda":"+250","burundi":"+257","haïti":"+509","haiti":"+509",
+  "belgique":"+32","suisse":"+41","canada":"+1","allemagne":"+49","espagne":"+34",
+  "italie":"+39","portugal":"+351","royaume-uni":"+44","uk":"+44",
+  "pays-bas":"+31","luxembourg":"+352","états-unis":"+1","etats-unis":"+1","usa":"+1",
+  "chine":"+86","inde":"+91","brésil":"+55","bresil":"+55","turquie":"+90",
+  "ghana":"+233","nigeria":"+234","kenya":"+254","afrique du sud":"+27",
+  "guinée-bissau":"+245","guinee-bissau":"+245","cap-vert":"+238","gambie":"+220",
+  "sierra leone":"+232","liberia":"+231","angola":"+244","mozambique":"+258",
+};
+function normPays(v){
+  return (v||"").toLowerCase().trim()
+    .normalize("NFD").replace(/[̀-ͯ]/g,"") // retire les accents pour la clé de recherche
+    .replace(/\s+/g," ");
+}
+const DIAL_CODES_NORM = Object.fromEntries(Object.entries(DIAL_CODES).map(([k,v])=>[normPays(k),v]));
+function wireAutoIndicatif(paysId,telId){
+  const paysEl=document.getElementById(paysId), telEl=document.getElementById(telId);
+  if(!paysEl||!telEl) return;
+  let lastAuto="";
+  paysEl.addEventListener("blur",()=>{
+    const code=DIAL_CODES_NORM[normPays(paysEl.value)];
+    if(!code) return;
+    const cur=telEl.value.trim();
+    if(cur===""||cur===lastAuto.trim()){ telEl.value=code+" "; lastAuto=code+" "; }
+  });
+}
+wireAutoIndicatif("u-pays","u-tel");
+wireAutoIndicatif("i-pays","i-tel");
+
+/* ── Retour visuel net sur les pastilles sélectionnées (choix multiples) ──
+   Ajoute/retire la classe .pill-on sur le <label> parent au clic, en JS plutôt
+   qu'en CSS :has() pur pour un rendu fiable sur tous les navigateurs. */
+function wirePillGroup(selector){
+  document.querySelectorAll(selector).forEach(input=>{
+    const label=input.closest("label");
+    if(!label) return;
+    input.addEventListener("change",()=>label.classList.toggle("pill-on",input.checked));
+  });
+}
+wirePillGroup("#u-interests input");
+wirePillGroup(".u-sitpro");
+wirePillGroup(".u-public");
+wirePillGroup(".u-besoin");
+wirePillGroup(".i-public");
+wirePillGroup(".i-besoin");
+
+/* ── Proposition de vérification d'identité juste après l'inscription ──
+   Réutilise le module Stripe Identity existant (déjà comparé aux nationalités
+   déclarées côté serveur) ; ici on l'expose au bon moment plutôt que de le
+   laisser caché dans Profil → Sécurité. */
+document.getElementById("success-identity-skip")?.addEventListener("click",()=>{
+  document.getElementById("success-btn").click();
+});
+document.getElementById("success-identity-btn")?.addEventListener("click",async(e)=>{
+  const btn=e.currentTarget, errBox=document.getElementById("success-identity-error");
+  errBox.style.display="none"; btn.disabled=true; btn.textContent="Préparation…";
+  try{
+    const r=await api("POST","/identity/verify",{});
+    if(r.url) window.location.href=r.url;
+    else throw new Error("Lien de vérification indisponible.");
+  }catch(err){
+    errBox.textContent=err.message||"Vérification impossible pour le moment.";
+    errBox.style.display="block"; btn.disabled=false; btn.textContent="🔐 Vérifier maintenant";
+  }
+});
 function goToStep(step){
   document.querySelectorAll(".insc-pane").forEach(p=>p.classList.remove("active"));
   ["dot-1","dot-2","dot-3"].forEach((id,i)=>{
@@ -593,6 +698,7 @@ async function submitForm(btnId,errId,body){
     document.getElementById("success-title").textContent=titles[role]||"Compte cree !";
     document.getElementById("success-msg").textContent=msgs[role]||"";
     document.getElementById("success-btn").onclick=()=>window.location.href=ROLE_DASHBOARD[role]||"index.html";
+    document.getElementById("success-identity-box").style.display = (role==="utilisateur") ? "block" : "none";
     goToStep(3);
   }catch(err){
     errBox.textContent=err.message||"Inscription impossible.";
@@ -619,7 +725,7 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
     if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
     if(!document.getElementById("u-charte").checked)throw new Error("Vous devez lire et accepter la Charte Institutionnelle pour créer un compte.");
     const interests=[...document.querySelectorAll("#u-interests input:checked")].map(c=>c.value);
-    const sitpro=document.querySelector('input[name="sitpro"]:checked')?.value||null;
+    const sitpro=[...document.querySelectorAll('.u-sitpro:checked')].map(c=>c.value).join(", ")||null;
     await submitForm("u-submit","u-error",{
       role:"utilisateur",nom,prenom,email,password:pwd,
       date_naissance:dob,nationalite1:nat1,
