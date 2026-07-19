@@ -869,6 +869,21 @@
   .hp-cta-card { width: 100%; max-width: 280px; }
   .hp-annuaire-preview { grid-template-columns: 1fr 1fr; }
   .hp-search-row { flex-wrap: wrap; }
+  .hp-hero-ctas {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    padding: 0 32px 6px;
+    scrollbar-width: none;
+  }
+  .hp-hero-ctas::-webkit-scrollbar { display: none; }
+  .hp-hero-ctas .hp-cta-primary,
+  .hp-hero-ctas .hp-cta-secondary {
+    flex: none;
+    white-space: nowrap;
+  }
 }
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
