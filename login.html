@@ -171,7 +171,7 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
 
       <!-- Bloc réservé aux administrateurs connectés (masqué au public). Révélé par JS si role='administrateur'. -->
       <div class="notice" id="demo-accounts-block" style="margin-top:18px;display:none;">
-        <strong>🔎 Comptes de démonstration</strong> <span style="font-size:11px;color:var(--muted);">(visible car vous êtes administrateur)</span><br>
+        <strong>🔎 Comptes de démonstration</strong> <span id="demo-hint" style="font-size:11px;color:var(--muted);"></span><br>
         <table style="margin-top:10px;width:100%;font-size:12.5px;border-collapse:collapse;">
           <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:5px 6px;font-weight:700;">jean@diaspoactif.demo</td>
@@ -209,16 +209,31 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
     document.getElementById("email").focus();
   }
 
-  /* Comptes de démonstration : visibles UNIQUEMENT pour un administrateur connecté.
-     Le public et les comptes non-admin ne voient jamais ce bloc. */
+  /* Comptes de démonstration : visibles pour (a) un administrateur connecté, ou
+     (b) une personne ouvrant le lien de démo secret login.html?demo=<jeton>.
+     Le public normal ne voit jamais ce bloc. */
   (async () => {
-    try {
-      const me = await api("GET", "/auth/me");
-      if (me && me.user && me.user.role === "administrateur") {
-        const bloc = document.getElementById("demo-accounts-block");
-        if (bloc) bloc.style.display = "";
-      }
-    } catch (_) { /* non connecté : le bloc reste masqué */ }
+    const DEMO_LINK_TOKEN = "demo-2026-a4f7c1b9"; // lien collaborateurs : login.html?demo=demo-2026-a4f7c1b9
+    let allow = false, raison = "";
+    const params = new URLSearchParams(location.search);
+    if (params.get("demo") === DEMO_LINK_TOKEN) {
+      allow = true; raison = "accès démonstration";
+      try { sessionStorage.setItem("da_demo_link", "1"); } catch (_) {}
+    } else if (sessionStorage.getItem("da_demo_link") === "1") {
+      allow = true; raison = "accès démonstration";
+    }
+    if (!allow) {
+      try {
+        const me = await api("GET", "/auth/me");
+        if (me && me.user && me.user.role === "administrateur") { allow = true; raison = "administrateur"; }
+      } catch (_) { /* non connecté */ }
+    }
+    if (allow) {
+      const bloc = document.getElementById("demo-accounts-block");
+      if (bloc) bloc.style.display = "";
+      const hint = document.getElementById("demo-hint");
+      if (hint) hint.textContent = "(" + raison + ")";
+    }
   })();
 
   document.getElementById("login-form").addEventListener("submit", async (e)=>{
