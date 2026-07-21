@@ -224,9 +224,9 @@ label.pill-on{
           <div><label>Confirmer <span style="color:#2563EB">*</span></label><input type="password" id="u-pwd2" minlength="8" placeholder="Repeter" autocomplete="new-password"></div>
         </div>
       </div>
-      <div id="u-charte-box" style="margin-top:18px;background:#fff8f2;border:2px solid #fed7aa;border-radius:10px;padding:14px 16px;transition:background .15s,border-color .15s;">
+      <div id="u-charte-box" onclick="if(event.target.closest('a'))return; var cb=document.getElementById('u-charte'); if(event.target!==cb){event.preventDefault(); cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true}));}" style="margin-top:18px;background:#fff8f2;border:2px solid #fed7aa;border-radius:10px;padding:14px 16px;transition:background .15s,border-color .15s;cursor:pointer;">
         <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-size:13.5px;line-height:1.5;padding:4px;margin:-4px;">
-          <input type="checkbox" id="u-charte" onchange="document.getElementById('u-charte-box').style.background=this.checked?'#f0fdf4':'#fff8f2';document.getElementById('u-charte-box').style.borderColor=this.checked?'#16a34a':'#fed7aa';document.getElementById('u-charte-confirm').style.display=this.checked?'flex':'none';" style="margin-top:1px;accent-color:#16a34a;flex-shrink:0;width:24px;height:24px;cursor:pointer;">
+          <input type="checkbox" id="u-charte" onclick="event.stopPropagation();" onchange="document.getElementById('u-charte-box').style.background=this.checked?'#f0fdf4':'#fff8f2';document.getElementById('u-charte-box').style.borderColor=this.checked?'#16a34a':'#fed7aa';document.getElementById('u-charte-confirm').style.display=this.checked?'flex':'none';" style="margin-top:1px;accent-color:#16a34a;flex-shrink:0;width:24px;height:24px;cursor:pointer;">
           <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a>. Cet engagement est obligatoire pour créer un compte.</span>
         </label>
         <div id="u-charte-confirm" style="display:none;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #bbf7d0;color:#15803d;font-weight:700;font-size:12.5px;">✓ Lecture confirmée — vous pouvez créer votre compte.</div>
@@ -365,9 +365,9 @@ label.pill-on{
         </div>
       </div>
       <div class="notice" style="margin-top:16px">&#9888; La création de compte est gratuite.</div>
-      <div id="i-charte-box" style="margin-top:18px;background:#fff8f2;border:2px solid #fed7aa;border-radius:10px;padding:14px 16px;transition:background .15s,border-color .15s;">
+      <div id="i-charte-box" onclick="if(event.target.closest('a'))return; var cb=document.getElementById('i-charte'); if(event.target!==cb){event.preventDefault(); cb.checked=!cb.checked; cb.dispatchEvent(new Event('change',{bubbles:true}));}" style="margin-top:18px;background:#fff8f2;border:2px solid #fed7aa;border-radius:10px;padding:14px 16px;transition:background .15s,border-color .15s;cursor:pointer;">
         <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;font-size:13.5px;line-height:1.5;padding:4px;margin:-4px;">
-          <input type="checkbox" id="i-charte" onchange="document.getElementById('i-charte-box').style.background=this.checked?'#f0fdf4':'#fff8f2';document.getElementById('i-charte-box').style.borderColor=this.checked?'#16a34a':'#fed7aa';document.getElementById('i-charte-confirm').style.display=this.checked?'flex':'none';" style="margin-top:1px;accent-color:#16a34a;flex-shrink:0;width:24px;height:24px;cursor:pointer;">
+          <input type="checkbox" id="i-charte" onclick="event.stopPropagation();" onchange="document.getElementById('i-charte-box').style.background=this.checked?'#f0fdf4':'#fff8f2';document.getElementById('i-charte-box').style.borderColor=this.checked?'#16a34a':'#fed7aa';document.getElementById('i-charte-confirm').style.display=this.checked?'flex':'none';" style="margin-top:1px;accent-color:#16a34a;flex-shrink:0;width:24px;height:24px;cursor:pointer;">
           <span>J'ai lu et j'accepte la <a href="charte.html" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:underline;">Charte Institutionnelle de Diaspo'Actif</a>. Cet engagement est obligatoire pour créer un compte.</span>
         </label>
         <div id="i-charte-confirm" style="display:none;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #bbf7d0;color:#15803d;font-weight:700;font-size:12.5px;">✓ Lecture confirmée — vous pouvez créer votre compte.</div>
