@@ -927,6 +927,12 @@
   border: 3px solid #fff;
 }
 .mobile-bottom-nav__item--publish span:last-child { margin-top: 2px; }
+/* Le tiroir de menu (#sidebar) n'existe que pour le hamburger mobile.
+   Sur cette page (pas de mise en page .with-sidebar), il ne doit
+   jamais apparaître en permanence au-delà du point de rupture mobile. */
+@media (min-width: 681px) {
+  #sidebar, #sidebar-backdrop, #sidebar-toggle { display: none !important; }
+}
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
