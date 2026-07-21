@@ -3243,3 +3243,102 @@ document.addEventListener("DOMContentLoaded", ()=>{
   s.src = 'assets/support-technique.js';
   document.body.appendChild(s);
 })();
+
+/* ── Concentrateur d'assistance : fusionne Support technique + Chatbot + O-Z
+   en un seul bouton flottant (badge = nombre d'assistants disponibles),
+   pour ne pas encombrer l'écran de 3 icônes séparées sur mobile. Les 3
+   déclencheurs d'origine sont masqués (pas supprimés) et simplement
+   "cliqués" par code au choix dans le menu — aucune de leurs logiques
+   internes n'est dupliquée. ── */
+(function buildAssistantHub(){
+  var ASSISTANTS = [
+    {key:'support', label:'Signaler un problème', icon:'🛠️', sel:'#st-fab, #st-sidebar-link'},
+    {key:'chatbot', label:"Chatbot Diaspo'Actif", icon:'💬', sel:'#cb-fab'},
+    {key:'oz', label:'Assistant O-Z', icon:'🌍', sel:'#oz-bubble'}
+  ];
+  var found = {};
+  var hubBtn = null, hubMenu = null;
+
+  function buildHub(){
+    if (document.getElementById('assist-hub-fab')) return;
+    hubBtn = document.createElement('button');
+    hubBtn.id = 'assist-hub-fab';
+    hubBtn.type = 'button';
+    hubBtn.setAttribute('aria-label', "Assistance Diaspo'Actif");
+    hubBtn.innerHTML = '💬<span id="assist-hub-badge">0</span>';
+    hubBtn.addEventListener('click', function(e){ e.stopPropagation(); hubMenu.classList.toggle('open'); });
+    document.body.appendChild(hubBtn);
+
+    hubMenu = document.createElement('div');
+    hubMenu.id = 'assist-hub-menu';
+    document.body.appendChild(hubMenu);
+
+    var style = document.createElement('style');
+    style.textContent =
+      '#assist-hub-fab{position:fixed;bottom:20px;right:20px;z-index:1097;width:52px;height:52px;border-radius:50%;border:none;'+
+      'background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;font-size:22px;cursor:pointer;'+
+      'box-shadow:0 6px 18px rgba(37,99,235,.4);display:flex;align-items:center;justify-content:center;}'+
+      '#assist-hub-badge{position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:11px;font-weight:800;'+
+      'border-radius:50%;width:19px;height:19px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;}'+
+      '#assist-hub-menu{display:none;position:fixed;bottom:82px;right:20px;z-index:1097;background:#fff;border-radius:14px;'+
+      'box-shadow:0 8px 30px rgba(0,0,0,.22);overflow:hidden;min-width:230px;}'+
+      '#assist-hub-menu.open{display:block;}'+
+      '#assist-hub-menu button{width:100%;display:flex;align-items:center;gap:10px;padding:13px 16px;border:none;background:#fff;'+
+      'font-size:13.5px;font-weight:600;color:#0D2B4E;cursor:pointer;text-align:left;border-bottom:1px solid #eef2f8;}'+
+      '#assist-hub-menu button:last-child{border-bottom:none;}'+
+      '#assist-hub-menu button:hover{background:#f5f8fc;}'+
+      '#assist-hub-menu .ic{font-size:19px;}'+
+      '@media(max-width:600px){#assist-hub-fab{bottom:88px;right:14px;width:48px;height:48px;font-size:19px;}'+
+      '#assist-hub-menu{bottom:146px;right:14px;}}'+
+      '.assist-hub-hidden{display:none !important;}';
+    document.head.appendChild(style);
+
+    document.addEventListener('click', function(e){
+      if (hubMenu.classList.contains('open') && !hubMenu.contains(e.target) && e.target !== hubBtn) {
+        hubMenu.classList.remove('open');
+      }
+    });
+  }
+
+  function renderMenu(){
+    var keys = Object.keys(found);
+    hubMenu.innerHTML = ASSISTANTS.filter(function(a){ return found[a.key]; }).map(function(a){
+      return '<button type="button" data-key="'+a.key+'"><span class="ic">'+a.icon+'</span>'+a.label+'</button>';
+    }).join('');
+    hubMenu.querySelectorAll('button').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        hubMenu.classList.remove('open');
+        var a = ASSISTANTS.filter(function(x){ return x.key === btn.dataset.key; })[0];
+        var trigger = document.querySelector(a.sel);
+        if (trigger) setTimeout(function(){ trigger.click(); }, 0);
+      });
+    });
+    var badge = document.getElementById('assist-hub-badge');
+    if (badge) badge.textContent = keys.length;
+  }
+
+  var attempts = 0;
+  var poll = setInterval(function(){
+    attempts++;
+    var changed = false;
+    ASSISTANTS.forEach(function(a){
+      if (found[a.key]) return;
+      var el = document.querySelector(a.sel);
+      if (el) {
+        found[a.key] = true; changed = true;
+      }
+    });
+    // Réaffirmer la classe de masquage à chaque tour : _moveToSlots() peut
+    // réécrire style.cssText sur #cb-fab après coup et effacerait un simple
+    // style inline — une classe survit à ce remplacement.
+    ASSISTANTS.forEach(function(a){
+      if (!found[a.key]) return;
+      document.querySelectorAll(a.sel).forEach(function(x){ x.classList.add('assist-hub-hidden'); });
+    });
+    if (changed) {
+      buildHub();
+      renderMenu();
+    }
+    if (attempts > 24) clearInterval(poll);
+  }, 250);
+})();
