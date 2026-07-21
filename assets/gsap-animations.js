@@ -25,7 +25,9 @@
       y: -60, opacity: 0, duration: 0.5
     });
 
-    // Hero titre + sous-titre
+    // Hero titre + sous-titre — uniquement sur les pages qui ont un .hero
+    if (!document.querySelector('.hero')) return;
+
     tl.from('.hero h1, .hero h2', {
       y: 28, opacity: 0, duration: 0.55, stagger: 0.12
     }, '-=0.25');
