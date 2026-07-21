@@ -1406,6 +1406,9 @@
     p: i / CONNS.length,
     spd: 0.0015 + (i % 5) * 0.0003,
     trail: [],
+    /* Second point animé : même trajet, sens inverse (retour), déphasé pour ne pas se superposer au premier */
+    pRev: (i / CONNS.length + 0.5) % 1,
+    trailRev: [],
   }));
 
   /* Grille de fond (points terre simplifiés) */
@@ -1527,6 +1530,40 @@
       trail.push({x: bx, y: by});
       if (trail.length > 8) trail.shift();
       arcProg[i].p = nextP;
+
+      /* Second point animé : trajet retour (accueil→origine), même courbe parcourue en sens inverse */
+      const tr = 1 - arcProg[i].pRev;
+      const rx = (1-tr)*(1-tr)*from[0] + 2*(1-tr)*tr*mx + tr*tr*to[0];
+      const ry = (1-tr)*(1-tr)*from[1] + 2*(1-tr)*tr*my + tr*tr*to[1];
+
+      const trailRev = arcProg[i].trailRev;
+      trailRev.forEach((pos, ti) => {
+        const ratio = (ti + 1) / trailRev.length;
+        const alpha = Math.floor(ratio * 140).toString(16).padStart(2,'0');
+        const r = 1.2 + ratio * 1.4;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = conn.c + alpha;
+        ctx.fill();
+      });
+
+      ctx.shadowColor = conn.c;
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(rx, ry, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(rx, ry, 2, 0, Math.PI * 2);
+      ctx.fillStyle = conn.c;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      const nextPRev = (arcProg[i].pRev + arcProg[i].spd) % 1;
+      if (nextPRev < arcProg[i].pRev) trailRev.length = 0;
+      trailRev.push({x: rx, y: ry});
+      if (trailRev.length > 8) trailRev.shift();
+      arcProg[i].pRev = nextPRev;
     });
 
     /* Villes */
