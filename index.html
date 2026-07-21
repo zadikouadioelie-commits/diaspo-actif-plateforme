@@ -872,13 +872,61 @@
   .hp-hero-ctas {
     flex-direction: column;
     align-items: stretch;
+    margin: 0;
   }
   .hp-hero-ctas .hp-cta-primary,
   .hp-hero-ctas .hp-cta-secondary {
     justify-content: center;
     width: 100%;
+    min-height: 52px;
   }
+
+  /* Barre compacte : ☰ Diaspo'Actif 🔔 👤 */
+  .topbar-inner { justify-content: space-between; }
+  .logo { flex: 1; justify-content: center; text-align: center; }
+  #demo-test-btn, #premium-topbar-btn, .role-tag, #logout-link { display: none !important; }
+  .topbar-right .user-chip[href="messagerie.html"] { display: none; }
+  .topbar-right .user-chip:not([href="messagerie.html"]) { max-width: 34px; overflow: hidden; white-space: nowrap; }
+
+  /* Hero une colonne, réordonné : badge → titre → carte → description → boutons */
+  .hp-hero-inner { display: flex; flex-direction: column; gap: 28px; }
+  .hp-hero-text { display: contents; }
+  .hp-hero-eyebrow { order: 1; align-self: center; margin: 0; }
+  .hp-hero-title { order: 2; margin: 0; font-size: clamp(22px, 6.5vw, 30px); text-align: center; }
+  .hp-hero-map { order: 3; height: 260px; margin: 0; }
+  .hp-hero-sub { order: 4; margin: 0; text-align: center; }
+  .hp-hero-ctas { order: 5; }
+
+  /* Animations d'entrée, discrètes (respecte prefers-reduced-motion) */
+  .hp-hero-title, .hp-hero-map, .hp-hero-ctas {
+    animation: hpFadeUp .3s ease-out both;
+  }
+  .hp-hero-eyebrow { animation: hpFadeUp .25s ease-out both; }
+  .hp-hero-eyebrow { animation-delay: 0s; }
+  .hp-hero-title { animation-delay: .08s; }
+  .hp-hero-map { animation-delay: .16s; }
+  .hp-hero-sub { animation: hpFadeUp .25s ease-out both; animation-delay: .22s; }
+  .hp-hero-ctas { animation-delay: .28s; }
 }
+@keyframes hpFadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hp-hero-eyebrow, .hp-hero-title, .hp-hero-map, .hp-hero-sub, .hp-hero-ctas { animation: none !important; }
+}
+.mobile-bottom-nav__item--publish .nav-icon {
+  background: linear-gradient(135deg, #2563EB, #1d4ed8);
+  color: #fff;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px !important;
+  margin-top: -22px;
+  box-shadow: 0 4px 14px rgba(37,99,235,.45);
+  border: 3px solid #fff;
+}
+.mobile-bottom-nav__item--publish span:last-child { margin-top: 2px; }
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
@@ -888,6 +936,7 @@
 
   <header class="topbar">
     <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
       <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
       <nav class="nav">
         <a href="index.html" class="active">Accueil</a>
@@ -903,6 +952,20 @@
       </div>
     </div>
   </header>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+    <div class="brand">Diaspo'Actif</div>
+    <a href="index.html">🏠 Accueil</a>
+    <a href="annuaire.html">🔍 Annuaire</a>
+    <a href="fil-actualite.html">📰 Fil d'actualité</a>
+    <a href="actualites.html">📢 Actualités</a>
+    <a href="evenements.html">📅 Événements</a>
+    <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
+    <a href="premium.html" id="hb-premium-link">⭐ Passer Premium</a>
+    <div id="hb-account-section"></div>
+  </aside>
 
   <!-- ===== SECTION 1 : HERO ===== -->
   <section class="hp-hero">
@@ -2131,12 +2194,46 @@ document.getElementById('tm-never').addEventListener('click', async () => {
 
   <!-- ─── Mobile Bottom Navigation ─── -->
   <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
-    <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
-    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
-    <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
-    <a class="mobile-bottom-nav__item" href="evenements.html"><span class="nav-icon">📅</span><span>Événements</span></a>
-    <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
+    <a class="mobile-bottom-nav__item active" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">👥</span><span>Annuaire</span></a>
+    <a class="mobile-bottom-nav__item mobile-bottom-nav__item--publish" href="fil-actualite.html" id="mob-nav-publish"><span class="nav-icon">➕</span><span>Publier</span></a>
+    <a class="mobile-bottom-nav__item" href="#" id="mob-nav-alertes" onclick="return typeof openNotifDropdown==='function' ? (openNotifDropdown(this), false) : true;"><span class="nav-icon">🔔</span><span>Alertes</span></a>
+    <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Profil</span></a>
   </nav>
+<script>
+(function(){
+  // Section compte du menu latéral mobile + lien "Profil" de la barre du bas :
+  // adaptés selon l'état de connexion (indépendant du timing d'applyAuthState).
+  function render(user){
+    var box = document.getElementById('hb-account-section');
+    var navLogin = document.getElementById('mob-nav-login');
+    if (!box) return;
+    if (user){
+      var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
+      var dashHref = dash[user.role] || 'index.html';
+      box.innerHTML =
+        '<a href="' + dashHref + '#apparence">⚙️ Paramètres</a>' +
+        '<a href="#" id="hb-logout-link">🚪 Déconnexion</a>';
+      var out = document.getElementById('hb-logout-link');
+      if (out) out.addEventListener('click', function(e){
+        e.preventDefault();
+        fetch('/api/auth/logout', {method:'POST', credentials:'same-origin'}).finally(function(){
+          window.location.href = 'index.html';
+        });
+      });
+      if (navLogin) navLogin.href = dashHref;
+    } else {
+      box.innerHTML =
+        '<a href="login.html">🔑 Se connecter</a>' +
+        '<a href="inscription.html">✨ Créer un compte</a>';
+    }
+  }
+  fetch('/api/auth/me', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ render(d && d.user ? d.user : null); })
+    .catch(function(){ render(null); });
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
