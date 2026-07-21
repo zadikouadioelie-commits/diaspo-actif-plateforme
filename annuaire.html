@@ -171,6 +171,11 @@
   .ann-stat-band-inner{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
   .ann-stat-band-inner::-webkit-scrollbar{display:none;}
   .ann-stat-chip{padding:12px 16px;font-size:12.5px;flex:none;}
+  .topbar-inner{justify-content:space-between;}
+  .logo{flex:1;justify-content:center;text-align:center;}
+}
+@media(min-width:681px){
+  #sidebar, #sidebar-backdrop, #sidebar-toggle{display:none!important;}
 }
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
@@ -181,6 +186,7 @@
 
   <header class="topbar">
     <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
       <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
       <nav class="nav">
         <a href="index.html">Accueil</a>
@@ -195,6 +201,20 @@
       </div>
     </div>
   </header>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+    <div class="brand">Diaspo'Actif</div>
+    <a href="index.html">🏠 Accueil</a>
+    <a href="annuaire.html">🔍 Annuaire</a>
+    <a href="fil-actualite.html">📰 Fil d'actualité</a>
+    <a href="actualites.html">📢 Actualités</a>
+    <a href="evenements.html">📅 Événements</a>
+    <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
+    <a href="premium.html">⭐ Passer Premium</a>
+    <div id="hb-account-section"></div>
+  </aside>
 
   <!-- ===== HERO ===== -->
   <div class="ann-hero">
@@ -342,11 +362,35 @@
   <!-- ─── Mobile Bottom Navigation ─── -->
   <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
     <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
-    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+    <a class="mobile-bottom-nav__item active" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
     <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
     <a class="mobile-bottom-nav__item" href="evenements.html"><span class="nav-icon">📅</span><span>Événements</span></a>
     <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
   </nav>
+  <script>
+  (function(){
+    function render(user){
+      var box = document.getElementById('hb-account-section');
+      var navLogin = document.getElementById('mob-nav-login');
+      if (!box) return;
+      if (user){
+        var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
+        var dashHref = dash[user.role] || 'index.html';
+        box.innerHTML = '<a href="' + dashHref + '#apparence">⚙️ Paramètres</a><a href="#" id="hb-logout-link">🚪 Déconnexion</a>';
+        var out = document.getElementById('hb-logout-link');
+        if (out) out.addEventListener('click', function(e){
+          e.preventDefault();
+          fetch('/api/auth/logout', {method:'POST', credentials:'same-origin'}).finally(function(){ window.location.href = 'index.html'; });
+        });
+        if (navLogin) navLogin.href = dashHref;
+      } else {
+        box.innerHTML = '<a href="login.html">🔑 Se connecter</a><a href="inscription.html">✨ Créer un compte</a>';
+      }
+    }
+    fetch('/api/auth/me', {credentials:'same-origin'}).then(function(r){ return r.json(); })
+      .then(function(d){ render(d && d.user ? d.user : null); }).catch(function(){ render(null); });
+  })();
+  </script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>

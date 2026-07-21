@@ -388,6 +388,9 @@ button{font-family:inherit;cursor:pointer;}
     mask-image:linear-gradient(to right,transparent,#000 12px);
   }
   .topbar-right::-webkit-scrollbar{display:none;}
+  /* Sur mobile, la barre du haut ne garde que l'essentiel (connexion/notifs/profil) */
+  #demo-test-btn, #premium-topbar-btn, .role-tag, #logout-link, #ia-slots{display:none!important;}
+  .topbar-right .user-chip[href="messagerie.html"]{display:none;}
   .topbar-right>*{flex:none;}
 
   /* Sidebar : tiroir hors-écran */
