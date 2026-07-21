@@ -90,8 +90,7 @@
       const updateFabVisibility = () => {
         const heroBottom = hero.getBoundingClientRect().bottom;
         const pastHero = heroBottom <= 0;
-        btn.style.opacity = pastHero ? "1" : "0";
-        btn.style.pointerEvents = pastHero ? "auto" : "none";
+        btn.style.display = pastHero ? "flex" : "none";
       };
       updateFabVisibility();
       window.addEventListener("scroll", updateFabVisibility, { passive: true });
