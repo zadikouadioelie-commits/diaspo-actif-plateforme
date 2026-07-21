@@ -378,10 +378,17 @@ button{font-family:inherit;cursor:pointer;}
   /* Topbar compact */
   .topbar-inner{padding:10px 14px;gap:10px;flex-wrap:nowrap;}
   .nav{display:none;}
+  .logo{flex:none;}
   .logo small{display:none;}
   .lang-select{display:none;}
   .sidebar-toggle{display:block;}
-  .topbar-right{gap:8px;}
+  .topbar-right{
+    gap:8px;flex-wrap:nowrap;min-width:0;overflow-x:auto;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none;
+    mask-image:linear-gradient(to right,transparent,#000 12px);
+  }
+  .topbar-right::-webkit-scrollbar{display:none;}
+  .topbar-right>*{flex:none;}
 
   /* Sidebar : tiroir hors-écran */
   .with-sidebar{flex-direction:column;position:relative;}
