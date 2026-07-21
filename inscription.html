@@ -640,6 +640,7 @@ document.getElementById("success-identity-btn")?.addEventListener("click",async(
   }catch(err){
     errBox.textContent=err.message||"Vérification impossible pour le moment.";
     errBox.style.display="block"; btn.disabled=false; btn.textContent="🔐 Vérifier maintenant";
+    errBox.scrollIntoView({block:"center"});
   }
 });
 function goToStep(step){
@@ -703,6 +704,7 @@ async function submitForm(btnId,errId,body){
   }catch(err){
     errBox.textContent=err.message||"Inscription impossible.";
     errBox.style.display="block";btn.disabled=false;btn.textContent=orig;
+    errBox.scrollIntoView({block:"center"});
   }
 }
 function req(v,label){if(!v)throw new Error("Le champ « "+label+" » est obligatoire.");}
@@ -740,7 +742,7 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
       publics:[...document.querySelectorAll('.u-public:checked')].map(c=>c.value),
       besoins:[...document.querySelectorAll('.u-besoin:checked')].map(c=>c.value)
     });
-  }catch(e){const eb=document.getElementById("u-error");eb.textContent=e.message;eb.style.display="block";}
+  }catch(e){const eb=document.getElementById("u-error");eb.textContent=e.message;eb.style.display="block";eb.scrollIntoView({block:"center"});}
 });
 document.getElementById("i-submit").addEventListener("click",async()=>{
   try{
@@ -787,7 +789,7 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       besoins:[...document.querySelectorAll('.i-besoin:checked')].map(c=>c.value),
       annee_creation:document.getElementById("i-annee-creation").value||null
     });
-  }catch(e){const eb=document.getElementById("i-error");eb.textContent=e.message;eb.style.display="block";}
+  }catch(e){const eb=document.getElementById("i-error");eb.textContent=e.message;eb.style.display="block";eb.scrollIntoView({block:"center"});}
 });
 /* ===== Rayonnement + territoires dynamiques ===== */
 function refreshRayPills(){
