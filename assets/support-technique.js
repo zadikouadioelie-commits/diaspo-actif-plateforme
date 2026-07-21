@@ -76,10 +76,27 @@
         background:linear-gradient(135deg,#DC2626,#991B1B);color:#fff;
         font-size:22px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.28);
         display:flex;align-items:center;justify-content:center;
+        opacity:1;transition:opacity .2s ease;
       }
       @media (max-width:600px){ #st-fab{ bottom:88px; left:14px; width:44px; height:44px; font-size:19px; } }
     `;
     document.head.appendChild(style);
+
+    /* Sur les pages avec un grand hero (accueil…), le bouton flottant peut
+       chevaucher les boutons d'action du hero sur mobile. On le masque
+       tant qu'on n'a pas dépassé le hero, pour ne rien bloquer visuellement. */
+    const hero = document.querySelector(".hero, .hp-hero");
+    if (hero && window.innerWidth <= 600) {
+      const updateFabVisibility = () => {
+        const heroBottom = hero.getBoundingClientRect().bottom;
+        const pastHero = heroBottom <= 0;
+        btn.style.opacity = pastHero ? "1" : "0";
+        btn.style.pointerEvents = pastHero ? "auto" : "none";
+      };
+      updateFabVisibility();
+      window.addEventListener("scroll", updateFabVisibility, { passive: true });
+      window.addEventListener("resize", updateFabVisibility);
+    }
   }
 
   function buildModal() {
