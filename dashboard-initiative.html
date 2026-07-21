@@ -84,7 +84,7 @@
       <a href="agenda.html">📅 Mon Agenda</a>
       <a href="reseau.html">🌐 Mon Réseau Pro <span class="pill" id="reseau-badge" style="display:none;"></span></a>
       <a href="reunions.html">📹 Visioconférence</a>
-      <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a>
+      <!-- Désactivé temporairement : intégration réelle des API réseaux sociaux pas encore branchée. <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a> -->
       <a href="centre-financier.html">💰 Centre Financier</a>
 
       <div class="sb-group-lbl">07 — COLLABORATION</div>
@@ -2835,17 +2835,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>
         </div>
       </div>
+      <!-- Désactivé temporairement : intégration réelle des API réseaux sociaux pas encore branchée.
       <div class="card" style="margin-top:16px;" id="cockpit-social-sync-card">
         <h3 style="margin:0 0 12px;font-size:15px;">🔄 Synchronisation réseaux sociaux</h3>
         <div id="cockpit-social-sync-body" style="font-size:13px;color:var(--muted);">Chargement…</div>
       </div>
+      -->
       <div class="card" style="margin-top:16px;" id="cockpit-financier-card">
         <h3 style="margin:0 0 12px;font-size:15px;">💰 Centre Financier</h3>
         <div id="cockpit-financier-body" style="font-size:13px;color:var(--muted);">Chargement…</div>
       </div>
     </div>`;
     content.insertAdjacentHTML('afterbegin', cockpitHTML);
-    loadCockpitSocialSyncWidget();
     loadCockpitFinancierWidget();
 
     // QR code vers la vitrine publique (profil.html?id=<owner>#vitrine)
