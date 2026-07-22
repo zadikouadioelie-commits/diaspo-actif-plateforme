@@ -513,7 +513,7 @@ async function applyAuthState() {
         <div class="notif-dropdown" id="notif-dropdown"></div>
       </div>
       <a href="${ROLE_DASHBOARD[user.role] || '#'}" class="user-chip" style="text-decoration:none;">
-        <div class="avatar">${photoAvatar(user.nom, 30)}</div> ${user.nom}
+        <div class="avatar">${user.photo_url ? `<img src="${user.photo_url}" alt="${user.nom}" style="width:30px;height:30px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">` : photoAvatar(user.nom, 30)}</div> ${user.nom}
       </a>
       <span class="role-tag">${ROLE_LABEL_FR[user.role] || user.role}</span>
       <a href="#" id="logout-link" class="btn btn-sm btn-outline" style="color:#000;">Déconnexion</a>`;
