@@ -4768,7 +4768,7 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
 
   const rows = await db.prepare(`
     SELECT c.*,
-      u.nom AS avec_nom, u.role AS avec_role, u.ville AS avec_ville,
+      u.nom AS avec_nom, u.role AS avec_role, u.ville AS avec_ville, u.photo_url AS avec_photo,
       (SELECT contenu FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere,
       (SELECT type FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere_type,
       (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere_date,

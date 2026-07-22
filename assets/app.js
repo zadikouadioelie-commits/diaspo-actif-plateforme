@@ -108,16 +108,19 @@ window.showCertifModal = function(niveau) {
 })();
 /* ========== FIN BADGE ========== */
 
-/* ---------- Avatars photo (DiceBear) ---------- */
-function photoAvatar(name, size=48, type='user') {
+/* ---------- Avatars photo (DiceBear, ou vraie photo/logo si disponible) ---------- */
+function photoAvatar(name, size=48, type='user', photoUrl=null) {
+  if (photoUrl) {
+    return `<img src="${photoUrl}" alt="${name||'?'}" style="width:${size}px;height:${size}px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">`;
+  }
   const seed = encodeURIComponent((name||'?').trim());
   const url = type === 'initiative'
     ? `https://api.dicebear.com/7.x/initials/svg?seed=${seed}&backgroundColor=1B3A6B,1565C0,24487E&fontColor=ffffff&fontSize=38`
     : `https://api.dicebear.com/7.x/lorelei/svg?seed=${seed}&backgroundColor=E8F1FC,dde3ec`;
   return `<img src="${url}" alt="${name||'?'}" style="width:${size}px;height:${size}px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">`;
 }
-function avatarDiv(name, size=48, type='user', extraStyle='') {
-  return `<div class="init-logo" style="width:${size}px;height:${size}px;${extraStyle}">${photoAvatar(name, size, type)}</div>`;
+function avatarDiv(name, size=48, type='user', extraStyle='', photoUrl=null) {
+  return `<div class="init-logo" style="width:${size}px;height:${size}px;${extraStyle}">${photoAvatar(name, size, type, photoUrl)}</div>`;
 }
 
 /* Badge de messages non lus dans la topbar */
@@ -813,7 +816,7 @@ async function initAnnuaire(){
     return `
     <div class="ann-card" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
       <div class="ann-card-photo" style="position:relative;display:flex;align-items:center;justify-content:center;background:#f1f5f9;">
-        ${photoAvatar([u.prenom,u.nom].filter(Boolean).join(' ')||u.nom, 96, 'user')}
+        ${photoAvatar([u.prenom,u.nom].filter(Boolean).join(' ')||u.nom, 96, 'user', u.photo_url)}
         <span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>
       </div>
       <div class="ann-card-body">
@@ -834,7 +837,7 @@ async function initAnnuaire(){
     return `
     <div class="ann-card" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
       <div class="ann-card-photo" style="position:relative;display:flex;align-items:center;justify-content:center;background:#f1f5f9;">
-        ${photoAvatar(o.nom, 96, 'user')}
+        ${photoAvatar(o.nom, 96, 'user', o.photo_url)}
         <span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>
       </div>
       <div class="ann-card-body">
@@ -1098,7 +1101,7 @@ async function initFicheInitiative(){
     <div class="profile-card">
       <div class="profile-cover"></div>
       <div class="profile-head">
-        <div class="init-logo" style="width:64px;height:64px;">${photoAvatar(it.nom, 64, 'initiative')}</div>
+        <div class="init-logo" style="width:64px;height:64px;">${photoAvatar(it.nom, 64, 'initiative', it.logo_url)}</div>
         <div style="flex:1;">
           <div class="flex-between">
             <div>
@@ -1156,7 +1159,7 @@ async function initMessagerie(){
       }
       cv.innerHTML = convs.slice(0,4).map(c=>`
         <a href="messagerie.html" style="text-decoration:none;display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center;">
-          <div class="avatar" style="flex-shrink:0;width:36px;height:36px;">${photoAvatar(c.avec_nom||'?', 36)}</div>
+          <div class="avatar" style="flex-shrink:0;width:36px;height:36px;">${photoAvatar(c.avec_nom||'?', 36, 'user', c.avec_photo)}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-weight:700;font-size:13px;${c.non_lus>0?'color:var(--orange);':''}">${c.avec_nom||"Utilisateur"} ${c.non_lus>0?`<span style="background:var(--orange);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;">${c.non_lus}</span>`:''}</div>
             <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.derniere||"Nouvelle conversation"}</div>
@@ -1335,7 +1338,7 @@ async function initDashboardUtilisateur(){
         const r = await api("GET", "/conversations");
         cv.innerHTML = r.conversations.length ? r.conversations.map(c=>`
           <a class="init-card" href="messagerie.html?conv=${c.id}" style="margin-bottom:10px;">
-            <div class="init-logo">${photoAvatar(c.avec_nom||'?', 48)}</div>
+            <div class="init-logo">${photoAvatar(c.avec_nom||'?', 48, 'user', c.avec_photo)}</div>
             <div class="meta"><h4>${c.avec_nom || "Utilisateur"}</h4><p>${c.derniere || "Nouvelle conversation"}</p></div>
           </a>`).join("") : `<div class="empty">Aucune conversation pour le moment.</div>`;
       }
@@ -1997,7 +2000,7 @@ async function initFilActualite(){
       pubBox.innerHTML = `
 <div class="composer card">
   <div class="composer-trigger">
-    <div class="ct-av">${photoAvatar(me.nom, 42)}</div>
+    <div class="ct-av">${photoAvatar(me.nom, 42, 'user', me.photo_url)}</div>
     <button class="ct-ph" id="comp-open-btn">Que souhaitez-vous partager ?</button>
   </div>
   <div class="composer-type-bar">
@@ -2008,7 +2011,7 @@ async function initFilActualite(){
   </div>
   <div class="composer-form" id="comp-form">
     <div class="composer-head">
-      <div class="ch-av">${photoAvatar(me.nom, 40)}</div>
+      <div class="ch-av">${photoAvatar(me.nom, 40, 'user', me.photo_url)}</div>
       <div>
         <div class="ch-name">${me.nom}</div>
         <div class="ch-cat">
@@ -2759,7 +2762,7 @@ function renderProfilUtilisateur(vm){
     <div class="card" style="margin-bottom:20px;">
       <div class="flex-between" style="align-items:flex-start;flex-wrap:wrap;gap:14px;">
         <div style="display:flex;gap:14px;align-items:center;">
-          <div class="avatar" style="width:64px;height:64px;font-size:22px;">${photoAvatar(vm.nom, 64)}</div>
+          <div class="avatar" style="width:64px;height:64px;font-size:22px;">${photoAvatar(vm.nom, 64, 'user', vm.photo_url)}</div>
           <div>
             <h2 style="margin:0 0 4px;">${vm.nom} ${vm.verifie ? '<span class="tag" style="background:#E7F4EE;color:var(--green);border-color:#cdeede;">✅ Profil vérifié</span>' : ''}</h2>
             <p style="margin:0;color:var(--muted);">${vm.statut_professionnel || ""}${vm.ville ? " · "+vm.ville : ""}</p>
@@ -2915,6 +2918,7 @@ function buildProfilViewModel(u){
   const pr = u.profil || {};
   return {
     nom: pr.nom || u.nom,
+    photo_url: u.photo_url || null,
     statut_professionnel: pr.statut_professionnel || (pr.profession && pr.profession.situation) || ROLE_LABEL_FR[u.role] || u.role,
     ville: pr.ville || u.ville || "",
     verifie: pr.verifie !== undefined ? pr.verifie : true,
