@@ -681,10 +681,12 @@ async function executerSuppressionCompte(userId, drId) {
 
   await db.prepare("DELETE FROM sessions WHERE user_id=?").run(userId);
 
-  await db.prepare(`INSERT INTO deletion_request_history (deletion_request_id,action,note) VALUES (?,?,?)`)
-    .run(drId, "suppression_effective", null);
+  if (drId) {
+    await db.prepare(`INSERT INTO deletion_request_history (deletion_request_id,action,note) VALUES (?,?,?)`)
+      .run(drId, "suppression_effective", null);
+  }
 
-  SEC.logSecurity("account_deletion_executed", { uid: userId, deletion_request_id: drId });
+  SEC.logSecurity("account_deletion_executed", { uid: userId, deletion_request_id: drId || null });
 }
 
 /* POST /api/deletion-requests — soumet une demande de suppression définitive */
@@ -9052,7 +9054,14 @@ route("DELETE", "/api/admin/membres/:id", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   if (Number(params.id) === user.id) return sendJSON(res, 400, { error: "Impossible de supprimer votre propre compte." });
-  await db.prepare("DELETE FROM users WHERE id=?").run(params.id);
+  const cible = await db.prepare("SELECT id FROM users WHERE id=?").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  /* Anonymisation, pas suppression physique : la table users est référencée par 122 clés
+     étrangères (moitié seulement en ON DELETE CASCADE) — un vrai DELETE FROM users échoue
+     ou casse l'intégrité dès qu'un compte a la moindre activité. Même logique que
+     l'auto-suppression RGPD (DELETE /api/auth/account), voir executerSuppressionCompte(). */
+  await executerSuppressionCompte(params.id, null);
+  SEC.logSecurity("admin_membre_supprime", { admin_id: user.id, cible_id: Number(params.id) });
   sendJSON(res, 200, { ok: true });
 });
 
