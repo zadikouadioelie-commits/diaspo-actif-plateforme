@@ -6100,11 +6100,6 @@ function goSection(name){
   if(lnk) lnk.classList.add('active');
 }
 
-/* ── Réseau Professionnel — chargement à l'ouverture ── */
-document.querySelectorAll(".sidebar a[data-section='reseau-pro']").forEach(a => {
-  a.addEventListener('click', () => setTimeout(() => loadReseauPro(), 80));
-});
-
 /* ── Diaspora Données Statistiques ── */
 let _dsData = null;
 
@@ -6542,6 +6537,7 @@ async function submitAccordDirect(){
     'temoignages-admin':   () => loadTemoignagesAdmin(),
     parametres:  () => loadParametres(),
     membres:     () => loadAdminMembres(),
+    'reseau-pro': () => loadReseauPro(),
     initiatives: () => loadAdminInitiatives(),
     chatbot:     () => switchCbTab('stats'),
     billetterie: () => loadAdminBilletterie(),
@@ -8485,6 +8481,7 @@ async function submitAccordDirect(){
   // ══ MEMBRES ═════════════════════════════════════════════════
   async function loadAdminMembres() {
     const el = document.getElementById('membres-list');
+    const fmtDate = s => { if(!s) return '—'; const d=new Date(s); const M=['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']; return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`; };
     el.innerHTML = '<div class="notice">Chargement…</div>';
     try {
       const { membres = [] } = await api('GET', '/admin/membres');
