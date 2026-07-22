@@ -2764,9 +2764,16 @@
 
       <!-- MEMBRES -->
       <section id="section-membres" style="display:none;">
-        <h2>Gestion des membres</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+          <h2 style="margin:0;">Gestion des membres</h2>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm btn-orange" id="membres-tab-actifs" onclick="switchMembresTab('actifs')">👥 Membres</button>
+            <button class="btn btn-sm btn-outline" id="membres-tab-historique" onclick="switchMembresTab('historique')">🕘 Historique des suppressions</button>
+          </div>
+        </div>
         <div class="notice">Cette section affiche les membres inscrits sur la plateforme. Les données personnelles sont affichées en lecture seule pour l'administrateur. Seul l'utilisateur peut modifier son profil.</div>
         <div id="membres-list" style="margin-top:16px;"><div class="notice">Chargement…</div></div>
+        <div id="membres-historique-list" style="margin-top:16px;display:none;"></div>
       </section>
 
       <!-- RÉSEAU PROFESSIONNEL -->
@@ -8532,6 +8539,55 @@ async function submitAccordDirect(){
   }
   window.adminValiderMembre = adminValiderMembre;
   window.adminSupprimerMembre = adminSupprimerMembre;
+
+  function switchMembresTab(tab) {
+    const btnActifs = document.getElementById('membres-tab-actifs');
+    const btnHisto  = document.getElementById('membres-tab-historique');
+    const listActifs = document.getElementById('membres-list');
+    const listHisto  = document.getElementById('membres-historique-list');
+    if (tab === 'historique') {
+      btnActifs.className = 'btn btn-sm btn-outline';
+      btnHisto.className  = 'btn btn-sm btn-orange';
+      listActifs.style.display = 'none';
+      listHisto.style.display = '';
+      loadMembresHistorique();
+    } else {
+      btnActifs.className = 'btn btn-sm btn-orange';
+      btnHisto.className  = 'btn btn-sm btn-outline';
+      listActifs.style.display = '';
+      listHisto.style.display = 'none';
+    }
+  }
+  window.switchMembresTab = switchMembresTab;
+
+  async function loadMembresHistorique() {
+    const el = document.getElementById('membres-historique-list');
+    const fmtDate = s => { if(!s) return '—'; const d=new Date(s); const M=['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']; return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()} à ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+    el.innerHTML = '<div class="notice">Chargement…</div>';
+    try {
+      const { historique = [] } = await api('GET', '/admin/membres/historique-suppressions');
+      if (!historique.length) { el.innerHTML = '<div class="notice">Aucune suppression enregistrée.</div>'; return; }
+      el.innerHTML = `
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="border-bottom:2px solid var(--border);">
+              <th style="padding:8px;text-align:left;">Compte (id)</th>
+              <th style="padding:8px;text-align:left;">Rôle</th>
+              <th style="padding:8px;text-align:left;">Supprimé par</th>
+              <th style="padding:8px;text-align:left;">Date</th>
+            </tr></thead>
+            <tbody>${historique.map(h => `
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px;font-weight:600;">#${h.user_id}</td>
+                <td style="padding:8px;">${esc(h.role||'—')}</td>
+                <td style="padding:8px;">${esc(h.admin_nom||'—')}</td>
+                <td style="padding:8px;color:var(--muted);">${fmtDate(h.created_at)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    } catch(e) { el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  }
 
   // ══ INITIATIVES ADMIN ════════════════════════════════════════
   async function loadAdminInitiatives() {

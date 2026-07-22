@@ -2138,6 +2138,17 @@ db.exec(`
     created_at  TEXT DEFAULT (datetime('now'))
   );
 
+  /* ── Historique des suppressions directes par un admin (bouton "Suppr." de Gestion des membres),
+     distinct du workflow RGPD "Demandes de suppression" (deletion_requests) initié par l'utilisateur ── */
+  CREATE TABLE IF NOT EXISTS admin_suppressions_membres (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    role       TEXT,
+    admin_id   INTEGER,
+    admin_nom  TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   /* ── Demandes de suppression définitive de compte (RGPD, workflow admin) ── */
   CREATE TABLE IF NOT EXISTS deletion_requests (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,

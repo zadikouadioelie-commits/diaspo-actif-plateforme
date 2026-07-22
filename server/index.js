@@ -9041,7 +9041,9 @@ route("GET", "/api/admin/membres", async (req, res, params, body, query) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const role = query.role || null;
   const q = query.q ? `%${query.q}%` : null;
-  let sql = "SELECT id,nom,prenom,email,telephone,role,ville,pays,statut_verification,created_at FROM users WHERE 1=1";
+  // Les comptes déjà anonymisés (email @diaspoactif.invalid) ne sont plus des "membres" à gérer —
+  // ils apparaissent uniquement dans l'historique des suppressions (voir route dédiée ci-dessous).
+  let sql = "SELECT id,nom,prenom,email,telephone,role,ville,pays,statut_verification,created_at FROM users WHERE email NOT LIKE '%@diaspoactif.invalid'";
   const args = [];
   if (role) { sql += " AND role=?"; args.push(role); }
   if (q) { sql += " AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ?)"; args.push(q, q, q); }
@@ -9050,17 +9052,28 @@ route("GET", "/api/admin/membres", async (req, res, params, body, query) => {
   sendJSON(res, 200, { membres: rows });
 });
 
+/* GET /api/admin/membres/historique-suppressions — journal des comptes supprimés par un admin
+   (distinct des "Demandes de suppression" RGPD initiées par l'utilisateur lui-même). */
+route("GET", "/api/admin/membres/historique-suppressions", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const rows = await db.prepare("SELECT * FROM admin_suppressions_membres ORDER BY created_at DESC LIMIT 200").all();
+  sendJSON(res, 200, { historique: rows });
+});
+
 route("DELETE", "/api/admin/membres/:id", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   if (Number(params.id) === user.id) return sendJSON(res, 400, { error: "Impossible de supprimer votre propre compte." });
-  const cible = await db.prepare("SELECT id FROM users WHERE id=?").get(params.id);
+  const cible = await db.prepare("SELECT id, role FROM users WHERE id=?").get(params.id);
   if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
   /* Anonymisation, pas suppression physique : la table users est référencée par 122 clés
      étrangères (moitié seulement en ON DELETE CASCADE) — un vrai DELETE FROM users échoue
      ou casse l'intégrité dès qu'un compte a la moindre activité. Même logique que
      l'auto-suppression RGPD (DELETE /api/auth/account), voir executerSuppressionCompte(). */
   await executerSuppressionCompte(params.id, null);
+  await db.prepare("INSERT INTO admin_suppressions_membres (user_id, role, admin_id, admin_nom) VALUES (?,?,?,?)")
+    .run(Number(params.id), cible.role, user.id, user.nom);
   SEC.logSecurity("admin_membre_supprime", { admin_id: user.id, cible_id: Number(params.id) });
   sendJSON(res, 200, { ok: true });
 });
