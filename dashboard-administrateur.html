@@ -8530,6 +8530,8 @@ async function submitAccordDirect(){
     await api('DELETE', `/admin/membres/${id}`).catch(e => alert(e.message));
     loadAdminMembres();
   }
+  window.adminValiderMembre = adminValiderMembre;
+  window.adminSupprimerMembre = adminSupprimerMembre;
 
   // ══ INITIATIVES ADMIN ════════════════════════════════════════
   async function loadAdminInitiatives() {
