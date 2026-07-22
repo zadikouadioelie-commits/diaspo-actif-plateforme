@@ -10415,12 +10415,12 @@ route("POST", "/api/session/heartbeat", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 200, { ok: false });
   const secs = Math.min(Math.max(parseInt(body.secs) || 30, 1), 120);
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO user_sessions (user_id, date, duree_sec) VALUES (?, date('now'), ?)
-    ON CONFLICT(user_id, date) DO UPDATE SET duree_sec = duree_sec + excluded.duree_sec
+    ON CONFLICT(user_id, date) DO UPDATE SET duree_sec = user_sessions.duree_sec + excluded.duree_sec
   `).run(user.id, secs);
   // Aussi tracer l'activité du jour
-  db.prepare("INSERT OR IGNORE INTO user_activity (user_id, date) VALUES (?, date('now'))").run(user.id);
+  await db.prepare("INSERT OR IGNORE INTO user_activity (user_id, date) VALUES (?, date('now'))").run(user.id);
   sendJSON(res, 200, { ok: true });
 });
 
