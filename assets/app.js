@@ -3166,6 +3166,92 @@ document.addEventListener("DOMContentLoaded", ()=>{
     });
   })();
 
+  // ── Barre de recherche des modules (sidebar) : suggestions floues au fil de la frappe
+  (function initSidebarSearch() {
+    const sidebar = document.querySelector(".sidebar");
+    const brand = sidebar && sidebar.querySelector(".brand");
+    if (!sidebar || !brand || sidebar.querySelector(".sb-search-wrap")) return;
+
+    function sbNormalize(s) {
+      return (s || "").normalize("NFD").replace(new RegExp("[\\u0300-\\u036f]", "g"), "").replace(/[^\p{L}\p{N}\s]/gu, "").toLowerCase().trim();
+    }
+    function sbEsc(s) { return (s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+    function sbScore(text, query) {
+      if (!query) return 0;
+      if (text === query) return 100;
+      if (text.startsWith(query)) return 90;
+      if (text.includes(query)) return 70;
+      const words = text.split(/\s+/);
+      if (words.some(w => w.startsWith(query))) return 60;
+      if (words.some(w => w.includes(query))) return 45;
+      // Correspondance approximative : les lettres de la recherche apparaissent dans l'ordre
+      let ti = 0;
+      for (let qi = 0; qi < query.length; qi++) {
+        const idx = text.indexOf(query[qi], ti);
+        if (idx === -1) return 0;
+        ti = idx + 1;
+      }
+      return 20;
+    }
+
+    const links = Array.from(sidebar.querySelectorAll("a")).filter(a => a.id !== "sidebar-close");
+    const items = links.map(a => {
+      const clone = a.cloneNode(true);
+      clone.querySelectorAll("span").forEach(s => s.remove());
+      const label = (clone.textContent || "").trim();
+      return { el: a, label, norm: sbNormalize(label) };
+    }).filter(it => it.label);
+    if (!items.length) return;
+
+    const wrap = document.createElement("div");
+    wrap.className = "sb-search-wrap";
+    wrap.style.cssText = "position:relative;padding:0 0 14px;";
+    wrap.innerHTML = `
+      <input type="text" id="sb-search-input" placeholder="🔍 Rechercher un module…" autocomplete="off"
+        style="width:100%;box-sizing:border-box;padding:11px 13px;border-radius:10px;border:none;background:#fff;color:#0D2B4E;font-size:14px;font-weight:600;outline:none;">
+      <div class="sb-search-results" style="display:none;position:absolute;left:0;right:0;top:calc(100% - 10px);background:#fff;border-radius:10px;box-shadow:0 14px 30px rgba(0,0,0,.35);z-index:60;max-height:320px;overflow-y:auto;"></div>
+    `;
+    brand.insertAdjacentElement("afterend", wrap);
+
+    const input = wrap.querySelector("#sb-search-input");
+    const results = wrap.querySelector(".sb-search-results");
+
+    function renderResults(matches) {
+      if (!matches.length) {
+        results.innerHTML = `<div style="padding:12px 14px;font-size:13px;color:#8a8f9c;">Aucun module trouvé.</div>`;
+      } else {
+        results.innerHTML = matches.map((m, i) => `<div class="sb-search-item" data-idx="${i}" style="padding:10px 14px;font-size:13.5px;font-weight:600;color:#0D2B4E;cursor:pointer;border-bottom:1px solid #eef0f4;">${sbEsc(m.label)}</div>`).join("");
+        results.querySelectorAll(".sb-search-item").forEach((row, i) => {
+          row.addEventListener("mouseenter", () => row.style.background = "#f3f4f7");
+          row.addEventListener("mouseleave", () => row.style.background = "");
+          row.addEventListener("mousedown", e => {
+            e.preventDefault();
+            matches[i].el.click();
+            input.value = "";
+            results.style.display = "none";
+            results.innerHTML = "";
+          });
+        });
+      }
+      results.style.display = "block";
+    }
+
+    input.addEventListener("input", () => {
+      const q = sbNormalize(input.value);
+      if (!q) { results.style.display = "none"; results.innerHTML = ""; return; }
+      const matches = items.map(it => ({ ...it, score: sbScore(it.norm, q) }))
+        .filter(it => it.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8);
+      renderResults(matches);
+    });
+    input.addEventListener("focus", () => { if (input.value.trim()) results.style.display = "block"; });
+    input.addEventListener("keydown", e => {
+      if (e.key === "Escape") { input.value = ""; results.style.display = "none"; results.innerHTML = ""; input.blur(); }
+    });
+    document.addEventListener("click", e => { if (!wrap.contains(e.target)) results.style.display = "none"; });
+  })();
+
   // Barre de recherche globale dans la topbar (si présente)
   const searchInput = document.getElementById("global-search");
   if(searchInput) {
