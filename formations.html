@@ -1401,11 +1401,10 @@
   async function initDevenirFormateur(){
     const me = await fetchCurrentUser().catch(()=>null);
     if(!me) return;
-    if (me.role !== 'utilisateur' && me.role !== 'initiative') return; // Premium non proposé aux autres rôles
+    if (me.role !== 'initiative') return; // Création de formations réservée aux comptes Initiative
     try {
-      const premiumType = me.role === 'initiative' ? 'initiative_abonne' : 'utilisateur_abonne';
       const { accreditations } = await api('GET', '/accreditations/mes');
-      const estPremium = (accreditations||[]).some(a=>a.type===premiumType && a.statut==='active');
+      const estPremium = (accreditations||[]).some(a=>a.type==='initiative_abonne' && a.statut==='active');
       if (estPremium) {
         document.getElementById('sb-tab-espace-formateur').style.display = '';
         return;

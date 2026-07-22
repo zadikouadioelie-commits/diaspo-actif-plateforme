@@ -5884,11 +5884,15 @@ route("GET", "/api/mes-inscriptions", async (req, res) => {
 route("POST", "/api/formations", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  /* La création de formations n'est plus une accréditation à demander : elle est réservée
-     aux comptes Premium (accréditation utilisateur_abonne / initiative_abonne selon le rôle). */
-  const premiumType = user.role === 'initiative' ? 'initiative_abonne' : 'utilisateur_abonne';
-  if (user.role !== 'administrateur' && !(await hasAccreditation(user.id, premiumType))) {
-    return sendJSON(res, 402, { error: "La création de formations est réservée aux comptes Premium.", accred_type: premiumType });
+  /* La création de formations est réservée aux comptes Initiative (Premium) et Administrateur.
+     Les comptes Utilisateur peuvent consulter le catalogue et s'inscrire, mais pas créer de formation. */
+  if (user.role !== 'administrateur') {
+    if (user.role !== 'initiative') {
+      return sendJSON(res, 403, { error: "La création de formations est réservée aux comptes Initiative." });
+    }
+    if (!(await hasAccreditation(user.id, 'initiative_abonne'))) {
+      return sendJSON(res, 402, { error: "La création de formations est réservée aux comptes Initiative Premium.", accred_type: 'initiative_abonne' });
+    }
   }
   const { titre, type_formation, organisme, domaine, nationalite, langue, niveau, description,
           prix, duree, duree_heures, places, mode_acces, telecharge_autorise,
