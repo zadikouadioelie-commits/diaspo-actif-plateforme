@@ -378,8 +378,9 @@ button{font-family:inherit;cursor:pointer;}
   /* Topbar compact */
   .topbar-inner{padding:10px 14px;gap:10px;flex-wrap:nowrap;}
   .nav{display:none;}
-  .logo{flex:none;}
-  .logo small{display:none;}
+  /* Logo + nom masqués sur mobile : libère la place dans le bandeau pour que le bouton
+     Déconnexion reste visible sans avoir à défiler. */
+  .logo{display:none;}
   .lang-select{display:none;}
   .sidebar-toggle{display:block;}
   .topbar-right{
@@ -388,8 +389,8 @@ button{font-family:inherit;cursor:pointer;}
     mask-image:linear-gradient(to right,transparent,#000 12px);
   }
   .topbar-right::-webkit-scrollbar{display:none;}
-  /* Sur mobile, la barre du haut ne garde que l'essentiel (connexion/notifs/profil) */
-  #demo-test-btn, #premium-topbar-btn, .role-tag, #logout-link, #ia-slots{display:none!important;}
+  /* Sur mobile, la barre du haut ne garde que l'essentiel (connexion/notifs/profil/déconnexion) */
+  #demo-test-btn, #premium-topbar-btn, .role-tag, #ia-slots{display:none!important;}
   .topbar-right .user-chip[href="messagerie.html"]{display:none;}
   .topbar-right>*{flex:none;}
 
