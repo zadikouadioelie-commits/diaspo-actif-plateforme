@@ -233,6 +233,16 @@ function publicUser(u) {
 function safeParse(s) {
   try { return JSON.parse(s || "{}"); } catch (e) { return {}; }
 }
+/* Comme safeParse(), mais garantit un tableau : safeParse() renvoie {} (objet, pas
+   tableau) dès que la valeur est vide/absente, donc le pattern classique
+   "safeParse(x) || []" ne fonctionne jamais ({} est truthy) — bug reproduit sur
+   une vingtaine de champs tableau (publics_json, besoins_json, zones_json, etc.),
+   provoquant des "x.includes is not a function" cote client des qu'un compte n'a
+   pas encore rempli ces champs. */
+function safeParseArray(s) {
+  const v = safeParse(s);
+  return Array.isArray(v) ? v : [];
+}
 function safeJSON(s, fallback) {
   try { return JSON.parse(s || JSON.stringify(fallback)); } catch (e) { return fallback; }
 }
@@ -3384,11 +3394,11 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
     : [];
   row.decouverte_premium = row.owner_user_id ? await getDecouvertePremium(row.owner_user_id) : null;
   /* Profil public enrichi : champs JSON parsés pour les colonnes gauche/droite d'initiative.html */
-  row.publics = safeParse(row.publics_json) || [];
-  row.besoins = safeParse(row.besoins_json) || [];
-  row.realisations = safeParse(row.realisations_json) || [];
+  row.publics = safeParseArray(row.publics_json);
+  row.besoins = safeParseArray(row.besoins_json);
+  row.realisations = safeParseArray(row.realisations_json);
   row.stats_perso = safeParse(row.stats_perso_json) || {};
-  row.documents = safeParse(row.vitrine_documents_json) || [];
+  row.documents = safeParseArray(row.vitrine_documents_json);
   row.reseaux_sociaux_obj = safeParse(row.reseaux_sociaux) || {};
   row.pays_intervention_arr = safeParse(row.pays_intervention) || (row.pays_intervention ? [row.pays_intervention] : []);
   sendJSON(res, 200, { initiative: row });
@@ -3422,10 +3432,10 @@ route("GET", "/api/collectivites/:id/profil-public", async (req, res, params) =>
       theme_couleur: row.theme_couleur || 'navy',
       nom_responsable: row.nom_responsable_etatique, prenom_responsable: row.prenom_responsable_etatique, fonction_responsable: row.fonction_responsable_etatique,
       is_verified: !!row.is_verified,
-      galerie: safeParse(row.galerie_json) || [],
-      documents: safeParse(row.documents_publics_json) || [],
-      realisations: safeParse(row.realisations_json) || [],
-      projets_en_cours: safeParse(row.projets_en_cours_json) || [],
+      galerie: safeParseArray(row.galerie_json),
+      documents: safeParseArray(row.documents_publics_json),
+      realisations: safeParseArray(row.realisations_json),
+      projets_en_cours: safeParseArray(row.projets_en_cours_json),
       stats: { abonnes: nb_abonnes, publications: nb_publications, evenements: nb_evenements },
       abonne, prefs: monAbonnement ? monAbonnement.prefs : 'toutes',
       is_owner: cu ? Number(cu.id) === Number(row.id) : false,
@@ -7070,16 +7080,16 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     deal_master: dmLaureat ? { ...dmLaureat, nb_editions: dmHistorique } : null,
     /* Profil public enrichi (colonnes gauche/droite, miroir des initiatives) */
     telephone: u.telephone,
-    publics: safeParse(u.publics_json) || [],
-    besoins: safeParse(u.besoins_json) || [],
-    realisations: safeParse(u.realisations_json) || [],
+    publics: safeParseArray(u.publics_json),
+    besoins: safeParseArray(u.besoins_json),
+    realisations: safeParseArray(u.realisations_json),
     stats_perso: safeParse(u.stats_perso_json) || {},
     services_perso: u.services_perso,
-    zones: safeParse(u.zones_json) || [],
+    zones: safeParseArray(u.zones_json),
     reseaux_enrichis: safeParse(u.reseaux_json) || {},
     annee_debut: u.annee_debut,
     assistant_actif: u.assistant_actif == null ? 1 : u.assistant_actif,
-    galerie: safeParse(u.galerie_json) || [],
+    galerie: safeParseArray(u.galerie_json),
   }});
 });
 
@@ -8574,7 +8584,7 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
 
   let ad = null;
   for (const c of candidates) {
-    const zones = safeParse(c.cible_zones) || [];
+    const zones = safeParseArray(c.cible_zones);
     if (zones.length && !zones.includes('international')) {
       if (!user) continue;
       let geoOk = false;
@@ -8589,7 +8599,7 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
       const cp = safeParse(c.cible_pays);
       if (Array.isArray(cp) && cp.length && (!user || !cp.includes(user.pays))) continue;
     }
-    const cibleListes = safeParse(c.cible_listes) || [];
+    const cibleListes = safeParseArray(c.cible_listes);
     if (cibleListes.length) {
       if (!user) continue;
       const ph = cibleListes.map(() => '?').join(',');
@@ -8635,7 +8645,7 @@ route("PUT", "/api/ads/:id", async (req, res, params, body) => {
   const description = body.description !== undefined ? body.description : ad.description;
   const cta = body.cta !== undefined ? (PUB_AD_CTA.includes(body.cta) ? body.cta : ad.cta) : ad.cta;
   const lienUrl = body.lien_url !== undefined ? body.lien_url : ad.lien_url;
-  let emplacements = safeParse(ad.emplacements) || [];
+  let emplacements = safeParseArray(ad.emplacements);
   if (Array.isArray(body.emplacements)) emplacements = body.emplacements.filter(e => PUB_SLOTS.includes(e));
 
   /* La durée reste celle définie à la création (max 30 jours) — on ignore volontairement body.duree_jours. */
@@ -12309,7 +12319,7 @@ route("GET", "/api/offres/:id/candidatures", async (req, res, params) => {
     LEFT JOIN lettres_motivation lm ON oc.lettre_id = lm.id
     WHERE oc.offre_id=? ORDER BY oc.created_at DESC
   `).all(params.id);
-  sendJSON(res, 200, cands.map(c => ({ ...c, tags: safeParse(c.tags) || [], documents_recus: safeParse(c.documents_recus_json) || [] })));
+  sendJSON(res, 200, cands.map(c => ({ ...c, tags: safeParseArray(c.tags), documents_recus: safeParseArray(c.documents_recus_json) })));
 });
 
 /* PATCH /api/offres/:id/candidatures/:cid */
@@ -19083,9 +19093,9 @@ ${jsonLd}
       if (!row) return null;
       return {
         ...row,
-        services: safeParse(row.services) || [],
-        langues: safeParse(row.langues) || [],
-        nationalites_concernees: safeParse(row.nationalites_concernees) || [],
+        services: safeParseArray(row.services),
+        langues: safeParseArray(row.langues),
+        nationalites_concernees: safeParseArray(row.nationalites_concernees),
         accreditations: await initAccreds(row.id),
         nb_recommandations: await countRecos(row.id),
         nb_affiliations: (await db.prepare(`SELECT COUNT(*) as c FROM reseau_affiliations WHERE destinataire_id=? AND statut='accepte'`).get(row.id))?.c || 0,
