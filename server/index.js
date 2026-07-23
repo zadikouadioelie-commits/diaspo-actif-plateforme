@@ -3191,7 +3191,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   let meVillePays = { ville: null, pays: null };
   if (cu) { const r = await db.prepare("SELECT ville, pays FROM users WHERE id=?").get(cu.id); meVillePays = { ville: r?.ville || null, pays: r?.pays || null }; }
 
-  let initiatives = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL ORDER BY created_at DESC").all();
+  let initiatives = await db.prepare("SELECT i.* FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY i.created_at DESC").all();
   if (query.pays) initiatives = initiatives.filter(r => r.pays === query.pays);
   if (query.domaine) initiatives = initiatives.filter(r => r.domaine === query.domaine);
   if (query.type) initiatives = initiatives.filter(r => r.type === query.type);
@@ -3329,7 +3329,7 @@ route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query)
 });
 
 route("GET", "/api/initiatives", async (req, res, params, body, query) => {
-  let rows = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL ORDER BY created_at DESC").all();
+  let rows = await db.prepare("SELECT i.* FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY i.created_at DESC").all();
   const q = (query.q || "").toLowerCase();
   if (q) rows = rows.filter(r => r.nom.toLowerCase().includes(q) || (r.description || "").toLowerCase().includes(q));
   if (query.pays) rows = rows.filter(r => r.pays === query.pays);
@@ -6735,7 +6735,7 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
 
   // Totaux globaux
   const totalUtilisateurs  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (is_demo IS NULL OR is_demo=FALSE)").get())?.n;
-  const totalInitiatives   = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL").get())?.n;
+  const totalInitiatives   = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
   const totalInstitutions  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite' AND (is_demo IS NULL OR is_demo=FALSE)").get())?.n;
   // Contenu réel uniquement : on exclut les comptes de démonstration (is_demo).
   const totalPublications  = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
@@ -6956,7 +6956,7 @@ route("GET", "/api/dashboard/collectivite", async (req, res) => {
 
   try {
   const totalMembres = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur', 'initiative') AND (is_demo IS NULL OR is_demo=FALSE)").get())?.n ?? 0;
-  const totalInitiatives = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL").get())?.n ?? 0;
+  const totalInitiatives = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n ?? 0;
   const paysRows = await db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 10").all();
   const profil = await db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
   const nbMessages = (await db.prepare("SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON m.conversation_id=c.id WHERE (c.user1_id=? OR c.user2_id=?) AND m.sender_id!=? AND m.lu=0").get(user.id,user.id,user.id))?.n ?? 0;
@@ -7647,7 +7647,7 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
     ? await db.prepare("SELECT id,nom,role,ville,pays FROM users WHERE (nom LIKE ? OR ville LIKE ?) AND role != 'administrateur' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 8").all(like, like)
     : [];
   const _rawInits = (type === "tous" || type === "initiatives")
-    ? await db.prepare("SELECT id,slug,nom,domaine,pays,ville,description,owner_user_id FROM initiatives WHERE (nom LIKE ? OR description LIKE ? OR domaine LIKE ?) AND (owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL) LIMIT 8").all(like, like, like)
+    ? await db.prepare("SELECT i.id,i.slug,i.nom,i.domaine,i.pays,i.ville,i.description,i.owner_user_id FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (i.nom LIKE ? OR i.description LIKE ? OR i.domaine LIKE ?) AND (u.is_demo IS NULL OR u.is_demo=FALSE) LIMIT 8").all(like, like, like)
     : [];
   const initiatives = await Promise.all(_rawInits.map(async i => ({
     ...i,
@@ -7687,8 +7687,9 @@ route("GET", "/api/recherche-contacts", async (req, res, params, body, query) =>
     FROM users WHERE id != ? AND role != 'administrateur' AND (compte_masque IS NULL OR compte_masque=0) AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500
   `).all(user.id);
   const inits = await db.prepare(`
-    SELECT id, nom, domaine, ville, pays, owner_user_id, logo_url, description, mission, services, vitrine_services_categories_json
-    FROM initiatives WHERE (owner_user_id IS NULL OR owner_user_id != ?) AND (owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL) LIMIT 500
+    SELECT i.id, i.nom, i.domaine, i.ville, i.pays, i.owner_user_id, i.logo_url, i.description, i.mission, i.services, i.vitrine_services_categories_json
+    FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id
+    WHERE (i.owner_user_id IS NULL OR i.owner_user_id != ?) AND (u.is_demo IS NULL OR u.is_demo=FALSE) LIMIT 500
   `).all(user.id);
 
   let candidats = [
@@ -14707,7 +14708,7 @@ ${jsonLd}
     if (req.method === "GET" && pathname === "/api/stats") {
       try {
         const membres = (await db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND (is_demo IS NULL OR is_demo=FALSE)`).get())?.n;
-        const initiatives = (await db.prepare(`SELECT COUNT(*) AS n FROM initiatives WHERE owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL`).get())?.n;
+        const initiatives = (await db.prepare(`SELECT COUNT(*) AS n FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)`).get())?.n;
         const pays = (await db.prepare(`SELECT COUNT(DISTINCT pays) AS n FROM initiatives WHERE pays IS NOT NULL`).get())?.n;
         return sendJSON(res, 200, { membres, initiatives, pays });
       } catch (e) {
