@@ -952,6 +952,9 @@ async function seedPg(pool) {
 
   // Comptes de démonstration : pas de vraie adresse email → déjà "vérifiés"
   await pool.query(`UPDATE users SET email_verifie=1 WHERE email LIKE '%@diaspoactif.demo'`).catch(()=>{});
+  // Comptes de démonstration (connexion "Comptes test") : jamais dans l'annuaire, les recherches
+  // ni les compteurs de membres — voir toutes les clauses "is_demo" du code.
+  await pool.query(`UPDATE users SET is_demo=TRUE WHERE email LIKE '%@diaspoactif.demo'`).catch(()=>{});
 
   // Initialise le compteur de visites
   await pool.query(

@@ -3191,21 +3191,21 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   let meVillePays = { ville: null, pays: null };
   if (cu) { const r = await db.prepare("SELECT ville, pays FROM users WHERE id=?").get(cu.id); meVillePays = { ville: r?.ville || null, pays: r?.pays || null }; }
 
-  let initiatives = await db.prepare("SELECT * FROM initiatives ORDER BY created_at DESC").all();
+  let initiatives = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL ORDER BY created_at DESC").all();
   if (query.pays) initiatives = initiatives.filter(r => r.pays === query.pays);
   if (query.domaine) initiatives = initiatives.filter(r => r.domaine === query.domaine);
   if (query.type) initiatives = initiatives.filter(r => r.type === query.type);
   if (query.ville) { const v = query.ville.toLowerCase(); initiatives = initiatives.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
   let utilisateurs = (query.type && query.type !== 'Utilisateurs') ? [] : await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, titre_pro, bio, competences, experiences, centres_interet FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' LIMIT 500"
+    "SELECT id, nom, prenom, ville, pays, photo_url, titre_pro, bio, competences, experiences, centres_interet FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
   ).all();
   if (query.pays) utilisateurs = utilisateurs.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); utilisateurs = utilisateurs.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
   // Collectivités et Diaspo'Actif (Administrateur) — organismes institutionnels, absents de la table initiatives
   let organismes = (query.type && !['Collectivités','Institutions'].includes(query.type)) ? [] : await db.prepare(
-    "SELECT id, nom, ville, pays, photo_url, bio, role FROM users WHERE role IN ('collectivite','administrateur') AND compte_masque=0 AND nom != 'Compte supprimé' LIMIT 500"
+    "SELECT id, nom, ville, pays, photo_url, bio, role FROM users WHERE role IN ('collectivite','administrateur') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
   ).all();
   if (query.pays) organismes = organismes.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); organismes = organismes.filter(r => (r.ville||'').toLowerCase().includes(v)); }
@@ -3320,7 +3320,7 @@ route("GET", "/api/annuaire/suggestions", async (req, res, params, body, query) 
 /* GET /api/annuaire/utilisateurs — liste publique des comptes Utilisateur (annuaire), filtrable par nom/prénom/ville */
 route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query) => {
   let rows = await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, titre_pro FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' ORDER BY nom ASC LIMIT 200"
+    "SELECT id, nom, prenom, ville, pays, photo_url, titre_pro FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 200"
   ).all();
   if (query.nom) { const q = query.nom.toLowerCase(); rows = rows.filter(r => (r.nom||"").toLowerCase().includes(q)); }
   if (query.prenom) { const q = query.prenom.toLowerCase(); rows = rows.filter(r => (r.prenom||"").toLowerCase().includes(q)); }
@@ -3329,7 +3329,7 @@ route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query)
 });
 
 route("GET", "/api/initiatives", async (req, res, params, body, query) => {
-  let rows = await db.prepare("SELECT * FROM initiatives ORDER BY created_at DESC").all();
+  let rows = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL ORDER BY created_at DESC").all();
   const q = (query.q || "").toLowerCase();
   if (q) rows = rows.filter(r => r.nom.toLowerCase().includes(q) || (r.description || "").toLowerCase().includes(q));
   if (query.pays) rows = rows.filter(r => r.pays === query.pays);
@@ -6734,9 +6734,9 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   if (user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
 
   // Totaux globaux
-  const totalUtilisateurs  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur'").get())?.n;
-  const totalInitiatives   = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives").get())?.n;
-  const totalInstitutions  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite'").get())?.n;
+  const totalUtilisateurs  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (is_demo IS NULL OR is_demo=FALSE)").get())?.n;
+  const totalInitiatives   = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL").get())?.n;
+  const totalInstitutions  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite' AND (is_demo IS NULL OR is_demo=FALSE)").get())?.n;
   // Contenu réel uniquement : on exclut les comptes de démonstration (is_demo).
   const totalPublications  = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
   const totalFormations    = (await db.prepare("SELECT COUNT(*) AS n FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
@@ -6955,8 +6955,8 @@ route("GET", "/api/dashboard/collectivite", async (req, res) => {
   if (user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux Collectivités." });
 
   try {
-  const totalMembres = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur', 'initiative')").get())?.n ?? 0;
-  const totalInitiatives = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives").get())?.n ?? 0;
+  const totalMembres = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('utilisateur', 'initiative') AND (is_demo IS NULL OR is_demo=FALSE)").get())?.n ?? 0;
+  const totalInitiatives = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives WHERE owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL").get())?.n ?? 0;
   const paysRows = await db.prepare("SELECT pays, COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND pays IS NOT NULL GROUP BY pays ORDER BY n DESC LIMIT 10").all();
   const profil = await db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
   const nbMessages = (await db.prepare("SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON m.conversation_id=c.id WHERE (c.user1_id=? OR c.user2_id=?) AND m.sender_id!=? AND m.lu=0").get(user.id,user.id,user.id))?.n ?? 0;
@@ -6986,7 +6986,7 @@ route("GET", "/api/dashboard/collectivite", async (req, res) => {
 /* ---------- Observatoire statistique (agrégé, anonymisé) ---------- */
 route("GET", "/api/observatoire", async (req, res, params, body, query) => {
   const nationalite = query.nationalite || null;
-  let rows = await db.prepare("SELECT pays, ville, COUNT(*) AS n FROM users WHERE role = 'utilisateur' GROUP BY pays, ville").all();
+  let rows = await db.prepare("SELECT pays, ville, COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND (is_demo IS NULL OR is_demo=FALSE) GROUP BY pays, ville").all();
   rows = rows.filter(r => r.pays);
   const mask = (n) => n < SEUIL_CONFIDENTIALITE ? null : n;
   const parPays = {};
@@ -6996,7 +6996,7 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
     if (r.ville) parPays[r.pays].villes.push({ ville: r.ville, membres: mask(r.n) });
   });
   Object.values(parPays).forEach(p => p.membres = mask(p.membres));
-  const totalMembres = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur'").get())?.n;
+  const totalMembres = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND (is_demo IS NULL OR is_demo=FALSE)").get())?.n;
   sendJSON(res, 200, { nationalite, seuil_confidentialite: SEUIL_CONFIDENTIALITE, total_membres: totalMembres, par_pays: Object.values(parPays) });
 });
 
@@ -7644,10 +7644,10 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
   if (cuRech) { try { db.prepare("INSERT INTO recherches_utilisateur (user_id, requete) VALUES (?,?)").run(cuRech.id, q.slice(0, 200)); } catch (_) {} }
 
   const utilisateurs = (type === "tous" || type === "utilisateurs")
-    ? await db.prepare("SELECT id,nom,role,ville,pays FROM users WHERE (nom LIKE ? OR ville LIKE ?) AND role != 'administrateur' LIMIT 8").all(like, like)
+    ? await db.prepare("SELECT id,nom,role,ville,pays FROM users WHERE (nom LIKE ? OR ville LIKE ?) AND role != 'administrateur' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 8").all(like, like)
     : [];
   const _rawInits = (type === "tous" || type === "initiatives")
-    ? await db.prepare("SELECT id,slug,nom,domaine,pays,ville,description,owner_user_id FROM initiatives WHERE nom LIKE ? OR description LIKE ? OR domaine LIKE ? LIMIT 8").all(like, like, like)
+    ? await db.prepare("SELECT id,slug,nom,domaine,pays,ville,description,owner_user_id FROM initiatives WHERE (nom LIKE ? OR description LIKE ? OR domaine LIKE ?) AND (owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL) LIMIT 8").all(like, like, like)
     : [];
   const initiatives = await Promise.all(_rawInits.map(async i => ({
     ...i,
@@ -7684,11 +7684,11 @@ route("GET", "/api/recherche-contacts", async (req, res, params, body, query) =>
 
   const users = await db.prepare(`
     SELECT id, nom, prenom, role, ville, pays, photo_url, titre_pro, bio, competences
-    FROM users WHERE id != ? AND role != 'administrateur' AND (compte_masque IS NULL OR compte_masque=0) LIMIT 500
+    FROM users WHERE id != ? AND role != 'administrateur' AND (compte_masque IS NULL OR compte_masque=0) AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500
   `).all(user.id);
   const inits = await db.prepare(`
     SELECT id, nom, domaine, ville, pays, owner_user_id, logo_url, description, mission, services, vitrine_services_categories_json
-    FROM initiatives WHERE owner_user_id IS NULL OR owner_user_id != ? LIMIT 500
+    FROM initiatives WHERE (owner_user_id IS NULL OR owner_user_id != ?) AND (owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL) LIMIT 500
   `).all(user.id);
 
   let candidats = [
@@ -14706,8 +14706,8 @@ ${jsonLd}
     /* ---- GET /api/stats — statistiques agrégées publiques ---- */
     if (req.method === "GET" && pathname === "/api/stats") {
       try {
-        const membres = (await db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur'`).get())?.n;
-        const initiatives = (await db.prepare(`SELECT COUNT(*) AS n FROM initiatives`).get())?.n;
+        const membres = (await db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND (is_demo IS NULL OR is_demo=FALSE)`).get())?.n;
+        const initiatives = (await db.prepare(`SELECT COUNT(*) AS n FROM initiatives WHERE owner_user_id NOT IN (SELECT id FROM users WHERE is_demo=TRUE) OR owner_user_id IS NULL`).get())?.n;
         const pays = (await db.prepare(`SELECT COUNT(DISTINCT pays) AS n FROM initiatives WHERE pays IS NOT NULL`).get())?.n;
         return sendJSON(res, 200, { membres, initiatives, pays });
       } catch (e) {
@@ -18721,10 +18721,10 @@ ${jsonLd}
       const fPaysArg = paysFilt ? [paysFilt] : [];
 
       try {
-        // ── Membres par rôle ──
+        // ── Membres par rôle (comptes de démonstration exclus) ──
         const roles = await db.prepare(`
           SELECT role, COUNT(*) n FROM users
-          WHERE role NOT IN ('administrateur') ${fPays} ${sw.replace('created_at','created_at')}
+          WHERE role NOT IN ('administrateur') AND (is_demo IS NULL OR is_demo=FALSE) ${fPays} ${sw.replace('created_at','created_at')}
           GROUP BY role
         `).all(...fPaysArg);
         const byRole = {};
@@ -18738,10 +18738,10 @@ ${jsonLd}
         // ── Géographie ──
         const countryRows = await db.prepare(`
           SELECT pays, COUNT(*) n FROM users
-          WHERE pays IS NOT NULL AND pays!='' AND role NOT IN ('administrateur')
+          WHERE pays IS NOT NULL AND pays!='' AND role NOT IN ('administrateur') AND (is_demo IS NULL OR is_demo=FALSE)
           ${fPays} GROUP BY pays ORDER BY n DESC LIMIT 50
         `).all(...fPaysArg);
-        const nbPays = (await db.prepare(`SELECT COUNT(DISTINCT pays) n FROM users WHERE pays IS NOT NULL AND pays!=''`).get())?.n;
+        const nbPays = (await db.prepare(`SELECT COUNT(DISTINCT pays) n FROM users WHERE pays IS NOT NULL AND pays!='' AND (is_demo IS NULL OR is_demo=FALSE)`).get())?.n;
         const nbVilles = (await db.prepare(`SELECT COUNT(DISTINCT ville) n FROM users WHERE ville IS NOT NULL AND ville!=''`).get())?.n;
         const nbRegions = (await db.prepare(`SELECT COUNT(DISTINCT region) n FROM users WHERE region IS NOT NULL AND region!=''`).get())?.n;
 
