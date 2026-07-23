@@ -9531,7 +9531,6 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
 
   // ─── MODE TOUS (fil global enrichi) ────────────────────────────────────────
   // Algorithme : suivis en premier, puis populaires, puis reste chronologique
-  try {
   let orderedIds = new Set();
   const allPosts = [];
 
@@ -9595,10 +9594,10 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       `).all(cu.id);
       dwellRows.forEach(r => { behaviorMap[r.categorie] = (behaviorMap[r.categorie] || 0) + Math.floor((r.total || 0) / 20); });
       // Priorité 3 : profils récemment visités (boost transitoire, hors comptes déjà suivis)
-      (await db.prepare(`SELECT DISTINCT profil_user_id FROM profil_visites WHERE visiteur_id=? ORDER BY created_at DESC LIMIT 50`).all(cu.id))
+      (await db.prepare(`SELECT profil_user_id FROM profil_visites WHERE visiteur_id=? GROUP BY profil_user_id ORDER BY MAX(created_at) DESC LIMIT 50`).all(cu.id))
         .forEach(r => recentAuteurs.add(r.profil_user_id));
       // Priorité 3 : recherches récentes (les termes recherchés augmentent la pertinence des posts qui les contiennent)
-      recentTermes = (await db.prepare(`SELECT DISTINCT requete FROM recherches_utilisateur WHERE user_id=? ORDER BY created_at DESC LIMIT 15`).all(cu.id))
+      recentTermes = (await db.prepare(`SELECT requete FROM recherches_utilisateur WHERE user_id=? GROUP BY requete ORDER BY MAX(created_at) DESC LIMIT 15`).all(cu.id))
         .map(r => (r.requete || '').toLowerCase()).filter(Boolean);
     }
     const prefsCategories = Array.isArray(filPrefs.categories) && filPrefs.categories.length ? filPrefs.categories : null;
@@ -9644,14 +9643,10 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   // Pagination sur le résultat fusionné
   const total = allPosts.length;
   const paginated = allPosts.slice(offset, offset + limit);
-  return sendJSON(res, 200, {
+  sendJSON(res, 200, {
     posts: await Promise.all(paginated.map(p => p.type === 'carte_vitrine' ? p : enrichPost(p, cu))),
     total, page, pages: Math.ceil(total/limit), mode
   });
-  } catch (e) {
-    // DIAGNOSTIC TEMPORAIRE — a retirer des que la cause est identifiee.
-    return sendJSON(res, 500, { error: e.message, stack: (e.stack||'').split('\n').slice(0,5) });
-  }
 });
 
 /* ---------- Follow / Unfollow utilisateur ---------- */
