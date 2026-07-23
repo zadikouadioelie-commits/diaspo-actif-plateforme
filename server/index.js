@@ -18707,6 +18707,7 @@ ${jsonLd}
 
     if (req.method === 'GET' && pathname === '/api/stats') {
       const me = await getCurrentUser(req);
+      const q = parsed.query || {};
       const p = q.period || 'all';   // today|week|month|year|all
       const paysFilt = q.pays || null;
       const contFilt = q.continent || null;
@@ -18720,7 +18721,7 @@ ${jsonLd}
         if (period === 'year')   return `AND created_at >= datetime('now','start of year')`;
         return '';
       }
-      const sw = since(p);
+      const sw = await since(p);
 
       const fPays = paysFilt ? `AND pays=?` : '';
       const fPaysArg = paysFilt ? [paysFilt] : [];
@@ -18777,9 +18778,9 @@ ${jsonLd}
           GROUP BY titre_pro ORDER BY n DESC LIMIT 20
         `).all();
         const secteurs = await db.prepare(`
-          SELECT secteur, COUNT(*) n FROM initiatives
-          WHERE secteur IS NOT NULL AND secteur!=''
-          GROUP BY secteur ORDER BY n DESC LIMIT 15
+          SELECT domaine AS secteur, COUNT(*) n FROM initiatives
+          WHERE domaine IS NOT NULL AND domaine!=''
+          GROUP BY domaine ORDER BY n DESC LIMIT 15
         `).all();
         const nbMetiers = (await db.prepare(`SELECT COUNT(DISTINCT titre_pro) n FROM users WHERE titre_pro IS NOT NULL AND titre_pro!=''`).get())?.n;
 
@@ -18791,11 +18792,11 @@ ${jsonLd}
           nouveaux_membres: (await db.prepare(`SELECT COUNT(*) n FROM users WHERE created_at >= datetime('now','-30 days')`).get())?.n,
           messages:         (await db.prepare(`SELECT COUNT(*) n FROM messages ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
           evenements:       (await db.prepare(`SELECT COUNT(*) n FROM evenements ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
-          billets_vendus:   (await db.prepare(`SELECT COUNT(*) n FROM event_tickets WHERE statut IN ('paye','valide') ${sw}`).get())?.n,
-          qr_codes:         (await db.prepare(`SELECT COUNT(*) n FROM event_tickets ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
-          initiatives_pub:  (await db.prepare(`SELECT COUNT(*) n FROM initiatives WHERE statut='publiee' ${sw}`).get())?.n,
+          billets_vendus:   (await db.prepare(`SELECT COUNT(*) n FROM tickets WHERE payment_status='paid' ${sw}`).get())?.n,
+          qr_codes:         (await db.prepare(`SELECT COUNT(*) n FROM tickets ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
+          initiatives_pub:  (await db.prepare(`SELECT COUNT(*) n FROM initiatives ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
           reunions:         (await db.prepare(`SELECT COUNT(*) n FROM reunions ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
-          resumes_ia:       (await db.prepare(`SELECT COUNT(*) n FROM reunions WHERE resume_ai IS NOT NULL AND resume_ai!='' ${sw}`).get())?.n,
+          resumes_ia:       (await db.prepare(`SELECT COUNT(*) n FROM reunions WHERE enregistrement_active=1 ${sw}`).get())?.n,
           candidatures:     (await db.prepare(`SELECT COUNT(*) n FROM candidatures ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
           collaborations:   (await db.prepare(`SELECT COUNT(*) n FROM collaborations ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
           posts:            (await db.prepare(`SELECT COUNT(*) n FROM fil_posts ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
@@ -18811,7 +18812,7 @@ ${jsonLd}
 
         // ── Emploi & opportunités ──
         const emploiStats = {
-          offres_emploi:    (await db.prepare(`SELECT COUNT(*) n FROM offres_emploi`).get())?.n ?? 0,
+          offres_emploi:    (await db.prepare(`SELECT COUNT(*) n FROM offres`).get())?.n ?? 0,
           candidatures:     actStats.candidatures,
           collaborations:   actStats.collaborations,
         };
@@ -18831,8 +18832,8 @@ ${jsonLd}
 
         // ── Stats IA ──
         const iaStats = {
-          recommandations: (await db.prepare(`SELECT COUNT(*) n FROM chatbot_history WHERE type='recommend'`).get())?.n ?? 0,
-          recherches: (await db.prepare(`SELECT COUNT(*) n FROM chatbot_history`).get())?.n ?? 0,
+          recommandations: 0, // pas de table dediee au suivi des recommandations IA pour l'instant
+          recherches: (await db.prepare(`SELECT COUNT(*) n FROM chatbot_questions`).get())?.n ?? 0,
         };
 
         // ── Top villes ──
