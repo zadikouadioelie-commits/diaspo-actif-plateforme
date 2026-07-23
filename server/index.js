@@ -18734,8 +18734,8 @@ ${jsonLd}
           GROUP BY role
         `).all(...fPaysArg);
         const byRole = {};
-        roles.forEach(r => byRole[r.role] = r.n);
-        const totalMembres = roles.reduce((s,r)=>s+r.n,0);
+        roles.forEach(r => byRole[r.role] = Number(r.n));
+        const totalMembres = roles.reduce((s,r)=>s+Number(r.n),0);
 
         // ── Vérifications ──
         const verified = (await db.prepare(`SELECT COUNT(*) n FROM users WHERE is_verified=1 ${fPays} ${sw}`).get(...fPaysArg))?.n;
@@ -18768,7 +18768,7 @@ ${jsonLd}
         const continentMap = {};
         countryRows.forEach(r => {
           const c = CONTINENTS[r.pays] || 'Autre';
-          continentMap[c] = (continentMap[c] || 0) + r.n;
+          continentMap[c] = (continentMap[c] || 0) + Number(r.n);
         });
 
         // ── Compétences & métiers ──
