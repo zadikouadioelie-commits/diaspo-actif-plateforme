@@ -690,6 +690,8 @@ html, body { overflow-x:clip; }
 .pvz-premium-badge { display:inline-flex; align-items:center; gap:4px; background:linear-gradient(135deg,#F5D061,#C9971C); color:#3A2600; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:999px; box-shadow:0 1px 3px rgba(0,0,0,.2); }
 .pvz-verified .dot { width:15px; height:15px; border-radius:50%; background-color:var(--tp,#2F6BED); color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; }
 .pvz-sub { font-size:13.5px; color:#6B7686; margin-top:5px; }
+.pvz-responsable { font-size:12px; color:#8A93A3; margin-top:4px; }
+.pvz-responsable strong { color:#6B7686; font-weight:700; }
 .pvz-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 .pvz-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background-color:var(--tp-light,#F2F5FA); color:var(--tp-dark,#3B4658); font-size:12.5px; font-weight:500; }
 .pvz-actions { display:flex; gap:9px; flex:none; padding-top:20px; flex-wrap:wrap; }
@@ -1589,9 +1591,18 @@ function renderVisitorProfile() {
   const root = document.getElementById('pvz-visitor');
   if (!root) return;
 
-  const nom = [profil.prenom, profil.nom].filter(Boolean).join(' ') || profil.nom || 'Membre';
+  // Comptes organisme (initiative/collectivité/administrateur) : le nom de la structure est
+  // l'identité principale mise en avant ; le gestionnaire du compte n'apparaît qu'en second
+  // niveau, discrètement (voir pvz-responsable ci-dessous).
+  const nomPersonnel = [profil.prenom, profil.nom].filter(Boolean).join(' ') || profil.nom || 'Membre';
+  const isOrgAccount = !!profil.nom_structure;
+  const nom = profil.nom_structure || nomPersonnel;
   const sub = profil.titre_pro || (profil.situation_pro ? profil.situation_pro.replace(/_/g,' ') : (profil.role_label || profil.role || 'Membre'));
   const isInit = profil.role === 'initiative';
+  const responsableNom = profil.responsable ? [profil.responsable.prenom, profil.responsable.nom].filter(Boolean).join(' ') : '';
+  const responsableLine = (isOrgAccount && responsableNom)
+    ? `<div class="pvz-responsable">👤 Responsable du compte : <strong>${esc(responsableNom)}</strong>${profil.responsable.fonction ? ` — ${esc(profil.responsable.fonction)}` : ''}</div>`
+    : '';
   const verified = !!(profil.identite_verifiee);
   const isPremium = (profil._accreditations || []).includes('utilisateur_abonne');
 
@@ -1646,6 +1657,7 @@ function renderVisitorProfile() {
               ${verified ? `<span class="pvz-verified"><span class="dot">✓</span>Identité vérifiée</span>` : ''}
             </div>
             <div class="pvz-sub">${esc(sub)}</div>
+            ${responsableLine}
             ${chips.length ? `<div class="pvz-chips">${chips.join('')}</div>` : ''}
           </div>
           <div class="pvz-actions">${isOwn ? ownerActionsRow : followBtn+msgBtn+shareBtn}</div>
@@ -6415,15 +6427,18 @@ function openEditIdentity() {
   const existingForm = document.getElementById('identity-edit-form');
   if (existingForm) { existingForm.remove(); return; }
 
+  const isOrgRole = ['initiative','collectivite','administrateur'].includes(profil.role);
+
   const form = document.createElement('div');
   form.id = 'identity-edit-form';
   form.className = 'p-edit-form';
   form.style.marginTop = '12px';
   form.innerHTML = `
     <h4 style="margin:0 0 12px;font-size:14px;">Modifier le profil</h4>
+    ${isOrgRole ? `<div class="fg full"><div><label>Nom de la structure (affiché en priorité sur l'annuaire et le profil public)</label><input id="id-nom-structure" placeholder="Ex : Habitat Agricole" value="${esc(profil.nom_structure||'')}"></div></div>` : ''}
     <div class="fg">
-      <div><label>Prénom</label><input id="id-prenom" value="${esc(profil.prenom||'')}"></div>
-      <div><label>Nom</label><input id="id-nom" value="${esc(profil.nom||'')}"></div>
+      <div><label>${isOrgRole ? 'Prénom du responsable' : 'Prénom'}</label><input id="id-prenom" value="${esc(profil.prenom||'')}"></div>
+      <div><label>${isOrgRole ? 'Nom du responsable' : 'Nom'}</label><input id="id-nom" value="${esc(profil.nom||'')}"></div>
       <div><label>Titre professionnel</label><input id="id-titre" placeholder="Ex : CEO · Ingénieure · Étudiant" value="${esc(profil.titre_pro||'')}"></div>
       <div><label>Téléphone</label><input id="id-tel" type="tel" value="${esc(profil.telephone||'')}"></div>
       <div><label>Ville</label><input id="id-ville" value="${esc(profil.ville||'')}"></div>
@@ -6464,6 +6479,8 @@ async function saveIdentity() {
     bio:           document.getElementById('id-bio').value.trim(),
     centres_interet: [...document.querySelectorAll('#identity-edit-form input[type=checkbox]:checked')].map(c=>c.value),
   };
+  const nomStructureInput = document.getElementById('id-nom-structure');
+  if (nomStructureInput) body.nom_structure = nomStructureInput.value.trim();
   try {
     const r = await api('PUT', '/profil', body);
     Object.assign(profil, body);

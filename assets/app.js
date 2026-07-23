@@ -718,6 +718,9 @@ function renderInitiativeCard(it){
   const rayHtml = ray ? `<span class="ann-ray-badge ann-ray-${ray}">${RAY_ICON[ray]||'🌐'} ${RAY_LABEL[ray]||ray}</span>` : '';
   const desc    = it.description || it.mission || '';
   const membres = it.membres ? `<span class="ann-membres">👥 ${it.membres}</span>` : '';
+  // Le nom de la structure (it.nom) est deja le titre principal ; le responsable du compte
+  // n'apparait qu'en information secondaire discrete (meme regle que renderOrganismeCard).
+  const responsableNom = [it.prenom_responsable, it.nom_responsable].filter(Boolean).join(' ');
 
   const certifBadgeHtml = it.certif ? `<div class="ann-certif-wrap">${badgeCertif(it.certif, { small: true })}</div>` : "";
   const partenaireOfficielBadge = it.partenaire_officiel
@@ -753,6 +756,7 @@ function renderInitiativeCard(it){
       </div>
       ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
+      ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${it.fonction_responsable ? ` — ${it.fonction_responsable}` : ''}</div>` : ''}
       ${partenaireOfficielBadge}
       ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
       ${accredBadges ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${accredBadges}</div>` : ''}
@@ -912,12 +916,17 @@ async function initAnnuaire(){
     const profilHref = `profil.html?id=${encodeURIComponent(o.id)}`;
     const badge = o.role === 'administrateur' ? "DIASPO'ACTIF" : 'COLLECTIVITÉ';
     const isOwn = !!(ME && ME.id === o.id);
+    // Le nom de l'organisme/institution prime sur le nom personnel du gestionnaire du compte,
+    // qui n'apparait qu'en information secondaire discrete (cf. renderVisitorProfile, meme regle).
+    const nomAffiche = o.nom_institution || o.nom;
+    const responsableNom = [o.prenom_responsable_etatique, o.nom_responsable_etatique].filter(Boolean).join(' ');
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      ${annCardCoverHtml(o.id, o.nom, o.banner_url, o.photo_url, `<span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>`, isOwn)}
+      ${annCardCoverHtml(o.id, nomAffiche, o.banner_url, o.photo_url, `<span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>`, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
-        <div class="ann-card-title">${o.nom}</div>
+        <div class="ann-card-title">${nomAffiche}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
+        ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${o.fonction_responsable_etatique ? ` — ${o.fonction_responsable_etatique}` : ''}</div>` : ''}
         ${o.bio ? `<div class="ann-card-desc">${o.bio}</div>` : ''}
         <div class="ann-card-foot">
           <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>

@@ -1389,6 +1389,7 @@ const MIGRATIONS = [
   ["partenaires_officiels", "cles_matching TEXT DEFAULT '[]'"],
   // ── Comptes Étatiques ──
   ["users", "type_organisme TEXT"],
+  ["users", "nom_institution TEXT"],
   ["users", "sigle_institution TEXT"],
   ["users", "description_institution TEXT"],
   ["users", "tel_secondaire TEXT"],

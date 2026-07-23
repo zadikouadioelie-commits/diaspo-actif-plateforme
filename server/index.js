@@ -409,6 +409,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     const fields = {
       // Section 1 — Institution
       type_organisme: type_organisme || type_institution || null,
+      nom_institution: nom_institution || null,
       sigle_institution: sigle_institution || null,
       description_institution: description_institution || null,
       date_creation_institution: date_creation_institution || null,
@@ -3216,7 +3217,9 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
 
   // Collectivités et Diaspo'Actif (Administrateur) — organismes institutionnels, absents de la table initiatives
   let organismes = (query.type && !['Collectivités','Institutions'].includes(query.type)) ? [] : await db.prepare(
-    "SELECT id, nom, ville, pays, photo_url, banner_url, bio, role FROM users WHERE role IN ('collectivite','administrateur') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
+    `SELECT id, nom, nom_institution, type_organisme, ville, pays, photo_url, banner_url, bio, role,
+       nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique
+     FROM users WHERE role IN ('collectivite','administrateur') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500`
   ).all();
   if (query.pays) organismes = organismes.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); organismes = organismes.filter(r => (r.ville||'').toLowerCase().includes(v)); }
@@ -3275,7 +3278,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
     let score = 1;
     if (termesOriginaux.length) {
       score = annuaireScorerEntite([
-        [[o.nom], 1000],
+        [[o.nom_institution, o.nom], 1000],
         [[o.bio], 200],
       ], termesOriginaux, termesEtendus);
       if (score <= 0) return;
@@ -7029,10 +7032,26 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
 
 /* ---------- Profil (lecture enrichie) ---------- */
 route("GET", "/api/profil/:id", async (req, res, params) => {
-  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie,compte_masque,telephone,publics_json,besoins_json,realisations_json,stats_perso_json,services_perso,zones_json,reseaux_json,annee_debut,assistant_actif,galerie_json,nationalite1,nationalite2,origine1,origine2 FROM users WHERE id=?").get(params.id);
+  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie,compte_masque,telephone,publics_json,besoins_json,realisations_json,stats_perso_json,services_perso,zones_json,reseaux_json,annee_debut,assistant_actif,galerie_json,nationalite1,nationalite2,origine1,origine2,nom_institution,type_organisme,fonction_responsable_etatique FROM users WHERE id=?").get(params.id);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
   const me = await getCurrentUser(req);
   if (u.compte_masque && (!me || Number(me.id) !== Number(u.id))) return sendJSON(res, 404, { error: "Profil introuvable." });
+
+  /* Comptes organisme (initiative/collectivité/administrateur) : le nom de la structure prime
+     sur le nom personnel, qui n'apparaît plus qu'en information secondaire "responsable du compte". */
+  let nomStructure = null, responsable = null;
+  if (u.role === 'initiative') {
+    const initRow = await db.prepare("SELECT nom, nom_responsable, prenom_responsable, fonction_responsable FROM initiatives WHERE owner_user_id=?").get(u.id);
+    if (initRow) {
+      nomStructure = initRow.nom;
+      responsable = { prenom: initRow.prenom_responsable || u.prenom, nom: initRow.nom_responsable || u.nom, fonction: initRow.fonction_responsable };
+    }
+  } else if (u.role === 'collectivite' || u.role === 'administrateur') {
+    if (u.nom_institution) {
+      nomStructure = u.nom_institution;
+      responsable = { prenom: u.prenom, nom: u.nom, fonction: u.fonction_responsable_etatique };
+    }
+  }
   const nbAbonnes    = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(u.id))?.n;
   const nbSuivis     = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE follower_id=?").get(u.id))?.n;
   const isFollowing  = me ? !!await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, u.id) : false;
@@ -7092,6 +7111,9 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     annee_debut: u.annee_debut,
     assistant_actif: u.assistant_actif == null ? 1 : u.assistant_actif,
     galerie: safeParseArray(u.galerie_json),
+    nom_structure: nomStructure,
+    responsable,
+    type_organisme: u.type_organisme,
   }});
 });
 
@@ -7177,13 +7199,27 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
   if (body.privacy !== undefined) {
     fields.push("privacy_json=?"); vals.push(JSON.stringify(body.privacy));
   }
+  // Nom de la structure (comptes organisme) : prime sur le nom personnel dans l'affichage public.
+  if (body.nom_structure !== undefined) {
+    const nomStructure = String(body.nom_structure || "").trim();
+    if (user.role === "collectivite" || user.role === "administrateur") {
+      fields.push("nom_institution=?"); vals.push(nomStructure || null);
+    } else if (user.role === "initiative" && nomStructure) {
+      db.prepare("UPDATE initiatives SET nom=? WHERE owner_user_id=?").run(nomStructure, user.id);
+    }
+  }
   if (fields.length) { vals.push(user.id); db.prepare(`UPDATE users SET ${fields.join(",")} WHERE id=?`).run(...vals); }
-  const up = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,telephone,profil_json,privacy_json FROM users WHERE id=?").get(user.id);
+  const up = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,telephone,profil_json,privacy_json,nom_institution FROM users WHERE id=?").get(user.id);
+  let nomStructureOut = up.role === "collectivite" || up.role === "administrateur" ? (up.nom_institution || null) : null;
+  if (up.role === "initiative") {
+    const initRow = await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=?").get(up.id);
+    nomStructureOut = initRow ? initRow.nom : null;
+  }
   sendJSON(res, 200, { profil: { ...publicUser(up), bio: up.bio, photo_url: up.photo_url, banner_url: up.banner_url,
     prenom: up.prenom, titre_pro: up.titre_pro, theme_couleur: up.theme_couleur,
     competences: safeParse(up.competences||"[]"), experiences: safeParse(up.experiences||"[]"),
     centres_interet: safeParse(up.centres_interet||"[]"), situation_pro: up.situation_pro, telephone: up.telephone,
-    privacy: safeParse(up.privacy_json||"{}") } });
+    privacy: safeParse(up.privacy_json||"{}"), nom_structure: nomStructureOut } });
 });
 
 /* ---------- Profil — Fil d'activité publique ---------- */
@@ -14605,7 +14641,7 @@ async function handleRequest(req, res) {
   if (pathname === '/profil.html') {
     try {
       const uid = parsed.query.id;
-      const u = uid ? await db.prepare("SELECT id, nom, prenom, role FROM users WHERE id=?").get(uid) : null;
+      const u = uid ? await db.prepare("SELECT id, nom, prenom, role, nom_institution FROM users WHERE id=?").get(uid) : null;
       const init = u ? await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(u.id) : null;
       const filePath = path.join(ROOT, 'profil-app.html');
       let html = await fs.promises.readFile(filePath, 'utf8');
@@ -14636,8 +14672,12 @@ async function handleRequest(req, res) {
         image = `${base}/assets/logo.png`;
         noindex = true;
       } else if (u) {
-        title = `${[u.prenom, u.nom].filter(Boolean).join(' ')} — Diaspo'Actif`;
-        description = `Profil de ${[u.prenom, u.nom].filter(Boolean).join(' ')} sur Diaspo'Actif.`;
+        // Comptes organisme (collectivité/administrateur) : le nom de la structure prime en SEO aussi.
+        const nomAffiche = (['collectivite','administrateur'].includes(u.role) && u.nom_institution)
+          ? u.nom_institution
+          : [u.prenom, u.nom].filter(Boolean).join(' ');
+        title = `${nomAffiche} — Diaspo'Actif`;
+        description = `Profil de ${nomAffiche} sur Diaspo'Actif.`;
         image = `${base}/assets/logo.png`;
       } else {
         title = `Diaspo'Actif — Profil`;
