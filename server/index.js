@@ -279,6 +279,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     centres_interet, situation_pro,
     // initiative
     type_org, description, domaine, objectifs,
+    origine1, origine2,
     nom_responsable, prenom_responsable, fonction_responsable, email_responsable, tel_responsable,
     site_web, reseaux_sociaux, pays_intervention,
     // collectivite (legacy)
@@ -362,16 +363,16 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     db.prepare(`
       INSERT INTO initiatives (slug, nom, type, description, domaine, objectifs,
         pays, region, ville, adresse, code_postal, site_web, reseaux_sociaux,
-        nationalite1, nationalite2,
+        nationalite1, nationalite2, origine1, origine2,
         pays_intervention, nom_responsable, prenom_responsable, fonction_responsable,
         email_responsable, tel_responsable, owner_user_id, abonnement_actif)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
     `).run(
       slug, nom_institution || nom, type_org || null, description || null, domaine || null, objectifs || null,
       pays || null, region || null, ville || null, adresse || null, code_postal || null,
       site_web || null,
       typeof reseaux_sociaux === "object" ? JSON.stringify(reseaux_sociaux) : (reseaux_sociaux || "{}"),
-      nationalite1 || null, nationalite2 || null,
+      nationalite1 || null, nationalite2 || null, origine1 || null, origine2 || null,
       JSON.stringify(Array.isArray(pays_intervention) ? pays_intervention : []),
       nom_responsable || nom || null, prenom_responsable || prenom || null,
       fonction_responsable || null, email_responsable || email,
@@ -3198,7 +3199,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   if (query.ville) { const v = query.ville.toLowerCase(); initiatives = initiatives.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
   let utilisateurs = (query.type && query.type !== 'Utilisateurs') ? [] : await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet, nationalite1, nationalite2, origine1, origine2 FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
   ).all();
   if (query.pays) utilisateurs = utilisateurs.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); utilisateurs = utilisateurs.filter(r => (r.ville||'').toLowerCase().includes(v)); }
@@ -3320,7 +3321,7 @@ route("GET", "/api/annuaire/suggestions", async (req, res, params, body, query) 
 /* GET /api/annuaire/utilisateurs — liste publique des comptes Utilisateur (annuaire), filtrable par nom/prénom/ville */
 route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query) => {
   let rows = await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 200"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, nationalite1, nationalite2, origine1, origine2 FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 200"
   ).all();
   if (query.nom) { const q = query.nom.toLowerCase(); rows = rows.filter(r => (r.nom||"").toLowerCase().includes(q)); }
   if (query.prenom) { const q = query.prenom.toLowerCase(); rows = rows.filter(r => (r.prenom||"").toLowerCase().includes(q)); }

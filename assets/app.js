@@ -886,12 +886,16 @@ async function initAnnuaire(){
     const profilHref = `profil.html?id=${encodeURIComponent(u.id)}`;
     const nom = [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom;
     const isOwn = !!(ME && ME.id === u.id);
+    // Origine : renseignee via le module Confidentialite du profil (users.origine1/2) —
+    // affichee seulement si l'information existe reellement, jamais un repli "-".
+    const origs = [u.origine1, u.origine2].filter(Boolean).join(' • ');
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
       ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>`, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nom}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
+        ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
         ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
         <div class="ann-card-foot">
           <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
