@@ -9580,10 +9580,13 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       `).all(cu.id, cu.id);
       interactions.forEach(r => { behaviorMap[r.categorie] = (behaviorMap[r.categorie] || 0) + 1; });
       // Une sauvegarde reflète une intention plus forte qu'un like/commentaire (contenu qu'on veut retrouver) : poids double.
-      const bookmarkInteractions = await db.prepare(`
-        SELECT p.categorie AS categorie FROM fil_bookmarks b JOIN fil_posts p ON p.id=b.post_id WHERE b.user_id=? AND p.categorie IS NOT NULL
-      `).all(cu.id);
-      bookmarkInteractions.forEach(r => { behaviorMap[r.categorie] = (behaviorMap[r.categorie] || 0) + 2; });
+      // Try/catch dédié : ce signal est secondaire, il ne doit jamais faire échouer tout le fil.
+      try {
+        const bookmarkInteractions = await db.prepare(`
+          SELECT p.categorie AS categorie FROM fil_bookmarks b JOIN fil_posts p ON p.id=b.post_id WHERE b.user_id=? AND p.categorie IS NOT NULL
+        `).all(cu.id);
+        bookmarkInteractions.forEach(r => { behaviorMap[r.categorie] = (behaviorMap[r.categorie] || 0) + 2; });
+      } catch (_) { /* fil_bookmarks optionnel pour le scoring */ }
       const dwellRows = await db.prepare(`
         SELECT p.categorie AS categorie, SUM(d.duree_sec) AS total
         FROM fil_post_dwell d JOIN fil_posts p ON p.id=d.post_id
