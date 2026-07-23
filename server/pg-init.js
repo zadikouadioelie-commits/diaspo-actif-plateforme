@@ -961,7 +961,12 @@ async function seedPg(pool) {
   // ce qu'un autre script a pu positionner avant.
   const emailsComptesTest = [
     ...demoUsers.map(u => u.email),
-    'admin@diaspoactif.com', 'test-utilisateur@diaspoactif.com',
+    // 'admin@diaspoactif.com' est l'email prévu par seed-comptes-test.js, mais n'existe pas en
+    // production : le compte administrateur réel (id=4) a été créé avec contact@diaspoactif.com
+    // (voir vitrine-admin-connexion.html) — sans cette entrée, l'UPDATE ci-dessous ne matchait
+    // aucune ligne (silencieusement, via le .catch(()=>{}) plus bas) et la carte "Administrateur"
+    // restait visible dans /api/annuaire/recherche malgré un seedPg() qui s'exécutait correctement.
+    'admin@diaspoactif.com', 'contact@diaspoactif.com', 'test-utilisateur@diaspoactif.com',
     'test-initiative@diaspoactif.com', 'test-collectivite@diaspoactif.com',
   ];
   await pool.query(`UPDATE users SET is_demo=FALSE WHERE is_demo IS DISTINCT FROM FALSE`).catch(()=>{});

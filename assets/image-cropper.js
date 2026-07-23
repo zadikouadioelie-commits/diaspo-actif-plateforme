@@ -36,6 +36,11 @@
     .icrop-btn-reset { background:none; color:#1565C0; padding:6px 10px; font-size:12px; white-space:nowrap; }
     .icrop-btn-reset:hover { text-decoration:underline; }
     .icrop-hint { font-size:11.5px; color:#94a3b8; padding:0 20px 4px; }
+    .icrop-fillrow { padding:2px 20px 14px; display:flex; align-items:center; gap:10px; }
+    .icrop-fillrow-label { font-size:12px; color:#64748b; white-space:nowrap; }
+    .icrop-swatches { display:flex; gap:8px; }
+    .icrop-swatch { width:24px; height:24px; border-radius:50%; border:2px solid #e2e8f0; cursor:pointer; padding:0; box-shadow:0 0 0 1px rgba(0,0,0,.06) inset; }
+    .icrop-swatch.active { border-color:#1565C0; box-shadow:0 0 0 2px rgba(21,101,192,.25); }
   `;
 
   function ensureStyle() {
@@ -83,6 +88,16 @@
             <span class="icrop-zoom-label" style="font-size:15px;">🔍</span>
             <button class="icrop-btn icrop-btn-reset" type="button" title="Revenir à l'image complète">↺ Réinitialiser</button>
           </div>
+          <div class="icrop-fillrow">
+            <span class="icrop-fillrow-label">Fond :</span>
+            <div class="icrop-swatches">
+              <button type="button" class="icrop-swatch active" data-color="#FFFFFF" style="background:#FFFFFF" title="Blanc"></button>
+              <button type="button" class="icrop-swatch" data-color="#F1E4CB" style="background:#F1E4CB" title="Beige"></button>
+              <button type="button" class="icrop-swatch" data-color="#E2E8F0" style="background:#E2E8F0" title="Gris clair"></button>
+              <button type="button" class="icrop-swatch" data-color="#0D2B4E" style="background:#0D2B4E" title="Bleu marine"></button>
+              <button type="button" class="icrop-swatch" data-color="#F26422" style="background:#F26422" title="Orange"></button>
+            </div>
+          </div>
           <div class="icrop-actions">
             <button class="icrop-btn icrop-btn-cancel" type="button">Annuler</button>
             <button class="icrop-btn icrop-btn-ok" type="button">Valider</button>
@@ -100,9 +115,11 @@
       const btnCancel = overlay.querySelector('.icrop-btn-cancel');
       const btnClose   = overlay.querySelector('.icrop-close');
       const btnReset   = overlay.querySelector('.icrop-btn-reset');
+      const swatches   = overlay.querySelectorAll('.icrop-swatch');
 
       let img = new Image();
       let imgLoaded = false;
+      let fillColor = '#FFFFFF';
       let scale = 1, fitScale = 1;
       let offX = 0, offY = 0; // décalage du centre de l'image (en px, repère canvas)
       let dragging = false, lastX = 0, lastY = 0;
@@ -124,7 +141,7 @@
         const dpr = window.devicePixelRatio || 1;
         const cw = canvas.width, ch = canvas.height;
         ctx.clearRect(0, 0, cw, ch);
-        ctx.fillStyle = '#111';
+        ctx.fillStyle = fillColor;
         ctx.fillRect(0, 0, cw, ch);
         const iw = img.naturalWidth * scale * dpr;
         const ih = img.naturalHeight * scale * dpr;
@@ -173,6 +190,15 @@
         draw();
       });
 
+      swatches.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          fillColor = btn.getAttribute('data-color');
+          swatches.forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          draw();
+        });
+      });
+
       function pointerDown(x, y) {
         dragging = true; lastX = x; lastY = y;
         stage.classList.add('dragging');
@@ -217,6 +243,8 @@
         const ih = img.naturalHeight * scale * ratio;
         const cx = outW / 2 + offX * ratio;
         const cy = outH / 2 + offY * ratio;
+        octx.fillStyle = fillColor;
+        octx.fillRect(0, 0, outW, outH);
         octx.imageSmoothingQuality = 'high';
         octx.drawImage(img, cx - iw / 2, cy - ih / 2, iw, ih);
         out.toBlob((blob) => cleanup(blob), 'image/jpeg', 0.9);
