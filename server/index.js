@@ -9531,6 +9531,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
 
   // ─── MODE TOUS (fil global enrichi) ────────────────────────────────────────
   // Algorithme : suivis en premier, puis populaires, puis reste chronologique
+  try {
   let orderedIds = new Set();
   const allPosts = [];
 
@@ -9643,10 +9644,14 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   // Pagination sur le résultat fusionné
   const total = allPosts.length;
   const paginated = allPosts.slice(offset, offset + limit);
-  sendJSON(res, 200, {
+  return sendJSON(res, 200, {
     posts: await Promise.all(paginated.map(p => p.type === 'carte_vitrine' ? p : enrichPost(p, cu))),
     total, page, pages: Math.ceil(total/limit), mode
   });
+  } catch (e) {
+    // DIAGNOSTIC TEMPORAIRE — a retirer des que la cause est identifiee.
+    return sendJSON(res, 500, { error: e.message, stack: (e.stack||'').split('\n').slice(0,5) });
+  }
 });
 
 /* ---------- Follow / Unfollow utilisateur ---------- */
