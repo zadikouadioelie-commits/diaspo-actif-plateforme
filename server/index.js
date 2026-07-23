@@ -3355,6 +3355,22 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   sendJSON(res, 200, { initiatives: rows });
 });
 
+/* GET /api/mon-initiative — l'initiative du compte connecté, jamais filtrée par is_demo :
+   contrairement à /api/initiatives (liste publique), un compte doit toujours pouvoir gérer/voir
+   sa propre vitrine, même si ce compte est par ailleurs masqué du public (voir profil-app.html
+   renderVitrine() qui appelait /api/initiatives et filtrait côté client — cassé pour les comptes
+   de démonstration une fois is_demo exclu de cette liste publique). */
+route("GET", "/api/mon-initiative", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const row = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(user.id);
+  if (!row) return sendJSON(res, 200, { initiative: null });
+  row.nationalites_concernees = safeParse(row.nationalites_concernees);
+  row.nationalite_unique = !!row.nationalite_unique;
+  row.abonnement_actif = !!row.abonnement_actif;
+  sendJSON(res, 200, { initiative: row });
+});
+
 route("GET", "/api/initiatives/:id", async (req, res, params) => {
   const row = await db.prepare("SELECT * FROM initiatives WHERE id = ? OR slug = ?").get(params.id, params.id);
   if (!row) return sendJSON(res, 404, { error: "Initiative introuvable." });

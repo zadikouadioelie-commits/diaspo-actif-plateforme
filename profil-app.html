@@ -2211,11 +2211,18 @@ async function renderVitrine() {
   const el = document.getElementById('p-vitrine');
   el.innerHTML = '<div class="empty-p" style="padding:30px 0;">Chargement de la vitrine…</div>';
 
-  // Récupérer l'initiative liée à ce profil (le propriétaire ou n'importe quel visiteur la consulte)
+  // Récupérer l'initiative liée à ce profil. Le propriétaire passe par /mon-initiative (jamais
+  // filtrée par is_demo : on doit toujours pouvoir gérer sa propre vitrine) ; un visiteur passe par
+  // la liste publique /initiatives (filtrée is_demo, comportement normal pour un tiers).
   let init = null;
   try {
-    const all = await api('GET', '/initiatives');
-    init = (all.initiatives || []).find(i => Number(i.owner_user_id) === Number(profil.id)) || null;
+    if (isOwn) {
+      const r = await api('GET', '/mon-initiative');
+      init = r.initiative || null;
+    } else {
+      const all = await api('GET', '/initiatives');
+      init = (all.initiatives || []).find(i => Number(i.owner_user_id) === Number(profil.id)) || null;
+    }
   } catch (e) { init = null; }
 
   if (!init) {
@@ -3467,11 +3474,11 @@ async function pvzInitVitrineToggleBtn() {
   const btn = document.getElementById('pvz-vitrine-toggle-btn');
   if (!btn) return;
   try {
-    const [all, accredRes] = await Promise.all([
-      api('GET', '/initiatives'),
+    const [monInit, accredRes] = await Promise.all([
+      api('GET', '/mon-initiative'),
       api('GET', '/accreditations/mes').catch(() => ({ accreditations: [] })),
     ]);
-    const init = (all.initiatives || []).find(i => Number(i.owner_user_id) === Number(profil.id));
+    const init = monInit.initiative || null;
     if (!init) { btn.remove(); return; }
     _vitrineInit = init;
     window._daPremiumInitiative = (accredRes.accreditations || []).some(a => a.type === 'initiative_abonne' && a.statut === 'active');
