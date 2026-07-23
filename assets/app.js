@@ -151,6 +151,33 @@ async function annuaireEditCover() {
 }
 window.annuaireEditCover = annuaireEditCover;
 
+/* Idem pour une carte Initiative — mêmes recadreur/upload, mais persiste sur
+   initiatives.vitrine_banniere_url (même route que "Changer la bannière" de la vitrine). */
+async function annuaireEditInitiativeCover(initiativeId) {
+  if (!window.openImageCropper || !window.uploadMedia) {
+    alert("Le module de recadrage n'est pas disponible sur cette page.");
+    return;
+  }
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/jpeg,image/png,image/webp";
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const cropped = await openImageCropper(file, { shape: "rect", aspect: 16 / 6, outW: 2000, outH: 750 });
+      if (!cropped) return;
+      const url = await uploadMedia(cropped, "banner");
+      await api("PUT", `/initiatives/${initiativeId}/vitrine`, { vitrine_banniere_url: url });
+      if (window.annuaireRefresh) window.annuaireRefresh();
+    } catch (err) {
+      alert("Erreur lors du chargement de la couverture : " + err.message);
+    }
+  };
+  input.click();
+}
+window.annuaireEditInitiativeCover = annuaireEditInitiativeCover;
+
 /* Badge de messages non lus dans la topbar */
 function updateTopbarBadge(count) {
   const badge = document.getElementById("msg-topbar-badge");
@@ -682,7 +709,8 @@ const RAY_LABEL = {locale:'Locale', régionale:'Régionale', nationale:'National
 function renderInitiativeCard(it){
   const badge   = DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()};
   const seed    = encodeURIComponent(it.slug || it.nom || 'init');
-  const photo   = `https://picsum.photos/seed/${seed}/400/240`;
+  const photo   = it.vitrine_banniere_url || it.logo_url || `https://picsum.photos/seed/${seed}/400/240`;
+  const isOwnInit = !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && it.owner_user_id && CURRENT_USER.id === it.owner_user_id);
   const loc     = [it.ville, it.pays].filter(Boolean).join(', ') || '—';
   const nats    = [it.nationalite1, it.nationalite2].filter(Boolean).join(' • ') || '—';
   const origs   = [it.origine1, it.origine2].filter(Boolean).join(' • ');
@@ -714,6 +742,7 @@ function renderInitiativeCard(it){
       <span class="ann-cat-badge" style="background:${badge.bg};">${badge.label}</span>
       ${it.type ? `<span class="ann-type-badge">${it.type}</span>` : ''}
       ${certifBadgeHtml}
+      ${isOwnInit ? `<button type="button" class="ann-card-cover-edit" onclick="event.stopPropagation(); annuaireEditInitiativeCover(${it.id})">📷 Modifier la couverture</button>` : ''}
     </div>
     <div class="ann-card-body">
       <div class="ann-card-title">${it.nom}</div>
