@@ -713,7 +713,7 @@ function renderInitiativeCard(it){
   const isOwnInit = !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && it.owner_user_id && CURRENT_USER.id === it.owner_user_id);
   const loc     = [it.ville, it.pays].filter(Boolean).join(', ') || '—';
   const nats    = [it.nationalite1, it.nationalite2].filter(Boolean).join(' • ') || '—';
-  const origs   = [it.origine1, it.origine2].filter(Boolean).join(' • ');
+  const origs   = [it.origine1, it.origine2].filter(Boolean).join(' • ') || it.pays_origine || '—';
   const ray     = it.rayonnement || '';
   const rayHtml = ray ? `<span class="ann-ray-badge ann-ray-${ray}">${RAY_ICON[ray]||'🌐'} ${RAY_LABEL[ray]||ray}</span>` : '';
   const desc    = it.description || it.mission || '';
@@ -751,7 +751,7 @@ function renderInitiativeCard(it){
         <span class="ann-card-loc">📍 ${loc}</span>
         ${rayHtml}
       </div>
-      ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
+      <div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
       ${partenaireOfficielBadge}
       ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
