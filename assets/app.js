@@ -3252,6 +3252,60 @@ document.addEventListener("DOMContentLoaded", ()=>{
     document.addEventListener("click", e => { if (!wrap.contains(e.target)) results.style.display = "none"; });
   })();
 
+  // ── Groupe "Bandeau" dans la sidebar : reprend sur mobile les actions du bandeau du haut
+  // qui n'ont plus de place à cet endroit (nav masquée, sélecteur de langue masqué, etc.)
+  (async function initSidebarBandeau() {
+    const sidebar = document.querySelector(".sidebar");
+    if (!sidebar || sidebar.querySelector(".sb-bandeau-group")) return;
+    const anchor = sidebar.querySelector(".sb-search-wrap") || sidebar.querySelector(".brand");
+    if (!anchor) return;
+
+    const user = await fetchCurrentUser();
+    const isAdmin = user?.role === "administrateur";
+
+    const wrap = document.createElement("div");
+    wrap.className = "sb-bandeau-group";
+    wrap.innerHTML = `
+      <span class="sb-group-lbl" style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);padding:4px 8px 4px;">📱 Bandeau</span>
+      <a href="index.html">🏠 Accueil</a>
+      <a href="annuaire.html">🔍 Annuaire</a>
+      <a href="fil-actualite.html">📰 Fil d'actualité</a>
+      <a href="messagerie.html">💬 Messages</a>
+      <a href="#" id="sb-bandeau-notifs">🔔 Notifications</a>
+      <div id="sb-bandeau-lang-wrap" style="margin-bottom:4px;"></div>
+      ${isAdmin ? `<a href="#" id="sb-bandeau-comptes-test">🧪 Comptes test</a>` : ""}
+    `;
+    anchor.insertAdjacentElement("afterend", wrap);
+
+    // Notifications : délègue au vrai bouton de la topbar (garde le dropdown correctement
+    // rattaché à .notif-bell-wrap pour la logique "fermer au clic extérieur" existante).
+    document.getElementById("sb-bandeau-notifs")?.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation(); // sinon ce clic continue de remonter jusqu'à document APRÈS le clic
+      document.getElementById("notif-bell-btn")?.click(); // délégué, qui referme aussitôt le dropdown
+    });
+
+    if (isAdmin) {
+      document.getElementById("sb-bandeau-comptes-test")?.addEventListener("click", e => {
+        e.preventDefault();
+        if (window.openDemoTestModal) window.openDemoTestModal();
+      });
+    }
+
+    // Langue : clone du vrai sélecteur (déjà peuplé par initLangSelector) pour rester synchronisé
+    // sans dupliquer la logique de traduction — change réellement la langue via setLang().
+    const realSel = document.getElementById("lang-select");
+    if (realSel && realSel.options.length) {
+      const clone = document.createElement("select");
+      clone.id = "sb-bandeau-lang";
+      clone.style.cssText = "width:100%;padding:11px 13px;border-radius:10px;border:none;background:#fff;color:#0D2B4E;font-size:14px;font-weight:600;";
+      clone.innerHTML = realSel.innerHTML;
+      clone.value = realSel.value;
+      clone.addEventListener("change", () => { if (window.setLang) window.setLang(clone.value); });
+      document.getElementById("sb-bandeau-lang-wrap").appendChild(clone);
+    }
+  })();
+
   // Barre de recherche globale dans la topbar (si présente)
   const searchInput = document.getElementById("global-search");
   if(searchInput) {

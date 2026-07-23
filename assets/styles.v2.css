@@ -374,7 +374,13 @@ button{font-family:inherit;cursor:pointer;}
 }
 .sidebar-backdrop.open{display:block;}
 
+/* Groupe "Bandeau" de la sidebar : reprend les actions du bandeau du haut, masquées ou
+   inaccessibles sur mobile faute de place (nav, langue, comptes test...). Inutile sur desktop
+   où le bandeau du haut affiche déjà tout ça. */
+.sb-bandeau-group{display:none;}
+
 @media(max-width:768px){
+  .sb-bandeau-group{display:block;}
   /* Topbar compact */
   .topbar-inner{padding:10px 14px;gap:10px;flex-wrap:nowrap;}
   .nav{display:none;}
