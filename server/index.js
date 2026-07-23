@@ -3198,14 +3198,14 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   if (query.ville) { const v = query.ville.toLowerCase(); initiatives = initiatives.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
   let utilisateurs = (query.type && query.type !== 'Utilisateurs') ? [] : await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, titre_pro, bio, competences, experiences, centres_interet FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
   ).all();
   if (query.pays) utilisateurs = utilisateurs.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); utilisateurs = utilisateurs.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
   // Collectivités et Diaspo'Actif (Administrateur) — organismes institutionnels, absents de la table initiatives
   let organismes = (query.type && !['Collectivités','Institutions'].includes(query.type)) ? [] : await db.prepare(
-    "SELECT id, nom, ville, pays, photo_url, bio, role FROM users WHERE role IN ('collectivite','administrateur') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
+    "SELECT id, nom, ville, pays, photo_url, banner_url, bio, role FROM users WHERE role IN ('collectivite','administrateur') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
   ).all();
   if (query.pays) organismes = organismes.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); organismes = organismes.filter(r => (r.ville||'').toLowerCase().includes(v)); }
@@ -3320,7 +3320,7 @@ route("GET", "/api/annuaire/suggestions", async (req, res, params, body, query) 
 /* GET /api/annuaire/utilisateurs — liste publique des comptes Utilisateur (annuaire), filtrable par nom/prénom/ville */
 route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query) => {
   let rows = await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, titre_pro FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 200"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 200"
   ).all();
   if (query.nom) { const q = query.nom.toLowerCase(); rows = rows.filter(r => (r.nom||"").toLowerCase().includes(q)); }
   if (query.prenom) { const q = query.prenom.toLowerCase(); rows = rows.filter(r => (r.prenom||"").toLowerCase().includes(q)); }

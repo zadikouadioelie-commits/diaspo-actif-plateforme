@@ -123,6 +123,34 @@ function avatarDiv(name, size=48, type='user', extraStyle='', photoUrl=null) {
   return `<div class="init-logo" style="width:${size}px;height:${size}px;${extraStyle}">${photoAvatar(name, size, type, photoUrl)}</div>`;
 }
 
+/* Modifier la couverture d'une carte de l'annuaire (bouton visible uniquement pour son propriétaire).
+   Réutilise le recadreur et l'endpoint d'upload déjà utilisés pour la bannière du profil public,
+   pour rester synchronisé avec elle (même colonne users.banner_url). */
+async function annuaireEditCover() {
+  if (!window.openImageCropper || !window.uploadMedia) {
+    alert("Le module de recadrage n'est pas disponible sur cette page.");
+    return;
+  }
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/jpeg,image/png,image/webp";
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const cropped = await openImageCropper(file, { shape: "rect", aspect: 16 / 6, outW: 2000, outH: 750 });
+      if (!cropped) return; // annulé par l'utilisateur
+      const url = await uploadMedia(cropped, "banner");
+      await api("PUT", "/profil", { banner_url: url });
+      if (window.annuaireRefresh) window.annuaireRefresh();
+    } catch (err) {
+      alert("Erreur lors du chargement de la couverture : " + err.message);
+    }
+  };
+  input.click();
+}
+window.annuaireEditCover = annuaireEditCover;
+
 /* Badge de messages non lus dans la topbar */
 function updateTopbarBadge(count) {
   const badge = document.getElementById("msg-topbar-badge");
@@ -794,6 +822,8 @@ async function initAnnuaire(){
   const list = document.getElementById("init-list");
   if(!list) return;
 
+  const ME = await fetchCurrentUser();
+
   let ALL = [];
   try {
     const r = await api("GET", "/initiatives");
@@ -810,18 +840,29 @@ async function initAnnuaire(){
   /* Normalisation */
   const norm = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g,"");
 
+  function annCardCoverHtml(id, name, bannerUrl, photoUrl, badgeHtml, isOwn) {
+    const bg = bannerUrl
+      ? `background-image:url('${bannerUrl}');background-size:cover;background-position:center;`
+      : `background:linear-gradient(135deg,#0D2B4E,#1B3A6B 55%,#F26422);`;
+    return `
+      <div class="ann-card-banner" style="${bg}">
+        ${badgeHtml}
+        ${isOwn ? `<button type="button" class="ann-card-cover-edit" onclick="event.stopPropagation(); annuaireEditCover(${id})">📷 Modifier la couverture</button>` : ''}
+      </div>
+      <div class="ann-card-avatar-wrap">${photoAvatar(name, 88, 'user', photoUrl)}</div>`;
+  }
+
   function renderPersonCard(u) {
     const loc = [u.ville, u.pays].filter(Boolean).join(', ') || '—';
     const profilHref = `profil.html?id=${encodeURIComponent(u.id)}`;
+    const nom = [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom;
+    const isOwn = !!(ME && ME.id === u.id);
     return `
-    <div class="ann-card" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      <div class="ann-card-photo" style="position:relative;display:flex;align-items:center;justify-content:center;background:#f1f5f9;">
-        ${photoAvatar([u.prenom,u.nom].filter(Boolean).join(' ')||u.nom, 96, 'user', u.photo_url)}
-        <span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>
-      </div>
-      <div class="ann-card-body">
-        <div class="ann-card-title">${[u.prenom, u.nom].filter(Boolean).join(' ')}</div>
-        <div class="ann-card-meta-row"><span class="ann-card-loc">📍 ${loc}</span></div>
+    <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
+      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>`, isOwn)}
+      <div class="ann-card-body ann-card-body-profile">
+        <div class="ann-card-title">${nom}</div>
+        <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
         ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
         <div class="ann-card-foot">
           <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
@@ -834,15 +875,13 @@ async function initAnnuaire(){
     const loc = [o.ville, o.pays].filter(Boolean).join(', ') || '—';
     const profilHref = `profil.html?id=${encodeURIComponent(o.id)}`;
     const badge = o.role === 'administrateur' ? "DIASPO'ACTIF" : 'COLLECTIVITÉ';
+    const isOwn = !!(ME && ME.id === o.id);
     return `
-    <div class="ann-card" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      <div class="ann-card-photo" style="position:relative;display:flex;align-items:center;justify-content:center;background:#f1f5f9;">
-        ${photoAvatar(o.nom, 96, 'user', o.photo_url)}
-        <span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>
-      </div>
-      <div class="ann-card-body">
+    <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
+      ${annCardCoverHtml(o.id, o.nom, o.banner_url, o.photo_url, `<span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>`, isOwn)}
+      <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${o.nom}</div>
-        <div class="ann-card-meta-row"><span class="ann-card-loc">📍 ${loc}</span></div>
+        <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
         ${o.bio ? `<div class="ann-card-desc">${o.bio}</div>` : ''}
         <div class="ann-card-foot">
           <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
@@ -963,6 +1002,9 @@ async function initAnnuaire(){
         </div>`;
     renderChips();
   }
+
+  /* ── Rafraîchit l'affichage courant sans réinitialiser les filtres (ex: après modif de couverture) ── */
+  window.annuaireRefresh = apply;
 
   /* ── Exposer reset et removeFilter globalement ── */
   window.annResetFilters = function() {
