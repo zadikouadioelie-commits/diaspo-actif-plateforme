@@ -886,8 +886,10 @@ async function initAnnuaire(){
     const profilHref = `profil.html?id=${encodeURIComponent(u.id)}`;
     const nom = [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom;
     const isOwn = !!(ME && ME.id === u.id);
-    // Origine : renseignee via le module Confidentialite du profil (users.origine1/2) —
-    // affichee seulement si l'information existe reellement, jamais un repli "-".
+    // Nationalité/origine : renseignees via le module Confidentialite du profil (users.*) —
+    // toujours affichees ensemble avec le lieu (meme convention que les cartes initiative) :
+    // nationalite avec repli "-", origine seulement si l'information existe reellement.
+    const nats  = [u.nationalite1, u.nationalite2].filter(Boolean).join(' • ') || '—';
     const origs = [u.origine1, u.origine2].filter(Boolean).join(' • ');
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
@@ -896,6 +898,7 @@ async function initAnnuaire(){
         <div class="ann-card-title">${nom}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
         ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
+        <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
         ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
         <div class="ann-card-foot">
           <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>

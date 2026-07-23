@@ -7029,7 +7029,7 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
 
 /* ---------- Profil (lecture enrichie) ---------- */
 route("GET", "/api/profil/:id", async (req, res, params) => {
-  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie,compte_masque,telephone,publics_json,besoins_json,realisations_json,stats_perso_json,services_perso,zones_json,reseaux_json,annee_debut,assistant_actif,galerie_json FROM users WHERE id=?").get(params.id);
+  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie,compte_masque,telephone,publics_json,besoins_json,realisations_json,stats_perso_json,services_perso,zones_json,reseaux_json,annee_debut,assistant_actif,galerie_json,nationalite1,nationalite2,origine1,origine2 FROM users WHERE id=?").get(params.id);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
   const me = await getCurrentUser(req);
   if (u.compte_masque && (!me || Number(me.id) !== Number(u.id))) return sendJSON(res, 404, { error: "Profil introuvable." });
@@ -7056,6 +7056,8 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     ...publicUser(u),
     bio: u.bio, photo_url: u.photo_url, banner_url: u.banner_url,
     prenom: u.prenom, titre_pro: u.titre_pro,
+    nationalite1: u.nationalite1, nationalite2: u.nationalite2,
+    origine1: u.origine1, origine2: u.origine2,
     centres_interet: safeParse(u.centres_interet || "[]"),
     competences: safeParse(u.competences || "[]"),
     experiences: safeParse(u.experiences || "[]"),

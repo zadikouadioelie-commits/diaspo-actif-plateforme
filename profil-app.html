@@ -1600,11 +1600,16 @@ function renderVisitorProfile() {
     ? `<img loading="lazy" src="${esc(profil.photo_url)}" alt="${esc(nom)}">`
     : esc(initials(nom));
 
-  // Chips (métier / pays / ville) — seulement ceux renseignés
+  // Chips (métier / pays / ville / nationalité / origine) — seulement ceux renseignés.
+  // Nationalité et origine doivent toujours apparaître avec le lieu géographique (pays/ville).
+  const nats  = [profil.nationalite1, profil.nationalite2].filter(Boolean).join(' • ');
+  const origs = [profil.origine1, profil.origine2].filter(Boolean).join(' • ');
   const chips = [];
   if (profil.titre_pro) chips.push(`<span class="pvz-chip">💼 ${esc(profil.titre_pro)}</span>`);
   if (profil.pays)      chips.push(`<span class="pvz-chip">🌍 ${esc(profil.pays)}</span>`);
   if (profil.ville)     chips.push(`<span class="pvz-chip">📍 ${esc(profil.ville)}</span>`);
+  if (nats)             chips.push(`<span class="pvz-chip">🏛 Nationalité : ${esc(nats)}</span>`);
+  if (origs)            chips.push(`<span class="pvz-chip">🗺️ Origine : ${esc(origs)}</span>`);
 
   // Actions
   const following = profil.isFollowing;
