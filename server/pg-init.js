@@ -954,7 +954,18 @@ async function seedPg(pool) {
   await pool.query(`UPDATE users SET email_verifie=1 WHERE email LIKE '%@diaspoactif.demo'`).catch(()=>{});
   // Comptes de démonstration (connexion "Comptes test") : jamais dans l'annuaire, les recherches
   // ni les compteurs de membres — voir toutes les clauses "is_demo" du code.
-  await pool.query(`UPDATE users SET is_demo=TRUE WHERE email LIKE '%@diaspoactif.demo'`).catch(()=>{});
+  // Ciblage précis par email exact (PAS un LIKE '%@diaspoactif.demo' large) : ce domaine est aussi
+  // partagé par d'autres comptes légitimes (mairies/préfectures, initiatives) qui doivent rester
+  // publics — un LIKE trop large les masquait par erreur (initiatives vidées de l'annuaire).
+  const emailsComptesTest = demoUsers.map(u => u.email);
+  await pool.query(
+    `UPDATE users SET is_demo=FALSE WHERE is_demo=TRUE AND email <> ALL($1::text[])`,
+    [emailsComptesTest]
+  ).catch(()=>{});
+  await pool.query(
+    `UPDATE users SET is_demo=TRUE WHERE email = ANY($1::text[])`,
+    [emailsComptesTest]
+  ).catch(()=>{});
 
   // Initialise le compteur de visites
   await pool.query(
