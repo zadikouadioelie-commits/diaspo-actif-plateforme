@@ -33,6 +33,8 @@
     .icrop-btn-cancel:hover { background:#e2e8f0; }
     .icrop-btn-ok { background:#1565C0; color:#fff; }
     .icrop-btn-ok:hover { background:#0D47A1; }
+    .icrop-btn-reset { background:none; color:#1565C0; padding:6px 10px; font-size:12px; white-space:nowrap; }
+    .icrop-btn-reset:hover { text-decoration:underline; }
     .icrop-hint { font-size:11.5px; color:#94a3b8; padding:0 20px 4px; }
   `;
 
@@ -70,15 +72,16 @@
             <span>${shape === 'circle' ? '🖼️ Recadrer la photo' : '🖼️ Recadrer la bannière'}</span>
             <button class="icrop-close" type="button" aria-label="Fermer">✕</button>
           </div>
-          <div class="icrop-hint">Faites glisser pour repositionner, utilisez le curseur pour zoomer.</div>
+          <div class="icrop-hint">Image complète affichée par défaut. Faites glisser pour repositionner, utilisez le curseur pour zoomer (dans les deux sens).</div>
           <div class="icrop-stage" style="aspect-ratio:${aspect}">
             <canvas></canvas>
             <div class="icrop-mask ${shape === 'circle' ? 'circle' : ''}"></div>
           </div>
           <div class="icrop-controls">
             <span class="icrop-zoom-label">🔍</span>
-            <input type="range" min="100" max="400" value="100" step="1">
+            <input type="range" min="50" max="400" value="100" step="1">
             <span class="icrop-zoom-label" style="font-size:15px;">🔍</span>
+            <button class="icrop-btn icrop-btn-reset" type="button" title="Revenir à l'image complète">↺ Réinitialiser</button>
           </div>
           <div class="icrop-actions">
             <button class="icrop-btn icrop-btn-cancel" type="button">Annuler</button>
@@ -96,10 +99,11 @@
       const btnOk  = overlay.querySelector('.icrop-btn-ok');
       const btnCancel = overlay.querySelector('.icrop-btn-cancel');
       const btnClose   = overlay.querySelector('.icrop-close');
+      const btnReset   = overlay.querySelector('.icrop-btn-reset');
 
       let img = new Image();
       let imgLoaded = false;
-      let scale = 1, minScale = 1;
+      let scale = 1, fitScale = 1;
       let offX = 0, offY = 0; // décalage du centre de l'image (en px, repère canvas)
       let dragging = false, lastX = 0, lastY = 0;
 
@@ -142,10 +146,13 @@
       img.onload = () => {
         imgLoaded = true;
         const { w, h } = stageSize();
-        // minScale = plus petit facteur pour couvrir toute la zone (comportement object-fit:cover)
-        minScale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
-        scale = minScale;
+        // fitScale = plus grand facteur qui montre l'image ENTIERE dans le cadre (object-fit:contain).
+        // Zoom par defaut = image complete visible, jamais recadree automatiquement (comportement
+        // precedent : minScale=cover forcait toujours un recadrage, impossible a annuler).
+        fitScale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+        scale = fitScale;
         offX = 0; offY = 0;
+        zoomEl.value = 100;
         fitCanvasToStage();
       };
       img.src = URL.createObjectURL(file);
@@ -153,9 +160,16 @@
       window.addEventListener('resize', fitCanvasToStage);
 
       zoomEl.addEventListener('input', () => {
-        const pct = Number(zoomEl.value) / 100; // 1.0 -> 4.0
-        scale = minScale * pct;
+        const pct = Number(zoomEl.value) / 100; // 0.3 -> 4.0, 1.0 = image complete visible
+        scale = fitScale * pct;
         clampOffset();
+        draw();
+      });
+
+      btnReset.addEventListener('click', () => {
+        scale = fitScale;
+        offX = 0; offY = 0;
+        zoomEl.value = 100;
         draw();
       });
 
