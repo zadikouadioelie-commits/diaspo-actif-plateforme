@@ -7028,7 +7028,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   const initiativesSuivies = await db.prepare("SELECT i.id,i.slug,i.nom,i.domaine,i.pays FROM abonnements a JOIN initiatives i ON i.id=a.initiative_id WHERE a.user_id=? LIMIT 12").all(u.id);
   const usersSuivis  = await db.prepare("SELECT u2.id,u2.nom,u2.prenom,u2.titre_pro,u2.ville,u2.photo_url FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? LIMIT 12").all(u.id);
   const publications = await db.prepare(`
-    SELECT p.id, p.type, p.categorie, p.contenu, p.created_at,
+    SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, p.medias, p.media_url, p.media_type,
       COUNT(DISTINCT r.id) AS nb_reactions,
       COUNT(DISTINCT c.id) AS nb_commentaires
     FROM fil_posts p
@@ -14717,18 +14717,6 @@ ${jsonLd}
       } catch (e) {
         console.error('visits error:', e);
         return sendJSON(res, 200, { count: 0 });
-      }
-    }
-
-    /* ---- GET /api/stats — statistiques agrégées publiques ---- */
-    if (req.method === "GET" && pathname === "/api/stats") {
-      try {
-        const membres = (await db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'utilisateur' AND (is_demo IS NULL OR is_demo=FALSE)`).get())?.n;
-        const initiatives = (await db.prepare(`SELECT COUNT(*) AS n FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)`).get())?.n;
-        const pays = (await db.prepare(`SELECT COUNT(DISTINCT pays) AS n FROM initiatives WHERE pays IS NOT NULL`).get())?.n;
-        return sendJSON(res, 200, { membres, initiatives, pays });
-      } catch (e) {
-        return sendJSON(res, 200, { membres: 0, initiatives: 0, pays: 0 });
       }
     }
 
