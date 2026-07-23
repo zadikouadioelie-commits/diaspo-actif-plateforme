@@ -952,16 +952,19 @@ async function seedPg(pool) {
 
   // Comptes de démonstration : pas de vraie adresse email → déjà "vérifiés"
   await pool.query(`UPDATE users SET email_verifie=1 WHERE email LIKE '%@diaspoactif.demo'`).catch(()=>{});
-  // Comptes de démonstration (connexion "Comptes test") : jamais dans l'annuaire, les recherches
-  // ni les compteurs de membres — voir toutes les clauses "is_demo" du code.
-  // Ciblage précis par email exact (PAS un LIKE '%@diaspoactif.demo' large) : ce domaine est aussi
-  // partagé par d'autres comptes légitimes (mairies/préfectures, initiatives) qui doivent rester
-  // publics — un LIKE trop large les masquait par erreur (initiatives vidées de l'annuaire).
-  const emailsComptesTest = demoUsers.map(u => u.email);
-  await pool.query(
-    `UPDATE users SET is_demo=FALSE WHERE is_demo=TRUE AND email <> ALL($1::text[])`,
-    [emailsComptesTest]
-  ).catch(()=>{});
+  // Comptes de démonstration (connexion "Comptes test" + comptes créés par seed-comptes-test.js) :
+  // jamais dans l'annuaire, les recherches ni les compteurs de membres — voir les clauses "is_demo"
+  // du code. Ciblage précis par liste d'emails exacte (PAS un LIKE '%@diaspoactif.demo' large : ce
+  // domaine est aussi partagé par d'autres comptes légitimes comme des mairies/préfectures ou de
+  // vraies initiatives, qu'un LIKE trop large masquait par erreur — initiatives vidées de l'annuaire).
+  // Reset complet puis réapplication à chaque cold start : état déterministe, jamais dépendant de
+  // ce qu'un autre script a pu positionner avant.
+  const emailsComptesTest = [
+    ...demoUsers.map(u => u.email),
+    'admin@diaspoactif.com', 'test-utilisateur@diaspoactif.com',
+    'test-initiative@diaspoactif.com', 'test-collectivite@diaspoactif.com',
+  ];
+  await pool.query(`UPDATE users SET is_demo=FALSE WHERE is_demo IS DISTINCT FROM FALSE`).catch(()=>{});
   await pool.query(
     `UPDATE users SET is_demo=TRUE WHERE email = ANY($1::text[])`,
     [emailsComptesTest]
