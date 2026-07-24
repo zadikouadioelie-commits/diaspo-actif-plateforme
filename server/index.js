@@ -2050,7 +2050,7 @@ route("GET", "/api/initiatives/:id/adhesion-stats", async (req, res, params) => 
 /* ── Campagnes : liste + création ── */
 /* ── Campagnes actives — lecture publique (section "Campagnes en cours" du profil) ── */
 route("GET", "/api/initiatives/:id/campagnes-actives", async (req, res, params) => {
-  const init = await db.prepare("SELECT id FROM initiatives WHERE id = ? OR slug = ?").get(params.id, params.id);
+  const init = await getInitiativeByIdOrSlug(params.id, "id");
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   const rows = await db.prepare(`SELECT id, nom, objectif_membres, date_debut, date_fin FROM adhesion_campagnes WHERE initiative_id=? AND statut='active' ORDER BY created_at DESC`).all(init.id);
   sendJSON(res, 200, { campagnes: rows });
@@ -3109,6 +3109,18 @@ async function getCertif(initiativeId) {
   return await db.prepare("SELECT niveau, statut, date_attribution FROM certifications WHERE initiative_id=? AND statut='actif'").get(initiativeId) || null;
 }
 
+/* Helper : recherche une initiative par id numerique OU par slug (utilise par les liens annuaire,
+   qui privilegient toujours le slug). "WHERE id=? OR slug=?" plante en Postgres des que idOrSlug
+   n'est pas purement numerique (comparaison entier/texte refusee au niveau du type de colonne,
+   contrairement a SQLite qui l'evalue silencieusement a faux) — d'ou les fiches initiative
+   inaccessibles depuis l'annuaire en production. */
+async function getInitiativeByIdOrSlug(idOrSlug, columns = "*") {
+  if (/^\d+$/.test(String(idOrSlug))) {
+    return await db.prepare(`SELECT ${columns} FROM initiatives WHERE id = ? OR slug = ?`).get(idOrSlug, idOrSlug);
+  }
+  return await db.prepare(`SELECT ${columns} FROM initiatives WHERE slug = ?`).get(idOrSlug);
+}
+
 /* ===== Recherche par mots-clés — Annuaire ===== */
 const ANNUAIRE_NORMALISE = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const ANNUAIRE_STEM = w => w.replace(/(aux|eux|ies)$/,'al').replace(/s$/,''); // pluriel simplifié
@@ -3386,7 +3398,7 @@ route("GET", "/api/mon-initiative", async (req, res) => {
 });
 
 route("GET", "/api/initiatives/:id", async (req, res, params) => {
-  const row = await db.prepare("SELECT * FROM initiatives WHERE id = ? OR slug = ?").get(params.id, params.id);
+  const row = await getInitiativeByIdOrSlug(params.id);
   if (!row) return sendJSON(res, 404, { error: "Initiative introuvable." });
   row.nationalites_concernees = safeParse(row.nationalites_concernees);
   row.nationalite_unique = !!row.nationalite_unique;
@@ -3581,7 +3593,7 @@ route("POST", "/api/admin/collectivites/:id/refuser", async (req, res, params, b
 
 /* ── Équipe publique : responsable principal + membres acceptés (liens vers profils DA) ── */
 route("GET", "/api/initiatives/:id/equipe", async (req, res, params) => {
-  const init = await db.prepare("SELECT id, owner_user_id, nom_responsable, prenom_responsable, fonction_responsable FROM initiatives WHERE id = ? OR slug = ?").get(params.id, params.id);
+  const init = await getInitiativeByIdOrSlug(params.id, "id, owner_user_id, nom_responsable, prenom_responsable, fonction_responsable");
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   const equipe = [];
   if (init.owner_user_id) {
@@ -3607,7 +3619,7 @@ route("GET", "/api/initiatives/:id/equipe", async (req, res, params) => {
 
 /* ── Score d'activité : dynamisme calculé (complément du score de confiance) ── */
 route("GET", "/api/initiatives/:id/score-activite", async (req, res, params) => {
-  const init = await db.prepare("SELECT * FROM initiatives WHERE id = ? OR slug = ?").get(params.id, params.id);
+  const init = await getInitiativeByIdOrSlug(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
 
   const pubs30j = init.owner_user_id
@@ -3645,7 +3657,7 @@ route("GET", "/api/initiatives/:id/score-activite", async (req, res, params) => 
 route("GET", "/api/initiatives/:id/stats-impact", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const init = await db.prepare("SELECT * FROM initiatives WHERE id=? OR slug=?").get(params.id, params.id);
+  const init = await getInitiativeByIdOrSlug(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id) && user.role !== "administrateur")
     return sendJSON(res, 403, { error: "Réservé au propriétaire." });
