@@ -1777,6 +1777,26 @@ function renderVisitorProfile() {
 }
 
 /* Bascule Profil/Vitrine côté visiteur */
+/* Le layout 2 colonnes forcé en mode Vitrine (colonne gauche + centre élargi) ne doit s'appliquer
+   qu'au-dessus du seuil où la media query @media(max-width:1100px) empile déjà .pp-3col sur 1
+   colonne : un style inline gagne toujours sur une règle de media query, donc sans ce garde-fou
+   le layout desktop restait forcé sur mobile (colonnes côte à côte, contenu coupé). */
+let _pp3colIsVitrine = false;
+const _pp3colMq = window.matchMedia('(min-width:1101px)');
+function applyPp3colLayout() {
+  const col3 = document.querySelector('.pp-3col');
+  if (!col3) return;
+  col3.style.gridTemplateColumns = (_pp3colIsVitrine && _pp3colMq.matches) ? 'minmax(230px,270px) minmax(0,1fr)' : '';
+}
+function setPp3colVitrineState(isVitrine) {
+  _pp3colIsVitrine = isVitrine;
+  applyPp3colLayout();
+}
+/* matchMedia.change (plutôt que window.resize) : se déclenche uniquement au franchissement du
+   seuil, fiable y compris lors d'une rotation d'écran ou d'un redimensionnement de fenêtre. */
+if (_pp3colMq.addEventListener) _pp3colMq.addEventListener('change', applyPp3colLayout);
+else if (_pp3colMq.addListener) _pp3colMq.addListener(applyPp3colLayout);
+
 function pvzSwitchTab(view) {
   const body = document.getElementById('pvz-profil-body');
   const vitrine = document.getElementById('p-vitrine');
@@ -1788,11 +1808,11 @@ function pvzSwitchTab(view) {
   if (segP) segP.classList.toggle('active', !isVitrine);
   if (segV) segV.classList.toggle('active', isVitrine);
 
-  /* En vitrine : on retire la colonne de droite pour donner plus d'espace aux produits. */
+  /* En vitrine : on retire la colonne de droite pour donner plus d'espace aux produits
+     (uniquement au-dessus du seuil mobile — voir applyPp3colLayout). */
   const colRight = document.getElementById('pp-col-right');
-  const col3 = document.querySelector('.pp-3col');
   if (colRight) colRight.style.display = isVitrine ? 'none' : '';
-  if (col3) col3.style.gridTemplateColumns = isVitrine ? 'minmax(230px,270px) minmax(0,1fr)' : '';
+  setPp3colVitrineState(isVitrine);
 
   if (isVitrine) {
     history.replaceState(null, '', '#vitrine');
@@ -2087,11 +2107,11 @@ function switchProfileView(view) {
   const pBanner = document.getElementById('p-banner');
   if (pBanner) pBanner.style.display = isVitrine ? 'none' : '';
 
-  /* En vitrine : on retire la colonne de droite pour donner plus d'espace aux produits. */
+  /* En vitrine : on retire la colonne de droite pour donner plus d'espace aux produits
+     (uniquement au-dessus du seuil mobile — voir applyPp3colLayout). */
   const colRight = document.getElementById('pp-col-right');
-  const col3 = document.querySelector('.pp-3col');
   if (colRight) colRight.style.display = isVitrine ? 'none' : '';
-  if (col3) col3.style.gridTemplateColumns = isVitrine ? 'minmax(230px,270px) minmax(0,1fr)' : '';
+  setPp3colVitrineState(isVitrine);
 
   if (isVitrine) {
     // Préserve un éventuel &pub=<id> pour le lien profond
