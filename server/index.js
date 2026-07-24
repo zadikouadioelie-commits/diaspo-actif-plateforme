@@ -11775,8 +11775,13 @@ route("GET", "/api/admin/accreditations/demandes", async (req, res, params, body
   sendJSON(res, 200, { demandes: rows });
 });
 
-/* GET /api/admin/accreditations — liste de tous les comptes accrédités */
-route("GET", "/api/admin/accreditations", async (req, res) => {
+/* GET /api/admin/accreditations-da — liste de tous les comptes accrédités DA (Mobilisation Active,
+   Créateur d'Opportunités...). Renommé depuis /api/admin/accreditations (2026-07-24) : ce chemin
+   était déjà pris par la route des accréditations Observatoire (institutions collectivité) définie
+   plus haut dans le fichier, et le routeur ne retenant que la première correspondance, cette route
+   n'était jamais exécutée — les onglets "Accréditations actives"/"Historique" du dashboard admin
+   recevaient silencieusement les données Observatoire au lieu des données DA attendues. */
+route("GET", "/api/admin/accreditations-da", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const rows = await db.prepare(`

@@ -5984,7 +5984,7 @@ async function loadDAActives(){
   const tbody=document.getElementById('da-actives-body');
   tbody.innerHTML='<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted);">Chargement…</td></tr>';
   try{
-    const r=await api('GET','/admin/accreditations');
+    const r=await api('GET','/admin/accreditations-da');
     const rows=r.accreditations||[];
     if(!rows.length){tbody.innerHTML='<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--muted);">Aucune accréditation enregistrée.</td></tr>';return;}
     tbody.innerHTML=rows.map(a=>`<tr style="border-bottom:1px solid var(--border);">
@@ -6015,7 +6015,7 @@ async function loadDAHisto(){
   tbody.innerHTML='<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted);">Chargement…</td></tr>';
   try{
     // Réutilise la route admin qui liste tout
-    const r=await api('GET','/admin/accreditations');
+    const r=await api('GET','/admin/accreditations-da');
     // L'historique n'est pas encore une route dédiée, on affiche les accreditations par updated_at
     const rows=r.accreditations||[];
     tbody.innerHTML=rows.length
@@ -6415,7 +6415,7 @@ async function loadDAWidgetStats(){
   try{
     const [dem,act]=await Promise.all([
       api('GET','/admin/accreditations/demandes?statut=en_attente'),
-      api('GET','/admin/accreditations')
+      api('GET','/admin/accreditations-da')
     ]);
     const pending=(dem.demandes||[]).length;
     const wp=document.getElementById('da-widget-pending');
