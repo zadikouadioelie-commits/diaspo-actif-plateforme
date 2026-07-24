@@ -2740,26 +2740,32 @@ async function renderVitrineVisitor(init) {
     <button class="pvz-btn" style="white-space:nowrap;${window._daPremiumInitiative===false?'background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;border:none;':''}" onclick="pvzQuickToggleVitrine()">${vitrineVisible ? '🔒 Masquer la vitrine' : '🌐 Rendre visible'}</button>
   </div>` : '';
 
+  /* Ordre reel des sections : pilote par "Organiser ma vitrine" (dashboard, glisser-deposer),
+     pas seulement stocke — sans ca, reordonner dans le dashboard n'aurait aucun effet visible
+     sur la vraie vitrine publique. Bannière/actionbar/contact restent des blocs de structure fixes
+     (comme dans l'exemple du cahier des charges : bannière toujours en tete, contact toujours en pied). */
+  const MODULE_SECTIONS = [
+    ['offre_flash', offreFlashSec], ['a_propos', presentation], ['expertise', expertiseSec],
+    ['certifications', certificationsSec], ['vision_objectifs', visionSec], ['catalogue', collectionsSec],
+    ['produits', produitsSec], ['services', services], ['pourquoi_choisir', pourquoiSec],
+    ['galerie_photos', galerieSec], ['resultats_impact', impactSec], ['besoins_projet', besoinsSec],
+    ['avis', avisSec], ['temoignages', temoignagesSec], ['partenaires', partenairesObjectifSec],
+    ['documents', telechargementsSec],
+  ];
+  const sortedModuleSections = MODULE_SECTIONS
+    .map(([key, html], i) => ({ html, ordre: modOrdre(key, i) }))
+    .sort((a, b) => a.ordre - b.ordre)
+    .map(s => s.html).join('');
+
   el.innerHTML = `<div class="pvt-scope" id="pvt-scope" data-theme="${theme==='bordeaux'?'':theme}" data-style="${stylePreset==='moderne'?'':stylePreset}">
     <div class="pvt-flow">
       ${masqueeBanner}
       ${subnav}
       ${hero}
       ${actionbar}
-      ${offreFlashSec}
-      ${presentation}
-      <div class="pvt-grid2">${expertiseSec}${certificationsSec}</div>
-      ${visionSec}
-      ${collectionsSec}
-      ${produitsSec}
+      ${sortedModuleSections}
       <div id="pvt-publications"></div>
       <div class="pvt-grid2">${promosSec}${meilleuresVentesSec}</div>
-      <div class="pvt-grid2">${services}${pourquoiSec}</div>
-      ${galerieSec}
-      <div class="pvt-grid2">${impactSec}${besoinsSec}</div>
-      ${avisSec}
-      ${temoignagesSec}
-      <div class="pvt-grid2">${partenairesObjectifSec}${telechargementsSec}</div>
       ${contactSec}
     </div>
   </div>`;
