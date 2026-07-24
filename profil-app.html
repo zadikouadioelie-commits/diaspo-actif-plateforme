@@ -2425,6 +2425,13 @@ async function renderVitrineVisitor(init) {
   const banniere = init.vitrine_banniere_url || '';
   const galerie = safeParseJson(init.galerie_json, []);
   const ownerId = init.owner_user_id;
+  /* Module "Paramètres Vitrine" v2 : un module masqué explicitement (registre côté serveur, voir
+     getVitrineModulesState) ne s'affiche jamais publiquement, même s'il a du contenu — mais un
+     module jamais configuré reste actif par défaut (repli sûr, aucune régression sur les vitrines
+     déjà construites avant l'introduction du registre). */
+  const modState = init.vitrine_modules_state || {};
+  const modOn = key => modState[key] ? !!modState[key].actif : true;
+  const modOrdre = (key, def) => (modState[key] && Number.isFinite(modState[key].ordre)) ? modState[key].ordre : def;
 
   // Charger les produits (données réelles)
   let produits = [];
@@ -2442,20 +2449,26 @@ async function renderVitrineVisitor(init) {
   const telClean = tel.replace(/[^0-9+]/g,'');
   const slogan = init.slogan || (init.description ? esc(init.description).split(/[.\n]/)[0].slice(0,110) : '');
 
-  // Sous-nav : uniquement les sections présentes
+  // Sous-nav : uniquement les sections présentes ET actives (modules masqués exclus)
   const navItems = [];
-  if (init.description || isOwn)      navItems.push(['presentation','Présentation']);
-  if (catalogues.length || isOwn)     navItems.push(['collections','Catalogue']);
-  if (articlesNonClasses.length || isOwn) navItems.push(['produits','Non classé']);
-  navItems.push(['promos','Promotions']);
-  if (init.vitrine_services_categories_json || init.vitrine_services || isOwn) navItems.push(['services','Services']);
-  navItems.push(['pourquoi','Pourquoi nous']);
-  if (galerie.length)                 navItems.push(['galerie','Galerie']);
-  navItems.push(['avis','Avis']);
-  if (init.vitrine_partenaires_json || init.vitrine_objectif_cible || isOwn) navItems.push(['partenaires','Partenaires']);
-  if (init.vitrine_documents_json || isOwn) navItems.push(['telechargements','Téléchargements']);
+  if ((init.description || isOwn) && modOn('a_propos'))      navItems.push(['presentation','Présentation']);
+  if ((catalogues.length || isOwn) && modOn('catalogue'))     navItems.push(['collections','Catalogue']);
+  if ((articlesNonClasses.length || isOwn) && modOn('produits')) navItems.push(['produits','Non classé']);
+  if (modOn('offre_flash') || true) navItems.push(['promos','Promotions']);
+  if ((init.vitrine_services_categories_json || init.vitrine_services || isOwn) && modOn('services')) navItems.push(['services','Services']);
+  if (modOn('pourquoi_choisir')) navItems.push(['pourquoi','Pourquoi nous']);
+  if (galerie.length && modOn('galerie_photos'))  navItems.push(['galerie','Galerie']);
+  if ((init.vitrine_expertise_json || isOwn) && modOn('expertise')) navItems.push(['expertise','Expertise']);
+  if ((init.vitrine_certifications_json || isOwn) && modOn('certifications')) navItems.push(['certifications','Certifications']);
+  if ((init.vitrine_vision_objectifs || isOwn) && modOn('vision_objectifs')) navItems.push(['vision','Vision']);
+  if ((init.vitrine_resultats_impact_json || isOwn) && modOn('resultats_impact')) navItems.push(['impact','Impact']);
+  if ((init.besoins_json || isOwn) && modOn('besoins_projet')) navItems.push(['besoins','Besoins']);
+  if (modOn('avis')) navItems.push(['avis','Avis']);
+  if ((init.vitrine_temoignages_json || isOwn) && modOn('temoignages')) navItems.push(['temoignages','Témoignages']);
+  if ((init.vitrine_partenaires_json || init.vitrine_objectif_cible || isOwn) && (modOn('partenaires') || modOn('objectif_jauge'))) navItems.push(['partenaires','Partenaires']);
+  if ((init.vitrine_documents_json || isOwn) && modOn('documents')) navItems.push(['telechargements','Téléchargements']);
   navItems.push(['contact','Contact']);
-  if (init.vitrine_google_maps_url || init.adresse || isOwn) navItems.push(['carte','Carte']);
+  if ((init.vitrine_google_maps_url || init.adresse || isOwn) && modOn('carte')) navItems.push(['carte','Carte']);
 
   const subnav = `<div class="pvt-subnav">${navItems.map((n,i)=>`<a href="#pv-${n[0]}"${i===0?' class="active"':''}>${n[1]}</a>`).join('')}</div>`;
 
@@ -2486,33 +2499,33 @@ async function renderVitrineVisitor(init) {
     </div>
   </section>`;
 
-  const presentation = (init.description || isOwn) ? `<section id="pv-presentation" class="pvt-section">
+  const presentation = ((init.description || isOwn) && modOn('a_propos')) ? `<section id="pv-presentation" class="pvt-section">
     <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Présentation de la vitrine</h3>${isOwn?`<button onclick="editVitrineText('description','Présentation','Décrivez votre activité…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
     <div class="pvt-section-body"><p style="margin:0;font-size:14px;line-height:1.7;color:#3B4658;">${init.description ? esc(init.description).replace(/\n/g,'<br>') : `<span style="color:#94a3b8;font-style:italic;">Aucune présentation. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</p></div>
   </section>` : '';
 
-  const collectionsSec = (catalogues.length || isOwn) ? `<section id="pv-collections" class="pvt-section">
+  const collectionsSec = ((catalogues.length || isOwn) && modOn('catalogue')) ? `<section id="pv-collections" class="pvt-section">
     <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Catalogue</h3>${isOwn?`<button onclick="openCatalogueModal()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Créer un catalogue</button>`:''}</div>
     <div class="pvt-section-body"><div id="pvt-cataloguesgrid">${!catalogues.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun catalogue pour le moment.${isOwn?' Cliquez sur « Créer un catalogue » pour commencer.':''}</div>`:''}</div></div>
   </section>` : '';
 
   // Offre flash : titre + date de fin définis par le titulaire, compte à rebours réel
   const flashActive = init.vitrine_offre_flash_titre && init.vitrine_offre_flash_fin && new Date(init.vitrine_offre_flash_fin) > new Date();
-  const offreFlashSec = (flashActive || isOwn) ? `<section id="pv-flash" style="border-radius:15px;background:var(--v4);color:#fff;padding:20px;position:relative;">
+  const offreFlashSec = ((flashActive || isOwn) && modOn('offre_flash')) ? `<section id="pv-flash" style="border-radius:15px;background:var(--v4);color:#fff;padding:20px;position:relative;">
     <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,.16);padding:4px 10px;border-radius:999px;">⚡ OFFRE FLASH</span>
     <div style="font-size:18px;font-weight:700;margin:12px 0 4px;">${flashActive ? esc(init.vitrine_offre_flash_titre) : (isOwn?'Aucune offre flash active':'')}</div>
     ${flashActive ? `<div id="pvt-flash-countdown" style="display:flex;gap:8px;margin:12px 0;font-family:'Bricolage Grotesque';font-size:20px;font-weight:700;"></div>` : ''}
     ${isOwn ? `<button onclick="editOffreFlash()" style="margin-top:8px;background:#fff;color:var(--v4);border:none;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;">✏️ ${flashActive?'Modifier':'Créer'} l'offre flash</button>` : ''}
   </section>` : '';
 
-  const produitsSec = (articlesNonClasses.length || isOwn) ? `<section id="pv-produits" class="pvt-section">
+  const produitsSec = ((articlesNonClasses.length || isOwn) && modOn('produits')) ? `<section id="pv-produits" class="pvt-section">
     <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Articles non classés</h3>${isOwn?`<button onclick="openProductModal()" ${produits.length>=MAX_PRODUITS_VITRINE?'disabled':''} style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un article (${produits.length}/${MAX_PRODUITS_VITRINE})</button>`:''}</div>
     <div class="pvt-section-body"><div class="pvt-prodgrid" id="pvt-prodgrid">${!articlesNonClasses.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun article non classé.${isOwn?' Ajoutez un article et rangez-le dans un catalogue depuis « Modifier ».':''}</div>`:''}</div></div>
   </section>` : '';
 
   const servicesCats = safeParseJson(init.vitrine_services_categories_json, null);
   const hasServices = (servicesCats && servicesCats.length) || init.vitrine_services;
-  const services = (hasServices || isOwn) ? `<section id="pv-services" class="pvt-section">
+  const services = ((hasServices || isOwn) && modOn('services')) ? `<section id="pv-services" class="pvt-section">
     <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🛠 Services</h3>${isOwn?`<button onclick="pvtEditServices()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
     <div id="pvt-services-body" class="pvt-services-list">${
       servicesCats && servicesCats.length
@@ -2525,7 +2538,7 @@ async function renderVitrineVisitor(init) {
     }</div>
   </section>` : '';
 
-  const galerieSec = galerie.length ? `<section id="pv-galerie" class="pvt-section">
+  const galerieSec = (galerie.length && modOn('galerie_photos')) ? `<section id="pv-galerie" class="pvt-section">
     <div class="pvt-section-head sm"><h3>📸 Galerie</h3></div>
     <div class="pvt-gallery">${galerie.map(u=>`<img loading="lazy" src="${esc(u)}" alt="">`).join('')}</div>
   </section>` : '';
@@ -2543,22 +2556,84 @@ async function renderVitrineVisitor(init) {
   </section>`;
 
   // Pourquoi nous choisir — chargé de façon asynchrone (table dédiée, CRUD + glisser-déposer)
-  const pourquoiSec = `<section id="pv-pourquoi" class="pvt-section">
+  const pourquoiSec = modOn('pourquoi_choisir') ? `<section id="pv-pourquoi" class="pvt-section">
     <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>✔ Pourquoi nous choisir</h3>${isOwn?`<button onclick="pvtOpenArgumentModal()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un argument</button>`:''}</div>
     <div id="pvt-pourquoi-body" style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px;color:#3B4658;"><div class="pvz-empty">Chargement…</div></div>
-  </section>`;
+  </section>` : '';
 
   // Avis clients
-  const avisSec = `<section id="pv-avis" class="pvt-section">
+  const avisSec = modOn('avis') ? `<section id="pv-avis" class="pvt-section">
     <div class="pvt-section-head sm"><h3>⭐ Avis clients</h3></div>
     <div id="pvt-avis-body" style="padding:16px 20px;"><div class="pvz-empty">Chargement…</div></div>
-  </section>`;
+  </section>` : '';
+
+  // Témoignages (curés par le titulaire — distinct des Avis clients notés)
+  const temoignages = safeParseJson(init.vitrine_temoignages_json, []);
+  const temoignagesSec = ((temoignages.length || isOwn) && modOn('temoignages')) ? `<section id="pv-temoignages" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>💬 Témoignages</h3>${isOwn?`<button onclick="pvtEditTemoignages()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">
+      ${temoignages.length ? temoignages.map(t=>`
+        <div style="background:#F6F1EE;border-radius:12px;padding:14px;">
+          <div style="font-size:13px;color:#3B4658;line-height:1.5;font-style:italic;">« ${esc(t.texte||'')} »</div>
+          <div style="margin-top:8px;font-size:12px;font-weight:700;color:#122A4D;">${esc(t.nom||'')}</div>
+          ${t.fonction?`<div style="font-size:11px;color:#8794A7;">${esc(t.fonction)}</div>`:''}
+        </div>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun témoignage. Cliquez sur Modifier pour en ajouter.':''}</span>`}
+    </div>
+  </section>` : '';
+
+  // Vision et objectifs (texte libre — type Projet/Impact)
+  const visionSec = ((init.vitrine_vision_objectifs || isOwn) && modOn('vision_objectifs')) ? `<section id="pv-vision" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🎯 Vision et objectifs</h3>${isOwn?`<button onclick="editVitrineText('vitrine_vision_objectifs','Vision et objectifs','Décrivez la vision et les objectifs du projet…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div class="pvt-section-body"><p style="margin:0;font-size:14px;line-height:1.7;color:#3B4658;">${init.vitrine_vision_objectifs ? esc(init.vitrine_vision_objectifs).replace(/\n/g,'<br>') : `<span style="color:#94a3b8;font-style:italic;">Non renseigné.</span>`}</p></div>
+  </section>` : '';
+
+  // Résultats / Impact (liste de chiffres clés — type Projet/Impact)
+  const resultatsImpact = safeParseJson(init.vitrine_resultats_impact_json, []);
+  const impactSec = ((resultatsImpact.length || isOwn) && modOn('resultats_impact')) ? `<section id="pv-impact" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>📊 Résultats / Impact</h3>${isOwn?`<button onclick="pvtEditResultatsImpact()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;">
+      ${resultatsImpact.length ? resultatsImpact.map(r=>`
+        <div style="text-align:center;">
+          <div style="font-family:'Bricolage Grotesque';font-size:26px;font-weight:800;color:var(--v1);">${esc(r.valeur||'')}</div>
+          <div style="font-size:12px;color:#6B7686;margin-top:2px;">${esc(r.libelle||'')}</div>
+        </div>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun résultat renseigné.':''}</span>`}
+    </div>
+  </section>` : '';
+
+  // Besoins du projet (réutilise besoins_json, déjà existant côté profil public enrichi)
+  const besoinsProjet = safeParseJson(init.besoins_json, []);
+  const besoinsSec = ((besoinsProjet.length || isOwn) && modOn('besoins_projet')) ? `<section id="pv-besoins" class="pvt-section">
+    <div class="pvt-section-head sm"><h3>🙏 Besoins du projet</h3></div>
+    <div style="padding:16px 20px;display:flex;flex-wrap:wrap;gap:8px;">
+      ${besoinsProjet.length ? besoinsProjet.map(b=>`<span class="pvz-interest-chip">${esc(b)}</span>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun besoin exprimé.':''}</span>`}
+    </div>
+  </section>` : '';
+
+  // Expertise (liste de domaines — type Formation)
+  const expertiseList = safeParseJson(init.vitrine_expertise_json, []);
+  const expertiseSec = ((expertiseList.length || isOwn) && modOn('expertise')) ? `<section id="pv-expertise" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🧠 Expertise</h3>${isOwn?`<button onclick="pvtEditExpertise()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:16px 20px;display:flex;flex-wrap:wrap;gap:8px;">
+      ${expertiseList.length ? expertiseList.map(e=>`<span class="pvz-interest-chip">${esc(e)}</span>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun domaine renseigné.':''}</span>`}
+    </div>
+  </section>` : '';
+
+  // Certifications (type Formation)
+  const certifsList = safeParseJson(init.vitrine_certifications_json, []);
+  const certificationsSec = ((certifsList.length || isOwn) && modOn('certifications')) ? `<section id="pv-certifications" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🎓 Certifications</h3>${isOwn?`<button onclick="pvtEditCertifications()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:8px;">
+      ${certifsList.length ? certifsList.map(c=>`<div style="display:flex;align-items:center;gap:9px;font-size:13px;color:#3B4658;"><span>🏅</span><span style="flex:1;">${esc(c.nom||'')}</span>${c.annee?`<span style="color:#8794A7;font-size:12px;">${esc(String(c.annee))}</span>`:''}</div>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucune certification renseignée.':''}</span>`}
+    </div>
+  </section>` : '';
 
   // Partenaires (module dédié — /api/initiatives/:id/partenaires) + Objectif
   let partenaires = [];
   try { const pr = await api('GET', `/initiatives/${init.id}/partenaires`); partenaires = pr.partenaires || []; } catch(e) {}
-  const partenairesObjectifSec = (partenaires.length || init.vitrine_objectif_cible || isOwn) ? `<section id="pv-partenaires" class="pvt-section">
-    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🤝 Nos partenaires</h3>${isOwn?`<a href="dashboard-initiative.html#partenaires-liste" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;">⚙️ Gérer</a>`:''}</div>
+  const showPartenaires = modOn('partenaires') && (partenaires.length || isOwn);
+  const showObjectif = modOn('objectif_jauge') && (init.vitrine_objectif_cible || isOwn);
+  const partenairesObjectifSec = (showPartenaires || showObjectif) ? `<section id="pv-partenaires" class="pvt-section">
+    ${showPartenaires ? `<div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🤝 Nos partenaires</h3>${isOwn?`<a href="dashboard-initiative.html#partenaires-liste" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;">⚙️ Gérer</a>`:''}</div>
     <div style="padding:18px 22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;">
       ${partenaires.length ? partenaires.map(p=>`
         <div style="text-align:center;background:#F6F1EE;border-radius:12px;padding:12px;">
@@ -2569,8 +2644,8 @@ async function renderVitrineVisitor(init) {
           ${p.profil_url?`<a href="${esc(p.profil_url)}" style="display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:var(--v1);">Voir le profil →</a>`:''}
           ${(p.site_web||p.email||p.telephone)?`<div style="font-size:10px;color:#8794A7;margin-top:4px;">${[p.site_web,p.email,p.telephone].filter(Boolean).map(esc).join(' · ')}</div>`:''}
         </div>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun partenaire ajouté.':''}</span>`}
-    </div>
-    ${(init.vitrine_objectif_cible || isOwn) ? `<div style="padding:0 22px 18px;">
+    </div>` : ''}
+    ${showObjectif ? `<div style="padding:18px 22px;">
       <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px;align-items:center;">
         <span style="color:#6B7686;">🎯 Objectif${init.vitrine_objectif_libelle?` : ${esc(init.vitrine_objectif_libelle)}`:''}</span>
         <b style="color:var(--v1);">${init.vitrine_objectif_cible ? `<span id="pvt-objectif-actuel">…</span> / ${init.vitrine_objectif_cible}` : '—'}</b>
@@ -2582,7 +2657,7 @@ async function renderVitrineVisitor(init) {
 
   // Téléchargements
   const documents = safeParseJson(init.vitrine_documents_json, []);
-  const telechargementsSec = (documents.length || isOwn) ? `<section id="pv-telechargements" class="pvt-section">
+  const telechargementsSec = ((documents.length || isOwn) && modOn('documents')) ? `<section id="pv-telechargements" class="pvt-section">
     <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>📥 Téléchargements</h3>${isOwn?`<button onclick="pvtAddDocument()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter</button>`:''}</div>
     <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
       ${documents.length ? documents.map((d,i)=>`<div style="display:flex;align-items:center;gap:11px;font-size:13px;color:#3B4658;padding:9px 12px;border:1px solid var(--vsoftbd);border-radius:10px;"><span style="font-size:17px;">📄</span><span style="flex:1;">${esc(d.titre)}</span><a href="${esc(d.url)}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;color:var(--v1);">Télécharger</a>${isOwn?`<button onclick="pvtRemoveDocument(${i})" style="background:none;border:none;color:#B91C1C;cursor:pointer;font-size:13px;">✕</button>`:''}</div>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">Aucun document.</span>`}
@@ -2626,8 +2701,10 @@ async function renderVitrineVisitor(init) {
   if (telAnyClean) dynBtns.push(`<a class="pvt-contact-btn" href="tel:${esc(telAnyClean)}">📞 Téléphone</a>`);
   if (init.vitrine_email_pro) dynBtns.push(`<a class="pvt-contact-btn" href="mailto:${esc(init.vitrine_email_pro)}">✉️ Email</a>`);
   if (init.site_web) dynBtns.push(`<a class="pvt-contact-btn" href="${esc(init.site_web.startsWith('http')?init.site_web:'https://'+init.site_web)}" target="_blank" rel="noopener">🌍 Site internet</a>`);
-  if (hasMap) dynBtns.push(`<a class="pvt-contact-btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapsQuery)}" target="_blank" rel="noopener">📍 Itinéraire</a>`);
+  if (hasMap && modOn('carte')) dynBtns.push(`<a class="pvt-contact-btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapsQuery)}" target="_blank" rel="noopener">📍 Itinéraire</a>`);
   if (!isOwn && init.vitrine_rdv_active) dynBtns.push(`<a class="pvt-contact-btn" href="javascript:void(0)" onclick="pvtOpenRdvModal(${ownerId},'${esc(init.nom||'')}')">📅 Prendre rendez-vous</a>`);
+  if (modOn('demande_devis') && (init.vitrine_devis_active || isOwn)) dynBtns.push(`<a class="pvt-contact-btn" href="javascript:void(0)" onclick="contacterBoutique(${ownerId},'devis')">📝 Demande de devis</a>`);
+  if (modOn('demande_partenariat') && (init.vitrine_partenariat_active || isOwn)) dynBtns.push(`<a class="pvt-contact-btn" href="javascript:void(0)" onclick="contacterBoutique(${ownerId},'partenariat')">🤝 Demande de partenariat</a>`);
   dynBtns.push(`<a class="pvt-contact-btn" href="javascript:void(0)" onclick="contacterBoutique(${ownerId})">💬 Message</a>`);
 
   const contactSec = `<section id="pv-contact" class="pvt-contact">
@@ -2659,13 +2736,17 @@ async function renderVitrineVisitor(init) {
       ${actionbar}
       ${offreFlashSec}
       ${presentation}
+      <div class="pvt-grid2">${expertiseSec}${certificationsSec}</div>
+      ${visionSec}
       ${collectionsSec}
       ${produitsSec}
       <div id="pvt-publications"></div>
       <div class="pvt-grid2">${promosSec}${meilleuresVentesSec}</div>
       <div class="pvt-grid2">${services}${pourquoiSec}</div>
       ${galerieSec}
+      <div class="pvt-grid2">${impactSec}${besoinsSec}</div>
       ${avisSec}
+      ${temoignagesSec}
       <div class="pvt-grid2">${partenairesObjectifSec}${telechargementsSec}</div>
       ${contactSec}
     </div>
@@ -2923,6 +3004,85 @@ async function pvtDocEnregistrer() {
     renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
+/* ══════════ Éditeur générique de liste structurée (Témoignages, Résultats/Impact, Certifications) ══════════
+   Stockage simple : un champ JSON unique sur initiatives, réutilise la route PUT /vitrine générique
+   (cohérent avec vitrine_documents_json / vitrine_partenaires_json déjà existants). */
+function pvtOpenListEditor({ field, title, itemLabel, itemFields }) {
+  if (!isOwn || !_vitrineInit) return;
+  const current = safeParseJson(_vitrineInit[field], []);
+  document.getElementById('pvt-list-modal')?.remove();
+  const rowHtml = (item) => `<div class="pvt-le-row" style="border:1px solid #E2E8F0;border-radius:10px;padding:10px;margin-bottom:8px;">
+    ${itemFields.map(f => `<input data-k="${f.key}" placeholder="${esc(f.label)}" value="${esc(item[f.key]||'')}" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;margin-bottom:6px;">`).join('')}
+    <button type="button" onclick="this.closest('.pvt-le-row').remove()" style="background:none;border:none;color:#B91C1C;font-size:12px;cursor:pointer;padding:0;">🗑 Retirer</button>
+  </div>`;
+  const overlay = document.createElement('div');
+  overlay.id = 'pvt-list-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:460px;width:100%;padding:22px;max-height:85vh;overflow-y:auto;">
+    <h2 style="margin:0 0 14px;font-size:16px;">✏️ ${esc(title)}</h2>
+    <div id="pvt-le-rows">${current.map(rowHtml).join('')}</div>
+    <button type="button" onclick="pvtLeAddRow()" style="margin-bottom:16px;background:none;border:1.5px dashed #cbd5e1;border-radius:8px;padding:8px 14px;font-size:12.5px;color:#6B7686;cursor:pointer;width:100%;">➕ Ajouter ${esc(itemLabel)}</button>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="document.getElementById('pvt-list-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;">Annuler</button>
+      <button onclick="pvtLeSave()" style="padding:9px 16px;border-radius:8px;border:none;background:var(--v1,#8E1B2E);color:#fff;font-weight:700;cursor:pointer;">Enregistrer</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  window._pvtLeCtx = { field, itemFields };
+}
+function pvtLeAddRow() {
+  const rows = document.getElementById('pvt-le-rows');
+  const { itemFields } = window._pvtLeCtx;
+  const div = document.createElement('div');
+  div.className = 'pvt-le-row';
+  div.style.cssText = 'border:1px solid #E2E8F0;border-radius:10px;padding:10px;margin-bottom:8px;';
+  div.innerHTML = itemFields.map(f => `<input data-k="${f.key}" placeholder="${esc(f.label)}" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;margin-bottom:6px;">`).join('') +
+    `<button type="button" onclick="this.closest('.pvt-le-row').remove()" style="background:none;border:none;color:#B91C1C;font-size:12px;cursor:pointer;padding:0;">🗑 Retirer</button>`;
+  rows.appendChild(div);
+}
+async function pvtLeSave() {
+  const { field, itemFields } = window._pvtLeCtx;
+  const rows = [...document.querySelectorAll('#pvt-le-rows .pvt-le-row')];
+  const list = rows.map(r => {
+    const obj = {};
+    itemFields.forEach(f => { obj[f.key] = r.querySelector(`[data-k="${f.key}"]`).value.trim(); });
+    return obj;
+  }).filter(obj => Object.values(obj).some(v => v));
+  try {
+    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { [field]: list });
+    _vitrineInit[field] = JSON.stringify(list);
+    document.getElementById('pvt-list-modal')?.remove();
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+function pvtEditTemoignages() {
+  pvtOpenListEditor({ field:'vitrine_temoignages_json', title:'Témoignages', itemLabel:'un témoignage',
+    itemFields:[{key:'texte',label:'Texte du témoignage'},{key:'nom',label:'Nom de la personne'},{key:'fonction',label:'Fonction (facultatif)'}] });
+}
+function pvtEditResultatsImpact() {
+  pvtOpenListEditor({ field:'vitrine_resultats_impact_json', title:'Résultats / Impact', itemLabel:'un résultat',
+    itemFields:[{key:'valeur',label:'Valeur (ex : 500+)'},{key:'libelle',label:'Libellé (ex : bénéficiaires accompagnés)'}] });
+}
+function pvtEditCertifications() {
+  pvtOpenListEditor({ field:'vitrine_certifications_json', title:'Certifications', itemLabel:'une certification',
+    itemFields:[{key:'nom',label:'Nom de la certification'},{key:'annee',label:'Année (facultatif)'}] });
+}
+/* Expertise : simple liste de domaines (un seul champ par entrée) — saisie rapide séparée par virgules. */
+async function pvtEditExpertise() {
+  if (!isOwn || !_vitrineInit) return;
+  const current = safeParseJson(_vitrineInit.vitrine_expertise_json, []);
+  const val = prompt('Domaines d\'expertise, séparés par des virgules :', current.join(', '));
+  if (val === null) return;
+  const list = val.split(',').map(s => s.trim()).filter(Boolean);
+  try {
+    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_expertise_json: list });
+    _vitrineInit.vitrine_expertise_json = JSON.stringify(list);
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
 async function pvtRemoveDocument(i) {
   if (!isOwn || !_vitrineInit) return;
   const list = safeParseJson(_vitrineInit.vitrine_documents_json, []);
@@ -3688,9 +3848,9 @@ async function renderBoutique(init, ownerFlag) {
 let _boutiqueInit = null;
 let _produitFiltre = 'tous';
 
-function contacterBoutique(ownerId) {
+function contacterBoutique(ownerId, objet) {
   if (!CU) { window.location.href = 'login.html'; return; }
-  window.location.href = `messagerie.html?with=${ownerId}`;
+  window.location.href = `messagerie.html?with=${ownerId}${objet ? '&objet='+encodeURIComponent(objet) : ''}`;
 }
 
 function filtrerProduits(f) {

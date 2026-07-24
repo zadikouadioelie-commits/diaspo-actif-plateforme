@@ -4481,6 +4481,21 @@ db.exec(`
   if (!initCols6.includes('annee_creation'))    db.exec("ALTER TABLE initiatives ADD COLUMN annee_creation INTEGER");
   if (!initCols6.includes('assistant_actif'))   db.exec("ALTER TABLE initiatives ADD COLUMN assistant_actif INTEGER DEFAULT 1");
 
+  // ── Module "Paramètres Vitrine" v2 : type de vitrine (modèle) + registre des modules actif/masqué/ordre ──
+  // vitrine_modules_json : { [cleModule]: { actif: bool, ordre: number } }. Un module masqué conserve
+  // ses données (aucune colonne n'est jamais vidée par ce système) ; seul son affichage public change.
+  const initCols7 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
+  if (!initCols7.includes('vitrine_type'))                    db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_type TEXT");
+  if (!initCols7.includes('vitrine_modules_json'))            db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_modules_json TEXT DEFAULT '{}'");
+  if (!initCols7.includes('vitrine_temoignages_json'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_temoignages_json TEXT");
+  if (!initCols7.includes('vitrine_vision_objectifs'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_vision_objectifs TEXT");
+  if (!initCols7.includes('vitrine_resultats_impact_json'))   db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_resultats_impact_json TEXT");
+  if (!initCols7.includes('vitrine_expertise_json'))          db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_expertise_json TEXT");
+  if (!initCols7.includes('vitrine_certifications_json'))     db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_certifications_json TEXT");
+  if (!initCols7.includes('vitrine_devis_active'))            db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_devis_active INTEGER DEFAULT 0");
+  if (!initCols7.includes('vitrine_partenariat_active'))      db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_partenariat_active INTEGER DEFAULT 0");
+  if (!initCols7.includes('vitrine_style_json'))              db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_style_json TEXT DEFAULT '{}'");
+
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
   db.exec(`
     CREATE TABLE IF NOT EXISTS initiative_partenaires (

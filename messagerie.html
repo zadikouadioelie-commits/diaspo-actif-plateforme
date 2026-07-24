@@ -1139,14 +1139,22 @@ document.getElementById("btn-back").addEventListener("click",()=>{
   document.getElementById("msg-empty").style.display="flex";
 });
 
-/* ---- Lien depuis d'autres pages : ?with=<userId>[&produit=<id>] ---- */
+/* ---- Lien depuis d'autres pages : ?with=<userId>[&produit=<id>][&objet=devis|partenariat] ---- */
 let _pendingProduitId = null;
-async function openConvWithUser(userId, produitId){
+const OBJET_TEMPLATES = {
+  devis: "Bonjour,\n\nJe souhaiterais recevoir un devis pour vos produits/services.\n\nMerci de me recontacter avec davantage d'informations.",
+  partenariat: "Bonjour,\n\nJe souhaiterais explorer une possibilité de partenariat avec votre initiative.\n\nN'hésitez pas à me recontacter pour en discuter.",
+};
+async function openConvWithUser(userId, produitId, objet){
   try{
     const r=await api("POST","/conversations",{user_id:userId});
     await loadConvList();
     openConv(r.conversation_id);
     if (produitId) await prefillProduitMessage(produitId);
+    else if (objet && OBJET_TEMPLATES[objet]) {
+      const inp = document.getElementById('msg-input');
+      if (inp){ inp.value = OBJET_TEMPLATES[objet]; inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,200)+'px'; inp.focus(); }
+    }
   }catch(e){ alert(e.message); }
 }
 
@@ -1281,14 +1289,14 @@ async function proposerClassementContact(contactId, contactNom, convId){
   // PRIORITÉ : ouvrir directement la conversation demandée (?with= / ?init=) dès que possible
   {
     const up=new URLSearchParams(location.search);
-    const w=up.get("with"), ini=up.get("init"), prod=up.get("produit");
+    const w=up.get("with"), ini=up.get("init"), prod=up.get("produit"), objet=up.get("objet");
     if(w){
-      openConvWithUser(Number(w), prod?Number(prod):null);
+      openConvWithUser(Number(w), prod?Number(prod):null, objet);
     } else if(ini){
       (async()=>{ try{
         const r=await api("GET","/initiatives/"+encodeURIComponent(ini));
         const it=r.initiative||r; const oid=Number(it.owner_user_id||it.user_id);
-        if(oid) openConvWithUser(oid, prod?Number(prod):null);
+        if(oid) openConvWithUser(oid, prod?Number(prod):null, objet);
         else alert("Impossible d'ouvrir la conversation : propriétaire introuvable.");
       }catch(e){ alert(e.message); } })();
     }

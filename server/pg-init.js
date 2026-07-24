@@ -562,6 +562,17 @@ async function migratePg(pool) {
     ['initiatives', 'stats_perso_json', 'TEXT'],
     ['initiatives', 'annee_creation', 'INTEGER'],
     ['initiatives', 'assistant_actif', 'INTEGER DEFAULT 1'],
+    // Module "Paramètres Vitrine" v2 : type de vitrine (modèle) + registre des modules actif/masqué/ordre
+    ['initiatives', 'vitrine_type', 'TEXT'],
+    ['initiatives', 'vitrine_modules_json', "TEXT DEFAULT '{}'"],
+    ['initiatives', 'vitrine_temoignages_json', 'TEXT'],
+    ['initiatives', 'vitrine_vision_objectifs', 'TEXT'],
+    ['initiatives', 'vitrine_resultats_impact_json', 'TEXT'],
+    ['initiatives', 'vitrine_expertise_json', 'TEXT'],
+    ['initiatives', 'vitrine_certifications_json', 'TEXT'],
+    ['initiatives', 'vitrine_devis_active', 'INTEGER DEFAULT 0'],
+    ['initiatives', 'vitrine_partenariat_active', 'INTEGER DEFAULT 0'],
+    ['initiatives', 'vitrine_style_json', "TEXT DEFAULT '{}'"],
     // Profil public enrichi des comptes personnels (miroir)
     ['users', 'publics_json', 'TEXT'],
     ['users', 'besoins_json', 'TEXT'],

@@ -1400,7 +1400,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
     <!-- ══ SECTION ⭐ PARAMÈTRES VITRINE ══ -->
     <div style="display:none;" id="parametres-vitrine">
-      <h2 style="margin:0 0 16px;">⭐ Paramètres Vitrine</h2>
+      <h2 style="margin:0 0 6px;">⭐ Paramètres Vitrine</h2>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 20px;">Le centre de configuration de votre vitrine unique — modèle, modules, organisation et apparence.</p>
 
       <div class="card" style="margin-bottom:20px;">
         <h3 style="margin:0 0 12px;font-size:15px;">👁️ Statut de la vitrine</h3>
@@ -1410,6 +1411,34 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <button class="btn" id="btn-statut-masque" onclick="definirStatutVitrine(0)" style="flex:1;min-width:180px;justify-content:center;">🔒 Non visible</button>
         </div>
         <div id="parametres-vitrine-statut" style="margin-top:12px;font-size:13px;font-weight:700;"></div>
+        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+          <a href="profil.html#vitrine" target="_blank" class="btn btn-outline" style="text-decoration:none;">👁 Voir ma vitrine publique</a>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 4px;font-size:15px;">🎨 Choisir mon modèle de vitrine</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Le modèle active automatiquement un jeu de modules adaptés à votre activité. Vous restez ensuite libre de tout personnaliser — choisir un modèle n'efface jamais vos données ni vos modules déjà actifs.</p>
+        <div id="pv-templates-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 4px;font-size:15px;">🧩 Personnaliser ma vitrine</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Activez, masquez ou configurez chaque module. Un module masqué conserve ses données — vous pouvez le réactiver à tout moment sans rien perdre.</p>
+        <div id="pv-modules-lib"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 4px;font-size:15px;">↕️ Organiser ma vitrine</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Glissez-déposez pour réordonner les sections actives de votre vitrine publique.</p>
+        <div id="pv-order-list" style="display:flex;flex-direction:column;gap:8px;"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 4px;font-size:15px;">🖌️ Apparence de la vitrine</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Style graphique de la vitrine (indépendant du modèle métier choisi ci-dessus).</p>
+        <div id="pv-theme-swatches" style="display:flex;gap:12px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
+        <p style="font-size:12px;color:var(--muted);margin:14px 0 0;">🔜 Typographies, style des boutons et mises en page alternatives : à venir dans une prochaine évolution du module.</p>
       </div>
     </div>
 
@@ -2945,7 +2974,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'evenements') window.renderInitEvenements?.();
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'messages-vitrine') renderMessagesVitrine();
-    if (name === 'parametres-vitrine') renderStatutVitrineSection();
+    if (name === 'parametres-vitrine') { renderStatutVitrineSection(); loadParametresVitrineFull(); }
     if (name === 'partenaires-liste') renderPartenairesListe();
     if (name === 'adhesions-init') adhSwitchTab('formules');
     if (name === 'votes-init') voSwitchTab('scrutins');
@@ -4147,6 +4176,176 @@ async function toggleVisibiliteVitrine(nouvelEtat) {
     renderVisibiliteVitrineStatut(nouvelEtat);
     renderStatutVitrineSection();
     document.getElementById('visibilite-vitrine-modal')?.remove();
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* ══════════════════════════════════════════════
+   PARAMÈTRES VITRINE v2 — modèles + bibliothèque de modules + organisation + apparence
+══════════════════════════════════════════════ */
+const PV_CATEGORIE_LABELS = {
+  presentation: '📋 Présentation', medias: '🖼️ Médias', activite: '🛍️ Activité',
+  interaction: '💬 Interaction', communication: '📣 Communication', impact: '🌍 Impact',
+};
+let __pvRegistry = null;
+let __pvModulesState = null;
+let __pvVitrineType = null;
+
+async function loadParametresVitrineFull() {
+  if (!window.__vitrineInitId) {
+    ['pv-templates-grid','pv-modules-lib','pv-order-list','pv-theme-swatches'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<div class="notice">Créez votre initiative pour configurer sa vitrine.</div>';
+    });
+    return;
+  }
+  try {
+    if (!__pvRegistry) __pvRegistry = await api('GET', '/vitrine-modules-registry');
+    const r = await api('GET', '/mon-initiative');
+    const init = r.initiative;
+    if (!init) return;
+    __pvModulesState = init.vitrine_modules_state || {};
+    __pvVitrineType = init.vitrine_type || null;
+    window.__pvInitTheme = init.vitrine_theme || 'bordeaux';
+    renderPvTemplates();
+    renderPvModulesLib();
+    renderPvOrderList();
+    renderPvThemeSwatches();
+  } catch (e) { console.error(e); }
+}
+
+function renderPvTemplates() {
+  const grid = document.getElementById('pv-templates-grid');
+  if (!grid || !__pvRegistry) return;
+  grid.innerHTML = Object.entries(__pvRegistry.templates).map(([key, t]) => `
+    <div style="border:2px solid ${__pvVitrineType===key?'var(--orange)':'var(--border)'};border-radius:12px;padding:14px;cursor:pointer;${__pvVitrineType===key?'background:#FFF7ED;':''}" onclick="pvChoisirType('${key}')">
+      <div style="font-size:15px;font-weight:800;margin-bottom:4px;">${t.label}</div>
+      <div style="font-size:11.5px;color:var(--muted);line-height:1.4;">${_mvEsc(t.pour)}</div>
+      ${__pvVitrineType===key?'<div style="margin-top:8px;font-size:11.5px;font-weight:700;color:var(--orange);">✓ Modèle actuel</div>':''}
+    </div>`).join('');
+}
+
+function pvChoisirType(type) {
+  if (!__pvRegistry) return;
+  const t = __pvRegistry.templates[type];
+  if (!t) return;
+  document.getElementById('pv-confirm-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'pv-confirm-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:26px;">
+    <h2 style="margin:0 0 12px;font-size:17px;">Appliquer le modèle ${t.label} ?</h2>
+    <p style="font-size:13.5px;color:#475569;line-height:1.7;margin:0 0 16px;">
+      Les modules recommandés pour ce type de vitrine seront activés automatiquement.<br><br>
+      Vos modules déjà actifs et toutes vos données existantes restent inchangés — rien n'est jamais supprimé ni masqué par ce changement.
+    </p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="document.getElementById('pv-confirm-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
+      <button onclick="pvAppliquerType('${type}')" style="padding:9px 16px;border-radius:8px;border:none;background:var(--orange);color:#fff;font-weight:700;cursor:pointer;">Appliquer</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function pvAppliquerType(type) {
+  try {
+    const r = await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine-type`, { type });
+    __pvVitrineType = type;
+    __pvModulesState = r.modules;
+    document.getElementById('pv-confirm-modal')?.remove();
+    renderPvTemplates(); renderPvModulesLib(); renderPvOrderList();
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+function renderPvModulesLib() {
+  const box = document.getElementById('pv-modules-lib');
+  if (!box || !__pvRegistry) return;
+  const byCat = {};
+  Object.entries(__pvRegistry.modules).forEach(([key, m]) => { (byCat[m.categorie] = byCat[m.categorie] || []).push({ key, ...m }); });
+  box.innerHTML = Object.entries(byCat).map(([cat, mods]) => `
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">${PV_CATEGORIE_LABELS[cat]||cat}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;">
+        ${mods.map(m => {
+          const state = __pvModulesState[m.key] || { actif: false };
+          return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:9px 12px;${!m.implemente?'opacity:.6;':''}">
+            <span style="font-size:13px;font-weight:600;">${_mvEsc(m.label)}</span>
+            ${m.implemente
+              ? `<button onclick="pvToggleModule('${m.key}', ${!state.actif})" class="btn btn-sm ${state.actif?'btn-orange':'btn-outline'}" style="white-space:nowrap;">${state.actif?'✅ Actif':'👁️ Masqué'}</button>`
+              : `<span style="font-size:11px;color:var(--muted);white-space:nowrap;">🔜 Bientôt</span>`}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+}
+
+async function pvToggleModule(key, actif) {
+  try {
+    const r = await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine-modules`, { modules: { [key]: { actif } } });
+    __pvModulesState = r.modules;
+    renderPvModulesLib();
+    renderPvOrderList();
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+function renderPvOrderList() {
+  const box = document.getElementById('pv-order-list');
+  if (!box || !__pvRegistry) return;
+  const actifs = Object.entries(__pvModulesState).filter(([k,v]) => v.actif && __pvRegistry.modules[k]).sort((a,b) => a[1].ordre - b[1].ordre);
+  if (!actifs.length) { box.innerHTML = '<div class="notice">Aucun module actif pour le moment.</div>'; return; }
+  box.innerHTML = actifs.map(([key]) => `
+    <div class="pv-order-row" data-key="${key}" draggable="true" style="display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:9px 12px;cursor:grab;">
+      <span style="color:var(--muted);">⠿⠿</span>
+      <span style="font-size:13px;font-weight:600;flex:1;">${_mvEsc(__pvRegistry.modules[key].label)}</span>
+    </div>`).join('');
+  wirePvOrderDrag(box);
+}
+
+function wirePvOrderDrag(container) {
+  let dragKey = null;
+  container.querySelectorAll('.pv-order-row').forEach(row => {
+    row.addEventListener('dragstart', () => { dragKey = row.dataset.key; row.style.opacity = '.5'; });
+    row.addEventListener('dragend', () => { row.style.opacity = ''; });
+    row.addEventListener('dragover', (e) => e.preventDefault());
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const targetKey = row.dataset.key;
+      if (!dragKey || dragKey === targetKey) return;
+      const keys = [...container.querySelectorAll('.pv-order-row')].map(r => r.dataset.key);
+      const from = keys.indexOf(dragKey); keys.splice(from, 1);
+      const to = keys.indexOf(targetKey); keys.splice(to, 0, dragKey);
+      const dragRow = container.querySelector(`[data-key="${dragKey}"]`);
+      container.insertBefore(dragRow, row);
+      const patch = {};
+      keys.forEach((k, i) => { patch[k] = { ordre: i }; });
+      try {
+        const r = await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine-modules`, { modules: patch });
+        __pvModulesState = r.modules;
+      } catch (e) {}
+    });
+  });
+}
+
+function renderPvThemeSwatches() {
+  const box = document.getElementById('pv-theme-swatches');
+  if (!box) return;
+  const THEMES = [
+    { id:'bordeaux', color:'#8E1B2E', label:'Bordeaux' }, { id:'ocean', color:'#1B4F8E', label:'Océan' },
+    { id:'emeraude', color:'#1F6B4A', label:'Émeraude' }, { id:'prune', color:'#4A2E6B', label:'Prune' },
+    { id:'or', color:'#8A5E1A', label:'Or' },
+  ];
+  box.innerHTML = THEMES.map(t => `
+    <button onclick="pvSetTheme('${t.id}')" style="display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:none;cursor:pointer;">
+      <span style="width:36px;height:36px;border-radius:50%;background:${t.color};display:block;border:3px solid ${window.__pvInitTheme===t.id?'#16233D':'#fff'};box-shadow:0 1px 4px rgba(0,0,0,.2);"></span>
+      <span style="font-size:11px;color:var(--muted);">${t.label}</span>
+    </button>`).join('');
+}
+
+async function pvSetTheme(theme) {
+  try {
+    await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine`, { vitrine_theme: theme });
+    window.__pvInitTheme = theme;
+    renderPvThemeSwatches();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 

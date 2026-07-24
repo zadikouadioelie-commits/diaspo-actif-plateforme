@@ -1420,6 +1420,10 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     adresse, code_postal, vitrine_ville, vitrine_region, vitrine_pays,
     tel_responsable, vitrine_tel_pro, vitrine_whatsapp, email_responsable, vitrine_email_pro,
     site_web, vitrine_google_maps_url, vitrine_rdv_active,
+    // Modules "Paramètres Vitrine" v2
+    vitrine_temoignages_json, vitrine_vision_objectifs, vitrine_resultats_impact_json,
+    vitrine_expertise_json, vitrine_certifications_json, vitrine_devis_active, vitrine_partenariat_active,
+    vitrine_style_json,
   } = body;
   const THEMES_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
   await db.prepare(`
@@ -1431,7 +1435,10 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
       vitrine_pourquoi_choisir=?, vitrine_services_categories_json=?,
       adresse=?, code_postal=?, vitrine_ville=?, vitrine_region=?, vitrine_pays=?,
       tel_responsable=?, vitrine_tel_pro=?, vitrine_whatsapp=?, email_responsable=?, vitrine_email_pro=?,
-      site_web=?, vitrine_google_maps_url=?, vitrine_rdv_active=?
+      site_web=?, vitrine_google_maps_url=?, vitrine_rdv_active=?,
+      vitrine_temoignages_json=?, vitrine_vision_objectifs=?, vitrine_resultats_impact_json=?,
+      vitrine_expertise_json=?, vitrine_certifications_json=?, vitrine_devis_active=?, vitrine_partenariat_active=?,
+      vitrine_style_json=?
     WHERE id=?
   `).run(
     vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
@@ -1464,10 +1471,136 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     site_web !== undefined ? site_web : init.site_web,
     vitrine_google_maps_url !== undefined ? vitrine_google_maps_url : init.vitrine_google_maps_url,
     vitrine_rdv_active !== undefined ? (vitrine_rdv_active ? 1 : 0) : init.vitrine_rdv_active,
+    vitrine_temoignages_json !== undefined ? JSON.stringify(vitrine_temoignages_json) : init.vitrine_temoignages_json,
+    vitrine_vision_objectifs !== undefined ? vitrine_vision_objectifs : init.vitrine_vision_objectifs,
+    vitrine_resultats_impact_json !== undefined ? JSON.stringify(vitrine_resultats_impact_json) : init.vitrine_resultats_impact_json,
+    vitrine_expertise_json !== undefined ? JSON.stringify(vitrine_expertise_json) : init.vitrine_expertise_json,
+    vitrine_certifications_json !== undefined ? JSON.stringify(vitrine_certifications_json) : init.vitrine_certifications_json,
+    vitrine_devis_active !== undefined ? (vitrine_devis_active ? 1 : 0) : init.vitrine_devis_active,
+    vitrine_partenariat_active !== undefined ? (vitrine_partenariat_active ? 1 : 0) : init.vitrine_partenariat_active,
+    vitrine_style_json !== undefined ? JSON.stringify(vitrine_style_json) : init.vitrine_style_json,
     params.id
   );
   sendJSON(res, 200, { ok: true });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MODULE "PARAMÈTRES VITRINE" v2 — registre de modules + modèles + toggles
+   Une seule vitrine par Initiative, évolutive via modules activables/masquables.
+   Masquer un module NE SUPPRIME JAMAIS ses données (voir getVitrineModulesState).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Registre canonique des modules — source unique de vérité (backend + frontend via
+   GET /api/vitrine-modules-registry). "implemente:false" = présent dans la bibliothèque
+   mais affiché "🔜 Bientôt disponible" (aucune donnée factice, aucun bouton qui ne fait rien). */
+const VITRINE_MODULES_REGISTRY = {
+  a_propos:              { label: "À propos / Présentation", categorie: "presentation", implemente: true },
+  equipe:                { label: "Équipe / Organisation",   categorie: "presentation", implemente: true },
+  expertise:             { label: "Expertise",                categorie: "presentation", implemente: true },
+  certifications:        { label: "Certifications",           categorie: "presentation", implemente: true },
+  galerie_photos:        { label: "Galerie photos",           categorie: "medias", implemente: true },
+  galerie_videos:        { label: "Galerie vidéos",           categorie: "medias", implemente: false },
+  portfolio:             { label: "Portfolio",                categorie: "medias", implemente: false },
+  documents:             { label: "Documents",                categorie: "medias", implemente: true },
+  realisations:          { label: "Réalisations / Projets",   categorie: "medias", implemente: true },
+  produits:              { label: "Produits / Boutique",      categorie: "activite", implemente: true },
+  catalogue:             { label: "Catalogue",                categorie: "activite", implemente: true },
+  services:              { label: "Services",                 categorie: "activite", implemente: true },
+  formations_catalogue:  { label: "Formations",                categorie: "activite", implemente: false },
+  evenements:            { label: "Événements",                categorie: "activite", implemente: false },
+  contact:               { label: "Contact",                   categorie: "interaction", implemente: true },
+  demande_devis:         { label: "Demande de devis",          categorie: "interaction", implemente: true },
+  demande_partenariat:   { label: "Demande de partenariat",    categorie: "interaction", implemente: true },
+  reservation:           { label: "Réservation",                categorie: "interaction", implemente: false },
+  billetterie:           { label: "Billetterie",                categorie: "interaction", implemente: false },
+  temoignages:           { label: "Témoignages",                categorie: "interaction", implemente: true },
+  avis:                  { label: "Avis clients",               categorie: "interaction", implemente: true },
+  carte:                 { label: "Carte",                      categorie: "interaction", implemente: true },
+  actualites:            { label: "Actualités / Publications", categorie: "communication", implemente: false },
+  newsletter:            { label: "Newsletter",                 categorie: "communication", implemente: false },
+  reseaux_sociaux:       { label: "Réseaux sociaux",            categorie: "communication", implemente: true },
+  vision_objectifs:      { label: "Vision et objectifs",        categorie: "impact", implemente: true },
+  resultats_impact:      { label: "Résultats / Impact",         categorie: "impact", implemente: true },
+  besoins_projet:        { label: "Besoins du projet",          categorie: "impact", implemente: true },
+  partenaires:           { label: "Partenaires",                categorie: "impact", implemente: true },
+  financement_participatif: { label: "Financement participatif", categorie: "impact", implemente: false },
+  pourquoi_choisir:      { label: "Pourquoi nous choisir",      categorie: "interaction", implemente: true },
+  offre_flash:           { label: "Offre flash",                categorie: "activite", implemente: true },
+  objectif_jauge:        { label: "Objectif (jauge)",           categorie: "impact", implemente: true },
+};
+
+/* Les 5 modèles de vitrine — le choix d'un type ACTIVE (jamais ne masque) les modules
+   listés ; les modules déjà actifs pour une autre raison restent inchangés (évolutivité :
+   Portfolio -> +Boutique -> +Formation sans jamais recréer/écraser la vitrine). */
+const VITRINE_TEMPLATES = {
+  portfolio: {
+    label: "🎨 Portfolio / Création", pour: "Photographes, artistes, designers, créateurs, artisans créatifs, réalisateurs",
+    actifs: ["a_propos","contact","portfolio","galerie_photos","galerie_videos","realisations","temoignages","demande_devis","actualites"],
+    optionnels: ["produits","reservation","evenements","formations_catalogue"],
+  },
+  evenement: {
+    label: "🎭 Événement", pour: "Festivals, conférences, rencontres, événements culturels, manifestations",
+    actifs: ["a_propos","equipe","partenaires","evenements","galerie_photos","reservation","billetterie","actualites","reseaux_sociaux"],
+    optionnels: ["produits","newsletter","documents"],
+  },
+  commercial: {
+    label: "🛒 Commercial", pour: "Entreprises, artisans, producteurs, créateurs souhaitant vendre",
+    actifs: ["a_propos","equipe","contact","produits","catalogue","services","demande_devis","avis","temoignages","actualites"],
+    optionnels: ["galerie_photos","reservation","evenements","formations_catalogue"],
+  },
+  projet: {
+    label: "🌍 Projet / Impact", pour: "Projets sociaux, initiatives citoyennes, projets diaspora, projets territoriaux",
+    actifs: ["a_propos","vision_objectifs","equipe","realisations","resultats_impact","besoins_projet","partenaires","actualites","galerie_photos","documents","contact","demande_partenariat"],
+    optionnels: ["financement_participatif","evenements","formations_catalogue","produits"],
+  },
+  formation: {
+    label: "🎓 Formation", pour: "Formateurs, centres de formation, programmes éducatifs",
+    actifs: ["a_propos","expertise","certifications","formations_catalogue","contact","temoignages","actualites"],
+    optionnels: ["produits","galerie_videos","evenements"],
+  },
+};
+
+/* Modules toujours actifs par défaut pour toute vitrine, indépendamment du type choisi
+   (comportement historique conservé : ces sections existaient avant le système de modules). */
+const VITRINE_MODULES_SOCLE = ["pourquoi_choisir","offre_flash","objectif_jauge","carte"];
+
+/* État effectif des modules d'une initiative : fusionne vitrine_modules_json (choix explicites)
+   avec un repli sur "actif si du contenu existe déjà" pour tout module jamais touché par ce
+   nouveau système — indispensable pour ne rien casser sur les vitrines déjà construites avant
+   son introduction (règle : "les contenus existants ne doivent jamais être supprimés/cachés"). */
+function getVitrineModulesState(init) {
+  let stored = {};
+  try { stored = JSON.parse(init.vitrine_modules_json || "{}") || {}; } catch (_) {}
+  const hasContenu = {
+    a_propos: !!init.description, equipe: !!(init.nom_responsable || init.prenom_responsable),
+    expertise: !!(init.vitrine_expertise_json && init.vitrine_expertise_json !== "[]" && init.vitrine_expertise_json !== "null"),
+    certifications: !!(init.vitrine_certifications_json && init.vitrine_certifications_json !== "[]" && init.vitrine_certifications_json !== "null"),
+    galerie_photos: !!(init.galerie_json && init.galerie_json !== "[]" && init.galerie_json !== "null"),
+    documents: !!(init.vitrine_documents_json && init.vitrine_documents_json !== "[]" && init.vitrine_documents_json !== "null"),
+    realisations: !!(init.realisations_json && init.realisations_json !== "[]" && init.realisations_json !== "null"),
+    produits: true, catalogue: true, services: !!init.vitrine_services,
+    contact: true, demande_devis: !!init.vitrine_devis_active, demande_partenariat: !!init.vitrine_partenariat_active,
+    temoignages: !!(init.vitrine_temoignages_json && init.vitrine_temoignages_json !== "[]" && init.vitrine_temoignages_json !== "null"),
+    avis: true, carte: !!(init.vitrine_google_maps_url || init.adresse),
+    reseaux_sociaux: !!(init.reseaux_sociaux && init.reseaux_sociaux !== "{}" && init.reseaux_sociaux !== "null"),
+    vision_objectifs: !!init.vitrine_vision_objectifs,
+    resultats_impact: !!(init.vitrine_resultats_impact_json && init.vitrine_resultats_impact_json !== "[]" && init.vitrine_resultats_impact_json !== "null"),
+    besoins_projet: !!(init.besoins_json && init.besoins_json !== "[]" && init.besoins_json !== "null"),
+    partenaires: !!(init.vitrine_partenaires_json && init.vitrine_partenaires_json !== "[]" && init.vitrine_partenaires_json !== "null"),
+    pourquoi_choisir: !!init.vitrine_pourquoi_choisir,
+    offre_flash: !!init.vitrine_offre_flash_titre,
+    objectif_jauge: !!init.vitrine_objectif_cible,
+  };
+  const state = {};
+  Object.keys(VITRINE_MODULES_REGISTRY).forEach((key, i) => {
+    if (stored[key] && typeof stored[key] === "object") {
+      state[key] = { actif: !!stored[key].actif, ordre: Number.isFinite(stored[key].ordre) ? stored[key].ordre : i };
+    } else {
+      state[key] = { actif: !!hasContenu[key], ordre: i };
+    }
+  });
+  return state;
+}
 
 /* GET /api/initiatives/:id/avis — public, liste des avis + moyenne */
 route("GET", "/api/initiatives/:id/avis", async (req, res, params) => {
@@ -3394,6 +3527,7 @@ route("GET", "/api/mon-initiative", async (req, res) => {
   row.nationalites_concernees = safeParse(row.nationalites_concernees);
   row.nationalite_unique = !!row.nationalite_unique;
   row.abonnement_actif = !!row.abonnement_actif;
+  row.vitrine_modules_state = getVitrineModulesState(row);
   sendJSON(res, 200, { initiative: row });
 });
 
@@ -3416,7 +3550,61 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
   row.documents = safeParseArray(row.vitrine_documents_json);
   row.reseaux_sociaux_obj = safeParse(row.reseaux_sociaux) || {};
   row.pays_intervention_arr = safeParse(row.pays_intervention) || (row.pays_intervention ? [row.pays_intervention] : []);
+  row.vitrine_temoignages = safeParseArray(row.vitrine_temoignages_json);
+  row.vitrine_resultats_impact = safeParseArray(row.vitrine_resultats_impact_json);
+  row.vitrine_expertise = safeParseArray(row.vitrine_expertise_json);
+  row.vitrine_certifications = safeParseArray(row.vitrine_certifications_json);
+  row.vitrine_modules_state = getVitrineModulesState(row);
   sendJSON(res, 200, { initiative: row });
+});
+
+/* GET /api/vitrine-modules-registry — bibliothèque de modules + modèles de vitrine (public, statique) */
+route("GET", "/api/vitrine-modules-registry", async (req, res) => {
+  sendJSON(res, 200, { modules: VITRINE_MODULES_REGISTRY, templates: VITRINE_TEMPLATES, socle: VITRINE_MODULES_SOCLE });
+});
+
+/* PUT /api/initiatives/:id/vitrine-modules — activer/masquer/réordonner des modules (propriétaire).
+   Merge-patch : seuls les modules présents dans le body sont modifiés, jamais de suppression de
+   données. Corps : { modules: { [cle]: { actif?: bool, ordre?: number } } } */
+route("PUT", "/api/initiatives/:id/vitrine-modules", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const patch = body.modules && typeof body.modules === "object" ? body.modules : {};
+  const current = getVitrineModulesState(init);
+  Object.entries(patch).forEach(([key, val]) => {
+    if (!VITRINE_MODULES_REGISTRY[key]) return;
+    if (!val || typeof val !== "object") return;
+    current[key] = {
+      actif: val.actif !== undefined ? !!val.actif : current[key].actif,
+      ordre: Number.isFinite(val.ordre) ? val.ordre : current[key].ordre,
+    };
+  });
+  await db.prepare("UPDATE initiatives SET vitrine_modules_json=? WHERE id=?").run(JSON.stringify(current), params.id);
+  sendJSON(res, 200, { ok: true, modules: current });
+});
+
+/* PUT /api/initiatives/:id/vitrine-type — appliquer un modèle de vitrine (propriétaire).
+   Toujours ADDITIF : active les modules recommandés par le modèle sans jamais masquer un module
+   déjà actif ni toucher aux données existantes — permet à une Initiative d'évoluer (Portfolio puis
+   +Boutique puis +Formation) sans jamais recréer de vitrine. */
+route("PUT", "/api/initiatives/:id/vitrine-type", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { type } = body;
+  if (!VITRINE_TEMPLATES[type]) return sendJSON(res, 400, { error: "Type de vitrine invalide." });
+  const current = getVitrineModulesState(init);
+  [...VITRINE_TEMPLATES[type].actifs, ...VITRINE_MODULES_SOCLE].forEach((key, i) => {
+    if (!VITRINE_MODULES_REGISTRY[key]) return;
+    if (!current[key].actif) current[key] = { ...current[key], actif: true };
+  });
+  await db.prepare("UPDATE initiatives SET vitrine_type=?, vitrine_modules_json=? WHERE id=?").run(type, JSON.stringify(current), params.id);
+  sendJSON(res, 200, { ok: true, vitrine_type: type, modules: current });
 });
 
 /* ===========================================================================
@@ -6746,7 +6934,8 @@ route("GET", "/api/dashboard/initiative", async (req, res) => {
       ...initiative,
       nationalites_concernees: safeParse(initiative.nationalites_concernees),
       nationalite_unique: !!initiative.nationalite_unique,
-      abonnement_actif: !!initiative.abonnement_actif
+      abonnement_actif: !!initiative.abonnement_actif,
+      vitrine_modules_state: getVitrineModulesState(initiative),
     } : null,
     messages_non_lus: messagesNonLus,
     publications_recentes: publications
