@@ -2265,9 +2265,13 @@ async function renderVitrine() {
   // filtrée par is_demo : on doit toujours pouvoir gérer sa propre vitrine) ; un visiteur passe par
   // la liste publique /initiatives (filtrée is_demo, comportement normal pour un tiers).
   let init = null;
+  /* Aperçu dynamique du constructeur "Paramètres Vitrine" (dashboard-initiative.html) : l'iframe
+     charge cette page avec ?preview=draft — n'a d'effet que pour le propriétaire authentifié
+     (voir GET /api/mon-initiative côté serveur, jamais exposé à un visiteur). */
+  const wantsDraftPreview = new URLSearchParams(location.search).get('preview') === 'draft';
   try {
     if (isOwn) {
-      const r = await api('GET', '/mon-initiative');
+      const r = await api('GET', '/mon-initiative' + (wantsDraftPreview ? '?preview=draft' : ''));
       init = r.initiative || null;
     } else {
       const all = await api('GET', '/initiatives');

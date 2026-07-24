@@ -1401,71 +1401,79 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <!-- ══ SECTION ⭐ PARAMÈTRES VITRINE ══ -->
     <div style="display:none;" id="parametres-vitrine">
       <h2 style="margin:0 0 6px;">⭐ Paramètres Vitrine</h2>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 20px;">Le centre de configuration de votre vitrine unique — modèle, modules, organisation et apparence.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Configurez à gauche, voyez le résultat en direct à droite. Rien ne change sur votre vitrine publique tant que vous n'avez pas cliqué sur « 🚀 Publier ma vitrine ».</p>
 
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 4px;font-size:15px;">📋 Informations générales</h3>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ces informations sont aussi modifiables directement depuis votre vitrine publique.</p>
-        <div id="pv-infos-form"><div class="notice">Chargement…</div></div>
-      </div>
+      <div class="pv-builder-layout" style="display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:start;">
+        <div class="pv-builder-left">
 
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 12px;font-size:15px;">👁️ Statut de la vitrine</h3>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Choisissez si votre vitrine est visible par les visiteurs, ou masquée le temps de la préparer.</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn" id="btn-statut-visible" onclick="definirStatutVitrine(1)" style="flex:1;min-width:180px;justify-content:center;">🟢 Visible</button>
-          <button class="btn" id="btn-statut-masque" onclick="definirStatutVitrine(0)" style="flex:1;min-width:180px;justify-content:center;">🔒 Non visible</button>
+          <div class="card" style="margin-bottom:20px;">
+            <h3 style="margin:0 0 4px;font-size:15px;">📋 Informations générales</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ces informations sont enregistrées immédiatement (pas de brouillon) et aussi modifiables directement depuis votre vitrine publique.</p>
+            <div id="pv-infos-form"><div class="notice">Chargement…</div></div>
+          </div>
+
+          <div class="card" style="margin-bottom:20px;">
+            <h3 style="margin:0 0 12px;font-size:15px;">👁️ Statut de la vitrine</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Choisissez si votre vitrine est visible par les visiteurs, ou masquée le temps de la préparer.</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn" id="btn-statut-visible" onclick="definirStatutVitrine(1)" style="flex:1;min-width:180px;justify-content:center;">🟢 Visible</button>
+              <button class="btn" id="btn-statut-masque" onclick="definirStatutVitrine(0)" style="flex:1;min-width:180px;justify-content:center;">🔒 Non visible</button>
+            </div>
+            <div id="parametres-vitrine-statut" style="margin-top:12px;font-size:13px;font-weight:700;"></div>
+          </div>
+
+          <div class="card" style="margin-bottom:20px;">
+            <h3 style="margin:0 0 4px;font-size:15px;">🎨 Choisir mon modèle de vitrine</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Chaque modèle propose 3 variantes visuelles. Le modèle active automatiquement les modules adaptés à votre activité — vous restez ensuite libre de tout personnaliser. Choisir un modèle n'efface jamais vos données ni vos modules déjà actifs.</p>
+            <div id="pv-templates-grid" style="display:flex;flex-direction:column;gap:16px;"><div class="notice">Chargement…</div></div>
+          </div>
+
+          <div class="card" style="margin-bottom:20px;">
+            <h3 style="margin:0 0 4px;font-size:15px;">🧩 Personnaliser ma vitrine</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Activez, masquez ou configurez chaque module. Un module masqué conserve ses données — vous pouvez le réactiver à tout moment sans rien perdre.</p>
+            <div id="pv-modules-lib"><div class="notice">Chargement…</div></div>
+          </div>
+
+          <div class="card" style="margin-bottom:20px;" id="pv-order-card">
+            <h3 style="margin:0 0 4px;font-size:15px;">↕️ Organiser ma vitrine</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Glissez-déposez pour réordonner les sections actives de votre vitrine.</p>
+            <div id="pv-order-list" style="display:flex;flex-direction:column;gap:8px;"><div class="notice">Chargement…</div></div>
+          </div>
+
+          <div class="card" style="margin-bottom:20px;">
+            <h3 style="margin:0 0 4px;font-size:15px;">🖌️ Apparence de la vitrine</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Style graphique de la vitrine (indépendant du modèle métier choisi ci-dessus).</p>
+            <div id="pv-theme-swatches" style="display:flex;gap:12px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Style graphique</div>
+              <div id="pv-style-presets" style="display:flex;gap:8px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:14px 0 0;">🔜 Mises en page alternatives (au-delà des 3 styles ci-dessus) : à venir dans une prochaine évolution du module.</p>
+          </div>
+
         </div>
-        <div id="parametres-vitrine-statut" style="margin-top:12px;font-size:13px;font-weight:700;"></div>
-        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
-          <a href="profil.html#vitrine" target="_blank" class="btn btn-outline" style="text-decoration:none;">👁 Voir ma vitrine publique</a>
-        </div>
-      </div>
 
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 4px;font-size:15px;">🎨 Choisir mon modèle de vitrine</h3>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Le modèle active automatiquement un jeu de modules adaptés à votre activité. Vous restez ensuite libre de tout personnaliser — choisir un modèle n'efface jamais vos données ni vos modules déjà actifs.</p>
-        <div id="pv-templates-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;"><div class="notice">Chargement…</div></div>
-      </div>
-
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 4px;font-size:15px;">🧩 Personnaliser ma vitrine</h3>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Activez, masquez ou configurez chaque module. Un module masqué conserve ses données — vous pouvez le réactiver à tout moment sans rien perdre.</p>
-        <div id="pv-modules-lib"><div class="notice">Chargement…</div></div>
-      </div>
-
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 4px;font-size:15px;">↕️ Organiser ma vitrine</h3>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Glissez-déposez pour réordonner les sections actives de votre vitrine publique.</p>
-        <div id="pv-order-list" style="display:flex;flex-direction:column;gap:8px;"><div class="notice">Chargement…</div></div>
-      </div>
-
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 4px;font-size:15px;">🖌️ Apparence de la vitrine</h3>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Style graphique de la vitrine (indépendant du modèle métier choisi ci-dessus).</p>
-        <div id="pv-theme-swatches" style="display:flex;gap:12px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
-        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Style graphique</div>
-          <div id="pv-style-presets" style="display:flex;gap:8px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
-        </div>
-        <p style="font-size:12px;color:var(--muted);margin:14px 0 0;">🔜 Mises en page alternatives (au-delà des 3 styles ci-dessus) : à venir dans une prochaine évolution du module.</p>
-      </div>
-
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 4px;font-size:15px;">📱 Aperçu de ma vitrine</h3>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Toutes vos modifications sont enregistrées immédiatement — utilisez cet aperçu pour vérifier le rendu avant de partager votre vitrine.</p>
-        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-          <button class="btn btn-sm btn-orange" id="pv-preview-desktop" onclick="pvSetPreviewDevice('desktop')">🖥️ Ordinateur</button>
-          <button class="btn btn-sm btn-outline" id="pv-preview-tablet" onclick="pvSetPreviewDevice('tablet')">📱 Tablette</button>
-          <button class="btn btn-sm btn-outline" id="pv-preview-mobile" onclick="pvSetPreviewDevice('mobile')">📱 Mobile</button>
-          <button class="btn btn-sm btn-outline" onclick="pvRefreshPreview()" style="margin-left:auto;">↺ Actualiser</button>
-          <a href="profil.html#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;">↗ Ouvrir dans un onglet</a>
-        </div>
-        <div style="background:#EDF1F6;border-radius:12px;padding:20px;display:flex;justify-content:center;overflow-x:auto;">
-          <iframe id="pv-preview-frame" style="width:100%;max-width:1200px;height:720px;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:max-width .25s ease;"></iframe>
+        <div class="pv-builder-right" style="position:sticky;top:16px;">
+          <div class="card">
+            <h3 style="margin:0 0 4px;font-size:15px;">📱 Aperçu en direct</h3>
+            <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Se met à jour automatiquement après chaque modification.</p>
+            <div style="display:flex;gap:6px;margin-bottom:10px;">
+              <button class="btn btn-sm btn-orange" id="pv-preview-desktop" onclick="pvSetPreviewDevice('desktop')" title="Ordinateur">🖥️</button>
+              <button class="btn btn-sm btn-outline" id="pv-preview-tablet" onclick="pvSetPreviewDevice('tablet')" title="Tablette">📱</button>
+              <button class="btn btn-sm btn-outline" id="pv-preview-mobile" onclick="pvSetPreviewDevice('mobile')" title="Mobile">📱</button>
+              <a href="profil.html?preview=draft#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;margin-left:auto;" title="Ouvrir dans un onglet">↗</a>
+            </div>
+            <div id="pv-preview-frame-wrap" style="background:#EDF1F6;border-radius:12px;padding:10px;overflow:auto;max-height:640px;">
+              <iframe id="pv-preview-frame" style="width:100%;max-width:1200px;height:600px;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:max-width .25s ease;display:block;margin:0 auto;"></iframe>
+            </div>
+            <p style="font-size:11px;color:var(--muted);margin:8px 0 0;">💡 Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
+            <div id="pv-draft-status" style="margin:14px 0 10px;font-size:12.5px;font-weight:700;"></div>
+            <button class="btn btn-orange btn-block" onclick="pvPublish()">🚀 Publier ma vitrine</button>
+          </div>
         </div>
       </div>
     </div>
+    <style>@media(max-width:1000px){ .pv-builder-layout{ grid-template-columns:1fr!important; } .pv-builder-right{ position:static!important; } }</style>
 
     <!-- ══ SECTIONS GESTION ASSOCIATION ══ -->
     <div class="card" style="margin-bottom:20px;display:none;" id="asso-accreditation">
@@ -4205,7 +4213,11 @@ async function toggleVisibiliteVitrine(nouvelEtat) {
 }
 
 /* ══════════════════════════════════════════════
-   PARAMÈTRES VITRINE v2 — modèles + bibliothèque de modules + organisation + apparence
+   PARAMÈTRES VITRINE v2 — constructeur avec aperçu dynamique (brouillon / publication)
+   Tout ce qui touche type/modules/ordre/theme/style passe par vitrine_draft_json (voir
+   PUT /vitrine-draft) et n'affecte la vitrine publique qu'au clic sur "Publier ma vitrine"
+   (POST /vitrine-publish). "Informations générales" reste en enregistrement immediat (hors
+   brouillon), comme deja indique a l'utilisateur dans la carte correspondante.
 ══════════════════════════════════════════════ */
 const PV_CATEGORIE_LABELS = {
   presentation: '📋 Présentation', medias: '🖼️ Médias', activite: '🛍️ Activité',
@@ -4215,10 +4227,11 @@ let __pvRegistry = null;
 let __pvModulesState = null;
 let __pvVitrineType = null;
 let __pvInit = null;
+let __pvDraftPending = false;
 
 async function loadParametresVitrineFull() {
   if (!window.__vitrineInitId) {
-    ['pv-infos-form','pv-templates-grid','pv-modules-lib','pv-order-list','pv-theme-swatches'].forEach(id => {
+    ['pv-infos-form','pv-templates-grid','pv-modules-lib','pv-order-list','pv-theme-swatches','pv-style-presets'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = '<div class="notice">Créez votre initiative pour configurer sa vitrine.</div>';
     });
@@ -4226,12 +4239,13 @@ async function loadParametresVitrineFull() {
   }
   try {
     if (!__pvRegistry) __pvRegistry = await api('GET', '/vitrine-modules-registry');
-    const r = await api('GET', '/mon-initiative');
+    const r = await api('GET', '/mon-initiative?preview=draft');
     const init = r.initiative;
     if (!init) return;
     __pvInit = init;
     __pvModulesState = init.vitrine_modules_state || {};
     __pvVitrineType = init.vitrine_type || null;
+    __pvDraftPending = !!init.vitrine_draft_pending;
     window.__pvInitTheme = init.vitrine_theme || 'bordeaux';
     let styleObj = {};
     try { styleObj = JSON.parse(init.vitrine_style_json || '{}') || {}; } catch (e) {}
@@ -4242,8 +4256,35 @@ async function loadParametresVitrineFull() {
     renderPvOrderList();
     renderPvThemeSwatches();
     renderPvStylePresets();
+    renderPvDraftStatus();
     pvRefreshPreview();
   } catch (e) { console.error(e); }
+}
+
+function renderPvDraftStatus() {
+  const el = document.getElementById('pv-draft-status');
+  if (!el) return;
+  el.innerHTML = __pvDraftPending
+    ? '<span style="color:#B45309;">🟡 Modifications non publiées</span>'
+    : '<span style="color:#16a34a;">✅ Vitrine à jour</span>';
+}
+
+/* Merge-patch centralise vers le brouillon — toute action de configuration passe par ici. */
+async function pvDraftPatch(payload) {
+  const r = await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine-draft`, payload);
+  __pvDraftPending = true;
+  renderPvDraftStatus();
+  return r;
+}
+
+async function pvPublish() {
+  try {
+    await api('POST', `/initiatives/${window.__vitrineInitId}/vitrine-publish`);
+    __pvDraftPending = false;
+    renderPvDraftStatus();
+    pvRefreshPreview();
+    if (typeof showToast === 'function') showToast('Vitrine publiée ✓', 'success'); else alert('Vitrine publiée ✓');
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
 const PV_DOMAINES = ['Environnement','Agriculture','Education','Sante','Action Sociale','Technologie','Culture','Entrepreneuriat','Finance','Droit'];
@@ -4320,7 +4361,9 @@ async function pvSaveInfos() {
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
-/* ── Aperçu multi-écrans (iframe sur la vraie vitrine publique, aucune donnée dupliquée/simulée) ── */
+/* ── Aperçu en direct (iframe sur la vitrine réelle en mode brouillon — mêmes composants que la
+   vitrine publiée, voir ?preview=draft côté serveur). Rechargée après chaque action de config :
+   pas un patch DOM instantané, mais une mise à jour automatique bien réelle (~1s en local). ── */
 const PV_PREVIEW_WIDTHS = { desktop: '1200px', tablet: '768px', mobile: '390px' };
 let __pvPreviewDevice = 'desktop';
 function pvSetPreviewDevice(device) {
@@ -4335,22 +4378,87 @@ function pvSetPreviewDevice(device) {
 function pvRefreshPreview() {
   const frame = document.getElementById('pv-preview-frame');
   if (!frame || !window.__vitrineInitId) return;
-  frame.src = `profil.html?_preview=${Date.now()}#vitrine`;
+  const targetSrc = `profil.html?preview=draft&_cb=${Date.now()}#vitrine`;
+  // Ecouteur pose AVANT le changement de src ; par securite (l'evenement 'load' d'iframe s'est
+  // revele pas toujours declenche de facon fiable en test), on sonde aussi periodiquement jusqu'a
+  // detecter que le nouveau document est bien charge avant de brancher les clics.
+  if (frame.__pvLoadHandler) frame.removeEventListener('load', frame.__pvLoadHandler);
+  frame.__pvLoadHandler = () => { try { pvWirePreviewClicks(frame); } catch (e) {} };
+  frame.addEventListener('load', frame.__pvLoadHandler);
+  frame.src = targetSrc;
   pvSetPreviewDevice(__pvPreviewDevice);
+  let tries = 0;
+  const poll = setInterval(() => {
+    tries++;
+    try {
+      if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
+        pvWirePreviewClicks(frame);
+        clearInterval(poll);
+      }
+    } catch (e) {}
+    if (tries > 20) clearInterval(poll); // ~5s, abandon silencieux si jamais pret
+  }, 250);
 }
 
+/* Clic dans l'aperçu -> saute au réglage correspondant dans la colonne de gauche. */
+const PV_PREVIEW_SECTION_KEYS = { 'pv-presentation':'a_propos', 'pv-collections':'catalogue', 'pv-produits':'produits',
+  'pv-services':'services', 'pv-galerie':'galerie_photos', 'pv-avis':'avis', 'pv-temoignages':'temoignages',
+  'pv-partenaires':'partenaires', 'pv-telechargements':'documents', 'pv-pourquoi':'pourquoi_choisir',
+  'pv-flash':'offre_flash', 'pv-expertise':'expertise', 'pv-certifications':'certifications',
+  'pv-vision':'vision_objectifs', 'pv-impact':'resultats_impact', 'pv-besoins':'besoins_projet' };
+function pvWirePreviewClicks(frame) {
+  let doc; try { doc = frame.contentDocument; } catch (e) { return; }
+  if (!doc) return;
+  Object.entries(PV_PREVIEW_SECTION_KEYS).forEach(([secId, moduleKey]) => {
+    const el = doc.getElementById(secId);
+    if (!el || el.dataset.pvWired) return;
+    el.dataset.pvWired = '1';
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('button,a,input,textarea,select')) return; // laisse les vrais controles de la vitrine fonctionner
+      pvJumpToModule(moduleKey);
+    });
+  });
+}
+function pvJumpToModule(key) {
+  const row = document.querySelector(`#pv-modules-lib [data-module-key="${key}"]`);
+  const target = row || document.getElementById('pv-order-card');
+  target?.scrollIntoView({ behavior:'smooth', block:'center' });
+  if (row) { row.style.transition = 'background .3s'; row.style.background = '#FFF7ED'; setTimeout(() => row.style.background = '', 1500); }
+}
+
+/* ── Modèles de vitrine : 3 variantes visuelles par type (combine type + style graphique, meme
+   moteur que "Apparence" — rendu vraiment different par carte, pas des libelles decoratifs). ── */
+const PV_TEMPLATE_VARIANTS = {
+  portfolio:  [{style:'moderne',emoji:'🎨',label:'Créatif moderne'}, {style:'elegant',emoji:'🖼️',label:'Galerie élégante'}, {style:'minimaliste',emoji:'✨',label:'Minimaliste'}],
+  evenement:  [{style:'moderne',emoji:'🎭',label:'Dynamique'}, {style:'elegant',emoji:'✨',label:'Chic'}, {style:'minimaliste',emoji:'📐',label:'Épuré'}],
+  commercial: [{style:'moderne',emoji:'🛒',label:'Vitrine moderne'}, {style:'elegant',emoji:'💼',label:'Premium'}, {style:'minimaliste',emoji:'📦',label:'Sobre'}],
+  projet:     [{style:'moderne',emoji:'🌍',label:'Engagé'}, {style:'elegant',emoji:'✨',label:'Institutionnel'}, {style:'minimaliste',emoji:'📐',label:'Épuré'}],
+  formation:  [{style:'moderne',emoji:'🎓',label:'Dynamique'}, {style:'elegant',emoji:'📚',label:'Académique'}, {style:'minimaliste',emoji:'📐',label:'Épuré'}],
+};
 function renderPvTemplates() {
   const grid = document.getElementById('pv-templates-grid');
   if (!grid || !__pvRegistry) return;
   grid.innerHTML = Object.entries(__pvRegistry.templates).map(([key, t]) => `
-    <div style="border:2px solid ${__pvVitrineType===key?'var(--orange)':'var(--border)'};border-radius:12px;padding:14px;cursor:pointer;${__pvVitrineType===key?'background:#FFF7ED;':''}" onclick="pvChoisirType('${key}')">
-      <div style="font-size:15px;font-weight:800;margin-bottom:4px;">${t.label}</div>
-      <div style="font-size:11.5px;color:var(--muted);line-height:1.4;">${_mvEsc(t.pour)}</div>
-      ${__pvVitrineType===key?'<div style="margin-top:8px;font-size:11.5px;font-weight:700;color:var(--orange);">✓ Modèle actuel</div>':''}
+    <div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
+        <div style="font-size:14.5px;font-weight:800;">${t.label}</div>
+        <div style="font-size:11px;color:var(--muted);">${_mvEsc(t.pour)}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        ${(PV_TEMPLATE_VARIANTS[key]||[]).map(v => {
+          const isActive = __pvVitrineType === key && window.__pvStylePreset === v.style;
+          return `<div onclick="pvChoisirType('${key}','${v.style}')" style="cursor:pointer;border:2px solid ${isActive?'var(--orange)':'var(--border)'};border-radius:12px;padding:12px 8px;text-align:center;${isActive?'background:#FFF7ED;':''}">
+            <div style="font-size:20px;margin-bottom:4px;">${v.emoji}</div>
+            <div style="font-size:10.5px;font-weight:700;color:${isActive?'var(--orange)':'#374151'};">${_mvEsc(v.label)}</div>
+            ${isActive?'<div style="margin-top:4px;font-size:9.5px;font-weight:700;color:var(--orange);">✓ Actif</div>':''}
+          </div>`;
+        }).join('')}
+      </div>
     </div>`).join('');
 }
 
-function pvChoisirType(type) {
+function pvChoisirType(type, style) {
   if (!__pvRegistry) return;
   const t = __pvRegistry.templates[type];
   if (!t) return;
@@ -4361,25 +4469,27 @@ function pvChoisirType(type) {
   overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:26px;">
     <h2 style="margin:0 0 12px;font-size:17px;">Appliquer le modèle ${t.label} ?</h2>
     <p style="font-size:13.5px;color:#475569;line-height:1.7;margin:0 0 16px;">
-      Les modules recommandés pour ce type de vitrine seront activés automatiquement.<br><br>
-      Vos modules déjà actifs et toutes vos données existantes restent inchangés — rien n'est jamais supprimé ni masqué par ce changement.
+      Les modules recommandés pour ce type de vitrine seront activés automatiquement dans votre brouillon.<br><br>
+      Vos modules déjà actifs et toutes vos données existantes restent inchangés. Rien n'est visible publiquement tant que vous n'avez pas cliqué sur « Publier ma vitrine ».
     </p>
     <div style="display:flex;gap:10px;justify-content:flex-end;">
       <button onclick="document.getElementById('pv-confirm-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
-      <button onclick="pvAppliquerType('${type}')" style="padding:9px 16px;border-radius:8px;border:none;background:var(--orange);color:#fff;font-weight:700;cursor:pointer;">Appliquer</button>
+      <button onclick="pvAppliquerType('${type}','${style}')" style="padding:9px 16px;border-radius:8px;border:none;background:var(--orange);color:#fff;font-weight:700;cursor:pointer;">Appliquer au brouillon</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
-async function pvAppliquerType(type) {
+async function pvAppliquerType(type, style) {
   try {
-    const r = await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine-type`, { type });
-    __pvVitrineType = type;
-    __pvModulesState = r.modules;
+    const r = await pvDraftPatch({ type, style: { preset: style } });
+    __pvVitrineType = r.draft.type;
+    __pvModulesState = r.draft.modules;
+    window.__pvStylePreset = style;
     document.getElementById('pv-confirm-modal')?.remove();
-    renderPvTemplates(); renderPvModulesLib(); renderPvOrderList();
+    renderPvTemplates(); renderPvModulesLib(); renderPvOrderList(); renderPvStylePresets();
+    pvRefreshPreview();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
@@ -4401,7 +4511,7 @@ function renderPvModulesLib() {
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;">
         ${mods.map(m => {
           const state = __pvModulesState[m.key] || { actif: false };
-          return `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;border:1px solid var(--border);border-radius:10px;padding:9px 12px;${!m.implemente?'opacity:.6;':''}">
+          return `<div data-module-key="${m.key}" style="display:flex;align-items:center;justify-content:space-between;gap:6px;border:1px solid var(--border);border-radius:10px;padding:9px 12px;${!m.implemente?'opacity:.6;':''}">
             <span style="font-size:13px;font-weight:600;">${_mvEsc(m.label)}</span>
             <span style="display:flex;gap:4px;flex:none;">
             ${m.implemente
@@ -4416,10 +4526,11 @@ function renderPvModulesLib() {
 
 async function pvToggleModule(key, actif) {
   try {
-    const r = await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine-modules`, { modules: { [key]: { actif } } });
-    __pvModulesState = r.modules;
+    const r = await pvDraftPatch({ modules: { [key]: { actif } } });
+    __pvModulesState = r.draft.modules;
     renderPvModulesLib();
     renderPvOrderList();
+    pvRefreshPreview();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
@@ -4454,8 +4565,9 @@ function wirePvOrderDrag(container) {
       const patch = {};
       keys.forEach((k, i) => { patch[k] = { ordre: i }; });
       try {
-        const r = await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine-modules`, { modules: patch });
-        __pvModulesState = r.modules;
+        const r = await pvDraftPatch({ modules: patch });
+        __pvModulesState = r.draft.modules;
+        pvRefreshPreview();
       } catch (e) {}
     });
   });
@@ -4478,9 +4590,10 @@ function renderPvThemeSwatches() {
 
 async function pvSetTheme(theme) {
   try {
-    await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine`, { vitrine_theme: theme });
+    await pvDraftPatch({ theme });
     window.__pvInitTheme = theme;
     renderPvThemeSwatches();
+    pvRefreshPreview();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
@@ -4497,9 +4610,10 @@ function renderPvStylePresets() {
 }
 async function pvSetStylePreset(preset) {
   try {
-    await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine`, { vitrine_style_json: { preset } });
+    await pvDraftPatch({ style: { preset } });
     window.__pvStylePreset = preset;
     renderPvStylePresets();
+    renderPvTemplates();
     pvRefreshPreview();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }

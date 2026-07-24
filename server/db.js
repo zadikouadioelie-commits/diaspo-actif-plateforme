@@ -4496,6 +4496,9 @@ db.exec(`
   if (!initCols7.includes('vitrine_partenariat_active'))      db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_partenariat_active INTEGER DEFAULT 0");
   if (!initCols7.includes('vitrine_style_json'))              db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_style_json TEXT DEFAULT '{}'");
   if (!initCols7.includes('slogan'))                          db.exec("ALTER TABLE initiatives ADD COLUMN slogan TEXT");
+  // Brouillon du constructeur "Paramètres Vitrine" (aperçu dynamique) : { type, modules, style, theme }.
+  // Tant que non publié via POST /vitrine-publish, la vitrine publique reste inchangée.
+  if (!initCols7.includes('vitrine_draft_json'))              db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_draft_json TEXT DEFAULT '{}'");
 
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
   db.exec(`

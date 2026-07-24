@@ -574,6 +574,7 @@ async function migratePg(pool) {
     ['initiatives', 'vitrine_partenariat_active', 'INTEGER DEFAULT 0'],
     ['initiatives', 'vitrine_style_json', "TEXT DEFAULT '{}'"],
     ['initiatives', 'slogan', 'TEXT'],
+    ['initiatives', 'vitrine_draft_json', "TEXT DEFAULT '{}'"],
     // Profil public enrichi des comptes personnels (miroir)
     ['users', 'publics_json', 'TEXT'],
     ['users', 'besoins_json', 'TEXT'],

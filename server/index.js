@@ -1575,9 +1575,30 @@ const VITRINE_MODULES_SOCLE = ["pourquoi_choisir","offre_flash","objectif_jauge"
    avec un repli sur "actif si du contenu existe déjà" pour tout module jamais touché par ce
    nouveau système — indispensable pour ne rien casser sur les vitrines déjà construites avant
    son introduction (règle : "les contenus existants ne doivent jamais être supprimés/cachés"). */
-function getVitrineModulesState(init) {
-  let stored = {};
-  try { stored = JSON.parse(init.vitrine_modules_json || "{}") || {}; } catch (_) {}
+/* Brouillon du constructeur "Paramètres Vitrine" (aperçu dynamique) — voir vitrine_draft_json.
+   Tant qu'un champ n'a pas été touché dans le brouillon, on retombe sur la valeur publiée. */
+function resolveVitrineDraft(init) {
+  try { return JSON.parse(init.vitrine_draft_json || "{}") || {}; } catch (_) { return {}; }
+}
+function getVitrineConfig(init, { draft = false } = {}) {
+  const d = draft ? resolveVitrineDraft(init) : {};
+  const modulesState = getVitrineModulesState(init, { draft });
+  const type = draft && d.type !== undefined ? d.type : init.vitrine_type;
+  const style = draft && d.style ? d.style : (safeParse(init.vitrine_style_json) || {});
+  const theme = draft && d.theme ? d.theme : (init.vitrine_theme || 'bordeaux');
+  return { modulesState, type, style, theme };
+}
+
+function getVitrineModulesState(init, { draft = false } = {}) {
+  let stored = null; // doit rester "falsy" tant que non renseigne, sinon le repli sur l'etat
+  // publie ci-dessous (if (!stored)) ne se declenche jamais — un objet vide {} est truthy en JS.
+  if (draft) {
+    const d = resolveVitrineDraft(init);
+    stored = d.modules && typeof d.modules === "object" ? d.modules : null;
+  }
+  if (!stored) {
+    try { stored = JSON.parse(init.vitrine_modules_json || "{}") || {}; } catch (_) { stored = {}; }
+  }
   const hasContenu = {
     a_propos: !!init.description, equipe: !!(init.nom_responsable || init.prenom_responsable),
     expertise: !!(init.vitrine_expertise_json && init.vitrine_expertise_json !== "[]" && init.vitrine_expertise_json !== "null"),
@@ -3526,7 +3547,7 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
    sa propre vitrine, même si ce compte est par ailleurs masqué du public (voir profil-app.html
    renderVitrine() qui appelait /api/initiatives et filtrait côté client — cassé pour les comptes
    de démonstration une fois is_demo exclu de cette liste publique). */
-route("GET", "/api/mon-initiative", async (req, res) => {
+route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const row = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(user.id);
@@ -3534,11 +3555,23 @@ route("GET", "/api/mon-initiative", async (req, res) => {
   row.nationalites_concernees = safeParse(row.nationalites_concernees);
   row.nationalite_unique = !!row.nationalite_unique;
   row.abonnement_actif = !!row.abonnement_actif;
-  row.vitrine_modules_state = getVitrineModulesState(row);
+  /* ?preview=draft : utilisé par le constructeur "Paramètres Vitrine" (aperçu dynamique) et son
+     iframe pour lire l'état du brouillon plutôt que l'état publié — jamais exposé à un visiteur
+     (route déjà owner-only). Les champs sont remplacés en place pour que renderVitrineVisitor()
+     n'ait pas à distinguer brouillon/publié : elle lit toujours simplement vitrine_type/theme/style. */
+  const useDraft = query.preview === 'draft';
+  const cfg = getVitrineConfig(row, { draft: useDraft });
+  row.vitrine_modules_state = cfg.modulesState;
+  if (useDraft) {
+    row.vitrine_type = cfg.type;
+    row.vitrine_style_json = JSON.stringify(cfg.style || {});
+    row.vitrine_theme = cfg.theme;
+  }
+  row.vitrine_draft_pending = JSON.stringify(resolveVitrineDraft(row)) !== '{}';
   sendJSON(res, 200, { initiative: row });
 });
 
-route("GET", "/api/initiatives/:id", async (req, res, params) => {
+route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
   const row = await getInitiativeByIdOrSlug(params.id);
   if (!row) return sendJSON(res, 404, { error: "Initiative introuvable." });
   row.nationalites_concernees = safeParse(row.nationalites_concernees);
@@ -3561,7 +3594,20 @@ route("GET", "/api/initiatives/:id", async (req, res, params) => {
   row.vitrine_resultats_impact = safeParseArray(row.vitrine_resultats_impact_json);
   row.vitrine_expertise = safeParseArray(row.vitrine_expertise_json);
   row.vitrine_certifications = safeParseArray(row.vitrine_certifications_json);
-  row.vitrine_modules_state = getVitrineModulesState(row);
+  /* ?preview=draft : aperçu dynamique du constructeur — n'affecte JAMAIS un visiteur, uniquement le
+     propriétaire authentifié consultant sa propre vitrine en cours de configuration. */
+  let useDraft = false;
+  if (query.preview === 'draft') {
+    const me = await getCurrentUser(req).catch(() => null);
+    useDraft = !!(me && row.owner_user_id && Number(me.id) === Number(row.owner_user_id));
+  }
+  const cfg = getVitrineConfig(row, { draft: useDraft });
+  row.vitrine_modules_state = cfg.modulesState;
+  if (useDraft) {
+    row.vitrine_type = cfg.type;
+    row.vitrine_style_json = JSON.stringify(cfg.style || {});
+    row.vitrine_theme = cfg.theme;
+  }
   sendJSON(res, 200, { initiative: row });
 });
 
@@ -3570,48 +3616,65 @@ route("GET", "/api/vitrine-modules-registry", async (req, res) => {
   sendJSON(res, 200, { modules: VITRINE_MODULES_REGISTRY, templates: VITRINE_TEMPLATES, socle: VITRINE_MODULES_SOCLE });
 });
 
-/* PUT /api/initiatives/:id/vitrine-modules — activer/masquer/réordonner des modules (propriétaire).
-   Merge-patch : seuls les modules présents dans le body sont modifiés, jamais de suppression de
-   données. Corps : { modules: { [cle]: { actif?: bool, ordre?: number } } } */
-route("PUT", "/api/initiatives/:id/vitrine-modules", async (req, res, params, body) => {
+/* PUT /api/initiatives/:id/vitrine-draft — constructeur "Paramètres Vitrine" (aperçu dynamique).
+   Merge-patch dans vitrine_draft_json UNIQUEMENT : la vitrine publique n'est jamais modifiée tant
+   que POST /vitrine-publish n'a pas été appelé. Corps : { type?, style?, theme?,
+   modules?: { [cle]: { actif?: bool, ordre?: number } } } */
+route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
-  const patch = body.modules && typeof body.modules === "object" ? body.modules : {};
-  const current = getVitrineModulesState(init);
-  Object.entries(patch).forEach(([key, val]) => {
-    if (!VITRINE_MODULES_REGISTRY[key]) return;
-    if (!val || typeof val !== "object") return;
-    current[key] = {
-      actif: val.actif !== undefined ? !!val.actif : current[key].actif,
-      ordre: Number.isFinite(val.ordre) ? val.ordre : current[key].ordre,
-    };
-  });
-  await db.prepare("UPDATE initiatives SET vitrine_modules_json=? WHERE id=?").run(JSON.stringify(current), params.id);
-  sendJSON(res, 200, { ok: true, modules: current });
+
+  const draft = resolveVitrineDraft(init);
+  const currentModules = getVitrineModulesState(init, { draft: true });
+
+  if (body.modules && typeof body.modules === "object") {
+    Object.entries(body.modules).forEach(([key, val]) => {
+      if (!VITRINE_MODULES_REGISTRY[key] || !val || typeof val !== "object") return;
+      currentModules[key] = {
+        actif: val.actif !== undefined ? !!val.actif : currentModules[key].actif,
+        ordre: Number.isFinite(val.ordre) ? val.ordre : currentModules[key].ordre,
+      };
+    });
+  }
+  draft.modules = currentModules;
+
+  if (body.type !== undefined) {
+    if (body.type !== null && !VITRINE_TEMPLATES[body.type]) return sendJSON(res, 400, { error: "Type de vitrine invalide." });
+    draft.type = body.type;
+    if (body.type && VITRINE_TEMPLATES[body.type]) {
+      // Appliquer un modèle est toujours ADDITIF : active ses modules recommandés sans jamais en
+      // masquer un déjà actif — permet à une Initiative d'évoluer (Portfolio -> +Boutique -> +Formation).
+      [...VITRINE_TEMPLATES[body.type].actifs, ...VITRINE_MODULES_SOCLE].forEach((key) => {
+        if (!VITRINE_MODULES_REGISTRY[key]) return;
+        if (!draft.modules[key].actif) draft.modules[key] = { ...draft.modules[key], actif: true };
+      });
+    }
+  }
+  if (body.style !== undefined) draft.style = body.style;
+  if (body.theme !== undefined) draft.theme = body.theme;
+
+  await db.prepare("UPDATE initiatives SET vitrine_draft_json=? WHERE id=?").run(JSON.stringify(draft), params.id);
+  sendJSON(res, 200, { ok: true, draft });
 });
 
-/* PUT /api/initiatives/:id/vitrine-type — appliquer un modèle de vitrine (propriétaire).
-   Toujours ADDITIF : active les modules recommandés par le modèle sans jamais masquer un module
-   déjà actif ni toucher aux données existantes — permet à une Initiative d'évoluer (Portfolio puis
-   +Boutique puis +Formation) sans jamais recréer de vitrine. */
-route("PUT", "/api/initiatives/:id/vitrine-type", async (req, res, params, body) => {
+/* POST /api/initiatives/:id/vitrine-publish — applique le brouillon à la vitrine publique (propriétaire). */
+route("POST", "/api/initiatives/:id/vitrine-publish", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
-  const { type } = body;
-  if (!VITRINE_TEMPLATES[type]) return sendJSON(res, 400, { error: "Type de vitrine invalide." });
-  const current = getVitrineModulesState(init);
-  [...VITRINE_TEMPLATES[type].actifs, ...VITRINE_MODULES_SOCLE].forEach((key, i) => {
-    if (!VITRINE_MODULES_REGISTRY[key]) return;
-    if (!current[key].actif) current[key] = { ...current[key], actif: true };
-  });
-  await db.prepare("UPDATE initiatives SET vitrine_type=?, vitrine_modules_json=? WHERE id=?").run(type, JSON.stringify(current), params.id);
-  sendJSON(res, 200, { ok: true, vitrine_type: type, modules: current });
+  const draft = resolveVitrineDraft(init);
+  const modules = draft.modules ? JSON.stringify(draft.modules) : init.vitrine_modules_json;
+  const type = draft.type !== undefined ? draft.type : init.vitrine_type;
+  const style = draft.style ? JSON.stringify(draft.style) : init.vitrine_style_json;
+  const theme = draft.theme || init.vitrine_theme;
+  await db.prepare("UPDATE initiatives SET vitrine_modules_json=?, vitrine_type=?, vitrine_style_json=?, vitrine_theme=?, vitrine_draft_json='{}' WHERE id=?")
+    .run(modules, type, style, theme, params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ===========================================================================
