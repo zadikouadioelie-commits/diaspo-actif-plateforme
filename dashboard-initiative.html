@@ -1444,7 +1444,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <h3 style="margin:0 0 4px;font-size:15px;">🖌️ Apparence de la vitrine</h3>
         <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Style graphique de la vitrine (indépendant du modèle métier choisi ci-dessus).</p>
         <div id="pv-theme-swatches" style="display:flex;gap:12px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
-        <p style="font-size:12px;color:var(--muted);margin:14px 0 0;">🔜 Typographies, style des boutons et mises en page alternatives : à venir dans une prochaine évolution du module.</p>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Style graphique</div>
+          <div id="pv-style-presets" style="display:flex;gap:8px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin:14px 0 0;">🔜 Mises en page alternatives (au-delà des 3 styles ci-dessus) : à venir dans une prochaine évolution du module.</p>
       </div>
 
       <div class="card" style="margin-bottom:20px;">
@@ -4229,11 +4233,15 @@ async function loadParametresVitrineFull() {
     __pvModulesState = init.vitrine_modules_state || {};
     __pvVitrineType = init.vitrine_type || null;
     window.__pvInitTheme = init.vitrine_theme || 'bordeaux';
+    let styleObj = {};
+    try { styleObj = JSON.parse(init.vitrine_style_json || '{}') || {}; } catch (e) {}
+    window.__pvStylePreset = ['moderne','elegant','minimaliste'].includes(styleObj.preset) ? styleObj.preset : 'moderne';
     renderPvInfosForm();
     renderPvTemplates();
     renderPvModulesLib();
     renderPvOrderList();
     renderPvThemeSwatches();
+    renderPvStylePresets();
     pvRefreshPreview();
   } catch (e) { console.error(e); }
 }
@@ -4464,6 +4472,26 @@ async function pvSetTheme(theme) {
     await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine`, { vitrine_theme: theme });
     window.__pvInitTheme = theme;
     renderPvThemeSwatches();
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+const PV_STYLE_PRESETS = [
+  { id:'moderne', label:'Moderne', desc:'Coins arrondis, typographie ronde (par défaut)' },
+  { id:'elegant', label:'Élégant', desc:'Titres en Cormorant Garamond, coins nets' },
+  { id:'minimaliste', label:'Minimaliste', desc:'Angles droits, sans ombres, épuré' },
+];
+function renderPvStylePresets() {
+  const box = document.getElementById('pv-style-presets');
+  if (!box) return;
+  box.innerHTML = PV_STYLE_PRESETS.map(p => `
+    <button onclick="pvSetStylePreset('${p.id}')" class="btn btn-sm ${window.__pvStylePreset===p.id?'btn-orange':'btn-outline'}" title="${_mvEsc(p.desc)}">${p.label}</button>`).join('');
+}
+async function pvSetStylePreset(preset) {
+  try {
+    await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine`, { vitrine_style_json: { preset } });
+    window.__pvStylePreset = preset;
+    renderPvStylePresets();
+    pvRefreshPreview();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 

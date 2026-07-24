@@ -769,6 +769,16 @@ html, body { overflow-x:clip; }
 .pvt-scope[data-theme="emeraude"] { --v1:#1F6B4A; --v2:#0E3D2A; --v3:#2A9163; --v4:#0A2D1F; --vsoft:#E6F3EC; --vsoftbd:rgba(14,61,42,.14); }
 .pvt-scope[data-theme="prune"]    { --v1:#4A2E6B; --v2:#2C1A46; --v3:#6B49A6; --v4:#1E1233; --vsoft:#F0EAF7; --vsoftbd:rgba(44,26,70,.14); }
 .pvt-scope[data-theme="or"]       { --v1:#8A5E1A; --v2:#5E3F0E; --v3:#B5872A; --v4:#3D2907; --vsoft:#F6EFE0; --vsoftbd:rgba(94,63,14,.14); }
+/* Style graphique (independant du theme couleur) — 3 presets reels, appliques aux composants
+   structurels (hero, sections, boutons) ; les elements de contenu au style inline ne sont pas
+   affectes, limitation assumee pour rester contenu. */
+.pvt-scope[data-style="elegant"] .pvt-hero-title, .pvt-scope[data-style="elegant"] .pvt-section-head h3 { font-family:'Cormorant Garamond',serif; letter-spacing:.02em; font-weight:600; }
+.pvt-scope[data-style="elegant"] .pvt-hero, .pvt-scope[data-style="elegant"] .pvt-section, .pvt-scope[data-style="elegant"] .pvt-actionbar, .pvt-scope[data-style="elegant"] .pvt-subnav { border-radius:4px; }
+.pvt-scope[data-style="elegant"] .pvt-btn { border-radius:2px; letter-spacing:.04em; }
+.pvt-scope[data-style="minimaliste"] .pvt-hero, .pvt-scope[data-style="minimaliste"] .pvt-section, .pvt-scope[data-style="minimaliste"] .pvt-actionbar, .pvt-scope[data-style="minimaliste"] .pvt-subnav { border-radius:0; box-shadow:none; border-color:#E5E7EB; }
+.pvt-scope[data-style="minimaliste"] .pvt-btn { border-radius:0; }
+.pvt-scope[data-style="minimaliste"] .pvt-section-head { background:#F8FAFC !important; }
+.pvt-scope[data-style="minimaliste"] .pvt-section-head h3 { color:#122A4D !important; }
 .pvt-scope * { box-sizing:border-box; }
 .pvt-scope h3 { font-family:'Bricolage Grotesque','Public Sans',sans-serif; margin:0; }
 .pvt-flow { display:flex; flex-direction:column; gap:20px; margin-top:22px; min-width:0; }
@@ -2422,6 +2432,8 @@ const VITRINE_ICONES = ['✔️','⭐','🏆','🚚','🎁','🏭','🌍','🔒'
 async function renderVitrineVisitor(init) {
   const el = document.getElementById('p-vitrine');
   const theme = PVT_THEMES.some(t => t.id === init.vitrine_theme) ? init.vitrine_theme : 'bordeaux';
+  const styleObj = safeParseJson(init.vitrine_style_json, {});
+  const stylePreset = ['moderne','elegant','minimaliste'].includes(styleObj.preset) ? styleObj.preset : 'moderne';
   const banniere = init.vitrine_banniere_url || '';
   const galerie = safeParseJson(init.galerie_json, []);
   const ownerId = init.owner_user_id;
@@ -2728,7 +2740,7 @@ async function renderVitrineVisitor(init) {
     <button class="pvz-btn" style="white-space:nowrap;${window._daPremiumInitiative===false?'background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;border:none;':''}" onclick="pvzQuickToggleVitrine()">${vitrineVisible ? '🔒 Masquer la vitrine' : '🌐 Rendre visible'}</button>
   </div>` : '';
 
-  el.innerHTML = `<div class="pvt-scope" id="pvt-scope" data-theme="${theme==='bordeaux'?'':theme}">
+  el.innerHTML = `<div class="pvt-scope" id="pvt-scope" data-theme="${theme==='bordeaux'?'':theme}" data-style="${stylePreset==='moderne'?'':stylePreset}">
     <div class="pvt-flow">
       ${masqueeBanner}
       ${subnav}
