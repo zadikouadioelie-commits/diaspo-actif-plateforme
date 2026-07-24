@@ -1404,6 +1404,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <p style="font-size:13px;color:var(--muted);margin:0 0 20px;">Le centre de configuration de votre vitrine unique — modèle, modules, organisation et apparence.</p>
 
       <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 4px;font-size:15px;">📋 Informations générales</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ces informations sont aussi modifiables directement depuis votre vitrine publique.</p>
+        <div id="pv-infos-form"><div class="notice">Chargement…</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
         <h3 style="margin:0 0 12px;font-size:15px;">👁️ Statut de la vitrine</h3>
         <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Choisissez si votre vitrine est visible par les visiteurs, ou masquée le temps de la préparer.</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -4204,10 +4210,11 @@ const PV_CATEGORIE_LABELS = {
 let __pvRegistry = null;
 let __pvModulesState = null;
 let __pvVitrineType = null;
+let __pvInit = null;
 
 async function loadParametresVitrineFull() {
   if (!window.__vitrineInitId) {
-    ['pv-templates-grid','pv-modules-lib','pv-order-list','pv-theme-swatches'].forEach(id => {
+    ['pv-infos-form','pv-templates-grid','pv-modules-lib','pv-order-list','pv-theme-swatches'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = '<div class="notice">Créez votre initiative pour configurer sa vitrine.</div>';
     });
@@ -4218,15 +4225,91 @@ async function loadParametresVitrineFull() {
     const r = await api('GET', '/mon-initiative');
     const init = r.initiative;
     if (!init) return;
+    __pvInit = init;
     __pvModulesState = init.vitrine_modules_state || {};
     __pvVitrineType = init.vitrine_type || null;
     window.__pvInitTheme = init.vitrine_theme || 'bordeaux';
+    renderPvInfosForm();
     renderPvTemplates();
     renderPvModulesLib();
     renderPvOrderList();
     renderPvThemeSwatches();
     pvRefreshPreview();
   } catch (e) { console.error(e); }
+}
+
+const PV_DOMAINES = ['Environnement','Agriculture','Education','Sante','Action Sociale','Technologie','Culture','Entrepreneuriat','Finance','Droit'];
+const PV_RESEAUX_FIELDS = [
+  ['facebook','Facebook'], ['instagram','Instagram'], ['linkedin','LinkedIn'],
+  ['x','X / Twitter'], ['youtube','YouTube'], ['tiktok','TikTok'],
+];
+function renderPvInfosForm() {
+  const box = document.getElementById('pv-infos-form');
+  if (!box || !__pvInit) return;
+  const init = __pvInit;
+  let rs = {};
+  try { rs = JSON.parse(init.reseaux_sociaux || '{}') || {}; } catch (e) {}
+  box.innerHTML = `
+    <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="text-align:center;">
+        <div id="pv-logo-preview" style="width:80px;height:80px;border-radius:12px;background:${init.logo_url?`url('${_mvEsc(init.logo_url)}') center/cover`:'#EDF1F6'};display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--muted);margin-bottom:6px;">${init.logo_url?'':'🏢'}</div>
+        <label class="btn btn-sm btn-outline" style="cursor:pointer;">📷 Logo<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="pvUploadLogo(this)"></label>
+      </div>
+      <div style="flex:1;min-width:240px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="grid-column:1/-1;"><label class="pv-lbl">Nom de la vitrine</label><input id="pv-f-nom" value="${_mvEsc(init.nom||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div style="grid-column:1/-1;"><label class="pv-lbl">Description courte (sous-titre de la bannière)</label><input id="pv-f-slogan" value="${_mvEsc(init.slogan||'')}" placeholder="Ex : Artisanat durable pour la diaspora" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div><label class="pv-lbl">Catégorie</label><select id="pv-f-domaine" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">—</option>${PV_DOMAINES.map(d=>`<option value="${d}" ${init.domaine===d?'selected':''}>${d}</option>`).join('')}
+        </select></div>
+        <div><label class="pv-lbl">Site web</label><input id="pv-f-siteweb" value="${_mvEsc(init.site_web||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div><label class="pv-lbl">Ville</label><input id="pv-f-ville" value="${_mvEsc(init.vitrine_ville||init.ville||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div><label class="pv-lbl">Pays</label><input id="pv-f-pays" value="${_mvEsc(init.vitrine_pays||init.pays||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div><label class="pv-lbl">Téléphone</label><input id="pv-f-tel" value="${_mvEsc(init.vitrine_tel_pro||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div><label class="pv-lbl">Email pro</label><input id="pv-f-email" value="${_mvEsc(init.vitrine_email_pro||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label class="pv-lbl">Réseaux sociaux</label>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:6px;">
+        ${PV_RESEAUX_FIELDS.map(([k,l])=>`<input id="pv-f-rs-${k}" placeholder="${l}" value="${_mvEsc(rs[k]||'')}" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;">`).join('')}
+      </div>
+    </div>
+    <button class="btn btn-orange" onclick="pvSaveInfos()">💾 Enregistrer</button>
+    <span id="pv-infos-saved" style="margin-left:10px;font-size:12.5px;color:#16a34a;font-weight:700;display:none;">✓ Enregistré</span>
+    <style>.pv-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:4px;}</style>
+  `;
+}
+
+async function pvUploadLogo(input) {
+  const file = input.files[0]; if (!file) return;
+  try {
+    const url = await uploadMedia(file, 'logo');
+    __pvInit.logo_url = url;
+    await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine`, { logo_url: url });
+    renderPvInfosForm();
+  } catch (e) { alert('Erreur upload : ' + (e.message||'')); }
+}
+
+async function pvSaveInfos() {
+  const rs = {};
+  PV_RESEAUX_FIELDS.forEach(([k]) => { const v = document.getElementById('pv-f-rs-'+k).value.trim(); if (v) rs[k] = v; });
+  const payload = {
+    nom: document.getElementById('pv-f-nom').value.trim(),
+    slogan: document.getElementById('pv-f-slogan').value.trim(),
+    domaine: document.getElementById('pv-f-domaine').value,
+    site_web: document.getElementById('pv-f-siteweb').value.trim(),
+    vitrine_ville: document.getElementById('pv-f-ville').value.trim(),
+    vitrine_pays: document.getElementById('pv-f-pays').value.trim(),
+    vitrine_tel_pro: document.getElementById('pv-f-tel').value.trim(),
+    vitrine_email_pro: document.getElementById('pv-f-email').value.trim(),
+    reseaux_sociaux: rs,
+  };
+  try {
+    await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine`, payload);
+    Object.assign(__pvInit, payload);
+    const s = document.getElementById('pv-infos-saved');
+    if (s) { s.style.display = 'inline'; setTimeout(() => s.style.display = 'none', 2000); }
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
 /* ── Aperçu multi-écrans (iframe sur la vraie vitrine publique, aucune donnée dupliquée/simulée) ── */

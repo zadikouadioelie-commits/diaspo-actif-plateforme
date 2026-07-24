@@ -1424,6 +1424,8 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_temoignages_json, vitrine_vision_objectifs, vitrine_resultats_impact_json,
     vitrine_expertise_json, vitrine_certifications_json, vitrine_devis_active, vitrine_partenariat_active,
     vitrine_style_json,
+    // Informations générales (identité de la structure — éditables aussi depuis "Paramètres Vitrine")
+    nom, domaine, logo_url, reseaux_sociaux, slogan,
   } = body;
   const THEMES_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
   await db.prepare(`
@@ -1438,7 +1440,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
       site_web=?, vitrine_google_maps_url=?, vitrine_rdv_active=?,
       vitrine_temoignages_json=?, vitrine_vision_objectifs=?, vitrine_resultats_impact_json=?,
       vitrine_expertise_json=?, vitrine_certifications_json=?, vitrine_devis_active=?, vitrine_partenariat_active=?,
-      vitrine_style_json=?
+      vitrine_style_json=?, nom=?, domaine=?, logo_url=?, reseaux_sociaux=?, slogan=?
     WHERE id=?
   `).run(
     vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
@@ -1479,6 +1481,11 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_devis_active !== undefined ? (vitrine_devis_active ? 1 : 0) : init.vitrine_devis_active,
     vitrine_partenariat_active !== undefined ? (vitrine_partenariat_active ? 1 : 0) : init.vitrine_partenariat_active,
     vitrine_style_json !== undefined ? JSON.stringify(vitrine_style_json) : init.vitrine_style_json,
+    nom !== undefined && nom !== '' ? nom : init.nom,
+    domaine !== undefined ? domaine : init.domaine,
+    logo_url !== undefined ? logo_url : init.logo_url,
+    reseaux_sociaux !== undefined ? (typeof reseaux_sociaux === 'object' ? JSON.stringify(reseaux_sociaux) : reseaux_sociaux) : init.reseaux_sociaux,
+    slogan !== undefined ? slogan : init.slogan,
     params.id
   );
   sendJSON(res, 200, { ok: true });
