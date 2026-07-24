@@ -4383,6 +4383,13 @@ async function pvAppliquerType(type) {
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
+/* Modules dont le contenu se configure directement sur la vitrine (edition WYSIWYG deja existante) —
+   "⚙️ Configurer" y renvoie. Les modules purement structurels (contact, carte...) ou geres ailleurs
+   dans le dashboard (produits, catalogue) n'ont pas besoin de ce bouton. */
+const PV_MODULES_CONFIGURABLES = new Set(['a_propos','equipe','expertise','certifications','galerie_photos',
+  'documents','realisations','services','temoignages','vision_objectifs','resultats_impact','partenaires',
+  'objectif_jauge','pourquoi_choisir','offre_flash']);
+
 function renderPvModulesLib() {
   const box = document.getElementById('pv-modules-lib');
   if (!box || !__pvRegistry) return;
@@ -4394,11 +4401,13 @@ function renderPvModulesLib() {
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;">
         ${mods.map(m => {
           const state = __pvModulesState[m.key] || { actif: false };
-          return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:9px 12px;${!m.implemente?'opacity:.6;':''}">
+          return `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;border:1px solid var(--border);border-radius:10px;padding:9px 12px;${!m.implemente?'opacity:.6;':''}">
             <span style="font-size:13px;font-weight:600;">${_mvEsc(m.label)}</span>
+            <span style="display:flex;gap:4px;flex:none;">
             ${m.implemente
-              ? `<button onclick="pvToggleModule('${m.key}', ${!state.actif})" class="btn btn-sm ${state.actif?'btn-orange':'btn-outline'}" style="white-space:nowrap;">${state.actif?'✅ Actif':'👁️ Masqué'}</button>`
+              ? `${PV_MODULES_CONFIGURABLES.has(m.key)?`<a href="profil.html#vitrine" target="_blank" class="btn btn-sm btn-outline" title="Configurer le contenu de ce module sur la vitrine" style="text-decoration:none;padding:6px 8px;">⚙️</a>`:''}<button onclick="pvToggleModule('${m.key}', ${!state.actif})" class="btn btn-sm ${state.actif?'btn-orange':'btn-outline'}" style="white-space:nowrap;">${state.actif?'✅ Actif':'👁️ Masqué'}</button>`
               : `<span style="font-size:11px;color:var(--muted);white-space:nowrap;">🔜 Bientôt</span>`}
+            </span>
           </div>`;
         }).join('')}
       </div>
