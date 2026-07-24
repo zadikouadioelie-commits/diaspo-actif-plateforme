@@ -3973,14 +3973,21 @@ route("GET", "/api/users/search", async (req, res, params, body, query) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const q = (query.q || "").trim();
   if (q.length < 2) return sendJSON(res, 200, { users: [] });
+  // Restriction métier (ex: une collectivité ne peut contacter que collectivité/administrateur) —
+  // voir PEUT_CONTACTER/PEUT_INITIER. Exclut aussi les comptes anonymisés (suppression RGPD) et
+  // les comptes de démonstration, invisibles partout ailleurs sur la plateforme publique.
+  const allowed = PEUT_CONTACTER[user.role] || [];
+  const placeholders = allowed.map(() => "?").join(",");
+  if (!placeholders) return sendJSON(res, 200, { users: [] });
   const like = `%${q}%`;
   const rows = await db.prepare(`
     SELECT id, nom, prenom, email, role, photo_url AS avatar_url
     FROM users
-    WHERE id != ?
+    WHERE id != ? AND role IN (${placeholders})
+      AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE)
       AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ? OR CAST(id AS TEXT) = ?)
     LIMIT 10
-  `).all(user.id, like, like, like, q);
+  `).all(user.id, ...allowed, like, like, like, q);
   sendJSON(res, 200, { users: rows.map(u => ({ id: u.id, nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, avatar_url: u.avatar_url })) });
 });
 
@@ -5487,29 +5494,6 @@ route("GET", "/api/messages/non-lus", async (req, res) => {
       AND (CASE WHEN c.user1_id = ? THEN c.deleted_u1 ELSE c.deleted_u2 END) = 0
   `).get(user.id, user.id, user.id, user.id);
   sendJSON(res, 200, { total: r.n });
-});
-
-/* GET /api/users/search?q= — chercher des utilisateurs pour démarrer une conversation */
-route("GET", "/api/users/search", async (req, res, params, body, query) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-
-  const q = (query.q || "").trim();
-  if (q.length < 2) return sendJSON(res, 200, { users: [] });
-
-  const allowed = PEUT_CONTACTER[user.role] || [];
-  const placeholders = allowed.map(() => "?").join(",");
-  if (!placeholders) return sendJSON(res, 200, { users: [] });
-
-  const pattern = `%${q}%`;
-  const results = await db.prepare(`
-    SELECT id, nom, role, ville, pays FROM users
-    WHERE id != ? AND role IN (${placeholders})
-      AND (nom LIKE ? OR email LIKE ?)
-    LIMIT 10
-  `).all(user.id, ...allowed, pattern, pattern);
-
-  sendJSON(res, 200, { users: results });
 });
 
 
