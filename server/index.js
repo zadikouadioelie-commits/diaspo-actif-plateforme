@@ -5997,7 +5997,8 @@ const PREMIUM_DATE_PLANCHER = new Date('2026-07-26T00:00:00.000Z');
 /* Fin de la période gratuite d'un compte, en tenant compte de la remise à zéro. */
 function finPeriodeGratuite(createdAt) {
   if (!createdAt) return null;
-  const cree = new Date(String(createdAt).replace(' ', 'T'));
+  const cree = (createdAt instanceof Date) ? new Date(createdAt.getTime())
+                                           : new Date(String(createdAt).replace(' ', 'T'));
   if (isNaN(cree.getTime())) return null;
   const depart = cree.getTime() > PREMIUM_DATE_PLANCHER.getTime() ? cree : PREMIUM_DATE_PLANCHER;
   return finDecouvertePremium(depart.toISOString());
@@ -6281,9 +6282,12 @@ const DECOUVERTE_PREMIUM_MOIS = 3;
    (31 janvier → 30 avril) : sans cela JavaScript déborderait sur le mois suivant. */
 function finDecouvertePremium(createdAt) {
   if (!createdAt) return null;
-  /* SQLite stocke "2026-06-27 06:51:31" : l'espace n'est pas parsé de façon fiable
-     par tous les moteurs, on normalise en ISO avant lecture. */
-  const base = new Date(String(createdAt).replace(' ', 'T'));
+  /* Deux formats selon le moteur : SQLite renvoie la chaîne "2026-06-27 06:51:31", tandis
+     que PostgreSQL renvoie un objet Date. Appliquer replace(' ','T') à un objet Date le
+     transforme en "ThuTJul 23 2026...", soit une date INVALIDE — la période gratuite
+     n'était alors jamais calculée en production, alors que tout fonctionnait en local. */
+  const base = (createdAt instanceof Date) ? new Date(createdAt.getTime())
+                                           : new Date(String(createdAt).replace(' ', 'T'));
   if (isNaN(base.getTime())) return null;
   const quantieme = base.getDate();
   const fin = new Date(base.getTime());
