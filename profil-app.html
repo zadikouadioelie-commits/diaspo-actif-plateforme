@@ -2292,6 +2292,32 @@ async function renderVitrine() {
     return;
   }
 
+  /* Mode maintenance Premium — abonnement du propriétaire expiré.
+     Le contenu n'est ni supprimé ni modifié : seul l'affichage public est remplacé, afin de
+     préserver l'image de la plateforme et d'informer le visiteur. Le propriétaire, lui,
+     continue de voir sa vitrine (avec un rappel), pour pouvoir la retrouver intacte au
+     renouvellement. */
+  if (init.vitrine_maintenance && init.vitrine_maintenance.actif && !isOwn && !isAdmin) {
+    el.innerHTML = `<div style="max-width:560px;margin:40px auto;padding:34px 30px;text-align:center;background:#fff;border:1px solid var(--vsoftbd,#e5e7eb);border-radius:16px;">
+      <div style="font-size:40px;margin-bottom:10px;">🛠️</div>
+      <h2 style="margin:0 0 10px;font-size:19px;color:#122A4D;">Espace temporairement indisponible</h2>
+      <p style="margin:0;font-size:14px;line-height:1.7;color:#475569;">${esc(init.vitrine_maintenance.message)}</p>
+    </div>`;
+    return;
+  }
+  if (init.vitrine_maintenance && init.vitrine_maintenance.actif && isOwn) {
+    /* Bandeau propriétaire : il doit comprendre ce que voient ses visiteurs, et savoir que
+       ses contenus sont conservés — c'est le point le plus anxiogène d'une expiration. */
+    const j = init.vitrine_maintenance.jours_avant_purge;
+    el.insertAdjacentHTML('afterbegin', `<div style="margin:0 0 16px;padding:14px 16px;background:#FFF7ED;border:1.5px solid #F26422;border-radius:12px;">
+      <div style="font-weight:800;color:#9a3412;font-size:13.5px;">🛠️ Votre vitrine n'est plus visible du public</div>
+      <div style="font-size:12.5px;color:#9a3412;margin-top:4px;line-height:1.6;">
+        Votre abonnement Premium est arrivé à expiration. <strong>Vos contenus sont conservés</strong>${j != null ? ` (encore ${j} jours)` : ''} et réapparaîtront immédiatement après renouvellement.
+        <a href="premium.html?type=initiative" style="color:#9a3412;font-weight:800;">Renouveler →</a>
+      </div>
+    </div>`);
+  }
+
   // Vue hi-fi unifiée (propriétaire ET visiteur) — le propriétaire voit la même vitrine
   // restylée que ses visiteurs, avec des contrôles de modification en plus (voir
   // renderVitrineVisitor()). Le code de gestion "ancien style" ci-dessous n'est plus

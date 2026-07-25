@@ -2019,6 +2019,7 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
           media_type, media_url, media_duree_secondes, liste_stockage_id } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom de la formule requis." });
@@ -2256,6 +2257,7 @@ route("POST", "/api/initiatives/:id/adhesion-campagnes", async (req, res, params
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, objectif_membres, date_debut, date_fin } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom de campagne requis." });
   const id = (await db.prepare(`
@@ -2643,6 +2645,7 @@ route("POST", "/api/initiatives/:id/vote-scrutins", async (req, res, params, bod
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "votes"))) return;
   const { nom, type_scrutin, description, date_ouverture, date_fermeture, fermeture_mode,
           vote_secret, vote_nominatif, resultats_direct, pv_auto, quorum_requis } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom du scrutin requis." });
@@ -3651,6 +3654,13 @@ route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
     row.vitrine_expertise = safeParseArray(row.vitrine_expertise_json);
     row.vitrine_certifications = safeParseArray(row.vitrine_certifications_json);
   }
+
+  /* Mode maintenance Premium — espaces visibles du public.
+     Calculé À L'AFFICHAGE, jamais stocké : on ne touche pas à vitrine_active, qui reste le
+     choix du propriétaire. Un renouvellement rétablit donc la vitrine instantanément, sans
+     aucune intervention ni risque d'oublier de la remettre en ligne.
+     Les données ne sont ni supprimées ni modifiées : seul l'affichage change. */
+  row.vitrine_maintenance = await estEnMaintenancePremium(row.owner_user_id);
   sendJSON(res, 200, { initiative: row });
 });
 
@@ -5939,8 +5949,12 @@ const PREMIUM_PALIERS_RELANCE = [
    n'être protégés que côté navigateur. */
 async function getPremiumStatut(userId, role) {
   const type = PREMIUM_TYPE_PAR_ROLE[role];
-  if (!type) return { concerne: false, actif: false, type: null, date_expiration: null, jours_restants: null };
-  if (isPremiumDemoUnlock()) return { concerne: true, actif: true, type, date_expiration: null, jours_restants: null, source: 'demo_unlock' };
+  /* Forme de réponse IDENTIQUE dans tous les cas : un client qui lit "statut" ou
+     "jours_avant_purge" ne doit jamais recevoir undefined selon la branche empruntée. */
+  const base = { concerne: false, actif: false, statut: 'actif', type: null, date_expiration: null,
+                 jours_restants: null, jours_depuis_expiration: 0, jours_avant_purge: null, source: null };
+  if (!type) return base;
+  if (isPremiumDemoUnlock()) return { ...base, concerne: true, actif: true, type, source: 'demo_unlock' };
 
   const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
   const nouv = def ? await db.prepare("SELECT date_expiration FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id) : null;
@@ -5948,13 +5962,14 @@ async function getPremiumStatut(userId, role) {
   const ligne = nouv || ancien;
   const source = nouv ? 'user_accreditations' : (ancien ? 'compte_accreditations' : null);
 
-  if (!ligne) return { concerne: true, actif: false, type, date_expiration: null, jours_restants: null, source: null };
+  if (!ligne) return { ...base, concerne: true, actif: false, statut: 'expire', type };
 
   const fin = ligne.date_expiration ? new Date(ligne.date_expiration).getTime() : null;
   const expire = fin !== null && fin < Date.now();
   const joursRestants = fin === null ? null : Math.ceil((fin - Date.now()) / 86400000);
   const joursDepuisFin = expire ? Math.floor((Date.now() - fin) / 86400000) : 0;
   return {
+    ...base,
     concerne: true,
     actif: !expire,
     /* Statut du cycle de vie (cahier des charges "fin d'abonnement Premium") :
@@ -5971,6 +5986,81 @@ async function getPremiumStatut(userId, role) {
     source,
   };
 }
+
+/* ── Application des restrictions Premium ──
+   VOLONTAIREMENT DÉSACTIVÉE par défaut. Tant que PREMIUM_APPLICATION n'est pas mise à "1",
+   le système fonctionne en OBSERVATION : il journalise ce qu'il aurait bloqué, sans rien
+   bloquer. Cela permet de construire et de déployer tout le dispositif sans couper l'accès
+   de quiconque, puis de mesurer l'impact réel avant de l'activer.
+   Passer en application = une seule variable d'environnement, réversible immédiatement. */
+function premiumApplicationActive() { return process.env.PREMIUM_APPLICATION === '1'; }
+
+/* Journal des blocages qui AURAIENT eu lieu — sert à mesurer l'impact avant activation. */
+const __premiumObservations = [];
+function noterObservationPremium(userId, contexte) {
+  __premiumObservations.push({ userId, contexte, le: new Date().toISOString() });
+  if (__premiumObservations.length > 500) __premiumObservations.shift();
+}
+
+/* Point de contrôle UNIQUE pour tout module réservé à l'abonnement.
+   Retourne true si l'accès est autorisé. Sinon répond 402 et retourne false.
+   Toute route Premium doit passer par ici — c'est ce qui évite que chaque module
+   réinvente sa règle, dérive qui a laissé plusieurs modules protégés seulement
+   côté navigateur. */
+async function exigerPremium(user, res, contexte) {
+  const st = await getPremiumStatut(user.id, user.role);
+  if (!st.concerne || st.actif) return true;
+  if (!premiumApplicationActive()) {
+    noterObservationPremium(user.id, contexte);   // mode observation : on laisse passer
+    return true;
+  }
+  sendJSON(res, 402, {
+    error: "Votre abonnement Premium est arrivé à expiration. Renouvelez votre abonnement pour retrouver l'accès à vos fonctionnalités Premium.",
+    accred_type: st.type,
+    premium: st,
+    contexte,
+  });
+  return false;
+}
+
+/* Un espace public (vitrine, boutique…) doit-il afficher le mode maintenance ?
+   Renvoie null quand tout va bien, sinon le message destiné aux visiteurs.
+   Comme exigerPremium(), reste inactif tant que PREMIUM_APPLICATION n'est pas activée :
+   la maintenance est préparée mais n'affecte personne avant décision. */
+async function estEnMaintenancePremium(ownerUserId) {
+  if (!ownerUserId) return null;
+  try {
+    const proprio = await db.prepare("SELECT id, role FROM users WHERE id=?").get(ownerUserId);
+    if (!proprio) return null;
+    const st = await getPremiumStatut(proprio.id, proprio.role);
+    if (!st.concerne || st.actif) return null;
+    if (!premiumApplicationActive()) {
+      noterObservationPremium(proprio.id, 'espace_public');
+      return null;
+    }
+    return {
+      actif: true,
+      message: "Cette vitrine est temporairement indisponible. Son propriétaire doit renouveler son abonnement Premium afin de réactiver cet espace.",
+      /* Le contenu est conservé : on indique combien de temps il reste avant toute purge. */
+      jours_avant_purge: st.jours_avant_purge,
+    };
+  } catch (_) { return null; }
+}
+
+/* GET /api/admin/premium/observations — ce que l'application aurait bloqué (mesure d'impact). */
+route("GET", "/api/admin/premium/observations", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const parContexte = {};
+  __premiumObservations.forEach(o => { parContexte[o.contexte] = (parContexte[o.contexte] || 0) + 1; });
+  sendJSON(res, 200, {
+    application_active: premiumApplicationActive(),
+    total: __premiumObservations.length,
+    par_contexte: parContexte,
+    comptes_distincts: [...new Set(__premiumObservations.map(o => o.userId))].length,
+    dernieres: __premiumObservations.slice(-20),
+  });
+});
 
 /* GET /api/premium/statut — état de l'abonnement du compte connecté. */
 route("GET", "/api/premium/statut", async (req, res) => {
@@ -8935,6 +9025,9 @@ route("POST", "/api/ads/create", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (user.role !== "initiative") return sendJSON(res, 403, { error: "Réservé aux comptes Initiative." });
+  /* Le module Publicités est présenté comme Premium (bouton doré, fenêtre d'abonnement) :
+     le contrôle serveur manquait, la protection n'était donc que décorative. */
+  if (!(await exigerPremium(user, res, "publicites"))) return;
 
   /* Accréditation/abonnement Publicité désactivée temporairement (accès libre pour toute Initiative).
      Pour réactiver : décommenter le bloc ci-dessous. */
