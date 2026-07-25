@@ -605,16 +605,45 @@ route("POST", "/api/auth/verify-email", async (req, res, params, body) => {
 });
 
 /* GET /api/admin/error-logs — journal d'erreurs serveur (monitoring maison) */
+/* Auto-résolution des erreurs à chaque nouveau déploiement.
+   Une erreur corrigée cesse de se produire. Plutôt que de cocher 10 000 lignes à la main, on
+   considère qu'un déploiement remet le compteur à zéro : les erreurs antérieures passent en
+   "résolues", et si le défaut persiste il se re-journalise dans la minute. Le journal montre
+   ainsi ce qui est CASSÉ MAINTENANT, au lieu d'accumuler tout l'historique depuis l'origine —
+   c'est ce qui le rendait illisible, et donc inutile.
+
+   Le repère est l'identifiant du commit déployé, PAS le démarrage du processus : en
+   serverless les démarrages à froid sont incessants et videraient le journal en permanence,
+   y compris d'erreurs survenues cinq minutes plus tôt. L'opération n'a donc lieu qu'une fois
+   par déploiement. */
+async function autoResoudreErreursSiNouveauDeploiement() {
+  const deploiement = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID;
+  if (!deploiement) return null;   // hors Vercel (local) : on ne touche à rien
+  try {
+    const cle = 'error_logs_dernier_deploiement';
+    const precedent = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle=?").get(cle);
+    if (precedent && precedent.valeur === deploiement) return null;   // déjà traité
+
+    const avant = (await db.prepare("SELECT COUNT(*) n FROM error_logs WHERE resolu=0").get())?.n || 0;
+    await db.prepare("UPDATE error_logs SET resolu=1 WHERE resolu=0").run();
+    if (precedent) await db.prepare("UPDATE parametres_plateforme SET valeur=? WHERE cle=?").run(deploiement, cle);
+    else await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description) VALUES (?,?,?,?)")
+      .run(cle, deploiement, 'texte', "Dernier déploiement ayant déclenché l'auto-résolution du journal d'erreurs");
+    return { auto_resolues: avant, deploiement };
+  } catch (e) { return null; }
+}
+
 route("GET", "/api/admin/error-logs", async (req, res, params, body, query) => {
   const me = await getCurrentUser(req);
   if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const autoResolution = await autoResoudreErreursSiNouveauDeploiement();
   const filtre = query.statut === "resolu" ? "WHERE resolu=1" : query.statut === "actif" ? "WHERE resolu=0" : "";
   const logs = await db.prepare(`SELECT * FROM error_logs ${filtre} ORDER BY id DESC LIMIT 100`).all();
   const stats = {
     total_24h: (await db.prepare(`SELECT COUNT(*) n FROM error_logs WHERE created_at >= datetime('now','-1 day')`).get())?.n,
     non_resolues: (await db.prepare(`SELECT COUNT(*) n FROM error_logs WHERE resolu=0`).get())?.n,
   };
-  sendJSON(res, 200, { logs, stats });
+  sendJSON(res, 200, { logs, stats, auto_resolution: autoResolution });
 });
 
 /* PATCH /api/admin/error-logs/:id — marquer une erreur comme résolue */

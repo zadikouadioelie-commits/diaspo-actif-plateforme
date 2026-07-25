@@ -4125,6 +4125,7 @@
           </div>
           <div id="diag-resultat" style="margin-top:14px;"></div>
         </div>
+        <div id="errlog-auto"></div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px;">
           <div class="card" style="text-align:center;">
             <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Dernières 24h</div>
@@ -4515,6 +4516,17 @@ async function loadErrorLogs(filtre) {
     const data = await api('GET', '/admin/error-logs' + qs);
     document.getElementById('errlog-24h').textContent = data.stats.total_24h ?? 0;
     document.getElementById('errlog-nonresolues').textContent = data.stats.non_resolues ?? 0;
+    /* Une chute brutale du compteur doit s'expliquer, sinon elle inquiète ou induit en erreur :
+       on annonce explicitement l'auto-résolution déclenchée par un nouveau déploiement. */
+    const zoneAuto = document.getElementById('errlog-auto');
+    if (zoneAuto) {
+      zoneAuto.innerHTML = (data.auto_resolution && data.auto_resolution.auto_resolues)
+        ? `<div style="padding:10px 12px;background:#F0FDF4;border:1px solid #86EFAC;border-radius:9px;font-size:12.5px;color:#166534;margin-bottom:14px;">
+             ♻️ <strong>${data.auto_resolution.auto_resolues} erreur(s) marquée(s) résolues</strong> — un nouveau déploiement a eu lieu.
+             Celles qui persistent réapparaîtront d'elles-mêmes.
+           </div>`
+        : '';
+    }
     const badge = document.getElementById('errlog-badge');
     if (badge) {
       const n = data.stats.non_resolues || 0;
