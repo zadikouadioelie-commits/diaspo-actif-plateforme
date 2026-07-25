@@ -2957,7 +2957,7 @@ async function editOffreFlash() {
   const fin = prompt('Date et heure de fin (AAAA-MM-JJTHH:MM) :', finActuelle);
   if (fin === null) return;
   try {
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_offre_flash_titre: titre || null, vitrine_offre_flash_fin: fin ? new Date(fin).toISOString() : null });
+    await vitrineSave({ vitrine_offre_flash_titre: titre || null, vitrine_offre_flash_fin: fin ? new Date(fin).toISOString() : null });
     _vitrineInit.vitrine_offre_flash_titre = titre || null;
     _vitrineInit.vitrine_offre_flash_fin = fin ? new Date(fin).toISOString() : null;
     renderVitrineVisitor(_vitrineInit);
@@ -2973,7 +2973,7 @@ async function editObjectif() {
   if (libelle === null) return;
   try {
     const cibleNum = cible ? Number(cible) : null;
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_objectif_cible: cibleNum, vitrine_objectif_libelle: libelle || null });
+    await vitrineSave({ vitrine_objectif_cible: cibleNum, vitrine_objectif_libelle: libelle || null });
     _vitrineInit.vitrine_objectif_cible = cibleNum;
     _vitrineInit.vitrine_objectif_libelle = libelle || null;
     renderVitrineVisitor(_vitrineInit);
@@ -2991,7 +2991,7 @@ async function pvtAddPartenaire() {
       const url = await uploadMedia(file, 'logo');
       const list = safeParseJson(_vitrineInit.vitrine_partenaires_json, []);
       list.push({ nom: file.name.replace(/\.[^.]+$/,''), logo_url: url });
-      await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_partenaires_json: list });
+      await vitrineSave({ vitrine_partenaires_json: list });
       _vitrineInit.vitrine_partenaires_json = JSON.stringify(list);
       renderVitrineVisitor(_vitrineInit);
     } catch (err) { alert('Erreur : ' + err.message); }
@@ -3003,7 +3003,7 @@ async function pvtRemovePartenaire(i) {
   const list = safeParseJson(_vitrineInit.vitrine_partenaires_json, []);
   list.splice(i, 1);
   try {
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_partenaires_json: list });
+    await vitrineSave({ vitrine_partenaires_json: list });
     _vitrineInit.vitrine_partenaires_json = JSON.stringify(list);
     renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
@@ -3087,7 +3087,7 @@ async function pvtDocEnregistrer() {
   const list = safeParseJson(_vitrineInit.vitrine_documents_json, []);
   list.push({ titre, url });
   try {
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_documents_json: list });
+    await vitrineSave({ vitrine_documents_json: list });
     _vitrineInit.vitrine_documents_json = JSON.stringify(list);
     window._pvtDocOverlay?.remove();
     renderVitrineVisitor(_vitrineInit);
@@ -3139,7 +3139,7 @@ async function pvtLeSave() {
     return obj;
   }).filter(obj => Object.values(obj).some(v => v));
   try {
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { [field]: list });
+    await vitrineSave({ [field]: list });
     _vitrineInit[field] = JSON.stringify(list);
     document.getElementById('pvt-list-modal')?.remove();
     renderVitrineVisitor(_vitrineInit);
@@ -3166,7 +3166,7 @@ async function pvtEditExpertise() {
   if (val === null) return;
   const list = val.split(',').map(s => s.trim()).filter(Boolean);
   try {
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_expertise_json: list });
+    await vitrineSave({ vitrine_expertise_json: list });
     _vitrineInit.vitrine_expertise_json = JSON.stringify(list);
     renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
@@ -3177,7 +3177,7 @@ async function pvtRemoveDocument(i) {
   const list = safeParseJson(_vitrineInit.vitrine_documents_json, []);
   list.splice(i, 1);
   try {
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_documents_json: list });
+    await vitrineSave({ vitrine_documents_json: list });
     _vitrineInit.vitrine_documents_json = JSON.stringify(list);
     renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
@@ -3456,7 +3456,7 @@ function pvtToggleServiceCat(input) {
 async function pvtSaveServices() {
   const cats = [...document.querySelectorAll('#pvt-services-modal input[type=checkbox]:checked')].map(c => c.value);
   try {
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_services_categories_json: cats });
+    await vitrineSave({ vitrine_services_categories_json: cats });
     _vitrineInit.vitrine_services_categories_json = JSON.stringify(cats);
     document.getElementById('pvt-services-modal')?.remove();
     renderVitrineVisitor(_vitrineInit);
@@ -3467,7 +3467,7 @@ async function pvtSaveServices() {
 async function pvtSaveCoordField(field, value) {
   if (!isOwn || !_vitrineInit) return;
   try {
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { [field]: value });
+    await vitrineSave({ [field]: value });
     _vitrineInit[field] = value;
     // Les champs affectant les boutons/la carte nécessitent un nouveau rendu complet
     if (['adresse','code_postal','vitrine_ville','vitrine_region','vitrine_pays','vitrine_google_maps_url','tel_responsable','vitrine_tel_pro','vitrine_whatsapp','site_web','vitrine_email_pro','email_responsable','vitrine_rdv_active'].includes(field)) {
@@ -3716,7 +3716,7 @@ function renderPvtProducts(produits, ownerId) {
 async function ownerSetVitrineTheme(theme) {
   if (!isOwn || !_vitrineInit) return;
   try {
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_theme: theme });
+    await vitrineSave({ vitrine_theme: theme });
     _vitrineInit.vitrine_theme = theme;
     document.querySelectorAll('.vt-theme-sw').forEach(b => {
       b.style.border = '2px solid ' + (b.dataset.theme === theme ? '#16233D' : '#fff');
@@ -3866,12 +3866,42 @@ async function editVitrineBanner() {
       const cropped = await openImageCropper(file, { shape: 'rect', aspect: 16/6, outW: 2000, outH: 750 });
       if (!cropped) return;
       const url = await uploadMedia(cropped, 'banner');
-      await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { vitrine_banniere_url: url });
+      await vitrineSave({ vitrine_banniere_url: url });
       _vitrineInit.vitrine_banniere_url = url;
       renderVitrineVisitor(_vitrineInit);
     } catch (err) { alert('Erreur : ' + err.message); }
   };
   input.click();
+}
+
+/* ── Enregistrement des contenus de la vitrine ──
+   Dans l'aperçu du centre de création (?preview=draft), les contenus rejoignent le
+   BROUILLON : rien n'est visible du public avant « Publier », et « Annuler » peut donc
+   réellement revenir en arrière. Hors aperçu (vitrine réelle), le comportement historique
+   est conservé : enregistrement immédiat.
+   Les champs hors liste (thème, visibilité, coordonnées) restent toujours enregistrés
+   directement — les router vers le brouillon les ferait silencieusement disparaître,
+   la liste blanche du serveur les rejetant. */
+const VITRINE_CHAMPS_BROUILLON_CLIENT = [
+  'description', 'mission', 'vitrine_pourquoi_choisir', 'vitrine_vision_objectifs',
+  'vitrine_temoignages_json', 'vitrine_resultats_impact_json', 'vitrine_expertise_json',
+  'vitrine_certifications_json', 'vitrine_documents_json', 'vitrine_partenaires_json',
+  'vitrine_services', 'vitrine_services_categories_json', 'vitrine_horaires',
+  'vitrine_banniere_url', 'galerie_json',
+  'vitrine_objectif_cible', 'vitrine_objectif_libelle',
+  'vitrine_offre_flash_titre', 'vitrine_offre_flash_fin',
+];
+function vitrineEnApercu() { return /[?&]preview=draft/.test(location.search); }
+async function vitrineSave(payload) {
+  const id = _vitrineInit.id;
+  if (!vitrineEnApercu()) return api('PUT', `/initiatives/${id}/vitrine`, payload);
+  const contenu = {}, direct = {};
+  Object.entries(payload || {}).forEach(([k, v]) => {
+    (VITRINE_CHAMPS_BROUILLON_CLIENT.includes(k) ? contenu : direct)[k] = v;
+  });
+  if (Object.keys(direct).length) await api('PUT', `/initiatives/${id}/vitrine`, direct);
+  if (Object.keys(contenu).length) await api('PUT', `/initiatives/${id}/vitrine-draft`, { contenu });
+  return { ok: true };
 }
 
 async function editVitrineText(field, label, placeholder) {
@@ -3880,7 +3910,7 @@ async function editVitrineText(field, label, placeholder) {
   const val = prompt(label + ' :', current);
   if (val === null) return;
   try {
-    await api('PUT', `/initiatives/${_vitrineInit.id}/vitrine`, { [field]: val });
+    await vitrineSave({ [field]: val });
     _vitrineInit[field] = val;
     renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + e.message); }

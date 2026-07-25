@@ -4492,21 +4492,36 @@ const PV_MODULE_VERS_SECTION = Object.fromEntries(
   Object.entries(PV_PREVIEW_SECTION_KEYS).map(([secId, key]) => [key, secId])
 );
 
-function pvConfigurerDansApercu(moduleKey) {
+/* Lit le brouillon courant tel qu'il est stocké côté serveur. */
+async function pvDraftLire() {
+  try {
+    const r = await api('GET', '/mon-initiative');
+    const row = r.initiative || r;
+    return JSON.parse(row.vitrine_draft_json || '{}') || {};
+  } catch (e) { return null; }
+}
+
+async function pvConfigurerDansApercu(moduleKey) {
   const frame = document.getElementById('pv-preview-frame');
   const secId = PV_MODULE_VERS_SECTION[moduleKey];
   const libelle = (__pvRegistry && __pvRegistry.modules[moduleKey]) ? __pvRegistry.modules[moduleKey].label : moduleKey;
   if (!frame || !secId) return;
 
+  /* Instantané du brouillon AVANT toute modification — y compris avant l'activation
+     automatique ci-dessous, sinon on capturerait déjà l'état modifié et Annuler ne
+     restaurerait rien. La copie est profonde (JSON) : une référence partagée évoluerait
+     avec le brouillon. */
+  const avant = await pvDraftLire();
+  const instantane = avant ? JSON.parse(JSON.stringify(avant)) : null;
+
   /* Le module doit être actif pour exister dans l'aperçu : sinon on l'active d'abord,
-     sans quoi le bouton renverrait vers une section absente. On mémorise le fait de
-     l'avoir activé nous-même, pour qu'Annuler puisse le remasquer. */
+     sans quoi le bouton renverrait vers une section absente. */
   const etat = __pvModulesState && __pvModulesState[moduleKey];
   const activeParNous = !!(etat && !etat.actif);
-  if (activeParNous) { pvToggleModule(moduleKey, true); }
+  if (activeParNous) { await pvToggleModule(moduleKey, true); }
 
-  pvAfficherBarreConfig(libelle);
-  window.__pvConfigEnCours = { moduleKey, activeParNous };
+  pvAfficherBarreConfig(libelle, instantane !== null);
+  window.__pvConfigEnCours = { moduleKey, activeParNous, instantane };
 
   let essais = 0;
   const poll = setInterval(() => {
@@ -4528,16 +4543,18 @@ function pvConfigurerDansApercu(moduleKey) {
   }, 250);
 }
 
-function pvAfficherBarreConfig(libelle) {
+function pvAfficherBarreConfig(libelle, instantaneOk) {
   document.getElementById('pv-config-bar')?.remove();
   const anchor = document.getElementById('pv-draft-status');
   if (!anchor) return;
   const bar = document.createElement('div');
   bar.id = 'pv-config-bar';
   bar.style.cssText = 'margin:10px 0;padding:10px 12px;background:#FFF7ED;border:1.5px solid var(--orange);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+  /* Le message dit ce qu'Annuler sait réellement faire : sans instantané (lecture du
+     brouillon en échec), il ne pourra pas restaurer les contenus — autant l'annoncer. */
   bar.innerHTML = `<div style="flex:1;min-width:170px;">
       <div style="font-size:12.5px;font-weight:800;color:#9a3412;">⚙️ ${_mvEsc(libelle)}</div>
-      <div style="font-size:11.5px;color:#9a3412;opacity:.85;margin-top:2px;">Modifiez la section surlignée dans l'aperçu, puis validez.</div>
+      <div style="font-size:11.5px;color:#9a3412;opacity:.85;margin-top:2px;">Modifiez la section surlignée dans l'aperçu, puis validez.${instantaneOk ? ' « Annuler » rétablira l\'état actuel.' : ' ⚠ « Annuler » ne pourra pas rétablir les contenus.'}</div>
     </div>
     <button onclick="pvAnnulerConfig()" class="btn btn-sm btn-outline" style="white-space:nowrap;">✕ Annuler</button>
     <button onclick="pvValiderConfig()" class="btn btn-sm btn-orange" style="white-space:nowrap;">✓ Valider</button>`;
@@ -4561,14 +4578,28 @@ function pvNettoyerConfig() {
    qui l'avions activé pour l'occasion. À noter : les contenus modifiés dans l'aperçu sont
    enregistrés au fil de l'eau par la vitrine elle-même — Annuler ne les efface donc pas,
    et ne le prétend pas. */
-function pvAnnulerConfig() {
+async function pvAnnulerConfig() {
   const ctx = window.__pvConfigEnCours;
   pvNettoyerConfig();
   window.__pvConfigEnCours = null;
-  if (ctx && ctx.activeParNous) {
-    pvToggleModule(ctx.moduleKey, false); // recharge déjà l'aperçu et les listes
-    return;
+
+  /* Restauration exacte : on réécrit le brouillon tel qu'il était avant le clic sur ⚙️.
+     Cela défait d'un bloc les contenus saisis dans l'aperçu ET l'activation automatique
+     du module — inutile donc de remasquer séparément. */
+  if (ctx && ctx.instantane) {
+    try {
+      const r = await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine-draft-complet`, { draft: ctx.instantane });
+      __pvModulesState = (r.draft && r.draft.modules) || __pvModulesState;
+      __pvVitrineType = r.draft ? r.draft.type : __pvVitrineType;
+      if (r.draft && r.draft.style && r.draft.style.preset) window.__pvStylePreset = r.draft.style.preset;
+    } catch (e) { alert('Annulation impossible : ' + (e.message || '')); }
+  } else if (ctx && ctx.activeParNous) {
+    /* Repli quand l'instantané manque : on défait au moins l'activation automatique. */
+    await pvToggleModule(ctx.moduleKey, false);
   }
+
+  renderPvModulesLib(); renderPvOrderList(); renderPvTemplates(); renderPvStylePresets();
+  renderPvDraftStatus();
   pvRefreshPreview();
 }
 

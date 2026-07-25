@@ -1567,6 +1567,21 @@ const VITRINE_TEMPLATES = {
   },
 };
 
+/* Champs de contenu autorisés dans le brouillon de vitrine (liste blanche stricte).
+   Édités depuis l'aperçu, ils transitent par vitrine_draft_json et ne touchent la vitrine
+   publique qu'à la publication — c'est ce qui rend « Annuler » possible.
+   Volontairement ABSENTS : vitrine_active (visibilité, réservée au Premium), les coordonnées
+   et les Informations générales (nom, logo…), qui restent enregistrées immédiatement. */
+const VITRINE_CHAMPS_BROUILLON = [
+  "description", "mission", "vitrine_pourquoi_choisir", "vitrine_vision_objectifs",
+  "vitrine_temoignages_json", "vitrine_resultats_impact_json", "vitrine_expertise_json",
+  "vitrine_certifications_json", "vitrine_documents_json", "vitrine_partenaires_json",
+  "vitrine_services", "vitrine_services_categories_json", "vitrine_horaires",
+  "vitrine_banniere_url", "galerie_json",
+  "vitrine_objectif_cible", "vitrine_objectif_libelle",
+  "vitrine_offre_flash_titre", "vitrine_offre_flash_fin",
+];
+
 /* Modules toujours actifs par défaut pour toute vitrine, indépendamment du type choisi
    (comportement historique conservé : ces sections existaient avant le système de modules). */
 const VITRINE_MODULES_SOCLE = ["pourquoi_choisir","offre_flash","objectif_jauge","carte"];
@@ -3566,6 +3581,12 @@ route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
     row.vitrine_type = cfg.type;
     row.vitrine_style_json = JSON.stringify(cfg.style || {});
     row.vitrine_theme = cfg.theme;
+    /* Contenus du brouillon : même principe, superposés au passage pour que l'aperçu
+       montre les textes en cours d'édition sans qu'ils soient publiés. */
+    const c = resolveVitrineDraft(row).contenu || {};
+    Object.keys(c).forEach((champ) => {
+      if (VITRINE_CHAMPS_BROUILLON.includes(champ)) row[champ] = c[champ];
+    });
   }
   row.vitrine_draft_pending = JSON.stringify(resolveVitrineDraft(row)) !== '{}';
   sendJSON(res, 200, { initiative: row });
@@ -3607,6 +3628,18 @@ route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
     row.vitrine_type = cfg.type;
     row.vitrine_style_json = JSON.stringify(cfg.style || {});
     row.vitrine_theme = cfg.theme;
+    /* Contenus du brouillon superposés. Les champs dérivés (vitrine_temoignages…) ont été
+       calculés plus haut à partir des colonnes publiées : il faut les recalculer ici, sinon
+       l'aperçu afficherait l'ancienne valeur malgré la modification en cours. */
+    const c = resolveVitrineDraft(row).contenu || {};
+    Object.keys(c).forEach((champ) => {
+      if (VITRINE_CHAMPS_BROUILLON.includes(champ)) row[champ] = c[champ];
+    });
+    row.documents = safeParseArray(row.vitrine_documents_json);
+    row.vitrine_temoignages = safeParseArray(row.vitrine_temoignages_json);
+    row.vitrine_resultats_impact = safeParseArray(row.vitrine_resultats_impact_json);
+    row.vitrine_expertise = safeParseArray(row.vitrine_expertise_json);
+    row.vitrine_certifications = safeParseArray(row.vitrine_certifications_json);
   }
   sendJSON(res, 200, { initiative: row });
 });
@@ -3658,6 +3691,38 @@ route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body
   if (body.style !== undefined) draft.style = body.style;
   if (body.theme !== undefined) draft.theme = body.theme;
 
+  /* Contenus édités depuis l'aperçu : ils rejoignent le brouillon au lieu d'écrire
+     directement dans la vitrine publique. C'est ce qui rend « Annuler » réellement
+     possible, et ce qui garantit que rien n'est visible avant « Publier ». */
+  if (body.contenu && typeof body.contenu === "object") {
+    draft.contenu = draft.contenu || {};
+    Object.entries(body.contenu).forEach(([champ, val]) => {
+      if (!VITRINE_CHAMPS_BROUILLON.includes(champ)) return; // liste blanche stricte
+      draft.contenu[champ] = val;
+    });
+  }
+
+  await db.prepare("UPDATE initiatives SET vitrine_draft_json=? WHERE id=?").run(JSON.stringify(draft), params.id);
+  sendJSON(res, 200, { ok: true, draft });
+});
+
+/* PUT /api/initiatives/:id/vitrine-draft-complet — remplace le brouillon EN ENTIER.
+   Sert au bouton « Annuler » du centre de création : on restaure l'instantané pris avant
+   la session de configuration, ce qui défait d'un coup modules, style ET contenus. */
+route("PUT", "/api/initiatives/:id/vitrine-draft-complet", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const draft = (body && typeof body.draft === "object" && body.draft) ? body.draft : {};
+  /* On refiltre les contenus : un instantané ne doit pas pouvoir servir à écrire
+     des champs hors liste blanche. */
+  if (draft.contenu && typeof draft.contenu === "object") {
+    Object.keys(draft.contenu).forEach((champ) => {
+      if (!VITRINE_CHAMPS_BROUILLON.includes(champ)) delete draft.contenu[champ];
+    });
+  }
   await db.prepare("UPDATE initiatives SET vitrine_draft_json=? WHERE id=?").run(JSON.stringify(draft), params.id);
   sendJSON(res, 200, { ok: true, draft });
 });
@@ -3676,7 +3741,16 @@ route("POST", "/api/initiatives/:id/vitrine-publish", async (req, res, params) =
   const theme = draft.theme || init.vitrine_theme;
   await db.prepare("UPDATE initiatives SET vitrine_modules_json=?, vitrine_type=?, vitrine_style_json=?, vitrine_theme=?, vitrine_draft_json='{}' WHERE id=?")
     .run(modules, type, style, theme, params.id);
-  sendJSON(res, 200, { ok: true });
+
+  /* Contenus du brouillon : écrits colonne par colonne, en ne gardant que la liste blanche.
+     Requêtes séparées et paramétrées — le nom de colonne provient exclusivement de
+     VITRINE_CHAMPS_BROUILLON, jamais du corps de la requête. */
+  const contenu = (draft.contenu && typeof draft.contenu === "object") ? draft.contenu : {};
+  for (const champ of Object.keys(contenu)) {
+    if (!VITRINE_CHAMPS_BROUILLON.includes(champ)) continue;
+    await db.prepare(`UPDATE initiatives SET ${champ}=? WHERE id=?`).run(contenu[champ], params.id);
+  }
+  sendJSON(res, 200, { ok: true, champsPublies: Object.keys(contenu).length });
 });
 
 /* ===========================================================================
