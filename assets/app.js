@@ -559,7 +559,7 @@ async function applyAuthState() {
     /* Aperçu multi-appareils — outil de contrôle de mise en page (défini en fin de fichier).
        Masqué à l'intérieur de son propre cadre (?apercu=1), sinon l'outil se proposerait
        récursivement dans sa propre prévisualisation. */
-    const apercuBtnHtml = (APERCU_ROLES.indexOf(user.role) !== -1 && !apercuEstDansLeCadre()) ? `
+    const apercuBtnHtml = ((!APERCU_ROLES || APERCU_ROLES.indexOf(user.role) !== -1) && !apercuEstDansLeCadre()) ? `
       <button type="button" id="apercu-appareils-btn" onclick="openApercuAppareils()" title="Prévisualiser cette page en mobile, tablette et ordinateur" style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 12px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);">
         <span style="font-size:14px;">📱</span> Aperçu
       </button>` : '';
@@ -3596,7 +3596,9 @@ document.addEventListener("DOMContentLoaded", ()=>{
    qui masque les dépassements et empêche justement scrollWidth de les révéler.
    C'est ce piège qui rend ces bugs invisibles à l'œil nu.
    ══════════════════════════════════════════════════════════════════════════ */
-var APERCU_ROLES = ['administrateur', 'initiative']; // élargir ici pour d'autres rôles
+/* null = tous les comptes connectés (utilisateur, initiative, collectivité, administrateur).
+   Remplacer par une liste de rôles, ex. ['administrateur'], pour restreindre à nouveau. */
+var APERCU_ROLES = null;
 var APERCU_APPAREILS = [
   { id: 'mobile',   label: 'Mobile',     icone: '📱', largeur: 390,  hauteur: 780 },
   { id: 'tablette', label: 'Tablette',   icone: '💻', largeur: 768,  hauteur: 900 },
