@@ -1403,10 +1403,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <h2 style="margin:0 0 6px;">⭐ Paramètres Vitrine</h2>
       <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Configurez à gauche, voyez le résultat en direct à droite. Rien ne change sur votre vitrine publique tant que vous n'avez pas cliqué sur « 🚀 Publier ma vitrine ».</p>
 
-      <!-- Colonne de droite a 1.2fr : l'apercu occupe 20% de plus que la colonne de reglages
-           (54,5 % de la largeur au lieu de 50 %). La hauteur est deja bornee par l'ecran
-           (max-height:calc(100vh - 86px)), la largeur est donc le seul levier utile. -->
-      <div class="pv-builder-layout" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;">
+      <!-- 2fr / 3fr : l'apercu occupe 60 % de la largeur au lieu des 50 % d'origine, soit
+           exactement +20 % de SA propre taille. Attention au piege : un rapport 1fr/1.2fr
+           entre colonnes ne donne que 54,5 %, c'est-a-dire +9 % seulement — le rapport entre
+           colonnes n'est pas la variation de taille de l'apercu. La hauteur etant deja bornee
+           par l'ecran (max-height:calc(100vh - 86px)), la largeur est le seul levier. -->
+      <div class="pv-builder-layout" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:20px;">
         <div class="pv-builder-left">
 
           <div class="card" style="margin-bottom:20px;">
