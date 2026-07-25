@@ -5381,7 +5381,7 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
     if (!allowed.includes(other.role)) {
       return sendJSON(res, 403, { error: `Votre rôle (${user.role}) ne peut pas initier une conversation avec ce type de compte (${other.role}).` });
     }
-    if (!(await peutEcrireDirectement(user, otherId))) {
+    if (!(await peutEcrireDirectement(user, otherId, body.origine))) {
       return sendJSON(res, 403, {
         code: "contact_requis",
         error: "Vous devez d'abord établir le contact avec ce compte.",
@@ -5423,7 +5423,32 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
 
 /* Message imposé : l'utilisateur clique, il ne rédige pas. Un texte identique pour tous
    évite qu'une demande soit jugée sur sa forme plutôt que sur son auteur. */
-const MESSAGE_ETABLIR_CONTACT = "Bonjour, je souhaite entrer en contact avec vous sur Diaspo'Actif.";
+const MESSAGE_ETABLIR_CONTACT = "Bonjour, j'aimerais vous ajouter à mes contacts afin de pouvoir échanger avec vous sur Diaspo'Actif.";
+
+/* ─── Exceptions configurables par type de compte ───────────────────────────
+   La règle générale est la demande préalable. Les exceptions sont des données, pas du
+   code : un administrateur les ajuste sans déploiement, et elles restent inspectables.
+
+   - vitrine_contact_direct : une vitrine est un espace COMMERCIAL, publiée précisément
+     pour être contactée. Exiger une autorisation avant qu'un client puisse poser une
+     question sur un produit reviendrait à saboter l'objet de l'abonnement.
+   - collectivite_toujours_demande : un compte officiel exige la demande QUEL QUE SOIT
+     le point d'entrée — il l'emporte donc sur l'exception vitrine.
+   - administration_directe : le support doit toujours pouvoir joindre un membre, sans
+     quoi un compte pourrait devenir injoignable. */
+const REGLES_CONTACT_DEFAUT = {
+  vitrine_contact_direct: true,
+  collectivite_toujours_demande: true,
+  administration_directe: true,
+};
+
+async function reglesContact() {
+  try {
+    const r = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle='regles_contact'").get();
+    if (r && r.valeur) return { ...REGLES_CONTACT_DEFAUT, ...JSON.parse(r.valeur) };
+  } catch (e) { /* paramètre absent ou illisible : on retombe sur les valeurs par défaut */ }
+  return { ...REGLES_CONTACT_DEFAUT };
+}
 
 /* Blocage dans UN SENS OU L'AUTRE : celui qui bloque ne veut plus d'échange, et celui
    qui est bloqué ne doit pas pouvoir forcer le contact en inversant les rôles. */
@@ -5444,26 +5469,44 @@ async function sontContacts(a, b) {
 }
 
 /* Peut-on ouvrir une conversation neuve sans passer par une demande ?
-   Oui si l'un des deux est l'administration, ou si le lien existe déjà. */
-async function peutEcrireDirectement(user, cibleId) {
-  if (user.role === "administrateur") return true;
+   `origine` indique l'espace d'où part le contact ("vitrine" pour la boutique publique).
+
+   ⚠ L'origine est déclarée par le navigateur, donc falsifiable. Elle n'est jamais crue
+   sur parole : l'exception vitrine ne s'applique que si la cible possède RÉELLEMENT une
+   vitrine publiée. Prétendre venir d'une vitrine qui n'existe pas ne donne rien. */
+async function peutEcrireDirectement(user, cibleId, origine) {
+  const regles = await reglesContact();
   const cible = await db.prepare("SELECT role FROM users WHERE id=?").get(cibleId);
-  if (cible && cible.role === "administrateur") return true;
-  return await sontContacts(user.id, cibleId);
+
+  if (regles.administration_directe &&
+      (user.role === "administrateur" || (cible && cible.role === "administrateur"))) return true;
+
+  if (await sontContacts(user.id, cibleId)) return true;
+
+  /* Un compte officiel exige la demande quel que soit le point d'entrée : cette règle
+     l'emporte sur l'exception vitrine, sans quoi elle serait contournable. */
+  if (cible && cible.role === "collectivite" && regles.collectivite_toujours_demande) return false;
+
+  if (regles.vitrine_contact_direct && String(origine || "") === "vitrine") {
+    const init = await db.prepare("SELECT vitrine_active FROM initiatives WHERE owner_user_id=?").get(cibleId);
+    if (init && Number(init.vitrine_active) === 1) return true;
+  }
+  return false;
 }
 
 /* Décision unique consommée par toute l'interface. Le serveur tranche, les pages
    reflètent — deux implémentations de la même règle finiraient par diverger. */
-async function statutRelation(userId, cibleId) {
+async function statutRelation(user, cibleId, origine) {
+  const userId = user.id;
   if (await contactBloque(userId, cibleId)) {
     return { action: "bloque", libelle: "Contact bloqué", contact_direct: false };
   }
+  /* Une conversation existante ne suffit PLUS : retirer un contact doit refermer
+     l'échange même si l'historique demeure (§7 du cahier des charges). */
   const conv = await db.prepare(
     "SELECT id FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)"
   ).get(userId, cibleId, cibleId, userId);
-  const cible = await db.prepare("SELECT role FROM users WHERE id=?").get(cibleId);
-  const admin = cible && cible.role === "administrateur";
-  if (conv || admin || await sontContacts(userId, cibleId)) {
+  if (await peutEcrireDirectement(user, cibleId, origine)) {
     return { action: "message", libelle: "Message", contact_direct: true, conversation_id: conv ? conv.id : null };
   }
   const envoyee = await db.prepare(
@@ -5488,7 +5531,7 @@ route("GET", "/api/relation-statut", async (req, res, params, body, query) => {
   if (!cibleId || cibleId === user.id) return sendJSON(res, 400, { error: "Compte invalide." });
   const cible = await db.prepare("SELECT id FROM users WHERE id=?").get(cibleId);
   if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
-  sendJSON(res, 200, await statutRelation(user.id, cibleId));
+  sendJSON(res, 200, await statutRelation(user, cibleId, query.origine));
 });
 
 /* POST /api/demandes-contact — envoyer une demande. Message imposé côté serveur : ce que
@@ -5534,12 +5577,26 @@ route("GET", "/api/demandes-contact", async (req, res, params, body, query) => {
   let filtre = "";
   if (query.statut === "en_attente") filtre = " AND d.statut='en_attente'";
   else if (query.statut === "traitees") filtre = " AND d.statut<>'en_attente'";
+  /* La carte doit permettre de décider sans quitter la page : présentation, métier, lieu
+     et volume d'activité publique du demandeur accompagnent son identité (§3). */
   const demandes = await db.prepare(
     "SELECT d.id, d.statut, d.message, d.created_at, d.repondu_at, d.conversation_id," +
-    " u.id AS autre_id, u.nom AS autre_nom, u.prenom AS autre_prenom, u.role AS autre_role, u.photo_url AS autre_photo" +
+    " u.id AS autre_id, u.nom AS autre_nom, u.prenom AS autre_prenom, u.role AS autre_role," +
+    " u.photo_url AS autre_photo, u.bio AS autre_bio, u.titre_pro AS autre_titre," +
+    " u.ville AS autre_ville, u.pays AS autre_pays" +
     " FROM demandes_contact d JOIN users u ON u.id=d." + autre +
     " WHERE d." + col + "=?" + filtre + " ORDER BY d.created_at DESC LIMIT 200"
   ).all(user.id);
+  /* Activité publique : ce que le demandeur a réellement produit sur la plateforme.
+     Un compte vide n'est pas nécessairement suspect, mais l'information manque sans cela. */
+  for (const d of demandes) {
+    try {
+      d.activite = {
+        publications: (await db.prepare("SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?").get(d.autre_id))?.n || 0,
+        abonnes: (await db.prepare("SELECT COUNT(*) n FROM user_follows WHERE followed_id=?").get(d.autre_id))?.n || 0,
+      };
+    } catch (e) { d.activite = null; }
+  }
   const en_attente = (await db.prepare(
     "SELECT COUNT(*) n FROM demandes_contact WHERE destinataire_id=? AND statut='en_attente'"
   ).get(user.id))?.n || 0;
@@ -5605,6 +5662,62 @@ route("GET", "/api/contacts", async (req, res) => {
     " ORDER BY d.repondu_at DESC LIMIT 500"
   ).all(user.id, user.id, user.id);
   sendJSON(res, 200, { contacts });
+});
+
+/* DELETE /api/contacts/:userId — retirer un contact.
+
+   L'historique des messages est CONSERVÉ : la conversation reste lisible, on ne réécrit
+   pas le passé. Mais le lien est rompu, donc plus aucun nouvel échange tant qu'une
+   nouvelle demande n'a pas été acceptée (§7 du cahier des charges).
+
+   On supprime la ligne acceptée plutôt que de la marquer close : une demande ultérieure
+   doit pouvoir repartir de zéro, et l'index unique ne porte que sur les demandes en
+   attente. */
+route("DELETE", "/api/contacts/:userId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const autreId = Number(params.userId);
+  if (!autreId) return sendJSON(res, 400, { error: "Compte invalide." });
+  const info = await db.prepare(
+    "DELETE FROM demandes_contact WHERE statut='acceptee' AND ((demandeur_id=? AND destinataire_id=?) OR (demandeur_id=? AND destinataire_id=?))"
+  ).run(user.id, autreId, autreId, user.id);
+  sendJSON(res, 200, { ok: true, retire: (info && info.changes) || 0 });
+});
+
+/* POST /api/contacts/:userId/bloquer — bloquer depuis la liste des contacts.
+   Le blocage retire aussi le lien : on ne reste pas « contact » de quelqu'un qu'on bloque. */
+route("POST", "/api/contacts/:userId/bloquer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const autreId = Number(params.userId);
+  if (!autreId || autreId === user.id) return sendJSON(res, 400, { error: "Compte invalide." });
+  await db.prepare("INSERT OR IGNORE INTO contacts_bloques (bloqueur_id, bloque_id) VALUES (?,?)").run(user.id, autreId);
+  await db.prepare(
+    "DELETE FROM demandes_contact WHERE (demandeur_id=? AND destinataire_id=?) OR (demandeur_id=? AND destinataire_id=?)"
+  ).run(user.id, autreId, autreId, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET / PUT /api/admin/regles-contact — exceptions configurables par type de compte (§8).
+   Ce sont des données, pas du code : elles s'ajustent sans déploiement. */
+route("GET", "/api/admin/regles-contact", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  sendJSON(res, 200, { regles: await reglesContact(), defaut: REGLES_CONTACT_DEFAUT });
+});
+
+route("PUT", "/api/admin/regles-contact", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const regles = {};
+  for (const cle of Object.keys(REGLES_CONTACT_DEFAUT)) {
+    regles[cle] = body[cle] !== undefined ? !!body[cle] : REGLES_CONTACT_DEFAUT[cle];
+  }
+  const existe = await db.prepare("SELECT cle FROM parametres_plateforme WHERE cle='regles_contact'").get();
+  if (existe) await db.prepare("UPDATE parametres_plateforme SET valeur=? WHERE cle='regles_contact'").run(JSON.stringify(regles));
+  else await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description) VALUES (?,?,?,?)")
+    .run('regles_contact', JSON.stringify(regles), 'json', "Exceptions au principe de demande de contact préalable");
+  sendJSON(res, 200, { ok: true, regles });
 });
 
 /* GET /api/contacts/blocages — comptes que j'ai bloqués */
@@ -5824,6 +5937,19 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
   const autreId = Number(conv.user1_id) === Number(user.id) ? Number(conv.user2_id) : Number(conv.user1_id);
   if (await contactBloque(user.id, autreId)) {
     return sendJSON(res, 403, { code: "contact_bloque", error: "Aucun échange n'est possible avec ce compte." });
+  }
+  /* Le lien doit être ACTIF pour écrire, pas seulement avoir existé un jour. Retirer un
+     contact conserve l'historique — les messages restent lisibles — mais referme
+     l'échange tant qu'une nouvelle demande n'a pas été acceptée (§7). Les conversations
+     Toute conversation est bilatérale (user1_id / user2_id), la règle s'applique donc
+     partout sans exception de forme. */
+  if (!(await peutEcrireDirectement(user, autreId))) {
+    return sendJSON(res, 403, {
+      code: "contact_requis",
+      error: "Vous n'êtes plus en contact avec ce compte. Envoyez une nouvelle demande pour reprendre l'échange.",
+      destinataire_id: autreId,
+      message_predefini: MESSAGE_ETABLIR_CONTACT,
+    });
   }
 
   const contenu = (body.contenu || "").trim();

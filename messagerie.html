@@ -1205,6 +1205,7 @@ function dcCarte(d, traitee){
         </div>
         ${traitee && st ? `<span class="dc-statut" style="color:${st[1]};background:${st[2]};">${st[0]}</span>` : ''}
       </div>
+      ${dcPresentation(d)}
       <div class="dc-msg">${escH(d.message || '')}</div>
       ${traitee ? '' : `
       <div class="dc-actions">
@@ -1213,6 +1214,18 @@ function dcCarte(d, traitee){
         <button class="dc-btn bloc" onclick="dcRepondre(${d.id},'bloquer')">Bloquer</button>
       </div>`}
     </div>`;
+}
+
+/* Présentation et activité publique du demandeur : décider suppose de savoir qui écrit,
+   sans avoir à quitter la page. */
+function dcPresentation(d){
+  const lieu = [d.autre_ville, d.autre_pays].filter(Boolean).join(', ');
+  const lignes = [];
+  if (d.autre_titre) lignes.push(`<div style="font-size:12px;color:var(--text);margin-top:6px;">💼 ${escH(d.autre_titre)}</div>`);
+  if (lieu) lignes.push(`<div style="font-size:12px;color:var(--muted);margin-top:2px;">📍 ${escH(lieu)}</div>`);
+  if (d.autre_bio) lignes.push(`<div style="font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5;">${escH(String(d.autre_bio).slice(0,220))}${String(d.autre_bio).length>220?'…':''}</div>`);
+  if (d.activite) lignes.push(`<div style="font-size:11.5px;color:var(--muted);margin-top:6px;">📰 ${d.activite.publications} publication(s) · 👥 ${d.activite.abonnes} abonné(s)</div>`);
+  return lignes.join('');
 }
 
 function fmtDateDC(s){
@@ -1294,7 +1307,11 @@ async function chargerContacts(){
               <span class="dc-role">${escH(ROLE_LIBELLE[c.role] || c.role || '')}</span>
               <div class="dc-date">Contact depuis le ${fmtDateDC(c.depuis)}</div>
             </div>
-            <button class="dc-btn" onclick="ouvrirDepuisContact(${c.id})">✉️ Message</button>
+          </div>
+          <div class="dc-actions" style="margin-top:10px;">
+            <button class="dc-btn oui"  onclick="ouvrirDepuisContact(${c.id})">✉️ Message</button>
+            <button class="dc-btn non"  onclick="retirerContact(${c.id}, '${escH(nom).replace(/'/g,"\\'")}')">Retirer</button>
+            <button class="dc-btn bloc" onclick="bloquerContact(${c.id}, '${escH(nom).replace(/'/g,"\\'")}')">Bloquer</button>
           </div>
         </div>`;
     }).join('');
@@ -1302,6 +1319,20 @@ async function chargerContacts(){
     zone.innerHTML = `<div style="padding:20px;color:#DC2626;font-size:13px;">${escH(e.message)}</div>`;
   }
 }
+
+/* Retirer un contact : l'historique reste lisible, mais l'échange se referme tant qu'une
+   nouvelle demande n'a pas été acceptée. Le dire explicitement évite la mauvaise surprise. */
+window.retirerContact = async function(userId, nom){
+  if (!confirm(`Retirer ${nom} de vos contacts ?\n\nL'historique des messages est conservé, mais vous ne pourrez plus échanger tant qu'une nouvelle demande n'aura pas été acceptée.`)) return;
+  try { await api('DELETE', `/contacts/${userId}`); await chargerContacts(); }
+  catch(e) { alert(e.message); }
+};
+
+window.bloquerContact = async function(userId, nom){
+  if (!confirm(`Bloquer ${nom} ?\n\nCe compte ne pourra plus vous envoyer ni demande ni message, et il est retiré de vos contacts.`)) return;
+  try { await api('POST', `/contacts/${userId}/bloquer`); await chargerContacts(); }
+  catch(e) { alert(e.message); }
+};
 
 /* Ouvre directement l'échange avec ce contact, sans passer par la liste générale. */
 window.ouvrirDepuisContact = async function(userId){
