@@ -5897,8 +5897,12 @@ function isPremiumDemoUnlock() { return process.env.PREMIUM_DEMO_UNLOCK === '1';
 
 async function hasAccreditation(userId, type) {
   if (isPremiumDemoUnlock()) return true;
-  const ancien = await db.prepare("SELECT id FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type);
-  if (ancien) return true;
+  /* Ancien système : la date d'expiration EXISTE dans compte_accreditations mais n'était pas
+     consultée — une accréditation à l'ancien format restait donc valable indéfiniment, même
+     échue. C'était la cause racine du « compte encore Premium après la fin de l'abonnement ».
+     Le contrôle est aligné sur celui du nouveau système, juste en dessous. */
+  const ancien = await db.prepare("SELECT id, date_expiration FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type);
+  if (ancien && !(ancien.date_expiration && new Date(ancien.date_expiration).getTime() < Date.now())) return true;
   const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
   if (!def) return false;
   const nouv = await db.prepare("SELECT id, date_expiration FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id);
@@ -5906,6 +5910,49 @@ async function hasAccreditation(userId, type) {
   if (nouv.date_expiration && new Date(nouv.date_expiration).getTime() < Date.now()) return false;
   return true;
 }
+
+/* Type d'accréditation « abonnement » correspondant à chaque rôle. */
+const PREMIUM_TYPE_PAR_ROLE = { initiative: 'initiative_abonne', utilisateur: 'utilisateur_abonne' };
+
+/* Statut Premium détaillé — SOURCE UNIQUE pour tous les modules réservés à l'abonnement.
+   Renvoie non seulement l'accès, mais la date de fin et les jours restants : c'est ce qui
+   permet d'avertir avant l'échéance plutôt que de couper sans prévenir.
+   Toute vérification Premium doit passer par ici (ou par hasAccreditation), et jamais
+   recalculer sa propre règle dans son coin — c'est ainsi que des modules ont fini par
+   n'être protégés que côté navigateur. */
+async function getPremiumStatut(userId, role) {
+  const type = PREMIUM_TYPE_PAR_ROLE[role];
+  if (!type) return { concerne: false, actif: false, type: null, date_expiration: null, jours_restants: null };
+  if (isPremiumDemoUnlock()) return { concerne: true, actif: true, type, date_expiration: null, jours_restants: null, source: 'demo_unlock' };
+
+  const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
+  const nouv = def ? await db.prepare("SELECT date_expiration FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id) : null;
+  const ancien = await db.prepare("SELECT date_expiration FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type);
+  const ligne = nouv || ancien;
+  const source = nouv ? 'user_accreditations' : (ancien ? 'compte_accreditations' : null);
+
+  if (!ligne) return { concerne: true, actif: false, type, date_expiration: null, jours_restants: null, source: null };
+
+  const fin = ligne.date_expiration ? new Date(ligne.date_expiration).getTime() : null;
+  const expire = fin !== null && fin < Date.now();
+  return {
+    concerne: true,
+    actif: !expire,
+    type,
+    date_expiration: ligne.date_expiration || null,
+    /* null = abonnement sans date de fin. Négatif = nombre de jours depuis l'échéance,
+       utile pour graduer un éventuel retrait progressif. */
+    jours_restants: fin === null ? null : Math.ceil((fin - Date.now()) / 86400000),
+    source,
+  };
+}
+
+/* GET /api/premium/statut — état de l'abonnement du compte connecté. */
+route("GET", "/api/premium/statut", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  sendJSON(res, 200, await getPremiumStatut(user.id, user.role));
+});
 
 /* 🥇 Découverte Premium — période d'essai de 30 jours accordée automatiquement à la création
    du compte, pour tout rôle disposant d'un type d'accréditation "_abonne" premium.
