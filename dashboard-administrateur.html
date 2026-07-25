@@ -88,6 +88,7 @@
       <a href="#communication" data-section="communication">✉ Communication</a>
       <a href="#publications" data-section="publications">📢 Publications</a>
       <a href="#moderation" data-section="moderation">🛡 Modération</a>
+      <a href="#regles-contact" data-section="regles-contact">🤝 Contact &amp; diffusion</a>
       <a href="#suppression-comptes" data-section="suppression-comptes" style="display:flex;justify-content:space-between;align-items:center;">🗑 Demandes de suppression <span id="delreq-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="audiovisuel.html" style="display:none;">🎬 Atelier audiovisuel</a>
       <a href="#ads" data-section="ads">📣 Publicités</a>
@@ -2760,6 +2761,57 @@
           <button class="btn btn-orange" onclick="saveParametres()">💾 Enregistrer</button>
         </div>
         <div id="params-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"></div>
+      </section>
+
+      <!-- CONTACT & DIFFUSION -->
+      <section id="section-regles-contact" style="display:none;">
+        <h2 style="margin:0 0 4px;">🤝 Contact &amp; diffusion</h2>
+        <p style="margin:0 0 20px;color:var(--muted);font-size:13px;">
+          Deux réglages distincts : qui peut écrire à qui en privé, et à quelle communauté une collectivité peut s'adresser.
+        </p>
+
+        <!-- Exceptions au principe « Établir contact » -->
+        <div class="card" style="margin-bottom:18px;">
+          <h3 style="margin:0 0 4px;font-size:15px;">Exceptions à « Établir contact »</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">
+            Par principe, toute conversation privée exige une demande acceptée. Ces trois exceptions
+            s'appliquent à tous les comptes. Les décocher rend la règle plus stricte.
+          </p>
+          <div id="rc-liste"><div class="notice">Chargement…</div></div>
+          <div style="margin-top:14px;"><button class="btn btn-orange btn-sm" onclick="rcEnregistrer()">💾 Enregistrer</button></div>
+          <div id="rc-retour" style="margin-top:10px;"></div>
+        </div>
+
+        <!-- Dérogations de diffusion inter-origines -->
+        <div class="card">
+          <h3 style="margin:0 0 4px;font-size:15px;">Dérogations de diffusion inter-origines</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">
+            Une collectivité ne diffuse qu'auprès de sa propre communauté d'origine. Une dérogation lui ouvre
+            une autre communauté — organisations internationales, événements multiculturels, campagnes communes.
+            Chacune est tracée : une communication institutionnelle vers une autre diaspora peut avoir des
+            conséquences diplomatiques, il faut pouvoir dire qui l'a permise.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
+            <div style="flex:1;min-width:190px;">
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:3px;">Collectivité</label>
+              <select id="ad-coll" class="input-field" style="width:100%;font-size:13px;"><option value="">Chargement…</option></select>
+            </div>
+            <div style="flex:1;min-width:150px;">
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:3px;">Communauté ciblée</label>
+              <input id="ad-origine" class="input-field" style="width:100%;font-size:13px;" placeholder="Ex : Côte d'Ivoire">
+            </div>
+            <div style="flex:1.4;min-width:190px;">
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:3px;">Motif</label>
+              <input id="ad-motif" class="input-field" style="width:100%;font-size:13px;" placeholder="Campagne commune, partenariat validé…">
+            </div>
+            <div style="min-width:140px;">
+              <label style="display:block;font-size:11.5px;font-weight:700;margin-bottom:3px;">Expire le (optionnel)</label>
+              <input id="ad-expire" type="date" class="input-field" style="width:100%;font-size:13px;">
+            </div>
+            <button class="btn btn-orange btn-sm" onclick="adAccorder()">Accorder</button>
+          </div>
+          <div id="ad-liste"><div class="notice">Chargement…</div></div>
+        </div>
       </section>
 
       <!-- MEMBRES -->
@@ -6555,6 +6607,7 @@ async function submitAccordDirect(){
 
   // Navigation sections — lazy-load les modules à la demande
   const SECTION_LOADERS = {
+    'regles-contact': () => { rcCharger(); adCharger(); },
     reseau:      () => loadReseau(),
     contenu:     () => loadContenu(),
     retention:   () => loadRetention(),
@@ -11478,6 +11531,122 @@ async function diagSchema() {
       diagAfficher(`⚠️ <strong>${d.colonnes_manquantes} colonne(s) manquante(s)</strong><br>${liste}<br><span style="color:var(--muted);">${d.remede || ''}</span>`, '#dc2626');
     }
   } catch (e) { diagAfficher(`❌ ${diagMessageErreur(e)}`, '#dc2626'); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   CONTACT & DIFFUSION — pilotage des exceptions
+
+   Ces réglages existaient côté serveur mais n'étaient atteignables qu'en appelant
+   l'API à la main. Une règle qu'on ne peut pas voir est une règle qu'on oublie :
+   les rendre visibles, c'est la seule façon qu'elles soient réellement gouvernées.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* Chaque exception est expliquée par sa CONSÉQUENCE, pas par son nom technique :
+   un administrateur doit comprendre ce qu'il change avant de le changer. */
+const RC_LIBELLES = {
+  vitrine_contact_direct: [
+    'Contact direct depuis une vitrine',
+    "Un visiteur peut écrire au propriétaire d'une vitrine sans demande préalable. Une vitrine est un espace commercial, publiée pour être contactée — la décocher revient à exiger une autorisation avant qu'un client puisse poser une question sur un produit.",
+  ],
+  collectivite_toujours_demande: [
+    'Les collectivités exigent toujours une demande',
+    "Écrire à un compte officiel passe toujours par « Établir contact », quel que soit le point d'entrée. Cette règle l'emporte sur l'exception vitrine, sans quoi elle serait contournable.",
+  ],
+  administration_directe: [
+    "L'administration joint toujours un membre",
+    "Le support peut écrire à n'importe quel compte sans demande. La décocher permettrait à un membre de devenir injoignable par la plateforme elle-même.",
+  ],
+};
+
+async function rcCharger() {
+  const z = document.getElementById('rc-liste');
+  if (!z) return;
+  try {
+    const d = await api('GET', '/admin/regles-contact');
+    z.innerHTML = Object.entries(RC_LIBELLES).map(([cle, [titre, expl]]) => `
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer;">
+        <input type="checkbox" id="rc-${cle}" ${d.regles[cle] ? 'checked' : ''} style="margin-top:3px;width:16px;height:16px;flex-shrink:0;">
+        <span>
+          <span style="font-size:13.5px;font-weight:700;">${titre}</span>
+          <span style="display:block;font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:2px;">${expl}</span>
+        </span>
+      </label>`).join('');
+  } catch (e) { z.innerHTML = `<div class="notice">${diagMessageErreur(e)}</div>`; }
+}
+
+async function rcEnregistrer() {
+  const corps = {};
+  for (const cle of Object.keys(RC_LIBELLES)) corps[cle] = !!document.getElementById('rc-' + cle)?.checked;
+  const z = document.getElementById('rc-retour');
+  try {
+    await api('PUT', '/admin/regles-contact', corps);
+    z.innerHTML = `<span style="color:#166534;font-size:13px;font-weight:700;">✅ Règles enregistrées.</span>`;
+  } catch (e) { z.innerHTML = `<span style="color:#dc2626;font-size:13px;">❌ ${diagMessageErreur(e)}</span>`; }
+}
+
+async function adCharger() {
+  const sel = document.getElementById('ad-coll');
+  const z = document.getElementById('ad-liste');
+  if (!z) return;
+  /* Liste des collectivités : choisir dans une liste évite de saisir un identifiant. */
+  if (sel && sel.options.length <= 1) {
+    try {
+      const m = await api('GET', '/admin/membres');
+      const colls = (m.membres || []).filter(x => x.role === 'collectivite');
+      sel.innerHTML = '<option value="">— Choisir —</option>' +
+        colls.map(c => `<option value="${c.id}">${esc(c.nom || c.email)}</option>`).join('');
+    } catch (e) { sel.innerHTML = '<option value="">Erreur de chargement</option>'; }
+  }
+  try {
+    const d = await api('GET', '/admin/autorisations-diffusion');
+    const list = d.autorisations || [];
+    if (!list.length) { z.innerHTML = `<div class="notice">Aucune dérogation accordée à ce jour.</div>`; return; }
+    z.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="border-bottom:2px solid var(--border);">
+        <th style="padding:8px;text-align:left;">Collectivité</th>
+        <th style="padding:8px;text-align:left;">Communauté ciblée</th>
+        <th style="padding:8px;text-align:left;">Motif</th>
+        <th style="padding:8px;text-align:left;">Accordée par</th>
+        <th style="padding:8px;text-align:left;">État</th>
+        <th style="padding:8px;"></th>
+      </tr></thead><tbody>` + list.map(a => {
+        const revoquee = !!a.revoquee_le;
+        const expiree = a.expire_le && a.expire_le < new Date().toISOString().slice(0, 10);
+        const etat = revoquee ? ['Révoquée', '#991B1B'] : expiree ? ['Expirée', '#92400E'] : ['Active', '#166534'];
+        return `<tr style="border-bottom:1px solid var(--border);${revoquee ? 'opacity:.6;' : ''}">
+          <td style="padding:8px;font-weight:600;">${esc(a.collectivite_nom || '')}</td>
+          <td style="padding:8px;">${esc(a.origine_cible)}</td>
+          <td style="padding:8px;color:var(--muted);">${esc(a.motif || '—')}</td>
+          <td style="padding:8px;color:var(--muted);">${esc(a.accordee_par_nom || '—')}<br><span style="font-size:11px;">${esc((a.created_at || '').slice(0, 10))}</span></td>
+          <td style="padding:8px;color:${etat[1]};font-weight:700;">${etat[0]}${a.expire_le && !revoquee ? `<br><span style="font-size:11px;font-weight:400;color:var(--muted);">jusqu'au ${esc(a.expire_le)}</span>` : ''}</td>
+          <td style="padding:8px;text-align:right;">${revoquee ? '' : `<button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="adRevoquer(${a.id})">Révoquer</button>`}</td>
+        </tr>`;
+      }).join('') + '</tbody></table></div>';
+  } catch (e) { z.innerHTML = `<div class="notice">${diagMessageErreur(e)}</div>`; }
+}
+
+async function adAccorder() {
+  const coll = document.getElementById('ad-coll').value;
+  const origine = document.getElementById('ad-origine').value.trim();
+  if (!coll || !origine) { alert('Choisissez une collectivité et indiquez la communauté ciblée.'); return; }
+  try {
+    await api('POST', '/admin/autorisations-diffusion', {
+      collectivite_id: Number(coll), origine_cible: origine,
+      motif: document.getElementById('ad-motif').value.trim(),
+      expire_le: document.getElementById('ad-expire').value || null,
+    });
+    document.getElementById('ad-origine').value = '';
+    document.getElementById('ad-motif').value = '';
+    document.getElementById('ad-expire').value = '';
+    await adCharger();
+  } catch (e) { alert(diagMessageErreur(e).replace(/<[^>]+>/g, '')); }
+}
+
+async function adRevoquer(id) {
+  /* Révocation et non suppression : la trace de ce qui a été autorisé doit subsister. */
+  if (!confirm("Révoquer cette dérogation ?\n\nLa collectivité ne pourra plus diffuser vers cette communauté. La trace de l'autorisation est conservée.")) return;
+  try { await api('DELETE', `/admin/autorisations-diffusion/${id}`); await adCharger(); }
+  catch (e) { alert(diagMessageErreur(e).replace(/<[^>]+>/g, '')); }
 }
 
 async function diagPremium() {
