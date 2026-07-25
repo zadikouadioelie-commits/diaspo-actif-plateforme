@@ -513,6 +513,7 @@ const COLONNES_MIGRATION = [
     ['initiatives', 'vitrine_pays', 'TEXT'],
     ['initiatives', 'vitrine_whatsapp', 'TEXT'],
     ['initiatives', 'vitrine_tel_pro', 'TEXT'],
+    ['initiatives', 'vitrine_tel_visible', 'INTEGER DEFAULT 0'],
     ['initiatives', 'vitrine_email_pro', 'TEXT'],
     ['initiatives', 'vitrine_google_maps_url', 'TEXT'],
     ['initiatives', 'vitrine_rdv_active', 'INTEGER DEFAULT 0'],

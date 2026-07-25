@@ -590,8 +590,11 @@ const DOMAIN_GRAD = {
     const RS_ICONS = { site:'🌐', facebook:'📘', linkedin:'💼', instagram:'📸', youtube:'▶️', tiktok:'🎵', whatsapp:'💬', x:'✖️', twitter:'✖️' };
     const infos = [
       init.vitrine_horaires && ['🕒', esc2(init.vitrine_horaires)],
-      (init.vitrine_tel_pro || init.tel_responsable) && ['📞', renderMaskedPhone(init.vitrine_tel_pro || init.tel_responsable)],
-      (init.vitrine_email_pro || init.email_responsable) && ['✉️', esc2(init.vitrine_email_pro || init.email_responsable)],
+      /* Plus de repli sur les coordonnées du responsable : ce sont des données de gestion
+         de compte, pas des contacts publics. Seuls les champs de vitrine s'affichent, et le
+         serveur ne transmet le numéro que si le propriétaire a autorisé sa publication. */
+      init.vitrine_tel_pro && ['📞', renderMaskedPhone(init.vitrine_tel_pro)],
+      init.vitrine_email_pro && ['✉️', esc2(init.vitrine_email_pro)],
       init.site_web && ['🌐', `<a href="${esc2(init.site_web)}" target="_blank" style="color:#2563EB;">${esc2(init.site_web.replace(/^https?:\/\//,''))}</a>`],
       (init.adresse || init.ville) && ['📍', esc2([init.adresse, init.ville, init.pays].filter(Boolean).join(', '))],
     ].filter(Boolean);

@@ -1475,6 +1475,77 @@ route("PATCH", "/api/initiatives/:id/produits/reorder", async (req, res, params,
 });
 
 /* PUT /api/initiatives/:id/vitrine — owner only, infos vitrine (bannière/horaires/services + champs déjà existants) */
+/* ═══ CONTACT DE LA VITRINE — numéro public, distinct du numéro du compte ═══
+
+   Le téléphone du compte sert à la sécurité et à la récupération : il ne doit jamais
+   devenir un contact public. Le numéro de vitrine est un autre champ, que son propriétaire
+   renseigne et publie s'il le souhaite. Les deux peuvent porter le même numéro, mais ils
+   restent techniquement séparés : modifier l'un ne touche pas l'autre, et masquer le
+   public ne prive pas la plateforme du privé. */
+
+/* Masquage pour l'historique : on garde de quoi lever un doute, pas de quoi recomposer
+   un annuaire. Un journal d'audit ne doit pas devenir un second entrepôt de données
+   personnelles. */
+function masquerTel(t) {
+  const s = String(t || "").replace(/\s+/g, "");
+  if (!s) return null;
+  return s.length <= 4 ? "••••" : "••••" + s.slice(-4);
+}
+
+async function journaliserContact(userId, initiativeId, champ, avant, apres) {
+  try {
+    await db.prepare(
+      "INSERT INTO contact_historique (user_id, initiative_id, champ, ancienne_valeur, nouvelle_valeur) VALUES (?,?,?,?,?)"
+    ).run(userId, initiativeId || null, champ, avant, apres);
+  } catch (e) { /* l'historique ne doit jamais empêcher la modification elle-même */ }
+}
+
+/* PUT /api/initiatives/:id/contact-vitrine — { tel, whatsapp, visible } */
+route("PUT", "/api/initiatives/:id/contact-vitrine", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, owner_user_id, vitrine_tel_pro, vitrine_whatsapp, vitrine_tel_visible FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  if (body.tel !== undefined) {
+    const tel = String(body.tel || "").trim() || null;
+    if (tel !== init.vitrine_tel_pro) {
+      await db.prepare("UPDATE initiatives SET vitrine_tel_pro=? WHERE id=?").run(tel, init.id);
+      await journaliserContact(user.id, init.id, "vitrine_tel_pro", masquerTel(init.vitrine_tel_pro), masquerTel(tel));
+    }
+  }
+  if (body.whatsapp !== undefined) {
+    const wa = String(body.whatsapp || "").trim() || null;
+    if (wa !== init.vitrine_whatsapp) {
+      await db.prepare("UPDATE initiatives SET vitrine_whatsapp=? WHERE id=?").run(wa, init.id);
+      await journaliserContact(user.id, init.id, "vitrine_whatsapp", masquerTel(init.vitrine_whatsapp), masquerTel(wa));
+    }
+  }
+  if (body.visible !== undefined) {
+    const v = body.visible ? 1 : 0;
+    if (v !== Number(init.vitrine_tel_visible)) {
+      await db.prepare("UPDATE initiatives SET vitrine_tel_visible=? WHERE id=?").run(v, init.id);
+      await journaliserContact(user.id, init.id, "vitrine_tel_visible",
+        Number(init.vitrine_tel_visible) === 1 ? "affiché" : "masqué", v === 1 ? "affiché" : "masqué");
+    }
+  }
+  const maj = await db.prepare("SELECT vitrine_tel_pro, vitrine_whatsapp, vitrine_tel_visible FROM initiatives WHERE id=?").get(init.id);
+  sendJSON(res, 200, { ok: true, ...maj, vitrine_tel_visible: Number(maj.vitrine_tel_visible) === 1 });
+});
+
+/* GET /api/initiatives/:id/contact-historique — trace des modifications (§5) */
+route("GET", "/api/initiatives/:id/contact-historique", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const historique = await db.prepare(
+    "SELECT champ, ancienne_valeur, nouvelle_valeur, created_at FROM contact_historique WHERE initiative_id=? ORDER BY created_at DESC LIMIT 50"
+  ).all(init.id);
+  sendJSON(res, 200, { historique });
+});
+
 route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -3719,12 +3790,22 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
     }));
     rows = rows.filter((_, i) => keeps[i]);
   }
+  /* Liste PUBLIQUE : aucune coordonnée privée n'y a sa place, et le numéro de vitrine ne
+     s'affiche que si son propriétaire l'a autorisé. Contrairement à la fiche détaillée, il
+     n'y a pas de cas « je suis le propriétaire » à traiter ici — cette liste sert à parcourir
+     l'annuaire, pas à gérer son compte. */
+  const moiListe = await getCurrentUser(req);
   rows = await Promise.all(rows.map(async r => {
     const accreds = r.owner_user_id
       ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(r.owner_user_id)).map(a => a.type)
       : [];
     const decouverte_premium = r.owner_user_id ? await getDecouvertePremium(r.owner_user_id) : null;
-    return { ...r, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: await getCertif(r.id), accreditations: accreds, decouverte_premium };
+    const sien = moiListe && Number(moiListe.id) === Number(r.owner_user_id);
+    const contacts = sien ? {} : {
+      tel_responsable: null, email_responsable: null,
+      ...(Number(r.vitrine_tel_visible) === 1 ? {} : { vitrine_tel_pro: null, vitrine_whatsapp: null }),
+    };
+    return { ...r, ...contacts, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: await getCertif(r.id), accreditations: accreds, decouverte_premium };
   }));
   sendJSON(res, 200, { initiatives: rows });
 });
@@ -3767,6 +3848,22 @@ route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
 route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
   const row = await getInitiativeByIdOrSlug(params.id);
   if (!row) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  /* Coordonnées privées retirées AVANT tout enrichissement, pour qu'aucune branche du
+     traitement ne puisse les réintroduire par inadvertance. Le numéro du responsable est
+     une donnée de gestion de compte : il était renvoyé publiquement, y compris dans la
+     liste des initiatives, à un appelant non connecté (vérifié le 2026-07-25).
+     Le propriétaire et l'administration continuent de le voir. */
+  {
+    const moi = await getCurrentUser(req);
+    const proprietaire = moi && (Number(moi.id) === Number(row.owner_user_id) || moi.role === "administrateur");
+    if (!proprietaire) {
+      row.tel_responsable = null;
+      row.email_responsable = null;
+      /* Renseigner un numéro de vitrine ne vaut pas consentement à le publier :
+         il n'apparaît que si le propriétaire l'a explicitement autorisé. */
+      if (Number(row.vitrine_tel_visible) !== 1) { row.vitrine_tel_pro = null; row.vitrine_whatsapp = null; }
+    }
+  }
   row.nationalites_concernees = safeParse(row.nationalites_concernees);
   row.nationalite_unique = !!row.nationalite_unique;
   row.abonnement_actif = !!row.abonnement_actif;
@@ -8557,7 +8654,12 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     is_deal_master: !!dmLaureat,
     deal_master: dmLaureat ? { ...dmLaureat, nb_editions: dmHistorique } : null,
     /* Profil public enrichi (colonnes gauche/droite, miroir des initiatives) */
-    telephone: u.telephone,
+    /* Le téléphone du COMPTE est une donnée privée : création, sécurité, vérification
+       d'identité, récupération. Il était renvoyé à tout appelant, même non connecté —
+       vérifié le 2026-07-25 sur /api/profil/:id. Il n'est désormais transmis qu'à son
+       propriétaire et à l'administration. Le filtrage se fait ICI, côté serveur : masquer
+       le champ dans l'interface l'aurait laissé lisible dans la réponse. */
+    telephone: (me && (Number(me.id) === Number(u.id) || me.role === "administrateur")) ? u.telephone : null,
     publics: safeParseArray(u.publics_json),
     besoins: safeParseArray(u.besoins_json),
     realisations: safeParseArray(u.realisations_json),

@@ -1880,6 +1880,25 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_dc_destinataire ON demandes_contact(destinataire_id, statut);
   CREATE INDEX IF NOT EXISTS idx_dc_demandeur ON demandes_contact(demandeur_id, statut);
 
+  /* ===== HISTORIQUE DES MODIFICATIONS DE CONTACT =====
+     Trace des changements de coordonnées et de leur visibilité : qui a modifié quoi, quand.
+
+     Les valeurs sont volontairement MASQUÉES (quatre derniers chiffres). Un historique
+     d'audit ne doit pas devenir un second entrepôt de données personnelles : recopier les
+     numéros complets multiplierait les endroits à protéger sans rien apporter — savoir
+     QUE le numéro a changé, et vers quelle terminaison, suffit à lever un doute. */
+  CREATE TABLE IF NOT EXISTS contact_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    initiative_id INTEGER,
+    champ TEXT NOT NULL,
+    ancienne_valeur TEXT,
+    nouvelle_valeur TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_contact_hist ON contact_historique(user_id, created_at);
+
   /* ===== SAUVEGARDES DE VITRINE =====
      Prise AVANT toute transformation liée à un changement de type. Sans elle, « Repartir
      à zéro » serait irréversible et une conversion ratée laisserait l'utilisateur devant
@@ -4506,6 +4525,9 @@ db.exec(`
   if (!initCols6.includes('vitrine_pays'))             db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_pays TEXT");
   if (!initCols6.includes('vitrine_whatsapp'))         db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_whatsapp TEXT");
   if (!initCols6.includes('vitrine_tel_pro'))          db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_tel_pro TEXT");
+  /* Visibilite du numero de vitrine — MASQUE par defaut (0). Renseigner un numero ne vaut
+     pas consentement a le publier : le proprietaire doit le decider explicitement. */
+  if (!initCols6.includes('vitrine_tel_visible'))      db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_tel_visible INTEGER DEFAULT 0");
   if (!initCols6.includes('vitrine_email_pro'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_email_pro TEXT");
   if (!initCols6.includes('vitrine_google_maps_url'))  db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_google_maps_url TEXT");
   if (!initCols6.includes('vitrine_rdv_active'))       db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_rdv_active INTEGER DEFAULT 0");
