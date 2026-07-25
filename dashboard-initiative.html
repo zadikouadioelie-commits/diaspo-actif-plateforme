@@ -1487,13 +1487,16 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <button class="btn btn-sm btn-outline" id="pv-preview-mobile"  onclick="pvSetPreviewDevice('mobile')"  aria-pressed="false" title="Aperçu mobile"     style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;"><span style="font-size:15px;line-height:1;">📱</span>Mobile</button>
               <a href="profil.html?preview=draft#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;flex:none;" title="Ouvrir dans un onglet" aria-label="Ouvrir l'aperçu dans un nouvel onglet">↗</a>
             </div>
+            <div id="pv-zoom-info" style="font-size:11px;color:var(--muted);margin:0 0 8px;flex:none;"></div>
             <!-- direction:rtl place la barre verticale du panneau sur son bord GAUCHE : elle
                  reste ainsi constamment visible et nettement separee de celle de la page, qui
                  occupe le bord droit. direction:ltr sur le cadre empeche la vitrine elle-meme
                  d'etre inversee. Contrepartie geree par pvResetPreviewScroll() : en rtl
                  l'origine du defilement horizontal bascule a droite. -->
             <div id="pv-preview-frame-wrap" style="background:#EDF1F6;border-radius:12px;padding:10px;overflow:auto;flex:1;min-height:220px;direction:rtl;">
-              <iframe id="pv-preview-frame" style="direction:ltr;width:1400px!important;max-width:none!important;height:900px!important;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:width .25s ease;display:block;margin:0 auto;flex:none;"></iframe>
+              <!-- margin:0 (et non 0 auto) : le centrage automatique entrerait en conflit avec
+                   les marges negatives de compensation posees par pvAjusterEchelleApercu(). -->
+              <iframe id="pv-preview-frame" style="direction:ltr;width:1400px!important;max-width:none!important;height:900px!important;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:width .25s ease;display:block;margin:0;flex:none;"></iframe>
             </div>
             <p style="font-size:11px;color:var(--muted);margin:8px 0 0;flex:none;">💡 Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
             <div id="pv-draft-status" style="margin:10px 0 8px;font-size:12.5px;font-weight:700;flex:none;"></div>
@@ -4451,7 +4454,36 @@ function pvSetPreviewDevice(device) {
     btn.classList.toggle('btn-outline', d !== device);
     btn.setAttribute('aria-pressed', String(d === device)); // etat annonce, pas seulement colore
   });
+  pvAjusterEchelleApercu();
   pvResetPreviewScroll();
+}
+
+/* ── Mise à l'échelle de l'aperçu ──
+   Objectif : voir la page D'ENSEMBLE. En 1:1, une vitrine simulée à 1400px dans un panneau
+   d'environ 480px n'en montrait qu'un tiers, ce qui donnait l'impression d'un zoom excessif.
+   On réduit donc l'aperçu jusqu'à ce que la largeur simulée tienne entièrement.
+   Contrepartie assumée : à cette échelle le texte devient petit — l'aperçu sert à juger la
+   composition, pas à relire les contenus. Le pourcentage est affiché pour éviter toute
+   confusion avec la taille réelle.
+   Le zoom ne dépasse jamais 1 : on n'agrandit pas une largeur qui tient déjà (mobile). */
+function pvAjusterEchelleApercu() {
+  const frame = document.getElementById('pv-preview-frame');
+  const wrap = document.getElementById('pv-preview-frame-wrap');
+  if (!frame || !wrap) return;
+  const cible = parseInt(PV_PREVIEW_WIDTHS[__pvPreviewDevice], 10) || 1400;
+  const dispo = wrap.clientWidth - 20; // 10px de marge intérieure de chaque côté
+  const echelle = Math.max(0.2, Math.min(1, dispo / cible));
+  const hauteur = parseFloat(frame.style.height) || 900;
+
+  frame.style.transformOrigin = 'top left';
+  frame.style.transform = echelle < 1 ? `scale(${echelle})` : 'none';
+  /* La boîte de mise en page garde sa taille NON transformée : sans compensation, le
+     conteneur réserverait la place des 1400px et continuerait de défiler dans le vide. */
+  frame.style.marginRight = echelle < 1 ? `${-Math.round(cible * (1 - echelle))}px` : '0';
+  frame.style.marginBottom = echelle < 1 ? `${-Math.round(hauteur * (1 - echelle))}px` : '0';
+
+  const lbl = document.getElementById('pv-zoom-info');
+  if (lbl) lbl.textContent = echelle < 1 ? `Vue d'ensemble · ${Math.round(echelle * 100)} %` : 'Taille réelle · 100 %';
 }
 function pvRefreshPreview() {
   const frame = document.getElementById('pv-preview-frame');
