@@ -4213,14 +4213,23 @@ route("PUT", "/api/initiatives/:id/profil-public", async (req, res, params, body
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  /* origine1/origine2 n'étaient modifiables NULLE PART : seule la création les enregistrait,
+     et seulement depuis la correction du 2026-07-24. Toute initiative créée avant restait donc
+     sans origine pour toujours, et la ligne « 🌍 Origines » ne s'affichait sur aucune cartouche
+     — le code d'affichage existait pourtant (assets/app.js). Ajoutées ici avec les nationalités,
+     qui souffraient du même enfermement. */
   const { publics, besoins, realisations, stats_perso, annee_creation, assistant_actif,
-          pays_intervention, vitrine_services, vitrine_horaires, mission, historique } = body;
+          pays_intervention, vitrine_services, vitrine_horaires, mission, historique,
+          origine1, origine2, nationalite1, nationalite2, pays_origine } = body;
   await db.prepare(`UPDATE initiatives SET
       publics_json=COALESCE(?,publics_json), besoins_json=COALESCE(?,besoins_json),
       realisations_json=COALESCE(?,realisations_json), stats_perso_json=COALESCE(?,stats_perso_json),
       annee_creation=COALESCE(?,annee_creation), assistant_actif=COALESCE(?,assistant_actif),
       pays_intervention=COALESCE(?,pays_intervention), vitrine_services=COALESCE(?,vitrine_services),
-      vitrine_horaires=COALESCE(?,vitrine_horaires), mission=COALESCE(?,mission), historique=COALESCE(?,historique)
+      vitrine_horaires=COALESCE(?,vitrine_horaires), mission=COALESCE(?,mission), historique=COALESCE(?,historique),
+      origine1=COALESCE(?,origine1), origine2=COALESCE(?,origine2),
+      nationalite1=COALESCE(?,nationalite1), nationalite2=COALESCE(?,nationalite2),
+      pays_origine=COALESCE(?,pays_origine)
     WHERE id=?`)
     .run(Array.isArray(publics) ? JSON.stringify(publics) : null,
          Array.isArray(besoins) ? JSON.stringify(besoins) : null,
@@ -4233,6 +4242,11 @@ route("PUT", "/api/initiatives/:id/profil-public", async (req, res, params, body
          vitrine_horaires !== undefined ? vitrine_horaires : null,
          mission !== undefined ? mission : null,
          historique !== undefined ? historique : null,
+         origine1 !== undefined ? origine1 : null,
+         origine2 !== undefined ? origine2 : null,
+         nationalite1 !== undefined ? nationalite1 : null,
+         nationalite2 !== undefined ? nationalite2 : null,
+         pays_origine !== undefined ? pays_origine : null,
          params.id);
   sendJSON(res, 200, { ok: true });
 });

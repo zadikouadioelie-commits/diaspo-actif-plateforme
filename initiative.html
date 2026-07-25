@@ -607,7 +607,25 @@ const DOMAIN_GRAD = {
     const mapQuery = !hasLatLon && (init.adresse || init.ville)
       ? encodeURIComponent([init.adresse, init.ville, init.pays].filter(Boolean).join(', ')) : null;
 
+    /* Origines : jusqu'ici saisies à l'inscription et plus jamais modifiables, donc absentes
+       de toutes les initiatives créées avant le 2026-07-24 — et la ligne « 🌍 Origines » ne
+       s'affichait sur aucune cartouche de l'annuaire faute de donnée. La carte reste visible
+       pour le propriétaire même vide, sans quoi il n'aurait aucun moyen de la renseigner. */
+    const origines = [init.origine1, init.origine2].filter(Boolean);
+    const nationalites = [init.nationalite1, init.nationalite2].filter(Boolean);
+
     document.getElementById('col-left').innerHTML = `
+      ${(origines.length || nationalites.length || isOwner) ? `
+      <div class="side-card">
+        <h4>🌍 Origines ${editBtn('origines')}</h4>
+        ${origines.length
+          ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${origines.map(o => `<span class="tag" style="font-size:12.5px;padding:4px 10px;">${esc2(o)}</span>`).join('')}</div>`
+          : `<p style="font-size:12.5px;color:var(--muted);margin:0 0 8px;">Non renseignées${isOwner ? ' — cliquez sur ✏️ pour les ajouter.' : '.'}</p>`}
+        ${nationalites.length
+          ? `<h4 style="margin-top:10px;">🏛 Nationalités</h4>
+             <div style="display:flex;flex-wrap:wrap;gap:6px;">${nationalites.map(n => `<span class="tag" style="font-size:12.5px;padding:4px 10px;">${esc2(n)}</span>`).join('')}</div>`
+          : ''}
+      </div>` : ''}
       <div class="side-card">
         <h4>👥 Équipe</h4>
         ${EQUIPE.length ? EQUIPE.map(m => `
@@ -772,7 +790,22 @@ const DOMAIN_GRAD = {
   }
 
   window.editSection = function (section) {
-    if (section === 'publics') {
+    if (section === 'origines') {
+      const champ = (id, lbl, val, ph) => `<label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">${lbl}</label>
+        <input type="text" id="${id}" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${esc2(val || '')}" placeholder="${ph}">`;
+      openEditModal('🌍 Origines et nationalités',
+        `<p style="font-size:12px;color:var(--muted);margin:0 0 4px;">Pays d'origine de la structure ou de ses fondateurs. Ces informations apparaissent sur votre cartouche dans l'annuaire.</p>`
+        + champ('eo-o1', "Pays d'origine 1", init.origine1, "Ex : Côte d'Ivoire")
+        + champ('eo-o2', "Pays d'origine 2 (optionnel)", init.origine2, 'Ex : Sénégal')
+        + champ('eo-n1', 'Nationalité 1', init.nationalite1, 'Ex : Ivoirienne')
+        + champ('eo-n2', 'Nationalité 2 (optionnelle)', init.nationalite2, 'Ex : Française'),
+        ov => saveProfil({
+          origine1:     ov.querySelector('#eo-o1').value.trim(),
+          origine2:     ov.querySelector('#eo-o2').value.trim(),
+          nationalite1: ov.querySelector('#eo-n1').value.trim(),
+          nationalite2: ov.querySelector('#eo-n2').value.trim(),
+        }));
+    } else if (section === 'publics') {
       openEditModal('🎯 Public concerné', pillsHtml(PUBLICS_PRESETS, init.publics || [], 'ep-pub'),
         ov => saveProfil({ publics: readPills(ov, 'ep-pub') }));
     } else if (section === 'besoins') {
