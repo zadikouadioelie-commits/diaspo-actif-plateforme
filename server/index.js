@@ -6094,13 +6094,6 @@ async function getPremiumStatut(userId, role) {
    Passer en application = une seule variable d'environnement, réversible immédiatement. */
 function premiumApplicationActive() { return process.env.PREMIUM_APPLICATION === '1'; }
 
-/* Journal des blocages qui AURAIENT eu lieu — sert à mesurer l'impact avant activation. */
-const __premiumObservations = [];
-function noterObservationPremium(userId, contexte) {
-  __premiumObservations.push({ userId, contexte, le: new Date().toISOString() });
-  if (__premiumObservations.length > 500) __premiumObservations.shift();
-}
-
 /* Point de contrôle UNIQUE pour tout module réservé à l'abonnement.
    Retourne true si l'accès est autorisé. Sinon répond 402 et retourne false.
    Toute route Premium doit passer par ici — c'est ce qui évite que chaque module
@@ -6113,10 +6106,11 @@ async function exigerPremium(user, res, contexte) {
   if (user.role === 'administrateur') return true;
   const st = await getPremiumStatut(user.id, user.role);
   if (!st.concerne || st.actif) return true;
-  if (!premiumApplicationActive()) {
-    noterObservationPremium(user.id, contexte);   // mode observation : on laisse passer
-    return true;
-  }
+  /* Mode observation : on laisse passer sans rien journaliser. Un journal en mémoire ne
+     survit pas au serverless — chaque requête peut démarrer une instance neuve, et le
+     relevé revenait vide en production. La mesure d'impact ci-dessous, calculée sur la
+     base, remplit ce rôle de façon fiable. */
+  if (!premiumApplicationActive()) return true;
   sendJSON(res, 402, {
     error: "Votre abonnement Premium est arrivé à expiration. Renouvelez votre abonnement pour retrouver l'accès à vos fonctionnalités Premium.",
     accred_type: st.type,
@@ -6137,10 +6131,7 @@ async function estEnMaintenancePremium(ownerUserId) {
     if (!proprio) return null;
     const st = await getPremiumStatut(proprio.id, proprio.role);
     if (!st.concerne || st.actif) return null;
-    if (!premiumApplicationActive()) {
-      noterObservationPremium(proprio.id, 'espace_public');
-      return null;
-    }
+    if (!premiumApplicationActive()) return null;
     return {
       actif: true,
       message: "Cette vitrine est temporairement indisponible. Son propriétaire doit renouveler son abonnement Premium afin de réactiver cet espace.",
@@ -6150,15 +6141,14 @@ async function estEnMaintenancePremium(ownerUserId) {
   } catch (_) { return null; }
 }
 
-/* GET /api/admin/premium/observations — ce que l'application aurait bloqué (mesure d'impact). */
+/* GET /api/admin/premium/observations — qui serait bloque si l'on activait les restrictions.
+   Mesure CALCULEE sur la base : on parcourt les comptes et on evalue leur statut reel.
+   Un journal des tentatives avait d'abord ete tenu en memoire ; il a ete retire car il ne
+   survit pas au serverless (chaque requete peut demarrer une instance neuve) et revenait
+   invariablement vide en production. Le calcul ci-dessous ne depend d'aucun etat conserve. */
 route("GET", "/api/admin/premium/observations", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
-  const parContexte = {};
-  __premiumObservations.forEach(o => { parContexte[o.contexte] = (parContexte[o.contexte] || 0) + 1; });
-  /* Impact PRÉDICTIF calculé sur la base, et pas seulement sur les tentatives observées :
-     tant que personne n'a essayé d'agir, le journal reste vide et ne dit rien de l'ampleur
-     réelle. On parcourt donc les comptes pour savoir qui serait bloqué dès l'activation. */
   const comptes = await db.prepare("SELECT id, role, email FROM users").all();
   const parStatut = { actif: 0, bientot_expire: 0, expire: 0 };
   const parRole = {};
@@ -6198,13 +6188,6 @@ route("GET", "/api/admin/premium/observations", async (req, res) => {
       par_role: parRole,
       vitrines_passant_en_maintenance: vitrinesConcernees,
       exemples_comptes_bloques: exemplesBloques,
-    },
-    /* Ce qui a réellement été tenté depuis le démarrage du serveur. */
-    observations: {
-      total: __premiumObservations.length,
-      par_contexte: parContexte,
-      comptes_distincts: [...new Set(__premiumObservations.map(o => o.userId))].length,
-      dernieres: __premiumObservations.slice(-20),
     },
   });
 });
