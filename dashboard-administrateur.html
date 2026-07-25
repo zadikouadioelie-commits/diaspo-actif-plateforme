@@ -11456,6 +11456,15 @@ function diagAfficher(html, couleur) {
 }
 function diagPatiente(quoi) { diagAfficher(`⏳ ${quoi}…`, '#94a3b8'); }
 
+/* api() range la charge utile de l'erreur dans e.data. Le champ « detail » y porte la
+   cause réelle — sans lui, « DB init failed » ne dit rien de ce qui a échoué, et c'est
+   précisément le message que ces contrôles existent pour révéler. */
+function diagMessageErreur(e) {
+  const d = e && e.data;
+  const detail = d && (d.detail || d.error);
+  return detail && detail !== e.message ? `${e.message}<br><code style="font-size:11.5px;">${detail}</code>` : e.message;
+}
+
 async function diagSchema() {
   diagPatiente('Vérification de la base');
   try {
@@ -11466,7 +11475,7 @@ async function diagSchema() {
       const liste = (d.detail || []).map(c => `${c.table}.${c.colonne}`).join(', ');
       diagAfficher(`⚠️ <strong>${d.colonnes_manquantes} colonne(s) manquante(s)</strong><br>${liste}<br><span style="color:var(--muted);">${d.remede || ''}</span>`, '#dc2626');
     }
-  } catch (e) { diagAfficher(`❌ ${e.message}`, '#dc2626'); }
+  } catch (e) { diagAfficher(`❌ ${diagMessageErreur(e)}`, '#dc2626'); }
 }
 
 async function diagPremium() {
@@ -11484,7 +11493,7 @@ async function diagPremium() {
       + (bloques ? `<span style="color:#92400e;">${bloques} compte(s) seraient bloqués dès l'activation.</span>`
                  : `<span style="color:#166534;">Activer maintenant ne bloquerait personne.</span>`),
       couleur);
-  } catch (e) { diagAfficher(`❌ ${e.message}`, '#dc2626'); }
+  } catch (e) { diagAfficher(`❌ ${diagMessageErreur(e)}`, '#dc2626'); }
 }
 
 /* « Vérifier la base » constate l'écart ; celle-ci le comble. Elle rejoue les créations de
@@ -11510,7 +11519,7 @@ async function diagReparer() {
     } else {
       diagAfficher(`✅ <strong>Rien à réparer</strong> — ${html}`, '#16a34a');
     }
-  } catch (e) { diagAfficher(`❌ ${e.message}`, '#dc2626'); }
+  } catch (e) { diagAfficher(`❌ ${diagMessageErreur(e)}`, '#dc2626'); }
 }
 
 async function diagEmail() {
@@ -11526,7 +11535,7 @@ async function diagEmail() {
     } else {
       diagAfficher(`❌ <strong>Envoi refusé</strong><br><code style="font-size:11.5px;">${JSON.stringify(d.resultat || d).slice(0, 300)}</code>`, '#dc2626');
     }
-  } catch (e) { diagAfficher(`❌ ${e.message}`, '#dc2626'); }
+  } catch (e) { diagAfficher(`❌ ${diagMessageErreur(e)}`, '#dc2626'); }
 }
 </script>
 <script src="/assets/cookies-banner.js"></script>
