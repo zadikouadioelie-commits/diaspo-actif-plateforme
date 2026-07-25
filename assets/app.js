@@ -556,9 +556,17 @@ async function applyAuthState() {
         <span><span style="font-size:14px;">👑</span> Passer à Premium</span>
         <span style="font-size:9.5px;font-weight:700;color:#000;opacity:.85;">${premiumSousTitres[user.role]}</span>
       </a>` : '';
+    /* Aperçu multi-appareils — outil de contrôle de mise en page (défini en fin de fichier).
+       Masqué à l'intérieur de son propre cadre (?apercu=1), sinon l'outil se proposerait
+       récursivement dans sa propre prévisualisation. */
+    const apercuBtnHtml = (APERCU_ROLES.indexOf(user.role) !== -1 && !apercuEstDansLeCadre()) ? `
+      <button type="button" id="apercu-appareils-btn" onclick="openApercuAppareils()" title="Prévisualiser cette page en mobile, tablette et ordinateur" style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 12px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);">
+        <span style="font-size:14px;">📱</span> Aperçu
+      </button>` : '';
     el.innerHTML = `
       ${demoBtnHtml}
       ${premiumBtnHtml}
+      ${apercuBtnHtml}
       <a href="messagerie.html" class="user-chip" style="text-decoration:none;position:relative;" title="Messagerie">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span id="msg-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
@@ -3573,3 +3581,181 @@ document.addEventListener("DOMContentLoaded", ()=>{
     if (attempts > 24) clearInterval(poll);
   }, 250);
 })();
+
+/* ══════════════════════════════════════════════════════════════════════════
+   APERÇU MULTI-APPAREILS — contrôle de mise en page (bouton de la barre du haut)
+   ──────────────────────────────────────────────────────────────────────────
+   Recharge la page courante dans un cadre aux dimensions d'un téléphone, d'une
+   tablette ou d'un ordinateur. Le cadre (iframe) est indispensable : les règles
+   CSS responsives réagissent à la largeur de la FENÊTRE, pas à celle d'un
+   conteneur — redimensionner une simple div ne déclencherait pas l'affichage
+   mobile.
+
+   Le détecteur mesure CHAQUE élément individuellement au lieu de se fier au seul
+   scrollWidth du document : la plateforme pose « overflow-x: clip » sur body, ce
+   qui masque les dépassements et empêche justement scrollWidth de les révéler.
+   C'est ce piège qui rend ces bugs invisibles à l'œil nu.
+   ══════════════════════════════════════════════════════════════════════════ */
+var APERCU_ROLES = ['administrateur', 'initiative']; // élargir ici pour d'autres rôles
+var APERCU_APPAREILS = [
+  { id: 'mobile',   label: 'Mobile',     icone: '📱', largeur: 390,  hauteur: 780 },
+  { id: 'tablette', label: 'Tablette',   icone: '💻', largeur: 768,  hauteur: 900 },
+  { id: 'bureau',   label: 'Ordinateur', icone: '🖥️', largeur: 1280, hauteur: 800 }
+];
+var __apercuAppareil = 'mobile';
+
+function apercuEstDansLeCadre() {
+  return /[?&]apercu=1/.test(window.location.search);
+}
+
+/* Décrit un élément de façon lisible : div.ma-classe ou section#mon-id */
+function apercuDecrire(el) {
+  var s = el.tagName.toLowerCase();
+  if (el.id) return s + '#' + el.id;
+  if (el.className && typeof el.className === 'string' && el.className.trim()) {
+    s += '.' + el.className.trim().split(/\s+/)[0];
+  }
+  return s;
+}
+
+/* Repère les éléments qui dépassent la largeur de la fenêtre du cadre. */
+function apercuAnalyserDebordement(frame) {
+  try {
+    var d = frame.contentDocument, w = frame.contentWindow;
+    if (!d || !d.body || !w) return null;
+    var vw = w.innerWidth;
+    var coupables = [];
+    Array.prototype.forEach.call(d.body.querySelectorAll('*'), function (el) {
+      var r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return;
+      var depassement = Math.round(r.right - vw);
+      if (depassement > 1) {
+        coupables.push({ el: el, nom: apercuDecrire(el), depassement: depassement, largeur: Math.round(r.width) });
+      }
+    });
+    coupables.sort(function (a, b) { return b.depassement - a.depassement; });
+    return { largeurFenetre: vw, coupables: coupables.slice(0, 10), total: coupables.length };
+  } catch (e) { return null; }
+}
+
+function apercuSetAppareil(id) {
+  __apercuAppareil = id;
+  var conf = APERCU_APPAREILS.filter(function (a) { return a.id === id; })[0] || APERCU_APPAREILS[0];
+  var frame = document.getElementById('apercu-frame');
+  if (frame) {
+    /* !important obligatoire : la règle globale « iframe{max-width:100%} » de
+       responsive.v2.css écraserait sinon silencieusement la largeur cible. */
+    frame.style.setProperty('width', conf.largeur + 'px', 'important');
+    frame.style.setProperty('height', conf.hauteur + 'px', 'important');
+    frame.style.setProperty('max-width', 'none', 'important');
+  }
+  APERCU_APPAREILS.forEach(function (a) {
+    var b = document.getElementById('apercu-btn-' + a.id);
+    if (!b) return;
+    var actif = a.id === id;
+    b.style.background = actif ? '#F26422' : '#fff';
+    b.style.color = actif ? '#fff' : '#0D2B4E';
+    b.style.borderColor = actif ? '#F26422' : '#DCE4EF';
+    b.setAttribute('aria-pressed', String(actif));
+  });
+  var lbl = document.getElementById('apercu-dimensions');
+  if (lbl) lbl.textContent = conf.largeur + ' x ' + conf.hauteur + ' px';
+  apercuLancerAnalyse();
+}
+
+function apercuLancerAnalyse() {
+  var zone = document.getElementById('apercu-rapport');
+  var frame = document.getElementById('apercu-frame');
+  if (!zone || !frame) return;
+  zone.innerHTML = '<span style="color:#6C757D;">Analyse en cours...</span>';
+  /* Plusieurs passes : le rendu du cadre est asynchrone et sa largeur vient de changer. */
+  var essais = 0;
+  var poll = setInterval(function () {
+    essais++;
+    var r = apercuAnalyserDebordement(frame);
+    if (r) {
+      clearInterval(poll);
+      window.__apercuCoupables = r.coupables;
+      if (!r.coupables.length) {
+        zone.innerHTML = '<span style="color:#15803d;font-weight:800;">✓ Aucun débordement détecté</span>'
+          + ' <span style="color:#6C757D;">(fenêtre ' + r.largeurFenetre + 'px)</span>';
+        return;
+      }
+      zone.innerHTML =
+        '<div style="color:#b91c1c;font-weight:800;margin-bottom:6px;">⚠ ' + r.total + ' élément'
+        + (r.total > 1 ? 's dépassent' : ' dépasse') + ' la largeur de l\'écran — cliquez pour localiser</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:4px;">'
+        + r.coupables.map(function (c, i) {
+            return '<button onclick="apercuSurligner(' + i + ')" style="text-align:left;background:#FEF2F2;'
+              + 'border:1px solid #FECACA;border-radius:6px;padding:4px 8px;font-size:11.5px;cursor:pointer;'
+              + 'font-family:monospace;color:#7f1d1d;">' + c.nom
+              + ' <strong style="color:#b91c1c;">+' + c.depassement + 'px</strong></button>';
+          }).join('')
+        + '</div>';
+    }
+    if (essais > 12) {
+      clearInterval(poll);
+      zone.innerHTML = '<span style="color:#6C757D;">Analyse impossible (cadre non prêt).</span>';
+    }
+  }, 400);
+}
+
+/* Entoure l'élément fautif dans le cadre pour le localiser visuellement. */
+function apercuSurligner(index) {
+  var c = (window.__apercuCoupables || [])[index];
+  if (!c || !c.el) return;
+  var el = c.el, ancien = el.style.outline;
+  el.style.outline = '3px solid #F26422';
+  el.style.outlineOffset = '-3px';
+  try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+  setTimeout(function () { el.style.outline = ancien; el.style.outlineOffset = ''; }, 2600);
+}
+
+window.closeApercuAppareils = function () {
+  var o = document.getElementById('apercu-overlay');
+  if (o) o.remove();
+};
+
+window.openApercuAppareils = function () {
+  window.closeApercuAppareils();
+  /* On repart de l'URL courante en y ajoutant le drapeau anti-récursion. */
+  var u = new URL(window.location.href);
+  u.searchParams.set('apercu', '1');
+
+  var boutons = APERCU_APPAREILS.map(function (a) {
+    return '<button type="button" id="apercu-btn-' + a.id + '" onclick="apercuSetAppareil(\'' + a.id + '\')" '
+      + 'style="display:flex;align-items:center;gap:5px;border:1.5px solid #DCE4EF;background:#fff;color:#0D2B4E;'
+      + 'font-weight:700;font-size:12.5px;padding:7px 12px;border-radius:9px;cursor:pointer;">'
+      + '<span style="font-size:14px;">' + a.icone + '</span>' + a.label + '</button>';
+  }).join('');
+
+  var o = document.createElement('div');
+  o.id = 'apercu-overlay';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.75);z-index:3000;'
+    + 'display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML =
+    '<div style="background:#fff;border-radius:16px;max-width:96vw;max-height:94vh;display:flex;'
+    + 'flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);">'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #DCE4EF;flex-wrap:wrap;">'
+    +   '<strong style="font-size:15px;">📱 Aperçu multi-appareils</strong>'
+    +   '<div style="display:flex;gap:6px;">' + boutons + '</div>'
+    +   '<span id="apercu-dimensions" style="font-size:12px;color:#6C757D;font-family:monospace;"></span>'
+    +   '<button onclick="closeApercuAppareils()" aria-label="Fermer l\'aperçu" style="margin-left:auto;'
+    +     'background:#F1F5F9;border:none;border-radius:50%;width:30px;height:30px;font-size:17px;cursor:pointer;line-height:1;">×</button>'
+    + '</div>'
+    + '<div id="apercu-rapport" style="padding:10px 18px;border-bottom:1px solid #DCE4EF;font-size:12.5px;min-height:34px;"></div>'
+    + '<div style="flex:1;overflow:auto;background:#EDF1F6;padding:16px;display:flex;justify-content:center;align-items:flex-start;">'
+    +   '<iframe id="apercu-frame" src="' + u.toString() + '" title="Aperçu de la page"'
+    +     ' style="border:none;border-radius:10px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.18);flex:none;"></iframe>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(o);
+
+  o.addEventListener('click', function (e) { if (e.target === o) window.closeApercuAppareils(); });
+  document.addEventListener('keydown', function esc(e) {
+    if (e.key === 'Escape') { window.closeApercuAppareils(); document.removeEventListener('keydown', esc); }
+  });
+
+  document.getElementById('apercu-frame').addEventListener('load', apercuLancerAnalyse);
+  apercuSetAppareil(__apercuAppareil);
+};
