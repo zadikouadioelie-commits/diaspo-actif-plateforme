@@ -4111,9 +4111,13 @@ async function renderBoutique(init, ownerFlag) {
 let _boutiqueInit = null;
 let _produitFiltre = 'tous';
 
+/* Contact depuis la VITRINE : espace commercial, donc contact direct autorisé sans demande
+   de liaison préalable (règles de mise en relation). L'origine est transmise à la messagerie,
+   qui la relaie au serveur — lequel la vérifie en s'assurant qu'une vitrine publique existe
+   réellement, l'origine déclarée par le navigateur n'étant pas fiable en soi. */
 function contacterBoutique(ownerId, objet) {
   if (!CU) { window.location.href = 'login.html'; return; }
-  window.location.href = `messagerie.html?with=${ownerId}${objet ? '&objet='+encodeURIComponent(objet) : ''}`;
+  window.location.href = `messagerie.html?with=${ownerId}&origine=vitrine${objet ? '&objet='+encodeURIComponent(objet) : ''}`;
 }
 
 function filtrerProduits(f) {

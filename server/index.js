@@ -5077,7 +5077,9 @@ route("POST", "/api/fil/:id/republier", async (req, res, params, body) => {
    ⚠ L'origine est déclarée par le navigateur, donc falsifiable. Elle n'est donc PAS crue sur
    parole : l'exception ne s'applique que si l'initiative possède réellement une vitrine
    publique (vitrine_active=1). Sans vitrine, prétendre venir d'une vitrine ne donne rien. */
-const MESSAGE_DEMANDE_LIAISON = "Nous sommes intéressés par votre initiative et nous aimerions rentrer en contact avec vous.";
+/* Message imposé, identique pour tous les comptes : l'utilisateur clique, il ne rédige pas.
+   Uniformiser le texte évite qu'une demande soit refusée sur la forme plutôt que sur le fond. */
+const MESSAGE_DEMANDE_LIAISON = "Bonjour, nous sommes intéressés par votre initiative et nous aimerions entrer en contact avec vous afin d'échanger.";
 
 /* Une liaison acceptée existe-t-elle entre deux comptes, dans un sens ou dans l'autre ? */
 async function liaisonAcceptee(a, b) {

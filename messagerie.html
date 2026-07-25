@@ -1145,9 +1145,9 @@ const OBJET_TEMPLATES = {
   devis: "Bonjour,\n\nJe souhaiterais recevoir un devis pour vos produits/services.\n\nMerci de me recontacter avec davantage d'informations.",
   partenariat: "Bonjour,\n\nJe souhaiterais explorer une possibilité de partenariat avec votre initiative.\n\nN'hésitez pas à me recontacter pour en discuter.",
 };
-async function openConvWithUser(userId, produitId, objet){
+async function openConvWithUser(userId, produitId, objet, origine){
   try{
-    const r=await api("POST","/conversations",{user_id:userId});
+    const r=await api("POST","/conversations",{user_id:userId, origine: origine||""});
     await loadConvList();
     openConv(r.conversation_id);
     if (produitId) await prefillProduitMessage(produitId);
@@ -1155,7 +1155,36 @@ async function openConvWithUser(userId, produitId, objet){
       const inp = document.getElementById('msg-input');
       if (inp){ inp.value = OBJET_TEMPLATES[objet]; inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,200)+'px'; inp.focus(); }
     }
-  }catch(e){ alert(e.message); }
+  }catch(e){
+    /* Le serveur peut refuser le contact direct et exiger une demande de liaison. Ce n'est pas
+       une erreur mais une étape du parcours : on propose donc l'envoi en un clic plutôt que
+       d'afficher un message d'échec qui laisserait l'utilisateur sans issue. */
+    /* api() (assets/app.js) place la réponse du serveur dans e.data, jamais directement sur
+       l'erreur : lire e.code renverrait toujours undefined et l'utilisateur resterait bloqué
+       sur un message d'échec sans issue. */
+    const info = e && e.data;
+    if (info && info.code === 'demande_liaison_requise') { proposerDemandeLiaison(info); return; }
+    alert(e.message);
+  }
+}
+
+/* Propose l'envoi de la demande, avec le message imposé affiché tel quel — l'utilisateur doit
+   voir exactement ce qui sera transmis en son nom. */
+function proposerDemandeLiaison(info){
+  const libelle = info.libelle || 'Demande de liaison';
+  const nom = info.destinataire_nom ? ` à ${info.destinataire_nom}` : '';
+  const msg = info.message_predefini
+    ? `
+
+Message transmis :
+« ${info.message_predefini} »`
+    : '';
+  if (!confirm(`${info.error}
+
+Envoyer une ${libelle.toLowerCase()}${nom} ?${msg}`)) return;
+  api("POST","/demandes-liaison",{destinataire_id: info.destinataire_id})
+    .then(()=> alert(`${libelle} envoyée. Vous serez prévenu dès qu'elle aura une réponse.`))
+    .catch(err=> alert(err.message));
 }
 
 /* Préremplit le champ message avec les infos du produit (variante dispo/indispo) */
@@ -1289,14 +1318,14 @@ async function proposerClassementContact(contactId, contactNom, convId){
   // PRIORITÉ : ouvrir directement la conversation demandée (?with= / ?init=) dès que possible
   {
     const up=new URLSearchParams(location.search);
-    const w=up.get("with"), ini=up.get("init"), prod=up.get("produit"), objet=up.get("objet");
+    const w=up.get("with"), ini=up.get("init"), prod=up.get("produit"), objet=up.get("objet"), origine=up.get("origine");
     if(w){
-      openConvWithUser(Number(w), prod?Number(prod):null, objet);
+      openConvWithUser(Number(w), prod?Number(prod):null, objet, origine);
     } else if(ini){
       (async()=>{ try{
         const r=await api("GET","/initiatives/"+encodeURIComponent(ini));
         const it=r.initiative||r; const oid=Number(it.owner_user_id||it.user_id);
-        if(oid) openConvWithUser(oid, prod?Number(prod):null, objet);
+        if(oid) openConvWithUser(oid, prod?Number(prod):null, objet, origine);
         else alert("Impossible d'ouvrir la conversation : propriétaire introuvable.");
       }catch(e){ alert(e.message); } })();
     }
