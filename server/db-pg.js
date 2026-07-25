@@ -10,7 +10,11 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
   max: 5,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  /* 5 s ne suffisent pas face à Neon : une base en veille met plusieurs secondes à se
+     réveiller, et le pool rendait alors « timeout exceeded when trying to connect » —
+     erreur remontée jusqu'à l'utilisateur alors qu'il aurait suffi d'attendre un peu.
+     15 s reste très en deçà du statement_timeout et du plafond d'exécution Vercel. */
+  connectionTimeoutMillis: 15000,
   /* Filet de sécurité : une fonction serverless qui se fige/meurt en plein milieu
      d'une requête (ou en attente du verrou pg_advisory_lock de pg-init.js) ne doit
      jamais laisser une session Postgres bloquée indéfiniment — ça a déjà provoqué

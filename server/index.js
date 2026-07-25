@@ -13545,7 +13545,32 @@ async function scrapeSite() {
 }
 
 /* ── Migration colonnes chatbot (exécutée une seule fois au démarrage) ── */
+/* Ce bloc crée le schéma des modules Chatbot / FAQ / Onboarding / O-Z. Il s'exécute au
+   CHARGEMENT DU MODULE, donc à chaque démarrage à froid, sur chaque instance Vercel, et
+   sans passer par le verrou consultatif de pg-init.js.
+
+   Il lance une trentaine d'écritures NON ATTENDUES (les `add(...)` et les
+   `try { db.prepare(...).run(); } catch` — un try/catch n'intercepte pas le rejet d'une
+   promesse qu'on n'attend pas) sur un pool de 5 connexions. D'où la salve constatée le
+   2026-07-25 : « timeout exceeded when trying to connect », « Connection terminated due to
+   connection timeout », toutes étiquetées unhandledRejection, 370 erreurs en 24 h.
+
+   Une sortie anticipée suffit à supprimer la tempête : après le premier passage réussi,
+   un démarrage à froid ne fait plus qu'UNE lecture au lieu d'une trentaine d'écritures
+   concurrentes. Le marqueur n'est posé qu'après vérification que les tables existent
+   réellement — un passage partiel doit pouvoir être rejoué.
+
+   Reste à faire : rendre ces écritures séquentielles (voir les forEach non-async des
+   lignes ~13650, ~13850 et ~13990, qui empêchent d'y ajouter await tel quel). */
+const SCHEMA_MODULES_MARQUEUR = 'schema_modules_chatbot_faq';
+const SCHEMA_MODULES_VERSION  = '2026-07-25';
+
 (async function migrateChatbot() {
+  try {
+    const fait = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle=?").get(SCHEMA_MODULES_MARQUEUR);
+    if (fait && fait.valeur === SCHEMA_MODULES_VERSION) return;
+  } catch (e) { /* parametres_plateforme pas encore créée : on poursuit, c'est un premier démarrage */ }
+
   const cols = (await db.prepare("PRAGMA table_info(chatbot_memoire)").all()).map(c => c.name);
   const add = async (col, def) => { if (!cols.includes(col)) { try { await db.prepare(`ALTER TABLE chatbot_memoire ADD COLUMN ${col} ${def}`).run(); } catch(e){} } };
   add("categorie", "TEXT DEFAULT 'Général'");
@@ -14065,7 +14090,25 @@ async function scrapeSite() {
       ['statistiques', "Le module Statistiques donne accès aux indicateurs clés de la plateforme : membres actifs, événements, initiatives, engagement.", 'statistiques,analytics,donnees'],
       ['annuaire', "L'annuaire recense tous les membres, initiatives, entreprises et associations présents sur Diaspo'Actif. Filtrez par pays, secteur ou type de compte.", 'annuaire,membres,recherche,repertoire'],
     ];
-    kbItems.forEach(([t,c,g]) => db.prepare('INSERT INTO oz_knowledge (topic,content,tags) VALUES (?,?,?)').run(t,c,g));
+    for (const [t,c,g] of kbItems) {
+      try { await db.prepare('INSERT INTO oz_knowledge (topic,content,tags) VALUES (?,?,?)').run(t,c,g); } catch(e){}
+    }
+  }
+
+  /* Marqueur posé UNIQUEMENT si les tables sont réellement là. Les écritures de ce bloc
+     n'étant pas toutes attendues, atteindre cette ligne ne prouve pas qu'il a abouti :
+     on vérifie avant de déclarer le schéma en place, sinon un passage partiel serait
+     figé définitivement. */
+  try {
+    for (const t of ['faq_questions', 'onboarding_tutorials', 'oz_knowledge', 'chatbot_questions']) {
+      await db.prepare(`SELECT 1 FROM ${t} LIMIT 1`).all();
+    }
+    const existe = await db.prepare("SELECT cle FROM parametres_plateforme WHERE cle=?").get(SCHEMA_MODULES_MARQUEUR);
+    if (existe) await db.prepare("UPDATE parametres_plateforme SET valeur=? WHERE cle=?").run(SCHEMA_MODULES_VERSION, SCHEMA_MODULES_MARQUEUR);
+    else await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description) VALUES (?,?,?,?)")
+      .run(SCHEMA_MODULES_MARQUEUR, SCHEMA_MODULES_VERSION, 'texte', "Schéma Chatbot/FAQ/Onboarding/O-Z en place — évite de rejouer ces migrations à chaque démarrage à froid");
+  } catch (e) {
+    console.error('[schema-modules] non marqué (sera rejoué au prochain démarrage) :', e.message);
   }
 })();
 
