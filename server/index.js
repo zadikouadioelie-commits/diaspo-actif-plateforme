@@ -5926,10 +5926,16 @@ const PREMIUM_TYPE_PAR_ROLE = { initiative: 'initiative_abonne', utilisateur: 'u
 
 /* Cycle de vie de l'abonnement Premium (cahier des charges du 2026-07-25).
    PREMIUM_ALERTE_JOURS : seuil d'entrée en « bientôt expiré », déclenche les alertes.
-   PREMIUM_CONSERVATION_JOURS : durée pendant laquelle AUCUNE donnée Premium n'est
-   supprimée après l'échéance (7 mois). Les contenus sont bloqués, jamais effacés. */
+   La conservation des contenus est illimitée : bloqués, jamais effacés. */
 const PREMIUM_ALERTE_JOURS = 60;
-const PREMIUM_CONSERVATION_JOURS = 210; // ≈ 7 mois
+/* Conservation ILLIMITÉE (décision du 2026-07-25). À l'expiration, l'accès est bloqué mais
+   aucune donnée n'est jamais supprimée : le compte retrouve tout, intact, en se réabonnant.
+   Ce choix supprime les risques d'une purge — destruction de données appartenant à des tiers
+   (adhérents, acheteurs de billets, votants), absence de procédure de restauration éprouvée,
+   et dépendance à une horloge d'expiration dont on a justement corrigé un défaut ce jour-là.
+   L'accumulation de stockage, si elle devient réelle, se traitera sur les FICHIERS (hébergés
+   hors base), pas en effaçant des enregistrements. */
+const PREMIUM_CONSERVATION_ILLIMITEE = true;
 /* Paliers de rappel, du plus lointain au plus proche. La colonne sert de témoin :
    une relance déjà envoyée n'est jamais renvoyée. */
 const PREMIUM_PALIERS_RELANCE = [
@@ -5950,9 +5956,9 @@ const PREMIUM_PALIERS_RELANCE = [
 async function getPremiumStatut(userId, role) {
   const type = PREMIUM_TYPE_PAR_ROLE[role];
   /* Forme de réponse IDENTIQUE dans tous les cas : un client qui lit "statut" ou
-     "jours_avant_purge" ne doit jamais recevoir undefined selon la branche empruntée. */
+     "conservation_illimitee" ne doit jamais recevoir undefined selon la branche empruntée. */
   const base = { concerne: false, actif: false, statut: 'actif', type: null, date_expiration: null,
-                 jours_restants: null, jours_depuis_expiration: 0, jours_avant_purge: null, source: null };
+                 jours_restants: null, jours_depuis_expiration: 0, conservation_illimitee: true, source: null };
   if (!type) return base;
   if (isPremiumDemoUnlock()) return { ...base, concerne: true, actif: true, type, source: 'demo_unlock' };
 
@@ -5981,8 +5987,8 @@ async function getPremiumStatut(userId, role) {
        utile pour graduer un éventuel retrait progressif. */
     jours_restants: joursRestants,
     jours_depuis_expiration: joursDepuisFin,
-    /* Conservation des contenus : rien n'est supprimé avant ce délai après l'échéance. */
-    jours_avant_purge: expire ? Math.max(0, PREMIUM_CONSERVATION_JOURS - joursDepuisFin) : null,
+    /* Aucune purge : les contenus restent indéfiniment et reviennent intacts au réabonnement. */
+    conservation_illimitee: PREMIUM_CONSERVATION_ILLIMITEE,
     source,
   };
 }
@@ -6041,8 +6047,8 @@ async function estEnMaintenancePremium(ownerUserId) {
     return {
       actif: true,
       message: "Cette vitrine est temporairement indisponible. Son propriétaire doit renouveler son abonnement Premium afin de réactiver cet espace.",
-      /* Le contenu est conservé : on indique combien de temps il reste avant toute purge. */
-      jours_avant_purge: st.jours_avant_purge,
+      /* Le contenu est conservé sans limite de durée : aucune échéance à annoncer. */
+      conservation_illimitee: true,
     };
   } catch (_) { return null; }
 }
