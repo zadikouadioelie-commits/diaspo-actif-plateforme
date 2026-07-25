@@ -4110,6 +4110,21 @@
       <section id="section-error-logs" style="display:none;">
         <h2>🩺 Journal d'erreurs serveur</h2>
         <div class="notice" style="margin-bottom:16px;">Chaque erreur serveur (route qui plante, exception non gérée) est journalisée ici automatiquement. Remplace un service externe type Sentry pour un usage local/petite échelle.</div>
+
+        <!-- Contrôles de diagnostic. Ces vérifications n'étaient jusqu'ici accessibles qu'en
+             tapant des adresses d'API à la main. Or ce sont précisément les défauts SILENCIEUX
+             qu'elles révèlent : migration non jouée, envoi d'e-mail cassé, restriction sur le
+             point de bloquer des comptes. Un contrôle qu'on n'exécute pas ne sert à rien. -->
+        <div class="card" style="margin-bottom:18px;">
+          <h3 style="margin:0 0 4px;font-size:15px;">🧪 Contrôles de diagnostic</h3>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Vérifications ponctuelles à lancer notamment après chaque déploiement.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" onclick="diagSchema()">🗄️ Vérifier la base</button>
+            <button class="btn btn-sm btn-outline" onclick="diagPremium()">👑 Impact des restrictions Premium</button>
+            <button class="btn btn-sm btn-outline" onclick="diagEmail()">✉️ Tester l'envoi d'e-mail</button>
+          </div>
+          <div id="diag-resultat" style="margin-top:14px;"></div>
+        </div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px;">
           <div class="card" style="text-align:center;">
             <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Dernières 24h</div>
@@ -11335,6 +11350,64 @@ async function setTemoignageStatut(id, statut) {
     await api('PUT', `/admin/temoignages/${id}/statut`, { statut });
     loadTemoignagesAdmin();
   } catch(e) { alert('Erreur : '+e.message); }
+}
+
+/* ══ Contrôles de diagnostic ══
+   Ces vérifications existaient déjà côté serveur mais n'étaient atteignables qu'en tapant
+   une adresse d'API. Or elles révèlent des défauts SILENCIEUX — migration non jouée, e-mail
+   qui ne part pas — c'est-à-dire précisément ceux qu'on ne découvre pas tout seul. Les
+   rendre cliquables, c'est la seule façon qu'elles servent réellement. */
+function diagAfficher(html, couleur) {
+  const z = document.getElementById('diag-resultat');
+  if (z) z.innerHTML = `<div style="padding:12px 14px;border-radius:10px;border:1.5px solid ${couleur};background:${couleur}14;font-size:13px;line-height:1.6;">${html}</div>`;
+}
+function diagPatiente(quoi) { diagAfficher(`⏳ ${quoi}…`, '#94a3b8'); }
+
+async function diagSchema() {
+  diagPatiente('Vérification de la base');
+  try {
+    const d = await api('GET', '/admin/schema-check');
+    if (d.SCHEMA_A_JOUR) {
+      diagAfficher(`✅ <strong>Base à jour</strong> — ${d.colonnes_attendues} colonnes vérifiées sur ${d.moteur}.`, '#16a34a');
+    } else {
+      const liste = (d.detail || []).map(c => `${c.table}.${c.colonne}`).join(', ');
+      diagAfficher(`⚠️ <strong>${d.colonnes_manquantes} colonne(s) manquante(s)</strong><br>${liste}<br><span style="color:var(--muted);">${d.remede || ''}</span>`, '#dc2626');
+    }
+  } catch (e) { diagAfficher(`❌ ${e.message}`, '#dc2626'); }
+}
+
+async function diagPremium() {
+  diagPatiente('Calcul de l\'impact');
+  try {
+    const d = await api('GET', '/admin/premium/observations');
+    const i = d.impact_si_activation || {};
+    const s = i.comptes_par_statut || {};
+    const bloques = s.expire || 0;
+    const couleur = bloques ? '#f59e0b' : '#16a34a';
+    diagAfficher(
+      `<strong>Restrictions ${d.application_active ? 'ACTIVES' : 'désactivées'}</strong><br>`
+      + `Comptes : ${s.actif || 0} actifs · ${s.bientot_expire || 0} bientôt expirés · <strong>${bloques} expirés</strong><br>`
+      + `Vitrines qui passeraient en maintenance : <strong>${i.vitrines_passant_en_maintenance || 0}</strong><br>`
+      + (bloques ? `<span style="color:#92400e;">${bloques} compte(s) seraient bloqués dès l'activation.</span>`
+                 : `<span style="color:#166534;">Activer maintenant ne bloquerait personne.</span>`),
+      couleur);
+  } catch (e) { diagAfficher(`❌ ${e.message}`, '#dc2626'); }
+}
+
+async function diagEmail() {
+  const to = prompt("Adresse de destination du test :", "");
+  if (to === null) return;
+  diagPatiente('Envoi en cours');
+  try {
+    const d = await api('POST', '/admin/test-email', to ? { to } : {});
+    if (d.ENVOI_REUSSI) {
+      diagAfficher(`✅ <strong>E-mail envoyé</strong> à ${d.destinataire}.<br>Vérifiez la réception — pensez aux indésirables.`, '#16a34a');
+    } else if (d.resultat && d.resultat.reason === 'no_key') {
+      diagAfficher(`⚠️ <strong>Aucune clé d'envoi configurée</strong> sur cet environnement (RESEND_API_KEY).<br>Les e-mails ne partent pas — y compris les rappels de fin d'abonnement.`, '#dc2626');
+    } else {
+      diagAfficher(`❌ <strong>Envoi refusé</strong><br><code style="font-size:11.5px;">${JSON.stringify(d.resultat || d).slice(0, 300)}</code>`, '#dc2626');
+    }
+  } catch (e) { diagAfficher(`❌ ${e.message}`, '#dc2626'); }
 }
 </script>
 <script src="/assets/cookies-banner.js"></script>
