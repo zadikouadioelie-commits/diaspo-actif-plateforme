@@ -1464,10 +1464,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
         </div>
 
-        <!-- margin-right : ecarte la barre de defilement de l'apercu de celle de la page.
-             Les deux restent actives car elles n'ont pas le meme role (l'apercu vs le
-             tableau de bord entier) ; elles ne sont simplement plus collees. -->
-        <div class="pv-builder-right" style="position:sticky;top:70px;align-self:start;min-width:0;margin-right:28px;">
+        <!-- La marge droite qui separait les deux barres n'a plus lieu d'etre : la barre de
+             l'apercu est passee a gauche (direction:rtl sur #pv-preview-frame-wrap), celle de
+             la page reste a droite. Les 28px recuperes elargissent d'autant l'apercu. -->
+        <div class="pv-builder-right" style="position:sticky;top:70px;align-self:start;min-width:0;">
           <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 86px);overflow:hidden;">
             <h3 style="margin:0 0 4px;font-size:15px;">📱 Aperçu en direct</h3>
             <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Se met à jour automatiquement après chaque modification.</p>
@@ -1477,8 +1477,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <button class="btn btn-sm btn-outline" id="pv-preview-mobile" onclick="pvSetPreviewDevice('mobile')" title="Mobile">📱</button>
               <a href="profil.html?preview=draft#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;margin-left:auto;" title="Ouvrir dans un onglet">↗</a>
             </div>
-            <div id="pv-preview-frame-wrap" style="background:#EDF1F6;border-radius:12px;padding:10px;overflow:auto;flex:1;min-height:220px;">
-              <iframe id="pv-preview-frame" style="width:1400px!important;max-width:none!important;height:900px!important;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:width .25s ease;display:block;margin:0 auto;flex:none;"></iframe>
+            <!-- direction:rtl place la barre verticale du panneau sur son bord GAUCHE : elle
+                 reste ainsi constamment visible et nettement separee de celle de la page, qui
+                 occupe le bord droit. direction:ltr sur le cadre empeche la vitrine elle-meme
+                 d'etre inversee. Contrepartie geree par pvResetPreviewScroll() : en rtl
+                 l'origine du defilement horizontal bascule a droite. -->
+            <div id="pv-preview-frame-wrap" style="background:#EDF1F6;border-radius:12px;padding:10px;overflow:auto;flex:1;min-height:220px;direction:rtl;">
+              <iframe id="pv-preview-frame" style="direction:ltr;width:1400px!important;max-width:none!important;height:900px!important;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:width .25s ease;display:block;margin:0 auto;flex:none;"></iframe>
             </div>
             <p style="font-size:11px;color:var(--muted);margin:8px 0 0;flex:none;">💡 Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
             <div id="pv-draft-status" style="margin:10px 0 8px;font-size:12.5px;font-weight:700;flex:none;"></div>
@@ -4408,6 +4413,18 @@ async function pvSaveInfos() {
    pas un patch DOM instantané, mais une mise à jour automatique bien réelle (~1s en local). ── */
 const PV_PREVIEW_WIDTHS = { desktop: '1400px', tablet: '768px', mobile: '390px' };
 let __pvPreviewDevice = 'desktop';
+/* Le conteneur de l'apercu est en direction:rtl (barre verticale a gauche, toujours visible).
+   Effet de bord : l'origine du defilement horizontal passe a droite — scrollLeft va de
+   -(scrollWidth - clientWidth) jusqu'a 0, et 0 affiche la DROITE de la vitrine. On recale
+   donc sur le bord gauche apres chaque rendu, sinon l'apercu s'ouvrirait de travers. */
+function pvResetPreviewScroll() {
+  const wrap = document.getElementById('pv-preview-frame-wrap');
+  if (!wrap) return;
+  /* Plusieurs passes volontairement : la largeur du cadre est animee (transition .25s) et le
+     rendu de l'iframe est asynchrone, donc un recalage unique ne tient pas — mesure faite,
+     scrollLeft retombait a 0. La valeur negative est bornee par le navigateur. */
+  [0, 150, 400, 800].forEach(ms => setTimeout(() => { wrap.scrollLeft = -wrap.scrollWidth; }, ms));
+}
 function pvSetPreviewDevice(device) {
   __pvPreviewDevice = device;
   const frame = document.getElementById('pv-preview-frame');
@@ -4421,6 +4438,7 @@ function pvSetPreviewDevice(device) {
     const btn = document.getElementById('pv-preview-' + d);
     if (btn) { btn.classList.toggle('btn-orange', d === device); btn.classList.toggle('btn-outline', d !== device); }
   });
+  pvResetPreviewScroll();
 }
 function pvRefreshPreview() {
   const frame = document.getElementById('pv-preview-frame');
@@ -4430,7 +4448,7 @@ function pvRefreshPreview() {
   // revele pas toujours declenche de facon fiable en test), on sonde aussi periodiquement jusqu'a
   // detecter que le nouveau document est bien charge avant de brancher les clics.
   if (frame.__pvLoadHandler) frame.removeEventListener('load', frame.__pvLoadHandler);
-  frame.__pvLoadHandler = () => { try { pvWirePreviewClicks(frame); } catch (e) {} };
+  frame.__pvLoadHandler = () => { try { pvWirePreviewClicks(frame); pvResetPreviewScroll(); } catch (e) {} };
   frame.addEventListener('load', frame.__pvLoadHandler);
   frame.src = targetSrc;
   pvSetPreviewDevice(__pvPreviewDevice);
@@ -4440,6 +4458,7 @@ function pvRefreshPreview() {
     try {
       if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
         pvWirePreviewClicks(frame);
+        pvResetPreviewScroll();
         clearInterval(poll);
       }
     } catch (e) {}
