@@ -149,6 +149,19 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <div><label>Nationalite 3</label><input type="text" id="u-nat3" placeholder="Optionnel"></div>
         </div>
       </div>
+      <!-- Distinct des nationalités, et volontairement PUBLIC : c'est ce qui permet à deux
+           membres d'une même diaspora de se reconnaître dans l'annuaire. Les nationalités
+           restent privées, la promesse faite juste au-dessus n'est pas entamée. -->
+      <div class="form-section"><h4>Pays d'origine</h4>
+        <div class="nat-notice" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A;">
+          &#127757; <strong>Information publique</strong> — Affichée sur votre profil et dans l'annuaire.
+          Elle permet aux membres de votre diaspora de vous trouver. Facultative.
+        </div>
+        <div class="grid-2">
+          <div><label>Pays d'origine 1</label><input type="text" id="u-orig1" placeholder="Cote d'Ivoire"></div>
+          <div><label>Pays d'origine 2</label><input type="text" id="u-orig2" placeholder="Optionnel"></div>
+        </div>
+      </div>
       <div class="form-section"><h4>Residence</h4>
         <div class="grid-2">
           <div><label>Pays de residence <span style="color:#2563EB">*</span></label><input type="text" id="u-pays" placeholder="France"></div>
@@ -736,6 +749,8 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
       date_naissance:dob,nationalite1:nat1,
       nationalite2:document.getElementById("u-nat2").value.trim()||null,
       nationalite3:document.getElementById("u-nat3").value.trim()||null,
+      origine1:document.getElementById("u-orig1").value.trim()||null,
+      origine2:document.getElementById("u-orig2").value.trim()||null,
       pays,region,
       departement:document.getElementById("u-dept").value.trim()||null,
       ville,

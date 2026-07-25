@@ -333,12 +333,17 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   const statutVerif = role === "utilisateur" ? "auto" : "en_attente";
 
+  /* origine1/origine2 sont reçues depuis le formulaire mais n'étaient enregistrées que
+     dans la table initiatives : le COMPTE lui-même n'en gardait aucune trace. D'où un
+     seul membre sur vingt-cinq avec une origine renseignée, alors que la moitié avait
+     déclaré une nationalité. C'est le repère qui permet à deux diasporas de se trouver :
+     il doit vivre sur le compte, pas seulement sur l'organisation qu'il a créée. */
   const id = (await db.prepare(`
     INSERT INTO users (nom, prenom, email, password_hash, password_salt, role,
       ville, pays, region, departement, adresse, code_postal, telephone, date_naissance,
-      nationalite1, nationalite2, nationalite3,
+      nationalite1, nationalite2, nationalite3, origine1, origine2,
       centres_interet, situation_pro, type_institution, statut_verification)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     nom, prenom || null, emailNorm, hash, salt, role,
     ville || null, (role === "collectivite" ? pays_concerne : pays) || null,
@@ -346,6 +351,10 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     adresse || null, code_postal || null, (telephone || telephone_pro) || null,
     date_naissance || null,
     nationalite1 || null, nationalite2 || null, nationalite3 || null,
+    /* Une collectivité déclare son pays d'origine dans un champ dédié : on l'aligne ici
+       pour que TOUS les types de comptes portent l'information au même endroit. */
+    (origine1 || (role === "collectivite" ? pays_origine_institution : null)) || null,
+    origine2 || null,
     JSON.stringify(Array.isArray(centres_interet) ? centres_interet : []),
     situation_pro || null,
     type_institution || null,

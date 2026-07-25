@@ -762,11 +762,21 @@ function daDrapeau(pays) {
   return String.fromCodePoint(...[...iso.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
 }
 
-/* Renvoie { pays, source } — ou null si rien de fiable n'est disponible. */
-function daOrigine(o) {
+/* Renvoie { pays, source } — ou null si rien de publiable n'est disponible.
+
+   ⚠ Le repli sur la nationalité ne vaut PAS pour les comptes de personnes. Le formulaire
+   d'inscription leur promet noir sur blanc : « Information privée — jamais affichée
+   publiquement ». En déduire une origine affichée dans l'annuaire trahirait cet engagement,
+   même avec la meilleure intention. Les membres disposent désormais d'un champ « Pays
+   d'origine » distinct, annoncé comme public : c'est celui-là, et lui seul, qui s'affiche.
+
+   Pour une ORGANISATION, la nationalité est déjà une donnée publique de son identité
+   (elle figure sur sa fiche) : le repli y est légitime. */
+function daOrigine(o, estPersonne) {
   const dir = [o.origine1, o.origine2].filter(Boolean);
   if (dir.length) return { pays: dir.join(' · '), source: 'origine' };
   if (o.pays_origine) return { pays: o.pays_origine, source: 'origine' };
+  if (estPersonne) return null;
   const nat = [o.nationalite1, o.nationalite2].filter(Boolean)
     .map(x => DA_NAT_PAYS[_daNorm(x)] || null).filter(Boolean);
   if (nat.length) return { pays: [...new Set(nat)].join(' · '), source: 'nationalite' };
@@ -774,8 +784,8 @@ function daOrigine(o) {
 }
 
 /* Pastille posée sur l'image de la carte : c'est la zone que l'œil balaie en premier. */
-function daBadgeOrigine(o, style) {
-  const org = daOrigine(o);
+function daBadgeOrigine(o, style, estPersonne) {
+  const org = daOrigine(o, estPersonne);
   if (!org) return '';
   const premier = org.pays.split(' · ')[0];
   const titre = org.source === 'origine'
@@ -982,7 +992,7 @@ async function initAnnuaire(){
     const origs = [u.origine1, u.origine2].filter(Boolean).join(' • ');
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>${daBadgeOrigine(u)}`, isOwn)}
+      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>${daBadgeOrigine(u, '', true)}`, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nom}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
