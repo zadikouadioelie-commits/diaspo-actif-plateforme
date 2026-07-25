@@ -5625,8 +5625,14 @@ db.exec(`
 /* Migration : user_accreditations — flags de relance 🥇 Découverte Premium (évite les doublons). */
 ;(function migrateDecouvertePremiumRelances() {
   const cols = db.prepare("PRAGMA table_info(user_accreditations)").all().map(c => c.name);
+  /* Paliers J-60 à J-1 du cahier des charges "fin d'abonnement Premium". Les colonnes
+     10j et 5j sont conservées : d'anciennes relances y sont déjà enregistrées, les
+     supprimer ferait renvoyer des notifications déjà reçues.
+     ⚠ Miroir obligatoire dans server/pg-init.js. */
   [["relance_10j_le","TEXT"],["relance_5j_le","TEXT"],["relance_3j_le","TEXT"],
-   ["relance_24h_le","TEXT"],["relance_expire_le","TEXT"]].forEach(([col,type]) => {
+   ["relance_24h_le","TEXT"],["relance_expire_le","TEXT"],
+   ["relance_60j_le","TEXT"],["relance_30j_le","TEXT"],["relance_15j_le","TEXT"],
+   ["relance_7j_le","TEXT"]].forEach(([col,type]) => {
     if (!cols.includes(col)) db.exec(`ALTER TABLE user_accreditations ADD COLUMN ${col} ${type}`);
   });
 })();

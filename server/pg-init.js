@@ -708,6 +708,11 @@ async function migratePg(pool) {
     ['user_accreditations', 'relance_3j_le', 'TEXT'],
     ['user_accreditations', 'relance_24h_le', 'TEXT'],
     ['user_accreditations', 'relance_expire_le', 'TEXT'],
+    // Paliers J-60 à J-7 (fin d'abonnement Premium) — miroir de server/db.js
+    ['user_accreditations', 'relance_60j_le', 'TEXT'],
+    ['user_accreditations', 'relance_30j_le', 'TEXT'],
+    ['user_accreditations', 'relance_15j_le', 'TEXT'],
+    ['user_accreditations', 'relance_7j_le', 'TEXT'],
     ['formation_lecons', 'chapitre_id', 'INTEGER'],
     ['formation_lecons', 'telechargement_autorise', 'INTEGER DEFAULT 1'],
     ['formation_lecons', 'nb_pages', 'INTEGER'],

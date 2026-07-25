@@ -5914,6 +5914,23 @@ async function hasAccreditation(userId, type) {
 /* Type d'accréditation « abonnement » correspondant à chaque rôle. */
 const PREMIUM_TYPE_PAR_ROLE = { initiative: 'initiative_abonne', utilisateur: 'utilisateur_abonne' };
 
+/* Cycle de vie de l'abonnement Premium (cahier des charges du 2026-07-25).
+   PREMIUM_ALERTE_JOURS : seuil d'entrée en « bientôt expiré », déclenche les alertes.
+   PREMIUM_CONSERVATION_JOURS : durée pendant laquelle AUCUNE donnée Premium n'est
+   supprimée après l'échéance (7 mois). Les contenus sont bloqués, jamais effacés. */
+const PREMIUM_ALERTE_JOURS = 60;
+const PREMIUM_CONSERVATION_JOURS = 210; // ≈ 7 mois
+/* Paliers de rappel, du plus lointain au plus proche. La colonne sert de témoin :
+   une relance déjà envoyée n'est jamais renvoyée. */
+const PREMIUM_PALIERS_RELANCE = [
+  { jours: 60, col: 'relance_60j_le' },
+  { jours: 30, col: 'relance_30j_le' },
+  { jours: 15, col: 'relance_15j_le' },
+  { jours: 7,  col: 'relance_7j_le'  },
+  { jours: 3,  col: 'relance_3j_le'  },
+  { jours: 1,  col: 'relance_24h_le' },
+];
+
 /* Statut Premium détaillé — SOURCE UNIQUE pour tous les modules réservés à l'abonnement.
    Renvoie non seulement l'accès, mais la date de fin et les jours restants : c'est ce qui
    permet d'avertir avant l'échéance plutôt que de couper sans prévenir.
@@ -5935,14 +5952,22 @@ async function getPremiumStatut(userId, role) {
 
   const fin = ligne.date_expiration ? new Date(ligne.date_expiration).getTime() : null;
   const expire = fin !== null && fin < Date.now();
+  const joursRestants = fin === null ? null : Math.ceil((fin - Date.now()) / 86400000);
+  const joursDepuisFin = expire ? Math.floor((Date.now() - fin) / 86400000) : 0;
   return {
     concerne: true,
     actif: !expire,
+    /* Statut du cycle de vie (cahier des charges "fin d'abonnement Premium") :
+       actif → bientot_expire (alertes) → expire (blocage, données conservées). */
+    statut: expire ? 'expire' : (joursRestants !== null && joursRestants <= PREMIUM_ALERTE_JOURS ? 'bientot_expire' : 'actif'),
     type,
     date_expiration: ligne.date_expiration || null,
     /* null = abonnement sans date de fin. Négatif = nombre de jours depuis l'échéance,
        utile pour graduer un éventuel retrait progressif. */
-    jours_restants: fin === null ? null : Math.ceil((fin - Date.now()) / 86400000),
+    jours_restants: joursRestants,
+    jours_depuis_expiration: joursDepuisFin,
+    /* Conservation des contenus : rien n'est supprimé avant ce délai après l'échéance. */
+    jours_avant_purge: expire ? Math.max(0, PREMIUM_CONSERVATION_JOURS - joursDepuisFin) : null,
     source,
   };
 }
@@ -14872,28 +14897,52 @@ async function handleRequest(req, res) {
       return sendJSON(res, 401, { error: "Non autorisé." });
     }
     try {
+      /* Tous les abonnements Premium, et plus seulement les essais « découverte » :
+         un abonnement payant doit être annoncé comme les autres avant son échéance. */
       const essais = await db.prepare(`
-        SELECT ua.*, u.nom AS user_nom FROM user_accreditations ua
+        SELECT ua.*, u.nom AS user_nom, u.email AS user_email, ad.type AS accred_type
+        FROM user_accreditations ua
         JOIN users u ON u.id=ua.user_id
-        WHERE ua.statut='active' AND ua.type_tarif='decouverte' AND ua.date_expiration IS NOT NULL
+        LEFT JOIN accred_definitions ad ON ad.id=ua.accred_id
+        WHERE ua.statut='active' AND ua.date_expiration IS NOT NULL
+          AND ad.type IN ('initiative_abonne','utilisateur_abonne')
       `).all();
       const now = Date.now();
       let relancesEnvoyees = 0, expirations = 0;
       for (const e of essais) {
         const msRestant = new Date(e.date_expiration).getTime() - now;
         const joursRestants = msRestant / 86400000;
-        const PALIERS = [
-          { seuilJours: 10, col: 'relance_10j_le', msg: "Il vous reste 10 jours de 🥇 Découverte Premium." },
-          { seuilJours: 5, col: 'relance_5j_le', msg: "Il vous reste 5 jours de 🥇 Découverte Premium." },
-          { seuilJours: 3, col: 'relance_3j_le', msg: "Il vous reste 3 jours de 🥇 Découverte Premium." },
-          { seuilJours: 1, col: 'relance_24h_le', msg: "Votre 🥇 Découverte Premium se termine dans 24 heures." },
-        ];
-        for (const p of PALIERS) {
-          if (joursRestants <= p.seuilJours && joursRestants > 0 && !e[p.col]) {
-            creerNotif(e.user_id, 'decouverte_premium', '🥇 Découverte Premium', p.msg, { accred_id: e.accred_id, cta: 'passer_premium' });
-            await db.prepare(`UPDATE user_accreditations SET ${p.col}=datetime('now') WHERE id=?`).run(e.id);
-            relancesEnvoyees++;
+        const dateFr = new Date(e.date_expiration).toLocaleDateString('fr-FR');
+        const essaiGratuit = e.type_tarif === 'decouverte';
+        const libelle = essaiGratuit ? '🥇 Découverte Premium' : '👑 Abonnement Premium';
+        /* On retient le palier le PLUS PROCHE de l'échéance parmi ceux atteints, et non le
+           plus lointain. Un compte découvert tardivement (cron interrompu, abonnement créé
+           à J-2) reçoit ainsi une seule relance, juste, au lieu d'une série étalée sur
+           plusieurs jours en commençant par un « il vous reste 60 jours » absurde. */
+        const atteints = PREMIUM_PALIERS_RELANCE.filter(p => joursRestants <= p.jours && joursRestants > 0);
+        const palier = atteints.length && !e[atteints[atteints.length - 1].col] ? atteints[atteints.length - 1] : null;
+        if (palier) {
+          const restant = Math.max(1, Math.ceil(joursRestants));
+          const msg = `${libelle} : il vous reste ${restant} jour${restant > 1 ? 's' : ''}. Échéance le ${dateFr}.`;
+          creerNotif(e.user_id, 'decouverte_premium', libelle, msg, { accred_id: e.accred_id, cta: 'passer_premium' });
+          /* L'e-mail ne doit jamais faire échouer la relance : la notification plateforme
+             reste le canal fiable, l'e-mail est un complément. */
+          if (e.user_email) {
+            try {
+              const { sendEmail } = require("./mailer"); // même import ponctuel que le reste du fichier
+              await sendEmail(e.user_email, `${libelle} — échéance le ${dateFr}`,
+                `<p>Bonjour ${escH(e.user_nom || '')},</p><p>${escH(msg)}</p>
+                 <p>Vos contenus sont conservés : rien n'est supprimé à l'échéance.</p>`);
+            } catch (_) {}
           }
+          /* On marque aussi les paliers plus lointains déjà dépassés : les renvoyer plus tard
+             n'aurait aucun sens, et c'est ce qui évite la série de relances rétroactives.
+             Les noms de colonnes viennent de PREMIUM_PALIERS_RELANCE, jamais d'une entrée
+             utilisateur. */
+          for (const p of atteints) {
+            await db.prepare(`UPDATE user_accreditations SET ${p.col}=datetime('now') WHERE id=?`).run(e.id);
+          }
+          relancesEnvoyees++;
         }
         if (joursRestants <= 0) {
           if (!e.relance_expire_le) {
