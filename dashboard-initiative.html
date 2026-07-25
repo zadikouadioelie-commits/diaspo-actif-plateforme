@@ -1422,10 +1422,32 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <div id="parametres-vitrine-statut" style="margin-top:12px;font-size:13px;font-weight:700;"></div>
           </div>
 
+          <!-- Deux decisions independantes, deliberement separees en deux etapes :
+               l'etape 1 choisit LA FONCTION (quels modules s'activent), l'etape 2 choisit
+               L'APPARENCE. Elles etaient auparavant fusionnees dans une grille de 15 cartes
+               ou les 3 memes styles portaient 15 noms differents ("Epure" = minimaliste,
+               repete 3 fois), ce qui rendait impossible de savoir quoi representait quoi. -->
           <div class="card" style="margin-bottom:20px;">
-            <h3 style="margin:0 0 4px;font-size:15px;">🎨 Choisir mon modèle de vitrine</h3>
-            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Chaque modèle propose 3 variantes visuelles. Le modèle active automatiquement les modules adaptés à votre activité — vous restez ensuite libre de tout personnaliser. Choisir un modèle n'efface jamais vos données ni vos modules déjà actifs.</p>
-            <div id="pv-templates-grid" style="display:flex;flex-direction:column;gap:16px;"><div class="notice">Chargement…</div></div>
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px;flex-wrap:wrap;">
+              <span style="background:var(--navy);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;flex:none;">Étape 1</span>
+              <h3 style="margin:0;font-size:15px;">🎯 À quoi sert votre vitrine ?</h3>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ce choix active les modules adaptés à votre activité. Il ne change <strong>pas</strong> l'apparence — c'est l'étape 2. Vos modules déjà actifs et vos contenus restent intacts.</p>
+            <div id="pv-templates-grid" style="display:flex;flex-direction:column;gap:10px;"><div class="notice">Chargement…</div></div>
+          </div>
+
+          <div class="card" style="margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px;flex-wrap:wrap;">
+              <span style="background:var(--navy);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;flex:none;">Étape 2</span>
+              <h3 style="margin:0;font-size:15px;">🖌️ Quel style visuel ?</h3>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">L'habillage graphique de votre vitrine. Indépendant de l'étape 1 : changer de style ne touche jamais à vos modules ni à vos contenus.</p>
+            <div id="pv-style-presets" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"><div class="notice">Chargement…</div></div>
+            <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Couleur dominante</div>
+              <div id="pv-theme-swatches" style="display:flex;gap:12px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:14px 0 0;">🔜 Mises en page alternatives (au-delà des 3 styles ci-dessus) : à venir dans une prochaine évolution du module.</p>
           </div>
 
           <div class="card" style="margin-bottom:20px;">
@@ -1438,17 +1460,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <h3 style="margin:0 0 4px;font-size:15px;">↕️ Organiser ma vitrine</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Glissez-déposez pour réordonner les sections actives de votre vitrine.</p>
             <div id="pv-order-list" style="display:flex;flex-direction:column;gap:8px;"><div class="notice">Chargement…</div></div>
-          </div>
-
-          <div class="card" style="margin-bottom:20px;">
-            <h3 style="margin:0 0 4px;font-size:15px;">🖌️ Apparence de la vitrine</h3>
-            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Style graphique de la vitrine (indépendant du modèle métier choisi ci-dessus).</p>
-            <div id="pv-theme-swatches" style="display:flex;gap:12px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
-            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
-              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Style graphique</div>
-              <div id="pv-style-presets" style="display:flex;gap:8px;flex-wrap:wrap;"><div class="notice">Chargement…</div></div>
-            </div>
-            <p style="font-size:12px;color:var(--muted);margin:14px 0 0;">🔜 Mises en page alternatives (au-delà des 3 styles ci-dessus) : à venir dans une prochaine évolution du module.</p>
           </div>
 
         </div>
@@ -4463,38 +4474,37 @@ function pvJumpToModule(key) {
   if (row) { row.style.transition = 'background .3s'; row.style.background = '#FFF7ED'; setTimeout(() => row.style.background = '', 1500); }
 }
 
-/* ── Modèles de vitrine : 3 variantes visuelles par type (combine type + style graphique, meme
-   moteur que "Apparence" — rendu vraiment different par carte, pas des libelles decoratifs). ── */
-const PV_TEMPLATE_VARIANTS = {
-  portfolio:  [{style:'moderne',emoji:'🎨',label:'Créatif moderne'}, {style:'elegant',emoji:'🖼️',label:'Galerie élégante'}, {style:'minimaliste',emoji:'✨',label:'Minimaliste'}],
-  evenement:  [{style:'moderne',emoji:'🎭',label:'Dynamique'}, {style:'elegant',emoji:'✨',label:'Chic'}, {style:'minimaliste',emoji:'📐',label:'Épuré'}],
-  commercial: [{style:'moderne',emoji:'🛒',label:'Vitrine moderne'}, {style:'elegant',emoji:'💼',label:'Premium'}, {style:'minimaliste',emoji:'📦',label:'Sobre'}],
-  projet:     [{style:'moderne',emoji:'🌍',label:'Engagé'}, {style:'elegant',emoji:'✨',label:'Institutionnel'}, {style:'minimaliste',emoji:'📐',label:'Épuré'}],
-  formation:  [{style:'moderne',emoji:'🎓',label:'Dynamique'}, {style:'elegant',emoji:'📚',label:'Académique'}, {style:'minimaliste',emoji:'📐',label:'Épuré'}],
-};
+/* ── Étape 1 : la fonction de la vitrine (quels modules s'activent). Une carte par type,
+   qui annonce explicitement ce que le choix declenche. Le style graphique ne se decide
+   plus ici : c'est l'etape 2 (renderPvStylePresets). ── */
 function renderPvTemplates() {
   const grid = document.getElementById('pv-templates-grid');
   if (!grid || !__pvRegistry) return;
-  grid.innerHTML = Object.entries(__pvRegistry.templates).map(([key, t]) => `
-    <div>
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
-        <div style="font-size:14.5px;font-weight:800;">${t.label}</div>
-        <div style="font-size:11px;color:var(--muted);">${_mvEsc(t.pour)}</div>
+  grid.innerHTML = Object.entries(__pvRegistry.templates).map(([key, t]) => {
+    const actif = __pvVitrineType === key;
+    /* On ne compte que les modules reellement disponibles : annoncer des modules
+       "🔜 Bientot" gonflerait un chiffre que la vitrine ne pourrait pas tenir. */
+    const dispo = (t.actifs || []).filter(m => __pvRegistry.modules[m] && __pvRegistry.modules[m].implemente);
+    const apercu = dispo.slice(0, 4).map(m => __pvRegistry.modules[m].label);
+    const reste = dispo.length - apercu.length;
+    return `<div onclick="pvChoisirType('${key}')" role="button" tabindex="0"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pvChoisirType('${key}');}"
+      style="cursor:pointer;border:2px solid ${actif?'var(--orange)':'var(--border)'};border-radius:12px;padding:14px 16px;${actif?'background:#FFF7ED;':''}display:flex;align-items:flex-start;gap:12px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14.5px;font-weight:800;color:${actif?'var(--orange)':'var(--text)'};">${_mvEsc(t.label)}</div>
+        <div style="font-size:12.5px;color:#475569;margin-top:3px;line-height:1.5;">${_mvEsc(t.pour)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;">
+          <strong>${dispo.length} module${dispo.length > 1 ? 's' : ''} activé${dispo.length > 1 ? 's' : ''}</strong> : ${_mvEsc(apercu.join(', '))}${reste > 0 ? ` <span style="white-space:nowrap;">+ ${reste} autre${reste > 1 ? 's' : ''}</span>` : ''}
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-        ${(PV_TEMPLATE_VARIANTS[key]||[]).map(v => {
-          const isActive = __pvVitrineType === key && window.__pvStylePreset === v.style;
-          return `<div onclick="pvChoisirType('${key}','${v.style}')" style="cursor:pointer;border:2px solid ${isActive?'var(--orange)':'var(--border)'};border-radius:12px;padding:12px 8px;text-align:center;${isActive?'background:#FFF7ED;':''}">
-            <div style="font-size:20px;margin-bottom:4px;">${v.emoji}</div>
-            <div style="font-size:10.5px;font-weight:700;color:${isActive?'var(--orange)':'#374151'};">${_mvEsc(v.label)}</div>
-            ${isActive?'<div style="margin-top:4px;font-size:9.5px;font-weight:700;color:var(--orange);">✓ Actif</div>':''}
-          </div>`;
-        }).join('')}
+      <div style="flex:none;font-size:11.5px;font-weight:800;${actif?'color:var(--orange);':'color:var(--muted);'}white-space:nowrap;padding-top:2px;">
+        ${actif ? '✓ Sélectionné' : 'Choisir →'}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
-function pvChoisirType(type, style) {
+function pvChoisirType(type) {
   if (!__pvRegistry) return;
   const t = __pvRegistry.templates[type];
   if (!t) return;
@@ -4503,28 +4513,31 @@ function pvChoisirType(type, style) {
   overlay.id = 'pv-confirm-modal';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
   overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:26px;">
-    <h2 style="margin:0 0 12px;font-size:17px;">Appliquer le modèle ${t.label} ?</h2>
+    <h2 style="margin:0 0 12px;font-size:17px;">Utiliser « ${_mvEsc(t.label)} » ?</h2>
     <p style="font-size:13.5px;color:#475569;line-height:1.7;margin:0 0 16px;">
-      Les modules recommandés pour ce type de vitrine seront activés automatiquement dans votre brouillon.<br><br>
+      Les modules adaptés à ce type d'activité seront activés dans votre brouillon.<br><br>
+      <strong>L'apparence de votre vitrine ne change pas</strong> — elle se choisit à l'étape 2.<br><br>
       Vos modules déjà actifs et toutes vos données existantes restent inchangés. Rien n'est visible publiquement tant que vous n'avez pas cliqué sur « Publier ma vitrine ».
     </p>
     <div style="display:flex;gap:10px;justify-content:flex-end;">
       <button onclick="document.getElementById('pv-confirm-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
-      <button onclick="pvAppliquerType('${type}','${style}')" style="padding:9px 16px;border-radius:8px;border:none;background:var(--orange);color:#fff;font-weight:700;cursor:pointer;">Appliquer au brouillon</button>
+      <button onclick="pvAppliquerType('${type}')" style="padding:9px 16px;border-radius:8px;border:none;background:var(--orange);color:#fff;font-weight:700;cursor:pointer;">Activer ces modules</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
-async function pvAppliquerType(type, style) {
+async function pvAppliquerType(type) {
   try {
-    const r = await pvDraftPatch({ type, style: { preset: style } });
+    /* On ne patche QUE le type. Le style visuel releve de l'etape 2 et ne doit jamais
+       etre ecrase par un changement de fonction : c'est precisement la confusion que
+       l'ancienne grille type+style creait. */
+    const r = await pvDraftPatch({ type });
     __pvVitrineType = r.draft.type;
     __pvModulesState = r.draft.modules;
-    window.__pvStylePreset = style;
     document.getElementById('pv-confirm-modal')?.remove();
-    renderPvTemplates(); renderPvModulesLib(); renderPvOrderList(); renderPvStylePresets();
+    renderPvTemplates(); renderPvModulesLib(); renderPvOrderList();
     pvRefreshPreview();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
@@ -4640,18 +4653,29 @@ const PV_STYLE_PRESETS = [
   { id:'elegant', label:'Élégant', desc:'Titres en Cormorant Garamond, coins nets' },
   { id:'minimaliste', label:'Minimaliste', desc:'Angles droits, sans ombres, épuré' },
 ];
+/* Étape 2 : le style visuel. Cartes decrites plutot que petits boutons, pour que le
+   choix soit lisible sans survol (l'ancienne version cachait la description dans un
+   title=, invisible au toucher). */
 function renderPvStylePresets() {
   const box = document.getElementById('pv-style-presets');
   if (!box) return;
-  box.innerHTML = PV_STYLE_PRESETS.map(p => `
-    <button onclick="pvSetStylePreset('${p.id}')" class="btn btn-sm ${window.__pvStylePreset===p.id?'btn-orange':'btn-outline'}" title="${_mvEsc(p.desc)}">${p.label}</button>`).join('');
+  box.innerHTML = PV_STYLE_PRESETS.map(p => {
+    const actif = window.__pvStylePreset === p.id;
+    return `<div onclick="pvSetStylePreset('${p.id}')" role="button" tabindex="0"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pvSetStylePreset('${p.id}');}"
+      style="cursor:pointer;border:2px solid ${actif?'var(--orange)':'var(--border)'};border-radius:12px;padding:12px 14px;${actif?'background:#FFF7ED;':''}">
+      <div style="font-size:13.5px;font-weight:800;color:${actif?'var(--orange)':'var(--text)'};">${_mvEsc(p.label)}</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.45;">${_mvEsc(p.desc)}</div>
+      ${actif ? '<div style="margin-top:7px;font-size:11px;font-weight:800;color:var(--orange);">✓ Style actif</div>' : ''}
+    </div>`;
+  }).join('');
 }
 async function pvSetStylePreset(preset) {
   try {
     await pvDraftPatch({ style: { preset } });
     window.__pvStylePreset = preset;
+    /* Plus besoin de re-rendre l'etape 1 : elle ne depend plus du style graphique. */
     renderPvStylePresets();
-    renderPvTemplates();
     pvRefreshPreview();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
