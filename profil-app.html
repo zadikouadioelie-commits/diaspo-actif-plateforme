@@ -2585,6 +2585,50 @@ async function renderVitrineVisitor(init) {
 
   // Témoignages (curés par le titulaire — distinct des Avis clients notés)
   const temoignages = safeParseJson(init.vitrine_temoignages_json, []);
+  /* Remplit les sections Événements et Formations après le rendu. Aucune donnée factice :
+     si l'initiative n'a rien publié, la section le dit et renvoie l'auteur vers l'endroit
+     où l'on crée réellement ces contenus, plutôt que d'afficher un vide inexpliqué. */
+  window.pvtChargerEvenementsFormations = async function (init, isOwn) {
+    const owner = init.owner_user_id;
+    const vide = (msg, lien, libelle) =>
+      `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${msg}</span>` +
+      (isOwn && lien ? ` <a href="${lien}" style="font-size:13px;font-weight:700;color:#2F6BED;">${libelle} →</a>` : '');
+
+    const boxEvt = document.getElementById('pvt-evenements-body');
+    if (boxEvt) {
+      try {
+        const r = await api('GET', `/evenements?owner=${encodeURIComponent(owner)}`);
+        const liste = (r.evenements || []).filter(e => !e.visibilite || e.visibilite === 'public');
+        boxEvt.innerHTML = liste.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;">
+          ${liste.slice(0, 6).map(e => `<a href="evenement.html?id=${e.id}" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;">
+            ${e.image_couverture || e.image_url ? `<img loading="lazy" src="${esc(e.image_couverture || e.image_url)}" alt="" style="width:100%;height:110px;object-fit:cover;display:block;">` : ''}
+            <div style="padding:12px;">
+              <div style="font-size:11.5px;font-weight:800;color:#2F6BED;text-transform:uppercase;letter-spacing:.03em;">${esc(e.date_evt || '')}</div>
+              <div style="font-size:13.5px;font-weight:700;color:#122A4D;margin-top:3px;line-height:1.35;">${esc(e.titre || '')}</div>
+              ${e.lieu ? `<div style="font-size:12px;color:#8794A7;margin-top:4px;">📍 ${esc(e.lieu)}</div>` : ''}
+            </div></a>`).join('')}
+        </div>` : vide('Aucun événement publié pour le moment.', 'dashboard-initiative.html#evenements', 'Créer un événement');
+      } catch (e) { boxEvt.innerHTML = vide('Événements momentanément indisponibles.'); }
+    }
+
+    const boxForm = document.getElementById('pvt-formations-body');
+    if (boxForm) {
+      try {
+        const r = await api('GET', `/formations?owner=${encodeURIComponent(owner)}`);
+        const liste = r.formations || [];
+        boxForm.innerHTML = liste.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;">
+          ${liste.slice(0, 6).map(f => `<a href="formation.html?id=${f.id}" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;">
+            ${f.image_url ? `<img loading="lazy" src="${esc(f.image_url)}" alt="" style="width:100%;height:110px;object-fit:cover;display:block;">` : ''}
+            <div style="padding:12px;">
+              <div style="font-size:13.5px;font-weight:700;color:#122A4D;line-height:1.35;">${esc(f.titre || '')}</div>
+              ${f.niveau ? `<div style="font-size:11.5px;color:#8794A7;margin-top:4px;">${esc(f.niveau)}</div>` : ''}
+              <div style="font-size:13px;font-weight:800;color:#2F6BED;margin-top:6px;">${(f.mode_acces === 'gratuit' || Number(f.prix) === 0) ? 'Gratuit' : (f.prix ? esc(f.prix) + ' €' : '')}</div>
+            </div></a>`).join('')}
+        </div>` : vide('Aucune formation publiée pour le moment.', 'dashboard-initiative.html#formations-gestion', 'Créer une formation');
+      } catch (e) { boxForm.innerHTML = vide('Formations momentanément indisponibles.'); }
+    }
+  };
+
   const temoignagesSec = ((temoignages.length || isOwn) && modOn('temoignages')) ? `<section id="pv-temoignages" class="pvt-section">
     <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>💬 Témoignages</h3>${isOwn?`<button onclick="pvtEditTemoignages()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
     <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">
@@ -2748,7 +2792,22 @@ async function renderVitrineVisitor(init) {
      pas seulement stocke — sans ca, reordonner dans le dashboard n'aurait aucun effet visible
      sur la vraie vitrine publique. Bannière/actionbar/contact restent des blocs de structure fixes
      (comme dans l'exemple du cahier des charges : bannière toujours en tete, contact toujours en pied). */
+  /* Événements et Formations : les données existent déjà ailleurs sur la plateforme
+     (tables « evenements » et « formations », rattachées au compte). Ces sections sont donc
+     des vues, remplies après le rendu par pvtChargerEvenementsFormations() — l'initiative
+     n'a rien à ressaisir, elle publie comme d'habitude et la vitrine suit. */
+  const evenementsSec = modOn('evenements') ? `<section id="pv-evenements" class="pvt-section">
+    <div class="pvt-section-head sm"><h3>📅 Événements</h3></div>
+    <div class="pvt-section-body" id="pvt-evenements-body"><span style="color:#94a3b8;font-style:italic;font-size:13px;">Chargement…</span></div>
+  </section>` : '';
+
+  const formationsSec = modOn('formations_catalogue') ? `<section id="pv-formations" class="pvt-section">
+    <div class="pvt-section-head sm"><h3>🎓 Formations</h3></div>
+    <div class="pvt-section-body" id="pvt-formations-body"><span style="color:#94a3b8;font-style:italic;font-size:13px;">Chargement…</span></div>
+  </section>` : '';
+
   const MODULE_SECTIONS = [
+    ['evenements', evenementsSec], ['formations_catalogue', formationsSec],
     ['offre_flash', offreFlashSec], ['a_propos', presentation], ['expertise', expertiseSec],
     ['certifications', certificationsSec], ['vision_objectifs', visionSec], ['catalogue', collectionsSec],
     ['produits', produitsSec], ['services', services], ['pourquoi_choisir', pourquoiSec],
@@ -2796,6 +2855,8 @@ async function renderVitrineVisitor(init) {
     const pubWrap = document.getElementById('pvt-publications');
     if (pubWrap) { pubWrap.id = 'vt-publications'; renderPublications(init, false); }
   }
+
+  pvtChargerEvenementsFormations(init, isOwn);
 
   // Meilleures ventes + objectif (même requête, réutilisée)
   try {

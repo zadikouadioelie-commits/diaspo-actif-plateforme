@@ -1513,8 +1513,8 @@ const VITRINE_MODULES_REGISTRY = {
   produits:              { label: "Produits / Boutique",      categorie: "activite", implemente: true },
   catalogue:             { label: "Catalogue",                categorie: "activite", implemente: true },
   services:              { label: "Services",                 categorie: "activite", implemente: true },
-  formations_catalogue:  { label: "Formations",                categorie: "activite", implemente: false },
-  evenements:            { label: "Événements",                categorie: "activite", implemente: false },
+  formations_catalogue:  { label: "Formations",                categorie: "activite", implemente: true },
+  evenements:            { label: "Événements",                categorie: "activite", implemente: true },
   contact:               { label: "Contact",                   categorie: "interaction", implemente: true },
   demande_devis:         { label: "Demande de devis",          categorie: "interaction", implemente: true },
   demande_partenariat:   { label: "Demande de partenariat",    categorie: "interaction", implemente: true },
@@ -6033,6 +6033,8 @@ route("GET", "/api/formations", async (req, res, params, body, query) => {
   if (query.niveau) rows = rows.filter(r => r.niveau === query.niveau);
   if (query.langue) rows = rows.filter(r => r.langue === query.langue);
   if (query.gratuit === "1") rows = rows.filter(r => r.mode_acces === 'gratuit' || r.gratuit === 1);
+  /* Filtre par formateur — alimente le module "Formations" de la vitrine. */
+  if (query.owner) rows = rows.filter(r => Number(r.owner_user_id) === Number(query.owner));
   if (query.q) {
     const q = query.q.toLowerCase();
     rows = rows.filter(r => ((r.titre||'') + (r.description||'') + (r.organisme||'')).toLowerCase().includes(q));
@@ -9213,6 +9215,8 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   if (query.origine) rows = rows.filter(r => r.origine === query.origine);
   if (query.ville) { const v = query.ville.toLowerCase(); rows = rows.filter(r => (r.ville||"").toLowerCase().includes(v)); }
   if (query.type) rows = rows.filter(r => r.type_evt === query.type);
+  /* Filtre par organisateur — alimente le module "Événements" de la vitrine. */
+  if (query.owner) rows = rows.filter(r => Number(r.owner_user_id) === Number(query.owner));
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.lieu+r.description||"").toLowerCase().includes(q)); }
   const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
   sendJSON(res, 200, { evenements: withCounts });
