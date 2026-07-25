@@ -3,9 +3,10 @@
    Lit les blocs db.exec() depuis db.js et les exécute via pg.
    Appelé au cold start Vercel quand DATABASE_URL est définie.
    =========================================================== */
-const fs   = require('fs');
-const path = require('path');
-const pg   = require('./db-pg');
+const fs     = require('fs');
+const path   = require('path');
+const crypto = require('crypto');
+const pg     = require('./db-pg');
 
 let _initialized = false;
 
@@ -231,6 +232,45 @@ async function reparerSchema() {
    supplémentaire si jamais la migration elle-même se grippe. */
 const PG_INIT_LOCK_KEY = 84210001;
 
+/* Empreinte du schéma attendu — pour ne pas rejouer 877 requêtes à chaque réveil du site.
+
+   Mesuré le 2026-07-25 : 290 CREATE TABLE/INDEX + 587 ALTER TABLE ADD COLUMN étaient
+   soumis à CHAQUE démarrage à froid, sur un pool de 5 connexions. Vercel éteint le site
+   quand personne ne l'utilise et le rallume au premier visiteur, donc des dizaines de fois
+   par jour. D'où les « timeout exceeded when trying to connect » et « Query read timeout »
+   qui subsistaient après la correction du bloc Chatbot.
+
+   Or le schéma ne change qu'aux déploiements qui le modifient. On enregistre donc une
+   empreinte de sa définition : tant qu'elle est identique, il n'y a rien à rejouer. Un
+   déploiement touchant db.js ou la liste des colonnes change l'empreinte et relance les
+   migrations une fois — puis plus rien jusqu'au suivant. */
+function empreinteSchema() {
+  const dbSrc = fs.readFileSync(path.join(__dirname, 'db.js'), 'utf8');
+  return crypto.createHash('sha1')
+    .update(dbSrc)
+    .update(JSON.stringify(COLONNES_MIGRATION))
+    .digest('hex');
+}
+
+const CLE_EMPREINTE = 'schema_empreinte';
+
+async function empreinteEnregistree(client) {
+  try {
+    const { rows } = await client.query('SELECT valeur FROM parametres_plateforme WHERE cle=$1', [CLE_EMPREINTE]);
+    return rows[0] ? rows[0].valeur : null;
+  } catch (e) { return null; }   // table pas encore créée : premier démarrage
+}
+
+async function enregistrerEmpreinte(client, empreinte) {
+  try {
+    await client.query(
+      `INSERT INTO parametres_plateforme (cle, valeur, type, description) VALUES ($1,$2,'texte',$3)
+       ON CONFLICT (cle) DO UPDATE SET valeur = EXCLUDED.valeur`,
+      [CLE_EMPREINTE, empreinte, "Empreinte du schéma appliqué — évite de rejouer les migrations à chaque démarrage à froid"]
+    );
+  } catch (e) { console.error('[pg-init] empreinte non enregistrée :', e.message); }
+}
+
 async function pgInit() {
   if (_initialized) return;
 
@@ -246,25 +286,40 @@ async function pgInit() {
       return;
     }
     try {
+      /* Schéma inchangé depuis le dernier passage réussi : rien à rejouer. Une lecture
+         au lieu de 877 écritures — c'est ce qui saturait le pool à chaque réveil du site. */
+      const empreinte = empreinteSchema();
+      if (await empreinteEnregistree(client) === empreinte) {
+        _initialized = true;
+        return;
+      }
+
       // Vérifie si les tables existent déjà
       const { rows } = await client.query(
         "SELECT COUNT(*)::int AS cnt FROM information_schema.tables WHERE table_schema = 'public'"
       );
+      let echecs;
       if (rows[0].cnt > 3) {
         /* Schéma déjà en place — créer les tables manquantes (nouvelles depuis le dernier
            déploiement) + migrations de colonnes + corriger les comptes démo */
-        await createMissingTables(pool);
+        echecs = await createMissingTables(pool);
         await migratePg(pool);
         await seedPg(pool);
       } else {
         console.log('[pg-init] Création du schéma Postgres...');
-        await createMissingTables(pool);
+        echecs = await createMissingTables(pool);
 
         console.log('[pg-init] Schéma créé. Migrations + seeding...');
         await migratePg(pool);
         await seedPg(pool);
         console.log('[pg-init] ✅ Base de données Postgres prête.');
       }
+
+      /* Empreinte enregistrée UNIQUEMENT si tout est passé. Sinon on rejoue au prochain
+         démarrage : une création ratée ne doit jamais être figée comme « déjà faite »,
+         c'est exactement ce qui a rendu demandes_contact absente pendant des semaines. */
+      if (!echecs || echecs.length === 0) await enregistrerEmpreinte(client, empreinte);
+      else console.error(`[pg-init] ${echecs.length} échec(s) — empreinte non enregistrée, migrations rejouées au prochain démarrage.`);
     } finally {
       await client.query('SELECT pg_advisory_unlock($1)', [PG_INIT_LOCK_KEY]);
     }

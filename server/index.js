@@ -5406,7 +5406,10 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
     if (conv.user1_id === user.id && conv.deleted_u1) await db.prepare("UPDATE conversations SET deleted_u1=0 WHERE id=?").run(conv.id);
     if (conv.user2_id === user.id && conv.deleted_u2) await db.prepare("UPDATE conversations SET deleted_u2=0 WHERE id=?").run(conv.id);
   } else {
-    const id = await db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet) VALUES (?, ?, ?)").run(user.id, otherId, body.sujet || null).lastInsertRowid;
+    /* Parenthèses indispensables : .run() renvoie une PROMESSE, et lire .lastInsertRowid
+       dessus donne undefined — le client recevait une conversation sans identifiant et ne
+       pouvait pas l'ouvrir. Il faut attendre le résultat AVANT de lire la propriété. */
+    const id = (await db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet) VALUES (?, ?, ?)").run(user.id, otherId, body.sujet || null)).lastInsertRowid;
     conv = { id };
   }
   sendJSON(res, 201, { conversation_id: conv.id });
@@ -12795,7 +12798,10 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
   const existing = await db.prepare("SELECT id,statut FROM demandes_accreditation WHERE user_id=? AND type=? ORDER BY created_at DESC LIMIT 1").get(user.id, type);
   if (existing && existing.statut === "en_attente") return sendJSON(res, 409, { error: "Une demande est déjà en cours pour ce type." });
   if (hasAccred(user.id, type)) return sendJSON(res, 409, { error: "Vous possédez déjà cette accréditation." });
-  const id = await db.prepare("INSERT INTO demandes_accreditation (user_id, type, message) VALUES (?,?,?)").run(user.id, type, message||null).lastInsertRowid;
+  /* Même défaut : sans les parenthèses, .lastInsertRowid est lu sur la promesse et vaut
+     undefined — la demande d'accréditation était bien enregistrée, mais son identifiant
+     ne revenait jamais au client. */
+  const id = (await db.prepare("INSERT INTO demandes_accreditation (user_id, type, message) VALUES (?,?,?)").run(user.id, type, message||null)).lastInsertRowid;
   const DA_LABELS = { mobilisation_active:"Mobilisation Active", createur_opportunites:"Créateur d'Opportunités", observatoire_diaspora:"Observatoire Diaspora", institutionnelle:"Institutionnelle" };
   const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
   admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation", `${user.nom} demande l'accréditation « ${DA_LABELS[type]||type} »`, { demande_id: Number(id) }));
@@ -25759,7 +25765,9 @@ app.post('/api/oz/chat', requireAuth, async (req, res) => {
     if (ozConv) {
       convId = ozConv.id;
     } else {
-      convId = await db.prepare('INSERT INTO oz_conversations (user_id, messages_json) VALUES (?,?)').run(uid, '[]').lastInsertRowid;
+      /* Même défaut : la conversation de l'assistant était créée sans identifiant
+         exploitable, donc jamais retrouvée au message suivant. */
+      convId = (await db.prepare('INSERT INTO oz_conversations (user_id, messages_json) VALUES (?,?)').run(uid, '[]')).lastInsertRowid;
     }
   }
   try {
