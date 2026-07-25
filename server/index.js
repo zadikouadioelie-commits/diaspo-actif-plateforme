@@ -3647,8 +3647,10 @@ route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body
     if (body.type && VITRINE_TEMPLATES[body.type]) {
       // Appliquer un modèle est toujours ADDITIF : active ses modules recommandés sans jamais en
       // masquer un déjà actif — permet à une Initiative d'évoluer (Portfolio -> +Boutique -> +Formation).
+      // N'active jamais un module marqué "implemente:false" (🔜 Bientôt) : ces modules n'ont ni
+      // rendu réel sur la vitrine ni bouton pour les désactiver — les activer serait une impasse.
       [...VITRINE_TEMPLATES[body.type].actifs, ...VITRINE_MODULES_SOCLE].forEach((key) => {
-        if (!VITRINE_MODULES_REGISTRY[key]) return;
+        if (!VITRINE_MODULES_REGISTRY[key] || !VITRINE_MODULES_REGISTRY[key].implemente) return;
         if (!draft.modules[key].actif) draft.modules[key] = { ...draft.modules[key], actif: true };
       });
     }

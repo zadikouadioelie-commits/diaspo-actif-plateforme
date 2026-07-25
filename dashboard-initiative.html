@@ -1403,7 +1403,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <h2 style="margin:0 0 6px;">⭐ Paramètres Vitrine</h2>
       <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Configurez à gauche, voyez le résultat en direct à droite. Rien ne change sur votre vitrine publique tant que vous n'avez pas cliqué sur « 🚀 Publier ma vitrine ».</p>
 
-      <div class="pv-builder-layout" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div class="pv-builder-layout" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;">
         <div class="pv-builder-left">
 
           <div class="card" style="margin-bottom:20px;">
@@ -1453,7 +1453,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
         </div>
 
-        <div class="pv-builder-right" style="position:sticky;top:16px;">
+        <div class="pv-builder-right" style="position:sticky;top:16px;min-width:0;">
           <div class="card">
             <h3 style="margin:0 0 4px;font-size:15px;">📱 Aperçu en direct</h3>
             <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Se met à jour automatiquement après chaque modification.</p>
@@ -1464,7 +1464,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <a href="profil.html?preview=draft#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;margin-left:auto;" title="Ouvrir dans un onglet">↗</a>
             </div>
             <div id="pv-preview-frame-wrap" style="background:#EDF1F6;border-radius:12px;padding:10px;overflow:auto;max-height:960px;">
-              <iframe id="pv-preview-frame" style="width:100%;max-width:1400px;height:900px;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:max-width .25s ease;display:block;margin:0 auto;"></iframe>
+              <iframe id="pv-preview-frame" style="width:1400px!important;max-width:none!important;height:900px!important;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:width .25s ease;display:block;margin:0 auto;flex:none;"></iframe>
             </div>
             <p style="font-size:11px;color:var(--muted);margin:8px 0 0;">💡 Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
             <div id="pv-draft-status" style="margin:14px 0 10px;font-size:12.5px;font-weight:700;"></div>
@@ -4364,12 +4364,17 @@ async function pvSaveInfos() {
 /* ── Aperçu en direct (iframe sur la vitrine réelle en mode brouillon — mêmes composants que la
    vitrine publiée, voir ?preview=draft côté serveur). Rechargée après chaque action de config :
    pas un patch DOM instantané, mais une mise à jour automatique bien réelle (~1s en local). ── */
-const PV_PREVIEW_WIDTHS = { desktop: '1200px', tablet: '768px', mobile: '390px' };
+const PV_PREVIEW_WIDTHS = { desktop: '1400px', tablet: '768px', mobile: '390px' };
 let __pvPreviewDevice = 'desktop';
 function pvSetPreviewDevice(device) {
   __pvPreviewDevice = device;
   const frame = document.getElementById('pv-preview-frame');
-  if (frame) frame.style.maxWidth = PV_PREVIEW_WIDTHS[device] || '1200px';
+  // width fixe + !important : une regle globale (assets/responsive.v2.css) force
+  // "iframe{max-width:100%}" pour la reactivite generale du site, qui ecraserait sinon
+  // silencieusement la largeur cible ici. setProperty(...,'important') est necessaire, une simple
+  // affectation .style.width ne suffit pas a passer devant cette regle. Si la colonne est plus
+  // etroite que la largeur cible, #pv-preview-frame-wrap (overflow:auto) defile horizontalement.
+  if (frame) frame.style.setProperty('width', PV_PREVIEW_WIDTHS[device] || '1400px', 'important');
   ['desktop','tablet','mobile'].forEach(d => {
     const btn = document.getElementById('pv-preview-' + d);
     if (btn) { btn.classList.toggle('btn-orange', d === device); btn.classList.toggle('btn-outline', d !== device); }
@@ -4537,7 +4542,9 @@ async function pvToggleModule(key, actif) {
 function renderPvOrderList() {
   const box = document.getElementById('pv-order-list');
   if (!box || !__pvRegistry) return;
-  const actifs = Object.entries(__pvModulesState).filter(([k,v]) => v.actif && __pvRegistry.modules[k]).sort((a,b) => a[1].ordre - b[1].ordre);
+  // Filtre defensif : un module "🔜 Bientôt" (implemente:false) n'a ni rendu reel ni bouton pour
+  // le desactiver — ne doit jamais apparaitre ici meme si une ancienne action l'a active par erreur.
+  const actifs = Object.entries(__pvModulesState).filter(([k,v]) => v.actif && __pvRegistry.modules[k] && __pvRegistry.modules[k].implemente).sort((a,b) => a[1].ordre - b[1].ordre);
   if (!actifs.length) { box.innerHTML = '<div class="notice">Aucun module actif pour le moment.</div>'; return; }
   box.innerHTML = actifs.map(([key]) => `
     <div class="pv-order-row" data-key="${key}" draggable="true" style="display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:9px 12px;cursor:grab;">
