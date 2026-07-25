@@ -169,7 +169,7 @@
     </div>
   </header>
 
-  <div id="demandes-relation-bar" style="display:none;flex-shrink:0;"></div>
+
 
   <div class="msg-shell" id="msg-shell">
 
@@ -1166,35 +1166,10 @@ async function openConvWithUser(userId, produitId, objet, origine){
       if (inp){ inp.value = OBJET_TEMPLATES[objet]; inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,200)+'px'; inp.focus(); }
     }
   }catch(e){
-    /* Le serveur peut refuser le contact direct et exiger une demande de liaison. Ce n'est pas
-       une erreur mais une étape du parcours : on propose donc l'envoi en un clic plutôt que
-       d'afficher un message d'échec qui laisserait l'utilisateur sans issue. */
-    /* api() (assets/app.js) place la réponse du serveur dans e.data, jamais directement sur
-       l'erreur : lire e.code renverrait toujours undefined et l'utilisateur resterait bloqué
-       sur un message d'échec sans issue. */
-    const info = e && e.data;
-    if (info && info.code === 'demande_liaison_requise') { proposerDemandeLiaison(info); return; }
+    /* Le serveur ne peut plus exiger de demande préalable (règles supprimées le 2026-07-25) :
+       une erreur ici en est donc réellement une, et s'affiche telle quelle. */
     alert(e.message);
   }
-}
-
-/* Propose l'envoi de la demande, avec le message imposé affiché tel quel — l'utilisateur doit
-   voir exactement ce qui sera transmis en son nom. */
-function proposerDemandeLiaison(info){
-  const libelle = info.libelle || 'Demande de liaison';
-  const nom = info.destinataire_nom ? ` à ${info.destinataire_nom}` : '';
-  const msg = info.message_predefini
-    ? `
-
-Message transmis :
-« ${info.message_predefini} »`
-    : '';
-  if (!confirm(`${info.error}
-
-Envoyer une ${libelle.toLowerCase()}${nom} ?${msg}`)) return;
-  api("POST","/demandes-liaison",{destinataire_id: info.destinataire_id})
-    .then(()=> alert(`${libelle} envoyée. Vous serez prévenu dès qu'elle aura une réponse.`))
-    .catch(err=> alert(err.message));
 }
 
 /* Préremplit le champ message avec les infos du produit (variante dispo/indispo) */
@@ -1215,56 +1190,6 @@ async function prefillProduitMessage(produitId){
     const inp = document.getElementById('msg-input');
     if (inp){ inp.value = txt; inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,200)+'px'; inp.focus(); }
   }catch(e){ /* silencieux : le message reste vide */ }
-}
-
-/* ---- Demandes de contact reçues (consentement avant toute conversation) ---- */
-async function loadDemandesRelation(){
-  const bar = document.getElementById('demandes-relation-bar');
-  if (!bar) return;
-  const dcUrgenceBadge = { faible:'#94A3B8', normal:'#64748B', important:'#D97706', urgent:'#DC2626' };
-  try {
-    const r = await api('GET', '/demandes-contact?direction=recues&statut=en_attente');
-    const demandes = r.demandes || [];
-    if (!demandes.length){ bar.style.display='none'; bar.innerHTML=''; return; }
-    bar.style.display='block';
-    bar.innerHTML = `<div style="background:#EFF6FF;border-bottom:1.5px solid #BFDBFE;padding:10px 20px;display:flex;flex-direction:column;gap:10px;">
-      ${demandes.map(d=>`
-        <div style="display:flex;gap:10px;font-size:13px;flex-wrap:wrap;background:#fff;border:1px solid #DCE7FA;border-radius:12px;padding:10px 12px;">
-          ${d.image_url ? `<img src="${escH(d.image_url)}" style="width:56px;height:56px;object-fit:cover;border-radius:10px;flex-shrink:0;">` : ''}
-          <div style="flex:1;min-width:200px;">
-            <div>🤝 <strong>${escH(d.autre_nom)}</strong> souhaite entrer en mise en relation
-              <span style="background:${dcUrgenceBadge[d.urgence]||'#64748B'};color:#fff;border-radius:99px;padding:1px 8px;font-size:10px;font-weight:700;margin-left:4px;">${escH(d.urgence)}</span>
-            </div>
-            <div style="font-weight:700;margin-top:3px;">${escH(d.objet || d.motif_autre || d.motif)}</div>
-            <div style="color:var(--muted);font-size:12px;margin-top:2px;">${escH(d.motif_autre || d.motif)}${d.message?` — ${escH(d.message)}`:''}</div>
-            ${(d.compatibilite && d.compatibilite.length) ? `
-              <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:6px 10px;margin-top:6px;font-size:11.5px;color:#166534;">
-                <strong>💡 Pourquoi cette mise en relation peut vous intéresser ?</strong>
-                <ul style="margin:4px 0 0;padding-left:16px;">${d.compatibilite.map(c=>`<li>${escH(c)}</li>`).join('')}</ul>
-              </div>` : ''}
-            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-              <a class="btn btn-sm btn-outline" href="profil.html?id=${d.demandeur_id}" target="_blank" rel="noopener">👁️ Voir le profil</a>
-              <button class="btn btn-sm btn-orange" onclick="repondreDemandeRelation(${d.id},'accepter')">Accepter</button>
-              <button class="btn btn-sm btn-outline" onclick="repondreDemandeRelation(${d.id},'refuser')">Refuser</button>
-              <button class="btn btn-sm btn-outline" style="color:#DC2626;border-color:#DC2626;" onclick="repondreDemandeRelation(${d.id},'bloquer')">Bloquer</button>
-            </div>
-          </div>
-        </div>
-      `).join('')}
-    </div>`;
-  } catch(e) { bar.style.display='none'; }
-}
-
-async function repondreDemandeRelation(id, action){
-  if (action === 'bloquer' && !confirm('Bloquer ce compte ? Il ne pourra plus vous envoyer de demande de contact.')) return;
-  try {
-    const r = await api('POST', `/demandes-contact/${id}/repondre`, { action });
-    await loadDemandesRelation();
-    if (action === 'accepter' && r.conversation_id) {
-      await loadConvList();
-      openConv(r.conversation_id);
-    }
-  } catch(e) { alert('Erreur : ' + e.message); }
 }
 
 /* ---- Réseau Pro : classement du contact après une Mise en relation acceptée ----
@@ -1348,7 +1273,7 @@ async function proposerClassementContact(contactId, contactNom, convId){
 
   // Charger la liste des conversations
   await loadConvList();
-  await loadDemandesRelation();
+
   loadListeFilterOptions();
 
   // Boutons header conversation

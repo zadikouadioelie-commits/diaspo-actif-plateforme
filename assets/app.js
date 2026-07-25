@@ -777,7 +777,6 @@ function renderInitiativeCard(it){
         ${membres}
         <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
         ${vitrineBtn}
-        ${(it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'collectivite') ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); if(window.DemandeContact) window.DemandeContact.open(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')});">🤝 Mise en relation</button>` : ''}
         ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 S'inscrire à un événement</button>` : ''}
       </div>
     </div>
@@ -3923,62 +3922,27 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   BOUTON DE MISE EN RELATION — composant partagé
+   BOUTON DE CONTACT — composant partagé
    ──────────────────────────────────────────────────────────────────────────
-   Affiche la SEULE action possible pour un premier contact, au lieu de proposer
-   « Message » puis d'opposer un refus au clic. L'utilisateur voit donc la règle
-   avant d'agir, et non en se heurtant à une erreur.
+   Ce composant choisissait entre « Message », « Demande de liaison » et « Demande de
+   mise en relation » selon le compte visé, en interrogeant le serveur avant le clic.
+   Ces règles ont été supprimées le 2026-07-25 : tout compte écrit directement à tout
+   autre. Il ne reste donc qu'une action possible, et plus rien à demander au serveur.
 
-   La décision vient toujours du serveur (/api/relation-statut) : l'interface la
-   reflète, elle ne la rejoue pas. Deux implémentations de la même règle finiraient
-   par diverger, et c'est l'interface qui aurait tort.
+   Le composant est conservé parce que plusieurs pages posent déjà ses emplacements
+   dans leur HTML — le retirer imposerait de toutes les modifier pour un gain nul.
 
-   Usage : <span data-relation-user="123" data-relation-origine="profil"></span>
+   Usage : <span data-relation-user="123"></span>
    puis window.initBoutonsRelation() après insertion dans le DOM.
    ══════════════════════════════════════════════════════════════════════════ */
 
-async function relationStatut(userId, origine) {
-  try {
-    return await api('GET', `/relation-statut?user_id=${encodeURIComponent(userId)}&origine=${encodeURIComponent(origine || '')}`);
-  } catch (e) { return null; }
-}
-
-window.envoyerDemandeLiaison = async function (userId, libelle, messagePredefini, bouton) {
-  const texte = messagePredefini ? `\n\nMessage transmis :\n« ${messagePredefini} »` : '';
-  if (!confirm(`Envoyer une ${(libelle || 'demande de liaison').toLowerCase()} ?${texte}`)) return;
-  const ancien = bouton ? bouton.innerHTML : null;
-  if (bouton) { bouton.disabled = true; bouton.innerHTML = '⏳ Envoi…'; }
-  try {
-    await api('POST', '/demandes-liaison', { destinataire_id: Number(userId) });
-    if (bouton) { bouton.innerHTML = '⏳ Demande envoyée'; bouton.disabled = true; }
-    else alert('Demande envoyée.');
-  } catch (e) {
-    if (bouton) { bouton.innerHTML = ancien; bouton.disabled = false; }
-    alert(e.message);
-  }
-};
-
-/* Remplit chaque emplacement [data-relation-user] par le bouton adapté. */
-window.initBoutonsRelation = async function (racine) {
+window.initBoutonsRelation = function (racine) {
   const cibles = (racine || document).querySelectorAll('[data-relation-user]:not([data-relation-prete])');
   for (const el of cibles) {
     el.setAttribute('data-relation-prete', '1');
     const userId = el.getAttribute('data-relation-user');
-    const origine = el.getAttribute('data-relation-origine') || '';
     const classe = el.getAttribute('data-relation-classe') || 'pvz-btn';
-    const st = await relationStatut(userId, origine);
-    if (!st) { el.innerHTML = ''; continue; }   // non connecté ou erreur : on n'affiche rien
-
-    if (st.action === 'message') {
-      el.innerHTML = `<a href="messagerie.html?with=${userId}${origine ? '&origine=' + encodeURIComponent(origine) : ''}" class="${classe}">✉️ Message</a>`;
-    } else if (st.action === 'en_attente') {
-      /* Bouton inerte : réémettre une demande déjà en attente serait refusé par le serveur,
-         autant l'annoncer plutôt que de laisser cliquer dans le vide. */
-      el.innerHTML = `<button class="${classe}" disabled style="opacity:.65;cursor:default;">⏳ Demande envoyée</button>`;
-    } else {
-      const msg = (st.message_predefini || '').replace(/'/g, "\\'");
-      el.innerHTML = `<button class="${classe}" onclick="envoyerDemandeLiaison('${userId}', '${(st.libelle||'').replace(/'/g,"\\'")}', '${msg}', this)">🤝 ${st.libelle || 'Demande de liaison'}</button>`;
-    }
+    el.innerHTML = `<a href="messagerie.html?with=${userId}" class="${classe}">✉️ Message</a>`;
   }
 };
 

@@ -1850,34 +1850,13 @@ db.exec(`
     FOREIGN KEY(destinataire_id) REFERENCES users(id)
   );
 
-  /* ===== DEMANDES DE CONTACT INSTITUTIONNELLES =====
-     Remplace le premier message privé par une procédure de consentement explicite.
-     Obligatoire pour les comptes Collectivité (ils ne peuvent jamais initier une
-     conversation directe — voir PEUT_INITIER) ; disponible aussi pour tout compte
-     souhaitant une prise de contact plus formelle (motif, urgence, message-cadre). */
-  CREATE TABLE IF NOT EXISTS demandes_contact (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    demandeur_id INTEGER NOT NULL,
-    destinataire_id INTEGER NOT NULL,
-    objet TEXT,
-    motif TEXT NOT NULL,
-    motif_autre TEXT,
-    message TEXT NOT NULL,
-    image_url TEXT,
-    urgence TEXT DEFAULT 'normal' CHECK(urgence IN ('faible','normal','important','urgent')),
-    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','acceptee','refusee','expiree','bloquee')),
-    conversation_id INTEGER,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now')),
-    expires_at TEXT,
-    repondu_at TEXT,
-    FOREIGN KEY(demandeur_id) REFERENCES users(id),
-    FOREIGN KEY(destinataire_id) REFERENCES users(id)
-  );
-  CREATE INDEX IF NOT EXISTS idx_demandes_contact_destinataire ON demandes_contact(destinataire_id, statut);
-  CREATE INDEX IF NOT EXISTS idx_demandes_contact_demandeur ON demandes_contact(demandeur_id, statut);
+  /* Les tables demandes_contact et demandes_contact_config ont été retirées le 2026-07-25,
+     en même temps que le module qu'elles servaient : le contact est désormais direct entre
+     tous les comptes, sans consentement préalable. */
 
-  /* ===== BLOCAGES DE CONTACT ===== */
+  /* ===== BLOCAGES DE CONTACT =====
+     Conservé : le blocage n'est PAS une autorisation demandée avant, mais une mise à
+     l'écart décidée après coup par le destinataire. */
   CREATE TABLE IF NOT EXISTS contacts_bloques (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bloqueur_id INTEGER NOT NULL,
@@ -1886,16 +1865,6 @@ db.exec(`
     UNIQUE(bloqueur_id, bloque_id),
     FOREIGN KEY(bloqueur_id) REFERENCES users(id),
     FOREIGN KEY(bloque_id) REFERENCES users(id)
-  );
-
-  /* ===== PARAMÈTRES DU MODULE DEMANDES DE CONTACT (ligne unique, id=1) ===== */
-  CREATE TABLE IF NOT EXISTS demandes_contact_config (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    expiration_jours INTEGER DEFAULT 30,
-    cooldown_jours INTEGER DEFAULT 90,
-    max_par_jour INTEGER DEFAULT 20,
-    longueur_max_message INTEGER DEFAULT 500,
-    motifs_json TEXT DEFAULT '[]'
   );
 
   /* ===== SALLES DE RÉUNION VIRTUELLE ===== */
@@ -5357,14 +5326,7 @@ db.exec(`
   );
 `);
 
-// ── Mise en relation : objet + image d'illustration ──
-{
-  const dcCols = db.prepare("PRAGMA table_info(demandes_contact)").all().map(c => c.name);
-  if (dcCols.length) {
-    if (!dcCols.includes('objet')) db.exec("ALTER TABLE demandes_contact ADD COLUMN objet TEXT");
-    if (!dcCols.includes('image_url')) db.exec("ALTER TABLE demandes_contact ADD COLUMN image_url TEXT");
-  }
-}
+// Migration retirée le 2026-07-25 avec la table demandes_contact qu'elle complétait.
 
 /* ===== SUPPORT TECHNIQUE — signalement de dysfonctionnements =====
    Distinct du module "Parler à Diaspo'Actif" (chatbot, demandes générales) :

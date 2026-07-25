@@ -20,11 +20,11 @@
       ? `<img src="${esc(r.photo_url)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">`
       : `<div style="width:48px;height:48px;border-radius:50%;background:var(--border,#e2e2e2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted,#888);">${initiales}</div>`;
 
+    /* Les demandes de mise en relation ont été supprimées le 2026-07-25 : le contact est
+       direct pour tous, il ne reste donc qu'une seule action possible. */
     const action = r.statut_relation === "contact"
       ? `<a href="${esc(r.lien)}" class="btn btn-outline btn-sm">Voir le profil</a>`
-      : r.statut_relation === "envoyee"
-      ? `<button type="button" class="btn btn-outline btn-sm" disabled>Demande envoyée</button>`
-      : `<button type="button" class="btn btn-orange btn-sm" onclick="window.DemandeContact && window.DemandeContact.open(${Number(r.target_user_id)}, '${esc(r.nom).replace(/'/g, "\\'")}')">🤝 Mise en relation</button>`;
+      : `<a href="messagerie.html?with=${Number(r.target_user_id)}" class="btn btn-orange btn-sm">✉️ Message</a>`;
 
     return `
       <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border,#eee);">

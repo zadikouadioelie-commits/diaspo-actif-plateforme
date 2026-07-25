@@ -815,8 +815,7 @@ const COLONNES_MIGRATION = [
     ['users', 'annee_debut', 'INTEGER'],
     ['users', 'assistant_actif', 'INTEGER DEFAULT 1'],
     // Mise en relation : objet + image d'illustration
-    ['demandes_contact', 'objet', 'TEXT'],
-    ['demandes_contact', 'image_url', 'TEXT'],
+    /* Colonnes retirées le 2026-07-25 avec la table demandes_contact. */
     // Module Accréditations — file d'attente enrichie (commentaire interne, assignation, deadline)
     ['accred_demandes', 'commentaire_interne', 'TEXT'],
     ['accred_demandes', 'assignee_id', 'INTEGER'],

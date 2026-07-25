@@ -4159,8 +4159,6 @@ route("GET", "/api/initiatives/:id/stats-impact", async (req, res, params) => {
     reseau: {
       relations_pro:     null,
       partenaires:       await N("SELECT COUNT(*) c FROM initiative_partenaires WHERE initiative_id=?", iid),
-      demandes_contact:  null,
-      relations_validees:null,
       messages_recus:    oid ? await N("SELECT COUNT(*) c FROM messages m JOIN conversations cv ON cv.id=m.conversation_id WHERE (cv.user1_id=? OR cv.user2_id=?) AND m.sender_id!=?", oid, oid, oid) : null,
     },
     gouvernance: {
@@ -5121,52 +5119,25 @@ route("POST", "/api/fil/:id/republier", async (req, res, params, body) => {
    ⚠ L'origine est déclarée par le navigateur, donc falsifiable. Elle n'est donc PAS crue sur
    parole : l'exception ne s'applique que si l'initiative possède réellement une vitrine
    publique (vitrine_active=1). Sans vitrine, prétendre venir d'une vitrine ne donne rien. */
-/* Message imposé, identique pour tous les comptes : l'utilisateur clique, il ne rédige pas.
-   Uniformiser le texte évite qu'une demande soit refusée sur la forme plutôt que sur le fond. */
-const MESSAGE_DEMANDE_LIAISON = "Bonjour, nous sommes intéressés par votre initiative et nous aimerions entrer en contact avec vous afin d'échanger.";
+/* ═══ CONTACT DIRECT POUR TOUS (décision du 2026-07-25) ═══
 
-/* Une liaison acceptée existe-t-elle entre deux comptes, dans un sens ou dans l'autre ? */
-async function liaisonAcceptee(a, b) {
-  const r = await db.prepare(
-    `SELECT id FROM demandes_contact WHERE statut='acceptee'
-       AND ((demandeur_id=? AND destinataire_id=?) OR (demandeur_id=? AND destinataire_id=?)) LIMIT 1`
-  ).get(a, b, b, a);
-  return !!r;
-}
+   Le système d'autorisation préalable est entièrement retiré. N'importe quel compte peut
+   écrire à n'importe quel autre, sans demande ni acceptation.
 
-/* Renvoie null si le contact direct est autorisé, sinon la nature de la demande exigée. */
-async function demandeDeLiaisonExigee(user, cible, origine) {
-  if (user.role === "administrateur" || cible.role === "administrateur") return null;
+   Ce qui existait et n'existe plus :
+     - « Demande de liaison »          — exigée avant d'écrire à une Initiative
+     - « Demande de mise en relation » — exigée avant d'écrire à une Collectivité, laquelle
+                                         ne pouvait par ailleurs jamais initier un échange
+     - l'exception de la vitrine       — sans objet, puisqu'il n'y a plus rien à excepter
 
-  if (cible.role === "collectivite") {
-    return { code: "demande_liaison_requise", type: "mise_en_relation",
-             libelle: "Demande de mise en relation",
-             error: "Une collectivité doit accepter votre demande avant tout échange privé." };
-  }
-
-  /* Une Initiative qui en contacte une autre est soumise aux mêmes règles qu'un Utilisateur :
-     premier contact par demande de liaison, message imposé, échange libre après acceptation.
-     Seule la vitrine publique reste une porte ouverte — c'est un espace commercial, y publier
-     ses coordonnées vaut invitation à être contacté. */
-  if (cible.role === "initiative" && (user.role === "utilisateur" || user.role === "initiative")) {
-    if (origine === "vitrine") {
-      /* Vérification serveur : l'exception commerciale suppose une vitrine réellement publique. */
-      const init = await db.prepare("SELECT vitrine_active FROM initiatives WHERE owner_user_id=?").get(cible.id);
-      if (init && Number(init.vitrine_active) === 1) return null;
-    }
-    return { code: "demande_liaison_requise", type: "liaison",
-             libelle: "Demande de liaison",
-             message_predefini: MESSAGE_DEMANDE_LIAISON,
-             error: "Cette initiative doit accepter votre demande de liaison avant que vous puissiez lui écrire." };
-  }
-
-  return null;
-}
+   Le blocage d'un contact indésirable (table contacts_bloques) est conservé : c'est un
+   mécanisme différent, à la main du destinataire APRÈS coup, et non une autorisation
+   demandée avant. */
 
 const PEUT_INITIER = {
   utilisateur:   ["utilisateur", "initiative", "collectivite", "administrateur"],
   initiative:    ["utilisateur", "initiative", "collectivite", "administrateur"],
-  collectivite:  ["collectivite", "administrateur"],
+  collectivite:  ["utilisateur", "initiative", "collectivite", "administrateur"],
   administrateur:["utilisateur", "initiative", "collectivite", "administrateur"],
 };
 const PEUT_CONTACTER = PEUT_INITIER;
@@ -5400,19 +5371,9 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
 
   // Vérification d'initiation uniquement pour les NOUVELLES conversations
   if (!conv) {
-    /* Règles de mise en relation. Une liaison déjà acceptée vaut autorisation définitive :
-       le bouton devient « Message » et l'échange est libre, comme prévu au cahier des charges. */
-    if (!(await liaisonAcceptee(user.id, otherId))) {
-      const exigence = await demandeDeLiaisonExigee(user, other, String(body.origine || ""));
-      if (exigence) return sendJSON(res, 403, { ...exigence, destinataire_id: otherId, destinataire_nom: other.nom });
-    }
-
     const allowed = PEUT_INITIER[user.role] || [];
     if (!allowed.includes(other.role)) {
-      const msg = user.role === "collectivite"
-        ? "Les comptes officiels ne peuvent pas initier un contact direct avec un membre ou une organisation. Utilisez « Demande de mise en relation » : la conversation ne sera créée qu'après acceptation du destinataire."
-        : `Votre rôle (${user.role}) ne peut pas initier une conversation avec ce type de compte (${other.role}).`;
-      return sendJSON(res, 403, { error: msg });
+      return sendJSON(res, 403, { error: `Votre rôle (${user.role}) ne peut pas initier une conversation avec ce type de compte (${other.role}).` });
     }
   }
   if (conv) {
@@ -5430,306 +5391,33 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
 });
 
 /* ===========================================================================
-   DEMANDES DE CONTACT INSTITUTIONNELLES
-   Remplace le premier message privé par un consentement explicite du
-   destinataire. Obligatoire pour les comptes Collectivité (voir PEUT_INITIER,
-   ils ne peuvent jamais démarrer une conversation directement) ; ouvert à tout
-   compte souhaitant une prise de contact plus formelle (motif, urgence).
-=========================================================================== */
+   Les DEMANDES DE CONTACT ont été retirées le 2026-07-25.
 
-const DEMANDES_CONTACT_MOTIFS_DEFAUT = [
-  "Proposition de partenariat", "Demande d'expertise", "Invitation à un événement",
-  "Opportunité d'investissement", "Recherche de compétences", "Participation à une mission",
-  "Projet de développement territorial", "Demande d'informations", "Échange institutionnel", "Autre",
-];
+   Ce module imposait un consentement explicite du destinataire avant tout premier
+   message : « demande de liaison » vers une Initiative, « demande de mise en relation »
+   vers une Collectivité. Il portait aussi le quota quotidien, le délai de carence,
+   l'expiration automatique et le calcul de compatibilité entre les deux comptes.
 
-let _demandesContactConfigCache = null;
-async function getDemandesContactConfig() {
-  if (_demandesContactConfigCache) return _demandesContactConfigCache;
-  let row = await db.prepare("SELECT * FROM demandes_contact_config WHERE id=1").get();
-  if (!row) {
-    await db.prepare(
-      "INSERT INTO demandes_contact_config (id, expiration_jours, cooldown_jours, max_par_jour, longueur_max_message, motifs_json) VALUES (1,30,90,20,600,?)"
-    ).run(JSON.stringify(DEMANDES_CONTACT_MOTIFS_DEFAUT));
-    row = await db.prepare("SELECT * FROM demandes_contact_config WHERE id=1").get();
-  }
-  _demandesContactConfigCache = {
-    expiration_jours: row.expiration_jours, cooldown_jours: row.cooldown_jours,
-    max_par_jour: row.max_par_jour, longueur_max_message: row.longueur_max_message,
-    motifs: safeParse(row.motifs_json) || DEMANDES_CONTACT_MOTIFS_DEFAUT,
-  };
-  return _demandesContactConfigCache;
-}
+   Tout cela est supprimé : n'importe quel compte écrit directement à n'importe quel
+   autre. Seules subsistent les routes de BLOCAGE ci-dessous (table contacts_bloques),
+   qui relèvent d'un autre principe — le destinataire écarte un importun après coup,
+   il n'accorde pas une autorisation avant.
+   =========================================================================== */
 
-/* Révision légère (sans LLM) du message avant envoi : signale un ton commercial
-   ou un message trop court, propose une reformulation neutre. Non bloquant —
-   l'utilisateur reste libre d'envoyer tel quel (voir spec « Intelligence artificielle »). */
-const DEMANDE_CONTACT_MOTS_DEMARCHAGE = [
-  "achetez", "promo", "% de réduction", "cliquez ici", "argent facile", "offre limitée",
-  "gratuit aujourd'hui", "投资", "buy now", "click here",
-];
-function analyserDemandeContactIA(motif, message) {
-  const remarques = [];
-  const m = (message || "").toLowerCase();
-  if ((message || "").trim().length < 20) remarques.push("Le message est très court : détaillez le contexte et vos attentes pour augmenter vos chances de réponse.");
-  if (DEMANDE_CONTACT_MOTS_DEMARCHAGE.some(w => m.includes(w))) remarques.push("Le message contient des formulations proches du démarchage commercial ; reformulez-le de façon institutionnelle.");
-  if (!/[.?!]$/.test((message || "").trim())) remarques.push("Terminez votre message par une phrase de clôture claire (ex. une question ou un appel à échanger).");
-  const suggestion = remarques.length
-    ? `Bonjour, je me permets de vous contacter au sujet de « ${motif || "notre demande"} ». [Présentez le contexte en une phrase, puis votre demande précise et ce que vous proposez en retour.] Restant à votre disposition pour en échanger.`
-    : null;
-  return { ok: remarques.length === 0, remarques, suggestion };
-}
+/* GET /api/relation-statut?user_id= — quelle action l'interface doit-elle proposer ?
 
-/* POST /api/demandes-contact/analyser — pré-vérification IA avant envoi (étape 5 du formulaire) */
-route("POST", "/api/demandes-contact/analyser", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  sendJSON(res, 200, analyserDemandeContactIA(body.motif, body.message));
-});
-
-/* GET /api/demandes-contact/config — motifs disponibles + limites (formulaire) */
-route("GET", "/api/demandes-contact/config", async (req, res) => {
-  sendJSON(res, 200, await getDemandesContactConfig());
-});
-
-/* PUT /api/admin/demandes-contact/config — paramètres modifiables par un administrateur */
-route("PUT", "/api/admin/demandes-contact/config", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
-  await getDemandesContactConfig(); // garantit que la ligne id=1 existe
-  const fields = [], vals = [];
-  if (body.expiration_jours != null) { fields.push("expiration_jours=?"); vals.push(Number(body.expiration_jours)); }
-  if (body.cooldown_jours != null) { fields.push("cooldown_jours=?"); vals.push(Number(body.cooldown_jours)); }
-  if (body.max_par_jour != null) { fields.push("max_par_jour=?"); vals.push(Number(body.max_par_jour)); }
-  if (body.longueur_max_message != null) { fields.push("longueur_max_message=?"); vals.push(Number(body.longueur_max_message)); }
-  if (Array.isArray(body.motifs)) { fields.push("motifs_json=?"); vals.push(JSON.stringify(body.motifs.slice(0, 30))); }
-  if (fields.length) {
-    await db.prepare(`UPDATE demandes_contact_config SET ${fields.join(", ")} WHERE id=1`).run(...vals);
-    _demandesContactConfigCache = null;
-  }
-  sendJSON(res, 200, await getDemandesContactConfig());
-});
-
-/* POST /api/demandes-contact — envoyer une demande de contact */
-/* Creation d'une demande de contact. Extrait en fonction nommee pour etre reutilise par
-   /api/demandes-liaison, qui impose un message predefini : une seule mecanique de quota,
-   de carence, d'expiration et de blocage, donc aucune divergence possible entre les deux. */
-async function creerDemandeContact(req, res, body) {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-
-  const destinataireId = Number(body.destinataire_id);
-  if (!destinataireId || destinataireId === user.id) return sendJSON(res, 400, { error: "Destinataire invalide." });
-  const destinataire = await db.prepare("SELECT id, nom, role FROM users WHERE id=?").get(destinataireId);
-  if (!destinataire) return sendJSON(res, 404, { error: "Destinataire introuvable." });
-
-  // Cas exceptionnel : un compte Administrateur peut écrire à tout compte sans restriction
-  // (blocage, cooldown, quota) — nécessaire pour la modération et le support.
-  const estAdmin = user.role === "administrateur";
-
-  const bloque = estAdmin ? null : await db.prepare("SELECT id FROM contacts_bloques WHERE bloqueur_id=? AND bloque_id=?").get(destinataireId, user.id);
-  if (bloque) return sendJSON(res, 403, { error: "Vous ne pouvez pas contacter ce compte." });
-
-  const cfg = await getDemandesContactConfig();
-  const motifsValides = new Set(cfg.motifs);
-  const motif = (body.motif || "").trim();
-  if (!motif || !motifsValides.has(motif)) return sendJSON(res, 400, { error: "Motif invalide." });
-  const motifAutre = motif === "Autre" ? (body.motif_autre || "").trim().slice(0, 200) : null;
-  if (motif === "Autre" && !motifAutre) return sendJSON(res, 400, { error: "Merci de préciser le motif." });
-
-  const objet = (body.objet || "").trim().slice(0, 120);
-  if (!objet) return sendJSON(res, 400, { error: "L'objet est requis." });
-
-  const message = (body.message || "").trim();
-  if (!message) return sendJSON(res, 400, { error: "Le message est requis." });
-  if (message.length > cfg.longueur_max_message) return sendJSON(res, 400, { error: `Message limité à ${cfg.longueur_max_message} caractères.` });
-
-  const imageUrl = (body.image_url || "").trim().slice(0, 500) || null;
-  const urgence = ["faible", "normal", "important", "urgent"].includes(body.urgence) ? body.urgence : "normal";
-
-  // Conversation déjà active (non supprimée par le destinataire) : pas besoin de repasser par une demande.
-  const existeConv = await db.prepare("SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, destinataireId, destinataireId, user.id);
-  if (existeConv && !estAdmin) {
-    const destASupprime = existeConv.user1_id === destinataireId ? existeConv.deleted_u1 : existeConv.deleted_u2;
-    if (!destASupprime) return sendJSON(res, 409, { error: "Une conversation existe déjà avec ce compte." });
-  }
-
-  if (!estAdmin) {
-    const dejaEnAttente = await db.prepare("SELECT id FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='en_attente'").get(user.id, destinataireId);
-    if (dejaEnAttente) return sendJSON(res, 409, { error: "Une demande est déjà en attente pour ce compte." });
-
-    const derniereRefusee = await db.prepare("SELECT repondu_at FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='refusee' ORDER BY repondu_at DESC LIMIT 1").get(user.id, destinataireId);
-    if (derniereRefusee && derniereRefusee.repondu_at) {
-      const finCooldown = new Date(new Date(derniereRefusee.repondu_at.replace(" ", "T") + "Z").getTime() + cfg.cooldown_jours * 86400000);
-      if (finCooldown > new Date()) return sendJSON(res, 429, { error: `Vous devez patienter avant de recontacter ce compte (nouvelle tentative possible le ${finCooldown.toLocaleDateString("fr-FR")}).` });
-    }
-
-    const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0);
-    const nbAujourdhui = (await db.prepare("SELECT COUNT(*) n FROM demandes_contact WHERE demandeur_id=? AND created_at >= ?").get(user.id, debutJour.toISOString().slice(0, 19).replace("T", " ")))?.n || 0;
-    if (nbAujourdhui >= cfg.max_par_jour) return sendJSON(res, 429, { error: "Nombre maximal de demandes atteint pour aujourd'hui." });
-  }
-
-  const expiresAt = new Date(Date.now() + cfg.expiration_jours * 86400000).toISOString().slice(0, 19).replace("T", " ");
-  const id = (await db.prepare(
-    "INSERT INTO demandes_contact (demandeur_id, destinataire_id, objet, motif, motif_autre, message, image_url, urgence, expires_at) VALUES (?,?,?,?,?,?,?,?,?)"
-  ).run(user.id, destinataireId, objet, motif, motifAutre, message, imageUrl, urgence, expiresAt)).lastInsertRowid;
-
-  creerNotif(destinataireId, "demande_contact", `${user.nom} souhaite entrer en contact avec vous : ${objet}`,
-    `Motif : ${motifAutre || motif}. ${message}`.slice(0, 300), { demande_id: id });
-
-  sendJSON(res, 201, { id, expires_at: expiresAt });
-}
-route("POST", "/api/demandes-contact", async (req, res, params, body) => creerDemandeContact(req, res, body));
-
-/* Points communs entre demandeur et destinataire, calculés à partir des données déjà en
-   base (pas d'IA externe) — alimente « Pourquoi cette mise en relation peut vous intéresser ? ». */
-async function calculerCompatibilite(demandeurId, destinataireId) {
-  const [a, b] = await Promise.all([
-    db.prepare("SELECT pays, ville, region, origine1, domaine_utilisateur, role FROM users WHERE id=?").get(demandeurId),
-    db.prepare("SELECT pays, ville, region, origine1, domaine_utilisateur, role FROM users WHERE id=?").get(destinataireId),
-  ]);
-  if (!a || !b) return [];
-  const raisons = [];
-  if (a.origine1 && b.origine1 && a.origine1 === b.origine1) raisons.push(`Vous êtes tous deux originaires de ${a.origine1}.`);
-  if (a.pays && b.pays && a.pays === b.pays) raisons.push(`Vous résidez tous deux en ${a.pays}.`);
-  if (a.ville && b.ville && a.ville === b.ville) raisons.push(`Vous êtes sur le même territoire (${a.ville}).`);
-  if (a.region && b.region && a.region === b.region && !(a.ville && b.ville && a.ville === b.ville)) raisons.push(`Vous exercez dans la même région (${a.region}).`);
-  if (a.domaine_utilisateur && b.domaine_utilisateur && a.domaine_utilisateur === b.domaine_utilisateur) raisons.push(`Vous exercez dans le même secteur d'activité (${a.domaine_utilisateur}).`);
-
-  const suitDemandeur = await db.prepare("SELECT id FROM abonnements WHERE user_id=? AND initiative_id=?").get(destinataireId, demandeurId);
-  if (suitDemandeur) raisons.push("Ce compte suit déjà votre initiative.");
-  const suitDestinataire = await db.prepare("SELECT id FROM abonnements WHERE user_id=? AND initiative_id=?").get(demandeurId, destinataireId);
-  if (suitDestinataire) raisons.push("Vous suivez déjà ce compte.");
-  const suitCollDemandeur = await db.prepare("SELECT id FROM abonnements_collectivite WHERE user_id=? AND collectivite_id=?").get(destinataireId, demandeurId);
-  if (suitCollDemandeur) raisons.push("Cette collectivité suit déjà votre initiative.");
-
-  return raisons;
-}
-
-/* GET /api/demandes-contact?direction=recues|envoyees&statut= — historique */
-/* POST /api/demandes-liaison — demande de liaison en un clic (annuaire, profil public).
-   Le cahier des charges impose un message préenregistré NON MODIFIABLE : l'utilisateur clique,
-   il ne rédige pas. On réutilise donc entièrement la mécanique des demandes de contact — quota
-   quotidien, délai de carence, expiration, blocages, notification — en imposant simplement le
-   contenu. Cela évite un second système parallèle qui divergerait avec le temps. */
-/* GET /api/relation-statut?user_id=&origine= — quel bouton l'interface doit-elle afficher ?
-   Interroger le serveur AVANT le clic vaut mieux que d'intercepter un refus après : l'utilisateur
-   voit d'emblée la seule action possible, au lieu de découvrir la règle en se heurtant à une
-   erreur. La décision reste prise côté serveur — l'interface ne fait que la refléter, elle ne
-   la rejoue pas, ce qui évite deux implémentations qui divergeraient. */
+   Il n'y a plus qu'une seule réponse possible depuis la suppression des demandes préalables :
+   écrire. La route est conservée parce que plusieurs pages l'interrogent pour construire leur
+   bouton ; elle répond désormais invariablement « Message ». */
 route("GET", "/api/relation-statut", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const cibleId = Number(query.user_id);
   if (!cibleId || cibleId === user.id) return sendJSON(res, 400, { error: "Compte invalide." });
-  const cible = await db.prepare("SELECT id, nom, role FROM users WHERE id=?").get(cibleId);
+  const cible = await db.prepare("SELECT id FROM users WHERE id=?").get(cibleId);
   if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
-
-  /* Une conversation déjà ouverte vaut autorisation : on ne redemande jamais une liaison
-     à quelqu'un avec qui l'échange a commencé. */
-  const conv = await db.prepare(
-    "SELECT id FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)"
-  ).get(user.id, cibleId, cibleId, user.id);
-  if (conv || await liaisonAcceptee(user.id, cibleId)) {
-    return sendJSON(res, 200, { action: "message", libelle: "Message", contact_direct: true });
-  }
-
-  const enAttente = await db.prepare(
-    "SELECT id FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='en_attente'"
-  ).get(user.id, cibleId);
-  if (enAttente) {
-    return sendJSON(res, 200, { action: "en_attente", libelle: "Demande envoyée", contact_direct: false, demande_id: enAttente.id });
-  }
-
-  const exigence = await demandeDeLiaisonExigee(user, cible, String(query.origine || ""));
-  if (exigence) {
-    return sendJSON(res, 200, { action: "demande_liaison", libelle: exigence.libelle,
-                                contact_direct: false, type: exigence.type,
-                                message_predefini: MESSAGE_DEMANDE_LIAISON });
-  }
   sendJSON(res, 200, { action: "message", libelle: "Message", contact_direct: true });
 });
-
-route("POST", "/api/demandes-liaison", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const destinataireId = Number(body.destinataire_id);
-  if (!destinataireId) return sendJSON(res, 400, { error: "Destinataire invalide." });
-  const dest = await db.prepare("SELECT id, role FROM users WHERE id=?").get(destinataireId);
-  if (!dest) return sendJSON(res, 404, { error: "Destinataire introuvable." });
-
-  /* On délègue à la route existante en lui imposant objet, motif et message. */
-  return creerDemandeContact(req, res, {
-    destinataire_id: destinataireId,
-    objet: dest.role === "collectivite" ? "Demande de mise en relation" : "Demande de liaison",
-    motif: "Demande d'informations",
-    message: MESSAGE_DEMANDE_LIAISON,
-    urgence: "normal",
-  });
-});
-
-route("GET", "/api/demandes-contact", async (req, res, params, body, query) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  // Expiration paresseuse (pas de process persistant en serverless) : toute demande en
-  // attente dont le délai est dépassé passe à "expiree" au fil des lectures.
-  await db.prepare("UPDATE demandes_contact SET statut='expiree', updated_at=datetime('now') WHERE statut='en_attente' AND expires_at IS NOT NULL AND expires_at < datetime('now')").run();
-  const direction = query.direction === "envoyees" ? "envoyees" : "recues";
-  const col = direction === "envoyees" ? "demandeur_id" : "destinataire_id";
-  const autreCol = direction === "envoyees" ? "destinataire_id" : "demandeur_id";
-  const statuts = ["en_attente", "acceptee", "refusee", "expiree", "bloquee"];
-  let sql = `SELECT d.*, u.nom AS autre_nom, u.role AS autre_role, u.photo_url AS autre_photo FROM demandes_contact d JOIN users u ON u.id=d.${autreCol} WHERE d.${col}=?`;
-  const args = [user.id];
-  if (query.statut && statuts.includes(query.statut)) { sql += " AND d.statut=?"; args.push(query.statut); }
-  sql += " ORDER BY d.created_at DESC LIMIT 200";
-  const demandes = await db.prepare(sql).all(...args);
-  if (direction === "recues") {
-    for (const d of demandes) {
-      if (d.statut === "en_attente") d.compatibilite = await calculerCompatibilite(d.demandeur_id, d.destinataire_id);
-    }
-  }
-  sendJSON(res, 200, { demandes });
-});
-
-/* POST /api/demandes-contact/:id/repondre — le destinataire accepte, refuse ou bloque */
-route("POST", "/api/demandes-contact/:id/repondre", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const demande = await db.prepare("SELECT * FROM demandes_contact WHERE id=?").get(params.id);
-  if (!demande || demande.destinataire_id !== user.id) return sendJSON(res, 404, { error: "Demande introuvable." });
-  if (demande.statut !== "en_attente") return sendJSON(res, 409, { error: "Cette demande a déjà été traitée." });
-
-  const action = ["accepter", "refuser", "bloquer"].includes(body.action) ? body.action : null;
-  if (!action) return sendJSON(res, 400, { error: "Action invalide (accepter, refuser ou bloquer)." });
-
-  if (action === "refuser") {
-    await db.prepare("UPDATE demandes_contact SET statut='refusee', repondu_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(demande.id);
-    creerNotif(demande.demandeur_id, "demande_contact_refusee", "Votre demande de contact n'a pas été acceptée", "", { demande_id: demande.id });
-    return sendJSON(res, 200, { ok: true, statut: "refusee" });
-  }
-
-  if (action === "bloquer") {
-    await db.prepare("INSERT OR IGNORE INTO contacts_bloques (bloqueur_id, bloque_id) VALUES (?,?)").run(user.id, demande.demandeur_id);
-    await db.prepare("UPDATE demandes_contact SET statut='bloquee', repondu_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(demande.id);
-    return sendJSON(res, 200, { ok: true, statut: "bloquee" });
-  }
-
-  // Acceptation : création de la conversation (ou récupération/réactivation si déjà existante)
-  let conv = await db.prepare("SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, demande.demandeur_id, demande.demandeur_id, user.id);
-  if (!conv) {
-    const convId = (await db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet) VALUES (?, ?, ?)").run(demande.demandeur_id, user.id, "Demande de contact")).lastInsertRowid;
-    conv = { id: convId };
-  } else {
-    if (conv.user1_id === user.id && conv.deleted_u1) await db.prepare("UPDATE conversations SET deleted_u1=0 WHERE id=?").run(conv.id);
-    if (conv.user2_id === user.id && conv.deleted_u2) await db.prepare("UPDATE conversations SET deleted_u2=0 WHERE id=?").run(conv.id);
-  }
-  await db.prepare("UPDATE demandes_contact SET statut='acceptee', conversation_id=?, repondu_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(conv.id, demande.id);
-  creerNotif(demande.demandeur_id, "demande_contact_acceptee", `${user.nom} a accepté votre demande de contact`,
-    "Vous pouvez maintenant échanger avec ce compte.", { conversation_id: conv.id });
-
-  sendJSON(res, 200, { ok: true, statut: "acceptee", conversation_id: conv.id });
-});
-
 /* GET /api/demandes-contact/blocages — comptes que j'ai bloqués */
 route("GET", "/api/demandes-contact/blocages", async (req, res) => {
   const user = await getCurrentUser(req);
@@ -5746,29 +5434,6 @@ route("DELETE", "/api/demandes-contact/blocages/:userId", async (req, res, param
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await db.prepare("DELETE FROM contacts_bloques WHERE bloqueur_id=? AND bloque_id=?").run(user.id, Number(params.userId));
   sendJSON(res, 200, { ok: true });
-});
-
-/* GET /api/demandes-contact/stats — indicateurs pour le tableau de bord de l'expéditeur */
-route("GET", "/api/demandes-contact/stats", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const rows = await db.prepare("SELECT statut, created_at, repondu_at FROM demandes_contact WHERE demandeur_id=?").all(user.id);
-  const envoyees = rows.length;
-  const acceptees = rows.filter(r => r.statut === "acceptee").length;
-  const refusees = rows.filter(r => r.statut === "refusee").length;
-  const expirees = rows.filter(r => r.statut === "expiree").length;
-  const bloquees = rows.filter(r => r.statut === "bloquee").length;
-  const repondues = rows.filter(r => r.repondu_at);
-  const delaiMoyenMs = repondues.length
-    ? repondues.reduce((s, r) => s + (new Date(r.repondu_at.replace(" ", "T") + "Z") - new Date(r.created_at.replace(" ", "T") + "Z")), 0) / repondues.length
-    : 0;
-  sendJSON(res, 200, {
-    envoyees, acceptees, refusees, expirees, bloquees,
-    conversations_ouvertes: acceptees,
-    taux_acceptation: envoyees ? Math.round((acceptees / envoyees) * 100) : 0,
-    taux_blocage: envoyees ? Math.round((bloquees / envoyees) * 100) : 0,
-    delai_moyen_heures: Math.round(delaiMoyenMs / 3600000),
-  });
 });
 
 /* ===========================================================================
@@ -8839,8 +8504,11 @@ route("GET", "/api/recherche-contacts", async (req, res, params, body, query) =>
   const reseauIds = new Set();
   (await db.prepare("SELECT followed_id FROM user_follows WHERE follower_id=?").all(user.id)).forEach(r => reseauIds.add(Number(r.followed_id)));
   (await db.prepare("SELECT follower_id FROM user_follows WHERE followed_id=?").all(user.id)).forEach(r => reseauIds.add(Number(r.follower_id)));
-  (await db.prepare("SELECT demandeur_id, destinataire_id FROM demandes_contact WHERE statut='acceptee' AND (demandeur_id=? OR destinataire_id=?)").all(user.id, user.id))
-    .forEach(r => reseauIds.add(Number(r.demandeur_id) === user.id ? Number(r.destinataire_id) : Number(r.demandeur_id)));
+  /* Les demandes de contact acceptées servaient à repérer les personnes déjà en relation.
+     Le module ayant été supprimé, le signal équivalent — et plus fiable — est l'existence
+     d'une conversation : on a réellement échangé, pas seulement obtenu une autorisation. */
+  (await db.prepare("SELECT user1_id, user2_id FROM conversations WHERE user1_id=? OR user2_id=?").all(user.id, user.id))
+    .forEach(r => reseauIds.add(Number(r.user1_id) === user.id ? Number(r.user2_id) : Number(r.user1_id)));
   const initiativesSuivies = await db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(user.id);
   if (initiativesSuivies.length) {
     const ph = initiativesSuivies.map(() => "?").join(",");
@@ -8849,22 +8517,21 @@ route("GET", "/api/recherche-contacts", async (req, res, params, body, query) =>
   }
   (await db.prepare("SELECT collectivite_id FROM abonnements_collectivite WHERE user_id=?").all(user.id)).forEach(r => reseauIds.add(Number(r.collectivite_id)));
 
+  /* statut_relation ne connaît plus que deux valeurs depuis la suppression des demandes
+     préalables : « contact » si une conversation existe déjà, « aucune » sinon. Les états
+     « envoyee » et « recue » n'ont plus d'objet — il n'y a plus rien à attendre. */
   const targetIds = [...new Set(candidats.map(c => Number(c.target_user_id)))];
   let relationsMap = {};
   if (targetIds.length) {
     const placeholders = targetIds.map(() => "?").join(",");
     const relations = await db.prepare(`
-      SELECT demandeur_id, destinataire_id, statut, created_at FROM demandes_contact
-      WHERE (demandeur_id=? AND destinataire_id IN (${placeholders}))
-         OR (destinataire_id=? AND demandeur_id IN (${placeholders}))
-      ORDER BY created_at DESC
+      SELECT user1_id, user2_id FROM conversations
+      WHERE (user1_id=? AND user2_id IN (${placeholders}))
+         OR (user2_id=? AND user1_id IN (${placeholders}))
     `).all(user.id, ...targetIds, user.id, ...targetIds);
     for (const r of relations) {
-      const otherId = Number(r.demandeur_id) === Number(user.id) ? Number(r.destinataire_id) : Number(r.demandeur_id);
-      if (relationsMap[otherId]) continue; // garder la plus récente déjà rencontrée
-      relationsMap[otherId] = r.statut === "acceptee" ? "contact"
-        : r.statut === "en_attente" ? (Number(r.demandeur_id) === Number(user.id) ? "envoyee" : "recue")
-        : "aucune";
+      const otherId = Number(r.user1_id) === Number(user.id) ? Number(r.user2_id) : Number(r.user1_id);
+      relationsMap[otherId] = "contact";
     }
   }
 

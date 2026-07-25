@@ -1006,7 +1006,6 @@ html, body { overflow-x:clip; }
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
-<script src="assets/demande-contact.js"></script>
 <script src="assets/recherche-contacts.js"></script>
 <script>
 /* ===================================================
@@ -1097,16 +1096,6 @@ async function renderEnrichedColumns() {
   const owner = !!isOwn;
 
   window.ppContact = (sujet) => { location.href = `messagerie.html?user=${profil.id}&sujet=${encodeURIComponent(sujet)}`; };
-
-  window.ppDemandeRelation = async (membreId) => {
-    if (window.DemandeContact) return window.DemandeContact.open(membreId, profil.nom);
-    const message = prompt("Message accompagnant votre demande de contact (optionnel) :", "");
-    if (message === null) return;
-    try {
-      await api('POST', '/demandes-contact', { destinataire_id: membreId, motif: "Demande d'informations", message: message || "Bonjour, je souhaite entrer en contact avec vous." });
-      alert("Demande envoyée. La conversation ne sera ouverte qu'après acceptation par le membre.");
-    } catch(e) { alert('Erreur : ' + (e.message || 'impossible d\'envoyer la demande.')); }
-  };
 
   let SCOREACT = null;
   try { SCOREACT = await api('GET', `/profil/${profil.id}/score-activite`); } catch(e) {}
@@ -1227,12 +1216,8 @@ async function renderEnrichedColumns() {
     right.innerHTML = `
       ${!owner ? `<div class="pp-side-card">
         <h4>🚀 Entrer en relation</h4>
-        ${CU && CU.role === 'collectivite' ? `
-          <button class="pp-join-btn" onclick="ppDemandeRelation(${profil.id})">🤝 Mise en relation</button>
-          <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Les comptes officiels ne peuvent pas contacter directement un membre : une demande lui sera envoyée, la conversation ne s'ouvrira qu'après son acceptation.</p>
-        ` : `
-          <!-- Le serveur dit quelle action est possible ; le bouton la reflète au lieu de
-               mener systématiquement à la messagerie où la règle s'oppose après coup. -->
+        ${`
+          <!-- Contact direct pour tous depuis le 2026-07-25 : plus aucune demande préalable. -->
           <span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pp-join-btn"></span>
           <button class="pp-join-btn" onclick="ppContact('Proposition de collaboration')">🤝 Proposer une collaboration</button>
         `}
