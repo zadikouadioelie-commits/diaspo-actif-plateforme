@@ -1530,7 +1530,10 @@ const VITRINE_MODULES_REGISTRY = {
   avis:                  { label: "Avis clients",               categorie: "interaction", implemente: true },
   carte:                 { label: "Carte",                      categorie: "interaction", implemente: true },
   actualites:            { label: "Actualités / Publications", categorie: "communication", implemente: true },
-  newsletter:            { label: "Newsletter",                 categorie: "communication", implemente: false },
+  /* "Newsletter" retiré de la bibliothèque (2026-07-25) : proposer une inscription par
+     e-mail imposerait une table d'abonnés par initiative, un consentement et un lien de
+     désabonnement conformes au RGPD. Plutôt que de le laisser indéfiniment en "Bientôt",
+     le module ne figure plus dans le catalogue. */
   reseaux_sociaux:       { label: "Réseaux sociaux",            categorie: "communication", implemente: true },
   vision_objectifs:      { label: "Vision et objectifs",        categorie: "impact", implemente: true },
   resultats_impact:      { label: "Résultats / Impact",         categorie: "impact", implemente: true },
@@ -1554,7 +1557,7 @@ const VITRINE_TEMPLATES = {
   evenement: {
     label: "🎭 Événement", pour: "Festivals, conférences, rencontres, événements culturels, manifestations",
     actifs: ["a_propos","equipe","partenaires","evenements","galerie_photos","reservation","billetterie","actualites","reseaux_sociaux"],
-    optionnels: ["produits","newsletter","documents"],
+    optionnels: ["produits","documents"],
   },
   commercial: {
     label: "🛒 Commercial", pour: "Entreprises, artisans, producteurs, créateurs souhaitant vendre",
