@@ -3663,6 +3663,14 @@ function apercuSetAppareil(id) {
   apercuLancerAnalyse();
 }
 
+/* NOTE — ne pas etirer le cadre a la hauteur de son contenu.
+   Tentative faite puis retiree : les pages de la plateforme utilisent des unites liees a la
+   fenetre (« .sidebar{height:calc(100vh - 58px)} »), donc agrandir le cadre agrandit la page,
+   qui redemande un agrandissement : emballement mesure de 3266px a 5943px sans converger.
+   C'est inutile de toute facon — le document defile normalement a l'interieur du cadre. Le
+   defilement paraissait bloque a cause de « scroll-behavior: smooth » : lire scrollTop juste
+   apres l'avoir affecte renvoie une valeur proche de 0 tant que l'animation court. */
+
 function apercuLancerAnalyse() {
   var zone = document.getElementById('apercu-rapport');
   var frame = document.getElementById('apercu-frame');
@@ -3740,6 +3748,7 @@ window.openApercuAppareils = function () {
     +   '<strong style="font-size:15px;">📱 Aperçu multi-appareils</strong>'
     +   '<div style="display:flex;gap:6px;">' + boutons + '</div>'
     +   '<span id="apercu-dimensions" style="font-size:12px;color:#6C757D;font-family:monospace;"></span>'
+    +   '<span style="font-size:11.5px;color:#6C757D;">Faites défiler dans le cadre pour voir toute la page</span>'
     +   '<button onclick="closeApercuAppareils()" aria-label="Fermer l\'aperçu" style="margin-left:auto;'
     +     'background:#F1F5F9;border:none;border-radius:50%;width:30px;height:30px;font-size:17px;cursor:pointer;line-height:1;">×</button>'
     + '</div>'
