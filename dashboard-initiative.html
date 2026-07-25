@@ -4499,11 +4499,14 @@ function pvConfigurerDansApercu(moduleKey) {
   if (!frame || !secId) return;
 
   /* Le module doit être actif pour exister dans l'aperçu : sinon on l'active d'abord,
-     sans quoi le bouton renverrait vers une section absente. */
+     sans quoi le bouton renverrait vers une section absente. On mémorise le fait de
+     l'avoir activé nous-même, pour qu'Annuler puisse le remasquer. */
   const etat = __pvModulesState && __pvModulesState[moduleKey];
-  if (etat && !etat.actif) { pvToggleModule(moduleKey, true); }
+  const activeParNous = !!(etat && !etat.actif);
+  if (activeParNous) { pvToggleModule(moduleKey, true); }
 
   pvAfficherBarreConfig(libelle);
+  window.__pvConfigEnCours = { moduleKey, activeParNous };
 
   let essais = 0;
   const poll = setInterval(() => {
@@ -4536,13 +4539,14 @@ function pvAfficherBarreConfig(libelle) {
       <div style="font-size:12.5px;font-weight:800;color:#9a3412;">⚙️ ${_mvEsc(libelle)}</div>
       <div style="font-size:11.5px;color:#9a3412;opacity:.85;margin-top:2px;">Modifiez la section surlignée dans l'aperçu, puis validez.</div>
     </div>
+    <button onclick="pvAnnulerConfig()" class="btn btn-sm btn-outline" style="white-space:nowrap;">✕ Annuler</button>
     <button onclick="pvValiderConfig()" class="btn btn-sm btn-orange" style="white-space:nowrap;">✓ Valider</button>`;
   anchor.parentNode.insertBefore(bar, anchor);
 }
 
-function pvValiderConfig() {
+/* Ferme la session de configuration : barre + surlignage. Commun à Valider et Annuler. */
+function pvNettoyerConfig() {
   document.getElementById('pv-config-bar')?.remove();
-  /* On retire le surlignage de la section en cours avant de recharger. */
   const enCours = window.__pvSectionEnCours;
   if (enCours) {
     try {
@@ -4551,6 +4555,26 @@ function pvValiderConfig() {
     } catch (e) {}
     window.__pvSectionEnCours = null;
   }
+}
+
+/* Annuler = revenir à l'état d'avant le clic sur ⚙️ : on remasque le module si c'est nous
+   qui l'avions activé pour l'occasion. À noter : les contenus modifiés dans l'aperçu sont
+   enregistrés au fil de l'eau par la vitrine elle-même — Annuler ne les efface donc pas,
+   et ne le prétend pas. */
+function pvAnnulerConfig() {
+  const ctx = window.__pvConfigEnCours;
+  pvNettoyerConfig();
+  window.__pvConfigEnCours = null;
+  if (ctx && ctx.activeParNous) {
+    pvToggleModule(ctx.moduleKey, false); // recharge déjà l'aperçu et les listes
+    return;
+  }
+  pvRefreshPreview();
+}
+
+function pvValiderConfig() {
+  pvNettoyerConfig();
+  window.__pvConfigEnCours = null;
   /* On recharge l'aperçu pour que la modification soit visible immédiatement,
      et on rafraîchit la bibliothèque au cas où le module vienne d'être activé. */
   pvRefreshPreview();
