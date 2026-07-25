@@ -1403,7 +1403,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <h2 style="margin:0 0 6px;">⭐ Paramètres Vitrine</h2>
       <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Configurez à gauche, voyez le résultat en direct à droite. Rien ne change sur votre vitrine publique tant que vous n'avez pas cliqué sur « 🚀 Publier ma vitrine ».</p>
 
-      <div class="pv-builder-layout" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;">
+      <!-- Colonne de droite a 1.2fr : l'apercu occupe 20% de plus que la colonne de reglages
+           (54,5 % de la largeur au lieu de 50 %). La hauteur est deja bornee par l'ecran
+           (max-height:calc(100vh - 86px)), la largeur est donc le seul levier utile. -->
+      <div class="pv-builder-layout" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;">
         <div class="pv-builder-left">
 
           <div class="card" style="margin-bottom:20px;">
@@ -4480,6 +4483,81 @@ const PV_PREVIEW_SECTION_KEYS = { 'pv-presentation':'a_propos', 'pv-collections'
   'pv-partenaires':'partenaires', 'pv-telechargements':'documents', 'pv-pourquoi':'pourquoi_choisir',
   'pv-flash':'offre_flash', 'pv-expertise':'expertise', 'pv-certifications':'certifications',
   'pv-vision':'vision_objectifs', 'pv-impact':'resultats_impact', 'pv-besoins':'besoins_projet' };
+/* ── Configurer un module SANS quitter le centre de création ──
+   Le bouton ⚙️ ouvrait auparavant la vitrine dans un nouvel onglet : on perdait l'aperçu,
+   les réglages et le fil de la création. Il agit désormais dans l'aperçu lui-même — même
+   origine, donc on peut piloter son contenu — et une barre « Valider » confirme que le
+   résultat a bien été visualisé avant de revenir aux réglages. */
+const PV_MODULE_VERS_SECTION = Object.fromEntries(
+  Object.entries(PV_PREVIEW_SECTION_KEYS).map(([secId, key]) => [key, secId])
+);
+
+function pvConfigurerDansApercu(moduleKey) {
+  const frame = document.getElementById('pv-preview-frame');
+  const secId = PV_MODULE_VERS_SECTION[moduleKey];
+  const libelle = (__pvRegistry && __pvRegistry.modules[moduleKey]) ? __pvRegistry.modules[moduleKey].label : moduleKey;
+  if (!frame || !secId) return;
+
+  /* Le module doit être actif pour exister dans l'aperçu : sinon on l'active d'abord,
+     sans quoi le bouton renverrait vers une section absente. */
+  const etat = __pvModulesState && __pvModulesState[moduleKey];
+  if (etat && !etat.actif) { pvToggleModule(moduleKey, true); }
+
+  pvAfficherBarreConfig(libelle);
+
+  let essais = 0;
+  const poll = setInterval(() => {
+    essais++;
+    let doc; try { doc = frame.contentDocument; } catch (e) { return; }
+    const sec = doc && doc.getElementById(secId);
+    if (sec) {
+      clearInterval(poll);
+      sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      /* On met la section en évidence sans ouvrir l'éditeur : l'objectif est de VOIR
+         d'abord. L'édition reste déclenchée par l'utilisateur, via le bouton « Modifier »
+         que la vitrine expose déjà au propriétaire dans l'aperçu. Le surlignage persiste
+         jusqu'à la validation, pour ne pas perdre de vue la section en cours. */
+      sec.style.outline = '3px solid var(--orange)';
+      sec.style.outlineOffset = '-3px';
+      window.__pvSectionEnCours = { doc, secId };
+    }
+    if (essais > 16) clearInterval(poll);
+  }, 250);
+}
+
+function pvAfficherBarreConfig(libelle) {
+  document.getElementById('pv-config-bar')?.remove();
+  const anchor = document.getElementById('pv-draft-status');
+  if (!anchor) return;
+  const bar = document.createElement('div');
+  bar.id = 'pv-config-bar';
+  bar.style.cssText = 'margin:10px 0;padding:10px 12px;background:#FFF7ED;border:1.5px solid var(--orange);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+  bar.innerHTML = `<div style="flex:1;min-width:170px;">
+      <div style="font-size:12.5px;font-weight:800;color:#9a3412;">⚙️ ${_mvEsc(libelle)}</div>
+      <div style="font-size:11.5px;color:#9a3412;opacity:.85;margin-top:2px;">Modifiez la section surlignée dans l'aperçu, puis validez.</div>
+    </div>
+    <button onclick="pvValiderConfig()" class="btn btn-sm btn-orange" style="white-space:nowrap;">✓ Valider</button>`;
+  anchor.parentNode.insertBefore(bar, anchor);
+}
+
+function pvValiderConfig() {
+  document.getElementById('pv-config-bar')?.remove();
+  /* On retire le surlignage de la section en cours avant de recharger. */
+  const enCours = window.__pvSectionEnCours;
+  if (enCours) {
+    try {
+      const sec = enCours.doc.getElementById(enCours.secId);
+      if (sec) { sec.style.outline = ''; sec.style.outlineOffset = ''; }
+    } catch (e) {}
+    window.__pvSectionEnCours = null;
+  }
+  /* On recharge l'aperçu pour que la modification soit visible immédiatement,
+     et on rafraîchit la bibliothèque au cas où le module vienne d'être activé. */
+  pvRefreshPreview();
+  renderPvModulesLib();
+  renderPvOrderList();
+}
+
 function pvWirePreviewClicks(frame) {
   let doc; try { doc = frame.contentDocument; } catch (e) { return; }
   if (!doc) return;
@@ -4591,7 +4669,7 @@ function renderPvModulesLib() {
             <span style="font-size:13px;font-weight:600;">${_mvEsc(m.label)}</span>
             <span style="display:flex;gap:4px;flex:none;">
             ${m.implemente
-              ? `${PV_MODULES_CONFIGURABLES.has(m.key)?`<a href="profil.html#vitrine" target="_blank" class="btn btn-sm btn-outline" title="Configurer le contenu de ce module sur la vitrine" style="text-decoration:none;padding:6px 8px;">⚙️</a>`:''}<button onclick="pvToggleModule('${m.key}', ${!state.actif})" class="btn btn-sm ${state.actif?'btn-orange':'btn-outline'}" style="white-space:nowrap;">${state.actif?'✅ Actif':'👁️ Masqué'}</button>`
+              ? `${PV_MODULES_CONFIGURABLES.has(m.key)?`<button onclick="pvConfigurerDansApercu('${m.key}')" class="btn btn-sm btn-outline" title="Configurer ce module directement dans l'aperçu, sans quitter cette page" style="padding:6px 8px;">⚙️</button>`:''}<button onclick="pvToggleModule('${m.key}', ${!state.actif})" class="btn btn-sm ${state.actif?'btn-orange':'btn-outline'}" style="white-space:nowrap;">${state.actif?'✅ Actif':'👁️ Masqué'}</button>`
               : `<span style="font-size:11px;color:var(--muted);white-space:nowrap;">🔜 Bientôt</span>`}
             </span>
           </div>`;
