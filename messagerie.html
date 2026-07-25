@@ -1318,7 +1318,12 @@ async function proposerClassementContact(contactId, contactNom, convId){
   // PRIORITÉ : ouvrir directement la conversation demandée (?with= / ?init=) dès que possible
   {
     const up=new URLSearchParams(location.search);
-    const w=up.get("with"), ini=up.get("init"), prod=up.get("produit"), objet=up.get("objet"), origine=up.get("origine");
+    /* "user" est accepté comme équivalent de "with" : la majorité des boutons « Contacter »
+       du site (accueil, partenaires, billetterie, mes billets, profil, candidatures) emploient
+       cette forme, que la messagerie n'a jamais lue. Ces boutons ouvraient donc une messagerie
+       VIDE, sans conversation — constaté en production. Les traiter ici les répare tous d'un
+       coup, et les fait passer par les règles de mise en relation. */
+    const w=up.get("with") || up.get("user"), ini=up.get("init"), prod=up.get("produit"), objet=up.get("objet"), origine=up.get("origine");
     if(w){
       openConvWithUser(Number(w), prod?Number(prod):null, objet, origine);
     } else if(ini){
