@@ -2812,9 +2812,73 @@ async function renderVitrineVisitor(init) {
      brancher le conteneur pour qu'il soit activable, masquable et reordonnable comme les autres. */
   const actualitesSec = modOn('actualites') ? `<div id="pvt-publications"></div>` : '';
 
+  /* ── Galerie vidéos / Portfolio / Réservation ──
+     Même architecture que Témoignages : une colonne JSON, un éditeur de liste générique.
+     Chaque section n'apparaît que si elle a du contenu, ou pour le propriétaire (qui doit
+     pouvoir la remplir). */
+  const videos = safeParseJson(init.vitrine_videos_json, []);
+  /* Convertit un lien YouTube/Vimeo en URL de lecteur intégrable. Renvoie null si le format
+     n'est pas reconnu : on affiche alors un simple lien, plutôt qu'un cadre vide. */
+  const videoEmbed = (url) => {
+    const u = String(url || '');
+    let m = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/);
+    if (m) return 'https://www.youtube.com/embed/' + m[1];
+    m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+    if (m) return 'https://player.vimeo.com/video/' + m[1];
+    return null;
+  };
+  const videosSec = ((videos.length || isOwn) && modOn('galerie_videos')) ? `<section id="pv-videos" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🎬 Galerie vidéos</h3>${isOwn?`<button onclick="pvtEditVideos()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
+      ${videos.length ? videos.map(v => {
+        const emb = videoEmbed(v.url);
+        return `<div>
+          ${emb ? `<div style="position:relative;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;">
+              <iframe src="${esc(emb)}" title="${esc(v.titre||'Vidéo')}" loading="lazy" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:none;"></iframe>
+            </div>`
+            : `<a href="${esc(v.url||'#')}" target="_blank" rel="noopener" style="display:block;padding:14px;background:#F6F1EE;border-radius:10px;font-size:13px;color:#2F6BED;word-break:break-all;">▶ ${esc(v.url||'')}</a>`}
+          ${v.titre?`<div style="font-size:12.5px;font-weight:700;color:#122A4D;margin-top:6px;">${esc(v.titre)}</div>`:''}
+        </div>`;
+      }).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucune vidéo. Cliquez sur Modifier pour en ajouter.':''}</span>`}
+    </div>
+  </section>` : '';
+
+  const portfolio = safeParseJson(init.vitrine_portfolio_json, []);
+  const portfolioSec = ((portfolio.length || isOwn) && modOn('portfolio')) ? `<section id="pv-portfolio" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🗂️ Portfolio</h3>${isOwn?`<button onclick="pvtEditPortfolio()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;">
+      ${portfolio.length ? portfolio.map(p => {
+        const inner = `${p.image?`<img loading="lazy" src="${esc(p.image)}" alt="" style="width:100%;height:130px;object-fit:cover;display:block;">`:''}
+          <div style="padding:12px;">
+            <div style="font-size:13.5px;font-weight:700;color:#122A4D;line-height:1.35;">${esc(p.titre||'')}</div>
+            ${p.description?`<div style="font-size:12px;color:#6B7686;margin-top:4px;line-height:1.5;">${esc(p.description)}</div>`:''}
+          </div>`;
+        return p.lien
+          ? `<a href="${esc(p.lien)}" target="_blank" rel="noopener" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;">${inner}</a>`
+          : `<div style="background:#F6F1EE;border-radius:12px;overflow:hidden;">${inner}</div>`;
+      }).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun projet. Cliquez sur Modifier pour en ajouter.':''}</span>`}
+    </div>
+  </section>` : '';
+
+  const reservations = safeParseJson(init.vitrine_reservation_json, []);
+  const reservationSec = ((reservations.length || isOwn) && modOn('reservation')) ? `<section id="pv-reservation" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>📆 Réservation</h3>${isOwn?`<button onclick="pvtEditReservation()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px;">
+      ${reservations.length ? reservations.map(r => `<div style="background:#F6F1EE;border-radius:12px;padding:13px 15px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:150px;">
+            <div style="font-size:13.5px;font-weight:700;color:#122A4D;">${esc(r.intitule||'')}</div>
+            ${(r.duree||r.prix)?`<div style="font-size:12px;color:#6B7686;margin-top:3px;">${[r.duree?'⏱ '+esc(r.duree):'', r.prix?'💶 '+esc(r.prix):''].filter(Boolean).join(' · ')}</div>`:''}
+          </div>
+          ${r.lien ? `<a href="${esc(r.lien)}" target="_blank" rel="noopener" class="pvt-btn primary" style="text-decoration:none;">Réserver</a>`
+                   : `<button class="pvt-btn soft" onclick="contacterBoutique(${ownerId}, ${JSON.stringify('Réservation : ' + (r.intitule||'')).replace(/"/g,'&quot;')})">Demander</button>`}
+        </div>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucune prestation. Cliquez sur Modifier pour en ajouter.':''}</span>`}
+    </div>
+  </section>` : '';
+
   const MODULE_SECTIONS = [
     ['evenements', evenementsSec], ['formations_catalogue', formationsSec],
-    ['actualites', actualitesSec],
+    ['actualites', actualitesSec], ['galerie_videos', videosSec],
+    ['portfolio', portfolioSec], ['reservation', reservationSec],
     ['offre_flash', offreFlashSec], ['a_propos', presentation], ['expertise', expertiseSec],
     ['certifications', certificationsSec], ['vision_objectifs', visionSec], ['catalogue', collectionsSec],
     ['produits', produitsSec], ['services', services], ['pourquoi_choisir', pourquoiSec],
@@ -3158,6 +3222,25 @@ function pvtEditCertifications() {
   pvtOpenListEditor({ field:'vitrine_certifications_json', title:'Certifications', itemLabel:'une certification',
     itemFields:[{key:'nom',label:'Nom de la certification'},{key:'annee',label:'Année (facultatif)'}] });
 }
+/* Galerie vidéos : on stocke l'URL telle que fournie et on la convertit en lecteur intégré
+   à l'affichage (YouTube/Vimeo). Aucun hébergement de fichier vidéo : la plateforme ne le
+   propose pas encore, et prétendre le contraire créerait des vitrines cassées. */
+function pvtEditVideos() {
+  pvtOpenListEditor({ field:'vitrine_videos_json', title:'Galerie vidéos', itemLabel:'une vidéo',
+    itemFields:[{key:'url',label:'Lien de la vidéo (YouTube ou Vimeo)'},{key:'titre',label:'Titre (facultatif)'}] });
+}
+function pvtEditPortfolio() {
+  pvtOpenListEditor({ field:'vitrine_portfolio_json', title:'Portfolio', itemLabel:'une réalisation',
+    itemFields:[{key:'titre',label:'Titre du projet'},{key:'description',label:'Description courte'},
+                {key:'image',label:"Lien de l'image (facultatif)"},{key:'lien',label:'Lien externe (facultatif)'}] });
+}
+function pvtEditReservation() {
+  pvtOpenListEditor({ field:'vitrine_reservation_json', title:'Réservation', itemLabel:'une prestation réservable',
+    itemFields:[{key:'intitule',label:'Prestation (ex : Consultation d\'une heure)'},
+                {key:'duree',label:'Durée (facultatif)'},{key:'prix',label:'Tarif (facultatif)'},
+                {key:'lien',label:'Lien de réservation (facultatif)'}] });
+}
+
 /* Expertise : simple liste de domaines (un seul champ par entrée) — saisie rapide séparée par virgules. */
 async function pvtEditExpertise() {
   if (!isOwn || !_vitrineInit) return;

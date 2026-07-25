@@ -1426,6 +1426,8 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_style_json,
     // Informations générales (identité de la structure — éditables aussi depuis "Paramètres Vitrine")
     nom, domaine, logo_url, reseaux_sociaux, slogan,
+    // Modules "Galerie vidéos", "Portfolio", "Réservation"
+    vitrine_videos_json, vitrine_portfolio_json, vitrine_reservation_json,
   } = body;
   const THEMES_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
   await db.prepare(`
@@ -1440,7 +1442,8 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
       site_web=?, vitrine_google_maps_url=?, vitrine_rdv_active=?,
       vitrine_temoignages_json=?, vitrine_vision_objectifs=?, vitrine_resultats_impact_json=?,
       vitrine_expertise_json=?, vitrine_certifications_json=?, vitrine_devis_active=?, vitrine_partenariat_active=?,
-      vitrine_style_json=?, nom=?, domaine=?, logo_url=?, reseaux_sociaux=?, slogan=?
+      vitrine_style_json=?, nom=?, domaine=?, logo_url=?, reseaux_sociaux=?, slogan=?,
+      vitrine_videos_json=?, vitrine_portfolio_json=?, vitrine_reservation_json=?
     WHERE id=?
   `).run(
     vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
@@ -1486,6 +1489,9 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     logo_url !== undefined ? logo_url : init.logo_url,
     reseaux_sociaux !== undefined ? (typeof reseaux_sociaux === 'object' ? JSON.stringify(reseaux_sociaux) : reseaux_sociaux) : init.reseaux_sociaux,
     slogan !== undefined ? slogan : init.slogan,
+    vitrine_videos_json !== undefined ? vitrine_videos_json : init.vitrine_videos_json,
+    vitrine_portfolio_json !== undefined ? vitrine_portfolio_json : init.vitrine_portfolio_json,
+    vitrine_reservation_json !== undefined ? vitrine_reservation_json : init.vitrine_reservation_json,
     params.id
   );
   sendJSON(res, 200, { ok: true });
@@ -1506,8 +1512,8 @@ const VITRINE_MODULES_REGISTRY = {
   expertise:             { label: "Expertise",                categorie: "presentation", implemente: true },
   certifications:        { label: "Certifications",           categorie: "presentation", implemente: true },
   galerie_photos:        { label: "Galerie photos",           categorie: "medias", implemente: true },
-  galerie_videos:        { label: "Galerie vidéos",           categorie: "medias", implemente: false },
-  portfolio:             { label: "Portfolio",                categorie: "medias", implemente: false },
+  galerie_videos:        { label: "Galerie vidéos",           categorie: "medias", implemente: true },
+  portfolio:             { label: "Portfolio",                categorie: "medias", implemente: true },
   documents:             { label: "Documents",                categorie: "medias", implemente: true },
   realisations:          { label: "Réalisations / Projets",   categorie: "medias", implemente: true },
   produits:              { label: "Produits / Boutique",      categorie: "activite", implemente: true },
@@ -1518,7 +1524,7 @@ const VITRINE_MODULES_REGISTRY = {
   contact:               { label: "Contact",                   categorie: "interaction", implemente: true },
   demande_devis:         { label: "Demande de devis",          categorie: "interaction", implemente: true },
   demande_partenariat:   { label: "Demande de partenariat",    categorie: "interaction", implemente: true },
-  reservation:           { label: "Réservation",                categorie: "interaction", implemente: false },
+  reservation:           { label: "Réservation",                categorie: "interaction", implemente: true },
   billetterie:           { label: "Billetterie",                categorie: "interaction", implemente: false },
   temoignages:           { label: "Témoignages",                categorie: "interaction", implemente: true },
   avis:                  { label: "Avis clients",               categorie: "interaction", implemente: true },
@@ -1580,6 +1586,7 @@ const VITRINE_CHAMPS_BROUILLON = [
   "vitrine_banniere_url", "galerie_json",
   "vitrine_objectif_cible", "vitrine_objectif_libelle",
   "vitrine_offre_flash_titre", "vitrine_offre_flash_fin",
+  "vitrine_videos_json", "vitrine_portfolio_json", "vitrine_reservation_json",
 ];
 
 /* Modules toujours actifs par défaut pour toute vitrine, indépendamment du type choisi

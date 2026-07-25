@@ -4516,7 +4516,8 @@ const PV_PREVIEW_SECTION_KEYS = { 'pv-presentation':'a_propos', 'pv-collections'
   'pv-services':'services', 'pv-galerie':'galerie_photos', 'pv-avis':'avis', 'pv-temoignages':'temoignages',
   'pv-partenaires':'partenaires', 'pv-telechargements':'documents', 'pv-pourquoi':'pourquoi_choisir',
   'pv-flash':'offre_flash', 'pv-expertise':'expertise', 'pv-certifications':'certifications',
-  'pv-vision':'vision_objectifs', 'pv-impact':'resultats_impact', 'pv-besoins':'besoins_projet' };
+  'pv-vision':'vision_objectifs', 'pv-impact':'resultats_impact', 'pv-besoins':'besoins_projet',
+  'pv-videos':'galerie_videos', 'pv-portfolio':'portfolio', 'pv-reservation':'reservation' };
 /* ── Configurer un module SANS quitter le centre de création ──
    Le bouton ⚙️ ouvrait auparavant la vitrine dans un nouvel onglet : on perdait l'aperçu,
    les réglages et le fil de la création. Il agit désormais dans l'aperçu lui-même — même
@@ -4741,7 +4742,7 @@ async function pvAppliquerType(type) {
    dans le dashboard (produits, catalogue) n'ont pas besoin de ce bouton. */
 const PV_MODULES_CONFIGURABLES = new Set(['a_propos','equipe','expertise','certifications','galerie_photos',
   'documents','realisations','services','temoignages','vision_objectifs','resultats_impact','partenaires',
-  'objectif_jauge','pourquoi_choisir','offre_flash']);
+  'objectif_jauge','pourquoi_choisir','offre_flash','galerie_videos','portfolio','reservation']);
 
 function renderPvModulesLib() {
   const box = document.getElementById('pv-modules-lib');

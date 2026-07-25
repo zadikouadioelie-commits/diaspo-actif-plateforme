@@ -575,6 +575,10 @@ async function migratePg(pool) {
     ['initiatives', 'vitrine_style_json', "TEXT DEFAULT '{}'"],
     ['initiatives', 'slogan', 'TEXT'],
     ['initiatives', 'vitrine_draft_json', "TEXT DEFAULT '{}'"],
+    // Modules "Galerie vidéos", "Portfolio", "Réservation" — miroir de server/db.js
+    ['initiatives', 'vitrine_videos_json', 'TEXT'],
+    ['initiatives', 'vitrine_portfolio_json', 'TEXT'],
+    ['initiatives', 'vitrine_reservation_json', 'TEXT'],
     // Profil public enrichi des comptes personnels (miroir)
     ['users', 'publics_json', 'TEXT'],
     ['users', 'besoins_json', 'TEXT'],

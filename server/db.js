@@ -4499,6 +4499,13 @@ db.exec(`
   // Brouillon du constructeur "Paramètres Vitrine" (aperçu dynamique) : { type, modules, style, theme }.
   // Tant que non publié via POST /vitrine-publish, la vitrine publique reste inchangée.
   if (!initCols7.includes('vitrine_draft_json'))              db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_draft_json TEXT DEFAULT '{}'");
+  /* Modules "Galerie vidéos", "Portfolio" et "Réservation" — même principe que Témoignages :
+     une colonne JSON par module, éditée sur la vitrine par une liste générique.
+     ⚠ Toute colonne ajoutée ici doit l'être AUSSI dans server/pg-init.js (migratePg) :
+     les ALTER TABLE SQLite ne sont jamais exécutés sur PostgreSQL. */
+  if (!initCols7.includes('vitrine_videos_json'))             db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_videos_json TEXT");
+  if (!initCols7.includes('vitrine_portfolio_json'))          db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_portfolio_json TEXT");
+  if (!initCols7.includes('vitrine_reservation_json'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_reservation_json TEXT");
 
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
   db.exec(`
