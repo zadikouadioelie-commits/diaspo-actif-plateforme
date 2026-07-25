@@ -6241,6 +6241,39 @@ route("GET", "/api/admin/schema-check", async (req, res) => {
   }
 });
 
+/* POST /api/admin/test-email — envoie un e-mail de test à l'adresse indiquée.
+   Né d'un constat : deux envois de rappel étaient écrits avec la mauvaise signature et
+   échouaient en silence, sans qu'aucun moyen ne permette de s'en apercevoir avant l'échéance.
+   Cette route emprunte EXACTEMENT le même chemin que les rappels (mailer.sendEmail) et
+   renvoie la réponse brute du service d'envoi : on sait donc si la clé est configurée, si le
+   domaine est accepté, et l'identifiant du message envoyé. */
+route("POST", "/api/admin/test-email", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const destinataire = (body && body.to) || user.email;
+  if (!destinataire) return sendJSON(res, 400, { error: "Aucune adresse de destination." });
+  try {
+    const { sendEmail } = require('./mailer');
+    const resultat = await sendEmail({
+      to: destinataire,
+      subject: "Diaspo'Actif — test d'envoi",
+      html: `<p>Cet e-mail confirme que l'envoi fonctionne.</p>
+             <p>Il emprunte le même chemin que les rappels de fin d'abonnement Premium,
+             qui partiront automatiquement 60, 30, 15, 7, 3 et 1 jour avant chaque échéance.</p>
+             <p>Envoyé le ${new Date().toLocaleString('fr-FR')}.</p>`,
+    });
+    sendJSON(res, 200, {
+      destinataire,
+      /* resultat.ok=false + reason="no_key" signifie que RESEND_API_KEY n'est pas configurée
+         sur cet environnement : les e-mails ne partent pas, silencieusement. */
+      resultat,
+      ENVOI_REUSSI: !!(resultat && resultat.ok),
+    });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "test-email"));
+  }
+});
+
 /* GET /api/premium/statut — état de l'abonnement du compte connecté. */
 route("GET", "/api/premium/statut", async (req, res) => {
   const user = await getCurrentUser(req);
@@ -15118,9 +15151,14 @@ async function handleRequest(req, res) {
             `Cette formation sera retirée du catalogue le ${f.date_suppression_prevue.slice(0,10)}. Nous vous invitons à terminer votre parcours avant cette date afin de conserver votre progression et d'obtenir votre certificat.`,
             { formation_id: f.id });
           if (e.email) {
-            sendEmail(e.email, `« ${f.titre} » ne sera bientôt plus accessible`,
-              `Bonjour ${e.nom||''},\n\nLa formation « ${f.titre} » que vous suivez sur Diaspo'Actif sera retirée du catalogue le ${f.date_suppression_prevue.slice(0,10)} (dans ${joursRestants} jour${joursRestants>1?'s':''}).\n\nNous vous invitons à terminer votre parcours avant cette date afin de conserver votre progression et d'obtenir votre certificat.\n\nL'équipe Diaspo'Actif`
-            ).catch(()=>{});
+            /* Meme defaut que le rappel Premium : appel positionnel au lieu d'un objet
+               { to, subject, html }. Ces rappels de suppression n'etaient donc jamais
+               envoyes — defaut preexistant, revele en verifiant la signature. */
+            sendEmail({
+              to: e.email,
+              subject: `« ${f.titre} » ne sera bientôt plus accessible`,
+              html: `<p>Bonjour ${e.nom||''},</p><p>La formation « ${f.titre} » que vous suivez sur Diaspo'Actif sera retirée du catalogue le ${f.date_suppression_prevue.slice(0,10)} (dans ${joursRestants} jour${joursRestants>1?'s':''}).</p><p>Terminez votre parcours avant cette date afin de conserver votre progression et d'obtenir votre certificat.</p><p>L'équipe Diaspo'Actif</p>`,
+            }).catch(()=>{});
           }
         }
         const col = niveau === '7j' ? 'suppression_alerte_7j' : niveau === '3j' ? 'suppression_alerte_3j' : 'suppression_alerte_24h';
@@ -15262,10 +15300,16 @@ async function handleRequest(req, res) {
              reste le canal fiable, l'e-mail est un complément. */
           if (e.user_email) {
             try {
-              const { sendEmail } = require("./mailer"); // même import ponctuel que le reste du fichier
-              await sendEmail(e.user_email, `${libelle} — échéance le ${dateFr}`,
-                `<p>Bonjour ${escH(e.user_nom || '')},</p><p>${escH(msg)}</p>
-                 <p>Vos contenus sont conservés : rien n'est supprimé à l'échéance.</p>`);
+              const { sendEmail } = require("./mailer");
+              /* sendEmail attend un OBJET { to, subject, html }. Appelé avec trois arguments
+                 positionnels, les trois champs valaient undefined : Resend rejetait la requête
+                 et le try/catch avalait l'erreur — aucun rappel n'aurait jamais été envoyé. */
+              await sendEmail({
+                to: e.user_email,
+                subject: `${libelle} — échéance le ${dateFr}`,
+                html: `<p>Bonjour ${escH(e.user_nom || '')},</p><p>${escH(msg)}</p>
+                       <p>Vos contenus sont conservés : rien n'est supprimé à l'échéance.</p>`,
+              });
             } catch (_) {}
           }
           /* On marque aussi les paliers plus lointains déjà dépassés : les renvoyer plus tard
