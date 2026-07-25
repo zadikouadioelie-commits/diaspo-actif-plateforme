@@ -5257,7 +5257,12 @@ function slugVille(ville) {
   return sansAccents((ville || "").toUpperCase()).replace(/[^A-Z0-9]/g, "").slice(0, 10) || "NA";
 }
 /* Génère un identifiant territorial unique : COL-{PAYS}-{CP}-{VILLE}-{TYPE}-{NNN}. */
-function genererIdentifiantTerritorial(coll) {
+/* Fonction ASYNC : la vérification d'unicité interroge la base. Elle était synchrone, donc
+   sous PostgreSQL .get() renvoyait une promesse — « promesse?.c > 0 » vaut toujours false,
+   la boucle s'arrêtait au premier tour et TOUTES les collectivités d'une même ville et d'un
+   même type recevaient l'identifiant -001. Invisible en local, où SQLite répond
+   immédiatement et où la boucle fonctionnait donc correctement. */
+async function genererIdentifiantTerritorial(coll) {
   const pays = codePays(coll.pays_exercice || coll.pays);
   const cp = (coll.code_postal_exercice || coll.code_postal || "").replace(/[^0-9A-Za-z]/g, "").slice(0, 5);
   const ville = slugVille(coll.ville_exercice || coll.ville);
@@ -5268,7 +5273,7 @@ function genererIdentifiantTerritorial(coll) {
   do {
     candidat = `${prefixe}-${String(n).padStart(3, "0")}`;
     n++;
-  } while (db.prepare("SELECT COUNT(*) AS c FROM users WHERE identifiant_territorial=?").get(candidat)?.c > 0 && n < 1000);
+  } while (((await db.prepare("SELECT COUNT(*) AS c FROM users WHERE identifiant_territorial=?").get(candidat))?.c || 0) > 0 && n < 1000);
   return candidat;
 }
 /* Similarité de deux chaînes (0..1) — distance de Levenshtein normalisée. */
@@ -12224,8 +12229,11 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     // Génère et persiste l'identifiant s'il n'existe pas encore.
     let identifiant = coll.identifiant_territorial;
     if (!identifiant) {
-      identifiant = genererIdentifiantTerritorial(coll);
-      db.prepare("UPDATE users SET identifiant_territorial=? WHERE id=?").run(identifiant, user.id);
+      identifiant = await genererIdentifiantTerritorial(coll);
+      /* await indispensable : sur Vercel l'instance peut être gelée juste après la réponse,
+         et une écriture non attendue n'a alors jamais le temps d'aboutir — l'identifiant
+         aurait été régénéré à chaque appel. */
+      await db.prepare("UPDATE users SET identifiant_territorial=? WHERE id=?").run(identifiant, user.id);
       journalColl(user.id, "identifiant_genere", "Identifiant territorial attribué : " + identifiant);
     }
     // Administrateurs officiels : responsable principal + comptes rattachés (parent_institution_id).
