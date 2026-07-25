@@ -1453,27 +1453,38 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
         </div>
 
-        <div class="pv-builder-right" style="position:sticky;top:16px;min-width:0;">
-          <div class="card">
+        <div class="pv-builder-right" style="position:sticky;top:70px;align-self:start;min-width:0;">
+          <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 86px);overflow:hidden;">
             <h3 style="margin:0 0 4px;font-size:15px;">📱 Aperçu en direct</h3>
             <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Se met à jour automatiquement après chaque modification.</p>
-            <div style="display:flex;gap:6px;margin-bottom:10px;">
+            <div style="display:flex;gap:6px;margin-bottom:10px;flex:none;">
               <button class="btn btn-sm btn-orange" id="pv-preview-desktop" onclick="pvSetPreviewDevice('desktop')" title="Ordinateur">🖥️</button>
               <button class="btn btn-sm btn-outline" id="pv-preview-tablet" onclick="pvSetPreviewDevice('tablet')" title="Tablette">📱</button>
               <button class="btn btn-sm btn-outline" id="pv-preview-mobile" onclick="pvSetPreviewDevice('mobile')" title="Mobile">📱</button>
               <a href="profil.html?preview=draft#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;margin-left:auto;" title="Ouvrir dans un onglet">↗</a>
             </div>
-            <div id="pv-preview-frame-wrap" style="background:#EDF1F6;border-radius:12px;padding:10px;overflow:auto;max-height:960px;">
+            <div id="pv-preview-frame-wrap" style="background:#EDF1F6;border-radius:12px;padding:10px;overflow:auto;flex:1;min-height:220px;">
               <iframe id="pv-preview-frame" style="width:1400px!important;max-width:none!important;height:900px!important;border:none;border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:width .25s ease;display:block;margin:0 auto;flex:none;"></iframe>
             </div>
-            <p style="font-size:11px;color:var(--muted);margin:8px 0 0;">💡 Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
-            <div id="pv-draft-status" style="margin:14px 0 10px;font-size:12.5px;font-weight:700;"></div>
-            <button class="btn btn-orange btn-block" onclick="pvPublish()">🚀 Publier ma vitrine</button>
+            <p style="font-size:11px;color:var(--muted);margin:8px 0 0;flex:none;">💡 Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
+            <div id="pv-draft-status" style="margin:10px 0 8px;font-size:12.5px;font-weight:700;flex:none;"></div>
+            <button class="btn btn-orange btn-block" onclick="pvPublish()" style="flex:none;">🚀 Publier ma vitrine</button>
           </div>
         </div>
       </div>
     </div>
-    <style>@media(max-width:1000px){ .pv-builder-layout{ grid-template-columns:1fr!important; } .pv-builder-right{ position:static!important; } }</style>
+    <style>
+    /* responsive.v2.css pose body{overflow-x:hidden}, ce qui fait du body un conteneur de
+       defilement et neutralise position:sticky pour tous ses descendants. clip decoupe de la
+       meme facon sans creer ce conteneur, donc l'apercu peut rester fige au scroll. Les
+       navigateurs qui ignorent clip conservent simplement hidden (apercu non fige). */
+    body{ overflow-x:clip; }
+    @media(max-width:1000px){
+      .pv-builder-layout{ grid-template-columns:1fr!important; }
+      .pv-builder-right{ position:static!important; }
+      .pv-builder-right .card{ max-height:none!important; overflow:visible!important; }
+      #pv-preview-frame-wrap{ max-height:70vh; }
+    }</style>
 
     <!-- ══ SECTIONS GESTION ASSOCIATION ══ -->
     <div class="card" style="margin-bottom:20px;display:none;" id="asso-accreditation">
@@ -4262,8 +4273,21 @@ async function loadParametresVitrineFull() {
     renderPvStylePresets();
     renderPvDraftStatus();
     pvRefreshPreview();
+    pvSyncStickyTop();
   } catch (e) { console.error(e); }
 }
+
+/* La topbar est sticky et sa hauteur varie selon la largeur (le menu passe a la ligne).
+   On aligne dessus le decalage de l'apercu fige pour qu'il ne passe jamais dessous. */
+function pvSyncStickyTop() {
+  const right = document.querySelector('.pv-builder-right');
+  if (!right) return;
+  const h = document.querySelector('.topbar')?.offsetHeight || 58;
+  right.style.top = (h + 12) + 'px';
+  const card = right.querySelector('.card');
+  if (card) card.style.maxHeight = `calc(100vh - ${h + 28}px)`;
+}
+window.addEventListener('resize', () => { if (document.getElementById('parametres-vitrine')?.style.display !== 'none') pvSyncStickyTop(); });
 
 function renderPvDraftStatus() {
   const el = document.getElementById('pv-draft-status');
