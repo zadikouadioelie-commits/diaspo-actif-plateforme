@@ -5189,6 +5189,51 @@ function perimetreWhere(p, alias = "u") {
   return { where, params };
 }
 
+/* ─── ORIGINE INSTITUTIONNELLE D'UNE COLLECTIVITÉ ───────────────────────────
+   Le pays que l'institution REPRÉSENTE, à ne pas confondre avec son périmètre
+   territorial — le lieu où résident ses membres. Une ambassade du Sénégal à Paris a
+   pour origine le Sénégal et pour territoire la France : elle s'adresse aux Sénégalais
+   de France, pas aux Français.
+
+   Distinguer les deux est tout l'objet de la règle : sans cela, une ambassade pourrait
+   écrire à toute la diaspora d'un autre pays présente sur son territoire. */
+function origineCollectivite(coll) {
+  if (!coll) return null;
+  /* pays_origine_institution est le champ officiel, déclaré et validé à l'accréditation.
+     origine1 sert de repli pour les comptes créés avant son introduction. */
+  const o = coll.pays_origine_institution || coll.origine1 || null;
+  return o ? String(o).trim() : null;
+}
+
+const normOrigine = (s) => String(s || "").trim().toLowerCase()
+  .normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+/* Une dérogation administrative couvre-t-elle cette diffusion ? (§7) */
+async function autorisationDiffusion(collectiviteId, origineCible) {
+  try {
+    const r = await db.prepare(
+      `SELECT id, motif, accordee_par, created_at FROM autorisations_diffusion
+        WHERE collectivite_id=? AND LOWER(origine_cible)=LOWER(?)
+          AND revoquee_le IS NULL
+          AND (expire_le IS NULL OR expire_le >= date('now'))
+        LIMIT 1`
+    ).get(collectiviteId, origineCible);
+    return r || null;
+  } catch (e) { return null; }
+}
+
+/* Clause SQL bornant l'audience d'une diffusion à la communauté LÉGITIME d'une
+   collectivité : les membres qui ont déclaré cette origine, plus ceux qui se sont
+   abonnés à elle — s'abonner est une démarche volontaire, donc une audience choisie. */
+function audienceOrigineWhere(origine, collectiviteId, alias = "u") {
+  if (!origine) return { where: "1=0", params: [] };   // origine indéfinie ⇒ aucune diffusion
+  return {
+    where: `(${alias}.origine1 = ? OR ${alias}.origine2 = ? OR ${alias}.nationalite1 = ?
+             OR ${alias}.id IN (SELECT user_id FROM abonnements_collectivite WHERE collectivite_id = ?))`,
+    params: [origine, origine, origine, collectiviteId],
+  };
+}
+
 /* Un membre relève-t-il du périmètre de compétence d'une collectivité ?
    Utilisé pour la diffusion (principe 4) : un membre ne reçoit les contenus
    poussés (communications, consultations) que des collectivités dont il dépend. */
@@ -5468,6 +5513,23 @@ async function sontContacts(a, b) {
   return !!r;
 }
 
+/* La cible suit-elle `moi` ? La plateforme compte trois mécanismes d'abonnement distincts,
+   et les trois expriment la même intention volontaire — les ignorer reviendrait à exiger une
+   demande de contact à quelqu'un qui s'est déjà abonné :
+     - user_follows            : suivi générique entre comptes
+     - abonnements_collectivite : un membre suit une collectivité
+     - abonnements              : un membre suit une initiative (donc son propriétaire) */
+async function cibleMeSuit(cibleId, moiId) {
+  const direct = await db.prepare("SELECT id FROM user_follows WHERE follower_id=? AND followed_id=? LIMIT 1").get(cibleId, moiId);
+  if (direct) return true;
+  const coll = await db.prepare("SELECT id FROM abonnements_collectivite WHERE user_id=? AND collectivite_id=? LIMIT 1").get(cibleId, moiId);
+  if (coll) return true;
+  const init = await db.prepare(
+    "SELECT a.id FROM abonnements a JOIN initiatives i ON i.id=a.initiative_id WHERE a.user_id=? AND i.owner_user_id=? LIMIT 1"
+  ).get(cibleId, moiId);
+  return !!init;
+}
+
 /* Peut-on ouvrir une conversation neuve sans passer par une demande ?
    `origine` indique l'espace d'où part le contact ("vitrine" pour la boutique publique).
 
@@ -5482,6 +5544,13 @@ async function peutEcrireDirectement(user, cibleId, origine) {
       (user.role === "administrateur" || (cible && cible.role === "administrateur"))) return true;
 
   if (await sontContacts(user.id, cibleId)) return true;
+
+  /* Suivre un compte vaut autorisation d'en être contacté : c'est une démarche
+     volontaire, donc une ouverture au dialogue. La direction compte — c'est la CIBLE
+     qui doit m'avoir suivi, pas l'inverse ; sinon il suffirait de suivre quelqu'un
+     pour s'autoriser soi-même à lui écrire. Vaut pour tous les types de comptes et
+     toutes les origines. */
+  if (await cibleMeSuit(cibleId, user.id)) return true;
 
   /* Un compte officiel exige la demande quel que soit le point d'entrée : cette règle
      l'emporte sur l'exception vitrine, sans quoi elle serait contournable. */
@@ -5695,6 +5764,45 @@ route("POST", "/api/contacts/:userId/bloquer", async (req, res, params) => {
   await db.prepare(
     "DELETE FROM demandes_contact WHERE (demandeur_id=? AND destinataire_id=?) OR (demandeur_id=? AND destinataire_id=?)"
   ).run(user.id, autreId, autreId, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ─── Dérogations de diffusion inter-origines (§7) ─────────────────────────
+   Une communication institutionnelle vers une autre diaspora peut avoir des
+   conséquences diplomatiques : chaque dérogation est nominative, motivée, datée,
+   révocable, et attachée au compte qui l'a accordée. */
+route("GET", "/api/admin/autorisations-diffusion", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const autorisations = await db.prepare(
+    `SELECT a.*, c.nom AS collectivite_nom, ad.nom AS accordee_par_nom
+       FROM autorisations_diffusion a
+       JOIN users c ON c.id = a.collectivite_id
+       LEFT JOIN users ad ON ad.id = a.accordee_par
+      ORDER BY a.created_at DESC LIMIT 200`
+  ).all();
+  sendJSON(res, 200, { autorisations });
+});
+
+route("POST", "/api/admin/autorisations-diffusion", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const collId = Number(body.collectivite_id);
+  const origine = (body.origine_cible || "").trim();
+  if (!collId || !origine) return sendJSON(res, 400, { error: "Collectivité et origine ciblée requises." });
+  const coll = await db.prepare("SELECT id, role FROM users WHERE id=?").get(collId);
+  if (!coll || coll.role !== "collectivite") return sendJSON(res, 404, { error: "Collectivité introuvable." });
+  const id = (await db.prepare(
+    "INSERT INTO autorisations_diffusion (collectivite_id, origine_cible, motif, accordee_par, expire_le) VALUES (?,?,?,?,?)"
+  ).run(collId, origine, (body.motif || "").trim() || null, user.id, body.expire_le || null)).lastInsertRowid;
+  sendJSON(res, 201, { ok: true, id });
+});
+
+route("DELETE", "/api/admin/autorisations-diffusion/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  /* Révocation et non suppression : la trace de ce qui a été autorisé doit subsister. */
+  await db.prepare("UPDATE autorisations_diffusion SET revoquee_le=datetime('now') WHERE id=?").run(Number(params.id));
   sendJSON(res, 200, { ok: true });
 });
 
@@ -12300,12 +12408,39 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
       liste = await db.prepare("SELECT id,nom FROM listes_diffusion WHERE id=? AND proprietaire_id=?").get(liste_id, user.id);
       if (!liste) return sendJSON(res, 404, { error: "Liste de diffusion introuvable." });
     }
+    let origine = null, derogation = null;
     if (user.role === "collectivite") {
-      const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville FROM users WHERE id=?").get(user.id);
+      const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville,pays_origine_institution,origine1 FROM users WHERE id=?").get(user.id);
       perimetre = getPerimetre(coll);
+      origine = origineCollectivite(coll);
+      if (!origine) {
+        return sendJSON(res, 403, { code: "origine_indefinie",
+          error: "Votre origine institutionnelle n'est pas renseignée. Aucune diffusion collective n'est possible tant qu'elle n'a pas été déclarée et validée." });
+      }
+
+      /* Ciblage d'une AUTRE communauté d'origine : refusé, sauf dérogation tracée.
+         Le refus renvoie vers « Établir contact », qui reste la voie ouverte pour
+         collaborer avec un acteur d'une autre origine — la restriction porte sur la
+         diffusion de masse, pas sur la collaboration. */
+      const cibleOrigine = body.cible_origine ? String(body.cible_origine).trim() : null;
+      if (cibleOrigine && normOrigine(cibleOrigine) !== normOrigine(origine)) {
+        derogation = await autorisationDiffusion(user.id, cibleOrigine);
+        if (!derogation) {
+          return sendJSON(res, 403, {
+            code: "diffusion_hors_origine",
+            error: "Cette diffusion n'est pas autorisée vers cette communauté. Pour établir une collaboration avec ce groupe, utilisez le système Établir contact.",
+            origine_collectivite: origine,
+            origine_ciblee: cibleOrigine,
+          });
+        }
+      }
+
+      const audienceOrigine = derogation
+        ? audienceOrigineWhere(cibleOrigine, user.id, "u")   // dérogation : la communauté visée
+        : audienceOrigineWhere(origine, user.id, "u");       // règle générale : la sienne
       const { where: pw, params: pp } = perimetreWhere(perimetre, "u");
-      let sql = `SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw})`;
-      const args = [...pp];
+      let sql = `SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw}) AND ${audienceOrigine.where}`;
+      const args = [...pp, ...audienceOrigine.params];
       if (liste) { sql += ` AND u.id IN (SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL)`; args.push(liste.id); }
       try { nb = (await db.prepare(sql).get(...args))?.n || 0; } catch(e) { nb = 0; }
     } else {
@@ -12316,7 +12451,18 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
       try { nb = (await db.prepare(sql).get(...args))?.n || 0; } catch(e) { nb = 0; }
     }
     // La cible stockée reflète le périmètre réellement appliqué (transparence).
-    const cibleAppliquee = { ...(perimetre ? { perimetre, libelle: libellePerimetre(perimetre) } : { portee: "globale" }), ...(liste ? { liste_id: liste.id, liste_nom: liste.nom } : {}) };
+    const cibleAppliquee = {
+      ...(perimetre ? { perimetre, libelle: libellePerimetre(perimetre) } : { portee: "globale" }),
+      ...(liste ? { liste_id: liste.id, liste_nom: liste.nom } : {}),
+      /* L'origine réellement appliquée est enregistrée avec la communication : une
+         diffusion institutionnelle doit rester vérifiable après coup. */
+      ...(origine ? { origine } : {}),
+      /* origine_diffusee = la communauté réellement visée. C'est elle que le filtre de
+         RÉCEPTION consulte : sans elle, la règle ne vaudrait qu'à l'envoi et n'importe
+         quel appel direct la contournerait. */
+      ...(origine ? { origine_diffusee: derogation ? String(body.cible_origine).trim() : origine } : {}),
+      ...(derogation ? { derogation_id: derogation.id, derogation_motif: derogation.motif } : {}),
+    };
     // Alter table si colonnes manquantes (migration SQLite)
     try {
       await db.prepare("ALTER TABLE communications_institutionnelles ADD COLUMN photos_json TEXT DEFAULT '[]'").run();
@@ -12350,6 +12496,12 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
     // Toutes communications qui ne sont pas bloquées par l'utilisateur
     const desabo = (await db.prepare("SELECT institution_id FROM comm_desabonnements WHERE user_id=?").all(user.id)).map(r=>r.institution_id);
+    /* Origines déclarées par le membre + collectivités qu'il suit : les deux voies par
+       lesquelles il appartient légitimement à une audience. */
+    const moi = await db.prepare("SELECT origine1, origine2, nationalite1 FROM users WHERE id=?").get(user.id);
+    const mesOrigines = new Set([moi?.origine1, moi?.origine2, moi?.nationalite1].filter(Boolean).map(normOrigine));
+    const abonneA = new Set((await db.prepare("SELECT collectivite_id FROM abonnements_collectivite WHERE user_id=?").all(user.id)).map(r => Number(r.collectivite_id)));
+
     let rows = await db.prepare(`
       SELECT ci.*, u.nom AS emetteur_nom, u.role AS emetteur_role,
              u.type_organisme, u.type_institution, u.pays_exercice, u.region_exercice,
@@ -12367,7 +12519,20 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
         departement_exercice: r.departement_exercice, ville_exercice: r.ville_exercice,
         pays: r.e_pays, region: r.e_region, departement: r.e_departement, ville: r.e_ville,
       };
-      return membreDansPerimetre(coll, user);
+      if (!membreDansPerimetre(coll, user)) return false;
+
+      /* Règle d'origine : on ne reçoit une communication institutionnelle que si l'on
+         appartient à la communauté visée, ou si l'on s'est abonné à l'émetteur — un
+         abonnement est une démarche volontaire, donc une audience choisie.
+
+         Les communications ANTÉRIEURES à cette règle ne portent pas d'origine_diffusee :
+         les filtrer reviendrait à faire disparaître des messages déjà reçus. On conserve
+         pour elles le comportement territorial d'origine. */
+      const cible = safeParse(r.cible_json) || {};
+      const oDiff = cible.origine_diffusee;
+      if (!oDiff) return true;
+      if (abonneA.has(Number(r.emetteur_id))) return true;
+      return mesOrigines.has(normOrigine(oDiff));
     });
     if (desabo.length) rows = rows.filter(r => !desabo.includes(null) && !desabo.includes(r.emetteur_id));
     sendJSON(res, 200, { communications: rows.slice(0, 30) });

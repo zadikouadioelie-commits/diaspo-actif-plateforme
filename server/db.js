@@ -1880,6 +1880,28 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_dc_destinataire ON demandes_contact(destinataire_id, statut);
   CREATE INDEX IF NOT EXISTS idx_dc_demandeur ON demandes_contact(demandeur_id, statut);
 
+  /* ===== AUTORISATIONS DE DIFFUSION INTER-ORIGINES =====
+     Une collectivité ne diffuse qu'auprès de sa propre communauté d'origine. Cette table
+     porte les dérogations accordées par l'administration : organisations internationales,
+     événements multiculturels, campagnes communes, partenariats validés.
+
+     Chaque dérogation est TRACÉE — qui l'a accordée, quand, pour quelle origine, pour quel
+     motif — parce qu'une communication institutionnelle vers une autre diaspora peut avoir
+     des conséquences diplomatiques : il faut pouvoir dire qui l'a permise. */
+  CREATE TABLE IF NOT EXISTS autorisations_diffusion (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    collectivite_id INTEGER NOT NULL,
+    origine_cible TEXT NOT NULL,
+    motif TEXT,
+    accordee_par INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    expire_le TEXT,
+    revoquee_le TEXT,
+    FOREIGN KEY(collectivite_id) REFERENCES users(id),
+    FOREIGN KEY(accordee_par) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_autor_diff ON autorisations_diffusion(collectivite_id, origine_cible);
+
   /* ===== BLOCAGES DE CONTACT =====
      Un blocage interdit désormais RÉELLEMENT l'échange : plus de demande possible, et
      plus aucun message. Auparavant la table existait mais n'était vérifiée nulle part. */
