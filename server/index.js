@@ -1536,7 +1536,10 @@ const VITRINE_MODULES_REGISTRY = {
   demande_devis:         { label: "Demande de devis",          categorie: "interaction", implemente: true },
   demande_partenariat:   { label: "Demande de partenariat",    categorie: "interaction", implemente: true },
   reservation:           { label: "Réservation",                categorie: "interaction", implemente: true },
-  billetterie:           { label: "Billetterie",                categorie: "interaction", implemente: false },
+  /* "Billetterie" retiré de la bibliothèque (2026-07-25) : la vente de billets est désormais
+     intégrée à la section « Événements », qui affiche tarif et bouton de réservation quand des
+     billets existent. Deux sections d'événements alimentées par deux tables différentes
+     auraient obligé le visiteur à comprendre une distinction purement technique. */
   temoignages:           { label: "Témoignages",                categorie: "interaction", implemente: true },
   avis:                  { label: "Avis clients",               categorie: "interaction", implemente: true },
   carte:                 { label: "Carte",                      categorie: "interaction", implemente: true },
@@ -1567,7 +1570,7 @@ const VITRINE_TEMPLATES = {
   },
   evenement: {
     label: "🎭 Événement", pour: "Festivals, conférences, rencontres, événements culturels, manifestations",
-    actifs: ["a_propos","equipe","partenaires","evenements","galerie_photos","reservation","billetterie","actualites","reseaux_sociaux"],
+    actifs: ["a_propos","equipe","partenaires","evenements","galerie_photos","reservation","actualites","reseaux_sociaux"],
     optionnels: ["produits","documents"],
   },
   commercial: {
@@ -16976,11 +16979,12 @@ ${jsonLd}
         u.nom AS organisateur_nom,
         COALESCE(tkc.billets_vendus,0) AS billets_vendus,
         COALESCE(ttc.nb_types,0) AS nb_types,
+        ttc.prix_min AS prix_min,
         ${expositionExpr} AS statut_exposition
         FROM events e
         LEFT JOIN users u ON u.id=e.organisateur_id
         LEFT JOIN (SELECT event_id, COUNT(*) AS billets_vendus FROM tickets WHERE payment_status='paid' GROUP BY event_id) tkc ON tkc.event_id=e.id
-        LEFT JOIN (SELECT event_id, COUNT(*) AS nb_types FROM ticket_types WHERE actif=1 GROUP BY event_id) ttc ON ttc.event_id=e.id
+        LEFT JOIN (SELECT event_id, COUNT(*) AS nb_types, MIN(prix) AS prix_min FROM ticket_types WHERE actif=1 GROUP BY event_id) ttc ON ttc.event_id=e.id
         WHERE 1=1`;
       const args = [];
       if (q.statut) { sql += ' AND e.statut=?'; args.push(q.statut); }

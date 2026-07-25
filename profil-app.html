@@ -2624,15 +2624,49 @@ async function renderVitrineVisitor(init) {
     const boxEvt = document.getElementById('pvt-evenements-body');
     if (boxEvt) {
       try {
-        const r = await api('GET', `/evenements?owner=${encodeURIComponent(owner)}`);
-        const liste = (r.evenements || []).filter(e => !e.visibilite || e.visibilite === 'public');
+        /* La plateforme gère DEUX systèmes d'événements sur deux tables distinctes :
+           « evenements » (annonces, inscription libre) et « events » (billetterie payante,
+           quotas, QR code). Les afficher dans deux sections séparées obligeait le visiteur à
+           comprendre une distinction purement technique. On les fusionne donc en une seule
+           liste, où le tarif et le bouton de réservation n'apparaissent que si des billets
+           existent réellement. */
+        const [rAnnonces, rBillets] = await Promise.all([
+          api('GET', `/evenements?owner=${encodeURIComponent(owner)}`).catch(() => ({})),
+          api('GET', `/events?organisateur_id=${encodeURIComponent(owner)}`).catch(() => ({})),
+        ]);
+
+        const annonces = (rAnnonces.evenements || [])
+          .filter(e => !e.visibilite || e.visibilite === 'public')
+          .map(e => ({
+            id: e.id, lien: `evenement.html?id=${e.id}`, titre: e.titre, lieu: e.lieu,
+            date: e.date_evt, image: e.image_couverture || e.image_url, billetterie: false,
+          }));
+
+        /* Seuls les événements réellement en vente : un brouillon ou un événement clos ne doit
+           pas apparaître sur la vitrine publique. */
+        const billetterie = (rBillets.events || [])
+          .filter(e => e.statut === 'publie')
+          .map(e => ({
+            id: e.id, lien: `evenement-billetterie.html?id=${e.id}`, titre: e.titre, lieu: e.ville || e.adresse,
+            date: e.date_debut, image: e.image_b64, billetterie: true,
+            prix: e.prix_min, places: (e.capacite || 0) - (e.billets_vendus || 0),
+          }));
+
+        const liste = [...billetterie, ...annonces]
+          .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+
         boxEvt.innerHTML = liste.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;">
-          ${liste.slice(0, 6).map(e => `<a href="evenement.html?id=${e.id}" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;">
-            ${e.image_couverture || e.image_url ? `<img loading="lazy" src="${esc(e.image_couverture || e.image_url)}" alt="" style="width:100%;height:110px;object-fit:cover;display:block;">` : ''}
+          ${liste.slice(0, 6).map(e => `<a href="${e.lien}" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;">
+            ${e.image ? `<img loading="lazy" src="${esc(e.image)}" alt="" style="width:100%;height:110px;object-fit:cover;display:block;">` : ''}
             <div style="padding:12px;">
-              <div style="font-size:11.5px;font-weight:800;color:#2F6BED;text-transform:uppercase;letter-spacing:.03em;">${esc(e.date_evt || '')}</div>
+              <div style="font-size:11.5px;font-weight:800;color:#2F6BED;text-transform:uppercase;letter-spacing:.03em;">${esc(String(e.date || '').slice(0, 16))}</div>
               <div style="font-size:13.5px;font-weight:700;color:#122A4D;margin-top:3px;line-height:1.35;">${esc(e.titre || '')}</div>
               ${e.lieu ? `<div style="font-size:12px;color:#8794A7;margin-top:4px;">📍 ${esc(e.lieu)}</div>` : ''}
+              ${e.billetterie ? `<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                  <span style="font-size:13px;font-weight:800;color:#2F6BED;">${Number(e.prix) > 0 ? esc(String(e.prix)) + ' €' : 'Gratuit'}</span>
+                  <span style="font-size:11.5px;font-weight:700;background:#2F6BED;color:#fff;padding:4px 10px;border-radius:7px;">🎟️ Réserver</span>
+                </div>
+                ${e.places > 0 && e.places <= 20 ? `<div style="font-size:11px;color:#b45309;margin-top:5px;">Plus que ${e.places} place${e.places > 1 ? 's' : ''}</div>` : ''}` : ''}
             </div></a>`).join('')}
         </div>` : vide('Aucun événement publié pour le moment.', 'dashboard-initiative.html#evenements', 'Créer un événement');
       } catch (e) { boxEvt.innerHTML = vide('Événements momentanément indisponibles.'); }
