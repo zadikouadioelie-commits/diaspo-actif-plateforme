@@ -5974,13 +5974,18 @@ async function getDecouvertePremium(userId) {
   return { date_expiration: row.date_expiration };
 }
 
+/* Durée de la période « Découverte Premium » offerte à la création du compte.
+   Portée de 30 à 90 jours le 2026-07-25. Constante nommée plutôt que valeur en dur :
+   la durée est une décision commerciale, elle doit se changer à un seul endroit. */
+const DECOUVERTE_PREMIUM_JOURS = 90;
+
 async function accorderDecouvertePremium(userId, role) {
   const type = PREMIUM_ACCRED_TYPE_BY_ROLE[role];
   if (!type) return;
   try {
     const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
     if (!def) return;
-    const expire = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const expire = new Date(Date.now() + DECOUVERTE_PREMIUM_JOURS * 24 * 60 * 60 * 1000).toISOString();
     await db.prepare(`
       INSERT INTO user_accreditations (user_id, accred_id, statut, date_expiration, type_tarif, montant_paye)
       VALUES (?,?,?,?,?,0)
