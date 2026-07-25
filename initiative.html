@@ -306,7 +306,13 @@ const DOMAIN_GRAD = {
               🔔 ${estAbonne ? 'Abonné' : "S'abonner"}
             </button>
           ` : me ? '' : `<a href="login.html" class="btn btn-orange">🔔 S'abonner</a>`}
-          <a href="messagerie.html?init=${init.id}" class="btn btn-outline">✏️ Écrire</a>
+          ${init.owner_user_id
+            /* Le serveur décide de l'action possible et le bouton la reflète : « Message »
+               si l'échange est ouvert, « Demande de liaison » avec son message imposé sinon.
+               Auparavant « Écrire » menait toujours à la messagerie, où l'utilisateur se
+               heurtait à la règle après coup. Voir initBoutonsRelation (assets/app.js). */
+            ? `<span data-relation-user="${init.owner_user_id}" data-relation-origine="profil" data-relation-classe="btn btn-outline"></span>`
+            : `<a href="messagerie.html?init=${init.id}" class="btn btn-outline">✏️ Écrire</a>`}
         </div>
       </div>
 
@@ -686,7 +692,9 @@ const DOMAIN_GRAD = {
           ${FORMULES.length ? `<a class="rejoindre-btn primary" href="adhesions.html?init=${init.id}">🎫 Adhérer / Cotiser</a>` : ''}
           <button class="rejoindre-btn" onclick="contacterBesoin('Je souhaite devenir bénévole')">🙋 Devenir bénévole</button>
           <button class="rejoindre-btn" onclick="contacterBesoin('Proposition de partenariat')">🤝 Devenir partenaire</button>
-          <a class="rejoindre-btn" href="messagerie.html?init=${init.id}">✉️ Contacter</a>
+          ${init.owner_user_id
+            ? `<span data-relation-user="${init.owner_user_id}" data-relation-origine="profil" data-relation-classe="rejoindre-btn"></span>`
+            : `<a class="rejoindre-btn" href="messagerie.html?init=${init.id}">✉️ Contacter</a>`}
         `}
       </div>
       ${labels.length ? `<div class="side-card"><h4>🏆 Labels & accréditations</h4>${labels.map(l => `<div class="side-list-item">${l}</div>`).join('')}</div>` : ''}
@@ -744,6 +752,10 @@ const DOMAIN_GRAD = {
 
   renderColLeft();
   renderColRight();
+  /* La page se construit APRÈS le chargement du document : sans cet appel explicite, les
+     emplacements [data-relation-user] resteraient vides — le composant ne se déclenche
+     qu'au DOMContentLoaded, déjà passé à ce stade. */
+  if (window.initBoutonsRelation) window.initBoutonsRelation(document);
   if (galerie.length && typeof loadGaleriePhotoCounts === 'function') loadGaleriePhotoCounts('initiative', init.id);
 
   /* ══ ÉDITION INLINE (propriétaire) ══ */
@@ -755,6 +767,7 @@ const DOMAIN_GRAD = {
     const r = await api('GET', `/initiatives/${init.id}`);
     Object.assign(init, r.initiative);
     renderColLeft(); renderColRight();
+    if (window.initBoutonsRelation) window.initBoutonsRelation(document);
   }
 
   function openEditModal(titre, bodyHtml, onSave) {
