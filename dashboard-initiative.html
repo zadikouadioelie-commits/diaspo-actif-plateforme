@@ -1471,11 +1471,16 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 86px);overflow:hidden;">
             <h3 style="margin:0 0 4px;font-size:15px;">📱 Aperçu en direct</h3>
             <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Se met à jour automatiquement après chaque modification.</p>
-            <div style="display:flex;gap:6px;margin-bottom:10px;flex:none;">
-              <button class="btn btn-sm btn-orange" id="pv-preview-desktop" onclick="pvSetPreviewDevice('desktop')" title="Ordinateur">🖥️</button>
-              <button class="btn btn-sm btn-outline" id="pv-preview-tablet" onclick="pvSetPreviewDevice('tablet')" title="Tablette">📱</button>
-              <button class="btn btn-sm btn-outline" id="pv-preview-mobile" onclick="pvSetPreviewDevice('mobile')" title="Mobile">📱</button>
-              <a href="profil.html?preview=draft#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;margin-left:auto;" title="Ouvrir dans un onglet">↗</a>
+            <!-- Selecteur d'appareil (controle segmente). Tablette et Mobile partageaient le
+                 meme 📱 : deux fonctions, une seule icone, impossible de les distinguer sans
+                 survol — donc invisible au toucher. Trois glyphes distincts + libelle ecrit.
+                 (Il n'existe pas d'emoji tablette : 💻 assure le contraste visuel entre le
+                 grand et le petit ecran, le mot "Tablette" leve toute ambiguite.) -->
+            <div style="display:flex;gap:6px;margin-bottom:10px;flex:none;flex-wrap:wrap;">
+              <button class="btn btn-sm btn-orange"  id="pv-preview-desktop" onclick="pvSetPreviewDevice('desktop')" aria-pressed="true"  title="Aperçu ordinateur" style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;"><span style="font-size:15px;line-height:1;">🖥️</span>Ordinateur</button>
+              <button class="btn btn-sm btn-outline" id="pv-preview-tablet"  onclick="pvSetPreviewDevice('tablet')"  aria-pressed="false" title="Aperçu tablette"   style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;"><span style="font-size:15px;line-height:1;">💻</span>Tablette</button>
+              <button class="btn btn-sm btn-outline" id="pv-preview-mobile"  onclick="pvSetPreviewDevice('mobile')"  aria-pressed="false" title="Aperçu mobile"     style="flex:1;min-width:0;justify-content:center;gap:5px;padding-left:6px;padding-right:6px;"><span style="font-size:15px;line-height:1;">📱</span>Mobile</button>
+              <a href="profil.html?preview=draft#vitrine" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;flex:none;" title="Ouvrir dans un onglet" aria-label="Ouvrir l'aperçu dans un nouvel onglet">↗</a>
             </div>
             <!-- direction:rtl place la barre verticale du panneau sur son bord GAUCHE : elle
                  reste ainsi constamment visible et nettement separee de celle de la page, qui
@@ -4436,7 +4441,10 @@ function pvSetPreviewDevice(device) {
   if (frame) frame.style.setProperty('width', PV_PREVIEW_WIDTHS[device] || '1400px', 'important');
   ['desktop','tablet','mobile'].forEach(d => {
     const btn = document.getElementById('pv-preview-' + d);
-    if (btn) { btn.classList.toggle('btn-orange', d === device); btn.classList.toggle('btn-outline', d !== device); }
+    if (!btn) return;
+    btn.classList.toggle('btn-orange', d === device);
+    btn.classList.toggle('btn-outline', d !== device);
+    btn.setAttribute('aria-pressed', String(d === device)); // etat annonce, pas seulement colore
   });
   pvResetPreviewScroll();
 }
