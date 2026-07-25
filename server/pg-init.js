@@ -108,8 +108,9 @@ async function pgInit() {
 /* Migrations de colonnes ajoutées via ALTER TABLE dans db.js
    (jamais exécutées en Postgres car pg-init ignore les ALTER).
    Idempotent grâce à ADD COLUMN IF NOT EXISTS. */
-async function migratePg(pool) {
-  const cols = [
+/* Liste unique des colonnes attendues — partagee entre la migration et le controle
+   post-deploiement, pour qu'elles ne puissent jamais diverger. */
+const COLONNES_MIGRATION = [
     // Billetterie V1 — early-bird + attributs enrichis par type de billet
     ['ticket_types', 'avantages', 'TEXT'],
     ['ticket_types', 'devise', "TEXT DEFAULT 'EUR'"],
@@ -750,7 +751,10 @@ async function migratePg(pool) {
     ['formations', 'date_archivage', 'TEXT'],
     ['formations', 'date_suppression_definitive', 'TEXT'],
     ['formations', 'logo_url', 'TEXT'],
-  ];
+];
+
+async function migratePg(pool) {
+  const cols = COLONNES_MIGRATION;
   for (const [table, col, type] of cols) {
     try {
       await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} ${type}`);
@@ -1032,3 +1036,14 @@ async function seedPg(pool) {
 }
 
 module.exports = pgInit;
+
+/* Colonnes attendues par le schema, exposees pour le controle post-deploiement.
+   migratePg() les applique au demarrage, mais uniquement lors d'un demarrage a froid ET si
+   le verrou consultatif est libre : une instance qui ne l'obtient pas sert les requetes avec
+   l'ancien schema. Une migration non jouee etait donc INVISIBLE — elle ne se manifestait que
+   par une erreur 500 au premier enregistrement touchant une colonne manquante.
+   /api/admin/schema-check compare cette liste au schema reel pour rendre l'ecart verifiable
+   immediatement apres un deploiement. */
+module.exports.colonnesAttendues = function colonnesAttendues() {
+  return COLONNES_MIGRATION;
+};

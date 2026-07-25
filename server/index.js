@@ -6192,6 +6192,55 @@ route("GET", "/api/admin/premium/observations", async (req, res) => {
   });
 });
 
+/* GET /api/admin/schema-check — colonnes déclarées mais absentes de la base réelle.
+   Né d'un incident : un déploiement avait ajouté trois colonnes à une requête UPDATE
+   existante alors que la migration PostgreSQL n'avait pas encore tourné. Résultat, TOUTE
+   sauvegarde de vitrine échouait — et rien ne le signalait. La migration ne s'exécute en
+   effet qu'au démarrage à froid ET si le verrou consultatif est libre.
+   Ce contrôle transforme un écart silencieux en écart constatable, à lancer juste après
+   chaque déploiement. */
+route("GET", "/api/admin/schema-check", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  try {
+    const attendues = require('./pg-init').colonnesAttendues();
+    const postgres = !!process.env.DATABASE_URL;
+    const manquantes = [];
+    const parTable = {};
+    attendues.forEach(([t, c]) => { (parTable[t] = parTable[t] || []).push(c); });
+
+    for (const [table, colonnes] of Object.entries(parTable)) {
+      let existantes = [];
+      try {
+        if (postgres) {
+          const rows = await db.prepare(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=?"
+          ).all(table);
+          existantes = rows.map(r => r.column_name);
+        } else {
+          const rows = await db.prepare(`PRAGMA table_info(${table})`).all();
+          existantes = rows.map(r => r.name);
+        }
+      } catch (_) { continue; } // table absente : hors sujet ici
+      if (!existantes.length) continue;
+      colonnes.forEach(c => { if (!existantes.includes(c)) manquantes.push({ table, colonne: c }); });
+    }
+
+    sendJSON(res, 200, {
+      moteur: postgres ? 'postgresql' : 'sqlite',
+      colonnes_attendues: attendues.length,
+      colonnes_manquantes: manquantes.length,
+      SCHEMA_A_JOUR: manquantes.length === 0,
+      detail: manquantes.slice(0, 50),
+      remede: manquantes.length
+        ? "Migration pas encore jouée sur cette base. Elle s'applique au prochain démarrage à froid ; sinon redéployer. En attendant, aucune requête ne doit référencer ces colonnes."
+        : null,
+    });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "schema-check"));
+  }
+});
+
 /* GET /api/premium/statut — état de l'abonnement du compte connecté. */
 route("GET", "/api/premium/statut", async (req, res) => {
   const user = await getCurrentUser(req);
