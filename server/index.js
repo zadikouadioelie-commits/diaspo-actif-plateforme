@@ -6018,8 +6018,8 @@ async function getPremiumStatut(userId, role) {
   if (isPremiumDemoUnlock()) return { ...base, concerne: true, actif: true, type: type || null, source: 'demo_unlock' };
 
   const def = type ? await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type) : null;
-  const nouv = def ? await db.prepare("SELECT date_expiration, type_tarif FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id) : null;
-  const ancien = type ? await db.prepare("SELECT date_expiration FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type) : null;
+  const nouv = def ? await db.prepare("SELECT date_expiration, type_tarif, montant_paye FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id) : null;
+  const ancien = type ? await db.prepare("SELECT date_expiration, frais_acces FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type) : null;
   let ligne = nouv || ancien;
   let source = nouv ? 'user_accreditations' : (ancien ? 'compte_accreditations' : null);
 
@@ -6031,10 +6031,12 @@ async function getPremiumStatut(userId, role) {
   const finGratuite = u ? finPeriodeGratuite(u.created_at) : null;
 
   /* Un abonnement PAYANT n'est jamais prolongé par la remise à zéro : son échéance fait foi.
-     Seuls les essais gratuits ("decouverte") en profitent. Les lignes de l'ancien format,
-     dépourvues de type_tarif, sont traitées comme payantes — prudence : mieux vaut ne pas
-     offrir du temps que d'en offrir à tort sur un abonnement acheté. */
-  const estEssaiGratuit = !!(nouv && nouv.type_tarif === 'decouverte');
+     Le critère est le MONTANT RÉELLEMENT PAYÉ, et non l'étiquette type_tarif : en production
+     les accréditations offertes ne portent pas toutes la mention "decouverte", et s'y fier
+     excluait de vrais essais gratuits de la remise à zéro — constaté après déploiement, la
+     date restait inchangée. Montant nul ou absent = période offerte, donc prolongeable. */
+  const montantPaye = nouv ? Number(nouv.montant_paye || 0) : Number((ancien && ancien.frais_acces) || 0);
+  const estEssaiGratuit = !!ligne && !(montantPaye > 0);
 
   if (!ligne) {
     if (!finGratuite) return { ...base, concerne: true, actif: false, statut: 'expire', type: type || null };
