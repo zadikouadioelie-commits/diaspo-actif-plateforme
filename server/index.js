@@ -6383,11 +6383,34 @@ route("GET", "/api/admin/schema-check", async (req, res) => {
       colonnes.forEach(c => { if (!existantes.includes(c)) manquantes.push({ table, colonne: c }); });
     }
 
+    /* Tables entierement absentes — cas plus grave qu'une colonne manquante et jusqu'ici
+       invisible : createMissingTables() journalise ses echecs dans la console et poursuit,
+       si bien qu'une table jamais creee ne se manifeste que par des erreurs 500 sur toutes
+       les routes qui la touchent. */
+    const tablesAttendues = [...new Set(
+      require('fs').readFileSync(require('path').join(__dirname, 'db.js'), 'utf8')
+        .match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/gi) || []
+    )].map(m => m.replace(/CREATE TABLE IF NOT EXISTS\s+/i, ''));
+    const tablesManquantes = [];
+    for (const t of tablesAttendues) {
+      try {
+        if (postgres) {
+          const r = await db.prepare("SELECT 1 AS ok FROM information_schema.tables WHERE table_schema='public' AND table_name=?").get(t);
+          if (!r) tablesManquantes.push(t);
+        } else {
+          const r = await db.prepare("SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name=?").get(t);
+          if (!r) tablesManquantes.push(t);
+        }
+      } catch (_) {}
+    }
+
     sendJSON(res, 200, {
       moteur: postgres ? 'postgresql' : 'sqlite',
       colonnes_attendues: attendues.length,
       colonnes_manquantes: manquantes.length,
-      SCHEMA_A_JOUR: manquantes.length === 0,
+      tables_attendues: tablesAttendues.length,
+      tables_manquantes: tablesManquantes,
+      SCHEMA_A_JOUR: manquantes.length === 0 && tablesManquantes.length === 0,
       detail: manquantes.slice(0, 50),
       remede: manquantes.length
         ? "Migration pas encore jouée sur cette base. Elle s'applique au prochain démarrage à froid ; sinon redéployer. En attendant, aucune requête ne doit référencer ces colonnes."
