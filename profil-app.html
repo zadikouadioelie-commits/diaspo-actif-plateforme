@@ -2806,8 +2806,15 @@ async function renderVitrineVisitor(init) {
     <div class="pvt-section-body" id="pvt-formations-body"><span style="color:#94a3b8;font-style:italic;font-size:13px;">Chargement…</span></div>
   </section>` : '';
 
+  /* Actualités / Publications : le rendu existait deja (renderPublications + endpoint
+     /initiatives/:id/publications) mais n'etait pas relie au systeme de modules — le module
+     etait donc affiche "🔜 Bientot" alors que la fonctionnalite marchait. On se contente de
+     brancher le conteneur pour qu'il soit activable, masquable et reordonnable comme les autres. */
+  const actualitesSec = modOn('actualites') ? `<div id="pvt-publications"></div>` : '';
+
   const MODULE_SECTIONS = [
     ['evenements', evenementsSec], ['formations_catalogue', formationsSec],
+    ['actualites', actualitesSec],
     ['offre_flash', offreFlashSec], ['a_propos', presentation], ['expertise', expertiseSec],
     ['certifications', certificationsSec], ['vision_objectifs', visionSec], ['catalogue', collectionsSec],
     ['produits', produitsSec], ['services', services], ['pourquoi_choisir', pourquoiSec],
@@ -2827,7 +2834,6 @@ async function renderVitrineVisitor(init) {
       ${hero}
       ${actionbar}
       ${sortedModuleSections}
-      <div id="pvt-publications"></div>
       <div class="pvt-grid2">${promosSec}${meilleuresVentesSec}</div>
       ${contactSec}
     </div>

@@ -1523,7 +1523,7 @@ const VITRINE_MODULES_REGISTRY = {
   temoignages:           { label: "Témoignages",                categorie: "interaction", implemente: true },
   avis:                  { label: "Avis clients",               categorie: "interaction", implemente: true },
   carte:                 { label: "Carte",                      categorie: "interaction", implemente: true },
-  actualites:            { label: "Actualités / Publications", categorie: "communication", implemente: false },
+  actualites:            { label: "Actualités / Publications", categorie: "communication", implemente: true },
   newsletter:            { label: "Newsletter",                 categorie: "communication", implemente: false },
   reseaux_sociaux:       { label: "Réseaux sociaux",            categorie: "communication", implemente: true },
   vision_objectifs:      { label: "Vision et objectifs",        categorie: "impact", implemente: true },
