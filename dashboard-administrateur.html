@@ -11509,18 +11509,32 @@ async function diagReparer() {
   try {
     const d = await api('POST', '/admin/reparer-schema');
     const creees = d.tables_creees || [], echecs = d.echecs || [];
+    const colonnes = d.colonnes_ajoutees || [], absentes = d.tables_absentes || [], illisibles = d.tables_illisibles || [];
     let html = `Base passée de <strong>${d.tables_avant}</strong> à <strong>${d.tables_apres}</strong> tables.`;
-    if (creees.length) html += `<br>✅ Créées : <code style="font-size:11.5px;">${creees.join(', ')}</code>`;
+    if (creees.length)  html += `<br>✅ Tables créées : <code style="font-size:11.5px;">${creees.join(', ')}</code>`;
+    /* Les colonnes ajoutées n'étaient PAS affichées : le bouton pouvait réparer sans le dire,
+       et annoncer « rien à réparer » juste après avoir agi. */
+    if (colonnes.length) html += `<br>✅ Champs ajoutés : <code style="font-size:11.5px;">${colonnes.join(', ')}</code>`;
     if (d.migration && d.migration !== 'ok') html += `<br>⚠️ Migration des colonnes : ${d.migration}`;
-    if (echecs.length) {
-      html += `<br><br>❌ <strong>${echecs.length} création(s) impossible(s)</strong> :<ul style="margin:6px 0 0;padding-left:18px;font-size:12px;">`
-           + echecs.map(x => `<li><code>${x.objet}</code> — ${x.erreur}</li>`).join('') + `</ul>`;
-      diagAfficher(html, '#dc2626');
-    } else if (creees.length) {
-      diagAfficher(`✅ <strong>Base réparée</strong><br>${html}`, '#16a34a');
-    } else {
-      diagAfficher(`✅ <strong>Rien à réparer</strong> — ${html}`, '#16a34a');
+
+    /* Une table déclarée mais absente était ignorée en silence — exactement le cas qu'on
+       cherchait. Elle doit apparaître en rouge, pas disparaître du rapport. */
+    if (absentes.length) {
+      html += `<br><br>❌ <strong>${absentes.length} table(s) déclarée(s) mais ABSENTE(S)</strong> :<br><code style="font-size:11.5px;">${absentes.join(', ')}</code>`;
     }
+    if (illisibles.length) {
+      html += `<br><br>❌ <strong>${illisibles.length} table(s) présente(s) mais ILLISIBLE(S)</strong> :<ul style="margin:6px 0 0;padding-left:18px;font-size:12px;">`
+           + illisibles.map(x => `<li><code>${x.table}</code> — ${x.erreur}</li>`).join('') + `</ul>`;
+    }
+    if (echecs.length) {
+      html += `<br><br>❌ <strong>${echecs.length} opération(s) impossible(s)</strong> :<ul style="margin:6px 0 0;padding-left:18px;font-size:12px;">`
+           + echecs.map(x => `<li><code>${x.objet}</code> — ${x.erreur}</li>`).join('') + `</ul>`;
+    }
+
+    const probleme = echecs.length || absentes.length || illisibles.length;
+    if (probleme)                               diagAfficher(html, '#dc2626');
+    else if (creees.length || colonnes.length)  diagAfficher(`✅ <strong>Base réparée</strong><br>${html}`, '#16a34a');
+    else                                        diagAfficher(`✅ <strong>Rien à réparer</strong> — ${html}`, '#16a34a');
   } catch (e) { diagAfficher(`❌ ${diagMessageErreur(e)}`, '#dc2626'); }
 }
 

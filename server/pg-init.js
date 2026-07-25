@@ -162,11 +162,29 @@ async function reparerSchema() {
   try { colonnes = await ajouterColonnesManquantes(pool); }
   catch (e) { colonnes.echecs.push({ objet: '(analyse des colonnes)', erreur: e.message }); }
   const apres = await listerTables(pool);
+
+  /* Contrôle de lecture réelle. Compter les tables ne suffit pas : le 2026-07-25, le rapport
+     annonçait « 294 sur 294, rien à réparer » pendant que toute requête sur demandes_contact
+     renvoyait 500. Une table peut exister et rester illisible (colonne absente, type
+     incompatible). On interroge donc chacune pour de bon, et on remonte le message PostgreSQL
+     tel quel — c'est lui qu'on cherche depuis le début, et rien ne le remplace. */
+  const declarees = Object.keys(colonnesDeclareesParTable());
+  const presentes = new Set(apres);
+  const tables_absentes = declarees.filter(t => !presentes.has(t));
+  const tables_illisibles = [];
+  for (const t of declarees) {
+    if (!presentes.has(t)) continue;
+    try { await pool.query(`SELECT * FROM ${t} LIMIT 1`); }
+    catch (e) { tables_illisibles.push({ table: t, erreur: e.message }); }
+  }
+
   return {
     tables_avant: avant.length,
     tables_apres: apres.length,
     tables_creees: apres.filter(t => !avant.includes(t)),
     colonnes_ajoutees: colonnes.ajoutees,
+    tables_absentes,
+    tables_illisibles,
     echecs: [...echecs, ...colonnes.echecs],
     migration,
   };
