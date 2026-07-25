@@ -5980,6 +5980,29 @@ const PREMIUM_PALIERS_RELANCE = [
   { jours: 1,  col: 'relance_24h_le' },
 ];
 
+/* Remise à zéro ponctuelle des périodes gratuites (décision du 2026-07-25).
+   Tous les comptes existants repartent du 26 juillet 2026 pour 3 mois, soit une gratuité
+   jusqu'au 26 octobre. Les comptes créés ensuite comptent depuis LEUR propre création : la
+   date plancher devient alors sans effet, et la règle reste individuelle comme prévu.
+
+   C'est une date PLANCHER, pas une date de fin commune : elle relève le point de départ,
+   elle ne fixe pas l'échéance. Le choix d'un calcul plutôt que d'une écriture en base évite
+   un script à lancer sur la production, couvre les comptes sans ligne d'abonnement (les 12
+   Collectivités n'en ont aucune) et reste réversible en changeant cette seule constante.
+
+   Les abonnements PAYANTS en sont exclus : leur échéance propre fait foi, on ne prolonge
+   jamais gratuitement un abonnement acheté. */
+const PREMIUM_DATE_PLANCHER = new Date('2026-07-26T00:00:00.000Z');
+
+/* Fin de la période gratuite d'un compte, en tenant compte de la remise à zéro. */
+function finPeriodeGratuite(createdAt) {
+  if (!createdAt) return null;
+  const cree = new Date(String(createdAt).replace(' ', 'T'));
+  if (isNaN(cree.getTime())) return null;
+  const depart = cree.getTime() > PREMIUM_DATE_PLANCHER.getTime() ? cree : PREMIUM_DATE_PLANCHER;
+  return finDecouvertePremium(depart.toISOString());
+}
+
 /* Statut Premium détaillé — SOURCE UNIQUE pour tous les modules réservés à l'abonnement.
    Renvoie non seulement l'accès, mais la date de fin et les jours restants : c'est ce qui
    permet d'avertir avant l'échéance plutôt que de couper sans prévenir.
@@ -5995,22 +6018,36 @@ async function getPremiumStatut(userId, role) {
   if (isPremiumDemoUnlock()) return { ...base, concerne: true, actif: true, type: type || null, source: 'demo_unlock' };
 
   const def = type ? await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type) : null;
-  const nouv = def ? await db.prepare("SELECT date_expiration FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id) : null;
+  const nouv = def ? await db.prepare("SELECT date_expiration, type_tarif FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id) : null;
   const ancien = type ? await db.prepare("SELECT date_expiration FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type) : null;
   let ligne = nouv || ancien;
   let source = nouv ? 'user_accreditations' : (ancien ? 'compte_accreditations' : null);
 
-  /* Aucun abonnement enregistré : on retombe sur la période gratuite CALCULÉE depuis la date
-     de création du compte. C'est ce qui rend la règle universelle — Collectivité, qui n'a
-     aucun type d'abonnement dédié, et tout type de compte ajouté plus tard en bénéficient
-     sans une ligne de code de plus. Aucune date de fin globale n'intervient : chaque compte
-     suit son propre calendrier. */
+  /* Période gratuite calculée : 3 mois depuis la création du compte, jamais avant la date
+     plancher de remise à zéro. Elle rend la règle universelle — Collectivité, qui n'a aucun
+     type d'abonnement dédié, et tout type de compte ajouté plus tard en bénéficient sans une
+     ligne de code de plus. */
+  const u = await db.prepare("SELECT created_at FROM users WHERE id=?").get(userId);
+  const finGratuite = u ? finPeriodeGratuite(u.created_at) : null;
+
+  /* Un abonnement PAYANT n'est jamais prolongé par la remise à zéro : son échéance fait foi.
+     Seuls les essais gratuits ("decouverte") en profitent. Les lignes de l'ancien format,
+     dépourvues de type_tarif, sont traitées comme payantes — prudence : mieux vaut ne pas
+     offrir du temps que d'en offrir à tort sur un abonnement acheté. */
+  const estEssaiGratuit = !!(nouv && nouv.type_tarif === 'decouverte');
+
   if (!ligne) {
-    const u = await db.prepare("SELECT created_at FROM users WHERE id=?").get(userId);
-    const finGratuite = u ? finDecouvertePremium(u.created_at) : null;
     if (!finGratuite) return { ...base, concerne: true, actif: false, statut: 'expire', type: type || null };
     ligne = { date_expiration: finGratuite.toISOString() };
     source = 'periode_gratuite_creation';
+  } else if (estEssaiGratuit && finGratuite) {
+    /* L'essai court jusqu'à la plus lointaine des deux dates : sa propre échéance ou celle
+       issue de la remise à zéro. On ne raccourcit jamais un essai en cours. */
+    const finLigne = ligne.date_expiration ? new Date(ligne.date_expiration).getTime() : 0;
+    if (finGratuite.getTime() > finLigne) {
+      ligne = { date_expiration: finGratuite.toISOString() };
+      source = 'periode_gratuite_remise_a_zero';
+    }
   }
 
   const fin = ligne.date_expiration ? new Date(ligne.date_expiration).getTime() : null;
