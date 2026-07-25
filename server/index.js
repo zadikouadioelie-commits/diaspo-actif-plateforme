@@ -321,6 +321,16 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   /* Sécurité : le rôle "administrateur" ne peut PAS être créé via l'inscription publique.
      Un admin ne peut être promu que manuellement en base (ou par un admin existant). */
   if (!["utilisateur", "initiative", "collectivite"].includes(role)) return sendJSON(res, 400, { error: "Rôle invalide." });
+
+  /* Pays d'origine et pays de résidence sont le socle de la mise en relation entre
+     diasporas : la plateforme ne sait rien proposer de pertinent sans eux. La règle est
+     donc appliquée ICI et pas seulement dans le formulaire — une validation qui ne vit
+     que dans le navigateur se contourne par un appel direct.
+     Une collectivité déclare ces informations dans ses champs institutionnels dédiés. */
+  const origineDeclaree = role === "collectivite" ? (origine1 || pays_origine_institution) : origine1;
+  const residenceDeclaree = role === "collectivite" ? (pays_exercice || pays_concerne || pays) : pays;
+  if (!origineDeclaree) return sendJSON(res, 400, { error: "Le pays d'origine est obligatoire." });
+  if (!residenceDeclaree) return sendJSON(res, 400, { error: "Le pays de résidence est obligatoire." });
   if (!SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
   if (password.length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit comporter au moins 8 caractères." });
 
@@ -8627,6 +8637,12 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
   if (centres_interet !== undefined) { fields.push("centres_interet=?"); vals.push(JSON.stringify(Array.isArray(centres_interet)?centres_interet:[])); }
   if (situation_pro !== undefined)   { fields.push("situation_pro=?");   vals.push(situation_pro); }
   if (telephone !== undefined)       { fields.push("telephone=?");        vals.push(telephone); }
+  /* Identité territoriale : modifiable, car une situation change. Une donnée périmée
+     oriente vers les mauvaises personnes — c'est pire qu'une donnée absente. */
+  if (body.origine1 !== undefined)     { fields.push("origine1=?");     vals.push(body.origine1 || null); }
+  if (body.origine2 !== undefined)     { fields.push("origine2=?");     vals.push(body.origine2 || null); }
+  if (body.nationalite1 !== undefined) { fields.push("nationalite1=?"); vals.push(body.nationalite1 || null); }
+  if (body.nationalite2 !== undefined) { fields.push("nationalite2=?"); vals.push(body.nationalite2 || null); }
   if (competences !== undefined)     { fields.push("competences=?");      vals.push(JSON.stringify(Array.isArray(competences)?competences:[])); }
   if (experiences !== undefined)     { fields.push("experiences=?");      vals.push(JSON.stringify(Array.isArray(experiences)?experiences:[])); }
   if (body.galerie !== undefined)    { fields.push("galerie_json=?");     vals.push(JSON.stringify(Array.isArray(body.galerie)?body.galerie:[])); }

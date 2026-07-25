@@ -1142,8 +1142,30 @@ async function renderEnrichedColumns() {
       profil.situation_pro && ['🎓', esc2(profil.situation_pro)],
     ].filter(Boolean);
 
+    /* Identité territoriale : c'est le socle de la mise en relation entre diasporas.
+       Affichée en tête pour le propriétaire, avec un rappel de maintenir l'information
+       à jour — une donnée périmée oriente vers les mauvaises personnes, ce qui est pire
+       qu'une donnée absente. Un manque est signalé explicitement plutôt que laissé vide. */
+    const _origP = [profil.origine1, profil.origine2].filter(Boolean);
+    const _resP  = [profil.ville, profil.pays].filter(Boolean).join(', ');
+    const carteTerritoire = `
+      <div class="pp-side-card">
+        <h4><span>🌍 Origine et résidence</span> ${owner ? `<button class="edit-btn" onclick="openEditIdentity()" title="Modifier">✏️</button>` : ''}</h4>
+        <div style="font-size:12.5px;line-height:1.7;">
+          <div><strong>Pays d'origine :</strong> ${_origP.length ? esc2(_origP.join(' · ')) : '<span style="color:#B45309;">à renseigner</span>'}</div>
+          <div><strong>Résidence :</strong> ${_resP ? esc2(_resP) : '<span style="color:#B45309;">à renseigner</span>'}</div>
+          ${profil.nationalite1 ? `<div style="color:var(--muted);"><strong>Nationalité :</strong> ${esc2([profil.nationalite1, profil.nationalite2].filter(Boolean).join(' · '))}</div>` : ''}
+        </div>
+        ${owner ? `<div style="margin-top:9px;padding:8px 10px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;font-size:11.5px;color:#1E3A8A;line-height:1.55;">
+          <strong>Informations importantes.</strong> Votre pays d'origine et votre pays de résidence
+          permettent d'améliorer les mises en relation, les recherches et les communications adaptées
+          à votre profil. Pensez à les corriger en cas de changement de situation.
+        </div>` : ''}
+      </div>`;
+
     left.innerHTML = `
       ${owner ? `<div class="pp-side-card" id="pp-recherche-contacts"></div>` : ''}
+      ${carteTerritoire}
       <div class="pp-side-card">
         <h4><span>💡 Compétences</span> ${owner ? '<button class="edit-btn" onclick="switchProfileTab(\'competences\')" title="Modifier dans l\'onglet Compétences">✏️</button>' : ''}</h4>
         ${comps.length ? comps.map(c => `<span class="pp-tag">${esc2(typeof c === 'string' ? c : (c.nom || c.label || ''))}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
@@ -6889,7 +6911,20 @@ function openEditIdentity() {
       <div><label>Titre professionnel</label><input id="id-titre" placeholder="Ex : CEO · Ingénieure · Étudiant" value="${esc(profil.titre_pro||'')}"></div>
       <div><label>Téléphone</label><input id="id-tel" type="tel" value="${esc(profil.telephone||'')}"></div>
       <div><label>Ville</label><input id="id-ville" value="${esc(profil.ville||'')}"></div>
-      <div><label>Pays</label><input id="id-pays" value="${esc(profil.pays||'')}"></div>
+      <div><label>Pays de résidence <span style="color:#2563EB">*</span></label><input id="id-pays" value="${esc(profil.pays||'')}"></div>
+    </div>
+    <!-- Origine et nationalité : modifiables ici, sans quoi une personne changeant de
+         situation ne pourrait pas corriger la donnée qui la relie à sa diaspora. -->
+    <div class="fg">
+      <div><label>Pays d'origine <span style="color:#2563EB">*</span></label><input id="id-orig1" placeholder="Ex : Côte d'Ivoire" value="${esc(profil.origine1||'')}"></div>
+      <div><label>Deuxième pays d'origine</label><input id="id-orig2" placeholder="Facultatif" value="${esc(profil.origine2||'')}"></div>
+      <div><label>Nationalité <span style="color:var(--muted);font-weight:400;">(facultatif)</span></label><input id="id-nat1" value="${esc(profil.nationalite1||'')}"></div>
+      <div><label>Deuxième nationalité</label><input id="id-nat2" placeholder="Facultatif" value="${esc(profil.nationalite2||'')}"></div>
+    </div>
+    <div style="margin:-2px 0 12px;padding:8px 10px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;font-size:11.5px;color:#1E3A8A;line-height:1.55;">
+      <strong>Informations importantes.</strong> Votre pays d'origine et votre pays de résidence sont
+      essentiels au bon fonctionnement de Diaspo'Actif : ils améliorent les mises en relation, les
+      recherches et les communications adaptées à votre profil. Corrigez-les en cas de changement.
     </div>
     <div class="fg full"><div><label>Biographie</label><textarea id="id-bio" rows="4">${esc(profil.bio||'')}</textarea></div></div>
     <div style="margin-bottom:10px;">
@@ -6923,6 +6958,10 @@ async function saveIdentity() {
     telephone:     document.getElementById('id-tel').value.trim(),
     ville:         document.getElementById('id-ville').value.trim(),
     pays:          document.getElementById('id-pays').value.trim(),
+    origine1:      document.getElementById('id-orig1').value.trim(),
+    origine2:      document.getElementById('id-orig2').value.trim(),
+    nationalite1:  document.getElementById('id-nat1').value.trim(),
+    nationalite2:  document.getElementById('id-nat2').value.trim(),
     bio:           document.getElementById('id-bio').value.trim(),
     centres_interet: [...document.querySelectorAll('#identity-edit-form input[type=checkbox]:checked')].map(c=>c.value),
   };

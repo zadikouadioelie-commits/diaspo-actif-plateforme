@@ -141,14 +141,14 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         </div>
         <div style="margin-top:12px"><label>Date de naissance <span style="color:#2563EB">*</span></label><input type="date" id="u-dob"></div>
       </div>
-      <div class="form-section"><h4>Nationalites</h4>
+      <div class="form-section"><h4>Nationalites <span style="font-weight:400;color:#64748B;font-size:12px;">— facultatif</span></h4>
         <!-- Cette mention annoncait « information privee, jamais affichee publiquement ».
              C'etait faux : l'annuaire expose deja les nationalites a tout visiteur, meme non
              connecte. Une promesse qu'on ne tient pas vaut moins qu'une information claire —
              et l'origine est la raison d'etre de la plateforme, pas une donnee a cacher. -->
-        <div class="nat-notice" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A;">&#127757; <strong>Information publique</strong> — Affichee sur votre profil et dans l'annuaire. C'est ce qui permet aux membres de votre diaspora de vous reconnaitre et d'entrer en relation avec vous.</div>
+        <div class="nat-notice" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A;">&#127757; <strong>Information publique et facultative</strong> — Affichee sur votre profil et dans l'annuaire. Le reseau fonctionne sans elle : ce sont votre pays d'origine et votre pays de residence qui permettent les mises en relation.</div>
         <div class="grid-3">
-          <div><label>Nationalite 1 <span style="color:#2563EB">*</span></label><input type="text" id="u-nat1" placeholder="Francaise"></div>
+          <div><label>Nationalite 1</label><input type="text" id="u-nat1" placeholder="Francaise (facultatif)"></div>
           <div><label>Nationalite 2</label><input type="text" id="u-nat2" placeholder="Senegalaise (opt.)"></div>
           <div><label>Nationalite 3</label><input type="text" id="u-nat3" placeholder="Optionnel"></div>
         </div>
@@ -156,14 +156,15 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
       <!-- Distinct des nationalités, et volontairement PUBLIC : c'est ce qui permet à deux
            membres d'une même diaspora de se reconnaître dans l'annuaire. Les nationalités
            restent privées, la promesse faite juste au-dessus n'est pas entamée. -->
-      <div class="form-section"><h4>Pays d'origine</h4>
+      <div class="form-section"><h4>Pays d'origine <span style="color:#2563EB">*</span></h4>
         <div class="nat-notice" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A;">
-          &#127757; <strong>Information publique</strong> — Affichée sur votre profil et dans l'annuaire.
-          Elle permet aux membres de votre diaspora de vous trouver. Facultative.
+          &#127757; <strong>Information essentielle</strong> — Le pays auquel vous etes rattache dans le cadre
+          de la diaspora ou de votre parcours. Avec votre pays de residence, c'est ce qui permet aux membres
+          de votre diaspora de vous trouver et a la plateforme de vous proposer des mises en relation pertinentes.
         </div>
         <div class="grid-2">
-          <div><label>Pays d'origine 1</label><input type="text" id="u-orig1" placeholder="Cote d'Ivoire"></div>
-          <div><label>Pays d'origine 2</label><input type="text" id="u-orig2" placeholder="Optionnel"></div>
+          <div><label>Pays d'origine <span style="color:#2563EB">*</span></label><input type="text" id="u-orig1" placeholder="Cote d'Ivoire"></div>
+          <div><label>Deuxieme pays d'origine</label><input type="text" id="u-orig2" placeholder="Optionnel"></div>
         </div>
       </div>
       <div class="form-section"><h4>Residence</h4>
@@ -289,10 +290,10 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <textarea id="i-objectifs" rows="2" placeholder="Vos principaux objectifs…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
         </div>
       </div>
-      <div class="form-section"><h4>Nationalites concernees</h4>
-        <div class="nat-notice">&#127760; Appartenance juridique ou administrative de l'organisation — affichee dans l'annuaire.</div>
+      <div class="form-section"><h4>Nationalites concernees <span style="font-weight:400;color:#64748B;font-size:12px;">— facultatif</span></h4>
+        <div class="nat-notice">&#127760; Appartenance juridique ou administrative de l'organisation — affichee dans l'annuaire. Facultative : ce sont le pays d'origine et le pays d'implantation qui portent l'identite territoriale.</div>
         <div class="grid-2">
-          <div><label>Nationalite 1 <span style="color:#2563EB">*</span></label><input type="text" id="i-nat1" placeholder="Ivoirienne"></div>
+          <div><label>Nationalite 1</label><input type="text" id="i-nat1" placeholder="Ivoirienne (facultatif)"></div>
           <div><label>Nationalite 2 (facultatif)</label><input type="text" id="i-nat2" placeholder="Française"></div>
         </div>
       </div>
@@ -734,6 +735,7 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
     const prenom=document.getElementById("u-prenom").value.trim();
     const dob=document.getElementById("u-dob").value;
     const nat1=document.getElementById("u-nat1").value.trim();
+    const orig1=document.getElementById("u-orig1").value.trim();
     const pays=document.getElementById("u-pays").value.trim();
     const ville=document.getElementById("u-ville").value.trim();
     const email=document.getElementById("u-email").value.trim();
@@ -741,7 +743,10 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
     const pwd2=document.getElementById("u-pwd2").value;
     const region=document.getElementById("u-region").value.trim();
     req(nom,"Nom");req(prenom,"Prenom");req(dob,"Date de naissance");
-    req(nat1,"Nationalite 1");req(pays,"Pays de residence");req(region,"Region de residence");req(ville,"Ville");
+    /* Pays d'origine et pays de residence sont le socle de la mise en relation entre
+       diasporas : ils deviennent obligatoires. La nationalite passe en facultatif —
+       elle n'est pas necessaire au fonctionnement du reseau. */
+    req(orig1,"Pays d'origine");req(pays,"Pays de residence");req(region,"Region de residence");req(ville,"Ville");
     req(email,"Email");req(pwd,"Mot de passe");
     if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
     if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
@@ -753,7 +758,7 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
       date_naissance:dob,nationalite1:nat1,
       nationalite2:document.getElementById("u-nat2").value.trim()||null,
       nationalite3:document.getElementById("u-nat3").value.trim()||null,
-      origine1:document.getElementById("u-orig1").value.trim()||null,
+      origine1:orig1,
       origine2:document.getElementById("u-orig2").value.trim()||null,
       pays,region,
       departement:document.getElementById("u-dept").value.trim()||null,
@@ -780,7 +785,9 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     const pwd2=document.getElementById("i-pwd2").value;
     const nat1i=document.getElementById("i-nat1").value.trim();
     const orig1=document.getElementById("i-orig1").value.trim();
-    req(nom,"Nom organisation");req(typeOrg,"Type");req(nat1i,"Nationalite 1");req(orig1,"Origine 1");req(desc,"Description");
+    /* Nationalite devenue facultative : c'est le couple origine / implantation qui porte
+       l'identite territoriale de l'organisation. */
+    req(nom,"Nom organisation");req(typeOrg,"Type");req(orig1,"Pays d'origine");req(desc,"Description");
     req(pays,"Pays");req(ville,"Ville");req(rnom,"Nom responsable");
     req(rprenom,"Prenom responsable");req(email,"Email");req(pwd,"Mot de passe");
     if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
