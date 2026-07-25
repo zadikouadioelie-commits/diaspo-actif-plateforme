@@ -14,14 +14,27 @@
 <link rel="apple-touch-icon" href="assets/logo.png">
 <style>
 /* ===== Hero annuaire ===== */
+/* Bandeau entièrement en CSS. Il portait une photo d'illustration tirée d'un service
+   d'images génériques : sans rapport avec la diaspora, sans droits maîtrisés, et une
+   requête vers un tiers à chaque chargement. Le dégradé de la plateforme était déjà
+   présent dessous — le révéler suffisait. La lueur et la trame ajoutent la profondeur
+   que l'image apportait, sans dépendre de personne. */
 .ann-hero{
   position:relative;height:320px;overflow:hidden;
-  background:linear-gradient(135deg,#0F2A50 0%,#1B3A6B 60%,#1565C0 100%);
+  background:
+    radial-gradient(120% 95% at 82% 8%, rgba(56,152,236,.55) 0%, rgba(56,152,236,0) 58%),
+    linear-gradient(135deg,#0F2A50 0%,#1B3A6B 60%,#1565C0 100%);
 }
-.ann-hero-img{width:100%;height:100%;object-fit:cover;display:block;opacity:.45;}
+/* Trame diagonale très discrète — donne de la matière sans distraire du titre. */
+.ann-hero::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(115deg, rgba(255,255,255,.05) 0 2px, transparent 2px 24px);
+}
 .ann-hero-overlay{
   position:absolute;inset:0;
-  background:linear-gradient(to bottom,rgba(10,30,60,.3) 0%,rgba(10,30,60,.7) 100%);
+  /* Assombrissement conservé pour la lisibilité du titre en blanc, allégé en haut
+     puisqu'il n'y a plus de photo à masquer. */
+  background:linear-gradient(to bottom,rgba(10,30,60,.15) 0%,rgba(10,30,60,.6) 100%);
 }
 .ann-hero-content{
   position:absolute;inset:0;display:flex;flex-direction:column;
@@ -238,7 +251,6 @@
 
   <!-- ===== HERO ===== -->
   <div class="ann-hero">
-    <img class="ann-hero-img" src="https://picsum.photos/seed/diaspora-community/1400/400" alt="Diaspora" loading="eager" onerror="this.style.display='none'">
     <div class="ann-hero-overlay"></div>
     <div class="ann-hero-content">
       <div class="ann-hero-text">
