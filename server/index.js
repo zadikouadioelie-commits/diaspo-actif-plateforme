@@ -5996,11 +5996,15 @@ const PREMIUM_DATE_PLANCHER = new Date('2026-07-26T00:00:00.000Z');
 
 /* Fin de la période gratuite d'un compte, en tenant compte de la remise à zéro. */
 function finPeriodeGratuite(createdAt) {
-  if (!createdAt) return null;
   const cree = (createdAt instanceof Date) ? new Date(createdAt.getTime())
-                                           : new Date(String(createdAt).replace(' ', 'T'));
-  if (isNaN(cree.getTime())) return null;
-  const depart = cree.getTime() > PREMIUM_DATE_PLANCHER.getTime() ? cree : PREMIUM_DATE_PLANCHER;
+             : (createdAt ? new Date(String(createdAt).replace(' ', 'T')) : null);
+  /* Date de création absente ou illisible : on part de la date plancher. Un compte dont la
+     date de création est inexploitable est forcément un compte existant, donc concerné par la
+     remise à zéro. Constaté en production : created_at revenait vide, la période gratuite
+     n'était jamais calculée et la remise à zéro restait sans effet. Dépendre d'une colonne
+     facultative pour accorder un droit etait fragile — le repli supprime cette dépendance. */
+  const depart = (cree && !isNaN(cree.getTime()) && cree.getTime() > PREMIUM_DATE_PLANCHER.getTime())
+    ? cree : PREMIUM_DATE_PLANCHER;
   return finDecouvertePremium(depart.toISOString());
 }
 
