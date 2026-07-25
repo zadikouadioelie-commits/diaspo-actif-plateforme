@@ -762,30 +762,33 @@ function daDrapeau(pays) {
   return String.fromCodePoint(...[...iso.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
 }
 
-/* Renvoie { pays, source } — ou null si rien de publiable n'est disponible.
+/* Renvoie { pays, source } — ou null si rien n'est disponible.
 
-   ⚠ Le repli sur la nationalité ne vaut PAS pour les comptes de personnes. Le formulaire
-   d'inscription leur promet noir sur blanc : « Information privée — jamais affichée
-   publiquement ». En déduire une origine affichée dans l'annuaire trahirait cet engagement,
-   même avec la meilleure intention. Les membres disposent désormais d'un champ « Pays
-   d'origine » distinct, annoncé comme public : c'est celui-là, et lui seul, qui s'affiche.
+   Le repli sur la nationalité vaut pour TOUS les comptes. L'annuaire les expose déjà à
+   tout visiteur, même non connecté : les masquer ici n'aurait rien protégé, cela aurait
+   seulement privé le lecteur d'un repère. La mention « information privée » du formulaire,
+   qui était contredite par cet affichage, a été corrigée le 2026-07-25.
 
-   Pour une ORGANISATION, la nationalité est déjà une donnée publique de son identité
-   (elle figure sur sa fiche) : le repli y est légitime. */
-function daOrigine(o, estPersonne) {
+   Beaucoup de membres saisissent directement un nom de pays dans le champ nationalité
+   (« Cameroun » plutôt que « Camerounaise ») : on accepte donc les deux, sans quoi le
+   repère manquerait précisément là où l'information existe. */
+function daOrigine(o) {
   const dir = [o.origine1, o.origine2].filter(Boolean);
   if (dir.length) return { pays: dir.join(' · '), source: 'origine' };
   if (o.pays_origine) return { pays: o.pays_origine, source: 'origine' };
-  if (estPersonne) return null;
-  const nat = [o.nationalite1, o.nationalite2].filter(Boolean)
-    .map(x => DA_NAT_PAYS[_daNorm(x)] || null).filter(Boolean);
+  const nat = [o.nationalite1, o.nationalite2].filter(Boolean).map(x => {
+    const n = _daNorm(x);
+    if (DA_NAT_PAYS[n]) return DA_NAT_PAYS[n];
+    for (const k of Object.keys(DA_PAYS_ISO)) if (_daNorm(k) === n) return x;  // déjà un pays
+    return null;
+  }).filter(Boolean);
   if (nat.length) return { pays: [...new Set(nat)].join(' · '), source: 'nationalite' };
   return null;
 }
 
 /* Pastille posée sur l'image de la carte : c'est la zone que l'œil balaie en premier. */
-function daBadgeOrigine(o, style, estPersonne) {
-  const org = daOrigine(o, estPersonne);
+function daBadgeOrigine(o, style) {
+  const org = daOrigine(o);
   if (!org) return '';
   const premier = org.pays.split(' · ')[0];
   const titre = org.source === 'origine'
@@ -992,7 +995,7 @@ async function initAnnuaire(){
     const origs = [u.origine1, u.origine2].filter(Boolean).join(' • ');
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>${daBadgeOrigine(u, '', true)}`, isOwn)}
+      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>${daBadgeOrigine(u)}`, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nom}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>

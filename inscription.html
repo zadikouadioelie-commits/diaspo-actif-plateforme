@@ -142,7 +142,11 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         <div style="margin-top:12px"><label>Date de naissance <span style="color:#2563EB">*</span></label><input type="date" id="u-dob"></div>
       </div>
       <div class="form-section"><h4>Nationalites</h4>
-        <div class="nat-notice">&#128274; <strong>Information privee</strong> — Jamais affichees publiquement. Utilisees uniquement pour le ciblage institutionnel anonymise et les recommandations.</div>
+        <!-- Cette mention annoncait « information privee, jamais affichee publiquement ».
+             C'etait faux : l'annuaire expose deja les nationalites a tout visiteur, meme non
+             connecte. Une promesse qu'on ne tient pas vaut moins qu'une information claire —
+             et l'origine est la raison d'etre de la plateforme, pas une donnee a cacher. -->
+        <div class="nat-notice" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A;">&#127757; <strong>Information publique</strong> — Affichee sur votre profil et dans l'annuaire. C'est ce qui permet aux membres de votre diaspora de vous reconnaitre et d'entrer en relation avec vous.</div>
         <div class="grid-3">
           <div><label>Nationalite 1 <span style="color:#2563EB">*</span></label><input type="text" id="u-nat1" placeholder="Francaise"></div>
           <div><label>Nationalite 2</label><input type="text" id="u-nat2" placeholder="Senegalaise (opt.)"></div>
