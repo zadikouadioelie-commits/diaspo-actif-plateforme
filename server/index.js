@@ -1621,6 +1621,57 @@ const VITRINE_MODULES_REGISTRY = {
 /* Les 5 modèles de vitrine — le choix d'un type ACTIVE (jamais ne masque) les modules
    listés ; les modules déjà actifs pour une autre raison restent inchangés (évolutivité :
    Portfolio -> +Boutique -> +Formation sans jamais recréer/écraser la vitrine). */
+/* ═══ CHANGEMENT DE TYPE DE VITRINE : où vit le contenu de chaque module ═══
+
+   Changer de type désactive certains modules. Le contenu, lui, reste en base — mais il
+   devient INVISIBLE, ce qui est pire qu'une suppression annoncée : l'utilisateur croit
+   avoir perdu son travail sans savoir qu'il dort quelque part.
+
+   Cette carte permet de dire précisément ce qui devient orphelin, et de proposer une
+   conversion plutôt qu'un abandon silencieux. Un module absent d'ici est un module sans
+   contenu propre (contact, carte, réseaux sociaux) : rien à préserver. */
+const VITRINE_CONTENU_MODULE = {
+  a_propos:         { champs: ["description", "mission"], label: "Présentation" },
+  portfolio:        { champs: ["vitrine_portfolio_json"], label: "Portfolio" },
+  galerie_photos:   { champs: ["galerie_json"], label: "Galerie photos" },
+  galerie_videos:   { champs: ["vitrine_videos_json"], label: "Galerie vidéos" },
+  realisations:     { champs: ["realisations_json"], label: "Réalisations" },
+  services:         { champs: ["vitrine_services", "vitrine_services_categories_json"], label: "Services" },
+  expertise:        { champs: ["vitrine_expertise_json"], label: "Expertise" },
+  certifications:   { champs: ["vitrine_certifications_json"], label: "Certifications" },
+  documents:        { champs: ["vitrine_documents_json"], label: "Documents" },
+  partenaires:      { champs: ["vitrine_partenaires_json"], label: "Partenaires" },
+  temoignages:      { champs: ["vitrine_temoignages_json"], label: "Témoignages" },
+  vision_objectifs: { champs: ["vitrine_vision_objectifs"], label: "Vision et objectifs" },
+  resultats_impact: { champs: ["vitrine_resultats_impact_json"], label: "Résultats / Impact" },
+  besoins_projet:   { champs: ["besoins_json"], label: "Besoins du projet" },
+  reservation:      { champs: ["vitrine_reservation_json"], label: "Réservation" },
+  pourquoi_choisir: { champs: ["vitrine_pourquoi_choisir"], label: "Pourquoi nous choisir" },
+  produits:         { table: "produits_vitrine", label: "Produits" },
+  catalogue:        { table: "catalogues_vitrine", label: "Catalogue" },
+  avis:             { table: "vitrine_avis", label: "Avis clients" },
+};
+
+/* Conversions possibles quand un module devient orphelin. La clé est le module perdu ;
+   la valeur indique vers quel module l'emmener, s'il est actif dans le nouveau type.
+
+   Ces correspondances suivent le SENS du contenu, pas sa forme : un produit décrit une
+   chose qu'on a faite, il devient une réalisation ; des services décrivent un savoir-faire,
+   ils deviennent une expertise. Une conversion qui ne respecterait pas le sens produirait
+   une vitrine incohérente, ce qui est pire que de signaler la perte. */
+const VITRINE_ADAPTATIONS = {
+  produits:     [{ vers: "portfolio",    quoi: "Vos produits deviennent des réalisations présentées en portfolio." },
+                 { vers: "realisations", quoi: "Vos produits deviennent des réalisations." }],
+  catalogue:    [{ vers: "portfolio",    quoi: "Votre catalogue devient une sélection de réalisations." },
+                 { vers: "realisations", quoi: "Votre catalogue devient une liste de réalisations." }],
+  services:     [{ vers: "expertise",    quoi: "Vos services deviennent vos domaines d'expertise." }],
+  expertise:    [{ vers: "services",     quoi: "Votre expertise devient une liste de services." }],
+  realisations: [{ vers: "portfolio",    quoi: "Vos réalisations rejoignent votre portfolio." }],
+  portfolio:    [{ vers: "realisations", quoi: "Votre portfolio devient une liste de réalisations." }],
+  avis:         [{ vers: "temoignages",  quoi: "Vos avis clients deviennent des témoignages." }],
+  temoignages:  [{ vers: "avis",         quoi: "Vos témoignages deviennent des avis." }],
+};
+
 const VITRINE_TEMPLATES = {
   portfolio: {
     label: "🎨 Portfolio / Création", pour: "Photographes, artistes, designers, créateurs, artisans créatifs, réalisateurs",
@@ -3762,6 +3813,241 @@ route("GET", "/api/vitrine-modules-registry", async (req, res) => {
    Merge-patch dans vitrine_draft_json UNIQUEMENT : la vitrine publique n'est jamais modifiée tant
    que POST /vitrine-publish n'a pas été appelé. Corps : { type?, style?, theme?,
    modules?: { [cle]: { actif?: bool, ordre?: number } } } */
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHANGEMENT DE TYPE DE VITRINE — accompagné, jamais destructeur
+
+   Changer de type désactive des modules. Le contenu reste en base mais devient
+   invisible : l'utilisateur croit avoir tout perdu sans savoir que son travail dort
+   quelque part. Ces routes rendent la transformation lisible et réversible.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Un module a-t-il du contenu ? Un champ vide, une liste vide ou un « {} » ne comptent
+   pas : annoncer la perte d'un module vide inquiéterait pour rien. */
+async function moduleAContenu(init, cle) {
+  const def = VITRINE_CONTENU_MODULE[cle];
+  if (!def) return false;
+  if (def.table) {
+    try {
+      const r = await db.prepare("SELECT COUNT(*) n FROM " + def.table + " WHERE initiative_id=?").get(init.id);
+      return (r && Number(r.n)) > 0;
+    } catch (e) { return false; }
+  }
+  for (const champ of def.champs || []) {
+    const v = init[champ];
+    if (v === null || v === undefined) continue;
+    const s = String(v).trim();
+    if (!s || s === "[]" || s === "{}" || s === "null") continue;
+    return true;
+  }
+  return false;
+}
+
+/* GET /api/initiatives/:id/vitrine/analyser-type?type= — que deviendrait mon contenu ?
+   Interrogé AVANT de confirmer : l'utilisateur doit voir ce qu'il risque avant d'agir,
+   pas le découvrir après. */
+route("GET", "/api/initiatives/:id/vitrine/analyser-type", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  const nouveau = String(query.type || "");
+  const tpl = VITRINE_TEMPLATES[nouveau];
+  if (!tpl) return sendJSON(res, 400, { error: "Type de vitrine inconnu." });
+
+  const draft = safeParse(init.vitrine_draft_json) || {};
+  const typeActuel = draft.type !== undefined ? draft.type : init.vitrine_type;
+  const actuels = new Set(VITRINE_TEMPLATES[typeActuel] ? VITRINE_TEMPLATES[typeActuel].actifs : []);
+  const futurs = new Set([...(tpl.actifs || []), ...(tpl.optionnels || [])]);
+
+  const conserves = [], orphelins = [], vides = [];
+  for (const cle of Object.keys(VITRINE_CONTENU_MODULE)) {
+    const aDuContenu = await moduleAContenu(init, cle);
+    const label = VITRINE_CONTENU_MODULE[cle].label;
+    if (futurs.has(cle)) { if (aDuContenu) conserves.push({ cle, label }); continue; }
+    if (!actuels.has(cle) && !aDuContenu) continue;   // ni avant ni après, et vide : hors sujet
+    if (!aDuContenu) { vides.push({ cle, label }); continue; }
+
+    /* Orphelin : du contenu réel, plus de module pour l'afficher. On cherche une
+       destination active dans le NOUVEAU type — sans quoi la conversion n'aurait
+       nulle part où poser le contenu. */
+    const pistes = (VITRINE_ADAPTATIONS[cle] || []).filter(a => futurs.has(a.vers));
+    orphelins.push({ cle, label, adaptation: pistes[0] || null });
+  }
+
+  sendJSON(res, 200, {
+    type_actuel: typeActuel, type_cible: nouveau, libelle_cible: tpl.label,
+    conserves, orphelins, vides,
+    adaptables: orphelins.filter(o => o.adaptation).length,
+    sans_destination: orphelins.filter(o => !o.adaptation).length,
+  });
+});
+
+/* Sauvegarde intégrale AVANT transformation (§6). Le contenu est stocké en JSON entier :
+   restaurer champ par champ obligerait à connaître la liste des champs au moment de la
+   restauration, alors qu'elle évolue — une sauvegarde partielle est une fausse sauvegarde. */
+async function sauvegarderVitrine(init, typeAvant, typeApres, mode) {
+  const contenu = {};
+  for (const def of Object.values(VITRINE_CONTENU_MODULE)) {
+    for (const champ of def.champs || []) contenu[champ] = init[champ] === undefined ? null : init[champ];
+  }
+  contenu.vitrine_type = init.vitrine_type;
+  contenu.vitrine_modules_json = init.vitrine_modules_json;
+  contenu.vitrine_draft_json = init.vitrine_draft_json;
+  const id = (await db.prepare(
+    "INSERT INTO vitrine_sauvegardes (initiative_id, contenu_json, type_avant, type_apres, mode) VALUES (?,?,?,?,?)"
+  ).run(init.id, JSON.stringify(contenu), typeAvant || null, typeApres || null, mode)).lastInsertRowid;
+  return id;
+}
+
+/* Conversions réelles. Chaque fonction renvoie un texte décrivant ce qu'elle a fait,
+   pour que l'utilisateur lise la transformation au lieu de la deviner. */
+async function convertirContenu(init, cle, vers) {
+  const lire = (c) => safeParse(init[c]) || [];
+  const ecrire = (champ, val) => db.prepare("UPDATE initiatives SET " + champ + "=? WHERE id=?").run(JSON.stringify(val), init.id);
+
+  if ((cle === "produits" || cle === "catalogue") && (vers === "portfolio" || vers === "realisations")) {
+    const table = cle === "produits" ? "produits_vitrine" : "catalogues_vitrine";
+    /* try/catch et NON .catch() : sous SQLite .all() renvoie un tableau, pas une promesse —
+       enchaîner .catch() dessus lève « .catch is not a function ». Le repli existe parce que
+       toutes ces tables ne portent pas de colonne image_url. */
+    let rows;
+    try { rows = await db.prepare("SELECT nom, description, image_url FROM " + table + " WHERE initiative_id=? LIMIT 200").all(init.id); }
+    catch (e) { rows = await db.prepare("SELECT nom, description FROM " + table + " WHERE initiative_id=? LIMIT 200").all(init.id); }
+    const champ = vers === "portfolio" ? "vitrine_portfolio_json" : "realisations_json";
+    const existant = lire(champ);
+    const ajoutes = rows.map(r => ({ titre: r.nom, description: r.description || "", image: r.image_url || null, origine: cle }));
+    await ecrire(champ, [...existant, ...ajoutes]);
+    return ajoutes.length + " élément(s) repris depuis « " + VITRINE_CONTENU_MODULE[cle].label + " »";
+  }
+
+  if (cle === "services" && vers === "expertise") {
+    const cats = lire("vitrine_services_categories_json");
+    const texte = (init.vitrine_services || "").trim();
+    const items = cats.length ? cats : (texte ? texte.split(/\r?\n|,/).map(s => s.trim()).filter(Boolean) : []);
+    const existant = lire("vitrine_expertise_json");
+    const ajoutes = items.map(x => (typeof x === "string" ? { titre: x, description: "" } : x));
+    await ecrire("vitrine_expertise_json", [...existant, ...ajoutes]);
+    return ajoutes.length + " service(s) repris en expertise";
+  }
+
+  if (cle === "expertise" && vers === "services") {
+    const items = lire("vitrine_expertise_json");
+    const lignes = items.map(x => (typeof x === "string" ? x : (x.titre || ""))).filter(Boolean);
+    const actuel = (init.vitrine_services || "").trim();
+    await db.prepare("UPDATE initiatives SET vitrine_services=? WHERE id=?")
+      .run([actuel, ...lignes].filter(Boolean).join("\n"), init.id);
+    return lignes.length + " domaine(s) d'expertise repris en services";
+  }
+
+  if ((cle === "realisations" && vers === "portfolio") || (cle === "portfolio" && vers === "realisations")) {
+    const source = cle === "realisations" ? "realisations_json" : "vitrine_portfolio_json";
+    const cible  = cle === "realisations" ? "vitrine_portfolio_json" : "realisations_json";
+    const items = lire(source);
+    await ecrire(cible, [...lire(cible), ...items]);
+    return items.length + " élément(s) déplacé(s)";
+  }
+
+  if (cle === "avis" && vers === "temoignages") {
+    const rows = await db.prepare("SELECT commentaire, note FROM vitrine_avis WHERE initiative_id=? LIMIT 100").all(init.id);
+    const ajoutes = rows.filter(r => (r.commentaire || "").trim())
+      .map(r => ({ texte: r.commentaire, note: r.note || null, auteur: "Client" }));
+    await ecrire("vitrine_temoignages_json", [...lire("vitrine_temoignages_json"), ...ajoutes]);
+    return ajoutes.length + " avis repris en témoignages";
+  }
+
+  if (cle === "temoignages" && vers === "avis") {
+    /* Sens interdit : un avis est déposé par un client identifié, un témoignage est
+       rédigé par le propriétaire. Les convertir fabriquerait de faux avis. */
+    return null;
+  }
+  return null;
+}
+
+/* POST /api/initiatives/:id/vitrine/changer-type — { type, mode: "adapter" | "zero" }
+   Une sauvegarde est prise dans les DEUX cas : « Repartir à zéro » doit rester réversible
+   tant que l'utilisateur n'a rien reconstruit par-dessus. */
+route("POST", "/api/initiatives/:id/vitrine/changer-type", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  const nouveau = String(body.type || "");
+  const tpl = VITRINE_TEMPLATES[nouveau];
+  if (!tpl) return sendJSON(res, 400, { error: "Type de vitrine inconnu." });
+  const mode = body.mode === "zero" ? "zero" : "adapter";
+
+  const draft = safeParse(init.vitrine_draft_json) || {};
+  const typeActuel = draft.type !== undefined ? draft.type : init.vitrine_type;
+  const sauvegarde_id = await sauvegarderVitrine(init, typeActuel, nouveau, mode);
+
+  const futurs = new Set([...(tpl.actifs || []), ...(tpl.optionnels || [])]);
+  const journal = [];
+
+  if (mode === "zero") {
+    /* Suppression explicitement demandée, et seulement du CONTENU de vitrine : les
+       coordonnées, le nom et le logo ne relèvent pas du type choisi. */
+    for (const [cle, def] of Object.entries(VITRINE_CONTENU_MODULE)) {
+      if (futurs.has(cle)) continue;
+      for (const champ of def.champs || []) {
+        const vide = /_json$/.test(champ) ? "[]" : "";
+        try { await db.prepare("UPDATE initiatives SET " + champ + "=? WHERE id=?").run(vide, init.id); } catch (e) {}
+      }
+    }
+    journal.push("Contenus des modules désactivés effacés.");
+  } else {
+    for (const cle of Object.keys(VITRINE_CONTENU_MODULE)) {
+      if (futurs.has(cle)) continue;
+      if (!(await moduleAContenu(init, cle))) continue;
+      const piste = (VITRINE_ADAPTATIONS[cle] || []).find(a => futurs.has(a.vers));
+      if (!piste) { journal.push("« " + VITRINE_CONTENU_MODULE[cle].label + " » conservé en base, sans emplacement dans ce type."); continue; }
+      const fait = await convertirContenu(init, cle, piste.vers);
+      journal.push(fait ? "« " + VITRINE_CONTENU_MODULE[cle].label + " » → " + fait : "« " + VITRINE_CONTENU_MODULE[cle].label + " » conservé en base.");
+    }
+  }
+
+  /* Le type ne s'applique qu'au BROUILLON : la vitrine publique ne change qu'à la
+     publication, ce qui laisse le temps de vérifier l'aperçu (§5). */
+  const nouveauDraft = { ...draft, type: nouveau, modules: draft.modules || safeParse(init.vitrine_modules_json) || {} };
+  for (const m of tpl.actifs || []) nouveauDraft.modules[m] = true;
+  await db.prepare("UPDATE initiatives SET vitrine_draft_json=? WHERE id=?").run(JSON.stringify(nouveauDraft), init.id);
+
+  sendJSON(res, 200, { ok: true, mode, sauvegarde_id, journal, type: nouveau, draft: nouveauDraft });
+});
+
+/* GET / POST restauration — le retour en arrière du §6. */
+route("GET", "/api/initiatives/:id/vitrine/sauvegardes", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const sauvegardes = await db.prepare(
+    "SELECT id, type_avant, type_apres, mode, created_at FROM vitrine_sauvegardes WHERE initiative_id=? ORDER BY created_at DESC LIMIT 20"
+  ).all(init.id);
+  sendJSON(res, 200, { sauvegardes });
+});
+
+route("POST", "/api/initiatives/:id/vitrine/restaurer/:sauvegardeId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const s = await db.prepare("SELECT * FROM vitrine_sauvegardes WHERE id=? AND initiative_id=?").get(params.sauvegardeId, init.id);
+  if (!s) return sendJSON(res, 404, { error: "Sauvegarde introuvable." });
+
+  const contenu = safeParse(s.contenu_json) || {};
+  let restaures = 0;
+  for (const [champ, valeur] of Object.entries(contenu)) {
+    try { await db.prepare("UPDATE initiatives SET " + champ + "=? WHERE id=?").run(valeur, init.id); restaures++; }
+    catch (e) { /* champ disparu depuis la sauvegarde : on restaure ce qui existe encore */ }
+  }
+  sendJSON(res, 200, { ok: true, champs_restaures: restaures, revenu_a: s.type_avant });
+});
+
+
 route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });

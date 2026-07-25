@@ -1880,6 +1880,26 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_dc_destinataire ON demandes_contact(destinataire_id, statut);
   CREATE INDEX IF NOT EXISTS idx_dc_demandeur ON demandes_contact(demandeur_id, statut);
 
+  /* ===== SAUVEGARDES DE VITRINE =====
+     Prise AVANT toute transformation liée à un changement de type. Sans elle, « Repartir
+     à zéro » serait irréversible et une conversion ratée laisserait l'utilisateur devant
+     une vitrine abîmée sans recours.
+
+     On stocke le contenu complet en JSON plutôt que colonne par colonne : la liste des
+     champs de vitrine change au fil des versions, et une sauvegarde qui ne restaurerait
+     que les champs connus au moment de sa prise serait une fausse sauvegarde. */
+  CREATE TABLE IF NOT EXISTS vitrine_sauvegardes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    contenu_json TEXT NOT NULL,
+    type_avant TEXT,
+    type_apres TEXT,
+    mode TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_vitrine_sauv ON vitrine_sauvegardes(initiative_id, created_at);
+
   /* ===== AUTORISATIONS DE DIFFUSION INTER-ORIGINES =====
      Une collectivité ne diffuse qu'auprès de sa propre communauté d'origine. Cette table
      porte les dérogations accordées par l'administration : organisations internationales,
